@@ -1,0 +1,13 @@
+lab: emulator-5554, AVD averi_lab
+averi: /private/tmp/claude-502/-Volumes-Workspaces-Projects-averi/d7239d5b-171e-4b2c-bca0-e282c482e932/scratchpad/wt/t19
+uiautomator scroll:scroll-bounded-flush.P.fully ok: Element id:"lab.scroll-bounded-flush.P" fully visible after 1 swipe; then Tapped id:"lab.scroll-bounded-flush.P"
+uiautomator scroll:scroll-bounded-flush.S.fully ok: Element id:"lab.scroll-bounded-flush.S" fully visible after 2 swipes; then Tapped id:"lab.scroll-bounded-flush.S"
+<!-- averi: this checkout -->
+# Live golden: 2 cases, 2 ok, 0 loud, 0 mismatches (0 not known), 0 skipped
+
+## uiautomator
+- ok scroll:scroll-bounded-flush.P.fully scroll-bounded-flush: scroll_until P (partly-centre-in) down, fully: stops on it as the app lays it out, every stroke on upper bringing it closer, then the tap fires it — Element id:"lab.scroll-bounded-flush.P" fully visible after 1 swipe; then Tapped id:"lab.scroll-bounded-flush.P"
+    app: P 128,722 825x176 (whole); upper clip 0,303 1080x605 offset 76 (launched 0); strokes upper 0→76; fired tap P; touches (540,788) (541,810)
+- ok scroll:scroll-bounded-flush.S.fully scroll-bounded-flush: scroll_until S (sliver) down, fully: stops on it as the app lays it out, every stroke on lower bringing it closer, then the tap fires it — Element id:"lab.scroll-bounded-flush.S" fully visible after 2 swipes; then Tapped id:"lab.scroll-bounded-flush.S"
+    app: S 128,1292 825x176 (whole); lower clip 0,1046 1080x495 offset 227 (launched 0); strokes lower 0→59, lower 59→227; fired tap S; touches (540,1443) (540,1443) (541,1380)
+

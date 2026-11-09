@@ -1,0 +1,242 @@
+commit 6b7e49b5dcc256e30b46ddba3f2af659ff13b58b
+before raw-1 19:17:20 host=[1.82 5.94 5.58] start_count=1 dev=[0.97 0.66 0.50 1/1766 24973] uptime=51387.26
+after raw-1 19:18:12 host=[4.79 6.00 5.62] start_count=1 dev=[1.42 0.82 0.56 1/1762 25369] uptime=51439.19
+block 1
+before control-1 19:18:12 host=[4.79 6.00 5.62] start_count=1 dev=[1.42 0.82 0.56 1/1762 25375] uptime=51439.32
+after control-1 rc=0 19:18:34 host=[7.62 6.62 5.85] start_count=1 dev=[4.32 1.46 0.77 3/1763 25644] uptime=51461.34
+before control-2 19:18:35 host=[7.62 6.62 5.85] start_count=1 dev=[4.32 1.46 0.77 1/1763 25650] uptime=51461.51
+after control-2 rc=0 19:18:57 host=[5.51 6.21 5.72] start_count=1 dev=[3.47 1.45 0.78 1/1763 25913] uptime=51484.02
+before control-3 19:18:57 host=[5.51 6.21 5.72] start_count=1 dev=[3.47 1.45 0.78 1/1763 25919] uptime=51484.18
+after control-3 rc=0 19:19:20 host=[4.31 5.89 5.62] start_count=1 dev=[2.83 1.46 0.81 1/1763 26185] uptime=51507.23
+before control-4 19:19:20 host=[4.31 5.89 5.62] start_count=1 dev=[2.83 1.46 0.81 1/1763 26191] uptime=51507.39
+after control-4 rc=0 19:19:43 host=[3.78 5.65 5.54] start_count=1 dev=[2.64 1.50 0.83 3/1763 26455] uptime=51530.13
+before control-5 19:19:43 host=[3.78 5.65 5.54] start_count=1 dev=[2.64 1.50 0.83 1/1763 26461] uptime=51530.28
+after control-5 rc=0 19:20:06 host=[3.00 5.35 5.44] start_count=1 dev=[2.20 1.49 0.85 1/1762 26725] uptime=51552.87
+before control-6 19:20:06 host=[3.00 5.35 5.44] start_count=1 dev=[2.20 1.49 0.85 1/1762 26731] uptime=51553.03
+after control-6 rc=0 19:20:29 host=[2.41 5.03 5.32] start_count=1 dev=[1.73 1.43 0.84 4/1764 27000] uptime=51575.72
+before flush-1 19:20:29 host=[2.41 5.03 5.32] start_count=1 dev=[1.73 1.43 0.84 1/1764 27006] uptime=51575.88
+after flush-1 rc=0 19:21:08 host=[1.65 4.51 5.11] start_count=1 dev=[1.95 1.53 0.90 1/1763 27473] uptime=51615.37
+before raw-2 19:21:09 host=[1.65 4.51 5.11] start_count=1 dev=[1.95 1.53 0.90 1/1763 27479] uptime=51615.53
+after raw-2 19:22:01 host=[1.91 4.16 4.95] start_count=1 dev=[1.89 1.59 0.96 4/1782 27903] uptime=51667.99
+block 2
+before control-7 19:22:01 host=[1.91 4.16 4.95] start_count=1 dev=[1.89 1.59 0.96 2/1789 27918] uptime=51668.12
+after control-7 rc=0 19:22:23 host=[2.12 4.03 4.88] start_count=1 dev=[1.63 1.55 0.96 1/1727 28199] uptime=51690.40
+before control-8 19:22:24 host=[2.12 4.03 4.88] start_count=1 dev=[1.63 1.55 0.96 1/1727 28205] uptime=51690.57
+after control-8 rc=0 19:22:46 host=[2.62 4.01 4.85] start_count=1 dev=[1.73 1.59 0.99 4/1728 28469] uptime=51713.21
+before control-9 19:22:46 host=[2.62 4.01 4.85] start_count=1 dev=[1.73 1.59 0.99 1/1728 28475] uptime=51713.36
+after control-9 rc=0 19:23:09 host=[2.59 3.90 4.79] start_count=1 dev=[1.77 1.61 1.01 1/1732 28747] uptime=51736.14
+before control-10 19:23:09 host=[2.59 3.90 4.79] start_count=1 dev=[1.77 1.61 1.01 4/1732 28753] uptime=51736.29
+after control-10 rc=0 19:23:32 host=[2.41 3.77 4.72] start_count=1 dev=[1.40 1.54 1.00 1/1734 29025] uptime=51758.70
+before control-11 19:23:32 host=[2.41 3.77 4.72] start_count=1 dev=[1.40 1.54 1.00 1/1734 29031] uptime=51758.84
+after control-11 rc=0 19:23:55 host=[2.34 3.65 4.65] start_count=1 dev=[1.35 1.53 1.01 1/1692 29294] uptime=51781.73
+before control-12 19:23:55 host=[2.34 3.65 4.65] start_count=1 dev=[1.35 1.53 1.01 1/1692 29300] uptime=51781.89
+after control-12 rc=0 19:24:17 host=[2.09 3.50 4.57] start_count=1 dev=[0.97 1.43 0.99 1/1691 29566] uptime=51804.22
+before flush-2 19:24:17 host=[2.09 3.50 4.57] start_count=1 dev=[0.97 1.43 0.99 1/1691 29575] uptime=51804.36
+after flush-2 rc=0 19:24:56 host=[2.61 3.46 4.50] start_count=1 dev=[1.71 1.58 1.06 3/1699 30049] uptime=51843.23
+before raw-3 19:24:56 host=[2.61 3.46 4.50] start_count=1 dev=[1.71 1.58 1.06 1/1699 30055] uptime=51843.38
+after raw-3 19:25:49 host=[1.86 3.08 4.29] start_count=1 dev=[1.17 1.46 1.04 5/1699 30453] uptime=51895.62
+block 3
+before control-13 19:25:49 host=[1.86 3.08 4.29] start_count=1 dev=[1.17 1.46 1.04 1/1699 30459] uptime=51895.76
+after control-13 rc=0 19:26:11 host=[2.05 3.04 4.25] start_count=1 dev=[1.30 1.47 1.06 1/1699 30721] uptime=51918.22
+before control-14 19:26:11 host=[2.05 3.04 4.25] start_count=1 dev=[1.30 1.47 1.06 1/1699 30727] uptime=51918.38
+after control-14 rc=0 19:26:34 host=[1.55 2.84 4.14] start_count=1 dev=[1.57 1.52 1.08 1/1699 30992] uptime=51940.88
+before control-15 19:26:34 host=[1.55 2.84 4.14] start_count=1 dev=[1.57 1.52 1.08 3/1699 30998] uptime=51941.04
+after control-15 rc=0 19:26:56 host=[1.49 2.74 4.08] start_count=1 dev=[1.80 1.59 1.12 9/1698 31261] uptime=51963.40
+before control-16 19:26:57 host=[1.49 2.74 4.08] start_count=1 dev=[1.80 1.59 1.12 1/1698 31267] uptime=51963.55
+after control-16 rc=0 19:27:19 host=[1.57 2.66 4.01] start_count=1 dev=[1.72 1.58 1.12 1/1697 31536] uptime=51985.89
+before control-17 19:27:19 host=[1.57 2.66 4.01] start_count=1 dev=[1.72 1.58 1.12 4/1697 31542] uptime=51986.05
+after control-17 rc=0 19:27:42 host=[1.48 2.57 3.94] start_count=1 dev=[1.31 1.50 1.11 1/1697 31805] uptime=52008.94
+before control-18 19:27:42 host=[1.48 2.57 3.94] start_count=1 dev=[1.31 1.50 1.11 1/1697 31811] uptime=52009.10
+after control-18 rc=0 19:28:05 host=[1.61 2.51 3.88] start_count=1 dev=[1.26 1.49 1.12 2/1696 32075] uptime=52032.07
+before flush-3 19:28:05 host=[1.61 2.51 3.88] start_count=1 dev=[1.26 1.49 1.12 1/1696 32081] uptime=52032.23
+after flush-3 rc=0 19:28:44 host=[1.84 2.44 3.79] start_count=1 dev=[1.16 1.42 1.10 1/1697 32553] uptime=52071.00
+before raw-4 19:28:44 host=[1.84 2.44 3.79] start_count=1 dev=[1.16 1.42 1.10 6/1697 32559] uptime=52071.16
+after raw-4 19:29:36 host=[6.27 3.41 4.06] start_count=1 dev=[1.97 1.63 1.20 1/1697 849] uptime=52123.00
+block 4
+before control-19 19:29:36 host=[6.27 3.41 4.06] start_count=1 dev=[1.97 1.63 1.20 3/1697 867] uptime=52123.11
+after control-19 rc=0 19:29:59 host=[4.72 3.24 3.99] start_count=1 dev=[1.47 1.54 1.18 10/1697 1306] uptime=52145.87
+before control-20 19:29:59 host=[4.72 3.24 3.99] start_count=1 dev=[1.47 1.54 1.18 1/1698 1313] uptime=52146.02
+after control-20 rc=0 19:30:21 host=[4.71 3.34 4.00] start_count=1 dev=[1.73 1.61 1.21 1/1699 1784] uptime=52168.01
+before control-21 19:30:21 host=[4.71 3.34 4.00] start_count=1 dev=[1.73 1.61 1.21 1/1699 1795] uptime=52168.21
+after control-21 rc=0 19:30:43 host=[4.60 3.42 4.01] start_count=1 dev=[1.23 1.50 1.18 4/1700 2143] uptime=52190.44
+before control-22 19:30:44 host=[4.60 3.42 4.01] start_count=1 dev=[1.23 1.50 1.18 1/1700 2149] uptime=52190.60
+after control-22 rc=0 19:31:07 host=[3.76 3.32 3.96] start_count=1 dev=[1.53 1.56 1.21 4/1699 2438] uptime=52213.45
+before control-23 19:31:07 host=[3.76 3.32 3.96] start_count=1 dev=[1.53 1.56 1.21 1/1699 2444] uptime=52213.59
+after control-23 rc=0 19:31:29 host=[5.33 3.70 4.08] start_count=1 dev=[1.75 1.62 1.23 2/1699 2817] uptime=52236.01
+before control-24 19:31:29 host=[5.33 3.70 4.08] start_count=1 dev=[1.75 1.62 1.23 1/1699 2823] uptime=52236.16
+after control-24 rc=0 19:31:52 host=[4.03 3.53 4.01] start_count=1 dev=[1.76 1.64 1.26 1/1699 3134] uptime=52259.12
+before flush-4 19:31:52 host=[4.03 3.53 4.01] start_count=1 dev=[1.76 1.64 1.26 1/1699 3140] uptime=52259.28
+after flush-4 rc=0 19:32:31 host=[3.01 3.34 3.91] start_count=1 dev=[1.11 1.50 1.22 1/1699 3639] uptime=52298.27
+before raw-5 19:32:32 host=[3.01 3.34 3.91] start_count=1 dev=[1.11 1.50 1.22 1/1699 3650] uptime=52298.42
+after raw-5 19:33:24 host=[2.23 3.09 3.79] start_count=1 dev=[2.27 1.75 1.32 4/1699 4056] uptime=52350.64
+block 5
+before control-25 19:33:24 host=[2.23 3.09 3.79] start_count=1 dev=[2.27 1.75 1.32 1/1699 4062] uptime=52350.76
+after control-25 rc=0 19:33:46 host=[2.07 2.99 3.73] start_count=1 dev=[2.69 1.90 1.38 1/1699 4339] uptime=52372.80
+before control-26 19:33:46 host=[2.07 2.99 3.73] start_count=1 dev=[2.69 1.90 1.38 1/1699 4345] uptime=52372.96
+after control-26 rc=0 19:34:08 host=[2.08 2.92 3.69] start_count=1 dev=[2.59 1.93 1.41 2/1697 4612] uptime=52395.26
+before control-27 19:34:09 host=[2.08 2.92 3.69] start_count=1 dev=[2.59 1.93 1.41 7/1699 4620] uptime=52395.43
+after control-27 rc=0 19:34:31 host=[1.88 2.81 3.63] start_count=1 dev=[1.92 1.83 1.39 1/1699 4888] uptime=52417.56
+before control-28 19:34:31 host=[1.88 2.81 3.63] start_count=1 dev=[1.92 1.83 1.39 2/1699 4894] uptime=52417.71
+after control-28 rc=0 19:34:54 host=[2.17 2.81 3.61] start_count=1 dev=[1.52 1.74 1.37 1/1699 5168] uptime=52440.57
+before control-29 19:34:54 host=[2.17 2.81 3.61] start_count=1 dev=[1.52 1.74 1.37 1/1699 5174] uptime=52440.71
+after control-29 rc=0 19:35:16 host=[1.83 2.68 3.54] start_count=1 dev=[1.94 1.82 1.40 1/1698 5440] uptime=52462.76
+before control-30 19:35:16 host=[1.83 2.68 3.54] start_count=1 dev=[1.94 1.82 1.40 1/1698 5446] uptime=52462.91
+after control-30 rc=0 19:35:38 host=[1.81 2.62 3.49] start_count=1 dev=[1.90 1.82 1.41 9/1699 5716] uptime=52485.16
+before flush-5 19:35:38 host=[1.81 2.62 3.49] start_count=1 dev=[1.90 1.82 1.41 1/1699 5722] uptime=52485.32
+after flush-5 rc=0 19:36:14 host=[4.65 3.35 3.73] start_count=1 dev=[1.67 1.78 1.41 2/1699 6163] uptime=52520.94
+before raw-6 19:36:14 host=[4.65 3.35 3.73] start_count=1 dev=[1.67 1.78 1.41 1/1699 6169] uptime=52521.09
+after raw-6 19:37:06 host=[3.18 3.17 3.64] start_count=1 dev=[1.59 1.75 1.42 1/1699 6570] uptime=52573.12
+block 6
+before control-31 19:37:06 host=[3.18 3.17 3.64] start_count=1 dev=[1.59 1.75 1.42 1/1699 6576] uptime=52573.25
+after control-31 rc=0 19:37:29 host=[2.92 3.11 3.60] start_count=1 dev=[2.28 1.90 1.48 1/1699 6844] uptime=52595.93
+before control-32 19:37:29 host=[2.92 3.11 3.60] start_count=1 dev=[2.28 1.90 1.48 1/1699 6850] uptime=52596.08
+after control-32 rc=0 19:37:52 host=[2.37 2.97 3.54] start_count=1 dev=[2.23 1.92 1.50 2/1699 7113] uptime=52618.51
+before control-33 19:37:52 host=[2.37 2.97 3.54] start_count=1 dev=[2.23 1.92 1.50 1/1699 7119] uptime=52618.68
+after control-33 rc=0 19:38:14 host=[2.12 2.87 3.49] start_count=1 dev=[1.82 1.84 1.48 1/1699 7384] uptime=52641.05
+before control-34 19:38:14 host=[2.12 2.87 3.49] start_count=1 dev=[1.82 1.84 1.48 1/1699 7390] uptime=52641.20
+after control-34 rc=0 19:38:37 host=[1.67 2.71 3.41] start_count=1 dev=[1.87 1.86 1.50 7/1699 7656] uptime=52664.22
+before control-35 19:38:37 host=[1.67 2.71 3.41] start_count=1 dev=[1.87 1.86 1.50 1/1699 7665] uptime=52664.37
+after control-35 rc=0 19:39:00 host=[1.76 2.66 3.38] start_count=1 dev=[1.55 1.78 1.48 3/1699 7931] uptime=52687.09
+before control-36 19:39:00 host=[1.76 2.66 3.38] start_count=1 dev=[1.42 1.75 1.47 1/1699 7937] uptime=52687.24
+after control-36 rc=0 19:39:23 host=[2.07 2.67 3.36] start_count=1 dev=[1.22 1.69 1.46 3/1699 8204] uptime=52709.68
+before flush-6 19:39:23 host=[2.07 2.67 3.36] start_count=1 dev=[1.22 1.69 1.46 5/1699 8210] uptime=52709.84
+after flush-6 rc=0 19:40:02 host=[2.21 2.63 3.31] start_count=1 dev=[1.33 1.65 1.45 1/1699 8675] uptime=52748.81
+before raw-7 19:40:02 host=[2.21 2.63 3.31] start_count=1 dev=[1.33 1.65 1.45 1/1699 8681] uptime=52748.97
+after raw-7 19:40:55 host=[1.52 2.38 3.18] start_count=1 dev=[1.00 1.52 1.42 1/1698 9076] uptime=52801.46
+block 7
+before control-37 19:40:55 host=[1.52 2.38 3.18] start_count=1 dev=[1.00 1.52 1.42 7/1698 9082] uptime=52801.58
+after control-37 rc=0 19:41:17 host=[1.49 2.30 3.13] start_count=1 dev=[1.53 1.61 1.45 3/1699 9347] uptime=52824.21
+before control-38 19:41:17 host=[1.49 2.30 3.13] start_count=1 dev=[1.53 1.61 1.45 1/1699 9356] uptime=52824.38
+after control-38 rc=0 19:41:40 host=[1.36 2.21 3.08] start_count=1 dev=[2.01 1.72 1.49 1/1699 9622] uptime=52847.11
+before control-39 19:41:40 host=[1.36 2.21 3.08] start_count=1 dev=[2.01 1.72 1.49 1/1699 9628] uptime=52847.26
+after control-39 rc=0 19:42:03 host=[1.83 2.26 3.07] start_count=1 dev=[1.45 1.61 1.46 1/1706 9908] uptime=52869.68
+before control-40 19:42:03 host=[1.83 2.26 3.07] start_count=1 dev=[1.45 1.61 1.46 1/1706 9914] uptime=52869.85
+after control-40 rc=0 19:42:25 host=[1.76 2.21 3.03] start_count=1 dev=[1.23 1.55 1.45 7/1700 10176] uptime=52891.99
+before control-41 19:42:25 host=[1.76 2.21 3.03] start_count=1 dev=[1.23 1.55 1.45 1/1700 10182] uptime=52892.15
+after control-41 rc=0 19:42:48 host=[1.57 2.13 2.98] start_count=1 dev=[1.29 1.56 1.45 1/1700 10450] uptime=52914.69
+before control-42 19:42:48 host=[1.57 2.13 2.98] start_count=1 dev=[1.29 1.56 1.45 3/1700 10456] uptime=52914.85
+after control-42 rc=0 19:43:10 host=[1.68 2.12 2.95] start_count=1 dev=[1.30 1.55 1.45 3/1702 10723] uptime=52937.22
+before flush-7 19:43:10 host=[1.68 2.12 2.95] start_count=1 dev=[1.36 1.56 1.45 7/1702 10729] uptime=52937.39
+after flush-7 rc=0 19:43:49 host=[1.48 2.02 2.88] start_count=1 dev=[1.17 1.49 1.44 1/1700 11204] uptime=52976.23
+before raw-8 19:43:49 host=[1.48 2.02 2.88] start_count=1 dev=[1.17 1.49 1.44 1/1700 11210] uptime=52976.39
+after raw-8 19:44:42 host=[2.27 2.16 2.88] start_count=1 dev=[1.43 1.54 1.46 6/1699 11605] uptime=53028.68
+block 8
+before control-43 19:44:42 host=[2.27 2.16 2.88] start_count=1 dev=[1.43 1.54 1.46 2/1699 11611] uptime=53028.81
+after control-43 rc=0 19:45:05 host=[2.73 2.29 2.91] start_count=1 dev=[1.03 1.44 1.42 6/1582 11874] uptime=53051.49
+before control-44 19:45:05 host=[2.73 2.29 2.91] start_count=1 dev=[1.03 1.44 1.42 1/1582 11880] uptime=53051.66
+after control-44 rc=0 19:45:27 host=[2.67 2.30 2.90] start_count=1 dev=[1.85 1.60 1.48 1/1582 12142] uptime=53073.46
+before control-45 19:45:27 host=[2.67 2.30 2.90] start_count=1 dev=[1.85 1.60 1.48 1/1582 12148] uptime=53073.60
+after control-45 rc=0 19:45:49 host=[4.68 2.86 3.08] start_count=1 dev=[2.04 1.66 1.50 1/1582 12413] uptime=53096.37
+before control-46 19:45:50 host=[4.68 2.86 3.08] start_count=1 dev=[2.04 1.66 1.50 1/1582 12419] uptime=53096.52
+after control-46 rc=0 19:46:11 host=[4.42 2.92 3.10] start_count=1 dev=[2.11 1.70 1.52 5/1582 12690] uptime=53118.38
+before control-47 19:46:12 host=[4.42 2.92 3.10] start_count=1 dev=[2.11 1.70 1.52 1/1582 12696] uptime=53118.54
+after control-47 rc=0 19:46:34 host=[3.57 2.84 3.06] start_count=1 dev=[1.95 1.70 1.52 3/1583 12967] uptime=53141.22
+before control-48 19:46:34 host=[3.57 2.84 3.06] start_count=1 dev=[1.95 1.70 1.52 1/1584 12974] uptime=53141.39
+after control-48 rc=0 19:46:57 host=[2.79 2.70 3.01] start_count=1 dev=[1.72 1.68 1.52 1/1584 13237] uptime=53163.92
+before flush-8 19:46:57 host=[2.79 2.70 3.01] start_count=1 dev=[1.72 1.68 1.52 1/1584 13243] uptime=53164.08
+after flush-8 rc=0 19:47:33 host=[2.16 2.55 2.94] start_count=1 dev=[1.56 1.62 1.50 1/1583 13685] uptime=53200.32
+before raw-9 19:47:34 host=[2.16 2.55 2.94] start_count=1 dev=[1.56 1.62 1.50 1/1583 13691] uptime=53200.48
+after raw-9 19:48:24 host=[2.96 2.83 3.03] start_count=1 dev=[1.91 1.76 1.56 3/1583 14098] uptime=53251.32
+block 9
+before control-49 19:48:25 host=[2.96 2.83 3.03] start_count=1 dev=[1.91 1.76 1.56 1/1583 14104] uptime=53251.43
+after control-49 rc=0 19:48:46 host=[2.49 2.73 2.98] start_count=1 dev=[1.37 1.65 1.53 1/1584 14376] uptime=53273.37
+before control-50 19:48:47 host=[2.49 2.73 2.98] start_count=1 dev=[1.37 1.65 1.53 1/1584 14383] uptime=53273.53
+after control-50 rc=0 19:49:09 host=[2.12 2.62 2.94] start_count=1 dev=[1.38 1.64 1.53 1/1583 14653] uptime=53296.09
+before control-51 19:49:09 host=[2.12 2.62 2.94] start_count=1 dev=[1.38 1.64 1.53 1/1583 14659] uptime=53296.25
+after control-51 rc=0 19:49:31 host=[2.28 2.63 2.93] start_count=1 dev=[1.35 1.60 1.52 1/1583 14924] uptime=53318.40
+before control-52 19:49:32 host=[2.28 2.63 2.93] start_count=1 dev=[1.35 1.60 1.52 1/1583 14930] uptime=53318.56
+after control-52 rc=0 19:49:54 host=[2.26 2.60 2.91] start_count=1 dev=[1.49 1.61 1.53 1/1583 15193] uptime=53341.00
+before control-53 19:49:54 host=[2.26 2.60 2.91] start_count=1 dev=[1.49 1.61 1.53 6/1583 15199] uptime=53341.15
+after control-53 rc=0 19:50:17 host=[2.07 2.53 2.88] start_count=1 dev=[2.08 1.75 1.58 6/1583 15464] uptime=53363.58
+before control-54 19:50:17 host=[2.07 2.53 2.88] start_count=1 dev=[2.08 1.75 1.58 2/1583 15471] uptime=53363.75
+after control-54 rc=0 19:50:40 host=[1.90 2.46 2.84] start_count=1 dev=[1.82 1.72 1.57 1/1583 15736] uptime=53386.44
+before flush-9 19:50:40 host=[1.90 2.46 2.84] start_count=1 dev=[1.82 1.72 1.57 1/1583 15742] uptime=53386.59
+after flush-9 rc=0 19:51:19 host=[1.96 2.41 2.81] start_count=1 dev=[1.92 1.76 1.59 13/1581 16545] uptime=53425.76
+before raw-10 19:51:19 host=[2.20 2.45 2.82] start_count=1 dev=[1.92 1.76 1.59 5/1581 16551] uptime=53425.94
+after raw-10 19:52:13 host=[2.11 2.42 2.79] start_count=1 dev=[2.57 1.97 1.67 1/1778 17495] uptime=53479.67
+block 10
+before control-55 19:52:13 host=[2.11 2.42 2.79] start_count=1 dev=[2.57 1.97 1.67 1/1778 17501] uptime=53479.80
+after control-55 rc=0 19:52:36 host=[2.74 2.53 2.82] start_count=1 dev=[1.98 1.87 1.64 9/1757 17775] uptime=53502.74
+before control-56 19:52:36 host=[2.74 2.53 2.82] start_count=1 dev=[2.47 1.97 1.68 4/1757 17782] uptime=53502.92
+after control-56 rc=0 19:52:59 host=[2.37 2.46 2.78] start_count=1 dev=[2.13 1.93 1.67 1/1741 18052] uptime=53525.69
+before control-57 19:52:59 host=[2.37 2.46 2.78] start_count=1 dev=[2.13 1.93 1.67 1/1741 18058] uptime=53525.86
+after control-57 rc=0 19:53:22 host=[2.30 2.44 2.77] start_count=1 dev=[2.23 1.98 1.69 5/1750 18341] uptime=53548.62
+before control-58 19:53:22 host=[2.30 2.44 2.77] start_count=1 dev=[2.23 1.98 1.69 1/1750 18347] uptime=53548.79
+after control-58 rc=0 19:53:44 host=[1.84 2.33 2.72] start_count=1 dev=[2.12 1.97 1.69 1/1747 18614] uptime=53571.36
+before control-59 19:53:45 host=[2.17 2.39 2.74] start_count=1 dev=[2.12 1.97 1.69 7/1747 18620] uptime=53571.52
+after control-59 rc=0 19:54:07 host=[1.83 2.29 2.70] start_count=1 dev=[2.21 2.00 1.71 1/1765 18912] uptime=53594.04
+before control-60 19:54:07 host=[1.83 2.29 2.70] start_count=1 dev=[2.21 2.00 1.71 2/1765 18918] uptime=53594.19
+after control-60 rc=0 19:54:30 host=[1.83 2.25 2.67] start_count=1 dev=[3.10 2.23 1.80 1/1761 19191] uptime=53616.76
+before flush-10 19:54:30 host=[1.83 2.25 2.67] start_count=1 dev=[3.10 2.23 1.80 1/1761 19197] uptime=53616.90
+after flush-10 rc=0 19:55:09 host=[1.83 2.21 2.63] start_count=1 dev=[2.93 2.28 1.83 1/1756 19664] uptime=53655.62
+before raw-11 19:55:09 host=[1.83 2.21 2.63] start_count=1 dev=[2.93 2.28 1.83 1/1756 19670] uptime=53655.77
+after raw-11 19:56:01 host=[3.07 2.48 2.71] start_count=1 dev=[2.36 2.18 1.82 6/1756 20067] uptime=53708.13
+block 11
+before control-61 19:56:01 host=[3.07 2.48 2.71] start_count=1 dev=[2.36 2.18 1.82 1/1756 20073] uptime=53708.26
+after control-61 rc=0 19:56:23 host=[2.71 2.43 2.68] start_count=1 dev=[2.03 2.12 1.81 1/1756 20337] uptime=53730.29
+before control-62 19:56:24 host=[2.71 2.43 2.68] start_count=1 dev=[2.03 2.12 1.81 1/1756 20343] uptime=53730.45
+after control-62 rc=0 19:56:46 host=[2.43 2.39 2.66] start_count=1 dev=[1.65 2.03 1.79 1/1757 20613] uptime=53752.94
+before control-63 19:56:46 host=[2.43 2.39 2.66] start_count=1 dev=[2.00 2.10 1.81 2/1757 20619] uptime=53753.10
+after control-63 rc=0 19:57:09 host=[2.20 2.34 2.63] start_count=1 dev=[1.43 1.96 1.77 1/1757 20887] uptime=53775.85
+before control-64 19:57:09 host=[2.20 2.34 2.63] start_count=1 dev=[1.43 1.96 1.77 2/1757 20893] uptime=53776.01
+after control-64 rc=0 19:57:31 host=[2.49 2.39 2.64] start_count=1 dev=[1.01 1.82 1.73 2/1756 21157] uptime=53798.38
+before control-65 19:57:32 host=[2.49 2.39 2.64] start_count=1 dev=[1.01 1.82 1.73 1/1756 21163] uptime=53798.54
+after control-65 rc=0 19:57:54 host=[2.43 2.38 2.63] start_count=1 dev=[1.49 1.86 1.74 4/1752 21432] uptime=53820.97
+before control-66 19:57:54 host=[2.43 2.38 2.63] start_count=1 dev=[1.49 1.86 1.74 2/1752 21438] uptime=53821.13
+after control-66 rc=0 19:58:17 host=[2.69 2.44 2.65] start_count=1 dev=[2.37 2.06 1.81 5/1752 21701] uptime=53844.00
+before flush-11 19:58:17 host=[2.69 2.44 2.65] start_count=1 dev=[2.37 2.06 1.81 1/1752 21707] uptime=53844.17
+after flush-11 rc=0 19:58:56 host=[1.95 2.29 2.58] start_count=1 dev=[2.75 2.17 1.86 6/1752 22174] uptime=53883.24
+before raw-12 19:58:56 host=[1.95 2.29 2.58] start_count=1 dev=[2.75 2.17 1.86 1/1752 22180] uptime=53883.39
+after raw-12 19:59:48 host=[3.94 2.81 2.76] start_count=1 dev=[1.23 1.85 1.77 22/1783 22607] uptime=53934.55
+block 12
+before control-67 19:59:48 host=[3.94 2.81 2.76] start_count=1 dev=[1.23 1.85 1.77 2/1798 22630] uptime=53934.68
+after control-67 rc=0 20:00:10 host=[5.64 3.30 2.93] start_count=1 dev=[1.50 1.87 1.78 3/1925 23179] uptime=53957.23
+before control-68 20:00:10 host=[5.64 3.30 2.93] start_count=1 dev=[1.50 1.87 1.78 1/1925 23185] uptime=53957.41
+after control-68 rc=0 20:00:33 host=[4.38 3.19 2.91] start_count=1 dev=[1.53 1.85 1.77 6/1897 23451] uptime=53979.71
+before control-69 20:00:33 host=[4.38 3.19 2.91] start_count=1 dev=[1.53 1.85 1.77 1/1897 23457] uptime=53979.87
+after control-69 rc=0 20:00:55 host=[3.49 3.07 2.87] start_count=1 dev=[1.64 1.86 1.78 2/1886 23723] uptime=54002.43
+before control-70 20:00:56 host=[3.49 3.07 2.87] start_count=1 dev=[1.64 1.86 1.78 8/1890 23736] uptime=54002.60
+after control-70 rc=0 20:01:18 host=[3.44 3.10 2.89] start_count=1 dev=[1.80 1.90 1.79 1/1895 24030] uptime=54025.21
+before control-71 20:01:18 host=[3.44 3.10 2.89] start_count=1 dev=[1.80 1.90 1.79 3/1895 24037] uptime=54025.38
+after control-71 rc=0 20:01:41 host=[2.88 3.00 2.85] start_count=1 dev=[2.77 2.10 1.86 22/1899 24305] uptime=54048.03
+before control-72 20:01:41 host=[2.97 3.02 2.86] start_count=1 dev=[2.77 2.10 1.86 3/1902 24314] uptime=54048.20
+after control-72 rc=0 20:02:03 host=[2.84 2.98 2.85] start_count=1 dev=[2.47 2.08 1.86 5/1898 24589] uptime=54070.27
+before flush-12 20:02:04 host=[2.84 2.98 2.85] start_count=1 dev=[2.47 2.08 1.86 2/1898 24595] uptime=54070.44
+after flush-12 rc=0 20:02:42 host=[2.32 2.80 2.79] start_count=1 dev=[2.29 2.10 1.88 6/1882 25084] uptime=54108.46
+before raw-13 20:02:42 host=[2.32 2.80 2.79] start_count=1 dev=[2.29 2.10 1.88 1/1883 25091] uptime=54108.61
+after raw-13 20:03:33 host=[2.60 2.87 2.82] start_count=1 dev=[1.19 1.83 1.80 1/1883 25487] uptime=54159.64
+block 13
+before control-73 20:03:33 host=[2.60 2.87 2.82] start_count=1 dev=[1.19 1.83 1.80 1/1883 25493] uptime=54159.76
+after control-73 rc=0 20:03:55 host=[4.03 3.15 2.91] start_count=1 dev=[0.99 1.74 1.77 3/1883 25761] uptime=54181.72
+before control-74 20:03:55 host=[4.03 3.15 2.91] start_count=1 dev=[0.99 1.74 1.77 5/1883 25767] uptime=54181.89
+after control-74 rc=0 20:04:17 host=[5.33 3.48 3.04] start_count=1 dev=[1.16 1.72 1.76 2/1883 26030] uptime=54204.14
+before control-75 20:04:17 host=[5.33 3.48 3.04] start_count=1 dev=[1.16 1.72 1.76 7/1886 26039] uptime=54204.28
+after control-75 rc=0 20:04:40 host=[4.28 3.37 3.01] start_count=1 dev=[1.39 1.74 1.76 10/1885 26306] uptime=54226.70
+before control-76 20:04:40 host=[4.28 3.37 3.01] start_count=1 dev=[1.39 1.74 1.76 1/1885 26312] uptime=54226.86
+after control-76 rc=0 20:05:03 host=[3.01 3.14 2.94] start_count=1 dev=[1.75 1.79 1.78 3/1885 26575] uptime=54249.53
+before control-77 20:05:03 host=[3.01 3.14 2.94] start_count=1 dev=[1.75 1.79 1.78 7/1885 26581] uptime=54249.70
+after control-77 rc=0 20:05:25 host=[2.57 3.03 2.90] start_count=1 dev=[1.40 1.71 1.75 2/1884 26844] uptime=54272.24
+before control-78 20:05:25 host=[2.57 3.03 2.90] start_count=1 dev=[1.40 1.71 1.75 3/1884 26850] uptime=54272.40
+after control-78 rc=0 20:05:48 host=[2.21 2.92 2.86] start_count=1 dev=[1.29 1.66 1.74 1/1883 27116] uptime=54295.25
+before flush-13 20:05:48 host=[2.21 2.92 2.86] start_count=1 dev=[1.29 1.66 1.74 1/1883 27122] uptime=54295.41
+after flush-13 rc=0 20:06:27 host=[2.29 2.86 2.84] start_count=1 dev=[1.63 1.69 1.74 1/1882 27590] uptime=54333.70
+before raw-14 20:06:27 host=[2.29 2.86 2.84] start_count=1 dev=[1.63 1.69 1.74 1/1882 27596] uptime=54333.86
+after raw-14 20:07:19 host=[2.40 2.77 2.81] start_count=1 dev=[2.93 2.04 1.86 3/1881 28028] uptime=54386.04
+block 14
+before control-79 20:07:19 host=[2.40 2.77 2.81] start_count=1 dev=[2.93 2.04 1.86 1/1881 28034] uptime=54386.16
+after control-79 rc=0 20:07:42 host=[2.21 2.70 2.78] start_count=1 dev=[2.53 2.02 1.86 1/1881 28297] uptime=54408.91
+before control-80 20:07:42 host=[2.21 2.70 2.78] start_count=1 dev=[2.53 2.02 1.86 1/1881 28303] uptime=54409.07
+after control-80 rc=0 20:08:04 host=[2.63 2.75 2.80] start_count=1 dev=[1.93 1.92 1.83 2/1882 28569] uptime=54431.09
+before control-81 20:08:04 host=[2.63 2.75 2.80] start_count=1 dev=[1.93 1.92 1.83 1/1882 28575] uptime=54431.24
+after control-81 rc=0 20:08:26 host=[5.40 3.34 3.01] start_count=1 dev=[1.82 1.90 1.82 1/1882 28843] uptime=54453.30
+before control-82 20:08:27 host=[5.40 3.34 3.01] start_count=1 dev=[1.82 1.90 1.82 2/1882 28849] uptime=54453.47
+after control-82 rc=0 20:08:49 host=[5.10 3.44 3.05] start_count=1 dev=[2.22 2.00 1.86 2/1881 29122] uptime=54475.56
+before control-83 20:08:49 host=[5.10 3.44 3.05] start_count=1 dev=[2.22 2.00 1.86 2/1881 29128] uptime=54475.72
+after control-83 rc=0 20:09:11 host=[3.93 3.28 3.00] start_count=1 dev=[2.03 1.98 1.86 1/1881 29394] uptime=54498.26
+before control-84 20:09:12 host=[3.93 3.28 3.00] start_count=1 dev=[2.03 1.98 1.86 1/1881 29400] uptime=54498.42
+after control-84 rc=0 20:09:34 host=[3.44 3.23 2.99] start_count=1 dev=[1.58 1.89 1.83 4/1882 29663] uptime=54521.22
+before flush-14 20:09:34 host=[3.44 3.23 2.99] start_count=1 dev=[1.58 1.89 1.83 1/1882 29669] uptime=54521.39
+after flush-14 rc=0 20:10:13 host=[3.79 3.31 3.03] start_count=1 dev=[1.91 1.96 1.86 1/1836 30137] uptime=54559.90
+before raw-15 20:10:13 host=[4.13 3.39 3.06] start_count=1 dev=[1.91 1.96 1.86 1/1836 30144] uptime=54560.06
+after raw-15 20:11:05 host=[3.22 3.24 3.02] start_count=1 dev=[2.11 2.01 1.88 2/1836 30541] uptime=54612.31
+done, device time 3226 s

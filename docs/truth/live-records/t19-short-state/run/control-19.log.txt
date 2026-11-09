@@ -1,0 +1,13 @@
+lab: emulator-5554, AVD averi_lab
+averi: /private/tmp/claude-502/-Volumes-Workspaces-Projects-averi/d7239d5b-171e-4b2c-bca0-e282c482e932/scratchpad/wt/t19
+uiautomator lv-d62-control LOUD: other, not unaimable: ERROR scroll_until id:lab.carousel-recycler-free.C failed after 16293ms (timeout 15000ms; 5 swipes sent; 6 tree reads took 13952ms, the last 2305ms) — element reached the viewport but its right edge still lies on its scr
+<!-- averi: this checkout -->
+# Live golden: 1 cases, 0 ok, 2 loud, 0 mismatches (0 not known), 0 skipped
+
+## uiautomator
+- LOUD (carousel-kind) lv-d62-control carousel-recycler-free: D62/D68 control: after the 440-px pre-drag, fully: true left on the RecyclerView card: `unaimable` (hedged maxSwipes accepted, counted: ADR 0021 D68), never "fully visible" with C cut — other, not unaimable: ERROR scroll_until id:lab.carousel-recycler-free.C failed after 16293ms (timeout 15000ms; 5 swipes sent; 6 tree reads took 13952ms, the last 2305ms) — element reached the viewport but its right edge still lies on its scr
+    scroll_until → ERROR scroll_until id:lab.carousel-recycler-free.C failed after 16293ms (timeout 15000ms; 5 swipes sent; 6 tree reads took 13952ms, the last 2305ms) — element reached the viewport but its right edge still lies on its scroll container's (66,380 948x234), where Android cuts a node's bounds to the container, and a probe swipe toward it showed 22 px more of it — part of it lay past that edge, so it may still be cut there (last rect {"x":176,"y":380,"width":838,"height":234}); raise maxSwipes or timeoutMs
+    app: C cut L 0 R 110; offset 838, index 1; 5 carousel stroke(s) since the call
+
+LOUD (hedged ceiling): hedged 0 of 1 judged unaimable leg(s) — fewer than 3 judged, the ceiling unjudged (no pass claimed)
+
