@@ -246,7 +246,7 @@ export type ScrollAdapter = Pick<
  * after 0 swipes". Each round hands the reducer its tree, from which it
  * reads every match's nearest clipping ancestors (ui-tree/geometry.ts
  * #clipsOf, `Clips.scrollersOf`, over the `clipsDescendants` the parser sets), and a `fully: true` stop flush with
- * one of them is answered with one short probe toward that edge, drawn over
+ * one of them is answered with a short probe toward that edge (twice when it holds, T12), drawn over
  * a container with room for it above the keyboard (interact/flush-check.ts
  * has the rule and its cost; interact/stroke-plan.ts the box).
  * Only the screen box comes from here — the round decides the stroke's.

@@ -37,9 +37,9 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  * too), reads SHORTER, inside the container, with no edge past the viewport — measured: the SWIFT form's Fees row read
  * `{y:242, height:92}` of 143 against a container starting at 242, and was "fully visible after 0 swipes". The cut is
  * not in the tree, so it is asked of the device: a stroke TOWARD revealing that edge (content that lies up, for a top
- * edge — the finger moves down), drawn inside the container. Moves nothing: the content is at its end that way,
+ * edge — the finger moves down), drawn inside the container. Moves nothing, twice: the content is at its end that way,
  * nothing lies beyond the edge, the stop is accepted as it stood (the first row of a list at rest is flush with its
- * container's top and is not cut). Moves it, and it lies flush on the same edge with more of it showing
+ * container's top and is not cut) — once is not enough (T12, below). Moves it, and it lies flush on the same edge with more of it showing
  * (`revealedBy`): the cut is PROVED — content lay past that edge, and part of the match with it — so that read claims
  * no stop and confirms none (`FlushSeen.waits`): the next stroke is a REVEAL (course.ts#Revealing: the whole stroke,
  * its travel half the room the match leaves in that container, `roomPast`), a probe in every other respect. The proof
@@ -63,7 +63,15 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  * The doubt is the proof's, kept with it (`stillProven`): a read between that moved the match without proving the cut anew
  * (a stroke that was no reveal) leaves it owed, so the next held reveal is doubted all the same — once per proof, at most
  * one extra stroke. Cost: one stroke and one read on every held reveal, the legitimate pass whose content did end included.
- * Residual: a first probe the app did not take still reads checked (no proof to doubt by).
+ *
+ * A FIRST PROBE THAT MOVED NOTHING, with no proof, is DOUBTED once too (T12): a stroke the app did not take leaves the
+ * tree as content that ended does, and no read tells them apart (measured, T11's final A/B: a 90-px first probe logged
+ * `406 → 406` and read "nothing of it is cut there" with C 542 px cut). The same first probe is sent again from where it
+ * held (`Memory.heldFirst`, by rect and edge), at once; that one holding too is `checked` — two strokes taken for none
+ * (`CHECKED_AFTER_HOLDS`, the reply's count). Moving it, the paths above take over: a fresh proof, or a new candidate,
+ * whose own first held probe is doubted in turn. No swipe or time left for it: unchecked `budget`, never `checked`.
+ * Cost: one stroke and one read on every held first probe — the first row at rest, the legitimate pass, included.
+ * Residual: two first probes in a row the app did not take still read checked.
  *
  * A REVEAL NOT WORTH SENDING (D68, interact/aim-floor.ts): on a proven cut, each stroke that proved it is kept with its
  * drawn length and the match's growth (`Memory.measured`); once the room left on the match's uncut side is under what a
@@ -78,8 +86,9 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  * direction's): a vertical list's cell flush with the left edge of its container is the ordinary grid layout, and a
  * sideways stroke there could turn a page of a pager around it. Not when BOTH edges on the axis are flush — the match
  * fills its container, and one probe cannot tell which side, if either, is cut: unless an outer ancestor gives it a
- * one-edge flush (below), such a stop is reported unchecked, `flush.why` `fills` (`Flush`), and the reply says so. One
- * probe per candidate stop: a probe (or a reveal) after which the match is where it was settles it (`settles`).
+ * one-edge flush (below), such a stop is reported unchecked, `flush.why` `fills` (`Flush`), and the reply says so. A
+ * probe (or a reveal) after which the match is where it was settles the read (`settles`): no wait, no confirm — the
+ * stop, or the one probe or reveal sent again (D62, T11, T12).
  *
  * Every clipping ancestor, not the nearest alone: the match is flush with one of them on one edge — a card that fills
  * a carousel's height is flush with both of the carousel's edges, but the carousel is cut by the list around it, and
@@ -108,7 +117,8 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  * edge while the row's rect runs to the view's edge — not flush, not probed.
  *
  * Cost, stated: one stroke (it spends one of `maxSwipes` and counts in the reply's swipes), one settle and one tree
- * read — a probe that moves the match also its confirming read, unless it proved the cut — plus, on Android, what a
+ * read — two of each when it holds (T12), and a probe that moves the match also its confirming read, unless it proved
+ * the cut — plus, on Android, what a
  * round's keyboard reading costs (ui-tree/keyboard-cover.ts) — on every `fully: true` stop flush with a clipping
  * container or under a node pinned in it, legitimate ones included (a first row at rest, under a sticky header or
  * not). iOS has no clipping container (types.ts#UiNode.clipsDescendants), so it never probes. At the bound — no swipe
@@ -119,8 +129,8 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  */
 
 /**
- * A `fully: true` stop whose edge along the scroll lies on its scroll container's edge (`seeFlush`): `checked` when a
- * probe toward that edge moved nothing — nothing of it is cut there — and false, so it may be, `why`: no swipe or time
+ * A `fully: true` stop whose edge along the scroll lies on its scroll container's edge (`seeFlush`): `checked` when two
+ * probes toward that edge, with no proof, moved nothing (T12, `CHECKED_AFTER_HOLDS`) — nothing of it is cut there — and false, so it may be, `why`: no swipe or time
  * was left (`budget`); no clipping ancestor from the flush one outward has room for a stroke (`room`: a probe drawn
  * over the screen instead would touch down off the container and move nothing whatever lies beyond, so none is sent);
  * every one of them scrolls only across the edge (`axis`: a probe along it moves none of them —
@@ -206,6 +216,14 @@ interface ProvenCut {
   readonly doubted: boolean;
 }
 
+/**
+ * How many probes from one rect toward one edge must hold, with no proof, before the stop is `checked` (T12): the first
+ * may be a stroke the app did not take, and the tree reads that the same as content that ended there. scroll-text.ts
+ * says the count. Not tunable: `Memory.heldFirst` is one slot, so the rule is two holds by construction; this names the
+ * count for the reply.
+ */
+export const CHECKED_AFTER_HOLDS = 2;
+
 declare const opaque: unique symbol;
 
 /** The flush check — opaque: only this module reads it (the fields are `Memory`'s). */
@@ -232,6 +250,13 @@ interface Memory {
    * (`MeasuredStroke`): the aim floor's evidence (D68).
    */
   readonly measured: readonly MeasuredStroke[];
+  /**
+   * The first probe that held with no proof (`SentProbe`: the match's rect and flush edge it was sent from), sent again
+   * since (T12): the last probe held and nothing has moved since. A probe from there that holds again is `checked`.
+   * Cleared by the first read of a stop with no probe come back held — after a probe that moved the match, or after a
+   * read that judged no stop (which leaves no probe in flight): a match back on that rect after a move owes two holds anew.
+   */
+  readonly heldFirst: SentProbe | undefined;
 }
 
 /**
@@ -248,7 +273,7 @@ const close = (m: Memory): FlushCheck => m as unknown as FlushCheck;
 
 /** The check before the first read, for a scroll toward `direction`: no probe in flight, no cut proven. */
 export function startFlush(direction: Direction): FlushCheck {
-  return close({ probe: undefined, proven: undefined, direction, measured: [] });
+  return close({ probe: undefined, proven: undefined, direction, measured: [], heldFirst: undefined });
 }
 
 /** A probe is in flight: sent, and no read that read since — the read after it is the probe's (the round reads a failed one again, and offers no carry sample of it). */
@@ -344,10 +369,13 @@ export function seeFlush(check: FlushCheck, stop: FlushStop | undefined): FlushS
   // A reveal that moved nothing: doubted once — the cut stays proven, its doubt spent, and the same reveal goes again (D62, T11).
   const doubted = stroked && proof !== undefined && !proof.doubted;
   const proven = doubted ? { ...proof, doubted: true } : proof;
+  // A first probe that moved nothing, with no proof: doubted once for that rect and edge — the same first probe goes again (T12).
+  const doubtedFirst = stroked && proof === undefined && !heldBefore(m.heldFirst, probed);
   // A fresh proof is a measured stroke: how far it carried the match, for the aim floor (D68).
   const measured = fresh !== undefined && stop.drawn !== undefined ? [...m.measured, { drawn: strokeLength(stop.drawn), moved: fresh.revealed, edge: fresh.edge, container: fresh.container }] : m.measured;
-  const after: Memory = { ...m, probe: undefined, proven, measured };
-  const came: Came = !held ? 'moved' : !stroked ? 'tap' : doubted ? 'doubted' : 'held';
+  // The slot lives only while probes hold (`Memory.heldFirst`): a probe that came back not held, or none in flight, clears it.
+  const after: Memory = { ...m, probe: undefined, proven, measured, heldFirst: doubtedFirst ? probed : held ? m.heldFirst : undefined };
+  const came: Came = !held ? 'moved' : !stroked ? 'tap' : doubted || doubtedFirst ? 'doubted' : 'held';
   return { check: close(after), settles: held, waits: proven === undefined, verdict: verdictOf(after, stop, at, came) };
 }
 
@@ -355,9 +383,15 @@ export function seeFlush(check: FlushCheck, stop: FlushStop | undefined): FlushS
  * What the probe in flight came back with, as the verdict reads it (`seeFlush`): `moved` — no probe came back held (none
  * in flight, or the match moved); `held` — the match where it was sent from, after a stroke; `tap` — held, the stroke
  * drawn under twice the slop, which may have been a tap; `doubted` — held after a reveal on a proof not yet doubted
- * (`ProvenCut.doubted`): no stop, the reveal again (D62, T11).
+ * (`ProvenCut.doubted`): no stop, the reveal again (D62, T11); or held after a first probe with no proof, not yet sent
+ * again from there (`Memory.heldFirst`): no stop, the same first probe again (T12).
  */
 type Came = 'moved' | 'held' | 'tap' | 'doubted';
+
+/** `probed` was sent from where an earlier first probe held (`Memory.heldFirst`): the same rect, within a pixel, and the same edge. */
+function heldBefore(first: SentProbe | undefined, probed: SentProbe | undefined): boolean {
+  return first !== undefined && probed !== undefined && first.edge === probed.edge && sameRectWithinPixel(first.rect, probed.rect);
+}
 
 /** A flush edge of the match: on its container's own edge, or on a node `pinned` in its nearest at that side (`Flush`). */
 interface FlushEdge {
@@ -467,9 +501,10 @@ function verdictOf(after: Memory, { judged, facts, means }: FlushStop, { chain, 
   // no reveal was sent (`FlushCut`).
   const unchecked = (why: 'budget' | 'room' | 'axis' | 'tap'): FlushVerdict =>
     proven === undefined ? { of: 'flush', flush: { ...where, checked: false, why } } : { of: 'cut', cut: { of: 'flushCut', judged, ...where, revealed: proven.revealed, why } };
-  // A first probe that moved nothing: checked — nothing lies past the edge. A reveal already doubted that moved nothing:
-  // no `checked` on a proven cut (T11) but `held`, the hedge — either unless drawn too short to tell
-  // from a tap, which on a proven cut is no stop but that cut; or doubted (D62), when the reveal goes again below.
+  // A first probe that moved nothing twice (T12): checked — nothing lies past the edge. A reveal already doubted that
+  // moved nothing: no `checked` on a proven cut (T11) but `held`, the hedge — either unless drawn too short to tell
+  // from a tap, which on a proven cut is no stop but that cut; or doubted (D62, T11, T12), when the same probe or reveal
+  // goes again below — with no proof, a first probe again (`revealing` undefined).
   if (came === 'held') return { of: 'flush', flush: proven === undefined ? { ...where, checked: true } : { ...where, checked: false, why: 'held', revealed: proven.revealed } };
   if (came === 'tap') return unchecked('tap');
   // With no gesture box (`RoundSeen.screen` absent) nothing has room and the stop says `room` — the wrong reason (it

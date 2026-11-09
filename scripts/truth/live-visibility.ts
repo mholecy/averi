@@ -1,7 +1,8 @@
+import { countOf } from '../../src/util/count.js';
 import { UNMOVED_STROKES_EXHAUST } from '../../src/interact/scroll-rounds.js';
 import type { Platform } from '../differential/corpus.js';
 import type { CaseReads } from './live-cases.js';
-import { refusedAfterDismissal, replyKind, screenChangedSaid, screenUnchangedFor, swipesOf, turnsSaid, type ReplyKind, heldCutHedged, untriedSideSaid, directionNamed } from './replies.js';
+import { flushProbesSaid, refusedAfterDismissal, replyKind, screenChangedSaid, screenUnchangedFor, swipesOf, turnsSaid, type ReplyKind, heldCutHedged, untriedSideSaid, directionNamed } from './replies.js';
 import type { CellTruth, Geometry, LabState, ProbeEvent, Rect, Stroke, TargetTruth } from './schema.js';
 import { askedUnlistedBy, contractOf, judgedContext, stopHolds, type StopAsk, type TapAsk } from './target-contract.js';
 import { axisOf, bandsOf, directionOf, geometryOf, intersect, selectorOf, type Direction, type GeometryContext } from './truth.js';
@@ -692,7 +693,7 @@ function atRestCase(cell: string, t: TargetTruth, view: string): VisibilityCase 
     id: `rest:${cell}.${t.tag}.fully`,
     reads: VISIBILITY_READS,
     cell,
-    says: `scroll_until ${t.tag} (whole, flush under the sticky header pinned in ${view}) down, fully: stops on it after at most one probe that moves nothing, then the tap fires it (VA1's at-rest twin)`,
+    says: `scroll_until ${t.tag} (whole, flush under the sticky header pinned in ${view}) down, fully: stops on it after at most the probes that move nothing (two since T12), then the tap fires it (VA1's at-rest twin)`,
     calls: [
       { tool: 'scroll_until', args: { selector: selectorOf(t), direction: 'down', fully: true } },
       { tool: 'tap', args: { selector: selectorOf(t) } },
@@ -703,8 +704,11 @@ function atRestCase(cell: string, t: TargetTruth, view: string): VisibilityCase 
 
 /**
  * An at-rest case's judge (AT_REST): judgeScroll's `fully` stop and tap — and on top, the target whole where it was
- * launched: no more than one swipe said, and no stroke of `view` the app logged moved it (the probe toward the header
- * moves nothing at offset 0). A stroke that moved it is the failure of reading the header as an overlay (the note).
+ * launched: no more swipes said than the probes the reply itself claims moved nothing (`flushProbesSaid`: "a probe
+ * swipe" before T12, "2 probe swipes" since — the first probe that held is sent again; one when it claims none), so one
+ * stroke more than the probes claimed (e.g. 2 swipes with "a probe swipe") is a break, and no stroke of `view` the app
+ * logged moved it (the probes toward the header move nothing at offset 0). A T12 revert ("after 1 swipe … a probe swipe")
+ * passes here: golden, the flush-check and rounds unit tests and `lv-t12-drop-first` catch it, not the at-rest judge. A stroke that moved it is the failure of reading the header as an overlay (the note).
  */
 export function judgeAtRest(tag: string, view: string, replies: readonly string[], final: LabState, launched: LabState, atStop: LabState = final): LiveVerdict {
   const verdict = judgeScroll({ tag, view, fully: true, platform: 'android' }, replies, final, launched, atStop);
@@ -712,7 +716,8 @@ export function judgeAtRest(tag: string, view: string, replies: readonly string[
   const [scroll] = replies;
   const swipes = swipesOf(scroll) ?? 0;
   const moved = strokesSince(atStop, launched).filter((s) => s.view === view && Math.abs(s.to - s.from) > MOVE_SLACK);
-  const breaks = [...(swipes > 1 ? [`${swipes} swipes where one probe settles it`] : []), ...moved.map((s) => `a stroke moved ${view} ${round(s.from)}→${round(s.to)}`)];
+  const probes = flushProbesSaid(scroll) ?? 1;
+  const breaks = [...(swipes > probes ? [`${swipes} swipes where the reply allows ${countOf(probes, 'probe')}`] : []), ...moved.map((s) => `a stroke moved ${view} ${round(s.from)}→${round(s.to)}`)];
   return breaks.length === 0 ? verdict : { outcome: 'MISMATCH', cls: 'R-direction', kind: verdict.kind, why: `R-direction (at rest): ${breaks.join('; ')} — averi: ${short(scroll)}`, app: verdict.app };
 }
 

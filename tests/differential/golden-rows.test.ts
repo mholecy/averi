@@ -268,14 +268,14 @@ describe('R-sliver, R-band, R-under-chrome: scroll_until does not call it reache
 // scroll-bounded-flush's P as captured: cut flush by `upper`'s bottom (908); averi's real probe at 9c7885e drags up from
 // inside `upper` (788 → 697), toward the bottom edge.
 const UP_PROBE = 'adb shell input swipe 540 788 540 697 300';
-const FLUSH = 'Element id:"lab.edges.A" fully visible after 1 swipe; its bottom edge lies on its scroll container\'s (0,303 1080x605), and a probe swipe toward it moved nothing — nothing of it is cut there';
+const FLUSH = 'Element id:"lab.edges.A" fully visible after 2 swipes; its bottom edge lies on its scroll container\'s (0,303 1080x605), and 2 probe swipes toward it moved nothing — nothing of it is cut there';
 
 describe('R-fully on a flush edge: the stop\'s probe is the device\'s to answer, but the truth must bear out the edge and the swipe', () => {
   const flushCell: CellTruth = { ...CELL, screen: { width: 1080, height: 2220 }, scrollViews: { upper: rect(0, 303, 1080, 605) } };
   const flush = (visible: Rect) => expectations('android', target('partly-centre-in', { frame: rect(128, 798, 825, 176), visible, scrollView: 'upper' }), flushCell, 'uiautomator');
   const P = flush(rect(128, 798, 825, 110));
   it('probed from inside its scroll view toward the flush edge (#12 at 9c7885e): accepted', () => {
-    expect(verdict(P, 'fully', out(FLUSH, [UP_PROBE]))).toBeUndefined();
+    expect(verdict(P, 'fully', out(FLUSH, [UP_PROBE, UP_PROBE]))).toBeUndefined();
   });
   it('no swipe sent, a swipe dragging away from the edge, or one touching down outside its scroll view: red', () => {
     expect(verdict(P, 'fully', out(FLUSH))).toMatch(/^fully visible where it is partly-centre-in, after 0 swipe\(s\) that move nothing \(no swipe from inside its scroll view upper toward its bottom edge\)/);
@@ -283,7 +283,7 @@ describe('R-fully on a flush edge: the stop\'s probe is the device\'s to answer,
     expect(verdict(P, 'fully', out(FLUSH, ['adb shell input swipe 540 1200 540 1100 300']))).toMatch(/\(no swipe from inside its scroll view upper toward its bottom edge\)/);
   });
   it('an edge the truth does not show flush with its scroll view (the lab\'s scroll-bounded P runs past it): red', () => {
-    expect(verdict(flush(rect(128, 798, 825, 90)), 'fully', out(FLUSH, [UP_PROBE]))).toMatch(/\(its bottom edge is not flush with its scroll view upper in the truth \(888 vs 908\)\)/);
+    expect(verdict(flush(rect(128, 798, 825, 90)), 'fully', out(FLUSH, [UP_PROBE, UP_PROBE]))).toMatch(/\(its bottom edge is not flush with its scroll view upper in the truth \(888 vs 908\)\)/);
     expect(verdict(P, 'fully', out(FLUSH.replace('its bottom edge', 'its top edge'), ['adb shell input swipe 540 400 540 500 300']))).toMatch(/its top edge is not flush/);
   });
 });
@@ -291,7 +291,7 @@ describe('R-fully on a flush edge: the stop\'s probe is the device\'s to answer,
 // scroll-sticky-cut's R as captured (VA1): its piece cut at the merged sticky header pinned at its list's top, the stop's
 // probe drags down from inside the list, toward the top edge — the edge the reply names lies on the header's bottom.
 const PINNED_FLUSH =
-  'Element id:"lab.edges.A" fully visible after 1 swipe; its top edge lies on the edge of container id:lab.edges.header (0,303 1080x154), pinned at its scroll container\'s (0,303 1080x1238) top and drawn after it, and a probe swipe toward it moved nothing — nothing of it is cut there';
+  'Element id:"lab.edges.A" fully visible after 2 swipes; its top edge lies on the edge of container id:lab.edges.header (0,303 1080x154), pinned at its scroll container\'s (0,303 1080x1238) top and drawn after it, and 2 probe swipes toward it moved nothing — nothing of it is cut there';
 const DOWN_PROBE = 'adb shell input swipe 540 600 540 777 300';
 
 describe('R-fully on an edge flush under a header pinned in its scroll view (VA1): the truth bears out the edge at the chrome\'s inner edge', () => {
@@ -303,11 +303,11 @@ describe('R-fully on an edge flush under a header pinned in its scroll view (VA1
       'uiautomator',
     );
   it('its piece begins at the bottom of a chrome lying in its scroll view, flush with its top, and the probe drags toward it from inside the list: accepted', () => {
-    expect(verdict(sticky(rect(0, 303, 1080, 154)), 'fully', out(PINNED_FLUSH, [DOWN_PROBE]))).toBeUndefined();
+    expect(verdict(sticky(rect(0, 303, 1080, 154)), 'fully', out(PINNED_FLUSH, [DOWN_PROBE, DOWN_PROBE]))).toBeUndefined();
   });
   it('a chrome that ends short of the piece, or is not pinned at the list\'s top, bears out nothing: red; and no probe toward it: red', () => {
-    expect(verdict(sticky(rect(0, 303, 1080, 140)), 'fully', out(PINNED_FLUSH, [DOWN_PROBE]))).toMatch(/\(its top edge is not flush with its scroll view list in the truth \(391 vs 303\)\)/);
-    expect(verdict(sticky(rect(0, 320, 1080, 137)), 'fully', out(PINNED_FLUSH, [DOWN_PROBE]))).toMatch(/its top edge is not flush/);
+    expect(verdict(sticky(rect(0, 303, 1080, 140)), 'fully', out(PINNED_FLUSH, [DOWN_PROBE, DOWN_PROBE]))).toMatch(/\(its top edge is not flush with its scroll view list in the truth \(391 vs 303\)\)/);
+    expect(verdict(sticky(rect(0, 320, 1080, 137)), 'fully', out(PINNED_FLUSH, [DOWN_PROBE, DOWN_PROBE]))).toMatch(/its top edge is not flush/);
     expect(verdict(sticky(rect(0, 303, 1080, 154)), 'fully', out(PINNED_FLUSH))).toMatch(/\(no swipe from inside its scroll view list toward its top edge\)/);
   });
   it('a chrome flush with the piece and the list\'s top but not lying in the list (wider than it), or beside the piece, not across its edge: red', () => {
@@ -318,9 +318,9 @@ describe('R-fully on an edge flush under a header pinned in its scroll view (VA1
         { ...CELL, screen: { width: 1080, height: 2220 }, scrollViews: { list: rect(100, 303, 880, 1238) }, chrome: { stickyHeader: header } },
         'uiautomator',
       );
-    expect(verdict(narrow(rect(100, 303, 880, 154)), 'fully', out(PINNED_FLUSH, [DOWN_PROBE]))).toBeUndefined();
-    expect(verdict(narrow(rect(0, 303, 1080, 154)), 'fully', out(PINNED_FLUSH, [DOWN_PROBE]))).toMatch(/its top edge is not flush/);
-    expect(verdict(narrow(rect(960, 303, 20, 154)), 'fully', out(PINNED_FLUSH, [DOWN_PROBE]))).toMatch(/its top edge is not flush/);
+    expect(verdict(narrow(rect(100, 303, 880, 154)), 'fully', out(PINNED_FLUSH, [DOWN_PROBE, DOWN_PROBE]))).toBeUndefined();
+    expect(verdict(narrow(rect(0, 303, 1080, 154)), 'fully', out(PINNED_FLUSH, [DOWN_PROBE, DOWN_PROBE]))).toMatch(/its top edge is not flush/);
+    expect(verdict(narrow(rect(960, 303, 20, 154)), 'fully', out(PINNED_FLUSH, [DOWN_PROBE, DOWN_PROBE]))).toMatch(/its top edge is not flush/);
   });
   it('at the far edge (bottom), where src pins nothing, a chrome pinned at the list\'s bottom flush with the piece bears out nothing: red', () => {
     const footer = expectations(
@@ -341,7 +341,7 @@ describe('R-fully: fully: true never calls a cut target "visible" where it is, w
     ['"visible after 1 swipe": a replayed tree never moves, so it stopped where it is', out('Element id:"lab.edges.A" visible after 1 swipe', [IDB_STROKE]), 'fully visible where it is partly-centre-in, after 1 swipe(s) that move nothing: Element id:"lab.edges.A" visible after 1 swipe'],
     ['stuck', out('ERROR: stuck'), undefined],
     // A stop claiming a flush probe, on a truth with no scroll view to bear it out: red.
-    ['a flush probe claimed where the truth names no scroll view', out(FLUSH, [UP_PROBE]), /^fully visible where it is partly-centre-in, after 1 swipe\(s\) that move nothing \(no scroll view or visible part/],
+    ['a flush probe claimed where the truth names no scroll view', out(FLUSH, [UP_PROBE, UP_PROBE]), /^fully visible where it is partly-centre-in, after 2 swipe\(s\) that move nothing \(no scroll view or visible part/],
   ])('%s', (_n, o, expected) => {
     if (expected instanceof RegExp) expect(verdict(rs, 'fully', o)).toMatch(expected);
     else expect(verdict(rs, 'fully', o)).toBe(expected);

@@ -210,15 +210,29 @@ export const keyboardUnlistedSaid = (reply: string) => namesKeyboard(reply) && o
 const MOVED_TAP = / at \(-?[\d.]+,-?[\d.]+\) — its centre \(-?[\d.]+,-?[\d.]+\) is .*; tapped the uncovered part \d+x\d+/;
 export const movedTap = (reply: string) => MOVED_TAP.test(ownWords(reply));
 
+/** The checked flush clause's claim, both forms (`flushProbesSaid`): "a probe swipe" (before T12), or "n probe swipes" — n its second group. */
+const PROBES_HELD = /(a probe swipe|(\d+) probe swipes) toward it moved nothing/;
+
 /**
  * The side of a flush edge the `fully` stop says it probed (src/interact/scroll-text.ts#flushText, the wording since
  * 9c7885e: "its <side> edge lies on its scroll container's (…), and a probe swipe toward it moved nothing" — or, at a
  * node pinned in it (VA1), "its <side> edge lies on the edge of <node> (…), pinned at its scroll container's (…) <side>
- * and drawn after it, and a probe swipe toward it moved nothing"), or undefined when it says none
+ * and drawn after it, and a probe swipe toward it moved nothing"; since T12 "2 probe swipes toward it moved nothing",
+ * both read, as records keep the older), or undefined when it says none
  * (golden-spec/rows.ts#flushProbe).
  */
 export function flushProbedSide(reply: string): 'top' | 'bottom' | 'left' | 'right' | undefined {
-  return /its (top|bottom|left|right) edge lies on (?:its scroll container's|the edge of) .*a probe swipe toward it moved nothing/.exec(reply)?.[1] as 'top' | 'bottom' | 'left' | 'right' | undefined;
+  return new RegExp(`its (top|bottom|left|right) edge lies on (?:its scroll container's|the edge of) .*${PROBES_HELD.source}`).exec(reply)?.[1] as 'top' | 'bottom' | 'left' | 'right' | undefined;
+}
+
+/**
+ * How many probes the checked flush clause claims moved nothing (src/interact/scroll-text.ts#flushText): 1 for "a probe
+ * swipe toward it moved nothing" (before T12), n for "n probe swipes toward it moved nothing" (since); undefined when
+ * the reply says neither.
+ */
+export function flushProbesSaid(reply: string): number | undefined {
+  const m = PROBES_HELD.exec(reply);
+  return m === null ? undefined : m[2] === undefined ? 1 : Number(m[2]);
 }
 
 /**

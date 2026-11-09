@@ -10,6 +10,7 @@ import { outsideItsScrollView, orderRemedyText, presentedRemedy, presentedStop, 
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
 import { revealText, SIDES } from '../ui-tree/sides.js';
 import { countOf } from '../util/count.js';
+import { CHECKED_AFTER_HOLDS } from './flush-check.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
 import { fullyClaimed, shortOf, unfitRoom, type AppliedKeyboard, type Judged, type Unfit } from './scroll-read.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type FlushCut, type FlushPlace, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
@@ -86,8 +87,9 @@ export interface ScrollUntilResult {
    * its scroll container's edge (Android only:
    * interact/flush-check.ts) — where uiautomator cuts a
    * node's bounds, so the rect cannot say whether more of it lies beyond.
-   * `checked`: a first probe swipe toward that edge moved nothing, so nothing
-   * does (the probe is one of `swipes`). Not checked (`why`, flush-check.ts
+   * `checked`: two probe swipes toward that edge moved nothing, with no proof
+   * of a cut, so nothing does (T12: one may be a stroke the app did not
+   * take; both are among `swipes`). Not checked (`why`, flush-check.ts
    * #Flush): no swipe or time left, no container with room for a probe, a
    * probe short enough to be a tap, a cut a swipe proved and two swipes after
    * it that moved nothing (`held`), or — `fills`, with both `edges` and no
@@ -400,7 +402,7 @@ export function flushText(flush: ScrollUntilResult['flush']): string {
     );
   }
   const { where, cuts } = flushEdgeText(flush, 'lies');
-  if (flush.checked) return `; ${where}, and a probe swipe toward it moved nothing — nothing of it is cut there`;
+  if (flush.checked) return `; ${where}, and ${CHECKED_AFTER_HOLDS} probe swipes toward it moved nothing — nothing of it is cut there`;
   // T11: a cut a swipe proved is never called uncut, ADR 0013's T11 amendment; a new call's first probe tells.
   if (flush.why === 'held') return `; but ${where}, ${cuts}, and a swipe toward it showed ${flush.revealed} px more of it, then 2 swipes after it moved nothing — the content ended there or the app did not take them — ${cut}; calling again tells`;
   const unchecked = {
@@ -433,8 +435,8 @@ function flushEdgeText({ edge, container, pinned }: FlushPlace, lies: 'lies' | '
 /**
  * A cut a probe proved and no reveal was sent for (flush-check.ts#FlushCut), for the bound's and the stuck stop's
  * sentences: where the flush edge still lies, what the probe showed, and why no reveal followed when that was not the
- * budget. Never "a probe swipe toward it moved nothing": that is the checked stop's clause, which the truth reader
- * takes for a probed side (scripts/truth/replies.ts, flushProbedSide).
+ * budget. Never "… toward it moved nothing", after "a probe swipe" or "n probe swipes": that is the checked stop's
+ * clause, which the truth reader takes for a probed side (scripts/truth/replies.ts, flushProbedSide).
  */
 function flushCutText(cut: FlushCut): string {
   const { where, cuts } = flushEdgeText(cut, 'still lies');

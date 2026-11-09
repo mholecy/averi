@@ -983,8 +983,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       // proved (`FlushSeen.waits`): the next stroke reveals the rest, at once.
       if (!settled && flush.waits && observed.slowing && seen.elapsedMs < s.rules.timeoutMs) return waitOut(s);
       if (!settled && flush.waits && mayConfirm(s, seen.elapsedMs)) return confirm(s);
-      // `fully: true`, an edge flush with the clipping container: possibly cut there — probe once toward it, reveal
-      // what a probe proved cut, or say it could not be checked (`FlushVerdict`).
+      // `fully: true`, an edge flush with the clipping container: possibly cut there — probe toward it (and once more
+      // when that probe holds, T12), reveal what a probe proved cut, or say it could not be checked (`FlushVerdict`).
       const { verdict } = flush;
       if (verdict.of === 'witness') return ask('witness');
       if (verdict.of === 'probe') return probe(s, verdict);

@@ -1,0 +1,107 @@
+fix commit 28e1a0cefacbb657267b9cc2c569a60a27650f81
+base commit 5f126fdcd25fa5e30ccf59f490618c78453762d2
+before raw-group-1 11:06:34 host=[2.48 3.30 2.90] start_count=1 dev=[0.39 0.23 0.18 1/1851 4340] uptime=21940.68
+after raw-group-1 11:07:44 host=[1.81 2.92 2.79] start_count=1 dev=[0.79 0.37 0.23 1/1801 4933] uptime=22011.21
+before drop-first-base-1 11:07:44 host=[1.81 2.92 2.79] start_count=1 dev=[0.79 0.37 0.23 1/1801 4939] uptime=22011.28
+after drop-first-base-1 rc=1 11:07:54 host=[1.68 2.86 2.77] start_count=1 dev=[0.82 0.39 0.24 1/1801 5092] uptime=22021.16
+before drop-first-fix-1 11:07:54 host=[1.68 2.86 2.77] start_count=1 dev=[0.82 0.39 0.24 1/1801 5098] uptime=22021.28
+after drop-first-fix-1 rc=0 11:08:16 host=[1.61 2.77 2.74] start_count=1 dev=[0.85 0.44 0.26 1/1789 5413] uptime=22043.01
+before drop-first-fix-2 11:08:16 host=[1.61 2.77 2.74] start_count=1 dev=[0.85 0.44 0.26 1/1789 5419] uptime=22043.12
+after drop-first-fix-2 rc=0 11:08:38 host=[1.48 2.67 2.70] start_count=1 dev=[0.74 0.45 0.27 1/1791 5713] uptime=22064.77
+before drop-first-base-2 11:08:38 host=[1.48 2.67 2.70] start_count=1 dev=[0.74 0.45 0.27 1/1791 5719] uptime=22064.89
+after drop-first-base-2 rc=1 11:08:48 host=[1.40 2.61 2.68] start_count=1 dev=[0.63 0.43 0.26 1/1793 5872] uptime=22074.72
+before drop-first-base-3 11:08:48 host=[1.40 2.61 2.68] start_count=1 dev=[0.63 0.43 0.26 1/1793 5878] uptime=22074.83
+after drop-first-base-3 rc=1 11:08:58 host=[1.41 2.57 2.67] start_count=1 dev=[0.53 0.42 0.26 1/1793 6027] uptime=22084.65
+before drop-first-fix-3 11:08:58 host=[1.41 2.57 2.67] start_count=1 dev=[0.53 0.42 0.26 1/1793 6033] uptime=22084.76
+after drop-first-fix-3 rc=0 11:09:19 host=[1.62 2.53 2.65] start_count=1 dev=[0.45 0.40 0.26 1/1797 6326] uptime=22106.45
+before drop-first-fix-4 11:09:20 host=[1.62 2.53 2.65] start_count=1 dev=[0.45 0.40 0.26 1/1797 6332] uptime=22106.56
+after drop-first-fix-4 rc=0 11:09:41 host=[1.36 2.41 2.60] start_count=1 dev=[0.68 0.47 0.28 1/1795 6621] uptime=22128.35
+before drop-first-base-4 11:09:41 host=[1.36 2.41 2.60] start_count=1 dev=[0.68 0.47 0.28 1/1795 6627] uptime=22128.47
+after drop-first-base-4 rc=1 11:09:51 host=[1.23 2.35 2.58] start_count=1 dev=[0.65 0.47 0.29 1/1795 6778] uptime=22138.30
+before drop-first-base-5 11:09:51 host=[1.23 2.35 2.58] start_count=1 dev=[0.65 0.47 0.29 1/1795 6784] uptime=22138.41
+after drop-first-base-5 rc=1 11:10:01 host=[1.43 2.35 2.57] start_count=1 dev=[0.55 0.45 0.28 1/1795 6933] uptime=22148.25
+before drop-first-fix-5 11:10:01 host=[1.43 2.35 2.57] start_count=1 dev=[0.55 0.45 0.28 1/1795 6939] uptime=22148.36
+after drop-first-fix-5 rc=0 11:10:23 host=[1.59 2.33 2.56] start_count=1 dev=[0.39 0.42 0.27 1/1794 7226] uptime=22170.02
+before drop-first-fix-6 11:10:23 host=[1.59 2.33 2.56] start_count=1 dev=[0.39 0.42 0.27 1/1794 7232] uptime=22170.13
+after drop-first-fix-6 rc=0 11:10:45 host=[1.69 2.30 2.54] start_count=1 dev=[0.41 0.43 0.28 1/1792 7522] uptime=22191.82
+before drop-first-base-6 11:10:45 host=[1.69 2.30 2.54] start_count=1 dev=[0.41 0.43 0.28 1/1792 7528] uptime=22191.93
+after drop-first-base-6 rc=1 11:10:55 host=[1.64 2.28 2.53] start_count=1 dev=[0.34 0.41 0.27 1/1792 7679] uptime=22201.71
+before drop-first-base-7 11:10:55 host=[1.64 2.28 2.53] start_count=1 dev=[0.34 0.41 0.27 1/1792 7685] uptime=22201.81
+after drop-first-base-7 rc=1 11:11:05 host=[1.69 2.27 2.53] start_count=1 dev=[0.58 0.46 0.29 1/1792 7840] uptime=22211.59
+before drop-first-fix-7 11:11:05 host=[1.69 2.27 2.53] start_count=1 dev=[0.58 0.46 0.29 1/1792 7846] uptime=22211.70
+after drop-first-fix-7 rc=0 11:11:26 host=[1.49 2.18 2.49] start_count=1 dev=[0.38 0.43 0.28 1/1792 8136] uptime=22233.38
+before drop-first-fix-8 11:11:26 host=[1.49 2.18 2.49] start_count=1 dev=[0.38 0.43 0.28 1/1792 8142] uptime=22233.49
+after drop-first-fix-8 rc=0 11:11:48 host=[1.81 2.20 2.49] start_count=1 dev=[0.42 0.43 0.29 1/1792 8444] uptime=22255.17
+before drop-first-base-8 11:11:48 host=[1.81 2.20 2.49] start_count=1 dev=[0.42 0.43 0.29 1/1792 8450] uptime=22255.28
+after drop-first-base-8 rc=1 11:11:58 host=[1.85 2.20 2.48] start_count=1 dev=[0.43 0.43 0.29 1/1792 8599] uptime=22265.07
+before raw-group-2 11:11:58 host=[1.85 2.20 2.48] start_count=1 dev=[0.43 0.43 0.29 1/1792 8605] uptime=22265.18
+after raw-group-2 11:13:09 host=[4.67 2.87 2.71] start_count=1 dev=[0.99 0.62 0.36 6/1792 9189] uptime=22335.74
+group drop-first: 16 records, before fast 0/24, after fast 0/24
+before residual-fix-1 11:13:09 host=[4.67 2.87 2.71] start_count=1 dev=[0.99 0.62 0.36 1/1792 9195] uptime=22335.86
+after residual-fix-1 rc=0 11:13:21 host=[4.32 2.89 2.72] start_count=1 dev=[0.91 0.62 0.37 5/1792 9367] uptime=22348.26
+before residual-fix-2 11:13:21 host=[4.32 2.89 2.72] start_count=1 dev=[0.91 0.62 0.37 1/1792 9373] uptime=22348.37
+after residual-fix-2 rc=0 11:13:34 host=[3.65 2.79 2.68] start_count=1 dev=[0.85 0.62 0.37 5/1793 9549] uptime=22360.75
+before residual-fix-3 11:13:34 host=[3.65 2.79 2.68] start_count=1 dev=[0.85 0.62 0.37 1/1793 9555] uptime=22360.86
+after residual-fix-3 rc=0 11:13:46 host=[3.14 2.72 2.66] start_count=1 dev=[1.24 0.72 0.41 1/1728 9728] uptime=22373.16
+before raw-group-3 11:13:46 host=[3.14 2.72 2.66] start_count=1 dev=[1.24 0.72 0.41 1/1728 9734] uptime=22373.26
+after raw-group-3 11:14:57 host=[3.00 2.77 2.68] start_count=1 dev=[0.64 0.66 0.41 5/1728 10326] uptime=22444.09
+group residual: 3 records, before fast 0/24, after fast 0/24
+before pins-base-1 11:14:57 host=[3.00 2.77 2.68] start_count=1 dev=[0.64 0.66 0.41 1/1728 10332] uptime=22444.21
+after pins-base-1 rc=0 11:16:27 host=[1.68 2.41 2.55] start_count=1 dev=[1.01 0.74 0.46 4/1705 11709] uptime=22534.02
+before pins-fix-1 11:16:27 host=[1.68 2.41 2.55] start_count=1 dev=[1.01 0.74 0.46 1/1705 11718] uptime=22534.12
+after pins-fix-1 rc=0 11:18:00 host=[1.52 2.15 2.43] start_count=1 dev=[0.82 0.75 0.48 4/1708 13138] uptime=22627.12
+before pins-fix-2 11:18:00 host=[1.52 2.15 2.43] start_count=1 dev=[0.82 0.75 0.48 1/1711 13150] uptime=22627.23
+after pins-fix-2 rc=0 11:19:33 host=[1.83 2.11 2.39] start_count=1 dev=[0.96 0.80 0.53 4/1705 14608] uptime=22719.74
+before pins-base-2 11:19:33 host=[1.83 2.11 2.39] start_count=1 dev=[0.96 0.80 0.53 1/1705 14614] uptime=22719.85
+after pins-base-2 rc=0 11:21:02 host=[2.42 2.38 2.47] start_count=1 dev=[0.45 0.70 0.52 5/1638 16040] uptime=22809.34
+before pins-base-3 11:21:02 host=[2.42 2.38 2.47] start_count=1 dev=[0.45 0.70 0.52 1/1638 16046] uptime=22809.45
+after pins-base-3 rc=0 11:22:32 host=[3.89 2.83 2.63] start_count=1 dev=[0.63 0.72 0.54 1/1630 17457] uptime=22898.69
+before pins-fix-3 11:22:32 host=[3.89 2.83 2.63] start_count=1 dev=[0.63 0.72 0.54 1/1630 17463] uptime=22898.81
+after pins-fix-3 rc=0 11:24:05 host=[1.82 2.42 2.49] start_count=1 dev=[0.88 0.83 0.60 1/1652 18914] uptime=22991.64
+before pins-fix-4 11:24:05 host=[1.82 2.42 2.49] start_count=1 dev=[0.88 0.83 0.60 1/1652 18920] uptime=22991.75
+after pins-fix-4 rc=0 11:25:38 host=[1.72 2.20 2.39] start_count=1 dev=[0.44 0.70 0.58 5/1651 20334] uptime=23084.74
+before pins-base-4 11:25:38 host=[2.06 2.26 2.41] start_count=1 dev=[0.44 0.70 0.58 1/1651 20340] uptime=23084.85
+after pins-base-4 rc=0 11:27:08 host=[1.86 2.12 2.34] start_count=1 dev=[0.70 0.75 0.61 5/1651 21720] uptime=23175.35
+before raw-group-4 11:27:08 host=[1.86 2.12 2.34] start_count=1 dev=[0.70 0.75 0.61 1/1651 21726] uptime=23175.46
+after raw-group-4 11:28:20 host=[1.73 2.04 2.29] start_count=1 dev=[0.75 0.76 0.63 8/1650 22317] uptime=23247.10
+group pins: 8 records, before fast 0/24, after fast 0/24
+before settings-base-1 11:28:20 host=[1.73 2.04 2.29] start_count=1 dev=[0.75 0.76 0.63 1/1650 22323] uptime=23247.22
+after settings-base-1 rc=0 11:28:41 host=[2.02 2.09 2.30] start_count=1 dev=[0.88 0.80 0.64 8/1679 22615] uptime=23267.58
+before settings-fix-1 11:28:41 host=[2.02 2.09 2.30] start_count=1 dev=[0.88 0.80 0.64 1/1679 22621] uptime=23267.69
+after settings-fix-1 rc=0 11:29:01 host=[1.67 2.00 2.27] start_count=1 dev=[0.89 0.81 0.65 8/1679 22876] uptime=23288.04
+before settings-fix-2 11:29:01 host=[1.67 2.00 2.27] start_count=1 dev=[0.89 0.81 0.65 1/1679 22882] uptime=23288.14
+after settings-fix-2 rc=0 11:29:21 host=[1.41 1.92 2.23] start_count=1 dev=[0.70 0.77 0.64 5/1680 23137] uptime=23308.45
+before settings-base-2 11:29:22 host=[1.41 1.92 2.23] start_count=1 dev=[0.70 0.77 0.64 1/1680 23143] uptime=23308.56
+after settings-base-2 rc=0 11:29:42 host=[1.68 1.94 2.23] start_count=1 dev=[1.13 0.87 0.67 9/1677 23396] uptime=23328.92
+before settings-base-3 11:29:42 host=[1.68 1.94 2.23] start_count=1 dev=[1.13 0.87 0.67 1/1677 23402] uptime=23329.03
+after settings-base-3 rc=0 11:30:02 host=[1.62 1.91 2.21] start_count=1 dev=[0.81 0.81 0.66 7/1677 23656] uptime=23349.39
+before settings-fix-3 11:30:02 host=[1.62 1.91 2.21] start_count=1 dev=[0.81 0.81 0.66 1/1677 23662] uptime=23349.50
+after settings-fix-3 rc=0 11:30:23 host=[1.58 1.88 2.19] start_count=1 dev=[0.64 0.77 0.65 11/1676 23915] uptime=23369.84
+before settings-fix-4 11:30:23 host=[1.58 1.88 2.19] start_count=1 dev=[0.64 0.77 0.65 1/1676 23921] uptime=23369.96
+after settings-fix-4 rc=0 11:30:43 host=[1.41 1.82 2.17] start_count=1 dev=[0.52 0.74 0.64 5/1676 24175] uptime=23390.32
+before settings-base-4 11:30:43 host=[1.41 1.82 2.17] start_count=1 dev=[0.52 0.74 0.64 1/1676 24181] uptime=23390.43
+after settings-base-4 rc=0 11:31:04 host=[1.90 1.93 2.19] start_count=1 dev=[0.56 0.74 0.64 1/1676 24435] uptime=23410.86
+before raw-group-5 11:31:04 host=[1.75 1.89 2.18] start_count=1 dev=[0.56 0.74 0.64 1/1676 24441] uptime=23410.96
+after raw-group-5 11:32:16 host=[2.17 2.00 2.20] start_count=1 dev=[0.41 0.67 0.62 7/1662 25040] uptime=23482.67
+group settings: 8 records, before fast 0/24, after fast 0/24
+before rest-max1-base-1 11:32:16 host=[2.17 2.00 2.20] start_count=1 dev=[0.41 0.67 0.62 1/1662 25046] uptime=23482.79
+after rest-max1-base-1 rc=0 11:32:24 host=[2.08 1.98 2.19] start_count=1 dev=[0.50 0.68 0.63 1/1662 25192] uptime=23490.59
+before rest-max1-fix-1 11:32:24 host=[2.08 1.98 2.19] start_count=1 dev=[0.50 0.68 0.63 1/1662 25198] uptime=23490.70
+after rest-max1-fix-1 rc=0 11:32:31 host=[1.99 1.97 2.18] start_count=1 dev=[0.46 0.67 0.62 4/1662 25344] uptime=23498.43
+before rest-max1-fix-2 11:32:32 host=[1.99 1.97 2.18] start_count=1 dev=[0.46 0.67 0.62 1/1664 25352] uptime=23498.54
+after rest-max1-fix-2 rc=0 11:32:39 host=[1.99 1.97 2.18] start_count=1 dev=[0.54 0.68 0.63 5/1664 25495] uptime=23506.06
+before rest-max1-base-2 11:32:39 host=[1.99 1.97 2.18] start_count=1 dev=[0.54 0.68 0.63 1/1664 25501] uptime=23506.17
+after rest-max1-base-2 rc=0 11:32:47 host=[1.98 1.97 2.18] start_count=1 dev=[0.49 0.67 0.62 3/1663 25642] uptime=23513.75
+before raw-group-6 11:32:47 host=[1.98 1.97 2.18] start_count=1 dev=[0.45 0.65 0.62 1/1663 25648] uptime=23513.85
+after raw-group-6 11:33:58 host=[1.83 1.94 2.15] start_count=1 dev=[0.58 0.65 0.62 3/1662 26236] uptime=23585.53
+group rest-max1: 4 records, before fast 0/24, after fast 0/24
+before vis-base-1 11:33:59 host=[1.83 1.94 2.15] start_count=1 dev=[0.58 0.65 0.62 1/1662 26242] uptime=23585.65
+after vis-base-1 rc=0 11:57:37 host=[2.10 1.87 1.74] start_count=1 dev=[1.31 1.01 0.84 1/1630 16612] uptime=25003.56
+before vis-fix-1 11:57:37 host=[2.10 1.87 1.74] start_count=1 dev=[1.31 1.01 0.84 1/1630 16618] uptime=25003.68
+after vis-fix-1 rc=0 12:21:06 host=[3.17 3.08 2.64] start_count=1 dev=[0.47 0.72 0.72 3/1596 7133] uptime=26413.45
+before vis-base-2 12:21:07 host=[3.17 3.08 2.64] start_count=1 dev=[0.47 0.72 0.72 1/1596 7139] uptime=26413.58
+after vis-base-2 rc=0 12:44:27 host=[3.01 3.19 3.12] start_count=1 dev=[1.24 0.87 0.72 1/1596 28798] uptime=27814.12
+before raw-group-7 12:44:27 host=[3.01 3.19 3.12] start_count=1 dev=[1.24 0.87 0.72 1/1596 28804] uptime=27814.23
+after raw-group-7 12:45:38 host=[3.04 3.18 3.12] start_count=1 dev=[1.18 0.89 0.74 1/1596 29392] uptime=27884.95
+group vis: 3 records, before fast 0/24, after fast 0/24
+done, device time 99 min

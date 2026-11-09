@@ -458,6 +458,20 @@ export const CAROUSEL_CASES: readonly CarouselCase[] = [
     calls: [fullyC(RECYCLER_FREE, 'left'), fullyC(RECYCLER_FREE, 'left')],
     judge: judgeDropTwo,
   },
+  // T12: the first probe after the pre-drag dropped, resolved as drawn — a held first probe with no proof, which read
+  // `checked` with C cut before T12 (T11's final A/B, short-fix-12). The same first probe goes again (the `no-retry` check
+  // reads it), carries C and proves the cut: then as lv-d62-control.
+  {
+    id: 'lv-t12-drop-first',
+    cell: RECYCLER_FREE,
+    platforms: ['android'],
+    preDrag: PRE_DRAG_PX,
+    reads: { swipes: { drop: [1] }, late: false },
+    skipFails: true,
+    says: 'T12: the same with the call\'s first stroke (its first probe) dropped, resolved as drawn: the probe sent again, then maxSwipes hedged or `unaimable`, never "fully visible" with C cut',
+    calls: [fullyC(RECYCLER_FREE, 'left')],
+    judge: judgeFully({ kinds: ['maxSwipes-hedged', 'unaimable'], cutBefore: true, dropped: 1 }),
+  },
   {
     id: 'lv-d68-launch',
     reads: CAROUSEL_READS,
