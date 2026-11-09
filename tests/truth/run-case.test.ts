@@ -344,10 +344,13 @@ describe('runCase: the focus reads and the launcher start (the chooser group, T7
   it('focus: the chooser left in front after the calls is dropped with one BACK, after the verdict and its screenshot, and read again', async () => {
     const lab = new FakeAndroidLab({ launched: read('launch'), states: [read('final')], focus: [LAB, CHOOSER, LAB] });
     const NOT: LiveVerdict = { outcome: 'MISMATCH', why: 'x' };
-    const run = await runCase(aCase({ reads: { focus: true, late: false }, judge: () => NOT }), 'uiautomator', rigOver(lab, ['1'], { keepShot: async () => undefined }));
+    const notes: string[] = [];
+    const run = await runCase(aCase({ reads: { focus: true, late: false }, judge: () => NOT }), 'uiautomator', rigOver(lab, ['1'], { keepShot: async () => undefined, note: (l) => void notes.push(l) }));
     expect(lab.log).toEqual(['launch c', 'focus', 'call tap under uiautomator-x1.yaml', 'pause 800', 'state', 'focus', 'screenshot', 'back', 'focus']);
     expect(run.record.focus).toEqual({ before: LAB, between: [], after: CHOOSER, teardown: LAB });
     expect(run.verdict).toEqual(NOT);
+    // Dropped: nothing said.
+    expect(notes).toEqual([]);
   });
 
   it('focus: a chooser on the stack but not in front, or no chooser, or an unread read: no BACK', async () => {
@@ -376,6 +379,14 @@ describe('runCase: the focus reads and the launcher start (the chooser group, T7
     expect(run.record.focus).toEqual({ home, before: HOME, between: [], after: LAB });
     expect(Object.keys(run.record.focus!)).toEqual(['home', 'before', 'between', 'after']);
     expect(logged).toEqual({ focus: { home, before: HOME, between: [], after: LAB } });
+  });
+
+  it('fromLauncher without reads.focus: the focus is read all the same (its premise is the read before the calls)', async () => {
+    const home = { resolved: 'priority=0\nlauncher/.Home\n' };
+    const lab = new FakeAndroidLab({ launched: read('launch'), states: [read('final')], focus: [HOME, LAB], home });
+    const run = await runCase(aCase({ fromLauncher: true }), 'uiautomator', rigOver(lab));
+    expect(lab.log).toEqual(['launch c', 'toLauncher', 'focus', 'call tap under uiautomator-x1.yaml', 'pause 800', 'state', 'focus']);
+    expect(run.record.focus).toEqual({ home, before: HOME, between: [], after: LAB });
   });
 
   it('no launcher start: no HOME read in the focus reads', async () => {

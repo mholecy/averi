@@ -1,4 +1,4 @@
-import { LAB_APP, type FocusRead, type HomeRead } from './lab-device.js';
+import { LAB_APP, windowInTransition, type FocusRead, type HomeRead } from './lab-device.js';
 import type { Call, Case, CaseReads, DeviceLog } from './live-cases.js';
 import type { LiveVerdict } from './live-visibility.js';
 import { chooserSaid, isError, launchedAs, linkHeldSaid, warnedSaid } from './replies.js';
@@ -29,15 +29,16 @@ export interface FocusReads {
 }
 
 /**
- * What one read says. `focused`: `mFocusedApp` at the read's FIRST window read — what the device showed when averi had
- * replied, before any wait (FocusRead.firstWindow, else the one window read). `current`: `mFocusedApp` once settled.
- * `settled`: the last window read names a focused window (`mCurrentFocus` not null). `records`: every activity record,
- * top first, read once the window settled (or the wait ran out).
+ * What one read says. `focusedFirst`: `mFocusedApp` at the read's first window read — what the device showed when averi
+ * had replied, before any wait (`settle.firstWindow`, else the one window read). `focusedSettled`: `mFocusedApp` at the
+ * last window read. `settle`: `settled` when that last read names a focused window; `ran-out` when it is still
+ * mid-transition after the wait (`windowInTransition`); `not-waited` when it is and no wait was taken (T7b's first run,
+ * before the wait). `records`: every activity record, top first, read after the last window read.
  */
 export interface Front {
-  focused: string;
-  current: string;
-  settled: boolean;
+  focusedFirst: string;
+  focusedSettled: string;
+  settle: 'settled' | 'ran-out' | 'not-waited';
   records: string[];
 }
 
@@ -46,22 +47,34 @@ const RECORD = String.raw`ActivityRecord\{[0-9a-f]+ u\d+ ([^\s}/]+\/[^\s}]+)[\s}
 const FOCUSED_APP = new RegExp(String.raw`mFocusedApp=[^\n]*?${RECORD}`);
 const HIST = new RegExp(String.raw`\* Hist +#\d+: ${RECORD}`, 'g');
 
+/**
+ * The read's wait: its `settle`, or — a record of T7b's review round 1 — `waitedMs` and `firstWindow` at its top (the
+ * first three settled runs kept `waitedMs` alone); none when it took no wait.
+ */
+function waitOf(read: Extract<FocusRead, { window: string }>): { waitedMs: number; firstWindow?: string } | undefined {
+  if (read.settle !== undefined) return read.settle;
+  const round1 = read as { waitedMs?: number; firstWindow?: string };
+  return round1.waitedMs === undefined ? undefined : { waitedMs: round1.waitedMs, firstWindow: round1.firstWindow };
+}
+
 /** The read as a Front, or unread with why: a failed read or one with no focused activity proves nothing. */
 export function frontOf(read: FocusRead): Front | { why: string } {
   if ('error' in read) return { why: `the focus read failed: ${read.error}` };
-  const current = FOCUSED_APP.exec(read.window)?.[1];
-  if (current === undefined) return { why: 'the focus read holds no mFocusedApp line' };
-  const focused = read.firstWindow === undefined ? current : FOCUSED_APP.exec(read.firstWindow)?.[1];
-  if (focused === undefined) return { why: 'the first focus read holds no mFocusedApp line' };
+  const focusedSettled = FOCUSED_APP.exec(read.window)?.[1];
+  if (focusedSettled === undefined) return { why: 'the focus read holds no mFocusedApp line' };
+  const wait = waitOf(read);
+  const focusedFirst = wait?.firstWindow === undefined ? focusedSettled : FOCUSED_APP.exec(wait.firstWindow)?.[1];
+  if (focusedFirst === undefined) return { why: 'the first focus read holds no mFocusedApp line' };
   const records = [...read.activities.matchAll(HIST)].map((m) => m[1]);
   if (records.length === 0) return { why: 'the activities read lists no record' };
-  return { focused, current, settled: !/mCurrentFocus=null\b/.test(read.window), records };
+  const settle = !windowInTransition(read.window) ? 'settled' : wait === undefined ? 'not-waited' : 'ran-out';
+  return { focusedFirst, focusedSettled, settle, records };
 }
 
 /** The chooser the read has focused once settled (run-case.ts's teardown), else none: an unread read, a record below. */
 export function chooserInFront(read: FocusRead): string | undefined {
   const front = frontOf(read);
-  return 'why' in front || !isChooser(front.current) ? undefined : front.current;
+  return 'why' in front || !isChooser(front.focusedSettled) ? undefined : front.focusedSettled;
 }
 
 /** A component in full: `pkg/.Cls` as `pkg/pkg.Cls`, the two forms the device prints. */
@@ -130,8 +143,10 @@ function frontsOf(log: DeviceLog | undefined): Fronts | LiveVerdict {
   return 'outcome' in after ? after : { ...(reads.home !== undefined && { home: reads.home }), before, between, after };
 }
 
-/** The read after the calls still mid-transition when the wait ran out: what is left on the stack is unread. */
-const NEVER_SETTLED: LiveVerdict = { outcome: 'SKIP', why: 'the read after the calls never settled (mCurrentFocus=null): whether a chooser is left on the stack is unread' };
+/** The read after the calls still mid-transition when the wait ran out, no chooser listed: what is left is unread. */
+const RAN_OUT: LiveVerdict = verdict('SKIP', 'the read after the calls did not settle in the 5 s wait (mCurrentFocus=null), and lists no chooser: whether one is left is unread');
+/** An old record's read after the calls, taken once, mid-transition: what is left is unread. */
+const NOT_WAITED: LiveVerdict = verdict('SKIP', 'the read after the calls was not waited (an old record) and is mid-transition (mCurrentFocus=null): whether a chooser is left on the stack is unread');
 
 /** The chooser records on the stack, top first. */
 const choosers = (f: Front): string[] => f.records.filter(isChooser);
@@ -147,28 +162,53 @@ const onFronts =
     return 'outcome' in fronts ? fronts : judge(fronts, replies, state);
   };
 
+/**
+ * A launch's headline that is not `Launched <want>`, or a ⚠ line under it: the MISMATCH, its why `averi says "<headline>"[
+ * with a ⚠ line] — <seen>`; else none.
+ */
+function headlineMismatch(reply: string, want: string, seen: string): LiveVerdict | undefined {
+  const warned = warnedSaid(reply);
+  return launchedAs(reply) === want && !warned ? undefined : verdict('MISMATCH', `averi says ${said(reply)}${warned ? ' with a ⚠ line' : ''} — ${seen}`);
+}
+
+/**
+ * lc1–lc3's error reply: a MISMATCH when the device shows the start took (`took`, what it shows), else LOUD (`seen`);
+ * none for a reply that is no error.
+ */
+function errorReply(reply: string, took: string | undefined, seen: string): LiveVerdict | undefined {
+  if (!isError(reply)) return undefined;
+  return took !== undefined ? verdict('MISMATCH', `averi says ${said(reply)} — ${took}`) : verdict('LOUD', `averi says ${said(reply)}; ${seen}`);
+}
+
+/**
+ * What is left on the stack is judged on a settled read only. A read whose wait ran out with a chooser record still
+ * listed is a MISMATCH (5 s, well past the ~1.3 s measured); with none, or a read not waited (an old record), unread.
+ */
+function unsettledStack(after: Front, reply: string): LiveVerdict | undefined {
+  if (after.settle === 'settled') return undefined;
+  if (after.settle === 'not-waited') return NOT_WAITED;
+  const left = choosers(after);
+  return left.length === 0 ? RAN_OUT : verdict('MISMATCH', `averi says ${said(reply)} — a chooser is still on the stack after the 5 s wait (${left.join(', ')}), well past the ~1.3 s measured`);
+}
+
 /** The premise of a case that raises its own chooser: none on the stack before its calls. */
 const noChooserBefore = (f: Front): LiveVerdict | undefined => {
   const up = choosers(f);
   return up.length === 0 ? undefined : verdict('SKIP', `a chooser was on the stack before the calls (${up.join(', ')})`);
 };
 
-/** The packages of the platform's own activities (the chooser's among them). */
-const PLATFORM_PACKAGES = CHOOSER_PACKAGES;
-
 /**
  * The premise of lc4' and lc4'': the launcher in front before the calls — the HOME activity the device resolves
- * (`home`), no record of the lab, no chooser. A record from before T7b's review round 1 has no HOME read: then at least
- * not the platform in front (the lab in front leaves its record on the stack).
+ * (`home`), no record of the lab, no chooser. A record from before T7b's review round 1 has no HOME read: then the weaker
+ * premise, at least no package of the platform's chooser in front (the lab in front leaves its record on the stack).
  */
-function fromTheLauncher(f: Front, home: HomeRead | undefined): LiveVerdict | undefined {
+function launcherPremise(f: Front, home: HomeRead | undefined): LiveVerdict | undefined {
   if (home === undefined) {
-    // The lab focused is caught below: its record is on the stack.
-    if (PLATFORM_PACKAGES.has(f.focused.split('/')[0])) return verdict('SKIP', `not started from the launcher: ${f.focused} was in front before the calls (no HOME activity read: the platform's)`);
+    if (CHOOSER_PACKAGES.has(f.focusedFirst.split('/')[0])) return verdict('SKIP', `not started from the launcher: ${f.focusedFirst} was in front before the calls (no HOME activity read: a package of the platform's chooser)`);
   } else {
     const resolved = homeOf(home);
     if (typeof resolved !== 'string') return verdict('SKIP', resolved.why);
-    if (full(f.focused) !== full(resolved)) return verdict('SKIP', `not started from the launcher: ${f.focused} was in front before the calls, not the HOME activity ${resolved}`);
+    if (full(f.focusedFirst) !== full(resolved)) return verdict('SKIP', `not started from the launcher: ${f.focusedFirst} was in front before the calls, not the HOME activity ${resolved}`);
   }
   const held = f.records.filter((r) => ofLab(r) || isChooser(r));
   return held.length === 0 ? undefined : verdict('SKIP', `not started from the launcher: the stack holds ${held.join(', ')} before the calls`);
@@ -180,18 +220,21 @@ function fromTheLauncher(f: Front, home: HomeRead | undefined): LiveVerdict | un
  * is a MISMATCH; no chooser raised and none named proves nothing (a preferred activity would do that): SKIP.
  */
 export const judgeChooserNamed: FrontJudge = ({ before, after }, [reply]) => {
-  const premise = noChooserBefore(before);
-  if (premise !== undefined) return premise;
-  const up = isChooser(after.focused);
-  if (isError(reply)) return up ? verdict('MISMATCH', `averi says ${said(reply)} — the start raised ${after.focused}, in front`) : verdict('LOUD', `averi says ${said(reply)}; ${after.focused} is in front`);
+  const front = after.focusedFirst;
+  const up = isChooser(front);
+  return noChooserBefore(before) ?? errorReply(reply, up ? `the start raised ${front}, in front` : undefined, `${front} is in front`) ?? chooserNamed(front, up, reply);
+};
+
+/** lc1 past its premise and an error: the headline the lab's, the chooser named the one in front. */
+function chooserNamed(front: string, up: boolean, reply: string): LiveVerdict {
   const app = launchedAs(reply);
   if (app !== LAB) return verdict('MISMATCH', `averi's headline names ${app ?? 'no launch'}, not ${LAB}: ${said(reply)}`);
   const named = chooserSaid(reply);
-  if (up && named === after.focused) return verdict('ok', `Launched, the chooser named (${named}), and it is in front`);
-  if (up && named === undefined) return verdict('MISMATCH', `averi says ${said(reply)} and names no chooser — ${after.focused} is in front`);
-  if (named !== undefined) return verdict('MISMATCH', `averi names the chooser (${named}) — ${after.focused} is in front`);
-  return verdict('SKIP', `no chooser raised and none named: ${after.focused} is in front (a preferred activity? \`dumpsys package preferred\`)`);
-};
+  if (up && named === front) return verdict('ok', `Launched, the chooser named (${named}), and it is in front`);
+  if (up && named === undefined) return verdict('MISMATCH', `averi says ${said(reply)} and names no chooser — ${front} is in front`);
+  if (named !== undefined) return verdict('MISMATCH', `averi names the chooser (${named}) — ${front} is in front`);
+  return verdict('SKIP', `no chooser raised and none named: ${front} is in front (a preferred activity? \`dumpsys package preferred\`)`);
+}
 
 /**
  * lc2: a `-p` start of a one-handler intent (`averilab://cell/<cell>`) opens the cell — a bare Launched, the lab in
@@ -201,13 +244,17 @@ export const judgeChooserNamed: FrontJudge = ({ before, after }, [reply]) => {
 export const judgeOneHandler =
   (cell: string): FrontJudge =>
   ({ after }, [reply], state) => {
-    if (isChooser(after.focused)) return verdict('SKIP', `a chooser for a one-handler link: ${after.focused} is in front`);
-    const opened = ofLab(after.focused) && state.cell === cell;
-    if (isError(reply)) return opened ? verdict('MISMATCH', `averi says ${said(reply)} — the app shows cell ${cell}, ${after.focused} in front`) : verdict('LOUD', `averi says ${said(reply)}; the app shows cell ${state.cell}`);
-    if (launchedAs(reply) !== LAB || warnedSaid(reply)) return verdict('MISMATCH', `averi says ${said(reply)}${warnedSaid(reply) ? ' with a ⚠ line' : ''} — ${after.focused} is in front, the app shows cell ${state.cell}`);
-    if (!ofLab(after.focused)) return verdict('MISMATCH', `averi says ${said(reply)} — ${after.focused} is in front`);
-    if (state.cell !== cell) return verdict('MISMATCH', `averi says ${said(reply)} — the app shows cell ${state.cell}, not ${cell}`);
-    return verdict('ok', `Launched, no note; ${after.focused} in front, the app shows cell ${cell}`);
+    const front = after.focusedFirst;
+    const chooserUp = isChooser(front) ? verdict('SKIP', `a chooser for a one-handler link: ${front} is in front`) : undefined;
+    const opened = ofLab(front) && state.cell === cell;
+    return (
+      chooserUp ??
+      errorReply(reply, opened ? `the app shows cell ${cell}, ${front} in front` : undefined, `the app shows cell ${state.cell}`) ??
+      headlineMismatch(reply, LAB, `${front} is in front, the app shows cell ${state.cell}`) ??
+      (!ofLab(front) ? verdict('MISMATCH', `averi says ${said(reply)} — ${front} is in front`)
+      : state.cell !== cell ? verdict('MISMATCH', `averi says ${said(reply)} — the app shows cell ${state.cell}, not ${cell}`)
+      : verdict('ok', `Launched, no note; ${front} in front, the app shows cell ${cell}`))
+    );
   };
 
 /**
@@ -216,54 +263,60 @@ export const judgeOneHandler =
  * dropped) is the chooser on the stack. The "one start at most" check (no more than one new lab record) CANNOT fail on
  * this lab: `.MainActivity` is singleTop, so the alias's start is delivered to the top instance (API 33: "Activity not
  * started, intent has been delivered to currently running top-most instance", records 1 → 1 every run); it stays as a
- * guard for a lab that changes, not as evidence.
+ * guard for a lab that changes, not as evidence. An error reply is judged before the settle.
  */
 export const judgeNamedActivity: FrontJudge = ({ before, after }, [reply]) => {
-  const premise = noChooserBefore(before);
-  if (premise !== undefined) return premise;
-  if (!after.settled) return NEVER_SETTLED;
+  const front = after.focusedFirst;
   const up = choosers(after);
-  if (isError(reply)) return ofLab(after.focused) && up.length === 0 ? verdict('MISMATCH', `averi says ${said(reply)} — ${after.focused} is in front, no chooser`) : verdict('LOUD', `averi says ${said(reply)}; ${after.focused} is in front`);
-  if (up.length > 0) return verdict('MISMATCH', `averi says ${said(reply)} — a chooser is on the stack (${up.join(', ')}): .Twin was not started by name`);
-  if (launchedAs(reply) !== `${LAB}/.Twin` || warnedSaid(reply)) return verdict('MISMATCH', `averi says ${said(reply)}${warnedSaid(reply) ? ' with a ⚠ line' : ''} — the launch named .Twin, ${after.focused} is in front`);
-  if (!ofLab(after.focused)) return verdict('MISMATCH', `averi says ${said(reply)} — ${after.focused} is in front`);
+  return (
+    noChooserBefore(before) ??
+    errorReply(reply, ofLab(front) && up.length === 0 ? `${front} is in front, no chooser` : undefined, `${front} is in front`) ??
+    unsettledStack(after, reply) ??
+    (up.length > 0 ? verdict('MISMATCH', `averi says ${said(reply)} — a chooser is on the stack (${up.join(', ')}): .Twin was not started by name`) : undefined) ??
+    headlineMismatch(reply, `${LAB}/.Twin`, `the launch named .Twin, ${front} is in front`) ??
+    twinStarted(before, after, reply)
+  );
+};
+
+/** lc3 past its other checks: the lab in front, one start at most. */
+function twinStarted(before: Front, after: Front, reply: string): LiveVerdict {
+  if (!ofLab(after.focusedFirst)) return verdict('MISMATCH', `averi says ${said(reply)} — ${after.focusedFirst} is in front`);
   const [was, is] = [labRecords(before), labRecords(after)];
   if (is > was + 1) return verdict('MISMATCH', `averi says ${said(reply)} — the lab has ${is} activity records, ${was} before the call: more than one start`);
-  return verdict('ok', `Launched .Twin, no note, no chooser; ${after.focused} in front, the lab's records ${was} → ${is}`);
-};
+  return verdict('ok', `Launched .Twin, no note, no chooser; ${after.focusedFirst} in front, the lab's records ${was} → ${is}`);
+}
 
 /**
  * The launch both lc4' and lc4'' end with: launch_app with no activity (monkey, D73's `--pct-syskeys 0 …`) — a bare
- * Launched, the lab's launcher activity focused, no chooser left on the stack. A refusal is a MISMATCH, not LOUD:
- * monkey starts the app on this AVD, from the launcher and over the chooser (D73, measured 12 of 12), so a refusal is the
- * bug D73 fixed coming back.
+ * Launched, the lab's launcher activity focused when averi replied (the first read), no chooser left on the stack (the
+ * settled read). A refusal is a MISMATCH, not LOUD: monkey starts the app on this AVD, from the launcher and over the
+ * chooser (D73, measured 12 of 12), so a refusal is the bug D73 fixed coming back.
  */
 function judgeMonkeyLaunch(after: Front, reply: string, state: LabState): LiveVerdict {
-  if (isError(reply)) return verdict('MISMATCH', `averi refused the launch (${cut(reply)}) — monkey can start the app from the launcher on this AVD (D73); ${after.focused} is in front`);
-  if (launchedAs(reply) !== LAB || warnedSaid(reply)) return verdict('MISMATCH', `averi says ${said(reply)}${warnedSaid(reply) ? ' with a ⚠ line' : ''} — ${after.focused} is in front`);
-  // What averi's "Launched" claims: the app focused when it replied — the first read, before any wait.
-  if (after.focused !== LAB_MAIN) return verdict('MISMATCH', `averi says ${said(reply)} — ${after.focused} was mFocusedApp at the first read after it, not ${LAB_MAIN}`);
-  // No chooser left: on the settled read only (a ResolverActivity record outlives the transition, about 1.3 s).
-  if (!after.settled) return NEVER_SETTLED;
+  const front = after.focusedFirst;
+  if (isError(reply)) return verdict('MISMATCH', `averi refused the launch (${cut(reply)}) — monkey can start the app from the launcher on this AVD (D73); ${front} is in front`);
   const left = choosers(after);
-  if (left.length > 0) return verdict('MISMATCH', `averi says ${said(reply)} — a chooser is still on the stack (${left.join(', ')})`);
-  return verdict('ok', `Launched, no note; ${LAB_MAIN} in front, no chooser on the stack (the app's cell ${JSON.stringify(state.cell)})`);
+  return (
+    headlineMismatch(reply, LAB, `${front} is in front`) ??
+    (front !== LAB_MAIN ? verdict('MISMATCH', `averi says ${said(reply)} — ${front} was mFocusedApp at the first read after it, not ${LAB_MAIN}`) : undefined) ??
+    unsettledStack(after, reply) ??
+    (left.length > 0 ? verdict('MISMATCH', `averi says ${said(reply)} — a chooser is still on the stack (${left.join(', ')})`) : undefined) ??
+    verdict('ok', `Launched, no note; ${LAB_MAIN} in front, no chooser on the stack (the app's cell ${JSON.stringify(state.cell)})`)
+  );
 }
 
-/** lc4' (D73's net): launch_app with no activity, from the launcher. */
-export const judgeFromLauncher: FrontJudge = ({ home, before, after }, [reply], state) => fromTheLauncher(before, home) ?? judgeMonkeyLaunch(after, reply, state);
+/** lc4' (D73's net, run on demand: backlog T20): launch_app with no activity, from the launcher. */
+export const judgeFromLauncher: FrontJudge = ({ home, before, after }, [reply], state) => launcherPremise(before, home) ?? judgeMonkeyLaunch(after, reply, state);
 
 /**
- * lc4'' (D73's net, over the chooser): from the launcher, `open_deep_link averilab://shared/open` raises the chooser
- * (read between the calls: its premise), and its reply names it rather than "Opened" (D55); then launch_app with no
- * activity brings the lab forward and no ResolverActivity is left.
+ * lc4'' (D73's net over the chooser, run on demand): from the launcher, `open_deep_link averilab://shared/open` raises the
+ * chooser (read between the calls: its premise), and its reply names it rather than "Opened" (D55); then launch_app with
+ * no activity brings the lab forward and no ResolverActivity is left.
  */
 export const judgeOverChooser: FrontJudge = ({ home, before, between: [link], after }, [linkReply, reply], state) => {
-  const premise = fromTheLauncher(before, home);
-  if (premise !== undefined) return premise;
-  if (link === undefined || !isChooser(link.focused)) return verdict('SKIP', `the link raised no chooser: ${link?.focused ?? 'nothing read'} was in front after it`);
-  if (!linkHeldSaid(linkReply) || chooserSaid(linkReply) !== link.focused) return verdict('MISMATCH', `the link: averi says ${said(linkReply)} — ${link.focused} was in front after it`);
-  return judgeMonkeyLaunch(after, reply, state);
+  const raised = link === undefined || !isChooser(link.focusedFirst) ? verdict('SKIP', `the link raised no chooser: ${link?.focusedFirst ?? 'nothing read'} was in front after it`) : undefined;
+  const named = link !== undefined && (!linkHeldSaid(linkReply) || chooserSaid(linkReply) !== link.focusedFirst) ? verdict('MISMATCH', `the link: averi says ${said(linkReply)} — ${link.focusedFirst} was in front after it`) : undefined;
+  return launcherPremise(before, home) ?? raised ?? named ?? judgeMonkeyLaunch(after, reply, state);
 };
 
 // --- the cases ---
@@ -311,7 +364,7 @@ export const CHOOSER_CASES: readonly ChooserCase[] = [
   {
     id: 'lc3',
     cell: START_CELL,
-    says: 'launch_app with activity .Twin and the two-handler intent (am start -n): no chooser, no note, one start',
+    says: 'launch_app with activity .Twin and the two-handler intent (am start -n): no chooser on the stack, no note, the lab in front',
     ...base,
     calls: [{ tool: 'launch_app', args: { appId: LAB, activity: '.Twin', intent: { action: VIEW, data: 'averilab://shared/x' } } }],
     judge: onFronts(judgeNamedActivity),

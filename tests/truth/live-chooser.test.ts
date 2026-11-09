@@ -32,23 +32,29 @@ const AT_CHOOSER: FocusRead = { window: windowOf(RESOLVER, RESOLVER), activities
 
 describe('frontOf: what one read says is in front, and on the stack', () => {
   it('the focused activity and every record, top first, as the device prints them', () => {
-    expect(frontOf(AT_CHOOSER)).toEqual({ focused: RESOLVER, current: RESOLVER, settled: true, records: [RESOLVER, MAIN, LAUNCHER] });
-    expect(frontOf(AT_LAB)).toEqual({ focused: MAIN, current: MAIN, settled: true, records: [MAIN, LAUNCHER] });
-    expect(frontOf(AT_LAUNCHER)).toEqual({ focused: LAUNCHER, current: LAUNCHER, settled: true, records: [LAUNCHER] });
+    expect(frontOf(AT_CHOOSER)).toEqual({ focusedFirst: RESOLVER, focusedSettled: RESOLVER, settle: 'settled', records: [RESOLVER, MAIN, LAUNCHER] });
+    expect(frontOf(AT_LAB)).toEqual({ focusedFirst: MAIN, focusedSettled: MAIN, settle: 'settled', records: [MAIN, LAUNCHER] });
+    expect(frontOf(AT_LAUNCHER)).toEqual({ focusedFirst: LAUNCHER, focusedSettled: LAUNCHER, settle: 'settled', records: [LAUNCHER] });
   });
 
-  it('a read that waited: `focused` is the first window read\'s (what the device showed when averi replied), `current` the settled one\'s', () => {
-    expect(frontOf({ ...AT_LAB, firstWindow: UNSETTLED(LAUNCHER), waitedMs: 300 })).toEqual({ focused: LAUNCHER, current: MAIN, settled: true, records: [MAIN, LAUNCHER] });
-    expect(frontOf({ ...AT_LAB, firstWindow: '  mCurrentFocus=null\n', waitedMs: 300 })).toEqual({ why: 'the first focus read holds no mFocusedApp line' });
+  it('a read that waited: `focusedFirst` is the first window read\'s (what the device showed when averi replied), `focusedSettled` the settled one\'s', () => {
+    expect(frontOf({ ...AT_LAB, settle: { firstWindow: UNSETTLED(LAUNCHER), waitedMs: 300 } })).toEqual({ focusedFirst: LAUNCHER, focusedSettled: MAIN, settle: 'settled', records: [MAIN, LAUNCHER] });
+    expect(frontOf({ ...AT_LAB, settle: { firstWindow: '  mCurrentFocus=null\n', waitedMs: 300 } })).toEqual({ why: 'the first focus read holds no mFocusedApp line' });
   });
 
-  it('a window still mid-transition (`mCurrentFocus=null`) is not settled, waited for or not', () => {
-    expect(frontOf({ window: UNSETTLED(MAIN), activities: hist(MAIN, 1) })).toEqual({ focused: MAIN, current: MAIN, settled: false, records: [MAIN] });
-    expect(frontOf({ window: UNSETTLED(MAIN), activities: hist(MAIN, 1), firstWindow: UNSETTLED(MAIN), waitedMs: 5_000 })).toMatchObject({ settled: false });
+  it("review round 1's records kept `waitedMs` and `firstWindow` at the read's top: read the same", () => {
+    const legacy = { ...AT_LAB, firstWindow: UNSETTLED(LAUNCHER), waitedMs: 300 } as FocusRead;
+    expect(frontOf(legacy)).toEqual({ focusedFirst: LAUNCHER, focusedSettled: MAIN, settle: 'settled', records: [MAIN, LAUNCHER] });
+    expect(frontOf({ window: UNSETTLED(MAIN), activities: hist(MAIN, 1), waitedMs: 5_000 } as FocusRead)).toMatchObject({ focusedFirst: MAIN, settle: 'ran-out' });
+  });
+
+  it('a window still mid-transition (`mCurrentFocus=null`): the wait ran out, or none was taken (an old record)', () => {
+    expect(frontOf({ window: UNSETTLED(MAIN), activities: hist(MAIN, 1) })).toEqual({ focusedFirst: MAIN, focusedSettled: MAIN, settle: 'not-waited', records: [MAIN] });
+    expect(frontOf({ window: UNSETTLED(MAIN), activities: hist(MAIN, 1), settle: { firstWindow: UNSETTLED(MAIN), waitedMs: 5_000 } })).toMatchObject({ settle: 'ran-out' });
   });
 
   it("API 36's shape, the task after a space: the component ends there", () => {
-    expect(frontOf({ window: `  mFocusedApp=ActivityRecord{1 u0 ${LAUNCHER} t2}\n`, activities: `  * Hist  #0: ActivityRecord{1 u0 ${LAUNCHER} t2}\n` })).toEqual({ focused: LAUNCHER, current: LAUNCHER, settled: true, records: [LAUNCHER] });
+    expect(frontOf({ window: `  mFocusedApp=ActivityRecord{1 u0 ${LAUNCHER} t2}\n`, activities: `  * Hist  #0: ActivityRecord{1 u0 ${LAUNCHER} t2}\n` })).toEqual({ focusedFirst: LAUNCHER, focusedSettled: LAUNCHER, settle: 'settled', records: [LAUNCHER] });
   });
 
   it('a read that failed, or one with no mFocusedApp line, is unread with why — never "nothing in front"', () => {
@@ -74,7 +80,7 @@ describe('frontOf: what one read says is in front, and on the stack', () => {
     expect(chooserInFront(AT_CHOOSER)).toBe(RESOLVER);
     expect(chooserInFront(AT_LAB)).toBeUndefined();
     expect(chooserInFront({ window: windowOf(MAIN), activities: hist(MAIN, 1) + hist(RESOLVER, 2) })).toBeUndefined();
-    expect(chooserInFront({ ...AT_LAB, firstWindow: UNSETTLED(RESOLVER), waitedMs: 300 })).toBeUndefined();
+    expect(chooserInFront({ ...AT_LAB, settle: { firstWindow: UNSETTLED(RESOLVER), waitedMs: 300 } })).toBeUndefined();
     expect(chooserInFront({ error: 'offline' })).toBeUndefined();
   });
 
@@ -95,7 +101,10 @@ const launched = (app: string, answer: AppHolder = { holder: 'none' }) => launch
 const linked = (url: string, answer: AppHolder) => deepLinkText('android', url, answer);
 const REFUSED = 'ERROR monkey started nothing in dev.averi.lab — check that dev.averi.lab is installed … ** SYS_KEYS has no physical keys but with factor 2.0%.';
 
-const NEVER_SETTLED: LiveVerdict = { outcome: 'SKIP', why: 'the read after the calls never settled (mCurrentFocus=null): whether a chooser is left on the stack is unread' };
+const RAN_OUT: LiveVerdict = { outcome: 'SKIP', why: 'the read after the calls did not settle in the 5 s wait (mCurrentFocus=null), and lists no chooser: whether one is left is unread' };
+const NOT_WAITED: LiveVerdict = { outcome: 'SKIP', why: 'the read after the calls was not waited (an old record) and is mid-transition (mCurrentFocus=null): whether a chooser is left on the stack is unread' };
+/** The wait ran out on `window`, the stack `activities`. */
+const ranOut = (window: string, activities: string): FocusRead => ({ window, activities, settle: { firstWindow: window, waitedMs: 5_000 } });
 const HOME = { resolved: `priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\n${LAUNCHER}\n` };
 const caseOf = (id: string) => CHOOSER_CASES.find((c) => c.id === id)!;
 const judge = (id: string, replies: string[], focus: Partial<FocusReads>, s: LabState = LAUNCHED): LiveVerdict =>
@@ -206,8 +215,14 @@ describe('lc3: launch_app naming .Twin with the same intent: no chooser, no note
     expect(judge('lc3', [launched('dev.averi.lab/.Twin', chooser)], { after: AT_LAB }).outcome).toBe('MISMATCH');
   });
 
-  it('SKIP: the read after the call never settled, so whether a chooser is on the stack is unread', () => {
-    expect(judge('lc3', [launched('dev.averi.lab/.Twin')], { after: { window: UNSETTLED(MAIN), activities: hist(MAIN, 1), firstWindow: UNSETTLED(MAIN), waitedMs: 5_000 } })).toEqual(NEVER_SETTLED);
+  it('the read after the call unsettled: SKIP with no chooser listed (ran out, or not waited); MISMATCH with one still listed after the 5 s wait', () => {
+    expect(judge('lc3', [launched('dev.averi.lab/.Twin')], { after: ranOut(UNSETTLED(MAIN), hist(MAIN, 1)) })).toEqual(RAN_OUT);
+    expect(judge('lc3', [launched('dev.averi.lab/.Twin')], { after: { window: UNSETTLED(MAIN), activities: hist(MAIN, 1) + hist(RESOLVER, 2) } })).toEqual(NOT_WAITED);
+    expect(judge('lc3', [launched('dev.averi.lab/.Twin')], { after: ranOut(UNSETTLED(MAIN), hist(MAIN, 1) + hist(RESOLVER, 2)) })).toEqual({ outcome: 'MISMATCH', why: `averi says "Launched dev.averi.lab/.Twin on android" — a chooser is still on the stack after the 5 s wait (${RESOLVER}), well past the ~1.3 s measured` });
+  });
+
+  it('an error reply is judged before the settle: MISMATCH with the lab in front and no chooser, an unsettled read or not', () => {
+    expect(judge('lc3', ['ERROR x'], { after: ranOut(UNSETTLED(MAIN), hist(MAIN, 1)) }).outcome).toBe('MISMATCH');
   });
 
   it('MISMATCH: two starts — two more records of the lab than before', () => {
@@ -242,12 +257,14 @@ describe("lc4': launch_app with no activity, from the launcher (monkey): Launche
   });
 
   it('mFocusedApp is judged on the first read (when averi replied), the stack on the settled one', () => {
-    const late = { ...AT_LAB, firstWindow: UNSETTLED(LAUNCHER), waitedMs: 300 };
+    const late = { ...AT_LAB, settle: { firstWindow: UNSETTLED(LAUNCHER), waitedMs: 300 } };
     expect(judge("lc4'", [launched('dev.averi.lab')], { ...fromLauncher, after: late })).toEqual({ outcome: 'MISMATCH', why: `averi says "Launched dev.averi.lab on android" — ${LAUNCHER} was mFocusedApp at the first read after it, not ${MAIN}` });
-    const settledLater = { ...AT_LAB, firstWindow: UNSETTLED(MAIN), waitedMs: 300 };
+    const settledLater = { ...AT_LAB, settle: { firstWindow: UNSETTLED(MAIN), waitedMs: 300 } };
     expect(judge("lc4'", [launched('dev.averi.lab')], { ...fromLauncher, after: settledLater }, state('')).outcome).toBe('ok');
-    const neverSettled = { window: UNSETTLED(MAIN), activities: hist(MAIN, 1) + hist(RESOLVER, 2) };
-    expect(judge("lc4'", [launched('dev.averi.lab')], { ...fromLauncher, after: neverSettled })).toEqual(NEVER_SETTLED);
+    const notWaited = { window: UNSETTLED(MAIN), activities: hist(MAIN, 1) + hist(RESOLVER, 2) };
+    expect(judge("lc4'", [launched('dev.averi.lab')], { ...fromLauncher, after: notWaited })).toEqual(NOT_WAITED);
+    expect(judge("lc4'", [launched('dev.averi.lab')], { ...fromLauncher, after: ranOut(UNSETTLED(MAIN), hist(MAIN, 1)) })).toEqual(RAN_OUT);
+    expect(judge("lc4'", [launched('dev.averi.lab')], { ...fromLauncher, after: ranOut(UNSETTLED(MAIN), hist(MAIN, 1) + hist(RESOLVER, 2)) })).toEqual({ outcome: 'MISMATCH', why: `averi says "Launched dev.averi.lab on android" — a chooser is still on the stack after the 5 s wait (${RESOLVER}), well past the ~1.3 s measured` });
   });
 
   it('SKIP: not the HOME activity in front before the calls (the lab, another app), or the HOME activity unread', () => {
@@ -263,7 +280,7 @@ describe("lc4': launch_app with no activity, from the launcher (monkey): Launche
     const settings: FocusRead = { window: windowOf('com.android.settings/.Settings'), activities: hist('com.android.settings/.Settings', 3) + hist(LAUNCHER, 4862) };
     expect(judge("lc4'", [launched('dev.averi.lab')], { before: settings, after: AT_LAB }, state('')).outcome).toBe('ok');
     const platform: FocusRead = { window: windowOf('android/.Something'), activities: hist(LAUNCHER, 4862) };
-    expect(judge("lc4'", [launched('dev.averi.lab')], { before: platform, after: AT_LAB })).toEqual({ outcome: 'SKIP', why: 'not started from the launcher: android/.Something was in front before the calls (no HOME activity read: the platform\'s)' });
+    expect(judge("lc4'", [launched('dev.averi.lab')], { before: platform, after: AT_LAB })).toEqual({ outcome: 'SKIP', why: 'not started from the launcher: android/.Something was in front before the calls (no HOME activity read: a package of the platform\'s chooser)' });
     expect(judge("lc4'", [launched('dev.averi.lab')], { before: AT_LAB, after: AT_LAB }).outcome).toBe('SKIP');
     expect(judge("lc4'", [launched('dev.averi.lab')], { before: { window: windowOf(LAUNCHER), activities: hist(LAUNCHER, 1) + hist(MAIN, 2) }, after: AT_LAB }).outcome).toBe('SKIP');
     expect(judge("lc4'", [launched('dev.averi.lab')], { before: { window: windowOf(LAUNCHER), activities: hist(LAUNCHER, 1) + hist(RESOLVER, 2) }, after: AT_LAB }).outcome).toBe('SKIP');

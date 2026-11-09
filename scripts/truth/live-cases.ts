@@ -165,7 +165,7 @@ export interface Case extends RunsUnder {
   /**
    * Android, the chooser group: once launched, the lab is force-stopped and HOME pressed, so the calls start from the
    * launcher (AndroidLab.toLauncher; lc4', lc4''). `launched` stays the launch's state, the last the app wrote; the
-   * focus read before the calls is what says the launcher is in front.
+   * focus read before the calls is what says the launcher is in front, so this implies the focus reads (`reads.focus`).
    */
   fromLauncher?: true;
   calls: Call[];

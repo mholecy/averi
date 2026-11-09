@@ -313,10 +313,15 @@ export async function withMeasuredPanel(
 }
 
 /**
- * One focus read as the device printed it (AndroidLab.focus; the chooser group's, live-chooser.ts): the two greps, with how
- * long it waited for the window transition to settle when it did (`waitedMs`), or the error that stopped it.
+ * One focus read as the device printed it (AndroidLab.focus; the chooser group's, live-chooser.ts): the two greps, the
+ * window the last one read; `settle` when it waited for the window transition (`windowInTransition`) — how long, and the
+ * first window read, what the device showed when averi had replied; or the error that stopped it. Review round 1's
+ * records keep `waitedMs` and `firstWindow` at the top instead (live-chooser.ts#frontOf reads both).
  */
-export type FocusRead = { window: string; activities: string; waitedMs?: number; firstWindow?: string } | { error: string };
+export type FocusRead = { window: string; activities: string; settle?: { waitedMs: number; firstWindow: string } } | { error: string };
+
+/** A window read taken mid-transition: no window has the focus yet (`mCurrentFocus=null`). */
+export const windowInTransition = (window: string): boolean => /mCurrentFocus=null\b/.test(window);
 
 /** The HOME activity as `cmd package resolve-activity --brief` prints it (HOME_COMMAND), raw, or the error that stopped it. */
 export type HomeRead = { resolved: string } | { error: string };
@@ -434,8 +439,9 @@ export class AndroidLab implements LabDevice {
 
   /**
    * The device's word on what is in front and on the stack (FOCUS_WINDOW_COMMAND, ACTIVITIES_COMMAND), raw, after the
-   * guard, once settled: a window read mid-transition is taken again (FOCUS_SETTLE_MS), and the wait kept (`waitedMs`)
-   * with the first window read (`firstWindow`: what the device showed when averi had replied). A read that fails is kept as adb's words (`{ error }`): the judge reads it as unread, never as nothing in front.
+   * guard, once settled: a window read mid-transition is taken again (FOCUS_SETTLE_MS), and the wait kept (`settle`:
+   * `waitedMs`, and the first window read, `firstWindow`, what the device showed when averi had replied). A read that
+   * fails is kept as adb's words (`{ error }`): the judge reads it as unread, never as nothing in front.
    */
   async focus(): Promise<FocusRead> {
     await this.guard();
@@ -444,14 +450,14 @@ export class AndroidLab implements LabDevice {
       const firstWindow = await windowRead();
       let window = firstWindow;
       let waitedMs = 0;
-      while (/mCurrentFocus=null\b/.test(window) && waitedMs < FOCUS_SETTLE_MS) {
+      while (windowInTransition(window) && waitedMs < FOCUS_SETTLE_MS) {
         const step = Math.min(FOCUS_POLL_MS, FOCUS_SETTLE_MS - waitedMs);
         await pause(step);
         waitedMs += step;
         window = await windowRead();
       }
       const activities = (await this.adb('shell', ACTIVITIES_COMMAND)).stdout;
-      return { window, activities, ...(waitedMs > 0 && { waitedMs, firstWindow }) };
+      return { window, activities, ...(waitedMs > 0 && { settle: { waitedMs, firstWindow } }) };
     } catch (e) {
       return { error: adbSaid(e) };
     }

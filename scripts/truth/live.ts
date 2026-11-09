@@ -87,7 +87,7 @@ import { parseLabApp, type LabApp } from './schema.js';
  *
  * `chooser` (T7b, Android, not in the default groups): launch_app and open_deep_link around Android's "Open with" chooser
  * (live-chooser.ts) — lc1 the `-p` start that raises it, named; lc2 a one-handler link, no note; lc3 `.Twin` named, no
- * chooser; lc4' monkey from the launcher and lc4'' monkey over a link's chooser (D73's net). The oracle is the device's
+ * chooser; lc4' monkey from the launcher and lc4'' monkey over a link's chooser (D73's net, run on demand: no recurring run includes it yet, backlog T20). The oracle is the device's
  * focus and activity stack (AndroidLab.focus, the record's `focus`), read before, between and after the calls; a chooser
  * left in front is dropped with one BACK. A SKIP fails the run.
  */

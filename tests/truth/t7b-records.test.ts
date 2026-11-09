@@ -11,7 +11,12 @@ import { judged, rejudgedResults, selectCases, type Case, type CaseRecord, type 
 
 const DIR = new URL('../../docs/truth/live-records/t7b-chooser/', import.meta.url);
 const read = (f: string) => JSON.parse(readFileSync(new URL(f, DIR), 'utf8')) as RunRecord;
-/** The first three settled runs (no first window read kept, no HOME read), then review round 1's three (both kept). */
+/**
+ * The first three settled runs (no first window read kept, no HOME read), then review round 1's three (both kept, at the
+ * read's top: the `settle` field came after them). The records without a HOME read — the first run and the first three
+ * settled runs — are judged under the weaker launcher premise (live-chooser.ts#launcherPremise: no package of the
+ * platform's chooser in front, no lab or chooser record), not "the HOME activity in front".
+ */
 const FIRST_RUNS = ['run-1.json', 'run-2.json', 'run-3.json'];
 const REVIEW_RUNS = ['review1-run-1.json', 'review1-run-2.json', 'review1-run-3.json'];
 const RUNS = [...FIRST_RUNS, ...REVIEW_RUNS];
@@ -28,7 +33,7 @@ describe('T7b: the chooser group\'s records, rejudged', () => {
     const results = await rejudgedResults(read('unsettled-1.json'), { groups: ['chooser'] });
     expect(results.map((r) => [r.c.id, r.verdict.outcome])).toEqual([...IDS.slice(0, 3).map((id) => [id, 'ok']), ["lc4'", 'SKIP'], ["lc4''", 'SKIP']]);
     expect(results[3].verdict.why).toBe(results[4].verdict.why);
-    expect(results[4].verdict.why).toBe('the read after the calls never settled (mCurrentFocus=null): whether a chooser is left on the stack is unread');
+    expect(results[4].verdict.why).toBe('the read after the calls was not waited (an old record) and is mid-transition (mCurrentFocus=null): whether a chooser is left on the stack is unread');
     const pp = read('unsettled-1.json').results.find((r) => r.id === "lc4''")!;
     expect(pp.focus!.after).toMatchObject({ window: expect.stringMatching(/mCurrentFocus=null\n {2}mFocusedApp=ActivityRecord\{\w+ u0 dev\.averi\.lab\/\.MainActivity\}/), activities: expect.stringContaining('android/com.android.internal.app.ResolverActivity') });
     expect(pp.focus!.after).not.toHaveProperty('waitedMs');

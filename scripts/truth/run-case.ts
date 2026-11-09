@@ -103,8 +103,10 @@ export async function runCase(c: Case, source: Source, rig: CaseRig): Promise<Ca
     if (lab.platform !== 'android') return skip("a start from the launcher is the Android lab's only");
     home = await lab.toLauncher();
   }
-  const focusLab = c.reads?.focus === true ? (lab.platform === 'android' ? lab : undefined) : undefined;
-  if (c.reads?.focus === true && focusLab === undefined) return skip("a focus read is the Android lab's only");
+  // A start from the launcher implies the focus reads: its premise is the read before the calls (live-chooser.ts).
+  const readsFocus = c.reads?.focus === true || c.fromLauncher === true;
+  const focusLab = readsFocus && lab.platform === 'android' ? lab : undefined;
+  if (readsFocus && focusLab === undefined) return skip("a focus read is the Android lab's only");
   if (c.keyboard && launched.keyboard?.visible !== true) return skip(lab.platform === 'ios' ? 'no soft keyboard at launch (the simulator saw HID typing; see IosLab.launch)' : 'no IME at launch');
   // The first of the two device reads the kf judges rest on (LabState.imeTouchable, lab-device.ts#withMeasuredPanel),
   // on the Android lab only.
