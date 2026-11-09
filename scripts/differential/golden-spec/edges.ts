@@ -19,6 +19,7 @@ import { absentFullyRow, colourFails, directionRow, fullyRow, stopRow, strokeRow
  * | sliver | R-sliver tap, R-sliver scroll_until, R-fully |
  * | partly-centre-in | R-land (Tapped inside what shows), R-fully |
  * | centre-out | R-land (refused, or Tapped inside its piece), R-fully |
+ * | (none: CellTruth.absent) | R-absent: R-stroke and R-fully toward AbsentTarget.toward (absentRows) |
  *
  * What each row asks is the target contract's (`c`, scripts/truth/target-contract.ts#contractOf — the live golden's
  * cases read the same clauses), handed to the row that judges it: the judged geometry, the tap's clause (rows.ts
@@ -27,6 +28,8 @@ import { absentFullyRow, colourFails, directionRow, fullyRow, stopRow, strokeRow
  * it — as each row asks it: the tap and the stroke by truth.ts#selectorOf (askedUnlistedBy: a text target's string), the
  * colour by its identifier (unlistedBy); R-stroke asks every touch-down inside the target's own scroll view where the truth names one
  * (rows.ts#strokeRow).
+ *
+ * A target laid out nowhere (CellTruth.absent: no frame, so no geometry) is asked absentRows' R-absent rows below.
  */
 export function edgeRows(platform: Platform, t: TargetTruth, cell: CellTruth, source: SourceKind, c: TargetContract): Expectation[] {
   // The tap and the stroke ask by truth.ts#selectorOf (a text target by its string), the colour assert by the identifier.

@@ -462,9 +462,9 @@ export interface TargetTruth {
 
 /**
  * A target the app laid out no frame for (CellTruth.absent): what the catalog says of it — `toward`, the direction its
- * scroll view lays it out in (CatalogTarget.toward; absent on an entry captured before T6) — and, per raw tree, whether
- * the tree lists it anyway (TargetTruth.listed, TargetTruth.textListed — recorded always: a frameless target has no
- * geometry to gate them on).
+ * scroll view lays it out in (CatalogTarget.toward; an entry without it, captured before T6 made the catalog name it,
+ * is asked nothing) — and, per raw tree, whether the tree lists it anyway (TargetTruth.listed, TargetTruth.textListed —
+ * recorded always: a frameless target has no geometry to gate them on).
  */
 export type AbsentTarget = Pick<TargetTruth, 'tag' | 'id' | 'text' | 'label' | 'color' | 'declared' | 'scrollView' | 'textListed'> & {
   listed: Partial<Record<SourceKind, boolean>>;
@@ -507,8 +507,9 @@ export interface CellTruth {
    * so (CatalogTarget.mayBeAbsent: a lazy list's or a recycler's card not composed at launch, carousel-lazy's C) —
    * ControlTruth's `not-rendered` for a target: not in
    * `targets`, which hold a frame, never probed, nothing measured — and, as each raw tree has it (truth.ts#listedIn),
-   * whether it lists the target: the `listed` golden's `absent` derives from (target-contract.ts#askedUnlistedBy). No
-   * golden row reads it yet (backlog T6). Absent when every target had a frame.
+   * whether it lists the target: the `listed` golden's `absent` derives from (target-contract.ts#askedUnlistedBy).
+   * Golden asks each one scroll_until and `fully: true` toward it (AbsentTarget.toward; golden-spec/edges.ts#absentRows,
+   * T6). Absent when every target had a frame.
    */
   absent?: AbsentTarget[];
   /** A form cell's truth (its `targets` empty). */
