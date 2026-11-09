@@ -152,6 +152,37 @@ describe('parseUiautomatorXml', () => {
       expect(first.step).toEqual({ do: 'done', facts: { cleared: 0, end: { kind: 'empty', placeholder: 'shown' } } });
     });
 
+    // After D71 (ADR 0034's D71 amendment), with D72's readings: no clear, the field already holding `held`, `value` typed,
+    // the field keeping `keep` of it (its first keys dropped) — `before` and every reading through the dump's parser.
+    const typedOver = async (held: string, value: string, keep: (typed: string) => string) => {
+      let text = held;
+      const io: FieldIo = {
+        type: async (typed) => {
+          text += keep(typed);
+        },
+        wipe: async () => undefined,
+        read: async () => dumped(text).value ?? '',
+        screen: () => dumped(text),
+        reportDroppedTail: () => undefined,
+      };
+      return typeAndConfirm(io, {
+        value, clear: false, isInput: true, resolvedValue: null, before: dumped(held).value ?? '', placeholder: undefined, held: 0, pollMs: 1,
+        field: dumped(held), delivery: 'may-arrive-late',
+      });
+    };
+
+    it('D71: `1 ` typed after `1` without clear, the `1` dropped, reads `1 ` — refused with the select-all hedge, never Filled', async () => {
+      expect(await typedOver('1', '1 ', (t) => t.slice(1))).toEqual({ kind: 'missed', observed: '1 ', again: [], differs: { kind: 'length', wholeToo: true } });
+    });
+
+    it('`Jan ` appended to `Jan` without clear lands (`JanJan `)', async () => {
+      expect(await typedOver('Jan', 'Jan ', (t) => t)).toMatchObject({ kind: 'landed', observed: 'JanJan ' });
+    });
+
+    it('`Jan ` typed after `Jan ` without clear, no key landing, still lands — ADR 0034 residual 7, the value already shown', async () => {
+      expect(await typedOver('Jan ', 'Jan ', () => '')).toMatchObject({ kind: 'landed', observed: 'Jan ' });
+    });
+
     it('the clear of a field holding `Jan ` deletes 4', () => {
       const first = clearStep(startClear(undefined), { value: dumped('Jan ').value });
       expect(first.step).toEqual({ do: 'delete', count: 4 });

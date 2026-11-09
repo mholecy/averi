@@ -1,0 +1,26 @@
+lab: emulator-5554, AVD averi_lab
+averi: <scratchpad>/d71-base-3b7393ba
+uiautomator p1 ok: Filled id:"lab.form-prefilled.name" (4 characters)
+uiautomator p1o MISMATCH: the app holds "Jan Šťastný Jr. ", but averi failed: ERROR fill: typed 5 characters but the field shows 15 (content withheld from this error)
+uiautomator f13 ok: Filled id:"lab.form-format.phone" (12 characters)
+uiautomator f15 ok: refused as "did not change", the field kept "31.12.2026": ERROR fill: typed 4 characters but the field shows 10 — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)
+uiautomator f16 ok: refused, the field kept "31.12.2021": ERROR fill: typed 2 characters but the field shows 10 (content withheld from this error)
+uiautomator g3 ok: Filled id:"lab.form-grouped.phoneGrouped" (12 characters, the field shows them reformatted: 3 separators added)
+uiautomator fp1 ok: Filled id:"lab.form-focus-prefix.dialLands" (3 characters)
+uiautomator fp2 ok: Filled, hedged on its ⚠ line, over "+421 ": Filled id:"lab.form-focus-prefix.dialRefuses" (3 characters) ⚠ the field shows 4 characters for the 3 typed, and its text after focus was not read, so that text may not all come from these keys (a field can insert text on focus): check its value with ui_snapshot
+<!-- averi: <scratchpad>/d71-base-3b7393ba -->
+# Live golden: 8 cases, 7 ok, 0 loud, 1 mismatches (1 not known), 0 skipped
+
+## uiautomator
+- ok p1 form-prefilled: a no-clear fill keeps the prefill — Filled id:"lab.form-prefilled.name" (4 characters)
+- MISMATCH (failed-holds) p1o form-prefilled: D71 run only: a no-clear fill appends text with a trailing outer space — the app holds "Jan Šťastný Jr. ", but averi failed: ERROR fill: typed 5 characters but the field shows 15 (content withheld from this error)
+    type_text → ERROR fill: typed 5 characters but the field shows 15 (content withheld from this error)
+- ok f13 form-format: fill, no clear, a phone number under a `+421` placeholder — Filled id:"lab.form-format.phone" (12 characters)
+- ok f15 form-format: fill, clear, a full date; then, no clear, digits the full field refuses though its text holds them: did not change — refused as "did not change", the field kept "31.12.2026": ERROR fill: typed 4 characters but the field shows 10 — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)
+- ok f16 form-format: fill, clear, a date one digit short; then, no clear, two digits the field keeps only the first of, though its text holds them: refused — refused, the field kept "31.12.2021": ERROR fill: typed 2 characters but the field shows 10 (content withheld from this error)
+- ok g3 form-grouped: fill, no clear, a phone number the field groups in threes under a `+421` placeholder — Filled id:"lab.form-grouped.phoneGrouped" (12 characters, the field shows them reformatted: 3 separators added)
+- ok fp1 form-focus-prefix: fill, no clear, digits into a field that inserted a `+421 ` dial code on focus: the keys land after it — Filled id:"lab.form-focus-prefix.dialLands" (3 characters)
+- ok fp2 form-focus-prefix: fill, no clear, digits into a field that inserted a `+421 ` dial code on focus and refuses every key: did not change on iOS (idb, wda: the re-read runs); on Android (uiautomator: the re-read skipped, the inserted `+421 ` holds `421`) a Filled hedged on its ⚠ line, ok and counted under ADR 0028 residual 3, and without the line a MISMATCH fill-claim — Filled, hedged on its ⚠ line, over "+421 ": Filled id:"lab.form-focus-prefix.dialRefuses" (3 characters) ⚠ the field shows 4 characters for the 3 typed, and its text after focus was not read, so that text may not all come from these keys (a field can insert text on focus): check its value with ui_snapshot
+
+Accepted under residual:ADR 0028 residual 3 — a prefix inserted on focus that holds the value lands on the skipped re-read: Android's Filled says on a ⚠ line that the text after focus was not read: 1 of 1 judged run(s) of fp2
+

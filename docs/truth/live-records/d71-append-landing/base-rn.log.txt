@@ -1,0 +1,9 @@
+lab: emulator-5554, AVD averi_lab
+averi: <scratchpad>/d71-base-3b7393ba
+uiautomator rfe2 ok: Filled id:"lab.rn-format-eager.E.field" (10 characters, the field shows them reformatted: 2 separators added)
+<!-- averi: <scratchpad>/d71-base-3b7393ba -->
+# Live golden: 1 cases, 1 ok, 0 loud, 0 mismatches (0 not known), 0 skipped
+
+## uiautomator
+- ok rfe2 rn-format-eager: fill, no clear, 10 characters into the RN eager field: a drop of the last 2 leaves `SK31 1200 ` (the eager mark), the full value ends mid-group — Filled id:"lab.rn-format-eager.E.field" (10 characters, the field shows them reformatted: 2 separators added)
+
