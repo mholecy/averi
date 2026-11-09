@@ -1867,13 +1867,24 @@ flows:
     });
   });
 
+  it('a hedged flush stop (T17) marks a fully: true line ⚠ and opens NOT CONFIRMED WHOLE: a row that fills its scroll container, which no probe can check', async () => {
+    resetLayout();
+    const list = { x: 0, y: 242, width: 1000, height: 1500 };
+    const target = node({ role: 'button', identifier: 'submit_button', rect: { ...list } });
+    const fake = new FakeAdapter({ form: screen(node({ role: 'container', identifier: 'list', rect: { ...list }, clipsDescendants: true, children: [target] })) }, 'form');
+    const trace = await FlowEngine.run(cfgFully, fake, FAST, { flow: 'to_submit' });
+    const row = trace.find((t) => t.action.endsWith('scroll_until'));
+    expect(row?.detail).toMatch(/^id:"submit_button" visible after 0 swipes, NOT CONFIRMED WHOLE: it fills its scroll container \(0,242 1000x1500\) exactly/);
+    expect(row?.action).toBe('⚠ scroll_until');
+  });
+
   it('the `unlocated` row (window hidden, input method shown) marks a fully: true line ⚠: "fully visible" is not established', async () => {
     const fake = scrollingFake(500);
     fake.attachKeyboard({ state: 'hidden' }, 'shown');
     const trace = await FlowEngine.run(cfgFully, fake, FAST, { flow: 'to_submit' });
     const row = trace.find((t) => t.action.endsWith('scroll_until'));
     expect(row?.action).toBe('⚠ scroll_until');
-    expect(row?.detail).toMatch(/^id:"submit_button" fully visible after 0 swipes; the input method reports a soft keyboard shown, but the window state gives it no area/);
+    expect(row?.detail).toMatch(/^id:"submit_button" visible after 0 swipes, NOT CONFIRMED UNCOVERED: the input method reports a soft keyboard shown, but the window state gives it no area/);
     expect(fake.keys).toEqual([]);
   });
 });

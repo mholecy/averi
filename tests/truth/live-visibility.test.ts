@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { touchTurns, classStrokes, directionBreaks, distanceAt, judgeAbsentAtEnd, judgeAndroidTurn, judgeAtRest, judgeBlankStretch, judgeCarry, judgeDismissal, judgePresentedAssert, judgePresentedScroll, presentedAssertCase, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases } from '../../scripts/truth/live-visibility.js';
-import { flushText } from '../../src/interact/scroll-text.js';
+import { describeScrollResult, flushText } from '../../src/interact/scroll-text.js';
 import { stopHolds } from '../../scripts/truth/target-contract.js';
 import { turnsSaid } from '../../scripts/truth/replies.js';
 import type { CellTruth, LabState, Stroke, TargetTruth } from '../../scripts/truth/schema.js';
@@ -138,12 +138,36 @@ describe('judgeScroll', () => {
     expect(judgeScroll(c, [reply, 'ERROR'], beside, launched).outcome).toBe('MISMATCH');
     expect(judgeScroll({ ...c, unlisted: true }, [reply, 'ERROR'], beside, launched)).toMatchObject({ outcome: 'LOUD', why: expect.stringMatching(/not in the tree: its strokes unjudged — stroked upper/) });
   });
+  it('T17 (T14): every hedged fully: true stop — each flush hedge, the unlocated keyboard, src\'s lead and the pre-T17 `; but` of the committed records — the target cut: LOUD hedged-stop, never a stop-claim MISMATCH', () => {
+    const container = { x: 0, y: 303, width: 1080, height: 1238 };
+    const flushes = [
+      { edge: 'top', container, checked: false, why: 'budget' },
+      { edge: 'top', container, checked: false, why: 'room' },
+      { edge: 'top', container, checked: false, why: 'axis' },
+      { edge: 'top', container, checked: false, why: 'tap' },
+      { edge: 'top', container, checked: false, why: 'held', revealed: 66 },
+      { edges: ['top', 'bottom'], container, checked: false, why: 'fills' },
+    ] as const;
+    const cut = state({ frames: { T: { x: 51, y: 840, width: 300, height: 64 } }, offsets: { page: 0 }, strokes: [stroke(382, 0)], events: [{ kind: 'tap', tag: 'T', at }] });
+    const replies = [
+      ...flushes.flatMap((flush) => [`Element id:"x" ${describeScrollResult({ swipes: 3, visible: 1, clipped: [], flush })}`, `Element id:"x" fully visible after 3 swipes; but ${flushText(flush)}`]),
+      `Element id:"x" ${describeScrollResult({ swipes: 3, visible: 1, clipped: [], keyboard: { state: 'unlocated' } })}`,
+    ];
+    for (const hedge of replies) {
+      expect(judgeScroll({ ...c, fully: true }, [hedge, 'Tapped'], cut, launched)).toMatchObject({ outcome: 'LOUD', cls: 'hedged-stop' });
+      expect(judgeScroll({ ...c, fully: true }, [hedge, 'Tapped'], reached, launched).outcome).toBe('ok');
+    }
+    // A checked flush stop claims it whole: on a cut target it stays the MISMATCH.
+    const checked = `Element id:"x" ${describeScrollResult({ swipes: 3, visible: 1, clipped: [], flush: { edge: 'top', container, checked: true } })}`;
+    expect(judgeScroll({ ...c, fully: true }, [checked, 'Tapped'], cut, launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'stop-claim' });
+  });
+
   it('T11: the hedge on two held reveals, the app bearing it out or not: ok with the target whole, LOUD with it cut — no claim, so no MISMATCH; the same stop with no hedge stays one', () => {
-    const hedge = `Element id:"x" fully visible after 3 swipes${flushText({ edge: 'top', container: { x: 0, y: 303, width: 1080, height: 1238 }, checked: false, why: 'held', revealed: 66 })}`;
+    const hedge = `Element id:"x" ${describeScrollResult({ swipes: 3, visible: 1, clipped: [], flush: { edge: 'top', container: { x: 0, y: 303, width: 1080, height: 1238 }, checked: false, why: 'held', revealed: 66 } })}`;
     expect(judgeScroll({ ...c, fully: true }, [hedge, 'Tapped'], reached, launched).outcome).toBe('ok');
     const cut = state({ frames: { T: { x: 51, y: 840, width: 300, height: 64 } }, offsets: { page: 0 }, strokes: [stroke(382, 0)], events: [{ kind: 'tap', tag: 'T', at }] });
-    expect(judgeScroll({ ...c, fully: true }, [hedge, 'Tapped'], cut, launched)).toMatchObject({ outcome: 'LOUD', cls: 'held-hedge' });
-    expect(judgeScroll({ ...c, fully: true }, [hedge.split(';')[0], 'Tapped'], cut, launched).outcome).toBe('MISMATCH');
+    expect(judgeScroll({ ...c, fully: true }, [hedge, 'Tapped'], cut, launched)).toMatchObject({ outcome: 'LOUD', cls: 'hedged-stop' });
+    expect(judgeScroll({ ...c, fully: true }, ['Element id:"x" fully visible after 3 swipes', 'Tapped'], cut, launched).outcome).toBe('MISMATCH');
     // Everything but a laid-out target, a right tap and a fully: true case falls through to what it always was.
     const wrongTap = { ...cut, events: [] };
     expect(judgeScroll({ ...c, fully: true }, [hedge, 'Tapped id:"x"'], wrongTap, launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'stop-claim', why: expect.stringMatching(/then the tap: averi says Tapped/) });
@@ -152,7 +176,7 @@ describe('judgeScroll', () => {
     const offScreen = state({ frames: { T: { x: 51, y: 5000, width: 300, height: 64 } }, offsets: { page: 0 }, strokes: [stroke(382, 0)] });
     expect(judgeScroll(c, [hedge, 'ERROR refused'], offScreen, launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'stop-claim' });
     // fully: true and off the screen: laid out, the tap not wrong, the hedge stands.
-    expect(judgeScroll({ ...c, fully: true }, [hedge, 'ERROR refused'], offScreen, launched)).toMatchObject({ outcome: 'LOUD', cls: 'held-hedge' });
+    expect(judgeScroll({ ...c, fully: true }, [hedge, 'ERROR refused'], offScreen, launched)).toMatchObject({ outcome: 'LOUD', cls: 'hedged-stop' });
   });
 
   it('the stop held but the tap after it fired something else: MISMATCH', () => {

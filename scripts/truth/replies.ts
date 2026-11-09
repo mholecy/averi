@@ -1,6 +1,6 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { FOCUS_TEXT_NOT_READ } from '../../src/interact/fill-text.js';
-import { boundText, TREE_READ_FAILED, UNTRIED_END, UNTRIED_LEAD } from '../../src/interact/scroll-text.js';
+import { boundText, HEDGED_LEAD, TREE_READ_FAILED, UNTRIED_END, UNTRIED_LEAD } from '../../src/interact/scroll-text.js';
 import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, KEYBOARD_UNLISTED, NO_ID_LISTED } from '../../src/ui-tree/miss.js';
 import { untriedSideText } from '../../src/interact/target-text.js';
 import { EDGES, rectText } from '../../src/ui-tree/geometry.js';
@@ -54,8 +54,18 @@ export const ASSERT_SUMMARY = /^\d+\/\d+ asserts|^All \d+ asserts/;
 /** averi refused or failed: `ERROR …` — a refusal, a timeout, a stop that gave up. */
 export const isError = (reply: string | undefined) => reply?.startsWith('ERROR') === true;
 
-/** scroll_until stopped on its target: `Element … visible after N swipes` (plain or `fully visible`). */
+/** scroll_until stopped on its target: `Element … visible after N swipes` (plain, `fully visible`, or a hedged `visible after N swipes, NOT CONFIRMED …`). */
 export const VISIBLE_STOP = /^Element .* visible after /;
+
+/**
+ * A `fully: true` stop whose opening claims nothing whole (T17, ADR 0013's T17 amendment): src's lead `Element …
+ * visible [by the tree ]after N swipes, NOT CONFIRMED WHOLE|UNCOVERED|WHOLE OR UNCOVERED: …` (scroll-text.ts
+ * #describeScrollResult, #HEDGED_LEAD) — or the pre-T17 form the committed t11/t12 live records hold, `fully visible
+ * [by the tree ]after N swipes[, judged above …]; but …` (a flush hedge, scroll-text.ts#flushText). A stop, never a claim.
+ */
+const HEDGED_STOP = new RegExp(`^Element .* visible (?:by the tree )?after \\d+ swipes?, ${HEDGED_LEAD} (?:WHOLE|UNCOVERED|WHOLE OR UNCOVERED): `);
+const OLD_HEDGED_STOP = /^Element .* fully visible (?:by the tree )?after \d+ swipes?[^;]*; but /;
+export const fullyHedged = (reply: string) => HEDGED_STOP.test(reply) || OLD_HEDGED_STOP.test(reply);
 
 /** The reply claims scroll_until's stop on its target (VISIBLE_STOP), fully or not. */
 export const claimsVisible = (reply: string) => VISIBLE_STOP.test(reply);
@@ -267,27 +277,27 @@ export const MAX_SWIPES = bound.slice(bound.indexOf('('));
 /**
  * The other words carouselReply keys on, pinned, each as src/interact/scroll-text.ts writes it: no export there
  * produces them alone — they are inline in unexported builders (#unaimableText, #unfitText, #flushCutText) reached only
- * through a whole ScrollOutcome, or (the unchecked flush clause) inside #flushText's sentence around a container's rect
- * — so tests/truth/replies.test.ts holds each one to that file and drives the builders that write them. The unaimable
- * stop's end (D68), the unfit stop's remedy (D52), the flush cut a probe proved (the hedge D62 keeps), the unchecked
- * flush clause of a stop, the inferred axis (D59), and the hedge on two held reveals (T11).
+ * through a whole ScrollOutcome, or (the held hedge) inside #flushText's sentence around a container's rect — so
+ * tests/truth/replies.test.ts holds each one to that file and drives the builders that write them. The unaimable
+ * stop's end (D68), the unfit stop's remedy (D52), the flush cut a probe proved (the hedge D62 keeps), the inferred
+ * axis (D59), and the hedge on two held reveals (T11). The unchecked flush clause (`it may be cut there`) is no longer
+ * keyed on: since T17 a hedged stop's lead says it (`fullyHedged`, which reads the pre-T17 records' `; but` too).
  */
 export const CAROUSEL_REPLY_WORDS = [
   'more swipes are unlikely to help',
   '— drop fully: true, or accept what it shows',
   'so it may still be cut there',
-  'it may be cut there',
   '(the tree does not say which way it scrolls: ',
   'the content ended there or the app did not take them',
 ] as const;
-const [UNAIMABLE, UNFIT, PROVEN_CUT, UNCHECKED_CUT, INFERRED_AXIS, HELD_CUT] = CAROUSEL_REPLY_WORDS;
+const [UNAIMABLE, UNFIT, PROVEN_CUT, INFERRED_AXIS, HELD_CUT] = CAROUSEL_REPLY_WORDS;
 
 /**
  * What a carousel's `scroll_until … fully: true` replied, from a closed set (T7a; the carousel judges read it): `unaimable`
  * (D68's stop: no swipe can bring it whole, the round sent nothing more — it says "drop fully: true" too, so it is
  * asked first), `unfit` (D52's: as wide as its scroll view), `maxSwipes-hedged` (the bound, with the flush cut a probe
  * proved: "may still be cut there" — D62's honest end and ADR 0021's residual), `fully-visible` (the stop claimed whole,
- * by the tree or the eyes, without the unchecked flush clause that says it may be cut — batch-9's false pass reads so),
+ * by the tree or the eyes, its lead no hedge — `fullyHedged`, T17 — batch-9's false pass reads so),
  * and `other` (a bound without that hedge, a stuck stop, a plain stop, any other error).
  */
 export type CarouselReply = 'unaimable' | 'unfit' | 'maxSwipes-hedged' | 'fully-visible' | 'other';
@@ -298,7 +308,7 @@ export function carouselReply(reply: string): CarouselReply {
     if (reply.includes(MAX_SWIPES) && reply.includes(PROVEN_CUT)) return 'maxSwipes-hedged';
     return 'other';
   }
-  return /^Element .* fully visible (?:by the tree )?after /.test(reply) && !reply.includes(UNCHECKED_CUT) ? 'fully-visible' : 'other';
+  return /^Element .* fully visible (?:by the tree )?after /.test(reply) && !fullyHedged(reply) ? 'fully-visible' : 'other';
 }
 
 /** A stop hedged on a cut a swipe proved and two swipes after it that moved nothing (T11, scroll-text.ts#flushText's `held`): it claims nothing whole. */

@@ -5,7 +5,7 @@ import type { MarkedLayer } from '../../src/ui-tree/presentation.js';
 import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, missNote, withMissNote } from '../../src/ui-tree/miss.js';
 import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
 import { boundText, describeScrollResult, flushText } from '../../src/interact/scroll-text.js';
-import { CAROUSEL_REPLY_WORDS, carouselReply, MAX_SWIPES, flushProbedSide, flushProbesSaid, idbReasonsSaid, inferredAxisSaid, noIdListedSaid, OCR_FAILED_CLOSED, presentedRemedySaid, windowHintSaid, heldCutHedged, bandSaid, directionNamed, UNCHANGED_SAID, LIVE_REPLY_WORDS, refusedUnsentSaid, scrollVerdictSaid, underBarRemedySaid, untriedSideSaid } from '../../scripts/truth/replies.js';
+import { CAROUSEL_REPLY_WORDS, carouselReply, fullyHedged, replyKind, VISIBLE_STOP, MAX_SWIPES, flushProbedSide, flushProbesSaid, idbReasonsSaid, inferredAxisSaid, noIdListedSaid, OCR_FAILED_CLOSED, presentedRemedySaid, windowHintSaid, heldCutHedged, bandSaid, directionNamed, UNCHANGED_SAID, LIVE_REPLY_WORDS, refusedUnsentSaid, scrollVerdictSaid, underBarRemedySaid, untriedSideSaid } from '../../scripts/truth/replies.js';
 import { refusalOf, type Typeable } from '../../src/adapters/typeable.js';
 import { revealText } from '../../src/ui-tree/sides.js';
 import { untriedSideText } from '../../src/interact/target-text.js';
@@ -176,14 +176,45 @@ describe("carouselReply: the five kinds of a carousel's `fully: true` reply (T7a
     expect(carouselReply(d62)).toBe('fully-visible');
     // The eyes could not tell (src's `fully visible by the tree after N`): still the claim.
     expect(carouselReply(fits.replace('fully visible after', 'fully visible by the tree after'))).toBe('fully-visible');
-    const unchecked = `Element C fully visible after 0 swipes${flushText({ edge: 'right', container: CAROUSEL, checked: false, why: 'budget' })}`;
+    const unchecked = `Element C ${describeScrollResult({ swipes: 0, visible: 1, clipped: [], flush: { edge: 'right', container: CAROUSEL, checked: false, why: 'budget' } })}`;
     expect(carouselReply(unchecked)).toBe('other');
     // T11: two held reveals on a proven cut are no claim either.
-    const held = `Element C fully visible after 3 swipes${flushText({ edge: 'right', container: CAROUSEL, checked: false, why: 'held', revealed: 55 })}`;
+    const held = `Element C ${describeScrollResult({ swipes: 3, visible: 1, clipped: [], flush: { edge: 'right', container: CAROUSEL, checked: false, why: 'held', revealed: 55 } })}`;
     expect(carouselReply(held)).toBe('other');
     expect(heldCutHedged(held)).toBe(true);
     expect(heldCutHedged(unchecked)).toBe(false);
     expect(heldCutHedged(d62)).toBe(false);
+    // Before T17 the hedge opened `fully visible …; but …` (the committed t11/t12 records): no claim either.
+    const oldUnchecked = `Element C fully visible after 0 swipes; but ${flushText({ edge: 'right', container: CAROUSEL, checked: false, why: 'budget' })}`;
+    expect(carouselReply(oldUnchecked)).toBe('other');
+  });
+
+  it('fullyHedged (T17): a `fully: true` stop whose lead claims nothing whole — src\'s NOT CONFIRMED lead, every hedge, and the pre-T17 `fully visible …; but …` of the committed records; never a claim', () => {
+    const at = (r: Parameters<typeof describeScrollResult>[0]) => `Element id:"x" ${describeScrollResult(r)}`;
+    const flushes = [
+      { edge: 'right', container: CAROUSEL, checked: false, why: 'budget' },
+      { edge: 'right', container: CAROUSEL, checked: false, why: 'room' },
+      { edge: 'right', container: CAROUSEL, checked: false, why: 'axis' },
+      { edge: 'right', container: CAROUSEL, checked: false, why: 'tap' },
+      { edge: 'right', container: CAROUSEL, checked: false, why: 'held', revealed: 55 },
+      { edges: ['left', 'right'], container: CAROUSEL, checked: false, why: 'fills' },
+    ] as const;
+    for (const flush of flushes) {
+      const reply = at({ swipes: 3, visible: 1, clipped: [], flush });
+      expect(reply).toMatch(VISIBLE_STOP);
+      expect(replyKind(reply)).toBe('visible');
+      expect(fullyHedged(reply)).toBe(true);
+      expect(carouselReply(reply)).toBe('other');
+      // The pre-T17 form, as the committed records hold it.
+      expect(fullyHedged(`Element id:"x" fully visible after 3 swipes; but ${flushText(flush)}`)).toBe(true);
+      expect(fullyHedged(`Element id:"x" fully visible by the tree after 3 swipes, judged above the soft keyboard over [0,1400][1080,2200]; but ${flushText(flush)}`)).toBe(true);
+    }
+    expect(fullyHedged(at({ swipes: 1, visible: 1, clipped: [], keyboard: { state: 'unlocated' } }))).toBe(true);
+    // A claim: clean, checked; and neither a plain stop nor a failure is a hedged one.
+    expect(fullyHedged(at({ swipes: 1, visible: 1, clipped: [] }))).toBe(false);
+    expect(fullyHedged(at({ swipes: 2, visible: 1, clipped: [], flush: { edge: 'right', container: CAROUSEL, checked: true } }))).toBe(false);
+    expect(fullyHedged('Element C visible after 2 swipes — CLIPPED at right, 92% of it is in the viewport. A rect assert or screenshot on this element will measure the CLIPPED box')).toBe(false);
+    expect(fullyHedged('ERROR scroll_until C failed after 6 swipes (maxSwipes) — NOT CONFIRMED WHOLE: x')).toBe(false);
   });
 
   it('other: the stuck reply (batch-11), a plain stop, a not-found, a timeout', () => {
@@ -197,7 +228,7 @@ describe("carouselReply: the five kinds of a carousel's `fully: true` reply (T7a
     for (const words of CAROUSEL_REPLY_WORDS) expect(source).toContain(words);
     expect(MAX_SWIPES).toBe('(maxSwipes)');
     expect(boundText({ of: 'maxSwipes' }, 6).endsWith(MAX_SWIPES)).toBe(true);
-    expect(source).toContain('`fully visible by the tree after ${n}`');
+    expect(source).toContain('`visible by the tree after ${n}`');
   });
 });
 

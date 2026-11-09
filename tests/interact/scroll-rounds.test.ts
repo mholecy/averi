@@ -752,7 +752,7 @@ describe('round — a fully: true stop flush with its clipping scroll container 
     const result = resultOf(played);
     expect(result.flush).toEqual({ edge: 'top', container: FORM, checked: false, why: 'budget' });
     expect(describeScrollResult(result)).toBe(
-      "fully visible after 0 swipes; but its top edge lies on its scroll container's (0,242 1080x1736), where Android cuts a node's bounds to the container, and no swipe or time was left to check it — it may be cut there, a rect assert or screenshot may measure part of it",
+      "visible after 0 swipes, NOT CONFIRMED WHOLE: its top edge lies on its scroll container's (0,242 1080x1736), where Android cuts a node's bounds to the container, and no swipe or time was left to check it — it may be cut there, a rect assert or screenshot may measure part of it",
     );
     const late = play({ ...FULLY_ANDROID, timeoutMs: 10 }, [{ ...formRead(242, 92), elapsedMs: 10 }]);
     expect(resultOf(late).flush?.checked).toBe(false);
@@ -774,7 +774,7 @@ describe('round — a fully: true stop flush with its clipping scroll container 
     const result = resultOf(played);
     expect(result).toEqual({ swipes: 0, visible: 1, clipped: [], flush: { edges: ['top', 'bottom'], container: FORM, checked: false, why: 'fills' } });
     expect(describeScrollResult(result)).toBe(
-      "fully visible after 0 swipes; but it fills its scroll container (0,242 1080x1736) exactly — its top and bottom edges lie on the container's, " +
+      "visible after 0 swipes, NOT CONFIRMED WHOLE: it fills its scroll container (0,242 1080x1736) exactly — its top and bottom edges lie on the container's, " +
         "where Android cuts a node's bounds to the container, and no probe swipe can tell which side, if either, is cut — it may be cut there, " +
         'a rect assert or screenshot may measure part of it; usual for a card as tall as its carousel — check with a screenshot',
     );
@@ -2842,7 +2842,7 @@ describe('round — a fully: true stop flush under a node pinned in its own scro
     const result = resultOf(played);
     expect(result.flush).toEqual({ edge: 'top', container: LIST, pinned: { ...HEADER, label: null }, checked: false, why: 'held', revealed: 66 });
     expect(describeScrollResult(result)).toBe(
-      "fully visible after 3 swipes; but its top edge lies on the edge of container id:lab.scroll-sticky-cut.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, " +
+      "visible after 3 swipes, NOT CONFIRMED WHOLE: its top edge lies on the edge of container id:lab.scroll-sticky-cut.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, " +
         "where Android cuts a node's bounds at a node drawn over it, and a swipe toward it showed 66 px more of it, then 2 swipes after it moved nothing — the content ended there or the app did not take them — " +
         'it may be cut there, a rect assert or screenshot may measure part of it; calling again tells',
     );
@@ -2860,7 +2860,7 @@ describe('round — a fully: true stop flush under a node pinned in its own scro
     const result = resultOf(play({ ...FULLY_ANDROID, maxSwipes: 0 }, [read('cut')]));
     expect(result.flush).toMatchObject({ edge: 'top', container: LIST, checked: false, why: 'budget' });
     expect(describeScrollResult(result)).toBe(
-      "fully visible after 0 swipes; but its top edge lies on the edge of container id:lab.scroll-sticky-cut.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, " +
+      "visible after 0 swipes, NOT CONFIRMED WHOLE: its top edge lies on the edge of container id:lab.scroll-sticky-cut.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, " +
         "where Android cuts a node's bounds at a node drawn over it, and no swipe or time was left to check it — it may be cut there, a rect assert or screenshot may measure part of it",
     );
   });
@@ -2879,7 +2879,7 @@ describe('round — a fully: true stop flush under a node pinned in its own scro
       const result = resultOf(played);
       expect(result.flush).toEqual({ edges: ['top', 'bottom'], container: LIST, pinned: { role: 'container', identifier: 'header', label: null, rect: { x: 0, y: 303, width: 1080, height: 154 } }, checked: false, why: 'fills' });
       expect(describeScrollResult(result)).toBe(
-        'fully visible after 0 swipes; but it spans its scroll container (0,303 1080x1238) from the edge of container id:header (0,303 1080x154), pinned at the container\'s top and drawn after it, ' +
+        'visible after 0 swipes, NOT CONFIRMED WHOLE: it spans its scroll container (0,303 1080x1238) from the edge of container id:header (0,303 1080x154), pinned at the container\'s top and drawn after it, ' +
           "to the container's bottom edge — its top edge lies on that node's, its bottom edge on the container's, where Android cuts a node's bounds at a node drawn over it or to the container, " +
           'and no probe swipe can tell which side, if either, is cut — it may be cut there, a rect assert or screenshot may measure part of it; check with a screenshot',
       );
@@ -2942,7 +2942,7 @@ describe('round — a fully: true stop flush under a node pinned in its own scro
       const result = resultOf(played);
       expect(result.flush).toEqual({ edges: ['left', 'right'], container: STRIP, pinned: HEAD, checked: false, why: 'fills' });
       expect(describeScrollResult(result)).toContain(
-        "but it spans its scroll container (0,300 1080x300) from the edge of container id:header (0,300 240x300), pinned at the container's left and drawn after it, " +
+        "NOT CONFIRMED WHOLE: it spans its scroll container (0,300 1080x300) from the edge of container id:header (0,300 240x300), pinned at the container's left and drawn after it, " +
           "to the container's right edge — its left edge lies on that node's, its right edge on the container's",
       );
     });

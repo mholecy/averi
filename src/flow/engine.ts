@@ -4,7 +4,7 @@ import { fillStepText } from '../interact/fill-text.js';
 import { typeIntoFocused } from '../interact/type-text.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS, ElementNotFoundError, isRefusedOnPresentElement, resolvePresent, type Ambiguity, type RefusedOnPresentElement } from '../interact/resolve.js';
 import { movedTapText } from '../interact/tap-judgement.js';
-import { describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
+import { describeScrollResult, flushHedged, scrollUntilVisible } from '../interact/scroll.js';
 import { eyesOn } from '../verify/eyes.js';
 import { swipeScreen } from '../interact/swipe.js';
 import { dismissKeyboard, KeyboardGuardError, type DismissResult, type GuardOptions } from '../interact/keyboard.js';
@@ -1354,11 +1354,13 @@ export class FlowEngine {
     });
     // ⚠ for a clipped stop, and (2026-10-08) for one the `unlocated`
     // row qualifies: the input method says a keyboard is up that nothing
-    // could place, so "fully visible" is not established either. A stop
+    // could place, so "fully visible" is not established either — nor
+    // (T17) on a flush edge no probe checked: both open NOT CONFIRMED. A stop
     // judged above a docked keyboard is not ⚠ on its own: the judgement
     // already excluded it, and the line says so.
+    const hedged = result.keyboard?.state === 'unlocated' || flushHedged(result.flush);
     this.log(
-      result.clipped.length > 0 || result.covered !== undefined || result.keyboard?.state === 'unlocated' ? '⚠ scroll_until' : 'scroll_until',
+      result.clipped.length > 0 || result.covered !== undefined || hedged ? '⚠ scroll_until' : 'scroll_until',
       `${describeElementSpec(element)} ${describeScrollResult(result)}`,
     );
   }

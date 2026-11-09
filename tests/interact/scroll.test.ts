@@ -348,7 +348,7 @@ describe('scrollUntilVisible — the soft keyboard', () => {
     expect(result).toEqual({ swipes: 2, visible: 1, clipped: [], keyboard: { state: 'unlocated' } }); // judged over the whole screen: there is no frame to exclude
     expect(fake.attachedKeyboard.witnessAnswers.queries).toBe(1);
     expect(describeScrollResult(result)).toBe(
-      'fully visible after 2 swipes; the input method reports a soft keyboard shown, but the window state gives it no area on ' +
+      'visible after 2 swipes, NOT CONFIRMED UNCOVERED: the input method reports a soft keyboard shown, but the window state gives it no area on ' +
         'screen (one still coming up? not measured), so where it lies is unknown — it was not judged and may cover the element',
     );
     expect(fake.keys).toEqual([]);
