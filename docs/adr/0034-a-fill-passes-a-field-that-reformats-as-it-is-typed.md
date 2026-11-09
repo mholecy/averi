@@ -26,6 +26,10 @@ folded into the rule; residual 8 (A) closed, residual 9 accepted; implemented on
 Amended 2026-11-03 (batch-10: D61, D63 and D64 proven live — the last paragraph of each of those amendments).
 Amended 2026-11-03 (T3: the eager trailing mark on a full reading numbered, residual 10; g2 and rfe3 filed in
 live-known.ts).
+Amended 2026-11-05 (A9: one answer about a reading; two corrections to the D64 amendment).
+Amended 2026-11-09 (D71: without clear, a reading equal to the value lands only as the earlier text or the named
+placeholder — `55` after `5`, the second key dropped, no longer replies Filled; residual 11 accepted; implemented on
+`fix/d71-append-landing`).
 
 ## Context
 
@@ -858,7 +862,61 @@ typed again, where an append should have left `555`. Residual 7 does not cover t
 well, nothing moved, and "the field does hold the value" answers it; here the reading moved, and the field holds the
 value only on the select-all reading the tree cannot tell apart. It reaches every value that what should be held starts
 with (`1212` after `12`, keys dropped). Unmeasured on a device, and not accepted here: backlog row D71. The D53 row
-`a-b1234` after `ab` lands too, and the row is now `a-b12.34`.
+`a-b1234` after `ab` lands too, and the row is now `a-b12.34`. Both corrections describe the rule before D71: since its
+amendment below, `55` for `55` after `5` is a `length` that is a whole landing too, and fails loudly with the select-all
+hedge on both platforms, nothing typed again — what the D64 passage said, without its "on iOS only".
+
+## Amendment: without clear, the value itself lands only as the earlier text or the named placeholder (2026-11-09, D71)
+
+**Context.** Found at A9's review (the correction above), pre-existing. Without clear, `showsExactly`'s first disjunct,
+`observed === value`, passed any reading equal to the value however it was reached. Kept by D63 and D64 for residual 7
+(the reading is the earlier text too) and the named placeholder equal to the value, it reached further: `55` typed
+after `5` with the second key dropped replied Filled at once, nothing typed again, where an append should have left
+`555`; so did `1212` after `12`, `1 ` after `1`, `-5` after `-`. D61's `valueAlone` did not refuse them: `555` starts
+with `55`. A false Filled — the field holds something other than what the append should have left, or, on the select-all
+reading, the value; the tree cannot tell the two apart.
+
+**Decision** (the orchestrator's option (c), with the hedge).
+- `fill-landing.ts#showsExactly`, without clear: `(observed === value && (observed === e.before || observed ===
+  e.placeholder)) || priorsOf(held, e).some(…)`. Residual 7 (`421` after `421`) and a named `Search` keep landing; any
+  other reading equal to the value is judged by the typing past the earlier text, as every reading is. A select-all
+  reading whose earlier text is not in it still lands, as the value alone (`priorsOf`: `world` after `Hello world`, D61's
+  `+421 903 123 456` and `421903123456` after idb's unnamed `+421` — g5 and f13). Refused are only the readings whose
+  letters and digits repeat the earlier text's (`55`/`5`, `1212`/`12`, `1 `/`1`) or whose earlier text has none
+  (`-5`/`-`).
+- A refused reading is no final one: the poll goes on, and a late key that makes `555` lands. Nothing is wiped, and
+  the tail is never typed again (`wholeLandingToo`: the value is there at an occurrence ending past the earlier text) —
+  a retyped `5` into a select-all field would end Filled over `555`.
+- **The hedge.** `notLandedOf`'s `wholeToo` is asked of a reading that is the value itself as well as of one with some of
+  the typing in its tail: `(landedSome(tail) || held === value) && wholeLandingToo(…)`. `1 ` after `1` and `-5` after
+  `-` prove no tail (no strict prefix of `11 `, `--5`), and would have read a bare "typed 2 characters but the field
+  shows 2". Every such refusal is a `length` (the typed part, past the earlier text, is shorter than the value) and says
+  "the field may have replaced its text (select-all): fill with `clear: true`". A `not-taken` carries it too, unworded:
+  its reply never words the Difference. The sweep's invariant "wholeToo implies a tail" is now "wholeToo is never
+  retyped".
+
+**Rejected.** (a) Accept as a residual: it keeps a false Filled, the one outcome not allowed. (b) Refuse wherever the
+earlier text is a start of the value: it would refuse idb's g5, `+421 903 123 456` typed after the unnamed `+421` (a
+start of the value's letters and digits), which holds the value — a new false failure on a live case that passes.
+
+**Consequences.** The cost is paid on the refused readings only: the whole poll (about 4 s on idb, 11.5 s on Android),
+then an honest failure where the reply was an instant Filled. No live case reads such a shape: p1, f13, f15, f16, g3,
+g5, fp1, fp2 and rfe2 read a value past their earlier text, a reformat, the value alone, or the earlier text unchanged.
+Not changed: the clear path, the masked rule, the reformat route, `priorsOf`, `tailOf`, `differenceOf`, fill-type.ts,
+fill.ts and the wordings (the `length` hedge is the D64 code review's).
+
+**Residual 11** (below): `12` after `1`, the head key dropped, still lands — D61's value alone, which idb's unnamed
+placeholders need.
+
+**Mutation-checked** by hand over fill-landing, fill-type, fill, fill-verdict and fill-text tests (501), each killed: the
+disjunct as it was (11 fail — every new D71 test, red on the base), dropped (8), its `&&` as `||` (39), without `before`
+(2), without the placeholder (5); the widening dropped (2), `landedSome` dropped from it (13), the guard always true (4),
+its `||` as `&&` (15).
+
+**Golden and live.** The golden replays tree reads and never types: Changed 0 against 3b7393ba. The unit tests are the
+evidence (fill-landing.test.ts's D71 group and the flipped pin, fill-type.test.ts's `55` refused and `55` then `555`
+landed on both deliveries, fill.test.ts's reply). Live: pending, a uiautomator regression of the no-clear cases p1, f13,
+f15, f16, g3, fp1, fp2 and rfe2 on base and fix; idb and wda (g5 and the no-clear cases) on the owner's list.
 
 ## Residuals accepted
 
@@ -906,3 +964,7 @@ with (`1212` after `12`, keys dropped). Unmeasured on a device, and not accepted
    field holds the value, but the trailing mark is no grouping the rules take, so averi refuses it and the reply names
    the check and the remedy. The safe side: a false mismatch, never a wrong Filled. Filed in live-known.ts as
    `ios idb|wda g2` and `ios idb|wda rfe3`; on Android g2 passes, the reading judged there having no trailing space.
+11. **Without clear, a value whose head key dropped still lands as the value alone** (D71's amendment): `12` typed after
+   `1` reads `12` with the first key lost — its letters and digits exactly the value's and no start of `112`, so D61's
+   `valueAlone` judges it as a select-all field's value. idb's unnamed placeholders need that rule (`421903123456` after
+   `+421`, f13; g5), and the tree cannot tell the two apart. Remedy: fill with `clear: true`.
