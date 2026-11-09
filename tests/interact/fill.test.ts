@@ -2128,6 +2128,31 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
     expect(fake.typed).toEqual(['55']);
   });
 
+  // D71 review round 1, m1 (ADR 0034's residual 12): an UNNAMED placeholder (idb) with no letter or digit that the value
+  // starts with, or whose skeleton the value repeats (`€5` after `€` is the same shape; the fake types ASCII only), is read as the earlier text — a correct fill without clear now
+  // fails, with the hedge. Its remedy, `clear: true`, is traced here end to end: the clear's delete leaves the
+  // placeholder showing (`unchanged`, after the re-read), the typing is judged by equality, and the fill lands.
+  it.each([
+    ['+447700900123', '+'],
+    ['@michal', '@'],
+    ['$5', '$'],
+    ['11', '1'],
+    ['0,000', '0,00'],
+  ])('`%s` under an unnamed `%s`: without clear refused with the select-all hedge; with clear, as the hedge says, Filled (D71)', async (value, placeholder) => {
+    const plain = groupingFake(placeholder, 100);
+    await expect(fillField(plain, { id: 'amount_input' }, value, FAST)).rejects.toThrow(/the field may have replaced its text \(select-all\): fill with `clear: true`/);
+    expect(plain.typed).toEqual([value]);
+    const cleared = groupingFake(placeholder, 100);
+    const result = await fillField(cleared, { id: 'amount_input' }, value, { ...FAST, clear: true });
+    // the clear: one round deletes the placeholder's length, the re-read still shows it — it ends unchanged, not failed
+    expect(result).toMatchObject({ cleared: 0, clearUnchanged: { shows: placeholder.length, deletes: placeholder.length }, readBack: { kind: 'landed' } });
+    expect(cleared.deletes).toEqual([placeholder.length]);
+    expect(cleared.typed).toEqual([value]);
+    expect(cleared.focused?.value).toBe(value);
+    // `clear-unchanged` is a reason only of a read-back that did not land (fill-verdict.ts): a plain Filled
+    expect(fillReply(result, 'id:amount_input')).toBe(`Filled id:amount_input (${value.length} characters)`);
+  });
+
   /** Two auto-advancing one-digit code boxes and a note under them: a box that has its digit moves the focus on. */
   const otpFake = () => {
     resetLayout();
