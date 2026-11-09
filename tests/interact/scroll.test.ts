@@ -614,12 +614,13 @@ describe('scrollUntilVisible — a fully: true stop flush with its clipping scro
     expect(fake.rowRect('Network').height).toBe(198);
   });
 
-  it('the first row at rest: one probe that moves nothing — the stated cost — then "fully visible after 1 swipe", saying why', async () => {
+  it('the first row at rest: two probes that move nothing — the stated cost (T12: one held probe may be a stroke the app did not take) — then "fully visible after 2 swipes", saying why', async () => {
     const fake = new LazyList(formLabels, 143, FORM);
     const result = await scrollUntilVisible(fake, 'text:"Beneficiary"', { ...FAST, fully: true });
-    expect(fake.swipes).toHaveLength(1);
+    expect(fake.swipes).toHaveLength(2);
+    expect(fake.swipes[1]).toEqual(fake.swipes[0]);
     expect(describeScrollResult(result)).toBe(
-      "fully visible after 1 swipe; its top edge lies on its scroll container's (0,242 1080x1736), and a probe swipe toward it moved nothing — nothing of it is cut there",
+      "fully visible after 2 swipes; its top edge lies on its scroll container's (0,242 1080x1736), and 2 probe swipes toward it moved nothing — nothing of it is cut there",
     );
   });
 
@@ -634,9 +635,9 @@ describe('scrollUntilVisible — a fully: true stop flush with its clipping scro
 </node>
 </hierarchy>`);
     const fake = new FakeAdapter({ s: tree }, 's');
-    // The fake's tree never moves: the probe moves nothing, and the stop is accepted as checked — what matters is that it was probed at all.
+    // The fake's tree never moves: the probe moves nothing, twice, and the stop is accepted as checked — what matters is that it was probed at all.
     const result = await scrollUntilVisible(fake, 'id:swift_payment.form.fees_select', { ...FAST, fully: true });
-    expect(fake.swipes).toHaveLength(1);
+    expect(fake.swipes).toHaveLength(2);
     expect(result.flush).toEqual({ edge: 'top', container: FORM, checked: true });
   });
 });
@@ -850,8 +851,12 @@ describe('scrollUntilVisible — nested clipping containers and a loading list (
     const fake = new FakeAdapter({ s: carouselTree(strip) }, 's');
     fake.viewportSize = { width: 1080, height: 2220 };
     const result = await scrollUntilVisible(fake, 'id:card', { ...FAST, fully: true });
-    expect(fake.swipes).toEqual([{ from: { x: 540, y: 1631 }, to: { x: 540, y: 1454 } }]); // the list's lower touch-down, finger up 177
-    expect(result.flush?.checked).toBe(true); // the static fake moves nothing: accepted, after a stroke that could have moved it
+    // The list's lower touch-down, finger up 177; the same again as it held (T12).
+    expect(fake.swipes).toEqual([
+      { from: { x: 540, y: 1631 }, to: { x: 540, y: 1454 } },
+      { from: { x: 540, y: 1631 }, to: { x: 540, y: 1454 } },
+    ]);
+    expect(result.flush?.checked).toBe(true); // the static fake moves nothing: accepted, after two strokes that could have moved it
   });
 
   it('a probe whose container has room on the screen but not above the IME is not drawn over the whole screen: no swipe, reported unchecked (`room`) — not "nothing of it is cut there" after a stroke that touched down off the list', async () => {
@@ -1279,7 +1284,10 @@ describe('scroll_until over idb\'s soft keyboard (round 7)', () => {
     fake.viewportSize = { width: 402, height: 874 };
     const result = await scrollUntilVisible(fake, 'id:row', { ...FAST, fully: true });
     expect(result.flush).toEqual({ edge: 'bottom', container: inner.rect, checked: true });
-    expect(fake.swipes).toEqual([{ from: { x: 201, y: 532 }, to: { x: 201, y: 484 } }]);
+    expect(fake.swipes).toEqual([
+      { from: { x: 201, y: 532 }, to: { x: 201, y: 484 } },
+      { from: { x: 201, y: 532 }, to: { x: 201, y: 484 } },
+    ]);
   });
 
   it('an app\'s PIN pad (no background listed — run5-ios #81\'s shape) is content: the stroke box is the whole screen, as before', async () => {

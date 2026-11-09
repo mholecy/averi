@@ -68,6 +68,10 @@ describe('flushProbedSide: the probed side in both forms src builds (src/interac
     }
   });
 
+  it('the wording before T12 (one probe), as records kept from then say it', () => {
+    expect(flushProbedSide("fully visible after 1 swipe; its bottom edge lies on its scroll container's (0,303 1080x605), and a probe swipe toward it moved nothing — nothing of it is cut there")).toBe('bottom');
+  });
+
   it('none where no probe moved nothing: unchecked, held on a proven cut, or spanning the container', () => {
     expect(flushProbedSide(`fully visible after 3 swipes${flushText({ edge: 'top', container, checked: false, why: 'held', revealed: 66 })}`)).toBeUndefined();
     expect(flushProbedSide(`fully visible after 0 swipes${flushText({ edge: 'top', container, pinned, checked: false, why: 'budget' })}`)).toBeUndefined();

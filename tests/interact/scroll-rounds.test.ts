@@ -699,13 +699,18 @@ describe('round — a fully: true stop flush with its clipping scroll container 
     expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] });
   });
 
-  it('the first row of a list at rest is flush with its container\'s top and NOT cut: the probe moves nothing and the stop is accepted — one extra stroke, the stated cost, said in the reply', () => {
-    const played = play(FULLY_ANDROID, [formRead(242), formRead(242)]);
-    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stop']); // no confirming read: it held still through the probe
+  it('the first row of a list at rest is flush with its container\'s top and NOT cut: two probes move nothing and the stop is accepted — two extra strokes, the stated cost (T12: one held probe may be a stroke the app did not take), said in the reply', () => {
+    const played = play(FULLY_ANDROID, [formRead(242), formRead(242), formRead(242)]);
+    // No confirming read: it held still through the probe; the same first probe again, at once.
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stop']);
+    expect(probeOf(played).map((s) => s.do === 'stroke' && [s.reach, s.maxTravel])).toEqual([
+      [0.25, 177],
+      [0.25, 177],
+    ]);
     const result = resultOf(played);
-    expect(result).toEqual({ swipes: 1, visible: 1, clipped: [], flush: { edge: 'top', container: FORM, checked: true } });
+    expect(result).toEqual({ swipes: 2, visible: 1, clipped: [], flush: { edge: 'top', container: FORM, checked: true } });
     expect(describeScrollResult(result)).toBe(
-      "fully visible after 1 swipe; its top edge lies on its scroll container's (0,242 1080x1736), and a probe swipe toward it moved nothing — nothing of it is cut there",
+      "fully visible after 2 swipes; its top edge lies on its scroll container's (0,242 1080x1736), and 2 probe swipes toward it moved nothing — nothing of it is cut there",
     );
   });
 
@@ -724,12 +729,22 @@ describe('round — a fully: true stop flush with its clipping scroll container 
   });
 
   it('a probe after which more of the row shows flush on the OTHER edge proved nothing of the edge it asked about: a new candidate, confirmed and probed toward its own edge — no reveal', () => {
-    const played = play({ ...FULLY_ANDROID, maxSwipes: 6 }, [formRead(242, 92), formRead(1878, 100), formRead(1878, 100), formRead(1878, 100)]);
-    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stroke', 'stop']);
+    const played = play({ ...FULLY_ANDROID, maxSwipes: 6 }, [formRead(242, 92), formRead(1878, 100), formRead(1878, 100), formRead(1878, 100), formRead(1878, 100)]);
+    // Its own first probe held: the same probe again (T12), then the stop.
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stroke', 'stroke', 'stop']);
     expect(probeOf(played).map((s) => s.do === 'stroke' && [s.toward, s.reach])).toEqual([
       ['up', 0.25],
       ['down', 0.25],
+      ['down', 0.25],
     ]);
+  });
+
+  it('one swipe only: the first probe held, and no swipe is left for the second (T12) — unchecked `budget`, never "nothing of it is cut there"', () => {
+    const played = play({ ...FULLY_ANDROID, maxSwipes: 1 }, [formRead(242), formRead(242)]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stop']);
+    const result = resultOf(played);
+    expect(result).toEqual({ swipes: 1, visible: 1, clipped: [], flush: { edge: 'top', container: FORM, checked: false, why: 'budget' } });
+    expect(describeScrollResult(result)).not.toContain('nothing of it is cut there');
   });
 
   it('no swipe left to probe with: reported fully visible with flush unchecked, and the reply says it may be cut', () => {
@@ -771,7 +786,8 @@ describe('round — a fully: true stop flush with its clipping scroll container 
   });
 
   it('within a pixel counts as flush (a rounding in the tree source)', () => {
-    expect(probeOf(play(FULLY_ANDROID, [formRead(243, 92), formRead(243, 92)]))).toHaveLength(1);
+    // The first probe and, as it held, the same again (T12).
+    expect(probeOf(play(FULLY_ANDROID, [formRead(243, 92), formRead(243, 92), formRead(243, 92)]))).toHaveLength(2);
   });
 
   it('only on fully: true — the default stop is not the flush check\'s business (intersection is its bar)', () => {
@@ -790,8 +806,9 @@ describe('round — a fully: true stop flush with its clipping scroll container 
   });
 
   it('a read after the probe that fails is read again — not answered with a stroke the caller\'s way', () => {
-    const played = play(FULLY_ANDROID, [formRead(242), { error: 'uiautomator dump returned no XML' }, formRead(242)]);
-    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stop']);
+    const played = play(FULLY_ANDROID, [formRead(242), { error: 'uiautomator dump returned no XML' }, formRead(242), formRead(242)]);
+    // The read again found the first probe held: the same probe again (T12), and that one held too.
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stroke', 'stop']);
     expect(resultOf(played).flush).toEqual({ edge: 'top', container: FORM, checked: true });
   });
 
@@ -913,14 +930,14 @@ describe('round — the flush check across nested clipping containers, and a pro
   it.each([30, 78])('a card cut with its carousel to a %i-px strip by the list\'s bottom: probed toward the bottom, over the LIST — the strip has no room for a stroke (it would be a tap on the card)', (strip) => {
     // The card shorter than the carousel: flush with the carousel's bottom only — the nearest ancestor flush on one edge.
     const row: Row = { found: [card(1978 - strip + 4)], scrollers: [carousel(strip), LIST] };
-    const played = play(FULLY_ANDROID, [row, row]);
+    const played = play(FULLY_ANDROID, [row, row, row]);
     expect(decided(played.steps[0])).toEqual({ do: 'stroke', kind: 'full', toward: 'down', reach: 0.25, box: LIST, probe: true, maxTravel: 177 });
     expect(resultOf(played).flush).toEqual({ edge: 'bottom', container: carousel(strip), checked: true });
   });
 
   it('a card that FILLS its carousel\'s height (flush with both its edges), the carousel cut by the list to 78 of 400 px: probed against the list it is cut by — not "fully visible after 0 swipes"', () => {
     const row: Row = { found: [card(1900)], scrollers: [carousel(78), LIST] };
-    const played = play(FULLY_ANDROID, [row, row]);
+    const played = play(FULLY_ANDROID, [row, row, row]);
     expect(played.steps[0]).toMatchObject({ do: 'stroke', kind: 'full', toward: 'down', box: LIST, probe: true });
     expect(resultOf(played).flush).toEqual({ edge: 'bottom', container: LIST, checked: true });
   });
@@ -977,7 +994,7 @@ describe('round — the flush check across nested clipping containers, and a pro
     expect(lone.steps.map((st) => st.do)).toEqual(['stop']);
     expect(resultOf(lone).flush).toEqual({ edge: 'top', container: UNDER, checked: false, why: 'room' });
     expect(lone.asks).toEqual(['witness', 'unlocated']); // the band asked about before the room above it is judged
-    const nested = play(FULLY_ANDROID, [row([UNDER, LIST]), row([UNDER, LIST])]);
+    const nested = play(FULLY_ANDROID, [row([UNDER, LIST]), row([UNDER, LIST]), row([UNDER, LIST])]);
     expect(nested.steps[0]).toMatchObject({ do: 'stroke', kind: 'full', toward: 'up', coverTop: 1398, box: LIST, probe: true });
     expect(resultOf(nested).flush).toEqual({ edge: 'top', container: UNDER, checked: true });
   });
@@ -2831,12 +2848,12 @@ describe('round — a fully: true stop flush under a node pinned in its own scro
     );
   });
 
-  it('the first row at rest, whole under the header (the lab\'s scroll-sticky-rest as captured): one probe that moves nothing — "fully visible after 1 swipe" (the stated cost)', async () => {
+  it('the first row at rest, whole under the header (the lab\'s scroll-sticky-rest as captured): two probes that move nothing — "fully visible after 2 swipes" (the stated cost, T12)', async () => {
     const tree = parseDump(await readFile(new URL('../fixtures/truth/android-averi_lab-api33/scroll-sticky-rest.xml', import.meta.url), 'utf8'));
     const rest: Row = { tree, found: [[...everyNode(tree)].find((x) => x.identifier === 'lab.scroll-sticky-rest.R')!] };
-    const played = play(FULLY_ANDROID, [rest, rest]);
-    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stop']);
-    expect(resultOf(played)).toMatchObject({ swipes: 1, flush: { edge: 'top', checked: true } });
+    const played = play(FULLY_ANDROID, [rest, rest, rest]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stop']);
+    expect(resultOf(played)).toMatchObject({ swipes: 2, flush: { edge: 'top', checked: true } });
   });
 
   it('no swipe left: unchecked for the budget, and the reply says Compose may have cut it at the pinned node', () => {
@@ -2880,9 +2897,9 @@ describe('round — a fully: true stop flush under a node pinned in its own scro
       `<node class="android.view.View" scrollable="true" resource-id="outer" bounds="[0,0][1080,2220]"><node class="android.view.View" scrollable="true" resource-id="list" bounds="[0,303][1080,1541]"><node class="android.view.View" clickable="true" resource-id="row" bounds="[128,457][953,633]" /><node class="android.view.View" resource-id="header" bounds="[0,303][1080,457]"><node class="android.widget.TextView" text="Section" bounds="[400,347][681,413]" /></node></node></node>`,
       'row',
     );
-    const played = play(FULLY_ANDROID, [row, row]);
-    expect(probes(played)).toHaveLength(1);
-    expect(probes(played)[0]).toMatchObject({ toward: 'up', probe: true });
+    const played = play(FULLY_ANDROID, [row, row, row]);
+    expect(probes(played)).toHaveLength(2);
+    for (const p of probes(played)) expect(p).toMatchObject({ toward: 'up', probe: true });
     expect(resultOf(played).flush).toEqual({ edge: 'top', container: LIST, pinned: { role: 'container', identifier: 'header', label: null, rect: { x: 0, y: 303, width: 1080, height: 154 } }, checked: true });
   });
 
@@ -2905,9 +2922,9 @@ describe('round — a fully: true stop flush under a node pinned in its own scro
         'card',
       );
 
-    it('is probed toward the node (content right, the finger right) from inside the strip; the probe that moves nothing settles it, naming the node', () => {
-      const played = play({ ...FULLY_ANDROID, direction: 'right' }, [card('[240,300][540,600]'), card('[240,300][540,600]')]);
-      expect(probes(played)).toHaveLength(1);
+    it('is probed toward the node (content right, the finger right) from inside the strip; two probes that move nothing settle it, naming the node', () => {
+      const played = play({ ...FULLY_ANDROID, direction: 'right' }, [card('[240,300][540,600]'), card('[240,300][540,600]'), card('[240,300][540,600]')]);
+      expect(probes(played)).toHaveLength(2);
       const p = probes(played)[0] as { toward: string; box: Rect };
       expect(p.toward).toBe('left');
       expect(p.box.y).toBeGreaterThanOrEqual(STRIP.y);
@@ -2915,7 +2932,7 @@ describe('round — a fully: true stop flush under a node pinned in its own scro
       const result = resultOf(played);
       expect(result.flush).toEqual({ edge: 'left', container: STRIP, pinned: HEAD, checked: true });
       expect(describeScrollResult(result)).toContain(
-        "its left edge lies on the edge of container id:header (0,300 240x300), pinned at its scroll container's (0,300 1080x300) left and drawn after it, and a probe swipe toward it moved nothing",
+        "its left edge lies on the edge of container id:header (0,300 240x300), pinned at its scroll container's (0,300 1080x300) left and drawn after it, and 2 probe swipes toward it moved nothing",
       );
     });
 

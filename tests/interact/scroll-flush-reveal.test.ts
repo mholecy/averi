@@ -143,9 +143,10 @@ describe('a probe that revealed more of a match still flush on the same edge pro
   });
 
   it('a probe after which it lies flush on the same edge with LESS of it showing proved nothing: confirmed and probed again, no reveal', () => {
-    const played = play(RULES, [sAt(60), sAt(30), sAt(30), sAt(30)]);
-    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stroke', 'stop']);
-    expect(strokes(played).map((s) => s.do === 'stroke' && s.reach)).toEqual([0.25, 0.25]);
+    const played = play(RULES, [sAt(60), sAt(30), sAt(30), sAt(30), sAt(30)]);
+    // The new candidate's own probe held: the same probe again (T12), then the stop.
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stroke', 'stroke', 'stop']);
+    expect(strokes(played).map((s) => s.do === 'stroke' && s.reach)).toEqual([0.25, 0.25, 0.25]);
   });
 
   it('a match that grew flush on the same edge with its uncut edge where it was (its container grew, the content did not carry it) proved no cut: confirmed, no reveal', () => {
@@ -157,9 +158,9 @@ describe('a probe that revealed more of a match still flush on the same edge pro
       if (s === undefined) throw new Error('no S in the capture');
       return { tree, found: [s] };
     };
-    const played = play(RULES, [sAt(0), grown(), grown(), grown()]);
-    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stroke', 'stop']);
-    expect(strokes(played).map((s) => s.do === 'stroke' && s.reach)).toEqual([0.25, 0.25]);
+    const played = play(RULES, [sAt(0), grown(), grown(), grown(), grown()]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stroke', 'stroke', 'stop']);
+    expect(strokes(played).map((s) => s.do === 'stroke' && s.reach)).toEqual([0.25, 0.25, 0.25]);
   });
 
   it('a read that judges no stop answers the probe in flight: the match back where the probe was sent from on a later read is a new candidate, probed again — not held', () => {

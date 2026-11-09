@@ -115,9 +115,10 @@ describe('the flush check', () => {
     expect(probing(seeFlush(inFlight, undefined).check)).toBe(false);
   });
 
-  it('a probe that came back with the match where it was: settled and checked — or, drawn too short to tell from a tap, unchecked `tap`', () => {
+  it('a probe that came back with the match where it was, twice: settled and checked — or, drawn too short to tell from a tap, unchecked `tap`', () => {
     const inFlight = sent(seeFlush(startFlush('down'), stopAt(flushOn('bottom', 22))).verdict);
-    const held = seeFlush(inFlight, stopAt(flushOn('bottom', 22)));
+    const once = seeFlush(inFlight, stopAt(flushOn('bottom', 22)));
+    const held = seeFlush(sent(once.verdict), stopAt(flushOn('bottom', 22)));
     expect(held).toMatchObject({ settles: true, waits: true });
     expect(said(held)).toEqual(CHECKED);
     expect(said(seeFlush(inFlight, stopAt(flushOn('bottom', 22), { drawn: TAP })))).toEqual({ of: 'flush', flush: { edge: 'bottom', container: LIST, checked: false, why: 'tap' } });
@@ -199,7 +200,9 @@ describe('the flush check', () => {
     const row: Rect = { x: 128, y: 1146, width: 825, height: 110 };
     const first = seeFlush(startFlush('up'), stopAt(row, { after: [header] }));
     expect(said(first)).toEqual({ of: 'probe', toward: 'up', reach: 0.25, maxTravel: CAP });
-    expect(said(seeFlush(sent(first.verdict), stopAt(row, { after: [header] })))).toEqual({
+    const once = seeFlush(sent(first.verdict), stopAt(row, { after: [header] }));
+    expect(said(once)).toEqual({ of: 'probe', toward: 'up', reach: 0.25, maxTravel: CAP });
+    expect(said(seeFlush(sent(once.verdict), stopAt(row, { after: [header] })))).toEqual({
       of: 'flush',
       flush: { edge: 'top', container: LIST, pinned: expect.objectContaining({ identifier: 'H' }), checked: true },
     });
@@ -316,9 +319,11 @@ describe('the flush check doubts a reveal that held on a proven cut (D62, T11)',
     expect(said(seeFlush(sent(shown.verdict), stopAt(flushOn('bottom', 82))))).toEqual(reveal(82));
   });
 
-  it('a first probe that held is checked whatever came before it: no proof, nothing to doubt', () => {
+  it('a first probe that held, no proof: the same first probe again (T12), checked when that one holds too', () => {
     const inFlight = sent(seeFlush(startFlush('down'), stopAt(flushOn('bottom', 22))).verdict);
-    expect(said(seeFlush(inFlight, stopAt(flushOn('bottom', 22), { drawn: PROBE })))).toEqual(CHECKED);
+    const once = seeFlush(inFlight, stopAt(flushOn('bottom', 22), { drawn: PROBE }));
+    expect(said(once)).toEqual({ of: 'probe', toward: 'down', reach: 0.25, maxTravel: CAP });
+    expect(said(seeFlush(sent(once.verdict), stopAt(flushOn('bottom', 22), { drawn: PROBE })))).toEqual(CHECKED);
   });
 
   // batch-9 run 0 (carousel-recycler-free, the 440-px pre-drag, then `left fully: true`): C flush with its carousel's
@@ -339,6 +344,57 @@ describe('the flush check doubts a reveal that held on a proven cut (D62, T11)',
     expect(held).toMatchObject({ waits: false, verdict: { of: 'probe', toward: 'right' } });
     expect(seeFlush(sent(proved.verdict), carouselStop(after, untaken, false)).verdict).toMatchObject({ of: 'cut', cut: { revealed: 135, why: 'budget', edge: 'right', container: CLIP } });
     expect(seeFlush(sent(held.verdict), carouselStop(after, untaken)).verdict).toEqual({ of: 'flush', flush: { edge: 'right', container: CLIP, checked: false, why: 'held', revealed: 135 } });
+  });
+});
+
+/**
+ * T12: a first probe that held, with no proof, is doubted once — the same first probe sent again — and `checked` only when
+ * that one holds too: a stroke the app did not take reads the same as content that ended, and no read tells them apart.
+ */
+describe('the flush check doubts a first probe that held (T12)', () => {
+  const FIRST = { of: 'probe', toward: 'down', reach: 0.25, maxTravel: CAP } as const;
+  /** The check after the first probe on a row showing 22 at the list's bottom held once. */
+  const heldOnce = (more: StopShown = {}): FlushSeen => seeFlush(sent(seeFlush(startFlush('down'), stopAt(flushOn('bottom', 22))).verdict), stopAt(flushOn('bottom', 22), more));
+
+  it('a first probe that held: settled, no proof — the same first probe again, not a reveal', () => {
+    const once = heldOnce();
+    expect(once).toMatchObject({ settles: true, waits: true });
+    expect(said(once)).toEqual(FIRST);
+  });
+
+  it('the second held too: checked — no proof, two strokes taken for none', () => {
+    const twice = seeFlush(sent(heldOnce().verdict), stopAt(flushOn('bottom', 22)));
+    expect(twice).toMatchObject({ settles: true, waits: true });
+    expect(said(twice)).toEqual(CHECKED);
+  });
+
+  it('the second moved it and showed more of it on that edge: a fresh proof — the reveal, the cut T11 doubts', () => {
+    const proved = seeFlush(sent(heldOnce().verdict), stopAt(flushOn('bottom', 82)));
+    expect(proved).toMatchObject({ settles: false, waits: false });
+    expect(said(proved)).toEqual({ of: 'probe', toward: 'down', reach: 1, maxTravel: Math.floor((LIST.height - 82) / 2) });
+  });
+
+  it('the second moved it off the edge, then a new candidate flush there: a first probe of its own, doubted too', () => {
+    const off = seeFlush(sent(heldOnce().verdict), stopAt({ x: 128, y: 1200, width: 825, height: 176 }));
+    expect(said(off)).toEqual({ of: 'none' });
+    const anew = seeFlush(off.check, stopAt(flushOn('bottom', 40)));
+    const once = seeFlush(sent(anew.verdict), stopAt(flushOn('bottom', 40)));
+    expect(said(once)).toEqual(FIRST);
+    expect(said(seeFlush(sent(once.verdict), stopAt(flushOn('bottom', 40))))).toEqual(CHECKED);
+  });
+
+  it('no swipe or time left for the second: unchecked `budget`, never checked', () => {
+    expect(said(heldOnce({ budget: false }))).toEqual({ of: 'flush', flush: { edge: 'bottom', container: LIST, checked: false, why: 'budget' } });
+  });
+
+  it('a first probe drawn too short to tell from a tap: `tap`, as before — no second probe', () => {
+    expect(said(heldOnce({ drawn: TAP }))).toEqual({ of: 'flush', flush: { edge: 'bottom', container: LIST, checked: false, why: 'tap' } });
+  });
+
+  it('a proof, then two held reveals: still T11\'s hedge, not checked', () => {
+    const proved = seeFlush(sent(heldOnce().verdict), stopAt(flushOn('bottom', 82)));
+    const doubted = seeFlush(sent(proved.verdict), stopAt(flushOn('bottom', 82)));
+    expect(said(seeFlush(sent(doubted.verdict), stopAt(flushOn('bottom', 82))))).toEqual(HELD(60));
   });
 });
 

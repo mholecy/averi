@@ -231,7 +231,7 @@ describe('round — the end turn: the caller\'s way first, proven exhausted, the
 
   it('a flush probe that moves nothing is no proof of an end: the stop it checks is reported checked, never "content exhausted"', () => {
     // A clipping list (Android's mark, on a tree of unclipped frames, so both questions can be asked of one tree): its
-    // first row flush with its top, the list listing nothing above it — `fully: true` probes up once.
+    // first row flush with its top, the list listing nothing above it — `fully: true` probes up, and as that held, once more (T12).
     const list: Rect = { x: 0, y: 300, width: 402, height: 400 };
     const row = node({ role: 'button', identifier: 'first', rect: { x: 0, y: 300, width: 402, height: 64 } });
     const tree = node({
@@ -241,8 +241,9 @@ describe('round — the end turn: the caller\'s way first, proven exhausted, the
       children: [node({ role: 'scrollable', rect: list, clipsDescendants: true, children: [node({ role: 'other', rect: { x: 0, y: 300, width: 402, height: 1200 } }), row] })],
     });
     const r: Row = { tree, found: [row] };
-    const played = play({ ...IPHONE, direction: 'down', fully: true }, [r, r]);
+    const played = play({ ...IPHONE, direction: 'down', fully: true }, [r, r, r]);
     expect(played.steps[0]).toMatchObject({ do: 'stroke', probe: true, toward: 'up' });
-    expect(played.outcome).toMatchObject({ kind: 'visible', swipes: 1, flush: { edge: 'top', checked: true } });
+    expect(played.steps[1]).toMatchObject({ do: 'stroke', probe: true, toward: 'up' });
+    expect(played.outcome).toMatchObject({ kind: 'visible', swipes: 2, flush: { edge: 'top', checked: true } });
   });
 });
