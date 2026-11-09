@@ -6,7 +6,7 @@ import { parseArgs } from 'node:util';
 import { PNG } from 'pngjs';
 import type { Recording } from './corpus.js';
 import { configFor, connect, type Outcome } from './differential.js';
-import { expectations, formExpectations, sent, type Verb } from './golden-spec.js';
+import { absentExpectations, expectations, formExpectations, sent, type Verb } from './golden-spec.js';
 import { replyKind, type ReplyKind } from '../truth/replies.js';
 import type { Side } from './side.js';
 import { pct, type CellTruth, type ImeCapture } from '../truth/schema.js';
@@ -173,6 +173,14 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
         }
         const outcome = await c.call(e.call, config);
         result.checks.push(checkOf(recording.id, e.target ?? t.tag, e.verb, e.says, e.judge(outcome), outcome, e.read?.(outcome)));
+      }
+    }
+    // A target laid out nowhere (CellTruth.absent, T6): no frame to be inconsistent with — its rows are asked toward where
+    // it lies (golden-spec/edges.ts#absentRows), after the framed targets'.
+    for (const a of truth.absent ?? []) {
+      for (const e of absentExpectations(recording.platform, a, truth, recording.source, recording.payload)) {
+        const outcome = await c.call(e.call, config);
+        result.checks.push(checkOf(recording.id, e.target ?? a.tag, e.verb, e.says, e.judge(outcome), outcome, e.read?.(outcome)));
       }
     }
     // A form cell: its rows are judged unless a control's probe disagrees with its frame — then the cell is broken.

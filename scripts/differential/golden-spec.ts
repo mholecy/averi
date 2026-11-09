@@ -1,10 +1,10 @@
 import type { Platform, SourceKind } from './corpus.js';
-import type { CellTruth, TargetTruth } from '../truth/schema.js';
+import type { AbsentTarget, CellTruth, TargetTruth } from '../truth/schema.js';
 import { elementOf, listedIn, nodeFramesIn } from '../truth/truth.js';
 import { askedUnlistedBy, contractOf, unlistedBy } from '../truth/target-contract.js';
 import { barRows } from './golden-spec/bars.js';
 import { openRows } from './golden-spec/base.js';
-import { edgeRows } from './golden-spec/edges.js';
+import { absentRows, edgeRows } from './golden-spec/edges.js';
 import { dismissRows, ownPartsRows } from './golden-spec/false-covers.js';
 import { formRows, type FormExpectation } from './golden-spec/forms.js';
 import { coveredRows } from './golden-spec/covered.js';
@@ -98,6 +98,16 @@ export function expectations(platform: Platform, t: TargetTruth, cell: CellTruth
   // A text or label target is drawn on its own control: its colour is not asked (false-covers.ts#ownPartsRows).
   if (g === undefined || g === 'whole') return c.tap === undefined ? [] : t.text !== undefined ? text(ownPartsRows(platform, t, c, nodes)) : t.label !== undefined ? ownPartsRows(platform, t, c, nodes) : openRows(platform, t, c, nodes, { absent: askedUnlistedBy(t, source), nodeAbsent: unlistedBy(t, source) });
   return cell === undefined ? [] : text([...edgeRows(platform, t, cell, source, c), ...barRows(platform, t, cell, source, c)]);
+}
+
+/**
+ * The rows of a target its capture laid out no frame for (CellTruth.absent, T6: the L7 carousels' C) — scroll_until and
+ * `fully: true` toward it (golden-spec/edges.ts#absentRows). `tree`, the replayed tree's payload: where it lists the
+ * target's scroll view a scroller (truth.ts#scrollerListedIn), every touch-down is held inside it; without it, the
+ * screen's region only. golden.ts asks them after the framed targets' rows.
+ */
+export function absentExpectations(platform: Platform, a: AbsentTarget, cell: CellTruth, source: SourceKind, tree?: string): Expectation[] {
+  return absentRows(platform, a, cell, source, tree);
 }
 
 /**

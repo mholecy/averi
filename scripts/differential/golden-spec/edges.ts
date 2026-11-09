@@ -1,8 +1,9 @@
 import type { Platform, SourceKind } from '../corpus.js';
-import type { CellTruth, TargetTruth } from '../../truth/schema.js';
+import type { AbsentTarget, CellTruth, TargetTruth } from '../../truth/schema.js';
+import { directionOf, scrollerListedIn } from '../../truth/truth.js';
 import { classed, type Expectation } from './judges.js';
-import { askedUnlistedBy, unlistedBy, type TargetContract } from '../../truth/target-contract.js';
-import { colourFails, directionRow, fullyRow, stopRow, strokeRow, tapRow } from './rows.js';
+import { ABSENT_STOPS, askedUnlistedBy, unlistedBy, type TargetContract } from '../../truth/target-contract.js';
+import { absentFullyRow, colourFails, directionRow, fullyRow, stopRow, strokeRow, tapRow } from './rows.js';
 
 /**
  * The edge geometries' rows — a geometry group, named for the edges family (fixtures/apps/cells/edges.json, phase 3 B2)
@@ -31,20 +32,24 @@ export function edgeRows(platform: Platform, t: TargetTruth, cell: CellTruth, so
   // The tap and the stroke ask by truth.ts#selectorOf (a text target by its string), the colour assert by the identifier.
   const absent = askedUnlistedBy(t, source);
   const nodeAbsent = unlistedBy(t, source);
+  // A framed target its tree does not list: no scroll view asked of its strokes even where the tree lists that scroll
+  // view a scroller (absentRows' rule) — scroll-bounded's O and F on Android lie in `lower`, one of two vertical lists,
+  // and averi cannot tell which holds a row it never saw (T6: holding them inside turned both rows red).
+  const stroke = (row: string) => strokeRow(platform, t, cell, row, c.stop, directionOf(t, cell), { absent });
   const fully = c.fully === undefined ? [] : [fullyRow(platform, t, cell, c.fully)];
   switch (c.geometry) {
     case 'off-screen':
       return [
         tapRow(platform, t, c, 'R-off', { absent }),
         colourFails(platform, t, 'R-off: nothing of it is on the screen', { absent: nodeAbsent }),
-        strokeRow(platform, t, cell, 'R-off', c.stop, { absent }),
+        stroke('R-off'),
         directionRow(platform, t, cell),
       ].map(classed);
     case 'outside-scroll-view':
       return [
         tapRow(platform, t, c, 'R-outside-sv', { absent }),
         colourFails(platform, t, 'R-outside-sv: fails closed, never measuring the background', { expected: t.seen, absent: nodeAbsent }),
-        strokeRow(platform, t, cell, 'R-outside-sv', c.stop, { absent }),
+        stroke('R-outside-sv'),
         directionRow(platform, t, cell),
       ].map(classed);
     case 'sliver':
@@ -55,4 +60,30 @@ export function edgeRows(platform: Platform, t: TargetTruth, cell: CellTruth, so
     default:
       return [];
   }
+}
+
+/**
+ * Whether the replayed tree `tree` lists the target's scroll view (the truth's clip of it) a scroller
+ * (truth.ts#scrollerListedIn) — R-stroke then holds the strokes for a target it does not list inside it
+ * (rows.ts#strokeRow). False with no tree (a unit test of a row's choice) or no clip in the truth.
+ */
+function scrollerListed(t: Pick<TargetTruth, 'scrollView'>, cell: CellTruth, source: SourceKind, tree: string | undefined): boolean {
+  const clip = t.scrollView === undefined ? undefined : cell.scrollViews?.[t.scrollView];
+  return tree !== undefined && clip !== undefined && scrollerListedIn(tree, source, clip);
+}
+
+/**
+ * The rows of a target the app laid out no frame for (CellTruth.absent: the L7 carousels' C at launch, not composed
+ * until its carousel scrolls — T6), asked toward where it lies (AbsentTarget.toward; none without it): R-stroke
+ * (rows.ts#strokeRow) and R-fully (rows.ts#absentFullyRow) — `fully: true` never "visible", the same strokes. Both
+ * accept a reply that never found it where the capture's tree did not list it (askedUnlistedBy), judged by the swipes
+ * sent for it: every touch-down inside its scroll view where the replayed tree lists that a scroller (D59b — on the L7
+ * carousels a horizontal stroke over the page's vertical axis goes over the carousel of unknown axis, inside its band),
+ * along `toward`'s axis. What the contract asks of it is target-contract.ts#ABSENT_STOPS. No tap or colour row: nothing
+ * of it is on the screen to tap or measure, and the off-screen rows already ask both of such targets.
+ */
+export function absentRows(platform: Platform, a: AbsentTarget, cell: CellTruth, source: SourceKind, tree?: string): Expectation[] {
+  if (a.toward === undefined) return [];
+  const opts = { absent: askedUnlistedBy(a, source), scrollerListed: scrollerListed(a, cell, source, tree) };
+  return [strokeRow(platform, a, cell, 'R-absent', ABSENT_STOPS.stop, a.toward, opts), absentFullyRow(platform, a, cell, 'R-absent', ABSENT_STOPS.fully, a.toward, opts)].map(classed);
 }

@@ -26,11 +26,12 @@ import { BUDGET_MS, first, landed, notTapped, passed, passes, pointsText, reache
  * | R-off | off-screen | colour | fails: nothing of it is on the screen to measure | ADR 0010 (amendment: the off-screen case — nothing of what it reads on the screen, judged off the screen first), ADR 0002 (the thin sliver: judged off the screen, never measured) |
  * | R-outside-sv | outside-scroll-view | tap | refused naming scroll_until, nothing tapped | ADR 0005 |
  * | R-outside-sv | outside-scroll-view | colour | fails closed: it would measure the background | docs/bugs/2026-10-14-ios-color-assert-on-a-row-outside-its-scroll-view-measures-the-background-and-passes.md |
- * | R-stroke | off what shows (off-screen, outside-scroll-view) | scroll_until toward it (truth.ts#directionOf: sideways toward a card beside a carousel's clip) | swipes, every touch-down on the screen clear of the system bands and the chrome, and inside the target's own scroll view where the truth names it (not when the tree does not list it); every swipe along the axis of its direction | docs/bugs/2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md, docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard.md; the axis: docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md (its residual: a card of a carousel stroked across its axis) |
+ * | R-stroke | off what shows (off-screen, outside-scroll-view), or laid out nowhere (CellTruth.absent: R-absent, edges.ts#absentRows) | scroll_until toward it (truth.ts#directionOf: sideways toward a card beside a carousel's clip; AbsentTarget.toward) | swipes, every touch-down on the screen clear of the system bands and the chrome, and inside the target's own scroll view where the truth names it (not when the tree does not list it — but a target laid out nowhere whose scroll view the replayed tree lists a scroller: D59b, T6); every swipe along the axis of its direction | docs/bugs/2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md, docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard.md; the axis: docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md (its residual: a card of a carousel stroked across its axis) |
  * | R-sliver | sliver | tap | refused naming scroll_until, nothing tapped | ADR 0013; docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md |
  * | R-sliver | sliver | scroll_until | not reached where it is — the stop fails, whatever it swiped (the plain stop does not stop on a sliver; a replayed tree never moves) | ADR 0013 |
  * | R-land | partly-centre-in (reached) | tap | `Tapped`, every tap sent inside what shows (`visible`) | ADR 0005; docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md |
  * | R-land | centre-out, under-chrome | tap | refused, nothing sent — or `Tapped` inside its piece where the second probe fired (`reachedAtPiece`) | ADR 0005 (a covered target's tap moved to its piece, or refused) |
+ * | R-fully (R-absent) | laid out nowhere (CellTruth.absent) | scroll_until `fully: true` toward it | never "visible" (it has no frame), its swipes as R-stroke's (absentFullyRow) | ADR 0021 (D52's `unfit` and D59's inferred axis are the live leg: they need it drawn cut by its clip, which no launch tree shows); ADR 0010 D59b amendment |
  * | R-fully | partly-centre-in, centre-out, sliver (and R-overlap's) | scroll_until `fully: true` | never "visible" where it is, whatever it swiped: it is cut — but a rect flush with its scroll container's edge, probed with a swipe toward it, may stop when the replayed probe moves nothing (the probe's answer is the device's: replies.ts#flushProbedSide) | ADR 0005 (the `fully` stop judges no sliver: a stop flush with a clipping container is the flush probe's to check, scroll-rounds.ts#PROBE_REACH), ADR 0009 (N-a, `fully`); docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md, docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md |
  * | R-band | status-band, nav-band (iOS's home-indicator band is no band: target-contract.ts#judgedContext) | tap | refused, nothing tapped — where its probe fired (iOS below the bar's touch area, Android's navigation band under gesture navigation): Tapped inside what shows of it, or refused with nothing sent | ADR 0009 (N-a), ADR 0008; docs/bugs/2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md |
  * | R-band | status-band, nav-band | colour | fails: a system band over what it reads (Android's navigation bar under three buttons: asked for the colour the screen shows there, the bar's, so a pass means it measured the bar — #23) — but in Android's navigation band under gesture navigation, where the band is the app's (truth.ts#navigationBandTakes, measured: bands N reached, seen in its own colour beneath the gesture handle), passes on its own colour or fails closed | ADR 0001; ADR 0020 (the measured truth outranks a hand-written expectation) |
@@ -198,42 +199,93 @@ export function bandColour(platform: Platform, t: TargetTruth, cell: CellTruth):
   };
 }
 
+/** strokeRow's options beside RowOptions: whether the replayed tree lists the target's scroll view a scroller. */
+export interface StrokeOptions extends RowOptions {
+  /**
+   * The replayed tree lists a scroller at the clip of the scroll view the truth names (truth.ts#scrollerListedIn): a
+   * target the tree does not list (`absent`) is held inside it too. Set by edges.ts#absentRows only — for a target laid
+   * out nowhere (CellTruth.absent), whose scroll view is the one place it can come from; a framed target the tree does
+   * not list is not (edges.ts#edgeRows: scroll-bounded's O and F, rows of one of two vertical lists, which averi cannot
+   * tell apart for a row it never saw).
+   */
+  scrollerListed?: boolean;
+}
+
 /**
- * R-stroke over a target off what shows: scroll_until toward it swipes, every touch-down strokeable
+ * R-stroke over a target off what shows: scroll_until `direction` toward it swipes, every touch-down strokeable
  * (judges.ts#strokeable) — and, where the truth names the target's scroll view and the capture its clip, inside that
  * scroll view: a stroke that touches down beside it moves nothing it holds (WDA's own refusal names that scroll view).
- * `absent`, given by the caller where the tree may not list the target (target-contract.ts#unlistedBy: the capture's tree of that
- * source did not — uiautomator dumps only what is visible to the user), lets a "never appeared in the tree" reply be
- * judged by its strokes, the swipes sent looking for it the evidence all the same; the scroll-view check is then not
- * asked: averi cannot know which scroll view holds a node it never saw. Every swipe runs along the axis of its
- * direction (its larger leg on that axis, whichever way — a turn back is a stroke along it too): a scroll view moves
- * along its own axis, and a stroke across a carousel's moves it not (the residual of
- * docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md).
+ * `absent`, given by the caller where the tree may not list the target (target-contract.ts#unlistedBy: the capture's
+ * tree of that source did not — uiautomator dumps only what is visible to the user), lets a "never appeared in the tree"
+ * reply be judged by its strokes, the swipes sent looking for it the evidence all the same; the scroll-view check is
+ * then not asked — averi cannot know which scroll view holds a node it never saw — but where the caller says the
+ * replayed tree lists that scroll view a scroller (`scrollerListed`, T6: a target laid out nowhere, edges.ts#absentRows):
+ * then every touch-down inside it (D59b: a stroke across the page's axis goes over the nested carousel of unknown axis).
+ * Every swipe runs along the axis
+ * of its direction (its larger leg on that axis, whichever way — a turn back is a stroke along it too): a scroll view
+ * moves along its own axis, and a stroke across a carousel's moves it not (the residual of
+ * docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md). `direction`: the caller's —
+ * truth.ts#directionOf of a framed target, AbsentTarget.toward of one with no frame (edges.ts#absentRows).
  */
-export function strokeRow(platform: Platform, t: TargetTruth, cell: CellTruth, row: string, ask: StopAsk, opts: RowOptions = {}): Expectation {
-  const { absent } = opts;
-  const direction = directionOf(t, cell);
-  const own = absent === undefined && t.scrollView !== undefined ? cell.scrollViews?.[t.scrollView] : undefined;
+export function strokeRow(platform: Platform, t: StrokeTarget, cell: CellTruth, row: string, ask: StopAsk, direction: Direction, opts: StrokeOptions = {}): Expectation {
+  const own = ownScrollView(t, cell, opts);
   return withAbsent(
     {
       verb: 'scroll_until',
       asks: ask,
-      says: `${row}, R-stroke: swipes ${direction} for it, every touch-down clear of the bands and the chrome${own === undefined ? '' : ` and inside its scroll view ${t.scrollView}`}`,
+      says: `${row}, R-stroke: swipes ${direction} for it, ${strokesSaid(t, own)}`,
       call: scrollCall(platform, t, direction),
-      judge: (o) => {
-        if (swipes(o) === 0) return said(o, 'no swipe');
-        const beside = own === undefined ? [] : touchDowns(o).filter((p) => !within(p, own));
-        const axis = axisOf(direction);
-        const across = strokes(o).filter(({ from, to }) => Math.abs(to[axis] - from[axis]) <= Math.abs(to[otherAxis(axis)] - from[otherAxis(axis)]));
-        return (
-          strokesOff(o, cell) ??
-          (beside.length === 0 ? undefined : `touched down outside its scroll view ${t.scrollView} at ${pointsText(beside)}: ${first(o)}`) ??
-          (across.length === 0 ? undefined : `swiped across the ${axis} axis it scrolls ${direction} along, from ${pointsText(across.map((s) => s.from))}: ${first(o)}`)
-        );
-      },
+      judge: strokesJudge(cell, t, own, direction),
     },
     opts,
   );
+}
+
+/**
+ * R-fully of a target with no frame (CellTruth.absent — the L7 carousels' C at launch; D52's `unfit` and D59's
+ * inferred axis are its live leg, which needs C drawn cut by the clip: a replayed launch tree never draws it):
+ * `fully: true` toward it is never "visible" — nothing of it is laid out — and its swipes are R-stroke's (strokeRow).
+ */
+export function absentFullyRow(platform: Platform, t: StrokeTarget, cell: CellTruth, row: string, ask: StopAsk, direction: Direction, opts: StrokeOptions = {}): Expectation {
+  const own = ownScrollView(t, cell, opts);
+  const strokesOk = strokesJudge(cell, t, own, direction);
+  return withAbsent(
+    {
+      verb: 'fully',
+      asks: ask,
+      says: `${row}, R-fully: fully: true never "visible" (it has no frame), swipes ${direction} for it, ${strokesSaid(t, own)}`,
+      call: scrollCall(platform, t, direction, true),
+      judge: (o) => (claimsVisible(o.reply) ? said(o, `fully visible though it has no frame, after ${swipes(o)} swipe(s) that move nothing`) : strokesOk(o)),
+    },
+    opts,
+  );
+}
+
+/** What R-stroke reads of its target: how it is asked (truth.ts#selectorOf) and the scroll view it lies in. */
+type StrokeTarget = Pick<TargetTruth, 'id' | 'text' | 'label' | 'scrollView'>;
+
+/**
+ * The clip R-stroke holds every touch-down inside: the target's scroll view's, where the truth names it — and, for a
+ * target the tree may not list (`absent`), only where the replayed tree lists that scroll view a scroller.
+ */
+const ownScrollView = (t: StrokeTarget, cell: CellTruth, { absent, scrollerListed }: StrokeOptions): Rect | undefined =>
+  t.scrollView !== undefined && (absent === undefined || scrollerListed === true) ? cell.scrollViews?.[t.scrollView] : undefined;
+
+const strokesSaid = (t: StrokeTarget, own: Rect | undefined) => `every touch-down clear of the bands and the chrome${own === undefined ? '' : ` and inside its scroll view ${t.scrollView}`}`;
+
+/** R-stroke's judge: a swipe; every touch-down strokeable, inside `own` where given; every swipe along `direction`'s axis. */
+function strokesJudge(cell: CellTruth, t: StrokeTarget, own: Rect | undefined, direction: Direction): (o: Outcome) => string | undefined {
+  return (o) => {
+    if (swipes(o) === 0) return said(o, 'no swipe');
+    const beside = own === undefined ? [] : touchDowns(o).filter((p) => !within(p, own));
+    const axis = axisOf(direction);
+    const across = strokes(o).filter(({ from, to }) => Math.abs(to[axis] - from[axis]) <= Math.abs(to[otherAxis(axis)] - from[otherAxis(axis)]));
+    return (
+      strokesOff(o, cell) ??
+      (beside.length === 0 ? undefined : `touched down outside its scroll view ${t.scrollView} at ${pointsText(beside)}: ${first(o)}`) ??
+      (across.length === 0 ? undefined : `swiped across the ${axis} axis it scrolls ${direction} along, from ${pointsText(across.map((s) => s.from))}: ${first(o)}`)
+    );
+  };
 }
 
 /**

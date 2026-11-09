@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { configFor, type Outcome } from '../../scripts/differential/differential.js';
-import { directionRow, dismissRow, expectations, landed, strokeable, strokesOff, type Expectation } from '../../scripts/differential/golden-spec.js';
-import type { CellTruth, Geometry, Rect, TargetTruth } from '../../scripts/truth/schema.js';
+import { absentExpectations, directionRow, dismissRow, expectations, landed, strokeable, strokesOff, type Expectation } from '../../scripts/differential/golden-spec.js';
+import type { AbsentTarget, CellTruth, Geometry, Rect, TargetTruth } from '../../scripts/truth/schema.js';
 
 // Phase 3's row types (scripts/differential/golden-spec/rows.ts, wired by geometry in edges.ts and bars.ts), each judge
 // on the replies that decide it, and the guarantee that they ask nothing of a capture with no measured geometry — the
@@ -488,5 +488,81 @@ describe('R-overlap: a whole target, its centre clear, its edge under a band or 
     expect(verdict(rs, 'scroll_until', out('ERROR: stuck'))).toBe('stopped: ERROR: stuck');
     expect(verdict(rs, 'fully', out(VISIBLE))).toMatch(/^fully visible/);
     expect(verdict(rs, 'fully', out('ERROR: stuck under the tab bar'))).toBeUndefined();
+  });
+});
+
+describe('an absent target (CellTruth.absent: the L7 carousels\' C, not composed at launch) — R-stroke and fully toward it (D59b, D52/D59\'s from-launch leg)', () => {
+  // carousel-lazy on the averi_lab AVD: the carousel 66,380 948x234 inside the page, C right of the first card, no
+  // frame and no node at launch. Batch-11's stroke (864,1110)→(216,1110) went over the page below the carousel; D59b's
+  // (824,497)→(256,497) inside it.
+  const cell: CellTruth = {
+    cell: 'carousel-lazy',
+    layer: 'none',
+    device: 'averi_lab emulator, Android 13 (API 33)',
+    screen: { width: 1080, height: 2220 },
+    scale: 1,
+    targets: [],
+    safeArea: { top: 66, left: 0, bottom: 66, right: 0 },
+    scrollViews: { page: rect(0, 0, 1080, 2220), carousel: rect(66, 380, 948, 234) },
+    navigation: 'gesture',
+  };
+  const C: AbsentTarget = { tag: 'C', id: 'lab.carousel-lazy.C', color: '#D81B60', declared: 'open', scrollView: 'carousel', listed: { uiautomator: false }, toward: 'right' };
+  const TREE = '<hierarchy><node scrollable="true" class="android.widget.ScrollView" bounds="[0,0][1080,2220]"><node scrollable="true" class="android.view.View" bounds="[66,380][1014,614]" /></node></hierarchy>';
+  const NEVER = 'ERROR scroll_until id:"lab.carousel-lazy.C" failed after 2 swipes — element never appeared in the tree';
+  const INSIDE = 'adb shell input swipe 824 497 256 497 300';
+  const BELOW = 'adb shell input swipe 864 1110 216 1110 300';
+  const rs = absentExpectations('android', C, cell, 'uiautomator', TREE);
+  it('asks scroll_until and fully: true toward it (AbsentTarget.toward), by its identifier', () => {
+    expect(says(rs)).toEqual([
+      'scroll_until: R-absent, R-stroke: swipes right for it, every touch-down clear of the bands and the chrome and inside its scroll view carousel',
+      'fully: R-absent, R-fully: fully: true never "visible" (it has no frame), swipes right for it, every touch-down clear of the bands and the chrome and inside its scroll view carousel',
+    ]);
+    expect(rs.map((r) => r.call.args)).toEqual([
+      { platform: 'android', selector: 'id:"lab.carousel-lazy.C"', direction: 'right' },
+      { platform: 'android', selector: 'id:"lab.carousel-lazy.C"', direction: 'right', fully: true },
+    ]);
+    expect(rs.map((r) => r.asks)).toEqual([
+      { fully: false, holds: false },
+      { fully: true, holds: false },
+    ]);
+  });
+  it.each(['scroll_until', 'fully'])('%s: never found, its strokes inside the carousel along its axis — accepted (D59b)', (verb) => {
+    expect(verdict(rs, verb, out(NEVER, [INSIDE, INSIDE]))).toBeUndefined();
+  });
+  it.each(['scroll_until', 'fully'])('%s: stroked over the page below the carousel (batch-11), or across its axis inside it, or not at all — red', (verb) => {
+    expect(verdict(rs, verb, out(NEVER, [BELOW, BELOW]))).toBe(`touched down outside its scroll view carousel at (864,1110) (864,1110): ${NEVER}`);
+    expect(verdict(rs, verb, out(NEVER, ['adb shell input swipe 540 600 540 400 300']))).toBe(`swiped across the x axis it scrolls right along, from (540,600): ${NEVER}`);
+    expect(verdict(rs, verb, out(NEVER))).toBe(`no swipe: ${NEVER}`);
+  });
+  it('fully: "visible" is never right of a target with no frame, whatever it swiped', () => {
+    const visible = 'Element id:"lab.carousel-lazy.C" fully visible after 1 swipe';
+    expect(verdict(rs, 'fully', out(visible, [INSIDE]))).toBe(`fully visible though it has no frame, after 1 swipe(s) that move nothing: ${visible}`);
+  });
+  it('its scroll view not listed a scroller by the replayed tree (or no tree given): averi cannot see where it lies — the screen\'s region only', () => {
+    for (const unlisted of [absentExpectations('android', C, cell, 'uiautomator', '<hierarchy><node scrollable="false" bounds="[66,380][1014,614]" /></hierarchy>'), absentExpectations('android', C, cell, 'uiautomator')]) {
+      expect(unlisted[0].says).toBe('R-absent, R-stroke: swipes right for it, every touch-down clear of the bands and the chrome');
+      expect(verdict(unlisted, 'scroll_until', out(NEVER, [BELOW, BELOW]))).toBeUndefined();
+    }
+  });
+  it('listed by the replayed tree after all: a reply that never found it is no answer', () => {
+    const listed = absentExpectations('android', { ...C, listed: { uiautomator: true } }, cell, 'uiautomator', TREE);
+    expect(verdict(listed, 'scroll_until', out(NEVER, [INSIDE]))).toBe(`not in the tree: ${NEVER}`);
+  });
+  it('an absent entry with no direction (captured before AbsentTarget.toward): nothing asked', () => {
+    expect(absentExpectations('android', { ...C, toward: undefined }, cell, 'uiautomator', TREE)).toEqual([]);
+  });
+});
+
+describe('R-stroke of a FRAMED target its tree does not list: its strokes are not held to its scroll view, even one the tree lists a scroller', () => {
+  // scroll-bounded's O and F on Android: rows of `lower`, one of two vertical lists, unlisted by uiautomator — averi
+  // cannot tell which list holds a row it never saw, so it strokes the largest. Only a target laid out nowhere
+  // (CellTruth.absent) is held inside its listed scroll view (absentExpectations, above).
+  const cell: CellTruth = { ...CELL, chrome: {}, scrollViews: { list: rect(0, 380, 402, 180) } };
+  const off = target('off-screen', { frame: rect(51, 908, 300, 64), reached: false, probe: [], visible: null, scrollView: 'list', listed: { uiautomator: false } });
+  const NEVER = 'ERROR scroll_until id:"lab.edges.A" failed after 2 swipes — element never appeared in the tree';
+  it('the list listed scrollable at its clip: a touch-down beside it is accepted, as averi never saw which list holds it', () => {
+    const rs = expectations('android', off, cell, 'uiautomator', '<hierarchy><node scrollable="true" bounds="[0,380][402,560]" /></hierarchy>');
+    expect(rs.find((r) => r.verb === 'scroll_until')!.says).toBe('R-off, R-stroke: swipes down for it, every touch-down clear of the bands and the chrome');
+    expect(verdict(rs, 'scroll_until', out(NEVER, ['adb shell input swipe 201 699 201 175 300']))).toBeUndefined();
   });
 });

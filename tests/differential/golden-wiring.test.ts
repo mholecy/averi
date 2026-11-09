@@ -8,7 +8,7 @@ import { loadCorpus } from '../../scripts/differential/corpus.js';
 import { installFakeDevice } from '../../scripts/differential/fake-device.js';
 import { goldenRecording, type GoldenResult } from '../../scripts/differential/golden.js';
 import { loadSide } from '../../scripts/differential/side.js';
-import type { CellTruth, TargetTruth } from '../../scripts/truth/schema.js';
+import type { AbsentTarget, CellTruth, TargetTruth } from '../../scripts/truth/schema.js';
 
 // The golden mode's wiring of phase 3's truth (golden.ts#goldenRecording), on a synthetic capture: the committed
 // Android `open` capture (its tree and screenshot) with a truth whose targets carry a measured geometry — none of the
@@ -48,7 +48,9 @@ beforeAll(async () => {
     },
     d,
   ];
-  await writeFile(join(run, 'open.truth.json'), JSON.stringify({ ...truth, targets, safeArea: { top: 66, left: 0, bottom: 0, right: 0 } }));
+  // A target laid out nowhere (CellTruth.absent, T6): asked toward where it lies.
+  const absent: AbsentTarget[] = [{ tag: 'E', id: 'lab.open.E', color: '#D81B60', declared: 'open', listed: { uiautomator: false }, toward: 'down' }];
+  await writeFile(join(run, 'open.truth.json'), JSON.stringify({ ...truth, targets, absent, safeArea: { top: 66, left: 0, bottom: 0, right: 0 } }));
   await writeFile(
     join(run, 'manifest.json'),
     JSON.stringify({
@@ -78,6 +80,10 @@ describe('golden over a capture whose truth carries a measured geometry', () => 
     expect(asked('A')).toEqual(['tap: R-band', 'colour: fails (R-band', 'scroll_until: R-band']);
     expect(asked('C')).toEqual(['tap: R-land', 'fully: R-fully']);
     expect(asked('D')).toEqual(["tap: Tapped at its node's centre (539.5,1876) in the tree", 'colour: passes on its own colour #FB8C00', 'scroll_until: reached with no swipe']);
+  });
+  it('asks a target its capture laid out no frame for (CellTruth.absent) its R-stroke and R-fully, after the framed ones', () => {
+    expect(asked('E')).toEqual(['scroll_until: R-absent, R-stroke', 'fully: R-absent, R-fully']);
+    expect(result.checks.at(-1)?.target).toBe('E');
   });
   it('never asks a live-only row: off the screen, R-off\'s three and not R-direction', () => {
     expect(asked('B')).toEqual(['tap: R-off', 'colour: fails (R-off', 'scroll_until: R-off, R-stroke']);
