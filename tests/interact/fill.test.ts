@@ -2115,8 +2115,8 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
     expect(fake.typed).toEqual(['world']);
   });
 
-  // D71 (ADR 0034's D71 amendment): `55` typed after `5` that kept one key reads the value itself — it replied Filled at
-  // once. It fails now, naming the select-all reading and `clear: true`, and nothing is typed again.
+  // D71 (ADR 0034's D71 amendment): `55` typed after `5` that kept one key reads the value itself — it replied Filled
+  // at once. It fails now, naming the select-all reading and `clear: true`, and nothing is typed again.
   it.each(['on-return', 'may-arrive-late'] as const)('%s: a prefilled `5`, `55` typed and one key dropped: not Filled, the select-all hedge, nothing typed again (D71)', async (delivery) => {
     const fake = formFake('5');
     fake.typingDelivery = delivery;
@@ -2128,10 +2128,11 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
     expect(fake.typed).toEqual(['55']);
   });
 
-  // D71 review round 1, m1 (ADR 0034's residual 12): an UNNAMED placeholder (idb) with no letter or digit that the value
-  // starts with, or whose skeleton the value repeats (`€5` after `€` is the same shape; the fake types ASCII only), is read as the earlier text — a correct fill without clear now
-  // fails, with the hedge. Its remedy, `clear: true`, is traced here end to end: the clear's delete leaves the
-  // placeholder showing (`unchanged`, after the re-read), the typing is judged by equality, and the fill lands.
+  // D71 review round 1, m1 (ADR 0034's residual 12): an UNNAMED placeholder (idb) with no letter or digit that the
+  // value starts with, or whose skeleton the value repeats (`€5` after `€` is the same shape; the fake types ASCII
+  // only), is read as the earlier text — a correct fill without clear now fails, with the hedge. Its remedy,
+  // `clear: true`, is traced here end to end: the clear's delete leaves the placeholder showing (`unchanged`, after the
+  // re-read), the typing is judged by equality, and the fill lands.
   it.each([
     ['+447700900123', '+'],
     ['@michal', '@'],

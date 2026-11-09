@@ -111,11 +111,12 @@ describe('readingOf — the whole answer about one reading', () => {
     ['a dropped tail that is a whole landing too: never typed again', '11 ', { value: '11', before: '1' }, { kind: 'missed', tail: { missing: '1', retypable: false }, differs: { kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true, wholeToo: true } }],
     ['a length that is a whole landing too: never typed again', 'xaa', { value: 'aa', before: 'xa' }, { kind: 'missed', tail: { missing: 'a', retypable: false }, differs: { kind: 'length', wholeToo: true } }],
     // D71: the value itself, reached by a typing that moved the reading, is no landing where it is a prefix of what the
-    // field should hold too (`5` then `55`, the second key dropped) — a length that is a whole landing too, never typed again
+    // field should hold too (`5` then `55`, the second key dropped) — a length that is a whole landing too, never typed
+    // again
     ['the value itself, a prefix of what the field should hold too: a length that is a whole landing too', '55', { value: '55', before: '5' }, { kind: 'missed', tail: { missing: '5', retypable: false }, differs: { kind: 'length', wholeToo: true } }],
     ['the value decorated, inside the earlier text\'s span: never typed again', '-5-', { value: '-5', before: '-5' }, { kind: 'missed', tail: { missing: '5', retypable: false }, differs: { kind: 'length', wholeToo: true } }],
-    // D71 review round 1, n1: the select-all hedge is of a reading that took the text — a non-input showing its own text
-    // is not-taken, unmarked; its tail is held back as before (a whole landing too), so nothing is typed again
+    // D71 review round 1, n1: the select-all hedge is of a reading that took the text — a non-input showing its own
+    // text is not-taken, unmarked; its tail is held back as before (a whole landing too), so nothing is typed again
     ['a non-input showing its own text, the value with a tail too: not-taken, no hedge', '55', { value: '55', before: '5', isInput: false, resolvedValue: '55' }, { kind: 'not-taken', tail: { missing: '5', retypable: false }, differs: { kind: 'length' } }],
     ['a non-input showing its own text, the value, no tail: not-taken, no hedge', '1 ', { value: '1 ', before: '1', isInput: false, resolvedValue: '1 ' }, { kind: 'not-taken', differs: { kind: 'length' } }],
     ['no prefix: no tail', 'the', { value: 'teh' }, { kind: 'missed', differs: { kind: 'same-length', positions: 2 } }],
@@ -151,8 +152,8 @@ describe('readingOf — the whole answer about one reading', () => {
                   const { tail, differs } = r;
                   seen.add(differs.kind);
                   if ('wholeToo' in differs && differs.wholeToo === true) {
-                    // D71: a tail held back, or the value itself refused with no tail proven (`1 ` after `1`) — never typed
-                    // again, and only of a reading that took the text (review round 1, n1, n2)
+                    // D71: a tail held back, or the value itself refused with no tail proven (`1 ` after `1`) — never
+                    // typed again, and only of a reading that took the text (review round 1, n1, n2)
                     if (!(tail !== undefined || observed === value) || tail?.retypable === true) throw wrong('wholeToo is a tail held back or the value itself, never retyped');
                     if (r.kind === 'not-taken') throw wrong('a not-taken is never marked wholeToo');
                     seen.add('wholeToo');
@@ -839,8 +840,8 @@ describe('without clear, the value itself lands only as the earlier text or the 
     expect(landingOf('Search', e('Search', 'Search', { placeholder: 'Search' }))).toEqual({ kind: 'placeholder' });
   });
 
-  // the live no-clear cases (scripts/truth/live-cases.ts) as each source reads them: idb's unnamed `+421` is the earlier
-  // text; uiautomator's is none. g5 and f13 read the value itself, so the old disjunct answered them until D71
+  // the live no-clear cases (scripts/truth/live-cases.ts) as each source reads them: idb's unnamed `+421` is the
+  // earlier text; uiautomator's is none. g5 and f13 read the value itself, so the old disjunct answered them until D71
   it.each([
     ['g5', '+421 903 123 456', '+421 903 123 456', '+421'],
     ['g5', '+421 903 123 456', '+421 903 123 456', null],

@@ -904,10 +904,11 @@ earlier text is a start of the value: it would refuse idb's g5, `+421 903 123 45
 start of the value's letters and digits), which holds the value — a new false failure on a live case that passes.
 
 **Consequences.** The cost is paid on the refused readings only: the whole poll (5 reads: about 4 s on idb, about 20 s
-on WDA at about 4 s a read, about 11.5 s on Android), then an honest failure where the reply was an instant Filled. No live case reads such a shape: p1, f13, f15, f16, g3,
-g5, fp1, fp2 and rfe2 read a value past their earlier text, a reformat, the value alone, or the earlier text unchanged.
-Not changed: the clear path, the masked rule, the reformat route, `priorsOf`, `tailOf`, `differenceOf`, fill-type.ts,
-fill.ts and the wordings (the `length` hedge is the D64 code review's).
+on WDA at about 4 s a read, about 11.5 s on Android), then an honest failure where the reply was an instant Filled. No
+live case reads such a shape: p1, f13, f15, f16, g3, g5, fp1, fp2 and rfe2 read a value past their earlier text, a
+reformat, the value alone, or the earlier text unchanged. Not changed: the clear path, the masked rule, the reformat
+route, `priorsOf`, `tailOf`, `differenceOf`, fill-type.ts, fill.ts and the wordings (the `length` hedge is the D64 code
+review's).
 
 New false failures, the price (review round 1, m1; residual 12): a correct fill without clear whose reading is the value,
 where the earlier text the tree shows is no content — an UNNAMED placeholder (idb; API 33's EditText hint) with no
@@ -928,16 +929,18 @@ refusal, with the hedge, where until then the trimmed reading read `unchanged`.
 **Residual 11** (below): `12` after `1`, the head key dropped, still lands — D61's value alone, which idb's unnamed
 placeholders need.
 
-**Mutation-checked** by hand over fill-landing, fill-type, fill, fill-verdict, fill-text and fill-clear tests (521, after
-review round 1), each killed: the disjunct as it was (16 fail — every new D71 test, red on the base), dropped (8), its
-`&&` as `||` (44), without `before` (2), without the placeholder (5); the widening dropped (5), `landedSome` dropped from
-it (9), the guard always true (4), its `||` as `&&` (14); the `tookText` gate dropped (3) or negated (26), `retypable`
-by the marker instead of `wholeLandingToo` (1); fill-verdict's `clear-unchanged` said of a landed read-back too (10).
+**Mutation-checked** by hand over fill-landing, fill-type, fill, fill-verdict, fill-text and fill-clear tests (521,
+after review round 1), each killed: the disjunct as it was (16 fail — every new D71 test, red on the base), dropped (8),
+its `&&` as `||` (44), without `before` (2), without the placeholder (5); the widening dropped (5), `landedSome` dropped
+from it (9), the guard always true (4), its `||` as `&&` (14); the `tookText` gate dropped (3) or negated (26),
+`retypable` by the marker instead of `wholeLandingToo` (1); fill-verdict's `clear-unchanged` said of a landed read-back
+too (10). fill-landing cold score: recorded at merge.
 
 **Golden and live.** The golden replays tree reads and never types: Changed 0 against 3b7393ba. The unit tests are the
-evidence (fill-landing.test.ts's D71 group and the flipped pin, fill-type.test.ts's `55` refused and `55` then `555`
-landed on both deliveries, fill.test.ts's reply and its unnamed-placeholder rows with and without clear). Live: pending, a uiautomator regression of the no-clear cases p1, f13,
-f15, f16, g3, fp1, fp2 and rfe2 on base and fix; idb and wda (g5 and the no-clear cases) on the owner's list.
+*evidence (fill-landing.test.ts's D71 group and the flipped pin, fill-type.test.ts's `55` refused and `55` then `555`
+*landed on both deliveries, fill.test.ts's reply and its unnamed-placeholder rows with and without clear). Live:
+*pending, a uiautomator regression of the no-clear cases p1, f13, f15, f16, g3, fp1, fp2 and rfe2 on base and fix; idb
+*and wda (g5 and the no-clear cases) on the owner's list.
 
 ## Residuals accepted
 

@@ -127,13 +127,14 @@ export function readingOf(observed: string, e: Expectation): Reading {
 function notLandedOf(observed: string, e: Expectation): NotLanded {
   const tail = tailOf(observed, e);
   const held = heldText(observed, e.placeholder);
-  const whole = wholeLandingToo(held, e);
+  const heldWhole = wholeLandingToo(held, e); // the raw fact: what keeps a tail from being typed again
   // The hedge is of a reading that took the text: a `not-taken` is never marked (D71 review round 1, n1). D71: the
   // value itself, refused by `showsExactly`, is a whole landing too though no tail of the typing is proven (`-5` after
-  // `-`, `1 ` after `1`).
-  const wholeToo = tookText(observed, e) && (landedSome(tail) || held === e.value) && whole;
+  // `-`, `1 ` after `1`). `held`, not `observed`: the same here, as a reading that is the named placeholder and the
+  // value landed (`showsExactly` compares `observed` with the raw `before` and placeholder, residual 7).
+  const wholeToo = tookText(observed, e) && (landedSome(tail) || held === e.value) && heldWhole;
   return {
-    ...(tail !== undefined && { tail: { missing: tail.missing, retypable: landedSome(tail) && !whole } }),
+    ...(tail !== undefined && { tail: { missing: tail.missing, retypable: landedSome(tail) && !heldWhole } }),
     differs: differenceOf(observed, e, tail, wholeToo),
   };
 }
@@ -192,10 +193,11 @@ const tookText = (observed: string, e: Pick<Expectation, 'value' | 'isInput' | '
  * the second key dropped replied Filled where an append should have left `555` (`1212` after `12` too). A select-all
  * reading whose earlier text is not in it still lands, as the value alone (`priorsOf`); refused are the readings whose
  * letters and digits repeat the earlier text's (`55`/`5`, `1212`/`12`, `1 `/`1`) or whose earlier text has none
- * (`-5`/`-`), a length that is a whole landing too (`notLandedOf`): nothing typed again, the reply naming
- * `clear: true`. Left open: `12` after `1` (the head key dropped) lands as D61's value alone, which idb's unnamed
- * placeholders need (ADR 0034's D71 amendment, residual 11). The limit, on the safe side: a caret not at the end whose typing leaves the reading
- * starting with the earlier text (`aba` for `ab` after `a`) is refused (ADR 0034's D64 amendment, residual 9).
+ * (`-5`/`-`), a length that is a whole landing too (`notLandedOf`): nothing typed again, the reply naming `clear:
+ * true`. Left open: `12` after `1` (the head key dropped) lands as D61's value alone, which idb's unnamed placeholders
+ * need (ADR 0034's D71 amendment, residual 11). The limit, on the safe side: a caret not at the end whose typing leaves
+ * the reading starting with the earlier text (`aba` for `ab` after `a`) is refused (ADR 0034's D64 amendment, residual
+ * 9).
  */
 function showsExactly(observed: string, e: Expectation): boolean {
   const { value, clear } = e;
