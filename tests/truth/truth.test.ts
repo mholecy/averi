@@ -471,6 +471,21 @@ describe('capture', () => {
     expect(lines).toContain('open/C: WARNING — the app reported no frame for it, but the uiautomator tree lists it');
   });
 
+  it("a framed target carries the catalog's half as an absent one does (capture-run.ts#catalogPart): its text, scroll view and string listing; `listed` only with a geometry", async () => {
+    const cell: CatalogCell = { ...OPEN, targets: [{ tag: 'A', color: GREEN, slot: 0, declared: 'open', text: 'Pay', scrollView: 'list' }] };
+    class BoxLab extends FakeLab {
+      override async state(c = 'open'): Promise<LabState | undefined> {
+        const s = (await super.state(c))!;
+        return { ...s, frames: { ...s.frames, 'A.box': rect(10, 10, 20, 20) } };
+      }
+    }
+    await capture(new BoxLab((x, y) => [ev('touch', `${x},${y}`), ev('tap', 'A')]), [cell], { out, note: 'test', catalog: [cell], log: () => undefined });
+    const truth = JSON.parse(await readFile(join(out, 'open.truth.json'), 'utf8')) as CellTruth;
+    expect(truth.targets).toEqual([
+      { tag: 'A', id: 'lab.open.A', text: 'Pay', color: GREEN, declared: 'open', frame: rect(10, 10, 20, 20), reached: true, probe: [ev('touch', '20,20')], drawn: 1, seen: GREEN, scrollView: 'list', textListed: { uiautomator: false } },
+    ]);
+  });
+
   it("a label target's label is kept on its absent entry", async () => {
     const cell: CatalogCell = { ...OPEN, targets: [...OPEN.targets, { ...C, label: 'Next card' }] };
     await capture(new FakeLab((x, y) => [ev('touch', `${x},${y}`), ev('tap', 'A')]), [cell], { out, note: 'test', catalog: [cell], log: () => undefined });
@@ -481,7 +496,7 @@ describe('capture', () => {
   it('a target with no frame the catalog does not allow absent fails its cell, loudly — a renamed tag or a wrong screen is never "absent"', async () => {
     const cell: CatalogCell = { ...OPEN, targets: [...OPEN.targets, { ...C, mayBeAbsent: undefined }] };
     const { failed, manifest } = await capture(new FakeLab((x, y) => [ev('touch', `${x},${y}`), ev('tap', 'A')]), [cell], { out, note: 'test', catalog: [cell], log: () => undefined });
-    expect(failed).toEqual(['open: cell open: the app reported no frame for target C']);
+    expect(failed).toEqual([{ cell: 'open', reason: 'cell open: the app reported no frame for target C' }]);
     expect(manifest.captures).toEqual([]);
     expect((await readdir(out)).filter((f) => f.startsWith('open.'))).toEqual([]);
   });
@@ -489,7 +504,7 @@ describe('capture', () => {
   it('a cell left with no framed target where the catalog lists some fails, even if each may be absent', async () => {
     const cell: CatalogCell = { ...OPEN, targets: [C, { ...C, tag: 'D' }] };
     const { failed } = await capture(new FakeLab(() => []), [cell], { out, note: 'test', catalog: [cell], log: () => undefined });
-    expect(failed).toEqual(['open: cell open: the app reported a frame for none of its 2 targets (C, D) — the wrong screen?']);
+    expect(failed).toEqual([{ cell: 'open', reason: 'cell open: the app reported a frame for none of its 2 targets (C, D) — the wrong screen?' }]);
     expect((await readdir(out)).filter((f) => f.startsWith('open.'))).toEqual([]);
   });
 
@@ -510,10 +525,11 @@ describe('capture', () => {
     const lab = new FailingLab((x, y) => [ev('touch', `${x},${y}`), ev('tap', 'A')]);
     const lines: string[] = [];
     const result = await capture(lab, [BAD, OPEN], { out, note: 'test', catalog: [BAD, OPEN], log: (l) => lines.push(l) });
-    expect(result.failed).toEqual(['bad: adb: device offline']);
+    expect(result.failed).toEqual([{ cell: 'bad', reason: 'adb: device offline' }]);
     expect(result.broken).toEqual([]);
     expect(result.halted).toBeUndefined();
     expect(lines).toContain('bad: FAILED — adb: device offline; nothing of it written, the other cells go on');
+    expect(lines.some((l) => /HALTED/.test(l))).toBe(false);
     expect(lines).toContainEqual(expect.stringMatching(/^bad: Error: adb: device offline\n\s+at /));
     const written = JSON.parse(await readFile(join(out, 'manifest.json'), 'utf8')) as RunManifest;
     expect(written).toEqual(result.manifest);
@@ -527,7 +543,7 @@ describe('capture', () => {
     // A's probe leaves no touch (broken), then the text target's box is missing: the cell throws.
     const cell: CatalogCell = { ...OPEN, targets: [...OPEN.targets, { tag: 'A', color: GREEN, slot: 1, declared: 'open', text: 'Pay' }] };
     const result = await capture(new FakeLab(() => []), [cell], { out, note: 'test', catalog: [cell], log: () => undefined });
-    expect(result.failed).toEqual(["open: cell open: the app reported no frame for text target A's box (A.box)"]);
+    expect(result.failed).toEqual([{ cell: 'open', reason: "cell open: the app reported no frame for text target A's box (A.box)" }]);
     expect(result.broken).toEqual([]);
   });
 
@@ -539,7 +555,7 @@ describe('capture', () => {
     }
     const { failed, manifest } = await run(new PathLab(() => []), [OPEN]);
     expect(manifest.failed).toEqual([{ cell: 'open', reason: "ENOENT: no such file, open '~/lab/dump.xml' and '<tmp>/z.png'" }]);
-    expect(failed).toEqual(["open: ENOENT: no such file, open '~/lab/dump.xml' and '<tmp>/z.png'"]);
+    expect(failed).toEqual(manifest.failed);
   });
 
   it('a write that fails midway leaves the earlier capture whole: the files go to .tmp first and are renamed only when all are written', async () => {
@@ -554,9 +570,23 @@ describe('capture', () => {
     // The truth's .tmp cannot be written (a directory stands there): the last of the cell's files.
     await mkdir(join(out, 'open.truth.json.tmp'));
     const { failed } = await run(new Rotated((x, y) => [ev('touch', `${x},${y}`), ev('tap', 'A')]), [OPEN]);
-    expect(failed).toEqual([expect.stringMatching(/^open: EISDIR/)]);
+    expect(failed).toEqual([{ cell: 'open', reason: expect.stringMatching(/^EISDIR/) }]);
     for (const [f, text] of Object.entries(before)) expect(await readFile(join(out, f), 'utf8')).toBe(text);
     expect((await readdir(out)).filter((f) => f.endsWith('.tmp'))).toEqual(['open.truth.json.tmp']); // the planted one alone
+  });
+
+  it('a rename that fails after every .tmp was written: the cell fails, its why naming the files renamed and the .tmp left, and the log says it was partly written', async () => {
+    const lab = new FakeLab((x, y) => [ev('touch', `${x},${y}`), ev('tap', 'A')]);
+    // The truth, renamed last, cannot replace a directory that holds a file.
+    await mkdir(join(out, 'open.truth.json'));
+    await writeFile(join(out, 'open.truth.json', 'x'), '');
+    const lines: string[] = [];
+    const { failed, manifest } = await capture(lab, [OPEN], { out, note: 'test', catalog: [OPEN, FORM_CELL], log: (l) => lines.push(l) });
+    expect(failed).toEqual([{ cell: 'open', reason: expect.stringMatching(/; renamed already: open\.png, open\.xml, open\.state\.json; left as \.tmp: open\.truth\.json\.tmp$/) }]);
+    expect(manifest.captures).toEqual([]);
+    expect(lines).toContainEqual(expect.stringMatching(/^open: FAILED — .*; partly written \(the reason names what\), the earlier capture no longer whole, the other cells go on$/));
+    expect(lines.some((l) => /nothing of it written/.test(l))).toBe(false);
+    expect((await readdir(out)).filter((f) => f.endsWith('.tmp'))).toEqual(['open.truth.json.tmp']);
   });
 
   it("a failed cell keeps its earlier capture, untouched, and is listed failed; a later run that captures it clears its failure, one that does not ask for it keeps it — carried, not this run's", async () => {
@@ -569,7 +599,7 @@ describe('capture', () => {
       }
     }
     const failedRun = await run(new Dying(() => []), [OPEN]);
-    expect(failedRun.failed).toEqual(['open: uiautomator: could not get idle state']);
+    expect(failedRun.failed).toEqual([{ cell: 'open', reason: 'uiautomator: could not get idle state' }]);
     expect(failedRun.carried).toEqual([]);
     expect(failedRun.manifest.captures.map((c) => c.file)).toEqual(['open.xml']);
     expect(failedRun.manifest.failed).toEqual([{ cell: 'open', reason: 'uiautomator: could not get idle state' }]);
@@ -588,7 +618,7 @@ describe('capture', () => {
     // A run of no cell: open's failure stays on the manifest, said as carried.
     const other = await run(new FakeLab(() => []), []);
     expect(other.failed).toEqual([]);
-    expect(other.carried).toEqual(['open: uiautomator: null root node']);
+    expect(other.carried).toEqual([{ cell: 'open', reason: 'uiautomator: null root node' }]);
     expect(other.manifest.failed).toEqual([{ cell: 'open', reason: 'uiautomator: null root node' }]);
     // Captured again: its failure is gone (no `failed` left at all).
     const again = await run(lab, [OPEN]);
@@ -617,7 +647,7 @@ describe('capture', () => {
       { cell: 'b2', reason: 'earlier' },
       { cell: 'b3', reason: 'dead' },
     ]);
-    expect(carried).toEqual(['b2: earlier']);
+    expect(carried).toEqual([{ cell: 'b2', reason: 'earlier' }]);
   });
 
   it.each([
@@ -663,8 +693,9 @@ describe('capture', () => {
     const result = await capture(lab, [BAD, OPEN], { out, note: 'test', catalog: [BAD, OPEN], log: (l) => lines.push(l) });
     expect(lab.launched).toEqual(['bad']);
     expect(result.halted).toEqual({ cell: 'bad', reason: expect.stringMatching(/^TypeError: /), bug: expect.any(TypeError) });
-    expect(result.failed).toEqual([expect.stringMatching(/^bad: TypeError: /)]);
+    expect(result.failed).toEqual([{ cell: 'bad', reason: expect.stringMatching(/^TypeError: /) }]);
     expect(lines).toContainEqual(expect.stringMatching(/^bad: TypeError: .*\n\s+at /));
+    expect(lines).toContainEqual(expect.stringMatching(/^bad: HALTED — a programming error \(TypeError\) — halting: TypeError: .*; the run stops here, its manifest written$/));
     const written = JSON.parse(await readFile(join(out, 'manifest.json'), 'utf8')) as RunManifest;
     expect(written.failed).toEqual([{ cell: 'bad', reason: expect.stringMatching(/^TypeError: /) }]);
   });
@@ -944,7 +975,7 @@ describe('capture of a form cell (Android)', () => {
     lab.launch = async (cell: string) => (launched.push(cell), launch(cell));
     const result = await capture(lab, [FORM_KEYBOARD, FORM_PICKER], { out, note: 'test', catalog: [FORM_KEYBOARD, FORM_PICKER], log: () => undefined });
     expect(result.halted).toEqual({ cell: 'form-k', reason: expect.stringMatching(/^cell form-k: the IME is floating .* dock it first/) });
-    expect(result.failed).toEqual([expect.stringMatching(/^form-k: cell form-k: the IME is floating/)]);
+    expect(result.failed).toEqual([{ cell: 'form-k', reason: expect.stringMatching(/^cell form-k: the IME is floating/) }]);
     expect(result.skipped).toEqual([]);
     expect(launched.includes('form-p')).toBe(false);
     const written = JSON.parse(await readFile(join(out, 'manifest.json'), 'utf8')) as RunManifest;

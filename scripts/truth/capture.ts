@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import type { CellFailure } from '../differential/corpus.js';
 import { capture, type CaptureResult } from './capture-run.js';
 import { loadCatalog, selectCells } from './catalog.js';
 import { AndroidLab, IosLab, LAB_APP, type LabDevice } from './lab-device.js';
@@ -32,7 +33,7 @@ import { isMain } from '../is-main.js';
  * no frame for, where the catalog allows it (CatalogTarget.mayBeAbsent), is recorded absent (CellTruth.absent), never
  * probed; any other missing frame fails the cell. A cell whose capture throws fails alone: nothing of it written, the
  * other cells captured, the manifest written listing it under `failed` (capture-run.ts); a halt
- * (capture-run.ts#CaptureHalt, or a bug in the capture — rethrown here once the summary is said) stops the run once the
+ * (capture-run.ts#CaptureHalt, or a programming error — rethrown here once the summary is said) stops the run once the
  * manifest is written. Exit code 1 when a cell is broken (its truth's sources disagree) or failed, or the run halted
  * (outcome); failures carried from an earlier run are said, not counted.
  */
@@ -83,11 +84,12 @@ export async function main(platform: 'ios' | 'android', argv: string[] = process
 export function outcome(result: CaptureResult): { lines: string[]; exitCode: 0 | 1; rethrow?: Error } {
   const lines: string[] = [];
   const list = (xs: string[]) => xs.map((x) => `  ${x}`).join('\n');
+  const said = (fs: readonly CellFailure[]) => fs.map((f) => `${f.cell}: ${f.reason}`);
   if (result.broken.length > 0) lines.push(`\nBROKEN CELLS — the truth's sources disagree:\n${list(result.broken)}`);
-  if (result.failed.length > 0) lines.push(`\nFAILED CELLS — the capture threw; nothing of them written this run (an earlier capture, if any, kept; manifest.json lists them under \`failed\`):\n${list(result.failed)}`);
+  if (result.failed.length > 0) lines.push(`\nFAILED CELLS — the capture threw; nothing of them written this run (an earlier capture, if any, kept; manifest.json lists them under \`failed\`):\n${list(said(result.failed))}`);
   if (result.halted !== undefined) lines.push(`\nHALTED at ${result.halted.cell} — ${result.halted.reason}; the cells after it were not captured`);
   const exitCode = lines.length > 0 ? 1 : 0;
-  if (result.carried.length > 0) lines.push(`\nstill failed from an earlier run (manifest.json \`failed\`): ${result.carried.join('; ')}`);
+  if (result.carried.length > 0) lines.push(`\nstill failed from an earlier run (manifest.json \`failed\`): ${said(result.carried).join('; ')}`);
   return { lines, exitCode, ...(result.halted?.bug !== undefined && { rethrow: result.halted.bug }) };
 }
 

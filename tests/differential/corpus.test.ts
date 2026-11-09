@@ -119,4 +119,12 @@ describe('failedCaptureLines', () => {
     await run('run-d', { platform: 'ios', captures: [], failed: [{ cell: 'held-no', reason: 'z' }] }, {});
     expect((await failedCaptureLines(dir)).at(-1)).toBe('golden: corpus run run-d holds no capture from its last attempt at 1 cell (manifest.json `failed`): held-no: z');
   });
+
+  it("a run with no readable manifest gets the corpus's own error, not a raw ENOENT or SyntaxError — as loadCorpus and runLines", async () => {
+    await mkdir(join(dir, 'run-x'));
+    await expect(failedCaptureLines(dir)).rejects.toThrow(/^corpus run run-x: no readable manifest\.json \(ENOENT/);
+    await writeFile(join(dir, 'run-x', 'manifest.json'), '{');
+    await expect(failedCaptureLines(dir)).rejects.toThrow(/^corpus run run-x: no readable manifest\.json \(/);
+    await expect(runLines(dir, ['run-x/a.xml'])).rejects.toThrow(/^corpus run run-x: no readable manifest\.json/);
+  });
 });
