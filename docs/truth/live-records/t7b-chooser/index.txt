@@ -1,0 +1,22 @@
+T7b, the chooser live group (scripts/truth/live-chooser.ts), on the lab AVD: emulator-5554, averi_lab, API 33.
+2026-11-09, the harness and src of 7874cb10 (the runs were on its working tree; 7874cb10 differs only by one unreachable
+line removed from judgeChooserNamed and by tests).
+
+command  node --import tsx scripts/truth/live.ts --serial emulator-5554 --groups chooser --record <scratchpad>/t7b/run-N.json --shots <scratchpad>/t7b/shots
+device   before 16:34:17 start_count=1 uptime=41603.62; after 16:45:53 start_count=1 uptime=42299.94 (no restart)
+preferred  `dumpsys package preferred`, before and after: the lab's two last-chosen entries only (`.Twin` for shared,
+         `.MainActivity` for pair, both mAlways=false, hashes 18364f6 and 5606c59 unchanged); no default, nothing reset
+
+unsettled-1.json        16:42:21–16:42:51  lc1 ok, lc2 ok, lc3 ok, lc4' ok, lc4'' MISMATCH: its focus read 800 ms after
+                        monkey's return found mCurrentFocus=null and the ResolverActivity record still on the stack under
+                        the lab's (unsettled-1-lc4pp.png, the screen then). Diagnosed by hand after it (raw am start +
+                        monkey, polled every ~0.4 s): mCurrentFocus null and the record present for ~1.3 s, both gone
+                        together, 0 at every read after. AndroidLab.focus now waits out mCurrentFocus=null (300 ms polls,
+                        5 s at most) and records `waitedMs`; the judge is unchanged.
+run-1.json              16:44:08–16:44:39  5 of 5 ok
+run-2.json              16:44:47–16:45:17  5 of 5 ok
+run-3.json              16:45:17–16:45:47  5 of 5 ok
+In runs 1–3 lc4' and lc4'' each waited 300 ms on the read after the calls; lc1's teardown BACK dropped the chooser every
+run (the read after it: .MainActivity focused).
+
+Read back by tests/truth/t7b-records.test.ts.
