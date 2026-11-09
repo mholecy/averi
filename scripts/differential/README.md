@@ -156,7 +156,16 @@ container …"), is no such reply: the target is in the tree, refused for where 
 `right` or `left` for one wholly beside its scroll view's clip and level with it (a carousel's card,
 edges/carousel-in-list), else `down` or `up` by its centre; R-stroke holds every swipe along that direction's axis (its
 larger leg on it, either way — a turn back too): a stroke across a carousel's axis moves the page, not the carousel
-(rows.ts#strokeRow).
+(rows.ts#strokeRow). Its scroll view is not asked of a target its tree does not list — averi cannot tell which scroll
+view holds a row it never saw (why, and the exception: rows.ts#StrokeOptions.scrollerListed; backlog D76) — but of a
+target laid out nowhere (`CellTruth.absent`, T6: the L7 carousels' C at launch), asked `R-absent`
+(golden-spec/edges.ts#absentRows) toward where the catalog says it lies (`CatalogTarget.toward`, kept as
+`AbsentTarget.toward`): scroll_until and `fully: true` toward it, a reply that never found it judged by its strokes,
+every touch-down inside its scroll view where the replayed tree lists that a scroller (truth.ts#scrollerListedIn:
+uiautomator's `scrollable="true"`, WDA's ScrollView, Table or CollectionView, never idb) — D59b: a horizontal stroke
+over the page's vertical axis goes over the nested carousel of unknown axis, inside its band — every swipe along the
+direction's axis, and `fully: true` never "visible" (rows.ts#absentFullyRow; D52's `unfit` and D59's inferred axis need
+C drawn cut by the clip, which no launch tree shows: a capture of it is backlog T6d).
 
 ```sh
 node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [--side <git ref | path>] [--worktrees <dir>] \
@@ -332,7 +341,8 @@ name that matches nothing is an error. A run of some cells adds to (or replaces 
 the other cells keep their captures. A manifest names one device: a run into a directory captured on another device is
 refused. A catalog target the app lays out no frame for, where the catalog allows it (`mayBeAbsent`: the four L7
 carousels' C, not composed at launch), is recorded in the truth's `absent`, never probed, with whether each raw tree
-lists it; no golden row reads it yet (backlog T6). Any other missing frame fails the cell, as does a cell left with no
+lists it and the direction it lies in (`toward`, the catalog's, required with `mayBeAbsent`): golden asks it
+`R-absent` (above). Any other missing frame fails the cell, as does a cell left with no
 framed target. A cell whose capture throws fails alone: its files go to `<name>.tmp` and are renamed only once all are
 written, so nothing of it is written (an earlier capture of it stays whole) — but a rename that fails after every
 `.tmp` was written leaves it mixed, its why naming the files renamed and the `.tmp` files left —, the other cells are

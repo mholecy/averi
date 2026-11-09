@@ -1,0 +1,53 @@
+{
+  "cell": "rn-format-eager",
+  "ready": true,
+  "screen": {
+    "x": 0,
+    "y": 0,
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "density": 2.75,
+  "frames": {
+    "E.box": {
+      "x": 128,
+      "y": 303,
+      "width": 825,
+      "height": 176
+    },
+    "E": {
+      "x": 177,
+      "y": 360,
+      "width": 94,
+      "height": 61
+    },
+    "P.box": {
+      "x": 128,
+      "y": 798,
+      "width": 825,
+      "height": 176
+    },
+    "P": {
+      "x": 177,
+      "y": 855,
+      "width": 119,
+      "height": 61
+    }
+  },
+  "events": [],
+  "fields": {
+    "E": {
+      "value": "",
+      "focused": false,
+      "error": null
+    },
+    "P": {
+      "value": "",
+      "focused": false,
+      "error": null
+    }
+  },
+  "focus": null,
+  "keyboard": null
+}

@@ -124,7 +124,8 @@ export function judgedGeometry(platform: Platform, t: Pick<TargetTruth, 'geometr
  * F and scroll-top-edge's A are not in the Android dump (docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md, its
  * Android part). undefined: the tree lists it, or the capture did not record it — held to be in the tree. The replayed
  * rows of a target off what shows accept a reply that never found it (golden-spec/edges.ts: its `absent`), and R-stroke
- * asks no scroll view of its strokes (golden-spec/rows.ts#strokeRow); the live case holds its strokes to no
+ * asks no scroll view of its strokes (golden-spec/rows.ts#strokeRow; the one exception, a target laid out nowhere, at
+ * rows.ts#StrokeOptions.scrollerListed, backlog D76); the live case holds its strokes to no
  * R-direction (live-visibility.ts#judgeScroll): averi cannot know where a node it never saw lies, nor which scroll view
  * holds it.
  */
@@ -233,6 +234,14 @@ export function fullyAsked(g: Geometry | undefined, scrollView: string | undefin
   if (CUT.includes(g) || parseGeometry(g).kind === 'chrome-overlap') return true;
   return bandNamed(g) !== undefined && scrollView !== undefined;
 }
+
+/**
+ * The stop clauses of a target the app laid out no frame for (CellTruth.absent — the L7 carousels' C at launch): no stop
+ * holds where it is, for it lies nowhere yet — the plain stop and `fully` must swipe for it (golden-spec/edges.ts
+ * #absentRows). Whether it may be missing from a tree is unlistedBy's, as for any target (its `listed`). No live case
+ * asks it yet.
+ */
+export const ABSENT_STOPS: { stop: StopAsk; fully: StopAsk } = { stop: { fully: false, holds: false }, fully: { fully: true, holds: false } };
 
 // --- the whole contract of a target ---
 

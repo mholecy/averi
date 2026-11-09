@@ -234,6 +234,12 @@
           "why": "the cover judgement 13d68a2 introduced reads a React Native field's floating label, overhanging its EditText by 3 px past the 2-px own-label allowance, as under its own field (green at 16ae6bb: round 7's RN corpus, captured after the fact, shows it) — lab note LR2 (docs/bugs/2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it.md), fixed by A8's ce19c23 (the overhang half a percent of the screen's shorter side, 5 px here), f3a7043 keeping it green"
         },
         {
+          "rows": ["android-rn-averi_lab-api33/rn-format.xml G tap", "android-rn-averi_lab-api33/rn-format.xml G scroll_until", "android-rn-averi_lab-api33/rn-format.xml A tap", "android-rn-averi_lab-api33/rn-format.xml A scroll_until", "android-rn-averi_lab-api33/rn-format-eager.xml E tap", "android-rn-averi_lab-api33/rn-format-eager.xml E scroll_until", "android-rn-averi_lab-api33/rn-format-eager.xml P tap", "android-rn-averi_lab-api33/rn-format-eager.xml P scroll_until"],
+          "broke": "13d68a2",
+          "fixed": "ce19c23",
+          "why": "rn-field's shape (LR2) in the two RN format cells, captured after the last full calibrate: a React Native field's floating label overhanging its EditText read as under its own field by 13d68a2's cover judgement (green at 16ae6bb), fixed by A8's ce19c23, f3a7043 keeping it green — rn-format captured by D18 (e5e70767, 2026-10-31), rn-format-eager by T6 (2026-11-09); found by T6's full calibrate and checked by golden --side --only rn-format,rn-format-eager: red at ce19c23^ (565bcb9), green at ce19c23 and f3a7043"
+        },
+        {
           "rows": ["ios-rn-iphone17-ios27/rn-field.wda.json N tap", "ios-rn-iphone17-ios27/rn-field.wda.json N scroll_until", "ios-rn-iphone17-ios27/rn-field.wda.json M tap", "ios-rn-iphone17-ios27/rn-field.wda.json M scroll_until"],
           "broke": "13d68a2",
           "fixed": "ce19c23",
@@ -1461,6 +1467,22 @@
         "android-rn-averi_lab-api33/rn-field.xml M ocr"
       ],
       "remark": "Fixed by round 7's A8 on arch/r23-rn-label, merged into arch/round-23 as bf0becd: ce19c23 (src/ui-tree/draw-order.ts#labelOverhang — the own-label overhang is 2 pt or dp, half a percent of the screen's shorter side: 5 px on averi_lab, where RN's 1-dp overhang is 3 px; the field shape no longer asks its parent's size; docs/adr/0014-a-text-input-is-no-cover-of-its-own-label.md, refinement 2026-10-19) and f3a7043 (the label must span the field's height). The pair is the parent of ce19c23, round 6's src 565bcb9, and f3a7043. Before: N's and M's label refused as under textfield (the tap, scroll_until's stop after 3 swipes, the ocr assert failed closed); after: tapped at the node's centre, reached with no swipe, the ocr passes. The six react-native.known.ts rows struck. #6's fix (13d68a2) and #22's (596a379), under which these rows first read red, record them as regressions fixed at ce19c23. Live: LOUD at round 7's first RN run (rn4, tap:rn-field.N, tap:rn-field.M refused: docs/truth/live-rn-2026-10-19.md); the live-known entries stay until the final device check runs the RN group at the merged src."
+    },
+    {
+      "n": "LR4",
+      "note": "2026-11-09-lab-android-uiautomator-lists-a-react-native-cover-before-its-target-so-it-is-tapped-and-measured.md",
+      "status": "open",
+      "verified": "golden",
+      "defect": "^(Tapped|passed on #263238): ",
+      "checks": [
+        "android-rn-averi_lab-api33/rn-banner.xml T tap",
+        "android-rn-averi_lab-api33/rn-banner.xml T colour",
+        "android-rn-averi_lab-api33/rn-banner.xml U tap",
+        "android-rn-averi_lab-api33/rn-banner.xml U colour",
+        "android-rn-averi_lab-api33/rn-banner.xml C tap",
+        "android-rn-averi_lab-api33/rn-banner.xml C colour"
+      ],
+      "remark": "T6's Android capture of rn-banner (2026-11-09, averi_lab API 33): uiautomator lists each cover before its target, though React Native draws it over — C's too, whose frame starts below its target's — so every tap is Tapped and every colour assert passes on the cover #263238 (LR3's Android twin; backlog D75)."
     }
   ],
   "excluded": [

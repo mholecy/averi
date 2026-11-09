@@ -22,6 +22,13 @@ import type { Platform, SourceKind } from '../differential/corpus.js';
 /** What a cell builds around a target. New kinds come with the cells that need them. */
 export type Declared = 'open' | 'presented-over' | 'covered';
 
+/**
+ * Where content lies, as scroll_until's `direction` names it (`down`: below the current view) — the harness's one
+ * definition (truth.ts re-exports it). src/ui-tree/sides.ts#Direction is averi's own, the same union: src imports no
+ * script.
+ */
+export type Direction = 'up' | 'down' | 'left' | 'right';
+
 export interface CatalogTarget {
   tag: string;
   /** `#RRGGBB`: the target is a solid rectangle of it, nothing else drawn on it. */
@@ -57,6 +64,13 @@ export interface CatalogTarget {
    * target fails its cell (capture-run.ts) — a renamed tag or a wrong screen is never "absent".
    */
   mayBeAbsent?: true;
+  /**
+   * With `mayBeAbsent` only, and always with it (catalog.ts#buildCatalog): the direction its scroll view lays it out in
+   * once scrolled — right of the first card for the L7 carousels' C. The capture keeps it on the absent entry
+   * (AbsentTarget.toward), where golden asks scroll_until for it that way (golden-spec/edges.ts#absentRows): with no
+   * frame, truth.ts#directionOf has nothing to read a direction from.
+   */
+  toward?: Direction;
 }
 
 /**
@@ -454,11 +468,15 @@ export interface TargetTruth {
 }
 
 /**
- * A target the app laid out no frame for (CellTruth.absent): what the catalog says of it and, per raw tree, whether the
- * tree lists it anyway (TargetTruth.listed, TargetTruth.textListed — recorded always: a frameless target has no
- * geometry to gate them on).
+ * A target the app laid out no frame for (CellTruth.absent): what the catalog says of it — `toward`, the direction its
+ * scroll view lays it out in (CatalogTarget.toward; an entry without it, captured before T6 made the catalog name it,
+ * is asked nothing) — and, per raw tree, whether the tree lists it anyway (TargetTruth.listed, TargetTruth.textListed —
+ * recorded always: a frameless target has no geometry to gate them on).
  */
-export type AbsentTarget = Pick<TargetTruth, 'tag' | 'id' | 'text' | 'label' | 'color' | 'declared' | 'scrollView' | 'textListed'> & { listed: Partial<Record<SourceKind, boolean>> };
+export type AbsentTarget = Pick<TargetTruth, 'tag' | 'id' | 'text' | 'label' | 'color' | 'declared' | 'scrollView' | 'textListed'> & {
+  listed: Partial<Record<SourceKind, boolean>>;
+  toward?: CatalogTarget['toward'];
+};
 
 /**
  * Where a target's frame lies, measured (truth.ts#geometryOf), in averi's judging order (ADR 0005: off the screen, the
@@ -496,8 +514,9 @@ export interface CellTruth {
    * so (CatalogTarget.mayBeAbsent: a lazy list's or a recycler's card not composed at launch, carousel-lazy's C) —
    * ControlTruth's `not-rendered` for a target: not in
    * `targets`, which hold a frame, never probed, nothing measured — and, as each raw tree has it (truth.ts#listedIn),
-   * whether it lists the target: the `listed` golden's `absent` derives from (target-contract.ts#askedUnlistedBy). No
-   * golden row reads it yet (backlog T6). Absent when every target had a frame.
+   * whether it lists the target: the `listed` golden's `absent` derives from (target-contract.ts#askedUnlistedBy).
+   * Golden asks each one scroll_until and `fully: true` toward it (AbsentTarget.toward; golden-spec/edges.ts#absentRows,
+   * T6). Absent when every target had a frame.
    */
   absent?: AbsentTarget[];
   /** A form cell's truth (its `targets` empty). */

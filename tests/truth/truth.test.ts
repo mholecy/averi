@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RunManifest } from '../../scripts/differential/corpus.js';
 import { capture } from '../../scripts/truth/capture-run.js';
 import type { LabDevice, RawTree } from '../../scripts/truth/lab-device.js';
+import { SCROLL_TYPES } from '../../src/adapters/wda-source.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, LabState, ProbeEvent, Rect, TargetTruth } from '../../scripts/truth/schema.js';
 import {
   axisOf,
@@ -23,7 +24,9 @@ import {
   probePoint,
   readControlProbe,
   readTargetProbe,
+  scrollerListedIn,
   selectorOf,
+  WDA_SCROLLERS,
   situationOf,
   touchTargetOf,
   touchesAt,
@@ -87,6 +90,32 @@ describe('directionOf — toward the target, along its scroll view\'s axis', () 
     expect(at(rect(378, 138, 354, 85))).toBe('up');
     expect(at(rect(378, 138, 354, 85), 'other')).toBe('up');
     expect(at(rect(378, 900, 354, 85), 'carousel')).toBe('down');
+  });
+});
+
+describe('scrollerListedIn — whether a raw tree lists a scroller at a scroll view\'s clip, the harness\'s own reading', () => {
+  const read = (f: string) => readFile(new URL(`../fixtures/truth/${f}`, import.meta.url), 'utf8');
+  it('uiautomator: a scrollable node whose bounds are the clip (within a pixel) — the L7 LazyRow and RecyclerView, carousel-in-list\'s HorizontalScrollView', async () => {
+    const clip = rect(66, 380, 948, 234);
+    for (const cell of ['carousel-lazy', 'carousel-recycler', 'carousel-in-list']) expect(scrollerListedIn(await read(`android-averi_lab-api33/${cell}.xml`), 'uiautomator', clip)).toBe(true);
+    expect(scrollerListedIn(await read('android-averi_lab-api33/carousel-lazy.xml'), 'uiautomator', rect(67, 379, 947, 235))).toBe(true);
+    // The boundary: one pixel off on an edge is the same scroller, two are not.
+    expect(scrollerListedIn(await read('android-averi_lab-api33/carousel-lazy.xml'), 'uiautomator', rect(66, 380, 949, 234))).toBe(true);
+    expect(scrollerListedIn(await read('android-averi_lab-api33/carousel-lazy.xml'), 'uiautomator', rect(66, 380, 950, 234))).toBe(false);
+    expect(scrollerListedIn(await read('android-averi_lab-api33/carousel-lazy.xml'), 'uiautomator', rect(64, 380, 950, 234))).toBe(false);
+    // Off by more than a pixel, or not scrollable there (open's targets, no scroller at the clip): none.
+    expect(scrollerListedIn(await read('android-averi_lab-api33/carousel-lazy.xml'), 'uiautomator', rect(66, 380, 948, 300))).toBe(false);
+    expect(scrollerListedIn('<hierarchy><node scrollable="false" bounds="[66,380][1014,614]" /></hierarchy>', 'uiautomator', clip)).toBe(false);
+  });
+  it('WDA: a ScrollView, Table or CollectionView at the clip; idb lists no scroller at all (ADR 0010 residual 5)', async () => {
+    const carousel = rect(24, 138, 354, 85);
+    expect(scrollerListedIn(await read('ios-iphone17-ios27/carousel-in-list.wda.json'), 'wda', carousel)).toBe(true);
+    expect(scrollerListedIn(JSON.stringify({ value: { type: 'Other', rect: carousel } }), 'wda', carousel)).toBe(false);
+    expect(scrollerListedIn(JSON.stringify({ value: { type: 'Table', rect: carousel } }), 'wda', carousel)).toBe(true);
+    expect(scrollerListedIn(await read('ios-iphone17-ios27/carousel-in-list.idb.json'), 'idb', carousel)).toBe(false);
+  });
+  it("WDA's scroller types are averi's own (src/adapters/wda-source.ts#SCROLL_TYPES), copied: the two held equal", () => {
+    expect([...WDA_SCROLLERS].sort()).toEqual([...SCROLL_TYPES].sort());
   });
 });
 
@@ -436,8 +465,9 @@ describe('capture', () => {
     expect(broken).toEqual([expect.stringMatching(/^open\/A: the probe tap left no touch/)]);
   });
 
-  // carousel-lazy's C: absent at launch by design, opted in by the catalog (CatalogTarget.mayBeAbsent).
-  const C = { tag: 'C', color: '#D81B60', slot: 1, declared: 'open' as const, scrollView: 'carousel', mayBeAbsent: true as const };
+  // carousel-lazy's C: absent at launch by design, opted in by the catalog (CatalogTarget.mayBeAbsent), laid out once its
+  // carousel scrolls right (CatalogTarget.toward).
+  const C = { tag: 'C', color: '#D81B60', slot: 1, declared: 'open' as const, scrollView: 'carousel', mayBeAbsent: true as const, toward: 'right' as const };
 
   it('a target the catalog says may be absent, with no frame, is recorded absent — never probed, never a target with a made-up frame — and the cell is captured', async () => {
     const cell: CatalogCell = { ...OPEN, targets: [...OPEN.targets, C] };
@@ -450,7 +480,8 @@ describe('capture', () => {
     const truth = JSON.parse(await readFile(join(out, 'open.truth.json'), 'utf8')) as CellTruth;
     expect(truth.targets.map((t) => t.tag)).toEqual(['A']);
     // listed as each raw tree has it (truth.ts#listedIn): golden's `absent` (target-contract.ts#askedUnlistedBy) reads it.
-    expect(truth.absent).toEqual([{ tag: 'C', id: 'lab.open.C', color: '#D81B60', declared: 'open', scrollView: 'carousel', listed: { uiautomator: false } }]);
+    // and the direction it lies in (CatalogTarget.toward): golden's scroll_until for it.
+    expect(truth.absent).toEqual([{ tag: 'C', id: 'lab.open.C', color: '#D81B60', declared: 'open', scrollView: 'carousel', listed: { uiautomator: false }, toward: 'right' }]);
     expect(lines).toContain('open/C: absent — the app reported no frame for it (the catalog allows it), not probed');
     expect(lines.some((l) => /WARNING/.test(l))).toBe(false);
     expect(manifest.captures.map((c) => c.file)).toEqual(['open.xml']);
@@ -467,7 +498,7 @@ describe('capture', () => {
     const { broken, failed } = await capture(new ListingLab((x, y) => [ev('touch', `${x},${y}`), ev('tap', 'A')]), [cell], { out, note: 'test', catalog: [cell], log: (l) => lines.push(l) });
     expect([broken, failed]).toEqual([[], []]);
     const truth = JSON.parse(await readFile(join(out, 'open.truth.json'), 'utf8')) as CellTruth;
-    expect(truth.absent).toEqual([{ tag: 'C', id: 'lab.open.C', text: 'Card C', color: '#D81B60', declared: 'open', listed: { uiautomator: true }, textListed: { uiautomator: false } }]);
+    expect(truth.absent).toEqual([{ tag: 'C', id: 'lab.open.C', text: 'Card C', color: '#D81B60', declared: 'open', listed: { uiautomator: true }, textListed: { uiautomator: false }, toward: 'right' }]);
     expect(lines).toContain('open/C: WARNING — the app reported no frame for it, but the uiautomator tree lists it');
   });
 
@@ -490,7 +521,7 @@ describe('capture', () => {
     const cell: CatalogCell = { ...OPEN, targets: [...OPEN.targets, { ...C, label: 'Next card' }] };
     await capture(new FakeLab((x, y) => [ev('touch', `${x},${y}`), ev('tap', 'A')]), [cell], { out, note: 'test', catalog: [cell], log: () => undefined });
     const truth = JSON.parse(await readFile(join(out, 'open.truth.json'), 'utf8')) as CellTruth;
-    expect(truth.absent).toEqual([{ tag: 'C', id: 'lab.open.C', label: 'Next card', color: '#D81B60', declared: 'open', scrollView: 'carousel', listed: { uiautomator: false } }]);
+    expect(truth.absent).toEqual([{ tag: 'C', id: 'lab.open.C', label: 'Next card', color: '#D81B60', declared: 'open', scrollView: 'carousel', listed: { uiautomator: false }, toward: 'right' }]);
   });
 
   it('a target with no frame the catalog does not allow absent fails its cell, loudly — a renamed tag or a wrong screen is never "absent"', async () => {

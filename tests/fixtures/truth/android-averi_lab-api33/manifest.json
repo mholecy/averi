@@ -159,6 +159,28 @@
       "truth": "form-format.truth.json"
     },
     {
+      "file": "form-grouped.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "form-grouped.png",
+      "truth": "form-grouped.truth.json"
+    },
+    {
+      "file": "form-focus-prefix.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "form-focus-prefix.png",
+      "truth": "form-focus-prefix.truth.json"
+    },
+    {
       "file": "scroll-bounded.xml",
       "source": "uiautomator",
       "form": "raw",
@@ -269,6 +291,50 @@
       "truth": "scroll-collapsing.truth.json"
     },
     {
+      "file": "carousel-lazy.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "carousel-lazy.png",
+      "truth": "carousel-lazy.truth.json"
+    },
+    {
+      "file": "carousel-recycler.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "carousel-recycler.png",
+      "truth": "carousel-recycler.truth.json"
+    },
+    {
+      "file": "carousel-lazy-free.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "carousel-lazy-free.png",
+      "truth": "carousel-lazy-free.truth.json"
+    },
+    {
+      "file": "carousel-recycler-free.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "carousel-recycler-free.png",
+      "truth": "carousel-recycler-free.truth.json"
+    },
+    {
       "file": "bands.xml",
       "source": "uiautomator",
       "form": "raw",
@@ -366,6 +432,28 @@
       },
       "screenshot": "text-nav-cut.png",
       "truth": "text-nav-cut.truth.json"
+    },
+    {
+      "file": "held-no.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "held-no.png",
+      "truth": "held-no.truth.json"
+    },
+    {
+      "file": "held-no-spinner.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "held-no-spinner.png",
+      "truth": "held-no-spinner.truth.json"
     }
   ]
 }

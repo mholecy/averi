@@ -133,7 +133,7 @@ describe('marginText — over every Android capture', () => {
   });
 });
 
-/** `<capture> <control>@<its y> <- <text>@<its y>`: 78 pairs in 11 trees, the form cells' fields under their next title or error text. */
+/** `<capture> <control>@<its y> <- <text>@<its y>`: 82 pairs in 14 trees, the form cells' fields under their next title or error text. */
 const MARGIN_TEXTS: readonly string[] = [
   'android-lab-form-keyboard-after-back.xml lab.form-keyboard.reference@370 <- lab.form-keyboard.message.title@496',
   'android-lab-form-keyboard-after-back.xml lab.form-keyboard.message@552 <- lab.form-keyboard.street.title@678',
@@ -170,8 +170,10 @@ const MARGIN_TEXTS: readonly string[] = [
   'form-errors.xml lab.form-errors.amount@878 <- lab.form-errors.amount@999',
   'form-errors.xml lab.form-errors.pin@1132 <- lab.form-errors.pin-error@1253',
   'form-errors.xml lab.form-errors.iban@1386 <- IbanError@1507',
+  'form-focus-prefix.xml lab.form-focus-prefix.dialLands@370 <- lab.form-focus-prefix.dialRefuses.title@496',
   'form-format.xml lab.form-format.iban@370 <- lab.form-format.amount.title@496',
   'form-format.xml lab.form-format.amount@552 <- lab.form-format.ibanShown.title@678',
+  'form-grouped.xml lab.form-grouped.ibanEager@370 <- lab.form-grouped.phoneGrouped.title@496',
   'form-keyboard-floating.after-back.xml lab.form-keyboard-floating.reference@370 <- lab.form-keyboard-floating.message.title@496',
   'form-keyboard-floating.after-back.xml lab.form-keyboard-floating.message@552 <- lab.form-keyboard-floating.street.title@678',
   'form-keyboard-floating.after-back.xml lab.form-keyboard-floating.street@734 <- lab.form-keyboard-floating.city.title@860',

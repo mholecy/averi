@@ -102,6 +102,10 @@ describe('the cell catalog', () => {
     expect(() => buildCatalog([...all(), { family: 'nope' as never, note: '', cells: [] }])).toThrow('no family nope');
     const both = { tag: 'I', color: '#000000', slot: 0, declared: 'open' as const, text: 'Close', label: 'Close' };
     expect(() => buildCatalog(all([{ family: 'false-covers', note: '', cells: [{ id: 'z', layer: 'none', targets: [both] }] }]))).toThrow("cell z's I names both a text and a label");
+    // An absent target's direction (CatalogTarget.toward) goes with mayBeAbsent, both ways: golden asks scroll_until it.
+    const card = { tag: 'C', color: '#000000', slot: 0, declared: 'open' as const, scrollView: 'carousel' };
+    expect(() => buildCatalog(all([{ family: 'false-covers', note: '', cells: [{ id: 'z', layer: 'none', targets: [{ ...card, mayBeAbsent: true }] }] }]))).toThrow("cell z's C may be absent but names no `toward`");
+    expect(() => buildCatalog(all([{ family: 'false-covers', note: '', cells: [{ id: 'z', layer: 'none', targets: [{ ...card, toward: 'right' }] }] }]))).toThrow("cell z's C names `toward` but may not be absent");
   });
 
   it('lays out an array-free object and a plain array on one line, the rest one member per line', () => {
@@ -192,8 +196,9 @@ describe('L7: carousel-lazy and carousel-recycler (D37\'s snapping pager) and th
     for (const id of ['carousel-lazy', 'carousel-recycler', 'carousel-lazy-free', 'carousel-recycler-free']) {
       expect(of(id)).toMatchObject({ family: 'edges', layer: 'none', platforms: ['android'] });
       // C, the second card, may be absent (no frame, no node) at launch — the lazy list composes it only once it scrolls in
-      // (CatalogTarget.mayBeAbsent: the capture records it in CellTruth.absent).
-      expect(of(id).targets).toEqual(of('carousel-in-list').targets.map((t) => (t.tag === 'C' ? { ...t, mayBeAbsent: true } : t)));
+      // (CatalogTarget.mayBeAbsent: the capture records it in CellTruth.absent), right of the first (`toward`, where
+      // scroll_until goes for it while it has no frame).
+      expect(of(id).targets).toEqual(of('carousel-in-list').targets.map((t) => (t.tag === 'C' ? { ...t, mayBeAbsent: true, toward: 'right' } : t)));
       expect(captureRefusal(of(id), 'ios', undefined)).toBe('built for android only');
       expect(captureRefusal(of(id), 'android', 'gesture')).toBeUndefined();
     }

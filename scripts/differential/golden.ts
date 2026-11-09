@@ -6,7 +6,7 @@ import { parseArgs } from 'node:util';
 import { PNG } from 'pngjs';
 import type { Recording } from './corpus.js';
 import { configFor, connect, type Outcome } from './differential.js';
-import { expectations, formExpectations, sent, type Verb } from './golden-spec.js';
+import { absentExpectations, expectations, formExpectations, sent, type Expectation, type Verb } from './golden-spec.js';
 import { replyKind, type ReplyKind } from '../truth/replies.js';
 import type { Side } from './side.js';
 import { pct, type CellTruth, type ImeCapture } from '../truth/schema.js';
@@ -156,6 +156,17 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
   };
   const config = await configFor(recording, undefined, truth.config);
   const c = await connect(side, recording, profile);
+  // One row asked and judged, keyed by its target (`tag` unless the row names its own, Expectation.target): an `ocr` row
+  // on a host whose recognizer cannot read is skipped, not asked (ocrAvailability).
+  const ask = async (e: Expectation, tag: string): Promise<void> => {
+    const why = e.verb === 'ocr' ? await ocrAvailability() : undefined;
+    if (why !== undefined) {
+      result.checks.push(skippedCheck(recording.id, e.target ?? tag, e.verb, e.says, why));
+      return;
+    }
+    const outcome = await c.call(e.call, config);
+    result.checks.push(checkOf(recording.id, e.target ?? tag, e.verb, e.says, e.judge(outcome), outcome, e.read?.(outcome)));
+  };
   try {
     for (const t of truth.targets) {
       const why = consistency(t, recording.platform, truth.screen, truth.navigation);
@@ -165,16 +176,11 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
       }
       // A live-only row (its truth a dynamic: golden-spec/judges.ts#Expectation.live) is the live golden's, never asked
       // here.
-      for (const e of expectations(recording.platform, t, truth, recording.source, recording.payload).filter((x) => x.live === undefined)) {
-        const why = e.verb === 'ocr' ? await ocrAvailability() : undefined;
-        if (why !== undefined) {
-          result.checks.push(skippedCheck(recording.id, e.target ?? t.tag, e.verb, e.says, why));
-          continue;
-        }
-        const outcome = await c.call(e.call, config);
-        result.checks.push(checkOf(recording.id, e.target ?? t.tag, e.verb, e.says, e.judge(outcome), outcome, e.read?.(outcome)));
-      }
+      for (const e of expectations(recording.platform, t, truth, recording.source, recording.payload).filter((x) => x.live === undefined)) await ask(e, t.tag);
     }
+    // A target laid out nowhere (CellTruth.absent, T6): no frame to be inconsistent with — its rows are asked toward where
+    // it lies (golden-spec/edges.ts#absentRows), after the framed targets'.
+    for (const a of truth.absent ?? []) for (const e of absentExpectations(recording.platform, a, truth, recording.source, recording.payload)) await ask(e, a.tag);
     // A form cell: its rows are judged unless a control's probe disagrees with its frame — then the cell is broken.
     const brokenControls = (truth.form?.controls ?? []).flatMap((c) => {
       const why = controlConsistency(c, outOfProcessKeyboard(recording.platform, truth.form?.keyboard?.frame, truth.form?.keyboard?.panels));
@@ -183,15 +189,7 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
     result.broken.push(...brokenControls);
     if (brokenControls.length === 0) {
       // A live-only form row (Expectation.live) is the live golden's, never asked here — as a target's.
-      for (const e of formExpectations(recording.platform, truth, recording.source, recording.payload).filter((x) => x.live === undefined)) {
-        const why = e.verb === 'ocr' ? await ocrAvailability() : undefined;
-        if (why !== undefined) {
-          result.checks.push(skippedCheck(recording.id, e.target, e.verb, e.says, why));
-          continue;
-        }
-        const outcome = await c.call(e.call, config);
-        result.checks.push(checkOf(recording.id, e.target, e.verb, e.says, e.judge(outcome), outcome, e.read?.(outcome)));
-      }
+      for (const e of formExpectations(recording.platform, truth, recording.source, recording.payload).filter((x) => x.live === undefined)) await ask(e, e.target);
     }
   } finally {
     await c.close();

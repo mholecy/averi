@@ -1,0 +1,60 @@
+{
+  "cell": "form-focus-prefix",
+  "ready": true,
+  "screen": {
+    "x": 0,
+    "y": 0,
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "density": 2.75,
+  "frames": {
+    "dialLands.title": {
+      "x": 55,
+      "y": 314,
+      "width": 400,
+      "height": 66
+    },
+    "dialLands": {
+      "x": 55,
+      "y": 386,
+      "width": 970,
+      "height": 99
+    },
+    "dialRefuses.title": {
+      "x": 55,
+      "y": 496,
+      "width": 457,
+      "height": 66
+    },
+    "dialRefuses": {
+      "x": 55,
+      "y": 568,
+      "width": 970,
+      "height": 99
+    },
+    "submit": {
+      "x": 55,
+      "y": 700,
+      "width": 970,
+      "height": 132
+    }
+  },
+  "events": [],
+  "fields": {
+    "dialLands": {
+      "value": "",
+      "focused": false,
+      "error": null
+    },
+    "dialRefuses": {
+      "value": "",
+      "focused": false,
+      "error": null
+    }
+  },
+  "focus": null,
+  "keyboard": null,
+  "submits": []
+}

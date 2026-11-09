@@ -229,8 +229,12 @@ const SECURE_BY_TYPE: ReadonlyMap<string, boolean> = new Map([
   ['TextView', false],
 ]);
 
-/** WDA's scroll-view types (`parkedIn`): the ones the role map makes `scrollable`. */
-const SCROLL_TYPES: ReadonlySet<string> = new Set(['Table', 'CollectionView', 'ScrollView']);
+/**
+ * WDA's scroll-view types (`parkedIn`): the ones the role map makes `scrollable`. `WDA_SCROLLERS` in
+ * scripts/truth/truth.ts copies it for the harness's own reading of a raw tree (tests/truth/truth.test.ts holds the
+ * two equal).
+ */
+export const SCROLL_TYPES: ReadonlySet<string> = new Set(['Table', 'CollectionView', 'ScrollView']);
 
 function toUiNode(el: WdaElement, marks: SourceMarks, inherited: Inherited): UiNode {
   const hidden = inherited.hidden || marks.hiddenRoots.has(el);

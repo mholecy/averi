@@ -1,0 +1,20 @@
+{
+  "cell": "held-no-spinner",
+  "ready": true,
+  "screen": {
+    "x": 0,
+    "y": 0,
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "density": 2.75,
+  "frames": {},
+  "events": [
+    {
+      "kind": "phase",
+      "tag": "bare",
+      "at": 1794234296.689
+    }
+  ]
+}
