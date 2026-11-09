@@ -103,3 +103,31 @@ describe('a later-listed control over the target\'s centre in a classic run: dra
     expect(exposure.tapAt).toEqual({ point: { x: 290, y: 1100 }, moved: false });
   });
 });
+
+/**
+ * The review's spec pin (D75 round 2): a real form the mark reaches — rn-field on Android, React Native's screen view
+ * listing its three field boxes, each label and each EditText as siblings in location order, marked — judges every
+ * field and label exactly as the unmarked tree did: the same covers, the same share shown, the same tap point.
+ */
+describe('rn-field under uiautomator: the mark reaches its run and changes nothing of its fields and labels', () => {
+  const dump = async () => parseDump(await readFile(new URL('../fixtures/truth/android-rn-averi_lab-api33/rn-field.xml', import.meta.url), 'utf8'));
+  const byId = (t: UiNode, id: string): UiNode => [...everyNode(t)].find((n) => n.identifier === id)!;
+  const named = (n: UiNode): string => `${n.role} ${n.identifier ?? n.label ?? ''} ${n.rect.x},${n.rect.y}`;
+  const judged = (t: UiNode, id: string) => {
+    const e = drawOrder(t).exposure(byId(t, id), PHONE);
+    return { covers: e.covers.map((c) => `${named(c.node)} ${c.order.kind}`), shows: e.shows, tapAt: e.tapAt, aimedClearOf: e.aimedClearOf.map(named) };
+  };
+
+  it('the run holding the fields and labels is marked', async () => {
+    const t = await dump();
+    expect([...everyNode(t)].find((n) => n.children.some((c) => c.identifier === 'lab.rn-field.N.field'))!.readingOrder).toBe(true);
+  });
+
+  it.each(['lab.rn-field.N', 'lab.rn-field.N.field', 'lab.rn-field.I', 'lab.rn-field.I.field', 'lab.rn-field.M', 'lab.rn-field.M.field'])('%s: judged the same marked and unmarked', async (id) => {
+    const marked = await dump();
+    const unmarked = await dump();
+    for (const n of everyNode(unmarked)) delete n.readingOrder;
+    expect(judged(marked, id)).toEqual(judged(unmarked, id));
+    expect(judged(marked, id).tapAt?.moved).toBe(false);
+  });
+});

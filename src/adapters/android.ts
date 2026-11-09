@@ -1615,6 +1615,8 @@ export function parseUiautomatorXml(xml: string, drawnOverStrip: DrawnOverStrip)
     children.length === 1
       ? { ...children[0], paddedTouchTargets: true, activeWindowOnly: true, boundsCutAtScreen: true, ...(presented !== undefined && { presentation: presented }) }
       : { role: 'container', label: null, identifier: null, value: null, rect: zeroRect(), children, paddedTouchTargets: true, activeWindowOnly: true, boundsCutAtScreen: true };
+  // The one window's root, copied: what the provider rule said of it holds for its copy.
+  if (children.length === 1 && provided.has(children[0])) provided.add(tree);
   // Each window's own tree: the root synthesized over several windows is no ViewGroup, its windows in no sorted order.
   for (const window of children.length === 1 ? [tree] : children) markLocationSorted(window, provided);
   widenUnderCovers(tree, grown, drawnOverStrip);
@@ -1791,7 +1793,7 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
   const { rect, clippedOut } = nodeBounds(raw.bounds, around.parent);
   const clips = raw.scrollable === 'true';
   const inProvider = around.inProvider || providesNodes(raw);
-  const children = rawChildren.map((child) => normalizeNode(child, { parent: rect, clip: clips ? rect : around.clip, grown: around.grown, inProvider, provided: around.provided }));
+  const children = rawChildren.map((child) => normalizeNode(child, { ...around, parent: rect, clip: clips ? rect : around.clip, inProvider }));
   const whole = around.clip === undefined ? undefined : uncut(rect, children, around.clip);
   const node: UiNode = {
     role: isTextInput ? 'textfield' : (ROLE_MAP[className] ?? (rawChildren.length > 0 ? 'container' : 'other')),

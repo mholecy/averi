@@ -343,8 +343,8 @@ drawn over it.
   classic Views passes it; a run listed so by chance passes it too.
 - LEFT-TO-RIGHT is assumed: the dump names no layout direction, so a right-to-left run (sorted by right edges) reads
   out of order and is not marked — it keeps its order as draw order, as before.
-- NOT a node a node provider lists: a node of the class `android.view.View` with children hosts virtual nodes (a plain
-  View holds no child views) — Compose's AndroidComposeView, under a `ComposeView` on a screen and under a bare
+- NOT a node a node provider lists: any node of the class `android.view.View` hosts virtual nodes (a plain View holds no
+  child views, so any children it lists are virtual) — Compose's AndroidComposeView, under a `ComposeView` on a screen and under a bare
   ViewGroup in a Compose dialog's window — and nothing under it is marked (android.ts#providesNodes). Compose's order is
   composition order: form-shared-id lists each outlined field (left 55) before its label drawn over its outline (left
   77) — location order by chance; marked, the five labels would gain their fields as untold covers.
@@ -352,7 +352,7 @@ drawn over it.
   reading-order.ts#peersOf (a sibling listed before the target that draws there is a peer whose order the eyes tell,
   ADR 0024), placed.ts#FRAME_EXCUSES's `structural` (a childless leaf the app named is drawn unless it wraps a sibling),
   and the eyes. Nothing in ui-tree knows Android.
-- `ui_snapshot` prints the mark on Android too ("readingOrder": true — its children are listed by position, not in
+- `ui_snapshot` prints the mark on Android too ("readingOrder": true — its children are listed by location, not in
   draw order).
 
 Measured: golden over the truth corpus against `7eb998dd` (1667 checks): exactly rn-banner's six uiautomator rows
@@ -386,8 +386,8 @@ is AOSP's, every classic ViewGroup's).
   `zIndex` (or listed by a provider in another order) is read by its listing, as before. AndroidView interop — classic
   Views hosted inside Compose — sits under the provider's host, so it is never marked either, though AOSP sorts its own
   ViewGroups.
-- A provider other than Compose (an `ExploreByTouchHelper` on a custom View) is caught by the same shape (a plain View
-  with children); a WebView (`android.webkit.WebView`) is not, and its virtual DOM nodes are marked where they happen to
+- A provider other than Compose (an `ExploreByTouchHelper` on a custom View) is caught by the same shape (any node of the
+  class `android.view.View`); a WebView (`android.webkit.WebView`) is not, and its virtual DOM nodes are marked where they happen to
   be in location order: their overlaps then ask the eyes — a screenshot per tap, a refusal when the eyes cannot tell.
   Unmeasured.
 - The dump's bounds are CUT (to a scroll view, to the screen) where AOSP sorted the whole drawing rect: a classic run

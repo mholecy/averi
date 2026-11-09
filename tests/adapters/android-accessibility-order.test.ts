@@ -119,6 +119,17 @@ describe('parseUiautomatorXml marks a parent whose children are listed in locati
     expect([...everyNode(t)].filter((n) => n.readingOrder)).toEqual([]);
   });
 
+  it('a one-window dump whose window root is itself a plain android.view.View (a provider\'s host): the root the parser copies from it stays unmarked', () => {
+    const t = parseDump(`<hierarchy rotation="0">
+  <node class="android.view.View" bounds="[0,0][1080,2220]">
+    <node class="android.view.View" resource-id="app:id/cover" bounds="[73,276][1008,419]"/>
+    <node class="android.view.View" resource-id="app:id/target" bounds="[128,303][953,479]"/>
+  </node>
+</hierarchy>`);
+    expect(t.children).toHaveLength(2);
+    expect(t.readingOrder).toBeUndefined();
+  });
+
   it('the root the parser synthesizes over two windows is not marked (it is no ViewGroup), while a run in a window still is', () => {
     const t = parseDump(`<hierarchy rotation="0">
   <node class="android.widget.FrameLayout" bounds="[0,0][1080,1000]">

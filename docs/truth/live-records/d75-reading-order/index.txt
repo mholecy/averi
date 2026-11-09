@@ -37,7 +37,7 @@ native: the forms group (~50 cases, ~13 min an arm) and the whole visibility gro
   stopped at the budget after 61 cases (all ok; native-base.log.txt), and native-fix ran the three cells whose committed
   trees the mark changes (bands-three-button, bottom-sheet-dialog, dialog-views-fullscreen; every other native capture
   is Compose, unmarked): 31 cases each, 31 ok each, every reply identical (cmp.mjs: 0 changed verdicts).
-  native-base-stopped.log.txt, native-base-forms-stopped.log: the two forms runs stopped by hand (base only, all as in
+  native-base-stopped.log.txt, native-base-forms-stopped.log.txt: the two forms runs stopped by hand (base only, all as in
   their logs), kept for the record, not compared.
 cost of the extra screenshot: only rn-banner's three taps ask the eyes (one screenshot each); RN arm 242 s vs 251 s —
   no cost visible at this resolution.

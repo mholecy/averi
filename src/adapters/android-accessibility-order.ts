@@ -38,8 +38,8 @@ export function compareByLocation(a: Rect, b: Rect): number {
  */
 export function markLocationSorted<T extends UiNode>(tree: T, provided: ReadonlySet<UiNode>): T {
   for (const node of everyNode(tree)) {
-    const kids = node.children;
     if (provided.has(node)) continue;
+    const kids = node.children;
     if (kids.length >= 2 && kids.every((child, i) => i === 0 || compareByLocation(kids[i - 1].rect, child.rect) <= 0)) node.readingOrder = true;
   }
   return tree;

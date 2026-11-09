@@ -1,4 +1,5 @@
 #!/bin/zsh
+# D75 live: one harness (the logs it writes as *.log were renamed *.log.txt when committed, da5fec09: *.log is ignored)
 # D75 live: one harness (the fix worktree), base src by --side; each arm base first, then fix.
 S=<scratchpad>
 W=<repo>
