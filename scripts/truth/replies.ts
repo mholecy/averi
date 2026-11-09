@@ -1,9 +1,10 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { FOCUS_TEXT_NOT_READ } from '../../src/interact/fill-text.js';
-import { boundText, TREE_READ_FAILED } from '../../src/interact/scroll-text.js';
+import { boundText, TREE_READ_FAILED, UNTRIED_END, UNTRIED_LEAD } from '../../src/interact/scroll-text.js';
 import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, KEYBOARD_UNLISTED, NO_ID_LISTED } from '../../src/ui-tree/miss.js';
 import { untriedSideText } from '../../src/interact/target-text.js';
-import { EDGES } from '../../src/ui-tree/geometry.js';
+import { EDGES, rectText } from '../../src/ui-tree/geometry.js';
+import type { Rect } from '../../src/adapters/types.js';
 import type { Direction } from '../../src/ui-tree/sides.js';
 import { escapeRegExp } from '../../src/verify/text-hint.js';
 
@@ -393,6 +394,23 @@ export const scrollVerdictSaid = (reply: string): boolean => /^ERROR scroll_unti
  */
 const UNTRIED_SIDES = EDGES.map(untriedSideText);
 export const untriedSideSaid = (reply: string) => UNTRIED_SIDES.some((words) => reply.includes(words));
+
+/** A rect as averi's replies quote it: src/ui-tree/geometry.ts#rectText's `x,y wxh`, not a copy. */
+export const replyRect = rectText;
+
+/**
+ * A scroll_until stop names the scroll view of `rect` among those the swipes did not go over (D76,
+ * src/interact/scroll-text.ts#besideText): `(x,y wxh)` between UNTRIED_LEAD and UNTRIED_END, both src's words — not
+ * the rect quoted elsewhere (the scroll view swiped, a miss's scroll view), nor past that clause. Bounded by
+ * UNTRIED_END, not the first dash: a node's label may hold one.
+ */
+export function namesUntried(reply: string, rect: Rect): boolean {
+  const lead = reply.indexOf(UNTRIED_LEAD);
+  if (lead < 0) return false;
+  const from = lead + UNTRIED_LEAD.length;
+  const end = reply.indexOf(UNTRIED_END, from);
+  return end >= 0 && reply.slice(from, end).includes(`(${rectText(rect)})`);
+}
 
 // --- the ocr assert's readings ---
 

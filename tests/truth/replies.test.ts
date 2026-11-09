@@ -15,7 +15,7 @@ import { failureOf, play, resultOf, type Row } from '../helpers/rounds.js';
 import type { AppHolder } from '../../src/adapters/types.js';
 import { appHolderText } from '../../src/interact/app-holder-text.js';
 import { deepLinkText, launchText } from '../../src/mcp/tool-text.js';
-import { chooserSaid, launchedAs, linkHeldSaid, warnedSaid } from '../../scripts/truth/replies.js';
+import { chooserSaid, launchedAs, linkHeldSaid, namesUntried, warnedSaid } from '../../scripts/truth/replies.js';
 
 /**
  * A src file's code without its comments, so a phrase that only a comment still says counts as no longer written. It
@@ -318,5 +318,31 @@ describe("launchedAs, chooserSaid, warnedSaid: launch_app's and open_deep_link's
     expect(warnedSaid(launched('dev.averi.lab'))).toBe(false);
     expect(warnedSaid(launched('dev.averi.lab/.Twin'))).toBe(false);
     expect(warnedSaid('Launched dev.averi.lab on android ⚠ inline')).toBe(false);
+  });
+});
+
+describe('namesUntried: a scroll view among those the swipes did not go over, as src words them (scroll-text.ts#besideText, D76)', () => {
+  const UPPER: Rect = { x: 0, y: 303, width: 1080, height: 605 };
+  const LOWER: Rect = { x: 0, y: 1046, width: 1080, height: 495 };
+  const said = (others: { label: string | null; rect: Rect }[]) =>
+    boundText({ of: 'exhausted', lastStroke: 'down', unchanged: 'tree', beside: { axis: 'vertical', within: UPPER, others: others.map((o) => ({ role: 'scrollable', identifier: null, ...o })) } }, 2);
+
+  it('the list named untried, not the one swiped, nor one after the clause', () => {
+    const reply = said([{ label: null, rect: LOWER }]);
+    expect(namesUntried(reply, LOWER)).toBe(true);
+    expect(namesUntried(reply, UPPER)).toBe(false);
+    expect(namesUntried(`${reply} — element lies outside its scroll view scrollable (0,303 1080x605)`, UPPER)).toBe(false);
+    expect(namesUntried(boundText({ of: 'maxSwipes' }, 2), LOWER)).toBe(false);
+  });
+
+  it('a label holding a dash does not end the clause; a clause cut before its remedy names nothing', () => {
+    const reply = said([{ label: 'A — B', rect: { x: 0, y: 1600, width: 1080, height: 600 } }, { label: null, rect: LOWER }]);
+    expect(namesUntried(reply, LOWER)).toBe(true);
+    expect(namesUntried(`${reply.slice(0, reply.indexOf(' — if the element lies'))}; else: content exhausted`, LOWER)).toBe(false);
+  });
+
+  it('a rect quoted before the clause, or with no clause at all, is not named untried', () => {
+    expect(namesUntried(`list scrollable (0,303 1080x605); ${said([{ label: null, rect: LOWER }])}`, UPPER)).toBe(false);
+    expect(namesUntried(`${'x'.repeat(40)} scrollable (0,1046 1080x495) — if the element lies in it`, LOWER)).toBe(false);
   });
 });

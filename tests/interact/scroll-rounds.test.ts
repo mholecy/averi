@@ -3110,3 +3110,94 @@ describe('round — a tree read that waits for the screen at rest (readSettles)'
     expect(resultOf(played)).toEqual({ swipes: 2, visible: 1, clipped: [] });
   });
 });
+
+/**
+ * D76: a target not yet in the tree, with more than one listed scroll view along the stroke — the strokes go over the
+ * largest (stroke-plan.ts#candidatesOf), never a sibling, so the exhausted stop names the ones they did not go over
+ * (stroke-plan.ts#strokedBeside, scroll-text.ts#boundText). Over android scroll-bounded's real dump (API 33): `upper`
+ * [0,303][1080,908], `lower` [0,1046][1080,1541], O and F rows of `lower` not laid out at launch.
+ */
+describe('round — the scroll views the strokes did not go over, before the target is read (D76)', () => {
+  const BOUNDED = readFileSync(new URL('../fixtures/truth/android-averi_lab-api33/scroll-bounded.xml', import.meta.url), 'utf8');
+  const UPPER: Rect = { x: 0, y: 303, width: 1080, height: 605 };
+  const LOWER: Rect = { x: 0, y: 1046, width: 1080, height: 495 };
+  const lower = { role: 'scrollable', label: null, identifier: null, rect: LOWER };
+  const mid = { role: 'scrollable', label: null, identifier: 'mid', rect: { x: 0, y: 1600, width: 1080, height: 300 } };
+  const BESIDE =
+    'the swipes went over the scroll view 0,303 1080x605 only; the tree shows another scroll view that scrolls vertically, which the swipes did not go over: scrollable (0,1046 1080x495) — if the element lies in it, swipe inside it (swipe, its coordinates) until the element shows, then scroll_until it';
+
+  it('boundText, one: the scroll view swiped, then the one not, with the way into it; the generic causes after the else', () => {
+    expect(boundText({ of: 'exhausted', lastStroke: 'down', unchanged: 'tree', beside: { axis: 'vertical', within: UPPER, others: [lower] } }, 2)).toBe(
+      `after 2 swipes (the last 2, swiping down, did not change the screen: ${BESIDE}; else: content exhausted, still loading, or the swipes were not taken)`,
+    );
+  });
+
+  it('boundText, several: counted, largest first as given; and over the screen box (no scroll view swiped) said so', () => {
+    expect(boundText({ of: 'exhausted', lastStroke: 'up', unchanged: 'matches', beside: { axis: 'vertical', within: UPPER, others: [lower, mid] } }, 2)).toBe(
+      'after 2 swipes (the last 2, swiping up, did not move it: the swipes went over the scroll view 0,303 1080x605 only; the tree shows 2 other scroll views that scroll vertically, which the swipes did not go over: scrollable (0,1046 1080x495), scrollable id:mid (0,1600 1080x300) — if the element lies in one of them, swipe inside it (swipe, its coordinates) until the element shows, then scroll_until it; else: content exhausted, or the swipes were not taken)',
+    );
+    expect(boundText({ of: 'exhausted', lastStroke: 'left', unchanged: 'tree', beside: { axis: 'horizontal', others: [lower] } }, 2)).toContain(
+      'did not change the screen: the swipes were drawn over the screen whole (aimed at no scroll view); the tree shows a scroll view that scrolls horizontally, which the swipes did not go over: scrollable (0,1046 1080x495) — if the element lies in it,',
+    );
+  });
+
+  it('boundText, the clause order: a node named under the touch-down, then the strokes across their scroll view, then the scroll views beside — said in that order, the node and the scroll views beside both said (review round 1); an end the tree proves outranks all', () => {
+    const touched = { at: { x: 540, y: 788 }, on: { role: 'text', label: 'Banner', identifier: null, rect: { x: 0, y: 700, width: 1080, height: 200 } }, container: UPPER };
+    const across = { rect: UPPER, axis: 'horizontal' as const };
+    const beside = { axis: 'vertical' as const, within: UPPER, others: [lower] };
+    expect(boundText({ of: 'exhausted', lastStroke: 'down', unchanged: 'tree', touched, across, beside }, 2)).toContain('did not change the screen: they touched down at 540,788 on text "Banner"');
+    expect(boundText({ of: 'exhausted', lastStroke: 'down', unchanged: 'tree', touched, beside }, 2)).toBe(
+      `after 2 swipes (the last 2, swiping down, did not change the screen: they touched down at 540,788 on text "Banner" at 0,700 1080x200, drawn over the list 0,303 1080x605, which may have taken them (else: ${BESIDE}; else: content exhausted, still loading))`,
+    );
+    expect(boundText({ of: 'exhausted', lastStroke: 'down', unchanged: 'tree', across, beside }, 2)).toContain('did not change the screen: each went across the scroll view');
+    expect(boundText({ of: 'exhausted', lastStroke: 'down', unchanged: 'tree', across, beside }, 2)).not.toContain('went over the scroll view 0,303 1080x605 only');
+    const ends = { way: 'down' as const, unmoved: 1, scrollView: node({ role: 'scrollable', rect: { ...UPPER } }) };
+    expect(boundText({ of: 'exhausted', lastStroke: 'down', unchanged: 'matches', beside, ends }, 1)).not.toContain('did not go over');
+  });
+
+  it('boundText, more than 3: the 3 largest named, then how many more (review round 1)', () => {
+    const more = [0, 1, 2, 3, 4].map((i) => ({ role: 'scrollable', label: null, identifier: `l${i}`, rect: { x: 0, y: 1000 + i * 100, width: 1080, height: 90 } }));
+    expect(boundText({ of: 'exhausted', lastStroke: 'down', unchanged: 'tree', beside: { axis: 'vertical', within: UPPER, others: more } }, 2)).toContain(
+      'the tree shows 5 other scroll views that scroll vertically, which the swipes did not go over: scrollable id:l0 (0,1000 1080x90), scrollable id:l1 (0,1100 1080x90), scrollable id:l2 (0,1200 1080x90) and 2 more — if the element lies in one of them,',
+    );
+    expect(boundText({ of: 'exhausted', lastStroke: 'down', unchanged: 'tree', beside: { axis: 'vertical', within: UPPER, others: more.slice(0, 3) } }, 2)).toContain('scrollable id:l2 (0,1200 1080x90) — if the element');
+  });
+
+  it('boundText over the screen box names the touch-down, and the scroll view it lies in when the tree lists one (review round 1)', () => {
+    expect(boundText({ of: 'exhausted', lastStroke: 'up', unchanged: 'tree', beside: { axis: 'vertical', at: { x: 201, y: 437 }, landed: { x: 0, y: 100, width: 402, height: 200 }, others: [lower] } }, 2)).toContain(
+      'did not change the screen: the swipes were drawn over the screen whole (aimed at no scroll view), touching down at 201,437 inside the scroll view 0,100 402x200; the tree shows a scroll view',
+    );
+    expect(boundText({ of: 'exhausted', lastStroke: 'up', unchanged: 'tree', beside: { axis: 'vertical', at: { x: 201, y: 437 }, others: [lower] } }, 2)).toContain('(aimed at no scroll view), touching down at 201,437; the tree shows a scroll view');
+  });
+
+  it('boundText at maxSwipes and at the timeout: the scroll views beside said too, then the bound\'s own way out (review round 1)', () => {
+    const beside = { axis: 'vertical' as const, within: UPPER, others: [lower] };
+    expect(boundText({ of: 'maxSwipes', beside }, 1)).toBe(`after 1 swipe (maxSwipes: ${BESIDE}; else: raise maxSwipes or timeoutMs)`);
+    expect(boundText({ of: 'timeout', timeoutMs: 15_000, elapsedMs: 16_000, reads: { count: 2, totalMs: 900, lastMs: 450 }, beside }, 1)).toBe(
+      `after 16000ms (timeout 15000ms; 1 swipe sent; 2 tree reads took 900ms, the last 450ms; ${BESIDE}; else: raise maxSwipes or timeoutMs)`,
+    );
+  });
+
+  it('the lab tree at maxSwipes and at the timeout, the target never read: the stop names `lower` (review round 1: raising the bound strokes `upper` again)', () => {
+    const tree = parseDump(BOUNDED);
+    const capped = play({ ...ANDROID, maxSwipes: 1, timeoutMs: 15_000 }, [{ tree }, { tree }]);
+    expect(capped.outcome).toMatchObject({ kind: 'bound', by: { of: 'maxSwipes', beside: { within: UPPER, others: [lower] } } });
+    expect(failureOf(capped, 'id:lab.scroll-bounded.O').message).toContain(`failed after 1 swipe (maxSwipes: ${BESIDE}; else: raise maxSwipes or timeoutMs) — element never appeared in the tree`);
+    const timed = play({ ...ANDROID, maxSwipes: 6, timeoutMs: 15_000 }, [{ tree }, { tree, elapsedMs: 16_000 }]);
+    expect(timed.outcome).toMatchObject({ kind: 'bound', by: { of: 'timeout', beside: { within: UPPER, others: [lower] } } });
+    // No swipe sent: nothing to say of what the swipes went over.
+    const none = play({ ...ANDROID, maxSwipes: 0, timeoutMs: 15_000 }, [{ tree }]);
+    expect(none.outcome).toMatchObject({ kind: 'bound', by: { of: 'maxSwipes' } });
+    expect(none.outcome).not.toHaveProperty('by.beside');
+  });
+
+  it('the lab tree: O not in the tree, every stroke over `upper` (540,788 — the measured touch-down), the stop names `lower`', () => {
+    const tree = parseDump(BOUNDED);
+    const played = play({ ...ANDROID, maxSwipes: 6, timeoutMs: 15_000 }, [{ tree }, { tree }, { tree }]);
+    const sent = played.steps.flatMap((st) => (st.do === 'stroke' ? [st] : []));
+    expect(sent.map((st) => st.box)).toEqual([UPPER, UPPER]);
+    for (const st of sent) expect(st.points?.from).toEqual({ x: 540, y: 788 });
+    expect(played.outcome).toMatchObject({ kind: 'bound', by: { of: 'exhausted', beside: { within: UPPER, others: [lower] } } });
+    expect(failureOf(played, 'id:lab.scroll-bounded.O').message).toContain(`did not change the screen: ${BESIDE}; else: content exhausted, still loading, or the swipes were not taken)`);
+  });
+});

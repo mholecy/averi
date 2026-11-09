@@ -3,7 +3,7 @@ import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
 import { axisOf, directionOf, otherAxis, navigationBandTakes, parseGeometry, rectInside, regionOverlap, sampleOf, selectorOf, type Direction } from '../../truth/truth.js';
 import { bandNamed, isBand, judgedContext, type StopAsk, type TapAsk, type TargetContract } from '../../truth/target-contract.js';
-import { ASSERTS_FAILED, claimsTap, claimsVisible, dismissalCover, flushProbedSide, isError, notInTree, scrollAdvice } from '../../truth/replies.js';
+import { ASSERTS_FAILED, claimsTap, claimsVisible, dismissalCover, flushProbedSide, isError, namesUntried, notInTree, replyRect, scrollAdvice } from '../../truth/replies.js';
 import { BUDGET_MS, first, landed, notTapped, passed, passes, pointsText, reachedWithNoSwipe, said, strokes, strokesOff, swipes, tapPoints, touchDowns, within, type Expectation } from './judges.js';
 
 /**
@@ -209,10 +209,18 @@ export interface StrokeOptions extends RowOptions {
    * not list is not held so (edges.ts#edgeRows): scroll-bounded's O and F on Android lie in `lower`, one of two
    * vertical lists, and averi strokes only the largest, its reply blaming exhaustion without naming `lower` — holding
    * them inside turned both rows red (T6). The absent-only condition stands in for "the named scroll view is the only
-   * listed scroller that could take the stroke"; the case of two along the stroke is backlog D76 (D59b's honesty
-   * class).
+   * listed scroller that could take the stroke"; the case of two along the stroke is `namedSuffices`.
    */
   scrollerListed?: boolean;
+  /**
+   * A framed target the tree does not list (`absent`), whose scroll view the replayed tree lists a scroller: a
+   * touch-down outside that scroll view passes only when the reply quotes its rect among the scroll views the swipes
+   * did not go over (`namesUntried`) — averi strokes the largest scroller before it reads the target, and its exhausted
+   * stop names the listed scroll views along the stroke the swipes did not go over (D76,
+   * interact/stroke-plan.ts#strokedBeside). Set by edges.ts#edgeRows (scroll-bounded's O and F on Android, rows of
+   * `lower`).
+   */
+  namedSuffices?: boolean;
 }
 
 /**
@@ -266,26 +274,37 @@ export function absentFullyRow(platform: Platform, t: StrokeTarget, cell: CellTr
 /** What R-stroke reads of its target: how it is asked (truth.ts#selectorOf) and the scroll view it lies in. */
 type StrokeTarget = Pick<TargetTruth, 'id' | 'text' | 'label' | 'scrollView'>;
 
+/** The scroll view R-stroke holds every touch-down inside (`rect`) — or, `named`, where a touch-down outside it passes when the reply names it among those the swipes did not go over (StrokeOptions.namedSuffices). */
+interface OwnScrollView {
+  readonly rect: Rect;
+  readonly named: boolean;
+}
+
 /**
  * The clip R-stroke holds every touch-down inside: the target's scroll view's, where the truth names it — and, for a
- * target the tree may not list (`absent`), only where the replayed tree lists that scroll view a scroller.
+ * target the tree may not list (`absent`), only where the replayed tree lists that scroll view a scroller
+ * (`scrollerListed`, or `namedSuffices`, which also lets the reply's naming it pass).
  */
-const ownScrollView = (t: StrokeTarget, cell: CellTruth, { absent, scrollerListed }: StrokeOptions): Rect | undefined =>
-  t.scrollView !== undefined && (absent === undefined || scrollerListed === true) ? cell.scrollViews?.[t.scrollView] : undefined;
+const ownScrollView = (t: StrokeTarget, cell: CellTruth, { absent, scrollerListed, namedSuffices }: StrokeOptions): OwnScrollView | undefined => {
+  const rect = t.scrollView !== undefined && (absent === undefined || scrollerListed === true || namedSuffices === true) ? cell.scrollViews?.[t.scrollView] : undefined;
+  return rect === undefined ? undefined : { rect, named: namedSuffices === true };
+};
 
-/** What R-stroke's `says` asks of the touch-downs: clear of the bands and the chrome, and inside `own` where given. */
-const touchDownClause = (t: StrokeTarget, own: Rect | undefined) => `every touch-down clear of the bands and the chrome${own === undefined ? '' : ` and inside its scroll view ${t.scrollView}`}`;
+/** What R-stroke's `says` asks of the touch-downs: clear of the bands and the chrome, and inside `own` where given — or, where `own.named`, the reply naming it. */
+const touchDownClause = (t: StrokeTarget, own: OwnScrollView | undefined) =>
+  `every touch-down clear of the bands and the chrome${own === undefined ? '' : ` and inside its scroll view ${t.scrollView}${own.named ? `, or the reply names ${t.scrollView} (${replyRect(own.rect)})` : ''}`}`;
 
-/** R-stroke's judge: a swipe; every touch-down strokeable, inside `own` where given; every swipe along `direction`'s axis. */
-function strokesJudge(t: StrokeTarget, cell: CellTruth, own: Rect | undefined, direction: Direction): (o: Outcome) => string | undefined {
+/** R-stroke's judge: a swipe; every touch-down strokeable, inside `own` where given (or, `own.named`, the reply naming it untried, replies.ts#namesUntried); every swipe along `direction`'s axis. */
+function strokesJudge(t: StrokeTarget, cell: CellTruth, own: OwnScrollView | undefined, direction: Direction): (o: Outcome) => string | undefined {
   return (o) => {
     if (swipes(o) === 0) return said(o, 'no swipe');
-    const beside = own === undefined ? [] : touchDowns(o).filter((p) => !within(p, own));
+    const outside = own === undefined || (own.named && namesUntried(o.reply, own.rect)) ? [] : touchDowns(o).filter((p) => !within(p, own.rect));
+    const unnamed = own?.named === true ? `, and the reply does not name it (${replyRect(own.rect)})` : '';
     const axis = axisOf(direction);
     const across = strokes(o).filter(({ from, to }) => Math.abs(to[axis] - from[axis]) <= Math.abs(to[otherAxis(axis)] - from[otherAxis(axis)]));
     return (
       strokesOff(o, cell) ??
-      (beside.length === 0 ? undefined : `touched down outside its scroll view ${t.scrollView} at ${pointsText(beside)}: ${first(o)}`) ??
+      (outside.length === 0 ? undefined : `touched down outside its scroll view ${t.scrollView} at ${pointsText(outside)}${unnamed}: ${first(o)}`) ??
       (across.length === 0 ? undefined : `swiped across the ${axis} axis it scrolls ${direction} along, from ${pointsText(across.map((s) => s.from))}: ${first(o)}`)
     );
   };

@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { everyNode, type Point, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
-import { MIN_STROKE_BOX, planProbe, planStroke, seeRead, startStrokes, strokedAcross, strokeSent, touchedOn, TOUCH_DOWN_CUT_FLOOR, type StrokeMemory } from '../../src/interact/stroke-plan.js';
+import { MIN_STROKE_BOX, planProbe, planStroke, seeRead, startStrokes, strokedAcross, strokedBeside, strokeSent, touchedOn, TOUCH_DOWN_CUT_FLOOR, type StrokeMemory } from '../../src/interact/stroke-plan.js';
 import { shortenStroke, swipeVector, swipeVectorAbove, type Direction } from '../../src/interact/swipe.js';
 import { containsPoint, largestScroller } from '../../src/ui-tree/geometry.js';
 import { keyboardSideNodes } from '../../src/ui-tree/soft-keyboard.js';
@@ -510,6 +510,110 @@ describe('before a read finds the target, a sideways stroke goes inside a nested
     const tree = page(strip);
     const sent = strokeSent(planOn(tree, 'right').memory);
     expect(strokedAcross(sent, factsOf(tree), 'right', BOX)).toEqual({ rect: PAGE, axis: 'vertical', along: { view: { role: 'scrollable', label: null, identifier: null, rect: strip.rect }, noRoom: true } });
+  });
+});
+
+describe('strokedBeside — the listed scroll views along the stroke the swipes did not go over, before a read found the target (D76)', () => {
+  /** android scroll-bounded's two vertical lists, as uiautomator dumps them: `upper` the larger, `lower` below it. */
+  const UPPER: Rect = { x: 0, y: 303, width: 1080, height: 605 };
+  const LOWER: Rect = { x: 0, y: 1046, width: 1080, height: 495 };
+  const list = (rect: Rect, extra: Partial<UiNode> = {}): UiNode => node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'vertical', rect: { ...rect }, ...extra });
+  const bounded = (...more: UiNode[]): UiNode => screenOf([list(UPPER), list(LOWER, { identifier: 'lower' }), ...more]);
+  /** One stroke `toward` planned and sent over `tree`'s read: its memory and the points as drawn. */
+  const sentOn = (tree: UiNode, toward: Direction, target?: UiNode) => {
+    const plan = planOn(tree, toward, { target });
+    return { memory: strokeSent(plan.memory), drawn: plan.stroke.points };
+  };
+
+  it('names the sibling list the strokes never went over: they went over the largest, `upper`', () => {
+    const tree = bounded();
+    const { memory, drawn } = sentOn(tree, 'down');
+    expect(drawn !== undefined && containsPoint(UPPER, drawn.from)).toBe(true);
+    expect(strokedBeside(memory, factsOf(tree), 'down', BOX)).toEqual({ axis: 'vertical', within: UPPER, others: [{ role: 'scrollable', label: null, identifier: 'lower', rect: LOWER }] });
+    // No other list along the stroke: nothing to name.
+    const alone = screenOf([list(UPPER)]);
+    const one = sentOn(alone, 'down');
+    expect(strokedBeside(one.memory, factsOf(alone), 'down', BOX)).toBeUndefined();
+  });
+
+  it('leaves out the one holding the last touch-down: over the screen box (no list clips: WDA\'s dialect) the list the finger landed in is not named, the other is', () => {
+    const loose = (rect: Rect, identifier: string): UiNode => node({ role: 'scrollable', identifier, scrollAxis: 'vertical', rect: { ...rect } });
+    const tree = screenOf([loose(UPPER, 'upper'), loose({ x: 0, y: 1300, width: 1080, height: 495 }, 'lower')]);
+    const { memory, drawn } = sentOn(tree, 'up');
+    expect(drawn !== undefined && containsPoint(UPPER, drawn.from)).toBe(true);
+    // Over the screen box the touch-down is said, and the list it lies in (review round 1).
+    expect(strokedBeside(memory, factsOf(tree), 'up', BOX)).toEqual({ axis: 'vertical', at: drawn?.from, landed: UPPER, others: [{ role: 'scrollable', label: null, identifier: 'lower', rect: { x: 0, y: 1300, width: 1080, height: 495 } }] });
+    // No stroke sent yet (the plan held): no touch-down to leave out or to say.
+    const held = planOn(tree, 'up').memory;
+    expect(strokedBeside(held, factsOf(tree), 'up', BOX)?.others.map((o) => o.identifier)).toEqual(['upper', 'lower']);
+    expect(strokedBeside(held, factsOf(tree), 'up', BOX)).not.toHaveProperty('at');
+    // After a turn the touch-down said is the LAST stroke's (the content-down one, low on the screen), each one's list left out.
+    const three = screenOf([loose(UPPER, 'upper'), loose({ x: 0, y: 1300, width: 1080, height: 300 }, 'mid'), loose({ x: 0, y: 1850, width: 1080, height: 300 }, 'low')]);
+    const up = sentOn(three, 'up');
+    const turned = planStroke(up.memory, { kind: 'full', toward: 'down', reach: 1, gesture: BOX, read: { facts: factsOf(three), target: undefined } });
+    expect(turned.stroke.points?.from).toEqual({ x: 540, y: 1776 });
+    const said = strokedBeside(strokeSent(turned.memory), factsOf(three), 'down', BOX);
+    expect(said).toMatchObject({ at: { x: 540, y: 1776 } });
+    expect(said?.others.map((o) => o.identifier)).toEqual(['mid', 'low']);
+    // A touch-down in no list: the point alone; of two lists holding it, the inner one.
+    const apart = screenOf([loose({ x: 0, y: 1300, width: 1080, height: 300 }, 'a'), loose({ x: 0, y: 1700, width: 1080, height: 300 }, 'b')]);
+    const off = sentOn(apart, 'up');
+    expect(strokedBeside(off.memory, factsOf(apart), 'up', BOX)).toMatchObject({ at: { x: 540, y: 444 }, others: [{ identifier: 'a' }, { identifier: 'b' }] });
+    expect(strokedBeside(off.memory, factsOf(apart), 'up', BOX)).not.toHaveProperty('landed');
+    const inner: Rect = { x: 0, y: 400, width: 1080, height: 100 };
+    const nested = screenOf([loose(UPPER, 'outer'), loose(inner, 'inner'), loose({ x: 0, y: 1300, width: 1080, height: 300 }, 'a')]);
+    const into = sentOn(nested, 'up');
+    expect(strokedBeside(into.memory, factsOf(nested), 'up', BOX)).toMatchObject({ landed: inner, others: [{ identifier: 'a' }] });
+  });
+
+  it('leaves out a list ANY swipe of the call touched down in, not only the last (code review): an earlier swipe inside a nested list, the last over the page holding it', () => {
+    const PAGE: Rect = { x: 0, y: 0, width: 1080, height: 1800 };
+    const NESTED: Rect = { x: 0, y: 200, width: 1080, height: 400 };
+    const SIBLING: Rect = { x: 0, y: 1850, width: 1080, height: 300 };
+    // The first read tells the page horizontal (a pager): a `down` stroke goes inside the nested list (D59b).
+    const as = (axis: 'horizontal' | 'vertical') => screenOf([node({ role: 'scrollable', clipsDescendants: true, scrollAxis: axis, rect: { ...PAGE }, children: [list(NESTED, { identifier: 'nested' })] }), list(SIBLING, { identifier: 'sibling' })]);
+    const first = planOn(as('horizontal'), 'down');
+    expect(first.stroke.box).toEqual(NESTED);
+    // The next read tells it vertical: the stroke goes over the page, touching down below the nested list.
+    const page = as('vertical');
+    const second = planStroke(strokeSent(first.memory), { kind: 'full', toward: 'down', reach: 1, gesture: BOX, read: { facts: factsOf(page), target: undefined } });
+    expect(second.stroke.box).toEqual(PAGE);
+    expect(second.stroke.points !== undefined && containsPoint(NESTED, second.stroke.points.from)).toBe(false);
+    expect(strokedBeside(strokeSent(second.memory), factsOf(page), 'down', BOX)?.others.map((o) => o.identifier)).toEqual(['sibling']);
+  });
+
+  it('leaves out one across the axis: a carousel beside the lists is no scroll view a vertical stroke could have tried', () => {
+    const tree = bounded(node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', identifier: 'chips', rect: { x: 0, y: 1600, width: 1080, height: 300 } }));
+    const { memory } = sentOn(tree, 'down');
+    expect(strokedBeside(memory, factsOf(tree), 'down', BOX)?.others.map((o) => o.identifier)).toEqual(['lower']);
+  });
+
+  it('undefined once a read found the target: its own scroll views are the candidates', () => {
+    const row = node({ role: 'button', identifier: 'row', rect: { x: 0, y: 1600, width: 1080, height: 100 } });
+    const tree = screenOf([list(UPPER), list(LOWER, { identifier: 'lower', children: [row] })]);
+    const { memory } = sentOn(tree, 'down', row);
+    expect(strokedBeside(memory, factsOf(tree), 'down', BOX)).toBeUndefined();
+  });
+
+  it('undefined when the last stroke went ACROSS the scroll view it was drawn over (D59b\'s `across` says that)', () => {
+    const tree = screenOf([node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { ...UPPER } }), list(LOWER, { identifier: 'lower' })]);
+    const { memory } = sentOn(tree, 'down');
+    expect(strokedAcross(memory, factsOf(tree), 'down', BOX)).toMatchObject({ rect: UPPER, axis: 'horizontal' });
+    expect(strokedBeside(memory, factsOf(tree), 'down', BOX)).toBeUndefined();
+  });
+
+  it('orders several largest first, whatever their order in the tree', () => {
+    const tree = bounded(list({ x: 0, y: 1600, width: 1080, height: 100 }, { identifier: 'small' }), list({ x: 0, y: 1750, width: 1080, height: 400 }, { identifier: 'mid' }));
+    const { memory } = sentOn(tree, 'down');
+    expect(strokedBeside(memory, factsOf(tree), 'down', BOX)?.others.map((o) => o.identifier)).toEqual(['lower', 'mid', 'small']);
+  });
+
+  it('leaves out text inputs and the keyboard\'s own scroll views', () => {
+    const field = node({ role: 'textfield', clipsDescendants: true, scrollAxis: 'vertical', identifier: 'field', rect: { x: 0, y: 1600, width: 1080, height: 200 } });
+    const keyboard = node({ role: 'keyboard', ofKeyboard: true, rect: { x: 0, y: 1850, width: 1080, height: 370 }, children: [list({ x: 0, y: 1850, width: 1080, height: 120 }, { identifier: 'strip', ofKeyboard: true })] });
+    const tree = bounded(field, keyboard);
+    const { memory } = sentOn(tree, 'down');
+    expect(strokedBeside(memory, factsOf(tree), 'down', BOX)?.others.map((o) => o.identifier)).toEqual(['lower']);
   });
 });
 
