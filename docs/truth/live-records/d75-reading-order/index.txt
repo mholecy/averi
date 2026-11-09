@@ -1,0 +1,43 @@
+fix commit d9094566bf25179b9480eb0e370cbcace69816da
+base: git archive 7eb998dd at <scratchpad>/base
+before rn-base 17:54:23 start_count=1 uptime=46409.50 dev=[0.31 0.36 0.35 1/1637 14018]
+after rn-base rc=1 secs=251 17:58:34 start_count=1 uptime=46660.77 dev=[1.82 1.43 0.81 7/1652 18223]
+before rn-fix 17:58:34 start_count=1 uptime=46660.83 dev=[1.82 1.43 0.81 1/1652 18229]
+after rn-fix rc=0 secs=242 18:02:36 start_count=1 uptime=46902.61 dev=[1.15 1.40 0.95 1/1660 22476]
+rn-fix renamed rn-fix-0: the worktree's src was hand-mutated while it loaded (possible taint); rerun below at 4b0fd33e
+fix commit 4b0fd33e331a713594789112485366b18ac13874
+base: git archive 7eb998dd at <scratchpad>/base
+before native-base 18:02:49 start_count=1 uptime=46915.55 dev=[0.97 1.36 0.94 1/1655 22490]
+native-base (whole groups) stopped by hand at 18:06 after 15 forms cases: the whole visibility group would pass the 45-min budget; rerun narrowed (--cells) below
+fix commit 4b0fd33e331a713594789112485366b18ac13874
+base: git archive 7eb998dd at <scratchpad>/base
+before native-base 18:06:53 start_count=1 uptime=47159.84 dev=[1.98 1.80 1.23 1/1680 25686]
+native-base (forms + narrowed visibility) stopped by hand at 18:19 after 50 forms cases (the forms group alone ~13 min an arm, Compose-only trees the fix leaves unmarked); budget: visibility only, the 13 cells, base then fix; the rn-fix rerun dropped
+fix commit 4b0fd33e331a713594789112485366b18ac13874
+base: git archive 7eb998dd at <scratchpad>/base
+before native-base 18:20:20 start_count=1 uptime=47966.68 dev=[2.30 2.41 1.94 1/1598 5456]
+native-base (visibility, 13 cells) stopped by hand at 18:29 at the budget (35 min used), its log kept; fix run on the three cells whose trees the mark changes
+fix commit 4b0fd33e331a713594789112485366b18ac13874
+base: git archive 7eb998dd at <scratchpad>/base
+before native-fix 18:29:31 start_count=1 uptime=48518.10 dev=[0.56 1.17 1.56 1/1828 14385]
+after native-fix rc=0 secs=257 18:33:48 start_count=1 uptime=48774.74 dev=[0.73 0.89 1.34 1/1800 18427]
+
+== D75 live summary (emulator-5554, averi_lab AVD API 33; one harness: the fix worktree's live.ts, the base src by --side) ==
+device: 17:54:23 -> 18:33:48 (39.4 min, budget 45); system_server start_count 1 throughout; /proc/uptime 46409.50 -> 48774.74 (+2365 s);
+  no restart, no install, no pm clear, no dexopt change.
+rn-fix-0: run at d9094566 (the fix commit's src; loaded at 17:58:35, before any hand mutation of the tree, which began
+  after it started — live.ts loads its src once at start). Its results are the expected ones; kept as the RN fix arm.
+  No rerun: the budget went to the native arms.
+RN (--app react-native --groups forms,visibility), base 251 s vs fix 242 s: 24 cases each;
+  base ok 21 + MISMATCH 3 (tap:rn-banner.T/U/C "Tapped", the app logged nothing: LR4 live);
+  fix ok 24 — the three now "refused, nothing fired" (drawn over it as a screenshot shows). Every other case: same verdict.
+native: the forms group (~50 cases, ~13 min an arm) and the whole visibility group do not fit the budget twice, so
+  native-base ran visibility on 13 cells (bands, bands-three-button, bottom-sheet-dialog, dialog-views-fullscreen,
+  sheet-medium, alert-dim, fab, pinned-bar, scroll-sticky, form-errors, own-parts, text-under-bar, tabbar-floating),
+  stopped at the budget after 61 cases (all ok; native-base.log), and native-fix ran the three cells whose committed
+  trees the mark changes (bands-three-button, bottom-sheet-dialog, dialog-views-fullscreen; every other native capture
+  is Compose, unmarked): 31 cases each, 31 ok each, every reply identical (cmp.mjs: 0 changed verdicts).
+  native-base-stopped.log, native-base-forms-stopped.log: the two forms runs stopped by hand (base only, all as in
+  their logs), kept for the record, not compared.
+cost of the extra screenshot: only rn-banner's three taps ask the eyes (one screenshot each); RN arm 242 s vs 251 s —
+  no cost visible at this resolution.
