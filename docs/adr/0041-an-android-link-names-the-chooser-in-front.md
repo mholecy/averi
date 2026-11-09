@@ -287,10 +287,11 @@ Residuals, stated:
 - With a chooser and a real reason both seen, which of them stopped monkey is not known; the reply names both, the
   reason first. A chooser named with no reason of monkey's is called the cause, as batch-11 measured (3 of 3).
 - The note names the chooser by its component only; its labels and centres stay D55c's. See the D55c amendment below.
-- Device check: none yet for the new replies. Proposed live cases (T7's "launch and deep link" group, not built):
-  lc1 `launch_app {intent: VIEW averilab://shared/x}` names the chooser; lc2 the one-handler `averilab://cell/x`, no
-  note; lc3 `activity: .Twin` with the same intent, no note and one start; lc4 the chooser raised by
-  `open_deep_link averilab://shared/open`, then `launch_app dev.averi.lab` (monkey), the error naming the chooser.
+- Device check: the live cases proposed here are built as T7b's chooser group (see the T7b amendment below): lc1
+  `launch_app {intent: VIEW averilab://shared/x}` names the chooser; lc2 the one-handler `averilab://cell/x`, no note;
+  lc3 `activity: .Twin` with the same intent, no note (its "one start" cannot fail on this lab: `.MainActivity` is
+  singleTop). The lc4 proposed here (the chooser raised by `open_deep_link averilab://shared/open`, then `launch_app
+  dev.averi.lab` (monkey), the error naming the chooser) is void since D73; lc4' and lc4'' replace it.
 
 ## Amendment: the chooser's own tree is quoted, from one dump on the chooser path (2026-11-03, D55c)
 
@@ -640,13 +641,47 @@ Residuals, stated:
   set shares of events that a count of 1 never reaches, so they should be harmless.
 - If monkey ever exits 0 with the chooser still in front (API 34 and later's `com.android.intentresolver`, unmeasured), the
   reply is a bare `Launched`, no ⚠. Not reading the focus after monkey's success is a choice: the app was in focus and the
-  chooser gone at monkey's return 5 of 5, and it saves about 70 ms on every such launch. Live case lc4'' covers the lab side.
-- No permanent check runs this path on a device: the lab launches with `am start -W -n` (`lab-device.ts`), the perf
-  baseline names `.MainActivity`, and the differential has no Android launch. So this bug's net is backlog T7b's lc4'
-  (`launch_app` with no activity from the launcher answers `Launched`, the app `mFocusedApp`) and lc4'' (the same over
-  `open_deep_link averilab://shared/open`'s chooser, no `ResolverActivity` left), not built here. Until then the throwaway
-  script's 12 of 12 is a one-time proof.
+  chooser gone at monkey's return 5 of 5, and it saves about 70 ms on every such launch. Live case lc4'' covers the lab
+  side; the T7b amendment below corrects "the chooser gone" for a force-stopped lab: its record lingers about 1.3 s.
+- No permanent check ran this path on a device when this amendment was written: the lab launches with `am start -W -n`
+  (`lab-device.ts`), the perf baseline names `.MainActivity`, and the differential has no Android launch. Backlog T7b's
+  lc4' (`launch_app` with no activity from the launcher answers `Launched`, the app `mFocusedApp`) and lc4'' (the same
+  over `open_deep_link averilab://shared/open`'s chooser, no `ResolverActivity` left), since built (the T7b amendment
+  below), are D73's net, run on demand with `live.ts --groups chooser` (lab, API 33); no recurring run includes it yet (backlog T20).
 - D55b's proposed live case lc4 (the error naming the chooser) is void: monkey under the chooser now answers `Launched`.
   lc4' and lc4'' take its place.
 - ADR 0041's "The reply does not say what `launch_app` does with the chooser up, because that is unmeasured" is answered
   for monkey: it brings the app forward, and the chooser goes.
+
+## Amendment: the chooser group, live; the ResolverActivity record outlives monkey's return (2026-11-09, T7b)
+
+**Context.** The cases proposed above (D55b's lc1–lc3, D73's lc4' and lc4'') are built as the live truth harness's
+chooser group (backlog T7, `live.ts --groups chooser`, `scripts/truth/live-chooser.ts`; ADR 0044's T7b amendment). Its
+oracle is the device's own `mFocusedApp` and the `Hist` records of `dumpsys activity activities`, read by the harness's own
+grep and parser, not this ADR's `chooserInFocus`. Runs on emulator-5554 (averi_lab, API 33):
+docs/truth/live-records/t7b-chooser.
+
+**What the device showed, against the D73 amendment above.** D73 says "the app was in focus and the chooser gone at
+monkey's return 5 of 5" and "no ResolverActivity record left". For a force-stopped lab started by monkey over the chooser
+(lc4''), and from the launcher (lc4'), that holds only in part:
+- `mFocusedApp` is already the lab's `.MainActivity` at the first read, about 800 ms after averi replied: 6 of 6 reads
+  in review round 1's three runs (lc4' and lc4'' each, their `firstWindow`), and in the first run's (`unsettled-1.json`)
+  too — there its single, unwaited `window` read, taken before the harness waited at all, not a `firstWindow`.
+- `mCurrentFocus` is still `null` there (the window transition), and in the first run the ResolverActivity record was
+  still on the stack under the lab's. By hand right after (a raw `am start` of the link, then monkey, polled every
+  ~0.4 s): the null focus and the record both lasted about 1.3 s and went together; every read after had neither.
+  D73's 5 of 5 were most likely runs with the lab's process alive (not measured); a cold start draws later.
+
+**Why "Launched" still holds.** averi's reply claims the launch, and the app is the focused activity when it replies;
+the chooser is no longer in front. A ResolverActivity record below the lab, finishing, holds nothing: it is gone once
+the transition ends, with no input. So the reply stays a bare `Launched`, and no focus read after monkey's success is
+added. The group judges `mFocusedApp === .MainActivity` on the first read (`FocusRead.settle.firstWindow`) and "no
+chooser left on the stack" only on the settled read (the harness waits while `mCurrentFocus` is null, 300 ms polls, 5 s
+at most). A read whose wait runs out with a chooser record still listed is a MISMATCH (5 s, well past the ~1.3 s
+measured); with none listed, or an old record's unwaited read, what is left is unread (SKIP). Review round 1's three
+runs: 5 of 5 ok each. lc4' and lc4'' are D73's net, run on demand with `live.ts --groups chooser` (lab, API 33); no recurring run includes it yet (backlog T20).
+
+**Consequences.** The residual above, a monkey that exits 0 with the chooser still in front (API 34 and later,
+unmeasured), stands: the group runs on API 33 only. lc3's "one start" is not a check on this lab (`.MainActivity` is
+singleTop: the alias's start is delivered to the top instance); what catches a `-p` start there is the chooser on the
+stack.

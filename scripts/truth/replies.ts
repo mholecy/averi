@@ -448,3 +448,24 @@ export function snapshotNodes(reply: string): SnapshotNode[] | undefined {
  * Nothing else: an OCR that read other text is a failed assert. tests/truth/replies.test.ts pins each in the source.
  */
 export const OCR_FAILED_CLOSED = /OCR needs the macOS Vision framework|OCR needs the Swift compiler|the OCR recognizer did not compile|recognizer failed: /;
+
+// --- T7b: launch_app's and open_deep_link's replies, read by the chooser group (live-chooser.ts) ---
+
+/**
+ * The app launch_app's headline names: `Launched <app>[/<Activity>] on <platform>[ (state cleared)]` on the reply's first
+ * line (src/mcp/tool-text.ts#launchText, flow/launch.ts#launchedLine); undefined for any other reply, an error included.
+ */
+export const launchedAs = (reply: string): string | undefined => /^Launched (\S+) on (?:android|ios)\b/.exec(reply.split('\n')[0])?.[1];
+
+/**
+ * The chooser a reply names in front, by its component: a launch's ⚠ line and a link's headline alike ("its chooser
+ * (<component>) is in front", src/interact/app-holder-text.ts#chooserText, with D55c's sheet or without); undefined when
+ * the reply names none.
+ */
+export const chooserSaid = (reply: string): string | undefined => /\bits chooser \(([^\s()]+)\) is in front\b/.exec(reply)?.[1];
+
+/** open_deep_link's headline is the chooser, not `Opened` (src/mcp/tool-text.ts#deepLinkText: a holder named leads). */
+export const linkHeldSaid = (reply: string): boolean => /^Android has not opened \S+ yet: its chooser \(/.test(reply);
+
+/** The reply carries a ⚠ line under its headline (src/mcp/tool-text.ts#warnLine, and the `⚠ clearState` line). */
+export const warnedSaid = (reply: string): boolean => /\n⚠ /.test(reply);

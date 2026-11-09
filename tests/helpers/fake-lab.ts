@@ -1,11 +1,13 @@
 import type { Point } from '../../src/adapters/types.js';
 import type { LabDevice, RawTree } from '../../scripts/truth/lab-device.js';
+import type { FocusRead, HomeRead } from '../../scripts/truth/lab-device.js';
 import type { LabApp, LabState } from '../../scripts/truth/schema.js';
 
 /**
  * A lab device with no device (scripts/truth/lab-device.ts#LabDevice), for the live golden's cycle
  * (scripts/truth/run-case.ts): what it answers is scripted, and everything asked of it lands in `log`. `FakeLab` is the iOS shape; `FakeAndroidLab` adds
- * what run-case.ts asks only of the Android lab (the raw swipe, the guard before a panel read, the IME's touchable region). Capture's own fakes
+ * what run-case.ts asks only of the Android lab (the raw swipe, the guard before a panel read, the IME's touchable region,
+ * the focus read, the launcher start and the BACK of the chooser group). Capture's own fakes
  * (tests/truth/truth.test.ts, geometry.test.ts) script a screen and a tap's outcome; this one scripts a case's reads.
  */
 
@@ -78,6 +80,10 @@ export interface FakeAndroidLabScript extends FakeLabScript {
   swipeFails?: Error;
   /** Thrown by the guard (a device the lab refuses). */
   guardFails?: Error;
+  /** What each `focus()` answers, in turn (past the end, the last again). */
+  focus?: readonly FocusRead[];
+  /** What `toLauncher()` answers: the HOME activity's read. */
+  home?: HomeRead;
 }
 
 export class FakeAndroidLab extends ScriptedLab {
@@ -86,12 +92,33 @@ export class FakeAndroidLab extends ScriptedLab {
   private readonly swipeFails: Error | undefined;
   private readonly guardFails: Error | undefined;
   private touchableRead = 0;
+  private readonly focusReads: readonly FocusRead[];
+  private focusRead = 0;
+  private readonly home: HomeRead;
 
   constructor(script: FakeAndroidLabScript) {
     super(script);
     this.touchable = script.touchable ?? [''];
     this.swipeFails = script.swipeFails;
     this.guardFails = script.guardFails;
+    this.focusReads = script.focus ?? [{ error: 'no focus scripted' }];
+    this.home = script.home ?? { error: 'no home scripted' };
+  }
+
+  async focus(): Promise<FocusRead> {
+    this.log.push('focus');
+    const answer = this.focusReads[Math.min(this.focusRead, this.focusReads.length - 1)];
+    this.focusRead += 1;
+    return answer;
+  }
+
+  async toLauncher(): Promise<HomeRead> {
+    this.log.push('toLauncher');
+    return this.home;
+  }
+
+  async back(): Promise<void> {
+    this.log.push('back');
   }
 
   async guard(): Promise<void> {

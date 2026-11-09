@@ -83,3 +83,47 @@ not do the work (`adb` is not on `CaseLab`). T7b can add the start verb at the s
 - run-case.ts joins the mutation run (ADR 0038): every device call sits behind the rig, its tests take milliseconds, and
   its branches are what this ADR protects. T2's runner.ts is the precedent for an orchestrator over a fake seam. ADR 0038's amendment says what that costs.
 - iOS is unmeasured live here. The cycle has no iOS-only branch beyond a SKIP's words, and a fake of each shape runs it.
+
+## Amendment: T7b paid the price list (2026-11-09)
+
+**Context.** "What T7b still has to add" above listed five items. T7b (backlog row T7, the chooser group,
+`scripts/truth/live-chooser.ts`) built the group; this is what each item cost.
+
+**Decision.**
+- **The start verb for lc4'.** `Case.fromLauncher?: true`, beside `preDrag`: after the ordinary launch, `AndroidLab.toLauncher`
+  force-stops the lab and presses HOME, then reads the HOME activity the device resolves (`cmd package resolve-activity
+  --brief -c android.intent.category.HOME -a android.intent.action.MAIN`, read-only), kept as `focus.home`: the judges'
+  premise is that activity focused before the calls. It is a step, not a read, so it is a field on `Case`, not on
+  `reads`; on the iOS lab it is the case's SKIP. Its premise is a focus read, so `fromLauncher` implies the focus reads
+  in `runCase`, declared or not (a launcher start with no premise to judge cannot be written). `CaseLab`'s Android shape gains `FocusLab` (`focus`, `toLauncher`, `back`); `adb` itself stays off
+  it, so the 2026-11-06 objection to `Case.start` (its type could not do the work) does not apply.
+- **The new read.** `CaseReads.focus?: true`, as this ADR prices a read: the declaration, `CaseRecord.focus`
+  (`{ home?, before, between, after, teardown? }`) written by `caseRecord`, its reads in `runCase` (before the calls, between
+  them, after the final state), and `CaseEvidence`, `judgeOn` and `DeviceLog.focus` for the judge. Each read is
+  `AndroidLab.focus`: the window manager's `mCurrentFocus`/`mFocusedApp` lines and the `* Hist #n: ActivityRecord{…}` lines
+  of `dumpsys activity activities`, raw. The grep and the parser (`frontOf` and `isChooser` in `scripts/truth/live-chooser.ts`) are the
+  harness's own, not src's `CHOOSER_FOCUS_COMMAND` and `chooserInFocus`, so the oracle does not share the code it judges.
+  A read taken mid-transition (`mCurrentFocus=null`) is taken again, 300 ms apart, 5 s at most (the last poll shortened),
+  its wait and first window read kept as one field (`settle: { waitedMs, firstWindow }`; review round 1's records keep
+  both at the read's top, and `frontOf` reads either): the first live run read lc4'' 800 ms
+  after monkey's return and found the ResolverActivity record still on the stack, gone about 1.3 s later together with
+  the null focus (measured by hand). Each judge reads what it asks of the read it belongs to (review round 1): what averi's
+  reply claims (`mFocusedApp`) on the first window read, what is left on the stack on the settled one. A read whose wait
+  ran out with a chooser record still listed is a MISMATCH; with none listed, or an old record's unwaited read, the stack
+  is unread (SKIP). The FocusRead type lives in lab-device.ts, the DeviceLog in
+  live-cases.ts, so no type cycle runs through live-chooser.ts.
+- **A first `state()` with no cell (T10).** Not needed: lc4' and lc4'' launch a cell first, so the state file exists, and
+  after monkey's start the fresh process writes `cell: ""` (MainActivity.kt, `lab.none()`), which the judges quote but do
+  not rest on. T10 stays open.
+- **`launched` for lc4'.** Not widened: `launched` is the ordinary launch's state, which the app really wrote; the focus
+  read before the calls is what says the launcher is in front (the judges' premise, else SKIP). No judge reads a made-up
+  `LabState`, and no other judge changed.
+- **The teardown.** Measured, not inferred: lc1 leaves the chooser in front every run. When the settled read after the
+  calls names a chooser in front (`chooserInFront` in `scripts/truth/live-chooser.ts`), `runCase` presses BACK once (`AndroidLab.back`) after the verdict and its screenshot, reads the focus
+  again into `focus.teardown`, and says so through `note` if the chooser is still there. lc1's teardown dropped it in all
+  seven runs. A chooser on the stack but not in front is left: the next launch covers it, and ResolverActivity finishes on
+  stop.
+
+**Consequences.** `run-case.ts` (mutation scope) has three new branches, each pinned in tests/truth/run-case.test.ts over
+`FakeAndroidLab`; the group's `reads` is pinned in tests/truth/live-reads.test.ts; the judges' rules in
+tests/truth/live-chooser.test.ts over recorded device text; the seven live runs in tests/truth/t7b-records.test.ts.

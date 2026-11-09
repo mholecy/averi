@@ -90,10 +90,11 @@ import { ExecError, type ExecResult } from './exec.js';
  *   exception in `am` does (AM_ERROR_LINE_RE);
  * - monkey exiting 0 with Android's chooser still in front, on an API other
  *   than the lab's 33 (API 34 and later's `com.android.intentresolver`, say):
- *   on API 33 the app was in focus and the chooser gone at its return, 5 of 5
- *   (D73), so its success reads no focus, and the reply would be a bare
- *   `Launched` with no ⚠ (ADR 0041's D73 amendment; the lab side is backlog
- *   T7b's lc4'').
+ *   on API 33 the app is `mFocusedApp` at its return (D73 5 of 5; T7b's live
+ *   lc4' and lc4'', every run), so its success reads no focus, and the reply
+ *   would be a bare `Launched` with no ⚠. A force-stopped app's cold start
+ *   leaves the chooser's record on the stack, finishing, for about 1.3 s
+ *   (ADR 0041's D73 and T7b amendments).
  */
 
 /** Which device command made the start: the two report a refusal differently. */

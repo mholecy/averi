@@ -1,0 +1,46 @@
+T7b, the chooser live group (scripts/truth/live-chooser.ts), on the lab AVD: emulator-5554, averi_lab, API 33.
+2026-11-09, the harness and src of 7874cb10 (the runs were on its working tree; 7874cb10 differs only by one unreachable
+line removed from judgeChooserNamed and by tests).
+
+command  node --import tsx scripts/truth/live.ts --serial emulator-5554 --groups chooser --record <scratchpad>/t7b/run-N.json --shots <scratchpad>/t7b/shots
+device   before 16:34:17 start_count=1 uptime=41603.62; after 16:45:53 start_count=1 uptime=42299.94 (no restart)
+preferred  `dumpsys package preferred`, before and after: the lab's two last-chosen entries only (`.Twin` for shared,
+         `.MainActivity` for pair, both mAlways=false, hashes 18364f6 and 5606c59 unchanged); no default, nothing reset
+
+unsettled-1.json        16:42:21–16:42:51  lc1 ok, lc2 ok, lc3 ok, lc4' ok, lc4'' MISMATCH: its focus read 800 ms after
+                        monkey's return found mCurrentFocus=null and the ResolverActivity record still on the stack under
+                        the lab's (unsettled-1-lc4pp.png, the screen then). Diagnosed by hand after it (raw am start +
+                        monkey, polled every ~0.4 s): mCurrentFocus null and the record present for ~1.3 s, both gone
+                        together, 0 at every read after. AndroidLab.focus now waits out mCurrentFocus=null (300 ms polls,
+                        5 s at most) and records `waitedMs`; the judge is unchanged.
+run-1.json              16:44:08–16:44:39  5 of 5 ok
+run-2.json              16:44:47–16:45:17  5 of 5 ok
+run-3.json              16:45:17–16:45:47  5 of 5 ok
+In runs 1–3 lc4' and lc4'' each waited 300 ms on the read after the calls; lc1's teardown BACK dropped the chooser every
+run (the read after it: .MainActivity focused).
+
+Read back by tests/truth/t7b-records.test.ts.
+
+Review round 1 (2026-11-09): the read keeps its first window read (`firstWindow`, beside `waitedMs`): mFocusedApp is
+judged there, the stack on the settled read; a read that never settles leaves the stack unread (SKIP). A launcher start
+also reads the HOME activity (`cmd package resolve-activity --brief -c android.intent.category.HOME -a
+android.intent.action.MAIN`, kept as `focus.home`), which must be in front before the calls. The wait is capped at
+exactly 5 s.
+device   before 17:02:09 start_count=1 uptime=43275.81; after 17:07:34 start_count=1 uptime=43600.96 (no restart);
+         preferred activities as before, nothing reset
+review1-run-1.json      17:06:03–17:06:33  5 of 5 ok
+review1-run-2.json      17:06:33–17:07:04  5 of 5 ok
+review1-run-3.json      17:07:04–17:07:34  5 of 5 ok
+First reads: lc1 the chooser (ResolverActivity) in front, settled at once; lc2 and lc3 .MainActivity, settled at once;
+lc4' and lc4'' `mCurrentFocus=null` with dev.averi.lab/.MainActivity already mFocusedApp, settled 300 ms later
+(.MainActivity, no chooser record) — 6 of 6. HOME: com.google.android.apps.nexuslauncher/.NexusLauncherActivity, in
+front before lc4' and lc4'' every run. lc1's teardown BACK dropped the chooser every run.
+The older records rejudged by these judges: run-1..3 5 of 5 ok (no HOME read: the premise falls back to "not the
+platform in front, no lab or chooser record"); unsettled-1 lc1–lc3 ok, lc4' and lc4'' SKIP (their one read never
+settled; mFocusedApp the lab in both). The records are kept as recorded.
+
+Review round 2 and the code review (2026-11-09, no device): the wait's fields became one `settle: { waitedMs, firstWindow }`
+(the records above keep them at the read's top; the reader takes either). A read whose wait ran out with a chooser
+record still listed is now a MISMATCH; with none, SKIP; an old record's unwaited read (unsettled-1's) SKIP worded "not
+waited (an old record)". Rejudged then: every run as before (run-1..3 and review1-run-1..3 5 of 5 ok; unsettled-1 lc1–lc3
+ok, lc4' and lc4'' SKIP, only the wording of the SKIP changed).

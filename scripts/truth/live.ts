@@ -84,6 +84,12 @@ import { parseLabApp, type LabApp } from './schema.js';
  * D37's settled read on the snapping pagers. A case may drag the carousel raw first (Case.preDrag, AndroidLab.swipe),
  * and drop its Nth stroke (CaseReads.swipes): the Android adapter the registry builds has its `swipe` routed through one
  * SwipeHook, armed around each case's calls, which logs every stroke averi draws into the record (`swipes`).
+ *
+ * `chooser` (T7b, Android, not in the default groups): launch_app and open_deep_link around Android's "Open with" chooser
+ * (live-chooser.ts) — lc1 the `-p` start that raises it, named; lc2 a one-handler link, no note; lc3 `.Twin` named, no
+ * chooser; lc4' monkey from the launcher and lc4'' monkey over a link's chooser (D73's net, run on demand: no recurring run includes it yet, backlog T20). The oracle is the device's
+ * focus and activity stack (AndroidLab.focus, the record's `focus`), read before, between and after the calls; a chooser
+ * left in front is dropped with one BACK. A SKIP fails the run.
  */
 
 const { values } = parseArgs({
@@ -105,7 +111,7 @@ const { values } = parseArgs({
 // `--rejudge`'s record (live-cases.ts#RunRecord): read here, judged by live-cases.ts#rejudge.
 const rejudging = values.rejudge === undefined ? undefined : (JSON.parse(await readFile(values.rejudge, 'utf8')) as RunRecord);
 if (rejudging === undefined && (values.udid === undefined) === (values.serial === undefined)) {
-  throw new Error('usage: live.ts --udid <lab simulator> [--wda-port 8120] [--sources idb,wda] [--groups forms,visibility,dismissal,ensure,carousel] [--cells …] [--cases …] [--side <checkout>] [--record <file>] | --serial <lab emulator> […] | --rejudge <record>');
+  throw new Error('usage: live.ts --udid <lab simulator> [--wda-port 8120] [--sources idb,wda] [--groups forms,visibility,dismissal,ensure,carousel,chooser] [--cells …] [--cases …] [--side <checkout>] [--record <file>] | --serial <lab emulator> […] | --rejudge <record>');
 }
 const platform: Platform = rejudging?.platform ?? (values.serial !== undefined ? 'android' : 'ios');
 const app: LabApp = rejudging?.app ?? parseLabApp(values.app);
