@@ -110,7 +110,9 @@ describe('readingOf — the whole answer about one reading', () => {
     ['nothing of the typing in the prefix: a tail to name, none to type again', 'SK31', { value: '12000000', before: 'SK31' }, { kind: 'missed', tail: { missing: '12000000', retypable: false }, differs: { kind: 'unchanged' } }],
     ['a dropped tail that is a whole landing too: never typed again', '11 ', { value: '11', before: '1' }, { kind: 'missed', tail: { missing: '1', retypable: false }, differs: { kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true, wholeToo: true } }],
     ['a length that is a whole landing too: never typed again', 'xaa', { value: 'aa', before: 'xa' }, { kind: 'missed', tail: { missing: 'a', retypable: false }, differs: { kind: 'length', wholeToo: true } }],
-    ['the value itself lands, though it is a prefix of what the field should hold too', '55', { value: '55', before: '5' }, { kind: 'landed' }],
+    // D71: the value itself, reached by a typing that moved the reading, is no landing where it is a prefix of what the
+    // field should hold too (`5` then `55`, the second key dropped) — a length that is a whole landing too, never typed again
+    ['the value itself, a prefix of what the field should hold too: a length that is a whole landing too', '55', { value: '55', before: '5' }, { kind: 'missed', tail: { missing: '5', retypable: false }, differs: { kind: 'length', wholeToo: true } }],
     ['the value decorated, inside the earlier text\'s span: never typed again', '-5-', { value: '-5', before: '-5' }, { kind: 'missed', tail: { missing: '5', retypable: false }, differs: { kind: 'length', wholeToo: true } }],
     ['no prefix: no tail', 'the', { value: 'teh' }, { kind: 'missed', differs: { kind: 'same-length', positions: 2 } }],
     ['bullets prove no prefix', '••', { value: '12345' }, { kind: 'missed', differs: { kind: 'masked', held: 0 } }],
@@ -145,7 +147,8 @@ describe('readingOf — the whole answer about one reading', () => {
                   const { tail, differs } = r;
                   seen.add(differs.kind);
                   if ('wholeToo' in differs && differs.wholeToo === true) {
-                    if (tail === undefined || tail.retypable) throw wrong('wholeToo is a tail never typed again');
+                    // D71: the value itself refused (`1 ` after `1`) is marked with no tail proven — never typed again
+                    if (tail?.retypable === true) throw wrong('wholeToo is never retyped');
                     seen.add('wholeToo');
                   }
                   if (differs.kind === 'dropped-tail' && tail?.missing.length !== differs.dropped) throw wrong('a dropped-tail names the tail');
@@ -802,6 +805,62 @@ describe('the difference — what a missed read-back differs by, without content
  * that ends in a mark is what an eager field (a mark once a group is complete) shows after a drop, so the same prefixes
  * sweep it — an eager grouping adds no prefix of its own (only the full reading with its mark, which is no prefix).
  */
+/**
+ * D71: without clear, a reading equal to the value landed however it was reached (`observed === value`), so `55` typed
+ * after `5` with the second key dropped replied Filled at once where an append should have left `555`. The value itself
+ * lands now only where it is the earlier text too (residual 7) or the named placeholder; elsewhere it must be in the
+ * typing past the earlier text, as any reading. Refused only where the skeletons repeat or the earlier text has no letter
+ * or digit: a select-all reading elsewhere is still the value alone (`priorsOf`). Nothing is typed again, and the reply
+ * says the field may have replaced its text (`wholeToo`).
+ */
+describe('without clear, the value itself lands only as the earlier text or the named placeholder (D71)', () => {
+  const e = (value: string, before: string | null, f: Partial<Expectation> = {}) => expecting({ value, before, ...f });
+
+  it.each([
+    ['55', '5', 'the second key dropped, or a select-all field'],
+    ['1212', '12', 'the second `12` dropped, or a select-all field'],
+    ['1 ', '1', 'the trailing space typed alone, or a select-all field'],
+    ['-5', '-', 'an earlier text with no letter or digit'],
+  ])('`%s` after `%s` (%s): no landing, nothing typed again, a length that is a whole landing too', (value, before) => {
+    expect(landingOf(value, e(value, before))).toBeUndefined();
+    expect(retypableTailOf(value, e(value, before))).toBeUndefined();
+    expect(notLandedDiffers(value, e(value, before))).toEqual({ kind: 'length', wholeToo: true });
+  });
+
+  it.each([
+    ['421', '421', '421', 'residual 7: the earlier text itself'],
+    ['555', '55', '5', 'the append that landed'],
+    ['world', 'world', 'Hello world', 'a select-all field: the value alone (D29)'],
+    ['50', '50', '5x', 'a select-all field: the value alone, the earlier text not in it'],
+  ])('`%s` for `%s` after `%s` (%s) still lands', (shown, value, before) => {
+    expect(landingOf(shown, e(value, before))).toEqual({ kind: 'landed' });
+  });
+
+  it('the named placeholder equal to the value stays `placeholder`, whatever the earlier text read', () => {
+    expect(landingOf('Search', e('Search', null, { placeholder: 'Search' }))).toEqual({ kind: 'placeholder' });
+    expect(landingOf('Search', e('Search', 'Search', { placeholder: 'Search' }))).toEqual({ kind: 'placeholder' });
+  });
+
+  // the live no-clear cases (scripts/truth/live-cases.ts) as each source reads them: idb's unnamed `+421` is the earlier
+  // text; uiautomator's is none. g5 and f13 read the value itself, so the old disjunct answered them until D71
+  it.each([
+    ['g5', '+421 903 123 456', '+421 903 123 456', '+421'],
+    ['g5', '+421 903 123 456', '+421 903 123 456', null],
+    ['f13', '421903123456', '421903123456', '+421'],
+    ['f13', '421903123456', '421903123456', null],
+    ['g3', '421 903 123 456', '421903123456', '+421'],
+    ['p1', 'Jan Šťastný Jr.', ' Jr.', 'Jan Šťastný'],
+    ['rfe2', 'SK31 1200 00', 'SK31120000', null],
+  ])('%s: `%s` for `%s` after `%s` lands', (_id, shown, value, before) => {
+    expect(landingOf(shown, e(value, before))).toMatchObject({ kind: 'landed' });
+  });
+
+  // left open, a residual: the head key dropped reads the value too, and idb's unnamed placeholders need it to land
+  it('D61\'s `12` after `1` still lands (the value alone, its skeleton no start of `112`)', () => {
+    expect(landingOf('12', e('12', '1'))).toEqual({ kind: 'landed' });
+  });
+});
+
 describe('the tail and the difference agree on a dropped tail (D28)', () => {
   const groupLeft = (t: string, n: number, sep: string) => (t.match(new RegExp(`.{1,${n}}`, 'gu')) ?? []).join(sep);
   const groupRight = (t: string, n: number, sep: string) => [...groupLeft([...t].reverse().join(''), n, sep)].reverse().join('');

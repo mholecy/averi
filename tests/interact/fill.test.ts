@@ -2115,6 +2115,19 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
     expect(fake.typed).toEqual(['world']);
   });
 
+  // D71 (ADR 0034's D71 amendment): `55` typed after `5` that kept one key reads the value itself — it replied Filled at
+  // once. It fails now, naming the select-all reading and `clear: true`, and nothing is typed again.
+  it.each(['on-return', 'may-arrive-late'] as const)('%s: a prefilled `5`, `55` typed and one key dropped: not Filled, the select-all hedge, nothing typed again (D71)', async (delivery) => {
+    const fake = formFake('5');
+    fake.typingDelivery = delivery;
+    dropping(fake, 1);
+    await expect(fillField(fake, { id: 'amount_input' }, '55', FAST)).rejects.toHaveProperty(
+      'message',
+      'fill: typed 2 characters but the field shows 2 — the field may have replaced its text (select-all): fill with `clear: true` (content withheld from this error)',
+    );
+    expect(fake.typed).toEqual(['55']);
+  });
+
   /** Two auto-advancing one-digit code boxes and a note under them: a box that has its digit moves the focus on. */
   const otpFake = () => {
     resetLayout();

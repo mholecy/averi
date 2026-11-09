@@ -8,8 +8,8 @@
  *   without content.
  * - `landingOf`: the poll's question, all it needs of up to five readings a round — is this one final? Exactly,
  *   reformatted, only as the field's placeholder, or a masked reading that proves the field was wrongly said plain.
- *   Without clear, the value must be in what was typed past the earlier text, unless the reading is the value itself
- *   (D64; a reading unchanged since typing began holds none, D63). A landing carries how it was reformatted, or that
+ *   Without clear, the value must be in what was typed past the earlier text, unless the reading is the value itself and
+ *   the earlier text or the named placeholder too (D64, D71; a reading unchanged since typing began holds none, D63). A landing carries how it was reformatted, or that
  *   text around the value went unread with the re-read skipped (`focusUnread`, D64b-3).
  * - `withoutWholeToo`: a difference without its whole-landing hedge, for keys proven typed elsewhere.
  * interact/fill-type.ts polls on the second and goes by the first, and fill.ts throws the difference that comes back.
@@ -125,7 +125,10 @@ export function readingOf(observed: string, e: Expectation): Reading {
 /** What can be said of a reading that did not land (`NotLanded`); whether it is a whole landing too is asked here. */
 function notLandedOf(observed: string, e: Expectation): NotLanded {
   const tail = tailOf(observed, e);
-  const wholeToo = landedSome(tail) && wholeLandingToo(heldText(observed, e.placeholder), e);
+  const held = heldText(observed, e.placeholder);
+  // D71: the value itself, refused by `showsExactly`, is a whole landing too though no tail of the typing is proven
+  // (`-5` after `-`, `1 ` after `1`)
+  const wholeToo = (landedSome(tail) || held === e.value) && wholeLandingToo(held, e);
   return {
     ...(tail !== undefined && { tail: { missing: tail.missing, retypable: landedSome(tail) && !wholeToo } }),
     differs: differenceOf(observed, e, tail, wholeToo),
@@ -179,18 +182,24 @@ const tookText = (observed: string, e: Pick<Expectation, 'value' | 'isInput' | '
  * `priorsOf`'s, as for a reformat (review round 1, M-1): a reading whose letters and digits are exactly the value's and
  * no start of the earlier text's plus the value's is judged as the value alone too (D61) — a field that adds a leading
  * `+` under idb's unnamed `+421` (`+421903123456`), a select-all field that adds a mark (`SK31 ` after `SK3`, `50%`
- * after `5`). D63's rule is this one at its limit (`landingOf`). The value itself is excepted: a reading that is both
- * the earlier text and the value cannot be told from a select-all field that retyped it, or a placeholder equal to it
- * — it still lands (ADR 0034's D63 amendment, residual 7). The limit, on the safe side: a caret not at the end whose
- * typing leaves the reading starting with the earlier text (`aba` for `ab` after `a`) is refused (ADR 0034's D64
- * amendment, residual 9).
+ * after `5`). D63's rule is this one at its limit (`landingOf`). The value itself is excepted only where it is the
+ * earlier text or the named placeholder too: such a reading cannot be told from a select-all field that retyped it, or a
+ * placeholder equal to it — it still lands (ADR 0034's D63 amendment, residual 7). D71: any other reading equal to the
+ * value is judged as every reading is. Until then it landed however it was reached, so `55` typed after `5` with the
+ * second key dropped replied Filled where an append should have left `555` (`1212` after `12` too). A select-all reading
+ * whose earlier text is not in it still lands, as the value alone (`priorsOf`); refused are the readings whose letters
+ * and digits repeat the earlier text's (`55`/`5`, `1212`/`12`, `1 `/`1`) or whose earlier text has none (`-5`/`-`), a
+ * length that is a whole landing too (`notLandedOf`): nothing typed again, the reply naming `clear: true`. Left open:
+ * `12` after `1` (the head key dropped) lands as D61's value alone, which idb's unnamed placeholders need (ADR 0034's
+ * D71 amendment). The limit, on the safe side: a caret not at the end whose typing leaves the reading starting with
+ * the earlier text (`aba` for `ab` after `a`) is refused (ADR 0034's D64 amendment, residual 9).
  */
 function showsExactly(observed: string, e: Expectation): boolean {
   const { value, clear } = e;
   if (isMaskedValue(observed)) return clear ? observed.length === value.length : observed.length >= heldCount(e) + value.length;
   if (clear) return observed === value;
   const held = heldText(observed, e.placeholder);
-  return observed === value || priorsOf(held, e).some((prior) => typedPartOf(held, prior).includes(value));
+  return (observed === value && (observed === e.before || observed === e.placeholder)) || priorsOf(held, e).some((prior) => typedPartOf(held, prior).includes(value));
 }
 
 /** The bullets the field held after focus, an unread count as none. */
