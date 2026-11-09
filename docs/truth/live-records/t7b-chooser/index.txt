@@ -20,3 +20,21 @@ In runs 1–3 lc4' and lc4'' each waited 300 ms on the read after the calls; lc1
 run (the read after it: .MainActivity focused).
 
 Read back by tests/truth/t7b-records.test.ts.
+
+Review round 1 (2026-11-09): the read keeps its first window read (`firstWindow`, beside `waitedMs`): mFocusedApp is
+judged there, the stack on the settled read; a read that never settles leaves the stack unread (SKIP). A launcher start
+also reads the HOME activity (`cmd package resolve-activity --brief -c android.intent.category.HOME -a
+android.intent.action.MAIN`, kept as `focus.home`), which must be in front before the calls. The wait is capped at
+exactly 5 s.
+device   before 17:02:09 start_count=1 uptime=43275.81; after 17:07:34 start_count=1 uptime=43600.96 (no restart);
+         preferred activities as before, nothing reset
+review1-run-1.json      17:06:03–17:06:33  5 of 5 ok
+review1-run-2.json      17:06:33–17:07:04  5 of 5 ok
+review1-run-3.json      17:07:04–17:07:34  5 of 5 ok
+First reads: lc1 the chooser (ResolverActivity) in front, settled at once; lc2 and lc3 .MainActivity, settled at once;
+lc4' and lc4'' `mCurrentFocus=null` with dev.averi.lab/.MainActivity already mFocusedApp, settled 300 ms later
+(.MainActivity, no chooser record) — 6 of 6. HOME: com.google.android.apps.nexuslauncher/.NexusLauncherActivity, in
+front before lc4' and lc4'' every run. lc1's teardown BACK dropped the chooser every run.
+The older records rejudged by these judges: run-1..3 5 of 5 ok (no HOME read: the premise falls back to "not the
+platform in front, no lab or chooser record"); unsettled-1 lc1–lc3 ok, lc4' and lc4'' SKIP (their one read never
+settled; mFocusedApp the lab in both). The records are kept as recorded.
