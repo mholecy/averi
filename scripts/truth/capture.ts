@@ -29,10 +29,12 @@ import { isMain } from '../is-main.js';
  * lab app the run captures (schema.ts#LabApp; the native one unless said): a cell another app builds is skipped and
  * said (lab-device.ts#otherApp), and a run holds one app's captures — the React Native app's go to a run of their own
  * (tests/fixtures/truth/ios-rn-…, android-rn-…), its manifest's `app` AveriLabRN. A catalog target the app lays out
- * no frame for is recorded absent (CellTruth.absent), never probed. A cell whose capture throws fails alone: nothing of
- * it written, the other cells captured, the manifest written listing it under `failed` (capture-run.ts); a refusal
- * (capture-run.ts#CaptureRefusal) stops the run once the manifest is written. Exit code 1 when a cell is broken (its
- * truth's sources disagree) or failed (outcome).
+ * no frame for, where the catalog allows it (CatalogTarget.mayBeAbsent), is recorded absent (CellTruth.absent), never
+ * probed; any other missing frame fails the cell. A cell whose capture throws fails alone: nothing of it written, the
+ * other cells captured, the manifest written listing it under `failed` (capture-run.ts); a halt
+ * (capture-run.ts#CaptureHalt, or a bug in the capture — rethrown here once the summary is said) stops the run once the
+ * manifest is written. Exit code 1 when a cell is broken (its truth's sources disagree) or failed, or the run halted
+ * (outcome); failures carried from an earlier run are said, not counted.
  */
 
 export async function main(platform: 'ios' | 'android', argv: string[] = process.argv.slice(2)): Promise<void> {
@@ -65,22 +67,28 @@ export async function main(platform: 'ios' | 'android', argv: string[] = process
   } finally {
     await lab.close();
   }
-  const { lines, exitCode } = outcome(result);
+  const { lines, exitCode, rethrow } = outcome(result);
   for (const line of lines) console.error(line);
   if (exitCode !== 0) process.exitCode = exitCode;
+  if (rethrow !== undefined) throw rethrow;
 }
 
 /**
  * What the command line says of a run on stderr, and its exit code: 1 when a cell is broken (its truth's sources
  * disagree) or failed (its capture threw — capture-run.ts#CaptureResult.failed, the manifest's `failed`), each listed
- * with why; 0 and nothing said otherwise.
+ * with why, or the run halted (CaptureResult.halted, said last); failures carried from an earlier run
+ * (CaptureResult.carried) are said and leave the code as it is; 0 and nothing said otherwise. `rethrow`: a bug in the
+ * capture, for main to throw once all of this is said.
  */
-export function outcome(result: CaptureResult): { lines: string[]; exitCode: 0 | 1 } {
+export function outcome(result: CaptureResult): { lines: string[]; exitCode: 0 | 1; rethrow?: Error } {
   const lines: string[] = [];
   const list = (xs: string[]) => xs.map((x) => `  ${x}`).join('\n');
   if (result.broken.length > 0) lines.push(`\nBROKEN CELLS — the truth's sources disagree:\n${list(result.broken)}`);
   if (result.failed.length > 0) lines.push(`\nFAILED CELLS — the capture threw; nothing of them written this run (an earlier capture, if any, kept; manifest.json lists them under \`failed\`):\n${list(result.failed)}`);
-  return { lines, exitCode: lines.length > 0 ? 1 : 0 };
+  if (result.halted !== undefined) lines.push(`\nHALTED at ${result.halted.cell} — ${result.halted.reason}; the cells after it were not captured`);
+  const exitCode = lines.length > 0 ? 1 : 0;
+  if (result.carried.length > 0) lines.push(`\nstill failed from an earlier run (manifest.json \`failed\`): ${result.carried.join('; ')}`);
+  return { lines, exitCode, ...(result.halted?.bug !== undefined && { rethrow: result.halted.bug }) };
 }
 
 if (isMain(import.meta.url)) await main('ios');

@@ -51,6 +51,12 @@ export interface CatalogTarget {
   scrollView?: string;
   /** A text target's field reformats its text as it is typed (FieldFormat) — the React Native app's rn-format (D18). */
   format?: FieldFormat;
+  /**
+   * The app may lay out no frame for it at launch, by design: a lazy list's or a recycler's card not composed until it
+   * scrolls in (the four L7 carousels' C). The capture then records it in CellTruth.absent; with no frame, any other
+   * target fails its cell (capture-run.ts) — a renamed tag or a wrong screen is never "absent".
+   */
+  mayBeAbsent?: true;
 }
 
 /**
@@ -486,8 +492,9 @@ export interface CellTruth {
   scale: number;
   targets: TargetTruth[];
   /**
-   * The catalog's targets the app laid out no frame for (no `frames[<tag>]` in its state — a lazy list's or a
-   * recycler's card not composed at launch: carousel-lazy's C), ControlTruth's `not-rendered` for a target: not in
+   * The catalog's targets the app laid out no frame for (no `frames[<tag>]` in its state), each one the catalog allows
+   * so (CatalogTarget.mayBeAbsent: a lazy list's or a recycler's card not composed at launch, carousel-lazy's C) —
+   * ControlTruth's `not-rendered` for a target: not in
    * `targets`, which hold a frame, never probed, nothing measured — and, as each raw tree has it (truth.ts#listedIn),
    * whether it lists the target: the `listed` golden's `absent` derives from (target-contract.ts#askedUnlistedBy). No
    * golden row reads it yet (backlog T6). Absent when every target had a frame.

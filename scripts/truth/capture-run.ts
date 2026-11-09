@@ -1,6 +1,8 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
+import { hostHome } from '../../src/adapters/exec.js';
+import { withoutHostPaths } from '../../src/adapters/failure-text.js';
 import type { RunManifest } from '../differential/corpus.js';
 import { LAB_APP, type LabDevice, pause } from './lab-device.js';
 import { captureRefusal } from './catalog.js';
@@ -34,14 +36,18 @@ import { consistency, controlConsistency, controlPiece, imePanels, listedIn, mea
  * per control (field, submit, the picker's probe rows) where its frame lies (truth.ts#situationOf) and what its probe
  * did.
  *
- * A catalog target the app laid out no frame for (no `frames[<tag>]`: carousel-lazy's C, not composed at launch by
- * design) is recorded absent (CellTruth.absent): never probed or measured, each raw tree's word on whether it lists it
- * kept. A cell whose capture throws (the app's state missing what the capture needs, a device command failing) fails
- * alone and loudly: nothing of it is written — its files are written only once it ends — so an earlier capture of it
- * stays whole; the cells after it are captured; the manifest is written listing it under `failed` with why
- * (RunManifest.failed, kept until a run captures it again); CaptureResult.failed says it, and the command line exits 1
- * (capture.ts#outcome). A refusal (CaptureRefusal: the IME set up against the cell, a pinned submit with no bar) stops
- * the run, once the manifest is written.
+ * A catalog target the app laid out no frame for (no `frames[<tag>]`) where the catalog allows it
+ * (CatalogTarget.mayBeAbsent: the four L7 carousels' C, not composed at launch by design) is recorded absent
+ * (CellTruth.absent): never probed or measured, each raw tree's word on whether it lists it kept (a tree that does is
+ * logged as a WARNING). Any other missing frame fails the cell, and so does a cell left with no framed target where the
+ * catalog lists some. A cell whose capture throws (the app's state missing what the capture needs, a device command
+ * failing) fails alone and loudly, its stack logged: its files are written only once it ends, each to `<name>.tmp`
+ * and then renamed (flush), so a cell that throws, or whose writing fails, leaves an earlier capture of it whole; the
+ * cells after it are captured; the manifest is written listing it under `failed` with why, host paths out
+ * (RunManifest.failed, kept until a run captures it again or the catalog drops the cell); CaptureResult.failed says it,
+ * CaptureResult.carried the earlier runs' failures still listed, and the command line exits 1 (capture.ts#outcome). A
+ * halt (CaptureHalt: the IME set up against the cell, a pinned submit with no bar; or a bug in the capture — a
+ * TypeError, ReferenceError, RangeError) stops the run once the manifest is written, returned as CaptureResult.halted.
  *
  * averi judges nothing here: the trees are read with the raw tools, so the truth does not depend on the code it will
  * test. Run it against a device that holds nothing else of value: the lab app's data is replaced per launch.
@@ -63,10 +69,18 @@ export interface CaptureResult {
   /** Cells the app cannot build — `<cell>: why`. */
   skipped: string[];
   /**
-   * Cells whose capture threw — `<cell>: why`: nothing of the cell written this run, so an earlier capture of it stays
-   * as it was; listed on the manifest too (RunManifest.failed).
+   * Cells whose capture threw this run — `<cell>: why`: nothing of the cell written, so an earlier capture of it stays
+   * as it was; listed on the manifest too (RunManifest.failed), the why with its host paths out.
    */
   failed: string[];
+  /** Failures of earlier runs the manifest still lists (cells this run neither captured nor failed) — `<cell>: why`. */
+  carried: string[];
+  /**
+   * The run stopped at this cell (it is in `failed` too): a CaptureHalt, or a bug in the capture (`bug`: a TypeError,
+   * ReferenceError or RangeError, for the command line to rethrow once the summary is said). The cells after it were
+   * not launched.
+   */
+  halted?: { cell: string; reason: string; bug?: Error };
   manifest: RunManifest;
 }
 
@@ -87,7 +101,7 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
   const skipped: string[] = [];
   const failed: string[] = [];
   const failures: NonNullable<RunManifest['failed']> = [];
-  let refusal: CaptureRefusal | undefined;
+  let halted: CaptureResult['halted'];
   // Who takes a tap in the navigation band depends on it (truth.ts#navigationBandTakes): read once per run.
   const navigation = await lab.navigation?.();
   const captured = new Set<string>();
@@ -140,6 +154,9 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
       for (const t of cell.targets) {
         const frame = s.frames[t.tag];
         if (frame === undefined) {
+          // No frame where the catalog does not allow it (CatalogTarget.mayBeAbsent): a renamed tag, a wrong screen, a
+          // lab regression — the cell fails, never "absent".
+          if (t.mayBeAbsent !== true) throw new Error(`cell ${cell.id}: the app reported no frame for target ${t.tag}`);
           // Laid out nowhere (carousel-lazy's C before a swipe composes it): recorded absent (CellTruth.absent) — nothing
           // to tap or measure — with each tree's word on it.
           const id = `lab.${cell.id}.${t.tag}`;
@@ -154,7 +171,10 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
             listed: Object.fromEntries(trees.map((tree) => [tree.source, listedIn(tree.payload, tree.source, id)])),
             ...(t.text !== undefined && { textListed: Object.fromEntries(trees.map((tree) => [tree.source, textListedIn(tree.payload, tree.source, t.text!)])) }),
           });
-          log(`${cell.id}/${t.tag}: absent — the app reported no frame for it, not probed`);
+          log(`${cell.id}/${t.tag}: absent — the app reported no frame for it (the catalog allows it), not probed`);
+          // A tree listing what the app laid out nowhere: said, for whoever reads the run — the truth keeps it (`listed`).
+          const listing = Object.entries(truth.absent.at(-1)!.listed).filter(([, listed]) => listed).map(([source]) => source);
+          if (listing.length > 0) log(`${cell.id}/${t.tag}: WARNING — the app reported no frame for it, but the ${listing.join(' and ')} tree${listing.length > 1 ? 's list' : ' lists'} it`);
           continue;
         }
         // A text or label target is drawn on its control: how much of the control's box shows its colour (the text or
@@ -203,8 +223,8 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
         const ime = await lab.ime();
         // A floating IME's panels (truth.ts#imePanels): only on a cell captured floating (CatalogCell.ime), and always there.
         panels = imePanels(ime.shown.touchable, s.keyboard.frame);
-        if (cell.ime === 'floating' && panels.length === 0) throw new CaptureRefusal(`cell ${cell.id}: captured with the IME floating only, but its touchable region holds no panel beyond its band — switch Gboard to Floating first`);
-        if (cell.ime !== 'floating' && panels.length > 0) throw new CaptureRefusal(`cell ${cell.id}: the IME is floating (a panel beyond its band: ${panels.map((p) => `${p.x},${p.y} ${p.width}x${p.height}`).join(', ')}) — dock it first; only a cell marked ime: floating is captured so`);
+        if (cell.ime === 'floating' && panels.length === 0) throw new CaptureHalt(`cell ${cell.id}: captured with the IME floating only, but its touchable region holds no panel beyond its band — switch Gboard to Floating first`);
+        if (cell.ime !== 'floating' && panels.length > 0) throw new CaptureHalt(`cell ${cell.id}: the IME is floating (a panel beyond its band: ${panels.map((p) => `${p.x},${p.y} ${p.width}x${p.height}`).join(', ')}) — dock it first; only a cell marked ime: floating is captured so`);
         put(`${cell.id}.ime.json`, JSON.stringify(ime, null, 1) + '\n');
         truth.ime = `${cell.id}.ime.json`;
         // ime() left the keyboard hidden by one back: the layout averi finds an element again in after its guard's
@@ -224,20 +244,26 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
         put(`${cell.id}.displays.txt`, displays);
         truth.displays = `${cell.id}.displays.txt`;
       }
-      if (cell.ime === 'floating' && panels.length === 0) throw new CaptureRefusal(`cell ${cell.id}: captured with the IME floating only, but no IME was up`);
+      // Every target absent where the catalog lists some: no screen of this cell's (a wrong screen, a lab regression).
+      if (cell.targets.length > 0 && truth.targets.length === 0) throw new Error(`cell ${cell.id}: the app reported a frame for none of its ${cell.targets.length} targets (${cell.targets.map((t) => t.tag).join(', ')}) — the wrong screen?`);
+      if (cell.ime === 'floating' && panels.length === 0) throw new CaptureHalt(`cell ${cell.id}: captured with the IME floating only, but no IME was up`);
       if (cell.form !== undefined) truth.form = await formTruth(lab, cell, cell.form, s, png, cellBroken, log, afterBack, panels);
       put(`${cell.id}.truth.json`, JSON.stringify(truth, null, 2) + '\n');
       for (const t of trees) {
         entries.push({ file: `${cell.id}${t.suffix}`, source: t.source, form: 'raw', screen: truth.screen, screenshot: `${cell.id}.png`, truth: `${cell.id}.truth.json` });
       }
-      for (const [name, data] of files) await writeFile(join(opts.out, name), data);
+      await flush(opts.out, files);
     } catch (e) {
-      const reason = e instanceof Error ? e.message : String(e);
+      // The reason goes to a committed manifest: its host paths out (failure-text.ts#withoutHostPaths). A bug in the
+      // capture names its kind (TypeError: …).
+      const bug = isBug(e) ? e : undefined;
+      const reason = withoutHostPaths(bug !== undefined ? `${bug.name}: ${bug.message}` : e instanceof Error ? e.message : String(e), hostHome());
       failed.push(`${cell.id}: ${reason}`);
       failures.push({ cell: cell.id, reason });
-      if (e instanceof CaptureRefusal) {
-        log(`${cell.id}: REFUSED — ${reason}; the run stops here, its manifest written`);
-        refusal = e;
+      if (e instanceof Error && e.stack !== undefined) log(`${cell.id}: ${e.stack}`);
+      if (e instanceof CaptureHalt || bug !== undefined) {
+        log(`${cell.id}: HALTED — ${reason}; the run stops here, its manifest written`);
+        halted = { cell: cell.id, reason, ...(bug !== undefined && { bug }) };
         break;
       }
       log(`${cell.id}: FAILED — ${reason}; nothing of it written, the other cells go on`);
@@ -251,21 +277,44 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
   const kept = (previous?.captures ?? []).filter((c) => !captured.has(c.file.slice(0, c.file.indexOf('.'))));
   manifest.captures = [...kept, ...manifest.captures].sort((a, b) => order(a.file) - order(b.file));
   // A failure stands until a run captures the cell again: the earlier ones of cells this run neither captured nor
-  // failed are kept.
-  const stillFailed = [...(previous?.failed ?? []).filter((f) => !captured.has(f.cell) && !failures.some((x) => x.cell === f.cell)), ...failures];
-  if (stillFailed.length > 0) manifest.failed = stillFailed.sort((a, b) => order(`${a.cell}.`) - order(`${b.cell}.`));
+  // failed are kept (carried), unless the catalog no longer has the cell.
+  const carriedOver = (previous?.failed ?? []).filter((f) => !captured.has(f.cell) && !failures.some((x) => x.cell === f.cell) && order(`${f.cell}.`) >= 0);
+  const stillFailed = [...carriedOver, ...failures].sort((a, b) => order(`${a.cell}.`) - order(`${b.cell}.`));
+  if (stillFailed.length > 0) manifest.failed = stillFailed;
   await writeFile(join(opts.out, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
-  if (refusal !== undefined) throw refusal;
-  return { broken, skipped, failed, manifest };
+  return { broken, skipped, failed, carried: carriedOver.map((f) => `${f.cell}: ${f.reason}`), manifest, ...(halted !== undefined && { halted }) };
+}
+
+/** A programming error of the capture's own, not the device's or the app's: it halts the run (CaptureResult.halted). */
+const isBug = (e: unknown): e is Error => e instanceof TypeError || e instanceof ReferenceError || e instanceof RangeError;
+
+/**
+ * Write a cell's files all or none, as far as a file system lets: each to `<name>.tmp` first, then each renamed over its
+ * name. A write that fails removes the cell's `.tmp` files and throws, the earlier capture whole; only a rename failing
+ * (after every write succeeded) can leave the cell's files mixed.
+ */
+async function flush(out: string, files: readonly (readonly [string, string | Buffer])[]): Promise<void> {
+  const written: string[] = [];
+  try {
+    for (const [name, data] of files) {
+      await writeFile(join(out, `${name}.tmp`), data);
+      written.push(name);
+    }
+  } catch (e) {
+    await Promise.all(written.map((name) => rm(join(out, `${name}.tmp`), { force: true })));
+    throw e;
+  }
+  for (const name of written) await rename(join(out, `${name}.tmp`), join(out, name));
 }
 
 /**
  * The capture refusing to go on — the device set up wrong for the cell (the IME floating or docked against its
- * CatalogCell.ime), or a pinned submit with no bar, which would read every control under it open. Unlike any other
- * throw, which fails its cell alone (CaptureResult.failed), it stops the run: the manifest is written first, the cell
- * listed failed, then it is thrown.
+ * CatalogCell.ime), or a pinned submit with no bar, which would read every control under it open. (Not
+ * catalog.ts#captureRefusal, a cell skipped before it is launched.) Unlike any other throw, which fails its cell alone
+ * (CaptureResult.failed), it halts the run: the cell listed failed, the manifest written, the halt returned
+ * (CaptureResult.halted) — not thrown, so the command line still says the run's summary.
  */
-export class CaptureRefusal extends Error {}
+export class CaptureHalt extends Error {}
 
 /**
  * Relaunch the cell, run `first` when given (LabDevice.hideKeyboard), tap the frame's centre (or the point given), give
@@ -319,7 +368,7 @@ async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s
   ];
   // The pinned submit's bar is what situationOf reads as its cover: a state without it would measure every control
   // under it open.
-  if (form.submit.pinned === true && s.frames[`${form.submit.tag}.bar`] === undefined) throw new CaptureRefusal(`cell ${cell.id}: the app reported no frame for ${form.submit.tag}.bar`);
+  if (form.submit.pinned === true && s.frames[`${form.submit.tag}.bar`] === undefined) throw new CaptureHalt(`cell ${cell.id}: the app reported no frame for ${form.submit.tag}.bar`);
   const keyboard = s.keyboard?.visible === true ? s.keyboard : undefined;
   const controls: ControlTruth[] = [];
   for (const w of wanted) {

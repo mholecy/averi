@@ -166,3 +166,18 @@ export async function runLines(dir: string, ids: readonly string[]): Promise<str
   }
   return lines;
 }
+
+/**
+ * One stderr line per run of the corpus whose manifest lists failed cells (RunManifest.failed: the truth capture's
+ * cells whose last attempt threw) — golden says them before it replays, so a cell missing from a run, or replayed from
+ * an earlier capture, is never silent. It changes no row and no count.
+ */
+export async function failedCaptureLines(dir: string): Promise<string[]> {
+  const lines: string[] = [];
+  for (const run of (await readdir(dir)).sort()) {
+    if (!(await stat(join(dir, run))).isDirectory()) continue;
+    const { failed = [] } = JSON.parse(await readFile(join(dir, run, 'manifest.json'), 'utf8')) as RunManifest;
+    if (failed.length > 0) lines.push(`golden: corpus run ${run} holds no capture from its last attempt at ${failed.length} cell${failed.length === 1 ? '' : 's'} (manifest.json \`failed\`): ${failed.map((f) => `${f.cell}: ${f.reason}`).join('; ')}`);
+  }
+  return lines;
+}

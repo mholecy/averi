@@ -330,12 +330,16 @@ node --import tsx scripts/truth/capture.ts --udid <udid> --out tests/fixtures/tr
 `--family` keeps the cells of those families, `--cells` those cells (both given: the named cells of those families); a
 name that matches nothing is an error. A run of some cells adds to (or replaces those cells in) the run's manifest; the
 other cells keep their captures. A manifest names one device: a run into a directory captured on another device is
-refused. A catalog target the app lays out no frame for (carousel-lazy's C, not composed at launch) is recorded in the
-truth's `absent`, never probed, with whether each raw tree lists it; no golden row reads it yet (backlog T6). A cell
-whose capture throws fails alone: nothing of it is written (an earlier capture of it stays whole), the other cells are
-captured, and the manifest is written listing it under `failed` with why, until a run captures it again; a refusal
-(`CaptureRefusal`: the IME set up against the cell, a pinned submit with no bar) stops the run once the manifest is
-written. Exit code 1 when a cell is broken or failed.
+refused. A catalog target the app lays out no frame for, where the catalog allows it (`mayBeAbsent`: the four L7
+carousels' C, not composed at launch), is recorded in the truth's `absent`, never probed, with whether each raw tree
+lists it; no golden row reads it yet (backlog T6). Any other missing frame fails the cell, as does a cell left with no
+framed target. A cell whose capture throws fails alone: its files go to `<name>.tmp` and are renamed only once all are
+written, so nothing of it is written (an earlier capture of it stays whole), the other cells are captured, and the
+manifest is written listing it under `failed` with why (host paths out), until a run captures it again; golden says
+each run whose manifest lists one on stderr, changing no row. A halt (`CaptureHalt`: the IME set up against the cell,
+a pinned submit with no bar; or a bug in the capture, rethrown once the summary is said) stops the run once the
+manifest is written. Exit code 1 when a cell is broken or failed, or the run halted; failures carried from an earlier
+run are said, not counted.
 
 Android (fixtures/apps/android, Compose; an emulator of its own — the committed run is a dedicated `averi_lab` AVD,
 Pixel 3a profile, API 33 — never the device-check AVD; JDK 17, the Gradle wrapper's 8.13). The truth is in screen

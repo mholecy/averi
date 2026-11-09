@@ -288,9 +288,10 @@ if (isMain(import.meta.url)) {
   installFakeDevice();
   installVirtualClock();
   const { loadSide } = await import('./side.js');
-  const { loadCorpus } = await import('./corpus.js');
+  const { loadCorpus, failedCaptureLines } = await import('./corpus.js');
   try {
     const side = await loadSide(code.root);
+    for (const line of await failedCaptureLines(resolve(values.corpus))) console.error(line);
     const corpus = selectRecordings((await loadCorpus(resolve(values.corpus))).filter((r) => r.truth !== undefined), parseOnly(values.only));
     const results: GoldenResult[] = [];
     for (const r of corpus) results.push(await goldenRecording(r, side));

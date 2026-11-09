@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { loadCorpus, runLines } from '../../scripts/differential/corpus.js';
+import { failedCaptureLines, loadCorpus, runLines } from '../../scripts/differential/corpus.js';
 
 // The corpus a differential run reads (scripts/differential/README.md, "Corpus format"): one directory per capture
 // run, a manifest naming each tree's platform, source kind and form, and the tree files beside it.
@@ -106,5 +106,17 @@ describe('runLines', () => {
       '- device: 1 trees — iPhone 17 simulator',
       '- rebuilt: 2 trees — none: REBUILT from normalized trees — not device captures',
     ]);
+  });
+});
+
+describe('failedCaptureLines', () => {
+  it("one line per run whose manifest lists failed cells (the truth capture's RunManifest.failed), naming each and why; none for a run without", async () => {
+    await run('run-b', { platform: 'android', captures: [], failed: [{ cell: 'carousel-lazy', reason: 'adb: device offline' }, { cell: 'x', reason: 'y' }] }, {});
+    await run('run-a', { platform: 'ios', captures: [] }, {});
+    await run('run-c', { platform: 'ios', captures: [], failed: [] }, {});
+    await writeFile(join(dir, 'README.md'), 'not a run');
+    expect(await failedCaptureLines(dir)).toEqual(['golden: corpus run run-b holds no capture from its last attempt at 2 cells (manifest.json `failed`): carousel-lazy: adb: device offline; x: y']);
+    await run('run-d', { platform: 'ios', captures: [], failed: [{ cell: 'held-no', reason: 'z' }] }, {});
+    expect((await failedCaptureLines(dir)).at(-1)).toBe('golden: corpus run run-d holds no capture from its last attempt at 1 cell (manifest.json `failed`): held-no: z');
   });
 });
