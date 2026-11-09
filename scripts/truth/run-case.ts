@@ -1,6 +1,7 @@
 import { type LabDevice, pause as realPause, withMeasuredPanel } from './lab-device.js';
 import { type PreDragged, type PreDragLab, preDragOrSkip, type SwipeEntry, type SwipeHook } from './live-carousel.js';
 import { type Call, type Case, type CaseRecord, judged, LATE_READ_MS, wantsLateRead } from './live-cases.js';
+import { type FocusRead, type FocusReads, frontOf, isChooser } from './live-chooser.js';
 import type { Source } from './live-forms.js';
 import type { LiveVerdict } from './live-visibility.js';
 import { isError } from './replies.js';
@@ -9,9 +10,10 @@ import { labSelector, type LabState } from './schema.js';
 /**
  * One live case on one tree source: case + lab + tool call → one record and its verdict (backlog A11, docs/adr/0044).
  * The cycle, in the order the device sees it: the warm-up, the launch, the
- * pre-drag, the keyboard's SKIP, the panel's first read, the calls with the reads the case declares between them, the
- * pause, the state, the panel's second read, the late read (live-cases.ts#wantsLateRead), the verdict, a screenshot when
- * it is not ok. What a case reads is its declaration (Case.reads and the fields beside it), never its group; a new read is a
+ * pre-drag, the launcher start, the keyboard's SKIP, the panel's first read, the focus's first read, the calls with the
+ * reads the case declares between them, the pause, the state, the panel's second read, the focus's last read, the late
+ * read (live-cases.ts#wantsLateRead), the verdict, a screenshot when it is not ok, and the BACK that drops a chooser
+ * left in front (the teardown, read again). What a case reads is its declaration (Case.reads and the fields beside it), never its group; a new read is a
  * field there, a field on the record (CaseRecord, caseRecord), and its read in the cycle below; one the judge must see
  * also goes through CaseEvidence, judgeOn and the judge's parameters or DeviceLog.
  *
@@ -21,7 +23,14 @@ import { labSelector, type LabState } from './schema.js';
  */
 
 /** A lab a case runs on: Android's adds the raw stroke and the IME region; its `platform` tells them apart. */
-export type CaseLab = (LabDevice & { readonly platform: 'ios' }) | (LabDevice & PreDragLab & { readonly platform: 'android'; guard(): Promise<unknown>; imeTouchable(): Promise<string> });
+export type CaseLab = (LabDevice & { readonly platform: 'ios' }) | (LabDevice & PreDragLab & FocusLab & { readonly platform: 'android'; guard(): Promise<unknown>; imeTouchable(): Promise<string> });
+
+/** What the chooser group asks of the Android lab (lab-device.ts#AndroidLab): the focus read, the launcher start, one BACK. */
+export interface FocusLab {
+  focus(): Promise<FocusRead>;
+  toLauncher(): Promise<void>;
+  back(): Promise<void>;
+}
 
 export interface CaseRig {
   lab: CaseLab;
@@ -51,7 +60,7 @@ const WRITE_SETTLE_MS = 800;
 
 /** The one place a record is shaped: a skip's and a run's, in the order a recorded file keeps its keys. */
 function caseRecord(source: Source, c: Case, reads: Omit<CaseRecord, 'source' | 'id'>): CaseRecord {
-  const { skip, replies, launched, after, state, late, warmUpError, preDrag, swipes } = reads;
+  const { skip, replies, launched, after, state, late, warmUpError, preDrag, swipes, focus } = reads;
   return {
     source,
     id: c.id,
@@ -64,6 +73,7 @@ function caseRecord(source: Source, c: Case, reads: Omit<CaseRecord, 'source' | 
     ...(warmUpError !== undefined && { warmUpError }),
     ...(preDrag !== undefined && { preDrag }),
     ...(swipes !== undefined && { swipes }),
+    ...(focus !== undefined && { focus }),
   };
 }
 
@@ -86,11 +96,20 @@ export async function runCase(c: Case, source: Source, rig: CaseRig): Promise<Ca
     if ('skip' in dragged) return skip(dragged.skip);
     ({ preDrag: preDragged, launched } = dragged);
   }
+  // The launcher start (Case.fromLauncher): the lab stopped and HOME pressed, `launched` kept as the launch's.
+  if (c.fromLauncher === true) {
+    if (lab.platform !== 'android') return skip("a start from the launcher is the Android lab's only");
+    await lab.toLauncher();
+  }
+  const focusLab = c.reads?.focus === true ? (lab.platform === 'android' ? lab : undefined) : undefined;
+  if (c.reads?.focus === true && focusLab === undefined) return skip("a focus read is the Android lab's only");
   if (c.keyboard && launched.keyboard?.visible !== true) return skip(lab.platform === 'ios' ? 'no soft keyboard at launch (the simulator saw HID typing; see IosLab.launch)' : 'no IME at launch');
   // The first of the two device reads the kf judges rest on (LabState.imeTouchable, lab-device.ts#withMeasuredPanel),
   // on the Android lab only.
   const panelLab = c.measuresPanel === true && lab.platform === 'android' ? lab : undefined;
   if (panelLab !== undefined) launched = await withMeasuredPanel(launched, panelLab, note);
+  const before = focusLab === undefined ? undefined : await focusLab.focus();
+  const between: FocusRead[] = [];
   const config = await rig.configFor(source, c);
   const replies: string[] = [];
   const after: (LabState | undefined)[] = [];
@@ -101,6 +120,7 @@ export async function runCase(c: Case, source: Source, rig: CaseRig): Promise<Ca
     for (const [i, call] of c.calls.entries()) {
       replies.push(await rig.callTool(call, config));
       if (c.reads?.betweenCalls === true && i < c.calls.length - 1) after.push(await lab.state());
+      if (focusLab !== undefined && i < c.calls.length - 1) between.push(await focusLab.focus());
     }
   } finally {
     swipes = declared !== undefined ? rig.swipes.disarm() : undefined;
@@ -112,7 +132,8 @@ export async function runCase(c: Case, source: Source, rig: CaseRig): Promise<Ca
   // The second (D69): the panel again once the calls are done, kept on the final state — the judge holds the two reads
   // to agree (live-forms.ts#panelAfterCalls); `late` gets it from there (live-cases.ts#judged).
   const state = panelLab !== undefined ? await withMeasuredPanel(read, panelLab, note) : read;
-  const evidence = { source, replies, launched, after, state, swipes };
+  const focus: FocusReads | undefined = focusLab === undefined ? undefined : { before: before!, between, after: await focusLab.focus() };
+  const evidence = { source, replies, launched, after, state, swipes, focus };
   let late: LabState | undefined;
   if (wantsLateRead(c, evidence)) {
     await pause(LATE_READ_MS);
@@ -120,5 +141,16 @@ export async function runCase(c: Case, source: Source, rig: CaseRig): Promise<Ca
   }
   const verdict = judged(c, { ...evidence, late });
   if (rig.keepShot !== undefined && verdict.outcome !== 'ok') await rig.keepShot(`${source}-${c.id}-${now()}.png`, await lab.screenshot());
-  return { verdict, record: caseRecord(source, c, { replies, launched, after, state, late, warmUpError, preDrag: preDragged, swipes }) };
+  // The teardown: a chooser left in front is dropped with one BACK (batch-9: one dismissed it), so the next case does not
+  // start over it; read again, and said when it is still there.
+  if (focusLab !== undefined && focus !== undefined) {
+    const front = frontOf(focus.after);
+    if (!('why' in front) && isChooser(front.focused)) {
+      await focusLab.back();
+      focus.teardown = await focusLab.focus();
+      const still = frontOf(focus.teardown);
+      if (!('why' in still) && isChooser(still.focused)) note(`${source} ${c.id}: the chooser is still in front after one BACK (${still.focused})`);
+    }
+  }
+  return { verdict, record: caseRecord(source, c, { replies, launched, after, state, late, warmUpError, preDrag: preDragged, swipes, focus }) };
 }

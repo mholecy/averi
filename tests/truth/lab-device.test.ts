@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { capture } from '../../scripts/truth/capture-run.js';
-import { AndroidLab, DEVICE_CHECK_SIMULATOR, IosLab, withMeasuredPanel, type Exec } from '../../scripts/truth/lab-device.js';
+import { ACTIVITIES_COMMAND, AndroidLab, DEVICE_CHECK_SIMULATOR, FOCUS_WINDOW_COMMAND, IosLab, withMeasuredPanel, type Exec } from '../../scripts/truth/lab-device.js';
 import { INPUT_SHOWN_COMMAND, TOUCHABLE_COMMAND } from '../../src/adapters/android.js';
 import { parseLabApp, type CatalogCell, type LabState } from '../../scripts/truth/schema.js';
 
@@ -209,6 +209,84 @@ describe('AndroidLab: the averi_lab AVD or nothing', () => {
     }
     const shell = (command: string) => `adb -s emulator-5556 shell ${command}`;
     expect(calls).toEqual(['adb -s emulator-5556 emu avd name', shell('dumpsys window displays'), shell(INPUT_SHOWN_COMMAND), shell(TOUCHABLE_COMMAND), shell('input keyevent 4'), shell(INPUT_SHOWN_COMMAND), shell(TOUCHABLE_COMMAND)]);
+  });
+});
+
+describe('AndroidLab: the chooser group\'s reads and steps (T7b)', () => {
+  /** A fake exec that answers `answers` (by the shell words after `adb -s <serial> shell`), else fakeExec's. */
+  const answeringWith = (answers: Record<string, string | Error>) => {
+    const { exec, calls } = fakeExec();
+    const answering: Exec = async (file, args) => {
+      const asked = Object.keys(answers).find((k) => args.slice(3).join(' ') === k);
+      if (asked === undefined) return exec(file, args);
+      calls.push(`${file} ${args.join(' ')}`);
+      const answer = answers[asked];
+      if (answer instanceof Error) throw answer;
+      return { stdout: answer };
+    };
+    return { answering, calls };
+  };
+  const shell = (command: string) => `adb -s emulator-5556 shell ${command}`;
+  /** The lab's own waits run on fake time (1 s after each key), real timers back after. */
+  async function onFakeTime<T>(run: () => Promise<T>): Promise<T> {
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    try {
+      const pending = run();
+      await vi.runAllTimersAsync();
+      return await pending;
+    } finally {
+      vi.useRealTimers();
+    }
+  }
+
+  it('focus(): the window manager\'s focus lines and the activity stack\'s records, raw, after the guard', async () => {
+    const { answering, calls } = answeringWith({ [FOCUS_WINDOW_COMMAND]: 'mFocusedApp=…\n', [ACTIVITIES_COMMAND]: '* Hist  #0: …\n' });
+    expect(await new AndroidLab('emulator-5556', { exec: answering }).focus()).toEqual({ window: 'mFocusedApp=…\n', activities: '* Hist  #0: …\n' });
+    expect(calls).toEqual(['adb -s emulator-5556 emu avd name', shell(FOCUS_WINDOW_COMMAND), shell(ACTIVITIES_COMMAND)]);
+    expect(FOCUS_WINDOW_COMMAND).toBe("dumpsys window displays | grep -E 'mCurrentFocus=|mFocusedApp='");
+    expect(ACTIVITIES_COMMAND).toBe("dumpsys activity activities | grep -E 'Hist +#'");
+  });
+
+  it('focus(): a window read mid-transition (`mCurrentFocus=null`) is read again every 300 ms until it names a window, at most 5 s; the stack read once it has, the wait kept', async () => {
+    const { exec, calls } = fakeExec();
+    const windows = ['  mCurrentFocus=null\n  mFocusedApp=A\n', '  mCurrentFocus=null\n  mFocusedApp=A\n', '  mCurrentFocus=Window{1 u0 a/b}\n  mFocusedApp=A\n'];
+    let w = 0;
+    const answering: Exec = async (file, args) => {
+      const asked = args.slice(3).join(' ');
+      if (asked !== FOCUS_WINDOW_COMMAND && asked !== ACTIVITIES_COMMAND) return exec(file, args);
+      calls.push(asked === FOCUS_WINDOW_COMMAND ? 'window' : 'activities');
+      return { stdout: asked === FOCUS_WINDOW_COMMAND ? windows[Math.min(w++, windows.length - 1)] : 'stack' };
+    };
+    expect(await onFakeTime(() => new AndroidLab('emulator-5556', { exec: answering }).focus())).toEqual({ window: windows[2], activities: 'stack', waitedMs: 600 });
+    expect(calls.slice(1)).toEqual(['window', 'window', 'window', 'activities']);
+    // Never settled: the last read kept after 5 s, the wait said.
+    const stuck: Exec = async (file, args) => (args.slice(3).join(' ') === FOCUS_WINDOW_COMMAND ? { stdout: '  mCurrentFocus=null\n' } : args.slice(3).join(' ') === ACTIVITIES_COMMAND ? { stdout: 'stack' } : exec(file, args));
+    expect(await onFakeTime(() => new AndroidLab('emulator-5556', { exec: stuck }).focus())).toEqual({ window: '  mCurrentFocus=null\n', activities: 'stack', waitedMs: 5_100 });
+  });
+
+  it('focus(): a read that fails is kept as adb\'s words, never thrown; a refused device throws', async () => {
+    const failed = Object.assign(new Error('Command failed'), { stderr: 'error: device offline\n' });
+    const { answering } = answeringWith({ [FOCUS_WINDOW_COMMAND]: 'x', [ACTIVITIES_COMMAND]: failed });
+    expect(await new AndroidLab('emulator-5556', { exec: answering }).focus()).toEqual({ error: 'error: device offline' });
+    const refused = fakeExec('Pixel_7_API_34\r\nOK');
+    await expect(new AndroidLab('emulator-5554', { exec: refused.exec }).focus()).rejects.toThrow(/refused/);
+  });
+
+  it('toLauncher(): the lab force-stopped, HOME pressed, a second to settle; only of the lab AVD', async () => {
+    const { answering, calls } = answeringWith({ 'input keyevent KEYCODE_HOME': '' });
+    await onFakeTime(() => new AndroidLab('emulator-5556', { exec: answering }).toLauncher());
+    expect(calls).toEqual(['adb -s emulator-5556 emu avd name', shell('am force-stop dev.averi.lab'), shell('input keyevent KEYCODE_HOME')]);
+    const refused = fakeExec('Pixel_7_API_34\r\nOK');
+    await expect(new AndroidLab('emulator-5554', { exec: refused.exec }).toLauncher()).rejects.toThrow(/refused/);
+    expect(refused.calls.filter((c) => c.includes('shell'))).toEqual([]);
+  });
+
+  it('back(): one BACK, a second to settle; only of the lab AVD', async () => {
+    const { answering, calls } = answeringWith({ 'input keyevent KEYCODE_BACK': '' });
+    await onFakeTime(() => new AndroidLab('emulator-5556', { exec: answering }).back());
+    expect(calls).toEqual(['adb -s emulator-5556 emu avd name', shell('input keyevent KEYCODE_BACK')]);
+    const refused = fakeExec('Pixel_7_API_34\r\nOK');
+    await expect(new AndroidLab('emulator-5554', { exec: refused.exec }).back()).rejects.toThrow(/refused/);
   });
 });
 

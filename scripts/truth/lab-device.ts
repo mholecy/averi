@@ -7,6 +7,7 @@ import { INPUT_SHOWN_COMMAND, TOUCHABLE_COMMAND } from '../../src/adapters/andro
 import type { Point } from '../../src/adapters/types.js';
 import { WdaServer } from '../../src/adapters/wda.js';
 import type { Platform, SourceKind } from '../differential/corpus.js';
+import type { FocusRead } from './live-chooser.js';
 import { appOf, type CatalogCell, type ImeCapture, type ImeWitness, type LabApp, type LabState, type NavigationMode, WINDOW_MANAGER_WORD } from './schema.js';
 
 /**
@@ -312,6 +313,24 @@ export async function withMeasuredPanel(
   }
 }
 
+/**
+ * The chooser group's focus read (live-chooser.ts, T7b), the harness's own, beside src's (android-chooser.ts
+ * #CHOOSER_FOCUS_COMMAND) and not imported from it, so the oracle does not share the code it judges: the window
+ * manager's focus lines, and every activity record on the stack (`* Hist  #<n>: ActivityRecord{…}`, top first).
+ */
+export const FOCUS_WINDOW_COMMAND = "dumpsys window displays | grep -E 'mCurrentFocus=|mFocusedApp='";
+export const ACTIVITIES_COMMAND = "dumpsys activity activities | grep -E 'Hist +#'";
+/** How long a key (HOME, BACK) is given to take effect before the next read. */
+const KEY_SETTLE_MS = 1_000;
+/**
+ * A focus read taken mid-transition (`mCurrentFocus=null`) is taken again every FOCUS_POLL_MS, at most FOCUS_SETTLE_MS:
+ * the stack is read once a window has focus. Measured 2026-11-09 (T7b's first run, emulator-5554, API 33): after monkey
+ * started the force-stopped lab over the chooser, `mCurrentFocus` read null and the ResolverActivity record stayed on the
+ * stack for about 1.3 s, both gone together.
+ */
+const FOCUS_POLL_MS = 300;
+const FOCUS_SETTLE_MS = 5_000;
+
 /** A text's first non-blank line, trimmed ('' for none): the guard's AVD name and adb's words alike. */
 const firstSaid = (text: string): string => text.split(/\r?\n/).find((l) => l.trim() !== '')?.trim() ?? '';
 
@@ -401,6 +420,44 @@ export class AndroidLab implements LabDevice {
 
   async tap(x: number, y: number): Promise<void> {
     await this.adb('shell', 'input', 'tap', String(Math.round(x)), String(Math.round(y)));
+  }
+
+  /**
+   * The device's word on what is in front and on the stack (FOCUS_WINDOW_COMMAND, ACTIVITIES_COMMAND), raw, after the
+   * guard, once settled: a window read mid-transition is taken again (FOCUS_SETTLE_MS), and the wait kept (`waitedMs`). A
+   * read that fails is kept as adb's words (`{ error }`): the judge reads it as unread, never as nothing in front.
+   */
+  async focus(): Promise<FocusRead> {
+    await this.guard();
+    try {
+      const windowRead = async () => (await this.adb('shell', FOCUS_WINDOW_COMMAND)).stdout;
+      let window = await windowRead();
+      let waitedMs = 0;
+      while (/mCurrentFocus=null\b/.test(window) && waitedMs < FOCUS_SETTLE_MS) {
+        await pause(FOCUS_POLL_MS);
+        waitedMs += FOCUS_POLL_MS;
+        window = await windowRead();
+      }
+      const activities = (await this.adb('shell', ACTIVITIES_COMMAND)).stdout;
+      return { window, activities, ...(waitedMs > 0 && { waitedMs }) };
+    } catch (e) {
+      return { error: adbSaid(e) };
+    }
+  }
+
+  /** The chooser group's launcher start (Case.fromLauncher): the lab force-stopped, HOME, a second to settle. */
+  async toLauncher(): Promise<void> {
+    await this.guard();
+    await this.adb('shell', 'am', 'force-stop', this.package);
+    await this.adb('shell', 'input', 'keyevent', 'KEYCODE_HOME');
+    await pause(KEY_SETTLE_MS);
+  }
+
+  /** One BACK, a second to settle: the chooser group's teardown of a chooser left in front (batch-9: one dismissed it). */
+  async back(): Promise<void> {
+    await this.guard();
+    await this.adb('shell', 'input', 'keyevent', 'KEYCODE_BACK');
+    await pause(KEY_SETTLE_MS);
   }
 
   /**

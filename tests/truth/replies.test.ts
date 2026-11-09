@@ -12,6 +12,10 @@ import { untriedSideText } from '../../src/interact/target-text.js';
 import { EDGES } from '../../src/ui-tree/geometry.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { failureOf, play, resultOf, type Row } from '../helpers/rounds.js';
+import type { AppHolder } from '../../src/adapters/types.js';
+import { appHolderText } from '../../src/interact/app-holder-text.js';
+import { deepLinkText, launchText } from '../../src/mcp/tool-text.js';
+import { chooserSaid, launchedAs, linkHeldSaid, warnedSaid } from '../../scripts/truth/replies.js';
 
 /**
  * A src file's code without its comments, so a phrase that only a comment still says counts as no longer written. It
@@ -267,5 +271,52 @@ describe('LIVE_REPLY_WORDS: the words the live forms and turn judges key on, eac
     expect(scrollVerdictSaid('ERROR scroll_until id:"lab.ks" failed after 0 swipes — last UI tree read failed: …')).toBe(false);
     expect(scrollVerdictSaid('ERROR scroll_until: maxSwipes must be a positive integer')).toBe(false);
     expect(scrollVerdictSaid('Element id:"lab.ks" visible after 1 swipe')).toBe(false);
+  });
+});
+
+// T7b: the chooser group's reads (scripts/truth/live-chooser.ts), over src's own builders: launch_app's text
+// (mcp/tool-text.ts#launchText over flow/launch.ts's Launched, its note interact/app-holder-text.ts#appHolderText's) and
+// open_deep_link's (tool-text.ts#deepLinkText).
+describe("launchedAs, chooserSaid, warnedSaid: launch_app's and open_deep_link's replies as src words them (T7b)", () => {
+  const RESOLVER = 'android/com.android.internal.app.ResolverActivity';
+  const chooser: AppHolder = { holder: 'chooser', chooser: { component: RESOLVER } };
+  const sheet: AppHolder = {
+    holder: 'chooser',
+    chooser: { component: RESOLVER, sheet: { title: 'Open with', apps: [{ label: 'AveriLab', centre: { x: 540, y: 1727 } }], once: { label: 'Just once', centre: { x: 723, y: 2058 }, disabled: true }, always: { label: 'Always', centre: { x: 936, y: 2058 }, disabled: true } } },
+  };
+  const launched = (app: string, answer: AppHolder = { holder: 'none' }) => launchText('android', { app, note: appHolderText({ app: app.split('/')[0] }, answer) });
+
+  it('launchedAs: the app the headline names, with its activity when one was named; nothing for any other reply', () => {
+    expect(launchedAs(launched('dev.averi.lab'))).toBe('dev.averi.lab');
+    expect(launchedAs(launched('dev.averi.lab/.Twin'))).toBe('dev.averi.lab/.Twin');
+    expect(launchedAs(launched('dev.averi.lab', chooser))).toBe('dev.averi.lab');
+    expect(launchedAs(launchText('android', { app: 'dev.averi.lab', wiped: 'x' }))).toBe('dev.averi.lab');
+    expect(launchedAs('ERROR monkey started nothing in dev.averi.lab — …')).toBeUndefined();
+    expect(launchedAs(deepLinkText('android', 'averilab://cell/x', { holder: 'none' }))).toBeUndefined();
+    expect(launchedAs(`x\n${launched('dev.averi.lab')}`)).toBeUndefined();
+  });
+
+  it("chooserSaid: the component a launch's ⚠ line and a link's headline name, with the sheet or without", () => {
+    expect(chooserSaid(launched('dev.averi.lab', chooser))).toBe(RESOLVER);
+    expect(chooserSaid(launched('dev.averi.lab', sheet))).toBe(RESOLVER);
+    expect(chooserSaid(deepLinkText('android', 'averilab://shared/open', chooser))).toBe(RESOLVER);
+    expect(chooserSaid(deepLinkText('android', 'averilab://shared/open', sheet))).toBe(RESOLVER);
+    expect(chooserSaid(launched('dev.averi.lab'))).toBeUndefined();
+    expect(chooserSaid(`Launched dev.averi.lab on android\n⚠ its chooser (${RESOLVER}) was dismissed`)).toBeUndefined();
+    expect(chooserSaid(deepLinkText('android', 'averilab://cell/x', { holder: 'none' }))).toBeUndefined();
+  });
+
+  it('linkHeldSaid: a link whose headline is the chooser, not "Opened"', () => {
+    expect(linkHeldSaid(deepLinkText('android', 'averilab://shared/open', chooser))).toBe(true);
+    expect(linkHeldSaid(deepLinkText('android', 'averilab://shared/open', { holder: 'none' }))).toBe(false);
+    expect(linkHeldSaid(launched('dev.averi.lab', chooser))).toBe(false);
+  });
+
+  it('warnedSaid: any ⚠ line under the headline, none on a plain one', () => {
+    expect(warnedSaid(launched('dev.averi.lab', chooser))).toBe(true);
+    expect(warnedSaid(launchText('android', { app: 'dev.averi.lab', wiped: 'x' }))).toBe(true);
+    expect(warnedSaid(launched('dev.averi.lab'))).toBe(false);
+    expect(warnedSaid(launched('dev.averi.lab/.Twin'))).toBe(false);
+    expect(warnedSaid('Launched dev.averi.lab on android ⚠ inline')).toBe(false);
   });
 });

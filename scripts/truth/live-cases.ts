@@ -5,6 +5,7 @@ import type { Platform } from '../differential/corpus.js';
 import { familyOf } from './catalog.js';
 import { LAB_APP } from './lab-device.js';
 import { CAROUSEL_CASES, hedgedCeiling, type DeviceLog, type PreDragged, type Shorten, type SwipeEntry } from './live-carousel.js';
+import { CHOOSER_CASES, type FocusReads } from './live-chooser.js';
 import { knownEntry, knownLive } from './live-known.js';
 import { judgeFullWindow, judgeHeldNo } from './live-ensure.js';
 import { FLOATING_PANEL_EVIDENCE, holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, refusedCapped, refusedKept, refusedOnFocus, refusedUnchanged, short, type Source, valueOf } from './live-forms.js';
@@ -15,7 +16,7 @@ import { appOf, labId, labSelector, parseLabApp, type Catalog, type CellTruth, t
 /**
  * The live golden's cases and their judging, no device (run-case.ts runs one on a device, scripts/truth/live.ts is the CLI): the forms
  * cases, the visibility cases built from the cells' static truth, the dismissal cases, the carousel group's
- * (live-carousel.ts); `wantsLateRead` and `judged` (a case's reads, the
+ * (live-carousel.ts), the chooser group's (live-chooser.ts); `wantsLateRead` and `judged` (a case's reads, the
  * late one included: the one home of that rule); `summarize` (the report and the exit code, against live-known.ts); and `rejudge` — a recorded
  * run judged again by this checkout's judges, in process: what `live.ts --rejudge <record>` prints, and what
  * tests/truth/live-rejudge.test.ts reads without a node process a record.
@@ -80,12 +81,14 @@ export interface CaseRecord {
   preDrag?: PreDragged;
   /** A carousel case's strokes as averi drew them during its calls, a dropped one marked (CaseReads.swipes). */
   swipes?: SwipeEntry[];
+  /** A chooser case's focus reads: before, between and after its calls, and after a teardown (CaseReads.focus). */
+  focus?: FocusReads;
 }
 
 // --- the cases ---
 
 export interface Call {
-  tool: 'type_text' | 'tap' | 'scroll_until' | 'assert' | 'run_flow' | 'press_key' | 'ensure_state' | 'ui_snapshot' | 'swipe';
+  tool: 'type_text' | 'tap' | 'scroll_until' | 'assert' | 'run_flow' | 'press_key' | 'ensure_state' | 'ui_snapshot' | 'swipe' | 'launch_app' | 'open_deep_link';
   args: Record<string, unknown>;
 }
 
@@ -106,11 +109,17 @@ export interface CaseReads {
   swipes?: { drop?: readonly number[]; shorten?: Shorten };
   /** Never read again after a first read not ok (wantsLateRead): a later read would let a fling finish behind the reply's back. */
   late?: false;
+  /**
+   * Android: the device's word on what is in front and on the activity stack (AndroidLab.focus, live-chooser.ts#FocusRead),
+   * read before the calls, between them and after them (RunRecord `focus`, the judge's `log.focus`); a chooser left in
+   * front after them is dropped with one BACK and read again (`focus.teardown`), so the next case does not start over it.
+   */
+  focus?: true;
 }
 
 export interface Case extends RunsUnder {
   id: string;
-  group: 'forms' | 'visibility' | 'dismissal' | 'ensure' | 'carousel';
+  group: 'forms' | 'visibility' | 'dismissal' | 'ensure' | 'carousel' | 'chooser';
   cell: string;
   says: string;
   /** What it reads besides the launch and the final state. */
@@ -144,6 +153,12 @@ export interface Case extends RunsUnder {
    * (live-carousel.ts#preDrag) — `launched` is then the state read after it.
    */
   preDrag?: number;
+  /**
+   * Android, the chooser group: once launched, the lab is force-stopped and HOME pressed, so the calls start from the
+   * launcher (AndroidLab.toLauncher; lc4', lc4''). `launched` stays the launch's state, the last the app wrote; the
+   * focus read before the calls is what says the launcher is in front.
+   */
+  fromLauncher?: true;
   calls: Call[];
   /**
    * `launched`: the model as the launch left it, before any call — what a LOUD case's field held. `after[i]`: the state
@@ -620,7 +635,7 @@ export interface Selection {
   onlyCells?: readonly string[];
 }
 
-/** The cases of a run, in the order it runs them: the forms, the ensure group's, the carousel group's, then the visibility cells', then the dismissal's. */
+/** The cases of a run, in the order it runs them: the forms, the ensure group's, the carousel group's, the chooser group's, then the visibility cells', then the dismissal's. */
 export async function selectCases({ platform, app, groups, only, onlyCells }: Selection): Promise<Case[]> {
   const catalog = await catalogOf();
   const heldOf = (cell: string): HeldSpec => {
@@ -632,6 +647,7 @@ export async function selectCases({ platform, app, groups, only, onlyCells }: Se
     ...FORMS.map((c) => ({ ...c, group: 'forms' as const })),
     ...ENSURE.map(({ judgeOf, ...c }) => ({ ...c, group: 'ensure' as const, judge: judgeOf(heldOf(c.cell)) })),
     ...CAROUSEL_CASES.map((c) => ({ ...c, group: 'carousel' as const })),
+    ...CHOOSER_CASES.map((c) => ({ ...c, group: 'chooser' as const })),
   ];
   if (groups.includes('visibility')) {
     for (const truth of await truthsOf(platform, app)) {
@@ -681,10 +697,11 @@ export type RejudgeSelection = Omit<Selection, 'platform' | 'app'> & { app?: Lab
 export const LATE_READ_MS = 3_000;
 
 /** What a case's judges weigh: a record's fields, with a state to judge. */
-export type CaseEvidence = Pick<CaseRecord, 'source' | 'replies' | 'launched' | 'after' | 'late' | 'swipes'> & { state: LabState };
+export type CaseEvidence = Pick<CaseRecord, 'source' | 'replies' | 'launched' | 'after' | 'late' | 'swipes' | 'focus'> & { state: LabState };
 
 /** The case's judge on one state, over this evidence. */
-const judgeOn = (c: Case, r: CaseEvidence, state: LabState): LiveVerdict => c.judge(state, r.replies, r.source, r.launched, r.after, r.swipes === undefined ? {} : { swipes: r.swipes });
+const judgeOn = (c: Case, r: CaseEvidence, state: LabState): LiveVerdict =>
+  c.judge(state, r.replies, r.source, r.launched, r.after, { ...(r.swipes !== undefined && { swipes: r.swipes }), ...(r.focus !== undefined && { focus: r.focus }) });
 
 /**
  * Whether a case is read again: its first read is not ok (a model that catches up was the app's lag, not a lost value)

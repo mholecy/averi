@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Case } from '../../scripts/truth/live-cases.js';
+import type { FocusRead } from '../../scripts/truth/live-chooser.js';
 import type { LiveVerdict } from '../../scripts/truth/live-visibility.js';
 import { runCase, type CaseRig } from '../../scripts/truth/run-case.js';
 import type { LabState } from '../../scripts/truth/schema.js';
@@ -317,3 +318,79 @@ describe('runCase: after the calls', () => {
   });
 });
 
+
+describe('runCase: the focus reads and the launcher start (the chooser group, T7b)', () => {
+  /** A focus read naming `focused` in front, its records the stack. */
+  const front = (focused: string, ...below: string[]): FocusRead => ({
+    window: `  mFocusedApp=ActivityRecord{1 u0 ${focused}} t1}\n`,
+    activities: [focused, ...below].map((c) => `    * Hist  #0: ActivityRecord{1 u0 ${c}} t1}\n`).join(''),
+  });
+  const LAB = front('dev.averi.lab/.MainActivity');
+  const HOME = front('launcher/.Home');
+  const CHOOSER = front('android/com.android.internal.app.ResolverActivity', 'dev.averi.lab/.MainActivity');
+  const twoCalls = [{ tool: 'open_deep_link', args: {} }, { tool: 'launch_app', args: {} }] as Case['calls'];
+
+  it('focus: read before the calls, between them, and after the final state; kept in the record, handed to the judge', async () => {
+    const lab = new FakeAndroidLab({ launched: read('launch'), states: [read('final')], focus: [LAB, CHOOSER, LAB] });
+    let logged: unknown;
+    const c = aCase({ calls: twoCalls, reads: { focus: true, late: false }, judge: (_s, _r, _so, _l, _a, log) => ((logged = log), OK) });
+    const run = await runCase(c, 'uiautomator', rigOver(lab, ['1', '2']));
+    expect(lab.log).toEqual(['launch c', 'focus', 'call open_deep_link under uiautomator-x1.yaml', 'focus', 'call launch_app under uiautomator-x1.yaml', 'pause 800', 'state', 'focus']);
+    expect(run.record.focus).toEqual({ before: LAB, between: [CHOOSER], after: LAB });
+    expect(logged).toEqual({ focus: { before: LAB, between: [CHOOSER], after: LAB } });
+    expect(Object.keys(run.record)).toEqual(['source', 'id', 'replies', 'launched', 'after', 'state', 'focus']);
+  });
+
+  it('focus: the chooser left in front after the calls is dropped with one BACK, after the verdict and its screenshot, and read again', async () => {
+    const lab = new FakeAndroidLab({ launched: read('launch'), states: [read('final')], focus: [LAB, CHOOSER, LAB] });
+    const NOT: LiveVerdict = { outcome: 'MISMATCH', why: 'x' };
+    const run = await runCase(aCase({ reads: { focus: true, late: false }, judge: () => NOT }), 'uiautomator', rigOver(lab, ['1'], { keepShot: async () => undefined }));
+    expect(lab.log).toEqual(['launch c', 'focus', 'call tap under uiautomator-x1.yaml', 'pause 800', 'state', 'focus', 'screenshot', 'back', 'focus']);
+    expect(run.record.focus).toEqual({ before: LAB, between: [], after: CHOOSER, teardown: LAB });
+    expect(run.verdict).toEqual(NOT);
+  });
+
+  it('focus: a chooser on the stack but not in front, or no chooser, or an unread read: no BACK', async () => {
+    for (const after of [front('dev.averi.lab/.MainActivity', 'android/com.android.internal.app.ResolverActivity'), LAB, { error: 'offline' }]) {
+      const lab = new FakeAndroidLab({ launched: read('launch'), states: [read('final')], focus: [LAB, after] });
+      const run = await runCase(aCase({ reads: { focus: true, late: false } }), 'uiautomator', rigOver(lab));
+      expect(lab.log).not.toContain('back');
+      expect(run.record.focus).toEqual({ before: LAB, between: [], after });
+    }
+  });
+
+  it('focus: a chooser still in front after the BACK is said through the note', async () => {
+    const lab = new FakeAndroidLab({ launched: read('launch'), states: [read('final')], focus: [LAB, CHOOSER, CHOOSER] });
+    const notes: string[] = [];
+    await runCase(aCase({ reads: { focus: true, late: false } }), 'uiautomator', rigOver(lab, ['1'], { note: (l) => void notes.push(l) }));
+    expect(notes).toEqual(['uiautomator x1: the chooser is still in front after one BACK (android/com.android.internal.app.ResolverActivity)']);
+  });
+
+  it('fromLauncher: the lab sent to the launcher after the launch, before the first focus read and the calls', async () => {
+    const lab = new FakeAndroidLab({ launched: read('launch'), states: [read('final')], focus: [HOME, LAB] });
+    const run = await runCase(aCase({ fromLauncher: true, reads: { focus: true, late: false } }), 'uiautomator', rigOver(lab));
+    expect(lab.log).toEqual(['launch c', 'toLauncher', 'focus', 'call tap under uiautomator-x1.yaml', 'pause 800', 'state', 'focus']);
+    expect(run.record.launched).toEqual(read('launch'));
+    expect(run.record.focus?.before).toEqual(HOME);
+  });
+
+  it('fromLauncher or focus on a lab with neither (iOS): SKIP, the launch done, no call', async () => {
+    for (const [over, why] of [
+      [{ fromLauncher: true }, "a start from the launcher is the Android lab's only"],
+      [{ reads: { focus: true } }, "a focus read is the Android lab's only"],
+    ] as const) {
+      const lab = new FakeLab({ launched: read('launch') });
+      const run = await runCase(aCase(over), 'idb', rigOver(lab));
+      expect(lab.log).toEqual(['launch c']);
+      expect(run.verdict).toEqual({ outcome: 'SKIP', why });
+      expect(run.record).not.toHaveProperty('focus');
+    }
+  });
+
+  it('no focus declared on Android: no focus read, no BACK', async () => {
+    const lab = new FakeAndroidLab({ launched: read('launch'), states: [read('final')], focus: [CHOOSER] });
+    const run = await runCase(aCase(), 'uiautomator', rigOver(lab));
+    expect(lab.log).toEqual(['launch c', 'call tap under uiautomator-x1.yaml', 'pause 800', 'state']);
+    expect(run.record).not.toHaveProperty('focus');
+  });
+});
