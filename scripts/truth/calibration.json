@@ -234,6 +234,12 @@
           "why": "the cover judgement 13d68a2 introduced reads a React Native field's floating label, overhanging its EditText by 3 px past the 2-px own-label allowance, as under its own field (green at 16ae6bb: round 7's RN corpus, captured after the fact, shows it) — lab note LR2 (docs/bugs/2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it.md), fixed by A8's ce19c23 (the overhang half a percent of the screen's shorter side, 5 px here), f3a7043 keeping it green"
         },
         {
+          "rows": ["android-rn-averi_lab-api33/rn-format.xml G tap", "android-rn-averi_lab-api33/rn-format.xml G scroll_until", "android-rn-averi_lab-api33/rn-format.xml A tap", "android-rn-averi_lab-api33/rn-format.xml A scroll_until", "android-rn-averi_lab-api33/rn-format-eager.xml E tap", "android-rn-averi_lab-api33/rn-format-eager.xml E scroll_until", "android-rn-averi_lab-api33/rn-format-eager.xml P tap", "android-rn-averi_lab-api33/rn-format-eager.xml P scroll_until"],
+          "broke": "13d68a2",
+          "fixed": "ce19c23",
+          "why": "rn-field's shape (LR2) in the two RN format cells, captured after the last full calibrate: a React Native field's floating label overhanging its EditText read as under its own field by 13d68a2's cover judgement (green at 16ae6bb), fixed by A8's ce19c23, f3a7043 keeping it green — rn-format captured by D18 (e5e70767, 2026-10-31), rn-format-eager by T6 (2026-11-09); found by T6's full calibrate and checked by golden --side --only rn-format,rn-format-eager: red at ce19c23^ (565bcb9), green at ce19c23 and f3a7043"
+        },
+        {
           "rows": ["ios-rn-iphone17-ios27/rn-field.wda.json N tap", "ios-rn-iphone17-ios27/rn-field.wda.json N scroll_until", "ios-rn-iphone17-ios27/rn-field.wda.json M tap", "ios-rn-iphone17-ios27/rn-field.wda.json M scroll_until"],
           "broke": "13d68a2",
           "fixed": "ce19c23",

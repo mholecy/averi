@@ -61,10 +61,9 @@ export interface CatalogTarget {
    * With `mayBeAbsent` only, and always with it (catalog.ts#buildCatalog): the direction its scroll view lays it out in
    * once scrolled — right of the first card for the L7 carousels' C. The capture keeps it on the absent entry
    * (AbsentTarget.toward), where golden asks scroll_until for it that way (golden-spec/edges.ts#absentRows): with no
-   * frame, truth.ts#directionOf has nothing to read a direction from.
+   * frame, truth.ts#directionOf has nothing to read a direction from. The same union as truth.ts#Direction, spelled
+   * out: truth.ts imports this module, so importing it back would point the schema at the code that reads it.
    */
-  // The same union as truth.ts#Direction, spelled out: truth.ts imports this module, so importing it back would point
-  // the schema at the code that reads it.
   toward?: 'up' | 'down' | 'left' | 'right';
 }
 
