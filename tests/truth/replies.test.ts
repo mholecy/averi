@@ -5,7 +5,7 @@ import type { MarkedLayer } from '../../src/ui-tree/presentation.js';
 import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, missNote, withMissNote } from '../../src/ui-tree/miss.js';
 import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
 import { boundText, describeScrollResult, flushText } from '../../src/interact/scroll-text.js';
-import { CAROUSEL_REPLY_WORDS, carouselReply, MAX_SWIPES, flushProbedSide, idbReasonsSaid, inferredAxisSaid, noIdListedSaid, OCR_FAILED_CLOSED, presentedRemedySaid, windowHintSaid, heldCutHedged, bandSaid, directionNamed, UNCHANGED_SAID, LIVE_REPLY_WORDS, refusedUnsentSaid, scrollVerdictSaid, underBarRemedySaid, untriedSideSaid } from '../../scripts/truth/replies.js';
+import { CAROUSEL_REPLY_WORDS, carouselReply, MAX_SWIPES, flushProbedSide, flushProbesSaid, idbReasonsSaid, inferredAxisSaid, noIdListedSaid, OCR_FAILED_CLOSED, presentedRemedySaid, windowHintSaid, heldCutHedged, bandSaid, directionNamed, UNCHANGED_SAID, LIVE_REPLY_WORDS, refusedUnsentSaid, scrollVerdictSaid, underBarRemedySaid, untriedSideSaid } from '../../scripts/truth/replies.js';
 import { refusalOf, type Typeable } from '../../src/adapters/typeable.js';
 import { revealText } from '../../src/ui-tree/sides.js';
 import { untriedSideText } from '../../src/interact/target-text.js';
@@ -81,6 +81,12 @@ describe('flushProbedSide: the probed side in both forms src builds (src/interac
       expect(flushProbedSide(`fully visible after 1 swipe${flushText({ edge, container, checked: true })}`)).toBe(edge);
       expect(flushProbedSide(`fully visible after 2 swipes${flushText({ edge, container, pinned, checked: true })}`)).toBe(edge);
     }
+  });
+
+  it('flushProbesSaid: how many probes the checked clause claims — 1 for "a probe swipe", n for "n probe swipes", none elsewhere', () => {
+    expect(flushProbesSaid(`fully visible after 2 swipes${flushText({ edge: 'top', container, checked: true })}`)).toBe(2);
+    expect(flushProbesSaid("fully visible after 1 swipe; its bottom edge lies on its scroll container's (0,303 1080x605), and a probe swipe toward it moved nothing — nothing of it is cut there")).toBe(1);
+    expect(flushProbesSaid(`fully visible after 1 swipe${flushText({ edge: 'top', container, checked: false, why: 'budget' })}`)).toBeUndefined();
   });
 
   it('the wording before T12 (one probe), as records kept from then say it', () => {

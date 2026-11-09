@@ -1,8 +1,8 @@
-import { CHECKED_AFTER_HOLDS } from '../../src/interact/flush-check.js';
+import { countOf } from '../../src/util/count.js';
 import { UNMOVED_STROKES_EXHAUST } from '../../src/interact/scroll-rounds.js';
 import type { Platform } from '../differential/corpus.js';
 import type { CaseReads } from './live-cases.js';
-import { refusedAfterDismissal, replyKind, screenChangedSaid, screenUnchangedFor, swipesOf, turnsSaid, type ReplyKind, heldCutHedged, untriedSideSaid, directionNamed } from './replies.js';
+import { flushProbesSaid, refusedAfterDismissal, replyKind, screenChangedSaid, screenUnchangedFor, swipesOf, turnsSaid, type ReplyKind, heldCutHedged, untriedSideSaid, directionNamed } from './replies.js';
 import type { CellTruth, Geometry, LabState, ProbeEvent, Rect, Stroke, TargetTruth } from './schema.js';
 import { askedUnlistedBy, contractOf, judgedContext, stopHolds, type StopAsk, type TapAsk } from './target-contract.js';
 import { axisOf, bandsOf, directionOf, geometryOf, intersect, selectorOf, type Direction, type GeometryContext } from './truth.js';
@@ -704,8 +704,9 @@ function atRestCase(cell: string, t: TargetTruth, view: string): VisibilityCase 
 
 /**
  * An at-rest case's judge (AT_REST): judgeScroll's `fully` stop and tap — and on top, the target whole where it was
- * launched: no more swipes said than the probes a held stop takes (`CHECKED_AFTER_HOLDS`: one before T12, two since —
- * the first probe that held is sent again), and no stroke of `view` the app logged moved it (the probes toward the
+ * launched: no more swipes said than the probes the reply itself claims moved nothing (`flushProbesSaid`: "a probe
+ * swipe" before T12, "2 probe swipes" since — the first probe that held is sent again; one when it claims none), so a
+ * revert or one stroke more is a break either way, and no stroke of `view` the app logged moved it (the probes toward the
  * header move nothing at offset 0). A stroke that moved it is the failure of reading the header as an overlay (the note).
  */
 export function judgeAtRest(tag: string, view: string, replies: readonly string[], final: LabState, launched: LabState, atStop: LabState = final): LiveVerdict {
@@ -714,7 +715,10 @@ export function judgeAtRest(tag: string, view: string, replies: readonly string[
   const [scroll] = replies;
   const swipes = swipesOf(scroll) ?? 0;
   const moved = strokesSince(atStop, launched).filter((s) => s.view === view && Math.abs(s.to - s.from) > MOVE_SLACK);
-  const breaks = [...(swipes > CHECKED_AFTER_HOLDS ? [`${swipes} swipes where ${CHECKED_AFTER_HOLDS} probes settle it`] : []), ...moved.map((s) => `a stroke moved ${view} ${round(s.from)}→${round(s.to)}`)];
+  const claimed = flushProbesSaid(scroll);
+  const probes = claimed ?? 1;
+  const over = claimed === undefined ? `${swipes} swipes where one probe settles it` : `${swipes} swipes where the reply claims ${countOf(claimed, 'probe')}`;
+  const breaks = [...(swipes > probes ? [over] : []), ...moved.map((s) => `a stroke moved ${view} ${round(s.from)}→${round(s.to)}`)];
   return breaks.length === 0 ? verdict : { outcome: 'MISMATCH', cls: 'R-direction', kind: verdict.kind, why: `R-direction (at rest): ${breaks.join('; ')} — averi: ${short(scroll)}`, app: verdict.app };
 }
 

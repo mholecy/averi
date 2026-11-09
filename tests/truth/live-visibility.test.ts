@@ -181,6 +181,10 @@ describe('judgeAtRest — a first row at rest flush under its sticky header (VA1
     expect(judgeAtRest('R', 'list', [TWICE.replace('after 2 swipes', 'after 3 swipes'), 'Tapped'], fired, launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/3 swipes/) });
     expect(judgeAtRest('R', 'list', ['ERROR scroll_until failed after 4 swipes', 'Tapped'], fired, launched)).toMatchObject({ outcome: 'MISMATCH' });
   });
+  it('the swipes held to the probes the reply itself claims: a T12 revert (2 swipes, "a probe swipe"), or one stroke more than "2 probe swipes" (3), is a MISMATCH', () => {
+    expect(judgeAtRest('R', 'list', [VISIBLE.replace('after 1 swipe', 'after 2 swipes'), 'Tapped'], fired, launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/2 swipes where the reply claims 1 probe/) });
+    expect(judgeAtRest('R', 'list', [TWICE.replace('after 2 swipes', 'after 3 swipes'), 'Tapped'], fired, launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/3 swipes where the reply claims 2 probes/) });
+  });
   it('visibilityCases asks it of scroll-sticky-rest\'s R on Android, down, fully: true', () => {
     const t: TargetTruth = { tag: 'R', id: 'lab.scroll-sticky-rest.R', color: '#00897B', declared: 'open', frame: { x: 128, y: 457, width: 825, height: 176 }, reached: true, probe: [], drawn: 1, seen: '#00897B', geometry: 'whole', scrollView: 'list' };
     const cs = visibilityCases({ cell: 'scroll-sticky-rest', layer: 'none', device: 'd', screen: { width: 1080, height: 2220 }, scale: 1, targets: [t], scrollViews: { list: { x: 0, y: 303, width: 1080, height: 1238 } } }, 'android');

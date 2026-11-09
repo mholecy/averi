@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { isCut } from '../../scripts/truth/live-carousel.js';
-import type { CaseRecord, RunRecord } from '../../scripts/truth/live-cases.js';
+import { rejudgedResults, type CaseRecord, type RunRecord } from '../../scripts/truth/live-cases.js';
 import { carouselReply, swipesOf } from '../../scripts/truth/replies.js';
 
 /**
@@ -39,6 +39,32 @@ describe('T12: lv-t12-drop-first, the first probe after the pre-drag dropped', (
     for (const prefix of ['drop-first', 'residual', 'pins', 'settings', 'rest-max1', 'vis']) {
       expect(files(prefix).length).toBeGreaterThan(0);
       for (const f of files(prefix)) expect(read(f).deviceState).toMatchObject({ before: { short: 0 }, after: { short: 0 }, disagree: false });
+    }
+  });
+});
+
+/** Each record of `prefix` rejudged by this checkout's judges (live-cases.ts#rejudgedResults), the verdicts of case `id`. */
+async function verdicts(prefix: string, group: 'carousel' | 'visibility', id: string) {
+  const out = [];
+  for (const f of files(prefix)) out.push(...(await rejudgedResults(read(f), { groups: [group] })).filter((r) => r.c.id === id).map((r) => r.verdict));
+  return out;
+}
+
+describe('T12: the records rejudged by this checkout\'s judges', () => {
+  it('drop-first base: 8 of 8 MISMATCH fully-cut; fix: 8 of 8 ok, maxSwipes-hedged', async () => {
+    const base = await verdicts('drop-first-base', 'carousel', 'lv-t12-drop-first');
+    expect(base).toHaveLength(8);
+    for (const v of base) expect(v).toMatchObject({ outcome: 'MISMATCH', cls: 'fully-cut' });
+    const fix = await verdicts('drop-first-fix', 'carousel', 'lv-t12-drop-first');
+    expect(fix).toHaveLength(8);
+    for (const v of fix) expect(v).toMatchObject({ outcome: 'ok', why: expect.stringMatching(/^maxSwipes-hedged, C cut /) });
+  });
+
+  it('pins: sticky-rest R ok on every run of both arms', async () => {
+    for (const arm of ['pins-base', 'pins-fix']) {
+      const r = await verdicts(arm, 'visibility', 'rest:scroll-sticky-rest.R.fully');
+      expect(r).toHaveLength(4);
+      for (const v of r) expect(v.outcome).toBe('ok');
     }
   });
 });

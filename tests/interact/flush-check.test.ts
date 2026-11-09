@@ -383,6 +383,34 @@ describe('the flush check doubts a first probe that held (T12)', () => {
     expect(said(seeFlush(sent(once.verdict), stopAt(flushOn('bottom', 40))))).toEqual(CHECKED);
   });
 
+  it('held, then moved, then back on the same rect: its next hold is doubted again, not checked — the slot does not outlive a move', () => {
+    const off = seeFlush(sent(heldOnce().verdict), stopAt({ x: 128, y: 1200, width: 825, height: 176 }));
+    const back = seeFlush(off.check, stopAt(flushOn('bottom', 22)));
+    expect(said(back)).toEqual(FIRST);
+    const once = seeFlush(sent(back.verdict), stopAt(flushOn('bottom', 22)));
+    expect(said(once)).toEqual(FIRST);
+    expect(said(seeFlush(sent(once.verdict), stopAt(flushOn('bottom', 22))))).toEqual(CHECKED);
+  });
+
+  it('a read that judges no stop between: the next hold on the same rect is doubted again', () => {
+    const resent = sent(heldOnce().verdict);
+    const none = seeFlush(resent, undefined);
+    const back = seeFlush(none.check, stopAt(flushOn('bottom', 22)));
+    expect(said(seeFlush(sent(back.verdict), stopAt(flushOn('bottom', 22))))).toEqual(FIRST);
+  });
+
+  it('a held probe toward another edge from the same rect is doubted again: the slot is by rect AND edge', () => {
+    const row = flushOn('bottom', 22);
+    // A list whose top lies on the row's top: the same rect, flush on that list's top instead.
+    const below: Rect = { x: 0, y: row.y, width: 1080, height: 400 };
+    const first = seeFlush(startFlush('down'), stopAt(row));
+    // The probe toward the bottom held, the row now flush on the top of the list below: doubted, a probe toward the top.
+    const towardTop = seeFlush(sent(first.verdict), stopAt(row, { list: below }));
+    expect(towardTop.verdict).toMatchObject({ of: 'probe', toward: 'up' });
+    // That one held too: its edge is not the one that held first — doubted again, not checked.
+    expect(seeFlush(sent(towardTop.verdict), stopAt(row, { list: below })).verdict).toMatchObject({ of: 'probe', toward: 'up' });
+  });
+
   it('no swipe or time left for the second: unchecked `budget`, never checked', () => {
     expect(said(heldOnce({ budget: false }))).toEqual({ of: 'flush', flush: { edge: 'bottom', container: LIST, checked: false, why: 'budget' } });
   });

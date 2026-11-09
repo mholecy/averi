@@ -223,6 +223,16 @@ export function flushProbedSide(reply: string): 'top' | 'bottom' | 'left' | 'rig
 }
 
 /**
+ * How many probes the checked flush clause claims moved nothing (src/interact/scroll-text.ts#flushText): 1 for "a probe
+ * swipe toward it moved nothing" (before T12), n for "n probe swipes toward it moved nothing" (since); undefined when
+ * the reply says neither.
+ */
+export function flushProbesSaid(reply: string): number | undefined {
+  const m = /(a probe swipe|(\d+) probe swipes) toward it moved nothing/.exec(reply);
+  return m === null ? undefined : m[2] === undefined ? 1 : Number(m[2]);
+}
+
+/**
  * What a refused dismissal names as lying over it — `toolbar` (#7's first half: SwiftUI's screen-sized Toolbar host, #19's
  * bar), `scrollable` (#7's second half: a scroll view shorter than the screen, its frame over the title) — read from the
  * guard's own clause (src/interact/keyboard-in-tree.ts:361, `none of the configured dismissals is usable on this screen

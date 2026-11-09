@@ -222,6 +222,7 @@ interface ProvenCut {
  * says the count.
  */
 export const CHECKED_AFTER_HOLDS = 2;
+// Not tunable: `Memory.heldFirst` is one slot, so the rule is two holds by construction; this names the count for the reply.
 
 declare const opaque: unique symbol;
 
@@ -251,7 +252,9 @@ interface Memory {
   readonly measured: readonly MeasuredStroke[];
   /**
    * The first probe that held with no proof (`SentProbe`: the match's rect and flush edge it was sent from), sent again
-   * since (T12): a probe from there that holds again is `checked`. One slot, the last such probe; undefined until one held.
+   * since (T12): the last probe held and nothing has moved since. A probe from there that holds again is `checked`.
+   * Cleared by the first read of a stop with no probe come back held — after a probe that moved the match, or after a
+   * read that judged no stop (which leaves no probe in flight): a match back on that rect after a move owes two holds anew.
    */
   readonly heldFirst: SentProbe | undefined;
 }
@@ -370,7 +373,8 @@ export function seeFlush(check: FlushCheck, stop: FlushStop | undefined): FlushS
   const doubtedFirst = stroked && proof === undefined && !heldBefore(m.heldFirst, probed);
   // A fresh proof is a measured stroke: how far it carried the match, for the aim floor (D68).
   const measured = fresh !== undefined && stop.drawn !== undefined ? [...m.measured, { drawn: strokeLength(stop.drawn), moved: fresh.revealed, edge: fresh.edge, container: fresh.container }] : m.measured;
-  const after: Memory = { ...m, probe: undefined, proven, measured, heldFirst: doubtedFirst ? probed : m.heldFirst };
+  // The slot lives only while probes hold (`Memory.heldFirst`): a probe that came back not held, or none in flight, clears it.
+  const after: Memory = { ...m, probe: undefined, proven, measured, heldFirst: doubtedFirst ? probed : held ? m.heldFirst : undefined };
   const came: Came = !held ? 'moved' : !stroked ? 'tap' : doubted || doubtedFirst ? 'doubted' : 'held';
   return { check: close(after), settles: held, waits: proven === undefined, verdict: verdictOf(after, stop, at, came) };
 }
