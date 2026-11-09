@@ -1,0 +1,31 @@
+commit aa9eb813f25c4ffb9381f4921f8961e0ea92532d (fix); base d71-base-3b7393ba
+before base-forms 20:45:10 host=[1.83 3.14 3.07] start_count=1 dev=[0.17 0.99 1.54 1/1639 14548] uptime=56657.16
+after base-forms rc=1 20:47:45 host=[4.72 3.44 3.16] start_count=1 dev=[2.49 1.58 1.67 1/1644 16464] uptime=56812.41
+before fix-forms 20:47:46 host=[4.72 3.44 3.16] start_count=1 dev=[2.49 1.58 1.67 1/1644 16470] uptime=56812.57
+after fix-forms rc=1 20:50:22 host=[2.89 3.24 3.12] start_count=1 dev=[2.36 1.91 1.79 1/1646 18522] uptime=56968.89
+before base-rn 20:50:22 host=[2.89 3.24 3.12] start_count=1 dev=[2.36 1.91 1.79 1/1646 18528] uptime=56969.06
+after base-rn rc=0 20:50:35 host=[2.68 3.18 3.10] start_count=1 dev=[2.12 1.89 1.78 1/1648 18762] uptime=56982.03
+before fix-rn 20:50:35 host=[2.68 3.18 3.10] start_count=1 dev=[2.12 1.89 1.78 1/1648 18768] uptime=56982.15
+after fix-rn rc=0 20:50:47 host=[2.30 3.07 3.07] start_count=1 dev=[2.03 1.87 1.78 2/1650 18993] uptime=56994.10
+done, device time 337 s
+
+D71's live regression, uiautomator on the lab AVD (emulator-5554, averi_lab, API 33), 2026-11-09. Base: src of
+3b7393ba from a git-archive extract (`--side`, its label scratch/d71-base-3b7393ba); fix: this checkout at aa9eb813
+(D71 built and reviewed). The harness is this checkout's for both arms.
+command  docs/truth/live-records/d71-append-landing/run.sh <scratchpad>/d71-base-3b7393ba 15
+device   start_count 1 → 1, uptime 56657.16 → 56994.10 (no restart); no install, no reset; 337 s of device time
+
+base-forms.json / fix-forms.json   p1, f13, f15, f16, g3, fp1, fp2 ok on both arms, the same replies byte for byte
+                                   (fp2 ok under ADR 0028 residual 3, its ⚠ line); p1o MISMATCH failed-holds on both
+base-rn.json / fix-rn.json         rfe2 ok on both (`--app react-native`)
+rc=1 on the forms runs is p1o's MISMATCH, not known (it is no committed case).
+
+p1o is no committed case: run.sh adds it to scripts/truth/live-cases.ts for the run and restores the file after
+(`git checkout`), the outer-space append the D71 review asked for — ` Jr. ` typed without clear after p1's prefill, the
+app holding `Jan Šťastný Jr. `. On both arms the uiautomator reading is the TRIMMED one (pre-D72: Android input values
+lose their outer spaces), `Jan Šťastný Jr.`, 15 characters: the typing's ` Jr. ` is not in it, and averi fails loudly
+by length ("typed 5 characters but the field shows 15"), nothing typed again (Android's `may-arrive-late`). A false
+failure, honest — D72's (its os1/os2 cases, on its branch), not D71's: D71's rule is not reached (the reading is not the
+value). The record cannot be rejudged by this checkout's harness, which has no p1o; the folder is outside
+tests/truth/live-records-replayed.test.ts's guard. Host paths in the logs are replaced by <scratchpad> and
+<worktree d71>.

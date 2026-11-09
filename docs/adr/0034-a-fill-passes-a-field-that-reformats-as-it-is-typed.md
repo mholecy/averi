@@ -938,9 +938,15 @@ too (10). fill-landing cold score: recorded at merge.
 
 **Golden and live.** The golden replays tree reads and never types: Changed 0 against 3b7393ba. The unit tests are the
 evidence (fill-landing.test.ts's D71 group and the flipped pin, fill-type.test.ts's `55` refused and `55` then `555`
-landed on both deliveries, fill.test.ts's reply and its unnamed-placeholder rows with and without clear). Live:
-pending, a uiautomator regression of the no-clear cases p1, f13, f15, f16, g3, fp1, fp2 and rfe2 on base and fix; idb
-and wda (g5 and the no-clear cases) on the owner's list.
+landed on both deliveries, fill.test.ts's reply and its unnamed-placeholder rows with and without clear). Live
+(2026-11-09, uiautomator on averi_lab API 33; docs/truth/live-records/d71-append-landing/, base 3b7393ba by `--side` and
+the fix at aa9eb813, the same harness; start_count 1 → 1, 337 s of device time): p1, f13, f15, f16, g3, fp1, fp2 and
+rfe2 ok on both arms, every reply byte for byte the same — no live case reads the shape D71 refuses, as Consequences
+expects. The outer-space append the review asked for (p1o, a case added for the run only: ` Jr. ` typed without clear
+after p1's prefill) is a MISMATCH failed-holds on both arms, the same reply: the app holds `Jan Šťastný Jr. `, but
+uiautomator's reading is trimmed (pre-D72), `Jan Šťastný Jr.`, which does not hold the typed ` Jr. `, and the fill fails
+loudly by length — D72's false failure, not D71's (the reading is not the value). idb and wda (g5 and the no-clear
+cases) are on the owner's list.
 
 ## Residuals accepted
 
