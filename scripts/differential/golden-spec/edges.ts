@@ -27,17 +27,21 @@ import { absentFullyRow, colourFails, directionRow, fullyRow, stopRow, strokeRow
  * outside-scroll-view rows accept a target missing from the tree where its capture's tree of that source did not list
  * it — as each row asks it: the tap and the stroke by truth.ts#selectorOf (askedUnlistedBy: a text target's string), the
  * colour by its identifier (unlistedBy); R-stroke asks every touch-down inside the target's own scroll view where the truth names one
- * (rows.ts#strokeRow).
+ * (rows.ts#strokeRow) — for a target its tree does not list, only where `tree`, the replayed tree's payload, lists that
+ * scroll view a scroller, and then a touch-down beside it passes when the reply names it (StrokeOptions.namedSuffices,
+ * D76); with no tree, the screen's region only.
  *
  * A target laid out nowhere (CellTruth.absent: no frame, so no geometry) is asked absentRows' R-absent rows below.
  */
-export function edgeRows(platform: Platform, t: TargetTruth, cell: CellTruth, source: SourceKind, c: TargetContract): Expectation[] {
+export function edgeRows(platform: Platform, t: TargetTruth, cell: CellTruth, source: SourceKind, c: TargetContract, tree?: string): Expectation[] {
   // The tap and the stroke ask by truth.ts#selectorOf (a text target by its string), the colour assert by the identifier.
   const absent = askedUnlistedBy(t, source);
   const nodeAbsent = unlistedBy(t, source);
-  // A framed target its tree does not list: no scroll view asked of its strokes (no `scrollerListed`: why, and the gap
-  // it leaves, at rows.ts#StrokeOptions.scrollerListed; backlog D76).
-  const stroke = (row: string) => strokeRow(platform, t, cell, row, c.stop, directionOf(t, cell), { absent });
+  // A framed target its tree does not list, in a scroll view the replayed tree lists a scroller: a touch-down beside
+  // that scroll view passes only when the reply names it (`namedSuffices`: why not held inside outright, at
+  // rows.ts#StrokeOptions.namedSuffices; D76).
+  const namedSuffices = absent !== undefined && ownScrollerListed(t, cell, source, tree);
+  const stroke = (row: string) => strokeRow(platform, t, cell, row, c.stop, directionOf(t, cell), { absent, ...(namedSuffices && { namedSuffices }) });
   const fully = c.fully === undefined ? [] : [fullyRow(platform, t, cell, c.fully)];
   switch (c.geometry) {
     case 'off-screen':
@@ -81,8 +85,8 @@ function ownScrollerListed(t: Pick<TargetTruth, 'scrollView'>, cell: CellTruth, 
  * accept a reply that never found it where the capture's tree did not list it (askedUnlistedBy), judged by the swipes
  * sent for it: every touch-down inside its scroll view where the replayed tree lists that a scroller (D59b — on the L7
  * carousels a horizontal stroke over the page's vertical axis goes over the carousel of unknown axis, inside its band),
- * along `toward`'s axis (why only an absent target is held to its scroll view: rows.ts#StrokeOptions.scrollerListed;
- * backlog D76). What the contract asks of it is target-contract.ts#ABSENT_STOPS. No tap or colour row: nothing of it is
+ * along `toward`'s axis (why only an absent target is held to its scroll view outright: rows.ts#StrokeOptions.scrollerListed;
+ * a framed one the tree does not list is held to its scroll view or the reply's naming it, edgeRows, D76). What the contract asks of it is target-contract.ts#ABSENT_STOPS. No tap or colour row: nothing of it is
  * on the screen to tap or measure, and the off-screen rows already ask both of such targets.
  */
 export function absentRows(platform: Platform, a: AbsentTarget, cell: CellTruth, source: SourceKind, tree?: string): Expectation[] {

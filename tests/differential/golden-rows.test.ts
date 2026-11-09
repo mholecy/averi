@@ -553,16 +553,34 @@ describe('an absent target (CellTruth.absent: the L7 carousels\' C, not composed
   });
 });
 
-describe('R-stroke of a FRAMED target its tree does not list: its strokes are not held to its scroll view, even one the tree lists a scroller', () => {
+describe('R-stroke of a FRAMED target its tree does not list: a touch-down beside its scroll view the tree lists a scroller passes only when the reply names that scroll view (D76)', () => {
   // scroll-bounded's O and F on Android: rows of `lower`, one of two vertical lists, unlisted by uiautomator — averi
-  // cannot tell which list holds a row it never saw, so it strokes the largest. Only a target laid out nowhere
-  // (CellTruth.absent) is held inside its listed scroll view (absentExpectations, above).
+  // cannot tell which list holds a row it never saw, so it strokes the largest (T6: holding the strokes inside `lower`
+  // turned both rows red). Since D76 its exhausted stop names the listed scroll views the swipes did not go over: that
+  // is what is held. Only a target laid out nowhere (CellTruth.absent) is held inside outright (absentExpectations, above).
   const cell: CellTruth = { ...CELL, chrome: {}, scrollViews: { list: rect(0, 380, 402, 180) } };
   const off = target('off-screen', { frame: rect(51, 908, 300, 64), reached: false, probe: [], visible: null, scrollView: 'list', listed: { uiautomator: false } });
   const NEVER = 'ERROR scroll_until id:"lab.edges.A" failed after 2 swipes — element never appeared in the tree';
-  it('the list listed scrollable at its clip: a touch-down beside it is accepted, as averi never saw which list holds it', () => {
-    const rs = expectations('android', off, cell, 'uiautomator', '<hierarchy><node scrollable="true" bounds="[0,380][402,560]" /></hierarchy>');
-    expect(rs.find((r) => r.verb === 'scroll_until')!.says).toBe('R-off, R-stroke: swipes down for it, every touch-down clear of the bands and the chrome');
-    expect(verdict(rs, 'scroll_until', out(NEVER, ['adb shell input swipe 201 699 201 175 300']))).toBeUndefined();
+  const NAMED = 'ERROR scroll_until id:"lab.edges.A" failed after 2 swipes (… the tree shows another scroll view that scrolls vertically, which the swipes did not go over: scrollable (0,380 402x180) — …) — element never appeared in the tree';
+  const BESIDE = 'adb shell input swipe 201 699 201 175 300';
+  const LISTED = '<hierarchy><node scrollable="true" bounds="[0,380][402,560]" /></hierarchy>';
+  it('the list listed scrollable at its clip: a touch-down beside it is accepted when the reply names the list, red when it does not; one inside is accepted either way', () => {
+    const rs = expectations('android', off, cell, 'uiautomator', LISTED);
+    expect(rs.find((r) => r.verb === 'scroll_until')!.says).toBe('R-off, R-stroke: swipes down for it, every touch-down clear of the bands and the chrome and inside its scroll view list, or the reply names list (0,380 402x180)');
+    expect(verdict(rs, 'scroll_until', out(NAMED, [BESIDE]))).toBeUndefined();
+    expect(verdict(rs, 'scroll_until', out(NEVER, [BESIDE]))).toBe(`touched down outside its scroll view list at (201,699), and the reply does not name it (0,380 402x180): ${NEVER}`);
+    expect(verdict(rs, 'scroll_until', out(NEVER, ['adb shell input swipe 201 520 201 400 300']))).toBeUndefined();
+  });
+  it('a target the tree lists: held inside its scroll view outright — naming it is no excuse, averi saw where it lies', () => {
+    const rs = expectations('android', { ...off, listed: { uiautomator: true } }, cell, 'uiautomator', LISTED);
+    expect(rs.find((r) => r.verb === 'scroll_until')!.says).toBe('R-off, R-stroke: swipes down for it, every touch-down clear of the bands and the chrome and inside its scroll view list');
+    expect(verdict(rs, 'scroll_until', out(NAMED, [BESIDE]))).toMatch(/^touched down outside its scroll view list at \(201,699\): ERROR/);
+  });
+  it('the list not listed a scroller (or no tree given): the screen\'s region only, as before', () => {
+    for (const rs of [expectations('android', off, cell, 'uiautomator', '<hierarchy><node scrollable="false" bounds="[0,380][402,560]" /></hierarchy>'), expectations('android', off, cell, 'uiautomator')]) {
+      expect(rs.find((r) => r.verb === 'scroll_until')!.says).toBe('R-off, R-stroke: swipes down for it, every touch-down clear of the bands and the chrome');
+      expect(verdict(rs, 'scroll_until', out(NEVER, [BESIDE]))).toBeUndefined();
+    }
   });
 });
+

@@ -97,7 +97,7 @@ export function expectations(platform: Platform, t: TargetTruth, cell: CellTruth
   const g = c.geometry;
   // A text or label target is drawn on its own control: its colour is not asked (false-covers.ts#ownPartsRows).
   if (g === undefined || g === 'whole') return c.tap === undefined ? [] : t.text !== undefined ? text(ownPartsRows(platform, t, c, nodes)) : t.label !== undefined ? ownPartsRows(platform, t, c, nodes) : openRows(platform, t, c, nodes, { absent: askedUnlistedBy(t, source), nodeAbsent: unlistedBy(t, source) });
-  return cell === undefined ? [] : text([...edgeRows(platform, t, cell, source, c), ...barRows(platform, t, cell, source, c)]);
+  return cell === undefined ? [] : text([...edgeRows(platform, t, cell, source, c, tree), ...barRows(platform, t, cell, source, c)]);
 }
 
 /**

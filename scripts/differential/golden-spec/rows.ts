@@ -209,10 +209,17 @@ export interface StrokeOptions extends RowOptions {
    * not list is not held so (edges.ts#edgeRows): scroll-bounded's O and F on Android lie in `lower`, one of two
    * vertical lists, and averi strokes only the largest, its reply blaming exhaustion without naming `lower` — holding
    * them inside turned both rows red (T6). The absent-only condition stands in for "the named scroll view is the only
-   * listed scroller that could take the stroke"; the case of two along the stroke is backlog D76 (D59b's honesty
-   * class).
+   * listed scroller that could take the stroke"; the case of two along the stroke is `namedSuffices`.
    */
   scrollerListed?: boolean;
+  /**
+   * A framed target the tree does not list (`absent`), whose scroll view the replayed tree lists a scroller: a
+   * touch-down outside that scroll view passes only when the reply quotes its rect — averi strokes the largest scroller
+   * before it reads the target, and its exhausted stop names the listed scroll views along the stroke the swipes did not
+   * go over (D76, interact/stroke-plan.ts#strokedBeside). Set by edges.ts#edgeRows (scroll-bounded's O and F on
+   * Android, rows of `lower`).
+   */
+  namedSuffices?: boolean;
 }
 
 /**
@@ -231,13 +238,14 @@ export interface StrokeOptions extends RowOptions {
  */
 export function strokeRow(platform: Platform, t: StrokeTarget, cell: CellTruth, row: string, ask: StopAsk, direction: Direction, opts: StrokeOptions = {}): Expectation {
   const own = ownScrollView(t, cell, opts);
+  const named = opts.namedSuffices === true;
   return withAbsent(
     {
       verb: 'scroll_until',
       asks: ask,
-      says: `${row}, R-stroke: swipes ${direction} for it, ${touchDownClause(t, own)}`,
+      says: `${row}, R-stroke: swipes ${direction} for it, ${touchDownClause(t, own, named)}`,
       call: scrollCall(platform, t, direction),
-      judge: strokesJudge(t, cell, own, direction),
+      judge: strokesJudge(t, cell, own, direction, named),
     },
     opts,
   );
@@ -270,22 +278,27 @@ type StrokeTarget = Pick<TargetTruth, 'id' | 'text' | 'label' | 'scrollView'>;
  * The clip R-stroke holds every touch-down inside: the target's scroll view's, where the truth names it — and, for a
  * target the tree may not list (`absent`), only where the replayed tree lists that scroll view a scroller.
  */
-const ownScrollView = (t: StrokeTarget, cell: CellTruth, { absent, scrollerListed }: StrokeOptions): Rect | undefined =>
-  t.scrollView !== undefined && (absent === undefined || scrollerListed === true) ? cell.scrollViews?.[t.scrollView] : undefined;
+const ownScrollView = (t: StrokeTarget, cell: CellTruth, { absent, scrollerListed, namedSuffices }: StrokeOptions): Rect | undefined =>
+  t.scrollView !== undefined && (absent === undefined || scrollerListed === true || namedSuffices === true) ? cell.scrollViews?.[t.scrollView] : undefined;
 
-/** What R-stroke's `says` asks of the touch-downs: clear of the bands and the chrome, and inside `own` where given. */
-const touchDownClause = (t: StrokeTarget, own: Rect | undefined) => `every touch-down clear of the bands and the chrome${own === undefined ? '' : ` and inside its scroll view ${t.scrollView}`}`;
+/** A rect as averi's replies quote it (ui-tree/geometry.ts#rectText): `x,y wxh`. */
+const quotedRect = (r: Rect): string => `${r.x},${r.y} ${r.width}x${r.height}`;
 
-/** R-stroke's judge: a swipe; every touch-down strokeable, inside `own` where given; every swipe along `direction`'s axis. */
-function strokesJudge(t: StrokeTarget, cell: CellTruth, own: Rect | undefined, direction: Direction): (o: Outcome) => string | undefined {
+/** What R-stroke's `says` asks of the touch-downs: clear of the bands and the chrome, and inside `own` where given — or, `named`, the reply naming it. */
+const touchDownClause = (t: StrokeTarget, own: Rect | undefined, named = false) =>
+  `every touch-down clear of the bands and the chrome${own === undefined ? '' : ` and inside its scroll view ${t.scrollView}${named ? `, or the reply names ${t.scrollView} (${quotedRect(own)})` : ''}`}`;
+
+/** R-stroke's judge: a swipe; every touch-down strokeable, inside `own` where given (or the reply quoting `own`, `named`); every swipe along `direction`'s axis. */
+function strokesJudge(t: StrokeTarget, cell: CellTruth, own: Rect | undefined, direction: Direction, named = false): (o: Outcome) => string | undefined {
   return (o) => {
     if (swipes(o) === 0) return said(o, 'no swipe');
-    const beside = own === undefined ? [] : touchDowns(o).filter((p) => !within(p, own));
+    const beside = own === undefined || (named && o.reply.includes(quotedRect(own))) ? [] : touchDowns(o).filter((p) => !within(p, own));
+    const unnamed = named && own !== undefined ? `, and the reply does not name it (${quotedRect(own)})` : '';
     const axis = axisOf(direction);
     const across = strokes(o).filter(({ from, to }) => Math.abs(to[axis] - from[axis]) <= Math.abs(to[otherAxis(axis)] - from[otherAxis(axis)]));
     return (
       strokesOff(o, cell) ??
-      (beside.length === 0 ? undefined : `touched down outside its scroll view ${t.scrollView} at ${pointsText(beside)}: ${first(o)}`) ??
+      (beside.length === 0 ? undefined : `touched down outside its scroll view ${t.scrollView} at ${pointsText(beside)}${unnamed}: ${first(o)}`) ??
       (across.length === 0 ? undefined : `swiped across the ${axis} axis it scrolls ${direction} along, from ${pointsText(across.map((s) => s.from))}: ${first(o)}`)
     );
   };
