@@ -873,16 +873,26 @@ reading's length (fill-type.ts, `heldText(observed)`), one short per trimmed spa
 end, so `Jan ` of `Jan Novak` became `JJan Novak`. A clear of a field ending in a space counted short the same way.
 iOS already kept them (ios-node.ts).
 
-**Decision: the narrow fix, `text` alone.** The parser runs with `trimValues: false`, and an attribute value processor
-trims every attribute but `text` as before (`trimOuter`: after decoding, so it keeps at the edges a newline, a tab or a
-return — which uiautomator writes only as a reference, `&#10;`, `&#9;`, `&#13;`, never raw — exactly as the pre-decode
-trim did, and cuts every other whitespace). A text input's value is the raw `text`, outer spaces kept; a whitespace-only
-input keeps its value. A node's label drawn from `text` is trimmed, and content-desc, hint and resource-id stay trimmed,
-so `text:` and `label:` selectors match exactly as before.
+**Decision: the narrow fix, `text` and `hint` alone.** The parser runs with `trimValues: false`, and an attribute
+value processor trims every attribute but `text` and `hint` as before (`trimOuter`: after decoding, so it keeps at the
+edges a newline, a tab or a return — which uiautomator writes only as a reference, `&#10;`, `&#9;`, `&#13;`, never raw —
+and cuts every other whitespace). That is exactly the old trim for uiautomator's output; a space written as a reference
+at an edge (`&#32;`, `&#160;`), which uiautomator never writes, is cut now where the old trim kept it. A text input's
+value is the raw `text`, outer spaces kept; a whitespace-only input keeps its value. Its `hint` is kept raw too (review
+round 1, MINOR-1): it is the same kind of string, and a reading is compared with the placeholder exactly
+(fill-landing.ts, fill-clear.ts) — an empty field whose dump names `hint="Name "` and shows it as `text="Name "` reads
+empty, where a trimmed hint would make it 5 characters of content ("cleared 5 characters first" of an empty field). A
+node's label drawn from `text` is trimmed, and content-desc and resource-id stay trimmed, so matching through the LABEL
+is unchanged; the `value` path now sees the field's real text, as on iOS (Consequences).
 
-**Rejected: the global `trimValues: false`.** It would move every label and selector match: an app's `Close ` would no
-longer match `text:"Close"`, a change no case asked for. Also rejected: `v.trim()` in the processor — after decoding it
-would cut a leading or trailing `&#10;` the old trim kept, a label change beside the point.
+**Rejected: the global `trimValues: false`.** It would move every label match: an app's `Close ` would no longer match
+`text:"Close"`, a change no case asked for. Also rejected: `v.trim()` in the processor — after decoding it would cut a
+leading or trailing `&#10;` the old trim kept, a label change beside the point.
+
+**Sequencing.** D72 merges after D71. D72 makes the `1 `/`1` class reachable on Android: before it, a reading's outer
+space was trimmed away, so a no-clear `1 ` typed after `1` with a key dropped could not be read as it is. With D72
+alone that reading would reply a plain Filled; D71's refusal of that class is what D72's Android outer-space readings
+rely on.
 
 **Consequences.**
 - g2 under uiautomator (`SK3112000000` without clear into form-grouped's ibanEager, the app holding `SK31 1200 0000 `)
@@ -894,6 +904,13 @@ would cut a leading or trailing `&#10;` the old trim kept, a label change beside
   inserted `+421 ` is no longer silent (ADR 0028 residual 3, restated). The two `+421 ` pins in
   tests/adapters/android.test.ts are re-pinned so.
 - `ui_snapshot` shows an Android input's value with its outer spaces, as iOS does.
+- Selectors through the value change on Android (review round 1, MAJOR-1, accepted): the `value` path (`value:`,
+  `value~`, and `text:`, which asks a node's label and its value — selectors.ts#fieldValues; `assert`'s `text` and
+  `scroll_until`'s target the same) sees the field's real text, as on iOS. On an EditText with `content-desc="First
+  name"` holding `Jan `, `text:Jan`, `value:Jan` and `value~^Jan$` matched before and no longer do; `text:"Jan "` and
+  `value:"Jan "` match. The old match was against a falsified value. A flow that matched a trimmed Android value quotes
+  the space (`text:"Jan "`) or uses `~` (`value~^Jan`). An input with no content-desc still matches `text:Jan` through
+  its label, trimmed as before. Pinned in tests/adapters/android.test.ts.
 - Golden (`scripts/differential/golden.ts --corpus tests/fixtures/truth`, base 3b7393ba): 0 checks changed — no captured
   dump has a value with an outer space.
 

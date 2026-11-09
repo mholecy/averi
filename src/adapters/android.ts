@@ -1600,10 +1600,13 @@ export function parseUiautomatorXml(xml: string, drawnOverStrip: DrawnOverStrip)
     htmlEntities: true,
     // A text input's value keeps its outer spaces, as the app holds them (D72; iOS's reading does too, ios-node.ts):
     // the parser's own trim cut them, so `Jan ` read back `Jan` — a false failure, and with clear a wipe one short per
-    // space (`JJan `). `text` alone keeps them; every other attribute is trimmed as before (`trimOuter`), and a label
-    // drawn from `text` is trimmed in normalizeNode, so `text:` and `label:` selectors match as they did.
+    // space (`JJan `). `text` and `hint` keep them — a hint is compared with a reading exactly (fill-landing.ts), so an
+    // empty field showing `Name ` reads empty. Every other attribute is trimmed as before (`trimOuter`), and a label
+    // drawn from `text` is trimmed in normalizeNode: matching through the LABEL is unchanged. The `value` path
+    // (`value:`, and `text:`, which asks the value too) sees the field's real text, as on iOS — a flow that matched a
+    // trimmed Android value quotes the space (`text:"Jan "`) or uses `~`.
     trimValues: false,
-    attributeValueProcessor: (name: string, value: string) => (name === 'text' ? value : trimOuter(value)),
+    attributeValueProcessor: (name: string, value: string) => (name === 'text' || name === 'hint' ? value : trimOuter(value)),
     isArray: (name) => name === 'node',
   }).parse(xml);
   const roots: RawNode[] = parsed.hierarchy?.node ?? [];
@@ -1970,6 +1973,8 @@ function parseBounds(bounds: string | undefined): Rect {
  * An attribute's outer whitespace cut, as fast-xml-parser's `trimValues` cut it before D72 — but after the entities
  * are decoded, where the parser trimmed before: so a newline, a tab or a return, which uiautomator writes only as a
  * reference (`&#10;`, `&#9;`, `&#13;`, never raw), is kept at the edges as it was, and every other whitespace is cut.
+ * Exactly as before for uiautomator's output; a space written as a reference at an edge (`&#32;`, `&#160;`), which
+ * uiautomator never writes, is cut now where the old trim kept it.
  */
 function trimOuter(value: string): string {
   return value.replace(/^[^\S\n\t\r]+|[^\S\n\t\r]+$/g, '');

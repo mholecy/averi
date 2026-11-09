@@ -15,6 +15,7 @@ import { execErrorLikeExec } from '../helpers/exec-error.js';
 import { GBOARD, GBOARD_PANEL, GBOARD_STRIP, INPUT_SHOWN_LINE, parseDump, drawnOverStrip } from '../helpers/android-dumps.js';
 import { everyNode, type DeviceAdapter, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
+import { findAll } from '../../src/ui-tree/selectors.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
 import { resolveSettled } from '../../src/interact/resolve.js';
 import { FakeAdapter } from '../helpers/fake.js';
@@ -62,8 +63,9 @@ UI hierchary dumped to: /dev/tty`;
 describe('parseUiautomatorXml', () => {
   const tree = parseDump(UIAUTOMATOR_XML.slice(0, UIAUTOMATOR_XML.lastIndexOf('>') + 1));
 
-  // D72: a text input's value keeps its outer spaces, as the app holds them (iOS's too, ios-node.ts); what names a node
-  // — its label, content-desc, hint, resource-id — is trimmed as before, so `text:` and `label:` selectors match as before.
+  // D72: a text input's value keeps its outer spaces, as the app holds them (iOS's too, ios-node.ts), and so does a
+  // hint; what names a node — its label, content-desc, resource-id — is trimmed as before, so matching through the
+  // label is unchanged, while the `value` path (`value:`, and `text:`, which asks the value too) sees the real text.
   describe("a value's outer spaces (D72)", () => {
     it('an EditText holding `Jan ` reads value `Jan `, labelled `Jan`', () => {
       const field = parseDump('<hierarchy><node class="android.widget.EditText" text="Jan " bounds="[0,0][100,100]" /></hierarchy>');
@@ -75,15 +77,13 @@ describe('parseUiautomatorXml', () => {
       expect(field).toMatchObject({ role: 'textfield', value: 'Jan ', label: 'Jan' });
     });
 
-    it('a label drawn from text, a content-desc, a hint and a resource-id are trimmed as before', () => {
+    it('a label drawn from text, a content-desc and a resource-id are trimmed as before', () => {
       const tree = parseDump(`<hierarchy><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
         <node class="android.widget.TextView" text=" Close " bounds="[0,0][100,100]" />
         <node class="android.widget.Button" content-desc=" Send " resource-id=" app:id/send " bounds="[0,100][100,200]" />
-        <node class="android.widget.EditText" text="" hint=" IBAN " bounds="[0,200][100,300]" />
       </node></hierarchy>`);
       expect(tree.children[0]).toMatchObject({ label: 'Close', value: null });
       expect(tree.children[1]).toMatchObject({ label: 'Send', identifier: 'send' });
-      expect(tree.children[2]).toMatchObject({ value: null, placeholder: 'IBAN' });
     });
 
     it('an input holding only spaces keeps them as its value, and has no label', () => {
@@ -127,6 +127,29 @@ describe('parseUiautomatorXml', () => {
       expect(wipes).toEqual([4]);
       expect(out).toMatchObject({ kind: 'landed', observed: 'Jan Novak' });
       expect(held).toBe('Jan Novak'); // base: `JJan Novak`
+    });
+
+    // Review round 1, MAJOR-1: matching through the LABEL is unchanged; the `value` path sees the field's real text, as
+    // on iOS — a flow that matched a trimmed Android value quotes the space or uses `~`.
+    it('an input named by its content-desc: `text:"Jan"` no longer matches its value, `text:"Jan "` and `value:"Jan "` do', () => {
+      const tree = parseDump('<hierarchy><node class="android.widget.EditText" content-desc="First name" text="Jan " bounds="[0,0][100,100]" /></hierarchy>');
+      expect(findAll(tree, 'text:"Jan"')).toHaveLength(0);
+      expect(findAll(tree, 'text:"Jan "')).toHaveLength(1);
+      expect(findAll(tree, 'value:"Jan "')).toHaveLength(1);
+    });
+
+    it('an input with no content-desc still matches `text:Jan` through its label', () => {
+      const tree = parseDump('<hierarchy><node class="android.widget.EditText" text="Jan " bounds="[0,0][100,100]" /></hierarchy>');
+      expect(findAll(tree, 'text:Jan')).toHaveLength(1);
+    });
+
+    // Review round 1, MINOR-1: a hint is the same kind of string as text, compared with a reading exactly — kept untrimmed,
+    // so an empty field showing `Name ` reads empty, not as 5 characters to clear.
+    it('an empty input whose dump names `hint="Name "` and shows it as `text="Name "` reads empty', () => {
+      const field = parseDump('<hierarchy><node class="android.widget.EditText" text="Name " hint="Name " bounds="[0,0][100,100]" /></hierarchy>');
+      expect(field.placeholder).toBe('Name ');
+      const first = clearStep(startClear(field.placeholder), { value: field.value });
+      expect(first.step).toEqual({ do: 'done', facts: { cleared: 0, end: { kind: 'empty', placeholder: 'shown' } } });
     });
 
     it('the clear of a field holding `Jan ` deletes 4', () => {
