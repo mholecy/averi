@@ -95,6 +95,19 @@ all), and the screenshot says how much of the target is drawn as itself. The gol
   the host has one: inside a sandbox (or off macOS) the `ocr` rows are skipped and counted, never red;
   `GOLDEN_OCR=require` makes a skip an error. The covering layer is not named per target.
 
+## Amendment: four reads of a reply stay in live-forms.ts (2026-11-09, backlog A14)
+
+§2's "averi's replies are read by one module" (scripts/truth/replies.ts) has four exceptions, all in the live forms
+judges (scripts/truth/live-forms.ts), kept there by A14's analysis (docs/plans/2026-10-30-performance-backlog.md, row
+A14: "leave forms:88, 329, 519, 536"): refusedLadder's `last.includes(phrase)`, whose phrase its caller passes from
+replies.ts (`UNCHANGED_SAID`); judgeMissUnderSheet's `ASSERTS_FAILED.test`, replies.ts's own pattern applied there;
+kf3's `over ${frameText(panel)}` and kf1/kf2's `keyboard ${rectText(panel)}`, each one src word around src's own
+geometry builder over the app's measured panel, with `OVER_QUOTE` and `KEYBOARD_QUOTE` reading the same words for a
+MISMATCH's why-text only. None is a phrase to pin: moving them would add a wrapper, not a read of averi's wording.
+Every other read of the live forms and turn judges moved to replies.ts, its words pinned to the src file that writes
+them (`LIVE_REPLY_WORDS`, tests/truth/replies.test.ts). live-forms.ts's header names the four. The decision is
+unchanged.
+
 ## Bug note
 
 None: a principle. Findings it produced are in docs/bugs/2026-10-15-lab-*.md.

@@ -2,7 +2,7 @@ import { CHECKED_AFTER_HOLDS } from '../../src/interact/flush-check.js';
 import { UNMOVED_STROKES_EXHAUST } from '../../src/interact/scroll-rounds.js';
 import type { Platform } from '../differential/corpus.js';
 import type { CaseReads } from './live-cases.js';
-import { refusedAfterDismissal, replyKind, screenChangedSaid, screenUnchangedFor, swipesOf, turnsSaid, type ReplyKind, heldCutHedged } from './replies.js';
+import { refusedAfterDismissal, replyKind, screenChangedSaid, screenUnchangedFor, swipesOf, turnsSaid, type ReplyKind, heldCutHedged, untriedSideSaid, directionNamed } from './replies.js';
 import type { CellTruth, Geometry, LabState, ProbeEvent, Rect, Stroke, TargetTruth } from './schema.js';
 import { askedUnlistedBy, contractOf, judgedContext, stopHolds, type StopAsk, type TapAsk } from './target-contract.js';
 import { axisOf, bandsOf, directionOf, geometryOf, intersect, selectorOf, type Direction, type GeometryContext } from './truth.js';
@@ -398,7 +398,7 @@ export function judgeAndroidTurn(
   const turned = (classStrokes(atStop, launched, c.platform, c.tag, c.view, c.axis) ?? []).some((s) => s.cls === 'closer');
   const swipes = swipesOf(scroll) ?? 0;
   const unmoved = swipes - moved.length;
-  const named = scroll.includes(`direction: "${c.turnTo}"`);
+  const named = directionNamed(scroll, c.turnTo);
   if (turned || !named || unmoved > UNMOVED_STROKES_EXHAUST || v.kind === 'visible') return v;
   return { outcome: 'ok', kind: v.kind, why: `no turn on uiautomator (ADR 0021): ${swipes} swipes, the last ${unmoved} unmoved, failed naming direction: "${c.turnTo}" — ${short(scroll)}`, app: v.app };
 }
@@ -642,7 +642,7 @@ export function judgeAbsentAtEnd([scroll]: readonly string[], final: LabState, l
   const swipes = swipesOf(scroll);
   // "if it lies above, try …" names a side never stroked: the list never moved, so it is false here (the round-9 live
   // finding behind the tree's within-a-point test).
-  if (/if it lies (above|below|to the)/.test(scroll)) return { outcome: 'MISMATCH', cls: 'end-unread', kind, why: `a list that never moved names a side never stroked — averi: ${short(scroll)}` };
+  if (untriedSideSaid(scroll)) return { outcome: 'MISMATCH', cls: 'end-unread', kind, why: `a list that never moved names a side never stroked — averi: ${short(scroll)}` };
   if (swipes !== undefined && swipes <= UNMOVED_STROKES_EXHAUST && screenUnchangedFor(scroll) !== undefined) return { outcome: 'ok', kind, why: `exhausted after ${swipes} swipes, nothing fired — ${short(scroll)}` };
   return { outcome: 'MISMATCH', cls: 'end-unread', kind, why: `the list's end read as more to come — averi: ${short(scroll)}` };
 }
