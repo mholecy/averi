@@ -1,5 +1,5 @@
 lab: emulator-5554, AVD averi_lab
-averi: /private/tmp/claude-502/-Volumes-Workspaces-Projects-averi/d7239d5b-171e-4b2c-bca0-e282c482e932/scratchpad/wt/t19
+averi: <worktree t19>
 uiautomator lv-d62-control LOUD: other, not unaimable: ERROR scroll_until id:lab.carousel-recycler-free.C failed after 16001ms (timeout 15000ms; 5 swipes sent; 6 tree reads took 13725ms, the last 2401ms) — element reached the viewport but its right edge still lies on its scr
 <!-- averi: this checkout -->
 # Live golden: 1 cases, 0 ok, 2 loud, 0 mismatches (0 not known), 0 skipped
