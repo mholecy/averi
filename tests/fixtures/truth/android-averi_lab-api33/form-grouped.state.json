@@ -1,0 +1,60 @@
+{
+  "cell": "form-grouped",
+  "ready": true,
+  "screen": {
+    "x": 0,
+    "y": 0,
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "density": 2.75,
+  "frames": {
+    "ibanEager.title": {
+      "x": 55,
+      "y": 314,
+      "width": 563,
+      "height": 66
+    },
+    "ibanEager": {
+      "x": 55,
+      "y": 386,
+      "width": 970,
+      "height": 99
+    },
+    "phoneGrouped.title": {
+      "x": 55,
+      "y": 496,
+      "width": 551,
+      "height": 66
+    },
+    "phoneGrouped": {
+      "x": 55,
+      "y": 568,
+      "width": 970,
+      "height": 99
+    },
+    "submit": {
+      "x": 55,
+      "y": 700,
+      "width": 970,
+      "height": 132
+    }
+  },
+  "events": [],
+  "fields": {
+    "ibanEager": {
+      "value": "",
+      "focused": false,
+      "error": null
+    },
+    "phoneGrouped": {
+      "value": "",
+      "focused": false,
+      "error": null
+    }
+  },
+  "focus": null,
+  "keyboard": null,
+  "submits": []
+}

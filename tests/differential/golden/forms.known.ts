@@ -49,6 +49,8 @@ export const forms: KnownFile = {
     [`${ANDROID}/form-prefilled.xml`]: 16,
     [`${ANDROID}/form-shared-id.xml`]: 10,
     [`${ANDROID}/form-format.xml`]: 7,
+    [`${ANDROID}/form-grouped.xml`]: 5,
+    [`${ANDROID}/form-focus-prefix.xml`]: 5,
     [`${IOS}/form-basic.idb.json`]: 16,
     [`${IOS}/form-basic.wda.json`]: 16,
     [`${IOS}/form-errors.idb.json`]: 17,

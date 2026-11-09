@@ -82,6 +82,13 @@ export const edges: KnownFile = {
     [`${ANDROID}/scroll-top-edge-end.xml`]: 7,
     [`${ANDROID}/carousel-in-list.xml`]: 9,
     [`${ANDROID}/scroll-collapsing.xml`]: 5,
+    // T6's L7 carousels (Android only): B and U as carousel-in-list's (R-off's three each), and C — laid out nowhere at
+    // launch (CellTruth.absent) — R-absent's R-stroke and R-fully (golden-spec/edges.ts#absentRows): all green, D59b's
+    // strokes (824,497)→(256,497) inside the carousel's band.
+    [`${ANDROID}/carousel-lazy.xml`]: 8,
+    [`${ANDROID}/carousel-recycler.xml`]: 8,
+    [`${ANDROID}/carousel-lazy-free.xml`]: 8,
+    [`${ANDROID}/carousel-recycler-free.xml`]: 8,
     [`${IOS}/scroll-bounded.idb.json`]: 14,
     [`${IOS}/scroll-bounded.wda.json`]: 14,
     [`${IOS}/scroll-sticky.idb.json`]: 4,

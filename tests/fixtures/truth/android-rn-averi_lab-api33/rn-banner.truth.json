@@ -1,0 +1,78 @@
+{
+  "cell": "rn-banner",
+  "layer": "none",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [
+    {
+      "tag": "T",
+      "id": "lab.rn-banner.T",
+      "color": "#43A047",
+      "declared": "covered",
+      "frame": {
+        "x": 128,
+        "y": 303,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "541,391"
+        }
+      ],
+      "drawn": 0.341,
+      "seen": "#263238"
+    },
+    {
+      "tag": "U",
+      "id": "lab.rn-banner.U",
+      "color": "#8E24AA",
+      "declared": "covered",
+      "frame": {
+        "x": 128,
+        "y": 798,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "541,886"
+        }
+      ],
+      "drawn": 0.341,
+      "seen": "#263238"
+    },
+    {
+      "tag": "C",
+      "id": "lab.rn-banner.C",
+      "color": "#FB8C00",
+      "declared": "covered",
+      "frame": {
+        "x": 128,
+        "y": 1293,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "541,1381"
+        }
+      ],
+      "drawn": 0.188,
+      "seen": "#263238"
+    }
+  ],
+  "navigation": "gesture",
+  "windows": "rn-banner.windows.txt",
+  "displays": "rn-banner.displays.txt"
+}

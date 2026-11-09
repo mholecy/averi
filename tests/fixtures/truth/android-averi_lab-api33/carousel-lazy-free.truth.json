@@ -1,0 +1,96 @@
+{
+  "cell": "carousel-lazy-free",
+  "layer": "none",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [
+    {
+      "tag": "B",
+      "id": "lab.carousel-lazy-free.B",
+      "color": "#00ACC1",
+      "declared": "open",
+      "frame": {
+        "x": 128,
+        "y": 2915,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0,
+      "seen": "#000000",
+      "geometry": "off-screen",
+      "visible": null,
+      "piece": null,
+      "scrollView": "page",
+      "listed": {
+        "uiautomator": false
+      },
+      "unprobed": "its centre (541,3003) lies off the 1080x2220 screen"
+    },
+    {
+      "tag": "U",
+      "id": "lab.carousel-lazy-free.U",
+      "color": "#7CB342",
+      "declared": "open",
+      "frame": {
+        "x": 128,
+        "y": -550,
+        "width": 825,
+        "height": 176
+      },
+      "reached": false,
+      "probe": [],
+      "drawn": 0,
+      "seen": "#000000",
+      "geometry": "off-screen",
+      "visible": null,
+      "piece": null,
+      "scrollView": "page",
+      "listed": {
+        "uiautomator": false
+      },
+      "unprobed": "its centre (541,-462) lies off the 1080x2220 screen"
+    }
+  ],
+  "safeArea": {
+    "top": 66,
+    "left": 0,
+    "bottom": 66,
+    "right": 0
+  },
+  "scrollViews": {
+    "page": {
+      "x": 0,
+      "y": 0,
+      "width": 1080,
+      "height": 2220
+    },
+    "carousel": {
+      "x": 66,
+      "y": 380,
+      "width": 948,
+      "height": 234
+    }
+  },
+  "navigation": "gesture",
+  "windows": "carousel-lazy-free.windows.txt",
+  "absent": [
+    {
+      "tag": "C",
+      "id": "lab.carousel-lazy-free.C",
+      "color": "#D81B60",
+      "declared": "open",
+      "scrollView": "carousel",
+      "listed": {
+        "uiautomator": false
+      },
+      "toward": "right"
+    }
+  ],
+  "displays": "carousel-lazy-free.displays.txt"
+}

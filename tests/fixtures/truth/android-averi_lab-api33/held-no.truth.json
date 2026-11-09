@@ -1,0 +1,14 @@
+{
+  "cell": "held-no",
+  "layer": "none",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [],
+  "navigation": "gesture",
+  "windows": "held-no.windows.txt",
+  "displays": "held-no.displays.txt"
+}

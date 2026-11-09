@@ -16,6 +16,17 @@
       "truth": "rn-field.truth.json"
     },
     {
+      "file": "rn-banner.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "rn-banner.png",
+      "truth": "rn-banner.truth.json"
+    },
+    {
       "file": "rn-format.xml",
       "source": "uiautomator",
       "form": "raw",
@@ -25,6 +36,17 @@
       },
       "screenshot": "rn-format.png",
       "truth": "rn-format.truth.json"
+    },
+    {
+      "file": "rn-format-eager.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "rn-format-eager.png",
+      "truth": "rn-format-eager.truth.json"
     }
   ]
 }

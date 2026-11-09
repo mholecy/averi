@@ -1,0 +1,124 @@
+{
+  "cell": "form-grouped",
+  "layer": "none",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [],
+  "navigation": "gesture",
+  "windows": "form-grouped.windows.txt",
+  "displays": "form-grouped.displays.txt",
+  "form": {
+    "fields": [
+      {
+        "tag": "ibanEager",
+        "id": "lab.form-grouped.ibanEager",
+        "kind": "iban",
+        "title": "IBAN – spaced as each group ends",
+        "titleId": "lab.form-grouped.ibanEager.title",
+        "frame": {
+          "x": 55,
+          "y": 386,
+          "width": 970,
+          "height": 99
+        },
+        "value": "",
+        "focused": false,
+        "error": null,
+        "titleFrame": {
+          "x": 55,
+          "y": 314,
+          "width": 563,
+          "height": 66
+        }
+      },
+      {
+        "tag": "phoneGrouped",
+        "id": "lab.form-grouped.phoneGrouped",
+        "kind": "text",
+        "title": "Payee’s phone – grouped as typed",
+        "titleId": "lab.form-grouped.phoneGrouped.title",
+        "frame": {
+          "x": 55,
+          "y": 568,
+          "width": 970,
+          "height": 99
+        },
+        "value": "",
+        "focused": false,
+        "error": null,
+        "titleFrame": {
+          "x": 55,
+          "y": 496,
+          "width": 551,
+          "height": 66
+        }
+      }
+    ],
+    "controls": [
+      {
+        "tag": "ibanEager",
+        "id": "lab.form-grouped.ibanEager",
+        "kind": "field",
+        "frame": {
+          "x": 55,
+          "y": 386,
+          "width": 970,
+          "height": 99
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "540,436"
+          }
+        ]
+      },
+      {
+        "tag": "phoneGrouped",
+        "id": "lab.form-grouped.phoneGrouped",
+        "kind": "field",
+        "frame": {
+          "x": 55,
+          "y": 568,
+          "width": 970,
+          "height": 99
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "540,618"
+          }
+        ]
+      },
+      {
+        "tag": "submit",
+        "id": "lab.form-grouped.submit",
+        "kind": "button",
+        "frame": {
+          "x": 55,
+          "y": 700,
+          "width": 970,
+          "height": 132
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "540,766"
+          }
+        ]
+      }
+    ],
+    "keyboard": null,
+    "screenError": null,
+    "submits": []
+  }
+}

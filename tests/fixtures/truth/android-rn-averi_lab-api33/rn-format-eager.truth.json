@@ -1,0 +1,73 @@
+{
+  "cell": "rn-format-eager",
+  "layer": "none",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [
+    {
+      "tag": "E",
+      "id": "lab.rn-format-eager.E",
+      "text": "IBAN",
+      "color": "#C8E6C9",
+      "declared": "open",
+      "frame": {
+        "x": 177,
+        "y": 360,
+        "width": 94,
+        "height": 61
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "224,391"
+        },
+        {
+          "kind": "focus",
+          "tag": "E"
+        }
+      ],
+      "drawn": 0.991,
+      "seen": "#C8E6C9",
+      "textListed": {
+        "uiautomator": true
+      }
+    },
+    {
+      "tag": "P",
+      "id": "lab.rn-format-eager.P",
+      "text": "Phone",
+      "color": "#F8BBD0",
+      "declared": "open",
+      "frame": {
+        "x": 177,
+        "y": 855,
+        "width": 119,
+        "height": 61
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "237,886"
+        },
+        {
+          "kind": "focus",
+          "tag": "P"
+        }
+      ],
+      "drawn": 0.99,
+      "seen": "#F8BBD0",
+      "textListed": {
+        "uiautomator": true
+      }
+    }
+  ],
+  "navigation": "gesture",
+  "windows": "rn-format-eager.windows.txt",
+  "displays": "rn-format-eager.displays.txt"
+}
