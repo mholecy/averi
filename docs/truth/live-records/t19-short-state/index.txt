@@ -1,0 +1,36 @@
+T19, 2026-11-09, emulator-5554 (averi_lab), main 6b7e49b5 (T11 and T12 merged), no stroke injected, no shortening, no drop.
+Driver: t19.sh <dir> <limit min> [smoke]. Read-back: node analyze.mjs run (its output in run/analysis.txt).
+
+Device, before and after (no restart, no reboot, no install, no load experiment):
+  19:15:14 start_count=1 /proc/uptime 51261.20 (AVD up about 14 h 14 min)
+  20:11:12 start_count=1 /proc/uptime 54618.54 (the 3357-s difference equals the wall clock, so the guest did not reboot)
+  start_count was read before and after every run (run/index.txt, smoke/index.txt): 1 throughout.
+Device time: smoke 73 s (19:16:01-19:17:14) + run 3226 s (19:17:-20:11:05) = 3299 s, about 55 min.
+
+State label: a raw-strokes read (docs/truth/live-records/t11-carousel-visible/raw/raw-strokes.mjs, no averi: a 440-px pre-drag,
+then 4 x 142-px, 300-ms `input swipe`s on carousel-recycler-free, each from rest, carry read from the app's offsets), 4 rounds
+= 16 strokes before the first block and after every block. A read is short when 1 in 4 or more strokes carry 94 px or less
+(T12's label-group.mjs rule). The run's own first probe is the same stroke (142 px, 300 ms, from rest after the pre-drag),
+so it is reported per control run as a second label (probe short = carry <= 94).
+
+Raw reads: 15 of 15 short (4-9 of 16 at 94 px or less; 0 of 240 strokes at 0; pre-drag carries 366-439, fast is 435-443).
+The smoke read at 19:16 was already short (2 of 4). So the whole window was the short state, from the start, with the
+AVD up 14 h: it did not have to be reached; the fast state was never seen in this window.
+
+Blocks: 14 x (lv-d62-control x6, then scroll-bounded-flush P.fully and S.fully once, then a raw read).
+
+Results, short state throughout:
+  lv-d62-control x84 (+1 smoke): 0 false "fully visible"; 84 of 84 LOUD at the 15-s bound ("failed after 15432-16610ms
+    (timeout 15000ms; 5 swipes sent; 6 tree reads took 13264-14310ms)", each hedged "may still be cut there", C 70-172 px cut).
+    First probe (142 px) carried 0 in 0 of 84; at 94 px or less 32 of 84. Pre-drag carries 349-441.
+  scroll-bounded-flush P.fully x14, S.fully x14 (+1 each smoke): 28 of 28 ok, whole, "fully visible after 2 swipes" 26 and
+    "after 1 swipe" 2 (P, its probe carried it whole); first probe carried 0 in 0 of 28 (P 55-76 px, S 36-59 px).
+  Strokes averi sent: 474; carried 0: 4 (control-32 stroke 5 of 60 px, control-34 stroke 5 of 58 px, control-40 stroke 4
+    of 62 px, control-49 stroke 3 of 123 px), all reveals after a moved C, none a first probe, none two in a row. In
+    control-40 and control-49 the held reveal was sent again (T11's doubt) and carried 34 and 86 px; in 32 and 34 it was
+    the last stroke before the time bound.
+  Two strokes in a row carrying 0: 0 of 542 adjacent pairs (336 control, 26 P/S, 180 raw).
+
+Files: run/index.txt (stamps: host load, start_count, the AVD's /proc/loadavg and /proc/uptime before and after every run),
+run/control-N.json, run/flush-N.json (live.ts --record), run/*.log.txt, run/raw-N.jsonl, run/analysis.txt; smoke/ the same,
+not counted in the tallies.
