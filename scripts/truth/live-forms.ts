@@ -1,11 +1,10 @@
 import { minTapPiece } from '../../src/ui-tree/draw-order.js';
 import { frameText, rectText } from '../../src/ui-tree/geometry.js';
 import { firedSince, touchesSince, touchPointsText, type LiveVerdict } from './live-visibility.js';
-import { allPassed, ASSERTS_FAILED, claimsDone, claimsTap, firstLine, focusTextNotReadSaid, isError, missedTarget, presentedRemedySaid, replyKind, swipesOf, windowHintSaid } from './replies.js';
+import { allPassed, ASSERTS_FAILED, bandSaid, claimsDone, claimsTap, FIELD_UNCHANGED, firstLine, focusTextNotReadSaid, isError, missedTarget, presentedRemedySaid, refusedUnsentSaid, replyKind, scrollVerdictSaid, swipesOf, underBarRemedySaid, windowHintSaid } from './replies.js';
 import { parseInputShown, parseTouchableRegion } from '../../src/adapters/android.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import { rectIntersection, sameRect } from '../../src/adapters/types.js';
-import { TREE_READ_FAILED } from '../../src/interact/scroll-text.js';
 import { panelsBeyond } from '../../src/ui-tree/keyboard-cover.js';
 import type { SourceKind } from '../differential/corpus.js';
 import type { LabState, Rect } from './schema.js';
@@ -17,6 +16,12 @@ import { probePoint, within } from './truth.js';
  * the two below it are lab note F2A1's form-keyboard cases, whose submit bar riding on the IME has no node — the app's
  * frames (`submit.bar`) say what of a field it covers, which the tree cannot; `judgeUnderSheet` is the taps beneath
  * form-picker's sheet, `judgeMissUnderSheet` the asserts and the flow's `wait:` there.
+ *
+ * What a reply says is read by replies.ts (ADR 0020), its words pinned to src there (LIVE_REPLY_WORDS). Four reads
+ * stay here, none of them a phrase of averi's: refusedLadder's `last.includes(phrase)` (the phrase its caller passes,
+ * replies.ts#FIELD_UNCHANGED), judgeMissUnderSheet's `ASSERTS_FAILED.test` (replies.ts's own), and kf3's quotes of the
+ * measured panel, `over ${frameText(panel)}` and `keyboard ${rectText(panel)}` — src's geometry builders over the
+ * app's frame, not words to pin.
  */
 
 /** The tree sources the live cases run under: iOS's (idb, wda), Android's one. */
@@ -68,7 +73,7 @@ export const refusedKept =
     const kind = replyKind(last);
     if (claimsDone(last)) return { outcome: 'MISMATCH', cls: 'fill-claim', kind, why: `averi says ${short(last)} — it cannot type the value; the app holds ${JSON.stringify(got)}` };
     if (got !== before) return { outcome: 'LOUD', cls: 'loud-changed', kind, why: `the app holds ${JSON.stringify(got)} — field CHANGED (was ${JSON.stringify(before)}); averi: ${short(last)}` };
-    if (!isError(last) || !last.includes('Refused before anything was sent')) return { outcome: 'LOUD', cls: 'loud-untouched', kind, why: `the prefill kept, but not refused before anything was sent: ${short(last)}` };
+    if (!isError(last) || !refusedUnsentSaid(last)) return { outcome: 'LOUD', cls: 'loud-untouched', kind, why: `the prefill kept, but not refused before anything was sent: ${short(last)}` };
     return { outcome: 'ok', kind, why: `refused before anything was sent, the prefill kept: ${short(last)}` };
   };
 
@@ -111,7 +116,7 @@ export const refusedHolding =
  * cap, `31.12.2026` after a first fill, typed `2026` without clear. Before D63 averi passed that unchanged reading by
  * containment. The error must say the field did not change (`refusedHolding`).
  */
-export const refusedUnchanged = (tag: string, kept: string) => refusedHolding(tag, kept, 'did not change');
+export const refusedUnchanged = (tag: string, kept: string) => refusedHolding(tag, kept, FIELD_UNCHANGED);
 
 /**
  * f16 (D64): a field at its length cap that keeps only the head of the typing while its earlier text holds the value —
@@ -174,7 +179,7 @@ export const refusedOnFocus =
     if (source === 'uiautomator' && focusTextNotReadSaid(last)) {
       return { outcome: 'ok', kind: replyKind(last), why: `Filled, hedged on its ⚠ line, over ${JSON.stringify(got)}: ${last.replace('\n', ' ')}`, accepted: FOCUS_UNREAD_HEDGE };
     }
-    return refusedLadder(got, inserted, last, 'did not change');
+    return refusedLadder(got, inserted, last, FIELD_UNCHANGED);
   };
 
 /**
@@ -216,7 +221,7 @@ export function judgeNoteFill(s: LabState, replies: string[], source: Source, la
   const strip = shows !== undefined && shows < minTapPiece(s.screen);
   const untouched = Object.entries(s.fields ?? {}).every(([k, f]) => f.value === launched.fields?.[k]?.value);
   const submits = (s.submits ?? []).length;
-  if (strip && untouched && submits === 0 && /scroll_until it out from under|dismiss it first/.test(replies[0])) {
+  if (strip && untouched && submits === 0 && underBarRemedySaid(replies[0])) {
     return { outcome: 'ok', why: `refused by design (F2A1: note shows ${shows} px past the bar, under the ${minTapPiece(s.screen)} a tap needs), every field untouched, no submit: ${short(replies[0])}` };
   }
   const why = !strip ? `note shows ${shows ?? '?'} px past the bar — no strip` : !untouched ? 'a field CHANGED' : submits > 0 ? `the form was SUBMITTED (${submits}×)` : 'no remedy named';
@@ -231,9 +236,6 @@ export function judgeNoteFill(s: LabState, replies: string[], source: Source, la
  * that leaves the band unsaid — "fully visible", or a plain "visible" — is a MISMATCH: the tree has no node for the
  * padding, so the claim overstates by what it covers (ADR 0013's residual until the eyes, no allowance since).
  */
-/** The eyes' band over a stop's target, in the reply's words (src/ui-tree/eyes.ts): "PARTLY UNDER a surface …". */
-const BAND_SAID = /\bPARTLY UNDER a surface\b/;
-
 export function judgePhoneScroll(s: LabState, [reply]: string[], _source: string, launched: LabState): LiveVerdict {
   const submits = (s.submits ?? []).length;
   const touches = touchesSince(s, launched);
@@ -248,7 +250,7 @@ export function judgePhoneScroll(s: LabState, [reply]: string[], _source: string
   const where = phone == null ? 'phone not laid out' : `phone ${phone.y}–${phone.y + phone.height} (launched ${launched.frames.phone?.y ?? '?'}), ${covered} px of it under the bar`;
   if (replyKind(reply) === 'visible') {
     if (under(bar) || under(ime) || phone == null) return { outcome: 'MISMATCH', why: `averi says ${short(reply)} — phone's centre lies under the ${under(bar) ? 'bar' : 'IME'}; ${where}; ${strokes}` };
-    if (covered > 0 && !BAND_SAID.test(reply)) return { outcome: 'MISMATCH', why: `averi says ${short(reply)} — ${covered} px of phone under the bar, unsaid (no PARTLY UNDER a surface); ${where}; ${strokes}` };
+    if (covered > 0 && !bandSaid(reply)) return { outcome: 'MISMATCH', why: `averi says ${short(reply)} — ${covered} px of phone under the bar, unsaid (no PARTLY UNDER a surface); ${where}; ${strokes}` };
     return { outcome: 'ok', why: `stopped with phone's centre clear of the bar and the IME (${where}); ${strokes}: ${short(reply)}` };
   }
   return { outcome: 'ok', why: `no stop, nothing submitted (${where}); ${strokes}: ${short(reply)}` };
@@ -440,11 +442,6 @@ const MEASURED_TWICE = 'the panel measured at launch and again after the calls i
 const KEYBOARD_QUOTE = /keyboard \d+,\d+ \d+x\d+/g;
 /** scroll_until's panel quote, `over [l,t][r,b]` (src/interact/scroll-text.ts: `the soft keyboard over ${frameText(…)}`). */
 const OVER_QUOTE = /over \[\d+,\d+\]\[\d+,\d+\]/g;
-/**
- * kf3's refusal as averi words it (src/interact/scroll-text.ts: `scroll_until <target> failed …` / `stopped …`, the
- * tool's ERROR prefix before it), not the device failing its tree read (TREE_READ_FAILED) and not another tool error.
- */
-const scrollVerdict = (reply: string): boolean => /^ERROR scroll_until [^\s:]/.test(reply) && !reply.includes(TREE_READ_FAILED);
 /** An averi call that errored (or none recorded), not a reading of the panel: a harness fault, named so (as judgeMissUnderSheet names one). */
 const harnessFault = (said: string): LiveVerdict => ({ outcome: 'MISMATCH', why: `a harness fault, not a verdict on the panel over ks: ${said}` });
 
@@ -533,7 +530,7 @@ export const judgeFloatingGap =
       const panelAsNamed = `over ${frameText(panel)}`;
       if (!scroll.includes(panelAsNamed)) {
         // Only averi's own scroll_until verdict read the panel: a failed tree read, or another error, is no reading.
-        return misquoted(afterCalls, scroll, !isError(scroll) || scrollVerdict(scroll), { oneRead: `averi's reply does not name the measured panel ${panelAsNamed}`, verb: 'named', pattern: OVER_QUOTE, where: '', measured: panelAsNamed });
+        return misquoted(afterCalls, scroll, !isError(scroll) || scrollVerdictSaid(scroll), { oneRead: `averi's reply does not name the measured panel ${panelAsNamed}`, verb: 'named', pattern: OVER_QUOTE, where: '', measured: panelAsNamed });
       }
       return { outcome: 'ok', why: `${replyKind(scroll) === 'visible' ? `stopped with ks's centre clear of the measured panel (${where})` : `no stop (${where})`}, postcode untouched; ${logged}: ${short(scroll)}` };
     }

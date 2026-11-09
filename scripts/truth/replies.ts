@@ -2,6 +2,10 @@ import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { FOCUS_TEXT_NOT_READ } from '../../src/interact/fill-text.js';
 import { boundText } from '../../src/interact/scroll-text.js';
 import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, KEYBOARD_UNLISTED, NO_ID_LISTED } from '../../src/ui-tree/miss.js';
+import { untriedSideText } from '../../src/interact/target-text.js';
+import { EDGES } from '../../src/ui-tree/geometry.js';
+import type { Direction } from '../../src/ui-tree/sides.js';
+import { TREE_READ_FAILED } from '../../src/interact/scroll-text.js';
 
 /**
  * averi's reply wording, read in ONE place: every judge that reads what averi said — the replayed golden
@@ -314,6 +318,56 @@ export function screenUnchangedFor(reply: string): number | undefined {
   const m = /the last (\d+), swiping \w+, did not change the screen/.exec(reply);
   return m === null ? undefined : Number(m[1]);
 }
+
+// --- the live forms and turn judges' words (live-forms.ts, live-visibility.ts) ---
+
+/**
+ * The words the live forms judges and the Android turn judge key on, pinned, each as src writes it: tests/truth/
+ * replies.test.ts holds each one to its file. The typing refusal's "nothing was sent" (src/adapters/typeable.ts
+ * #refusalOf), a fill's unchanged field (src/interact/fill-text.ts's `unchanged` caveat), the two remedies for a field
+ * under a bar (src/interact/target-text.ts#cutByRemedy, #dismissKeyboardFirstText), the eyes' band (src/interact/
+ * scroll-text.ts#unlistedText) and a direction named (src/ui-tree/sides.ts#revealText and the like).
+ */
+export const LIVE_REPLY_WORDS = [
+  'Refused before anything was sent',
+  'did not change',
+  'scroll_until it out from under',
+  'dismiss it first',
+  'PARTLY UNDER a surface',
+  'direction: "',
+] as const;
+const [UNSENT, UNCHANGED, OUT_FROM_UNDER, DISMISS_FIRST, BAND, DIRECTION] = LIVE_REPLY_WORDS;
+
+/** A typing refusal says nothing was sent (D43a: live-forms.ts#refusedKept). */
+export const refusedUnsentSaid = (reply: string) => reply.includes(UNSENT);
+
+/** What a fill's error says of a field the typing left as it was: the phrase live-forms.ts#refusedUnchanged and #refusedOnFocus ask. */
+export const FIELD_UNCHANGED = UNCHANGED;
+
+/** A refusal names the remedy for a field under a bar: scroll it out from under, or dismiss the keyboard first (live-forms.ts#judgeNoteFill). */
+export const underBarRemedySaid = (reply: string) => reply.includes(OUT_FROM_UNDER) || reply.includes(DISMISS_FIRST);
+
+/** The eyes' band over a stop's target: "PARTLY UNDER a surface the tree does not list: …" (live-forms.ts#judgePhoneScroll). */
+const BAND_SAID = new RegExp(`\\b${BAND}\\b`);
+export const bandSaid = (reply: string) => BAND_SAID.test(reply);
+
+/** The reply names `direction` to scroll: `direction: "up"` (live-visibility.ts#judgeAndroidTurn). */
+export const directionNamed = (reply: string, direction: Direction) => reply.includes(`${DIRECTION}${direction}"`);
+
+/**
+ * scroll_until's own refusal (src/interact/scroll-text.ts: `scroll_until <target> failed …` / `stopped …`, the tool's
+ * ERROR prefix before it), not the device failing its tree read (TREE_READ_FAILED) and not another tool error
+ * (live-forms.ts's kf3).
+ */
+export const scrollVerdictSaid = (reply: string): boolean => /^ERROR scroll_until [^\s:]/.test(reply) && !reply.includes(TREE_READ_FAILED);
+
+/**
+ * A scroll_until failure that names a side it never read: `if it lies above, try direction: "up"` (src/interact/
+ * target-text.ts#untriedSideText, each side's sentence built by it, not copied) — false of a list that never moved
+ * (live-visibility.ts#judgeAbsentAtEnd).
+ */
+const UNTRIED_SIDES = EDGES.map(untriedSideText);
+export const untriedSideSaid = (reply: string) => UNTRIED_SIDES.some((words) => reply.includes(words));
 
 // --- the ocr assert's readings ---
 
