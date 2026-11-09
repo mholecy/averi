@@ -1,7 +1,7 @@
 import { minTapPiece } from '../../src/ui-tree/draw-order.js';
 import { frameText, rectText } from '../../src/ui-tree/geometry.js';
 import { firedSince, touchesSince, touchPointsText, type LiveVerdict } from './live-visibility.js';
-import { allPassed, ASSERTS_FAILED, bandSaid, claimsDone, claimsTap, FIELD_UNCHANGED, firstLine, focusTextNotReadSaid, isError, missedTarget, presentedRemedySaid, refusedUnsentSaid, replyKind, scrollVerdictSaid, swipesOf, underBarRemedySaid, windowHintSaid } from './replies.js';
+import { allPassed, ASSERTS_FAILED, bandSaid, claimsDone, claimsTap, UNCHANGED_SAID, firstLine, focusTextNotReadSaid, isError, missedTarget, presentedRemedySaid, refusedUnsentSaid, replyKind, scrollVerdictSaid, swipesOf, underBarRemedySaid, windowHintSaid } from './replies.js';
 import { parseInputShown, parseTouchableRegion } from '../../src/adapters/android.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import { rectIntersection, sameRect } from '../../src/adapters/types.js';
@@ -18,7 +18,7 @@ import { probePoint, within } from './truth.js';
  * form-picker's sheet, `judgeMissUnderSheet` the asserts and the flow's `wait:` there.
  *
  * What a reply says is read by replies.ts (ADR 0020), its words pinned to src there (LIVE_REPLY_WORDS). Four reads
- * stay here: refusedLadder's `last.includes(phrase)` (the phrase its caller passes, replies.ts#FIELD_UNCHANGED),
+ * stay here: refusedLadder's `last.includes(phrase)` (the phrase its caller passes, replies.ts#UNCHANGED_SAID),
  * judgeMissUnderSheet's `ASSERTS_FAILED.test` (replies.ts's own), and the quotes of the measured panel — kf3's
  * `over ${frameText(panel)}` (scroll_until's: src/interact/scroll-text.ts, `the soft keyboard over ${frameText(…)}`)
  * and kf1/kf2's `keyboard ${rectText(panel)}` (the pixel poll's: src/verify/pixel-poll.ts#keyboardCovers). Each is
@@ -118,7 +118,7 @@ export const refusedHolding =
  * cap, `31.12.2026` after a first fill, typed `2026` without clear. Before D63 averi passed that unchanged reading by
  * containment. The error must say the field did not change (`refusedHolding`).
  */
-export const refusedUnchanged = (tag: string, kept: string) => refusedHolding(tag, kept, FIELD_UNCHANGED);
+export const refusedUnchanged = (tag: string, kept: string) => refusedHolding(tag, kept, UNCHANGED_SAID);
 
 /**
  * f16 (D64): a field at its length cap that keeps only the head of the typing while its earlier text holds the value —
@@ -181,7 +181,7 @@ export const refusedOnFocus =
     if (source === 'uiautomator' && focusTextNotReadSaid(last)) {
       return { outcome: 'ok', kind: replyKind(last), why: `Filled, hedged on its ⚠ line, over ${JSON.stringify(got)}: ${last.replace('\n', ' ')}`, accepted: FOCUS_UNREAD_HEDGE };
     }
-    return refusedLadder(got, inserted, last, FIELD_UNCHANGED);
+    return refusedLadder(got, inserted, last, UNCHANGED_SAID);
   };
 
 /**

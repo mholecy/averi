@@ -5,8 +5,7 @@ import type { MarkedLayer } from '../../src/ui-tree/presentation.js';
 import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, missNote, withMissNote } from '../../src/ui-tree/miss.js';
 import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
 import { boundText, describeScrollResult, flushText } from '../../src/interact/scroll-text.js';
-import { CAROUSEL_REPLY_WORDS, carouselReply, MAX_SWIPES, flushProbedSide, idbReasonsSaid, inferredAxisSaid, noIdListedSaid, OCR_FAILED_CLOSED, presentedRemedySaid, windowHintSaid, heldCutHedged } from '../../scripts/truth/replies.js';
-import { bandSaid, directionNamed, FIELD_UNCHANGED, LIVE_REPLY_WORDS, refusedUnsentSaid, scrollVerdictSaid, underBarRemedySaid, untriedSideSaid } from '../../scripts/truth/replies.js';
+import { CAROUSEL_REPLY_WORDS, carouselReply, MAX_SWIPES, flushProbedSide, idbReasonsSaid, inferredAxisSaid, noIdListedSaid, OCR_FAILED_CLOSED, presentedRemedySaid, windowHintSaid, heldCutHedged, bandSaid, directionNamed, UNCHANGED_SAID, LIVE_REPLY_WORDS, refusedUnsentSaid, scrollVerdictSaid, underBarRemedySaid, untriedSideSaid } from '../../scripts/truth/replies.js';
 import { refusalOf, type Typeable } from '../../src/adapters/typeable.js';
 import { revealText } from '../../src/ui-tree/sides.js';
 import { untriedSideText } from '../../src/interact/target-text.js';
@@ -214,8 +213,8 @@ describe('LIVE_REPLY_WORDS: the words the live forms and turn judges key on, eac
   it('each phrase is written in its src file, in code', () => {
     expect(Object.keys(WRITTEN_IN)).toEqual([...LIVE_REPLY_WORDS]);
     for (const [words, file] of Object.entries(WRITTEN_IN)) expect(src(file)).toContain(words);
-    // 'did not change' is in another fill sentence too (the deletes'): FIELD_UNCHANGED is held to the `unchanged` caveat's own
-    expect(src('src/interact/fill-text.ts')).toContain(`— the field ${FIELD_UNCHANGED}: `);
+    // 'did not change' is in another fill sentence too (the deletes'): UNCHANGED_SAID is held to the `unchanged` caveat's own
+    expect(src('src/interact/fill-text.ts')).toContain(`— the field ${UNCHANGED_SAID}: `);
     // scrollVerdictSaid's head: scroll_until's own failures and stops (src/interact/scroll-text.ts)
     expect(src('src/interact/scroll-text.ts')).toContain('`scroll_until ${describe} failed after ');
   });

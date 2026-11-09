@@ -10,9 +10,10 @@ import { escapeRegExp } from '../../src/verify/text-hint.js';
 /**
  * averi's reply wording, read in ONE place: every judge that reads what averi said — the replayed golden
  * (scripts/differential/golden-spec, golden.ts) and the live one (live.ts, live-visibility.ts, live-forms.ts) — reads
- * it through these, and nothing else in those judges tests a reply's words but the reads live-forms.ts's header names. A rewording of averi's replies is fixed here, beside
- * the src line that writes each one. What a reply DID (the taps and swipes the device was sent) is not a reply's
- * wording: golden-spec/judges.ts reads that from the fake device's log, live-visibility.ts from the app's.
+ * it through these, and nothing else in those judges tests a reply's words but the reads live-forms.ts's header names
+ * (ADR 0020's A14 amendment). A rewording of averi's replies is fixed here, beside the src line that writes each one.
+ * What a reply DID (the taps and swipes the device was sent) is not a reply's wording: golden-spec/judges.ts reads
+ * that from the fake device's log, live-visibility.ts from the app's.
  *
  * Everything here takes the reply as averi returned it: its text, `ERROR ` prefixed when the tool call was an error
  * (differential.ts and live.ts#callTool both spell it so).
@@ -344,7 +345,7 @@ export const refusedUnsentSaid = (reply: string) => reply.includes(UNSENT);
  * accepts the deletes' sentence (fill-text.ts, "… that the deletes did not change") and scroll_until's "did not change
  * the screen"; tightening it to "the field did not change" would be a judge change, not this read's move here.
  */
-export const FIELD_UNCHANGED = UNCHANGED;
+export const UNCHANGED_SAID = UNCHANGED;
 
 /** A refusal names the remedy for a field under a bar: scroll it out from under, or dismiss the keyboard first (live-forms.ts#judgeNoteFill). */
 export const underBarRemedySaid = (reply: string) => reply.includes(OUT_FROM_UNDER) || reply.includes(DISMISS_FIRST);
@@ -371,7 +372,10 @@ export const scrollVerdictSaid = (reply: string): boolean => /^ERROR scroll_unti
 /**
  * A scroll_until failure that names a side it never read: `if it lies above, try direction: "up"` (src/interact/
  * target-text.ts#untriedSideText, each side's sentence built by it, not copied) — false of a list that never moved
- * (live-visibility.ts#judgeAbsentAtEnd).
+ * (live-visibility.ts#judgeAbsentAtEnd). Deliberately exact: A14 asked to derive it, and untriedSideText is its only
+ * producer, so the whole sentence is matched. Unlike directionNamed, kept wide (the `direction: "…"` fragment, which
+ * three producers write) so as not to narrow its judge: this one derives every word it reads, that one pins a
+ * fragment.
  */
 const UNTRIED_SIDES = EDGES.map(untriedSideText);
 export const untriedSideSaid = (reply: string) => UNTRIED_SIDES.some((words) => reply.includes(words));
