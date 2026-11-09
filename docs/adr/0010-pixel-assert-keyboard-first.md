@@ -474,14 +474,20 @@ stroke for them went over `upper`, at (540,788), twice, and the call failed "con
 swipes were not taken". The reply never said that `lower` was not tried. That is D59b's honesty class: there the
 scroll view lay across the stroke, here beside it.
 
-**Decision.** (a) When the exhausted stop comes before any read found the target, the reply names the scroll views
-the tree tells scroll along the stroke that the swipes did not go over (`stroke-plan.ts#strokedBeside`, carried as
+**Decision.** (a) When a bound stops the call before any read found the target — exhausted, maxSwipes or the
+timeout, once a swipe was sent and the round's tree read — the reply names the scroll views the tree tells scroll
+along the stroke that the swipes did not go over (no swipe touched down in them) (`stroke-plan.ts#strokedBeside`, carried as
 `scroll-rounds.ts#BoundBy`'s `beside`, said by `scroll-text.ts#boundText`). They are asked of the whole tree
 (`Clips.toldOn`, as the across clause asks it: the usable screen, no text input, none of the keyboard's own), less
 any that holds the last stroke's touch-down (the one stroked, and an outer one the finger also landed in), largest
-first. The clause comes after a node named under the touch-down and after the across clause, and never with the
-across clause: `strokedBeside` is undefined when the last stroke went across its scroll view. An end the tree proves
-outranks it, as it outranks both. The wording:
+first; the 3 largest are named, the rest counted (`and 2 more`). The order touched → across → beside is the
+sentence's, not a precedence: under a node named at the touch-down the clause is said inside its `else:` (`… which
+may have taken them (else: <beside>; else: content exhausted, still loading)`). It never comes with the across
+clause: `strokedBeside` is undefined when the last stroke went across its scroll view. An end the tree proves
+outranks it, as it outranks both. At maxSwipes and the timeout the bound's own way out follows it: `after 1 swipe
+(maxSwipes: <beside>; else: raise maxSwipes or timeoutMs)`, `after 16000ms (timeout 15000ms; 1 swipe sent; 2 tree
+reads took 900ms, the last 450ms: <beside>; else: raise maxSwipes or timeoutMs)` — told only to raise the bound, a
+caller strokes the same list again (review round 1). The exhausted wording:
 
 `failed after 2 swipes (the last 2, swiping down, did not change the screen: the swipes went over the scroll view
 0,303 1080x605 only; the tree shows another scroll view that scrolls vertically, which the swipes did not go over:
@@ -490,9 +496,10 @@ shows, then scroll_until it; else: content exhausted, still loading, or the swip
 
 Several are counted (`2 other scroll views that scroll vertically, …: A, B — if the element lies in one of them, …`).
 Over the screen box (WDA marks no node clipping, so before the target is read it strokes the screen whole) the first
-clause reads `the swipes were drawn over the screen whole, aimed at no scroll view`, and `a scroll view` replaces
-`another`. On the WDA capture of the same cell a target not in the tree now names `lower` (0,380 402x180): the
-touch-down lies in `upper`.
+clause reads `the swipes were drawn over the screen whole, aimed at no scroll view, touching down at x,y in the scroll
+view <rect>` (the smallest one told along the stroke holding the touch-down; the point alone where none does), and
+`a scroll view` replaces `another`. On the WDA capture of the same cell a target not in the tree now names `lower`
+(0,380 402x180), touching down at 201,175 in the scroll view 0,110 402x220, the list above it.
 
 (b) **Rejected:** trying the candidates in turn, as D59b's nested ones are tried. It spends device time. It moves
 lists the caller never named. On `scroll-bounded` it still cannot reach F within the defaults (6 swipes, 15 s).
@@ -503,14 +510,15 @@ Once it exists, this reply should cite it as the remedy, in place of the manual 
 **Residuals.** (1) The remedy is manual: a swipe inside the named list, then `scroll_until` again. (2) idb lists no
 scroll view (`Clips.toldOn` answers none on a flat tree), so nothing is named there. The reply is the generic one, as
 before. (3) A scroll view of unknown axis (a RecyclerView or a LazyColumn dumped as `android.view.View`) is not named,
-as residual (c) of D59b. (4) Only the exhausted stop says it. A maxSwipes or timeout stop before the target was read
-does not.
+as residual (c) of D59b. (4) A bound before any swipe was sent (maxSwipes 0, a timeout spent on the first read) says
+nothing of it: no swipe went anywhere.
 
 **Golden.** Against a `git archive 6b7e49b5` base: Changed exactly 2, android `scroll-bounded` O and F `scroll_until`,
-the reply only; Strike 0, COUNTS 0, Re-pin 0. The R-stroke row of a framed target that the tree does not list, in a
+the reply only; Strike 0, COUNTS 0, Re-pin 0 (the same after review round 1: no capture's maxSwipes or timeout stop
+holds an untried list). The R-stroke row of a framed target that the tree does not list, in a
 scroll view the replayed tree lists, now holds a touch-down beside that scroll view only when the reply quotes its
-rect (StrokeOptions' `namedSuffices` in scripts/differential/golden-spec/rows.ts, set by
-`edgeRows` in golden-spec/edges.ts). It is red at 6b7e49b5's src
+rect inside the reply's `which the swipes did not go over:` clause (StrokeOptions' `namedSuffices` in
+scripts/differential/golden-spec/rows.ts, set by `edgeRows` in golden-spec/edges.ts). It is red at 6b7e49b5's src
 (`--side` at the extract: 2 new) and green here. Holding the strokes inside `lower` outright stays out: T6 tried that,
 and averi cannot know which list holds a row it never saw.
 
@@ -522,8 +530,14 @@ the clause order; the round over the real `scroll-bounded` dump), tests/interact
 each killed: the found and the across guards, the touch-down and stroked-view filters, the sort, the empty result,
 the keyboard predicate, the text-input predicate (geometry.ts), `beside` dropped from the bound, the clause put
 first, the `a`/`another` and `it`/`one of them` words, the axis word; in golden, `namedSuffices` always and never met,
-its clip unset, its `absent` guard and its listed-scroller guard. One redundant guard was removed rather than left as
-an equivalent mutant: the round's `across !== undefined` before asking `strokedBeside`, which asks it itself.
+its clip unset, its `absent` guard and its listed-scroller guard. Review round 1's, each killed: `beside` dropped from
+the maxSwipes and the timeout bound and from their sentences, the swipe-count guard, the `else:` advice dropped, the
+clause hidden under `touched`, the cap at 4 and `and N more` dropped, the screen box's point and list dropped, the
+largest holding list for the smallest, the within path saying the point; in golden, the clause match widened to the
+whole reply and past its dash. The `toldOn` sort is shared by `strokedAcross` and `strokedBeside`
+(`toldLargestFirst`). Redundant guards were removed rather than left as equivalent mutants: the round's
+`across !== undefined` and `movesWith !== undefined` before asking `strokedBeside` (it asks the first itself; a
+`movesWith` stop has found a match).
 
 ## Bug note
 

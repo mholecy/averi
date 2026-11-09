@@ -162,7 +162,7 @@ describe('round — the end turn: the caller\'s way first, proven exhausted, the
     const played = play(IPHONE, [at(0, 'nope'), at(0, 'nope'), at(0, 'nope')]);
     expect(strokesToward(played)).toEqual(['up', 'up']);
     expect(failureOf(played, 'id:"nope"').message).toContain(
-      'failed after 2 swipes (the last 2, swiping up, did not change the screen: the swipes were drawn over the screen whole, aimed at no scroll view; the tree shows a scroll view that scrolls vertically, which the swipes did not go over: scrollable (0,380 402x180) — if the element lies in it, swipe inside it (swipe, its coordinates) until the element shows, then scroll_until it; else: content exhausted, still loading, or the swipes were not taken)',
+      'failed after 2 swipes (the last 2, swiping up, did not change the screen: the swipes were drawn over the screen whole, aimed at no scroll view, touching down at 201,175 in the scroll view 0,110 402x220; the tree shows a scroll view that scrolls vertically, which the swipes did not go over: scrollable (0,380 402x180) — if the element lies in it, swipe inside it (swipe, its coordinates) until the element shows, then scroll_until it; else: content exhausted, still loading, or the swipes were not taken)',
     );
   });
 

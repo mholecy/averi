@@ -529,7 +529,7 @@ describe('strokedBeside — the listed scroll views along the stroke the swipes 
     const tree = bounded();
     const { memory, drawn } = sentOn(tree, 'down');
     expect(drawn !== undefined && containsPoint(UPPER, drawn.from)).toBe(true);
-    expect(strokedBeside(memory, factsOf(tree), 'down', BOX, drawn)).toEqual({ within: UPPER, others: [{ role: 'scrollable', label: null, identifier: 'lower', rect: LOWER }] });
+    expect(strokedBeside(memory, factsOf(tree), 'down', BOX, drawn)).toEqual({ axis: 'vertical', within: UPPER, others: [{ role: 'scrollable', label: null, identifier: 'lower', rect: LOWER }] });
     // The one stroked is never named, even with no stroke handed back to place the touch-down.
     expect(strokedBeside(memory, factsOf(tree), 'down', BOX, undefined)?.others.map((o) => o.identifier)).toEqual(['lower']);
     // No other list along the stroke: nothing to name.
@@ -543,9 +543,20 @@ describe('strokedBeside — the listed scroll views along the stroke the swipes 
     const tree = screenOf([loose(UPPER, 'upper'), loose({ x: 0, y: 1300, width: 1080, height: 495 }, 'lower')]);
     const { memory, drawn } = sentOn(tree, 'up');
     expect(drawn !== undefined && containsPoint(UPPER, drawn.from)).toBe(true);
-    expect(strokedBeside(memory, factsOf(tree), 'up', BOX, drawn)).toEqual({ others: [{ role: 'scrollable', label: null, identifier: 'lower', rect: { x: 0, y: 1300, width: 1080, height: 495 } }] });
+    // Over the screen box the touch-down is said, and the list it lies in (review round 1).
+    expect(strokedBeside(memory, factsOf(tree), 'up', BOX, drawn)).toEqual({ axis: 'vertical', at: drawn?.from, landed: UPPER, others: [{ role: 'scrollable', label: null, identifier: 'lower', rect: { x: 0, y: 1300, width: 1080, height: 495 } }] });
     // No stroke handed back: nothing is left out but the one stroked.
     expect(strokedBeside(memory, factsOf(tree), 'up', BOX, undefined)?.others.map((o) => o.identifier)).toEqual(['upper', 'lower']);
+    expect(strokedBeside(memory, factsOf(tree), 'up', BOX, undefined)).not.toHaveProperty('at');
+    // A touch-down in no list: the point alone; of two lists holding it, the inner one.
+    const apart = screenOf([loose({ x: 0, y: 1300, width: 1080, height: 300 }, 'a'), loose({ x: 0, y: 1700, width: 1080, height: 300 }, 'b')]);
+    const off = sentOn(apart, 'up');
+    expect(strokedBeside(off.memory, factsOf(apart), 'up', BOX, off.drawn)).toMatchObject({ at: { x: 540, y: 444 }, others: [{ identifier: 'a' }, { identifier: 'b' }] });
+    expect(strokedBeside(off.memory, factsOf(apart), 'up', BOX, off.drawn)).not.toHaveProperty('landed');
+    const inner: Rect = { x: 0, y: 400, width: 1080, height: 100 };
+    const nested = screenOf([loose(UPPER, 'outer'), loose(inner, 'inner'), loose({ x: 0, y: 1300, width: 1080, height: 300 }, 'a')]);
+    const into = sentOn(nested, 'up');
+    expect(strokedBeside(into.memory, factsOf(nested), 'up', BOX, into.drawn)).toMatchObject({ landed: inner, others: [{ identifier: 'a' }] });
   });
 
   it('leaves out one across the axis: a carousel beside the lists is no scroll view a vertical stroke could have tried', () => {

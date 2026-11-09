@@ -470,7 +470,7 @@ export function strokedAcross(memory: StrokeMemory, facts: Pick<TreeFacts, 'scen
   const way = axisOf(toward);
   const axis = clips.axesOf(within)?.axis;
   if (axis === undefined || axis === way) return undefined;
-  const [view] = [...clips.toldOn(way, screen, facts.reading.ofKeyboard)].sort((a, b) => rectArea(b.rect) - rectArea(a.rect));
+  const [view] = toldLargestFirst(facts, way, screen);
   if (view === undefined) return { rect: within, axis };
   const judged = roomless.some((r) => sameRect(r, view.rect));
   return { rect: within, axis, along: { view: quoted(view), ...(judged && { noRoom: true as const }) } };
@@ -479,12 +479,22 @@ export function strokedAcross(memory: StrokeMemory, facts: Pick<TreeFacts, 'scen
 /**
  * The scroll views the strokes did not try (`strokedBeside`): `within`, the one the last stroke sent went over
  * (undefined: the gesture box whole), and `others`, every other scroll view the tree tells scrolls the stroke's way,
- * largest first.
+ * largest first. Over the gesture box whole, `at`, the last touch-down, and `landed`, the smallest scroll view told
+ * along the stroke that holds it, when one does (WDA, which marks no node clipping, strokes the screen before the
+ * target is read: where the finger landed is what the reader can check).
  */
 export interface StrokedBeside {
+  /** The stroke's axis, along which every one of `others` is told to scroll. */
+  readonly axis: ScrollAxis;
   readonly within?: Rect;
+  readonly at?: Point;
+  readonly landed?: Rect;
   readonly others: readonly QuotedNode[];
 }
+
+/** Every scroll view of the tree told to scroll on `way` (ui-tree/geometry.ts#Clips.toldOn: meeting `screen`, none of the keyboard's own), largest first — what `strokedAcross` and `strokedBeside` name. */
+const toldLargestFirst = (facts: Pick<TreeFacts, 'scene' | 'reading'>, way: ScrollAxis, screen: Rect): UiNode[] =>
+  [...facts.scene.clips.toldOn(way, screen, facts.reading.ofKeyboard)].sort((a, b) => rectArea(b.rect) - rectArea(a.rect));
 
 /**
  * Before any read found the target (`Memory.target` unset), every scroll view of the WHOLE tree told to scroll along
@@ -507,12 +517,13 @@ export function strokedBeside(memory: StrokeMemory, facts: Pick<TreeFacts, 'scen
   const way = axisOf(toward);
   const axis = within === undefined ? undefined : clips.axesOf(within)?.axis;
   if (axis !== undefined && axis !== way) return undefined;
-  const others = clips
-    .toldOn(way, screen, facts.reading.ofKeyboard)
-    .filter((n) => !(within !== undefined && sameRect(n.rect, within)) && !(drawn !== undefined && containsPoint(n.rect, drawn.from)))
-    .sort((a, b) => rectArea(b.rect) - rectArea(a.rect));
+  const told = toldLargestFirst(facts, way, screen);
+  const holds = (n: UiNode): boolean => drawn !== undefined && containsPoint(n.rect, drawn.from);
+  const others = told.filter((n) => !(within !== undefined && sameRect(n.rect, within)) && !holds(n));
   if (others.length === 0) return undefined;
-  return { ...(within !== undefined && { within }), others: others.map(quoted) };
+  if (within !== undefined) return { axis: way, within, others: others.map(quoted) };
+  const landed = told.filter(holds).at(-1);
+  return { axis: way, ...(drawn !== undefined && { at: { ...drawn.from } }), ...(landed !== undefined && { landed: { ...landed.rect } }), others: others.map(quoted) };
 }
 
 /**

@@ -214,7 +214,8 @@ export interface StrokeOptions extends RowOptions {
   scrollerListed?: boolean;
   /**
    * A framed target the tree does not list (`absent`), whose scroll view the replayed tree lists a scroller: a
-   * touch-down outside that scroll view passes only when the reply quotes its rect — averi strokes the largest scroller
+   * touch-down outside that scroll view passes only when the reply quotes its rect among the scroll views the swipes
+   * did not go over (`namesUntried`) — averi strokes the largest scroller
    * before it reads the target, and its exhausted stop names the listed scroll views along the stroke the swipes did not
    * go over (D76, interact/stroke-plan.ts#strokedBeside). Set by edges.ts#edgeRows (scroll-bounded's O and F on
    * Android, rows of `lower`).
@@ -284,6 +285,12 @@ const ownScrollView = (t: StrokeTarget, cell: CellTruth, { absent, scrollerListe
 /** A rect as averi's replies quote it (ui-tree/geometry.ts#rectText): `x,y wxh`. */
 const quotedRect = (r: Rect): string => `${r.x},${r.y} ${r.width}x${r.height}`;
 
+/** The clause of averi's reply naming the scroll views the swipes did not go over (interact/scroll-text.ts#besideText), up to its dash. */
+const UNTRIED = /which the swipes did not go over: ([^—]*)/;
+
+/** The reply names `own` among the scroll views the swipes did not go over — its rect inside that clause, not elsewhere (the one swiped is quoted too). */
+const namesUntried = (reply: string, own: Rect): boolean => UNTRIED.exec(reply)?.[1].includes(`(${quotedRect(own)})`) === true;
+
 /** What R-stroke's `says` asks of the touch-downs: clear of the bands and the chrome, and inside `own` where given — or, `named`, the reply naming it. */
 const touchDownClause = (t: StrokeTarget, own: Rect | undefined, named = false) =>
   `every touch-down clear of the bands and the chrome${own === undefined ? '' : ` and inside its scroll view ${t.scrollView}${named ? `, or the reply names ${t.scrollView} (${quotedRect(own)})` : ''}`}`;
@@ -292,7 +299,7 @@ const touchDownClause = (t: StrokeTarget, own: Rect | undefined, named = false) 
 function strokesJudge(t: StrokeTarget, cell: CellTruth, own: Rect | undefined, direction: Direction, named = false): (o: Outcome) => string | undefined {
   return (o) => {
     if (swipes(o) === 0) return said(o, 'no swipe');
-    const beside = own === undefined || (named && o.reply.includes(quotedRect(own))) ? [] : touchDowns(o).filter((p) => !within(p, own));
+    const beside = own === undefined || (named && namesUntried(o.reply, own)) ? [] : touchDowns(o).filter((p) => !within(p, own));
     const unnamed = named && own !== undefined ? `, and the reply does not name it (${quotedRect(own)})` : '';
     const axis = axisOf(direction);
     const across = strokes(o).filter(({ from, to }) => Math.abs(to[axis] - from[axis]) <= Math.abs(to[otherAxis(axis)] - from[otherAxis(axis)]));
