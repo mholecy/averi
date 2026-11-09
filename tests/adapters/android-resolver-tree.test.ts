@@ -13,8 +13,9 @@ import { parseDump } from '../helpers/android-dumps.js';
 // (D55d), pinned in android-chooser.test.ts.
 // android-ui-snapshot-lab-resolver.json is averi's own ui_snapshot reply on the same chooser, batch-10's E4a (a later
 // raise of the same link, the same main): the fixture's parse is that reply byte for byte, but for the two `disabled`
-// marks D66 added (docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md). The recorded reply is device
-// evidence and stays as it was taken.
+// marks D66 added (docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md) and the seven `readingOrder`
+// marks D75 added (a classic run in AOSP's location order, adapters/android-accessibility-order.ts; ui_snapshot prints
+// them, as it does iOS's). The recorded reply is device evidence and stays as it was taken.
 
 const raw = readFileSync(new URL('../fixtures/uiautomator-lab-resolver.xml', import.meta.url), 'utf8');
 /** The chooser's tree as the adapter parses it (any status line after the last `>` cut, as AndroidAdapter.uiTree does), parsed once: no test changes it. */
@@ -28,13 +29,28 @@ const oneById = (root: UiNode, id: string): UiNode => {
 };
 
 describe('the chooser\'s real tree (batch-10 E2, API 33): what the uiautomator parser yields today', () => {
-  it('is averi\'s ui_snapshot reply on the chooser (batch-10 E4a), byte for byte, plus `"disabled": true` after the children of the two buttons (D66)', () => {
+  it('is averi\'s ui_snapshot reply on the chooser (batch-10 E4a), byte for byte, plus `"disabled": true` after the children of the two buttons (D66) and the `readingOrder` marks (D75, below)', () => {
     const reply = readFileSync(new URL('../fixtures/android-ui-snapshot-lab-resolver.json', import.meta.url), 'utf8');
     // The node's own indent, then everything up to its (empty) children: the mark is the node's last key.
     const marked = (id: string) => new RegExp(`^( *)("identifier": "${id}",[\\s\\S]*?"children": \\[\\])`, 'm');
     const expected = reply.replace(marked('button_once'), '$1$2,\n$1"disabled": true').replace(marked('button_always'), '$1$2,\n$1"disabled": true');
     expect(expected.match(/"disabled": true/g)).toHaveLength(2);
-    expect(JSON.stringify(chooserTree, null, 2)).toBe(expected);
+    expect(JSON.stringify(chooserTree, (key, value: unknown) => (key === 'readingOrder' ? undefined : value), 2)).toBe(expected);
+  });
+
+  it('marks `readingOrder` (D75) on the seven classic runs of two or more children, each in AOSP\'s location order, and prints it', () => {
+    const marked = [...everyNode(chooserTree)].filter((n) => n.readingOrder === true);
+    expect(marked.map((n) => n.identifier ?? `${n.role} ${n.rect.x},${n.rect.y}`)).toEqual([
+      'contentPanel',
+      'resolver_list',
+      'container 0,1650',
+      'container 0,1804',
+      'container 132,1825',
+      'button_bar_container',
+      'button_bar',
+    ]);
+    expect(marked.every((n) => n.children.length >= 2)).toBe(true);
+    expect(JSON.stringify(chooserTree, null, 2).match(/"readingOrder": true/g)).toHaveLength(7);
   });
 
   it('27 nodes, every package `android`, the root the active window\'s whole screen, marked as uiautomator\'s', () => {

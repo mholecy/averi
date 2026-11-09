@@ -23,11 +23,13 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * transparent overlay smaller than the screen reads as drawn, and a label
  * inside a sheet that does not contain the point does not. "Later in
  * pre-order = drawn later" is measured on WDA trees (Windows by level) and
- * on Compose (the floating tab bar); for classic Android Views
- * uiautomator's sibling order is the accessibility child order, which
- * Android may sort by position rather than by Z (not measured) — there a
- * later sibling drawn beneath may read as drawn over, for every question.
- * And iOS's accessibility lists a SwiftUI container's elements in READING
+ * on Compose (the floating tab bar). For classic Android Views it is FALSE:
+ * AOSP sorts a ViewGroup's accessibility children by LOCATION, not by Z
+ * (ViewGroup.ChildListForAccessibility; measured on the lab's rn-banner, every
+ * cover listed before the target it is drawn over, lab note LR4) — the
+ * uiautomator parser marks such a run `readingOrder`
+ * (adapters/android-accessibility-order.ts), and the reading-order rules below
+ * judge it as iOS's. And iOS's accessibility lists a SwiftUI container's elements in READING
  * order, by their tops, not in draw order (`UiNode.readingOrder`: idb's flat
  * list, a WDA run of siblings sorted by top): there a control drawn on top
  * may be listed BEFORE the control it is drawn over (the lab's menu row W

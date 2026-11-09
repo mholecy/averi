@@ -155,8 +155,10 @@ const holdsWhole = (node: UiNode, target: Placed, screenArea: number): boolean =
  * A childless node the app NAMED (an identifier), in a nested run in reading order (reading-order.ts#listsNestedReadingOrder:
  * WDA's top-sorted run, React Native's flattened screen among them), is drawn — lab note LR3: rn-banner's bare cover
  * `lab.rn-banner.C.cover 31,480 340x52`, a View with a testID and nothing in it, drawn over C — unless it holds a sibling
- * of its own whole (this predicate). Elsewhere a named leaf stays excused as before (an Android Snackbar host's icon,
- * a bare overlay with only an id: tests/ui-tree/draw-order.test.ts, tests/adapters/android.test.ts). WDA's flattening of React
+ * of its own whole (this predicate). uiautomator's run in AOSP's location order is one too
+ * (adapters/android-accessibility-order.ts, lab note LR4: rn-banner's U.cover and C.cover; and a classic bare overlay
+ * with only an id, tests/adapters/android.test.ts). Elsewhere a named leaf stays excused as before (an Android Snackbar
+ * host's icon in a run not so ordered: tests/ui-tree/draw-order.test.ts). WDA's flattening of React
  * Native's tree lists a View's content as the View's siblings — myport's login lists `login_username_field
  * 36,339 330x80`, childless, and after it the field's row `36,367 330x52` it wraps: such a wrapper draws through its
  * content, as any wrapper.

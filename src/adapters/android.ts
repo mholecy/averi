@@ -5,6 +5,7 @@ import { CONTROL_CHAR_RE, controlCharRemedy, inputTextControlFate } from './inpu
 import { NOT_PRINTABLE_ASCII, refusalOf, type Typeable } from './typeable.js';
 import { causeOf, runStart, startSaid, type StartRefused } from './android-start.js';
 import { CHOOSER_FOCUS_COMMAND, chooserAlsoInFront, chooserInFocus, chooserSheet } from './android-chooser.js';
+import { markLocationSorted } from './android-accessibility-order.js';
 import { encodePng } from './png-encode.js';
 import { screencapRaw, screenshotPng, type ScreenshotSource } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
@@ -1603,7 +1604,8 @@ export function parseUiautomatorXml(xml: string, drawnOverStrip: DrawnOverStrip)
   if (roots.length === 0) throw new Error('uiautomator dump contained no nodes');
   // An arrow, not `roots.map(normalizeNode)`: map would hand its index in as `around`.
   const grown = new Map<UiNode, Rect>();
-  const children = roots.map((root) => normalizeNode(root, { grown }));
+  const provided = new Set<UiNode>();
+  const children = roots.map((root) => normalizeNode(root, { grown, provided, inProvider: false }));
   // The source's marks: Compose lists a control's touch target as its wrapper (types.ts#UiNode.paddedTouchTargets),
   // the dump lists the active window only (`activeWindowOnly`), and that window, when the dump shows it presented, is
   // marked so (`presentation`, `presentedWindow`), and it cuts a node's bounds at the screen's edge
@@ -1613,6 +1615,7 @@ export function parseUiautomatorXml(xml: string, drawnOverStrip: DrawnOverStrip)
     children.length === 1
       ? { ...children[0], paddedTouchTargets: true, activeWindowOnly: true, boundsCutAtScreen: true, ...(presented !== undefined && { presentation: presented }) }
       : { role: 'container', label: null, identifier: null, value: null, rect: zeroRect(), children, paddedTouchTargets: true, activeWindowOnly: true, boundsCutAtScreen: true };
+  markLocationSorted(tree, provided);
   widenUnderCovers(tree, grown, drawnOverStrip);
   return tree;
 }
@@ -1751,7 +1754,20 @@ interface Around {
   parent?: Rect;
   clip?: Rect;
   grown: Map<UiNode, Rect>;
+  /** Whether the node is, or lies under, a node provider's host (`providesNodes`): its children are the provider's. */
+  inProvider: boolean;
+  /** The dump's nodes whose children a node provider lists, not AOSP's sort (android-accessibility-order.ts#markLocationSorted skips them). */
+  provided: Set<UiNode>;
 }
+
+/**
+ * Whether `raw` hosts a NODE PROVIDER — its children are virtual nodes the provider lists in its own order, not the
+ * views AOSP sorts by location (android-accessibility-order.ts): a node of the class `android.view.View` with
+ * children. A plain View holds no child views, so such children are virtual: Compose's (AndroidComposeView dumps as
+ * `android.view.View`, under a ComposeView on a screen and under a bare ViewGroup in a dialog's window — measured on
+ * every Compose capture of the lab, API 33), or an ExploreByTouchHelper's. Everything under it is the provider's too.
+ */
+const providesNodes = (raw: RawNode, rawChildren: readonly RawNode[]): boolean => raw.class === 'android.view.View' && rawChildren.length > 0;
 
 function normalizeNode(raw: RawNode, around: Around): UiNode {
   const className = raw.class?.split('.').pop() ?? '';
@@ -1770,7 +1786,8 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
   const isTextInput = className.endsWith('EditText') || composeTextInput;
   const { rect, clippedOut } = nodeBounds(raw.bounds, around.parent);
   const clips = raw.scrollable === 'true';
-  const children = rawChildren.map((child) => normalizeNode(child, { parent: rect, clip: clips ? rect : around.clip, grown: around.grown }));
+  const inProvider = around.inProvider || providesNodes(raw, rawChildren);
+  const children = rawChildren.map((child) => normalizeNode(child, { parent: rect, clip: clips ? rect : around.clip, grown: around.grown, inProvider, provided: around.provided }));
   const whole = around.clip === undefined ? undefined : uncut(rect, children, around.clip);
   const node: UiNode = {
     role: isTextInput ? 'textfield' : (ROLE_MAP[className] ?? (rawChildren.length > 0 ? 'container' : 'other')),
@@ -1807,6 +1824,7 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
   // says of itself is not what the field in it does, and a missing attribute stays unknown.
   if (isTextInput && (raw.password === 'true' || raw.password === 'false')) node.secure = raw.password === 'true';
   if (whole !== undefined) around.grown.set(node, whole);
+  if (inProvider) around.provided.add(node);
   return node;
 }
 

@@ -260,11 +260,17 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
     expect(rowOf(t)).not.toHaveProperty('cutBounds');
   });
 
-  it('…nor a bare structural overlay (childless, nothing said, only an id) — and the same overlay saying something, or a host whose tab lies on the strip, still widens it', () => {
-    expect(rowOf(rowWith('', '<node class="android.view.View" resource-id="overlay" bounds="[0,1540][1080,2000]" />'))).not.toHaveProperty('cutBounds');
+  it('…nor a bare structural overlay (childless, nothing said, no id) — and the same overlay saying something, or a host whose tab lies on the strip, still widens it', () => {
+    expect(rowOf(rowWith('', '<node class="android.view.View" bounds="[0,1540][1080,2000]" />'))).not.toHaveProperty('cutBounds');
     expect(rowOf(rowWith('', '<node class="android.view.View" resource-id="overlay" content-desc="Banner" bounds="[0,1540][1080,2000]" />'))).toHaveProperty('cutBounds');
     const tabHost = '<node class="android.view.View" bounds="[0,0][1080,2220]"><node class="android.view.View" resource-id="tabs" bounds="[66,1550][1014,1800]"><node class="android.view.View" content-desc="Home" bounds="[100,1560][300,1700]" /></node></node>';
     expect(rowOf(rowWith('', tabHost))).toMatchObject({ rect: { x: 66, y: 1500, width: 948, height: 100 }, cutBounds: { x: 66, y: 1500, width: 948, height: 50 } });
+  });
+
+  it('a bare overlay the app NAMED (only an id), in a classic run listed in location order (the root: the list, then the overlay, one left edge, the higher top first — marked readingOrder, D75): drawn, as LR3 has it under WDA, so the row widens', () => {
+    const t = rowWith('', '<node class="android.view.View" resource-id="overlay" bounds="[0,1540][1080,2000]" />');
+    expect(t.readingOrder).toBe(true);
+    expect(rowOf(t)).toHaveProperty('cutBounds');
   });
 
   it('every target-column excuse applies, those measured on iOS too: a childless full-screen scrim listed after the list widens nothing, nor a classic list sheet (a RecyclerView) whose rows lie on the strip — its rows are another scroller\'s content, its frame no surface', () => {

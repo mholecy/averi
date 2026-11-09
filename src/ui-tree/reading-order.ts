@@ -7,7 +7,8 @@ import type { SeenOrder } from './seen-order.js';
 /**
  * READING ORDER: what a listing given in reading order — not in draw order — says of a target's order against its
  * siblings (`readingOrderOf`). iOS's accessibility lists a SwiftUI container's elements by their tops
- * (`UiNode.readingOrder`: idb's flat list, a WDA run sorted by top), so a node drawn on top may be listed BEFORE the
+ * (`UiNode.readingOrder`: idb's flat list, a WDA run sorted by top) — and AOSP lists a classic Android ViewGroup's
+ * children by location (a uiautomator run so ordered, lab note LR4) — so a node drawn on top may be listed BEFORE the
  * node it is drawn over, and the draw order's rule "listed later = drawn later" (draw-order.ts#DrawOrder's doc) does
  * not hold there. This module is the one owner of "listed before, but drawn over" in such a listing: which siblings
  * listed before a target cover it — a heading (`headingsOver`: drawn over it, SwiftUI's pinned section header), a
@@ -54,7 +55,7 @@ function listsInReadingOrder(parent: UiNode): boolean {
 
 /**
  * Whether `parent` lists its children in reading order in a NESTED tree (`listsInReadingOrder`, and no flat list): WDA's
- * run sorted by top — where a sibling listed before a target may be drawn over it whatever it is (`peersOf`), and a
+ * run sorted by top, or uiautomator's classic run in AOSP's location order (lab note LR4) — where a sibling listed before a target may be drawn over it whatever it is (`peersOf`), and a
  * childless node the app named is drawn unless it wraps a sibling (placed.ts#FRAME_EXCUSES `structural`: React
  * Native's flattened views). Not idb's flat list (`UiNode.flatList`), whose listing is its own (ADR 0015).
  */

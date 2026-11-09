@@ -4,6 +4,8 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
+import { seenOrderOf } from '../../src/ui-tree/seen-order.js';
+import { parseDump } from '../helpers/android-dumps.js';
 import { tagged } from '../helpers/covers.js';
 
 /**
@@ -37,6 +39,31 @@ describe('rn-banner under WDA: a later sibling drawn over the target is its cove
     const t = parseWdaSource(await capture('rn-banner.wda.json'));
     const [target, cover] = at(t, 'C');
     expect(tagged(drawOrder(t).exposure(target, IPHONE).covers)).toEqual([{ node: cover, order: 'drawn', presented: false }]);
+  });
+});
+
+/**
+ * The same cell under uiautomator (lab note LR4, docs/bugs/2026-11-09-lab-android-uiautomator-lists-a-react-native-cover-before-its-target-so-it-is-tapped-and-measured.md):
+ * AOSP lists a classic ViewGroup's children by location (adapters/android-accessibility-order.ts), every cover (left 73)
+ * before its target (left 128) — C's too, whose top (1321) lies below C's (1293). The parser marks the run
+ * `readingOrder`, so each cover is a peer whose order the eyes tell; seen over its target, it covers it.
+ */
+describe('rn-banner under uiautomator: each cover, listed before its target, is a cover the eyes tell', () => {
+  const PHONE = { x: 0, y: 0, width: 1080, height: 2220 };
+  const android = async () => parseDump(await readFile(new URL('../fixtures/truth/android-rn-averi_lab-api33/rn-banner.xml', import.meta.url), 'utf8'));
+  const COLOUR = { T: '#43A047', U: '#8E24AA', C: '#FB8C00' } as const;
+  it.each(['T', 'U', 'C'] as const)('%s, its cover seen drawn over it: covered by it at its centre, nothing tapped', async (tag) => {
+    const t = await android();
+    const [target, cover] = at(t, tag);
+    const seen = seenOrderOf(target, [{ peer: cover, seen: 'under', overlap: '#263238', own: COLOUR[tag], other: '#263238' }]);
+    const exposure = drawOrder(t, seen).exposure(target, PHONE);
+    expect(tagged(exposure.covers)).toEqual([{ node: cover, order: 'seenOver', presented: false }]);
+    expect(exposure.centreCover?.node).toBe(cover);
+  });
+  it.each(['T', 'U', 'C'] as const)('%s with no screenshot: its cover is one whose order is not told — never read as beneath it', async (tag) => {
+    const t = await android();
+    const [target, cover] = at(t, tag);
+    expect(tagged(drawOrder(t).exposure(target, PHONE).covers)).toEqual([{ node: cover, order: 'untold', presented: false }]);
   });
 });
 
