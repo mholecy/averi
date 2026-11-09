@@ -168,14 +168,17 @@ describe('judgeAtRest — a first row at rest flush under its sticky header (VA1
   const launched = rest();
   const fired = rest({ strokes: [stroke(0, 0, 'list')], events: [{ kind: 'tap', tag: 'R', at }] });
   const VISIBLE = 'Element id:"lab.scroll-sticky-rest.R" fully visible after 1 swipe; its top edge lies on the edge of …, pinned at its scroll container\'s (0,303 1080x1238) top and drawn after it, and a probe swipe toward it moved nothing';
-  it('one probe that moved nothing, then the tap fires R: ok', () => {
+  const TWICE = 'Element id:"lab.scroll-sticky-rest.R" fully visible after 2 swipes; its top edge lies on the edge of …, pinned at its scroll container\'s (0,303 1080x1238) top and drawn after it, and 2 probe swipes toward it moved nothing — nothing of it is cut there';
+  it('one probe that moved nothing, then the tap fires R: ok — and two (T12: a held first probe is sent again), as src says it now', () => {
     expect(judgeAtRest('R', 'list', [VISIBLE, 'Tapped id:"lab.scroll-sticky-rest.R"'], fired, launched).outcome).toBe('ok');
+    const twice = rest({ strokes: [stroke(0, 0, 'list'), stroke(0, 0, 'list')], events: [{ kind: 'tap', tag: 'R', at }] });
+    expect(judgeAtRest('R', 'list', [TWICE, 'Tapped id:"lab.scroll-sticky-rest.R"'], twice, launched).outcome).toBe('ok');
   });
   it('a stroke that moved the list, or more than one swipe, or no stop: MISMATCH', () => {
     // Stroked away and back (round 9's overlay rule stroked the list 66→877→439→1→205): whole again at the stop, still a break.
     const moved = rest({ strokes: [stroke(0, 66, 'list'), stroke(66, 0, 'list')], events: [{ kind: 'tap', tag: 'R', at }] });
     expect(judgeAtRest('R', 'list', [VISIBLE, 'Tapped'], moved, launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/^R-direction \(at rest\): a stroke moved list 0→66; a stroke moved list 66→0/) });
-    expect(judgeAtRest('R', 'list', [VISIBLE.replace('after 1 swipe', 'after 2 swipes'), 'Tapped'], fired, launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/2 swipes/) });
+    expect(judgeAtRest('R', 'list', [TWICE.replace('after 2 swipes', 'after 3 swipes'), 'Tapped'], fired, launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/3 swipes/) });
     expect(judgeAtRest('R', 'list', ['ERROR scroll_until failed after 4 swipes', 'Tapped'], fired, launched)).toMatchObject({ outcome: 'MISMATCH' });
   });
   it('visibilityCases asks it of scroll-sticky-rest\'s R on Android, down, fully: true', () => {

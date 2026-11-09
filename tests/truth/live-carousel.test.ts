@@ -169,16 +169,17 @@ describe('preDrag: the probes\' 440-px, 1-s drag left on the carousel, then the 
 });
 
 describe('selectCases: the carousel group, Android and the native app only, never by default', () => {
-  it('its ten cases, in order, when asked', () => {
-    expect(CASES.map((c) => c.id)).toEqual(['lv-d62-control', 'lv-d62-drop', 'lv-d62-short', 'lv-d62-drop-two', 'lv-d68-launch', 'lv-d59b-lazy', 'lv-d59b-recycler', 'd52-e2', 'd37-snap-lazy', 'd37-snap-recycler']);
+  it('its eleven cases, in order, when asked', () => {
+    expect(CASES.map((c) => c.id)).toEqual(['lv-d62-control', 'lv-d62-drop', 'lv-d62-short', 'lv-d62-drop-two', 'lv-t12-drop-first', 'lv-d68-launch', 'lv-d59b-lazy', 'lv-d59b-recycler', 'd52-e2', 'd37-snap-lazy', 'd37-snap-recycler']);
     expect(CASES.every((c) => c.group === 'carousel')).toBe(true);
     expect(caseOf('lv-d62-drop')).toMatchObject({ preDrag: 440, reads: { swipes: { drop: [2] } } });
     expect(caseOf('lv-d62-short')).toMatchObject({ preDrag: 440, reads: { swipes: { drop: [2], shorten: { stroke: 1, px: 90 } } } });
+    expect(caseOf('lv-t12-drop-first')).toMatchObject({ preDrag: 440, reads: { swipes: { drop: [1] } } });
     expect(caseOf('lv-d62-control').reads?.swipes).toEqual({});
   });
 
   it('a premise SKIP fails the run on the lv-d62 legs alone (skipFails: the harness broke), never elsewhere', () => {
-    expect(CASES.filter((c) => c.skipFails === true).map((c) => c.id)).toEqual(['lv-d62-control', 'lv-d62-drop', 'lv-d62-short', 'lv-d62-drop-two']);
+    expect(CASES.filter((c) => c.skipFails === true).map((c) => c.id)).toEqual(['lv-d62-control', 'lv-d62-drop', 'lv-d62-short', 'lv-d62-drop-two', 'lv-t12-drop-first']);
     for (const id of ['lv-d62-control', 'lv-d62-drop']) {
       const r = recorded(id);
       r.launched = withC(r.launched, 66);
@@ -198,7 +199,7 @@ describe('selectCases: the carousel group, Android and the native app only, neve
     expect((await selectCases({ platform: 'android', app: 'native', groups: ['forms'] })).some((c) => c.group === 'carousel')).toBe(false);
     expect(await selectCases({ platform: 'ios', app: 'native', groups: ['carousel'] })).toEqual([]);
     expect(await selectCases({ platform: 'android', app: 'react-native', groups: ['carousel'] })).toEqual([]);
-    expect(CAROUSEL_CASES).toHaveLength(10);
+    expect(CAROUSEL_CASES).toHaveLength(11);
   });
 });
 
@@ -303,6 +304,21 @@ describe('lv-d62-drop-two: two reveals dropped, the hedge with C cut, then "call
     expect(run({ replies: [SECOND, SECOND] })).toMatchObject({ outcome: 'LOUD', cls: 'carousel-kind' });
     expect(run({ cutAtHedge: false })).toMatchObject({ outcome: 'SKIP' });
     expect(run({ swipes: [false, true, false, false] })).toMatchObject({ outcome: 'SKIP' });
+  });
+});
+
+describe('lv-t12-drop-first: the first probe after the pre-drag dropped (T12)', () => {
+  /** lv-d62-drop's record as lv-t12-drop-first: its first stroke dropped, the strokes after it sent. */
+  const dropFirst = (strokes: readonly { from: number; to: number }[]): Recorded => {
+    const r = { ...recorded('lv-d62-drop'), id: 'lv-t12-drop-first' };
+    r.swipes = strokes.map((s, i) => ({ from: { x: s.from, y: 497 }, to: { x: s.to, y: 497 }, dropped: i === 0 }));
+    return r;
+  };
+  it('the false claim (base: one held probe read `checked`) is a MISMATCH before any premise', () => {
+    const r = dropFirst([{ from: 824, to: 682 }]);
+    r.replies = [D62_FALSE_PASS];
+    r.state = withC(r.state!, 438);
+    expect(verdictOf(r)).toMatchObject({ outcome: 'MISMATCH', cls: 'fully-cut' });
   });
 });
 
