@@ -212,6 +212,13 @@ describe('tool descriptions quote each operation default from its owner', () => 
     expect(property('scroll_until', 'timeoutMs').description).toBe('Default 15250');
   });
 
+  it('scroll_until: a hedged fully: true success opens NOT CONFIRMED WHOLE / UNCOVERED (T17), the unprobed hedges named too', async () => {
+    const { HEDGED_LEAD, HEDGE_WHATS } = await vi.importActual<typeof import('../../src/interact/scroll-text.js')>('../../src/interact/scroll-text.js');
+    const [whole, uncovered] = HEDGE_WHATS;
+    expect(description('scroll_until')).toContain(`on Android an unprobed or proven cut or unplaced keyboard succeeds hedged: "${HEDGED_LEAD} ${whole}"/"${uncovered}"`);
+    expect(description('scroll_until')).not.toContain('may succeed hedged ("it may be cut there"; call again)');
+  });
+
   it('scroll_until: the timeout is checked once a round, so a call can run past it by one swipe, its settle and one more round', () => {
     expect(description('scroll_until')).toContain('at maxSwipes / timeoutMs (checked once a round, so a call can run past it by one swipe and one more read)');
     expect(full('scroll_until')).toContain(

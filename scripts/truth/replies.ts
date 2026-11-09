@@ -1,6 +1,6 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { FOCUS_TEXT_NOT_READ } from '../../src/interact/fill-text.js';
-import { boundText, HEDGED_LEAD, TREE_READ_FAILED, UNTRIED_END, UNTRIED_LEAD } from '../../src/interact/scroll-text.js';
+import { boundText, HEDGE_WHATS, HEDGED_LEAD, type HedgeWhat, TREE_READ_FAILED, UNTRIED_END, UNTRIED_LEAD } from '../../src/interact/scroll-text.js';
 import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, KEYBOARD_UNLISTED, NO_ID_LISTED } from '../../src/ui-tree/miss.js';
 import { untriedSideText } from '../../src/interact/target-text.js';
 import { EDGES, rectText } from '../../src/ui-tree/geometry.js';
@@ -54,18 +54,38 @@ export const ASSERT_SUMMARY = /^\d+\/\d+ asserts|^All \d+ asserts/;
 /** averi refused or failed: `ERROR …` — a refusal, a timeout, a stop that gave up. */
 export const isError = (reply: string | undefined) => reply?.startsWith('ERROR') === true;
 
-/** scroll_until stopped on its target: `Element … visible after N swipes` (plain, `fully visible`, or a hedged `visible after N swipes, NOT CONFIRMED …`). */
-export const VISIBLE_STOP = /^Element .* visible after /;
+/**
+ * scroll_until stopped on its target: `Element … visible after N swipes` — plain, `fully visible`, the eyes unjudged
+ * (`fully visible by the tree after`), or hedged (`visible [by the tree ]after N swipes, NOT CONFIRMED …`, T17).
+ */
+export const VISIBLE_STOP = /^Element .* visible (?:by the tree )?after /;
 
 /**
- * A `fully: true` stop whose opening claims nothing whole (T17, ADR 0013's T17 amendment): src's lead `Element …
- * visible [by the tree ]after N swipes, NOT CONFIRMED WHOLE|UNCOVERED|WHOLE OR UNCOVERED: …` (scroll-text.ts
- * #describeScrollResult, #HEDGED_LEAD) — or the pre-T17 form the committed t11/t12 live records hold, `fully visible
- * [by the tree ]after N swipes[, judged above …]; but …` (a flush hedge, scroll-text.ts#flushText). A stop, never a claim.
+ * A `fully: true` stop whose opening claims nothing whole or uncovered (T17, ADR 0013's T17 amendment), read apart:
+ * src's lead `Element … visible [by the tree ]after N swipes, NOT CONFIRMED <what>: …` (scroll-text.ts
+ * #describeScrollResult, its words `HEDGED_LEAD` and `HEDGE_WHATS`), `old: false`; or the pre-T17 opening the committed
+ * live records hold (the t11/t12 records, tests/fixtures/d59-b9-lazy-predrag.json), `fully visible [by the tree ]after
+ * N swipes[, judged above …]; but …` — always a flush hedge, so `WHOLE`, `old: true`. Undefined on any other reply.
  */
-const HEDGED_STOP = new RegExp(`^Element .* visible (?:by the tree )?after \\d+ swipes?, ${HEDGED_LEAD} (?:WHOLE|UNCOVERED|WHOLE OR UNCOVERED): `);
+export interface HedgedLead {
+  readonly what: HedgeWhat;
+  readonly old: boolean;
+}
+// Longest first, so no alternative is read as a shorter one's prefix.
+const HEDGE_WHAT_PATTERN = [...HEDGE_WHATS].sort((a, b) => b.length - a.length).join('|');
+const HEDGED_STOP = new RegExp(`^Element .* visible (?:by the tree )?after \\d+ swipes?, ${HEDGED_LEAD} (${HEDGE_WHAT_PATTERN}): `);
 const OLD_HEDGED_STOP = /^Element .* fully visible (?:by the tree )?after \d+ swipes?[^;]*; but /;
-export const fullyHedged = (reply: string) => HEDGED_STOP.test(reply) || OLD_HEDGED_STOP.test(reply);
+export function hedgedLead(reply: string): HedgedLead | undefined {
+  const lead = HEDGED_STOP.exec(reply);
+  if (lead !== null) return { what: lead[1] as HedgeWhat, old: false };
+  return OLD_HEDGED_STOP.test(reply) ? { what: 'WHOLE', old: true } : undefined;
+}
+
+/** A hedged `fully: true` stop (`hedgedLead`), of either form: a stop, never a claim. */
+export const fullyHedged = (reply: string) => hedgedLead(reply) !== undefined;
+
+/** The hedge covers a cut (`WHOLE`, alone or with `UNCOVERED`): what a flush edge no probe checked leaves unconfirmed. */
+export const hedgesCut = (lead: HedgedLead | undefined): boolean => lead !== undefined && lead.what !== 'UNCOVERED';
 
 /** The reply claims scroll_until's stop on its target (VISIBLE_STOP), fully or not. */
 export const claimsVisible = (reply: string) => VISIBLE_STOP.test(reply);

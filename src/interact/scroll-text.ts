@@ -271,13 +271,35 @@ const UNLOCATED_TEXT = `${UNLOCATED_KEYBOARD} — it was not judged and may cove
 
 /**
  * The words a hedged `fully: true` stop opens with after `visible after N swipes, ` (T17, ADR 0013's T17 amendment):
- * `NOT CONFIRMED WHOLE` (a flush edge no probe checked), `NOT CONFIRMED UNCOVERED` (a keyboard nothing could place), or
- * `NOT CONFIRMED WHOLE OR UNCOVERED`. The truth reader reads it (`fullyHedged` in scripts/truth/replies.ts).
+ * `NOT CONFIRMED <what>:`, `<what>` one of `HEDGE_WHATS`. The truth reader builds its pattern from both
+ * (`fullyHedged` in scripts/truth/replies.ts).
  */
 export const HEDGED_LEAD = 'NOT CONFIRMED';
 
+/**
+ * What a hedged stop could not confirm (`stopHedges`): `WHOLE` (a flush edge no probe checked), `UNCOVERED` (a soft
+ * keyboard nothing could place), or `WHOLE OR UNCOVERED` (both). The one spelling of each.
+ */
+export const HEDGE_WHATS = ['WHOLE', 'UNCOVERED', 'WHOLE OR UNCOVERED'] as const;
+export type HedgeWhat = (typeof HEDGE_WHATS)[number];
+const [WHOLE, UNCOVERED, WHOLE_OR_UNCOVERED] = HEDGE_WHATS;
+
 /** A flush stop no probe checked (flush-check.ts#Flush, every `why`): the reply hedges it, and its lead says so (T17). */
-export const flushHedged = (flush: ScrollUntilResult['flush']): flush is Flush & { checked: false } => flush !== undefined && !flush.checked;
+const flushHedged = (flush: ScrollUntilResult['flush']): flush is Flush & { checked: false } => flush !== undefined && !flush.checked;
+
+/**
+ * What a `fully: true` stop could not confirm (T17), or undefined for a stop that claims it all, or none: a stop whose
+ * reply would otherwise open `fully visible` — nothing clipped or covered, no surface the eyes saw — with a flush edge no
+ * probe checked (`WHOLE`), a keyboard the window state gives no area (`UNCOVERED`), or both. Its reply opens
+ * `visible after N swipes, NOT CONFIRMED <it>:` (`describeScrollResult`), and a flow logs it ⚠ (flow/engine.ts).
+ */
+export function stopHedges(r: ScrollUntilResult): HedgeWhat | undefined {
+  if (!fullyClaimed({ clipped: r.clipped, covered: r.covered !== undefined }) || r.eyes?.sees === 'surface') return undefined;
+  const cut = flushHedged(r.flush);
+  const keyboard = r.keyboard?.state === 'unlocated';
+  if (cut) return keyboard ? WHOLE_OR_UNCOVERED : WHOLE;
+  return keyboard ? UNCOVERED : undefined;
+}
 
 /** The honest one-line summary both call sites print. */
 export function describeScrollResult(r: ScrollUntilResult): string {
@@ -297,13 +319,13 @@ export function describeScrollResult(r: ScrollUntilResult): string {
     const tail = `${clear}${eyes}${moving}${endTurnText(r.endTurn)}${detentText(r.detent)}`;
     // T17 (ADR 0013's T17 amendment): a stop the reply hedges — a flush edge no probe checked, a keyboard nothing
     // could place — opens with what is not confirmed, never `fully visible`: the hedge is the lead, not a `; but`.
-    const hedges = [flushHedged(r.flush) ? flushText(r.flush) : undefined, r.keyboard?.state === 'unlocated' ? UNLOCATED_TEXT : undefined];
-    if (hedges.some((h) => h !== undefined)) {
-      const [cut, keyboard] = hedges;
-      const what = cut === undefined ? 'UNCOVERED' : keyboard === undefined ? 'WHOLE' : 'WHOLE OR UNCOVERED';
-      const above = topCover === undefined ? '' : `; judged above the soft keyboard over ${frameText(topCover)}`;
+    const what = stopHedges(r);
+    if (what !== undefined) {
+      const cut = r.flush !== undefined && what !== UNCOVERED ? flushText(r.flush) : undefined;
+      const keyboard = what === WHOLE ? undefined : UNLOCATED_TEXT;
+      const above = topCover === undefined ? '' : ` — judged above the soft keyboard over ${frameText(topCover)}`;
       const checked = r.flush !== undefined && r.flush.checked ? `; ${flushText(r.flush)}` : '';
-      return `${visible}, ${HEDGED_LEAD} ${what}: ${hedges.filter((h) => h !== undefined).join('; ')}${above}${checked}${tail}`;
+      return `${visible}, ${HEDGED_LEAD} ${what}: ${[cut, keyboard].filter((h) => h !== undefined).join('; ')}${above}${checked}${tail}`;
     }
     const above = topCover === undefined ? '' : `, judged above the soft keyboard over ${frameText(topCover)}`;
     const flush = r.flush === undefined ? '' : `; ${flushText(r.flush)}`;

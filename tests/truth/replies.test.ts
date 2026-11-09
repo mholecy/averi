@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { everyNode, type PresentationKind, type Rect } from '../../src/adapters/types.js';
+import { everyNode, type PresentationKind, type Rect, type UiNode } from '../../src/adapters/types.js';
 import type { MarkedLayer } from '../../src/ui-tree/presentation.js';
 import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, missNote, withMissNote } from '../../src/ui-tree/miss.js';
 import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
 import { boundText, describeScrollResult, flushText } from '../../src/interact/scroll-text.js';
-import { CAROUSEL_REPLY_WORDS, carouselReply, fullyHedged, replyKind, VISIBLE_STOP, MAX_SWIPES, flushProbedSide, flushProbesSaid, idbReasonsSaid, inferredAxisSaid, noIdListedSaid, OCR_FAILED_CLOSED, presentedRemedySaid, windowHintSaid, heldCutHedged, bandSaid, directionNamed, UNCHANGED_SAID, LIVE_REPLY_WORDS, refusedUnsentSaid, scrollVerdictSaid, underBarRemedySaid, untriedSideSaid } from '../../scripts/truth/replies.js';
+import { CAROUSEL_REPLY_WORDS, carouselReply, fullyHedged, hedgedLead, replyKind, VISIBLE_STOP, MAX_SWIPES, flushProbedSide, flushProbesSaid, idbReasonsSaid, inferredAxisSaid, noIdListedSaid, OCR_FAILED_CLOSED, presentedRemedySaid, windowHintSaid, heldCutHedged, bandSaid, directionNamed, UNCHANGED_SAID, LIVE_REPLY_WORDS, refusedUnsentSaid, scrollVerdictSaid, underBarRemedySaid, untriedSideSaid } from '../../scripts/truth/replies.js';
 import { refusalOf, type Typeable } from '../../src/adapters/typeable.js';
 import { revealText } from '../../src/ui-tree/sides.js';
 import { untriedSideText } from '../../src/interact/target-text.js';
@@ -198,18 +198,37 @@ describe("carouselReply: the five kinds of a carousel's `fully: true` reply (T7a
       { edge: 'right', container: CAROUSEL, checked: false, why: 'tap' },
       { edge: 'right', container: CAROUSEL, checked: false, why: 'held', revealed: 55 },
       { edges: ['left', 'right'], container: CAROUSEL, checked: false, why: 'fills' },
+      { edges: ['left', 'right'], container: CAROUSEL, pinned: { role: 'container', label: null, identifier: 'header', rect: { x: 66, y: 380, width: 120, height: 234 } }, checked: false, why: 'fills' },
     ] as const;
+    const bar: UiNode = { role: 'button', label: null, identifier: 'bar', value: null, children: [], rect: { x: 0, y: 614, width: 1080, height: 100 } };
+    const unjudged = { sees: 'unjudged', edge: 'bottom', by: bar, why: 'a blended frame' } as const;
     for (const flush of flushes) {
       const reply = at({ swipes: 3, visible: 1, clipped: [], flush });
       expect(reply).toMatch(VISIBLE_STOP);
       expect(replyKind(reply)).toBe('visible');
       expect(fullyHedged(reply)).toBe(true);
+      expect(hedgedLead(reply)).toEqual({ what: 'WHOLE', old: false });
       expect(carouselReply(reply)).toBe('other');
+      // The eyes unjudged: `visible by the tree after …, NOT CONFIRMED WHOLE:` — still a stop, still hedged.
+      const byTree = at({ swipes: 3, visible: 1, clipped: [], flush, eyes: unjudged });
+      expect(byTree).toMatch(/^Element id:"x" visible by the tree after 3 swipes, NOT CONFIRMED WHOLE: /);
+      expect(replyKind(byTree)).toBe('visible');
+      expect(hedgedLead(byTree)).toEqual({ what: 'WHOLE', old: false });
+      // With an unlocated keyboard too: `NOT CONFIRMED WHOLE OR UNCOVERED:`.
+      const both = at({ swipes: 3, visible: 1, clipped: [], flush, keyboard: { state: 'unlocated' } });
+      expect(both).toContain(', NOT CONFIRMED WHOLE OR UNCOVERED: ');
+      expect(hedgedLead(both)).toEqual({ what: 'WHOLE OR UNCOVERED', old: false });
+      expect(hedgedLead(at({ swipes: 3, visible: 1, clipped: [], flush, keyboard: { state: 'unlocated' }, eyes: unjudged }))).toEqual({ what: 'WHOLE OR UNCOVERED', old: false });
       // The pre-T17 form, as the committed records hold it.
-      expect(fullyHedged(`Element id:"x" fully visible after 3 swipes; but ${flushText(flush)}`)).toBe(true);
+      expect(hedgedLead(`Element id:"x" fully visible after 3 swipes; but ${flushText(flush)}`)).toEqual({ what: 'WHOLE', old: true });
       expect(fullyHedged(`Element id:"x" fully visible by the tree after 3 swipes, judged above the soft keyboard over [0,1400][1080,2200]; but ${flushText(flush)}`)).toBe(true);
     }
-    expect(fullyHedged(at({ swipes: 1, visible: 1, clipped: [], keyboard: { state: 'unlocated' } }))).toBe(true);
+    expect(hedgedLead(at({ swipes: 1, visible: 1, clipped: [], keyboard: { state: 'unlocated' } }))).toEqual({ what: 'UNCOVERED', old: false });
+    // M2: the unjudged claim is a stop too — `fully visible by the tree after` reads `visible`, not hedged.
+    const claimByTree = at({ swipes: 1, visible: 1, clipped: [], eyes: unjudged });
+    expect(claimByTree).toMatch(/^Element id:"x" fully visible by the tree after 1 swipe; /);
+    expect(replyKind(claimByTree)).toBe('visible');
+    expect(fullyHedged(claimByTree)).toBe(false);
     // A claim: clean, checked; and neither a plain stop nor a failure is a hedged one.
     expect(fullyHedged(at({ swipes: 1, visible: 1, clipped: [] }))).toBe(false);
     expect(fullyHedged(at({ swipes: 2, visible: 1, clipped: [], flush: { edge: 'right', container: CAROUSEL, checked: true } }))).toBe(false);

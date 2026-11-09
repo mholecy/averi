@@ -209,8 +209,12 @@ export function stopAsk(judged: Geometry | undefined, fully: boolean): StopAsk {
   return { fully, holds: stopHolds(judged ?? 'whole', fully) };
 }
 
-/** Cut by its scroll view or the screen: the `fully` stop asks more of it than the plain one (R-fully). */
-const CUT: readonly Geometry[] = ['partly-centre-in', 'centre-out', 'sliver'];
+/**
+ * Cut by its scroll view or the screen: the `fully` stop asks more of it than the plain one (R-fully), and the cut a
+ * hedged `fully: true` stop's `NOT CONFIRMED WHOLE` says it may be (live-visibility.ts#judgeScroll, T17). Not a cut:
+ * `off-screen`, `outside-scroll-view` (none of it shows), a system band or app chrome over it (no flush edge hedges those).
+ */
+export const CUT_GEOMETRIES: readonly Geometry[] = ['partly-centre-in', 'centre-out', 'sliver'];
 
 /**
  * Where a stop may leave its target (truth.ts#geometryOf): the plain stop on a centre in what shows, clear of the bands
@@ -224,14 +228,14 @@ export function stopHolds(g: Geometry, fully: boolean): boolean {
 }
 
 /**
- * Whether `fully: true` is asked of the target beside the plain stop (R-fully): a cut target (CUT); one whose edge the
+ * Whether `fully: true` is asked of the target beside the plain stop (R-fully): a cut target (CUT_GEOMETRIES); one whose edge the
  * chrome overlaps; and, in a scroll view only, one in a system band or overlapped at its edge by one — a target in no
  * scroll view there may be a pinned surface the `fully` stop stops on at once (ADR 0009 (b), (c)). On the judged
  * geometry (judgedGeometry).
  */
 export function fullyAsked(g: Geometry | undefined, scrollView: string | undefined): boolean {
   if (g === undefined) return false;
-  if (CUT.includes(g) || parseGeometry(g).kind === 'chrome-overlap') return true;
+  if (CUT_GEOMETRIES.includes(g) || parseGeometry(g).kind === 'chrome-overlap') return true;
   return bandNamed(g) !== undefined && scrollView !== undefined;
 }
 

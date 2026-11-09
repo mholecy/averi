@@ -672,21 +672,40 @@ truth harness read them apart: `held` on a cut target was LOUD (`held-hedge`), t
 
 **Decision (the orchestrator's: option (a) of backlog T17).** Every such stop stays a success, as the T11 amendment keeps
 `held` (a failure would be false in the common case: the element is whole and usable on a legitimate pass), but it opens
-with a lead that does not claim it whole (`scroll-text.ts#describeScrollResult`, `#HEDGED_LEAD`, `#flushHedged`):
+with a lead that does not claim it whole (`scroll-text.ts#describeScrollResult`, `#stopHedges`, its words `#HEDGED_LEAD`
+and `#HEDGE_WHATS`):
 
 - a flush edge no probe checked: `visible after N swipes, NOT CONFIRMED WHOLE: <the clause that followed `; but `>`;
 - a keyboard nothing could place: `visible after N swipes, NOT CONFIRMED UNCOVERED: <its clause>`;
 - both: `visible after N swipes, NOT CONFIRMED WHOLE OR UNCOVERED: <the flush clause>; <the keyboard's>`;
 - the eyes unjudged: `visible by the tree after N swipes, NOT CONFIRMED …`.
 
-Where a stop was judged above a docked keyboard the lead stays whole and `; judged above the soft keyboard over …` follows
-the clause; a `checked` flush with an unlocated keyboard puts the probe's clause after the keyboard's. A `checked` stop
-keeps `fully visible after N swipes; … nothing of it is cut there`, and a clean stop `fully visible after N swipes`. The lead
-still matches `VISIBLE_STOP` (scripts/truth/replies.ts), so the reply's kind stays `visible`. The truth reader reads both forms through one
-predicate, `fullyHedged` in scripts/truth/replies.ts (the committed t11/t12 live records hold the old one): `carouselReply`
-calls either `other`, and `judgeScroll` (scripts/truth/live-visibility.ts) calls every hedged stop on a target the app lays out not whole
-LOUD `hedged-stop` (was `held-hedge`, `held` only: T14 closed with it). The flow log marks a hedged flush stop
-`⚠ scroll_until`, as the `unlocated` one was.
+Where a stop was judged above a docked keyboard, nothing comes between `visible after N swipes, NOT CONFIRMED …:` and
+the hedge's clause: ` — judged above the soft keyboard over …` follows the clause. A `checked` flush with an unlocated
+keyboard puts the probe's clause after the keyboard's. A `checked` stop keeps `fully visible after N swipes; … nothing of it
+is cut there`, and a clean stop `fully visible after N swipes`. The flow log marks every hedged stop `⚠ scroll_until`
+through the same `stopHedges` (flow/engine.ts), as it marked the `unlocated` one; the scroll_until tool description names the
+lead as the signal of a hedged success.
+
+**The truth reader.** `VISIBLE_STOP` (scripts/truth/replies.ts) reads `visible (?:by the tree )?after`, so every stop is kind
+`visible` — the new lead, and the unjudged claim `fully visible by the tree after`, which it missed before T17 (no committed
+record holds one). `hedgedLead` (same file) reads both forms, its pattern built from src's `HEDGED_LEAD` and `HEDGE_WHATS`:
+src's lead, `old: false`, and the pre-T17 `fully visible …; but …` the committed t11/t12 records and
+tests/fixtures/d59-b9-lazy-predrag.json hold, always a flush hedge, so `WHOLE`, `old: true`. `carouselReply` calls either
+`other`. `judgeScroll` (scripts/truth/live-visibility.ts) calls a stop LOUD only where the hedge covers what the app shows:
+a `WHOLE` hedge (alone or with `UNCOVERED`) on a target the app lays out CUT (`CUT_GEOMETRIES` in scripts/truth/target-contract.ts:
+`partly-centre-in`, `centre-out`, `sliver` — cut by its scroll view or the screen, the cut a flush edge can hide): LOUD
+`hedged-stop` (was `held-hedge`, `held` only: T14 closed with it). The same hedge in a pre-T17 record is LOUD
+`hedged-stop-old-lead`, its why naming the opening: its body hedged, but that build's opening claimed "fully visible" —
+the lie this amendment's Context names, kept apart so a rejudge never reads an old reply as honest as a new one. Everywhere
+else the claim's `stop-claim` MISMATCH stands: `off-screen` and `outside-scroll-view` (none of it shows — the lead's
+"visible" is false, whatever the hedge says of a cut), a band or app chrome over it (no flush edge hedges those), and an
+`UNCOVERED`-only hedge on a cut target (it hedges what may cover the element, not the cut).
+
+**T11's off-screen exemption, re-decided.** T11's judge called the held hedge LOUD on any laid-out target, `off-screen`
+included (pinned by its review round 3, not argued in the T11 amendment above). Nothing in that amendment holds for it: the
+held hedge says a part of the element may lie past its container's edge, and a target wholly off the screen is not that.
+It is now a `stop-claim` MISMATCH, as every other hedge there; no committed record reaches it.
 
 **Rejected.** (b) A structured flag beside the text (a `hedged: true` in the result): the MCP reply an agent reads is the
 text, and the text would still open `fully visible`; the flag fixes the harness, not the lie. (c) Make the hedges failures:
@@ -696,11 +715,14 @@ inconsistent — the unproven hedges say the same "it may be cut there" with les
 proven one dropped.
 
 **Consequences.** The opening of a hedged reply now carries the hedge; the clause is unchanged, so an agent or a reference
-that keyed on `it may be cut there` still finds it. Wording only: no stroke, read or verdict changes. Golden Changed 0
-(a replayed tree never moves, so no probe proves, and no fixture stops on a hedge with a probe owed — verified on this
-branch). The rejudge of the committed live records (`live.ts --rejudge`) flips no verdict; see the backlog row.
+that keyed on `it may be cut there` still finds it. No src verdict changes — no stroke, read, success or failure — only the
+reply's opening, the flow log's ⚠; in the harness, `VISIBLE_STOP`, the LOUD classes and `judgeScroll`'s gate change. Golden
+Changed 0, and not for want of movement alone: `fills`, `room` and `axis` need no probe, so a replayed tree could reach them,
+and none does — of the corpus's 197 `fully visible` replies (base and branch alike) none is hedged and 4 are `checked`, so no
+fixture reaches any hedge. The rejudge of the committed live records (`live.ts --rejudge`'s path, 668 records with
+tests/fixtures, 7915 cases) flips no verdict.
 
-**Residuals.** (1) The old form stays readable only through `fullyHedged`; a new reader that keys on the opening must use
+**Residuals.** (1) The old form stays readable only through `hedgedLead` (`fullyHedged`); a new reader that keys on the opening must use
 it, not `fully visible`. (2) The two-held-first-probes residual of the T12 amendment is a `checked` stop, not a hedge: it
 still opens `fully visible`, and is still a lie when both probes were not taken.
 

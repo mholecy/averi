@@ -10,7 +10,7 @@ import { fillReply } from '../interact/fill-text.js';
 import { typeIntoFocused } from '../interact/type-text.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS } from '../interact/resolve.js';
 import type { GuardOptions } from '../interact/keyboard.js';
-import { DEFAULT_MAX_SWIPES, DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
+import { DEFAULT_MAX_SWIPES, DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, HEDGE_WHATS, HEDGED_LEAD, scrollUntilVisible } from '../interact/scroll.js';
 import { eyesOn } from '../verify/eyes.js';
 import { SWIPE_REACH_FRACTION, swipeScreen } from '../interact/swipe.js';
 import { tapElement } from '../interact/tap.js';
@@ -524,7 +524,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       description:
         'Swipe until the element is in the viewport. direction = where the content lies (down = below the current view). ' +
         'A default stop has the element\'s CENTRE on screen, below the status bar, clear of anything of the app drawn over it (a pinned button bar, a floating tab bar) and not cut to a strip too thin to tap; the rest may still be clipped — the reply says which edges and what fraction show, or "fully visible". ' +
-        `Pass fully: true when the next step MEASURES the element (a rect/color/ocr assert, a screenshot): none of it may then be clipped, covered, under the keyboard, or under a system bar past ${SLACK} units (pt on iOS, px on Android), and the call fails loudly naming the shortfall, or, on Android on a cut a swipe proved, may succeed hedged ("it may be cut there"; call again). ` +
+        `Pass fully: true when the next step MEASURES the element (a rect/color/ocr assert, a screenshot): none of it may then be clipped, covered, under the keyboard, or under a system bar past ${SLACK} units (pt on iOS, px on Android), and the call fails loudly naming the shortfall; on Android an unprobed or proven cut or unplaced keyboard succeeds hedged: "${HEDGED_LEAD} ${HEDGE_WHATS[0]}"/"${HEDGE_WHATS[1]}". ` +
         'It fails, naming the cause, when swiping no longer moves the element out (the cover, the status bar, the cut), when content is exhausted, or at maxSwipes / timeoutMs (checked once a round, so a call can run past it by one swipe and one more read). ' +
         `It never swipes on a screen presented over the target — a swipe there could dismiss it — and fails "… ${presentedStop()}". ` +
         'Where no tree shows such a layer (iOS idb), a swipe that CHANGES THE SCREEN stops the call. ' +

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeScrollResult, type ScrollUntilResult } from '../../src/interact/scroll-text.js';
+import { describeScrollResult, stopHedges, type ScrollUntilResult } from '../../src/interact/scroll-text.js';
 import { node } from '../helpers/fake.js';
 
 /**
@@ -62,9 +62,9 @@ describe('T17 — a hedged fully: true stop opens with a lead that does not clai
     );
   });
 
-  it('a flush hedge judged above a docked keyboard: the lead first, where it was judged after the hedge', () => {
+  it('a flush hedge judged above a docked keyboard: the lead first, ` — judged above the soft keyboard over …` after the hedge', () => {
     const reply = describeScrollResult(stop({ flush: { edge: 'top', container: box, checked: false, why: 'tap' }, keyboard: { state: 'shown', frame: { x: 0, y: 1400, width: 1080, height: 800 } } }));
-    expect(reply).toMatch(/^visible after 3 swipes, NOT CONFIRMED WHOLE: its top edge .* too short to tell from a tap — it may be cut there, a rect assert or screenshot may measure part of it; judged above the soft keyboard over /);
+    expect(reply).toMatch(/^visible after 3 swipes, NOT CONFIRMED WHOLE: its top edge .* too short to tell from a tap — it may be cut there, a rect assert or screenshot may measure part of it — judged above the soft keyboard over /);
   });
 
   it('a checked flush stop with an unlocated keyboard: only the keyboard is unconfirmed, the probe clause kept after it', () => {
@@ -72,5 +72,20 @@ describe('T17 — a hedged fully: true stop opens with a lead that does not clai
     expect(reply).toBe(
       `visible after 3 swipes, NOT CONFIRMED UNCOVERED: ${UNLOCATED_CLAUSE}; its top edge lies on its scroll container's (0,242 1080x1736), and 2 probe swipes toward it moved nothing — nothing of it is cut there`,
     );
+  });
+
+  it('stopHedges: what a fully: true stop could not confirm — the one predicate the reply and the flow log share', () => {
+    const budget = { edge: 'top', container: box, checked: false, why: 'budget' } as const;
+    for (const [, flush] of HEDGES) expect(stopHedges(stop({ flush }))).toBe('WHOLE');
+    expect(stopHedges(stop({ keyboard: { state: 'unlocated' } }))).toBe('UNCOVERED');
+    expect(stopHedges(stop({ flush: budget, keyboard: { state: 'unlocated' } }))).toBe('WHOLE OR UNCOVERED');
+    expect(stopHedges(stop({ flush: { edge: 'top', container: box, checked: true }, keyboard: { state: 'unlocated' } }))).toBe('UNCOVERED');
+    // A stop that claims it all, or nothing whole: none.
+    expect(stopHedges(stop({}))).toBeUndefined();
+    expect(stopHedges(stop({ flush: { edge: 'top', container: box, checked: true } }))).toBeUndefined();
+    expect(stopHedges(stop({ flush: budget, clipped: ['bottom'], visible: 0.8 }))).toBeUndefined();
+    expect(stopHedges(stop({ flush: budget, covered: { by: header, shows: 0.7 } }))).toBeUndefined();
+    const surface = { sees: 'surface', edge: 'bottom', by: node({ role: 'button', rect: { x: 0, y: 1978, width: 1080, height: 100 } }), depth: 20, surface: '#F2F2F7', own: '#FFFFFF' } as const;
+    expect(stopHedges(stop({ flush: budget, eyes: surface }))).toBeUndefined();
   });
 });
