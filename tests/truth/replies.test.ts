@@ -14,6 +14,17 @@ import { EDGES } from '../../src/ui-tree/geometry.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { failureOf, play, resultOf, type Row } from '../helpers/rounds.js';
 
+/**
+ * A src file's code without its comments, so a phrase that only a comment still says counts as no longer written. It
+ * strips block comments (`/* … *\/`, JSDoc included, across lines) and whole-line `//` comments (a line whose first
+ * non-blank characters are `//`); a `//` comment after code on the same line stays, as does anything that only looks
+ * like a comment inside a string or a regex.
+ */
+const src = (file: string) =>
+  readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+
 // The two "close it first" the harness reads apart (scripts/truth/replies.ts): the presented remedy, driven here by
 // src's own builders (ui-tree/standing.ts#presentedRemedy, #presentedStop) over every layer they word, and the
 // active-window hint (#ACTIVE_WINDOW_HINT), which is no presented remedy.
@@ -169,7 +180,7 @@ describe("carouselReply: the five kinds of a carousel's `fully: true` reply (T7a
   });
 
   it('each phrase it keys on is written in src/interact/scroll-text.ts', () => {
-    const source = readFileSync(new URL('../../src/interact/scroll-text.ts', import.meta.url), 'utf8');
+    const source = src('src/interact/scroll-text.ts');
     for (const words of CAROUSEL_REPLY_WORDS) expect(source).toContain(words);
     expect(MAX_SWIPES).toBe('(maxSwipes)');
     expect(boundText({ of: 'maxSwipes' }, 6).endsWith(MAX_SWIPES)).toBe(true);
@@ -200,12 +211,6 @@ describe('LIVE_REPLY_WORDS: the words the live forms and turn judges key on, eac
     'PARTLY UNDER a surface': 'src/interact/scroll-text.ts',
     'direction: "': 'src/ui-tree/sides.ts',
   };
-  /** A src file's code, its comments left out: a phrase that only a comment still says is no longer written. */
-  const src = (file: string) =>
-    readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/^\s*\/\/.*$/gm, '');
-
   it('each phrase is written in its src file, in code', () => {
     expect(Object.keys(WRITTEN_IN)).toEqual([...LIVE_REPLY_WORDS]);
     for (const [words, file] of Object.entries(WRITTEN_IN)) expect(src(file)).toContain(words);
@@ -225,6 +230,16 @@ describe('LIVE_REPLY_WORDS: the words the live forms and turn judges key on, eac
     expect(underBarRemedySaid('ERROR … cut at its top edge by container id:"lab.submit" …; scroll_until it out from under that container first (…)')).toBe(true);
     expect(underBarRemedySaid('ERROR … the soft keyboard is up (its top edge at y 1398): dismiss it first (press_key back …)')).toBe(true);
     expect(underBarRemedySaid('ERROR id:"lab.note" was not tapped: it lies below the viewport — scroll_until it with direction: "down"')).toBe(false);
+  });
+
+  it('bandSaid: the band sentence src wrote on the device (k7, android-k7-eyes-1), not a lookalike', () => {
+    const record = JSON.parse(readFileSync(new URL('../../docs/truth/live-records/android-k7-eyes-1.json', import.meta.url), 'utf8')) as { results: { id: string; replies: string[] }[] };
+    const k7 = record.results.find((r) => r.id === 'k7')!.replies[0];
+    expect(k7).toMatch(/^Element id:"lab\.form-keyboard\.phone" visible after 1 swipe — PARTLY UNDER a surface the tree does not list: /);
+    expect(bandSaid(k7)).toBe(true);
+    for (const lookalike of ['PARTLY UNDER a surfaced', 'XPARTLY UNDER a surface', 'PARTLY UNDER  a surface', 'partly under a surface', 'PARTLY UNDER the surface']) {
+      expect(bandSaid(k7.replace('PARTLY UNDER a surface', lookalike))).toBe(false);
+    }
   });
 
   it('bandSaid: the eyes\' band as a word, not inside another', () => {

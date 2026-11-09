@@ -1,16 +1,16 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { FOCUS_TEXT_NOT_READ } from '../../src/interact/fill-text.js';
-import { boundText } from '../../src/interact/scroll-text.js';
+import { boundText, TREE_READ_FAILED } from '../../src/interact/scroll-text.js';
 import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, KEYBOARD_UNLISTED, NO_ID_LISTED } from '../../src/ui-tree/miss.js';
 import { untriedSideText } from '../../src/interact/target-text.js';
 import { EDGES } from '../../src/ui-tree/geometry.js';
 import type { Direction } from '../../src/ui-tree/sides.js';
-import { TREE_READ_FAILED } from '../../src/interact/scroll-text.js';
+import { escapeRegExp } from '../../src/verify/text-hint.js';
 
 /**
  * averi's reply wording, read in ONE place: every judge that reads what averi said — the replayed golden
- * (scripts/differential/golden-spec, golden.ts) and the live one (live.ts, live-visibility.ts) — reads it through
- * these, and nothing else in those judges tests a reply's words. A rewording of averi's replies is fixed here, beside
+ * (scripts/differential/golden-spec, golden.ts) and the live one (live.ts, live-visibility.ts, live-forms.ts) — reads
+ * it through these, and nothing else in those judges tests a reply's words but the reads live-forms.ts's header names. A rewording of averi's replies is fixed here, beside
  * the src line that writes each one. What a reply DID (the taps and swipes the device was sent) is not a reply's
  * wording: golden-spec/judges.ts reads that from the fake device's log, live-visibility.ts from the app's.
  *
@@ -322,11 +322,8 @@ export function screenUnchangedFor(reply: string): number | undefined {
 // --- the live forms and turn judges' words (live-forms.ts, live-visibility.ts) ---
 
 /**
- * The words the live forms judges and the Android turn judge key on, pinned, each as src writes it: tests/truth/
- * replies.test.ts holds each one to its file. The typing refusal's "nothing was sent" (src/adapters/typeable.ts
- * #refusalOf), a fill's unchanged field (src/interact/fill-text.ts's `unchanged` caveat), the two remedies for a field
- * under a bar (src/interact/target-text.ts#cutByRemedy, #dismissKeyboardFirstText), the eyes' band (src/interact/
- * scroll-text.ts#unlistedText) and a direction named (src/ui-tree/sides.ts#revealText and the like).
+ * The words the live forms judges and the Android turn judge key on, pinned, each as src writes it: the src file that
+ * writes each one is tests/truth/replies.test.ts#WRITTEN_IN's, which holds each word to that file's code.
  */
 export const LIVE_REPLY_WORDS = [
   'Refused before anything was sent',
@@ -341,17 +338,27 @@ const [UNSENT, UNCHANGED, OUT_FROM_UNDER, DISMISS_FIRST, BAND, DIRECTION] = LIVE
 /** A typing refusal says nothing was sent (D43a: live-forms.ts#refusedKept). */
 export const refusedUnsentSaid = (reply: string) => reply.includes(UNSENT);
 
-/** What a fill's error says of a field the typing left as it was: the phrase live-forms.ts#refusedUnchanged and #refusedOnFocus ask. */
+/**
+ * What a fill's error says of a field the typing left as it was (src/interact/fill-text.ts's `unchanged` caveat, "the
+ * field did not change: …"): the phrase live-forms.ts#refusedUnchanged and #refusedOnFocus ask. Bare, so it also
+ * accepts the deletes' sentence (fill-text.ts, "… that the deletes did not change") and scroll_until's "did not change
+ * the screen"; tightening it to "the field did not change" would be a judge change, not this read's move here.
+ */
 export const FIELD_UNCHANGED = UNCHANGED;
 
 /** A refusal names the remedy for a field under a bar: scroll it out from under, or dismiss the keyboard first (live-forms.ts#judgeNoteFill). */
 export const underBarRemedySaid = (reply: string) => reply.includes(OUT_FROM_UNDER) || reply.includes(DISMISS_FIRST);
 
 /** The eyes' band over a stop's target: "PARTLY UNDER a surface the tree does not list: …" (live-forms.ts#judgePhoneScroll). */
-const BAND_SAID = new RegExp(`\\b${BAND}\\b`);
+const BAND_SAID = new RegExp(`\\b${escapeRegExp(BAND)}\\b`);
 export const bandSaid = (reply: string) => BAND_SAID.test(reply);
 
-/** The reply names `direction` to scroll: `direction: "up"` (live-visibility.ts#judgeAndroidTurn). */
+/**
+ * The reply names `direction` to scroll: `direction: "up"` (live-visibility.ts#judgeAndroidTurn). The producer judged
+ * is src/ui-tree/sides.ts#revealText (`scroll_until it with direction: "up"`), the pin's anchor; untriedSideText
+ * (src/interact/target-text.ts) and scroll-text.ts's turn-back sentence (`— try direction: "<back>"`) write the
+ * fragment too, unpinned. Not derived from revealText: that would narrow the judge.
+ */
 export const directionNamed = (reply: string, direction: Direction) => reply.includes(`${DIRECTION}${direction}"`);
 
 /**

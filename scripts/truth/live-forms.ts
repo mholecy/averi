@@ -18,10 +18,12 @@ import { probePoint, within } from './truth.js';
  * form-picker's sheet, `judgeMissUnderSheet` the asserts and the flow's `wait:` there.
  *
  * What a reply says is read by replies.ts (ADR 0020), its words pinned to src there (LIVE_REPLY_WORDS). Four reads
- * stay here, none of them a phrase of averi's: refusedLadder's `last.includes(phrase)` (the phrase its caller passes,
- * replies.ts#FIELD_UNCHANGED), judgeMissUnderSheet's `ASSERTS_FAILED.test` (replies.ts's own), and kf3's quotes of the
- * measured panel, `over ${frameText(panel)}` and `keyboard ${rectText(panel)}` — src's geometry builders over the
- * app's frame, not words to pin.
+ * stay here: refusedLadder's `last.includes(phrase)` (the phrase its caller passes, replies.ts#FIELD_UNCHANGED),
+ * judgeMissUnderSheet's `ASSERTS_FAILED.test` (replies.ts's own), and the quotes of the measured panel — kf3's
+ * `over ${frameText(panel)}` (scroll_until's: src/interact/scroll-text.ts, `the soft keyboard over ${frameText(…)}`)
+ * and kf1/kf2's `keyboard ${rectText(panel)}` (the pixel poll's: src/verify/pixel-poll.ts#keyboardCovers). Each is
+ * one src word around src's own geometry builder, left unpinned as A14 decided. KEYBOARD_QUOTE and OVER_QUOTE read
+ * the same words, for a MISMATCH's why-text only.
  */
 
 /** The tree sources the live cases run under: iOS's (idb, wda), Android's one. */
