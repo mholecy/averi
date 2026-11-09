@@ -97,6 +97,10 @@ describe('scrollerListedIn — whether a raw tree lists a scroller at a scroll v
     const clip = rect(66, 380, 948, 234);
     for (const cell of ['carousel-lazy', 'carousel-recycler', 'carousel-in-list']) expect(scrollerListedIn(await read(`android-averi_lab-api33/${cell}.xml`), 'uiautomator', clip)).toBe(true);
     expect(scrollerListedIn(await read('android-averi_lab-api33/carousel-lazy.xml'), 'uiautomator', rect(67, 379, 947, 235))).toBe(true);
+    // The boundary: one pixel off on an edge is the same scroller, two are not.
+    expect(scrollerListedIn(await read('android-averi_lab-api33/carousel-lazy.xml'), 'uiautomator', rect(66, 380, 949, 234))).toBe(true);
+    expect(scrollerListedIn(await read('android-averi_lab-api33/carousel-lazy.xml'), 'uiautomator', rect(66, 380, 950, 234))).toBe(false);
+    expect(scrollerListedIn(await read('android-averi_lab-api33/carousel-lazy.xml'), 'uiautomator', rect(64, 380, 950, 234))).toBe(false);
     // Off by more than a pixel, or not scrollable there (open's targets, no scroller at the clip): none.
     expect(scrollerListedIn(await read('android-averi_lab-api33/carousel-lazy.xml'), 'uiautomator', rect(66, 380, 948, 300))).toBe(false);
     expect(scrollerListedIn('<hierarchy><node scrollable="false" bounds="[66,380][1014,614]" /></hierarchy>', 'uiautomator', clip)).toBe(false);

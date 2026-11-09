@@ -63,6 +63,8 @@ export interface CatalogTarget {
    * (AbsentTarget.toward), where golden asks scroll_until for it that way (golden-spec/edges.ts#absentRows): with no
    * frame, truth.ts#directionOf has nothing to read a direction from.
    */
+  // The same union as truth.ts#Direction, spelled out: truth.ts imports this module, so importing it back would point
+  // the schema at the code that reads it.
   toward?: 'up' | 'down' | 'left' | 'right';
 }
 

@@ -1461,6 +1461,22 @@
         "android-rn-averi_lab-api33/rn-field.xml M ocr"
       ],
       "remark": "Fixed by round 7's A8 on arch/r23-rn-label, merged into arch/round-23 as bf0becd: ce19c23 (src/ui-tree/draw-order.ts#labelOverhang — the own-label overhang is 2 pt or dp, half a percent of the screen's shorter side: 5 px on averi_lab, where RN's 1-dp overhang is 3 px; the field shape no longer asks its parent's size; docs/adr/0014-a-text-input-is-no-cover-of-its-own-label.md, refinement 2026-10-19) and f3a7043 (the label must span the field's height). The pair is the parent of ce19c23, round 6's src 565bcb9, and f3a7043. Before: N's and M's label refused as under textfield (the tap, scroll_until's stop after 3 swipes, the ocr assert failed closed); after: tapped at the node's centre, reached with no swipe, the ocr passes. The six react-native.known.ts rows struck. #6's fix (13d68a2) and #22's (596a379), under which these rows first read red, record them as regressions fixed at ce19c23. Live: LOUD at round 7's first RN run (rn4, tap:rn-field.N, tap:rn-field.M refused: docs/truth/live-rn-2026-10-19.md); the live-known entries stay until the final device check runs the RN group at the merged src."
+    },
+    {
+      "n": "LR4",
+      "note": "2026-11-09-lab-android-uiautomator-lists-a-react-native-cover-before-its-target-so-it-is-tapped-and-measured.md",
+      "status": "open",
+      "verified": "golden",
+      "defect": "^(Tapped|passed on #263238): ",
+      "checks": [
+        "android-rn-averi_lab-api33/rn-banner.xml T tap",
+        "android-rn-averi_lab-api33/rn-banner.xml T colour",
+        "android-rn-averi_lab-api33/rn-banner.xml U tap",
+        "android-rn-averi_lab-api33/rn-banner.xml U colour",
+        "android-rn-averi_lab-api33/rn-banner.xml C tap",
+        "android-rn-averi_lab-api33/rn-banner.xml C colour"
+      ],
+      "remark": "T6's Android capture of rn-banner (2026-11-09, averi_lab API 33): uiautomator lists each cover before its target, though React Native draws it over — C's too, whose frame starts below its target's — so every tap is Tapped and every colour assert passes on the cover #263238 (LR3's Android twin; backlog D75)."
     }
   ],
   "excluded": [

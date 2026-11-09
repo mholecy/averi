@@ -37,7 +37,9 @@ export function edgeRows(platform: Platform, t: TargetTruth, cell: CellTruth, so
   const nodeAbsent = unlistedBy(t, source);
   // A framed target its tree does not list: no scroll view asked of its strokes even where the tree lists that scroll
   // view a scroller (absentRows' rule) — scroll-bounded's O and F on Android lie in `lower`, one of two vertical lists,
-  // and averi cannot tell which holds a row it never saw (T6: holding them inside turned both rows red).
+  // and averi strokes only the largest, its reply blaming exhaustion without naming `lower` (T6: holding them inside
+  // turned both rows red; the gap is backlog D76, D59b's honesty class). absentRows' absent-only condition stands in
+  // for "the named scroll view is the only listed scroller that could take the stroke" (D76).
   const stroke = (row: string) => strokeRow(platform, t, cell, row, c.stop, directionOf(t, cell), { absent });
   const fully = c.fully === undefined ? [] : [fullyRow(platform, t, cell, c.fully)];
   switch (c.geometry) {
@@ -82,7 +84,9 @@ function scrollerListed(t: Pick<TargetTruth, 'scrollView'>, cell: CellTruth, sou
  * accept a reply that never found it where the capture's tree did not list it (askedUnlistedBy), judged by the swipes
  * sent for it: every touch-down inside its scroll view where the replayed tree lists that a scroller (D59b — on the L7
  * carousels a horizontal stroke over the page's vertical axis goes over the carousel of unknown axis, inside its band),
- * along `toward`'s axis. What the contract asks of it is target-contract.ts#ABSENT_STOPS. No tap or colour row: nothing
+ * along `toward`'s axis — held to its scroll view on the absent-only condition, which stands in for "the named scroll
+ * view is the only listed scroller that could take the stroke" (true of the L7 carousels: the page lies across it; the
+ * case of two along the stroke is backlog D76). What the contract asks of it is target-contract.ts#ABSENT_STOPS. No tap or colour row: nothing
  * of it is on the screen to tap or measure, and the off-screen rows already ask both of such targets.
  */
 export function absentRows(platform: Platform, a: AbsentTarget, cell: CellTruth, source: SourceKind, tree?: string): Expectation[] {
