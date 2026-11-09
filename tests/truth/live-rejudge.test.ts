@@ -442,6 +442,11 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['android-carousel-t7a-1.json', 'carousel', { cases: 8, ok: 8, loud: 0, mismatches: 0 }],
     ['android-carousel-t7a-2.json', 'carousel', { cases: 8, ok: 8, loud: 0, mismatches: 0 }],
     ['android-carousel-t7a-3.json', 'carousel', { cases: 8, ok: 8, loud: 0, mismatches: 0 }],
+    // D72's device run (2026-11-09, fix/d72-android-outer-spaces at 5bf59f85 plus os1/os2): the whole forms group, os1
+    // and os2 (`Jan `, with and without clear) ok, fp2's ⚠ line saying 5, g2 the residual-10 MISMATCH, known since D72;
+    // b1d, b7 LOUD, known. The RN app's rfe1–rfe3: rfe3 the same MISMATCH, known since D72 (first read on Android).
+    ['d72-outer-spaces/android-forms-d72-fix.json', 'forms', { cases: 58, ok: 55, loud: 2, mismatches: 1 }],
+    ['d72-outer-spaces/android-rn-forms-d72-fix.json', 'forms', { cases: 3, ok: 2, loud: 0, mismatches: 1 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudgeInProcess(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);

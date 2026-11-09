@@ -1,0 +1,25 @@
+D72, Android's reading keeps a value's outer spaces (ADR 0034's D72 amendment), on the lab AVD: emulator-5554, averi_lab,
+API 33. 2026-11-09. The fix: fix/d72-android-outer-spaces at 5bf59f85 plus the live cases os1/os2 (scripts/truth/
+live-cases.ts). The base: a `git archive 3b7393ba` extract, run with `--side` (the same harness and cases).
+
+device   before 20:22:16 start_count=1 uptime=55282.41; after 20:40:10 start_count=1 uptime=56356.64 (no restart,
+         no install, no pm clear); about 18 device minutes.
+
+raw-dump-jan.log.txt          20:21:26  measured first: form-basic launched, the name field tapped, `input text 'Jan%s'`,
+                              `uiautomator dump`: the dump writes `text="Jan "` — the space is the dump's, and averi
+                              trimmed it (fast-xml-parser's trimValues) before D72.
+android-forms-d72-fix.*       20:22:16–20:36:51  the whole forms group, the fix: 58 cases, 55 ok, 2 loud (b1d, b7, known),
+                              1 mismatch (g2, known since D72: "typed 12 characters but the field shows 15 … 3 separators
+                              added", the app holding `SK31 1200 0000 `). os1 ok (`Filled … (4 characters)`), os2 ok
+                              (`Filled … (4 characters, cleared 4 characters first)`), fp2 ok with "⚠ the field shows 5
+                              characters for the 3 typed".
+android-forms-d72-base.*      20:37:10–20:39:08  os1, os2, g2, fp2, the base (--side): os1 MISMATCH "typed 4 characters but the
+                              field shows 3" (the app holding `Jan `), os2 MISMATCH "typed 4 characters (after one wipe and
+                              retype) but the field shows 3" (the app holding `Ema `), g2 ok (the space trimmed), fp2 ok
+                              with "⚠ the field shows 4 characters" where the app holds 5.
+android-rn-forms-d72-fix.*    20:39:17–20:40:10  the RN app's rfe1–rfe3, the fix: rfe1, rfe2 ok; rfe3 the residual-10
+                              MISMATCH (first read on Android), filed in live-known.ts with g2.
+
+Not seen live: the base's `JJan ` damage (needs a partial landing with clear; pinned by the unit test
+tests/adapters/android.test.ts "typeAndConfirm with clear, `Jan ` of `Jan Novak` landed").
+The fix records are read back by tests/truth/live-rejudge.test.ts; the base record is a --side run, kept as evidence.

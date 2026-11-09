@@ -886,8 +886,8 @@ would cut a leading or trailing `&#10;` the old trim kept, a label change beside
 
 **Consequences.**
 - g2 under uiautomator (`SK3112000000` without clear into form-grouped's ibanEager, the app holding `SK31 1200 0000 `)
-  moves from ok to the `separated` MISMATCH, as on iOS: honest, the field undamaged. Filed in live-known.ts as
-  `android uiautomator g2` under residual 10. The Android forms records committed before D72 (android-forms-l7-1.json,
+  moves from ok to the `separated` MISMATCH, as on iOS: honest, the field undamaged; rfe3 (React Native) reads the
+  same. Filed in live-known.ts as `android uiautomator g2|rfe3` under residual 10. The Android forms records committed before D72 (android-forms-l7-1.json,
   android-forms-d61-whole.json) rejudge g2 as known but ok, FIXED — the replies of a trimming averi
   (tests/truth/live-rejudge.test.ts, `PRE_D72_G2`).
 - ADR 0028's D64b-3 line counts what the app holds: fp2's ⚠ line says 5 characters, not 4, and a typed `+421` over an
@@ -896,6 +896,15 @@ would cut a leading or trailing `&#10;` the old trim kept, a label change beside
 - `ui_snapshot` shows an Android input's value with its outer spaces, as iOS does.
 - Golden (`scripts/differential/golden.ts --corpus tests/fixtures/truth`, base 3b7393ba): 0 checks changed — no captured
   dump has a value with an outer space.
+
+**Measured (2026-11-09, emulator-5554, averi_lab API 33; docs/truth/live-records/d72-outer-spaces/).** First, the raw
+dump of form-basic's name after `input text 'Jan%s'`: `text="Jan "` — the space is the dump's; averi trimmed it. The
+new live cases os1 (`Jan ` without clear) and os2 (`Jan `, then `Ema ` with clear) on the base (3b7393ba, `--side`):
+both MISMATCH, "typed 4 characters but the field shows 3", the app holding the value; g2 ok; fp2's line saying 4. On
+the fix, the whole forms group: 58 cases, 55 ok, b1d and b7 LOUD (known), g2 the residual-10 MISMATCH (known); os1 ok,
+os2 ok "cleared 4 characters first", fp2's line saying 5. The RN app's rfe3, first read on Android: the same
+residual-10 MISMATCH, filed with g2 (`android uiautomator g2|rfe3`); rfe1 and rfe2 ok. Not seen live: the base's
+`JJan ` damage, which needs a partial landing under clear (pinned in tests/adapters/android.test.ts).
 
 **Residuals, stated.** Residual 10 now holds on Android too. A label still loses its outer spaces on Android, as
 before (iOS's label keeps what WDA or idb gives it); no case asks for them.
@@ -945,5 +954,5 @@ before (iOS's label keeps what WDA or idb gives it); no case asks for them.
    T3's amendment): `SK31 1200 0000 ` for a typed `SK3112000000` — every typed character is there, in order, and the
    field holds the value, but the trailing mark is no grouping the rules take, so averi refuses it and the reply names
    the check and the remedy. The safe side: a false mismatch, never a wrong Filled. Filed in live-known.ts as
-   `ios idb|wda g2`, `ios idb|wda rfe3` and, since D72's amendment (Android's reading keeps the trailing space; it
-   passed before, the space trimmed), `android uiautomator g2`.
+   `ios idb|wda g2`, `ios idb|wda rfe3` and, since D72's amendment (Android's reading keeps the trailing space; g2
+   passed before, the space trimmed), `android uiautomator g2|rfe3`.

@@ -351,6 +351,17 @@ const FORMS: Omit<Case, 'group'>[] = [
     judge: judgeFloatingGap('kf3'),
   },
   { id: 'b1', cell: B, says: 'fill, no clear, a name', calls: [fill(B, 'name', 'Jan Novak')], judge: holds('name', 'Jan Novak') },
+  // D72: a value with an outer space. Before D72 the Android dump's parser trimmed it, so `Jan ` read back `Jan` (a false
+  // failure) and a clear over it deleted one short. Android only: D72 is the Android reading's (iOS kept the spaces).
+  { id: 'os1', cell: B, platforms: ['android'], says: 'fill, no clear, a name ending in a space (D72)', calls: [fill(B, 'name', 'Jan ')], judge: holds('name', 'Jan ') },
+  {
+    id: 'os2',
+    cell: B,
+    platforms: ['android'],
+    says: 'fill a name ending in a space, then fill with clear another ending in a space: the clear deletes all 4 (D72)',
+    calls: [fill(B, 'name', 'Jan '), fill(B, 'name', 'Ema ', true)],
+    judge: holds('name', 'Ema '),
+  },
   { id: 'b1d', cell: B, says: 'fill, no clear, a name with diacritics', calls: [fill(B, 'name', 'Jan Šťastný')], judge: holds('name', 'Jan Šťastný') },
   {
     id: 'b2',
@@ -578,7 +589,7 @@ const FORMS: Omit<Case, 'group'>[] = [
   // ios-rn-*-forms-l7-*.json): rfe1 and rfe2 ok 20 of 20, rfe3 that MISMATCH ×10.
   { id: 'rfe1', cell: RFE, says: 'fill, clear, 24 characters into the RN eager field: a drop of the last 4 leaves `… 4263 ` (the eager mark), the full value takes none', calls: [fill(RFE, 'E.field', 'SK3112000000198742637541', true)], judge: holds('E', 'SK31 1200 0000 1987 4263 7541') },
   { id: 'rfe2', cell: RFE, says: 'fill, no clear, 10 characters into the RN eager field: a drop of the last 2 leaves `SK31 1200 ` (the eager mark), the full value ends mid-group', calls: [fill(RFE, 'E.field', 'SK31120000')], judge: holds('E', 'SK31 1200 00') },
-  { id: 'rfe3', cell: RFE, says: 'fill, no clear, an IBAN ending on a complete group into the RN eager field — expected MISMATCH failed-holds by design on iOS (idb, wda; D53 `separated`: averi refuses the trailing mark, the app holds the value); React Native on Android unread', calls: [fill(RFE, 'E.field', 'SK3112000000')], judge: holds('E', 'SK31 1200 0000 ') },
+  { id: 'rfe3', cell: RFE, says: 'fill, no clear, an IBAN ending on a complete group into the RN eager field — expected MISMATCH failed-holds by design under every source (D53 `separated`: averi refuses the trailing mark, the app holds the value; React Native on Android first read by D72, whose reading keeps the trailing space)', calls: [fill(RFE, 'E.field', 'SK3112000000')], judge: holds('E', 'SK31 1200 0000 ') },
 ];
 
 // --- the ensure group (backlog D30, ADR 0033): D2's held "no" on a device ---
