@@ -1,0 +1,52 @@
+lab: emulator-5554, AVD averi_lab
+averi: <scratchpad>/base
+uiautomator k1 ok: Tapped id:"lab.form-keyboard.vs" (the soft keyboard covered id:"lab.form-keyboard.vs"; hidden before tapping)
+uiautomator k4 ok: Tapped id:"lab.form-keyboard.submit"
+uiautomator k3 ok: refused by design (F2A1: note shows 0 px past the bar, under the 65 a tap needs), every field untouched, no submit: ERROR id:"lab.form-keyboard.note" was not tapped: after back was pressed to hide the soft keyboard, it is cut at its top edge by container id:lab.form-keyboard.submit (55,1994 970x132), drawn after it — the dump (Compose
+uiautomator k5 ok: refused, nothing fired (focus postcode): ERROR id:"lab.form-keyboard.note" was not tapped: after back was pressed to hide the soft keyboard, it is cut at its top edge by container id:lab.form-keyboard.submit (55,1994 970x132), drawn after it — the dump (Compose
+uiautomator k6 ok: Tapped id:"lab.form-keyboard.phone" (the soft keyboard covered id:"lab.form-keyboard.phone"; hidden before tapping)
+uiautomator k7 ok: no stop, nothing submitted (phone 1129–1228 (launched 1296), 0 px of it under the bar); 3 stroke(s) the app logged at (540,857) (540,857) (540,857): ERROR scroll_until id:"lab.form-keyboard.phone" failed after 3 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x1015 scr
+uiautomator k7f ok: phone 1296–1395, vs.title from 1406, 0 px under the bar; 0 stroke(s): Element id:"lab.form-keyboard.phone" fully visible after 0 swipes — text "Variable symbol" (55,1406 258x56), drawn after it, overlaps its bottom 6 px with nothing a screenshot shows (Android dumps a control's touch targe
+uiautomator kf1 ok: Element id:"lab.form-keyboard-floating.submit" fully visible after 0 swipes
+uiautomator kf2 ok: 1 submit, the IME still up: Element id:"lab.form-keyboard-floating.submit" fully visible after 0 swipes / Tapped id:"lab.form-keyboard-floating.submit"
+uiautomator kf3 ok: no stop (ks 1493–1592), postcode untouched; 3 touch(es) the app logged at (540,857) (540,857) (540,857): ERROR scroll_until id:"lab.form-keyboard-floating.ks" failed after 3 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x10
+uiautomator b1 ok: Filled id:"lab.form-basic.name" (9 characters)
+uiautomator b1d LOUD: the app holds "", not "Jan Šťastný" — field untouched; averi: ERROR cannot type U+0160 'Š': on Android averi types only printable ASCII (U+0020–U+007E): `input text` crashes on another character after typing the ones before it. Refused before anything was sent — nothing tapped, cle
+uiautomator b2 ok: Typed 6 characters
+uiautomator b3 ok: Filled id:"lab.form-basic.email" (23 characters)
+uiautomator b4 ok: Filled id:"lab.form-basic.iban" (29 characters)
+uiautomator b5 ok: Filled id:"lab.form-basic.amount" (7 characters)
+uiautomator b6 ok: Filled id:"lab.form-basic.pin" (4 characters)
+uiautomator b7 LOUD: the app holds "", not "O’Brien “Jr.” – Co…" — field untouched; averi: ERROR cannot type U+2019 '’': on Android averi types only printable ASCII (U+0020–U+007E): `input text` crashes on another character after typing the ones before it. Refused before anything was sent — nothing tapped, cle
+uiautomator p1 ok: Filled id:"lab.form-prefilled.name" (4 characters)
+uiautomator p2 ok: Filled id:"lab.form-prefilled.iban" (29 characters, cleared 29 characters first)
+uiautomator p3 ok: Filled id:"lab.form-prefilled.email" (0 characters, cleared 23 characters first)
+uiautomator p4 ok: Filled id:"lab.form-prefilled.amount" (5 characters, cleared 8 characters first)
+uiautomator p5 ok: Filled id:"lab.form-prefilled.pin" (1 character)
+uiautomator p6 ok: Filled id:"lab.form-prefilled.pin" (4 characters, cleared 4 characters first)
+uiautomator p7 ok: refused before anything was sent, the prefill kept: ERROR cannot type U+0160 'Š': on Android averi types only printable ASCII (U+0020–U+007E): `input text` crashes on another character after typing the ones before it. Refused before anything was sent — nothing tapped, cle
+uiautomator e1a ok: name: message gone; email: message still read
+uiautomator c1 ok: Element id:"lab.form-picker.country.ST" fully visible after 3 swipes
+uiautomator c2 ok: not tapped, nothing fired; the presented remedy, once: ERROR Timed out after 5000ms: element id:"lab.form-picker.name" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — scroll_until it in that window's own list
+uiautomator c3 ok: not tapped, nothing fired; the presented remedy, once: ERROR Timed out after 5000ms: element id:"lab.form-picker.country" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — scroll_until it in that window's own l
+uiautomator c4 ok: not tapped, nothing fired; the presented remedy, once: ERROR Timed out after 5000ms: element id:"lab.form-picker.submit" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — scroll_until it in that window's own li
+uiautomator c5 ok: failed, nothing fired; the presented remedy, once: FAIL  element id:"lab.form-picker.name" exists — not found within 3 s (the tree lists only the window on top: scroll_until it in that window's own list first; if it is not there, a sheet or modal is p
+uiautomator c6 ok: failed, nothing fired; the presented remedy, once: FAIL  element id:"lab.form-picker.name" fill within dE00 8 of #FFFFFF — not found within 5 s (the tree lists only the window on top: scroll_until it in that window's own list first; if it is not there
+uiautomator c7 ok: failed, nothing fired; the presented remedy, once: ERROR Timed out after 3000ms waiting for element id:"lab.form-picker.name"
+uiautomator f1 ok: Filled id:"lab.form-format.iban" (12 characters, the field shows them reformatted: 2 separators added); the tree shows the model's text
+uiautomator f2 ok: Filled id:"lab.form-format.iban" (12 characters, the field shows them reformatted: 2 separators added); the tree shows the model's text
+uiautomator f3 ok: Filled id:"lab.form-format.amount" (10 characters, the field shows them reformatted: 2 separators added); the tree shows the model's text
+uiautomator f4 ok: Filled id:"lab.form-format.ibanShown" (12 characters, the field shows them reformatted: 2 separators added)
+uiautomator f5 ok: Filled id:"lab.form-format.iban" (14 characters)
+uiautomator f6 ok: Typed 8 characters
+uiautomator f7 ok: Filled id:"lab.form-format.iban" (12 characters, the field shows them reformatted: 2 separators added)
+uiautomator f8 ok: flow type_it: start
+uiautomator f9 ok: flow fill_it: start
+uiautomator f10 ok: flow pin_it: start
+uiautomator f11 ok: Filled id:"lab.form-format.date" (8 characters, the field shows them reformatted: 2 separators added); the tree shows the model's text
+uiautomator f12 ok: Filled id:"lab.form-format.date" (10 characters)
+uiautomator f13 ok: Filled id:"lab.form-format.phone" (12 characters)
+uiautomator f14 ok: Filled id:"lab.form-format.phone" (13 characters)
+uiautomator f15 ok: refused as "did not change", the field kept "31.12.2026": ERROR fill: typed 4 characters but the field shows 10 — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)
+uiautomator f16 ok: refused, the field kept "31.12.2021": ERROR fill: typed 2 characters but the field shows 10 (content withheld from this error)
+uiautomator g1 ok: Filled id:"lab.form-grouped.ibanEager" (15 characters, the field shows them reformatted: 3 separators added); the tree shows the model's text

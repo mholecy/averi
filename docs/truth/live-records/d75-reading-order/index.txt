@@ -34,10 +34,10 @@ RN (--app react-native --groups forms,visibility), base 251 s vs fix 242 s: 24 c
 native: the forms group (~50 cases, ~13 min an arm) and the whole visibility group do not fit the budget twice, so
   native-base ran visibility on 13 cells (bands, bands-three-button, bottom-sheet-dialog, dialog-views-fullscreen,
   sheet-medium, alert-dim, fab, pinned-bar, scroll-sticky, form-errors, own-parts, text-under-bar, tabbar-floating),
-  stopped at the budget after 61 cases (all ok; native-base.log), and native-fix ran the three cells whose committed
+  stopped at the budget after 61 cases (all ok; native-base.log.txt), and native-fix ran the three cells whose committed
   trees the mark changes (bands-three-button, bottom-sheet-dialog, dialog-views-fullscreen; every other native capture
   is Compose, unmarked): 31 cases each, 31 ok each, every reply identical (cmp.mjs: 0 changed verdicts).
-  native-base-stopped.log, native-base-forms-stopped.log: the two forms runs stopped by hand (base only, all as in
+  native-base-stopped.log.txt, native-base-forms-stopped.log: the two forms runs stopped by hand (base only, all as in
   their logs), kept for the record, not compared.
 cost of the extra screenshot: only rn-banner's three taps ask the eyes (one screenshot each); RN arm 242 s vs 251 s —
   no cost visible at this resolution.
