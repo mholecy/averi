@@ -104,6 +104,36 @@ describe('parseUiautomatorXml marks a parent whose children are listed in locati
     expect(t.readingOrder).toBe(true);
   });
 
+  it('a plain android.view.View with two children in location order (a provider\'s virtual nodes): it and they stay unmarked', () => {
+    const t = parseDump(`<hierarchy rotation="0">
+  <node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+    <node class="android.view.View" resource-id="app:id/host" bounds="[0,0][1080,2220]">
+      <node class="android.view.View" resource-id="app:id/cover" bounds="[73,276][1008,419]"/>
+      <node class="android.view.View" resource-id="app:id/target" bounds="[128,303][953,479]">
+        <node class="android.widget.TextView" text="one" bounds="[128,303][500,350]"/>
+        <node class="android.widget.TextView" text="two" bounds="[128,360][500,400]"/>
+      </node>
+    </node>
+  </node>
+</hierarchy>`);
+    expect([...everyNode(t)].filter((n) => n.readingOrder)).toEqual([]);
+  });
+
+  it('the root the parser synthesizes over two windows is not marked (it is no ViewGroup), while a run in a window still is', () => {
+    const t = parseDump(`<hierarchy rotation="0">
+  <node class="android.widget.FrameLayout" bounds="[0,0][1080,1000]">
+    <node class="android.widget.TextView" text="a" bounds="[0,100][500,200]"/>
+    <node class="android.widget.TextView" text="b" bounds="[0,300][500,400]"/>
+  </node>
+  <node class="android.widget.FrameLayout" bounds="[0,1000][1080,2220]">
+    <node class="android.widget.TextView" text="c" bounds="[0,1100][500,1200]"/>
+  </node>
+</hierarchy>`);
+    expect(t.children).toHaveLength(2);
+    expect(t.readingOrder).toBeUndefined();
+    expect(t.children[0].readingOrder).toBe(true);
+  });
+
   it('a node with one child is not marked: there is no order to read', async () => {
     const t = await dump('android-averi_lab-api33', 'scroll-sticky.xml');
     expect(t.children).toHaveLength(1);

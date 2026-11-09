@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
+import { seenOrderOf } from '../../src/ui-tree/seen-order.js';
+import { tagged } from '../helpers/covers.js';
 import { parseDump } from '../helpers/android-dumps.js';
 
 /**
@@ -60,5 +62,44 @@ describe('the lab\'s form-shared-id (Compose, in location order by chance, unmar
   it.each(['Value*', 'IBAN*', 'BIC*', 'Payee’s bank name*', 'Payee’s name'])('%s: no cover — read as drawn over its field, as Compose lists it', async (label) => {
     const t = parseDump(await readFile(new URL('../fixtures/truth/android-averi_lab-api33/form-shared-id.xml', import.meta.url), 'utf8'));
     expect(drawOrder(t).exposure(byLabel(t, label), PHONE).covers).toEqual([]);
+  });
+});
+
+/**
+ * The review's MAJOR 1 (D75 round 1): marking is not monotone-cautious. A control listed AFTER the target in a classic
+ * run, over its centre, was a cover by the draw order (`drawn`: the tap refused); in a marked run it is a peer whose
+ * order is untold — still a cover with no screenshot, but LIFTED when the eyes see the target on top (ADR 0024's
+ * judgement, now on Android frames). Unmeasured live in that direction (ADR 0015's D75 residual; backlog D77).
+ */
+describe('a later-listed control over the target\'s centre in a classic run: drawn unmarked, untold marked, lifted by the eyes', () => {
+  const OVERLAP = `<hierarchy rotation="0">
+  <node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+    <node class="android.widget.Button" text="A" resource-id="app:id/a" bounds="[40,1000][540,1200]"/>
+    <node class="android.widget.Button" text="B" resource-id="app:id/b" bounds="[200,1050][900,1150]"/>
+  </node>
+</hierarchy>`;
+  const at = (t: UiNode) => [byLabel(t, 'A'), byLabel(t, 'B')] as const;
+
+  it('before D75 (the run unmarked): B, listed later, is drawn over A — the tap refused', () => {
+    const t = parseDump(OVERLAP);
+    for (const n of everyNode(t)) delete n.readingOrder;
+    const [a, b] = at(t);
+    expect(tagged(drawOrder(t).exposure(a, PHONE).covers)).toEqual([{ node: b, order: 'drawn', presented: false }]);
+  });
+
+  it('marked (A left 40 before B left 200, one stripe), no screenshot: B is a cover whose order is untold — still refused', () => {
+    const t = parseDump(OVERLAP);
+    expect(t.readingOrder).toBe(true);
+    const [a, b] = at(t);
+    expect(tagged(drawOrder(t).exposure(a, PHONE).covers)).toEqual([{ node: b, order: 'untold', presented: false }]);
+  });
+
+  it('marked, the eyes seeing A over B: no cover — A is tapped at its centre', () => {
+    const t = parseDump(OVERLAP);
+    const [a, b] = at(t);
+    const seen = seenOrderOf(a, [{ peer: b, seen: 'over', overlap: '#1E88E5', own: '#1E88E5', other: '#E53935' }]);
+    const exposure = drawOrder(t, seen).exposure(a, PHONE);
+    expect(exposure.covers).toEqual([]);
+    expect(exposure.tapAt).toEqual({ point: { x: 290, y: 1100 }, moved: false });
   });
 });

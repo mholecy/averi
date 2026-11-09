@@ -358,9 +358,10 @@ drawn over it.
 Measured: golden over the truth corpus against `7eb998dd` (1667 checks): exactly rn-banner's six uiautomator rows
 change, MISMATCH → ok (T and U refused "drawn over it as a screenshot shows", C too; the colour asserts fail closed
 naming the cover), struck from react-native.known.ts; calibrate `--note LR4`: CALIBRATED. Over the 66 Android trees
-of tests/fixtures (1087 nodes, each judged as a target, marked against unmarked): 36 nodes marked; the targets whose
-exposure changes are rn-banner's six (T, U, C and their covers) and bands-three-button's root containers and N `[127,2088][952,2220]`,
-now under the decor's `navigationBarBackground` `[0,2088][1080,2220]` — a childless leaf with an id, listed after the
+of tests/fixtures (1087 nodes, each judged as a target, marked against unmarked): 36 nodes marked; 13 nodes' exposure
+changes, in two trees — rn-banner's seven (T, U and C, their three covers, and the toast's text `Saved`) and
+bands-three-button's six (its five screen-sized containers — the window, its wrappers and `android:id/content` — now
+partly under the navigation bar's background, and N `[127,2088][952,2220]`); of those only T, U, C and N are lab targets. N is now under the decor's `navigationBarBackground` `[0,2088][1080,2220]` — a childless leaf with an id, listed after the
 content, so drawn (the named-leaf rule, below); the truth agrees (N not reached, 0 % drawn) and its golden rows did not
 change. The chooser (ResolverActivity, classic Views) gains seven marks and no changed target. Live on the averi_lab AVD
 (docs/truth/live-records/d75-reading-order/, base `7eb998dd` and the fix under one harness): the React Native forms and
@@ -371,8 +372,9 @@ reply identical. The eyes cost one screenshot per tap on those three targets onl
 **The named-leaf change.** LR3's rule that a childless node the app named is drawn (`structural`'s exception) now
 reaches marked uiautomator runs: a bare View with only a resource id — rn-banner's U.cover and C.cover, the decor's
 `navigationBarBackground`, a synthetic classic overlay (tests/adapters/android.test.ts) — counts as drawn where before
-it was excused as structural. The safe direction: a cover where there was none (a refusal or a widened row), never a
-false `Tapped`. An unnamed bare View stays excused.
+it was excused as structural. That change alone runs in the safe direction: a cover where there was none (a refusal
+or a widened row). An unnamed bare View stays excused. The mark as a whole is NOT monotone-cautious: a control listed
+AFTER the target that the draw order made a cover becomes a peer the eyes may lift (the residual below).
 
 Rejected: a helper APK reading the real drawing order (far too costly to ship and keep); hedging every overlap with no
 eyes (falsely refuses a form's label or error text over its field); a React-Native-only rule (the wrong scope: the sort
@@ -391,7 +393,29 @@ is AOSP's, every classic ViewGroup's).
 - The dump's bounds are CUT (to a scroll view, to the screen) where AOSP sorted the whole drawing rect: a classic run
   with a child cut so may fail the check and keep its order as draw order — a later-drawn cover listed first stays
   read beneath the target, as before this amendment.
+- ViewLocationHolder sorts LAYOUT positions (`getDrawingRect` offset by `offsetDescendantRectToMyCoords`, which
+  applies no translation or scale), while the dump's bounds are on-screen, transforms included: a run whose child is
+  translated or scaled (an animation, a `translationX` offset) can fail the check and keep its order as draw order.
+- AOSP falls back to COMPARISON_STRATEGY_LOCATION (no stripes: top, then left …) when TimSort finds the stripe
+  comparator intransitive (`ChildListForAccessibility.sort`, the IllegalArgumentException): such a run fails the
+  stripe check and keeps its order as draw order.
 - A right-to-left classic run is not marked (above).
+- **A later-listed control over the target's centre, refused as drawn before D75, is now lifted when the eyes see the
+  target on top** — ADR 0024's judgement on Android frames, unmeasured live in that direction. In a marked run such a
+  control (B listed after A, holding A's centre) is an untold peer, no longer the draw order's `drawn` cover: with no
+  screenshot it still covers (refused, as before), but a screenshot that sees A over B lifts it and A is `Tapped`
+  (tests/ui-tree/draw-order-android-reading-order.test.ts, the review's repro). Where AOSP's listing is location order
+  that is right (the listing says nothing of Z); where the eyes misjudge, it is a false `Tapped` that was a refusal.
+  Backlog D77 asks for a classic cell whose target is truly drawn over a later-listed control.
+- **React Native maps some accessibility roles to the className `android.view.View`** (verified in the lab app's
+  react-native 0.88.0, ReactAndroid/…/uimanager/ReactAccessibilityDelegate.kt, `AccessibilityRole.getValue`, set by
+  `setRole` only when a role is given): `none` (given explicitly), `link`, `summary`, `header`, `alert`, `combobox`,
+  `menu`, `menubar`, `menuitem`, `progressbar`, `radiogroup`, `scrollbar`, `tab`, `tabbar`, `tablist`, `timer`,
+  `toolbar`. Such a view dumps like a node provider's host (android.ts#providesNodes), so its own children and
+  everything under it stay unmarked: an RN container with one of those roles holding a target and its cover keeps
+  LR4's lie (a `Tapped` on the cover). A view with such a role as a CHILD (a toast with `role="alert"`) does not unmark
+  its parent's run. Not narrowed (the owner's decision, D75 round 1); backlog D77 asks for an RN banner cell whose
+  container carries such a role.
 - Every marked run pays what WDA's does (this ADR's second residual and the LR3 amendment's third): two overlapping
   siblings that are really drawn in list order — a badge over an avatar, a label laid over its field — ask the eyes,
   and are refused where a screenshot cannot tell them apart. The lab's classic-Views twin of rn-banner is not built

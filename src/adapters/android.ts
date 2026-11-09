@@ -1615,7 +1615,8 @@ export function parseUiautomatorXml(xml: string, drawnOverStrip: DrawnOverStrip)
     children.length === 1
       ? { ...children[0], paddedTouchTargets: true, activeWindowOnly: true, boundsCutAtScreen: true, ...(presented !== undefined && { presentation: presented }) }
       : { role: 'container', label: null, identifier: null, value: null, rect: zeroRect(), children, paddedTouchTargets: true, activeWindowOnly: true, boundsCutAtScreen: true };
-  markLocationSorted(tree, provided);
+  // Each window's own tree: the root synthesized over several windows is no ViewGroup, its windows in no sorted order.
+  for (const window of children.length === 1 ? [tree] : children) markLocationSorted(window, provided);
   widenUnderCovers(tree, grown, drawnOverStrip);
   return tree;
 }
@@ -1766,6 +1767,9 @@ interface Around {
  * holds no child views, so any children it lists are virtual: Compose's (AndroidComposeView dumps as
  * `android.view.View`, under a ComposeView on a screen and under a bare ViewGroup in a dialog's window — measured on
  * every Compose capture of the lab, API 33), or an ExploreByTouchHelper's. Everything under it is the provider's too.
+ * The class is the accessibility className, which a delegate may set: React Native gives `android.view.View` to a view
+ * with some accessibility roles (`toolbar`, `alert`, `header`, `tablist`, … — ReactAccessibilityDelegate.kt), so such a
+ * container's subtree is read as a provider's, unmarked (ADR 0015's D75 residual; not narrowed).
  */
 const providesNodes = (raw: RawNode): boolean => raw.class === 'android.view.View';
 
