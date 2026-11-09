@@ -219,10 +219,10 @@ interface ProvenCut {
 /**
  * How many probes from one rect toward one edge must hold, with no proof, before the stop is `checked` (T12): the first
  * may be a stroke the app did not take, and the tree reads that the same as content that ended there. scroll-text.ts
- * says the count.
+ * says the count. Not tunable: `Memory.heldFirst` is one slot, so the rule is two holds by construction; this names the
+ * count for the reply.
  */
 export const CHECKED_AFTER_HOLDS = 2;
-// Not tunable: `Memory.heldFirst` is one slot, so the rule is two holds by construction; this names the count for the reply.
 
 declare const opaque: unique symbol;
 

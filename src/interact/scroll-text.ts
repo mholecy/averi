@@ -435,7 +435,7 @@ function flushEdgeText({ edge, container, pinned }: FlushPlace, lies: 'lies' | '
 /**
  * A cut a probe proved and no reveal was sent for (flush-check.ts#FlushCut), for the bound's and the stuck stop's
  * sentences: where the flush edge still lies, what the probe showed, and why no reveal followed when that was not the
- * budget. Never "probe swipes toward it moved nothing": that is the checked stop's clause, which the truth reader
+ * budget. Never "a probe swipe" or "n probe swipes toward it moved nothing": that is the checked stop's clause, which the truth reader
  * takes for a probed side (scripts/truth/replies.ts, flushProbedSide).
  */
 function flushCutText(cut: FlushCut): string {
