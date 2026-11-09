@@ -718,12 +718,13 @@ inconsistent — the unproven hedges say the same "it may be cut there" with les
 proven one dropped.
 
 **Consequences.** The opening of a hedged reply now carries the hedge; the clause is unchanged, so an agent or a reference
-that keyed on `it may be cut there` still finds it. No src verdict changes — no stroke, read, success or failure — only the
-reply's opening, the flow log's ⚠; in the harness, `VISIBLE_STOP`, the LOUD classes and `judgeScroll`'s gate change. Golden
-Changed 0, and not for want of movement alone: `fills`, `room` and `axis` need no probe, so a replayed tree could reach them,
-and none does — of the corpus's 1667 replies, 180 open `Element … fully visible` (base and branch alike, counted from a fresh
-golden JSON of each), none is hedged in either form and 4 are `checked`, so no fixture reaches any hedge. The rejudge of the committed live records (`live.ts --rejudge`'s path, 668 records with
-tests/fixtures, 7915 cases) flips no verdict.
+that keyed on `it may be cut there` still finds it. No src verdict changes — no stroke, read, success or failure — only
+the reply's opening, the flow log's ⚠; in the harness, `VISIBLE_STOP`, the LOUD classes and `judgeScroll`'s gate change.
+Golden Changed 0, and not for want of movement alone: `fills`, `room` and `axis` need no probe, so a replayed tree could
+reach them, and none does — of the corpus's 1667 replies, 180 open `Element … fully visible` (base and branch alike,
+counted from a fresh golden JSON of each), none is hedged in either form and 4 are `checked`, so no fixture reaches any
+hedge. The rejudge of the committed live records (`live.ts --rejudge`'s path, 668 records with tests/fixtures, 7915 cases)
+flips no verdict.
 
 **Residuals.** (1) The old form stays readable only through `hedgedLead` (`fullyHedged`); a new reader that keys on the opening must use
 it, not `fully visible`. (2) The two-held-first-probes residual of the T12 amendment is a `checked` stop, not a hedge: it
