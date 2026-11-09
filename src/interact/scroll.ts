@@ -9,7 +9,7 @@ import { round, startRounds, type RoundSeen, type Rounds, type RoundStep } from 
 import { scrollFailure, scrollResult, type ScrollUntilResult } from './scroll-text.js';
 import { dragMs, screenBox, type Direction, type ScreenBox } from './swipe.js';
 
-export { describeScrollResult, type ScrollUntilResult } from './scroll-text.js';
+export { describeScrollResult, HEDGE_WHATS, HEDGED_LEAD, stopHedges, type ScrollUntilResult } from './scroll-text.js';
 
 /** The scroll's budget when the caller has none — the MCP scroll_until tool's documented default is derived from it. */
 export const DEFAULT_SCROLL_TIMEOUT_MS = 15_000;

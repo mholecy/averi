@@ -2,9 +2,10 @@ import { countOf } from '../../src/util/count.js';
 import { UNMOVED_STROKES_EXHAUST } from '../../src/interact/scroll-rounds.js';
 import type { Platform } from '../differential/corpus.js';
 import type { CaseReads } from './live-cases.js';
-import { flushProbesSaid, refusedAfterDismissal, replyKind, screenChangedSaid, screenUnchangedFor, swipesOf, turnsSaid, type ReplyKind, heldCutHedged, untriedSideSaid, directionNamed } from './replies.js';
+import { flushProbesSaid, refusedAfterDismissal, replyKind, screenChangedSaid, screenUnchangedFor, swipesOf, turnsSaid, type ReplyKind, hedgedLead, hedgesCut, untriedSideSaid, directionNamed } from './replies.js';
 import type { CellTruth, Geometry, LabState, ProbeEvent, Rect, Stroke, TargetTruth } from './schema.js';
-import { askedUnlistedBy, contractOf, judgedContext, stopHolds, type StopAsk, type TapAsk } from './target-contract.js';
+import { HEDGED_LEAD } from '../../src/interact/scroll-text.js';
+import { askedUnlistedBy, contractOf, CUT_GEOMETRIES, judgedContext, stopHolds, type StopAsk, type TapAsk } from './target-contract.js';
 import { axisOf, bandsOf, directionOf, geometryOf, intersect, selectorOf, type Direction, type GeometryContext } from './truth.js';
 
 /**
@@ -98,8 +99,11 @@ export type VerdictClass =
   | 'held-said'
   | 'window-cut'
   | 'entry-not-bare'
-  // judgeScroll: a stop hedged on two held reveals (T11) with the target not whole.
-  | 'held-hedge'
+  // judgeScroll: a fully: true stop whose lead says it may be cut (T17: `NOT CONFIRMED WHOLE`, every flush hedge, T11's
+  // held one among them; replies.ts#hedgedLead) with the target cut (target-contract.ts#CUT_GEOMETRIES); and the same
+  // hedge in a pre-T17 record, whose opening still claimed "fully visible".
+  | 'hedged-stop'
+  | 'hedged-stop-old-lead'
   // The carousel group (live-carousel.ts, T7a): "fully visible" while C is cut; a reply of another kind than the case's;
   // strokes drawn outside the carousel's band (D59b); a first read after a stroke that disagrees with the pager at rest (D37);
   // the drop leg with no D62 retry seen in its stroke log.
@@ -353,8 +357,16 @@ export function judgeScroll(
   const unchanged = unchangedClaimBroken(scroll, strokesSince(state, launched));
   const kind = replyKind(scroll);
   const visible = kind === 'visible';
-  // T11: "it may be cut there" on a cut a swipe proved claims nothing whole: honest, and not a pass.
-  if (visible && !holds && c.fully && g !== undefined && tapped?.outcome !== 'MISMATCH' && heldCutHedged(scroll)) return { outcome: 'LOUD', cls: 'held-hedge', kind, why: `hedged, and the app lays it out ${g}: ${short(scroll)}`, app };
+  // T11, T17: a stop whose lead says it may be cut claims nothing whole — every flush hedge alike, a cut a swipe proved or
+  // one no probe checked: honest where the app shows it cut, and not a pass. Off the screen or outside its scroll view
+  // the lead's "visible" is false whatever the hedge, and an UNCOVERED-only hedge says nothing of a cut: the claim's
+  // MISMATCH below (ADR 0013's T17 amendment).
+  const lead = hedgedLead(scroll);
+  if (visible && !holds && c.fully && g !== undefined && CUT_GEOMETRIES.includes(g) && tapped?.outcome !== 'MISMATCH' && lead !== undefined && hedgesCut(lead)) {
+    const old = lead.preT17;
+    const opening = old ? 'hedged in its body, but its opening claimed "fully visible" (before T17), and' : `hedged (${HEDGED_LEAD} ${lead.what}), and`;
+    return { outcome: 'LOUD', cls: old ? 'hedged-stop-old-lead' : 'hedged-stop', kind, why: `${opening} the app lays it out ${g}: ${short(scroll)}`, app };
+  }
   if (visible && !holds) return { outcome: 'MISMATCH', cls: 'stop-claim', kind, why: `averi says ${short(scroll)} — the app lays it out ${g ?? 'nowhere'}, not ${stop}${tapped?.outcome === 'MISMATCH' ? `; then the tap: ${tapped.why}` : ''}`, app };
   if (tapped?.outcome === 'MISMATCH') return { ...tapped, why: `after ${short(scroll)}, the tap: ${tapped.why}`, app };
   // Whatever the tree listed: a claim about the screen the app's own strokes contradict.

@@ -207,7 +207,7 @@ describe('T11: a reveal that held is doubted once, however far the stroke that p
     const result = resultOf(played);
     expect(result).toMatchObject({ swipes: 3, flush: { edge: 'right', checked: false, why: 'held', revealed: 91 } });
     expect(describeScrollResult(result)).toBe(
-      "fully visible after 3 swipes; but its right edge lies on its scroll container's (66,380 948x234), where Android cuts a node's bounds to the container, " +
+      "visible after 3 swipes, NOT CONFIRMED WHOLE: its right edge lies on its scroll container's (66,380 948x234), where Android cuts a node's bounds to the container, " +
         'and a swipe toward it showed 91 px more of it, then 2 swipes after it moved nothing — the content ended there or the app did not take them — ' +
         'it may be cut there, a rect assert or screenshot may measure part of it; calling again tells',
     );

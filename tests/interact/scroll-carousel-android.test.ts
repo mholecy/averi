@@ -392,7 +392,7 @@ describe('`fully: true` on a card as wide as a carousel of untold axis (D59): un
     // The recorded reads alone: 65 lies within FIT_ROOM_PX of the carousel's 66 — not clipped, so not unfit; batch-9's own words.
     const ends = replay(FULLY_LEFT, [lazyAt(before.x), ...Array.from({ length: 8 }, () => lazyAt(after.x))]);
     expect(ends.outcome).toMatchObject({ kind: 'visible', swipes: 1 });
-    expect(describeScrollResult(resultOf(ends))).toBe(`fully visible after 1 swipe${B9.runs[1].reply.slice(B9.runs[1].reply.indexOf(';'))}`);
+    expect(describeScrollResult(resultOf(ends))).toBe(`visible after 1 swipe, NOT CONFIRMED WHOLE: ${B9.runs[1].reply.slice(B9.runs[1].reply.indexOf('; but ') + '; but '.length)}`);
     // E2's course (D52's record of this card's shape, from the same 574): its 4th read, C at 45 with both sides known
     // after a stroke that moved it, stops unfit — honest, C being as wide as the carousel: one offset only shows it whole.
     const course = replay(FULLY_LEFT, [before.x, 231, -102, 45, 189, 131, after.x].map((x) => lazyAt(x)));
@@ -481,7 +481,7 @@ describe('`fully: true` on a card as wide as a carousel of untold axis (D59): un
     const FULLY = { ...RULES, fully: true };
     const va1 = play({ ...FULLY, direction: 'down' }, [rAt('[128,457][953,567]'), rAt('[128,457][953,633]'), rAt('[128,457][953,633]'), rAt('[128,457][953,633]')]);
     expect(va1.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stroke', 'stop']);
-    expect(describeScrollResult(resultOf(va1))).toMatch(/^fully visible after 3 swipes; but its top edge lies on the edge of container id:lab\.scroll-sticky-cut\.header/);
+    expect(describeScrollResult(resultOf(va1))).toMatch(/^visible after 3 swipes, NOT CONFIRMED WHOLE: its top edge lies on the edge of container id:lab\.scroll-sticky-cut\.header/);
     const carried = replay({ ...FULLY, direction: 'down' }, [rAt('[128,1480][953,1541]'), rAt('[128,1200][953,1310]'), rAt('[128,1200][953,1310]')]);
     expect(carried.outcome).toMatchObject({ kind: 'visible' });
     expect(describeScrollResult(resultOf(carried))).toBe('fully visible after 1 swipe');

@@ -4,7 +4,7 @@ import { fillStepText } from '../interact/fill-text.js';
 import { typeIntoFocused } from '../interact/type-text.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS, ElementNotFoundError, isRefusedOnPresentElement, resolvePresent, type Ambiguity, type RefusedOnPresentElement } from '../interact/resolve.js';
 import { movedTapText } from '../interact/tap-judgement.js';
-import { describeScrollResult, scrollUntilVisible } from '../interact/scroll.js';
+import { describeScrollResult, scrollUntilVisible, stopHedges } from '../interact/scroll.js';
 import { eyesOn } from '../verify/eyes.js';
 import { swipeScreen } from '../interact/swipe.js';
 import { dismissKeyboard, KeyboardGuardError, type DismissResult, type GuardOptions } from '../interact/keyboard.js';
@@ -1354,11 +1354,18 @@ export class FlowEngine {
     });
     // ⚠ for a clipped stop, and (2026-10-08) for one the `unlocated`
     // row qualifies: the input method says a keyboard is up that nothing
-    // could place, so "fully visible" is not established either. A stop
-    // judged above a docked keyboard is not ⚠ on its own: the judgement
-    // already excluded it, and the line says so.
+    // could place, so "fully visible" is not established either — nor
+    // (T17) on a flush edge no probe checked: both open NOT CONFIRMED
+    // (scroll-text.ts#stopHedges). The `unlocated` row is asked again on its
+    // own, defensively: stopHedges says nothing of a stop with a surface the
+    // eyes saw, and such a stop never carries it (under fully: true a surface
+    // is no stop, and the row is asked of fully: true stops only —
+    // tests/interact/scroll-eyes.test.ts pins it), but the ⚠ must not hang on
+    // that. A stop judged above a docked keyboard is not ⚠ on its own: the
+    // judgement already excluded it, and the line says so.
+    const warned = result.clipped.length > 0 || result.covered !== undefined || stopHedges(result) !== undefined || result.keyboard?.state === 'unlocated';
     this.log(
-      result.clipped.length > 0 || result.covered !== undefined || result.keyboard?.state === 'unlocated' ? '⚠ scroll_until' : 'scroll_until',
+      warned ? '⚠ scroll_until' : 'scroll_until',
       `${describeElementSpec(element)} ${describeScrollResult(result)}`,
     );
   }

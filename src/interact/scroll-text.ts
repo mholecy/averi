@@ -266,6 +266,41 @@ const clippedDrawnHead = (describe: string, swipes: number, where: string, at: s
 /** `1 swipe`, `3 swipes` — the one spelling of the count every scroll sentence quotes. */
 const swipesText = (n: number): string => countOf(n, 'swipe');
 
+/** The unlocated keyboard's clause (the window model's `unlocated` row): what a `fully: true` stop could not judge. */
+const UNLOCATED_TEXT = `${UNLOCATED_KEYBOARD} — it was not judged and may cover the element`;
+
+/**
+ * The words a hedged `fully: true` stop opens with after `visible after N swipes, ` (T17, ADR 0013's T17 amendment):
+ * `NOT CONFIRMED <what>:`, `<what>` one of `HEDGE_WHATS`. The truth reader builds its pattern from both
+ * (`hedgedLead` in scripts/truth/replies.ts).
+ */
+export const HEDGED_LEAD = 'NOT CONFIRMED';
+
+/**
+ * What a hedged stop could not confirm (`stopHedges`): `WHOLE` (a flush edge no probe checked), `UNCOVERED` (a soft
+ * keyboard nothing could place), or `WHOLE OR UNCOVERED` (both). The one spelling of each.
+ */
+export const HEDGE_WHATS = ['WHOLE', 'UNCOVERED', 'WHOLE OR UNCOVERED'] as const;
+export type HedgeWhat = (typeof HEDGE_WHATS)[number];
+const [WHOLE, UNCOVERED, WHOLE_OR_UNCOVERED] = HEDGE_WHATS;
+
+/** A flush stop no probe checked (flush-check.ts#Flush, every `why`): the reply hedges it, and its lead says so (T17). */
+const flushHedged = (flush: ScrollUntilResult['flush']): flush is Flush & { checked: false } => flush !== undefined && !flush.checked;
+
+/**
+ * What a `fully: true` stop could not confirm (T17), or undefined for a stop that claims it all, or none: a stop whose
+ * reply would otherwise open `fully visible` — nothing clipped or covered, no surface the eyes saw — with a flush edge no
+ * probe checked (`WHOLE`), a keyboard the window state gives no area (`UNCOVERED`), or both. Its reply opens
+ * `visible after N swipes, NOT CONFIRMED <it>:` (`describeScrollResult`), and a flow logs it ⚠ (flow/engine.ts).
+ */
+export function stopHedges(r: ScrollUntilResult): HedgeWhat | undefined {
+  if (!fullyClaimed({ clipped: r.clipped, covered: r.covered !== undefined }) || r.eyes?.sees === 'surface') return undefined;
+  const cut = flushHedged(r.flush);
+  const keyboard = r.keyboard?.state === 'unlocated';
+  if (cut) return keyboard ? WHOLE_OR_UNCOVERED : WHOLE;
+  return keyboard ? UNCOVERED : undefined;
+}
+
 /** The honest one-line summary both call sites print. */
 export function describeScrollResult(r: ScrollUntilResult): string {
   const n = swipesText(r.swipes);
@@ -276,14 +311,25 @@ export function describeScrollResult(r: ScrollUntilResult): string {
   const moving = r.settled === false ? `; ${STILL_MOVING}` : '';
   const surface = r.eyes?.sees === 'surface' ? r.eyes : undefined;
   if (fullyClaimed({ clipped: r.clipped, covered: r.covered !== undefined }) && surface === undefined) {
-    const above = topCover === undefined ? '' : `, judged above the soft keyboard over ${frameText(topCover)}`;
-    const unlocated = r.keyboard?.state === 'unlocated' ? `; ${UNLOCATED_KEYBOARD} — it was not judged and may cover the element` : '';
     // The eyes could not tell (ui-tree/eyes.ts): the claim is the tree's, and what it cannot see is said.
     const unjudged = r.eyes?.sees === 'unjudged' ? r.eyes : undefined;
-    const claim = unjudged === undefined ? `fully visible after ${n}` : `fully visible by the tree after ${n}`;
+    const visible = unjudged === undefined ? `visible after ${n}` : `visible by the tree after ${n}`;
     const eyes = unjudged === undefined ? '' : `; ${unjudgedText(unjudged)}`;
     const clear = r.seenClear === undefined ? '' : ` — ${r.seenClear.map(seenClearText).join('; ')}`;
-    return `${claim}${above}${flushText(r.flush)}${clear}${eyes}${unlocated}${moving}${endTurnText(r.endTurn)}${detentText(r.detent)}`;
+    const tail = `${clear}${eyes}${moving}${endTurnText(r.endTurn)}${detentText(r.detent)}`;
+    // T17 (ADR 0013's T17 amendment): a stop the reply hedges — a flush edge no probe checked, a keyboard nothing
+    // could place — opens with what is not confirmed, never `fully visible`: the hedge is the lead, not a `; but`.
+    const what = stopHedges(r);
+    if (what !== undefined) {
+      const cut = r.flush !== undefined && what !== UNCOVERED ? flushText(r.flush) : undefined;
+      const keyboard = what === WHOLE ? undefined : UNLOCATED_TEXT;
+      const above = topCover === undefined ? '' : ` — judged above the soft keyboard over ${frameText(topCover)}`;
+      const checked = r.flush !== undefined && r.flush.checked ? `; ${flushText(r.flush)}` : '';
+      return `${visible}, ${HEDGED_LEAD} ${what}: ${[cut, keyboard].filter((h) => h !== undefined).join('; ')}${above}${checked}${tail}`;
+    }
+    const above = topCover === undefined ? '' : `, judged above the soft keyboard over ${frameText(topCover)}`;
+    const flush = r.flush === undefined ? '' : `; ${flushText(r.flush)}`;
+    return `fully ${visible}${above}${flush}${tail}`;
   }
   // Partly under something of the app: a plain stop, its centre
   // clear — said like a clip, and with what a measurement would take in.
@@ -371,14 +417,14 @@ export const endTurnText = (turn: EndTurn | undefined): string =>
 const detentText = (detent: DetentMove | undefined): string => (detent === undefined ? '' : `; the sheet moved from its ${detent.from} detent to ${detent.to}`);
 
 /**
- * The flush clause (flush-check.ts): what the stop's edge on
- * its scroll container means — checked by a probe, or not checked. The
+ * The flush clause (flush-check.ts), with no separator: what the stop's edge on
+ * its scroll container means — checked by a probe (after `fully visible after N swipes; `), or not checked (the
+ * hedge a `NOT CONFIRMED WHOLE` lead opens with, T17: `flushHedged`). The
  * container is quoted as a node's rect (`rectText`): it is one. Exported for
  * the troubleshooting reference (tests/mcp/tool-descriptions.test.ts pins
  * its `axis` rendering).
  */
-export function flushText(flush: ScrollUntilResult['flush']): string {
-  if (flush === undefined) return '';
+export function flushText(flush: Flush): string {
   const cut = "it may be cut there, a rect assert or screenshot may measure part of it";
   const box = rectText(flush.container);
   if ('edges' in flush) {
@@ -387,7 +433,7 @@ export function flushText(flush: ScrollUntilResult['flush']): string {
     if (flush.pinned !== undefined) {
       const [start, end] = flush.edges;
       return (
-        `; but it spans its scroll container (${box}) from the edge of ${nodeText(flush.pinned)}, pinned at the container's ${start} and drawn after it, ` +
+        `it spans its scroll container (${box}) from the edge of ${nodeText(flush.pinned)}, pinned at the container's ${start} and drawn after it, ` +
         `to the container's ${end} edge — its ${start} edge lies on that node's, its ${end} edge on the container's, where Android cuts a node's bounds ` +
         `at a node drawn over it or to the container, and no probe swipe can tell which side, if either, is cut — ${cut}; check with a screenshot`
       );
@@ -396,22 +442,22 @@ export function flushText(flush: ScrollUntilResult['flush']): string {
     // as tall as its horizontal carousel inside a vertical list fills the
     // carousel.
     return (
-      `; but it fills its scroll container (${box}) exactly — its ${flush.edges.join(' and ')} edges lie on ` +
+      `it fills its scroll container (${box}) exactly — its ${flush.edges.join(' and ')} edges lie on ` +
       `the container's, where Android cuts a node's bounds to the container, and no probe swipe can tell which side, if either, is cut — ${cut}; ` +
       'usual for a card as tall as its carousel — check with a screenshot'
     );
   }
   const { where, cuts } = flushEdgeText(flush, 'lies');
-  if (flush.checked) return `; ${where}, and ${CHECKED_AFTER_HOLDS} probe swipes toward it moved nothing — nothing of it is cut there`;
+  if (flush.checked) return `${where}, and ${CHECKED_AFTER_HOLDS} probe swipes toward it moved nothing — nothing of it is cut there`;
   // T11: a cut a swipe proved is never called uncut, ADR 0013's T11 amendment; a new call's first probe tells.
-  if (flush.why === 'held') return `; but ${where}, ${cuts}, and a swipe toward it showed ${flush.revealed} px more of it, then 2 swipes after it moved nothing — the content ended there or the app did not take them — ${cut}; calling again tells`;
+  if (flush.why === 'held') return `${where}, ${cuts}, and a swipe toward it showed ${flush.revealed} px more of it, then 2 swipes after it moved nothing — the content ended there or the app did not take them — ${cut}; calling again tells`;
   const unchecked = {
     budget: 'no swipe or time was left to check it',
     room: 'no scroll container around it has room for a probe swipe to check it',
     axis: `every scroll container around it from that one outward scrolls only ${axisOfEdge(flush.edge) === 'vertical' ? 'sideways' : 'up and down'}, so no probe swipe can move its ${flush.edge} edge into view to check it`,
     tap: 'the probe swipe was too short to tell from a tap',
   }[flush.why];
-  return `; but ${where}, ${cuts}, and ${unchecked} — ${cut}`;
+  return `${where}, ${cuts}, and ${unchecked} — ${cut}`;
 }
 
 /**
