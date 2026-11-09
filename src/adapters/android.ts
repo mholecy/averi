@@ -1762,12 +1762,12 @@ interface Around {
 
 /**
  * Whether `raw` hosts a NODE PROVIDER — its children are virtual nodes the provider lists in its own order, not the
- * views AOSP sorts by location (android-accessibility-order.ts): a node of the class `android.view.View` with
- * children. A plain View holds no child views, so such children are virtual: Compose's (AndroidComposeView dumps as
+ * views AOSP sorts by location (android-accessibility-order.ts): a node of the class `android.view.View`. A plain View
+ * holds no child views, so any children it lists are virtual: Compose's (AndroidComposeView dumps as
  * `android.view.View`, under a ComposeView on a screen and under a bare ViewGroup in a dialog's window — measured on
  * every Compose capture of the lab, API 33), or an ExploreByTouchHelper's. Everything under it is the provider's too.
  */
-const providesNodes = (raw: RawNode, rawChildren: readonly RawNode[]): boolean => raw.class === 'android.view.View' && rawChildren.length > 0;
+const providesNodes = (raw: RawNode): boolean => raw.class === 'android.view.View';
 
 function normalizeNode(raw: RawNode, around: Around): UiNode {
   const className = raw.class?.split('.').pop() ?? '';
@@ -1786,7 +1786,7 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
   const isTextInput = className.endsWith('EditText') || composeTextInput;
   const { rect, clippedOut } = nodeBounds(raw.bounds, around.parent);
   const clips = raw.scrollable === 'true';
-  const inProvider = around.inProvider || providesNodes(raw, rawChildren);
+  const inProvider = around.inProvider || providesNodes(raw);
   const children = rawChildren.map((child) => normalizeNode(child, { parent: rect, clip: clips ? rect : around.clip, grown: around.grown, inProvider, provided: around.provided }));
   const whole = around.clip === undefined ? undefined : uncut(rect, children, around.clip);
   const node: UiNode = {

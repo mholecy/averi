@@ -73,6 +73,27 @@ describe('parseUiautomatorXml marks a parent whose children are listed in locati
     expect([...everyNode(t)].filter((n) => n.readingOrder)).toEqual([]);
   });
 
+  it('a classic run OUT of location order (in one stripe the child further right listed first) is not marked: its order stays draw order', () => {
+    const t = parseDump(`<hierarchy rotation="0">
+  <node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+    <node class="android.widget.TextView" text="Forgot password?" bounds="[380,1180][700,1240]"/>
+    <node class="android.widget.Button" text="LOG IN" bounds="[40,1150][1040,1280]"/>
+  </node>
+</hierarchy>`);
+    expect(t.readingOrder).toBeUndefined();
+  });
+
+  it('…nor one out of order after a first pair in order: every pair is asked', () => {
+    const t = parseDump(`<hierarchy rotation="0">
+  <node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+    <node class="android.widget.TextView" text="Title" bounds="[40,100][1040,200]"/>
+    <node class="android.widget.TextView" text="Forgot password?" bounds="[380,1180][700,1240]"/>
+    <node class="android.widget.Button" text="LOG IN" bounds="[40,1150][1040,1280]"/>
+  </node>
+</hierarchy>`);
+    expect(t.readingOrder).toBeUndefined();
+  });
+
   it('two children of one rect, either way round, are in order (a tie AOSP breaks by what the dump does not give) — marked', () => {
     const t = parseDump(`<hierarchy rotation="0">
   <node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">

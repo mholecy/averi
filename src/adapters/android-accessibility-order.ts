@@ -30,7 +30,7 @@ export function compareByLocation(a: Rect, b: Rect): number {
  * WDA parser's (wda-source.ts#markWdaDialect): a run of classic Views passes it, AOSP having sorted it so — unless the
  * dump cut a child's bounds (a scroll view's clip, the screen's edge) where AOSP sorted on its whole drawing rect; such a
  * run, and any run listed so by chance, is judged as the dump lists it. Never a node in `provided` — the nodes whose
- * children a node provider lists (android.ts#providesNodes: Compose's), in its own order, not AOSP's sort (AOSP sorts
+ * children a node provider lists (android.ts#providesNodes: Compose's, under a plain View), in its own order, not AOSP's sort (AOSP sorts
  * only a ViewGroup with no provider, `addChildrenForAccessibility`): Compose lists its semantics children in composition
  * order — scroll-sticky's R before the header drawn over it, form-shared-id's field before the label drawn over its
  * outline, which happens to be location order — so its order is kept as draw order. Returns `tree`.
