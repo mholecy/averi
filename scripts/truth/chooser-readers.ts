@@ -12,15 +12,19 @@ import { LAB_APP } from './lab-device.js';
  * #handlersOf over a batch's CallResult, chooser-premise.ts over adb's error.
  */
 
-/** The lab app's package (lab-device.ts#LAB_APP's native app): the one the preferred read, the install and --check
- * ask. */
+/**
+ * The lab app's package (lab-device.ts#LAB_APP's native app): the one the preferred read, the install and --check
+ * ask.
+ */
 export const LAB_PACKAGE = LAB_APP.native.package;
 
 /** A RESTORE line's start (batch-11's `D55 (Android): …`): every hand line of the chooser's. */
 export const HAND_PREFIX = 'D55 (Android): ';
 
-/** The preferred read: `dumpsys package preferred` (batch-10's and batch-11's; batch-9's `preferred-activities` reads
- * alike). */
+/**
+ * The preferred read: `dumpsys package preferred` (batch-10's and batch-11's; batch-9's `preferred-activities` reads
+ * alike).
+ */
 export const PREFERRED_ARGV = ['dumpsys', 'package', 'preferred'] as const;
 
 // --------------------------------------------------------------------------------------- the preferred activities
@@ -107,8 +111,10 @@ export function preferredIn(out: string): PreferredRead {
 export const leaksOf = (p: { lab: readonly LabEntry[] }): LabEntry[] => p.lab.filter((e) => e.always === true);
 /** Entries with no mAlways line: neither a default nor last-chosen as read — they cannot be compared, so unproven. */
 export const unflaggedOf = (p: { lab: readonly LabEntry[] }): LabEntry[] => p.lab.filter((e) => e.always === undefined);
-/** The last-chosen entries "Just once" writes (`mAlways=false`): no default; AOSP 13's uninstall does not clear
- * them. */
+/**
+ * The last-chosen entries "Just once" writes (`mAlways=false`): no default; AOSP 13's uninstall does not clear
+ * them.
+ */
 export const lastChosenOf = (p: { lab: readonly LabEntry[] }): LabEntry[] => p.lab.filter((e) => e.always === false);
 
 // ----------------------------------------------------------------------------------------------- the handlers

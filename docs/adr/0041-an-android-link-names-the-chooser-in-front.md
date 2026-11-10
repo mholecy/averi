@@ -737,4 +737,8 @@ reads the stack and HOME with `frontOf`, `homeOf` and `isChooser` in `live-choos
 the state (no reinstall, no key, no setting — the owner's hand lines do that), and no recurring run includes the group
 yet (backlog T20b, a standing lab batch, and T20c, its schedule). Not run on a device: the emulator was down when this
 was built, so the premise's lines are pinned on batch-10's API 33 reads and T7b's recorded launcher reads, through a
-fake adb (tests/truth/chooser-premise.test.ts).
+fake adb (tests/truth/chooser-premise.test.ts). What the tests pin is `readPremiseInto` (read, record, echo) and
+`summarizeRecord` (the record's labels into the summary, shared with `--rejudge`); live.ts's own two call lines are
+not pinned — its `readPremiseInto` call and the record it hands `summarizeRecord` (live.ts:264 and :288). Pinning them
+would take a test that runs live.ts in its run mode. T16's device reads are in the same place: ADR 0044's T16
+amendment pins device-state.ts's read over a fake exec, not live.ts's calls of it.
