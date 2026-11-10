@@ -621,6 +621,8 @@ describe('typeAndConfirm — an earlier text that holds the value is no landing 
   it.each([
     ['11 ', '11', '1', '1', { kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true }],
     ['-5-', '-5', '-5', '5', { kind: 'length' }],
+    // D79 review round 1, NIT-2: the value itself, the hedge gone, the append count kept
+    ['55', '55', '5', '5', { kind: 'length', appended: 3 }],
   ])('`%s` for `%s` after `%s`, a sibling gaining the missing `%s`: missed, elsewhere, no hedge', async (shown, value, before, gained, differs) => {
     const { io, intent, typed } = scripted({ prefilled: before, format: () => shown, elsewhere: () => gained });
     const missed = await typeAndConfirm(io, { ...intent, value, before });

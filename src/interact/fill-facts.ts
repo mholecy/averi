@@ -378,7 +378,13 @@ export interface OtherInput {
  *   `5`), so its count is the typed one — the reply says instead the count
  *   an append would have shown (the earlier text's plus the typed), never
  *   two equal numbers (docs/bugs/2026-10-09-fill-mismatch-error-says-equal-
- *   counts-when-app-transforms-text.md's class).
+ *   counts-when-app-transforms-text.md's class). Two more of that class
+ *   (D79 review round 1), set only where the field's count is the typed
+ *   one: `past`, how many of the field's characters are past its earlier
+ *   text (the typing's part: `12` after `1` read `11` — 1; 0 when the
+ *   reading is the named placeholder), and `partlyMasked`, a reading with
+ *   bullets among its characters (`•1` for `11`), whose content cannot be
+ *   compared.
  * - `separated` (D53): every typed character is there, in order, with
  *   `added` separators (interact/fill-reformat.ts#SEPARATORS) and nothing
  *   else — separators ADR 0034's rules refuse as the field's grouping (a
@@ -399,4 +405,4 @@ export type Difference =
   | { kind: 'unchanged' }
   | { kind: 'dropped-tail'; landed: number; dropped: number; grouped: boolean; wholeToo?: true }
   | { kind: 'separated'; added: number }
-  | { kind: 'length'; wholeToo?: true; appended?: number };
+  | { kind: 'length'; wholeToo?: true; appended?: number; past?: number; partlyMasked?: true };

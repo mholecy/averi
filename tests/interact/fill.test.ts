@@ -1823,7 +1823,8 @@ describe('fillField — the review probes of the hint-aware clear (2026-10-09)',
       if (fake.focused) fake.focused.value = 'Company'; // the app rejected the input and emptied the field
     };
     await expect(fillField(fake, { id: 'last_name' }, 'company', FAST)).rejects.toThrow(
-      'fill: typed 7 characters but the field shows 7 (content withheld from this error)',
+      // D79 review round 1: the two counts are equal — the reply says none of them is the typing
+      'fill: typed 7 characters but the field shows 7, none of them typed: its placeholder (content withheld from this error)',
     );
   });
 
@@ -1850,7 +1851,10 @@ describe('fillField — the review probes of the hint-aware clear (2026-10-09)',
       fake.typed.push(t);
       if (fake.focused) fake.focused.value = '•'.repeat(t.length - 1) + t.slice(-1);
     };
-    await expect(fillField(fake, { id: 'amount_input' }, 'secret', FAST)).rejects.toThrow('fill: typed 6 characters but the field shows 6 (content withheld from this error)');
+    await expect(fillField(fake, { id: 'amount_input' }, 'secret', FAST)).rejects.toThrow(
+      // D79 review round 1: the two counts are equal — the reply says some are bullets, not comparable
+      'fill: typed 6 characters but the field shows 6, some of them bullets: the typing cannot be compared with them (content withheld from this error)',
+    );
   });
 
   it('I: an unchanged reading after the deletes costs one poll cadence and one tree read more — then the late deletes are seen', async () => {
@@ -2157,7 +2161,33 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
     expect(fake.typed).toEqual([value]);
   });
 
-  // D79: a true short landing keeps its two counts — they differ, and say what is missing.
+  // D79 review round 1, MAJOR-1: any `length` whose earlier text pads the reading up to the typed count read as equal
+  // counts too ("typed 2 characters but the field shows 2"). It says how many of them are past the earlier text.
+  it.each(['15', '1-', '1 '])('`11` typed after `1`, read `%s`: no bare equal counts, the count past the earlier text (D79)', async (shown) => {
+    const fake = formFake('1');
+    fake.typingDelivery = 'may-arrive-late';
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      if (fake.focused) fake.focused.value = shown;
+    };
+    await expect(fillField(fake, { id: 'amount_input' }, '11', FAST)).rejects.toHaveProperty(
+      'message',
+      'fill: typed 2 characters but the field shows 2, only 1 of them past its earlier text (content withheld from this error)',
+    );
+  });
+
+  it('`12` typed after `1`, read `11` (the `2` dropped, nothing typed again): the count past the earlier text (D79)', async () => {
+    const fake = formFake('1');
+    fake.typingDelivery = 'may-arrive-late';
+    dropping(fake, 1);
+    await expect(fillField(fake, { id: 'amount_input' }, '12', FAST)).rejects.toHaveProperty(
+      'message',
+      'fill: typed 2 characters but the field shows 2, only 1 of them past its earlier text (content withheld from this error)',
+    );
+    expect(fake.typed).toEqual(['12']);
+  });
+
+  // D79: a reading shorter or longer than typed keeps its two counts — they differ, and say what is missing or added.
   it('a short landing still reads its two counts (D79 pin)', async () => {
     const fake = formFake(null);
     fake.typingDelivery = 'may-arrive-late';
@@ -2165,6 +2195,16 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
     await expect(fillField(fake, { id: 'amount_input' }, 'Jan Novak', FAST)).rejects.toHaveProperty(
       'message',
       'fill: typed 9 characters but the field shows 3 (content withheld from this error)',
+    );
+  });
+
+  it('a reading longer than typed still reads its two counts (D79 pin)', async () => {
+    const fake = formFake('12');
+    fake.typingDelivery = 'may-arrive-late';
+    dropping(fake, 1);
+    await expect(fillField(fake, { id: 'amount_input' }, '34', FAST)).rejects.toHaveProperty(
+      'message',
+      'fill: typed 2 characters but the field shows 3 (content withheld from this error)',
     );
   });
 
@@ -2238,6 +2278,8 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
         'content withheld from this error',
     ],
     ['-5-', '-5', '-5', '5', 'fill: typed 2 characters but the field shows 3 (content withheld from this error)'],
+    // D79 review round 1, NIT-2: the value itself, the hedge gone, the append count kept
+    ['55', '55', '5', '5', 'fill: typed 2 characters but the field shows only the typed text, where an append would show 3 (content withheld from this error)'],
   ])('`%s` for `%s` after `%s`, a sibling gaining `%s`: the reply names the other input, without the select-all hedge', async (shown, value, before, gained, reply) => {
     resetLayout();
     const field = el({ role: 'textfield', identifier: 'f', value: before });

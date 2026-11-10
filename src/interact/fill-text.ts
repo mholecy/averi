@@ -308,12 +308,18 @@ const FAILURE_SENTENCE: SentenceTable<FillFailure> = {
 };
 
 /**
- * The mismatch's second count: the field's, or (D79) for a reading that is the value itself, refused without clear
- * (D71), what an append would have shown — its count is the typed one, and two equal numbers read as a match
- * (docs/bugs/2026-10-09-fill-mismatch-error-says-equal-counts-when-app-transforms-text.md's class). No content.
+ * The mismatch's second count: the field's — and (D79) where it is the typed count of a `length`, why the two equal
+ * numbers are no match (docs/bugs/2026-10-09-fill-mismatch-error-says-equal-counts-when-app-transforms-text.md's
+ * class): for the value itself, refused without clear (D71), what an append would have shown instead; how many of them
+ * are past the earlier text; or that some are bullets. Counts only, no content.
  */
 function showsText(shows: number, d: Difference): string {
-  return d.kind === 'length' && d.appended !== undefined ? `only the typed text, where an append would show ${d.appended}` : `${shows}`;
+  if (d.kind !== 'length') return `${shows}`;
+  if (d.appended !== undefined) return `only the typed text, where an append would show ${d.appended}`;
+  if (d.past === 0) return `${shows}, none of them typed: its placeholder`;
+  if (d.past !== undefined) return `${shows}, only ${d.past} of them past its earlier text`;
+  if (d.partlyMasked === true) return `${shows}, some of them bullets: the typing cannot be compared with them`;
+  return `${shows}`;
 }
 
 /**

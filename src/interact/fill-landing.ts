@@ -390,7 +390,8 @@ function differenceOf(observed: string, e: Pick<Expectation, keyof TextExpectati
   if (bulletsSaidPlain(observed, e)) return { kind: 'masked-said-plain' };
   if (observed === e.before) return { kind: 'unchanged' };
   if (isMaskedValue(observed)) return { kind: 'masked', held: clear ? undefined : heldCount(e) };
-  if (hasBullet(observed)) return { kind: 'length' };
+  // D79 review round 1: as many characters as typed, some bullets — the reply says they cannot be compared
+  if (hasBullet(observed)) return observed.length === value.length ? { kind: 'length', partlyMasked: true } : { kind: 'length' };
   const held = heldText(observed, e.placeholder);
   // D28: a reformatted strict prefix with some of the typing in it is a dropped tail, never "transformed".
   if (landedSome(tail) && tail.reformatted !== undefined) {
@@ -418,9 +419,12 @@ function differenceOf(observed: string, e: Pick<Expectation, keyof TextExpectati
   if (caseOnly !== undefined) return { kind: 'case', positions: caseOnly };
   // an exact strict prefix ends here: its typed part is shorter than the value, so no run is compared
   if (typed.length !== value.length) {
-    if (!wholeToo) return { kind: 'length' };
     // D79: the value itself (D71's refusal) reads its count as the typed one — the reply says what an append would show
-    return held === value ? { kind: 'length', wholeToo: true, appended: priorText(e).length + value.length } : { kind: 'length', wholeToo: true };
+    if (wholeToo && held === value) return { kind: 'length', wholeToo: true, appended: priorText(e).length + value.length };
+    const d: Difference = wholeToo ? { kind: 'length', wholeToo: true } : { kind: 'length' };
+    // D79 review round 1: an earlier text that pads the reading to the typed count — the reply says how much of it is
+    // the typing (none: the reading is the named placeholder)
+    return observed.length === value.length ? { ...d, past: typed.length } : d;
   }
   let differ = 0;
   for (let i = 0; i < value.length; i++) if (typed[i] !== value[i]) differ++;

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { Difference } from '../../src/interact/fill-facts.js';
+import { heldText, type Difference } from '../../src/interact/fill-facts.js';
 import { landingOf, needsHeldCount, readingOf, withoutWholeToo, type Expectation, type Reading } from '../../src/interact/fill-landing.js';
 import { SEPARATORS } from '../../src/interact/fill-reformat.js';
+import { fillFailureText } from '../../src/interact/fill-text.js';
 import { isMaskedValue } from '../../src/ui-tree/masked-value.js';
 
 /**
@@ -117,8 +118,8 @@ describe('readingOf — the whole answer about one reading', () => {
     ['the value decorated, inside the earlier text\'s span: never typed again', '-5-', { value: '-5', before: '-5' }, { kind: 'missed', tail: { missing: '5', retypable: false }, differs: { kind: 'length', wholeToo: true } }],
     // D71 review round 1, n1: the select-all hedge is of a reading that took the text — a non-input showing its own
     // text is not-taken, unmarked; its tail is held back as before (a whole landing too), so nothing is typed again
-    ['a non-input showing its own text, the value with a tail too: not-taken, no hedge', '55', { value: '55', before: '5', isInput: false, resolvedValue: '55' }, { kind: 'not-taken', tail: { missing: '5', retypable: false }, differs: { kind: 'length' } }],
-    ['a non-input showing its own text, the value, no tail: not-taken, no hedge', '1 ', { value: '1 ', before: '1', isInput: false, resolvedValue: '1 ' }, { kind: 'not-taken', differs: { kind: 'length' } }],
+    ['a non-input showing its own text, the value with a tail too: not-taken, no hedge', '55', { value: '55', before: '5', isInput: false, resolvedValue: '55' }, { kind: 'not-taken', tail: { missing: '5', retypable: false }, differs: { kind: 'length', past: 1 } }],
+    ['a non-input showing its own text, the value, no tail: not-taken, no hedge', '1 ', { value: '1 ', before: '1', isInput: false, resolvedValue: '1 ' }, { kind: 'not-taken', differs: { kind: 'length', past: 1 } }],
     ['no prefix: no tail', 'the', { value: 'teh' }, { kind: 'missed', differs: { kind: 'same-length', positions: 2 } }],
     ['bullets prove no prefix', '••', { value: '12345' }, { kind: 'missed', differs: { kind: 'masked', held: 0 } }],
   ];
@@ -159,18 +160,33 @@ describe('readingOf — the whole answer about one reading', () => {
                     seen.add('wholeToo');
                   }
                   // D79: the append count is said of the value itself refused, and of nothing else: the earlier text's
-                  // count plus the typed one
+                  // count (its named placeholder aside, review round 1, NIT-3) plus the typed one
+                  const priorCount = clear ? 0 : heldText(before, placeholder).length;
                   if ('appended' in differs) {
                     if (!(differs.kind === 'length' && differs.wholeToo === true && observed === value)) throw wrong('appended is of the value itself, hedged');
-                    if (differs.appended !== (clear ? 0 : (before ?? '').length) + value.length) throw wrong('appended is the earlier count plus the typed');
+                    if (differs.appended !== priorCount + value.length) throw wrong('appended is the earlier count plus the typed');
                     seen.add('appended');
                   } else if (differs.kind === 'length' && differs.wholeToo === true && observed === value) throw wrong('the value itself refused says its append count');
+                  // D79 review round 1, MAJOR-1: no missed reading's reply is two bare equal counts — they differ, or the
+                  // reply says the append count or how many are past the earlier text
+                  if ('past' in differs) {
+                    const heldNow = heldText(observed, placeholder);
+                    if (differs.past !== (heldNow === '' ? 0 : heldNow.length - priorCount)) throw wrong('past is the held count less the earlier one');
+                    if (differs.past < 1) throw wrong('the sweep reaches no placeholder reading as long as the value');
+                  }
+                  if ('partlyMasked' in differs && !(observed.includes('•') && observed.length === value.length)) throw wrong('partlyMasked is of an equal count with bullets');
+                  if (differs.kind === 'length' && r.kind === 'missed') {
+                    const reply = fillFailureText({ code: 'mismatch', typed: value.length, shows: observed.length, differs });
+                    const bare = /^fill: typed (\d+) characters? but the field shows (\d+)(?: \(| —|$)/.exec(reply);
+                    if (bare !== null && bare[1] === bare[2]) throw wrong(`two bare equal counts: ${reply}`);
+                    if (observed.length === value.length) seen.add('equal counts said');
+                  }
                   if (differs.kind === 'dropped-tail' && tail?.missing.length !== differs.dropped) throw wrong('a dropped-tail names the tail');
                   if (tail?.retypable === true && observed.includes('•')) throw wrong('a bullet proves no tail');
                   if (tail?.retypable === true && differs.kind === 'unchanged') seen.add('retypable and unchanged');
                 }
     expect([...seen].sort()).toEqual(
-      ['case', 'dropped-tail', 'landed', 'length', 'masked', 'masked-said-plain', 'missed', 'not-taken', 'placeholder', 'retypable and unchanged', 'said-plain', 'same-length', 'separated', 'unchanged', 'wholeToo', 'appended'].sort(),
+      ['case', 'dropped-tail', 'landed', 'length', 'masked', 'masked-said-plain', 'missed', 'not-taken', 'placeholder', 'retypable and unchanged', 'said-plain', 'same-length', 'separated', 'unchanged', 'wholeToo', 'appended', 'equal counts said'].sort(),
     );
   });
 });
@@ -757,7 +773,8 @@ describe('the difference — what a missed read-back differs by, without content
     ['bullets onto held bullets, no clear', { observed: '•'.repeat(32), before: '•'.repeat(20), value: 'x'.repeat(16), held: 20 }, { kind: 'masked', held: 20 }],
     ['bullets with clear: no held count (the clear emptied it)', { observed: '•••••', value: 'secret', clear: true, held: 4 }, { kind: 'masked', held: undefined }],
     // 3. partly masked
-    ['show-the-last-character (`•••••t`): lengths only', { observed: '•••••t', value: 'secret' }, { kind: 'length' }],
+    ['show-the-last-character (`•••••t`): lengths only, as many as typed and some bullets (D79)', { observed: '•••••t', value: 'secret' }, { kind: 'length', partlyMasked: true }],
+    ['show-the-last-character, one short: lengths only (D79 pin)', { observed: '••••t', value: 'secret' }, { kind: 'length' }],
     // 4. held text compared
     ['auto-capitalised, no clear', { observed: 'Hello', value: 'hello' }, { kind: 'case', positions: 1 }],
     ['auto-capitalised, with clear', { observed: 'Hello world', value: 'hello world', clear: true }, { kind: 'case', positions: 1 }],
@@ -773,7 +790,7 @@ describe('the difference — what a missed read-back differs by, without content
     // `separated` called directly); a mark outside SEPARATORS keeps the row a length
     ['a mask that inserts marks the fill does not take (`(`, `)`)', { observed: '(12) 345', value: '12345' }, { kind: 'length' }],
     ['typing onto a field showing only its placeholder: the placeholder is no held text, so nothing is sliced off', { observed: 'Searchx', before: 'Search', value: 'searchx', placeholder: 'Search' }, { kind: 'case', positions: 1 }],
-    ['a field that fell back to its named placeholder holds no text: never "but for case"', { observed: 'Company', before: 'Zed', value: 'company', placeholder: 'Company' }, { kind: 'length' }],
+    ['a field that fell back to its named placeholder holds no text: never "but for case"', { observed: 'Company', before: 'Zed', value: 'company', placeholder: 'Company' }, { kind: 'length', past: 0 }],
     ['a pair equal only upper-cased (dotless `ı`, `i`) is case too', { observed: 'ıd', value: 'id', clear: true }, { kind: 'case', positions: 1 }],
     ['a pair equal only lower-cased (the Kelvin sign `\u212A`, `k`) is case too', { observed: '\u212Ad', value: 'kd', clear: true }, { kind: 'case', positions: 1 }],
     ['`ß`/`SS` differ in length: a plain difference, never case', { observed: 'SS', value: 'ß', clear: true }, { kind: 'length' }],
