@@ -670,7 +670,9 @@ describe('hedgedStops (T15): every hedged stop counted, by reason and by verdict
   const OK = { outcome: 'ok' } as const;
   const CUT = { outcome: 'LOUD', cls: 'hedged-stop' } as const;
   const OLD_CUT = { outcome: 'LOUD', cls: 'hedged-stop-old-lead' } as const;
-  const r = (id: string, verdict: { outcome: 'ok' | 'LOUD' | 'MISMATCH' | 'SKIP'; cls?: 'hedged-stop' | 'hedged-stop-old-lead' | 'stop-claim' | 'not-reached' }, ...replies: string[]) => ({ source: 'uiautomator', c: { id }, verdict, replies });
+  type V = { outcome: 'ok' | 'LOUD' | 'MISMATCH' | 'SKIP'; cls?: 'hedged-stop' | 'hedged-stop-old-lead' | 'stop-claim' | 'not-reached' | 'fully-cut' };
+  const r = (id: string, verdict: V, ...replies: string[]) => ({ source: 'uiautomator', c: { id, group: 'visibility' as const }, verdict, replies });
+  const of = (group: 'carousel' | 'forms', id: string, verdict: V, ...replies: string[]) => ({ ...r(id, verdict, ...replies), c: { id, group } });
 
   it('hedgedStop: a case\'s first stop with a hedged lead, and why; none on a clean, checked or plain stop, a tap, a failure', () => {
     expect(hedgedStop(r('a', OK, held, 'Tapped id:"x"'))).toEqual({ why: 'held' });
@@ -713,6 +715,25 @@ describe('hedgedStops (T15): every hedged stop counted, by reason and by verdict
       'Hedged stops: 7 of 8 visible stops (target whole, ok: 4 — held 2, budget 1, keyboard 1; cut, LOUD: 2 — held 1, fills 1; another verdict: 1 — keyboard 1): ' +
         'uiautomator w1, uiautomator w2, uiautomator w3, uiautomator w4, uiautomator c1, uiautomator c2, uiautomator m1',
     );
+  });
+
+  it('only the visibility group is counted: a carousel or forms case, hedged or stopped, is no stop of it, its case unmarked', () => {
+    const carousel = of('carousel', 'lv-d62-drop-two', { outcome: 'LOUD', cls: 'fully-cut' }, held);
+    const forms = of('forms', 'k7', OK, clean);
+    const stops = hedgedStops([carousel, forms, r('w1', OK, budget)]);
+    expect(stops.visible).toBe(1);
+    expect([...stops.whole, ...stops.cut, ...stops.other].map((h) => h.result)).toEqual([expect.objectContaining({ c: { id: 'w1', group: 'visibility' } })]);
+    expect(hedgedStopsLine(hedgedStops([carousel, forms]))).toBeUndefined();
+  });
+
+  it('each counted hedge carries its result, so a case is marked exactly when it is counted (a SKIP neither)', () => {
+    const w1 = r('w1', OK, held);
+    const skipped = r('s', { outcome: 'SKIP' }, budget);
+    const stops = hedgedStops([w1, skipped]);
+    expect(stops.whole).toEqual([{ id: 'uiautomator w1', why: 'held', result: w1 }]);
+    // The very result, not a copy: the summary marks a case by it (live-cases.ts#summarize).
+    expect(stops.whole[0].result).toBe(w1);
+    expect([...stops.whole, ...stops.cut, ...stops.other].some((h) => h.result === skipped)).toBe(false);
   });
 
   it('a hedge whose reason is unread is counted, as `unread`', () => {

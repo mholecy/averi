@@ -3,6 +3,7 @@ import { FOCUS_TEXT_NOT_READ } from '../../src/interact/fill-text.js';
 import { boundText, HEDGE_WHATS, HEDGED_LEAD, type HedgeWhat, TREE_READ_FAILED, UNTRIED_END, UNTRIED_LEAD } from '../../src/interact/scroll-text.js';
 import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, KEYBOARD_UNLISTED, NO_ID_LISTED } from '../../src/ui-tree/miss.js';
 import { UNLOCATED_KEYBOARD } from '../../src/ui-tree/keyboard-cover.js';
+import type { Flush } from '../../src/interact/flush-check.js';
 import { untriedSideText } from '../../src/interact/target-text.js';
 import { EDGES, rectText } from '../../src/ui-tree/geometry.js';
 import type { Rect } from '../../src/adapters/types.js';
@@ -89,15 +90,21 @@ function hedged(reply: string): { lead: HedgedLead; clauses: string } | undefine
   return old === null ? undefined : { lead: { what: 'WHOLE', preT17: true }, clauses: reply.slice(old[0].length) };
 }
 
-/** What `hedgeWhy` reads a hedged stop's reason as (T15). */
+/** What `hedgeWhy` reads a hedged stop's reason as (T15): every unchecked flush `why`, and the unlocated keyboard. */
 export const HEDGE_WHYS = ['held', 'budget', 'room', 'axis', 'tap', 'fills', 'keyboard'] as const;
 export type HedgeWhy = (typeof HEDGE_WHYS)[number];
+/** A flush edge no probe checked: its `why`, src's (src/interact/flush-check.ts, `Flush`). */
+type UncheckedWhy = Extract<Flush, { checked: false }>['why'];
+type Equals<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
+type Holds<T extends true> = T;
+/** Compile-time: HEDGE_WHYS less `keyboard` is src's set of unchecked `why`s, so a `why` src adds or drops fails tsc here. */
+export type HedgeWhysAreSrcs = Holds<Equals<Exclude<HedgeWhy, 'keyboard'>, UncheckedWhy>>;
 /** The flush clause's reason, in flushText's words for each `why`, read in the clause before ` — it may be cut there`. */
-const FLUSH_WHYS: readonly (readonly [HedgeWhy, RegExp])[] = [
+const FLUSH_WHYS: readonly (readonly [UncheckedWhy, RegExp])[] = [
   ['held', /, and a swipe toward it showed \d+ px more of it, then 2 swipes after it moved nothing — the content ended there or the app did not take them/],
   ['budget', /, and no swipe or time was left to check it/],
   ['room', /, and no scroll container around it has room for a probe swipe to check it/],
-  ['axis', /, so no probe swipe can move its (?:top|bottom|left|right) edge into view to check it/],
+  ['axis', new RegExp(`, so no probe swipe can move its (?:${EDGES.join('|')}) edge into view to check it`)],
   ['tap', /, and the probe swipe was too short to tell from a tap/],
   ['fills', /it (?:fills|spans) its scroll container /],
 ];

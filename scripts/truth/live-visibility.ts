@@ -387,7 +387,7 @@ export function judgeScroll(
 /** A judged case as the summary holds it (live-cases.ts#Result): what hedgedStops reads. */
 export interface JudgedStop {
   source: string;
-  c: { id: string };
+  c: { id: string; group: string };
   verdict: Pick<LiveVerdict, 'outcome' | 'cls'>;
   replies: readonly string[];
 }
@@ -402,26 +402,29 @@ export function hedgedStop(r: Pick<JudgedStop, 'replies'>): { why: HedgeWhy | un
   return reply === undefined ? undefined : { why: hedgeWhy(reply) };
 }
 
-/** One hedged stop, by its case (`<source> <id>`) and reason. */
-export interface HedgedOne {
+/** One hedged stop counted: its case (`<source> <id>`), its reason, and the result it was read from (its case's mark). */
+export interface HedgedOne<R extends JudgedStop = JudgedStop> {
   id: string;
   why: HedgeWhy | undefined;
+  result: R;
 }
 
 /**
- * Every hedged stop of a run (T15), counted where judgeScroll lets the target-whole ones pass: `visible`, the judged
- * cases (no SKIP) that stopped on their target — the denominator; of them the hedged (`hedgedStop`), split by verdict:
- * `whole` ok (the app shows the target whole: no rule fails a hedge there), `cut` LOUD by judgeScroll's own rule
- * (`hedged-stop`, `hedged-stop-old-lead`: the target cut), `other` any other verdict (a claim the app does not bear out,
- * a tap that failed after). A count, no gate: a device or a change that turns plain stops into hedges shows as a rise.
+ * Every hedged stop of a run's visibility group (T15), counted where judgeScroll lets the target-whole ones pass:
+ * `visible`, the group's judged cases (no SKIP) that stopped on their target — the denominator; of them the hedged
+ * (`hedgedStop`), split by verdict: `whole` ok (judgeScroll fails no hedge on a target the app shows whole), `cut` LOUD by
+ * judgeScroll's own rule (`hedged-stop`, `hedged-stop-old-lead`: the target cut), `other` any other verdict (a claim the
+ * app does not bear out, a tap that failed after). Another group's stops are not judgeScroll's — the carousel's hedge
+ * with C cut is ok or LOUD by its own rules — so not counted. A count, no gate: a device or a change that turns plain
+ * stops into hedges shows as a rise.
  */
-export function hedgedStops(results: readonly JudgedStop[]): { visible: number; whole: HedgedOne[]; cut: HedgedOne[]; other: HedgedOne[] } {
-  const judged = results.filter((r) => r.verdict.outcome !== 'SKIP' && r.replies.some((x) => replyKind(x) === 'visible'));
-  const stops = { visible: judged.length, whole: [] as HedgedOne[], cut: [] as HedgedOne[], other: [] as HedgedOne[] };
+export function hedgedStops<R extends JudgedStop>(results: readonly R[]): { visible: number; whole: HedgedOne<R>[]; cut: HedgedOne<R>[]; other: HedgedOne<R>[] } {
+  const judged = results.filter((r) => r.c.group === 'visibility' && r.verdict.outcome !== 'SKIP' && r.replies.some((x) => replyKind(x) === 'visible'));
+  const stops = { visible: judged.length, whole: [] as HedgedOne<R>[], cut: [] as HedgedOne<R>[], other: [] as HedgedOne<R>[] };
   for (const r of judged) {
     const hedged = hedgedStop(r);
     if (hedged === undefined) continue;
-    const one = { id: `${r.source} ${r.c.id}`, why: hedged.why };
+    const one = { id: `${r.source} ${r.c.id}`, why: hedged.why, result: r };
     const cut = r.verdict.cls === 'hedged-stop' || r.verdict.cls === 'hedged-stop-old-lead';
     (r.verdict.outcome === 'ok' ? stops.whole : cut ? stops.cut : stops.other).push(one);
   }
@@ -434,7 +437,7 @@ export function hedgedStops(results: readonly JudgedStop[]): { visible: number; 
  * budget b; cut, LOUD: L — …[; another verdict: M — …]): <source> <id>, …` — each bucket's reasons in HEDGE_WHYS
  * order, `unread` last, a bucket's dash only when it holds any.
  */
-export function hedgedStopsLine({ visible, whole, cut, other }: ReturnType<typeof hedgedStops>): string | undefined {
+export function hedgedStopsLine({ visible, whole, cut, other }: ReturnType<typeof hedgedStops<JudgedStop>>): string | undefined {
   if (visible === 0) return undefined;
   const bucket = (label: string, ones: readonly HedgedOne[]): string => {
     const why = [...HEDGE_WHYS, undefined]

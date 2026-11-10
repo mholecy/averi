@@ -707,11 +707,18 @@ else the claim's `stop-claim` MISMATCH stands: `off-screen` and `outside-scroll-
 
 **T15: the hedges that pass are counted.** A hedge on a target the app shows whole stays ok — no rule above fails it — so a
 device or a change that turns plain stops into hedges would pass unseen. The summary counts them (`hedgedStops` in
-scripts/truth/live-visibility.ts, printed by `summarize` in scripts/truth/live-cases.ts): `Hedged stops: H of S visible
-stops (target whole, ok: K — held a, budget b, …; cut, LOUD: L …): <source> <case>, …`, S the judged cases that stopped on
-their target, each hedge's reason read off its clause (`hedgeWhy` in scripts/truth/replies.ts: the flush `why`, or
-`keyboard`), and the hedged case's own line ends `(hedged: <why>)`. A count, not a gate: no exit code changes, and a run
-that stopped on no target prints no line.
+scripts/truth/live-visibility.ts, printed by `summarize` in scripts/truth/live-cases.ts) — the visibility group's cases
+only, the ones `judgeScroll` judges (another group's stop is judged by its own rules: the carousel's hedge with C cut is
+ok there). S is the group's judged cases (no SKIP) that stopped on their target; each hedge's reason is read off its clause
+(`hedgeWhy` in scripts/truth/replies.ts: the flush `why` — `held`, `budget`, `room`, `axis`, `tap`, `fills` — or
+`keyboard`, an `UNCOVERED` hedge alone; `unread` where the clause names none). The line, after the cases, only when S > 0:
+
+    Hedged stops: H of S visible stops (target whole, ok: K[ — <reasons>]; cut, LOUD: L[ — <reasons>][; another verdict: M — <reasons>])[: <source> <case>, …]
+
+`<reasons>` is `<why> <n>, …` in that order, each bucket's dash only when it holds any; `cut, LOUD` is `judgeScroll`'s
+`hedged-stop` and `hedged-stop-old-lead`, `another verdict` any other (a claim the app does not bear out, a tap that failed
+after) and printed only when it holds any; the cases are listed only when H > 0. Each counted case's own line ends
+`— <why of the verdict> (hedged: <why>)`, any `[known…]` mark after it. A count, not a gate: no exit code changes.
 
 **T11's off-screen exemption, re-decided.** T11's judge called the held hedge LOUD on any laid-out target, `off-screen`
 included (pinned by its review round 3, not argued in the T11 amendment above). Nothing in that amendment holds for it: the

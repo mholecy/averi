@@ -7,7 +7,7 @@ import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, KEYBOARD_UNLISTED, miss
 import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
 import { boundText, describeScrollResult, flushText, UNTRIED_END, UNTRIED_LEAD } from '../../src/interact/scroll-text.js';
 import {
-  CAROUSEL_REPLY_WORDS, carouselReply, fullyHedged, hedgedLead, HEDGE_WHYS, hedgeWhy, replyKind, VISIBLE_STOP, MAX_SWIPES, flushProbedSide,
+  CAROUSEL_REPLY_WORDS, carouselReply, fullyHedged, hedgedLead, hedgeWhy, replyKind, VISIBLE_STOP, MAX_SWIPES, flushProbedSide,
   flushProbesSaid, idbReasonsSaid, inferredAxisSaid, noIdListedSaid, OCR_FAILED_CLOSED, presentedRemedySaid,
   windowHintSaid, heldCutHedged, bandSaid, directionNamed, UNCHANGED_SAID, LIVE_REPLY_WORDS, refusedUnsentSaid,
   scrollVerdictSaid, underBarRemedySaid, untriedSideSaid, chooserSaid, launchedAs, linkHeldSaid, namesUntried,
@@ -266,7 +266,7 @@ describe('hedgeWhy (T15): why a hedged stop is hedged, read off the clause src w
   const header = { role: 'container', label: null, identifier: 'header', rect: { x: 0, y: 303, width: 1080, height: 154 } };
   const at = (r: Partial<Parameters<typeof describeScrollResult>[0]>) => `Element id:"x" ${describeScrollResult({ swipes: 3, visible: 1, clipped: [], ...r })}`;
   // Every unchecked flush of interact/flush-check.ts#Flush, as tests/interact/scroll-hedged-lead.test.ts's HEDGES: a
-  // wording src changes fails here.
+  // wording src changes fails here (and a `why` src adds fails tsc: replies.ts's HedgeWhysAreSrcs).
   const FLUSHES = [
     ['budget', { edge: 'top', container: box, checked: false, why: 'budget' }],
     ['room', { edge: 'bottom', container: box, checked: false, why: 'room' }],
@@ -280,10 +280,6 @@ describe('hedgeWhy (T15): why a hedged stop is hedged, read off the clause src w
   ] as const;
   const bar: UiNode = { role: 'button', label: null, identifier: 'bar', value: null, children: [], rect: { x: 0, y: 1541, width: 1080, height: 100 } };
   const unjudged = { sees: 'unjudged', edge: 'bottom', by: bar, why: 'a blended frame' } as const;
-
-  it('the reasons are the unchecked flush `why`s and the unlocated keyboard, no other', () => {
-    expect([...HEDGE_WHYS].sort()).toEqual(['axis', 'budget', 'fills', 'held', 'keyboard', 'room', 'tap']);
-  });
 
   it.each(FLUSHES)('%s: the flush hedge, alone, the eyes unjudged, beside an unlocated keyboard (its flush reason first), before T17', (why, flush) => {
     expect(hedgeWhy(at({ flush }))).toBe(why);

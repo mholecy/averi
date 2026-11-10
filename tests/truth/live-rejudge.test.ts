@@ -488,8 +488,19 @@ describe('T15: the hedged stops of a visibility run, counted in its summary', ()
     expect(hedgedLines(out)).toEqual(['Hedged stops: 0 of 32 visible stops (target whole, ok: 0; cut, LOUD: 0)']);
     expect(out).not.toContain(' (hedged: ');
   });
-  it('a forms run stops on no target: no line, its summary as before T15', { timeout: 60_000 }, async () => {
-    const { out } = await rejudgeInProcess('android-forms-d61-1.json', 'forms');
+  // Only the visibility group is counted: another group's stop is judged by its own rules, not judgeScroll's.
+  it('a carousel run with a hedge (two-fix-1, lv-d62-drop-two hedged with C cut): no line, no mark', { timeout: 60_000 }, async () => {
+    const { out } = await rejudgeInProcess(`${FINAL_AB}/two-fix-1.json`, 'carousel');
+    expect(out).toMatch(/^- \S+ (?:\(\S+\) )?lv-d62-drop-two /m);
+    // Its reply a hedged stop (the pre-T17 lead), which the visibility group would count.
+    const recorded = JSON.parse(readFileSync(resolve(ROOT, pathOf(`${FINAL_AB}/two-fix-1.json`)), 'utf8')) as RunRecord;
+    expect(recorded.results.flatMap((r) => r.replies).filter((x) => /^Element .* fully visible after \d+ swipes?; but /.test(x))).toHaveLength(1);
+    expect(hedgedLines(out)).toEqual([]);
+    expect(out).not.toContain(' (hedged: ');
+  });
+  it('a forms run with a scroll stop (android-forms-d40-1): no line, its summary as before T15', { timeout: 60_000 }, async () => {
+    const { out } = await rejudgeInProcess('android-forms-d40-1.json', 'forms');
+    expect(out).toMatch(/visible (?:by the tree )?after \d+ swipes?/);
     expect(hedgedLines(out)).toEqual([]);
   });
 });
