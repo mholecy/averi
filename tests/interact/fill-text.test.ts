@@ -398,6 +398,19 @@ describe('fillFailureText — every error a fill throws', () => {
     expect(mismatch({ kind: 'length' }, 2, 3)).toBe('fill: typed 2 characters but the field shows 3 (content withheld from this error)');
   });
 
+  // D79: D71's refusal of the value itself read "typed 2 characters but the field shows 2" — equal counts read as a
+  // match. It says the count an append would have shown instead, the field's own count left out (it is the typed one).
+  it('a length that is the value itself says what an append would show, never two equal counts', () => {
+    expect(mismatch({ kind: 'length', wholeToo: true, appended: 3 }, 2, 2)).toBe(
+      'fill: typed 2 characters but the field shows only the typed text, where an append would show 3 — ' +
+        'the field may have replaced its text (select-all): fill with `clear: true` (content withheld from this error)',
+    );
+    // without the hedge (keys proven typed elsewhere: fill-landing.ts#withoutWholeToo keeps the count)
+    expect(mismatch({ kind: 'length', appended: 6 }, 4, 4)).toBe(
+      'fill: typed 4 characters but the field shows only the typed text, where an append would show 6 (content withheld from this error)',
+    );
+  });
+
   // D64 round 3 (NIT): keys proven typed elsewhere are no select-all — fill-type.ts takes the hedge off first
   // (fill-landing.ts#withoutWholeToo; pinned there, in fill-type.test.ts, and in bytes in fill.test.ts); here, the clause
   it('a typing that left the field says where it went, after what the Difference says', () => {

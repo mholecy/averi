@@ -373,7 +373,12 @@ export interface OtherInput {
  *   (interact/fill-landing.ts#wholeLandingToo) — so nothing was typed again,
  *   and the reply names that reading and its remedy. A `length` carries it
  *   too: an exact strict prefix that is a whole landing as well (`-5-` for
- *   `-5` after `-5`, `xaa` for `aa` after `xa`).
+ *   `-5` after `-5`, `xaa` for `aa` after `xa`). `appended` (D79): the
+ *   reading is the value itself, refused without clear (D71: `55` after
+ *   `5`), so its count is the typed one — the reply says instead the count
+ *   an append would have shown (the earlier text's plus the typed), never
+ *   two equal numbers (docs/bugs/2026-10-09-fill-mismatch-error-says-equal-
+ *   counts-when-app-transforms-text.md's class).
  * - `separated` (D53): every typed character is there, in order, with
  *   `added` separators (interact/fill-reformat.ts#SEPARATORS) and nothing
  *   else — separators ADR 0034's rules refuse as the field's grouping (a
@@ -394,4 +399,4 @@ export type Difference =
   | { kind: 'unchanged' }
   | { kind: 'dropped-tail'; landed: number; dropped: number; grouped: boolean; wholeToo?: true }
   | { kind: 'separated'; added: number }
-  | { kind: 'length'; wholeToo?: true };
+  | { kind: 'length'; wholeToo?: true; appended?: number };

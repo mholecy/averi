@@ -298,7 +298,7 @@ const FAILURE_SENTENCE: SentenceTable<FillFailure> = {
     'xcrun simctl list), then retry with clear: true so the field is reset',
   'clear-twice': ({ left, rounds }) => `fill: field still shows ${charactersText(left)} after clearing ${rounds === 2 ? 'twice' : `${rounds} times`}`,
   mismatch: ({ typed, shows, differs, notInput, again, elsewhere }) =>
-    `fill: typed ${charactersText(typed)}${again === undefined ? '' : ` (${againText(again)})`} but the field shows ${shows}` +
+    `fill: typed ${charactersText(typed)}${again === undefined ? '' : ` (${againText(again)})`} but the field shows ${showsText(shows, differs)}` +
     (DIFFERENCE_TEXT[differs.kind] as (d: Difference) => string)(differs) +
     (elsewhere === undefined
       ? ''
@@ -306,6 +306,15 @@ const FAILURE_SENTENCE: SentenceTable<FillFailure> = {
         `(${rectText(elsewhere.rect)}) changed while it typed (the focus moved), so nothing was typed again`) +
     (notInput === undefined ? '' : `; ${caveatText({ code: 'not-input', role: notInput.role, typed: true, input: notInput.input })}`),
 };
+
+/**
+ * The mismatch's second count: the field's, or (D79) for a reading that is the value itself, refused without clear
+ * (D71), what an append would have shown — its count is the typed one, and two equal numbers read as a match
+ * (docs/bugs/2026-10-09-fill-mismatch-error-says-equal-counts-when-app-transforms-text.md's class). No content.
+ */
+function showsText(shows: number, d: Difference): string {
+  return d.kind === 'length' && d.appended !== undefined ? `only the typed text, where an append would show ${d.appended}` : `${shows}`;
+}
 
 /**
  * What was sent again before the mismatch's read-back, in the order sent: a run of dropped tails as `retypedText`

@@ -2123,9 +2123,49 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
     dropping(fake, 1);
     await expect(fillField(fake, { id: 'amount_input' }, '55', FAST)).rejects.toHaveProperty(
       'message',
-      'fill: typed 2 characters but the field shows 2 — the field may have replaced its text (select-all): fill with `clear: true` (content withheld from this error)',
+      'fill: typed 2 characters but the field shows only the typed text, where an append would show 3 — ' +
+        'the field may have replaced its text (select-all): fill with `clear: true` (content withheld from this error)',
     );
     expect(fake.typed).toEqual(['55']);
+  });
+
+  // D79: D71's refusal of a reading that is the value itself read as equal counts ("typed 2 characters but the field
+  // shows 2"), the class of docs/bugs/2026-10-09-fill-mismatch-error-says-equal-counts-when-app-transforms-text.md. It
+  // says now what an append would have shown — the earlier text's count and the typed one — and no content.
+  it.each([
+    ['55', '5', 3],
+    ['1212', '12', 6],
+    ['-5', '-', 3],
+  ])('`%s` typed after `%s` into a select-all field: no equal counts, the append count %i, the hedge, no content (D79)', async (value, before, appended) => {
+    const fake = formFake(before);
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      if (fake.focused) fake.focused.value = text; // select-all: the typing replaced the text
+    };
+    const error: Error = await fillField(fake, { id: 'amount_input' }, value, FAST).then(
+      () => {
+        throw new Error('Filled');
+      },
+      (e: Error) => e,
+    );
+    expect(error.message).not.toMatch(new RegExp(`typed ${value.length} characters? but the field shows ${value.length}\\b`));
+    expect(error.message).toBe(
+      `fill: typed ${value.length} characters but the field shows only the typed text, where an append would show ${appended} — ` +
+        'the field may have replaced its text (select-all): fill with `clear: true` (content withheld from this error)',
+    );
+    expect(error.message).not.toContain(value);
+    expect(fake.typed).toEqual([value]);
+  });
+
+  // D79: a true short landing keeps its two counts — they differ, and say what is missing.
+  it('a short landing still reads its two counts (D79 pin)', async () => {
+    const fake = formFake(null);
+    fake.typingDelivery = 'may-arrive-late';
+    dropping(fake, 3);
+    await expect(fillField(fake, { id: 'amount_input' }, 'Jan Novak', FAST)).rejects.toHaveProperty(
+      'message',
+      'fill: typed 9 characters but the field shows 3 (content withheld from this error)',
+    );
   });
 
   // D71 review round 1, m1 (ADR 0034's residual 12): an UNNAMED placeholder (idb) with no letter or digit that the

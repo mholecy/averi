@@ -417,7 +417,11 @@ function differenceOf(observed: string, e: Pick<Expectation, keyof TextExpectati
   }
   if (caseOnly !== undefined) return { kind: 'case', positions: caseOnly };
   // an exact strict prefix ends here: its typed part is shorter than the value, so no run is compared
-  if (typed.length !== value.length) return wholeToo ? { kind: 'length', wholeToo: true } : { kind: 'length' };
+  if (typed.length !== value.length) {
+    if (!wholeToo) return { kind: 'length' };
+    // D79: the value itself (D71's refusal) reads its count as the typed one — the reply says what an append would show
+    return held === value ? { kind: 'length', wholeToo: true, appended: priorText(e).length + value.length } : { kind: 'length', wholeToo: true };
+  }
   let differ = 0;
   for (let i = 0; i < value.length; i++) if (typed[i] !== value[i]) differ++;
   return { kind: 'same-length', positions: differ };

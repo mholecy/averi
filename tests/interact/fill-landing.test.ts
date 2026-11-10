@@ -113,7 +113,7 @@ describe('readingOf — the whole answer about one reading', () => {
     // D71: the value itself, reached by a typing that moved the reading, is no landing where it is a prefix of what the
     // field should hold too (`5` then `55`, the second key dropped) — a length that is a whole landing too, never typed
     // again
-    ['the value itself, a prefix of what the field should hold too: a length that is a whole landing too', '55', { value: '55', before: '5' }, { kind: 'missed', tail: { missing: '5', retypable: false }, differs: { kind: 'length', wholeToo: true } }],
+    ['the value itself, a prefix of what the field should hold too: a length that is a whole landing too', '55', { value: '55', before: '5' }, { kind: 'missed', tail: { missing: '5', retypable: false }, differs: { kind: 'length', wholeToo: true, appended: 3 } }],
     ['the value decorated, inside the earlier text\'s span: never typed again', '-5-', { value: '-5', before: '-5' }, { kind: 'missed', tail: { missing: '5', retypable: false }, differs: { kind: 'length', wholeToo: true } }],
     // D71 review round 1, n1: the select-all hedge is of a reading that took the text — a non-input showing its own
     // text is not-taken, unmarked; its tail is held back as before (a whole landing too), so nothing is typed again
@@ -158,12 +158,19 @@ describe('readingOf — the whole answer about one reading', () => {
                     if (r.kind === 'not-taken') throw wrong('a not-taken is never marked wholeToo');
                     seen.add('wholeToo');
                   }
+                  // D79: the append count is said of the value itself refused, and of nothing else: the earlier text's
+                  // count plus the typed one
+                  if ('appended' in differs) {
+                    if (!(differs.kind === 'length' && differs.wholeToo === true && observed === value)) throw wrong('appended is of the value itself, hedged');
+                    if (differs.appended !== (clear ? 0 : (before ?? '').length) + value.length) throw wrong('appended is the earlier count plus the typed');
+                    seen.add('appended');
+                  } else if (differs.kind === 'length' && differs.wholeToo === true && observed === value) throw wrong('the value itself refused says its append count');
                   if (differs.kind === 'dropped-tail' && tail?.missing.length !== differs.dropped) throw wrong('a dropped-tail names the tail');
                   if (tail?.retypable === true && observed.includes('•')) throw wrong('a bullet proves no tail');
                   if (tail?.retypable === true && differs.kind === 'unchanged') seen.add('retypable and unchanged');
                 }
     expect([...seen].sort()).toEqual(
-      ['case', 'dropped-tail', 'landed', 'length', 'masked', 'masked-said-plain', 'missed', 'not-taken', 'placeholder', 'retypable and unchanged', 'said-plain', 'same-length', 'separated', 'unchanged', 'wholeToo'].sort(),
+      ['case', 'dropped-tail', 'landed', 'length', 'masked', 'masked-said-plain', 'missed', 'not-taken', 'placeholder', 'retypable and unchanged', 'said-plain', 'same-length', 'separated', 'unchanged', 'wholeToo', 'appended'].sort(),
     );
   });
 });
@@ -173,6 +180,7 @@ describe('withoutWholeToo — a Difference without its whole-landing hedge', () 
   it('a dropped tail keeps its counts, a length its kind: the key itself is gone', () => {
     expect(withoutWholeToo({ kind: 'dropped-tail', landed: 1, dropped: 2, grouped: true, wholeToo: true })).toStrictEqual({ kind: 'dropped-tail', landed: 1, dropped: 2, grouped: true });
     expect(withoutWholeToo({ kind: 'length', wholeToo: true })).toStrictEqual({ kind: 'length' });
+    expect(withoutWholeToo({ kind: 'length', wholeToo: true, appended: 3 })).toStrictEqual({ kind: 'length', appended: 3 }); // D79: the count stays
   });
 
   it('a Difference without the hedge is as it was', () => {
@@ -816,14 +824,14 @@ describe('without clear, the value itself lands only as the earlier text or the 
   const e = (value: string, before: string | null, f: Partial<Expectation> = {}) => expecting({ value, before, ...f });
 
   it.each([
-    ['55', '5', 'the second key dropped, or a select-all field'],
-    ['1212', '12', 'the second `12` dropped, or a select-all field'],
-    ['1 ', '1', 'the trailing space typed alone, or a select-all field'],
-    ['-5', '-', 'an earlier text with no letter or digit'],
-  ])('`%s` after `%s` (%s): no landing, nothing typed again, a length that is a whole landing too', (value, before) => {
+    ['55', '5', 'the second key dropped, or a select-all field', 3],
+    ['1212', '12', 'the second `12` dropped, or a select-all field', 6],
+    ['1 ', '1', 'the trailing space typed alone, or a select-all field', 3],
+    ['-5', '-', 'an earlier text with no letter or digit', 3],
+  ])('`%s` after `%s` (%s): no landing, nothing typed again, a length that is a whole landing too, an append showing %i (D79)', (value, before, _why, appended) => {
     expect(landingOf(value, e(value, before))).toBeUndefined();
     expect(retypableTailOf(value, e(value, before))).toBeUndefined();
-    expect(notLandedDiffers(value, e(value, before))).toEqual({ kind: 'length', wholeToo: true });
+    expect(notLandedDiffers(value, e(value, before))).toEqual({ kind: 'length', wholeToo: true, appended });
   });
 
   it.each([

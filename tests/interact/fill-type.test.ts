@@ -603,7 +603,7 @@ describe('typeAndConfirm — an earlier text that holds the value is no landing 
   // end Filled over `555`.
   it.each(['on-return', 'may-arrive-late'] as const)('%s: `55` after `5`, the second key dropped — missed, a length that is a whole landing too, nothing typed again', async (delivery) => {
     const { io, intent, typed } = scripted({ prefilled: '5', keep: [1] });
-    expect(await typeAndConfirm(io, { ...intent, value: '55', before: '5', delivery })).toEqual({ kind: 'missed', observed: '55', again: [], differs: { kind: 'length', wholeToo: true } });
+    expect(await typeAndConfirm(io, { ...intent, value: '55', before: '5', delivery })).toEqual({ kind: 'missed', observed: '55', again: [], differs: { kind: 'length', wholeToo: true, appended: 3 } });
     expect(typed).toEqual(['55']);
   });
 
