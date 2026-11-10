@@ -66,8 +66,10 @@ export interface RunRecord {
   results: CaseRecord[];
   /**
    * The carousel group's device label (T16, device-state.ts): its raw-strokes reads before the cases and after them, or
-   * why one is missing. Absent on records before T16, and on runs without the carousel group on Android. Not `device`:
-   * two records of 2026-10 (android-hint-everywhere-*-asserts.json) hold the device's name under that key.
+   * why one is missing. Absent on records before T16, and on runs with no carousel case selected on Android. Not
+   * `device`: two records of 2026-10 (android-hint-everywhere-*-asserts.json) hold the device's name under that key.
+   * Nor `deviceState`: T11's and T12's label-group.mjs wrote their labels there, in another shape
+   * (`{ before: { file, strokes, short, state }, after, disagree }`).
    */
   deviceLabel?: DeviceLabel;
 }

@@ -231,7 +231,7 @@
     "group": "lab",
     "tests": ["tests/truth/device-state.test.ts"],
     "floor": 98,
-    "baseline": "100 % on 2026-11-10 (T16, stateOf, parseGfxinfo, deviceLine, readDevice over AndroidLab, readInto; `npm run mutate -- --group lab --force`, cold, 184 s): 132 mutants, 131 killed, 1 timeout (counted killed: the stroke loop's `n++` as `n--`), 0 survived; the first cold run scored 89.39 % (14 survived: parseGfxinfo's one-line-missing checks, the unreadable state file, the launch's offset, the frames key), each killed by a test since"
+    "baseline": "100 % on 2026-11-10 (T16 review round 1: LAUNCH_SETTLE_MS after the launch, RECYCLER_FREE reused, rounds < 1 refused, the framework restart on the Device line, deviceLabelAtStart with `--device-read none`; `npm run mutate -- --group lab --force`, cold, 174 s): 170 mutants, 169 killed, 1 timeout (the same `n++` as `n--`), 0 survived; 100 % on 2026-11-10 (T16, stateOf, parseGfxinfo, deviceLine, readDevice over AndroidLab, readInto; `npm run mutate -- --group lab --force`, cold, 184 s): 132 mutants, 131 killed, 1 timeout (counted killed: the stroke loop's `n++` as `n--`), 0 survived; the first cold run scored 89.39 % (14 survived: parseGfxinfo's one-line-missing checks, the unreadable state file, the launch's offset, the frames key), each killed by a test since"
   },
   "scripts/truth/run-case.ts": {
     "group": "lab",

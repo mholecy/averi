@@ -573,6 +573,10 @@ frames 70+ ms again, and one raw stroke at 0 with no averi in the path; it held 
 the load is not a guest process doing work that `top` shows, and the state is not a one-off. Trigger unknown: a visibility run preceded it this time, and the 12:48 one was followed by the fast state. Evidence:
 `docs/truth/live-records/t11-carousel-visible`, `frames.txt`; rates read back by `tests/truth/t11-records.test.ts`.
 
+Since T16 a carousel run labels the state itself: the raw-strokes read and this amendment's 94-px line, short at one
+stroke in four, run before and after the group's cases and print as the summary's `Device:` line (ADR 0044's T16
+amendment, docs/adr/0044-a-case-declares-its-reads.md).
+
 ## Amendment: D68 — a reveal this call's own strokes say would most likely overshoot is not sent (2026-11-05)
 
 **Context.** Points 2 and 3 above send a reveal on a proven cut, or fail at the bound naming it. On the lab's

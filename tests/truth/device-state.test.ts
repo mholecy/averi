@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { type DeviceLabel, type DeviceRead, type DeviceRound, deviceLine, parseGfxinfo, readDevice, readInto, stateOf } from '../../scripts/truth/device-state.js';
+import { type DeviceLabel, type DeviceRead, type DeviceRound, deviceLine, deviceLabelAtStart, parseGfxinfo, readDevice, readInto, stateOf } from '../../scripts/truth/device-state.js';
 import { AndroidLab, type Exec } from '../../scripts/truth/lab-device.js';
 
 // The carousel group's device read (scripts/truth/device-state.ts, T16): the T11/T19 rule read back off the committed
@@ -65,11 +65,11 @@ describe("parseGfxinfo: the lab app's frames", () => {
 });
 
 /** A read of these rounds, with frames of this p50 (none: unread). */
-const readOf = (rounds: DeviceRound[], p50?: number): DeviceRead => ({
+const readOf = (rounds: DeviceRound[], p50?: number, startCount = '11'): DeviceRead => ({
   t: '2026-11-10T12:00:00.000Z',
   rounds,
   ...(p50 !== undefined && { frames: { total: 90, janky: 2, p50, p90: p50 + 4 } }),
-  startCount: '11',
+  startCount,
   hostLoad: '2.10 2.00 1.90',
 });
 const SHORT = [round(79, 87, 49, 72), round(140, 141, 139, 138), round(56, 70, 140, 141), round(140, 140, 140, 140)];
@@ -83,6 +83,10 @@ describe('deviceLine: the summary\'s label', () => {
 
   it('the reads disagreeing: said first, loud', () => {
     expect(deviceLine({ before: readOf(FAST), after: readOf(SHORT, 30) })).toBe('Device: DISAGREE — before fast 0/16, after short 6/16 (frames p50 unread → 30 ms)');
+  });
+
+  it('a framework restart between the reads (the start count changed) is said at the end', () => {
+    expect(deviceLine({ before: readOf(FAST, 17, '11'), after: readOf(FAST, 17, '12') })).toBe('Device: before fast 0/16, after fast 0/16 (frames p50 17 ms → 17 ms), framework restarted (start count 11 → 12)');
   });
 
   it('a failed read, or one missing: unlabelled, with why', () => {
@@ -172,8 +176,8 @@ describe('readDevice: raw strokes and the frames, through AndroidLab', () => {
       ...round,
       'adb -s emulator-5554 shell dumpsys gfxinfo dev.averi.lab',
     ]);
-    // The pre-drag settles 1.2 s, each stroke 1.5 s (raw-strokes.mjs).
-    expect(waits).toEqual([...[1_200, 1_500, 1_500, 1_500, 1_500], ...[1_200, 1_500, 1_500, 1_500, 1_500]]);
+    // raw-strokes.mjs's waits, after the launch's own settle on ready: the launch 1.5 s, the pre-drag 1.2 s, each stroke 1.5 s.
+    expect(waits).toEqual([...[1_500, 1_200, 1_500, 1_500, 1_500, 1_500], ...[1_500, 1_200, 1_500, 1_500, 1_500, 1_500]]);
   });
 
   it('a state file with no carousel offset fails the read, saying which round; gfxinfo with no frames reads none', { timeout: 10_000 }, async () => {
@@ -202,6 +206,33 @@ describe('readDevice: raw strokes and the frames, through AndroidLab', () => {
     expect(read.rounds).toHaveLength(4);
     expect(read.hostLoad).toMatch(/^\d+\.\d\d \d+\.\d\d \d+\.\d\d$/);
     expect(Date.parse(read.t)).toBeGreaterThan(Date.parse('2026-11-10T00:00:00Z'));
+  });
+});
+
+describe('readDevice refuses fewer than one round', () => {
+  it('before any adb call', async () => {
+    for (const rounds of [0, -1]) {
+      const avd = fakeAvd([]);
+      await expect(readDevice(new AndroidLab('emulator-5554', { exec: avd.exec }), { rounds, wait })).rejects.toThrow(`a device read needs one round or more, not ${rounds}`);
+      expect(avd.calls).toEqual([]);
+    }
+  });
+});
+
+describe('deviceLabelAtStart: which runs read the device, from the cases selected', () => {
+  const cases = (...groups: string[]) => groups.map((group) => ({ group }));
+  it('an Android run with a carousel case selected starts an empty label; --device-read none an unlabelled one', () => {
+    expect(deviceLabelAtStart('android', cases('visibility', 'carousel'), undefined)).toEqual({});
+    expect(deviceLabelAtStart('android', cases('carousel'), 'none')).toEqual({ error: 'not read (--device-read none)' });
+  });
+  it('no carousel case selected (other groups, or --cases that leave none), or iOS: no label at all', () => {
+    expect(deviceLabelAtStart('android', cases('visibility', 'forms'), undefined)).toBeUndefined();
+    expect(deviceLabelAtStart('android', [], undefined)).toBeUndefined();
+    expect(deviceLabelAtStart('ios', cases('carousel'), undefined)).toBeUndefined();
+    expect(deviceLabelAtStart('android', cases('forms'), 'none')).toBeUndefined();
+  });
+  it('any other --device-read value is refused', () => {
+    expect(() => deviceLabelAtStart('android', cases('carousel'), 'off')).toThrow('--device-read: none, or leave it out (the carousel group reads the device), not "off"');
   });
 });
 
