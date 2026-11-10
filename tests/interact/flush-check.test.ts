@@ -36,13 +36,15 @@ interface StopShown {
   gesture?: Rect;
   offered?: AppliedKeyboard;
   corroborated?: boolean;
+  /** The keyboard cover the read applied (`ProbeMeans.cover`); none by default. */
+  cover?: AppliedKeyboard;
   /** An outer clipping scroller of this rect, scrolling vertically, the list nested in it (a carousel in a page). */
   within?: Rect;
 }
 
 /** The stop the round shows the check: the match at `rect` in a clipping list at `list`, judged `fully`. */
 function stopAt(rect: Rect, shown: StopShown = {}): FlushStop {
-  const { list = LIST, axis, after = [], budget = true, gesture = SCREEN_BOX, offered, corroborated, within } = shown;
+  const { list = LIST, axis, after = [], budget = true, gesture = SCREEN_BOX, offered, corroborated, cover, within } = shown;
   // `drawn: undefined` given is no stroke handed back; left out, the default swipe.
   const drawn = 'drawn' in shown ? shown.drawn : SWIPE;
   const row = node({ role: 'button', identifier: 'S', rect: { ...rect } });
@@ -55,7 +57,7 @@ function stopAt(rect: Rect, shown: StopShown = {}): FlushStop {
     judged: judged.best,
     facts: judged.facts,
     drawn,
-    means: { screen: SCREEN_BOX, gesture, strokes: startStrokes(), cover: undefined, offered, corroborated, budget },
+    means: { screen: SCREEN_BOX, gesture, strokes: startStrokes(), cover, offered, corroborated, budget },
   };
 }
 
@@ -508,5 +510,108 @@ describe('the flush check stops a proven cut no swipe can bring whole (D68)', ()
     expect(read({ offered, corroborated: true, budget: false })).toMatchObject({ of: 'cut', cut: { why: 'budget', revealed: 27 } });
     expect(read({ offered, budget: false })).toMatchObject({ of: 'aim' });
     expect(read({ offered: { ...offered, line: { y: 1300, witnessed: true }, topCover: { x: 0, y: 1300, width: 1080, height: 920 } }, corroborated: true, budget: false })).toMatchObject({ of: 'aim' });
+  });
+});
+
+/**
+ * T13: the bounds the mutation run (scripts/mutation/scope.json) found no test holding — what proves a cut and what does
+ * not, which scroll views the probe is planned over, and when the witness is asked.
+ */
+describe('the flush check\'s bounds (T13)', () => {
+  it('a probe that held with no stroke handed back: unchecked `tap` — no stroke known, so none proved the edge', () => {
+    const inFlight = sent(seeFlush(startFlush('down'), stopAt(flushOn('bottom', 22))).verdict);
+    expect(said(seeFlush(inFlight, stopAt(flushOn('bottom', 22), { drawn: undefined })))).toEqual({ of: 'flush', flush: { edge: 'bottom', container: LIST, checked: false, why: 'tap' } });
+  });
+
+  it('a proof within a pixel: the uncut edge carried 61 px for 60 px more shown is a proof; 1 px more shown is none', () => {
+    const inFlight = sent(seeFlush(startFlush('down'), stopAt(flushOn('bottom', 22))).verdict);
+    // 60 px more of it, its top carried 61 px: its bottom 1 px inside the list's, still flush.
+    const carried = seeFlush(inFlight, stopAt({ x: 128, y: 1519 - 61, width: 825, height: 82 }));
+    expect(carried).toMatchObject({ settles: false, waits: false });
+    expect(said(carried)).toMatchObject({ of: 'probe', reach: 1 });
+    // Moved sideways, and 1 px more of it: no proof — the read judged like any other, a quarter probe again.
+    const grownOne = seeFlush(inFlight, stopAt({ x: 140, y: 1518, width: 825, height: 23 }));
+    expect(grownOne).toMatchObject({ settles: false, waits: true });
+    expect(said(grownOne)).toMatchObject({ of: 'probe', reach: 0.25 });
+  });
+
+  it('a probe after which the match lies flush on another edge, of an outer scroller: no proof — a first probe toward that edge', () => {
+    // The list nested in a page whose bottom is the list's: the row, flush on the list's top, grows to fill the list —
+    // flush now only on the page's bottom, though its top stayed put and it grew.
+    const page: Rect = { x: 0, y: 500, width: 1080, height: 1041 };
+    const inFlight = sent(seeFlush(startFlush('up'), stopAt(flushOn('top', 22), { within: page })).verdict);
+    const filled = seeFlush(inFlight, stopAt({ x: 128, y: 1046, width: 825, height: 495 }, { within: page }));
+    expect(filled).toMatchObject({ settles: false, waits: true });
+    expect(said(filled)).toMatchObject({ of: 'probe', toward: 'down', reach: 0.25 });
+  });
+
+  it('flush with an outer scroller only: the probe is drawn over that one, never over the list nested in it', () => {
+    // The row fills its list; the list's bottom is the page's: flush on the page's bottom alone.
+    const page: Rect = { x: 0, y: 500, width: 1080, height: 1041 };
+    const seen = seeFlush(startFlush('down'), stopAt(LIST, { axis: 'vertical', within: page }));
+    expect(seen.verdict).toMatchObject({ of: 'probe', toward: 'down', stroke: { box: page } });
+  });
+
+  it('a keyboard cover the read applied: no witness asked, even with another one offered — the probe drawn above the applied one', () => {
+    const cover: AppliedKeyboard = { topCover: { x: 0, y: 1500, width: 1080, height: 720 }, above: undefined, remedy: { dismissal: 'none' }, line: { y: 1500, witnessed: true } };
+    const offered: AppliedKeyboard = { ...cover, topCover: { x: 0, y: 1300, width: 1080, height: 920 }, line: { y: 1300, witnessed: true } };
+    expect(seeFlush(startFlush('down'), stopAt(flushOn('bottom', 22), { cover, offered })).verdict).toMatchObject({ of: 'probe', toward: 'down', stroke: { coverTop: 1500 } });
+  });
+
+  it('a cut let go, then the match flush there again: a first probe, however little room is left — the aim floor is a proven cut\'s alone', () => {
+    // The lab's bounded-list shape: a 74-px probe grew S 53 px, so the cut was proven and that stroke measured.
+    const PROBE74: Stroke = { from: { x: 540, y: 1480 }, to: { x: 540, y: 1406 } };
+    const proved = seeFlush(sent(seeFlush(startFlush('down'), stopAt(flushOn('bottom', 400))).verdict), stopAt(flushOn('bottom', 453), { drawn: PROBE74 }));
+    const off = seeFlush(proved.check, stopAt({ x: 128, y: 1200, width: 825, height: 176 }));
+    expect(off.verdict).toEqual({ of: 'none' });
+    // Back on the bottom edge, 15 px of room on its uncut side — under the 53 px that stroke carried it.
+    const back = seeFlush(off.check, stopAt(flushOn('bottom', 480)));
+    expect(back).toMatchObject({ waits: true });
+    expect(said(back)).toMatchObject({ of: 'probe', toward: 'down', reach: 0.25 });
+  });
+
+  it('a stop flush on its list\'s top with a node pinned at that same edge: one flush edge, the list\'s own — never both edges', () => {
+    // A 1-px header laid at the list's top, the row's top on its bottom: pinned there, on the edge the row already lies
+    // flush with (1 px into the list, within a pixel).
+    const header = node({ role: 'container', identifier: 'H', rect: { x: 0, y: 1046, width: 1080, height: 1 }, children: [node({ role: 'text', label: 'Section', rect: { x: 400, y: 1046, width: 281, height: 1 } })] });
+    const row: Rect = { x: 128, y: 1047, width: 825, height: 22 };
+    expect(said(seeFlush(startFlush('up'), stopAt(row, { after: [header] })))).toEqual({ of: 'probe', toward: 'up', reach: 0.25, maxTravel: CAP });
+  });
+
+  // A header pinned at the list's top (the sticky-header shape above), the row from its bottom down.
+  const pinnedHeader = () => node({ role: 'container', identifier: 'H', rect: { x: 0, y: 1046, width: 1080, height: 100 }, children: [node({ role: 'text', label: 'Section', rect: { x: 400, y: 1070, width: 281, height: 52 } })] });
+
+  it('a row from under a pinned header to its list\'s bottom fills the list: `fills`, top first, the header named', () => {
+    const row: Rect = { x: 128, y: 1146, width: 825, height: 395 };
+    expect(said(seeFlush(startFlush('down'), stopAt(row, { after: [pinnedHeader()] })))).toEqual({
+      of: 'flush',
+      flush: { edges: ['top', 'bottom'], container: LIST, pinned: expect.objectContaining({ identifier: 'H' }), checked: false, why: 'fills' },
+    });
+  });
+
+  it('a node pinned in the nearest list counts for that list alone: filling it, the row is asked on the one edge of the page it lies flush with', () => {
+    const page: Rect = { x: 0, y: 500, width: 1080, height: 1041 };
+    const row: Rect = { x: 128, y: 1146, width: 825, height: 395 };
+    expect(seeFlush(startFlush('down'), stopAt(row, { after: [pinnedHeader()], within: page })).verdict).toMatchObject({ of: 'probe', toward: 'down', stroke: { box: page } });
+  });
+
+  it('a pinned edge across the scroll\'s axis is no flush edge: a row flush on its list\'s left under a header pinned at its top, scrolled sideways, is asked its left edge alone', () => {
+    const row: Rect = { x: 0, y: 1146, width: 300, height: 110 };
+    expect(said(seeFlush(startFlush('left'), stopAt(row, { after: [pinnedHeader()] })))).toEqual({ of: 'probe', toward: 'left', reach: 0.25, maxTravel: CAP });
+  });
+
+  it('a stop with no clipping ancestor: nothing to say', () => {
+    const row = node({ role: 'button', identifier: 'S', rect: { x: 128, y: 1046, width: 825, height: 22 } });
+    const tree = node({ role: 'container', rect: SCREEN_BOX, children: [node({ role: 'container', rect: LIST, children: [row] })] });
+    const judged = judgeRead({ tree, found: [row], ofKeyboard: () => false, remedy: { dismissal: 'none' } }, SCREEN, true);
+    if ('ask' in judged || judged.best === undefined) throw new Error('no stop judged');
+    const stop: FlushStop = { judged: judged.best, facts: judged.facts, drawn: SWIPE, means: { screen: SCREEN_BOX, gesture: SCREEN_BOX, strokes: startStrokes(), cover: undefined, offered: undefined, corroborated: undefined, budget: true } };
+    expect(said(seeFlush(startFlush('down'), stop))).toEqual({ of: 'none' });
+  });
+
+  it('no room for a stroke even over the whole list: `room`, no witness asked about a keyboard offered', () => {
+    const strip: Rect = { x: 0, y: 1046, width: 1080, height: 30 };
+    const offered: AppliedKeyboard = { topCover: { x: 0, y: 1060, width: 1080, height: 1160 }, above: undefined, remedy: { dismissal: 'none' }, line: { y: 1060, witnessed: true } };
+    expect(said(seeFlush(startFlush('down'), stopAt({ x: 128, y: 1046, width: 825, height: 20 }, { list: strip, offered })))).toEqual({ of: 'flush', flush: { edge: 'top', container: strip, checked: false, why: 'room' } });
   });
 });

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { Point } from '../../src/adapters/types.js';
 import { describeScrollResult } from '../../src/interact/scroll-text.js';
-import { CAROUSEL_CASES, CUT_TOLERANCE_PX, D68_SPREAD, hedgedCeiling, hookSwipes, LAB_CAROUSEL, preDrag, preDragOrSkip, preDragStroke, SwipeHook, UNAIMABLE_LEGS, type SwipeEntry } from '../../scripts/truth/live-carousel.js';
+import { CAROUSEL_CASES, CUT_TOLERANCE_PX, D68_SPREAD, hedgedCeiling, hookSwipes, judgeFully, LAB_CAROUSEL, NO_CLIP, preDrag, preDragOrSkip, preDragStroke, SwipeHook, UNAIMABLE_LEGS, type SwipeEntry } from '../../scripts/truth/live-carousel.js';
 import { TOUCH_SLACK } from '../../scripts/truth/truth.js';
 import { judged, rejudge, rejudgedResults, selectCases, summarize, type Case, type RunRecord } from '../../scripts/truth/live-cases.js';
 import type { LabState } from '../../scripts/truth/schema.js';
@@ -275,14 +275,15 @@ describe('lv-d62-drop-two: two reveals dropped, the hedge with C cut, then "call
   const SECOND = 'ERROR scroll_until id:lab.carousel-recycler-free.C failed after 6 swipes (maxSwipes) — … so it may still be cut there; raise maxSwipes or timeoutMs';
   const dropped = (d: boolean) => ({ from: { x: 824, y: 497 }, to: { x: 682, y: 497 }, durationMs: 300, dropped: d });
   const at = 100;
-  const run = (over: { replies?: string[]; second?: { from: number; to: number } | null; swipes?: boolean[]; cutAtHedge?: boolean; wholeAtEnd?: boolean } = {}) => {
+  const run = (over: { replies?: string[]; second?: { from: number; to: number } | null; swipes?: boolean[]; cutAtHedge?: boolean; wholeAtEnd?: boolean; noAfter?: true; log?: { swipes?: SwipeEntry[] } } = {}) => {
     const launched = withC(recorded('lv-d62-drop').launched, 578);
     const base = launched.strokes ?? [];
     const proof = { view: 'carousel', from: 436, to: 572, at };
     const hedged = { ...withC(launched, over.cutAtHedge === false ? 66 : 442), strokes: [...base, proof] };
     const next = over.second === null ? [] : [{ view: 'carousel', ...(over.second ?? { from: 572, to: 772 }), at: at + 5 }];
     const state = { ...withC(launched, over.wholeAtEnd === true ? 66 : 242), strokes: [...base, proof, ...next] };
-    return caseOf('lv-d62-drop-two').judge(state, over.replies ?? [HEDGE, SECOND], 'uiautomator', launched, [hedged], { swipes: (over.swipes ?? [false, true, true, false]).map(dropped) });
+    const log = 'log' in over ? over.log : { swipes: (over.swipes ?? [false, true, true, false]).map(dropped) };
+    return caseOf('lv-d62-drop-two').judge(state, over.replies ?? [HEDGE, SECOND], 'uiautomator', launched, over.noAfter === true ? [] : [hedged], log);
   };
   it('the hedge with C cut, then the second call\'s first stroke moves C: ok', () => {
     expect(run()).toMatchObject({ outcome: 'ok' });
@@ -304,6 +305,28 @@ describe('lv-d62-drop-two: two reveals dropped, the hedge with C cut, then "call
     expect(run({ replies: [SECOND, SECOND] })).toMatchObject({ outcome: 'LOUD', cls: 'carousel-kind' });
     expect(run({ cutAtHedge: false })).toMatchObject({ outcome: 'SKIP' });
     expect(run({ swipes: [false, true, false, false] })).toMatchObject({ outcome: 'SKIP' });
+  });
+
+  it('T13: each verdict carries the app and the first reply\'s kind, and says why', () => {
+    expect(run()).toMatchObject({ outcome: 'ok', kind: 'visible', app: expect.stringMatching(/^C cut L 0 R \d+; offset /), why: `hedged with C cut L 0 R 376; the second call moved C 572→772: ${SECOND}` });
+    expect(run({ replies: [D62_FALSE_PASS, SECOND] }).why).toBe(`"fully visible" while C cut L 0 R 376: ${D62_FALSE_PASS}`);
+    expect(run({ cutAtHedge: false }).why).toBe('C whole after the first call (C cut L 0 R 0): no cut to tell');
+    expect(run({ replies: [SECOND, SECOND] }).why).toBe(`no hedge on the first call, C cut L 0 R 376: ${SECOND}`);
+    expect(run({ second: { from: 572, to: 573 } }).why).toBe(`the second call's first stroke did not move C: ${SECOND}`);
+    expect(run({ second: null }).why).toBe(`the second call's first stroke was not logged: ${SECOND}`);
+  });
+
+  it('T13: a second stroke that moved C CUT_TOLERANCE_PX is no move; one past it is', () => {
+    expect(run({ second: { from: 572, to: 572 + CUT_TOLERANCE_PX } })).toMatchObject({ outcome: 'LOUD', cls: 'carousel-kind' });
+    expect(run({ second: { from: 572, to: 573 + CUT_TOLERANCE_PX } })).toMatchObject({ outcome: 'ok' });
+  });
+
+  it('T13: no state after the first call, or a log that lacks strokes 2 and 3 dropped (stroke 2 kept, too few strokes, no strokes, no log): SKIP, never thrown', () => {
+    expect(run({ noAfter: true })).toMatchObject({ outcome: 'SKIP', why: NO_CLIP });
+    expect(run({ swipes: [false, false, true, false] })).toMatchObject({ outcome: 'SKIP', why: 'strokes 2 and 3 not both dropped' });
+    for (const swipes of [[false], [false, true]]) expect(run({ swipes })).toMatchObject({ outcome: 'SKIP', why: 'strokes 2 and 3 not both dropped' });
+    expect(run({ log: {} })).toMatchObject({ outcome: 'SKIP', why: 'strokes 2 and 3 not both dropped' });
+    expect(run({ log: undefined })).toMatchObject({ outcome: 'SKIP', why: 'strokes 2 and 3 not both dropped' });
   });
 });
 
@@ -538,6 +561,27 @@ describe('D37: the first read after a stroke on a snapping pager lists C where i
     expect(verdictOf({ ...r, replies: [r.replies[0], 'ERROR no tree'] })).toMatchObject({ outcome: 'LOUD', why: expect.stringMatching(/^no snapshot: /) });
   });
 
+  it('T13: the premises read off a state or launch that lacks them — SKIP, never thrown — each saying why; a failed swipe or read LOUD as a kind', () => {
+    const r = recorded('d37-snap-lazy');
+    expect(verdictOf({ ...r, launched: { ...r.launched, scrollViews: undefined } })).toMatchObject({ outcome: 'SKIP', why: 'the clip is undefined, not the lab\'s {"x":66,"y":380,"width":948,"height":234} the stroke was drawn for' });
+    expect(verdictOf({ ...r, state: { ...r.state!, offsets: undefined } })).toMatchObject({ outcome: 'SKIP', why: 'the app wrote no carousel.index or offset' });
+    const { carousel: _o, ...noOffset } = r.state!.offsets!;
+    expect(verdictOf({ ...r, state: { ...r.state!, offsets: noOffset } })).toMatchObject({ outcome: 'SKIP', why: 'the app wrote no carousel.index or offset' });
+    expect(verdictOf(at(r, 1, 951)).why).toBe('the resting offset 951 is no whole card (948): still moving at the read');
+    expect(verdictOf({ ...r, replies: ['ERROR Swipe failed', r.replies[1]] })).toMatchObject({ cls: 'carousel-kind' });
+    expect(verdictOf({ ...r, replies: [r.replies[0], 'ERROR no tree'] })).toMatchObject({ cls: 'carousel-kind', kind: 'refused' });
+    expect(verdictOf({ ...r, replies: [r.replies[0]] })).toMatchObject({ outcome: 'LOUD', cls: 'carousel-kind', kind: 'other', why: 'no snapshot: ' });
+  });
+
+  it('T13: C found by its id among the nodes listed, not the first node; the words of a card-0 ok and a card-2 MISMATCH', () => {
+    const r = recorded('d37-snap-lazy');
+    const both = JSON.stringify([{ role: 'other', identifier: 'lab.carousel-lazy.B', label: null, rect: { x: 300, y: 380, width: 948, height: 234 } }, { role: 'other', identifier: 'lab.carousel-lazy.C', label: null, rect: { x: 66, y: 380, width: 948, height: 234 } }], null, 2);
+    expect(verdictOf({ ...r, replies: [r.replies[0], both] }).outcome).toBe('ok');
+    const rec = recorded('d37-snap-recycler');
+    expect(verdictOf({ ...at(rec, 0, 0), replies: [rec.replies[0], snap(undefined, 'carousel-recycler')] }).why).toBe('at rest on card 0, the first read lists C absent');
+    expect(verdictOf({ ...at(rec, 2, 1896), replies: [rec.replies[0], snap({ x: 0, width: 69 }, 'carousel-recycler')] }).cls).toBe('unsettled-read');
+  });
+
   it('its stroke: across 60 % of the lab\'s clip at its middle, forward, 300 ms; then ui_snapshot of C', () => {
     expect(caseOf('d37-snap-lazy').calls).toEqual([
       { tool: 'swipe', args: { fromX: 824, fromY: 497, toX: 256, toY: 497, durationMs: 300 } },
@@ -639,5 +683,121 @@ describe('the hedged ceiling: a run whose every judged unaimable leg ends hedged
     expect(hedgedCeiling([row('lv-d62-control', 'ok', true), row('lv-d68-launch', 'ok', true), row('lv-d59b-recycler', 'LOUD', false), row('lv-d62-drop', 'ok', false)], true)).toMatchObject({ fails: false, hedged: 2, judged: 3 });
     expect(hedgedCeiling([row('lv-d62-control', 'ok', true), row('lv-d68-launch', 'ok', true), row('lv-d59b-recycler', 'ok', true), row('lv-d62-drop', 'ok', false)], true)).toMatchObject({ fails: true, hedged: 3, judged: 3 });
     expect(hedgedCeiling([row('lv-d62-control', 'ok', true), row('lv-d68-launch', 'ok', true), row('lv-d59b-recycler', 'SKIP', false)], true)).toMatchObject({ fails: false, hedged: 2, judged: 2 });
+  });
+});
+
+/**
+ * T13: what the mutation run (scripts/mutation/scope.json) found no test holding — the cases as the device runs them,
+ * each premise's guard against a state or log that lacks what it reads, and the words of every verdict.
+ */
+describe('the carousel group\'s cases and verdicts, held (T13)', () => {
+  const C = (cell: string, direction: 'left' | 'right') => ({ tool: 'scroll_until', args: { selector: `id:lab.${cell}.C`, direction, fully: true } });
+  const READS = { swipes: {}, late: false };
+
+  it('each scroll_until case: its cell, its pre-drag, what it reads and drops, whether its SKIP fails the run, its calls', () => {
+    const shown = CAROUSEL_CASES.filter((c) => !c.id.startsWith('d37-')).map(({ id, cell, preDrag: px, reads, skipFails, calls }) => ({ id, cell, preDrag: px, reads, skipFails, calls }));
+    expect(shown).toStrictEqual([
+      { id: 'lv-d62-control', cell: 'carousel-recycler-free', preDrag: 440, reads: READS, skipFails: true, calls: [C('carousel-recycler-free', 'left')] },
+      { id: 'lv-d62-drop', cell: 'carousel-recycler-free', preDrag: 440, reads: { swipes: { drop: [2] }, late: false }, skipFails: true, calls: [C('carousel-recycler-free', 'left')] },
+      { id: 'lv-d62-short', cell: 'carousel-recycler-free', preDrag: 440, reads: { swipes: { drop: [2], shorten: { stroke: 1, px: 90 } }, late: false }, skipFails: true, calls: [C('carousel-recycler-free', 'left')] },
+      { id: 'lv-d62-drop-two', cell: 'carousel-recycler-free', preDrag: 440, reads: { swipes: { drop: [2, 3] }, betweenCalls: true, late: false }, skipFails: true, calls: [C('carousel-recycler-free', 'left'), C('carousel-recycler-free', 'left')] },
+      { id: 'lv-t12-drop-first', cell: 'carousel-recycler-free', preDrag: 440, reads: { swipes: { drop: [1] }, late: false }, skipFails: true, calls: [C('carousel-recycler-free', 'left')] },
+      { id: 'lv-d68-launch', cell: 'carousel-recycler-free', preDrag: undefined, reads: READS, skipFails: undefined, calls: [C('carousel-recycler-free', 'right')] },
+      { id: 'lv-d59b-lazy', cell: 'carousel-lazy-free', preDrag: undefined, reads: READS, skipFails: undefined, calls: [C('carousel-lazy-free', 'right')] },
+      { id: 'lv-d59b-recycler', cell: 'carousel-recycler-free', preDrag: undefined, reads: READS, skipFails: undefined, calls: [C('carousel-recycler-free', 'right')] },
+      { id: 'd52-e2', cell: 'carousel-in-list', preDrag: 440, reads: READS, skipFails: undefined, calls: [C('carousel-in-list', 'left')] },
+    ]);
+  });
+
+  it('each case says what it stands for, its decision first; D37\'s names its pager', () => {
+    expect(Object.fromEntries(CAROUSEL_CASES.map((c) => [c.id, c.says.slice(0, c.says.indexOf(':') + 1)]))).toEqual({
+      'lv-d62-control': 'D62/D68 control:',
+      'lv-d62-drop': 'D62:',
+      'lv-d62-short': 'T11:',
+      'lv-d62-drop-two': 'T11:',
+      'lv-t12-drop-first': 'T12:',
+      'lv-d68-launch': 'D68:',
+      'lv-d59b-lazy': 'D59b/D59:',
+      'lv-d59b-recycler': 'D59b/D68:',
+      'd52-e2': 'D52 E2:',
+      'd37-snap-lazy': 'D37:',
+      'd37-snap-recycler': 'D37:',
+    });
+    for (const c of CAROUSEL_CASES) expect(c.says.length).toBeGreaterThan(c.says.indexOf(':') + 20);
+    expect(caseOf('d37-snap-lazy').says).toContain('on the snapping LazyRow pager');
+    expect(caseOf('d37-snap-recycler').says).toContain('on the snapping RecyclerView pager');
+  });
+
+  it('a verdict\'s app: C against the clip, the offset, the resting card and the carousel strokes since the call — none of another view; ? and - when unwritten', () => {
+    const r = recorded('lv-d62-control');
+    expect(verdictOf(r).app).toBe('C cut L 0 R 19; offset 929, index 1; 6 carousel stroke(s) since the call');
+    r.state = { ...r.state!, strokes: [...r.state!.strokes!, { view: 'page', from: 0, to: 40, at: 1793893750 }] };
+    expect(verdictOf(r).app).toBe('C cut L 0 R 19; offset 929, index 1; 6 carousel stroke(s) since the call');
+    expect(verdictOf({ ...r, state: { ...r.state, offsets: undefined } }).app).toBe('C cut L 0 R 19; offset ?, index -; 6 carousel stroke(s) since the call');
+  });
+
+  it('the pre-drag cases skip when C was whole before the call (lv-d62-short, lv-t12-drop-first, d52-e2 too)', () => {
+    for (const id of ['lv-d62-short', 'lv-t12-drop-first', 'd52-e2']) {
+      const r = { ...recorded(id === 'd52-e2' ? 'd52-e2' : 'lv-d62-drop'), id };
+      r.launched = withC(r.launched, 66);
+      expect(verdictOf(r)).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(/^C not cut before the call \(C cut L 0 R 0\)/) });
+    }
+  });
+
+  it('a case with neither a pre-drag nor a band asks nothing of the launch: no clip there, or C whole there, still judged', () => {
+    const r = recorded('lv-d68-launch');
+    expect(verdictOf({ ...r, launched: { ...r.launched, scrollViews: {} } })).toMatchObject({ outcome: 'ok' });
+    expect(verdictOf({ ...r, launched: withC(r.launched, 66) })).toMatchObject({ outcome: 'ok' });
+    const lazy = recorded('lv-d59b-lazy');
+    expect(verdictOf({ ...lazy, launched: { ...lazy.launched, scrollViews: {} } })).toMatchObject({ outcome: 'SKIP', why: NO_CLIP });
+  });
+
+  it('a premise read with no log at all: SKIP, never thrown', () => {
+    const drop = recorded('lv-d62-drop');
+    expect(caseOf('lv-d62-drop').judge(drop.state!, drop.replies, drop.source, drop.launched, drop.after, undefined)).toMatchObject({ outcome: 'SKIP', why: 'no stroke log: the drop unshown' });
+    const lazy = recorded('lv-d59b-lazy');
+    expect(caseOf('lv-d59b-lazy').judge(lazy.state!, lazy.replies, lazy.source, lazy.launched, lazy.after, undefined)).toMatchObject({ outcome: 'SKIP', why: 'no stroke log: the band unjudged' });
+  });
+
+  it('the words of an ok verdict: fully visible with C whole; a kind accepted under its residual', () => {
+    const whole = recorded('lv-d68-launch');
+    whole.replies = [D62_FALSE_PASS];
+    whole.state = withC(whole.state!, 66);
+    expect(verdictOf(whole).why).toBe(`fully visible, and C whole in the app: ${D62_FALSE_PASS}`);
+    const hedged = recorded('lv-d62-control');
+    hedged.replies = recorded('lv-d62-drop').replies;
+    expect(verdictOf(hedged)).toMatchObject({ outcome: 'ok', accepted: D68_SPREAD });
+    expect(verdictOf(hedged).why).toMatch(/^maxSwipes-hedged, accepted and counted \(residual:ADR 0021 D68 — the room left at the bound within a pixel of the least carry keeps maxSwipes, hedged: .*\), C cut L 0 R 19: ERROR scroll_until /);
+  });
+
+  it('lv-t12-drop-first: its first stroke dropped and sent again, then the hedged bound or `unaimable` ok — any other kind LOUD, naming both', () => {
+    const drop = recorded('lv-d62-drop');
+    const r = { ...drop, id: 'lv-t12-drop-first', swipes: [{ ...drop.swipes![0], dropped: true }, { ...drop.swipes![0] }, ...drop.swipes!.slice(2)] };
+    expect(verdictOf(r)).toMatchObject({ outcome: 'ok' });
+    expect(verdictOf({ ...r, replies: recorded('lv-d62-control').replies })).toMatchObject({ outcome: 'ok' });
+    const stuck = 'ERROR scroll_until id:lab.carousel-recycler-free.C failed after 6 swipes — element is on screen but did not move';
+    expect(verdictOf({ ...r, replies: [stuck] })).toMatchObject({ outcome: 'LOUD', cls: 'carousel-kind', why: `other, not maxSwipes-hedged or unaimable: ${stuck}` });
+  });
+
+  it('an unfit case that asks nothing of the axis takes either; one that names no count, none asked of it; one that asks a count names it', () => {
+    const r = recorded('d52-e2');
+    const uncounted = r.replies[0].replace('failed after 3 swipes', 'failed');
+    const judge = judgeFully({ kinds: ['unfit'] });
+    expect(judge(r.state!, [uncounted], r.source, r.launched, r.after, undefined)).toMatchObject({ outcome: 'ok' });
+    expect(judge(r.state!, recorded('lv-d59b-lazy').replies, r.source, r.launched, r.after, undefined)).toMatchObject({ outcome: 'ok' });
+    expect(judgeFully({ kinds: ['unaimable'], inferred: true })(r.state!, recorded('lv-d62-control').replies, r.source, r.launched, r.after, undefined)).toMatchObject({ outcome: 'ok' });
+    expect(verdictOf({ ...r, replies: [uncounted] })).toMatchObject({ outcome: 'LOUD', cls: 'carousel-kind', why: `unfit after ? swipes, more than 3: ${uncounted.slice(0, 220)}` });
+  });
+
+  it('preDrag refuses a launch that reports no scroll views at all', async () => {
+    const launch = recorded('lv-d62-control').preDrag!.launch;
+    const lab = { swipe: async () => undefined, state: async () => launch };
+    await expect(preDrag(lab, { ...launch, scrollViews: undefined }, 440, async () => undefined)).rejects.toThrow(/reports no carousel scroll view to pre-drag/);
+  });
+
+  it('no-retry names both strokes', () => {
+    const r = recorded('lv-d62-drop');
+    r.swipes![2] = { ...r.swipes![2], to: { x: 489, y: 497 } };
+    expect(verdictOf(r).why).toMatch(/^no retry seen: stroke 3 is not the dropped reveal sent again \(\(256,497\)→\(489,497\), not \(256,497\)→\(486,497\)\): ERROR /);
   });
 });

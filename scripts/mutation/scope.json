@@ -35,6 +35,12 @@
     "floor": 94,
     "baseline": "96.77 % on 2026-11-05 (D68 code review, StrokeCarry and Overshoot named; cold): 31 mutants, the same 1 equivalent survivor; 96.77 % on 2026-11-05 (D68 review round 1, the module's header worded as a likelihood, flush-check.ts's keyboard-aware plan beside it; cold): 31 mutants, the same 1 equivalent survivor; 96.77 % on 2026-11-05 (D68, aimFloor; cold, after a test killed the first run's non-equivalent survivor at 93.55 %, the tie's `b.moved === a.moved` made true): 31 mutants, 1 survived, 0 timeouts — the tie-break's `b.drawn < a.drawn` as `<=`, equivalent: on equal drawn and equal moved, either stroke gives the same AimFloor"
   },
+  "src/interact/flush-check.ts": {
+    "group": "core",
+    "tests": ["tests/interact/flush-check.test.ts"],
+    "floor": 94,
+    "baseline": "96.57 % on 2026-11-10 (T13, joined; `npm run mutate -- --force` cold): 350 mutants, 12 survived, all equivalent — `measured: []` seeded with a string (filtered out by its edge before the aim floor reads it); Came's 'moved' and 'doubted' emptied (verdictOf tells only 'held' and 'tap'); heldBefore's `probed !== undefined` true (reached only when the probe held, so sent); flushWith's empty-chain `[]` seeded (a one-edge nearest is no fill either); the fills' `e.pinned !== undefined` true (a node pins at top or left only, which EDGES sorts first); `under`/`flushed.pinned !== undefined` true three times (a `pinned: undefined` key, and every reader asks `pinned === undefined`); 'fills' emptied twice in revealedBy and stillProven (a fill has no edge, so the edge test rejects it all the same); aimed's `points === undefined` false (no points only without a gesture box, where planProbe already answered `room`). Its own tests only: with the round's play tables (scroll-flush-reveal, scroll-rounds) it reached the same score but core's cold run took 458 s against 266 s"
+  },
   "src/ui-tree/draw-order.ts": {
     "group": "core",
     "tests": ["tests/ui-tree/draw-order*.test.ts"],
@@ -226,5 +232,31 @@
     "tests": ["tests/truth/run-case.test.ts"],
     "floor": 98,
     "baseline": "100 % on 2026-11-09 (T7b, the chooser group: fromLauncher, the focus reads, the teardown; cold): 216 mutants, 0 survived; 100 % on 2026-11-06 (A11 review round 2: `swipes?: { drop?: number }`, no ternary; cold): 142 mutants, 0 survived; 98.62 % on 2026-11-06 (A11 review round 1, `swipes?: true | { drop }`; cold): 145 mutants, 2 survived, both equivalent; 99.32 % on 2026-11-06 (A11; cold): 148 mutants, 1 survived"
+  }
+,
+  "scripts/truth/replies.ts": {
+    "group": "lab",
+    "tests": [
+      "tests/truth/replies.test.ts",
+      "tests/truth/live-carousel.test.ts",
+      "tests/truth/live-visibility.test.ts",
+      "tests/truth/live-chooser.test.ts",
+      "tests/truth/live-ensure.test.ts",
+      "tests/truth/live-ensure-engine.test.ts"
+    ],
+    "floor": 95,
+    "baseline": "97.86 % on 2026-11-10 (T13, joined; cold): 376 mutants, 374 valid (2 runtime errors), 7 survived and 1 without coverage, all equivalent — HEDGE_WHAT_PATTERN's longest-first sort removed or broken three ways (the alternation is followed by `): `, so backtracking reaches the longest whatever the order); bareEntry's `first !== undefined` true (RegExp.test(undefined) reads \"undefined\", which never matches); MOVED_TAP's last `\\d+` cut to `\\d` (an unanchored tail: any reply the whole pattern takes, the cut one takes); namesUntried's `end >= 0` as `> 0` (a found end lies past the lead); snapshotNodes' `end < 2` false (end 1 slices `[`, which JSON.parse refuses into the same undefined) and its catch emptied (undefined either way, no coverage). Tests: its own, and the judges' that read it (live-carousel, live-visibility, live-chooser, live-ensure, live-ensure-engine); the bandSaid test's one device record copied into the sandbox"
+  },
+  "scripts/truth/live-carousel.ts": {
+    "group": "lab",
+    "tests": ["tests/truth/live-carousel.test.ts"],
+    "floor": 96,
+    "baseline": "98.88 % on 2026-11-10 (T13, joined; cold): 803 mutants, 800 valid (2 runtime errors), 8 survived and 1 without coverage, all equivalent — the SwipeHook entry's `durationMs !== undefined` true (a `durationMs: undefined` key); D68_SPREAD's id emptied (compared only with itself); judgeFully's band check behind `hasClip(launched)`: `scrollViews?.carousel` unguarded, `clip === undefined` false, its ternary and its 'no carousel clip at launch' words (unreachable, no coverage); judgeSettledRead's `snapshot ?? ''` fallbacks seeded twice (replyKind and snapshotNodes read the seed as they read ''), and `clip === undefined` false (JSON.stringify(undefined) never equals the lab's clip). The live cases' lab cell catalog (fixtures/apps/cells.json) copied into the sandbox"
+  },
+  "scripts/truth/live-visibility.ts": {
+    "group": "lab",
+    "tests": ["tests/truth/live-visibility.test.ts"],
+    "floor": 70,
+    "baseline": "72.70 % on 2026-11-10 (T13, joined at its measured score; cold): 1 293 mutants, 334 survived, 19 without coverage — 90 % would take some 230 more kills over thirty judges, a row of its own. T17's LOUD gate is held but for its redundant conjuncts (`visible`, `!holds`, `c.fully`, `g !== undefined`, `lead !== undefined`, each implied by a cut geometry and a hedged lead); its one gap, a hedged stop with no tap after it (`tapped?.outcome` unguarded), killed by T13's test. Floor low on purpose, like draw-order's: raise it as its tests come"
   }
 }
