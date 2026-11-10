@@ -138,13 +138,13 @@ export const handlersArgv = (url: string): string[] => [
   ...['-a', 'android.intent.action.VIEW', '-d', url],
 ];
 
+/** The handler query that failed, `why` the caller's words for it (a batch's exit, adb's error). */
+export const handlersUnread = (why: string): { why: string } => ({ why: `query-activities: ${why}` });
+
 /**
  * The handler query's text counted (a call that answered): the component lines, which must be as many as its `N
  * activities found:` line says (`No activities found` is 0); else why not.
  */
-/** The handler query that failed, `why` the caller's words for it (a batch's exit, adb's error). */
-export const handlersUnread = (why: string): { why: string } => ({ why: `query-activities: ${why}` });
-
 export function handlersIn(text: string): number | { why: string } {
   const out = text.replace(/\r/g, '');
   if (/^No activities found\s*$/m.test(out)) return 0;
