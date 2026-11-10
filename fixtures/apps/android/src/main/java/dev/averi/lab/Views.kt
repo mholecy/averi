@@ -55,8 +55,9 @@ fun viewsScreen(activity: Activity, cell: Cell, lab: Lab): View {
     val density = activity.resources.displayMetrics.density
     val px = { dp: Int -> (dp * density).roundToInt() }
     val screenWidth = activity.windowManager.maximumWindowMetrics.bounds.width()
-    // Centred as Base.kt centres a slot — in dp, then rounded: 128 px on averi_lab (1080 px at density 2.75), where
-    // rn-banner's targets lie too.
+    // Centred as Base.kt centres a slot — in dp, then rounded: 127 px on averi_lab (1080 px at density 2.75; in Float
+    // 127.49998), where Base's targets lie (tests/fixtures/truth/android-averi_lab-api33/open.state.json); React
+    // Native's rn-banner, rounding its own way, lies at 128.
     val left = ((screenWidth / density - ViewsLayout.SLOT_WIDTH) / 2 * density).roundToInt()
     val run = FrameLayout(activity).apply { setBackgroundColor(Color.WHITE) }
     identifiedAs(run, "lab.${cell.id}.run")
