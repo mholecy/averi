@@ -43,11 +43,13 @@ import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION,
  * window of its own.
  *
  * WHICH SCROLL VIEW, and the axis. The candidates are the target's scroll views, nearest first (`targetScrollers`),
- * once a read has found it; before that the screen's largest scroller, then the scroll views nested in it, largest
- * first, text inputs left out (`candidatesOf`, D59b: the axis rule below takes a nested one only when the largest
- * scrolls across the stroke — a carousel in a vertical page, stroked `right` for a card not laid out yet, is stroked
- * inside, not across the page's centre row, ADR 0010's D59b amendment); none (the screen box) when the target was found
- * in none. Each is remembered with its AXIS and its nested scroll views' (`ScrollView.axes`, asked of the read's tree:
+ * once a read has found it; before that the screen's largest scroller — or the scroll view the caller NAMED in its
+ * place (`scroll_until`'s `within`, D78: `nameScrollView`, resolved by interact/within.ts; a row of a sibling list the
+ * largest scroller does not hold is reached only so, ADR 0010's D78 amendment) — then the scroll views nested in it,
+ * largest first, text inputs left out (`candidatesOf`, D59b: the axis rule below takes a nested one only when the
+ * largest scrolls across the stroke — a carousel in a vertical page, stroked `right` for a card not laid out yet, is
+ * stroked inside, not across the page's centre row, ADR 0010's D59b amendment); none (the screen box) when the target
+ * was found in none. Once a read has found the target the named scroll view counts no more. Each is remembered with its AXIS and its nested scroll views' (`ScrollView.axes`, asked of the read's tree:
  * ui-tree/geometry.ts#Clips.axesOf, per source ui-tree/scroll-containers.ts#scrollAxis — Android's class, WDA's
  * `Table`, else on WDA the content's extent past the frame; unknown for a Compose lazy list, a RecyclerView and on idb,
  * which lists no scroll view). The stroke box (`strokeRoom`) takes the first with room for the stroke as drawn
@@ -134,13 +136,20 @@ interface Memory {
    * it.
    */
   readonly target: readonly ScrollView[] | undefined;
+  /**
+   * The scroll view the caller named (`scroll_until`'s `within`, D78; interact/within.ts#resolveWithin), with what is
+   * drawn over it and its axes — the candidate in place of the screen's largest scroller until a read finds the target
+   * (`candidatesOf`), refreshed by every plan with that round's read, as `target` is; kept by a read that lost its rect.
+   * Undefined when none was named.
+   */
+  readonly named: ScrollView | undefined;
   /** The candidates the last plan judged its stroke's scroll view from, for the stroke of a round whose tree did not read — judged again with that round's gesture box, cut by the rects they carry. */
   readonly last: readonly ScrollView[];
   /** The keyboard line the last read that READ stroked above (scroll-read.ts#strokeLine: the cover it applied — none when it applied none — and idb's band), for the stroke of a round whose tree did not read. */
   readonly line: KeyboardLine | undefined;
   /** The scroll view the last stroke SENT went over, a probe's included — undefined when it went over the gesture box whole — for `touchedOn`. */
-  readonly within: Rect | undefined;
-  /** The scroll view the last plan chose (undefined: the gesture box whole), which `strokeSent` makes `within`. */
+  readonly strokedOver: Rect | undefined;
+  /** The scroll view the last plan chose (undefined: the gesture box whole), which `strokeSent` makes `strokedOver`. */
   readonly chosen: Rect | undefined;
   /** Where the last plan's stroke touches down (undefined: no box, no points), which `strokeSent` adds to `touchDowns`. */
   readonly chosenAt: Point | undefined;
@@ -148,8 +157,8 @@ interface Memory {
   readonly touchDowns: readonly Point[];
   /** The candidates along the stroke (or of unknown axis) the last plan judged WITHOUT room before its fallback took one across it (`StrokeRoom.roomless`) — for `strokedAcross`'s `noRoom`; empty when it took none across. */
   readonly roomless: readonly Rect[];
-  /** The carry model's measure (`carried`): the most a stroke of this scroll over the scroll view `within` (undefined: the gesture box whole) carried its target per point of finger travel; undefined until one did (UNMEASURED_CARRY stands in, `carryOver`). */
-  readonly carry: { readonly within: Rect | undefined; readonly perPoint: number } | undefined;
+  /** The carry model's measure (`carried`): the most a stroke of this scroll over the scroll view `strokedOver` (undefined: the gesture box whole) carried its target per point of finger travel; undefined until one did (UNMEASURED_CARRY stands in, `carryOver`). */
+  readonly carry: { readonly strokedOver: Rect | undefined; readonly perPoint: number } | undefined;
 }
 
 const open = (m: StrokeMemory): Memory => m as unknown as Memory;
@@ -157,7 +166,17 @@ const close = (m: Memory): StrokeMemory => m as unknown as StrokeMemory;
 
 /** The memory before any read: no scroll view known, no keyboard line, no stroke sent. */
 export function startStrokes(): StrokeMemory {
-  return close({ target: undefined, last: [], line: undefined, within: undefined, chosen: undefined, chosenAt: undefined, touchDowns: [], roomless: [], carry: undefined });
+  return close({ target: undefined, named: undefined, last: [], line: undefined, strokedOver: undefined, chosen: undefined, chosenAt: undefined, touchDowns: [], roomless: [], carry: undefined });
+}
+
+/**
+ * The memory with the scroll view of rect `rect` NAMED (`scroll_until`'s `within`, D78, resolved on `facts`' tree by
+ * interact/within.ts#resolveWithin): until a read finds the target the strokes go over it — then over the scroll views
+ * nested in it, as over the largest scroller's (`candidatesOf`) — never over the screen's largest scroller. Once a read
+ * has found the target its own scroll views are the candidates, and the named one counts no more.
+ */
+export function nameScrollView(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>, rect: Rect): StrokeMemory {
+  return close({ ...open(memory), named: scrollViewOn(facts, { ...rect }) });
 }
 
 /** One read that read, as the plan keeps it (`seeRead`): its facts, the line its strokes stay above (scroll-read.ts#ReadJudgement.strokeLine), the target's node when it judged one, and the region the target's motion showed, read only on a tree that tells no scroll view of it (`ScrollRegion`). */
@@ -193,7 +212,7 @@ export function seeRead(memory: StrokeMemory, { facts, line, target, region }: S
   // A read that found no target keeps the target's scroll views of the last read that did.
   if (target === undefined) return close({ ...m, line });
   if (!isUntold(facts.scene.clips.drawnIn(target))) {
-    return close({ ...m, line, target: targetScrollers(facts, target).map((rect) => ({ rect: { ...rect }, over: overIn(facts, rect) ?? [], axes: facts.scene.clips.axesOf(rect) })) });
+    return close({ ...m, line, target: targetScrollers(facts, target).map((rect) => scrollViewOn(facts, { ...rect })) });
   }
   // Nothing is listed over it (idb lists no draw order over a scroll view), and nothing nested in it.
   return close({ ...m, line, target: region === undefined ? [] : [{ rect: { ...region.rect }, over: [], axes: { axis: region.axis, nested: [] } }] });
@@ -328,7 +347,7 @@ export function planStroke(memory: StrokeMemory, { toward, reach: turnsReach, ge
   const room = strokeRoom(gesture, over, toward, kept, 'any axis');
   const coverTop = room === undefined ? kept : room.coverTop;
   const box = room?.box ?? gesture;
-  const reach = box === undefined ? turnsReach : carryReach(carryOver(m.carry, room?.within), still, strokeLength(fullStroke(box, toward, coverTop)), turnsReach);
+  const reach = box === undefined ? turnsReach : carryReach(carryOver(m.carry, room?.scrollView), still, strokeLength(fullStroke(box, toward, coverTop)), turnsReach);
   const feeler = kind === 'feeler' ? FEELER : undefined;
   const points = box === undefined ? undefined : scrollStroke({ toward, reach, ...(coverTop !== undefined && { coverTop }), box, ...(feeler !== undefined && { maxTravel: feeler.maxTravel }) });
   const stroke: PlannedStroke = {
@@ -344,9 +363,14 @@ export function planStroke(memory: StrokeMemory, { toward, reach: turnsReach, ge
   const press = read === undefined || points === undefined ? undefined : read.facts.scene.presentedAt(points.from, read.target);
   const presented = press === undefined || points === undefined ? undefined : { ...press, touchDown: points.from };
   // The latest cut read for the target's scroll views is the one a later read that has lost a rect falls back to — not the oldest.
-  const planned: Memory = { ...m, last: candidates, ...(m.target !== undefined && read !== undefined && { target: candidates }) };
+  const planned: Memory = {
+    ...m,
+    last: candidates,
+    ...(m.target !== undefined && read !== undefined && { target: candidates }),
+    ...(m.target === undefined && m.named !== undefined && read !== undefined && { named: candidates[0] }),
+  };
   const chosenAt = points === undefined ? undefined : { ...points.from };
-  return { stroke, presented, memory: close({ ...planned, chosen: room === undefined ? undefined : { ...room.within }, chosenAt, roomless: room?.roomless ?? [] }) };
+  return { stroke, presented, memory: close({ ...planned, chosen: room === undefined ? undefined : { ...room.scrollView }, chosenAt, roomless: room?.roomless ?? [] }) };
 }
 
 /**
@@ -357,7 +381,7 @@ export function planStroke(memory: StrokeMemory, { toward, reach: turnsReach, ge
  */
 export function strokeSent(memory: StrokeMemory): StrokeMemory {
   const m = open(memory);
-  return close({ ...m, within: m.chosen === undefined ? undefined : { ...m.chosen }, touchDowns: m.chosenAt === undefined ? m.touchDowns : [...m.touchDowns, m.chosenAt] });
+  return close({ ...m, strokedOver: m.chosen === undefined ? undefined : { ...m.chosen }, touchDowns: m.chosenAt === undefined ? m.touchDowns : [...m.touchDowns, m.chosenAt] });
 }
 
 /** What a round asks of the plan for the `fully: true` flush check's probe. */
@@ -385,7 +409,7 @@ export interface ProbeAsk {
 export function planProbe(memory: StrokeMemory, { toward, reach, maxTravel, gesture, facts, scrollViews, keyboardTop }: ProbeAsk): { stroke: PlannedStroke; memory: StrokeMemory } | undefined {
   const room = strokeRoom(
     gesture,
-    scrollViews.map((rect) => ({ rect, over: overIn(facts, rect) ?? [], axes: facts.scene.clips.axesOf(rect) })),
+    scrollViews.map((rect) => scrollViewOn(facts, rect)),
     toward,
     keyboardTop,
     'none',
@@ -395,7 +419,7 @@ export function planProbe(memory: StrokeMemory, { toward, reach, maxTravel, gest
   const points = scrollStroke({ toward, reach, ...(coverTop !== undefined && { coverTop }), box, maxTravel });
   return {
     stroke: { toward, reach, ...(coverTop !== undefined && { coverTop }), box: { ...box }, maxTravel, points, kind: 'full' },
-    memory: close({ ...open(memory), chosen: { ...room.within }, chosenAt: { ...points.from } }),
+    memory: close({ ...open(memory), chosen: { ...room.scrollView }, chosenAt: { ...points.from } }),
   };
 }
 
@@ -438,7 +462,7 @@ export interface TouchedOn {
  * docs/bugs/2026-10-09-android-scroll-stroke-touches-down-on-floating-tab-bar.md
  */
 export function touchedOn(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>, drawn: Stroke | undefined): TouchedOn | undefined {
-  const { within: container } = open(memory);
+  const { strokedOver: container } = open(memory);
   if (container === undefined || drawn === undefined) return undefined;
   const on = facts.scene.order.drawnOverAt(container, drawn.from);
   if (on === undefined) return undefined;
@@ -454,11 +478,12 @@ export function touchedOn(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>,
 export interface StrokedAcross {
   readonly rect: Rect;
   readonly axis: ScrollAxis;
-  readonly along?: { readonly view: QuotedNode; readonly noRoom?: true };
+  /** `targetRead` (D78): a read had found the target, so the candidates were its own scroll views and a `within` naming `view` would be ignored — absent while none had. */
+  readonly along?: { readonly view: QuotedNode; readonly noRoom?: true; readonly targetRead?: true };
 }
 
 /**
- * The scroll view the last stroke SENT went over (`within`) when THIS read's tree tells its axis and it is the other
+ * The scroll view the last stroke SENT went over (`strokedOver`) when THIS read's tree tells its axis and it is the other
  * one than `toward`'s — the stroke went across it, which `strokeRoom` does only when no candidate along the stroke (or
  * of unknown axis) had room — with the largest scroll view of the WHOLE tree told to scroll that way, when there is
  * one (ui-tree/geometry.ts#Clips.toldOn; review round 1: a chips row beside the page is no candidate, and "the tree
@@ -470,20 +495,20 @@ export interface StrokedAcross {
  * One walk of the tree, at the stop only.
  */
 export function strokedAcross(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene' | 'reading'>, toward: Direction, screen: Rect): StrokedAcross | undefined {
-  const { within, roomless } = open(memory);
-  if (within === undefined) return undefined;
+  const { strokedOver, roomless, target } = open(memory);
+  if (strokedOver === undefined) return undefined;
   const { clips } = facts.scene;
   const way = axisOf(toward);
-  const axis = clips.axesOf(within)?.axis;
+  const axis = clips.axesOf(strokedOver)?.axis;
   if (axis === undefined || axis === way) return undefined;
   const [view] = toldLargestFirst(facts, way, screen);
-  if (view === undefined) return { rect: within, axis };
+  if (view === undefined) return { rect: strokedOver, axis };
   const judged = roomless.some((r) => sameRect(r, view.rect));
-  return { rect: within, axis, along: { view: quoted(view), ...(judged && { noRoom: true as const }) } };
+  return { rect: strokedOver, axis, along: { view: quoted(view), ...(judged && { noRoom: true as const }), ...(target !== undefined && { targetRead: true as const }) } };
 }
 
 /**
- * The scroll views the strokes did not try (`strokedBeside`): `within`, the one the last stroke sent went over
+ * The scroll views the strokes did not try (`strokedBeside`): `strokedOver`, the one the last stroke sent went over
  * (undefined: the gesture box whole), and `others`, every other scroll view the tree tells scrolls the stroke's way,
  * largest first. Over the gesture box whole, `at`, the last touch-down, and `landed`, the smallest scroll view told
  * along the stroke that holds it, when one does (WDA, which marks no node clipping, strokes the screen before the
@@ -492,7 +517,7 @@ export function strokedAcross(memory: StrokeMemory, facts: Pick<TreeFacts, 'scen
 export interface StrokedBeside {
   /** The stroke's axis, along which every one of `others` is told to scroll. */
   readonly axis: ScrollAxis;
-  readonly within?: Rect;
+  readonly strokedOver?: Rect;
   readonly at?: Point;
   readonly landed?: Rect;
   readonly others: readonly QuotedNode[];
@@ -509,28 +534,28 @@ const toldLargestFirst = (facts: Pick<TreeFacts, 'scene' | 'reading'>, way: Scro
  * (`Memory.touchDowns`: an earlier stroke inside a nested list and the last over the page holding it leave out both;
  * the scroll view each stroke went over holds its touch-down, so it is left out with it) — largest first. Before the
  * target is read the plan's candidates hold no sibling of the largest scroller (`candidatesOf`), so the stop's
- * sentence names them (scroll-text.ts#boundText) and the remedy is the caller's; why, and why the plan does not try
- * them in turn: ADR 0010's D76 amendment. Undefined once the target was found (its own scroll views are the
+ * sentence names them (scroll-text.ts#boundText) and the remedy is the caller's — `within` naming the one that holds the
+ * target (D78, `nameScrollView`); why, and why the plan does not try them in turn: ADR 0010's D76 amendment. Undefined once the target was found (its own scroll views are the
  * candidates), when the last stroke went ACROSS the scroll view it was drawn over (`strokedAcross` says that), and
  * when the tree tells no other — idb's flat list never does. One walk of the tree, at the stop only.
  */
 export function strokedBeside(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene' | 'reading'>, toward: Direction, screen: Rect): StrokedBeside | undefined {
-  const { target, within, touchDowns } = open(memory);
+  const { target, strokedOver, touchDowns } = open(memory);
   if (target !== undefined) return undefined;
   const way = axisOf(toward);
-  const axis = within === undefined ? undefined : facts.scene.clips.axesOf(within)?.axis;
+  const axis = strokedOver === undefined ? undefined : facts.scene.clips.axesOf(strokedOver)?.axis;
   if (axis !== undefined && axis !== way) return undefined;
   const told = toldLargestFirst(facts, way, screen);
   const others = told.filter((n) => !touchDowns.some((p) => containsPoint(n.rect, p)));
   if (others.length === 0) return undefined;
-  if (within !== undefined) return { axis: way, within, others: others.map(quoted) };
+  if (strokedOver !== undefined) return { axis: way, strokedOver, others: others.map(quoted) };
   const at = touchDowns.at(-1);
   const landed = at === undefined ? undefined : told.filter((n) => containsPoint(n.rect, at)).at(-1);
   return { axis: way, ...(at !== undefined && { at: { ...at } }), ...(landed !== undefined && { landed: { ...landed.rect } }), others: others.map(quoted) };
 }
 
 /**
- * What THIS read's tree lists of the content of the scroll view the last stroke sent went over (`within`), toward the
+ * What THIS read's tree lists of the content of the scroll view the last stroke sent went over (`strokedOver`), toward the
  * edge `toward` reveals (ui-tree/geometry.ts#Clips.contentToward: for content that lies up, its top): `ends` when
  * nothing of it lies that way, so no stroke toward `toward` over it can move anything in — the content is exhausted
  * that way by what the tree lists, not by strokes that changed nothing (scroll-rounds.ts#UNMOVED_STROKES_EXHAUST,
@@ -543,8 +568,8 @@ export function strokedBeside(memory: StrokeMemory, facts: Pick<TreeFacts, 'scen
  * docs/bugs/2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md
  */
 export function strokedContent(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>, toward: Direction): ListedContent | undefined {
-  const { within } = open(memory);
-  return within === undefined ? undefined : facts.scene.clips.contentToward(within, EDGE_TOWARD[toward]);
+  const { strokedOver } = open(memory);
+  return strokedOver === undefined ? undefined : facts.scene.clips.contentToward(strokedOver, EDGE_TOWARD[toward]);
 }
 
 /**
@@ -560,7 +585,7 @@ export function strokedContent(memory: StrokeMemory, facts: Pick<TreeFacts, 'sce
  *
  * `carried` keeps the sample: what the read right after a stroke of the course found the target moved, the way the
  * content went, per point of the finger's ACTUAL travel (the stroke as drawn — `shortenStroke`'s floors, a box the
- * plan cut: the unit stays a point of travel). It is kept FOR THE SCROLL VIEW the stroke went over (`within`, the
+ * plan cut: the unit stays a point of travel). It is kept FOR THE SCROLL VIEW the stroke went over (`strokedOver`, the
  * gesture box whole as one too): a fling is that scroll view's, so a carry measured over one is never applied to a
  * stroke over another — `strokeRoom` falling back to an outer scroll view, or the target found in another list — and
  * a sample over another scroll view replaces it (`carryOver`). A sample is the round's to offer only of the same
@@ -592,14 +617,14 @@ export function carried(memory: StrokeMemory, { moved, drawn }: { moved: number;
   const travel = strokeLength(drawn);
   if (moved <= 0 || travel < 2 * TOUCH_SLOP || moved > CARRY_CEILING * travel) return memory;
   const m = open(memory);
-  const kept = carryOver(m.carry, m.within) ?? 0;
-  return close({ ...m, carry: { within: m.within === undefined ? undefined : { ...m.within }, perPoint: Math.max(kept, moved / travel) } });
+  const kept = carryOver(m.carry, m.strokedOver) ?? 0;
+  return close({ ...m, carry: { strokedOver: m.strokedOver === undefined ? undefined : { ...m.strokedOver }, perPoint: Math.max(kept, moved / travel) } });
 }
 
-/** The carry measured over the scroll view `within` (undefined: the gesture box whole), or undefined: none measured, or measured over another (`carried`). Found by the exact rect, as the plan remembers its scroll views. */
-function carryOver(carry: Memory['carry'], within: Rect | undefined): number | undefined {
+/** The carry measured over the scroll view `strokedOver` (undefined: the gesture box whole), or undefined: none measured, or measured over another (`carried`). Found by the exact rect, as the plan remembers its scroll views. */
+function carryOver(carry: Memory['carry'], strokedOver: Rect | undefined): number | undefined {
   if (carry === undefined) return undefined;
-  const same = carry.within === undefined || within === undefined ? carry.within === within : sameRect(carry.within, within);
+  const same = carry.strokedOver === undefined || strokedOver === undefined ? carry.strokedOver === strokedOver : sameRect(carry.strokedOver, strokedOver);
   return same ? carry.perPoint : undefined;
 }
 
@@ -649,6 +674,9 @@ function carryReach(measured: number | undefined, still: StillNeeds | undefined,
   return Math.min(reach, measured === undefined ? Math.max(cut, (still.unmeasured?.minDrag ?? UNMEASURED_MIN_DRAG) / full) : cut);
 }
 
+/** The scroll view of rect `rect` as this read gives it: what it draws over it (none when it holds no such scroll view) and its axes. */
+const scrollViewOn = (facts: Pick<TreeFacts, 'scene'>, rect: Rect): ScrollView => ({ rect, over: overIn(facts, rect) ?? [], axes: facts.scene.clips.axesOf(rect) });
+
 /** The rects drawn over `rect` in this read, when it holds that scroll view (`TreeFacts.scene`'s draw order). */
 const overIn = (facts: Pick<TreeFacts, 'scene'>, rect: Rect): Rect[] | undefined => facts.scene.order.drawnOver(rect)?.map((n) => ({ ...n.rect }));
 
@@ -665,8 +693,10 @@ const overIn = (facts: Pick<TreeFacts, 'scene'>, rect: Rect): Rect[] | undefined
  * for `tabbar-floating`'s R touched down at y 175, in the header above its list (WDA's; idb's is the motion ledger's region).
  * docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md
  * docs/bugs/2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md
+ * Exported for `scroll_until`'s `within` (interact/within.ts#resolveWithin, D78): the scroll view an element names is
+ * its nearest one by this same rule.
  */
-function targetScrollers(facts: Pick<TreeFacts, 'scene'>, node: UiNode): readonly Rect[] {
+export function targetScrollers(facts: Pick<TreeFacts, 'scene'>, node: UiNode): readonly Rect[] {
   const { clips } = facts.scene;
   const chain = clips.scrollersOf(node);
   return chain.length > 0 ? chain : (toldFrame(clips.drawnIn(node))?.scrollers.map((n) => n.rect) ?? []);
@@ -676,7 +706,8 @@ function targetScrollers(facts: Pick<TreeFacts, 'scene'>, node: UiNode): readonl
  * The scroll views a round's stroke toward the target may go over, nearest first (`planStroke` judges their room):
  * with no read this round (`facts` undefined), the last plan's; once a read found the target, its scroll views — each
  * cut by what this read draws over it, or by what it carried, when this read has lost its rect — none when it was
- * found in none (the screen box); else the screen's largest scroller, then the scroll views nested in it — those the
+ * found in none (the screen box); else the scroll view the caller named (`Memory.named`, D78) or, none named, the
+ * screen's largest scroller, then the scroll views nested in it — those the
  * tree tells scroll along `toward` first, then the rest, each largest first (its `ScrollAxes.nested`, text inputs left
  * out: ui-tree/geometry.ts#Clips.axesOf) — or none. Told along before unknown (review round 1): a chips row (a
  * HorizontalScrollView) above a larger feed of unknown axis (a RecyclerView, most likely vertical) is the one a
@@ -694,15 +725,19 @@ function targetScrollers(facts: Pick<TreeFacts, 'scene'>, node: UiNode): readonl
  */
 function candidatesOf(m: Memory, facts: Pick<TreeFacts, 'scene' | 'mainScroller'> | undefined, toward: Direction): readonly ScrollView[] {
   if (facts === undefined) return m.last;
-  if (m.target !== undefined) return m.target.map(({ rect, over, axes }) => ({ rect, over: overIn(facts, rect) ?? over, axes: facts.scene.clips.axesOf(rect) ?? axes }));
-  const main = facts.mainScroller;
-  if (main === undefined) return [];
-  const axes = facts.scene.clips.axesOf(main);
+  const refreshed = ({ rect, over, axes }: ScrollView): ScrollView => ({ rect, over: overIn(facts, rect) ?? over, axes: facts.scene.clips.axesOf(rect) ?? axes });
+  if (m.target !== undefined) return m.target.map(refreshed);
+  // The named scroll view (`within`, D78) in place of the largest scroller — this read's cut, or the one it was named
+  // with when this read lost its rect — and the scroll views nested in it after it, as the largest scroller's.
+  let first: ScrollView;
+  if (m.named !== undefined) first = refreshed(m.named);
+  else if (facts.mainScroller !== undefined) first = scrollViewOn(facts, facts.mainScroller);
+  else return [];
   const way = axisOf(toward);
-  const nested = [...(axes?.nested ?? [])]
+  const nested = [...(first.axes?.nested ?? [])]
     .sort((a, b) => Number(b.axis === way) - Number(a.axis === way) || rectArea(b.rect) - rectArea(a.rect))
-    .map(({ rect }) => ({ rect, over: overIn(facts, rect) ?? [], axes: facts.scene.clips.axesOf(rect) }));
-  return [{ rect: main, over: overIn(facts, main) ?? [], axes }, ...nested];
+    .map(({ rect }) => scrollViewOn(facts, rect));
+  return [first, ...nested];
 }
 
 /**
@@ -764,13 +799,13 @@ function roomIn(met: Rect, toward: Direction, coverTop?: number): Rect | undefin
 export const TOUCH_DOWN_CUT_FLOOR = 1 / 3;
 
 /**
- * What `strokeRoom` decides: the candidate scroll view (`within`, as the tree gives it), the box the stroke is drawn in,
+ * What `strokeRoom` decides: the candidate scroll view (`scrollView`, as the tree gives it), the box the stroke is drawn in,
  * and the top edge of what covers that box's lower part, when something does. `roomless`: when the fallback took a
  * candidate that scrolls only across the stroke, the candidates along it (or of unknown axis) it had judged first and
  * found no room in — what the across clause says "had no room for a swipe" of (D59b).
  */
 interface StrokeRoom {
-  within: Rect;
+  scrollView: Rect;
   box: Rect;
   coverTop?: number;
   roomless?: readonly Rect[];
@@ -780,7 +815,7 @@ interface StrokeRoom {
  * THE STROKE BOX's one owner: the first of `candidates` — scroll views, nearest first — that leaves room for a stroke
  * toward `toward` over the gesture `box` (swipe.ts#screenBox's, the box the driver draws in), above a keyboard whose
  * top edge is `coverTop` (`roomIn`: the scroll view ∩ the screen ∩ above the keyboard, at least MIN_STROKE_BOX along
- * the stroke): `within`, the candidate as the tree gives it, `box`, what the stroke is drawn in, and `coverTop`, the
+ * the stroke): `scrollView`, the candidate as the tree gives it, `box`, what the stroke is drawn in, and `coverTop`, the
  * top edge of what covers that box's lower part — the keyboard's, or a node's drawn over the scroll view
  * (`overlayTop`), the higher of the two — for the stroke to keep clear of (`scrollStroke`); absent when nothing does.
  * Undefined is NO ROOM: a probe is then not sent (flush-check.ts reports `flush.why: 'room'`), and a stroke toward
@@ -816,18 +851,18 @@ function strokeRoom(box: Rect | undefined, candidates: readonly ScrollView[], to
  * above a carousel filling the page below: the lane 180–280 cut at the bar's 240 to 60).
  */
 function roomAmong(box: Rect, candidates: readonly ScrollView[], toward: Direction, coverTop: number | undefined): StrokeRoom | undefined {
-  for (const { rect: within, over, axes } of candidates) {
-    const met = rectIntersection(box, within);
+  for (const { rect: scrollView, over, axes } of candidates) {
+    const met = rectIntersection(box, scrollView);
     if (met === undefined) continue;
     const lane = clearLane(met, axes, toward, coverTop);
     const room = roomOver(lane, over, toward, coverTop) ?? (lane === met ? undefined : roomOver(met, over, toward, coverTop));
-    if (room !== undefined) return { within, ...room };
+    if (room !== undefined) return { scrollView, ...room };
   }
   return undefined;
 }
 
 /** The room in `box` — a candidate's part, or its lane — above the keyboard and what is drawn over it (`overlayTop`, `roomIn`): the box the stroke is drawn in and the cover's top edge, or undefined. */
-function roomOver(box: Rect, over: readonly Rect[], toward: Direction, coverTop: number | undefined): Omit<StrokeRoom, 'within'> | undefined {
+function roomOver(box: Rect, over: readonly Rect[], toward: Direction, coverTop: number | undefined): Omit<StrokeRoom, 'scrollView'> | undefined {
   const drawn = overlayTop(box, over, toward, coverTop);
   const top = drawn === undefined ? coverTop : Math.min(drawn, coverTop ?? drawn);
   const room = roomIn(box, toward, top);

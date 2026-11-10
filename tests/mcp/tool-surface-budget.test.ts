@@ -9,9 +9,10 @@ import { createAveriServer, REPOSITORY_URL } from '../../src/mcp/tools.js';
  * What every agent session pays before its first call: the server's `instructions` (initialize) plus the whole
  * `tools/list` result, as JSON. A budget, so the surface cannot regrow silently: a description that needs more room
  * moves its detail to skill/references/tools.md, or raises this number deliberately. Bytes are UTF-8 (an em dash is
- * three); tokens are roughly bytes / 4.
+ * three); tokens are roughly bytes / 4. Raised from 31,000 (30,999 used) to 31,500 for scroll_until's `within` (D78:
+ * 460 bytes — its schema, a string or a rect, and its one-sentence description).
  */
-const BUDGET_BYTES = 31_000;
+const BUDGET_BYTES = 31_500;
 
 /**
  * Claude Code cuts an MCP server's instructions and each tool description past CLAUDE_CODE_MAX_MCP_DESCRIPTION_LENGTH

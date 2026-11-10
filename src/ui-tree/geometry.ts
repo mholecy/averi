@@ -684,6 +684,12 @@ export function wholePast(rect: Rect, viewport: Rect): Edge | undefined {
  * Asked of nodes of THIS tree (a node of another read has no clipping
  * ancestor here: an empty chain, no cut).
  */
+/** A scroll view as `Clips.scrollViewsOn` lists it: the node, and the one axis the tree tells it scrolls on (undefined: not told). */
+export interface ListedScrollView {
+  readonly node: UiNode;
+  readonly axis: ScrollAxis | undefined;
+}
+
 export interface Clips {
   /**
    * The node's ancestors that CLIP it — every node marked
@@ -806,6 +812,14 @@ export interface Clips {
    * stroke's way is named, wherever it lies. One walk of the tree a call.
    */
   toldOn(axis: ScrollAxis, screen: Rect, ofKeyboard: (node: UiNode) => boolean): readonly UiNode[];
+  /**
+   * Every scroll view of the tree, as `toldOn` counts one (text inputs left out, meeting `screen`, none of the
+   * keyboard's own), in tree order, each with the one axis the tree tells it scrolls on — undefined where it cannot tell
+   * (a Compose lazy list, a RecyclerView); none on a tree that lists no ancestry. `toldOn` is those told on its axis.
+   * For `scroll_until`'s `within` refused on a stale rect (interact/within.ts, D78): every scroll view a `within` rect
+   * could name for the stroke, the unknown ones too. One walk of the tree a call.
+   */
+  scrollViewsOn(screen: Rect, ofKeyboard: (node: UiNode) => boolean): readonly ListedScrollView[];
   /**
    * What this tree lists of the content of the scroll view of rect `scroller` toward its `edge` (`ListedContent`) —
    * the scroll view found as `axesOf` finds its scroll view (scroll-containers.ts#isScrollViewOf, that exact rect — the
@@ -1151,11 +1165,15 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false, cutAtScreen
     };
     return under.some((d) => past[edge](d.rect)) ? LISTED : { kind: 'ends', view };
   };
-  const toldOn = (axis: ScrollAxis, screen: Rect, ofKeyboard: (node: UiNode) => boolean): readonly UiNode[] =>
+  const scrollViewsOn = (screen: Rect, ofKeyboard: (node: UiNode) => boolean): readonly ListedScrollView[] =>
     ancestry
-      ? [...everyNode(tree)].filter((n) => scrollViewNode(n) && scrollAxis(n, unclipped) === axis && rectIntersection(n.rect, screen) !== undefined && !ofKeyboard(n))
+      ? [...everyNode(tree)].filter((n) => scrollViewNode(n) && rectIntersection(n.rect, screen) !== undefined && !ofKeyboard(n)).map((node) => ({ node, axis: scrollAxis(node, unclipped) }))
       : [];
-  return { scrollersOf, cutSliver, inScroller, drawnIn, axesOf, toldOn, contentToward };
+  const toldOn = (axis: ScrollAxis, screen: Rect, ofKeyboard: (node: UiNode) => boolean): readonly UiNode[] =>
+    scrollViewsOn(screen, ofKeyboard)
+      .filter((v) => v.axis === axis)
+      .map((v) => v.node);
+  return { scrollersOf, cutSliver, inScroller, drawnIn, axesOf, toldOn, scrollViewsOn, contentToward };
 }
 
 /**

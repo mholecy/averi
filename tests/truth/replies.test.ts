@@ -447,7 +447,7 @@ describe('namesUntried: a scroll view among those the swipes did not go over, as
   const UPPER: Rect = { x: 0, y: 303, width: 1080, height: 605 };
   const LOWER: Rect = { x: 0, y: 1046, width: 1080, height: 495 };
   const said = (others: { label: string | null; rect: Rect }[]) =>
-    boundText({ of: 'exhausted', lastStroke: 'down', unchanged: 'tree', beside: { axis: 'vertical', within: UPPER, others: others.map((o) => ({ role: 'scrollable', identifier: null, ...o })) } }, 2);
+    boundText({ of: 'exhausted', lastStroke: 'down', unchanged: 'tree', beside: { axis: 'vertical', strokedOver: UPPER, others: others.map((o) => ({ role: 'scrollable', identifier: null, ...o })) } }, 2);
 
   it('the list named untried, not the one swiped, nor one after the clause', () => {
     const reply = said([{ label: null, rect: LOWER }]);

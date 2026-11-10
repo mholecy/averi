@@ -14,10 +14,11 @@ import type { Target, WaitEvidence } from './resolve.js';
 import { fullyClaimed, judgeRead, scrollViewsOf, shortOf, stops, strokeLine, unfitAlong, type AppliedKeyboard, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type Since, type TreeFacts, type Unfit } from './scroll-read.js';
 import { cardMoves, heldBack as heldBackBy, lastDrawn, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved, type Streaks, type StrokePhysics, type UnseenStrokes } from './motion-ledger.js';
 import { carriedCover, seeMargin, startMargin, type MarginMemo, type Offset } from './margin-memo.js';
-import { carried, planStroke, seeRead, startStrokes, strokedAcross, strokedBeside, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StrokedAcross, type StrokedBeside, type StrokeKind, type StrokeMemory, type StrokePlan, type TouchedOn } from './stroke-plan.js';
+import { carried, nameScrollView, planStroke, seeRead, startStrokes, strokedAcross, strokedBeside, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StrokedAcross, type StrokedBeside, type StrokeKind, type StrokeMemory, type StrokePlan, type TouchedOn } from './stroke-plan.js';
 import { courseFacts, lastSent, nextStroke, probeSent, seeTarget, sent, startCourse, stuckTurn, turnAtEnd, turnBack, unknownCentreNeeds, type Course, type EndProof, type EndTurn, type NextStroke, type PastSide } from './course.js';
 import { probing, seeFlush, startFlush, type Flush, type FlushAim, type FlushCheck, type FlushCut, type FlushVerdict, type ProbeMeans } from './flush-check.js';
 import type { Direction } from './swipe.js';
+import { resolveWithin, type Within, type WithinRefusal } from './within.js';
 
 /**
  * `scroll_until`'s ROUND as one pure function: `round(state, seen) → { state, step }` — what a read of the
@@ -133,6 +134,12 @@ export interface RoundRules {
   readSettles?: boolean;
   /** What the scroll looks for — asked of only by a miss (ui-tree/miss.ts#missOf); absent in a table of rounds, which hands each read its matches and gets the miss's facts of the tree alone. */
   target?: Target;
+  /**
+   * The scroll view the caller named for the strokes until the target is read (`scroll_until`'s `within`, D78;
+   * interact/within.ts): resolved at the scroll's first read that reads, before anything of it is judged, or the
+   * scroll stops there (`within`). Absent: the screen's largest scroller, as before.
+   */
+  within?: Within;
 }
 
 /** One tree read as the round is handed it (scroll-read.ts#RoundRead) — part of this protocol (`RoundSeen.read`), so it is importable from here. */
@@ -253,6 +260,8 @@ export type RoundStep =
  * - `unaimable`: a `fully: true` match a probe proved cut at its flush edge, whose uncut side has less room left in its
  *   scroll container than a stroke of this call no longer than the next reveal carried it (flush-check.ts#FlushAim, D68):
  *   another swipe would most likely push that side out past the container, so none is sent.
+ * - `within`: the caller's `within` (D78) names no scroll view to stroke on the scroll's first read that read
+ *   (interact/within.ts#WithinRefusal) — no swipe sent, whatever that read held of the target.
  * - `changed`: the screen changed under the strokes (ui-tree/read-tree.ts#ScreenChange) — the
  *   first read after them is another screen than the read before them; no
  *   stop is judged on it and no further stroke sent, whether the target is
@@ -311,6 +320,8 @@ export type ScrollOutcome = (
       presented?: PresentedTouchDown;
     }
   | { kind: 'changed'; swipes: number; change: ScreenChange; found: boolean }
+  /** D78: the caller's `within` names no scroll view to stroke (interact/within.ts#WithinRefusal) — stopped at the first read that read, before any swipe. */
+  | { kind: 'within'; swipes: 0; within: Within; refused: WithinRefusal }
 ) & { detent?: DetentMove; endTurn?: EndTurn };
 
 /**
@@ -885,6 +896,15 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // not read judges nothing.
   let judged = read === undefined ? undefined : judgeRead(read, s.frame, fully, seen.corroborated);
   if (judged !== undefined && 'ask' in judged) return ask(judged.ask);
+  // THE NAMED SCROLL VIEW (`RoundRules.within`, D78): resolved on the scroll's first read that reads — no read before
+  // it strokes anything — and before anything of it is judged, so a `within` that names no scroll view stops the scroll
+  // there, whatever the read holds of the target (interact/within.ts); else the plan strokes it until a read finds the
+  // target (stroke-plan.ts#nameScrollView).
+  if (judged !== undefined && s.rules.within !== undefined && s.treesRead === 1) {
+    const named = resolveWithin(judged.facts, s.rules.within, s.rules.direction, clearOfSystemBands(s.frame.box, s.frame));
+    if ('refused' in named) return stop(s, { kind: 'within', swipes: 0, within: s.rules.within, refused: named.refused });
+    s.strokes = nameScrollView(s.strokes, judged.facts, named.rect);
+  }
   // THE ORDER SEEN (ui-tree/eyes.ts): the best match covered by a control the listing does not order (ADR 0024) — the
   // eyes are asked once which is drawn on top; such a stop never strokes (`overlapped`, below), so one screenshot ends
   // the scroll's question, asked whole and told what the eyes answered — or covered by texts in its touch margin only

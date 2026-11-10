@@ -1,4 +1,4 @@
-import type { DeviceScreen, Point, Rect, UiNode } from '../adapters/types.js';
+import type { DeviceScreen, Point, Rect, ScrollAxis, UiNode } from '../adapters/types.js';
 import { axisOfEdge, containsPoint, coverText, frameText, nodeText, OPPOSITE_EDGE, outsideScrollViewText, quoted, rectText, wholePast, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import { CLIP_LINE, type EyesFinding, type SurfaceFinding } from '../ui-tree/eyes.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
@@ -17,6 +17,7 @@ import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, 
 import type { CarriedUnder, UnseenStrokes } from './motion-ledger.js';
 import type { PresentedTouchDown, StrokedAcross, StrokedBeside, TouchedOn } from './stroke-plan.js';
 import { EDGE_TOWARD, OPPOSITE, type Direction } from './swipe.js';
+import { isRect, type Within, type WithinRefusal } from './within.js';
 import { cutByRemedy, cutRemedy, cutSliverText, dismissKeyboardFirstText, hideClause, hideKeyboardHow, pastSideText, ridingKeyboard, underKeyboardText, untriedSideText, wholeThinWayPast, type KeyboardUp } from './target-text.js';
 
 /**
@@ -814,6 +815,61 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
     }
     case 'changed':
       return { message: changedText(o, describe) };
+    case 'within':
+      return { message: `scroll_until ${describe} stopped before any swipe — ${withinText(o.within, o.refused)}` };
+  }
+}
+
+/**
+ * A rect as the caller passes it back as `within` (D78): `{"x":0,"y":1046,"width":1080,"height":495}` — the JSON
+ * scroll_until's schema takes, so a reply's rect is copied as it stands.
+ */
+export const withinRect = ({ x, y, width, height }: Rect): string => JSON.stringify({ x, y, width, height });
+
+/** `within` as the caller gave it: a selector as spelled, a rect as `withinRect`. */
+const withinSaid = (within: Within): string => (isRect(within) ? withinRect(within) : within);
+
+/** The other axis' two directions, as a sentence offers them. */
+const DIRECTIONS_ON: Readonly<Record<ScrollAxis, string>> = { vertical: 'up or down', horizontal: 'left or right' };
+
+/** The axis across `axis` — `withinText`'s and `acrossText`'s one flip. */
+const OTHER_AXIS: Readonly<Record<ScrollAxis, ScrollAxis>> = { vertical: 'horizontal', horizontal: 'vertical' };
+
+/** A scroll view named with its rect as `within` takes it — `<node> as within: {…}`: the stale refusal's offers and D76's several beside. */
+const asWithin = (n: QuotedNode): string => `${nodeText(n)} as within: ${withinRect(n.rect)}`;
+
+/**
+ * Why `within` names no scroll view to stroke (interact/within.ts#WithinRefusal, D78), after `stopped before any
+ * swipe — `: what it matched or is the rect of, and the way out — a narrower selector, a rect the tree lists (each
+ * scroll view told along the stroke given as `within` takes it, `withinRect`), another direction or another scroll
+ * view, or, on idb, the tree source that lists scroll views.
+ */
+function withinText(within: Within, refused: WithinRefusal): string {
+  const w = `within ${withinSaid(within)}`;
+  switch (refused.of) {
+    case 'absent':
+      return `${w} matches nothing in the tree, so it names no scroll view — give a selector of the scroll view or of an element inside it, or its rect (ui_snapshot)`;
+    case 'ambiguous':
+      return `${w} matches ${refused.matches.length} elements: ${refused.matches.map(nodeText).join(', ')} — narrow it so exactly one matches, or give the scroll view's rect`;
+    case 'unscrolled':
+      return `${w} matches ${nodeText(refused.node)}, which is no scroll view and lies in none — name a scroll view or an element inside one`;
+    case 'stale': {
+      const { views, axis, across } = refused;
+      const offered = views.map(({ node, untold }) => (untold === true ? `${nodeText(node)} (its axis not told) as within: ${withinRect(node.rect)}` : asWithin(node)));
+      const shows =
+        views.length > 0
+          ? `${views.length === 1 ? 'a scroll view that may scroll' : `${views.length} scroll views that may scroll`} ${axis}ly: ${offered.join(', ')}`
+          : across === 0
+            ? 'no scroll view'
+            : `no scroll view that may scroll ${axis}ly — ${across === 1 ? 'the one it shows scrolls' : `the ${across} it shows scroll`} ${OTHER_AXIS[axis]}ly`;
+      return `${w} is the rect of no scroll view in the tree; the tree shows ${shows}`;
+    }
+    case 'across': {
+      const way = OTHER_AXIS[refused.axis];
+      return `${w} names the scroll view ${rectText(refused.rect)}, which scrolls ${refused.axis}ly and holds none that may scroll ${way}ly, so a swipe ${refused.toward} over it would move nothing — scroll_until with direction ${DIRECTIONS_ON[refused.axis]}, or name a scroll view that scrolls ${way}ly`;
+    }
+    case 'untold':
+      return `${w} cannot be resolved: idb lists no scroll view — set app.ios.treeSource: wda, or swipe inside it by coordinates (swipe) until the element shows, then scroll_until it without within`;
   }
 }
 
@@ -1010,17 +1066,21 @@ function boundBeside(beside: StrokedBeside | undefined, lead: ': ' | '; '): stri
  * across the scroll view it was drawn over, <rect>, which scrolls vertically, and` then what the whole tree shows the
  * other way. A scroll view told to scroll horizontally is named (`<node>, which scrolls horizontally, and which the
  * swipes did not go over`, or `…, but which had no room for a swipe` when the plan judged it without room), with
- * `swipe inside it (swipe, its coordinates), then scroll_until it`. Else `the tree shows no scroll view that may
+ * `scroll_until it again with within: <its rect>` (D78; `swipe inside it (swipe, its coordinates), then scroll_until it`
+ * where it had no room, or a read had found the target — its own scroll views are the candidates then, and `within` is
+ * ignored). Else `the tree shows no scroll view that may
  * scroll horizontally — if the element lies in a horizontal list the tree does not show as one, swipe inside that
  * list (swipe, its coordinates), then scroll_until it`. `boundText`'s; the troubleshooting reference pins it through
  * `boundText` (tests/mcp/tool-descriptions.test.ts).
  */
 function acrossText({ rect, axis, along }: StrokedAcross): string {
-  const way = axis === 'vertical' ? 'horizontal' : 'vertical';
+  const way = OTHER_AXIS[axis];
   const drawn = `each went across the scroll view it was drawn over, ${rectText(rect)}, which scrolls ${axis}ly, and the tree shows`;
   if (along !== undefined) {
     const why = along.noRoom === true ? 'but which had no room for a swipe' : 'and which the swipes did not go over';
-    return `${drawn} ${nodeText(along.view)}, which scrolls ${way}ly, ${why} — swipe inside it (swipe, its coordinates), then scroll_until it`;
+    // D78: one the swipes did not go over, the target not read yet, is the next call's `within`; else the way in by hand.
+    const into = along.noRoom === true || along.targetRead === true ? 'swipe inside it (swipe, its coordinates), then scroll_until it' : `scroll_until it again with within: ${withinRect(along.view.rect)}`;
+    return `${drawn} ${nodeText(along.view)}, which scrolls ${way}ly, ${why} — ${into}`;
   }
   return `${drawn} no scroll view that may scroll ${way}ly — if the element lies in a ${way} list the tree does not show as one, swipe inside that list (swipe, its coordinates), then scroll_until it`;
 }
@@ -1031,19 +1091,25 @@ function acrossText({ rect, axis, along }: StrokedAcross): string {
  * node clipping, before the target is read — `were drawn over the screen whole (aimed at no scroll view), touching down
  * at x,y inside the scroll view <rect>`), then `the tree shows another scroll view that scrolls vertically, which the
  * swipes did not go over: <node>` — several counted, the BESIDE_NAMED largest named and the rest counted (`and 2 more`)
- * — with `if the element lies in it, swipe inside it (swipe, its coordinates) until the element shows, then
- * scroll_until it`. "Did not go over": no swipe touched down in it. The remedy is the caller's: the swipes are not
- * tried there (D76's decision, ADR 0010's D76 amendment). `boundText`'s and `boundBeside`'s; the troubleshooting
+ * — with `if the element lies in it, scroll_until it again with within: {"x":…,"y":…,"width":…,"height":…}` (D78: its
+ * rect as `within` takes it, `withinRect`; several: each named `<node> as within: {…}`, then `… in one of them,
+ * scroll_until it again with that one's within`). "Did not go over": no swipe touched down in it. The remedy is the caller's: the swipes are not tried there
+ * (D76's decision, ADR 0010's D76 amendment). `boundText`'s and `boundBeside`'s; the troubleshooting
  * reference quotes it.
  */
-function besideText({ within, at, landed, axis, others }: StrokedBeside): string {
+function besideText({ strokedOver, at, landed, axis, others }: StrokedBeside): string {
   const where = at === undefined ? '' : `, touching down at ${at.x},${at.y}${landed === undefined ? '' : ` inside the scroll view ${rectText(landed)}`}`;
-  const went = within === undefined ? `the swipes were drawn over the screen whole (aimed at no scroll view)${where}` : `the swipes went over the scroll view ${rectText(within)} only`;
+  const went = strokedOver === undefined ? `the swipes were drawn over the screen whole (aimed at no scroll view)${where}` : `the swipes went over the scroll view ${rectText(strokedOver)} only`;
   const one = others.length === 1;
-  const some = one ? `${within === undefined ? 'a' : 'another'} scroll view that scrolls` : `${others.length} ${within === undefined ? '' : 'other '}scroll views that scroll`;
-  const named = others.slice(0, BESIDE_NAMED).map(nodeText).join(', ');
+  const some = one ? `${strokedOver === undefined ? 'a' : 'another'} scroll view that scrolls` : `${others.length} ${strokedOver === undefined ? '' : 'other '}scroll views that scroll`;
+  // Several: each named with its rect as `within` takes it, as the stale refusal lists them (D78); one: its rect is the remedy's.
+  const named = others
+    .slice(0, BESIDE_NAMED)
+    .map((n) => (one ? nodeText(n) : asWithin(n)))
+    .join(', ');
   const names = others.length > BESIDE_NAMED ? `${named} and ${others.length - BESIDE_NAMED} more` : named;
-  return `${went}; the tree shows ${some} ${axis}ly, ${UNTRIED_LEAD}${names}${UNTRIED_END}${one ? 'it' : 'one of them'}, swipe inside it (swipe, its coordinates) until the element shows, then scroll_until it`;
+  const remedy = one ? `it, scroll_until it again with within: ${withinRect(others[0].rect)}` : `one of them, scroll_until it again with that one's within`;
+  return `${went}; the tree shows ${some} ${axis}ly, ${UNTRIED_LEAD}${names}${UNTRIED_END}${remedy}`;
 }
 
 /** `besideText`'s words around the scroll views it names — exported for `namesUntried` in scripts/truth/replies.ts, which reads the names between them. */

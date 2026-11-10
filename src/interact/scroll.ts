@@ -8,6 +8,7 @@ import { describeTarget, matchesToJudge, type Target } from './resolve.js';
 import { round, startRounds, type RoundSeen, type Rounds, type RoundStep } from './scroll-rounds.js';
 import { scrollFailure, scrollResult, type ScrollUntilResult } from './scroll-text.js';
 import { dragMs, screenBox, type Direction, type ScreenBox } from './swipe.js';
+import { checkWithin, type Within } from './within.js';
 
 export { describeScrollResult, HEDGE_WHATS, HEDGED_LEAD, stopHedges, type ScrollUntilResult } from './scroll-text.js';
 
@@ -37,6 +38,12 @@ export interface ScrollOptions {
    * unchecked ("fully visible by the tree … a screenshot could not tell (no screenshot was taken)").
    */
   eyes?: Eyes;
+  /**
+   * The scroll view to stroke until the target is first read (D78; interact/within.ts): a selector of it or of an
+   * element inside it (the scroll view of its exact rect, else its nearest), or its rect. Resolved at the first read that reads; one
+   * that names no scroll view stops the scroll there, before any swipe. Default: the screen's largest scroller.
+   */
+  within?: Within;
 }
 
 /**
@@ -276,6 +283,8 @@ export async function scrollUntilVisible(
   target: Target,
   opts: ScrollOptions = {},
 ): Promise<ScrollUntilResult> {
+  // A `within` selector that does not parse is the caller's mistake, said before any device read (D78).
+  if (opts.within !== undefined) checkWithin(opts.within);
   const settleMs = opts.settleMs ?? 400;
   const describe = describeTarget(target);
   // The device's screen, read before the loop, so a device whose screen
@@ -291,6 +300,7 @@ export async function scrollUntilVisible(
     strokes: adapter.dragSpeed === undefined ? ('fling' as const) : ('drag' as const),
     readSettles: adapter.treeReadSettles === true,
     target,
+    ...(opts.within !== undefined && { within: opts.within }),
   };
   let state: Rounds = startRounds(rules, asBuilt);
   let drawn: Stroke | undefined;

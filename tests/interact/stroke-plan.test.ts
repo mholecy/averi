@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { everyNode, type Point, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
-import { MIN_STROKE_BOX, planProbe, planStroke, seeRead, startStrokes, strokedAcross, strokedBeside, strokeSent, touchedOn, TOUCH_DOWN_CUT_FLOOR, type StrokeMemory } from '../../src/interact/stroke-plan.js';
+import { MIN_STROKE_BOX, nameScrollView, planProbe, planStroke, seeRead, startStrokes, strokedAcross, strokedBeside, strokeSent, touchedOn, TOUCH_DOWN_CUT_FLOOR, type StrokeMemory } from '../../src/interact/stroke-plan.js';
 import { shortenStroke, swipeVector, swipeVectorAbove, type Direction } from '../../src/interact/swipe.js';
 import { containsPoint, largestScroller } from '../../src/ui-tree/geometry.js';
 import { keyboardSideNodes } from '../../src/ui-tree/soft-keyboard.js';
@@ -505,6 +505,15 @@ describe('before a read finds the target, a sideways stroke goes inside a nested
     expect(strokedAcross(strokeSent(planOn(loose, 'right', { target: row, gesture: PHONE }).memory), factsOf(loose), 'right', PHONE)?.along?.view.rect).toEqual(strip);
   });
 
+  it('…said to be named once a read found the target (`targetRead`, D78): its own scroll views were the candidates, so a `within` naming the one along would be ignored', () => {
+    const row = node({ role: 'button', identifier: 'row', rect: { x: 0, y: 300, width: 1080, height: 100 } });
+    const chips = node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { x: 0, y: 2000, width: 1080, height: 150 } });
+    const tree = screenOf([node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'vertical', rect: { ...PAGE }, children: [row] }), chips]);
+    const view = { role: 'scrollable', label: null, identifier: null, rect: chips.rect };
+    expect(strokedAcross(strokeSent(planOn(tree, 'right', { target: row }).memory), factsOf(tree), 'right', BOX)?.along).toEqual({ view, targetRead: true });
+    expect(strokedAcross(strokeSent(planOn(tree, 'right').memory), factsOf(tree), 'right', BOX)?.along).toEqual({ view });
+  });
+
   it('…and one that WAS a candidate along the stroke but had no room (a 60-px-wide strip nested in the page) is named with that', () => {
     const strip = node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { x: 0, y: 900, width: 60, height: 200 } });
     const tree = page(strip);
@@ -529,7 +538,7 @@ describe('strokedBeside — the listed scroll views along the stroke the swipes 
     const tree = bounded();
     const { memory, drawn } = sentOn(tree, 'down');
     expect(drawn !== undefined && containsPoint(UPPER, drawn.from)).toBe(true);
-    expect(strokedBeside(memory, factsOf(tree), 'down', BOX)).toEqual({ axis: 'vertical', within: UPPER, others: [{ role: 'scrollable', label: null, identifier: 'lower', rect: LOWER }] });
+    expect(strokedBeside(memory, factsOf(tree), 'down', BOX)).toEqual({ axis: 'vertical', strokedOver: UPPER, others: [{ role: 'scrollable', label: null, identifier: 'lower', rect: LOWER }] });
     // No other list along the stroke: nothing to name.
     const alone = screenOf([list(UPPER)]);
     const one = sentOn(alone, 'down');
@@ -614,6 +623,66 @@ describe('strokedBeside — the listed scroll views along the stroke the swipes 
     const tree = bounded(field, keyboard);
     const { memory } = sentOn(tree, 'down');
     expect(strokedBeside(memory, factsOf(tree), 'down', BOX)?.others.map((o) => o.identifier)).toEqual(['lower']);
+  });
+});
+
+describe('a named scroll view (`within`, D78) — the one the strokes go over until the target is read', () => {
+  /** android scroll-bounded's real dump (API 33): `upper` [0,303][1080,908] the larger, `lower` [0,1046][1080,1541] beside it. */
+  const bounded = parseDump(readFileSync(new URL('../fixtures/truth/android-averi_lab-api33/scroll-bounded.xml', import.meta.url), 'utf8'));
+  const UPPER: Rect = { x: 0, y: 303, width: 1080, height: 605 };
+  const LOWER: Rect = { x: 0, y: 1046, width: 1080, height: 495 };
+  const ask = (tree: UiNode, target?: UiNode) => ({ kind: 'full' as const, toward: 'down' as const, reach: 1, gesture: BOX, read: { facts: factsOf(tree), target } });
+
+  it('in place of the largest scroller: the stroke touches down inside `lower`, not at `upper`\'s centre row (540,788)', () => {
+    expect(planStroke(startStrokes(), ask(bounded)).stroke.points?.from).toEqual({ x: 540, y: 788 });
+    const { stroke } = planStroke(nameScrollView(startStrokes(), factsOf(bounded), LOWER), ask(bounded));
+    expect(stroke.box).toEqual(LOWER);
+    expect(stroke.points !== undefined && containsPoint(LOWER, stroke.points.from)).toBe(true);
+  });
+
+  it('the scroll views nested in it stay candidates after it (D59b): a horizontal page named, a `down` stroke goes inside its vertical list', () => {
+    const PAGE: Rect = { x: 0, y: 0, width: 1080, height: 1800 };
+    const INNER: Rect = { x: 0, y: 400, width: 1080, height: 800 };
+    const tree = screenOf([
+      node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'vertical', rect: { x: 0, y: 0, width: 1080, height: 2220 }, identifier: 'largest' }),
+      node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { ...PAGE }, children: [node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'vertical', rect: { ...INNER } })] }),
+    ]);
+    expect(planStroke(nameScrollView(startStrokes(), factsOf(tree), PAGE), ask(tree)).stroke.box).toEqual(INNER);
+  });
+
+  it('kept by a read that lost it (the list moved), with what was drawn over it then; a read that did not read keeps the last candidates', () => {
+    const named = nameScrollView(startStrokes(), factsOf(bounded), LOWER);
+    const moved = screenOf([scroller(UPPER)]);
+    expect(planStroke(named, ask(moved)).stroke.box).toEqual(LOWER);
+    const planned = planStroke(named, ask(bounded)).memory;
+    expect(planStroke(planned, { ...ask(bounded), read: undefined }).stroke.box).toEqual(LOWER);
+  });
+
+  it('a read that lost it keeps its axes as named — its nested scroll views still candidates — and the latest cut drawn over it, not the first', () => {
+    const PAGE: Rect = { x: 0, y: 0, width: 1080, height: 1800 };
+    const INNER: Rect = { x: 0, y: 400, width: 1080, height: 800 };
+    const paged = screenOf([node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { ...PAGE }, children: [node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'vertical', rect: { ...INNER } })] })]);
+    const gone = screenOf([]);
+    expect(planStroke(nameScrollView(startStrokes(), factsOf(paged), PAGE), ask(gone)).stroke.box).toEqual(INNER);
+    // Named on a read with nothing over `lower`; the next read draws a bar over its lower part; the one after lost it.
+    const named = nameScrollView(startStrokes(), factsOf(bounded), LOWER);
+    const BAR: Rect = { x: 0, y: 1400, width: 1080, height: 141 };
+    const barred = screenOf([scroller(UPPER), scroller(LOWER), cover(BAR)]);
+    const cut = planStroke(named, ask(barred));
+    expect(cut.stroke.coverTop).toBe(BAR.y);
+    expect(planStroke(cut.memory, ask(gone)).stroke.coverTop).toBe(BAR.y);
+  });
+
+  it('once a read finds the target, its own scroll views: `within` no longer counts', () => {
+    const p = [...everyNode(bounded)].find((n) => n.identifier === 'lab.scroll-bounded.P')!;
+    const named = nameScrollView(startStrokes(), factsOf(bounded), LOWER);
+    const found = seeRead(named, { facts: factsOf(bounded), line: undefined, target: p });
+    expect(planStroke(found, ask(bounded, p)).stroke.box).toEqual(UPPER);
+  });
+
+  it('strokedBeside names `upper`, the list the named strokes did not go over', () => {
+    const plan = planStroke(nameScrollView(startStrokes(), factsOf(bounded), LOWER), ask(bounded));
+    expect(strokedBeside(strokeSent(plan.memory), factsOf(bounded), 'down', BOX)).toEqual({ axis: 'vertical', strokedOver: LOWER, others: [{ role: 'scrollable', label: null, identifier: null, rect: UPPER }] });
   });
 });
 

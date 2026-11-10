@@ -696,6 +696,11 @@ export function visibilityCases(truth: CellTruth, platform: Platform): Visibilit
     const t = truth.targets.find((x) => x.tag === r.tag);
     if (t?.scrollView !== undefined) cases.push(atRestCase(truth.cell, t, t.scrollView));
   }
+  for (const w of WITHIN.filter((x) => x.cell === truth.cell && platform === 'android')) {
+    const t = truth.targets.find((x) => x.tag === w.tag);
+    const named = t?.scrollView === undefined ? undefined : truth.scrollViews?.[t.scrollView];
+    if (t?.scrollView !== undefined && named !== undefined) cases.push(withinCase(truth.cell, t, t.scrollView, w.by === 'rect' ? { ...named } : selectorOf({ id: w.by.rowOf })));
+  }
   for (const b of BLANK_STRETCH.filter((x) => x.cell === truth.cell && platform === 'android')) {
     const t = truth.targets.find((x) => x.tag === b.tag);
     if (t?.scrollView !== undefined) cases.push(blankStretchCase(truth.cell, t, t.scrollView, b.timeoutMs));
@@ -776,6 +781,44 @@ function blankStretchCase(cell: string, t: TargetTruth, view: string, timeoutMs:
 export function judgeBlankStretch(tag: string, view: string, replies: readonly string[], final: LabState, launched: LabState, atStop: LabState = final): LiveVerdict {
   const verdict = judgeScroll({ tag, view, fully: false, platform: 'android' }, replies, final, launched, atStop);
   return verdict.outcome === 'LOUD' ? { ...verdict, outcome: 'MISMATCH', cls: 'failed-holds', why: `past a blank stretch with the time to reach it, yet ${verdict.why}` } : verdict;
+}
+
+/**
+ * The within cases (D78, ADR 0010's D78 amendment): a row of a list beside the screen's largest scroller — android
+ * scroll-bounded's O and F, rows of `lower`, which uiautomator does not list at launch — reached by `scroll_until` with
+ * `within` naming that list: O by its rect (the capture's `scrollViews`, in px as uiautomator dumps it), F by a selector
+ * of S, a row of it (its nearest scroll view). Without `within` every stroke went over `upper` (D76). F lies ~2300 px
+ * down a 495-px list — about 8 strokes at 60 % of it — so the call is given 12 swipes and 30 s. Judged by
+ * `judgeWithin`: every stroke on the list bringing the target closer, the stop, then the tap. Android only: on iOS the
+ * WDA capture's rect is in points and idb lists no scroll view (refused there by design).
+ */
+export const WITHIN: readonly { cell: string; tag: string; by: 'rect' | { rowOf: string } }[] = [
+  { cell: 'scroll-bounded', tag: 'O', by: 'rect' },
+  { cell: 'scroll-bounded', tag: 'F', by: { rowOf: 'lab.scroll-bounded.S' } },
+];
+
+function withinCase(cell: string, t: TargetTruth, view: string, within: Rect | string): VisibilityCase {
+  return {
+    id: `within:${cell}.${t.tag}`,
+    reads: VISIBILITY_READS,
+    cell,
+    says: `scroll_until ${t.tag} down with within naming ${view} (${typeof within === 'string' ? `a row of it, ${within}` : 'its rect'}), maxSwipes 12, timeoutMs 30000: every stroke on ${view} bringing it closer, it stops on ${t.tag}, then the tap fires it (D78)`,
+    calls: [
+      { tool: 'scroll_until', args: { selector: selectorOf(t), direction: 'down', within, maxSwipes: 12, timeoutMs: 30_000 } },
+      { tool: 'tap', args: { selector: selectorOf(t) } },
+    ],
+    judge: (s, replies, launched, _source, after) => judgeWithin(t.tag, view, replies, s, launched, after[0] ?? s),
+  };
+}
+
+/**
+ * A within case's judge (WITHIN): judgeScroll's stop and tap, and nothing less — a loud failure, which judgeScroll
+ * accepts as honest, is this case's MISMATCH: `within` named the list the target lies in, and the call had the swipes
+ * and the time.
+ */
+export function judgeWithin(tag: string, view: string, replies: readonly string[], final: LabState, launched: LabState, atStop: LabState = final): LiveVerdict {
+  const verdict = judgeScroll({ tag, view, fully: false, platform: 'android' }, replies, final, launched, atStop);
+  return verdict.outcome === 'LOUD' ? { ...verdict, outcome: 'MISMATCH', cls: 'failed-holds', why: `within named ${view}, with the swipes and the time to reach it, yet ${verdict.why}` } : verdict;
 }
 
 /**

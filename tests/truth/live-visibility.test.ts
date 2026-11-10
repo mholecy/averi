@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { liveGeometry, touchTurns, classStrokes, directionBreaks, distanceAt, judgeAbsentAtEnd, judgeAndroidTurn, judgeAtRest, judgeBlankStretch, judgeCarry, judgeDismissal, judgePresentedAssert, judgePresentedScroll, presentedAssertCase, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases, hedgedStop, hedgedStops, hedgedStopsLine } from '../../scripts/truth/live-visibility.js';
+import { liveGeometry, touchTurns, classStrokes, directionBreaks, distanceAt, judgeAbsentAtEnd, judgeAndroidTurn, judgeAtRest, judgeBlankStretch, judgeWithin, judgeCarry, judgeDismissal, judgePresentedAssert, judgePresentedScroll, presentedAssertCase, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases, hedgedStop, hedgedStops, hedgedStopsLine } from '../../scripts/truth/live-visibility.js';
 import { describeScrollResult, flushText } from '../../src/interact/scroll-text.js';
 import { stopHolds } from '../../scripts/truth/target-contract.js';
 import { turnsSaid } from '../../scripts/truth/replies.js';
@@ -302,6 +302,36 @@ describe('judgeBlankStretch — tabbar-floating\'s F past the blank stretch of i
     expect(blank.map((c) => c.id)).toEqual(['blank:tabbar-floating.F']);
     expect(blank[0].calls).toEqual([{ tool: 'scroll_until', args: { selector: 'id:"lab.tabbar-floating.F"', direction: 'down', timeoutMs: 30_000 } }, { tool: 'tap', args: { selector: 'id:"lab.tabbar-floating.F"' } }]);
     expect(visibilityCases(truth, 'ios').filter((c) => c.id.startsWith('blank:'))).toEqual([]);
+  });
+});
+
+describe('the within cases — scroll-bounded\'s O and F, rows of `lower`, reached with `within` naming it (D78; Android)', () => {
+  const LOWER: Rect = { x: 0, y: 1046, width: 1080, height: 495 };
+  const target = (tag: 'O' | 'F', y: number): TargetTruth => ({ tag, id: `lab.scroll-bounded.${tag}`, color: '#000000', declared: 'open', frame: { x: 128, y, width: 825, height: 176 }, reached: false, probe: [], drawn: 0, seen: '#000000', geometry: 'off-screen', scrollView: 'lower', listed: { uiautomator: false } });
+  const truth: CellTruth = { cell: 'scroll-bounded', layer: 'none', device: 'd', screen: { width: 1080, height: 2220 }, scale: 1, targets: [target('O', 1706), target('F', 3796)], scrollViews: { upper: { x: 0, y: 303, width: 1080, height: 605 }, lower: LOWER } };
+
+  it('visibilityCases asks O with `lower`\'s rect and F with a selector of S, a row of it, down, with the swipes and the time F needs, then the tap; on Android only', () => {
+    const cases = visibilityCases(truth, 'android').filter((c) => c.id.startsWith('within:'));
+    expect(cases.map((c) => c.id)).toEqual(['within:scroll-bounded.O', 'within:scroll-bounded.F']);
+    expect(cases[0].calls).toEqual([
+      { tool: 'scroll_until', args: { selector: 'id:"lab.scroll-bounded.O"', direction: 'down', within: LOWER, maxSwipes: 12, timeoutMs: 30_000 } },
+      { tool: 'tap', args: { selector: 'id:"lab.scroll-bounded.O"' } },
+    ]);
+    expect(cases[1].calls[0]).toEqual({ tool: 'scroll_until', args: { selector: 'id:"lab.scroll-bounded.F"', direction: 'down', within: 'id:"lab.scroll-bounded.S"', maxSwipes: 12, timeoutMs: 30_000 } });
+    expect(visibilityCases(truth, 'ios').filter((c) => c.id.startsWith('within:'))).toEqual([]);
+  });
+
+  it('judgeWithin: judgeScroll\'s stop and tap; a loud failure is its MISMATCH — `within` named the list the target lies in', () => {
+    const scrolledTo = (offset: number, over: Partial<LabState> = {}): LabState =>
+      state({ screen: { x: 0, y: 0, width: 1080, height: 2220 }, scale: 1, safeArea: { top: 66, left: 0, bottom: 66, right: 0 }, frames: { O: { x: 128, y: 1706 - offset, width: 825, height: 176 } }, scrollViews: { lower: LOWER }, offsets: { lower: offset }, ...over });
+    const launched = scrolledTo(0);
+    const reached = scrolledTo(297, { strokes: [stroke(0, 297, 'lower')], events: [{ kind: 'tap', tag: 'O', at }] });
+    expect(judgeWithin('O', 'lower', ['Element id:"lab.scroll-bounded.O" visible after 1 swipe', 'Tapped id:"lab.scroll-bounded.O"'], reached, launched).outcome).toBe('ok');
+    // Two strokes on `lower`, each bringing O closer, and the call out of swipes: judgeScroll's honest LOUD, this case's MISMATCH.
+    const short = scrolledTo(200, { strokes: [stroke(0, 100, 'lower'), stroke(100, 200, 'lower')] });
+    const loud = ['ERROR scroll_until id:"lab.scroll-bounded.O" failed after 2 swipes (maxSwipes) — element never appeared in the tree'];
+    expect(judgeScroll({ tag: 'O', view: 'lower', fully: false, platform: 'android' }, loud, short, launched)).toMatchObject({ outcome: 'LOUD' });
+    expect(judgeWithin('O', 'lower', loud, short, launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'failed-holds' });
   });
 });
 

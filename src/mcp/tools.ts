@@ -543,14 +543,18 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
           .optional()
           .describe('Require the element ENTIRELY inside the viewport and uncovered, not just its centre. Default false'),
         timeoutMs: z.number().optional().describe(`Default ${DEFAULT_SCROLL_TIMEOUT_MS}`),
+        within: z
+          .union([z.string(), z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }).strict()])
+          .optional()
+          .describe('The scroll view to swipe until the element is first read: a selector of it or of an element inside it (its nearest scroll view), or its rect from ui_snapshot / a failure reply. Default: the screen\'s largest.'),
         configPath,
       },
     },
-    async ({ platform: p, selector, direction, maxSwipes, fully, timeoutMs, configPath: cp }) => {
+    async ({ platform: p, selector, direction, maxSwipes, fully, timeoutMs, within, configPath: cp }) => {
       const { cfg } = await loadForCall(TOOL_CONFIG.scroll_until(p), cp);
       const adapter = await deviceFor(p, iosToolSettings(cfg, p));
       // The eyes a `fully visible` claim is confirmed with (ui-tree/eyes.ts), wired here: interact/ may not import verify/.
-      const result = await scrollUntilVisible(adapter, selector, { direction, maxSwipes, fully, timeoutMs, eyes: eyesOn(adapter) });
+      const result = await scrollUntilVisible(adapter, selector, { direction, maxSwipes, fully, timeoutMs, within, eyes: eyesOn(adapter) });
       return text(`Element ${selector} ${describeScrollResult(result)}`);
     },
   );

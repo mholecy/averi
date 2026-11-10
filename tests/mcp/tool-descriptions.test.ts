@@ -597,12 +597,13 @@ describe('troubleshooting on scroll_until\'s end proof, unchecked axis and the d
     expect(TROUBLESHOOTING).toContain(`- **\`scroll_until … failed ${words.slice(0, cut)} — …${words.slice(back)} — …\`**`);
   });
 
-  it('the scroll views beside the one swiped (D76): the entry quotes boundText\'s words, the way out elided', async () => {
+  it('the scroll views beside the one swiped (D76): the entry quotes boundText\'s words, the way out elided but its `within` (D78)', async () => {
     const { boundText } = await vi.importActual<typeof import('../../src/interact/scroll-text.js')>('../../src/interact/scroll-text.js');
     const lower = { role: 'scrollable', label: null, identifier: null, rect: { x: 0, y: 1046, width: 1080, height: 495 } };
-    const words = boundText({ of: 'exhausted', lastStroke: 'down', unchanged: 'tree', beside: { axis: 'vertical', within: { x: 0, y: 303, width: 1080, height: 605 }, others: [lower] } }, 2);
+    const words = boundText({ of: 'exhausted', lastStroke: 'down', unchanged: 'tree', beside: { axis: 'vertical', strokedOver: { x: 0, y: 303, width: 1080, height: 605 }, others: [lower] } }, 2);
     const cut = words.indexOf(' — if the element lies');
-    const back = words.indexOf(' then scroll_until it');
+    // D78: the way out is the next call's `within`, quoted whole.
+    const back = words.indexOf(' scroll_until it again with within: ');
     expect(TROUBLESHOOTING).toContain(`- **\`scroll_until … failed ${words.slice(0, cut)} — …${words.slice(back)} — …\`**`);
   });
 
@@ -641,7 +642,7 @@ describe('the full reference quotes each operation default as shipped', () => {
     expect(full('ensure_state')).toContain(`the whole ~${formatSeconds(DEFAULT_ENSURE_TIMEOUT_MS)} second look`);
     expect(full('swipe')).toContain(`a stroke through the screen centre, ${Number((SWIPE_REACH_FRACTION * 100).toFixed(2))}% of the screen either side`);
     expect(full('scroll_until')).toContain(`\`maxSwipes\`: Default ${DEFAULT_MAX_SWIPES} `);
-    expect(full('scroll_until')).toContain(`\`timeoutMs\`: Default ${DEFAULT_SCROLL_TIMEOUT_MS}\n`);
+    expect(full('scroll_until')).toMatch(new RegExp(`\`timeoutMs\`: Default ${DEFAULT_SCROLL_TIMEOUT_MS}\\s`));
     expect(full('get_logs')).toContain(`(default ${LOG_MAX_LINES})`);
     expect(full('verify')).toContain(`primary at tolerance_de, default ${DEFAULT_TOLERANCE_DE}; vs-contract at ${CONTRACT_TOL_FACTOR}x`);
     expect(full('verify')).toContain(`(tolerance_size_pct, default ${DEFAULT_SIZE_TOLERANCE_PCT}%`);
