@@ -196,9 +196,10 @@ its outputs kept. device-state.ts is in the mutation scope (group `lab`), its re
 
 ## Amendment: no first state is a named failure (T10, 2026-11-10)
 
-**Context.** The cycle read the state after the calls as `stamped(await lab.state())!`: when the app wrote none, the judge
-met `undefined`, and a judge that read it threw a raw TypeError that ended the whole run. A11 kept that for byte parity and
-pinned it. T7b did not run into it (its fresh process writes `cell: ""`, a state), but a lab app that stops writing would.
+**Context.** The cycle read the state after the calls as `stamped(await lab.state())!`: when the app wrote none, the
+judge met `undefined`, and a judge that read it threw a raw TypeError that ended the whole run. A11 kept that for byte
+parity and pinned it. T7b did not run into it (its fresh process writes `cell: ""`, a state), but a lab app that stops
+writing would.
 
 **Decision.** A first state that is undefined is the case's LOUD verdict of class `no-state`, named with the case's id
 (`noFirstState` in `scripts/truth/live-cases.ts`: `no first state for <id>: the app wrote none after the calls`),
@@ -213,6 +214,8 @@ not `no-state`) is what every count of judged runs asks — the carousel's hedge
 residual tally's "N of M judged run(s)" — so a leg nothing judged never turns the ceiling's "no pass claimed" into a
 pass. `rejudgedResults` gives such a record the same verdict (no committed record has one: each with no state has a
 `skip`, so every committed record rejudges as before; the old `no state recorded` SKIP is gone). The between-calls
-reads already keep an undefined state as it was read, and the late read already drops one, so neither changes.
+reads already keep an undefined state as it was read (every judge that reads one falls back to the final state or
+SKIPs, so none throws; pinned), and the late read already drops one, so neither changes. A `no-state` case carries no
+KNOWN or NOT-known mark in the summary (`isStateless`, beside `isJudged`): no averi behaviour was judged.
 tests/truth/run-case.test.ts pins it, from the run to its summary and the rejudged record, in place of A11's pin;
 tests/truth/live-carousel.test.ts pins the ceiling and the residual tally.

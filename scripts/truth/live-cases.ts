@@ -10,7 +10,7 @@ import { CHOOSER_CASES, type FocusReads } from './live-chooser.js';
 import { knownEntry, knownLive } from './live-known.js';
 import { judgeFullWindow, judgeHeldNo } from './live-ensure.js';
 import { FLOATING_PANEL_EVIDENCE, holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, refusedCapped, refusedKept, refusedOnFocus, refusedUnchanged, short, type Source, valueOf } from './live-forms.js';
-import { hedgedStops, hedgedStopsLine, isJudged, judgeDismissal, PRESENTED_WINDOW_CELLS, presentedAssertCase, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
+import { hedgedStops, hedgedStopsLine, isJudged, isStateless, judgeDismissal, PRESENTED_WINDOW_CELLS, presentedAssertCase, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
 import { allPassed, claimsTap, isError } from './replies.js';
 import { appOf, labId, labSelector, parseLabApp, type Catalog, type CellTruth, type HeldSpec, type LabApp, type LabState } from './schema.js';
 
@@ -808,8 +808,8 @@ export function summarize({ platform, sources, results, side, rejudgedFrom, devi
   const fixed = ofThisCheckout ? cleared.filter((r) => knownEntry(platform, r.source, r.c.id)?.intermittent !== true) : [];
   /** A case whose SKIP proves nothing (Case.skipFails: the ensure cases, live-ensure.ts): the run fails on it. */
   const failingSkips = results.filter((r) => r.c.skipFails === true && r.verdict.outcome === 'SKIP');
-  /** A case with no first state (T10, noFirstState): the lab app wrote none, so nothing was judged; the run fails on it. */
-  const stateless = results.filter((r) => r.verdict.cls === 'no-state');
+  /** A case with no first state (T10, noFirstState): the lab app wrote none, nothing judged; the run fails on it. */
+  const stateless = results.filter((r) => isStateless(r.verdict));
   /** The carousel group's ceiling on the hedged acceptance (live-carousel.ts#hedgedCeiling): its LOUD counts in the tally. */
   const ceiling = hedgedCeiling(results, ofThisCheckout);
   /** T15: the visibility group's hedged stops (live-visibility.ts#hedgedStops), counted once: the tally's line and each case's mark. */
@@ -828,6 +828,8 @@ export function summarize({ platform, sources, results, side, rejudgedFrom, devi
       const other = otherRule(r);
       const mark =
         r.verdict.outcome === 'ok' ? (entry === undefined ? '' : ` [known${entry.intermittent === true ? ' (intermittent)' : ''}, ok this run: ${entry.note}]`)
+        // T10: the lab app wrote no state, so no averi behaviour was judged: neither known nor NOT known.
+        : isStateless(r.verdict) ? ''
         : note !== undefined ? ` [known: ${note}]`
         : other !== undefined ? ` [NOT known: ${r.verdict.cls ?? '?'} on ${r.verdict.kind ?? '?'}, where KNOWN pins ${other.cls} on ${other.kind} (${other.note})]`
         : '';

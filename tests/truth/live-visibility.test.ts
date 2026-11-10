@@ -714,7 +714,7 @@ describe('hedgedStops (T15): every hedged stop counted, by reason and by verdict
   const OK = { outcome: 'ok' } as const;
   const CUT = { outcome: 'LOUD', cls: 'hedged-stop' } as const;
   const OLD_CUT = { outcome: 'LOUD', cls: 'hedged-stop-old-lead' } as const;
-  type V = { outcome: 'ok' | 'LOUD' | 'MISMATCH' | 'SKIP'; cls?: 'hedged-stop' | 'hedged-stop-old-lead' | 'stop-claim' | 'not-reached' | 'fully-cut' | 'tap-refused' };
+  type V = { outcome: 'ok' | 'LOUD' | 'MISMATCH' | 'SKIP'; cls?: 'hedged-stop' | 'hedged-stop-old-lead' | 'stop-claim' | 'not-reached' | 'fully-cut' | 'tap-refused' | 'no-state' };
   const r = (id: string, verdict: V, ...replies: string[]) => ({ source: 'uiautomator', c: { id, group: 'visibility' as const }, verdict, replies });
   const of = (group: 'carousel' | 'forms', id: string, verdict: V, ...replies: string[]) => ({ ...r(id, verdict, ...replies), c: { id, group } });
 
@@ -731,6 +731,12 @@ describe('hedgedStops (T15): every hedged stop counted, by reason and by verdict
     const stops = hedgedStops([r('a', OK, clean, 'Tapped id:"x"'), r('b', OK, checked), r('c', OK, plain), r('d', OK, 'Tapped id:"x"'), r('e', { outcome: 'LOUD', cls: 'not-reached' }, 'ERROR scroll_until x failed after 6 swipes (maxSwipes)')]);
     expect(stops).toEqual({ visible: 3, all: [] });
     expect(hedgedStopsLine(stops)).toBe('Hedged stops: 0 of 3 visible stops (target whole, ok: 0; cut, LOUD: 0)');
+  });
+
+  it('a case with no first state (T10, `no-state`) replied all the same: its hedge is counted, in the `other` bucket', () => {
+    const stops = hedgedStops([r('n', { outcome: 'LOUD', cls: 'no-state' }, held, 'Tapped id:"x"')]);
+    expect(stops.visible).toBe(1);
+    expect(stops.all.map((h) => [h.id, h.bucket, h.why])).toEqual([['uiautomator n', 'other', 'held']]);
   });
 
   it('no visible stop: no line, so a summary without one reads as before', () => {

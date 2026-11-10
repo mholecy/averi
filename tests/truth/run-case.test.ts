@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { type Case, rejudge, type RunRecord, selectCases, summarize, THIS_CHECKOUT } from '../../scripts/truth/live-cases.js';
+import { type Case, noFirstState, rejudge, type RunRecord, selectCases, summarize, THIS_CHECKOUT } from '../../scripts/truth/live-cases.js';
+import { knownEntry } from '../../scripts/truth/live-known.js';
 import type { FocusRead } from '../../scripts/truth/lab-device.js';
 import type { LiveVerdict } from '../../scripts/truth/live-visibility.js';
 import { runCase, type CaseRig } from '../../scripts/truth/run-case.js';
@@ -61,6 +62,16 @@ describe('runCase: the reads a case declares', () => {
     expect(lab.log).toEqual(['launch c', 'call tap under idb-x1.yaml', 'call tap under idb-x1.yaml', 'call tap under idb-x1.yaml', 'pause 800', 'state']);
     expect(run.record.after).toEqual([]);
     expect(run.record).not.toHaveProperty('swipes');
+  });
+
+  it('betweenCalls: a read that finds no state is kept as read, undefined, and handed so to the judge (each one that reads it falls back or SKIPs)', async () => {
+    const lab = new FakeLab({ launched: read('launch'), states: [undefined, read('final')] });
+    let seen: unknown;
+    const c = aCase({ calls: threeCalls.slice(1), reads: { betweenCalls: true }, judge: (_s, _r, _so, _l, a) => ((seen = a), OK) });
+    const run = await runCase(c, 'idb', rigOver(lab, ['1', '2']));
+    expect(run.record.after).toStrictEqual([undefined]);
+    expect(seen).toStrictEqual([undefined]);
+    expect(run.verdict).toEqual(OK);
   });
 
   it('betweenCalls: the app read between the calls, not after the last, kept in order and unstamped', async () => {
@@ -378,8 +389,18 @@ describe('runCase: no first state, the app wrote none (T10)', () => {
     expect(again.exitCode).toBe(1);
   });
 
+  it('a case live-known.ts knows that comes out `no-state` carries no KNOWN or NOT-known mark: the lab app failed, not averi', async () => {
+    const [b1d] = await selectCases({ platform: 'android', app: 'native', groups: ['forms'], only: ['b1d'] });
+    expect(knownEntry('android', 'uiautomator', 'b1d')).toBeDefined();
+    const verdict = noFirstState('b1d');
+    const { lines, exitCode } = summarize({ platform: 'android', sources: ['uiautomator'], side: THIS_CHECKOUT, results: [{ source: 'uiautomator', c: b1d, verdict, replies: ['r'] }] });
+    expect(lines).toContain(`- LOUD (no-state) b1d ${b1d.cell}: ${b1d.says} — ${verdict.why}`);
+    expect(lines.join('\n')).not.toMatch(/\[(NOT )?known/);
+    expect(exitCode).toBe(1);
+  });
+
   it('a --side run (a calibration, held to no KNOWN entry) fails on it too: the lab app is broken whatever averi drove it', () => {
-    const results = [{ source: 'idb' as const, c: aCase(), verdict: { outcome: 'LOUD', cls: 'no-state', why: 'no first state for x1: the app wrote none after the calls' } as LiveVerdict, replies: ['r'] }];
+    const results = [{ source: 'idb' as const, c: aCase(), verdict: NO_STATE, replies: ['r'] }];
     const { lines, exitCode } = summarize({ platform: 'ios', sources: ['idb'], side: '<cal>/side-checkout', results });
     expect(lines).toContain('NO FIRST STATE — the app wrote none, the run fails: idb x1');
     expect(exitCode).toBe(1);

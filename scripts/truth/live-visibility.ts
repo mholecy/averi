@@ -112,8 +112,8 @@ export type VerdictClass =
   | 'off-band'
   | 'unsettled-read'
   | 'no-retry'
-  // run-case.ts (T10): no first state to judge, the app wrote none after the calls (live-cases.ts#noFirstState) — a broken
-  // lab app, not averi's; it fails the run (summarize).
+  // run-case.ts (T10): no first state to judge, the app wrote none after the calls (live-cases.ts#noFirstState) —
+  // a broken lab app, not averi's; it fails the run (summarize).
   | 'no-state';
 
 export interface LiveVerdict {
@@ -137,7 +137,10 @@ export interface LiveVerdict {
  * judge was asked about. Every count a pass is claimed on asks this (live-carousel.ts#hedgedCeiling, the residual tally
  * in live-cases.ts#summarize), so a run nothing judged never makes one claim a pass; hedgedStops does not.
  */
-export const isJudged = (v: Pick<LiveVerdict, 'outcome' | 'cls'>): boolean => v.outcome !== 'SKIP' && v.cls !== 'no-state';
+export const isJudged = (v: Pick<LiveVerdict, 'outcome' | 'cls'>): boolean => v.outcome !== 'SKIP' && !isStateless(v);
+
+/** Whether a verdict is a case's with no first state (T10, live-cases.ts#noFirstState): no judge was asked. */
+export const isStateless = (v: Pick<LiveVerdict, 'cls'>): boolean => v.cls === 'no-state';
 
 /** What a tap or a stroke made the app log: every event but the touches and focus changes (tap, dismissed, button, tab, select, submit). */
 export function firedSince(state: Pick<LabState, 'events'>, launched: Pick<LabState, 'events'>): ProbeEvent[] {
@@ -433,7 +436,7 @@ export interface CountedHedge<R extends JudgedStop = JudgedStop> {
 }
 
 /**
- * A run's hedged stops (T15): `visible` its visibility group's judged cases (no SKIP) that stopped on their target — one
+ * A run's hedged stops (T15): `visible` its visibility group's cases not SKIP that stopped on their target — one
  * per case, the denominator — and `all` the hedged among them (`hedgedStop`), in the run's order, each in its bucket by
  * verdict: `whole` ok, `cut` judgeScroll's LOUD on a target the app shows cut (`HEDGED_CUT`), `other` any other.
  */
@@ -451,15 +454,15 @@ export interface HedgedStops<R extends JudgedStop = JudgedStop> {
  * runs: a case with no first state (T10, `no-state`) still replied, so its hedge stays, in the `other` bucket.
  */
 export function hedgedStops<R extends JudgedStop>(results: readonly R[]): HedgedStops<R> {
-  const judged = results.filter((r) => r.c.group === 'visibility' && r.verdict.outcome !== 'SKIP' && r.replies.some((x) => replyKind(x) === 'visible'));
+  const replied = results.filter((r) => r.c.group === 'visibility' && r.verdict.outcome !== 'SKIP' && r.replies.some((x) => replyKind(x) === 'visible'));
   const cutBy: readonly (VerdictClass | undefined)[] = Object.values(HEDGED_CUT);
-  const all = judged.flatMap((r): CountedHedge<R>[] => {
+  const all = replied.flatMap((r): CountedHedge<R>[] => {
     const hedged = hedgedStop(r);
     if (hedged === undefined) return [];
     const bucket = r.verdict.outcome === 'ok' ? 'whole' : cutBy.includes(r.verdict.cls) ? 'cut' : 'other';
     return [{ id: `${r.source} ${r.c.id}`, bucket, why: hedged.why ?? UNREAD_WHY, result: r }];
   });
-  return { visible: judged.length, all };
+  return { visible: replied.length, all };
 }
 
 /**
