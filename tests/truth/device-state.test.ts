@@ -90,7 +90,7 @@ describe('deviceLine: the summary\'s label', () => {
   });
 
   it('a failed read, or one missing: unlabelled, with why', () => {
-    expect(deviceLine({ error: 'before: the lab app reported no carousel offset' })).toBe('Device: unlabelled — before: the lab app reported no carousel offset');
+    expect(deviceLine({ error: 'before: the lab app reported no carousel offset', side: 'before' })).toBe('Device: unlabelled — before: the lab app reported no carousel offset');
     expect(deviceLine({ before: readOf(FAST, 17) })).toBe('Device: unlabelled — no read after the cases');
   });
 });
@@ -276,7 +276,7 @@ describe('deviceLabelling: which runs read the device, and the one guard on a fa
   });
 
   it('no read at all: unlabelled, "no read before the cases"', () => {
-    expect(deviceLabelling(new AndroidLab('emulator-5554', { exec: fast().exec }), cases('carousel'), 'read', opts)!.label()).toEqual({ error: 'no read before the cases' });
+    expect(deviceLabelling(new AndroidLab('emulator-5554', { exec: fast().exec }), cases('carousel'), 'read', opts)!.label()).toEqual({ error: 'no read before the cases', side: 'before' });
   });
 
   it('a failed before read: the error with its side, and nothing read after it', { timeout: 10_000 }, async () => {
@@ -286,17 +286,21 @@ describe('deviceLabelling: which runs read the device, and the one guard on a fa
     await labelling.read('before');
     const sent = avd.calls.length;
     await labelling.read('after');
-    expect(labelling.label()).toEqual({ error: "before: adb: device 'emulator-5554' not found" });
+    expect(labelling.label()).toEqual({ error: "before: adb: device 'emulator-5554' not found", side: 'before' });
+    expect(Object.keys(labelling.label()).sort()).toEqual(['error', 'side']);
     expect(avd.calls).toHaveLength(sent);
   });
 
-  it('a failed after read: the error alone, the before read dropped (a label holds reads or an error, never both)', { timeout: 10_000 }, async () => {
+  it('a failed after read: the error with its side, the before read kept, and the before state said', { timeout: 10_000 }, async () => {
     const { lab, down } = goingDown();
     const labelling = deviceLabelling(lab, cases('carousel'), 'read', opts)!;
     await labelling.read('before');
     down();
     await labelling.read('after');
-    expect(labelling.label()).toEqual({ error: "after: adb: device 'emulator-5554' not found" });
+    const label = labelling.label();
+    expect(label).toMatchObject({ error: "after: adb: device 'emulator-5554' not found", side: 'after', before: { rounds: [{ pre: 438 }] } });
+    expect(Object.keys(label).sort()).toEqual(['before', 'error', 'side']);
+    expect(deviceLine(label)).toBe("Device: before fast 0/4 (frames p50 18 ms), unlabelled — after: adb: device 'emulator-5554' not found");
   });
 
   it('--device-read none: unlabelled, saying so, and no adb call', async () => {
@@ -305,7 +309,7 @@ describe('deviceLabelling: which runs read the device, and the one guard on a fa
     const labelling = deviceLabelling(new AndroidLab('emulator-5554', { exec: avd.exec }), cases('carousel'), 'none', { note: (l) => void notes.push(l) })!;
     await labelling.read('before');
     await labelling.read('after');
-    expect(labelling.label()).toEqual({ error: 'not read (--device-read none)' });
+    expect(labelling.label()).toEqual({ error: 'not read (--device-read none)', side: 'before' });
     expect(avd.calls).toEqual([]);
     expect(notes).toEqual([]);
   });

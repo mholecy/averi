@@ -158,9 +158,10 @@ state by accident and T12, T13 and T19 needed it labelled; each labelled its run
   cases selected (`deviceLabelling`: the cases `--groups`, `--cases` and `--cells` leave, not the groups asked), into
   `RunRecord.deviceLabel` (`{ before, after }`), and `summarize` prints `Device: before <state> <short>/<strokes>, after
   … (frames p50 … → …)`, `DISAGREE — ` first when the two states differ, `, framework restarted (start count a → b)` last
-  when the start count changed between the reads. A label holds reads or an error, never both (a union type). A read
-  that fails (adb, no carousel offset in the state file) leaves `{ error }` alone — an after read that fails drops the
-  before read with it — and `Device: unlabelled — <why>`; `deviceLabelling` is the one guard: nothing is read after a
+  when the start count changed between the reads. A label never holds an error with both reads (a union type). A read
+  that fails (adb, no carousel offset in the state file) leaves `{ error, side }` and `Device: unlabelled — <why>`; an
+  after read that fails keeps the good before read beside its error (`{ error, side: 'after', before }`, printed `Device:
+  before <state> (frames p50 …), unlabelled — after: <why>`), the evidence this label exists to keep; `deviceLabelling` is the one guard: nothing is read after a
   failure, the cases still run, and the exit code is untouched: a label, not a gate. A case that throws ends the cases
   without the after read: the record keeps `{ before }` and prints `Device: unlabelled — no read after the cases`.
   `--device-read none` skips both reads and records `{ error: 'not read (--device-read none)' }`, so the record still

@@ -86,11 +86,12 @@ export interface DeviceRead {
 export type Side = 'before' | 'after';
 
 /**
- * A run's label (RunRecord `deviceLabel`): the reads, or why it has none — never both. `{ before }` alone: the cases
- * threw, so nothing was read after them. `{ error }`: a read failed (`before:` or `after:` and its words; an after read
- * that fails drops the before read with it) or `--device-read none` — the run unlabelled, never aborted.
+ * A run's label (RunRecord `deviceLabel`): both reads, or why it has not got them — never an error with both. `{ before }`
+ * alone: the cases threw, so nothing was read after them. `{ error, side }`: the read of `side` failed (`error` its side
+ * and words), or `--device-read none` (side `before`) — the run unlabelled, never aborted; an after read that failed
+ * keeps the good before read beside its error.
  */
-export type DeviceLabel = { before: DeviceRead; after?: DeviceRead } | { error: string };
+export type DeviceLabel = { before: DeviceRead; after?: DeviceRead } | { error: string; side: Side; before?: DeviceRead };
 
 const restarted = (before: DeviceRead, after: DeviceRead): string =>
   before.startCount === after.startCount ? '' : `, framework restarted (start count ${before.startCount} → ${after.startCount})`;
@@ -105,7 +106,7 @@ const p50Text = (read: DeviceRead): string => (read.frames === undefined ? 'unre
  * restart between the reads (the start count changed, final-ab.sh's abort) last; unlabelled with why.
  */
 export function deviceLine(label: DeviceLabel): string {
-  if ('error' in label) return `Device: unlabelled — ${label.error}`;
+  if ('error' in label) return `Device: ${label.before === undefined ? '' : `before ${stateText(label.before)} (frames p50 ${p50Text(label.before)}), `}unlabelled — ${label.error}`;
   const { before, after } = label;
   if (after === undefined) return 'Device: unlabelled — no read after the cases';
   const disagree = stateOf(before.rounds).state !== stateOf(after.rounds).state;
@@ -219,7 +220,7 @@ export function deviceLabelling(
 ): DeviceLabelling | undefined {
   if (lab === undefined || !selected.some((c) => c.group === 'carousel')) return undefined;
   const reads: Partial<Record<Side, DeviceRead>> = {};
-  let error = mode === 'none' ? 'not read (--device-read none)' : undefined;
+  let error: { error: string; side: Side } | undefined = mode === 'none' ? { error: 'not read (--device-read none)', side: 'before' } : undefined;
   return {
     async read(side) {
       if (error !== undefined) return;
@@ -227,12 +228,12 @@ export function deviceLabelling(
       try {
         reads[side] = await readDevice(lab, options);
       } catch (e) {
-        error = `${side}: ${e instanceof Error ? e.message : String(e)}`;
+        error = { error: `${side}: ${e instanceof Error ? e.message : String(e)}`, side };
       }
     },
     label() {
-      if (error !== undefined) return { error };
-      if (reads.before === undefined) return { error: 'no read before the cases' };
+      if (error !== undefined) return { ...error, ...(reads.before !== undefined && { before: reads.before }) };
+      if (reads.before === undefined) return { error: 'no read before the cases', side: 'before' };
       return { before: reads.before, ...(reads.after !== undefined && { after: reads.after }) };
     },
   };

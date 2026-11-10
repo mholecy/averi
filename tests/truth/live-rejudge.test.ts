@@ -1282,7 +1282,7 @@ describe('T16: the carousel group\'s device label, printed from the record', () 
 
   it('a failed read: unlabelled, loud in the summary, the exit code untouched', { timeout: 60_000 }, async () => {
     const plain = await rejudgeRecord(recorded(), RECORD, { groups: ['carousel'] });
-    const failed = await rejudgeRecord({ ...recorded(), deviceLabel: { error: 'before: round 1: the lab app reported no carousel offset' } }, RECORD, { groups: ['carousel'] });
+    const failed = await rejudgeRecord({ ...recorded(), deviceLabel: { error: 'before: round 1: the lab app reported no carousel offset', side: 'before' } }, RECORD, { groups: ['carousel'] });
     expect(deviceLines(failed.lines)).toEqual(['Device: unlabelled — before: round 1: the lab app reported no carousel offset']);
     expect(failed.exitCode).toBe(plain.exitCode);
   });
