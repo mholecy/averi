@@ -1018,6 +1018,53 @@ residual-10 MISMATCH, filed with g2 (`android uiautomator g2|rfe3`); rfe1 and rf
 **Residuals, stated.** Residual 10 now holds on Android too. A label still loses its outer spaces on Android, as
 before (iOS's label keeps what WDA or idb gives it); no case asks for them.
 
+## Amendment: a refused reading that is the value itself says what an append would show (2026-11-10, D79)
+
+**Context.** Found at D71's review (m3), kept as decided there and filed as backlog row D79. D71's refusal of a
+reading that is the value itself (`55` typed after `5` without clear, read `55`) is a `length` whose two counts are
+equal by construction — the field's count is the typed one: "typed 2 characters but the field shows 2 — the field may
+have replaced its text (select-all): fill with `clear: true`". Two equal counts read as a match, the class of
+docs/bugs/2026-10-09-fill-mismatch-error-says-equal-counts-when-app-transforms-text.md (`case` and `same-length` closed
+it for a transformed input, not for this one).
+
+**Decision.**
+- fill-facts.ts#Difference: a `length` carries `appended`, the count an append would have shown — the earlier text's
+  (`priorText`, the named placeholder aside) plus the typed. `fill-landing.ts#differenceOf` sets it on a `length` that
+  is a whole landing too and whose held text is the value itself — exactly D71's refusal; no other reading carries it
+  (the sweep in fill-landing.test.ts pins both ways). `withoutWholeToo` keeps it: keys proven typed elsewhere take the
+  hedge off, not the count.
+- fill-text.ts words that mismatch's second count `only the typed text, where an append would show N`, the rest as it
+  was: "fill: typed 2 characters but the field shows only the typed text, where an append would show 3 — the field may
+  have replaced its text (select-all): fill with `clear: true` (content withheld from this error)". Counts only, as
+  every fill error (fill-text.ts#fillFailureText: no row is handed the typed value or the field's text; ADR 0043 keeps
+  a typing out of a failed command's words the same way): that the field shows "only the typed text" says no character. The
+  hedge and the remedy stay as D71 decided. `1212` after `12` says 6, `-5` after `-` and `1 ` after `1` say 3.
+
+**Rejected.** A new Difference kind: the reading is a `length` as D71 classified it, and every consumer (the sweep,
+the reply, `withoutWholeToo`) reads it so; one optional count is the narrowest change. Printing the earlier count as
+well (`the 1 it showed before`): the sum is what the reader compares, and a third number adds nothing.
+
+**Consequences.** Only the wording of D71's refusal changes; pass and fail do not, nothing else is typed, and no
+other reply moves. Under an unnamed placeholder (residual 12: `+447700900123` after idb's `+`) the append count is the
+placeholder's plus the typed (14) — what an append to the text the tree showed would read; the hedge names the
+select-all reading, and the remedy is the same. The other paths that print two equal counts were checked: `case`,
+`same-length`, `masked` (the held count said), `dropped-tail` (what landed said) and `unchanged` (the field did not
+change) each say why after the counts; `separated` always shows more. One remains: a short landing whose earlier text
+pads the reading to the typed count (`12` typed after `1`, read `11`, keys dropped and, on a may-arrive-late adapter,
+nothing typed again) reads "typed 2 characters but the field shows 2 (content withheld from this error)" — a true
+short landing, pinned unchanged by this row's brief, not D71's refusal; not changed here.
+
+**Mutation-checked** by hand over the interact and adapters tests (3687): the `held === value` gate always true (7
+fail) or always false (14), the earlier count dropped, subtracted or taken from the reading (14 each), the `wholeToo`
+guard dropped (37); in fill-text.ts the wording never chosen (6) or saying the field's count (6). One equivalent in
+fill-text.ts (not in the mutation scope): `showsText`'s `d.kind === 'length'` dropped — no other kind carries
+`appended`. fill-landing, narrowed cold (`npm run mutate -- --group core --force --mutate src/interact/fill-landing.ts`):
+97.19 % (356 mutants, 10 survived, 1 timeout), floor 95 — the same survivors as D71's run, none in the new code.
+
+**Golden and live.** The golden replays tree reads and never types: Changed 0 against main 41055181. No live record
+reads the shape (D71's live run: no live case reaches its refusal). The unit tests are the evidence: fill.test.ts's
+D79 rows (`55`/`5`, `1212`/`12`, `-5`/`-` through `fillField`, no equal counts, no content) and the short-landing pin.
+
 ## Residuals accepted
 
 1. **A split inside a code, or between a letter and a digit, passes as a reformat** (review round 3, MINOR-1;
