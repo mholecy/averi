@@ -139,12 +139,13 @@ state by accident and T12, T13 and T19 needed it labelled; each labelled its run
 - `readDevice` in `scripts/truth/device-state.ts` ports raw-strokes.mjs onto `AndroidLab` and live-carousel.ts's
   constants: per round, a fresh launch of `carousel-recycler-free` (`RECYCLER_FREE`; `AndroidLab.launch`, settled on the
   app's ready, then the script's own 1.5 s, `LAUNCH_SETTLE_MS`: the settle on ready is a floor, never a shorter wait),
-  the probes' 440-px pre-drag (`preDragStroke`, `PRE_DRAG_PX`, 1.2 s to settle), then four raw 142-px, 300-ms strokes
+  the carousel's offset read then (0 when the state file has none, the script's `off()??0`; an unreadable file fails
+  the read), the probes' 440-px pre-drag (`preDragStroke`, `PRE_DRAG_PX`, 1.2 s to settle), then four raw 142-px, 300-ms strokes
   along the clip's mid-line from 80 % to 65 % of its width (lv-d62's first probe, the script's 824 → 682 at y 497), each
   carry the change of the state file's carousel offset 1.5 s after it, and the device's loadavg. Four rounds (T19's
   count; T11's final A/B read six); fewer than one is refused. Then the lab app's frames (`dumpsys gfxinfo`, reset after
   each launch; `parseGfxinfo`), the framework's `sys.system_server.start_count` (final-ab.sh's restart check) and the
-  host's loadavg.
+  host's loadavg; the read ends, as the script does, with the lab app force-stopped.
 - The frames are the last round's: its pre-drag and four strokes, read once per read. They are not comparable with T11's
   `frames-*.txt`, whose window was one pre-drag and one stroke in a launch of its own (final-ab.sh's `read_device`):
   four strokes and their settles put more frames, and more of them idle, into the percentiles. A Device line's p50 is
@@ -154,13 +155,17 @@ state by accident and T12, T13 and T19 needed it labelled; each labelled its run
   line for lv-d62's 142-px probe, ADR 0013's T11 amendment), else fast. tests/truth/device-state-records.test.ts holds
   it to every label those scripts wrote into the T11 and T12 records.
 - `live.ts` reads before the first case and after the last when the run is on Android and a carousel case is among the
-  cases selected (`deviceLabelAtStart`: the cases `--groups`, `--cases` and `--cells` leave, not the groups asked), into
+  cases selected (`deviceLabelling`: the cases `--groups`, `--cases` and `--cells` leave, not the groups asked), into
   `RunRecord.deviceLabel` (`{ before, after }`), and `summarize` prints `Device: before <state> <short>/<strokes>, after
   … (frames p50 … → …)`, `DISAGREE — ` first when the two states differ, `, framework restarted (start count a → b)` last
-  when the start count changed between the reads. A read that fails (adb, no carousel offset in the state file) leaves
-  `{ error }` and `Device: unlabelled — <why>`; nothing is read after a failure, the cases still run, and the exit code is
-  untouched: a label, not a gate. `--device-read none` skips both reads and records `{ error: 'not read (--device-read
-  none)' }`, so the record still says it is unlabelled. Any other run, and iOS, reads nothing and prints no line.
+  when the start count changed between the reads. A label holds reads or an error, never both (a union type). A read
+  that fails (adb, no carousel offset in the state file) leaves `{ error }` alone — an after read that fails drops the
+  before read with it — and `Device: unlabelled — <why>`; `deviceLabelling` is the one guard: nothing is read after a
+  failure, the cases still run, and the exit code is untouched: a label, not a gate. A case that throws ends the cases
+  without the after read: the record keeps `{ before }` and prints `Device: unlabelled — no read after the cases`.
+  `--device-read none` skips both reads and records `{ error: 'not read (--device-read none)' }`, so the record still
+  says it is unlabelled; live.ts checks the flag beside its usage check, before the lab guard, and refuses it with
+  `--rejudge`, which reads no device. Any other run, and iOS, reads nothing and prints no line.
 - The record's key is `deviceLabel`: `device` holds the device's name in two Android records of 2026-10, and
   `deviceState` holds label-group.mjs's labels, in another shape, in the T11 and T12 records. The Device line is the
   record's, not a case's: `--rejudge` prints it whatever groups its selection keeps, carousel or not. A record without
@@ -168,11 +173,16 @@ state by accident and T12, T13 and T19 needed it labelled; each labelled its run
   `visibility,dismissal,ensure,carousel,chooser`, base 3b811b28 against T16).
 
 **Not yet run on a device.** `readDevice` has run only over a fake exec: the emulator was down when T16 was built, and
-the smoke went to the owner's list. The first live carousel run must confirm: `deviceLabel.before` and `.after` each hold
+the smoke went to the owner's list, its record and log to be committed as
+`docs/truth/live-records/t16-device-state/smoke-1.json` and `smoke-1.log.txt` (`live.ts --serial emulator-5554 --groups
+carousel --cases lv-d62-control --record …`). The first live carousel run must confirm: `deviceLabel.before` and `.after` each hold
 four rounds of four strokes with carries the state file gave (none NaN, none from a stale file), the pre-drag carrying
 about 438 px, frames present (`dumpsys gfxinfo` prints the four lines `parseGfxinfo` reads on this AVD) and the start
 count read; the `Device:` line printed under the summary and again, byte for byte, by `--rejudge` of the record; the
-case between the reads judged as without them; and the reads' real cost against the estimate below.
+case between the reads judged as without them; the reads' real cost against the estimate below; and the port's
+fidelity: `node docs/truth/live-records/t11-carousel-visible/raw/raw-strokes.mjs <out> 4` run right next to the
+`--groups carousel` run on the same boot, each read's state and short count compared with the Device line's (the
+same state expected, short counts close; a disagreement is the port's to explain before any label is trusted).
 
 **Consequences.** A read costs about 55 s, estimated, not measured: T11's raw-1.jsonl rounds ran 12 s apart with the
 script's 1.5-s launch sleep, and the settle on ready adds about half a second a round; four rounds and the frames' read.

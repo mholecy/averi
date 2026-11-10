@@ -847,7 +847,7 @@ export function summarize({ platform, sources, results, side, rejudgedFrom, devi
   if (hedgedLine !== undefined) lines.push(hedgedLine, '');
   // The ceiling's line: every judged unaimable leg hedged fails the run.
   if (ceiling.lines.length > 0) lines.push(...ceiling.lines, '');
-  // T16: the device's state around the carousel group's cases, only where the run read it — a count, no gate.
+  // T16: the device's state around the carousel group's cases, only where the run read it — a label, no gate.
   if (device !== undefined) lines.push(deviceLine(device), '');
   return { lines, exitCode: unknown.length > 0 || fixed.length > 0 || failingSkips.length > 0 || ceiling.fails ? 1 : 0 };
 }

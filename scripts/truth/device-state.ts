@@ -1,13 +1,12 @@
+import { loadavg } from 'node:os';
+import { type AndroidLab, LAB_APP, pause } from './lab-device.js';
+import { LAB_CAROUSEL, onMidLine, PRE_DRAG_PX, PRE_DRAG_SETTLE_MS, preDragStroke, RECYCLER_FREE } from './live-carousel.js';
+
 /**
  * The carousel group's device read (T16, ADR 0044's T16 amendment): raw strokes on the carousel with no averi, the
  * lab app's frames and the device's counters, read before the group's cases and after them, so the device's state —
  * fast, or the short carry T11 found by accident — is labelled in the record.
  */
-
-import { loadavg } from 'node:os';
-import { type AndroidLab, LAB_APP, pause } from './lab-device.js';
-import type { Platform } from '../differential/corpus.js';
-import { LAB_CAROUSEL, onMidLine, PRE_DRAG_PX, PRE_DRAG_SETTLE_MS, preDragStroke, RECYCLER_FREE } from './live-carousel.js';
 
 /** One raw stroke's carry (px the app's carousel moved, from its state file) and how long its `input swipe` took. */
 export interface RawStroke {
@@ -15,7 +14,10 @@ export interface RawStroke {
   ms: number;
 }
 
-/** One round, as T11's raw/raw-strokes.mjs wrote a JSONL row: the pre-drag's carry and time, four strokes, the device's loadavg. */
+/**
+ * One round, as T11's raw/raw-strokes.mjs wrote a JSONL row: the pre-drag's carry and time, four strokes, the device's
+ * loadavg. `load` (and DeviceRead's `startCount`, `hostLoad`) stay the strings the device printed, as the JSONL kept them.
+ */
 export interface DeviceRound {
   pre: number;
   preMs: number;
@@ -80,15 +82,15 @@ export interface DeviceRead {
   hostLoad: string;
 }
 
+/** Which read: before the run's cases, or after them. */
+export type Side = 'before' | 'after';
+
 /**
- * A run's label (RunRecord `deviceLabel`): the reads before the group's cases and after them, or why one is missing — a
- * read that failed (`error`, `before:` or `after:` and its words) leaves the run unlabelled, never aborted.
+ * A run's label (RunRecord `deviceLabel`): the reads, or why it has none — never both. `{ before }` alone: the cases
+ * threw, so nothing was read after them. `{ error }`: a read failed (`before:` or `after:` and its words; an after read
+ * that fails drops the before read with it) or `--device-read none` — the run unlabelled, never aborted.
  */
-export interface DeviceLabel {
-  before?: DeviceRead;
-  after?: DeviceRead;
-  error?: string;
-}
+export type DeviceLabel = { before: DeviceRead; after?: DeviceRead } | { error: string };
 
 const restarted = (before: DeviceRead, after: DeviceRead): string =>
   before.startCount === after.startCount ? '' : `, framework restarted (start count ${before.startCount} → ${after.startCount})`;
@@ -102,11 +104,10 @@ const p50Text = (read: DeviceRead): string => (read.frames === undefined ? 'unre
  * The summary's Device line: both states and the frames' p50, DISAGREE first when the states differ, a framework
  * restart between the reads (the start count changed, final-ab.sh's abort) last; unlabelled with why.
  */
-export function deviceLine({ before, after, error }: DeviceLabel): string {
-  const unlabelled = (why: string) => `Device: unlabelled — ${why}`;
-  if (error !== undefined) return unlabelled(error);
-  if (before === undefined) return unlabelled('no read before the cases');
-  if (after === undefined) return unlabelled('no read after the cases');
+export function deviceLine(label: DeviceLabel): string {
+  if ('error' in label) return `Device: unlabelled — ${label.error}`;
+  const { before, after } = label;
+  if (after === undefined) return 'Device: unlabelled — no read after the cases';
   const disagree = stateOf(before.rounds).state !== stateOf(after.rounds).state;
   return `Device: ${disagree ? 'DISAGREE — ' : ''}before ${stateText(before)}, after ${stateText(after)} (frames p50 ${p50Text(before)} → ${p50Text(after)})${restarted(before, after)}`;
 }
@@ -145,10 +146,11 @@ const hostLoadavg = (): string => loadavg().map((l) => l.toFixed(2)).join(' ');
 
 /**
  * One read, as raw-strokes.mjs read a round, `rounds` times (one or more): a fresh launch of RECYCLER_FREE
- * (AndroidLab.launch, settled on the app's ready) and LAUNCH_SETTLE_MS, gfxinfo reset, the probes' 440-px pre-drag (live-carousel.ts's), then
+ * (AndroidLab.launch, settled on the app's ready) and LAUNCH_SETTLE_MS, the carousel's offset then (0 when the state
+ * file has none, as the script's `off()??0`; an unreadable file throws, as the script's `st()` did), gfxinfo reset, the probes' 440-px pre-drag (live-carousel.ts's), then
  * STROKES_PER_ROUND raw strokes, each carry the carousel offset's change in the state file, and the device's loadavg.
- * Then the frames of the last round (its pre-drag and strokes), the framework's start count first. Throws on a state
- * file with no carousel offset after a stroke: no carry, no label.
+ * Then the frames of the last round (its pre-drag and strokes), the framework's start count first, and the lab app
+ * force-stopped, as the script ends. Throws on a state file with no carousel offset after a stroke: no carry, no label.
  */
 export async function readDevice(lab: DeviceLab, { rounds = DEFAULT_ROUNDS, wait = pause, now = Date.now, hostLoad = hostLoadavg }: ReadOptions = {}): Promise<DeviceRead> {
   if (rounds < 1) throw new Error(`a device read needs one round or more, not ${rounds}`);
@@ -168,8 +170,11 @@ export async function readDevice(lab: DeviceLab, { rounds = DEFAULT_ROUNDS, wait
       if (at === undefined) throw new Error(`round ${i}: the lab app reported no carousel offset`);
       return at;
     };
-    const launched = await lab.launch(RECYCLER_FREE);
+    await lab.launch(RECYCLER_FREE);
     await wait(LAUNCH_SETTLE_MS);
+    const settled = await lab.state();
+    if (settled === undefined) throw new Error(`round ${i}: the lab app's state file was unreadable after the launch`);
+    const launched = settled.offsets?.carousel ?? 0;
     await shell('dumpsys', 'gfxinfo', pkg, 'reset');
     const pre = preDragStroke(LAB_CAROUSEL, PRE_DRAG_PX);
     const preMs = await timed(() => lab.swipe(pre.from, pre.to, pre.durationMs));
@@ -184,33 +189,51 @@ export async function readDevice(lab: DeviceLab, { rounds = DEFAULT_ROUNDS, wait
       strokes.push({ carry: next - at, ms });
       at = next;
     }
-    read.push({ pre: dragged - (launched.offsets?.carousel ?? 0), preMs, strokes, load: await shell('cat', '/proc/loadavg') });
+    read.push({ pre: dragged - launched, preMs, strokes, load: await shell('cat', '/proc/loadavg') });
   }
   const frames = parseGfxinfo(await shell('dumpsys', 'gfxinfo', pkg));
+  await shell('am', 'force-stop', pkg);
   return { t, rounds: read, ...(frames !== undefined && { frames }), startCount, hostLoad: hostLoad() };
 }
 
-/** One read into the run's label: kept, or its failure as the label's error (`before: …`); nothing read after a failure. */
-export async function readInto(label: DeviceLabel, side: 'before' | 'after', read: () => Promise<DeviceRead>): Promise<void> {
-  if (label.error !== undefined) return;
-  try {
-    label[side] = await read();
-  } catch (e) {
-    label.error = `${side}: ${e instanceof Error ? e.message : String(e)}`;
-  }
+/** `--device-read`: the carousel group reads the device (`read`, the default), or the run opts out (`none`). */
+export type DeviceReadMode = 'read' | 'none';
+
+/** The run's label as it is read (live.ts): `read` takes one side, `label` is what the record keeps. */
+export interface DeviceLabelling {
+  read(side: Side): Promise<void>;
+  label(): DeviceLabel;
 }
 
-/** `--device-read`'s one value: the run reads nothing, and its record says so (unlabelled). */
-export const DEVICE_READ_NONE = 'none';
-
 /**
- * The label a run starts with (live.ts): `{}` to be read when it is on Android with a carousel case among the cases
- * selected (not the `--groups` asked: `--cases` may leave none); `{ error }` when `--device-read none` opts out, so the
- * record still says unlabelled; undefined — nothing read, no Device line — for any other run. `deviceRead` is the
- * flag's value; any but `none` is refused.
+ * The device reads a run takes (live.ts), or undefined — nothing read, no Device line — for a run with no Android lab
+ * or no carousel case among the cases selected (not the groups asked: `--cases` may leave none). `none` labels the run
+ * unlabelled and reads nothing. Otherwise each `read` takes its side with readDevice: this is the one guard, so a read
+ * that fails becomes the label's error, never a throw, and nothing is read after one.
  */
-export function deviceLabelAtStart(platform: Platform, selected: readonly { group: string }[], deviceRead: string | undefined): DeviceLabel | undefined {
-  if (deviceRead !== undefined && deviceRead !== DEVICE_READ_NONE) throw new Error(`--device-read: ${DEVICE_READ_NONE}, or leave it out (the carousel group reads the device), not "${deviceRead}"`);
-  if (platform !== 'android' || !selected.some((c) => c.group === 'carousel')) return undefined;
-  return deviceRead === DEVICE_READ_NONE ? { error: `not read (--device-read ${DEVICE_READ_NONE})` } : {};
+export function deviceLabelling(
+  lab: DeviceLab | undefined,
+  selected: readonly { group: string }[],
+  mode: DeviceReadMode,
+  { note, ...options }: ReadOptions & { note?: (line: string) => void } = {},
+): DeviceLabelling | undefined {
+  if (lab === undefined || !selected.some((c) => c.group === 'carousel')) return undefined;
+  const reads: Partial<Record<Side, DeviceRead>> = {};
+  let error = mode === 'none' ? 'not read (--device-read none)' : undefined;
+  return {
+    async read(side) {
+      if (error !== undefined) return;
+      note?.(`device: reading the state ${side} the cases`);
+      try {
+        reads[side] = await readDevice(lab, options);
+      } catch (e) {
+        error = `${side}: ${e instanceof Error ? e.message : String(e)}`;
+      }
+    },
+    label() {
+      if (error !== undefined) return { error };
+      if (reads.before === undefined) return { error: 'no read before the cases' };
+      return { before: reads.before, ...(reads.after !== undefined && { after: reads.after }) };
+    },
+  };
 }

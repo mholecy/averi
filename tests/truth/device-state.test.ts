@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { type DeviceLabel, type DeviceRead, type DeviceRound, deviceLine, deviceLabelAtStart, parseGfxinfo, readDevice, readInto, stateOf } from '../../scripts/truth/device-state.js';
+import { type DeviceRead, type DeviceRound, deviceLabelling, deviceLine, parseGfxinfo, readDevice, stateOf } from '../../scripts/truth/device-state.js';
 import { AndroidLab, type Exec } from '../../scripts/truth/lab-device.js';
 
 // The carousel group's device read (scripts/truth/device-state.ts, T16): the T11/T19 rule read back off the committed
@@ -91,9 +91,7 @@ describe('deviceLine: the summary\'s label', () => {
 
   it('a failed read, or one missing: unlabelled, with why', () => {
     expect(deviceLine({ error: 'before: the lab app reported no carousel offset' })).toBe('Device: unlabelled — before: the lab app reported no carousel offset');
-    expect(deviceLine({ before: readOf(FAST, 17), error: 'after: adb: device offline' })).toBe('Device: unlabelled — after: adb: device offline');
     expect(deviceLine({ before: readOf(FAST, 17) })).toBe('Device: unlabelled — no read after the cases');
-    expect(deviceLine({ after: readOf(FAST, 17) })).toBe('Device: unlabelled — no read before the cases');
   });
 });
 
@@ -104,21 +102,22 @@ const GFX = 'Total frames rendered: 88\nJanky frames: 2 (2.27%)\n50th percentile
  * The lab AVD as adb answers it, its carousel a model: a force-stop puts the carousel at `start` (null: the launch's
  * state reports no offset), the 440-px pre-drag carries 438, the nth raw stroke of a round carries `carries[round][n]`;
  * the state file reports the offset (`offsets` absent once `noOffsetFrom` strokes were drawn in a round, the file
- * unreadable once `noStateFrom` were). Every command is logged.
+ * unreadable once `noStateFrom` were, or at its `unreadableRead`th read since the force-stop). Every command is logged.
  */
-function fakeAvd(carries: number[][], { noOffsetFrom = Infinity, noStateFrom = Infinity, gfx = GFX, start = 0 as number | null } = {}) {
+function fakeAvd(carries: number[][], { noOffsetFrom = Infinity, noStateFrom = Infinity, gfx = GFX, start = 0 as number | null, unreadableRead = 0 } = {}) {
   const calls: string[] = [];
   let round = -1;
   let stroke = 0;
   let offset: number | undefined = start ?? undefined;
+  let reads = 0;
   const exec: Exec = async (file, args) => {
     const line = `${file} ${args.join(' ')}`;
     calls.push(line);
     const said = (stdout: string) => ({ stdout });
     if (line === 'adb -s emulator-5554 emu avd name') return said('averi_lab\r\nOK');
-    if (line === 'adb -s emulator-5554 shell am force-stop dev.averi.lab') return (round++, (stroke = 0), (offset = start ?? undefined), said(''));
+    if (line === 'adb -s emulator-5554 shell am force-stop dev.averi.lab') return (round++, (stroke = 0), (reads = 0), (offset = start ?? undefined), said(''));
     if (line === 'adb -s emulator-5554 exec-out run-as dev.averi.lab cat files/lab-state.json') {
-      if (stroke >= noStateFrom) throw new Error('run-as: package not debuggable');
+      if (stroke >= noStateFrom || ++reads === unreadableRead) throw new Error('run-as: package not debuggable');
       return said(JSON.stringify({ cell: 'carousel-recycler-free', ready: true, ...(stroke < noOffsetFrom && offset !== undefined && { offsets: { carousel: offset } }) }));
     }
     const swipe = /^adb -s emulator-5554 shell input swipe (\d+) 497 (\d+) 497 (\d+)$/.exec(line);
@@ -149,8 +148,9 @@ describe('readDevice: raw strokes and the frames, through AndroidLab', () => {
       [79, 87, 49, 72],
       [140, 141, 139, 138],
     ]);
-    waits.length = 0;
-    const read = await readDevice(new AndroidLab('emulator-5554', { exec: avd.exec }), { rounds: 2, wait, now: clock(5), hostLoad: () => '2.10 2.00 1.90' });
+    // Each wait logged among the commands, so the order of reads, waits and strokes is pinned.
+    const logged = async (ms: number) => void avd.calls.push(`wait ${ms}`);
+    const read = await readDevice(new AndroidLab('emulator-5554', { exec: avd.exec }), { rounds: 2, wait: logged, now: clock(5), hostLoad: () => '2.10 2.00 1.90' });
     expect(read).toEqual({
       t: '2026-11-10T12:00:00.000Z',
       rounds: [
@@ -161,23 +161,32 @@ describe('readDevice: raw strokes and the frames, through AndroidLab', () => {
       startCount: '11',
       hostLoad: '2.10 2.00 1.90',
     });
+    const state = 'adb -s emulator-5554 exec-out run-as dev.averi.lab cat files/lab-state.json';
+    // raw-strokes.mjs's round: the launch (AndroidLab.launch: its settle on ready reads the state twice) and the
+    // script's 1.5 s, the offset then; the pre-drag and 1.2 s; each stroke, 1.5 s and its offset; the loadavg.
     const round = [
       'adb -s emulator-5554 shell am force-stop dev.averi.lab',
       'adb -s emulator-5554 shell run-as dev.averi.lab rm -f files/lab-state.json',
       'adb -s emulator-5554 shell am start -W -n dev.averi.lab/.MainActivity --es cell carousel-recycler-free',
+      state,
+      state,
+      'wait 1500',
+      state,
       'adb -s emulator-5554 shell dumpsys gfxinfo dev.averi.lab reset',
       'adb -s emulator-5554 shell input swipe 872 497 432 497 1000',
-      ...Array(4).fill('adb -s emulator-5554 shell input swipe 824 497 682 497 300'),
+      'wait 1200',
+      state,
+      ...Array(4).fill(['adb -s emulator-5554 shell input swipe 824 497 682 497 300', 'wait 1500', state]).flat(),
       'adb -s emulator-5554 shell cat /proc/loadavg',
     ];
-    expect(avd.calls.filter((c) => !/emu avd name|lab-state\.json$/.test(c) || /rm -f/.test(c))).toEqual([
+    expect(avd.calls.filter((c) => !/emu avd name/.test(c))).toEqual([
       'adb -s emulator-5554 shell getprop sys.system_server.start_count',
       ...round,
       ...round,
       'adb -s emulator-5554 shell dumpsys gfxinfo dev.averi.lab',
+      // The script's last command: the lab app force-stopped.
+      'adb -s emulator-5554 shell am force-stop dev.averi.lab',
     ]);
-    // raw-strokes.mjs's waits, after the launch's own settle on ready: the launch 1.5 s, the pre-drag 1.2 s, each stroke 1.5 s.
-    expect(waits).toEqual([...[1_500, 1_200, 1_500, 1_500, 1_500, 1_500], ...[1_500, 1_200, 1_500, 1_500, 1_500, 1_500]]);
   });
 
   it('a state file with no carousel offset fails the read, saying which round; gfxinfo with no frames reads none', { timeout: 10_000 }, async () => {
@@ -191,6 +200,12 @@ describe('readDevice: raw strokes and the frames, through AndroidLab', () => {
   it('an unreadable state file fails the read the same way', { timeout: 10_000 }, async () => {
     const lab = new AndroidLab('emulator-5554', { exec: fakeAvd([[140, 140, 140, 140]], { noStateFrom: 3 }).exec });
     await expect(readDevice(lab, { rounds: 1, wait, now: clock(5), hostLoad: () => '' })).rejects.toThrow('round 1: the lab app reported no carousel offset');
+  });
+
+  it('a state file unreadable once the launch settled fails the read: no offset to carry from', { timeout: 10_000 }, async () => {
+    // Reads 1 and 2 are the launch's settle on ready; the 3rd is the offset after LAUNCH_SETTLE_MS.
+    const lab = new AndroidLab('emulator-5554', { exec: fakeAvd([[140, 140, 140, 140]], { start: 12, unreadableRead: 3 }).exec });
+    await expect(readDevice(lab, { rounds: 1, wait, now: clock(5), hostLoad: () => '' })).rejects.toThrow("round 1: the lab app's state file was unreadable after the launch");
   });
 
   it('the pre-drag carries from the launch\'s offset, from 0 where the launch reported none (raw-strokes.mjs: `?? 0`)', { timeout: 10_000 }, async () => {
@@ -219,38 +234,79 @@ describe('readDevice refuses fewer than one round', () => {
   });
 });
 
-describe('deviceLabelAtStart: which runs read the device, from the cases selected', () => {
+describe('deviceLabelling: which runs read the device, and the one guard on a failed read', () => {
   const cases = (...groups: string[]) => groups.map((group) => ({ group }));
-  it('an Android run with a carousel case selected starts an empty label; --device-read none an unlabelled one', () => {
-    expect(deviceLabelAtStart('android', cases('visibility', 'carousel'), undefined)).toEqual({});
-    expect(deviceLabelAtStart('android', cases('carousel'), 'none')).toEqual({ error: 'not read (--device-read none)' });
-  });
-  it('no carousel case selected (other groups, or --cases that leave none), or iOS: no label at all', () => {
-    expect(deviceLabelAtStart('android', cases('visibility', 'forms'), undefined)).toBeUndefined();
-    expect(deviceLabelAtStart('android', [], undefined)).toBeUndefined();
-    expect(deviceLabelAtStart('ios', cases('carousel'), undefined)).toBeUndefined();
-    expect(deviceLabelAtStart('android', cases('forms'), 'none')).toBeUndefined();
-  });
-  it('any other --device-read value is refused', () => {
-    expect(() => deviceLabelAtStart('android', cases('carousel'), 'off')).toThrow('--device-read: none, or leave it out (the carousel group reads the device), not "off"');
-  });
-});
+  const fast = () => fakeAvd(Array(4).fill([140, 140, 140, 140]));
+  const opts = { rounds: 1, wait, now: clock(5), hostLoad: () => '' };
+  /** An AVD that goes offline once `down()` is called: every command then fails as adb says it. */
+  const goingDown = () => {
+    const avd = fast();
+    let offline = false;
+    const exec: Exec = async (file, args) => {
+      if (offline) throw new Error("adb: device 'emulator-5554' not found");
+      return avd.exec(file, args);
+    };
+    return { avd, lab: new AndroidLab('emulator-5554', { exec }), down: () => void (offline = true) };
+  };
 
-describe('readInto: a failed read labels the run unlabelled, never throws', () => {
-  it('keeps each read, the first failure with its side, and reads nothing after one', async () => {
-    const read = readOf(FAST, 17);
-    const label: DeviceLabel = {};
-    await readInto(label, 'before', async () => read);
-    expect(label).toEqual({ before: read });
-    await readInto(label, 'after', async () => {
-      throw new Error('adb: device offline');
-    });
-    expect(label).toEqual({ before: read, error: 'after: adb: device offline' });
-    const failed: DeviceLabel = {};
-    await readInto(failed, 'before', () => Promise.reject('no state'));
-    let asked = false;
-    await readInto(failed, 'after', async () => ((asked = true), read));
-    expect(failed).toEqual({ error: 'before: no state' });
-    expect(asked).toBe(false);
+  it('no Android lab, or no carousel case among the cases selected: none', () => {
+    const lab = new AndroidLab('emulator-5554', { exec: fast().exec });
+    expect(deviceLabelling(undefined, cases('carousel'), 'read')).toBeUndefined();
+    expect(deviceLabelling(lab, cases('visibility', 'forms'), 'read')).toBeUndefined();
+    expect(deviceLabelling(lab, [], 'none')).toBeUndefined();
+    expect(deviceLabelling(lab, cases('visibility', 'carousel'), 'read')).toBeDefined();
+  });
+
+  it('both sides read: the label holds both, and the note says each read', { timeout: 10_000 }, async () => {
+    const notes: string[] = [];
+    const labelling = deviceLabelling(new AndroidLab('emulator-5554', { exec: fast().exec }), cases('carousel'), 'read', { ...opts, note: (l) => void notes.push(l) })!;
+    await labelling.read('before');
+    await labelling.read('after');
+    const label = labelling.label();
+    expect(label).toMatchObject({ before: { rounds: [{ pre: 438 }] }, after: { rounds: [{ pre: 438 }] } });
+    expect(deviceLine(label)).toBe('Device: before fast 0/4, after fast 0/4 (frames p50 18 ms → 18 ms)');
+    expect(notes).toEqual(['device: reading the state before the cases', 'device: reading the state after the cases']);
+  });
+
+  it('the cases threw, so no after read: the before read kept, "no read after the cases"', { timeout: 10_000 }, async () => {
+    const labelling = deviceLabelling(new AndroidLab('emulator-5554', { exec: fast().exec }), cases('carousel'), 'read', opts)!;
+    await labelling.read('before');
+    expect(Object.keys(labelling.label())).toEqual(['before']);
+    expect(deviceLine(labelling.label())).toBe('Device: unlabelled — no read after the cases');
+  });
+
+  it('no read at all: unlabelled, "no read before the cases"', () => {
+    expect(deviceLabelling(new AndroidLab('emulator-5554', { exec: fast().exec }), cases('carousel'), 'read', opts)!.label()).toEqual({ error: 'no read before the cases' });
+  });
+
+  it('a failed before read: the error with its side, and nothing read after it', { timeout: 10_000 }, async () => {
+    const { avd, lab, down } = goingDown();
+    const labelling = deviceLabelling(lab, cases('carousel'), 'read', opts)!;
+    down();
+    await labelling.read('before');
+    const sent = avd.calls.length;
+    await labelling.read('after');
+    expect(labelling.label()).toEqual({ error: "before: adb: device 'emulator-5554' not found" });
+    expect(avd.calls).toHaveLength(sent);
+  });
+
+  it('a failed after read: the error alone, the before read dropped (a label holds reads or an error, never both)', { timeout: 10_000 }, async () => {
+    const { lab, down } = goingDown();
+    const labelling = deviceLabelling(lab, cases('carousel'), 'read', opts)!;
+    await labelling.read('before');
+    down();
+    await labelling.read('after');
+    expect(labelling.label()).toEqual({ error: "after: adb: device 'emulator-5554' not found" });
+  });
+
+  it('--device-read none: unlabelled, saying so, and no adb call', async () => {
+    const avd = fast();
+    const notes: string[] = [];
+    const labelling = deviceLabelling(new AndroidLab('emulator-5554', { exec: avd.exec }), cases('carousel'), 'none', { note: (l) => void notes.push(l) })!;
+    await labelling.read('before');
+    await labelling.read('after');
+    expect(labelling.label()).toEqual({ error: 'not read (--device-read none)' });
+    expect(avd.calls).toEqual([]);
+    expect(notes).toEqual([]);
   });
 });

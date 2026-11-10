@@ -1272,6 +1272,14 @@ describe('T16: the carousel group\'s device label, printed from the record', () 
     expect(deviceLines((await rejudgeRecord(old, OLD, { groups: ['forms'] })).lines)).toEqual([]);
   });
 
+  it('the CLI refuses --device-read with --rejudge: a rejudge reads no device', { timeout: 60_000 }, async () => {
+    const refused = await run(process.execPath, ['--import', 'tsx', 'scripts/truth/live.ts', '--rejudge', pathOf(RECORD), '--groups', 'carousel', '--device-read', 'none'], { cwd: ROOT }).then(
+      () => '',
+      (e: { stderr?: string }) => e.stderr ?? '',
+    );
+    expect(refused).toContain('--device-read: a rejudge reads no device; leave it out');
+  });
+
   it('a failed read: unlabelled, loud in the summary, the exit code untouched', { timeout: 60_000 }, async () => {
     const plain = await rejudgeRecord(recorded(), RECORD, { groups: ['carousel'] });
     const failed = await rejudgeRecord({ ...recorded(), deviceLabel: { error: 'before: round 1: the lab app reported no carousel offset' } }, RECORD, { groups: ['carousel'] });
