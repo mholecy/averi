@@ -34,7 +34,8 @@ import androidx.compose.ui.unit.dp
 // (fixtures/apps/ios/AveriLab) in Compose. One cell per launch — the intent extra `cell` or averilab://cell/<id>; with
 // neither, the catalog as a list, for a person poking at the app. One file per cell family
 // (fixtures/apps/cells/<family>.json): Base.kt, Presented.kt, Forms.kt, Edges.kt, Bars.kt, FalseCovers.kt, Text.kt, Held.kt; CellRouter
-// below sends a cell to its family's screen.
+// below sends a cell to its family's screen — but the views family (Views.kt), whose classic Views the activity hosts
+// itself (`host`), outside Compose.
 
 class MainActivity : ComponentActivity() {
     private lateinit var lab: Lab
@@ -42,6 +43,8 @@ class MainActivity : ComponentActivity() {
     private var cell by mutableStateOf<Cell?>(null)
     /** Bumped per `show`: the same cell asked again (a deep link) is built afresh, its layer raised again. */
     private var generation by mutableIntStateOf(0)
+    /** Whether the content view is the Compose root (`compose`), not a views cell's run (Views.kt). */
+    private var composing = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Edge to edge: the activity's window is the whole screen, so the cell lays its slots out from the screen's
@@ -50,7 +53,15 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         catalog = Catalog.load(this)
         lab = Lab(this, windowManager.maximumWindowMetrics.bounds)
-        if (!open(intent)) lab.none()
+        if (!open(intent)) {
+            lab.none()
+            compose()
+        }
+    }
+
+    /** The Compose root: the catalog, an unsupported cell, or a cell's screen by its family (CellRouter). */
+    private fun compose() {
+        composing = true
         setContent {
             MaterialTheme(colorScheme = lightColorScheme()) {
                 val c = cell
@@ -87,6 +98,24 @@ class MainActivity : ComponentActivity() {
         lab.show(id, found)
         cell = found ?: Cell(id, "unknown", emptyList())
         generation++
+        host()
+    }
+
+    /**
+     * A views cell's run as the content view itself (setContentView), every other cell in the Compose root. NOT in a
+     * Compose AndroidView: interop Views sit under the node provider's host (`android.view.View`), whose subtree
+     * averi's reading-order mark never reaches (docs/adr/0015-flat-list-reading-order-break.md, the D75 residual
+     * "Compose, and anything not location-sorted, stay on draw order") — the views cells measure the mark on classic
+     * Views (backlog D77), so their run hangs from the decor's content view as a plain Views app's does.
+     */
+    private fun host() {
+        val c = cell
+        if (c != null && c.supported && c.family == VIEWS) {
+            composing = false
+            setContentView(viewsScreen(this, c, lab))
+        } else if (!composing) {
+            compose()
+        }
     }
 }
 
@@ -125,11 +154,16 @@ private fun CellRouter(cell: Cell, lab: Lab) {
         "false-covers" -> FalseCoversScreen(cell, lab)
         "text" -> TextScreen(cell, lab)
         "held" -> HeldScreen(cell, lab)
+        // Never routed here: MainActivity#host lays a views cell out as the content view, outside Compose (Views.kt).
+        VIEWS -> UnbuiltCell(cell)
         // The coloured-target host (Base.kt) with the cell's layer (Presented.kt).
         "base", "presented" -> CellScreen(cell, lab)
         else -> UnbuiltCell(cell)
     }
 }
+
+/** The family whose classic Views the activity hosts outside Compose (Views.kt; MainActivity#host). */
+private const val VIEWS = "views"
 
 /** A cell of a family whose screen does not build it yet: said on screen, never `ready`. */
 @Composable

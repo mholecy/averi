@@ -79,8 +79,11 @@ describe('the cell catalog', () => {
       'react-native/rn-banner',
       'react-native/rn-format',
       'react-native/rn-format-eager',
+      'react-native/rn-banner-role',
       'held/held-no',
       'held/held-no-spinner',
+      'views/views-banner',
+      'views/views-drawn-over',
     ]);
   });
 
@@ -124,6 +127,25 @@ describe('the cell catalog', () => {
     expect(() => selectCells(c, { cells: ['nope'] })).toThrow('no cell nope');
     // A family with no cell yet (here: edges with its cells left out — every family gains cells in phase 3).
     expect(() => selectCells({ ...c, cells: c.cells.filter((x) => x.family !== 'edges') }, { families: ['edges'] })).toThrow('no cell selected: families edges, cells any');
+  });
+});
+
+describe('D77: the native Views twin of rn-banner and rn-banner\'s role sub-case, Android only', () => {
+  it('views-banner: T, U and C covered, as rn-banner; views-drawn-over: A and A2 open, B and B2 covered by them', async () => {
+    const cells = (await loadCatalog()).cells;
+    const of = (id: string) => cells.find((c) => c.id === id)!;
+    expect(of('views-banner')).toMatchObject({ family: 'views', layer: 'none', platforms: ['android'] });
+    expect(of('views-banner').targets.map((t) => [t.tag, t.slot, t.declared])).toEqual([['T', 0, 'covered'], ['U', 1, 'covered'], ['C', 2, 'covered']]);
+    expect(of('views-drawn-over')).toMatchObject({ family: 'views', layer: 'none', platforms: ['android'] });
+    expect(of('views-drawn-over').targets.map((t) => [t.tag, t.slot, t.declared])).toEqual([['A', 0, 'open'], ['B', 0, 'covered'], ['A2', 1, 'open'], ['B2', 1, 'covered']]);
+  });
+
+  it('rn-banner-role: rn-banner\'s targets exactly, built on Android alone (rn-banner stays on both)', async () => {
+    const cells = (await loadCatalog()).cells;
+    const of = (id: string) => cells.find((c) => c.id === id)!;
+    expect(of('rn-banner-role')).toMatchObject({ family: 'react-native', layer: 'none', platforms: ['android'] });
+    expect(of('rn-banner-role').targets).toEqual(of('rn-banner').targets);
+    expect(of('rn-banner').platforms).toBeUndefined();
   });
 });
 

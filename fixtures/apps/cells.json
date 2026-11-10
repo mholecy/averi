@@ -856,6 +856,17 @@
       ]
     },
     {
+      "id": "rn-banner-role",
+      "family": "react-native",
+      "layer": "none",
+      "platforms": ["android"],
+      "targets": [
+        { "tag": "T", "color": "#43A047", "slot": 0, "declared": "covered" },
+        { "tag": "U", "color": "#8E24AA", "slot": 1, "declared": "covered" },
+        { "tag": "C", "color": "#FB8C00", "slot": 2, "declared": "covered" }
+      ]
+    },
+    {
       "id": "held-no",
       "family": "held",
       "layer": "none",
@@ -868,6 +879,29 @@
       "layer": "none",
       "targets": [],
       "held": { "bareMs": 6000, "spinnerMs": 4000 }
+    },
+    {
+      "id": "views-banner",
+      "family": "views",
+      "layer": "none",
+      "platforms": ["android"],
+      "targets": [
+        { "tag": "T", "color": "#43A047", "slot": 0, "declared": "covered" },
+        { "tag": "U", "color": "#8E24AA", "slot": 1, "declared": "covered" },
+        { "tag": "C", "color": "#FB8C00", "slot": 2, "declared": "covered" }
+      ]
+    },
+    {
+      "id": "views-drawn-over",
+      "family": "views",
+      "layer": "none",
+      "platforms": ["android"],
+      "targets": [
+        { "tag": "A", "color": "#1E88E5", "slot": 0, "declared": "open" },
+        { "tag": "B", "color": "#E53935", "slot": 0, "declared": "covered" },
+        { "tag": "A2", "color": "#00897B", "slot": 1, "declared": "open" },
+        { "tag": "B2", "color": "#FDD835", "slot": 1, "declared": "covered" }
+      ]
     }
   ]
 }

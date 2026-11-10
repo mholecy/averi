@@ -420,3 +420,18 @@ is AOSP's, every classic ViewGroup's).
   siblings that are really drawn in list order — a badge over an avatar, a label laid over its field — ask the eyes,
   and are refused where a screenshot cannot tell them apart. The lab's classic-Views twin of rn-banner is not built
   (backlog D77): the generality of the mark rests on AOSP's source and rn-banner, not on a native capture.
+
+**D77: the lab's native twin, built; its capture pending.** The Android lab app builds the classic-Views cells of the
+`views` family (fixtures/apps/cells/views.json, Views.kt) — `views-banner`, rn-banner's twin (T, U and C, each with a
+later-child cover 20 dp to its left, C's starting below its top), and `views-drawn-over` (A drawn over B by child order,
+A2 over B2 by translationZ, each A listed first and each pair holding the other's centre: the direction the mark
+opened) — and the React Native lab app `rn-banner-role` (rn-banner with each target and its cover in a slot View of
+role `toolbar`, which dumps as `android.view.View`; the slot encloses the cover, so no dumped bound is clipped to it and
+the role alone keeps the run unmarked). The views cells are hosted by the activity's setContentView, OUTSIDE Compose: an
+AndroidView sits under the provider's host and is never marked (the first residual above), so hosted there they would
+measure that residual, not the mark. Their predictions are pinned against synthetic dumps at the cells' geometry
+(tests/ui-tree/draw-order-android-views-twin.test.ts; A's side of views-drawn-over in
+draw-order-android-reading-order.test.ts): views-banner's T, U and C refused, with the eyes or without; views-drawn-over's
+B and B2 refused, A and A2 `Tapped` where the eyes see them on top; rn-banner-role's T, U and C `Tapped` at the centre —
+LR4's lie, this residual's role clause, expected red. No src change. The capture is on the owner's list (backlog D77):
+until it lands, the generality of the mark still rests on AOSP's source and rn-banner.

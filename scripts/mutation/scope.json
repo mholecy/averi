@@ -73,7 +73,7 @@
   },
   "src/adapters/android-accessibility-order.ts": {
     "group": "core",
-    "tests": ["tests/adapters/android-accessibility-order.test.ts", "tests/ui-tree/draw-order-android-reading-order.test.ts", "tests/ui-tree/draw-order-rn-covers.test.ts"],
+    "tests": ["tests/adapters/android-accessibility-order.test.ts", "tests/ui-tree/draw-order-android-reading-order.test.ts", "tests/ui-tree/draw-order-android-views-twin.test.ts", "tests/ui-tree/draw-order-rn-covers.test.ts"],
     "floor": 98,
     "baseline": "100 % on 2026-11-09 (D75, compareByLocation and markLocationSorted; `npm run mutate -- --group core --force` at 0a52f450, cold): 47 mutants, 0 survived, 0 without coverage"
   },

@@ -82,10 +82,12 @@ export interface CatalogTarget {
  * that is no cover; `text` text targets carrying P5's sample strings, open and under the bands and chrome (phase 4: the
  * tree's text and OCR on the real pixels); `react-native` React Native's own controls (round 7: its text fields), which
  * only the React Native lab app builds (appOf); `held` screens that render late (backlog D30: bare for seconds, then a
- * screen outside a state — the live golden's `ensure` group, ADR 0033's held "no"), no targets, no truth captured. In
- * this order in the generated catalog (scripts/truth/catalog.ts).
+ * screen outside a state — the live golden's `ensure` group, ADR 0033's held "no"), no targets, no truth captured;
+ * `views` classic Android Views hosted outside Compose (backlog D77: rn-banner's native twin, a target drawn over a
+ * later-listed control), which only the Android lab app builds (Views.kt). In this order in the generated catalog
+ * (scripts/truth/catalog.ts).
  */
-export const FAMILIES = ['base', 'presented', 'forms', 'edges', 'bars', 'false-covers', 'text', 'react-native', 'held'] as const;
+export const FAMILIES = ['base', 'presented', 'forms', 'edges', 'bars', 'false-covers', 'text', 'react-native', 'held', 'views'] as const;
 export type Family = (typeof FAMILIES)[number];
 
 /**

@@ -1,0 +1,134 @@
+package dev.averi.lab
+
+// The views family (fixtures/apps/cells/views.json, backlog D77): classic Android Views, the native twin of the React
+// Native app's rn-banner (lab note LR4) and a target drawn over a later-listed control (D75's review round 1). AOSP
+// sorts a classic ViewGroup's accessibility children by LOCATION (ViewGroup.ChildListForAccessibility's stripe
+// comparator), so uiautomator lists each run below by where its children lie, never by the order they are drawn in:
+// what averi's reading-order mark reads (src/adapters/android-accessibility-order.ts; docs/adr/0015-flat-list-reading-
+// order-break.md, its amendment "Android Views list children by location").
+//
+// HOSTED BY THE ACTIVITY'S setContentView (MainActivity#host), NOT in Compose: an AndroidView sits under the node
+// provider's host (AndroidComposeView, dumped as `android.view.View`), whose subtree the mark never reaches (ADR 0015's
+// residual "Compose, and anything not location-sorted, stay on draw order") — hosted there, these cells would measure
+// that residual instead of the mark (tests/ui-tree/draw-order-android-views-twin.test.ts, P2).
+//
+// Laid out in PIXELS from Base's slots (Base.kt: 300x64 dp, centred, the centre 142 + 180·slot dp down), each view at a
+// fixed place in one full-screen FrameLayout; the predictions' geometry (1080x2220 at density 2.75) is in that test.
+
+import android.annotation.SuppressLint
+import android.app.Activity
+import android.graphics.Color
+import android.view.Gravity
+import android.view.View
+import android.widget.FrameLayout
+import android.widget.TextView
+import kotlin.math.roundToInt
+
+/** The views family's layout, in dp. */
+private object ViewsLayout {
+    const val SLOT_WIDTH = 300
+    const val SLOT_HEIGHT = 64
+    fun slotTop(slot: Int) = 142 + 180 * slot - SLOT_HEIGHT / 2
+
+    /** views-banner's cover: 340x52, 20 dp LEFT of its target (listed first), 10 dp above its top (C's: below). */
+    const val COVER_WIDTH = 340
+    const val COVER_HEIGHT = 52
+    const val COVER_LEFT = -20
+    const val COVER_TOP = 10
+    const val COVER_COLOR = 0xFF263238
+
+    /** views-drawn-over's B: 300x44, 20 dp right of A and 10 dp below its top — each holding the other's centre. */
+    const val UNDER_RIGHT = 20
+    const val UNDER_TOP = 10
+    const val UNDER_HEIGHT = 44
+
+    /** A2's translationZ over B2. */
+    const val RAISE = 8
+}
+
+/** The views family's screen for `cell`: its run of classic Views, each target's frame (and each cover's) reported. */
+fun viewsScreen(activity: Activity, cell: Cell, lab: Lab): View {
+    val density = activity.resources.displayMetrics.density
+    val px = { dp: Int -> (dp * density).roundToInt() }
+    val screenWidth = activity.windowManager.maximumWindowMetrics.bounds.width()
+    val left = (screenWidth - px(ViewsLayout.SLOT_WIDTH)) / 2
+    val run = FrameLayout(activity).apply { setBackgroundColor(Color.WHITE) }
+    identifiedAs(run, "lab.${cell.id}.run")
+    val reported = linkedMapOf<String, View>()
+    val place = { v: View, x: Int, y: Int, w: Int, h: Int ->
+        run.addView(v, FrameLayout.LayoutParams(w, h).apply { gravity = Gravity.TOP or Gravity.START; leftMargin = x; topMargin = y })
+    }
+    val target = { t: Target ->
+        FrameLayout(activity).apply {
+            setBackgroundColor(t.color.toInt())
+            setOnClickListener { lab.event("tap", t.tag) }
+            identifiedAs(this, "lab.${cell.id}.${t.tag}")
+            reported[t.tag] = this
+        }
+    }
+    when (cell.id) {
+        "views-banner" -> for (t in cell.targets) {
+            // The target, then its cover as the LATER child: drawn over it.
+            val top = px(ViewsLayout.slotTop(t.slot))
+            place(target(t), left, top, px(ViewsLayout.SLOT_WIDTH), px(ViewsLayout.SLOT_HEIGHT))
+            val cover = bannerCover(activity, cell, t, px)
+            reported["${t.tag}.cover"] = cover
+            val coverTop = if (t.tag == "C") top + px(ViewsLayout.COVER_TOP) else top - px(ViewsLayout.COVER_TOP)
+            place(cover, left + px(ViewsLayout.COVER_LEFT), coverTop, px(ViewsLayout.COVER_WIDTH), px(ViewsLayout.COVER_HEIGHT))
+        }
+        "views-drawn-over" -> {
+            val byTag = cell.targets.associateBy { it.tag }
+            for ((over, under, raised) in listOf(Triple("A", "B", false), Triple("A2", "B2", true))) {
+                val a = byTag[over] ?: continue
+                val b = byTag[under] ?: continue
+                val top = px(ViewsLayout.slotTop(a.slot))
+                val aView = target(a)
+                val bView = target(b)
+                val placeA = { place(aView, left, top, px(ViewsLayout.SLOT_WIDTH), px(ViewsLayout.SLOT_HEIGHT)) }
+                val placeB = { place(bView, left + px(ViewsLayout.UNDER_RIGHT), top + px(ViewsLayout.UNDER_TOP), px(ViewsLayout.SLOT_WIDTH), px(ViewsLayout.UNDER_HEIGHT)) }
+                if (raised) {
+                    // A2 the EARLIER child, drawn (and touched) over B2 by its Z: ViewGroup orders drawing and touch
+                    // dispatch by Z first. No outline, so no shadow pixels around it.
+                    aView.translationZ = px(ViewsLayout.RAISE).toFloat()
+                    aView.outlineProvider = null
+                    placeA()
+                    placeB()
+                } else {
+                    // A the LATER child: drawn over B by child order.
+                    placeB()
+                    placeA()
+                }
+            }
+        }
+    }
+    // Per view, not the window's ViewTreeObserver (which outlives this cell's views in the process).
+    run.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> for ((tag, v) in reported) lab.frame(tag, onScreen(v)) }
+    // Ready once laid out and drawn, as the Compose cells (Presented.kt#PresentedLayer: 600 ms for a cell of no layer);
+    // never for a run another cell has replaced.
+    run.postDelayed({ if (run.isAttachedToWindow) lab.settled() }, 600)
+    return run
+}
+
+/**
+ * views-banner's cover of `t`: opaque, no clickable node, swallowing every touch (a touch on it reaches no target, as
+ * rn-banner's cover reaches no Pressable). T's a TextView `Saved` (a toast), the others a bare FrameLayout with an
+ * identifier only.
+ */
+@SuppressLint("ClickableViewAccessibility")
+private fun bannerCover(activity: Activity, cell: Cell, t: Target, px: (Int) -> Int): View {
+    val cover = if (t.tag == "T") {
+        TextView(activity).apply {
+            text = "Saved"
+            setTextColor(Color.WHITE)
+            textSize = 15f
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(px(16), 0, 0, 0)
+        }
+    } else {
+        FrameLayout(activity)
+    }
+    cover.setBackgroundColor(ViewsLayout.COVER_COLOR.toInt())
+    cover.setOnTouchListener { _, _ -> true }
+    identifiedAs(cover, "lab.${cell.id}.${t.tag}.cover")
+    return cover
+}

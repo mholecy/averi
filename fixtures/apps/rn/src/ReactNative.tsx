@@ -38,6 +38,16 @@ import type { Cell, Lab, Target } from './lab';
 // target's top: iOS lists RN's views by their tops, so the cover is listed BEFORE the target it is drawn over. T's is an
 // accessible view labelled `Saved` (a toast); U's a bare View with an identifier only (lab.<cell>.U.cover). C's starts
 // 10 pt BELOW its top — listed after it, the draw order and the listing agree: the control.
+//
+// `rn-banner-role` (Android only, backlog D77 sub-case b): rn-banner with each target and its cover inside a slot View
+// carrying `accessibilityRole="toolbar"`, kept un-flattened (`collapsable={false}`) — React Native gives that role the
+// accessibility className `android.view.View` (ReactAccessibilityDelegate.kt, AccessibilityRole.getValue), the shape of
+// a node provider's host, whose subtree averi's reading-order mark never reaches (docs/adr/0015-flat-list-reading-
+// order-break.md, the D75 residual; not narrowed). The slot ENCLOSES its cover (`ROLE_SLOT`: widened 20 pt left and
+// right, 10 pt up and down, the target and the cover where rn-banner lays them on the screen): a slot as small as its
+// target would clip the cover's dumped bounds to it (View#getBoundsOnScreen clips to each parent), which fails the
+// location check alone, and the cell would not tell the role from the clip. Predicted LR4's lie (a `Tapped` on the
+// cover): tests/ui-tree/draw-order-android-views-twin.test.ts, P3.
 
 export const SLOT = { width: 300, height: 64 };
 const slotTop = (slot: number) => 142 + 180 * slot - SLOT.height / 2;
@@ -46,11 +56,19 @@ const MULTILINE = 'M';
 
 /** The cell whose targets lie under a later sibling (LR3). */
 const BANNER = 'rn-banner';
+/** rn-banner with each slot a View of accessibility role `toolbar` (D77). */
+const BANNER_ROLE = 'rn-banner-role';
+/** Whether the cell is an rn-banner: its targets lie under a later sibling, and none is a field. */
+const isBanner = (cell: Cell) => cell.id === BANNER || cell.id === BANNER_ROLE;
+/** rn-banner-role's slot around its target: as far out as the cover reaches (20 pt left and right, 10 pt up and down). */
+const ROLE_SLOT = { x: 20, y: 10 };
 /** Each rn-banner target's cover, in the slot's coordinates: its top against the target's, and whether it is a labelled toast. */
+/** A cover's left against its target's: 20 pt further left, so AOSP's location sort lists it first (D75). */
+const COVER_LEFT = -20;
 const COVERS: Record<string, { top: number; label?: string }> = { T: { top: -10, label: 'Saved' }, U: { top: -10 }, C: { top: 10 } };
 
-/** The fields of a cell: one per target (none in rn-banner, whose targets are no fields). */
-export const fieldsOf = (cell: Cell) => (cell.id === BANNER ? [] : cell.targets.map((t) => t.tag));
+/** The fields of a cell: one per target (none in rn-banner and rn-banner-role, whose targets are no fields). */
+export const fieldsOf = (cell: Cell) => (isBanner(cell) ? [] : cell.targets.map((t) => t.tag));
 
 /** Reports a view's frame on the screen once it is laid out (and again whenever its layout changes). */
 function useFrame(lab: Lab, tag: string) {
@@ -78,11 +96,22 @@ export function ReactNativeScreen({ cell, lab }: { cell: Cell; lab: Lab }) {
   const width = Dimensions.get('screen').width;
   return (
     <View style={styles.screen}>
-      {cell.targets.map((t) => (
-        <View key={t.tag} style={[styles.slot, { left: (width - SLOT.width) / 2, top: slotTop(t.slot) }]}>
-          {cell.id === BANNER ? <CoveredTarget cell={cell} target={t} lab={lab} /> : t.label !== undefined ? <IconField cell={cell} target={t} lab={lab} /> : <LabelledField cell={cell} target={t} lab={lab} />}
-        </View>
-      ))}
+      {cell.targets.map((t) =>
+        cell.id === BANNER_ROLE ? (
+          <View
+            key={t.tag}
+            testID={`lab.${cell.id}.${t.tag}.slot`}
+            accessibilityRole="toolbar"
+            collapsable={false}
+            style={[styles.roleSlot, { left: (width - SLOT.width) / 2 - ROLE_SLOT.x, top: slotTop(t.slot) - ROLE_SLOT.y }]}>
+            <CoveredTarget cell={cell} target={t} lab={lab} inset={ROLE_SLOT} />
+          </View>
+        ) : (
+          <View key={t.tag} style={[styles.slot, { left: (width - SLOT.width) / 2, top: slotTop(t.slot) }]}>
+            {cell.id === BANNER ? <CoveredTarget cell={cell} target={t} lab={lab} /> : t.label !== undefined ? <IconField cell={cell} target={t} lab={lab} /> : <LabelledField cell={cell} target={t} lab={lab} />}
+          </View>
+        ),
+      )}
     </View>
   );
 }
@@ -165,22 +194,31 @@ function IconField({ cell, target, lab }: { cell: Cell; target: Target; lab: Lab
   );
 }
 
-/** An rn-banner target: a coloured Pressable, then its cover (`COVERS`) drawn over its centre. */
-function CoveredTarget({ cell, target, lab }: { cell: Cell; target: Target; lab: Lab }) {
+/**
+ * An rn-banner target: a coloured Pressable, then its cover (`COVERS`) drawn over its centre. `inset`: where the target
+ * lies in a slot wider than it (rn-banner-role's `ROLE_SLOT`); without it the target fills its slot.
+ */
+function CoveredTarget({ cell, target, lab, inset }: { cell: Cell; target: Target; lab: Lab; inset?: { x: number; y: number } }) {
   const id = `lab.${cell.id}.${target.tag}`;
   const own = useFrame(lab, target.tag);
   const coverFrame = useFrame(lab, `${target.tag}.cover`);
   const cover = COVERS[target.tag] ?? { top: -10 };
   return (
     <>
-      <Pressable testID={id} ref={own.ref} onLayout={own.onLayout} style={[styles.box, { backgroundColor: target.color }]} onPress={() => lab.event('tap', target.tag)} />
+      <Pressable
+        testID={id}
+        ref={own.ref}
+        onLayout={own.onLayout}
+        style={[inset === undefined ? styles.box : [styles.inSlot, { left: inset.x, top: inset.y }], { backgroundColor: target.color }]}
+        onPress={() => lab.event('tap', target.tag)}
+      />
       <View
         testID={`${id}.cover`}
         ref={coverFrame.ref}
         onLayout={coverFrame.onLayout}
         accessible={cover.label !== undefined}
         {...(cover.label !== undefined && { accessibilityLabel: cover.label })}
-        style={[styles.cover, { top: cover.top }]}>
+        style={[styles.cover, { top: cover.top + (inset?.y ?? 0), left: COVER_LEFT + (inset?.x ?? 0) }]}>
         {cover.label !== undefined ? <Text style={styles.toast}>{cover.label}</Text> : null}
       </View>
     </>
@@ -197,6 +235,8 @@ const styles = StyleSheet.create({
   multiline: { position: 'absolute', left: 18, right: 18, top: 22, height: 20, paddingTop: 0, paddingBottom: 0, paddingHorizontal: 0, margin: 0, fontSize: 15, color: '#1F2933', backgroundColor: 'transparent', textAlignVertical: 'top' },
   icon: { position: 'absolute', right: 10, top: 10, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   glyph: { color: '#FFFFFF', fontSize: 24, lineHeight: 28 },
-  cover: { position: 'absolute', left: -20, width: 340, height: 52, backgroundColor: '#263238', justifyContent: 'center', paddingLeft: 16 },
+  inSlot: { position: 'absolute', width: SLOT.width, height: SLOT.height },
+  roleSlot: { position: 'absolute', width: SLOT.width + 2 * ROLE_SLOT.x, height: SLOT.height + 2 * ROLE_SLOT.y },
+  cover: { position: 'absolute', width: 340, height: 52, backgroundColor: '#263238', justifyContent: 'center', paddingLeft: 16 },
   toast: { color: '#FFFFFF', fontSize: 15 },
 });
