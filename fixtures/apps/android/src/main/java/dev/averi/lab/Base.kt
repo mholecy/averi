@@ -34,10 +34,11 @@ import kotlin.math.roundToInt
 
 /**
  * A slot's target, as on iOS (Slot in Base.swift): 300×64 dp, centred horizontally, its centre 142 + 180·slot dp down.
+ * The views family lays its classic Views out from the same slots (Views.kt).
  */
-private val SLOT_WIDTH = 300.dp
-private val SLOT_HEIGHT = 64.dp
-private fun slotTop(slot: Int): Dp = (142 + 180 * slot).dp - SLOT_HEIGHT / 2
+internal val SLOT_WIDTH = 300.dp
+internal val SLOT_HEIGHT = 64.dp
+internal fun slotTop(slot: Int): Dp = (142 + 180 * slot).dp - SLOT_HEIGHT / 2
 
 /**
  * One target: a solid rectangle of its own colour, no visible text, no ripple (a screenshot taken during a probe tap

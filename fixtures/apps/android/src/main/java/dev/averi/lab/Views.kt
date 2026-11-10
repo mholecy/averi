@@ -22,19 +22,19 @@ import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.TextView
+import androidx.compose.ui.unit.Dp
 import kotlin.math.roundToInt
 
-/** The views family's layout, in dp. */
+/** The views family's layout, in dp, beside Base.kt's slot (SLOT_WIDTH, SLOT_HEIGHT, slotTop). */
 private object ViewsLayout {
-    const val SLOT_WIDTH = 300
-    const val SLOT_HEIGHT = 64
-    fun slotTop(slot: Int) = 142 + 180 * slot - SLOT_HEIGHT / 2
-
-    /** views-banner's cover: 340x52, 20 dp LEFT of its target (listed first), 10 dp above its top (C's: below). */
+    /**
+     * views-banner's cover: 340x52, its offset from its target's top-left corner — 20 dp LEFT (listed first), and
+     * 10 dp above its top (T, U) or below it (C), as rn-banner's COVERS (ReactNative.tsx).
+     */
     const val COVER_WIDTH = 340
     const val COVER_HEIGHT = 52
     const val COVER_LEFT = -20
-    const val COVER_TOP = 10
+    val COVER_TOP = mapOf("T" to -10, "U" to -10, "C" to 10)
     const val COVER_COLOR = 0xFF263238
 
     /** views-drawn-over's B: 300x44, 20 dp right of A and 10 dp below its top — each holding the other's centre. */
@@ -54,11 +54,13 @@ private object ViewsLayout {
 fun viewsScreen(activity: Activity, cell: Cell, lab: Lab): View {
     val density = activity.resources.displayMetrics.density
     val px = { dp: Int -> (dp * density).roundToInt() }
+    val pxOf = { dp: Dp -> (dp.value * density).roundToInt() }
     val screenWidth = activity.windowManager.maximumWindowMetrics.bounds.width()
     // Centred as Base.kt centres a slot — in dp, then rounded: 127 px on averi_lab (1080 px at density 2.75; in Float
     // 127.49998), where Base's targets lie (tests/fixtures/truth/android-averi_lab-api33/open.state.json); React
     // Native's rn-banner, rounding its own way, lies at 128.
-    val left = ((screenWidth / density - ViewsLayout.SLOT_WIDTH) / 2 * density).roundToInt()
+    val left = ((screenWidth / density - SLOT_WIDTH.value) / 2 * density).roundToInt()
+    val slotWidth = pxOf(SLOT_WIDTH)
     val run = FrameLayout(activity).apply { setBackgroundColor(Color.WHITE) }
     identifiedAs(run, "lab.${cell.id}.run")
     val reported = linkedMapOf<String, View>()
@@ -76,11 +78,11 @@ fun viewsScreen(activity: Activity, cell: Cell, lab: Lab): View {
     when (cell.id) {
         "views-banner" -> for (t in cell.targets) {
             // The target, then its cover as the LATER child: drawn over it.
-            val top = px(ViewsLayout.slotTop(t.slot))
-            place(target(t), left, top, px(ViewsLayout.SLOT_WIDTH), px(ViewsLayout.SLOT_HEIGHT))
+            val top = pxOf(slotTop(t.slot))
+            place(target(t), left, top, slotWidth, pxOf(SLOT_HEIGHT))
             val cover = bannerCover(activity, cell, t, px)
             reported["${t.tag}.cover"] = cover
-            val coverTop = if (t.tag == "C") top + px(ViewsLayout.COVER_TOP) else top - px(ViewsLayout.COVER_TOP)
+            val coverTop = top + px(ViewsLayout.COVER_TOP[t.tag] ?: -10)
             place(cover, left + px(ViewsLayout.COVER_LEFT), coverTop, px(ViewsLayout.COVER_WIDTH), px(ViewsLayout.COVER_HEIGHT))
         }
         "views-drawn-over" -> {
@@ -88,11 +90,11 @@ fun viewsScreen(activity: Activity, cell: Cell, lab: Lab): View {
             for ((over, under, raised) in listOf(Triple("A", "B", false), Triple("A2", "B2", true))) {
                 val a = byTag[over] ?: continue
                 val b = byTag[under] ?: continue
-                val top = px(ViewsLayout.slotTop(a.slot))
+                val top = pxOf(slotTop(a.slot))
                 val aView = target(a)
                 val bView = target(b)
-                val placeA = { place(aView, left, top, px(ViewsLayout.SLOT_WIDTH), px(ViewsLayout.SLOT_HEIGHT)) }
-                val placeB = { place(bView, left + px(ViewsLayout.UNDER_RIGHT), top + px(ViewsLayout.UNDER_TOP), px(ViewsLayout.SLOT_WIDTH), px(ViewsLayout.UNDER_HEIGHT)) }
+                val placeA = { place(aView, left, top, slotWidth, pxOf(SLOT_HEIGHT)) }
+                val placeB = { place(bView, left + px(ViewsLayout.UNDER_RIGHT), top + px(ViewsLayout.UNDER_TOP), slotWidth, px(ViewsLayout.UNDER_HEIGHT)) }
                 if (raised) {
                     // A2 the EARLIER child, drawn (and touched) over B2 by its Z: ViewGroup orders drawing and touch
                     // dispatch by Z first. No outline, so no shadow pixels around it.

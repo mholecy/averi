@@ -108,7 +108,7 @@ export function ReactNativeScreen({ cell, lab }: { cell: Cell; lab: Lab }) {
           </View>
         ) : (
           <View key={t.tag} style={[styles.slot, { left: (width - SLOT.width) / 2, top: slotTop(t.slot) }]}>
-            {cell.id === BANNER ? <CoveredTarget cell={cell} target={t} lab={lab} /> : t.label !== undefined ? <IconField cell={cell} target={t} lab={lab} /> : <LabelledField cell={cell} target={t} lab={lab} />}
+            {isBanner(cell) ? <CoveredTarget cell={cell} target={t} lab={lab} /> : t.label !== undefined ? <IconField cell={cell} target={t} lab={lab} /> : <LabelledField cell={cell} target={t} lab={lab} />}
           </View>
         ),
       )}

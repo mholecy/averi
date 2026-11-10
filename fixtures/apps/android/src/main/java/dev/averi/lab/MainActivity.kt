@@ -111,7 +111,7 @@ class MainActivity : ComponentActivity() {
      */
     private fun host() {
         val c = cell
-        if (c != null && c.supported && c.family == VIEWS) {
+        if (c != null && c.supported && c.family == "views") {
             composing = false
             setContentView(viewsScreen(this, c, lab))
         } else if (!composing) {
@@ -156,15 +156,12 @@ private fun CellRouter(cell: Cell, lab: Lab) {
         "text" -> TextScreen(cell, lab)
         "held" -> HeldScreen(cell, lab)
         // Never routed here: MainActivity#host lays a views cell out as the content view, outside Compose (Views.kt).
-        VIEWS -> UnbuiltCell(cell)
+        "views" -> UnbuiltCell(cell)
         // The coloured-target host (Base.kt) with the cell's layer (Presented.kt).
         "base", "presented" -> CellScreen(cell, lab)
         else -> UnbuiltCell(cell)
     }
 }
-
-/** The family whose classic Views the activity hosts outside Compose (Views.kt; MainActivity#host). */
-private const val VIEWS = "views"
 
 /** A cell of a family whose screen does not build it yet: said on screen, never `ready`. */
 @Composable

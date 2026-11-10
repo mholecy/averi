@@ -8,16 +8,17 @@ import { parseDump } from '../helpers/android-dumps.js';
 /**
  * The PREDICTIONS for backlog D77's lab cells, pinned before their capture (the owner's): what averi reads of the
  * native Android Views twin of rn-banner (fixtures/apps/android, Views.kt: `views-banner`, `views-drawn-over`) and of
- * rn-banner's role sub-case (fixtures/apps/rn, `rn-banner-role`). The dumps are SYNTHETIC, at the geometry each lab
- * app lays out on averi_lab (1080x2220, density 2.75). Views.kt: a slot 300x64 dp = 825x176 px, centred as Base.kt
- * centres it (46.36 dp in Float, 127.49998 px, rounded: left 127, right 952 — where Base's targets lie,
+ * rn-banner's role sub-case (fixtures/apps/rn, `rn-banner-role`). The dumps are SYNTHETIC, at the geometry each lab app
+ * lays out on averi_lab (1080x2220, density 2.75). Views.kt: a slot 300x64 dp = 825x176 px, centred as Base.kt centres
+ * it (46.36 dp in Float, 127.49998 px, rounded: left 127, right 952 — where Base's targets lie,
  * tests/fixtures/truth/android-averi_lab-api33/open.state.json), its top (142 + 180·slot - 32) dp rounded (303, 798,
  * 1293); a cover 340x52 dp = 935x143 px, 55 px LEFT of its target (72–1007), 28 px above its top (275, 770) — below it
- * for C (1321). React Native's (P3) rounds each view's offset in its parent, half
- * up: tests/fixtures/truth/android-rn-averi_lab-api33/rn-banner.xml has its targets at 128 (one px right of the views
- * twin's), T's cover at 276 (303 - 27.5 rounded to -27) and C's at 1321. Each run is in AOSP's location order (ViewGroup.ChildListForAccessibility's stripe sort: every
- * cover, its left edge 55 px further left, before its target). A capture that disagrees is a finding, not a
- * reason to edit these pins. ADR 0015's amendment "Android Views list children by location" and its D75 residuals.
+ * for C (1321). React Native's (P3) rounds each view's offset in its parent, half up:
+ * tests/fixtures/truth/android-rn-averi_lab-api33/rn-banner.xml has its targets at 128 (one px right of the views
+ * twin's), T's cover at 276 (303 - 27.5 rounded to -27) and C's at 1321. Each run is in AOSP's location order
+ * (ViewGroup.ChildListForAccessibility's stripe sort: every cover, its left edge 55 px further left, before its
+ * target). A capture that disagrees is a finding, not a reason to edit these pins. ADR 0015's amendment "Android Views
+ * list children by location" and its D75 residuals.
  */
 const PHONE = { x: 0, y: 0, width: 1080, height: 2220 };
 
