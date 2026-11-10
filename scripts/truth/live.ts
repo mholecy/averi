@@ -60,9 +60,12 @@ import { parseLabApp, type LabApp } from './schema.js';
  * control focused, nothing typed. A case not ok prints its whole replies, and every scroll case (and any case not ok)
  * the app's state beneath it. A case not ok that an existing note explains is KNOWN (live-known.ts) and marked so; the
  * exit code is 1 on a MISMATCH not known, and — in a run of this checkout, not a `--side` one — on a known case not
- * `intermittent` that came out ok (fixed: strike it off, as the static ratchet asks). `--record <file>` writes every
- * read (the launch state, the state between the calls, after them) as JSON; `--rejudge <file>` judges such a record
- * again with this checkout's judges, no device (live-cases.ts#rejudge, which tests/truth/live-rejudge.test.ts calls in
+ * `intermittent` that came out ok (fixed: strike it off, as the static ratchet asks). Every hedged stop (`NOT
+ * CONFIRMED …`, T17) is counted under the cases — `Hedged stops: H of S visible stops (target whole, ok: K — <reasons>;
+ * cut, LOUD: L): <cases>`, and ` (hedged: <why>)` on the case's line (T15, live-visibility.ts#hedgedStops) — a count,
+ * no exit code; no line in a run that stopped on no target. `--record <file>` writes every read (the launch state, the
+ * state between the calls, after them) as JSON; `--rejudge <file>` judges such a record again with this checkout's
+ * judges, no device (live-cases.ts#rejudge, which tests/truth/live-rejudge.test.ts calls in
  * process). The cases, their judging and the summary live in live-cases.ts, one case's device cycle in run-case.ts; this file is the CLI.
  *
  * `--app react-native` runs the cases of the React Native lab app's cells (fixtures/apps/rn, its own bundle and package:

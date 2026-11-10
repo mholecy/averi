@@ -9,7 +9,7 @@ import { CHOOSER_CASES, type FocusReads } from './live-chooser.js';
 import { knownEntry, knownLive } from './live-known.js';
 import { judgeFullWindow, judgeHeldNo } from './live-ensure.js';
 import { FLOATING_PANEL_EVIDENCE, holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, refusedCapped, refusedKept, refusedOnFocus, refusedUnchanged, short, type Source, valueOf } from './live-forms.js';
-import { judgeDismissal, PRESENTED_WINDOW_CELLS, presentedAssertCase, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
+import { hedgedStop, hedgedStops, hedgedStopsLine, judgeDismissal, PRESENTED_WINDOW_CELLS, presentedAssertCase, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
 import { allPassed, claimsTap, isError } from './replies.js';
 import { appOf, labId, labSelector, parseLabApp, type Catalog, type CellTruth, type HeldSpec, type LabApp, type LabState } from './schema.js';
 
@@ -809,7 +809,10 @@ export function summarize({ platform, sources, results, side, rejudgedFrom }: { 
         : note !== undefined ? ` [known: ${note}]`
         : other !== undefined ? ` [NOT known: ${r.verdict.cls ?? '?'} on ${r.verdict.kind ?? '?'}, where KNOWN pins ${other.cls} on ${other.kind} (${other.note})]`
         : '';
-      lines.push(`- ${r.verdict.outcome}${r.verdict.cls === undefined ? '' : ` (${r.verdict.cls})`} ${r.c.id} ${r.c.cell}: ${r.c.says} — ${r.verdict.why}${mark}`);
+      // T15: a hedged stop says why on its case's line (live-visibility.ts#hedgedStop), whatever its verdict.
+      const hedged = hedgedStop(r);
+      const hedge = hedged === undefined ? '' : ` (hedged: ${hedged.why ?? 'unread'})`;
+      lines.push(`- ${r.verdict.outcome}${r.verdict.cls === undefined ? '' : ` (${r.verdict.cls})`} ${r.c.id} ${r.c.cell}: ${r.c.says} — ${r.verdict.why}${hedge}${mark}`);
       if (r.verdict.outcome !== 'ok') for (const [i, reply] of r.replies.entries()) lines.push(`    ${r.c.calls[i].tool} → ${reply.replaceAll('\n', ' ⏎ ')}`);
       if (r.verdict.app !== undefined) lines.push(`    app: ${r.verdict.app}`);
     }
@@ -827,6 +830,9 @@ export function summarize({ platform, sources, results, side, rejudgedFrom }: { 
     const counted = results.filter((r) => r.verdict.accepted?.id === id);
     lines.push(`Accepted under ${residual}: ${counted.length} of ${of.length} judged run(s) of ${[...ids].join(', ')}`, '');
   }
+  // T15: every hedged stop counted against the stops on a target — a count, no gate; no line where nothing stopped.
+  const hedgedLine = hedgedStopsLine(hedgedStops(results));
+  if (hedgedLine !== undefined) lines.push(hedgedLine, '');
   // The ceiling's line: every judged unaimable leg hedged fails the run.
   if (ceiling.lines.length > 0) lines.push(...ceiling.lines, '');
   return { lines, exitCode: unknown.length > 0 || fixed.length > 0 || failingSkips.length > 0 || ceiling.fails ? 1 : 0 };

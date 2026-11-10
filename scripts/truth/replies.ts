@@ -2,6 +2,7 @@ import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { FOCUS_TEXT_NOT_READ } from '../../src/interact/fill-text.js';
 import { boundText, HEDGE_WHATS, HEDGED_LEAD, type HedgeWhat, TREE_READ_FAILED, UNTRIED_END, UNTRIED_LEAD } from '../../src/interact/scroll-text.js';
 import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, KEYBOARD_UNLISTED, NO_ID_LISTED } from '../../src/ui-tree/miss.js';
+import { UNLOCATED_KEYBOARD } from '../../src/ui-tree/keyboard-cover.js';
 import { untriedSideText } from '../../src/interact/target-text.js';
 import { EDGES, rectText } from '../../src/ui-tree/geometry.js';
 import type { Rect } from '../../src/adapters/types.js';
@@ -77,9 +78,43 @@ const HEDGE_WHAT_PATTERN = [...HEDGE_WHATS].sort((a, b) => b.length - a.length).
 const HEDGED_STOP = new RegExp(`^Element .* visible (?:by the tree )?after \\d+ swipes?, ${HEDGED_LEAD} (${HEDGE_WHAT_PATTERN}): `);
 const OLD_HEDGED_STOP = /^Element .* fully visible (?:by the tree )?after \d+ swipes?[^;]*; but /;
 export function hedgedLead(reply: string): HedgedLead | undefined {
+  return hedged(reply)?.lead;
+}
+
+/** `hedgedLead`, with the reply's words after it: the hedge's clauses, first. */
+function hedged(reply: string): { lead: HedgedLead; clauses: string } | undefined {
   const lead = HEDGED_STOP.exec(reply);
-  if (lead !== null) return { what: lead[1] as HedgeWhat, preT17: false };
-  return OLD_HEDGED_STOP.test(reply) ? { what: 'WHOLE', preT17: true } : undefined;
+  if (lead !== null) return { lead: { what: lead[1] as HedgeWhat, preT17: false }, clauses: reply.slice(lead[0].length) };
+  const old = OLD_HEDGED_STOP.exec(reply);
+  return old === null ? undefined : { lead: { what: 'WHOLE', preT17: true }, clauses: reply.slice(old[0].length) };
+}
+
+/** What `hedgeWhy` reads a hedged stop's reason as (T15). */
+export const HEDGE_WHYS = ['held', 'budget', 'room', 'axis', 'tap', 'fills', 'keyboard'] as const;
+export type HedgeWhy = (typeof HEDGE_WHYS)[number];
+/** The flush clause's reason, in flushText's words for each `why`, read in the clause before ` — it may be cut there`. */
+const FLUSH_WHYS: readonly (readonly [HedgeWhy, RegExp])[] = [
+  ['held', /, and a swipe toward it showed \d+ px more of it, then 2 swipes after it moved nothing — the content ended there or the app did not take them/],
+  ['budget', /, and no swipe or time was left to check it/],
+  ['room', /, and no scroll container around it has room for a probe swipe to check it/],
+  ['axis', /, so no probe swipe can move its (?:top|bottom|left|right) edge into view to check it/],
+  ['tap', /, and the probe swipe was too short to tell from a tap/],
+  ['fills', /it (?:fills|spans) its scroll container /],
+];
+/**
+ * Why a hedged stop (`hedgedLead`) is hedged, T15: the `why` of the flush edge no probe checked (src/interact/
+ * flush-check.ts#Flush, its clause scroll-text.ts#flushText) — `held` (a swipe showed more, then two moved nothing),
+ * `budget`, `room`, `axis`, `tap`, `fills` (both edges on the container's) — or `keyboard`, a soft keyboard the window
+ * state gives no area (the `UNCOVERED` hedge alone). A `WHOLE OR UNCOVERED` hedge reads its flush reason: the cut is
+ * the claim the eyes can measure, the keyboard's beside it. Undefined on a reply not hedged, and on a hedge whose
+ * clause names no reason src writes — a rewording read nowhere rather than guessed.
+ */
+export function hedgeWhy(reply: string): HedgeWhy | undefined {
+  const stop = hedged(reply);
+  if (stop === undefined) return undefined;
+  if (stop.lead.what === 'UNCOVERED') return stop.clauses.startsWith(UNLOCATED_KEYBOARD) ? 'keyboard' : undefined;
+  const [clause, ...after] = stop.clauses.split(' — it may be cut there');
+  return after.length === 0 ? undefined : FLUSH_WHYS.find(([, words]) => words.test(clause))?.[0];
 }
 
 /** A hedged `fully: true` stop (`hedgedLead`), of either form: a stop, never a claim. */

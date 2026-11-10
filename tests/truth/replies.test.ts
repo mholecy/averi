@@ -7,7 +7,7 @@ import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, KEYBOARD_UNLISTED, miss
 import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
 import { boundText, describeScrollResult, flushText, UNTRIED_END, UNTRIED_LEAD } from '../../src/interact/scroll-text.js';
 import {
-  CAROUSEL_REPLY_WORDS, carouselReply, fullyHedged, hedgedLead, replyKind, VISIBLE_STOP, MAX_SWIPES, flushProbedSide,
+  CAROUSEL_REPLY_WORDS, carouselReply, fullyHedged, hedgedLead, HEDGE_WHYS, hedgeWhy, replyKind, VISIBLE_STOP, MAX_SWIPES, flushProbedSide,
   flushProbesSaid, idbReasonsSaid, inferredAxisSaid, noIdListedSaid, OCR_FAILED_CLOSED, presentedRemedySaid,
   windowHintSaid, heldCutHedged, bandSaid, directionNamed, UNCHANGED_SAID, LIVE_REPLY_WORDS, refusedUnsentSaid,
   scrollVerdictSaid, underBarRemedySaid, untriedSideSaid, chooserSaid, launchedAs, linkHeldSaid, namesUntried,
@@ -258,6 +258,72 @@ describe("carouselReply: the five kinds of a carousel's `fully: true` reply (T7a
     expect(MAX_SWIPES).toBe('(maxSwipes)');
     expect(boundText({ of: 'maxSwipes' }, 6).endsWith(MAX_SWIPES)).toBe(true);
     expect(source).toContain('`visible by the tree after ${n}`');
+  });
+});
+
+describe('hedgeWhy (T15): why a hedged stop is hedged, read off the clause src writes (scroll-text.ts#describeScrollResult)', () => {
+  const box = { x: 0, y: 303, width: 1080, height: 1238 };
+  const header = { role: 'container', label: null, identifier: 'header', rect: { x: 0, y: 303, width: 1080, height: 154 } };
+  const at = (r: Partial<Parameters<typeof describeScrollResult>[0]>) => `Element id:"x" ${describeScrollResult({ swipes: 3, visible: 1, clipped: [], ...r })}`;
+  // Every unchecked flush of interact/flush-check.ts#Flush, as tests/interact/scroll-hedged-lead.test.ts's HEDGES: a
+  // wording src changes fails here.
+  const FLUSHES = [
+    ['budget', { edge: 'top', container: box, checked: false, why: 'budget' }],
+    ['room', { edge: 'bottom', container: box, checked: false, why: 'room' }],
+    ['axis', { edge: 'bottom', container: box, checked: false, why: 'axis' }],
+    ['axis', { edge: 'right', container: box, checked: false, why: 'axis' }],
+    ['tap', { edge: 'top', container: box, checked: false, why: 'tap' }],
+    ['held', { edge: 'right', container: box, checked: false, why: 'held', revealed: 64 }],
+    ['held', { edge: 'top', container: box, pinned: header, checked: false, why: 'held', revealed: 66 }],
+    ['fills', { edges: ['top', 'bottom'], container: box, checked: false, why: 'fills' }],
+    ['fills', { edges: ['top', 'bottom'], container: box, pinned: header, checked: false, why: 'fills' }],
+  ] as const;
+  const bar: UiNode = { role: 'button', label: null, identifier: 'bar', value: null, children: [], rect: { x: 0, y: 1541, width: 1080, height: 100 } };
+  const unjudged = { sees: 'unjudged', edge: 'bottom', by: bar, why: 'a blended frame' } as const;
+
+  it('the reasons are the unchecked flush `why`s and the unlocated keyboard, no other', () => {
+    expect([...HEDGE_WHYS].sort()).toEqual(['axis', 'budget', 'fills', 'held', 'keyboard', 'room', 'tap']);
+  });
+
+  it.each(FLUSHES)('%s: the flush hedge, alone, the eyes unjudged, beside an unlocated keyboard (its flush reason first), before T17', (why, flush) => {
+    expect(hedgeWhy(at({ flush }))).toBe(why);
+    expect(hedgeWhy(at({ flush, eyes: unjudged }))).toBe(why);
+    expect(hedgeWhy(at({ flush, keyboard: { state: 'unlocated' } }))).toBe(why);
+    expect(hedgeWhy(at({ flush, keyboard: { state: 'shown', frame: { x: 0, y: 1400, width: 1080, height: 800 } } }))).toBe(why);
+    expect(hedgeWhy(`Element id:"x" fully visible after 3 swipes; but ${flushText(flush)}`)).toBe(why);
+  });
+
+  it('keyboard: a soft keyboard nothing could place, alone or with a checked flush (whose probe clause is no reason)', () => {
+    expect(hedgeWhy(at({ keyboard: { state: 'unlocated' } }))).toBe('keyboard');
+    expect(hedgeWhy(at({ keyboard: { state: 'unlocated' }, flush: { edge: 'top', container: box, checked: true } }))).toBe('keyboard');
+  });
+
+  it('a pre-T17 reply of a committed record: held (t11 final-ab, scroll-sticky-cut.R.fully)', () => {
+    const record = JSON.parse(readFileSync(new URL('../../docs/truth/live-records/t11-carousel-visible/final-ab/harm-visibility-fix-1.json', import.meta.url), 'utf8')) as { results: { id: string; replies: string[] }[] };
+    const [reply] = record.results.find((r) => r.id === 'scroll:scroll-sticky-cut.R.fully')!.replies;
+    expect(hedgedLead(reply)).toEqual({ what: 'WHOLE', preT17: true });
+    expect(hedgeWhy(reply)).toBe('held');
+  });
+
+  it('no hedge, no reason: a clean stop, a checked one, a plain one, a failure that quotes the words, a tap', () => {
+    expect(hedgeWhy(at({}))).toBeUndefined();
+    expect(hedgeWhy(at({ flush: { edge: 'top', container: box, checked: true } }))).toBeUndefined();
+    expect(hedgeWhy(at({ flush: { edge: 'top', container: box, checked: false, why: 'budget' }, clipped: ['bottom'], visible: 0.8 }))).toBeUndefined();
+    expect(hedgeWhy('ERROR scroll_until x failed after 6 swipes (maxSwipes) — NOT CONFIRMED WHOLE: no swipe or time was left to check it')).toBeUndefined();
+    expect(hedgeWhy('Tapped id:"x"')).toBeUndefined();
+  });
+
+  it('a hedged lead whose clause names no reason src writes: undefined, not a guess', () => {
+    expect(hedgeWhy('Element id:"x" visible after 3 swipes, NOT CONFIRMED WHOLE: something src does not write')).toBeUndefined();
+    expect(hedgeWhy('Element id:"x" visible after 3 swipes, NOT CONFIRMED WHOLE: its top edge lies somewhere else — it may be cut there')).toBeUndefined();
+    // A reason's words after the flush clause, not in it, are not its reason: the clause ends ` — it may be cut there`.
+    expect(hedgeWhy('Element id:"x" visible after 3 swipes, NOT CONFIRMED WHOLE: its top edge lies on its scroll container\'s (0,303 1080x1238), and no swipe or time was left to check it, said after it')).toBeUndefined();
+    expect(hedgeWhy('Element id:"x" visible after 3 swipes, NOT CONFIRMED WHOLE: its top edge lies elsewhere — it may be cut there, and no swipe or time was left to check it — it may be cut there')).toBeUndefined();
+    // Nor are the words of the selector the reply echoes, before its lead.
+    const fills = flushText({ edges: ['top', 'bottom'], container: box, checked: false, why: 'fills' });
+    expect(hedgeWhy(`Element text:", and no swipe or time was left to check it" fully visible after 3 swipes; but ${fills}`)).toBe('fills');
+    expect(hedgeWhy(`Element text:", and no swipe or time was left to check it" visible after 3 swipes, NOT CONFIRMED WHOLE: ${fills}`)).toBe('fills');
+    expect(hedgeWhy('Element id:"x" visible after 3 swipes, NOT CONFIRMED UNCOVERED: no swipe or time was left to check it — it may be cut there')).toBeUndefined();
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { liveGeometry, touchTurns, classStrokes, directionBreaks, distanceAt, judgeAbsentAtEnd, judgeAndroidTurn, judgeAtRest, judgeBlankStretch, judgeCarry, judgeDismissal, judgePresentedAssert, judgePresentedScroll, presentedAssertCase, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases } from '../../scripts/truth/live-visibility.js';
+import { liveGeometry, touchTurns, classStrokes, directionBreaks, distanceAt, judgeAbsentAtEnd, judgeAndroidTurn, judgeAtRest, judgeBlankStretch, judgeCarry, judgeDismissal, judgePresentedAssert, judgePresentedScroll, presentedAssertCase, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases, hedgedStop, hedgedStops, hedgedStopsLine } from '../../scripts/truth/live-visibility.js';
 import { describeScrollResult, flushText } from '../../src/interact/scroll-text.js';
 import { stopHolds } from '../../scripts/truth/target-contract.js';
 import { turnsSaid } from '../../scripts/truth/replies.js';
@@ -652,5 +652,71 @@ describe('judgeAndroidTurn: no turn on uiautomator, a loud failure naming the wa
     const ios = visibilityCases(cell, 'ios').find((x) => x.id === 'turn:scroll-collapsing.A')!;
     expect(ios.says).toMatch(/^turn back: /);
     expect(ios.judge(after(away, 4), [failed(4, 2), TAP], launched, 'wda', [after(away, 4)])).toMatchObject({ outcome: 'MISMATCH', cls: 'R-direction' });
+  });
+});
+
+describe('hedgedStops (T15): every hedged stop counted, by reason and by verdict — a rise is seen, nothing gated', () => {
+  const box = { x: 0, y: 303, width: 1080, height: 1238 };
+  const stop = (flush?: Parameters<typeof flushText>[0], keyboard?: 'unlocated') =>
+    `Element id:"x" ${describeScrollResult({ swipes: 3, visible: 1, clipped: [], ...(flush !== undefined && { flush }), ...(keyboard !== undefined && { keyboard: { state: keyboard } }) })}`;
+  const held = stop({ edge: 'top', container: box, checked: false, why: 'held', revealed: 66 });
+  const budget = stop({ edge: 'top', container: box, checked: false, why: 'budget' });
+  const fills = stop({ edges: ['top', 'bottom'], container: box, checked: false, why: 'fills' });
+  const keyboard = stop(undefined, 'unlocated');
+  const oldHeld = `Element id:"x" fully visible after 3 swipes; but ${flushText({ edge: 'top', container: box, checked: false, why: 'held', revealed: 66 })}`;
+  const clean = stop();
+  const checked = stop({ edge: 'top', container: box, checked: true });
+  const plain = 'Element id:"x" visible after 2 swipes — CLIPPED at right, 92% of it is in the viewport. A rect assert or screenshot on this element will measure the CLIPPED box';
+  const OK = { outcome: 'ok' } as const;
+  const CUT = { outcome: 'LOUD', cls: 'hedged-stop' } as const;
+  const OLD_CUT = { outcome: 'LOUD', cls: 'hedged-stop-old-lead' } as const;
+  const r = (id: string, verdict: { outcome: 'ok' | 'LOUD' | 'MISMATCH' | 'SKIP'; cls?: 'hedged-stop' | 'hedged-stop-old-lead' | 'stop-claim' | 'not-reached' }, ...replies: string[]) => ({ source: 'uiautomator', c: { id }, verdict, replies });
+
+  it('hedgedStop: a case\'s first stop with a hedged lead, and why; none on a clean, checked or plain stop, a tap, a failure', () => {
+    expect(hedgedStop(r('a', OK, held, 'Tapped id:"x"'))).toEqual({ why: 'held' });
+    expect(hedgedStop(r('a', OK, 'Tapped id:"x"', budget))).toEqual({ why: 'budget' });
+    expect(hedgedStop(r('a', OK, 'Element id:"x" visible after 3 swipes, NOT CONFIRMED WHOLE: unread'))).toEqual({ why: undefined });
+    // A reply that also says it never found its target is no stop (replies.ts#replyKind), hedged or not.
+    expect(hedgedStop(r('a', OK, `${budget}; element never appeared in the tree`))).toBeUndefined();
+    for (const reply of [clean, checked, plain, 'Tapped id:"x"', 'ERROR scroll_until x failed after 6 swipes (maxSwipes)']) expect(hedgedStop(r('a', OK, reply))).toBeUndefined();
+  });
+
+  it('a run without a hedge: 0 of its visible stops, every bucket 0, no ids', () => {
+    const stops = hedgedStops([r('a', OK, clean, 'Tapped id:"x"'), r('b', OK, checked), r('c', OK, plain), r('d', OK, 'Tapped id:"x"'), r('e', { outcome: 'LOUD', cls: 'not-reached' }, 'ERROR scroll_until x failed after 6 swipes (maxSwipes)')]);
+    expect(stops).toEqual({ visible: 3, whole: [], cut: [], other: [] });
+    expect(hedgedStopsLine(stops)).toBe('Hedged stops: 0 of 3 visible stops (target whole, ok: 0; cut, LOUD: 0)');
+  });
+
+  it('no visible stop: no line, so a summary without one reads as before', () => {
+    const stops = hedgedStops([r('d', OK, 'Tapped id:"x"'), r('e', { outcome: 'SKIP' }, clean)]);
+    expect(stops.visible).toBe(0);
+    expect(hedgedStopsLine(stops)).toBeUndefined();
+  });
+
+  it('whole and ok, cut and LOUD (either lead), any other verdict apart — by reason, with the cases; a SKIP is no stop', () => {
+    const stops = hedgedStops([
+      r('w1', OK, held, 'Tapped id:"x"'),
+      r('w2', OK, budget),
+      r('w3', OK, oldHeld),
+      r('w4', OK, keyboard),
+      r('c1', CUT, fills),
+      r('c2', OLD_CUT, oldHeld),
+      r('m1', { outcome: 'MISMATCH', cls: 'stop-claim' }, keyboard),
+      r('p', OK, clean),
+      r('s', { outcome: 'SKIP' }, budget),
+    ]);
+    expect(stops.visible).toBe(8);
+    expect(stops.whole.map((h) => [h.id, h.why])).toEqual([['uiautomator w1', 'held'], ['uiautomator w2', 'budget'], ['uiautomator w3', 'held'], ['uiautomator w4', 'keyboard']]);
+    expect(stops.cut.map((h) => [h.id, h.why])).toEqual([['uiautomator c1', 'fills'], ['uiautomator c2', 'held']]);
+    expect(stops.other.map((h) => [h.id, h.why])).toEqual([['uiautomator m1', 'keyboard']]);
+    expect(hedgedStopsLine(stops)).toBe(
+      'Hedged stops: 7 of 8 visible stops (target whole, ok: 4 — held 2, budget 1, keyboard 1; cut, LOUD: 2 — held 1, fills 1; another verdict: 1 — keyboard 1): ' +
+        'uiautomator w1, uiautomator w2, uiautomator w3, uiautomator w4, uiautomator c1, uiautomator c2, uiautomator m1',
+    );
+  });
+
+  it('a hedge whose reason is unread is counted, as `unread`', () => {
+    const stops = hedgedStops([r('u', OK, 'Element id:"x" visible after 3 swipes, NOT CONFIRMED WHOLE: unread')]);
+    expect(hedgedStopsLine(stops)).toBe('Hedged stops: 1 of 1 visible stops (target whole, ok: 1 — unread 1; cut, LOUD: 0): uiautomator u');
   });
 });

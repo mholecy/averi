@@ -469,6 +469,31 @@ describe('live.ts --rejudge over the committed visibility records', () => {
   });
 });
 
+describe('T15: the hedged stops of a visibility run, counted in its summary', () => {
+  // T11's final A/B (t11-carousel-visible/final-ab, docs/truth/live-records/t11-carousel-visible): the fix's visibility
+  // run held one stop hedged, scroll-sticky-cut.R.fully (`held`, its pre-T17 lead), with the target whole — ok, so before
+  // T15 nothing in the summary said so; the base's held none. 32 of the 153 cases stop on their target in each.
+  const FINAL_AB = 't11-carousel-visible/final-ab';
+  const hedgedLines = (out: string) => out.split('\n').filter((l) => l.startsWith('Hedged stops: '));
+  it('harm-visibility-fix-1.json: 1 of 32, held, its case marked', { timeout: 60_000 }, async () => {
+    const { code, out } = await rejudgeInProcess(`${FINAL_AB}/harm-visibility-fix-1.json`, 'visibility');
+    expect(hedgedLines(out)).toEqual(['Hedged stops: 1 of 32 visible stops (target whole, ok: 1 — held 1; cut, LOUD: 0): uiautomator scroll:scroll-sticky-cut.R.fully']);
+    const marked = out.split('\n').filter((l) => l.includes(' (hedged: '));
+    expect(marked).toHaveLength(1);
+    expect(marked[0]).toMatch(/^- ok scroll:scroll-sticky-cut\.R\.fully .* \(hedged: held\)$/);
+    expect(code).toBe(0);
+  });
+  it.each(['harm-visibility-base-1.json', 'harm-visibility-base-2.json'])('%s: 0 of 32 — the line printed, every bucket 0', { timeout: 60_000 }, async (record) => {
+    const { out } = await rejudgeInProcess(`${FINAL_AB}/${record}`, 'visibility');
+    expect(hedgedLines(out)).toEqual(['Hedged stops: 0 of 32 visible stops (target whole, ok: 0; cut, LOUD: 0)']);
+    expect(out).not.toContain(' (hedged: ');
+  });
+  it('a forms run stops on no target: no line, its summary as before T15', { timeout: 60_000 }, async () => {
+    const { out } = await rejudgeInProcess('android-forms-d61-1.json', 'forms');
+    expect(hedgedLines(out)).toEqual([]);
+  });
+});
+
 describe('the flush probe\'s live records on a deep cut: a probe, then one reveal', () => {
   // docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md: S
   // (176 px, 154 of it below `lower`'s clip at rest) whole after the probe and one reveal of at most half the room above

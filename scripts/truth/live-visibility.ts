@@ -2,7 +2,7 @@ import { countOf } from '../../src/util/count.js';
 import { UNMOVED_STROKES_EXHAUST } from '../../src/interact/scroll-rounds.js';
 import type { Platform } from '../differential/corpus.js';
 import type { CaseReads } from './live-cases.js';
-import { flushProbesSaid, refusedAfterDismissal, replyKind, screenChangedSaid, screenUnchangedFor, swipesOf, turnsSaid, type ReplyKind, hedgedLead, hedgesCut, untriedSideSaid, directionNamed } from './replies.js';
+import { flushProbesSaid, refusedAfterDismissal, replyKind, screenChangedSaid, screenUnchangedFor, swipesOf, turnsSaid, type ReplyKind, hedgedLead, hedgesCut, untriedSideSaid, directionNamed, HEDGE_WHYS, hedgeWhy, type HedgeWhy } from './replies.js';
 import type { CellTruth, Geometry, LabState, ProbeEvent, Rect, Stroke, TargetTruth } from './schema.js';
 import { HEDGED_LEAD } from '../../src/interact/scroll-text.js';
 import { askedUnlistedBy, contractOf, CUT_GEOMETRIES, judgedContext, stopHolds, type StopAsk, type TapAsk } from './target-contract.js';
@@ -382,6 +382,70 @@ export function judgeScroll(
   if (tap === undefined || tapped === undefined) return { outcome: 'ok', kind, why: short(scroll), app };
   if (tapped.outcome !== 'ok') return { ...tapped, why: `stopped (${short(scroll)}), then the tap: ${tapped.why}`, app };
   return { outcome: 'ok', kind, why: `${short(scroll)}; then ${short(tap)}`, app };
+}
+
+/** A judged case as the summary holds it (live-cases.ts#Result): what hedgedStops reads. */
+export interface JudgedStop {
+  source: string;
+  c: { id: string };
+  verdict: Pick<LiveVerdict, 'outcome' | 'cls'>;
+  replies: readonly string[];
+}
+
+/**
+ * The case's hedged stop (T15): its first reply that stops on the target (replies.ts#replyKind `visible`) with a hedged
+ * lead (replies.ts#hedgedLead, either form), and why (replies.ts#hedgeWhy, undefined where the clause is unread);
+ * undefined when it has none.
+ */
+export function hedgedStop(r: Pick<JudgedStop, 'replies'>): { why: HedgeWhy | undefined } | undefined {
+  const reply = r.replies.find((x) => replyKind(x) === 'visible' && hedgedLead(x) !== undefined);
+  return reply === undefined ? undefined : { why: hedgeWhy(reply) };
+}
+
+/** One hedged stop, by its case (`<source> <id>`) and reason. */
+export interface HedgedOne {
+  id: string;
+  why: HedgeWhy | undefined;
+}
+
+/**
+ * Every hedged stop of a run (T15), counted where judgeScroll lets the target-whole ones pass: `visible`, the judged
+ * cases (no SKIP) that stopped on their target — the denominator; of them the hedged (`hedgedStop`), split by verdict:
+ * `whole` ok (the app shows the target whole: no rule fails a hedge there), `cut` LOUD by judgeScroll's own rule
+ * (`hedged-stop`, `hedged-stop-old-lead`: the target cut), `other` any other verdict (a claim the app does not bear out,
+ * a tap that failed after). A count, no gate: a device or a change that turns plain stops into hedges shows as a rise.
+ */
+export function hedgedStops(results: readonly JudgedStop[]): { visible: number; whole: HedgedOne[]; cut: HedgedOne[]; other: HedgedOne[] } {
+  const judged = results.filter((r) => r.verdict.outcome !== 'SKIP' && r.replies.some((x) => replyKind(x) === 'visible'));
+  const stops = { visible: judged.length, whole: [] as HedgedOne[], cut: [] as HedgedOne[], other: [] as HedgedOne[] };
+  for (const r of judged) {
+    const hedged = hedgedStop(r);
+    if (hedged === undefined) continue;
+    const one = { id: `${r.source} ${r.c.id}`, why: hedged.why };
+    const cut = r.verdict.cls === 'hedged-stop' || r.verdict.cls === 'hedged-stop-old-lead';
+    (r.verdict.outcome === 'ok' ? stops.whole : cut ? stops.cut : stops.other).push(one);
+  }
+  return stops;
+}
+
+/**
+ * The summary's line for `hedgedStops` (live-cases.ts#summarize), undefined when the run stopped on no target — so a
+ * summary without a scroll stop reads as before T15: `Hedged stops: H of S visible stops (target whole, ok: K — held a,
+ * budget b; cut, LOUD: L — …[; another verdict: M — …]): <source> <id>, …` — each bucket's reasons in HEDGE_WHYS
+ * order, `unread` last, a bucket's dash only when it holds any.
+ */
+export function hedgedStopsLine({ visible, whole, cut, other }: ReturnType<typeof hedgedStops>): string | undefined {
+  if (visible === 0) return undefined;
+  const bucket = (label: string, ones: readonly HedgedOne[]): string => {
+    const why = [...HEDGE_WHYS, undefined]
+      .map((w) => [w ?? 'unread', ones.filter((o) => o.why === w).length] as const)
+      .filter(([, n]) => n > 0)
+      .map(([w, n]) => `${w} ${n}`);
+    return `${label}: ${ones.length}${why.length === 0 ? '' : ` — ${why.join(', ')}`}`;
+  };
+  const all = [...whole, ...cut, ...other];
+  const buckets = [bucket('target whole, ok', whole), bucket('cut, LOUD', cut), ...(other.length === 0 ? [] : [bucket('another verdict', other)])];
+  return `Hedged stops: ${all.length} of ${visible} visible stops (${buckets.join('; ')})${all.length === 0 ? '' : `: ${all.map((o) => o.id).join(', ')}`}`;
 }
 
 /**

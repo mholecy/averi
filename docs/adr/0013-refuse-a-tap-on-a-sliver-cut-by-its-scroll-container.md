@@ -705,6 +705,14 @@ else the claim's `stop-claim` MISMATCH stands: `off-screen` and `outside-scroll-
 "visible" is false, whatever the hedge says of a cut), a band or app chrome over it (no flush edge hedges those), and an
 `UNCOVERED`-only hedge on a cut target (it hedges what may cover the element, not the cut).
 
+**T15: the hedges that pass are counted.** A hedge on a target the app shows whole stays ok — no rule above fails it — so a
+device or a change that turns plain stops into hedges would pass unseen. The summary counts them (`hedgedStops` in
+scripts/truth/live-visibility.ts, printed by `summarize` in scripts/truth/live-cases.ts): `Hedged stops: H of S visible
+stops (target whole, ok: K — held a, budget b, …; cut, LOUD: L …): <source> <case>, …`, S the judged cases that stopped on
+their target, each hedge's reason read off its clause (`hedgeWhy` in scripts/truth/replies.ts: the flush `why`, or
+`keyboard`), and the hedged case's own line ends `(hedged: <why>)`. A count, not a gate: no exit code changes, and a run
+that stopped on no target prints no line.
+
 **T11's off-screen exemption, re-decided.** T11's judge called the held hedge LOUD on any laid-out target, `off-screen`
 included (pinned by its review round 3, not argued in the T11 amendment above). Nothing in that amendment holds for it: the
 held hedge says a part of the element may lie past its container's edge, and a target wholly off the screen is not that.
