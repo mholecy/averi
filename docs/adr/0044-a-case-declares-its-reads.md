@@ -127,3 +127,37 @@ not do the work (`adb` is not on `CaseLab`). T7b can add the start verb at the s
 **Consequences.** `run-case.ts` (mutation scope) has three new branches, each pinned in tests/truth/run-case.test.ts over
 `FakeAndroidLab`; the group's `reads` is pinned in tests/truth/live-reads.test.ts; the judges' rules in
 tests/truth/live-chooser.test.ts over recorded device text; the seven live runs in tests/truth/t7b-records.test.ts.
+
+## Amendment: the carousel group reads the device's state around its cases (T16, 2026-11-10)
+
+**Context.** The carousel group's verdicts depend on a state of the device no case declares: some sessions a 142-px
+`input swipe` carries 135–146 px (fast), others 94 px or less one stroke in four or more (short). T11 found the short
+state by accident and T12, T13 and T19 needed it labelled; each labelled its runs by hand, with
+`docs/truth/live-records/t11-carousel-visible/raw/raw-strokes.mjs` and a per-folder `label-group.mjs`, outside `live.ts`.
+
+**Decision.** A run-level read, not a case-level one: the state belongs to the device over the run, not to a case's calls.
+- `readDevice` in `scripts/truth/device-state.ts` ports raw-strokes.mjs onto `AndroidLab` and live-carousel.ts's constants:
+  per round, a fresh launch of `carousel-recycler-free` (`AndroidLab.launch`, settled on the app's ready where the script
+  slept 1.5 s), the probes' 440-px pre-drag (`preDragStroke`, `PRE_DRAG_PX`, 1.2 s to settle), then four raw 142-px,
+  300-ms strokes along the clip's mid-line from 80 % to 65 % of its width (lv-d62's first probe, the script's 824 → 682 at
+  y 497), each carry the change of the state file's carousel offset 1.5 s after it, and the device's loadavg. Four
+  rounds (T19's count; T11's final A/B read six). Then the lab app's frames over the last round (`dumpsys gfxinfo`, reset
+  after each launch; `parseGfxinfo`), the framework's `sys.system_server.start_count` (final-ab.sh's restart check) and
+  the host's loadavg.
+- `stateOf` is the T11/T19 rule exactly as T11's `final-ab/label-group.mjs`, T12's `label-group.mjs` and T19's
+  `analyze.mjs` read it: every round's strokes pooled, short when one in four or more carried 94 px or less (the old
+  line for lv-d62's 142-px probe), else fast. tests/truth/device-state-records.test.ts holds it to every label those
+  scripts wrote into the T11 and T12 records.
+- `live.ts`, when its groups include `carousel` on Android, reads before the first case and after the last into
+  `RunRecord.deviceLabel` (`{ before, after }`), and `summarize` prints `Device: before <state> <short>/<strokes>, after …
+  (frames p50 … → …)`, `DISAGREE — ` first when the two states differ. A read that fails (adb, no carousel offset in the
+  state file) leaves `{ error }` and `Device: unlabelled — <why>`; nothing is read after a failure, the cases still run,
+  and the exit code is untouched: a label, not a gate. Any other group, and iOS, reads nothing.
+- The record's key is `deviceLabel`, not `device`: two Android records of 2026-10 hold the device's name under `device`.
+  A record without the key prints no Device line, so every committed record rejudges byte-identically (698 records, in
+  the forms groups and in `visibility,dismissal,ensure,carousel,chooser`, base 3b811b28 against T16).
+
+**Consequences.** A carousel run costs two reads of about 50 s each. raw-strokes.mjs and the label-group scripts stay as
+the evidence of the runs they labelled (a note beside raw-strokes.mjs says so); a new labelled run needs neither. The
+gfxinfo summariser T11 used (`fs.mjs`) is lost; `parseGfxinfo` reads only the four lines its outputs kept. device-state.ts
+is in the mutation scope (group `lab`), its read pinned over a fake exec through `AndroidLab`.

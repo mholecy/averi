@@ -1248,3 +1248,34 @@ describe('live.ts --rejudge over D40\'s forms records: every LOUD known by its r
     expect(code).toBe(0);
   });
 });
+
+describe('T16: the carousel group\'s device label, printed from the record', () => {
+  // T11's final A/B control run (fix arm): a carousel record from before T16, so with no `deviceLabel`.
+  const RECORD = 't11-carousel-visible/final-ab/control-fix-1.json';
+  const recorded = () => JSON.parse(readFileSync(resolve(ROOT, pathOf(RECORD)), 'utf8')) as RunRecord;
+  const round = (carry: number) => ({ pre: 438, preMs: 1_050, strokes: [carry, carry, carry, carry].map((c) => ({ carry: c, ms: 350 })), load: '0.10 0.20 0.30 1/1700 1' });
+  const read = (carry: number, p50: number) => ({ t: '2026-11-10T12:00:00.000Z', rounds: [round(carry), round(140)], frames: { total: 90, janky: 2, p50, p90: 30 }, startCount: '11', hostLoad: '2.00 2.00 2.00' });
+  const deviceLines = (lines: string[]) => lines.filter((l) => l.startsWith('Device: '));
+
+  it('a record with no `deviceLabel` prints no Device line; one with it, the line last, and the rest and the exit code the same', { timeout: 60_000 }, async () => {
+    const plain = await rejudgeRecord(recorded(), RECORD, { groups: ['carousel'] });
+    expect(deviceLines(plain.lines)).toEqual([]);
+    const labelled = await rejudgeRecord({ ...recorded(), deviceLabel: { before: read(60, 18), after: read(140, 22) } }, RECORD, { groups: ['carousel'] });
+    expect(labelled.lines).toEqual([...plain.lines, 'Device: DISAGREE — before short 4/8, after fast 0/8 (frames p50 18 ms → 22 ms)', '']);
+    expect(labelled.exitCode).toBe(plain.exitCode);
+  });
+
+  it('an older record holding the device\'s name under `device` prints no Device line', { timeout: 60_000 }, async () => {
+    const OLD = 'android-hint-everywhere-9fa59ae-asserts.json';
+    const old = JSON.parse(readFileSync(resolve(ROOT, pathOf(OLD)), 'utf8')) as RunRecord & { device?: unknown };
+    expect(old.device).toBe('averi_lab emulator-5554');
+    expect(deviceLines((await rejudgeRecord(old, OLD, { groups: ['forms'] })).lines)).toEqual([]);
+  });
+
+  it('a failed read: unlabelled, loud in the summary, the exit code untouched', { timeout: 60_000 }, async () => {
+    const plain = await rejudgeRecord(recorded(), RECORD, { groups: ['carousel'] });
+    const failed = await rejudgeRecord({ ...recorded(), deviceLabel: { error: 'before: round 1: the lab app reported no carousel offset' } }, RECORD, { groups: ['carousel'] });
+    expect(deviceLines(failed.lines)).toEqual(['Device: unlabelled — before: round 1: the lab app reported no carousel offset']);
+    expect(failed.exitCode).toBe(plain.exitCode);
+  });
+});

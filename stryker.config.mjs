@@ -47,6 +47,13 @@ export default {
     '!/docs/truth/live-records/t11-carousel-visible/final-ab/',
     '/docs/truth/live-records/t11-carousel-visible/final-ab/*',
     '!/docs/truth/live-records/t11-carousel-visible/final-ab/harm-visibility-fix-1.json',
+    // T16: the raw-strokes reads and the gfxinfo lines device-state.test.ts reads (stateOf, parseGfxinfo).
+    '!/docs/truth/live-records/t11-carousel-visible/raw/',
+    '/docs/truth/live-records/t11-carousel-visible/raw/*',
+    '!/docs/truth/live-records/t11-carousel-visible/raw/raw-1.jsonl',
+    '!/docs/truth/live-records/t11-carousel-visible/raw/raw-4-recovered.jsonl',
+    '!/docs/truth/live-records/t11-carousel-visible/frames-recovery.txt',
+    '!/docs/truth/live-records/t11-carousel-visible/final-ab/frames-fresh.txt',
     // The lab apps' cell catalog the live cases are built from (live-cases.ts#catalogOf; live-carousel.test.ts, T13).
     '!/fixtures/',
     '/fixtures/*',
