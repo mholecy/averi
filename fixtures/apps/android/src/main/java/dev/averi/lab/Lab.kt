@@ -3,6 +3,7 @@ package dev.averi.lab
 import android.content.Context
 import android.graphics.Rect
 import android.view.View
+import android.view.accessibility.AccessibilityNodeInfo
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.runtime.Composable
@@ -36,7 +37,7 @@ val SUPPORTED_LAYERS = setOf("none", "sheet-medium", "alert", "dialog-fullscreen
 data class Target(val tag: String, val color: Long, val slot: Int, val onLayer: Boolean, val text: String? = null, val label: String? = null)
 
 /**
- * `family`: base, presented, forms, edges, bars, false-covers, text, held — MainActivity's CellRouter routes by it. `form`: a form
+ * `family`: base, presented, forms, edges, bars, false-covers, text, held, views — MainActivity's CellRouter routes by it. `form`: a form
  * cell's catalog entry as it stands (Forms.kt reads it) — a form builds its own picker sheet, so its `sheet-large` is
  * supported where a coloured-target cell's is not. `held`: a held cell's phase lengths as they stand (Held.kt reads them).
  */
@@ -269,7 +270,22 @@ class Lab(context: Context, private val screen: Rect) {
     }
 }
 
-// --- phase 3's geometry, read once for every family that reports it (Edges.kt, Bars.kt) ---
+// --- phase 3's geometry, read once for every family that reports it (Edges.kt, Bars.kt, Views.kt) ---
+
+/** A View's unclipped frame on the screen, in pixels. */
+internal fun onScreen(v: View): Rect =
+    IntArray(2).also(v::getLocationOnScreen).let { Rect(it[0], it[1], it[0] + v.width, it[1] + v.height) }
+
+/** Gives a View's accessibility node the identifier `id`, as its viewIdResourceName (a View has no resource of that
+ * name). */
+internal fun identifiedAs(v: View, id: String) {
+    v.accessibilityDelegate = object : View.AccessibilityDelegate() {
+        override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
+            super.onInitializeAccessibilityNodeInfo(host, info)
+            info.viewIdResourceName = id
+        }
+    }
+}
 
 /**
  * A layout's frame on the SCREEN, unclipped: its position in the window plus the window's place on the screen, and its

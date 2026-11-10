@@ -66,6 +66,8 @@ enum CellRouter {
         // The coloured-target host (Base.swift); a presented cell's host and layer (Presented.swift).
         case "base": CellScreen(cell: cell)
         case "presented": PresentedScreen(cell: cell)
+        // Classic Android Views (Views.kt, backlog D77): built by the Android app alone, the cells `platforms: ["android"]`.
+        case "views": UnbuiltCell(cell: cell)
         default: UnbuiltCell(cell: cell)
         }
     }

@@ -304,7 +304,7 @@ live calibrations'), and `--rejudge <file>` judges it again with this checkout's
 lab simulator on its domain socket (`idb_companion --udid <udid> --grpc-domain-sock /tmp/idb/<udid>_companion.sock`).
 
 The cell catalog is one file per family, `fixtures/apps/cells/<family>.json` (base, presented, forms, edges, bars,
-false-covers, text, react-native, held — scripts/truth/schema.ts#FAMILIES); every lab app bundles
+false-covers, text, react-native, held, views — scripts/truth/schema.ts#FAMILIES); every lab app bundles
 `fixtures/apps/cells.json`, which `node --import tsx scripts/truth/catalog.ts` generates from them (`--check` exits 1
 when it is stale; tests/truth/catalog.test.ts fails then too), each cell stamped with its `family`, by which each app
 routes it to its family's file (`AveriLab/<Family>.swift`, `dev/averi/lab/<Family>.kt`). A cell's `config` is merged

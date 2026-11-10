@@ -1,0 +1,27 @@
+{
+  "family": "views",
+  "note": "Classic Android Views (backlog D77; docs/adr/0015-flat-list-reading-order-break.md, its amendment \"Android Views list children by location\" and the D75 residuals), built by the Android lab app alone (Views.kt) in FrameLayouts laid in pixels from Base's slots (300x64 dp, centred, the centre 142 + 180·slot dp down) and hosted by the activity's setContentView — NOT in Compose (an AndroidView sits under the node provider's host, `android.view.View`, whose subtree the reading-order mark never reaches: ADR 0015's residual). AOSP sorts a classic ViewGroup's accessibility children by LOCATION, so uiautomator lists them so, whatever order they are drawn in. views-banner: rn-banner's native twin (lab note LR4) — T, U and C, each a coloured clickable FrameLayout (a click logs its `tap`) with, as its LATER child, an opaque #263238 cover over its centre that swallows every touch (no target beneath is reached) and is no clickable node: 340x52 dp, 20 dp LEFT of its target (so the location sort lists it first), its top 10 dp above the target's — T's a TextView `Saved` (a toast), U's a bare FrameLayout with an identifier only (lab.<cell>.U.cover) — and C's 10 dp BELOW its target's top (listed first all the same: in one stripe the left edge decides). views-drawn-over (D75 review round 1's direction: a target drawn over a later-LISTED control holding its centre): A at slot 0 and B, a 300x44 dp control 20 dp right of A and 10 dp below its top, each holding the other's centre — A listed first (its left edge 20 dp further left) and drawn over B by child order (A the later child); A2 and B2 the same at slot 1, A2 the EARLIER child drawn over B2 by translationZ (8 dp, outlineProvider null: no shadow pixels). `slot` is the slot each pair lies at, B's and B2's their pair's. Predictions pinned in tests/ui-tree/draw-order-android-views-twin.test.ts.",
+  "cells": [
+    {
+      "id": "views-banner",
+      "layer": "none",
+      "platforms": ["android"],
+      "targets": [
+        { "tag": "T", "color": "#43A047", "slot": 0, "declared": "covered" },
+        { "tag": "U", "color": "#8E24AA", "slot": 1, "declared": "covered" },
+        { "tag": "C", "color": "#FB8C00", "slot": 2, "declared": "covered" }
+      ]
+    },
+    {
+      "id": "views-drawn-over",
+      "layer": "none",
+      "platforms": ["android"],
+      "targets": [
+        { "tag": "A", "color": "#1E88E5", "slot": 0, "declared": "open" },
+        { "tag": "B", "color": "#E53935", "slot": 0, "declared": "covered" },
+        { "tag": "A2", "color": "#00897B", "slot": 1, "declared": "open" },
+        { "tag": "B2", "color": "#FDD835", "slot": 1, "declared": "covered" }
+      ]
+    }
+  ]
+}

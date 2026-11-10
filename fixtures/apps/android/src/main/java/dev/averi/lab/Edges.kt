@@ -502,21 +502,6 @@ private fun RecyclerCarousel(cell: Cell, lab: Lab, clip: Modifier, snap: Boolean
     AndroidView(factory = { context -> recyclerCarousel(context, cell, lab, snap) }, modifier = clip)
 }
 
-/** A View's unclipped frame on the screen, in pixels. */
-private fun onScreen(v: View): android.graphics.Rect =
-    IntArray(2).also(v::getLocationOnScreen).let { android.graphics.Rect(it[0], it[1], it[0] + v.width, it[1] + v.height) }
-
-/** Gives a View's accessibility node the identifier `id`, as its viewIdResourceName (a View has no resource of that
- * name). */
-private fun identifiedAs(v: View, id: String) {
-    v.accessibilityDelegate = object : View.AccessibilityDelegate() {
-        override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
-            super.onInitializeAccessibilityNodeInfo(host, info)
-            info.viewIdResourceName = id
-        }
-    }
-}
-
 private fun recyclerCarousel(context: android.content.Context, cell: Cell, lab: Lab, snap: Boolean): View {
     val c = cell.targets.firstOrNull { it.tag == "C" }
     val list = RecyclerView(context).apply { setBackgroundColor(0xFFEEEEEE.toInt()) }
