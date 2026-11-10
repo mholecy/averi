@@ -12,8 +12,9 @@ import { parseDump } from '../helpers/android-dumps.js';
  * lays out on averi_lab (1080x2220, density 2.75). Views.kt: a slot 300x64 dp = 825x176 px, centred as Base.kt centres
  * it (46.36 dp in Float, 127.49998 px, rounded: left 127, right 952 — where Base's targets lie,
  * tests/fixtures/truth/android-averi_lab-api33/open.state.json), its top (142 + 180·slot - 32) dp rounded (303, 798,
- * 1293); a cover 340x52 dp = 935x143 px, 55 px LEFT of its target (72–1007), 28 px above its top (275, 770) — below it
- * for C (1321). React Native's (P3) rounds each view's offset in its parent, half up:
+ * 1293); a cover 340x52 dp = 935x143 px, 55 px LEFT of its target (72–1007), 27 px above its top (276, 771: -27.5 px
+ * rounded half up, as Kotlin's roundToInt; where rn-banner.xml has its covers) — 28 px below it for C (1321). React
+ * Native's (P3) rounds each view's offset in its parent, half up:
  * tests/fixtures/truth/android-rn-averi_lab-api33/rn-banner.xml has its targets at 128 (one px right of the views
  * twin's), T's cover at 276 (303 - 27.5 rounded to -27) and C's at 1321. Each run is in AOSP's location order
  * (ViewGroup.ChildListForAccessibility's stripe sort: every cover, its left edge 55 px further left, before its
@@ -24,9 +25,9 @@ const PHONE = { x: 0, y: 0, width: 1080, height: 2220 };
 
 /** A cell's run of [cover, target] pairs in location order, under a parent of `cls` identified lab.<cell>.run. */
 const bannerRun = (cell: string, cls = 'android.widget.FrameLayout') => `<node class="${cls}" resource-id="lab.${cell}.run" bounds="[0,0][1080,2220]">
-      <node class="android.widget.TextView" text="Saved" resource-id="lab.${cell}.T.cover" bounds="[72,275][1007,418]"/>
+      <node class="android.widget.TextView" text="Saved" resource-id="lab.${cell}.T.cover" bounds="[72,276][1007,419]"/>
       <node class="android.widget.FrameLayout" resource-id="lab.${cell}.T" clickable="true" bounds="[127,303][952,479]"/>
-      <node class="android.widget.FrameLayout" resource-id="lab.${cell}.U.cover" bounds="[72,770][1007,913]"/>
+      <node class="android.widget.FrameLayout" resource-id="lab.${cell}.U.cover" bounds="[72,771][1007,914]"/>
       <node class="android.widget.FrameLayout" resource-id="lab.${cell}.U" clickable="true" bounds="[127,798][952,974]"/>
       <node class="android.widget.FrameLayout" resource-id="lab.${cell}.C.cover" bounds="[72,1321][1007,1464]"/>
       <node class="android.widget.FrameLayout" resource-id="lab.${cell}.C" clickable="true" bounds="[127,1293][952,1469]"/>

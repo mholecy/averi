@@ -77,12 +77,16 @@ fun viewsScreen(activity: Activity, cell: Cell, lab: Lab): View {
     }
     when (cell.id) {
         "views-banner" -> for (t in cell.targets) {
+            // A tag with no cover offset is placed by no view: the cell is then unbuilt (the unplaced check below).
+            val coverOffset = ViewsLayout.COVER_TOP[t.tag] ?: continue
             // The target, then its cover as the LATER child: drawn over it.
             val top = pxOf(slotTop(t.slot))
             place(target(t), left, top, slotWidth, pxOf(SLOT_HEIGHT))
             val cover = bannerCover(activity, cell, t, px)
             reported["${t.tag}.cover"] = cover
-            val coverTop = top + px(ViewsLayout.COVER_TOP[t.tag] ?: -10)
+            // In px each side rounded half up, as Kotlin's roundToInt: -27.5 → -27 (276, 771 on averi_lab, where
+            // rn-banner.xml has its covers), 27.5 → 28 (1321).
+            val coverTop = top + px(coverOffset)
             place(cover, left + px(ViewsLayout.COVER_LEFT), coverTop, px(ViewsLayout.COVER_WIDTH), px(ViewsLayout.COVER_HEIGHT))
         }
         "views-drawn-over" -> {
