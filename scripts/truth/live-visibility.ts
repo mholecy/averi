@@ -1,8 +1,8 @@
 import { countOf } from '../../src/util/count.js';
 import { UNMOVED_STROKES_EXHAUST } from '../../src/interact/scroll-rounds.js';
 import type { Platform } from '../differential/corpus.js';
-import type { CaseReads } from './live-cases.js';
-import { flushProbesSaid, refusedAfterDismissal, replyKind, screenChangedSaid, screenUnchangedFor, swipesOf, turnsSaid, type ReplyKind, hedgedLead, hedgesCut, untriedSideSaid, directionNamed } from './replies.js';
+import type { Case, CaseReads } from './live-cases.js';
+import { flushProbesSaid, refusedAfterDismissal, replyKind, screenChangedSaid, screenUnchangedFor, swipesOf, turnsSaid, type ReplyKind, hedgedLead, hedgesCut, untriedSideSaid, directionNamed, HEDGE_WHYS, hedgeWhy, type HedgeWhy } from './replies.js';
 import type { CellTruth, Geometry, LabState, ProbeEvent, Rect, Stroke, TargetTruth } from './schema.js';
 import { HEDGED_LEAD } from '../../src/interact/scroll-text.js';
 import { askedUnlistedBy, contractOf, CUT_GEOMETRIES, judgedContext, stopHolds, type StopAsk, type TapAsk } from './target-contract.js';
@@ -330,6 +330,12 @@ export function directionBreaks(strokes: readonly Stroke[], classed: readonly Cl
 }
 
 /**
+ * judgeScroll's LOUD on a hedged stop whose target the app shows cut: `lead` for src's `NOT CONFIRMED` lead, `preT17`
+ * for the `fully visible …; but` opening of a record before T17 — what hedgedStops counts as `cut`.
+ */
+export const HEDGED_CUT = { lead: 'hedged-stop', preT17: 'hedged-stop-old-lead' } as const satisfies Record<string, VerdictClass>;
+
+/**
  * A scroll_until toward (or, `turnBack`, away from) `tag`, then a tap on it: the stop must hold where the app lays the
  * target out (stopHolds), every stroke on its own scroll view and R-direction kept (directionBreaks); a failure where the
  * app shows it as the stop needs it failed what happened. The tap after a stop must fire it alone (judgeTap). `axis`:
@@ -365,7 +371,7 @@ export function judgeScroll(
   if (visible && !holds && c.fully && g !== undefined && CUT_GEOMETRIES.includes(g) && tapped?.outcome !== 'MISMATCH' && lead !== undefined && hedgesCut(lead)) {
     const old = lead.preT17;
     const opening = old ? 'hedged in its body, but its opening claimed "fully visible" (before T17), and' : `hedged (${HEDGED_LEAD} ${lead.what}), and`;
-    return { outcome: 'LOUD', cls: old ? 'hedged-stop-old-lead' : 'hedged-stop', kind, why: `${opening} the app lays it out ${g}: ${short(scroll)}`, app };
+    return { outcome: 'LOUD', cls: HEDGED_CUT[old ? 'preT17' : 'lead'], kind, why: `${opening} the app lays it out ${g}: ${short(scroll)}`, app };
   }
   if (visible && !holds) return { outcome: 'MISMATCH', cls: 'stop-claim', kind, why: `averi says ${short(scroll)} — the app lays it out ${g ?? 'nowhere'}, not ${stop}${tapped?.outcome === 'MISMATCH' ? `; then the tap: ${tapped.why}` : ''}`, app };
   if (tapped?.outcome === 'MISMATCH') return { ...tapped, why: `after ${short(scroll)}, the tap: ${tapped.why}`, app };
@@ -382,6 +388,86 @@ export function judgeScroll(
   if (tap === undefined || tapped === undefined) return { outcome: 'ok', kind, why: short(scroll), app };
   if (tapped.outcome !== 'ok') return { ...tapped, why: `stopped (${short(scroll)}), then the tap: ${tapped.why}`, app };
   return { outcome: 'ok', kind, why: `${short(scroll)}; then ${short(tap)}`, app };
+}
+
+/** A judged case as the summary holds it (live-cases.ts#Result): what hedgedStops reads. */
+export interface JudgedStop {
+  source: string;
+  c: Pick<Case, 'id' | 'group'>;
+  verdict: Pick<LiveVerdict, 'outcome' | 'cls'>;
+  replies: readonly string[];
+}
+
+/**
+ * The case's hedged stop (T15): its first reply that stops on the target (replies.ts#replyKind `visible`) with a hedged
+ * lead (replies.ts#hedgedLead, either form), and why (replies.ts#hedgeWhy, undefined where the clause is unread);
+ * undefined when it has none.
+ */
+export function hedgedStop(r: Pick<JudgedStop, 'replies'>): { why: HedgeWhy | undefined } | undefined {
+  const reply = r.replies.find((x) => replyKind(x) === 'visible' && hedgedLead(x) !== undefined);
+  return reply === undefined ? undefined : { why: hedgeWhy(reply) };
+}
+
+/** A hedge whose clause names no reason src writes (replies.ts#hedgeWhy undefined), as it is counted and marked. */
+export const UNREAD_WHY = 'unread';
+
+/**
+ * One hedged stop counted: its case (`<source> <id>`), its verdict's bucket (`HedgedStops`), its reason (`UNREAD_WHY`
+ * where the clause names none), and the result it was read from — its case's mark (live-cases.ts#summarize).
+ */
+export interface CountedHedge<R extends JudgedStop = JudgedStop> {
+  id: string;
+  bucket: 'whole' | 'cut' | 'other';
+  why: HedgeWhy | typeof UNREAD_WHY;
+  result: R;
+}
+
+/**
+ * A run's hedged stops (T15): `visible` its visibility group's judged cases (no SKIP) that stopped on their target — one
+ * per case, the denominator — and `all` the hedged among them (`hedgedStop`), in the run's order, each in its bucket by
+ * verdict: `whole` ok, `cut` judgeScroll's LOUD on a target the app shows cut (`HEDGED_CUT`), `other` any other.
+ */
+export interface HedgedStops<R extends JudgedStop = JudgedStop> {
+  visible: number;
+  all: CountedHedge<R>[];
+}
+
+/**
+ * Every hedged stop of a run's visibility group (T15) — ADR 0013's T15 paragraph says which judge feeds which bucket.
+ * An ok is a target the app shows whole: every visibility judge that can return ok on a stop goes through judgeScroll,
+ * whose `fully` stop holds only on a `whole` geometry (a hedge is never a plain stop's). Another group's stops are not
+ * judgeScroll's — the carousel's hedge with C cut is ok by its own rules — so not counted. A count, no gate: a device or
+ * a change that turns plain stops into hedges shows as a rise.
+ */
+export function hedgedStops<R extends JudgedStop>(results: readonly R[]): HedgedStops<R> {
+  const judged = results.filter((r) => r.c.group === 'visibility' && r.verdict.outcome !== 'SKIP' && r.replies.some((x) => replyKind(x) === 'visible'));
+  const cutBy: readonly (VerdictClass | undefined)[] = Object.values(HEDGED_CUT);
+  const all = judged.flatMap((r): CountedHedge<R>[] => {
+    const hedged = hedgedStop(r);
+    if (hedged === undefined) return [];
+    const bucket = r.verdict.outcome === 'ok' ? 'whole' : cutBy.includes(r.verdict.cls) ? 'cut' : 'other';
+    return [{ id: `${r.source} ${r.c.id}`, bucket, why: hedged.why ?? UNREAD_WHY, result: r }];
+  });
+  return { visible: judged.length, all };
+}
+
+/**
+ * The summary's line for `hedgedStops` (live-cases.ts#summarize), undefined when the visibility group stopped on no
+ * target, so such a summary reads as before T15 — its format, ADR 0013's T15 paragraph.
+ */
+export function hedgedStopsLine({ visible, all }: HedgedStops): string | undefined {
+  if (visible === 0) return undefined;
+  const bucket = (label: string, of: CountedHedge['bucket']): string => {
+    const ones = all.filter((o) => o.bucket === of);
+    const why = [...HEDGE_WHYS, UNREAD_WHY]
+      .map((w) => [w, ones.filter((o) => o.why === w).length] as const)
+      .filter(([, n]) => n > 0)
+      .map(([w, n]) => `${w} ${n}`);
+    return `${label}: ${ones.length}${why.length === 0 ? '' : ` — ${why.join(', ')}`}`;
+  };
+  const other = all.some((o) => o.bucket === 'other') ? [bucket('another verdict', 'other')] : [];
+  const buckets = [bucket('target whole, ok', 'whole'), bucket('cut, LOUD', 'cut'), ...other];
+  return `Hedged stops: ${all.length} of ${visible} visible stops (${buckets.join('; ')})${all.length === 0 ? '' : `: ${all.map((o) => o.id).join(', ')}`}`;
 }
 
 /**

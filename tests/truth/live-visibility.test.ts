@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { liveGeometry, touchTurns, classStrokes, directionBreaks, distanceAt, judgeAbsentAtEnd, judgeAndroidTurn, judgeAtRest, judgeBlankStretch, judgeCarry, judgeDismissal, judgePresentedAssert, judgePresentedScroll, presentedAssertCase, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases } from '../../scripts/truth/live-visibility.js';
+import { liveGeometry, touchTurns, classStrokes, directionBreaks, distanceAt, judgeAbsentAtEnd, judgeAndroidTurn, judgeAtRest, judgeBlankStretch, judgeCarry, judgeDismissal, judgePresentedAssert, judgePresentedScroll, presentedAssertCase, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases, hedgedStop, hedgedStops, hedgedStopsLine } from '../../scripts/truth/live-visibility.js';
 import { describeScrollResult, flushText } from '../../src/interact/scroll-text.js';
 import { stopHolds } from '../../scripts/truth/target-contract.js';
 import { turnsSaid } from '../../scripts/truth/replies.js';
@@ -197,6 +197,20 @@ describe('judgeScroll', () => {
       for (const hedge of [...newLeads, ...oldLeads, uncovered]) expect(judgeScroll({ ...c, fully: true }, [hedge, 'Tapped'], reached, launched).outcome).toBe('ok');
       const checked = stop({ flush: { edge: 'top', container, checked: true } });
       expect(judgeScroll({ ...c, fully: true }, [checked, 'Tapped'], at(840), launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'stop-claim' });
+    });
+
+    it('T15: a hedge counts as target whole only where judgeScroll measured it whole — off the screen, outside its scroll view, with no frame or cut: another bucket', () => {
+      const counted = (state: LabState, reply: string) => hedgedStops([{ source: 'wda', c: { id: 'T', group: 'visibility' }, verdict: judgeScroll({ ...c, fully: true }, [reply, 'Tapped'], state, launched), replies: [reply, 'Tapped'] }]).all.map((h) => h.bucket);
+      const noFrame = state({ frames: {}, offsets: { page: 0 }, strokes: [stroke(382, 0)], events: [{ kind: 'tap', tag: 'T', at: 1 }] });
+      for (const hedge of [...newLeads, ...oldLeads, uncovered]) {
+        expect(counted(reached, hedge)).toEqual(['whole']);
+        for (const [, away] of NOT_CUT) expect(counted(away, hedge)).toEqual(['other']);
+        expect(counted(noFrame, hedge)).toEqual(['other']);
+      }
+      for (const [, cut] of CUTS) {
+        for (const hedge of [...newLeads, ...oldLeads]) expect(counted(cut, hedge)).toEqual(['cut']);
+        expect(counted(cut, uncovered)).toEqual(['other']);
+      }
     });
 
     it('T13: a hedged stop with no tap after it is judged all the same: LOUD on a cut target; a stop-claim off the screen naming where', () => {
@@ -652,5 +666,102 @@ describe('judgeAndroidTurn: no turn on uiautomator, a loud failure naming the wa
     const ios = visibilityCases(cell, 'ios').find((x) => x.id === 'turn:scroll-collapsing.A')!;
     expect(ios.says).toMatch(/^turn back: /);
     expect(ios.judge(after(away, 4), [failed(4, 2), TAP], launched, 'wda', [after(away, 4)])).toMatchObject({ outcome: 'MISMATCH', cls: 'R-direction' });
+  });
+});
+
+describe('hedgedStops (T15): every hedged stop counted, by reason and by verdict — a rise is seen, nothing gated', () => {
+  const box = { x: 0, y: 303, width: 1080, height: 1238 };
+  const stop = (flush?: Parameters<typeof flushText>[0], keyboard?: 'unlocated') =>
+    `Element id:"x" ${describeScrollResult({ swipes: 3, visible: 1, clipped: [], ...(flush !== undefined && { flush }), ...(keyboard !== undefined && { keyboard: { state: keyboard } }) })}`;
+  const held = stop({ edge: 'top', container: box, checked: false, why: 'held', revealed: 66 });
+  const budget = stop({ edge: 'top', container: box, checked: false, why: 'budget' });
+  const fills = stop({ edges: ['top', 'bottom'], container: box, checked: false, why: 'fills' });
+  const keyboard = stop(undefined, 'unlocated');
+  const oldHeld = `Element id:"x" fully visible after 3 swipes; but ${flushText({ edge: 'top', container: box, checked: false, why: 'held', revealed: 66 })}`;
+  const clean = stop();
+  const checked = stop({ edge: 'top', container: box, checked: true });
+  const plain = 'Element id:"x" visible after 2 swipes — CLIPPED at right, 92% of it is in the viewport. A rect assert or screenshot on this element will measure the CLIPPED box';
+  const OK = { outcome: 'ok' } as const;
+  const CUT = { outcome: 'LOUD', cls: 'hedged-stop' } as const;
+  const OLD_CUT = { outcome: 'LOUD', cls: 'hedged-stop-old-lead' } as const;
+  type V = { outcome: 'ok' | 'LOUD' | 'MISMATCH' | 'SKIP'; cls?: 'hedged-stop' | 'hedged-stop-old-lead' | 'stop-claim' | 'not-reached' | 'fully-cut' | 'tap-refused' };
+  const r = (id: string, verdict: V, ...replies: string[]) => ({ source: 'uiautomator', c: { id, group: 'visibility' as const }, verdict, replies });
+  const of = (group: 'carousel' | 'forms', id: string, verdict: V, ...replies: string[]) => ({ ...r(id, verdict, ...replies), c: { id, group } });
+
+  it('hedgedStop: a case\'s first stop with a hedged lead, and why; none on a clean, checked or plain stop, a tap, a failure', () => {
+    expect(hedgedStop(r('a', OK, held, 'Tapped id:"x"'))).toEqual({ why: 'held' });
+    expect(hedgedStop(r('a', OK, 'Tapped id:"x"', budget))).toEqual({ why: 'budget' });
+    expect(hedgedStop(r('a', OK, 'Element id:"x" visible after 3 swipes, NOT CONFIRMED WHOLE: unread'))).toEqual({ why: undefined });
+    // A reply that also says it never found its target is no stop (replies.ts#replyKind), hedged or not.
+    expect(hedgedStop(r('a', OK, `${budget}; element never appeared in the tree`))).toBeUndefined();
+    for (const reply of [clean, checked, plain, 'Tapped id:"x"', 'ERROR scroll_until x failed after 6 swipes (maxSwipes)']) expect(hedgedStop(r('a', OK, reply))).toBeUndefined();
+  });
+
+  it('a run without a hedge: 0 of its visible stops, every bucket 0, no ids', () => {
+    const stops = hedgedStops([r('a', OK, clean, 'Tapped id:"x"'), r('b', OK, checked), r('c', OK, plain), r('d', OK, 'Tapped id:"x"'), r('e', { outcome: 'LOUD', cls: 'not-reached' }, 'ERROR scroll_until x failed after 6 swipes (maxSwipes)')]);
+    expect(stops).toEqual({ visible: 3, all: [] });
+    expect(hedgedStopsLine(stops)).toBe('Hedged stops: 0 of 3 visible stops (target whole, ok: 0; cut, LOUD: 0)');
+  });
+
+  it('no visible stop: no line, so a summary without one reads as before', () => {
+    const stops = hedgedStops([r('d', OK, 'Tapped id:"x"'), r('e', { outcome: 'SKIP' }, clean)]);
+    expect(stops.visible).toBe(0);
+    expect(hedgedStopsLine(stops)).toBeUndefined();
+  });
+
+  it('whole and ok, cut and LOUD (either lead), any other verdict apart — by reason, with the cases; a SKIP is no stop', () => {
+    const stops = hedgedStops([
+      r('w1', OK, held, 'Tapped id:"x"'),
+      r('w2', OK, budget),
+      r('w3', OK, oldHeld),
+      r('w4', OK, keyboard),
+      r('c1', CUT, fills),
+      r('c2', OLD_CUT, oldHeld),
+      r('m1', { outcome: 'MISMATCH', cls: 'stop-claim' }, keyboard),
+      // A LOUD by another rule — the tap after a hedged stop refused — is no cut judgeScroll saw.
+      r('t1', { outcome: 'LOUD', cls: 'tap-refused' }, held, 'ERROR tap refused'),
+      r('p', OK, clean),
+      r('s', { outcome: 'SKIP' }, budget),
+    ]);
+    expect(stops.visible).toBe(9);
+    expect(stops.all.map((h) => [h.id, h.bucket, h.why])).toEqual([
+      ['uiautomator w1', 'whole', 'held'],
+      ['uiautomator w2', 'whole', 'budget'],
+      ['uiautomator w3', 'whole', 'held'],
+      ['uiautomator w4', 'whole', 'keyboard'],
+      ['uiautomator c1', 'cut', 'fills'],
+      ['uiautomator c2', 'cut', 'held'],
+      ['uiautomator m1', 'other', 'keyboard'],
+      ['uiautomator t1', 'other', 'held'],
+    ]);
+    expect(hedgedStopsLine(stops)).toBe(
+      'Hedged stops: 8 of 9 visible stops (target whole, ok: 4 — held 2, budget 1, keyboard 1; cut, LOUD: 2 — held 1, fills 1; another verdict: 2 — held 1, keyboard 1): ' +
+        'uiautomator w1, uiautomator w2, uiautomator w3, uiautomator w4, uiautomator c1, uiautomator c2, uiautomator m1, uiautomator t1',
+    );
+  });
+
+  it('only the visibility group is counted: a carousel or forms case, hedged or stopped, is no stop of it, its case unmarked', () => {
+    const carousel = of('carousel', 'lv-d62-drop-two', { outcome: 'LOUD', cls: 'fully-cut' }, held);
+    const forms = of('forms', 'k7', OK, clean);
+    const stops = hedgedStops([carousel, forms, r('w1', OK, budget)]);
+    expect(stops.visible).toBe(1);
+    expect(stops.all.map((h) => h.result)).toEqual([expect.objectContaining({ c: { id: 'w1', group: 'visibility' } })]);
+    expect(hedgedStopsLine(hedgedStops([carousel, forms]))).toBeUndefined();
+  });
+
+  it('each counted hedge carries its result, so a case is marked exactly when it is counted (a SKIP neither)', () => {
+    const w1 = r('w1', OK, held);
+    const skipped = r('s', { outcome: 'SKIP' }, budget);
+    const stops = hedgedStops([w1, skipped]);
+    expect(stops.all).toEqual([{ id: 'uiautomator w1', bucket: 'whole', why: 'held', result: w1 }]);
+    // The very result, not a copy: the summary marks a case by it (live-cases.ts#summarize).
+    expect(stops.all[0].result).toBe(w1);
+    expect(stops.all.some((h) => h.result === skipped)).toBe(false);
+  });
+
+  it('a hedge whose reason is unread is counted, as `unread`', () => {
+    const stops = hedgedStops([r('u', OK, 'Element id:"x" visible after 3 swipes, NOT CONFIRMED WHOLE: unread')]);
+    expect(stops.all.map((h) => h.why)).toEqual(['unread']);
+    expect(hedgedStopsLine(stops)).toBe('Hedged stops: 1 of 1 visible stops (target whole, ok: 1 — unread 1; cut, LOUD: 0): uiautomator u');
   });
 });

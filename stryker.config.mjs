@@ -32,8 +32,8 @@ export default {
     '/scripts/truth/*',
     '!/scripts/truth/batch/',
     '!/scripts/truth/*.ts',
-    // The one device record a scoped test reads (replies.test.ts's bandSaid, k7; backlog T13). That record only: the
-    // other records are outputs, as above.
+    // The device records a scoped test reads (replies.test.ts's bandSaid, k7, backlog T13; its hedgeWhy, T15). Those
+    // records only: the other records are outputs, as above.
     '!/docs/',
     '/docs/*',
     '!/docs/truth/',
@@ -41,6 +41,12 @@ export default {
     '!/docs/truth/live-records/',
     '/docs/truth/live-records/*',
     '!/docs/truth/live-records/android-k7-eyes-1.json',
+    // T15: the pre-T17 hedged reply replies.test.ts's hedgeWhy reads (t11's final A/B, scroll-sticky-cut.R.fully).
+    '!/docs/truth/live-records/t11-carousel-visible/',
+    '/docs/truth/live-records/t11-carousel-visible/*',
+    '!/docs/truth/live-records/t11-carousel-visible/final-ab/',
+    '/docs/truth/live-records/t11-carousel-visible/final-ab/*',
+    '!/docs/truth/live-records/t11-carousel-visible/final-ab/harm-visibility-fix-1.json',
     // The lab apps' cell catalog the live cases are built from (live-cases.ts#catalogOf; live-carousel.test.ts, T13).
     '!/fixtures/',
     '/fixtures/*',

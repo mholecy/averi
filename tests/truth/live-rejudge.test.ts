@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { type Case, judged, rejudge as rejudgeRecord, ROOT, type RunRecord } from '../../scripts/truth/live-cases.js';
 import type { LiveVerdict } from '../../scripts/truth/live-visibility.js';
+import { hedgedLead } from '../../scripts/truth/replies.js';
 import type { LabState } from '../../scripts/truth/schema.js';
 import { readLiveRecord, type LiveRecord, type RecordedCase, withFieldValue } from '../helpers/live-records.js';
 
@@ -466,6 +467,42 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // (WDA types them since) — those two lines, exactly, unmarked; a LOUD fails no run.
     expect([...out.matchAll(PRE_D43_WDA_LOUD)].map((m) => m[1]).sort()).toEqual(preD43Wda ? ['b1d', 'b7'] : []);
     expect(code, out.slice(-2000)).toBe(preD72 ? 1 : 0);
+  });
+});
+
+describe('T15: the hedged stops of a visibility run, counted in its summary', () => {
+  // T11's final A/B (t11-carousel-visible/final-ab, docs/truth/live-records/t11-carousel-visible): the fix's visibility
+  // run held one stop hedged, scroll-sticky-cut.R.fully (`held`, its pre-T17 lead), with the target whole — ok, so before
+  // T15 nothing in the summary said so; the base's held none. 32 of the 153 cases stop on their target in each.
+  const FINAL_AB = 't11-carousel-visible/final-ab';
+  const hedgedLines = (out: string) => out.split('\n').filter((l) => l.startsWith('Hedged stops: '));
+  it('harm-visibility-fix-1.json: 1 of 32, held, its case marked', { timeout: 60_000 }, async () => {
+    const { code, out } = await rejudgeInProcess(`${FINAL_AB}/harm-visibility-fix-1.json`, 'visibility');
+    expect(hedgedLines(out)).toEqual(['Hedged stops: 1 of 32 visible stops (target whole, ok: 1 — held 1; cut, LOUD: 0): uiautomator scroll:scroll-sticky-cut.R.fully']);
+    const marked = out.split('\n').filter((l) => l.includes(' (hedged: '));
+    expect(marked).toHaveLength(1);
+    expect(marked[0]).toMatch(/^- ok scroll:scroll-sticky-cut\.R\.fully .* \(hedged: held\)$/);
+    expect(code).toBe(0);
+  });
+  it.each(['harm-visibility-base-1.json', 'harm-visibility-base-2.json'])('%s: 0 of 32 — the line printed, every bucket 0', { timeout: 60_000 }, async (record) => {
+    const { out } = await rejudgeInProcess(`${FINAL_AB}/${record}`, 'visibility');
+    expect(hedgedLines(out)).toEqual(['Hedged stops: 0 of 32 visible stops (target whole, ok: 0; cut, LOUD: 0)']);
+    expect(out).not.toContain(' (hedged: ');
+  });
+  // Only the visibility group is counted: another group's stop is judged by its own rules, not judgeScroll's.
+  it('a carousel run with a hedge (two-fix-1, lv-d62-drop-two hedged with C cut): no line, no mark', { timeout: 60_000 }, async () => {
+    const { out } = await rejudgeInProcess(`${FINAL_AB}/two-fix-1.json`, 'carousel');
+    expect(out).toMatch(/^- \S+ (?:\(\S+\) )?lv-d62-drop-two /m);
+    // Its reply a hedged stop (the pre-T17 lead), which the visibility group would count.
+    const recorded = JSON.parse(readFileSync(resolve(ROOT, pathOf(`${FINAL_AB}/two-fix-1.json`)), 'utf8')) as RunRecord;
+    expect(recorded.results.flatMap((r) => r.replies).filter((x) => hedgedLead(x)?.preT17 === true)).toHaveLength(1);
+    expect(hedgedLines(out)).toEqual([]);
+    expect(out).not.toContain(' (hedged: ');
+  });
+  it('a forms run with a scroll stop (android-forms-d40-1): no line, its summary as before T15', { timeout: 60_000 }, async () => {
+    const { out } = await rejudgeInProcess('android-forms-d40-1.json', 'forms');
+    expect(out).toMatch(/visible (?:by the tree )?after \d+ swipes?/);
+    expect(hedgedLines(out)).toEqual([]);
   });
 });
 
