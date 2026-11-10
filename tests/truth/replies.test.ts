@@ -3,9 +3,9 @@ import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { describe, expect, it } from 'vitest';
 import { everyNode, type PresentationKind, type Rect, type UiNode } from '../../src/adapters/types.js';
 import type { MarkedLayer } from '../../src/ui-tree/presentation.js';
-import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, missNote, withMissNote } from '../../src/ui-tree/miss.js';
+import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, KEYBOARD_UNLISTED, missNote, withMissNote } from '../../src/ui-tree/miss.js';
 import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
-import { boundText, describeScrollResult, flushText } from '../../src/interact/scroll-text.js';
+import { boundText, describeScrollResult, flushText, UNTRIED_END, UNTRIED_LEAD } from '../../src/interact/scroll-text.js';
 import {
   CAROUSEL_REPLY_WORDS, carouselReply, fullyHedged, hedgedLead, replyKind, VISIBLE_STOP, MAX_SWIPES, flushProbedSide,
   flushProbesSaid, idbReasonsSaid, inferredAxisSaid, noIdListedSaid, OCR_FAILED_CLOSED, presentedRemedySaid,
@@ -26,8 +26,6 @@ import type { AppHolder } from '../../src/adapters/types.js';
 import { appHolderText } from '../../src/interact/app-holder-text.js';
 import { deepLinkText, launchText } from '../../src/mcp/tool-text.js';
 import { FOCUS_TEXT_NOT_READ } from '../../src/interact/fill-text.js';
-import { UNTRIED_END, UNTRIED_LEAD } from '../../src/interact/scroll-text.js';
-import { KEYBOARD_UNLISTED } from '../../src/ui-tree/miss.js';
 
 /**
  * A src file's code without its comments, so a phrase that only a comment still says counts as no longer written. It
