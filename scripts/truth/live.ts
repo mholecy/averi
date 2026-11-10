@@ -9,6 +9,7 @@ import type { DeviceAdapter } from '../../src/adapters/types.js';
 import { listIosDevices } from '../../src/adapters/discovery.js';
 import type { Platform } from '../differential/corpus.js';
 import { loadSide } from '../differential/side.js';
+import { deviceLabelling, type DeviceReadMode } from './device-state.js';
 import { AndroidLab, IosLab, LAB_AVD, LAB_WDA_DERIVED_DATA } from './lab-device.js';
 import { hookSwipes, SwipeHook } from './live-carousel.js';
 import { type Call, type Case, caseConfig, rejudge, type Result, ROOT, type RunRecord, selectCases, sideLabel, summarize, THIS_CHECKOUT } from './live-cases.js';
@@ -85,7 +86,14 @@ import { parseLabApp, type LabApp } from './schema.js';
  * cases (live-carousel.ts) — lv-d62's drop and control, D68 from a fresh launch, D59b's strokes in the band, D52's E2,
  * D37's settled read on the snapping pagers. A case may drag the carousel raw first (Case.preDrag, AndroidLab.swipe),
  * and drop its Nth stroke (CaseReads.swipes): the Android adapter the registry builds has its `swipe` routed through one
- * SwipeHook, armed around each case's calls, which logs every stroke averi draws into the record (`swipes`).
+ * SwipeHook, armed around each case's calls, which logs every stroke averi draws into the record (`swipes`). A run on
+ * Android with a carousel case among the cases selected (T16, ADR 0044's T16 amendment) reads the device's state
+ * (device-state.ts#readDevice: T11's raw strokes, no averi, four rounds, and the lab app's frames) before the first case
+ * and after the last, into the record (`deviceLabel`) and the summary's `Device:` line — short or fast by the T11/T19
+ * rule, DISAGREE when the two differ, a framework restart between them said; a read that fails leaves `Device:
+ * unlabelled — <why>`, the exit code untouched. `--device-read none` skips both reads (about 55 s each) and records the
+ * run unlabelled (refused with `--rejudge`). A run with no carousel case selected, and iOS, reads nothing of it
+ * (device-state.ts#deviceLabelling).
  *
  * `chooser` (T7b, Android, not in the default groups): launch_app and open_deep_link around Android's "Open with" chooser
  * (live-chooser.ts) — lc1 the `-p` start that raises it, named; lc2 a one-handler link, no note; lc3 `.Twin` named, no
@@ -108,13 +116,20 @@ const { values } = parseArgs({
     record: { type: 'string' },
     rejudge: { type: 'string' },
     app: { type: 'string' },
+    'device-read': { type: 'string' },
   },
 });
 // `--rejudge`'s record (live-cases.ts#RunRecord): read here, judged by live-cases.ts#rejudge.
 const rejudging = values.rejudge === undefined ? undefined : (JSON.parse(await readFile(values.rejudge, 'utf8')) as RunRecord);
 if (rejudging === undefined && (values.udid === undefined) === (values.serial === undefined)) {
-  throw new Error('usage: live.ts --udid <lab simulator> [--wda-port 8120] [--sources idb,wda] [--groups forms,visibility,dismissal,ensure,carousel,chooser] [--cells …] [--cases …] [--side <checkout>] [--record <file>] | --serial <lab emulator> […] | --rejudge <record>');
+  throw new Error('usage: live.ts --udid <lab simulator> [--wda-port 8120] [--sources idb,wda] [--groups forms,visibility,dismissal,ensure,carousel,chooser] [--cells …] [--cases …] [--side <checkout>] [--record <file>] | --serial <lab emulator> […] [--device-read none] | --rejudge <record>');
 }
+// `--device-read none`: the carousel group's device reads skipped (device-state.ts#deviceLabelling). A rejudge reads no
+// device, so the flag is refused there rather than ignored.
+const deviceReadFlag = values['device-read'];
+if (deviceReadFlag !== undefined && rejudging !== undefined) throw new Error('--device-read: a rejudge reads no device; leave it out');
+if (deviceReadFlag !== undefined && deviceReadFlag !== 'none') throw new Error(`--device-read: none, or leave it out (the carousel group reads the device), not "${deviceReadFlag}"`);
+const deviceReadMode: DeviceReadMode = deviceReadFlag === 'none' ? 'none' : 'read';
 const platform: Platform = rejudging?.platform ?? (values.serial !== undefined ? 'android' : 'ios');
 const app: LabApp = rejudging?.app ?? parseLabApp(values.app);
 const device = (values.udid ?? values.serial ?? 'rejudged')!;
@@ -212,6 +227,11 @@ if (rejudging !== undefined) {
     ...(shots !== undefined && { keepShot: (name: string, png: Buffer) => writeFile(join(shots, name), png) }),
     note: (line) => console.error(line),
   };
+  // T16: a carousel case selected on Android reads the device's state around the cases (device-state.ts): a read that
+  // fails, or `--device-read none`, leaves the run unlabelled, said in the summary, never aborted. A case that throws
+  // skips the after read: the record keeps `{ before }`, "no read after the cases".
+  const deviceReads = deviceLabelling(android, selected, deviceReadMode, { note: (line) => console.error(line) });
+  await deviceReads?.read('before');
   try {
     // Cases outer, sources inner: the keyboard's cases run on both sources before anything types.
     for (const c of selected) {
@@ -223,14 +243,16 @@ if (rejudging !== undefined) {
         console.error(`${source} ${c.id} ${run.verdict.outcome}: ${run.verdict.why}`);
       }
     }
+    await deviceReads?.read('after');
   } finally {
+    if (deviceReads !== undefined) record.deviceLabel = deviceReads.label();
     await close();
     await lab.close();
     if (values.record !== undefined) await writeFile(values.record, JSON.stringify(record) + '\n');
   }
   // The summary: every case, a known one marked with its note (live-known.ts); exit 1 on an unknown MISMATCH, and on a
   // known case not intermittent that came out ok in a run of this checkout (fixed: strike it off).
-  const { lines, exitCode } = summarize({ platform, sources, results, side: values.side ?? THIS_CHECKOUT });
+  const { lines, exitCode } = summarize({ platform, sources, results, side: values.side ?? THIS_CHECKOUT, device: record.deviceLabel });
   console.log(lines.join('\n'));
   process.exitCode = exitCode;
 }

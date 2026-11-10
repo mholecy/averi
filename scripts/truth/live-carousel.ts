@@ -392,7 +392,7 @@ export interface CarouselCase {
 
 /** The carousel cases' reads: the strokes are their oracle, and a later read would let a fling finish. */
 const CAROUSEL_READS: CaseReads = { swipes: {}, late: false };
-const RECYCLER_FREE = 'carousel-recycler-free';
+export const RECYCLER_FREE = 'carousel-recycler-free';
 const LAZY_FREE = 'carousel-lazy-free';
 const fullyC = (cell: string, direction: 'left' | 'right') => ({ tool: 'scroll_until' as const, args: { selector: `id:${labId(cell, 'C')}`, direction, fully: true } });
 /** The probes' pre-drag length, px. */

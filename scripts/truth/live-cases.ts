@@ -3,6 +3,7 @@ import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Platform } from '../differential/corpus.js';
 import { familyOf } from './catalog.js';
+import { type DeviceLabel, deviceLine } from './device-state.js';
 import { LAB_APP } from './lab-device.js';
 import { CAROUSEL_CASES, hedgedCeiling, type PreDragged, type Shorten, type SwipeEntry } from './live-carousel.js';
 import { CHOOSER_CASES, type FocusReads } from './live-chooser.js';
@@ -63,6 +64,14 @@ export interface RunRecord {
   app?: LabApp;
   side: string;
   results: CaseRecord[];
+  /**
+   * The carousel group's device label (T16, device-state.ts): its raw-strokes reads before the cases and after them, or
+   * why one is missing. Absent on records before T16, and on runs with no carousel case selected on Android. Not
+   * `device`: two records of 2026-10 (android-hint-everywhere-*-asserts.json) hold the device's name under that key.
+   * Nor `deviceState`: T11's and T12's label-group.mjs wrote their labels there, in another shape
+   * (`{ before: { file, strokes, short, state }, after, disagree }`).
+   */
+  deviceLabel?: DeviceLabel;
 }
 
 /** What one case read on one source: built in one place, run-case.ts#caseRecord. */
@@ -774,7 +783,7 @@ export interface Summary {
  * The summary of a run's results. `side`: the averi the run drove (THIS_CHECKOUT, or a `--side` checkout — a
  * calibration, never held to live-known.ts); `rejudgedFrom`: the record's path, when the results are a record's.
  */
-export function summarize({ platform, sources, results, side, rejudgedFrom }: { platform: Platform; sources: readonly Source[]; results: readonly Result[]; side: string; rejudgedFrom?: string }): Summary {
+export function summarize({ platform, sources, results, side, rejudgedFrom, device }: { platform: Platform; sources: readonly Source[]; results: readonly Result[]; side: string; rejudgedFrom?: string; device?: DeviceLabel }): Summary {
   /**
    * The note a not-ok case is known by — only when it failed by the rule, on the kind of reply, its KNOWN entry pins
    * (live-known.ts).
@@ -838,6 +847,8 @@ export function summarize({ platform, sources, results, side, rejudgedFrom }: { 
   if (hedgedLine !== undefined) lines.push(hedgedLine, '');
   // The ceiling's line: every judged unaimable leg hedged fails the run.
   if (ceiling.lines.length > 0) lines.push(...ceiling.lines, '');
+  // T16: the device's state around the carousel group's cases, only where the run read it — a label, no gate.
+  if (device !== undefined) lines.push(deviceLine(device), '');
   return { lines, exitCode: unknown.length > 0 || fixed.length > 0 || failingSkips.length > 0 || ceiling.fails ? 1 : 0 };
 }
 
@@ -848,5 +859,5 @@ export function summarize({ platform, sources, results, side, rejudgedFrom }: { 
 export async function rejudge(record: RunRecord, from: string, selection: RejudgeSelection): Promise<Summary> {
   const results = await rejudgedResults(record, selection);
   const sources = [...new Set(record.results.map((r) => r.source))];
-  return summarize({ platform: record.platform, sources, results, side: record.side, rejudgedFrom: from });
+  return summarize({ platform: record.platform, sources, results, side: record.side, rejudgedFrom: from, device: record.deviceLabel });
 }
