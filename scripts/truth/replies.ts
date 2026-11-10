@@ -71,7 +71,8 @@ export interface HedgedLead {
   readonly what: HedgeWhat;
   readonly preT17: boolean;
 }
-// Longest first, so no alternative is read as a shorter one's prefix.
+// Longest first, so no alternative is read as a shorter one's prefix: belt and braces, since the `): ` after the group
+// makes the regex backtrack to the longest anyway (T13: the sort's mutants survive, equivalent).
 const HEDGE_WHAT_PATTERN = [...HEDGE_WHATS].sort((a, b) => b.length - a.length).join('|');
 const HEDGED_STOP = new RegExp(`^Element .* visible (?:by the tree )?after \\d+ swipes?, ${HEDGED_LEAD} (${HEDGE_WHAT_PATTERN}): `);
 const OLD_HEDGED_STOP = /^Element .* fully visible (?:by the tree )?after \d+ swipes?[^;]*; but /;

@@ -32,6 +32,21 @@ export default {
     '/scripts/truth/*',
     '!/scripts/truth/batch/',
     '!/scripts/truth/*.ts',
+    // The one device record a scoped test reads (replies.test.ts's bandSaid, k7; backlog T13). That record only: the
+    // other records are outputs, as above.
+    '!/docs/',
+    '/docs/*',
+    '!/docs/truth/',
+    '/docs/truth/*',
+    '!/docs/truth/live-records/',
+    '/docs/truth/live-records/*',
+    '!/docs/truth/live-records/android-k7-eyes-1.json',
+    // The lab apps' cell catalog the live cases are built from (live-cases.ts#catalogOf; live-carousel.test.ts, T13).
+    '!/fixtures/',
+    '/fixtures/*',
+    '!/fixtures/apps/',
+    '/fixtures/apps/*',
+    '!/fixtures/apps/cells.json',
     '!/package.json',
     '!/tsconfig.json',
     '!/tsconfig.test.json',

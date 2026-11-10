@@ -20,6 +20,8 @@ T2b-2 part below).
 Amended 2026-11-05 (T2c: the abort's and the runner's budget tests on fake time, their bounds pinned exactly — see the
 T2 amendment's T2c part below).
 Amended 2026-11-06 (A11: scripts/truth/run-case.ts joined the run — see the amendment at the end).
+Amended 2026-11-10 (T13: flush-check.ts, replies.ts, live-carousel.ts and live-visibility.ts joined the run — see the T13
+amendment at the end).
 
 ## Context
 
@@ -1459,3 +1461,35 @@ What changes for the earlier text:
   use synthesized judges and a fake lab. So for run-case.ts the rule stops one step out: itself, its test, tests/helpers/fake-lab.ts,
   and the modules it imports itself (lab-device.ts, live-carousel.ts, live-cases.ts, replies.ts, schema.ts). That adds 6
   files to the rule. The rule is prose, not code, so this sentence is the exemption.
+
+## Amendment: the flush check and its readers join the run (2026-11-10, backlog T13)
+
+`src/interact/flush-check.ts` decides whether a `fully: true` stop may say `fully visible`, and the harness reads its
+replies through `scripts/truth/replies.ts` and judges them in `live-carousel.ts` and `live-visibility.ts`; until now no
+floor held any of them. Each joins with its own floor, by the floor rule (two points under the whole number):
+
+| Module | Group | Tests | Score | Floor |
+| --- | --- | --- | --- | --- |
+| src/interact/flush-check.ts | core | flush-check.test.ts | 96.57 % (350 mutants, 12 survived, 0 without coverage) | 94 |
+| scripts/truth/replies.ts | lab | replies.test.ts | 97.86 % (374 valid, 7 survived, 1 without coverage) | 95 |
+| scripts/truth/live-carousel.ts | lab | live-carousel.test.ts | 98.88 % (800 valid, 8 survived, 1 without coverage) | 96 |
+| scripts/truth/live-visibility.ts | lab | live-visibility.test.ts | 72.70 % (1 293 mutants, 334 survived, 19 without coverage) | 70 |
+
+Each entry lists the module's own test only; replies.ts's score, measured with replies.test.ts as the group's only test,
+is the same 97.86 %. Every survivor of the first three is argued equivalent in its scope.json baseline.
+live-visibility.ts joins at its measured score, low on purpose like draw-order's: 90 % would take some 230 more kills
+over thirty judges, backlog row T21. Its T17 LOUD gate is held but for conjuncts that a cut geometry and a hedged lead
+already imply: counted survivors (T21), not argued equivalent. T11's doubt sites in flush-check.ts — `!proof.doubted` (a
+held reveal doubted once), the held hedge's `checked: false, why: 'held'`, and `doubted || doubtedFirst` (no stop while
+a doubt is spent) — are killed by flush-check.test.ts and none is among its survivors: the floor now holds what T11's
+hand mutants showed.
+
+- **flush-check.ts's own tests only.** Its header names the round's play tables (scroll-flush-reveal.test.ts,
+  scroll-rounds.test.ts) as its wiring's tests; with them in core's include the score was the same and core's cold run
+  took 458 s, near the ~480 s line, since they also run against draw-order's and geometry's mutants. Without them:
+  core 266 s.
+- **The allowlist** takes two data files a scoped test reads, by name and nothing beside them: the one device record
+  replies.test.ts's bandSaid test reads (docs/truth/live-records/android-k7-eyes-1.json) and the lab apps' cell catalog
+  the live cases are built from (fixtures/apps/cells.json, read by catalogOf in scripts/truth/live-cases.ts).
+- **The cost**, measured cold on this branch (`npm run mutate -- --force`): core 266 s, lab 127 s, 393 s in all (core
+  200 s and lab 62 s at T2b-2). The lab's three modules add about 65 s; flush-check about 15 s.

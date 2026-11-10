@@ -1,11 +1,21 @@
 import { readFileSync } from 'node:fs';
+import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { describe, expect, it } from 'vitest';
 import { everyNode, type PresentationKind, type Rect, type UiNode } from '../../src/adapters/types.js';
 import type { MarkedLayer } from '../../src/ui-tree/presentation.js';
-import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, missNote, withMissNote } from '../../src/ui-tree/miss.js';
+import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, KEYBOARD_UNLISTED, missNote, withMissNote } from '../../src/ui-tree/miss.js';
 import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
-import { boundText, describeScrollResult, flushText } from '../../src/interact/scroll-text.js';
-import { CAROUSEL_REPLY_WORDS, carouselReply, fullyHedged, hedgedLead, replyKind, VISIBLE_STOP, MAX_SWIPES, flushProbedSide, flushProbesSaid, idbReasonsSaid, inferredAxisSaid, noIdListedSaid, OCR_FAILED_CLOSED, presentedRemedySaid, windowHintSaid, heldCutHedged, bandSaid, directionNamed, UNCHANGED_SAID, LIVE_REPLY_WORDS, refusedUnsentSaid, scrollVerdictSaid, underBarRemedySaid, untriedSideSaid } from '../../scripts/truth/replies.js';
+import { boundText, describeScrollResult, flushText, UNTRIED_END, UNTRIED_LEAD } from '../../src/interact/scroll-text.js';
+import {
+  CAROUSEL_REPLY_WORDS, carouselReply, fullyHedged, hedgedLead, replyKind, VISIBLE_STOP, MAX_SWIPES, flushProbedSide,
+  flushProbesSaid, idbReasonsSaid, inferredAxisSaid, noIdListedSaid, OCR_FAILED_CLOSED, presentedRemedySaid,
+  windowHintSaid, heldCutHedged, bandSaid, directionNamed, UNCHANGED_SAID, LIVE_REPLY_WORDS, refusedUnsentSaid,
+  scrollVerdictSaid, underBarRemedySaid, untriedSideSaid, chooserSaid, launchedAs, linkHeldSaid, namesUntried,
+  warnedSaid, allPassed, ASSERT_SUMMARY, ASSERTS_FAILED, bareEntry, callReply, claimsDone, claimsVisible,
+  dismissalCover, failedClosedUnchecked, firstLine, focusTextNotReadSaid, hedgesCut, keyboardUnlistedSaid,
+  missedTarget, movedTap, namesKeyboard, notInTree, ownWords, readingOf, readSomething, screenChangedSaid,
+  screenUnchangedFor, scrollAdvice, snapshotNodes, swipesOf, turnsSaid, claimsTap, heldStill, refusedAfterDismissal,
+} from '../../scripts/truth/replies.js';
 import { refusalOf, type Typeable } from '../../src/adapters/typeable.js';
 import { revealText } from '../../src/ui-tree/sides.js';
 import { untriedSideText } from '../../src/interact/target-text.js';
@@ -15,7 +25,7 @@ import { failureOf, play, resultOf, type Row } from '../helpers/rounds.js';
 import type { AppHolder } from '../../src/adapters/types.js';
 import { appHolderText } from '../../src/interact/app-holder-text.js';
 import { deepLinkText, launchText } from '../../src/mcp/tool-text.js';
-import { chooserSaid, launchedAs, linkHeldSaid, namesUntried, warnedSaid } from '../../scripts/truth/replies.js';
+import { FOCUS_TEXT_NOT_READ } from '../../src/interact/fill-text.js';
 
 /**
  * A src file's code without its comments, so a phrase that only a comment still says counts as no longer written. It
@@ -394,5 +404,205 @@ describe('namesUntried: a scroll view among those the swipes did not go over, as
   it('a rect quoted before the clause, or with no clause at all, is not named untried', () => {
     expect(namesUntried(`list scrollable (0,303 1080x605); ${said([{ label: null, rect: LOWER }])}`, UPPER)).toBe(false);
     expect(namesUntried(`${'x'.repeat(40)} scrollable (0,1046 1080x495) — if the element lies in it`, LOWER)).toBe(false);
+  });
+});
+
+/**
+ * T13: the reads the mutation run (scripts/mutation/scope.json) found no test holding — each pinned on the words its doc
+ * quotes from src, and on a lookalike it must not take: an anchor, a count of more than one digit, a singular, a
+ * selector it echoes.
+ */
+describe('the reads\' bounds (T13)', () => {
+  /** A client whose one tool call answers `answer`, or throws it; the call it was asked is kept. */
+  const clientOf = (answer: unknown) => {
+    const asked: unknown[] = [];
+    const client = {
+      callTool: async (...args: unknown[]) => {
+        asked.push(args);
+        if (answer instanceof Error) throw answer;
+        return answer;
+      },
+    } as unknown as Client;
+    return { client, asked };
+  };
+
+  it('callReply: the text blocks joined by lines, any other block by its type, ERROR before an error\'s, ERROR (thrown) for a throw', async () => {
+    const plain = clientOf({ content: [{ type: 'text', text: 'Tapped a' }, { type: 'image' }, { type: 'text' }, { type: 'text', text: 'more' }] });
+    expect(await callReply(plain.client, 'tap', { selector: 'id:a' }, 5000)).toBe('Tapped a\n[image]\n\nmore');
+    expect(plain.asked).toEqual([[{ name: 'tap', arguments: { selector: 'id:a' } }, undefined, { timeout: 5000 }]]);
+    expect(await callReply(clientOf({ content: [{ type: 'text', text: 'no element' }], isError: true }).client, 'tap', {})).toBe('ERROR no element');
+    expect(await callReply(clientOf({ content: [{ type: 'text', text: 'ok' }], isError: false }).client, 'tap', {})).toBe('ok');
+    const thrown = clientOf(new Error('Request timed out'));
+    expect(await callReply(thrown.client, 'tap', {})).toBe('ERROR (thrown) Request timed out');
+    expect(thrown.asked).toEqual([[{ name: 'tap', arguments: {} }, undefined, { timeout: 300_000 }]]);
+  });
+
+  it('an assert\'s summary: N/M or All N at the start, any number of digits; one passed only when it opens the reply', () => {
+    expect(allPassed('All 1 asserts passed\n✓ visible id:"a"')).toBe(true);
+    expect(allPassed('Tapped a — All 1 asserts passed')).toBe(false);
+    for (const failed of ['1/1 asserts FAILED', '12/12 asserts FAILED', '1/12 asserts FAILED']) expect(ASSERTS_FAILED.test(failed)).toBe(true);
+    expect(ASSERTS_FAILED.test('ERROR 1/1 asserts FAILED')).toBe(false);
+    for (const summary of ['12/12 asserts passed', '1/12 asserts FAILED', 'All 12 asserts passed']) expect(ASSERT_SUMMARY.test(summary)).toBe(true);
+    for (const other of ['x 1/2 asserts', 'a/1 asserts', '1/a asserts', 'All x asserts', 'Not All 1 asserts']) expect(ASSERT_SUMMARY.test(other)).toBe(false);
+  });
+
+  it('the stop\'s and the hedged stop\'s leads open the reply; the pre-T17 hedge reads any count of swipes, one included', () => {
+    expect(claimsVisible('ERROR Element id:"a" visible after 2 swipes')).toBe(false);
+    expect(hedgedLead('Element id:"a" fully visible after 12 swipes; but its top edge may be cut')).toEqual({ what: 'WHOLE', preT17: true });
+    expect(hedgedLead('Element id:"a" fully visible after 1 swipe; but its top edge may be cut')).toEqual({ what: 'WHOLE', preT17: true });
+    expect(hedgedLead('ERROR Element id:"a" fully visible after 2 swipes; but its top edge may be cut')).toBeUndefined();
+    expect(hedgesCut(undefined)).toBe(false);
+  });
+
+  it('notInTree: a wait for the element to appear — not one whose hint, on any later line, says it matched only unusable nodes', () => {
+    expect(notInTree('ERROR Timed out after 5000ms waiting for element id:"lab.x" to appear')).toBe(true);
+    expect(notInTree('ERROR Timed out after 5000ms waiting for element id:"lab.x" to appear; none usable\n(it matched only 0×0 nodes)')).toBe(false);
+    expect(replyKind('ERROR scroll_until id:"a" failed after 3 swipes: the element never appeared in the tree')).toBe('not found');
+  });
+
+  it('missedTarget: notInTree, or a flow\'s wait that timed out on it — at the reply\'s start, its milliseconds any number', () => {
+    expect(missedTarget('ERROR Timed out after 5000ms waiting for element id:"lab.x"')).toBe(true);
+    expect(missedTarget('ERROR assert failed: not found within 5 s')).toBe(true);
+    expect(missedTarget('Filled id:"a"; ERROR Timed out after 5000ms waiting for element id:"lab.x"')).toBe(false);
+    expect(missedTarget('ERROR Timed out after ms waiting for element id:"lab.x"')).toBe(false);
+    expect(missedTarget('Tapped id:"lab.x"')).toBe(false);
+  });
+
+  it('bareEntry: the entry probe\'s bare line opens its line', () => {
+    expect(bareEntry('environment x\n⚠ detect: c treated as not detected — every UI tree read was bare (3 reads)')).toBe(true);
+    expect(bareEntry('note: ⚠ detect: c treated as not detected — every UI tree read was bare (3 reads)')).toBe(false);
+  });
+
+  it('claimsDone: Filled, Cleared or Tapped opening the reply, not NOT verified; focusTextNotReadSaid: its hedge on a ⚠ line of its own', () => {
+    for (const done of ['Filled id:"a" with "x"', 'Cleared id:"a"', 'Tapped id:"a"']) expect(claimsDone(done)).toBe(true);
+    for (const not of ['Filled id:"a" with "x" — NOT verified', 'Scrolled; Filled id:"a"', 'ERROR Filled nothing']) expect(claimsDone(not)).toBe(false);
+    expect(focusTextNotReadSaid(`Filled id:"a" with "x"\n⚠ ${FOCUS_TEXT_NOT_READ}: it may not all come from the keys`)).toBe(true);
+    expect(focusTextNotReadSaid(`Filled id:"a" with "x" ⚠ ${FOCUS_TEXT_NOT_READ}`)).toBe(false);
+    expect(focusTextNotReadSaid('Filled id:"a" with "x"\n⚠ another caveat')).toBe(false);
+    expect(focusTextNotReadSaid(`ERROR id:"a" was not filled\n⚠ ${FOCUS_TEXT_NOT_READ}`)).toBe(false);
+  });
+
+  it('firstLine: an assert\'s first verdict line under its summary, else the first line, at most 200 characters', () => {
+    expect(firstLine('All 1 asserts passed\n✓ visible id:"a"')).toBe('✓ visible id:"a"');
+    expect(firstLine('All 1 asserts passed')).toBe('All 1 asserts passed');
+    expect(firstLine('Tapped id:"a"\nmore')).toBe('Tapped id:"a"');
+    expect(firstLine('x'.repeat(300))).toBe('x'.repeat(200));
+  });
+
+  it('ownWords and the reads through it: a selector echoed is no word of the reply\'s', () => {
+    expect(ownWords('tap id:"lab.form-keyboard.vs" now')).toBe('tap <selector> now');
+    expect(scrollAdvice('ERROR id:"a" lies below the viewport — scroll_until it first')).toBe(true);
+    expect(scrollAdvice('ERROR id:"scroll_until" was not tapped')).toBe(false);
+    expect(namesKeyboard('ERROR id:"a" lies under the soft keyboard')).toBe(true);
+    expect(keyboardUnlistedSaid(`waiting for id:"a": the soft keyboard is up and ${KEYBOARD_UNLISTED.idb}`)).toBe(true);
+    expect(keyboardUnlistedSaid('waiting for id:"a": the soft keyboard is up')).toBe(false);
+    expect(keyboardUnlistedSaid(`waiting for id:"a": ${KEYBOARD_UNLISTED.idb}`)).toBe(false);
+    expect(screenChangedSaid('ERROR scroll_until id:"a" stopped after 12 swipes — the swipe CHANGED THE SCREEN: a new screen')).toBe(true);
+  });
+
+  it('movedTap: the tap moved off its centre, every coordinate any number of digits, a minus or a fraction', () => {
+    expect(movedTap('Tapped id:"a" at (540,1200) — its centre (540,1300) is under id:"bar"; tapped the uncovered part 825x40')).toBe(true);
+    expect(movedTap('Tapped id:"a" at (-12.5,7) — its centre (-3,-44.5) is under id:"bar"; tapped the uncovered part 9x9')).toBe(true);
+    expect(movedTap('Tapped id:"a" at (a,1200) — its centre (540,1300) is under id:"bar"; tapped the uncovered part 825x40')).toBe(false);
+    expect(movedTap('Tapped id:"a" at (540,1200) — its centre (540,b) is under id:"bar"; tapped the uncovered part 825x40')).toBe(false);
+    expect(movedTap('Tapped id:"a" at (540,1200) — its centre (540,1300) is under id:"bar"; tapped the uncovered part ax40')).toBe(false);
+    expect(movedTap('Tapped id:"a" at (540,1200) — its centre (540,1300) is under id:"bar"; tapped the uncovered part 825xb')).toBe(false);
+  });
+
+  it('the counts a reply says: probes, turns, swipes and unchanged strokes, of any number of digits, a swipe singular too', () => {
+    expect(flushProbesSaid('its bottom edge lies on its scroll container\'s (0,1046 1080x495), and 12 probe swipes toward it moved nothing')).toBe(12);
+    expect(turnsSaid('It was turned round 12 times')).toBe(12);
+    expect(swipesOf('Element id:"a" visible after 12 swipes')).toBe(12);
+    expect(swipesOf('Element id:"a" visible after 1 swipe')).toBe(1);
+    expect(screenUnchangedFor('failed after 14 swipes: the last 12, swiping down, did not change the screen')).toBe(12);
+  });
+
+  it('dismissalCover: the role the guard\'s own clause names, in a parenthesis after a selector; none without the clause', () => {
+    expect(dismissalCover('ERROR id:"a" was not tapped: none of the configured dismissals is usable on this screen (id:"done" covered by toolbar 0,0 1080x200)')).toBe('toolbar');
+    expect(dismissalCover('ERROR id:"a" was not tapped: none of the configured dismissals is usable on this screen (id:"done" covered by scrollable 0,0 1080x200)')).toBe('scrollable');
+    expect(dismissalCover('Tapped id:"a"')).toBeUndefined();
+  });
+
+  it('carouselReply and scrollVerdictSaid: their leads open the reply', () => {
+    expect(carouselReply('note: Element id:"a" fully visible after 2 swipes')).toBe('other');
+    expect(scrollVerdictSaid('Tapped; ERROR scroll_until id:"a" failed after 2 swipes')).toBe(false);
+  });
+
+  it('namesUntried: a clause at the reply\'s very start, read from its lead on', () => {
+    const LOWER: Rect = { x: 0, y: 1046, width: 1080, height: 495 };
+    expect(namesUntried(`${UNTRIED_LEAD}scrollable (0,1046 1080x495)${UNTRIED_END}it`, LOWER)).toBe(true);
+    expect(namesUntried(`(0,1046 1080x495)${UNTRIED_LEAD}scrollable (0,303 1080x605)${UNTRIED_END}it`, LOWER)).toBe(false);
+  });
+
+  it('the ocr reads: the text read, escapes and all, none when it failed closed or read nothing', () => {
+    expect(failedClosedUnchecked('ERROR ocr: failing closed, rendered text unchecked')).toBe(true);
+    expect(readingOf('1/1 asserts FAILED\n✗ ocr id:"a": read "Total 12"')).toBe('Total 12');
+    expect(readingOf('✗ ocr id:"a": read "say \\"hi\\""')).toBe('say "hi"');
+    expect(readingOf('✗ ocr id:"a": read "x" — failing closed, rendered text unchecked')).toBeUndefined();
+    expect(readingOf('✗ ocr id:"a": nothing read')).toBeUndefined();
+    expect(readSomething('✗ ocr id:"a": read "x"')).toBe(true);
+    expect(readSomething('✗ ocr id:"a": read "x" — failing closed, rendered text unchecked')).toBe(false);
+    expect(readSomething('✗ ocr id:"a": nothing read')).toBe(false);
+  });
+
+  it('snapshotNodes: the first block only when it opens the reply as an array — an empty one with a note after it too', () => {
+    expect(snapshotNodes('[]\nnote: nothing matched')).toEqual([]);
+    expect(snapshotNodes(' [\n]')).toBeUndefined();
+  });
+
+  it('launchedAs: the headline opens the reply', () => {
+    expect(launchedAs('note: Launched com.x on android')).toBeUndefined();
+  });
+
+  it('claimsTap and replyKind: each kind of the closed set, in its precedence', () => {
+    expect(claimsTap('Tapped id:"a"')).toBe(true);
+    expect(claimsTap('ERROR id:"a" was not Tapped')).toBe(false);
+    expect(replyKind('Tapped id:"a"')).toBe('Tapped');
+    expect(replyKind('Element id:"a" visible after 2 swipes')).toBe('visible');
+    expect(replyKind('All 1 asserts passed\n✓ visible id:"a"')).toBe('PASS');
+    expect(replyKind('1/1 asserts FAILED\n✗ visible id:"a"')).toBe('FAIL');
+    expect(replyKind('ERROR id:"a" was not tapped: it lies below the viewport')).toBe('refused');
+    expect(replyKind('Scrolled down')).toBe('other');
+  });
+
+  it('hedgesCut: a WHOLE hedge, alone or with UNCOVERED; not UNCOVERED alone', () => {
+    expect(hedgesCut({ what: 'WHOLE', preT17: false })).toBe(true);
+    expect(hedgesCut({ what: 'WHOLE OR UNCOVERED', preT17: false })).toBe(true);
+    expect(hedgesCut({ what: 'UNCOVERED', preT17: false })).toBe(false);
+  });
+
+  it('heldStill: the held seconds, a fraction too, and the rung the engine\'s line names; none without the line', () => {
+    expect(heldStill("ensure_state …\nsecond look: not detected, the screen held still 12.5 s — running dismiss-sheet before the 20 s window's end")).toEqual({ heldS: 12.5, flow: 'dismiss-sheet' });
+    expect(heldStill('second look: not detected after 20 s')).toBeUndefined();
+  });
+
+  it('bareEntry: the condition the line names may be any text', () => {
+    expect(bareEntry('⚠ detect: visible id:"lab.sheet" treated as not detected — every UI tree read was bare (3 reads)')).toBe(true);
+  });
+
+  it('refusedAfterDismissal: the dismissal and the keyboard named in the refusal\'s own words', () => {
+    expect(refusedAfterDismissal('ERROR id:"lab.note" was not tapped: after id:"lab.done" was tapped (the configured dismissal) to hide the soft keyboard, it lies below the viewport')).toBe(true);
+    expect(refusedAfterDismissal('ERROR id:"lab.note" was not tapped: the soft keyboard is up')).toBe(false);
+  });
+
+  it('the counts\' singulars and their absence: one turn, one swipe that changed the screen; the end turn alone, or with the fling\'s; none said', () => {
+    expect(screenChangedSaid('ERROR scroll_until id:"a" stopped after 1 swipe — the swipe CHANGED THE SCREEN: a new screen')).toBe(true);
+    expect(turnsSaid('It was turned round 1 time')).toBe(1);
+    expect(turnsSaid('… so averi turned down')).toBe(1);
+    expect(turnsSaid('It was turned round 2 times … so averi turned down')).toBe(3);
+    expect(turnsSaid('Element id:"a" visible after 2 swipes')).toBe(0);
+    expect(swipesOf('Tapped id:"a"')).toBeUndefined();
+    expect(screenUnchangedFor('Element id:"a" visible after 2 swipes')).toBeUndefined();
+  });
+
+  it('snapshotNodes: a pretty-printed array read to its closing line', () => {
+    const nodes = [{ role: 'button', identifier: 'a', rect: { x: 1, y: 2, width: 3, height: 4 } }];
+    expect(snapshotNodes(`${JSON.stringify(nodes, null, 2)}\nnote: one more block`)).toEqual(nodes);
+    expect(snapshotNodes('[]')).toEqual([]);
+  });
+
+  it('linkHeldSaid: the chooser headline opens the reply', () => {
+    expect(linkHeldSaid('Android has not opened https://x.test yet: its chooser (android/com.android.internal.app.ResolverActivity) is in front')).toBe(true);
+    expect(linkHeldSaid('note: Android has not opened https://x.test yet: its chooser (android/x) is in front')).toBe(false);
   });
 });

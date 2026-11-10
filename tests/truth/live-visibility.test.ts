@@ -198,6 +198,12 @@ describe('judgeScroll', () => {
       const checked = stop({ flush: { edge: 'top', container, checked: true } });
       expect(judgeScroll({ ...c, fully: true }, [checked, 'Tapped'], at(840), launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'stop-claim' });
     });
+
+    it('T13: a hedged stop with no tap after it is judged all the same: LOUD on a cut target; a stop-claim off the screen naming where', () => {
+      for (const [geometry, cut] of CUTS) expect(judgeScroll({ ...c, fully: true }, [stop({ flush: flushes[0] })], cut, launched)).toMatchObject({ outcome: 'LOUD', cls: 'hedged-stop', why: expect.stringMatching(new RegExp(`^hedged \\(NOT CONFIRMED WHOLE\\), and the app lays it out ${geometry}: Element `)) });
+      const away = stop({ flush: flushes[0] });
+      expect(judgeScroll({ ...c, fully: true }, [away], at(5000), launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'stop-claim', why: expect.stringMatching(/^averi says Element id:"x" visible after 3 swipes, NOT CONFIRMED WHOLE: .* — the app lays it out off-screen, not fully visible$/) });
+    });
   });
 
   it('T11: the hedge on two held reveals, the app bearing it out or not: ok with the target whole, LOUD with it cut — no claim, so no MISMATCH; the same stop with no hedge stays one', () => {
