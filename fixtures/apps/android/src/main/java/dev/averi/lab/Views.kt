@@ -46,12 +46,18 @@ private object ViewsLayout {
     const val RAISE = 8
 }
 
-/** The views family's screen for `cell`: its run of classic Views, each target's frame (and each cover's) reported. */
+/**
+ * The views family's screen for `cell`: its run of classic Views, each target's frame (and each cover's) reported. A
+ * cell this file does not build, or one whose declared target it does not place (a renamed tag), is said on screen and
+ * NEVER marked ready, as MainActivity's UnbuiltCell: a capture of it times out naming the cell.
+ */
 fun viewsScreen(activity: Activity, cell: Cell, lab: Lab): View {
     val density = activity.resources.displayMetrics.density
     val px = { dp: Int -> (dp * density).roundToInt() }
     val screenWidth = activity.windowManager.maximumWindowMetrics.bounds.width()
-    val left = (screenWidth - px(ViewsLayout.SLOT_WIDTH)) / 2
+    // Centred as Base.kt centres a slot — in dp, then rounded: 128 px on averi_lab (1080 px at density 2.75), where
+    // rn-banner's targets lie too.
+    val left = ((screenWidth / density - ViewsLayout.SLOT_WIDTH) / 2 * density).roundToInt()
     val run = FrameLayout(activity).apply { setBackgroundColor(Color.WHITE) }
     identifiedAs(run, "lab.${cell.id}.run")
     val reported = linkedMapOf<String, View>()
@@ -100,7 +106,10 @@ fun viewsScreen(activity: Activity, cell: Cell, lab: Lab): View {
                 }
             }
         }
+        else -> return unbuilt(activity, cell)
     }
+    val unplaced = cell.targets.map { it.tag }.filter { it !in reported }
+    if (unplaced.isNotEmpty()) return unbuilt(activity, cell, "its ${unplaced.joinToString()} placed by no view")
     // Per view, not the window's ViewTreeObserver (which outlives this cell's views in the process).
     run.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> for ((tag, v) in reported) lab.frame(tag, onScreen(v)) }
     // Ready once laid out and drawn, as the Compose cells (Presented.kt#PresentedLayer: 600 ms for a cell of no layer);
@@ -108,6 +117,14 @@ fun viewsScreen(activity: Activity, cell: Cell, lab: Lab): View {
     run.postDelayed({ if (run.isAttachedToWindow) lab.settled() }, 600)
     return run
 }
+
+/** A views cell this file cannot build, said on screen and never ready (MainActivity's UnbuiltCell). */
+private fun unbuilt(activity: Activity, cell: Cell, why: String = "no view of family ${cell.family} builds it yet"): View =
+    TextView(activity).apply {
+        text = "Cell ${cell.id}: $why"
+        setBackgroundColor(Color.WHITE)
+        setPadding(48, 160, 48, 0)
+    }
 
 /**
  * views-banner's cover of `t`: opaque, no clickable node, swallowing every touch (a touch on it reaches no target, as

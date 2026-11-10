@@ -62,9 +62,9 @@ const BANNER_ROLE = 'rn-banner-role';
 const isBanner = (cell: Cell) => cell.id === BANNER || cell.id === BANNER_ROLE;
 /** rn-banner-role's slot around its target: as far out as the cover reaches (20 pt left and right, 10 pt up and down). */
 const ROLE_SLOT = { x: 20, y: 10 };
-/** Each rn-banner target's cover, in the slot's coordinates: its top against the target's, and whether it is a labelled toast. */
 /** A cover's left against its target's: 20 pt further left, so AOSP's location sort lists it first (D75). */
 const COVER_LEFT = -20;
+/** Each rn-banner target's cover, in the slot's coordinates: its top against the target's, and whether it is a labelled toast. */
 const COVERS: Record<string, { top: number; label?: string }> = { T: { top: -10, label: 'Saved' }, U: { top: -10 }, C: { top: 10 } };
 
 /** The fields of a cell: one per target (none in rn-banner and rn-banner-role, whose targets are no fields). */

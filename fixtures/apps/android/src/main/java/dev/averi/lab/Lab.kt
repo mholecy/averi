@@ -3,6 +3,7 @@ package dev.averi.lab
 import android.content.Context
 import android.graphics.Rect
 import android.view.View
+import android.view.accessibility.AccessibilityNodeInfo
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.runtime.Composable
@@ -269,7 +270,22 @@ class Lab(context: Context, private val screen: Rect) {
     }
 }
 
-// --- phase 3's geometry, read once for every family that reports it (Edges.kt, Bars.kt) ---
+// --- phase 3's geometry, read once for every family that reports it (Edges.kt, Bars.kt, Views.kt) ---
+
+/** A View's unclipped frame on the screen, in pixels. */
+internal fun onScreen(v: View): Rect =
+    IntArray(2).also(v::getLocationOnScreen).let { Rect(it[0], it[1], it[0] + v.width, it[1] + v.height) }
+
+/** Gives a View's accessibility node the identifier `id`, as its viewIdResourceName (a View has no resource of that
+ * name). */
+internal fun identifiedAs(v: View, id: String) {
+    v.accessibilityDelegate = object : View.AccessibilityDelegate() {
+        override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
+            super.onInitializeAccessibilityNodeInfo(host, info)
+            info.viewIdResourceName = id
+        }
+    }
+}
 
 /**
  * A layout's frame on the SCREEN, unclipped: its position in the window plus the window's place on the screen, and its

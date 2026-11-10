@@ -66,7 +66,8 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(colorScheme = lightColorScheme()) {
                 val c = cell
                 when {
-                    c == null -> CellList(catalog) { show(it) }
+                    // Shown after Compose's click dispatch returns: a views cell replaces the content view (`host`).
+                    c == null -> CellList(catalog) { id -> window.decorView.post { show(id) } }
                     !c.supported -> Unsupported(c)
                     else -> key(c.id, generation) { CellRouter(c, lab) }
                 }

@@ -8,23 +8,26 @@ import { parseDump } from '../helpers/android-dumps.js';
 /**
  * The PREDICTIONS for backlog D77's lab cells, pinned before their capture (the owner's): what averi reads of the
  * native Android Views twin of rn-banner (fixtures/apps/android, Views.kt: `views-banner`, `views-drawn-over`) and of
- * rn-banner's role sub-case (fixtures/apps/rn, `rn-banner-role`). The dumps are SYNTHETIC, at the geometry the lab code
- * lays out on averi_lab (1080x2220, density 2.75: a slot 300x64 dp = 825x176 px, left (1080 - 825) / 2 = 127, its top
- * (142 + 180·slot - 32) dp rounded; a cover 340x52 dp = 935x143 px, 20 dp = 55 px LEFT of its target, 10 dp = 28 px
- * above it — below it for C), each run in AOSP's location order (ViewGroup.ChildListForAccessibility's stripe sort:
- * every cover, its left edge 55 px further left, before its target). A capture that disagrees is a finding, not a
+ * rn-banner's role sub-case (fixtures/apps/rn, `rn-banner-role`). The dumps are SYNTHETIC, at the geometry each lab
+ * app lays out on averi_lab (1080x2220, density 2.75). Views.kt: a slot 300x64 dp = 825x176 px, centred as Base.kt
+ * centres it (46.36 dp, rounded: left 128, right 953, where rn-banner's capture has its targets), its top (142 +
+ * 180·slot - 32) dp rounded (303, 798, 1293); a cover 340x52 dp = 935x143 px, 55 px LEFT of its target (73–1008), 28 px
+ * above its top (275, 770) — below it for C (1321). React Native's (P3) rounds each view's offset in its parent, half
+ * up: tests/fixtures/truth/android-rn-averi_lab-api33/rn-banner.xml has T's cover at 276 (303 - 27.5 rounded to -27)
+ * and C's at 1321. Each run is in AOSP's location order (ViewGroup.ChildListForAccessibility's stripe sort: every
+ * cover, its left edge 55 px further left, before its target). A capture that disagrees is a finding, not a
  * reason to edit these pins. ADR 0015's amendment "Android Views list children by location" and its D75 residuals.
  */
 const PHONE = { x: 0, y: 0, width: 1080, height: 2220 };
 
 /** A cell's run of [cover, target] pairs in location order, under a parent of `cls` identified lab.<cell>.run. */
 const bannerRun = (cell: string, cls = 'android.widget.FrameLayout') => `<node class="${cls}" resource-id="lab.${cell}.run" bounds="[0,0][1080,2220]">
-      <node class="android.widget.TextView" text="Saved" resource-id="lab.${cell}.T.cover" bounds="[72,275][1007,418]"/>
-      <node class="android.widget.FrameLayout" resource-id="lab.${cell}.T" clickable="true" bounds="[127,303][952,479]"/>
-      <node class="android.widget.FrameLayout" resource-id="lab.${cell}.U.cover" bounds="[72,770][1007,913]"/>
-      <node class="android.widget.FrameLayout" resource-id="lab.${cell}.U" clickable="true" bounds="[127,798][952,974]"/>
-      <node class="android.widget.FrameLayout" resource-id="lab.${cell}.C.cover" bounds="[72,1321][1007,1464]"/>
-      <node class="android.widget.FrameLayout" resource-id="lab.${cell}.C" clickable="true" bounds="[127,1293][952,1469]"/>
+      <node class="android.widget.TextView" text="Saved" resource-id="lab.${cell}.T.cover" bounds="[73,275][1008,418]"/>
+      <node class="android.widget.FrameLayout" resource-id="lab.${cell}.T" clickable="true" bounds="[128,303][953,479]"/>
+      <node class="android.widget.FrameLayout" resource-id="lab.${cell}.U.cover" bounds="[73,770][1008,913]"/>
+      <node class="android.widget.FrameLayout" resource-id="lab.${cell}.U" clickable="true" bounds="[128,798][953,974]"/>
+      <node class="android.widget.FrameLayout" resource-id="lab.${cell}.C.cover" bounds="[73,1321][1008,1464]"/>
+      <node class="android.widget.FrameLayout" resource-id="lab.${cell}.C" clickable="true" bounds="[128,1293][953,1469]"/>
     </node>`;
 
 /** The decor and the activity's content view (setContentView), holding `inner`. */
@@ -47,8 +50,8 @@ const interop = (inner: string) =>
 const byId = (t: UiNode, id: string): UiNode => [...everyNode(t)].find((n) => n.identifier === id)!;
 /** The eyes' answer for `tag` against `peer`, from the target's side. */
 const eyes = (target: UiNode, peer: UiNode, seen: 'over' | 'under') => seenOrderOf(target, [{ peer, seen, overlap: '#263238', own: '#43A047', other: '#263238' }]);
-/** Each target's centre, as averi taps it when nothing covers it. */
-const CENTRE = { T: { x: 540, y: 391 }, U: { x: 540, y: 886 }, C: { x: 540, y: 1381 } } as const;
+/** Each target's centre, as averi taps it when nothing covers it: (128 + 953) / 2 = 540.5, rounded to 541. */
+const CENTRE = { T: { x: 541, y: 391 }, U: { x: 541, y: 886 }, C: { x: 541, y: 1381 } } as const;
 
 describe('P1 views-banner hosted by setContentView: the run is marked, each cover an untold peer — refused with and without the eyes', () => {
   const cell = 'views-banner';
@@ -106,15 +109,18 @@ describe('P2 the same run in Compose AndroidView interop: unmarked, tapped at th
  */
 describe('P3 rn-banner-role: the slot container dumps as android.view.View — unmarked, tapped at the centre (LR4 survives)', () => {
   const cell = 'rn-banner-role';
-  const slot = (tag: string, top: number, coverTop: number) => `<node class="android.view.View" resource-id="lab.${cell}.${tag}.slot" bounds="[72,${top - 28}][1007,${top - 28 + 231}]">
-        <node class="android.view.ViewGroup" resource-id="lab.${cell}.${tag}.cover" bounds="[72,${coverTop}][1007,${coverTop + 143}]"/>
-        <node class="android.view.ViewGroup" resource-id="lab.${cell}.${tag}" clickable="true" bounds="[127,${top}][952,${top + 176}]"/>
+  // The slot at (slot left - 20, slot top - 10) dp: left 72.5 rounded up to 73, top 275 / 770 / 1265, 935x231 px; the
+  // target 20,10 dp inside it (55, 27.5 rounded up to 28: 128,303 as rn-banner's); the cover at its left, at its top
+  // (T, U) or 20 dp = 55 px below it (C: 1320).
+  const slot = (tag: string, top: number, coverTop: number) => `<node class="android.view.View" resource-id="lab.${cell}.${tag}.slot" bounds="[73,${top - 28}][1008,${top - 28 + 231}]">
+        <node class="android.view.ViewGroup" resource-id="lab.${cell}.${tag}.cover" bounds="[73,${coverTop}][1008,${coverTop + 143}]"/>
+        <node class="android.view.ViewGroup" resource-id="lab.${cell}.${tag}" clickable="true" bounds="[128,${top}][953,${top + 176}]"/>
       </node>`;
   const t = parseDump(
     decor(`<node class="android.view.ViewGroup" bounds="[0,0][1080,2220]">
       ${slot('T', 303, 275)}
       ${slot('U', 798, 770)}
-      ${slot('C', 1293, 1321)}
+      ${slot('C', 1293, 1320)}
     </node>`),
   );
 
@@ -130,7 +136,7 @@ describe('P3 rn-banner-role: the slot container dumps as android.view.View — u
 });
 
 /**
- * views-drawn-over (sub-case a), B's side: A listed BEFORE B by location (left 127 before 182, one stripe) but drawn
+ * views-drawn-over (sub-case a), B's side: A listed BEFORE B by location (left 128 before 183, one stripe) but drawn
  * over it — by child order (A the later child) or by translationZ (A2) — each holding the other's centre. B's peer A,
  * listed before it, is untold: with no screenshot B is refused, and the eyes seeing B under A keep it refused. A's side
  * (B an untold peer, lifted when the eyes see A on top: A `Tapped`) is pinned in
@@ -140,10 +146,10 @@ describe('P4 views-drawn-over, B\'s side: A listed before and drawn over it — 
   const cell = 'views-drawn-over';
   const t = parseDump(
     decor(`<node class="android.widget.FrameLayout" resource-id="lab.${cell}.run" bounds="[0,0][1080,2220]">
-      <node class="android.widget.FrameLayout" resource-id="lab.${cell}.A" clickable="true" bounds="[127,303][952,479]"/>
-      <node class="android.widget.FrameLayout" resource-id="lab.${cell}.B" clickable="true" bounds="[182,331][1007,452]"/>
-      <node class="android.widget.FrameLayout" resource-id="lab.${cell}.A2" clickable="true" bounds="[127,798][952,974]"/>
-      <node class="android.widget.FrameLayout" resource-id="lab.${cell}.B2" clickable="true" bounds="[182,826][1007,947]"/>
+      <node class="android.widget.FrameLayout" resource-id="lab.${cell}.A" clickable="true" bounds="[128,303][953,479]"/>
+      <node class="android.widget.FrameLayout" resource-id="lab.${cell}.B" clickable="true" bounds="[183,331][1008,452]"/>
+      <node class="android.widget.FrameLayout" resource-id="lab.${cell}.A2" clickable="true" bounds="[128,798][953,974]"/>
+      <node class="android.widget.FrameLayout" resource-id="lab.${cell}.B2" clickable="true" bounds="[183,826][1008,947]"/>
     </node>`),
   );
 
