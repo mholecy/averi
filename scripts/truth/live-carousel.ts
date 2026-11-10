@@ -539,11 +539,11 @@ const percent = (p: number) => `${Number((p * 100).toPrecision(2))} %`;
 /**
  * The ceiling on D68_SPREAD's acceptance (live-cases.ts#summarize hands it the run's results): ADR 0021's D68
  * amendment measured the hedged bound on ~3 in 10 of the unaimable legs (HEDGED_RATE), so a run whose every judged leg
- * (live-visibility.ts#isJudged: not SKIP, not `no-state`) ended hedged — CEILING_MIN_LEGS or more — reads as D68's stop reverted, not as chance (about 2.7 % with
- * three; the 3 planned runs, 9 legs, make it negligible): MISMATCH-class, the run fails (`fails`; held only in a run of
- * this checkout — a `--side` one is a calibration). Fewer judged — any leg selected, even every one SKIPped: LOUD
- * (`loud`, counted in the summary's tally), no pass claimed, the exit untouched. "hedged N of M" whenever a leg was in
- * the run; no line when none was.
+ * (live-visibility.ts#isJudged: not SKIP, not `no-state`) ended hedged — CEILING_MIN_LEGS or more — reads as D68's stop
+ * reverted, not as chance (about 2.7 % with three; the 3 planned runs, 9 legs, make it negligible): MISMATCH-class, the
+ * run fails (`fails`; held only in a run of this checkout — a `--side` one is a calibration). Fewer judged — any leg
+ * selected, even every one SKIPped: LOUD (`loud`, counted in the summary's tally), no pass claimed, the exit untouched.
+ * "hedged N of M" whenever a leg was in the run; no line when none was.
  */
 export function hedgedCeiling(results: readonly CeilingResult[], ofThisCheckout: boolean): { lines: string[]; fails: boolean; loud: boolean; hedged: number; judged: number } {
   const legs = results.filter((r) => UNAIMABLE_LEGS.includes(r.c.id));

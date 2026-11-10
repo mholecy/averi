@@ -134,8 +134,8 @@ export interface LiveVerdict {
 
 /**
  * Whether a verdict was reached by a judge: not a SKIP, and not a case with no first state (T10, `no-state`), which no
- * judge was asked about. Every count of "judged" runs or legs asks this (live-carousel.ts#hedgedCeiling, the residual
- * tally in live-cases.ts#summarize), so a run nothing judged never makes one claim a pass.
+ * judge was asked about. Every count a pass is claimed on asks this (live-carousel.ts#hedgedCeiling, the residual tally
+ * in live-cases.ts#summarize), so a run nothing judged never makes one claim a pass; hedgedStops does not.
  */
 export const isJudged = (v: Pick<LiveVerdict, 'outcome' | 'cls'>): boolean => v.outcome !== 'SKIP' && v.cls !== 'no-state';
 
@@ -447,7 +447,8 @@ export interface HedgedStops<R extends JudgedStop = JudgedStop> {
  * An ok is a target the app shows whole: every visibility judge that can return ok on a stop goes through judgeScroll,
  * whose `fully` stop holds only on a `whole` geometry (a hedge is never a plain stop's). Another group's stops are not
  * judgeScroll's — the carousel's hedge with C cut is ok by its own rules — so not counted. A count, no gate: a device or
- * a change that turns plain stops into hedges shows as a rise.
+ * a change that turns plain stops into hedges shows as a rise. It counts averi's real replies, not isJudged's judged
+ * runs: a case with no first state (T10, `no-state`) still replied, so its hedge stays, in the `other` bucket.
  */
 export function hedgedStops<R extends JudgedStop>(results: readonly R[]): HedgedStops<R> {
   const judged = results.filter((r) => r.c.group === 'visibility' && r.verdict.outcome !== 'SKIP' && r.replies.some((x) => replyKind(x) === 'visible'));

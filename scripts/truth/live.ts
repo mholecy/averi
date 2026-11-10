@@ -62,14 +62,14 @@ import { parseLabApp, type LabApp } from './schema.js';
  * (`--cells` narrows them); `dismissal` (phase 5, iOS) a tap under the keyboard on the false-covers toolbar cells,
  * under the cell's own `keyboardDismiss` (CellConfig): the control focused, nothing typed. A case not ok prints its
  * whole replies, and every scroll case (and any case not ok) the app's state beneath it. A case not ok that an existing
- * note explains is KNOWN (live-known.ts) and marked so; the exit code is 1 on a MISMATCH not known, and — in a run of
- * this checkout, not a `--side` one — on a known case not `intermittent` that came out ok (fixed: strike it off, as the
- * static ratchet asks), and on a case whose app wrote no state after its calls (T10: LOUD, `no-state`). The visibility
- * group's hedged stops are counted under the cases, no exit code (T15: ADR 0013's T15 paragraph). `--record <file>`
- * writes every read (the launch state, the state between the calls, after them) as JSON; `--rejudge <file>` judges such
- * a record again with this checkout's judges, no device (live-cases.ts#rejudge, which tests/truth/live-rejudge.test.ts
- * calls in process). The cases, their judging and the summary live in live-cases.ts, one case's device cycle in
- * run-case.ts; this file is the CLI.
+ * note explains is KNOWN (live-known.ts) and marked so; the exit code is 1 on a MISMATCH not known, on a case whose app
+ * wrote no state after its calls (T10: LOUD, `no-state`; any run, `--side` too), and — in a run of this checkout, not a
+ * `--side` one — on a known case not `intermittent` that came out ok (fixed: strike it off, as the static ratchet
+ * asks). The visibility group's hedged stops are counted under the cases, no exit code (T15: ADR 0013's T15
+ * paragraph). `--record <file>` writes every read (the launch state, the state between the calls, after them) as JSON;
+ * `--rejudge <file>` judges such a record again with this checkout's judges, no device (live-cases.ts#rejudge, which
+ * tests/truth/live-rejudge.test.ts calls in process). The cases, their judging and the summary live in live-cases.ts,
+ * one case's device cycle in run-case.ts; this file is the CLI.
  *
  * `--app react-native` runs the cases of the React Native lab app's cells (fixtures/apps/rn, its own bundle and package:
  * lab-device.ts#LAB_APP; the visibility cases from its own truth runs, the manifests whose `app` is AveriLabRN) — the
