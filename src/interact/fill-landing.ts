@@ -388,11 +388,11 @@ function wholeLandingToo(held: string, e: TextExpectation): boolean {
 function differenceOf(observed: string, e: Pick<Expectation, keyof TextExpectation | 'held'>, tail: Tail | undefined, wholeToo: boolean): Difference {
   const { value, clear } = e;
   // D79: the field's count is the typed one — a `length` then says why that is no match (`EqualCount`)
-  const typedCount = observed.length === value.length;
+  const showsTypedCount = observed.length === value.length;
   if (bulletsSaidPlain(observed, e)) return { kind: 'masked-said-plain' };
   if (observed === e.before) return { kind: 'unchanged' };
   if (isMaskedValue(observed)) return { kind: 'masked', held: clear ? undefined : heldCount(e) };
-  if (hasBullet(observed)) return typedCount ? { kind: 'length', equal: { why: 'partly-masked' } } : { kind: 'length' };
+  if (hasBullet(observed)) return showsTypedCount ? { kind: 'length', equal: { why: 'partly-masked' } } : { kind: 'length' };
   const held = heldText(observed, e.placeholder);
   // D28: a reformatted strict prefix with some of the typing in it is a dropped tail, never "transformed".
   if (landedSome(tail) && tail.reformatted !== undefined) {
@@ -421,7 +421,7 @@ function differenceOf(observed: string, e: Pick<Expectation, keyof TextExpectati
   // an exact strict prefix ends here: its typed part is shorter than the value, so no run is compared
   if (typed.length !== value.length) {
     const d: Difference = wholeToo ? { kind: 'length', wholeToo: true } : { kind: 'length' };
-    return typedCount ? { ...d, equal: equalCountOf(held, typed, wholeToo, e) } : d;
+    return showsTypedCount ? { ...d, equal: equalCountOf(held, typed, wholeToo, e) } : d;
   }
   let differ = 0;
   for (let i = 0; i < value.length; i++) if (typed[i] !== value[i]) differ++;
