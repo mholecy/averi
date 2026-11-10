@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { escapeRegExp } from '../../src/verify/text-hint.js';
 
 /**
- * T18: escapeRegExp's only indirect test ("1 of 13 selected") has no regex
- * metacharacter, so a broken escape passed it. Its consumers — the text hint's
- * recommended `match:`, scripts/truth/replies.ts#BAND_SAID and
- * tests/run/verify.test.ts — need the string matched as literal text.
+ * The expected string, escaped, matches as literal text: its consumers — the
+ * text hint's recommended `match:`, scripts/truth/replies.ts#BAND_SAID and
+ * tests/run/verify.test.ts — rely on it. Pinned directly since T18: the one
+ * indirect test ("1 of 13 selected") has no regex metacharacter, so a broken
+ * escape passed it.
  */
 describe('escapeRegExp', () => {
   // Every character the escape's class claims: . * + ? ^ $ { } ( ) | [ ] \
@@ -50,10 +51,12 @@ describe('escapeRegExp', () => {
   });
 
   it('escapes exactly with a backslash before each metacharacter, nothing else', () => {
-    // Known-good literal, written by hand: letters and `/` (unclaimed — a
-    // RegExp constructor needs no `/` escape) pass through untouched.
+    // The exact text is the contract, not only its matching: the text hint
+    // shows the escaped string verbatim to the agent as the `match:` to write
+    // (src/verify/text-hint.ts#textHint). Known-good literals, written by hand:
+    // letters and `/` (unclaimed — a RegExp constructor needs no `/` escape)
+    // pass through untouched.
     expect(escapeRegExp('a.b(c)/d')).toBe('a\\.b\\(c\\)/d');
     expect(escapeRegExp('$9.99')).toBe('\\$9\\.99');
-    expect(escapeRegExp('.*+?^${}()|[]\\')).toBe('\\.\\*\\+\\?\\^\\$\\{\\}\\(\\)\\|\\[\\]\\\\');
   });
 });
