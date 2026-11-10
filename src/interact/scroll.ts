@@ -8,7 +8,7 @@ import { describeTarget, matchesToJudge, type Target } from './resolve.js';
 import { round, startRounds, type RoundSeen, type Rounds, type RoundStep } from './scroll-rounds.js';
 import { scrollFailure, scrollResult, type ScrollUntilResult } from './scroll-text.js';
 import { dragMs, screenBox, type Direction, type ScreenBox } from './swipe.js';
-import type { Within } from './within.js';
+import { checkWithin, type Within } from './within.js';
 
 export { describeScrollResult, HEDGE_WHATS, HEDGED_LEAD, stopHedges, type ScrollUntilResult } from './scroll-text.js';
 
@@ -283,6 +283,8 @@ export async function scrollUntilVisible(
   target: Target,
   opts: ScrollOptions = {},
 ): Promise<ScrollUntilResult> {
+  // A `within` selector that does not parse is the caller's mistake, said before any device read (D78).
+  if (opts.within !== undefined) checkWithin(opts.within);
   const settleMs = opts.settleMs ?? 400;
   const describe = describeTarget(target);
   // The device's screen, read before the loop, so a device whose screen

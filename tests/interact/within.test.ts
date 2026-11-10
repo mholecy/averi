@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Rect, UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
-import { resolveWithin } from '../../src/interact/within.js';
+import { checkWithin, resolveWithin } from '../../src/interact/within.js';
 import { lookAt } from '../../src/ui-tree/look.js';
 import { parseDump } from '../helpers/android-dumps.js';
 
@@ -57,6 +57,28 @@ describe('resolveWithin — a selector: the matched scroll view, or the nearest 
   });
 });
 
+describe('resolveWithin — one rule for a match that does not scroll: a scroll view of its very rect, else its nearest scroll view', () => {
+  const L: Rect = { x: 0, y: 400, width: 1080, height: 800 };
+  const PAGE: Rect = { x: 0, y: 0, width: 1080, height: 2220 };
+  const list = (): UiNode => ({ role: 'scrollable', label: null, identifier: 'L', value: null, clipsDescendants: true, scrollAxis: 'vertical', rect: { ...L }, children: [] });
+  const wrapper = (): UiNode => ({ role: 'container', label: null, identifier: 'wrap', value: null, rect: { ...L }, children: [list()] });
+  const root = (children: UiNode[]): UiNode => ({ role: 'container', label: null, identifier: null, value: null, rect: { ...PAGE }, children });
+  const page = (children: UiNode[]): UiNode => ({ role: 'scrollable', label: null, identifier: 'page', value: null, clipsDescendants: true, scrollAxis: 'vertical', rect: { ...PAGE }, children });
+
+  it('a wrapper laid exactly over its list, at the root: the list', () => {
+    expect(resolveWithin(factsOf(root([wrapper()])), 'id:wrap', 'down', PAGE)).toEqual({ rect: L });
+  });
+
+  it('the same wrapper inside a vertical page: the list, not the page', () => {
+    expect(resolveWithin(factsOf(root([page([wrapper()])])), 'id:wrap', 'down', PAGE)).toEqual({ rect: L });
+  });
+
+  it('a node in no scroll view, of no scroll view\'s rect: refused', () => {
+    const banner: UiNode = { role: 'text', label: 'Banner', identifier: 'banner', value: null, rect: { x: 0, y: 100, width: 1080, height: 200 }, children: [] };
+    expect(resolveWithin(factsOf(root([banner, list()])), 'id:banner', 'down', PAGE)).toEqual({ refused: { of: 'unscrolled', node: { role: 'text', label: 'Banner', identifier: 'banner', rect: banner.rect } } });
+  });
+});
+
 describe('resolveWithin — a rect: the listed scroll view of exactly that rect', () => {
   it('a rect a pixel off every listed scroll view: refused, naming the scroll views the tree tells along the stroke', () => {
     expect(resolveWithin(factsOf(ANDROID), { ...LOWER, height: 496 }, 'down', ANDROID_SCREEN)).toEqual({ refused: { of: 'stale', axis: 'vertical', told: [list(UPPER), list(LOWER)] } });
@@ -98,5 +120,19 @@ describe('resolveWithin — idb\'s flat list lists no scroll view: refused whate
   it('a selector of a row and a rect alike', () => {
     expect(resolveWithin(factsOf(IDB), 'id:lab.scroll-bounded.S', 'down', PHONE)).toEqual({ refused: { of: 'untold' } });
     expect(resolveWithin(factsOf(IDB), WDA_LOWER, 'down', PHONE)).toEqual({ refused: { of: 'untold' } });
+  });
+});
+
+describe('checkWithin — a string `within` parsed before anything is read, its errors naming `within`', () => {
+  it('a selector of no field:value form, and a regex that does not compile, throw naming it', () => {
+    expect(() => checkWithin('garbage')).toThrow(/^within garbage: Invalid selector at "garbage"/);
+    expect(() => checkWithin('text~"("')).toThrow(/^within text~"\(": Invalid regular expression/);
+  });
+
+  it('an exact value is no regex, and a rect or an element spec has nothing to parse', () => {
+    expect(() => checkWithin('text:"("')).not.toThrow();
+    expect(() => checkWithin('id:lab.scroll-bounded.S label~"Target.*"')).not.toThrow();
+    expect(() => checkWithin({ x: 0, y: 0, width: 1, height: 1 })).not.toThrow();
+    expect(() => checkWithin({ text: '(' })).not.toThrow();
   });
 });

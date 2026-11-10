@@ -45,7 +45,7 @@
     "group": "core",
     "tests": ["tests/interact/within.test.ts"],
     "floor": 98,
-    "baseline": "100 % on 2026-11-10 (D78, resolveWithin; `npm run mutate -- --group core --force`, cold, 307 s): 70 mutants, 0 survived, 0 timeouts — before it the across check read `axes?.axis` and `axes?.nested ?? []` (axes always found there: 2 equivalent survivors and 1 no-coverage); folded into the unscrolled refusal (a selector's scroll view found by `Clips.axesOf` like a rect's), they are gone"
+    "baseline": "100 % on 2026-11-10 (D78 review round 1: checkWithin, a string `within` parsed up front; one rule for a match, the scroll view of its very rect else its nearest; `npm run mutate -- --group core --force --mutate src/interact/within.ts`, cold): 86 mutants, 0 survived — checkWithin's `e instanceof Error ? … : String(e)` cut to `(e as Error).message` (both throwers throw Errors: no equivalent survivor); 100 % on 2026-11-10 (D78, resolveWithin; `npm run mutate -- --group core --force`, cold, 307 s): 70 mutants, 0 survived, 0 timeouts — before it the across check read `axes?.axis` and `axes?.nested ?? []` (axes always found there: 2 equivalent survivors and 1 no-coverage); folded into the unscrolled refusal (a selector's scroll view found by `Clips.axesOf` like a rect's), they are gone"
   },
   "src/ui-tree/draw-order.ts": {
     "group": "core",

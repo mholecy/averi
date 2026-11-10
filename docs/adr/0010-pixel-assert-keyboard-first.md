@@ -567,8 +567,11 @@ schema a string or that object, strict). `ScrollOptions.within` (interact/scroll
 
 (b) It is resolved ONCE, at the scroll's first read that reads, before anything of that read is judged
 (`interact/within.ts#resolveWithin`, called by `scroll-rounds.ts#round`): a selector must match exactly one node; a
-node that scrolls (`scroll-containers.ts#scrolls`) is the scroll view, else its nearest scroll view by the rule a found
-target's are taken by (`stroke-plan.ts#targetScrollers`, exported for it, not copied). A rect must be the rect of a
+scroll view of that match's very rect is the one named (the match itself when it scrolls, the list a wrapper is laid
+exactly over), else its nearest scroll view by the rule a found target's are taken by (`stroke-plan.ts#targetScrollers`,
+exported for it, not copied) — one rule wherever the match lies (review round 1's MINOR-2). A string `within` is parsed,
+its regexes compiled, before any device read (`within.ts#checkWithin`): one that does not parse throws `within <it>:
+<why>` (MINOR-1), not an unnamed "Invalid selector" from inside the round. A rect must be the rect of a
 listed scroll view exactly (`Clips.axesOf`, which finds it by `isScrollViewOf`, the test every remembered scroll view is
 found again by). The resolved rect is kept in the stroke memory (`stroke-plan.ts#nameScrollView`, `Memory.named` —
 not `within`, which already names the scroll view the last stroke went over), so a later read that lost it keeps it
@@ -592,7 +595,8 @@ and had another stroked would read the exhausted reply as that list's. It is ref
 shows the target: the option is checked where it is resolved, not only when a swipe needs it.
 
 (e) D76's reply cites it: `— if the element lies in it, scroll_until it again with within: {"x":0,"y":1046,"width":1080,"height":495}`
-(several: `— if the element lies in one of them, scroll_until it again with within: that one's rect`). `UNTRIED_LEAD`
+(several: each named `<node> as within: {…}`, as the stale refusal lists them, then `— if the element lies in one of
+them, scroll_until it again with that one's within` — review round 1's NIT-1). `UNTRIED_LEAD`
 and `UNTRIED_END` are unchanged, so `namesUntried` (scripts/truth/replies.ts) and golden's `namedSuffices` read the
 names as before. The across clause's named branch (D59b: a scroll view told along the stroke that the swipes did not
 go over) cites it the same way — `— scroll_until it again with within: <its rect>` — but keeps the manual words when the
@@ -604,8 +608,9 @@ ignored).
 `ScrollOptions.within` already accepts an element spec for it.
 
 **Residuals.** (1) A named scroll view with no room for a stroke (under `MIN_STROKE_BOX`, or cut to nothing by what is
-drawn over it) falls to `strokeRoom`'s own fallbacks — a nested one, else the gesture box whole — as the largest
-scroller's would; not refused, as room is judged per round. (2) A stale rect's refusal lists only scroll views whose
+drawn over it) falls to `strokeRoom`'s own fallbacks — a nested one, else the gesture box WHOLE — as the largest
+scroller's would; not refused, as room is judged per round. Over the gesture box whole the stroke may touch down on
+another scroll view than the one named (a follow-up row is filed for it). (2) A stale rect's refusal lists only scroll views whose
 axis the tree tells (`toldOn`): a Compose lazy list or a RecyclerView (axis unknown) is not listed, though a selector
 of a row inside it resolves to it. (3) The selector resolves on the first read only: a list laid out later is not
 found. (4) A `within` whose list scrolls away under the page (nested in the largest) is kept by its last rect: a
@@ -614,9 +619,10 @@ emulator was down). The live cases are drafted (scripts/truth/live-visibility.ts
 `within:scroll-bounded.O` with `lower`'s rect from the capture's `scrollViews`, `within:scroll-bounded.F` with
 `id:"lab.scroll-bounded.S"`, direction down, 12 swipes and 30 s (F lies ~2300 px down a 495-px list), judged by
 `judgeWithin` — judgeScroll's stop and tap from the app's stroke log (every stroke on `lower` bringing the target
-closer), a loud failure its MISMATCH. Their first run is on the owner's list. (6) A selector's match in no scroll
-view still names a scroll view that has its very rect (a wrapper laid exactly over its list): found by `Clips.axesOf`,
-as a rect is.
+closer), a loud failure its MISMATCH. Their first run is on the owner's list. (6) A selector's match names
+the scroll view of its very rect wherever it lies (found by `Clips.axesOf`, as a rect is): a wrapper laid exactly over
+its list names that list, at the root or inside a vertical page alike; so does an unrelated overlay of the list's rect
+— accepted, the rect is that scroll view's. Only a match in no scroll view and of no scroll view's rect is refused.
 
 **Golden.** Against the base JSON of `main` 4b6e3b56: Changed exactly 2, android `scroll-bounded` O and F
 `scroll_until`, the reply's wording only (D76's remedy now `within`), still green; Strike 0, COUNTS 0, Re-pin 0. The
@@ -644,7 +650,13 @@ reply's rect fields reordered, the selector form said as a target, the count, `a
 the stroke's direction dropped; `targetRead` inverted, its guard and `noRoom`'s each dropped; the plan's refresh of the
 named view dropped, its axes not kept by a read that lost it, named with no axes; the live cases' F by rect, on iOS
 too, 6 swipes, the LOUD not turned. One equivalent: `others[0]` as `others.at(-1)` where there is one. Mutation
-(scripts/mutation/scope.json, core): `src/interact/within.ts` 100 % (70 mutants), floor 98.
+(scripts/mutation/scope.json, core): `src/interact/within.ts` 100 % (70 mutants), floor 98; after review round 1
+100 % (86 mutants). Review round 1's tests: `checkWithin` (both repros, an exact value no regex, a rect and a spec not
+parsed) and the driver refusing before any device read; one rule for a match — a same-rect wrapper at the root and
+inside a vertical page both name the list, a node in no scroll view of no scroll view's rect refused; the several-views
+form's `as within:`. Its hand mutants, each killed: the regex not compiled, the driver's check dropped, the `within`
+prefix dropped, a spec parsed as a string, the same-rect rule dropped, the `as within:` dropped and given to the one
+view too.
 
 ## Bug note
 

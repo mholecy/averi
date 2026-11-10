@@ -1083,8 +1083,8 @@ function acrossText({ rect, axis, along }: StrokedAcross): string {
  * at x,y inside the scroll view <rect>`), then `the tree shows another scroll view that scrolls vertically, which the
  * swipes did not go over: <node>` — several counted, the BESIDE_NAMED largest named and the rest counted (`and 2 more`)
  * — with `if the element lies in it, scroll_until it again with within: {"x":…,"y":…,"width":…,"height":…}` (D78: its
- * rect as `within` takes it, `withinRect`; several: `… in one of them, scroll_until it again with within: that one's
- * rect`). "Did not go over": no swipe touched down in it. The remedy is the caller's: the swipes are not tried there
+ * rect as `within` takes it, `withinRect`; several: each named `<node> as within: {…}`, then `… in one of them,
+ * scroll_until it again with that one's within`). "Did not go over": no swipe touched down in it. The remedy is the caller's: the swipes are not tried there
  * (D76's decision, ADR 0010's D76 amendment). `boundText`'s and `boundBeside`'s; the troubleshooting
  * reference quotes it.
  */
@@ -1093,9 +1093,13 @@ function besideText({ within, at, landed, axis, others }: StrokedBeside): string
   const went = within === undefined ? `the swipes were drawn over the screen whole (aimed at no scroll view)${where}` : `the swipes went over the scroll view ${rectText(within)} only`;
   const one = others.length === 1;
   const some = one ? `${within === undefined ? 'a' : 'another'} scroll view that scrolls` : `${others.length} ${within === undefined ? '' : 'other '}scroll views that scroll`;
-  const named = others.slice(0, BESIDE_NAMED).map(nodeText).join(', ');
+  // Several: each named with its rect as `within` takes it, as the stale refusal lists them (D78); one: its rect is the remedy's.
+  const named = others
+    .slice(0, BESIDE_NAMED)
+    .map((n) => (one ? nodeText(n) : `${nodeText(n)} as within: ${withinRect(n.rect)}`))
+    .join(', ');
   const names = others.length > BESIDE_NAMED ? `${named} and ${others.length - BESIDE_NAMED} more` : named;
-  const remedy = one ? `it, scroll_until it again with within: ${withinRect(others[0].rect)}` : `one of them, scroll_until it again with within: that one's rect`;
+  const remedy = one ? `it, scroll_until it again with within: ${withinRect(others[0].rect)}` : `one of them, scroll_until it again with that one's within`;
   return `${went}; the tree shows ${some} ${axis}ly, ${UNTRIED_LEAD}${names}${UNTRIED_END}${remedy}`;
 }
 

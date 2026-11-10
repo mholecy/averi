@@ -3139,7 +3139,7 @@ describe('round — the scroll views the strokes did not go over, before the tar
 
   it('boundText, several: counted, largest first as given; and over the screen box (no scroll view swiped) said so', () => {
     expect(boundText({ of: 'exhausted', lastStroke: 'up', unchanged: 'matches', beside: { axis: 'vertical', within: UPPER, others: [lower, mid] } }, 2)).toBe(
-      'after 2 swipes (the last 2, swiping up, did not move it: the swipes went over the scroll view 0,303 1080x605 only; the tree shows 2 other scroll views that scroll vertically, which the swipes did not go over: scrollable (0,1046 1080x495), scrollable id:mid (0,1600 1080x300) — if the element lies in one of them, scroll_until it again with within: that one\'s rect; else: content exhausted, or the swipes were not taken)',
+      'after 2 swipes (the last 2, swiping up, did not move it: the swipes went over the scroll view 0,303 1080x605 only; the tree shows 2 other scroll views that scroll vertically, which the swipes did not go over: scrollable (0,1046 1080x495) as within: {"x":0,"y":1046,"width":1080,"height":495}, scrollable id:mid (0,1600 1080x300) as within: {"x":0,"y":1600,"width":1080,"height":300} — if the element lies in one of them, scroll_until it again with that one\'s within; else: content exhausted, or the swipes were not taken)',
     );
     expect(boundText({ of: 'exhausted', lastStroke: 'left', unchanged: 'tree', beside: { axis: 'horizontal', others: [lower] } }, 2)).toContain(
       'did not change the screen: the swipes were drawn over the screen whole (aimed at no scroll view); the tree shows a scroll view that scrolls horizontally, which the swipes did not go over: scrollable (0,1046 1080x495) — if the element lies in it,',
@@ -3163,9 +3163,9 @@ describe('round — the scroll views the strokes did not go over, before the tar
   it('boundText, more than 3: the 3 largest named, then how many more (review round 1)', () => {
     const more = [0, 1, 2, 3, 4].map((i) => ({ role: 'scrollable', label: null, identifier: `l${i}`, rect: { x: 0, y: 1000 + i * 100, width: 1080, height: 90 } }));
     expect(boundText({ of: 'exhausted', lastStroke: 'down', unchanged: 'tree', beside: { axis: 'vertical', within: UPPER, others: more } }, 2)).toContain(
-      'the tree shows 5 other scroll views that scroll vertically, which the swipes did not go over: scrollable id:l0 (0,1000 1080x90), scrollable id:l1 (0,1100 1080x90), scrollable id:l2 (0,1200 1080x90) and 2 more — if the element lies in one of them,',
+      'the tree shows 5 other scroll views that scroll vertically, which the swipes did not go over: scrollable id:l0 (0,1000 1080x90) as within: {"x":0,"y":1000,"width":1080,"height":90}, scrollable id:l1 (0,1100 1080x90) as within: {"x":0,"y":1100,"width":1080,"height":90}, scrollable id:l2 (0,1200 1080x90) as within: {"x":0,"y":1200,"width":1080,"height":90} and 2 more — if the element lies in one of them,',
     );
-    expect(boundText({ of: 'exhausted', lastStroke: 'down', unchanged: 'tree', beside: { axis: 'vertical', within: UPPER, others: more.slice(0, 3) } }, 2)).toContain('scrollable id:l2 (0,1200 1080x90) — if the element');
+    expect(boundText({ of: 'exhausted', lastStroke: 'down', unchanged: 'tree', beside: { axis: 'vertical', within: UPPER, others: more.slice(0, 3) } }, 2)).toContain('scrollable id:l2 (0,1200 1080x90) as within: {"x":0,"y":1200,"width":1080,"height":90} — if the element');
   });
 
   it('boundText over the screen box names the touch-down, and the scroll view it lies in when the tree lists one (review round 1)', () => {

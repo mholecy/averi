@@ -1,8 +1,7 @@
-import { type Rect, type ScrollAxis } from '../adapters/types.js';
+import type { Rect, ScrollAxis } from '../adapters/types.js';
 import { listsAncestry } from '../ui-tree/draw-order.js';
 import { quoted, type QuotedNode, type ScrollAxes } from '../ui-tree/geometry.js';
-import { scrolls } from '../ui-tree/scroll-containers.js';
-import { findTarget, type Target } from '../ui-tree/selectors.js';
+import { findTarget, parseSelector, type Target } from '../ui-tree/selectors.js';
 import type { TreeFacts } from './scroll-read.js';
 import { targetScrollers } from './stroke-plan.js';
 import { axisOf, type Direction } from './swipe.js';
@@ -13,10 +12,12 @@ import { axisOf, type Direction } from './swipe.js';
  * (interact/stroke-plan.ts#candidatesOf), so a row of a SIBLING list (the lab's `scroll-bounded`: O and F, rows of
  * `lower`, beside the larger `upper`) was never reached; D76's exhausted reply named such lists and left the remedy
  * manual. Named here as the caller can name it (ADR 0010's D78 amendment):
- * - a SELECTOR (or a flow's element spec) of the scroll view itself — a node that scrolls
- *   (ui-tree/scroll-containers.ts#scrolls) — or of an element inside it, whose NEAREST scroll view is taken by the rule
- *   that takes a found target's (stroke-plan.ts#targetScrollers: Android's clipping chain, else the scrolling
- *   ancestors); exactly one match, as a tap's selector;
+ * - a SELECTOR (or a flow's element spec) of exactly one node, by one rule: the scroll view of that node's very rect
+ *   (ui-tree/scroll-containers.ts#isScrollViewOf, through `Clips.axesOf` — the node itself when it scrolls, the list
+ *   a wrapper is laid exactly over, and so too the list an unrelated overlay of its rect lies over: the rect is that
+ *   scroll view's), else the NEAREST scroll view of the node, by the rule that takes a found target's
+ *   (stroke-plan.ts#targetScrollers: Android's clipping chain, else the scrolling ancestors); a node under none is
+ *   refused;
  * - a RECT, as ui_snapshot and a failure reply quote one: the listed scroll view of exactly that rect
  *   (ui-tree/geometry.ts#Clips.axesOf finds it by scroll-containers.ts#isScrollViewOf, the test every remembered scroll
  *   view is found again by), so a rect a pixel off is none.
@@ -52,6 +53,21 @@ export type WithinRefusal =
   /** The tree lists no scroll view (idb's flat list). */
   | { readonly of: 'untold' };
 
+/**
+ * A string `within` parsed as a selector, its regexes compiled, before the scroll reads anything (interact/scroll.ts):
+ * a selector that does not parse throws `within <it>: <why>` — else it would throw from inside the round, at the first
+ * read, without saying it was `within`'s. A rect or an element spec has nothing to parse.
+ */
+export function checkWithin(within: Within): void {
+  if (typeof within !== 'string') return;
+  try {
+    for (const c of parseSelector(within)) if (c.op === 're') new RegExp(c.value);
+  } catch (e) {
+    // parseSelector and the RegExp constructor throw Errors only.
+    throw new Error(`within ${within}: ${(e as Error).message}`);
+  }
+}
+
 /** `within` read as a rect, not a target: a rect has a width; neither a selector nor an element spec does. */
 export const isRect = (within: Within): within is Rect => typeof within === 'object' && 'width' in within;
 
@@ -75,9 +91,10 @@ export function resolveWithin(facts: Pick<TreeFacts, 'tree' | 'scene' | 'reading
     if (found.length === 0) return { refused: { of: 'absent' } };
     if (found.length > 1) return { refused: { of: 'ambiguous', matches: found.map(quoted) } };
     const [node] = found;
-    rect = { ...(scrolls(node) ? node.rect : (targetScrollers(facts, node)[0] ?? node.rect)) };
-    // Found by its rect as every remembered scroll view is (`Clips.axesOf`): none for a node in no scroll view — unless
-    // a scroll view has that very rect (a wrapper laid exactly over its list), which it then names.
+    // One rule: a scroll view of the match's very rect — the match itself, a wrapper laid exactly over its list, an
+    // overlay of the list's rect — else its nearest scroll view; a match under none falls to its own rect, which no
+    // scroll view has, and is refused.
+    rect = { ...(clips.axesOf(node.rect) !== undefined ? node.rect : (targetScrollers(facts, node)[0] ?? node.rect)) };
     axes = clips.axesOf(rect);
     if (axes === undefined) return { refused: { of: 'unscrolled', node: quoted(node) } };
   }

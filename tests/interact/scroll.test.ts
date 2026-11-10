@@ -1428,3 +1428,23 @@ describe('scroll_until\'s feeler on idb, as the driver sends it', () => {
     ]);
   });
 });
+
+describe('scroll_until within (D78): a selector that does not parse is refused before any device read, naming `within`', () => {
+  const untouched = () => {
+    throw new Error('test: the device was asked');
+  };
+  const adapter = { uiTree: untouched, viewport: untouched, swipe: untouched, keyboard: untouched, keyboardAdvice: untouched, focusedWindow: untouched } as unknown as Parameters<typeof scrollUntilVisible>[0];
+
+  it('a selector of no field:value form', async () => {
+    await expect(scrollUntilVisible(adapter, 'id:x', { ...FAST, within: 'garbage' })).rejects.toThrow(/^within garbage: Invalid selector at "garbage"/);
+  });
+
+  it('a regex that does not compile', async () => {
+    await expect(scrollUntilVisible(adapter, 'id:x', { ...FAST, within: 'text~"("' })).rejects.toThrow(/^within text~"\(": Invalid regular expression/);
+  });
+
+  it('a rect and an element spec are not parsed: the device is asked', async () => {
+    await expect(scrollUntilVisible(adapter, 'id:x', { ...FAST, within: { x: 0, y: 0, width: 1, height: 1 } })).rejects.toThrow('test: the device was asked');
+    await expect(scrollUntilVisible(adapter, 'id:x', { ...FAST, within: { id: 'list' } })).rejects.toThrow('test: the device was asked');
+  });
+});
