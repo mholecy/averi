@@ -9,10 +9,23 @@ import type { DeviceAdapter } from '../../src/adapters/types.js';
 import { listIosDevices } from '../../src/adapters/discovery.js';
 import type { Platform } from '../differential/corpus.js';
 import { loadSide } from '../differential/side.js';
+import { readPremiseInto } from './chooser-premise.js';
 import { deviceLabelling, type DeviceReadMode } from './device-state.js';
 import { AndroidLab, IosLab, LAB_AVD, LAB_WDA_DERIVED_DATA } from './lab-device.js';
 import { hookSwipes, SwipeHook } from './live-carousel.js';
-import { type Call, type Case, caseConfig, rejudge, type Result, ROOT, type RunRecord, selectCases, sideLabel, summarize, THIS_CHECKOUT } from './live-cases.js';
+import {
+  type Call,
+  type Case,
+  caseConfig,
+  rejudge,
+  type Result,
+  ROOT,
+  type RunRecord,
+  selectCases,
+  sideLabel,
+  summarizeRecord,
+  THIS_CHECKOUT,
+} from './live-cases.js';
 import type { Source } from './live-forms.js';
 import { callReply } from './replies.js';
 import { type CaseRig, runCase } from './run-case.js';
@@ -98,11 +111,21 @@ import { parseLabApp, type LabApp } from './schema.js';
  * run unlabelled (refused with `--rejudge`). A run with no carousel case selected, and iOS, reads nothing of it
  * (device-state.ts#deviceLabelling).
  *
- * `chooser` (T7b, Android, not in the default groups): launch_app and open_deep_link around Android's "Open with" chooser
- * (live-chooser.ts) — lc1 the `-p` start that raises it, named; lc2 a one-handler link, no note; lc3 `.Twin` named, no
- * chooser; lc4' monkey from the launcher and lc4'' monkey over a link's chooser (D73's net, run on demand: no recurring run includes it yet, backlog T20). The oracle is the device's
- * focus and activity stack (AndroidLab.focus, the record's `focus`), read before, between and after the calls; a chooser
- * left in front is dropped with one BACK. A SKIP fails the run.
+ * `chooser` (T7b, Android, not in the default groups): launch_app and open_deep_link around Android's "Open with"
+ * chooser (live-chooser.ts) — lc1 the `-p` start that raises it, named; lc2 a one-handler link, no note; lc3 `.Twin`
+ * named, no chooser; lc4' monkey from the launcher and lc4'' monkey over a link's chooser (D73's net, run on demand: no
+ * recurring run includes it yet — a standing lab batch is backlog T20b, its schedule T20c). The oracle is the device's
+ * focus and activity stack (AndroidLab.focus, the record's `focus`), read before, between and after the calls; a
+ * chooser left in front is dropped with one BACK. A SKIP fails the run. Before the cases (T20a, ADR 0041's T20a
+ * amendment), the group's premise is read once, read only (chooser-premise.ts#readPremiseInto): no lab default
+ * (`mAlways=true`, `dumpsys package preferred`), two handlers for `averilab://shared/open`, no chooser on the stack,
+ * HOME a launcher — into the record (`chooserPremise`), its lines said at once on stderr (stop the run there if you
+ * like) and again in the summary. A stale fact is `CHOOSER PREMISE: stale — … — the run fails` with the owner's hand
+ * line under it, and the exit code 1 — a `--side` run's too: the premise is the lab's state, not the averi under test,
+ * so a calibration on a stale lab proves no more than a run of this checkout. The cases still run, their verdicts
+ * unchanged: the line says why lc1 or lc4'' SKIPs. A last-chosen entry (`mAlways=false`) is a WARN line only; a read
+ * that fails is `unread — <why>`, never a throw, the exit code untouched. `--rejudge` prints the record's lines as they
+ * are, and only when a chooser case is among the cases it judges (`--groups forms` over a chooser record: nothing).
  */
 
 const { values } = parseArgs({
@@ -234,8 +257,12 @@ if (rejudging !== undefined) {
   // fails, or `--device-read none`, leaves the run unlabelled, said in the summary, never aborted. A case that throws
   // skips the after read: the record keeps `{ before }`, "no read after the cases".
   const deviceReads = deviceLabelling(android, selected, deviceReadMode, { note: (line) => console.error(line) });
-  await deviceReads?.read('before');
   try {
+    // T20a: a chooser case selected on Android reads the chooser's premise once, before anything else touches the
+    // device (chooser-premise.ts#readPremiseInto): read only, into the record, its lines said at once; a read that
+    // fails is its fact unread; the cases run whatever it says. Inside the try: nothing it throws skips the close.
+    await readPremiseInto(record, android, selected, { note: (line) => console.error(line) });
+    await deviceReads?.read('before');
     // Cases outer, sources inner: the keyboard's cases run on both sources before anything types.
     for (const c of selected) {
       for (const source of sources) {
@@ -255,8 +282,10 @@ if (rejudging !== undefined) {
   }
   // The summary: every case, a known one marked with its note (live-known.ts); exit 1 on an unknown MISMATCH, on a
   // known case not intermittent that came out ok in a run of this checkout (fixed: strike it off), and on a case whose
-  // app wrote no first state (T10, live-cases.ts#noFirstState).
-  const { lines, exitCode } = summarize({ platform, sources, results, side: values.side ?? THIS_CHECKOUT, device: record.deviceLabel });
+  // app wrote no first state (T10, live-cases.ts#noFirstState); and on a stale chooser premise (T20a). The record's
+  // labels (T16's device label, T20a's premise) as a rejudge reads them (live-cases.ts#summarizeRecord).
+  const side = values.side ?? THIS_CHECKOUT;
+  const { lines, exitCode } = summarizeRecord(record, results, { sources, side });
   console.log(lines.join('\n'));
   process.exitCode = exitCode;
 }

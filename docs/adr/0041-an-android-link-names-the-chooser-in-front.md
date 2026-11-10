@@ -647,7 +647,8 @@ Residuals, stated:
   (`lab-device.ts`), the perf baseline names `.MainActivity`, and the differential has no Android launch. Backlog T7b's
   lc4' (`launch_app` with no activity from the launcher answers `Launched`, the app `mFocusedApp`) and lc4'' (the same
   over `open_deep_link averilab://shared/open`'s chooser, no `ResolverActivity` left), since built (the T7b amendment
-  below), are D73's net, run on demand with `live.ts --groups chooser` (lab, API 33); no recurring run includes it yet (backlog T20).
+  below), are D73's net, run on demand with `live.ts --groups chooser` (lab, API 33); no recurring run includes it yet
+  (backlog T20b, a standing lab batch, and T20c, its schedule; T20a, the premise read before the cases, below).
 - D55b's proposed live case lc4 (the error naming the chooser) is void: monkey under the chooser now answers `Launched`.
   lc4' and lc4'' take its place.
 - ADR 0041's "The reply does not say what `launch_app` does with the chooser up, because that is unmeasured" is answered
@@ -679,9 +680,72 @@ added. The group judges `mFocusedApp === .MainActivity` on the first read (`Focu
 chooser left on the stack" only on the settled read (the harness waits while `mCurrentFocus` is null, 300 ms polls, 5 s
 at most). A read whose wait runs out with a chooser record still listed is a MISMATCH (5 s, well past the ~1.3 s
 measured); with none listed, or an old record's unwaited read, what is left is unread (SKIP). Review round 1's three
-runs: 5 of 5 ok each. lc4' and lc4'' are D73's net, run on demand with `live.ts --groups chooser` (lab, API 33); no recurring run includes it yet (backlog T20).
+runs: 5 of 5 ok each. lc4' and lc4'' are D73's net, run on demand with `live.ts --groups chooser` (lab, API 33); no
+recurring run includes it yet (backlog T20b, a standing lab batch, and T20c, its schedule).
 
 **Consequences.** The residual above, a monkey that exits 0 with the chooser still in front (API 34 and later,
 unmeasured), stands: the group runs on API 33 only. lc3's "one start" is not a check on this lab (`.MainActivity` is
 singleTop: the alias's start is delivered to the top instance); what catches a `-p` start there is the chooser on the
 stack.
+
+## Amendment: the chooser group's premise, read before its cases (2026-11-10, T20a)
+
+**Context.** The chooser group's cases rest on the lab's state, not on averi: lc1 and lc4'' need a chooser to rise
+for `averilab://shared/…`, which a lab default (`mAlways=true`) or a missing `.Twin` (one handler) prevents; lc1 and
+lc3 need none on the stack before their calls; lc4' and lc4'' start from the HOME activity the device resolves. When
+one of these did not hold, the case SKIPped ("no chooser raised and none named", "the link raised no chooser") and
+nothing said why, so a run on a stale lab read as a run with nothing to judge. The device batches read the same state
+(`lab-chooser.ts`, `--check`), but live.ts must not import the owner-run batch layer, and a batch must not load the
+live golden's modules.
+
+**Decision.** A run on Android with a chooser case among the cases selected reads the premise once, before the cases
+and before anything else touches the device, read only (`readPremiseInto` in `scripts/truth/chooser-premise.ts`, after
+the lab's guard): `dumpsys package preferred` (no lab default for `dev.averi.lab`), `cmd package query-activities
+--brief -a android.intent.action.VIEW -d averilab://shared/open` (two handlers, the lab's `.MainActivity` and
+`.Twin`), `AndroidLab.focus` (no ResolverActivity or ChooserActivity record on the stack), and HOME_COMMAND (HOME
+neither the platform's chooser — two Home apps, none chosen — nor the lab). The HOME rule is negative on purpose: it
+is the judges' own (`launcherPremise` in `live-chooser.ts` wants the HOME activity in front and no lab or chooser
+record on the stack, so a HOME that is the lab or the chooser always SKIPs there), so the premise never disagrees
+with the cases, and a positive list of launchers would be a guess. Fresh but wrong for both alike: Settings'
+FallbackHome (`com.android.settings/.FallbackHome`, HOME while the device is still locked after a boot). Each fact is
+fresh, stale (with the owner's hand line) or unread; the record keeps them with the summary's lines
+(`chooserPremise`), and the lines are said on stderr at once, so the owner can stop a run on a stale lab before its
+cases.
+- A stale fact: `CHOOSER PREMISE: stale — <every fact> — the run fails`, a hand line per stale fact under it, exit 1.
+  The default's is the batches' own (`defaultHand`, given its cause: it "predates this run", and the APK is the
+  checkout's build, `APK_PATH` in `lab-device.ts`, built first from the checkout root with `gradlew assembleDebug`
+  under JDK 17, as no APK was pulled; a batch's line is unchanged, "predates the batch"). The handlers', the stack's
+  and HOME's are new, each ending `then:` with the command that reads the premise again. The cases still run and are
+  judged as before: a stale premise explains a SKIP, it does not replace it.
+- A `--side` run fails on a stale premise too: the premise is the lab's state, the same whichever averi drives it, so
+  a calibration on a stale lab proves no more than a run of this checkout.
+- A last-chosen entry (`mAlways=false`, "Just once"'s, which no reinstall clears): a `Chooser premise: WARN` line only,
+  as `--check`'s exit 6 is a warning.
+- A read that fails, or proves nothing (no `Preferred Activities User N:` block, a lab entry with no mAlways line, no
+  `N activities found:` line, no HOME component): that fact unread with adb's words, the premise `unread` when no
+  fact is stale, never a throw, the exit code untouched.
+- `--rejudge` prints the record's lines as they are and reads no device, and only when a chooser case is among the
+  cases it judges (`--groups forms` over a chooser record prints no premise and fails on none). A record without the
+  key prints nothing, so every record committed before T20a rejudges byte for byte as before (checked over all 699
+  records under docs/ and tests/fixtures, with `--groups forms` and with every group, against 0b9cfbb0). A run and its
+  rejudge read the record's labels in one place (`summarizeRecord` in `live-cases.ts`).
+
+The readers both sides need moved, not copied, into `scripts/truth/chooser-readers.ts`, a leaf that imports nothing of
+batch/ and nothing live-*: the preferred block's parse (`preferredIn`), the leak rule (`leaksOf`, `unflaggedOf`,
+`lastChosenOf`), the handler query and its count (`handlersArgv`, `handlersIn`), the unread reads' words
+(`preferredUnread`, `handlersUnread`), an entry as a line quotes it (`ENTRY_CHARS`, `entryText`), and the hand lines'
+parts (`adbLine`, `defaultHand`, `checkHand`, `HAND_PREFIX`, `LAB_PACKAGE`, `PREFERRED_ARGV`). `lab-chooser.ts`
+re-exports what it exported before and keeps its CallResult wrappers (`preferredOf`, `handlersOf`: a failed call
+unread), behaviour unchanged. The
+premise itself (its facts, lines and new hand lines) is live-side, in `chooser-premise.ts`, which no batch imports; it
+reads the stack and HOME with `frontOf`, `homeOf` and `isChooser` in `live-chooser.ts`, the judges' own readers.
+
+**Consequences.** A stale lab is now a named failure with its remedy, not a quiet SKIP. Not done here: nothing clears
+the state (no reinstall, no key, no setting — the owner's hand lines do that), and no recurring run includes the group
+yet (backlog T20b, a standing lab batch, and T20c, its schedule). Not run on a device: the emulator was down when this
+was built, so the premise's lines are pinned on batch-10's API 33 reads and T7b's recorded launcher reads, through a
+fake adb (tests/truth/chooser-premise.test.ts). What the tests pin is `readPremiseInto` (read, record, echo) and
+`summarizeRecord` (the record's labels into the summary, shared with `--rejudge`); live.ts's own two call lines are
+not pinned — its `readPremiseInto` call and the record it hands `summarizeRecord` (live.ts:264 and :288). Pinning them
+would take a test that runs live.ts in its run mode. T16's device reads are in the same place: ADR 0044's T16
+amendment pins device-state.ts's read over a fake exec, not live.ts's calls of it.

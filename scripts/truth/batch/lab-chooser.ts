@@ -2,7 +2,39 @@ import { chooserInFocus, chooserSheet } from '../../../src/adapters/android-choo
 import { parseUiautomatorXml } from '../../../src/adapters/android.js';
 import { shellQuote } from '../../../src/adapters/adb-shell.js';
 import { everyNode, labelOf, rectCentre, type DrawnOverStrip, type Point, type Rect, type UiNode } from '../../../src/adapters/types.js';
-import { LAB_APP } from '../lab-device.js';
+import {
+  adbLine,
+  checkHand,
+  defaultHand,
+  entryText,
+  HAND_PREFIX,
+  handlersIn,
+  handlersUnread,
+  LAB_PACKAGE,
+  lastChosenOf,
+  leaksOf,
+  preferredIn,
+  preferredUnread,
+  unflaggedOf,
+  type HandBase,
+  type LabEntry,
+  type PreferredRead,
+} from '../chooser-readers.js';
+// Moved to the leaf module (T20a) and re-exported, so a batch that imports them from here still does.
+export {
+  adbLine,
+  checkHand,
+  defaultHand,
+  HAND_PREFIX,
+  LAB_PACKAGE,
+  lastChosenOf,
+  leaksOf,
+  PREFERRED_ARGV,
+  unflaggedOf,
+  type HandBase,
+  type LabEntry,
+  type PreferredRead,
+} from '../chooser-readers.js';
 import type { CallResult } from './bounded.js';
 import { exitText, failedCall, firstLineOf, messageOf, nameInLine, verdictLine, type Verdict } from './words.js';
 
@@ -15,23 +47,19 @@ import { exitText, failedCall, firstLineOf, messageOf, nameInLine, verdictLine, 
  * safeTap, the one point a batch may tap on the chooser, never "Always"; the reads that can come back unread (the role
  * holder, the clipboard, the install); and every line a batch prints of them.
  *
+ * The readers the live golden's chooser premise reads too (T20a) live in ../chooser-readers.ts, a leaf outside the
+ * batch layer: the preferred block's parse, the leak rule, the handler count, the default's and the check's hand
+ * lines; re-exported here. Here they are wrapped over a CallResult (preferredOf, handlersOf: a failed call is unread).
+ *
  * What is src's is reused, not copied: the focus is android-chooser.ts#chooserInFocus's, the tree src's own uiautomator
  * parser's (D66's UiNode.disabled), the fresh sheet android-chooser.ts#chooserSheet's, a hand line's quoting
  * adb-shell.ts#shellQuote's.
  */
 
-/** The lab app's package (lab-device.ts#LAB_APP's native app): the one the preferred read, the install and --check ask. */
-export const LAB_PACKAGE = LAB_APP.native.package;
-
 /** --check's verdict label (d55-b11.ts's `D55 check:` line). */
 export const CHECK_LABEL = 'D55 check';
 /** The cleanup's verdict label (batch-11's `D55 cleanup:` line; batch-12 wrote `E5 cleanup:`). */
 export const CLEANUP_LABEL = 'D55 cleanup';
-/** A RESTORE line's start (batch-11's `D55 (Android): …`). */
-export const HAND_PREFIX = 'D55 (Android): ';
-
-/** The preferred read: `dumpsys package preferred` (batch-10's and batch-11's; batch-9's `preferred-activities` reads alike). */
-export const PREFERRED_ARGV = ['dumpsys', 'package', 'preferred'] as const;
 /** The browser role holder read (batch-9's d55-probe.ts): API 33 has no such command — unread, never unchanged. */
 export const ROLE_HOLDERS_ARGV = ['cmd', 'role', 'get-role-holders', 'android.app.role.BROWSER'] as const;
 /** The clipboard read (batch-9's D43 probe asked its help first): API 33 has no shell implementation — unread. */
@@ -41,47 +69,6 @@ export const CENTRE_SLACK_PX = 2;
 
 // --------------------------------------------------------------------------------------- the preferred activities
 
-/** One lab entry of the block: its lines joined, its component, its mAlways (none: no such line), its Authority. */
-export interface LabEntry {
-  text: string;
-  component: string;
-  always: boolean | undefined;
-  authority?: string;
-}
-
-/** The block read — every user's, each lab entry in it — or unread, with why: never "no lab entry" unshown. */
-export type PreferredRead = { state: 'read'; users: number; lab: LabEntry[] } | { state: 'unread'; why: string };
-
-const BLOCK_HEADER = /^Preferred Activities User \d+:\s*$/;
-/** An entry's first line: its hash and component (`eb6cdf5 com.google.android.gm/.ComposeActivityGmailExternal`). */
-const ENTRY_LINE = /^(\s+)[0-9a-f]+ ([\w.$]+\/[\w.$]+)\s*$/;
-const indentOf = (line: string): number => line.length - line.trimStart().length;
-
-/** Whether an entry names the lab: its component is the lab app's, or it answers the lab's scheme. */
-const isLab = (component: string, lines: readonly string[]): boolean =>
-  component.startsWith(`${LAB_PACKAGE}/`) || lines.some((l) => l.trim() === 'Scheme: "averilab"');
-
-/** An entry while it is read: its first line's indent and component, and its lines so far. */
-interface OpenEntry {
-  indent: number;
-  component: string;
-  lines: string[];
-}
-
-/** A read entry as a lab entry, or undefined when it does not name the lab. */
-function labEntryOf(e: OpenEntry): LabEntry | undefined {
-  if (!isLab(e.component, e.lines)) return undefined;
-  const text = e.lines
-    .map((l) => l.trim())
-    .filter((l) => l !== '')
-    .join(' | ');
-  // mAlways on the entry's own first line after it (`mMatch=0x300000 mAlways=false`) only, never further down; an entry
-  // of one line has none (`String`: "undefined" holds no mAlways).
-  const flag = /\bmAlways=(true|false)\b/.exec(String(e.lines.slice(1).find((l) => l.trim() !== '')))?.[1];
-  const authority = /Authority: "([^"]+)"/.exec(text)?.[1];
-  return { text, component: e.component, always: flag === undefined ? undefined : flag === 'true', ...(authority !== undefined && { authority }) };
-}
-
 /**
  * The preferred read (d55-b11.ts's preferredOf): only the `Preferred Activities User N:` block(s), each running to the
  * next top-level line; in a block, each entry is its first line (a hash and a component) and every line after it
@@ -89,41 +76,8 @@ function labEntryOf(e: OpenEntry): LabEntry | undefined {
  * command's output), is unread.
  */
 export function preferredOf(r: CallResult): PreferredRead {
-  if (failedCall(r)) return { state: 'unread', why: `${PREFERRED_ARGV.join(' ')}: ${exitText(r)}` };
-  let users = 0;
-  let inBlock = false;
-  let open: OpenEntry | undefined;
-  const lab: LabEntry[] = [];
-  const close = (): void => {
-    const e = open === undefined ? undefined : labEntryOf(open);
-    if (e !== undefined) lab.push(e);
-    open = undefined;
-  };
-  for (const line of r.out.replace(/\r/g, '').split('\n')) {
-    if (open !== undefined && (line.trim() === '' || indentOf(line) > open.indent)) {
-      open.lines.push(line);
-      continue;
-    }
-    close();
-    if (BLOCK_HEADER.test(line)) {
-      users++;
-      inBlock = true;
-    } else if (/^\S/.test(line)) inBlock = false;
-    else {
-      const m = inBlock ? ENTRY_LINE.exec(line) : null;
-      if (m !== null) open = { indent: m[1].length, component: m[2], lines: [line] };
-    }
-  }
-  close();
-  return users === 0 ? { state: 'unread', why: 'no `Preferred Activities User N:` block in the dump' } : { state: 'read', users, lab };
+  return failedCall(r) ? preferredUnread(exitText(r)) : preferredIn(r.out);
 }
-
-/** The leaks: the lab's defaults (`mAlways=true`). */
-export const leaksOf = (p: { lab: readonly LabEntry[] }): LabEntry[] => p.lab.filter((e) => e.always === true);
-/** Entries with no mAlways line: neither a default nor last-chosen as read — they cannot be compared, so unproven. */
-export const unflaggedOf = (p: { lab: readonly LabEntry[] }): LabEntry[] => p.lab.filter((e) => e.always === undefined);
-/** The last-chosen entries "Just once" writes (`mAlways=false`): no default; AOSP 13's uninstall does not clear them. */
-export const lastChosenOf = (p: { lab: readonly LabEntry[] }): LabEntry[] => p.lab.filter((e) => e.always === false);
 
 /** A last-chosen entry a batch accepts as the lab's known state (batch-12's README), by Authority and component. */
 export interface AcceptedEntry {
@@ -174,13 +128,6 @@ export function checkExit(focus: FocusRead, preferred: PreferredRead, accepted: 
   return last.every((e) => acceptedOf(e, accepted) !== undefined) ? CHECK_EXIT.accepted : CHECK_EXIT.lastChosen;
 }
 
-/** What a hand line is built from: the lab's serial, the pulled APK, and the command to run after (`then: …`). */
-export interface HandBase {
-  serial: string;
-  apk: string;
-  then: string;
-}
-
 /**
  * What each exit means, once, for --check's line, the cleanup and the abort's window alike: its verdict word, whether
  * it proves the lab put back (a reinstall too), its words around --check's own, and its hand lines.
@@ -208,10 +155,6 @@ export const CHECK_OUTCOME: Readonly<Record<CheckExit, CheckOutcome>> = {
 };
 export const checkWordOf = (exit: CheckExit): Verdict => CHECK_OUTCOME[exit].word;
 
-/** How much of an entry's text a line quotes, before `…`. */
-const ENTRY_CHARS = 200;
-const cut = (s: string, n: number): string => (s.length > n ? `${s.slice(0, n)}…` : s);
-
 /** What a focus read says in a line. */
 const focusText = (f: FocusRead): string =>
   f.state === 'unread' ? `chooser unread (${f.why})` : f.chooser === undefined ? 'chooser no' : `chooser yes (${f.chooser})`;
@@ -226,7 +169,7 @@ export function checkWhy(focus: FocusRead, preferred: PreferredRead, accepted: r
   const ok = last.filter((e) => acceptedOf(e, accepted) !== undefined).length;
   const unflagged = unflaggedOf(preferred).length;
   const counts = `defaults ${leaksOf(preferred).length}, last-chosen ${last.length}${last.length > 0 ? `, accepted ${ok}` : ''}${unflagged > 0 ? `, no mAlways ${unflagged}` : ''}`;
-  const first = preferred.lab.length > 0 ? `; first: ${cut(preferred.lab[0].text, ENTRY_CHARS)}` : '';
+  const first = preferred.lab.length > 0 ? `; first: ${entryText(preferred.lab[0])}` : '';
   const users = `${preferred.users} user${preferred.users === 1 ? '' : 's'}`;
   return `${focusText(focus)}; preferred read (${users}); lab entries ${preferred.lab.length} (${counts})${first}`;
 }
@@ -276,13 +219,7 @@ export function comparedLine(label: string, c: ReadCompared): string {
  * must be as many as its `N activities found:` line says (`No activities found` is 0); else why not.
  */
 export function handlersOf(r: CallResult): number | { why: string } {
-  if (failedCall(r)) return { why: `query-activities: ${exitText(r)}` };
-  const out = r.out.replace(/\r/g, '');
-  if (/^No activities found\s*$/m.test(out)) return 0;
-  const said = /^(\d+) activit(?:y|ies) found:\s*$/m.exec(out);
-  if (said === null) return { why: `query-activities printed no \`N activities found:\` line: ${firstLineOf(out)}` };
-  const listed = out.split('\n').filter((l) => /^\s*[\w.]+\/[\w.$]+\s*$/.test(l)).length;
-  return listed === Number(said[1]) ? listed : { why: `query-activities said ${said[1]} activities but listed ${listed}` };
+  return failedCall(r) ? handlersUnread(exitText(r)) : handlersIn(r.out);
 }
 
 /** Why `adb get-state` says the emulator cannot be asked (not `device`), or undefined when it can. */
@@ -487,14 +424,6 @@ export function sanitizeFixture(text: string, serial: string): { ok: boolean; hi
 
 // ---------------------------------------------------------------------------------------------- the hand lines
 
-/** `adb -s <serial> <words…>`, each word quoted as a shell reads it back (adb-shell.ts#shellQuote). */
-export const adbLine = (serial: string, words: readonly string[]): string => ['adb', '-s', serial, ...words].map(shellQuote).join(' ');
-
-/** A lab default left: what clears it (batch-12's hand line; the uninstall wipes the lab's data), then `then`. */
-export const defaultHand = (b: HandBase): string =>
-  `${HAND_PREFIX}a lab default (mAlways=true) is set — "Always" is never tapped, so it predates the batch or is a defect: ` +
-  `${adbLine(b.serial, ['uninstall', LAB_PACKAGE])} && ${adbLine(b.serial, ['install', b.apk])} (clears it; wipes the lab's data); then: ${b.then}`;
-
 /** Interrupted inside the reinstall with adb unreachable: whether the lab is installed is unknown, never "missing". */
 export const unknownInstallHand = (b: HandBase): string =>
   `${HAND_PREFIX}whether the lab is installed is unknown (interrupted during its reinstall, adb unreachable): once adb ` +
@@ -517,11 +446,6 @@ export const cellsHand = (b: HandBase, catalog: string, why: string): string =>
 export const stateFileHand = (b: HandBase, stateFile: string, why: string, stateCommand?: string): string =>
   `${HAND_PREFIX}no reinstall was done: the probe's state file ${shellQuote(stateFile)} was not marked dirty (${why}); run ` +
   `${stateCommand ?? "the probe's --state"} first, then clear the default by hand: ${adbLine(b.serial, ['uninstall', LAB_PACKAGE])} && ${adbLine(b.serial, ['install', b.apk])}`;
-
-/** The chooser or the preferred activities not proven put back: what to read, and what to press. */
-export const checkHand = (serial: string): string =>
-  `${HAND_PREFIX}the chooser and the preferred activities not proven put back: ${adbLine(serial, ['shell', ...PREFERRED_ARGV])} ` +
-  `(no lab entry with mAlways=true may be left); a chooser in front: ${adbLine(serial, ['shell', 'input', 'keyevent', 'KEYCODE_BACK'])}`;
 
 /** The probe's state not put back, its restore failing with no hand line of its own: its command. */
 export const stateHand = (command: string): string => `${HAND_PREFIX}the lab's state not put back: ${command}`;

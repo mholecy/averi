@@ -193,6 +193,8 @@ the label-group scripts stay as the evidence of the runs they labelled (a note b
 labelled run needs neither. The gfxinfo summariser T11 used (`fs.mjs`) is lost; `parseGfxinfo` reads only the four lines
 its outputs kept. device-state.ts is in the mutation scope (group `lab`), its read pinned over a fake exec through
 `AndroidLab`.
+Since T20a (2026-11-10) live.ts takes the before read inside its `try`, after the chooser premise's read, so a future
+throw there cannot skip the close or the record's write; behaviour unchanged, as `read()` catches its own failures.
 
 ## Amendment: no first state is a named failure (T10, 2026-11-10)
 

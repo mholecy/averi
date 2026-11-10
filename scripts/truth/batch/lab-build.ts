@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { isDeviceCheckSimulator } from '../lab-device.js';
+import { APK_PATH, isDeviceCheckSimulator } from '../lab-device.js';
 import type { CallResult, Run } from './bounded.js';
 import { CELLS_ENTRY, UNZIP_SECS } from './lab-emu.js';
 import { CATALOG_PATH, cellsWhy, javaHomeOf, NOT_REBUILT, REBUILT, RERUN_HINT, type Opened } from './lab-lines.js';
@@ -29,9 +29,10 @@ export const JAVA_HOME_SECS = 10;
 export const GRADLE_STOP_SECS = 120;
 /** macOS's JDK finder (batch-11's JAVA_HOME_CMD). */
 export const JAVA_HOME = '/usr/libexec/java_home';
-/** The built lab app and APK in the checkout under test (batch-11.sh:47–48). */
+/** The built lab app in the checkout under test (batch-11.sh:47). */
 export const IOS_APP_PATH = 'fixtures/apps/ios/build/Build/Products/Debug-iphonesimulator/AveriLab.app';
-export const APK_PATH = 'fixtures/apps/android/build/outputs/apk/debug/AveriLab-debug.apk';
+/** The built lab APK (batch-11.sh:48): lab-device.ts's since T20a (the live premise's hand line installs it too). */
+export { APK_PATH } from '../lab-device.js';
 /** The needs' names in a batch's `needs`. */
 export const IOS_BUILD_NEED = 'ios-build';
 export const ANDROID_BUILD_NEED = 'android-build';

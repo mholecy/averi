@@ -3,6 +3,7 @@ import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Platform } from '../differential/corpus.js';
 import { familyOf } from './catalog.js';
+import type { ChooserPremise } from './chooser-premise.js';
 import { type DeviceLabel, deviceLine } from './device-state.js';
 import { LAB_APP } from './lab-device.js';
 import { CAROUSEL_CASES, hedgedCeiling, type PreDragged, type Shorten, type SwipeEntry } from './live-carousel.js';
@@ -72,6 +73,12 @@ export interface RunRecord {
    * (`{ before: { file, strokes, short, state }, after, disagree }`).
    */
   deviceLabel?: DeviceLabel;
+  /**
+   * The chooser group's premise (T20a, chooser-premise.ts), read once before the cases: its facts, its state, and the
+   * summary's lines as the run printed them. Absent on records before T20a, and on runs with no chooser case selected
+   * on Android.
+   */
+  chooserPremise?: ChooserPremise;
 }
 
 /** What one case read on one source: built in one place, run-case.ts#caseRecord. */
@@ -779,7 +786,7 @@ export async function rejudgedResults(record: RunRecord, selection: RejudgeSelec
 
 // --- the summary: every case, a known one marked with its note (live-known.ts); exit 1 on an unknown MISMATCH, and on
 // a known case not intermittent that came out ok in a run of this checkout (fixed: strike it off), on a SKIP of a case
-// marked skipFails, and on a case with no first state (T10) ---
+// marked skipFails, on a case with no first state (T10), and on a stale chooser premise (T20a) ---
 
 /** What a run (or a rejudged record) reports: the summary's lines, as live.ts prints them, and its exit code. */
 export interface Summary {
@@ -791,7 +798,23 @@ export interface Summary {
  * The summary of a run's results. `side`: the averi the run drove (THIS_CHECKOUT, or a `--side` checkout — a
  * calibration, never held to live-known.ts); `rejudgedFrom`: the record's path, when the results are a record's.
  */
-export function summarize({ platform, sources, results, side, rejudgedFrom, device }: { platform: Platform; sources: readonly Source[]; results: readonly Result[]; side: string; rejudgedFrom?: string; device?: DeviceLabel }): Summary {
+export function summarize({
+  platform,
+  sources,
+  results,
+  side,
+  rejudgedFrom,
+  device,
+  premise,
+}: {
+  platform: Platform;
+  sources: readonly Source[];
+  results: readonly Result[];
+  side: string;
+  rejudgedFrom?: string;
+  device?: DeviceLabel;
+  premise?: ChooserPremise;
+}): Summary {
   /**
    * The note a not-ok case is known by — only when it failed by the rule, on the kind of reply, its KNOWN entry pins
    * (live-known.ts).
@@ -862,7 +885,28 @@ export function summarize({ platform, sources, results, side, rejudgedFrom, devi
   if (ceiling.lines.length > 0) lines.push(...ceiling.lines, '');
   // T16: the device's state around the carousel group's cases, only where the run read it — a label, no gate.
   if (device !== undefined) lines.push(deviceLine(device), '');
-  return { lines, exitCode: unknown.length > 0 || fixed.length > 0 || failingSkips.length > 0 || stateless.length > 0 || ceiling.fails ? 1 : 0 };
+  // T20a: the chooser group's premise, its lines as the run printed them (a rejudge reads no device); stale fails the
+  // run. Only where a chooser case is among the results: a rejudge of another group judges nothing it rests on.
+  const shown = results.some((r) => r.c.group === 'chooser') ? premise : undefined;
+  if (shown !== undefined) lines.push(...shown.lines, '');
+  const stalePremise = shown?.state === 'stale';
+  const counted = unknown.length > 0 || fixed.length > 0 || failingSkips.length > 0 || stateless.length > 0;
+  const fails = counted || ceiling.fails || stalePremise;
+  return { lines, exitCode: fails ? 1 : 0 };
+}
+
+/**
+ * A run's summary from its record (live.ts's, after the cases; `--rejudge`'s, below): its results, and the labels the
+ * record keeps beside them — the carousel group's device label (T16, `deviceLabel`) and the chooser group's premise
+ * (T20a, `chooserPremise`) — read from the record in this one place, so a run and its rejudge print them alike.
+ */
+export function summarizeRecord(
+  record: RunRecord,
+  results: readonly Result[],
+  { sources, side, rejudgedFrom }: { sources: readonly Source[]; side: string; rejudgedFrom?: string },
+): Summary {
+  const labels = { device: record.deviceLabel, premise: record.chooserPremise };
+  return summarize({ platform: record.platform, sources, results, side, rejudgedFrom, ...labels });
 }
 
 /**
@@ -872,5 +916,5 @@ export function summarize({ platform, sources, results, side, rejudgedFrom, devi
 export async function rejudge(record: RunRecord, from: string, selection: RejudgeSelection): Promise<Summary> {
   const results = await rejudgedResults(record, selection);
   const sources = [...new Set(record.results.map((r) => r.source))];
-  return summarize({ platform: record.platform, sources, results, side: record.side, rejudgedFrom: from, device: record.deviceLabel });
+  return summarizeRecord(record, results, { sources, side: record.side, rejudgedFrom: from });
 }
