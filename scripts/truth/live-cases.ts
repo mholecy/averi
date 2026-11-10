@@ -795,7 +795,7 @@ export function summarize({ platform, sources, results, side, rejudgedFrom }: { 
   const ceiling = hedgedCeiling(results, ofThisCheckout);
   /** T15: the visibility group's hedged stops (live-visibility.ts#hedgedStops), counted once: the tally's line and each case's mark. */
   const hedges = hedgedStops(results);
-  const hedgeOf = new Map([...hedges.whole, ...hedges.cut, ...hedges.other].map((h) => [h.result, h.why ?? 'unread']));
+  const hedgeOf = new Map(hedges.all.map((h) => [h.result, h.why]));
   const lines = [
     `<!-- averi: ${side}${rejudgedFrom !== undefined ? ` (rejudged from ${rejudgedFrom})` : ''} -->`,
     `# Live golden: ${results.length} cases, ${count('ok')} ok, ${count('LOUD') + (ceiling.loud ? 1 : 0)} loud, ${count('MISMATCH')} mismatches (${unknown.length} not known), ${count('SKIP')} skipped`,

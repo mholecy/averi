@@ -707,18 +707,32 @@ else the claim's `stop-claim` MISMATCH stands: `off-screen` and `outside-scroll-
 
 **T15: the hedges that pass are counted.** A hedge on a target the app shows whole stays ok — no rule above fails it — so a
 device or a change that turns plain stops into hedges would pass unseen. The summary counts them (`hedgedStops` in
-scripts/truth/live-visibility.ts, printed by `summarize` in scripts/truth/live-cases.ts) — the visibility group's cases
-only, the ones `judgeScroll` judges (another group's stop is judged by its own rules: the carousel's hedge with C cut is
-ok there). S is the group's judged cases (no SKIP) that stopped on their target; each hedge's reason is read off its clause
-(`hedgeWhy` in scripts/truth/replies.ts: the flush `why` — `held`, `budget`, `room`, `axis`, `tap`, `fills` — or
-`keyboard`, an `UNCOVERED` hedge alone; `unread` where the clause names none). The line, after the cases, only when S > 0:
+scripts/truth/live-visibility.ts, printed by `summarize` in scripts/truth/live-cases.ts), over the visibility group alone
+(another group's stops are judged by its own rules: the carousel's hedge with C cut is ok there). S counts cases, one per
+case: the group's judged cases (no SKIP) with a reply that stops on the target. A case is hedged when one of those replies
+opens with a hedged lead (the first such reply is read), and its reason is read off the hedge's clause (`hedgeWhy` in
+scripts/truth/replies.ts: the flush `why` — `held`, `budget`, `room`, `axis`, `tap`, `fills` — or `keyboard`, an
+`UNCOVERED` hedge alone; `unread` where the clause names none).
+
+Which judge feeds which bucket. Only a `fully: true` stop carries a hedged lead: src/interact/scroll-rounds.ts#round shows
+the flush check a stop only under `fully` and asks `unlocated` only under `fully`, so the plain stops of `judgeBlankStretch`
+and `judgeCarry` (both `judgeScroll` with `fully: false`) never hedge. `target whole, ok` is an ok verdict, and every
+visibility judge that returns ok on a stop does it through `judgeScroll` (the `scroll:` cases; `judgeAtRest` when its
+probes and strokes hold too; `judgeAndroidTurn`, which keeps `judgeScroll`'s verdict on any stop), whose `fully` stop holds
+only where the app lays the target out `whole` — wholeness measured, never assumed: a target off the screen, outside its
+scroll view, with no frame, or under a band or chrome is a `stop-claim` MISMATCH, not ok. `cut, LOUD` is `judgeScroll`'s
+`hedged-stop` and `hedged-stop-old-lead` (a `WHOLE` hedge on a target in `CUT_GEOMETRIES`). `another verdict` is every other
+verdict on a hedged stop: those `stop-claim` MISMATCHes, an `UNCOVERED`-only hedge on a cut target, a tap that failed
+after the stop, `judgeAtRest`'s `failed-holds` (its own turn of `judgeScroll`'s LOUD: a cut hedged at-rest stop lands
+here, not in `cut`) and its `R-direction`, `judgePresentedScroll`'s `presented-stop`, `judgeAbsentAtEnd`'s `stop-claim`.
+
+The line, after the cases, only when S > 0:
 
     Hedged stops: H of S visible stops (target whole, ok: K[ — <reasons>]; cut, LOUD: L[ — <reasons>][; another verdict: M — <reasons>])[: <source> <case>, …]
 
-`<reasons>` is `<why> <n>, …` in that order, each bucket's dash only when it holds any; `cut, LOUD` is `judgeScroll`'s
-`hedged-stop` and `hedged-stop-old-lead`, `another verdict` any other (a claim the app does not bear out, a tap that failed
-after) and printed only when it holds any; the cases are listed only when H > 0. Each counted case's own line ends
-`— <why of the verdict> (hedged: <why>)`, any `[known…]` mark after it. A count, not a gate: no exit code changes.
+`<reasons>` is `<why> <n>, …` in the order above (`unread` last), each bucket's dash only when it holds any; `another
+verdict` is printed only when it holds any; the cases, in the run's order, only when H > 0. Each counted case's own line
+ends `— <why of the verdict> (hedged: <why>)`, any `[known…]` mark after it. A count, not a gate: no exit code changes.
 
 **T11's off-screen exemption, re-decided.** T11's judge called the held hedge LOUD on any laid-out target, `off-screen`
 included (pinned by its review round 3, not argued in the T11 amendment above). Nothing in that amendment holds for it: the

@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { type Case, judged, rejudge as rejudgeRecord, ROOT, type RunRecord } from '../../scripts/truth/live-cases.js';
 import type { LiveVerdict } from '../../scripts/truth/live-visibility.js';
+import { hedgedLead } from '../../scripts/truth/replies.js';
 import type { LabState } from '../../scripts/truth/schema.js';
 import { readLiveRecord, type LiveRecord, type RecordedCase, withFieldValue } from '../helpers/live-records.js';
 
@@ -494,7 +495,7 @@ describe('T15: the hedged stops of a visibility run, counted in its summary', ()
     expect(out).toMatch(/^- \S+ (?:\(\S+\) )?lv-d62-drop-two /m);
     // Its reply a hedged stop (the pre-T17 lead), which the visibility group would count.
     const recorded = JSON.parse(readFileSync(resolve(ROOT, pathOf(`${FINAL_AB}/two-fix-1.json`)), 'utf8')) as RunRecord;
-    expect(recorded.results.flatMap((r) => r.replies).filter((x) => /^Element .* fully visible after \d+ swipes?; but /.test(x))).toHaveLength(1);
+    expect(recorded.results.flatMap((r) => r.replies).filter((x) => hedgedLead(x)?.preT17 === true)).toHaveLength(1);
     expect(hedgedLines(out)).toEqual([]);
     expect(out).not.toContain(' (hedged: ');
   });
