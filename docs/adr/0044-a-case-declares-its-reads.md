@@ -157,7 +157,8 @@ state by accident and T12, T13 and T19 needed it labelled; each labelled its run
   A record without the key prints no Device line, so every committed record rejudges byte-identically (698 records, in
   the forms groups and in `visibility,dismissal,ensure,carousel,chooser`, base 3b811b28 against T16).
 
-**Consequences.** A carousel run costs two reads of about 50 s each. raw-strokes.mjs and the label-group scripts stay as
+**Consequences.** A carousel run costs two reads of about 50 s each: an estimate from T11's raw-1.jsonl (rounds 12 s
+apart), not yet measured on this code, whose live smoke did not run (no emulator up, 2026-11-10). raw-strokes.mjs and the label-group scripts stay as
 the evidence of the runs they labelled (a note beside raw-strokes.mjs says so); a new labelled run needs neither. The
 gfxinfo summariser T11 used (`fs.mjs`) is lost; `parseGfxinfo` reads only the four lines its outputs kept. device-state.ts
 is in the mutation scope (group `lab`), its read pinned over a fake exec through `AndroidLab`.
