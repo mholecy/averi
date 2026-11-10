@@ -1470,14 +1470,15 @@ floor held any of them. Each joins with its own floor, by the floor rule (two po
 
 | Module | Group | Tests | Score | Floor |
 | --- | --- | --- | --- | --- |
-| src/interact/flush-check.ts | core | flush-check.test.ts | 96.57 % (350 mutants, 12 survived) | 94 |
-| scripts/truth/replies.ts | lab | replies, and the judges' that read it: live-carousel, live-visibility, live-chooser, live-ensure, live-ensure-engine | 97.86 % (374 valid, 8 survived) | 95 |
-| scripts/truth/live-carousel.ts | lab | live-carousel.test.ts | 98.88 % (800 valid, 9 survived) | 96 |
-| scripts/truth/live-visibility.ts | lab | live-visibility.test.ts | 72.70 % (1 293 mutants, 353 survived) | 70 |
+| src/interact/flush-check.ts | core | flush-check.test.ts | 96.57 % (350 mutants, 12 survived, 0 without coverage) | 94 |
+| scripts/truth/replies.ts | lab | replies.test.ts | 97.86 % (374 valid, 7 survived, 1 without coverage) | 95 |
+| scripts/truth/live-carousel.ts | lab | live-carousel.test.ts | 98.88 % (800 valid, 8 survived, 1 without coverage) | 96 |
+| scripts/truth/live-visibility.ts | lab | live-visibility.test.ts | 72.70 % (1 293 mutants, 334 survived, 19 without coverage) | 70 |
 
-Every survivor of the first three is argued equivalent in its scope.json baseline. live-visibility.ts joins at its
-measured score, low on purpose like draw-order's: 90 % would take some 230 more kills over thirty judges, a row of its
-own. Its T17 LOUD gate is held but for conjuncts that a cut geometry and a hedged lead already imply.
+Each entry lists the module's own test only; replies.ts's score, measured with replies.test.ts as the group's only
+test, is the same 97.86 %. Every survivor of the first three is argued equivalent in its scope.json baseline. live-visibility.ts joins at its
+measured score, low on purpose like draw-order's: 90 % would take some 230 more kills over thirty judges, backlog row
+T21. Its T17 LOUD gate is held but for conjuncts that a cut geometry and a hedged lead already imply.
 
 - **flush-check.ts's own tests only.** Its header names the round's play tables (scroll-flush-reveal.test.ts,
   scroll-rounds.test.ts) as its wiring's tests; with them in core's include the score was the same and core's cold run

@@ -687,8 +687,9 @@ describe('the hedged ceiling: a run whose every judged unaimable leg ends hedged
 });
 
 /**
- * T13: what the mutation run (scripts/mutation/scope.json) found no test holding — the cases as the device runs them,
- * each premise's guard against a state or log that lacks what it reads, and the words of every verdict.
+ * T13: what the mutation run (scripts/mutation/scope.json) found no test holding — the cases as the device runs them
+ * (the case table's toStrictEqual and the `says` test pin the case data itself: a changed case fails here first, by
+ * design), each premise's guard against a state or log that lacks what it reads, and the words of every verdict.
  */
 describe('the carousel group\'s cases and verdicts, held (T13)', () => {
   const C = (cell: string, direction: 'left' | 'right') => ({ tool: 'scroll_until', args: { selector: `id:lab.${cell}.C`, direction, fully: true } });

@@ -23,7 +23,7 @@ import { KEYBOARD_UNLISTED } from '../../src/ui-tree/miss.js';
 import {
   allPassed, ASSERT_SUMMARY, ASSERTS_FAILED, bareEntry, callReply, claimsDone, claimsVisible, dismissalCover, failedClosedUnchecked, firstLine,
   focusTextNotReadSaid, hedgesCut, keyboardUnlistedSaid, missedTarget, movedTap, namesKeyboard, notInTree, ownWords, readingOf, readSomething,
-  screenChangedSaid, screenUnchangedFor, scrollAdvice, snapshotNodes, swipesOf, turnsSaid,
+  screenChangedSaid, screenUnchangedFor, scrollAdvice, snapshotNodes, swipesOf, turnsSaid, claimsTap, heldStill, refusedAfterDismissal,
 } from '../../scripts/truth/replies.js';
 
 /**
@@ -551,5 +551,57 @@ describe('the reads\' bounds (T13)', () => {
 
   it('launchedAs: the headline opens the reply', () => {
     expect(launchedAs('note: Launched com.x on android')).toBeUndefined();
+  });
+
+  it('claimsTap and replyKind: each kind of the closed set, in its precedence', () => {
+    expect(claimsTap('Tapped id:"a"')).toBe(true);
+    expect(claimsTap('ERROR id:"a" was not Tapped')).toBe(false);
+    expect(replyKind('Tapped id:"a"')).toBe('Tapped');
+    expect(replyKind('Element id:"a" visible after 2 swipes')).toBe('visible');
+    expect(replyKind('All 1 asserts passed\n✓ visible id:"a"')).toBe('PASS');
+    expect(replyKind('1/1 asserts FAILED\n✗ visible id:"a"')).toBe('FAIL');
+    expect(replyKind('ERROR id:"a" was not tapped: it lies below the viewport')).toBe('refused');
+    expect(replyKind('Scrolled down')).toBe('other');
+  });
+
+  it('hedgesCut: a WHOLE hedge, alone or with UNCOVERED; not UNCOVERED alone', () => {
+    expect(hedgesCut({ what: 'WHOLE', preT17: false })).toBe(true);
+    expect(hedgesCut({ what: 'WHOLE OR UNCOVERED', preT17: false })).toBe(true);
+    expect(hedgesCut({ what: 'UNCOVERED', preT17: false })).toBe(false);
+  });
+
+  it('heldStill: the held seconds, a fraction too, and the rung the engine\'s line names; none without the line', () => {
+    expect(heldStill("ensure_state …\nsecond look: not detected, the screen held still 12.5 s — running dismiss-sheet before the 20 s window's end")).toEqual({ heldS: 12.5, flow: 'dismiss-sheet' });
+    expect(heldStill('second look: not detected after 20 s')).toBeUndefined();
+  });
+
+  it('bareEntry: the condition the line names may be any text', () => {
+    expect(bareEntry('⚠ detect: visible id:"lab.sheet" treated as not detected — every UI tree read was bare (3 reads)')).toBe(true);
+  });
+
+  it('refusedAfterDismissal: the dismissal and the keyboard named in the refusal\'s own words', () => {
+    expect(refusedAfterDismissal('ERROR id:"lab.note" was not tapped: after id:"lab.done" was tapped (the configured dismissal) to hide the soft keyboard, it lies below the viewport')).toBe(true);
+    expect(refusedAfterDismissal('ERROR id:"lab.note" was not tapped: the soft keyboard is up')).toBe(false);
+  });
+
+  it('the counts\' singulars and their absence: one turn, one swipe that changed the screen; the end turn alone, or with the fling\'s; none said', () => {
+    expect(screenChangedSaid('ERROR scroll_until id:"a" stopped after 1 swipe — the swipe CHANGED THE SCREEN: a new screen')).toBe(true);
+    expect(turnsSaid('It was turned round 1 time')).toBe(1);
+    expect(turnsSaid('… so averi turned down')).toBe(1);
+    expect(turnsSaid('It was turned round 2 times … so averi turned down')).toBe(3);
+    expect(turnsSaid('Element id:"a" visible after 2 swipes')).toBe(0);
+    expect(swipesOf('Tapped id:"a"')).toBeUndefined();
+    expect(screenUnchangedFor('Element id:"a" visible after 2 swipes')).toBeUndefined();
+  });
+
+  it('snapshotNodes: a pretty-printed array read to its closing line', () => {
+    const nodes = [{ role: 'button', identifier: 'a', rect: { x: 1, y: 2, width: 3, height: 4 } }];
+    expect(snapshotNodes(`${JSON.stringify(nodes, null, 2)}\nnote: one more block`)).toEqual(nodes);
+    expect(snapshotNodes('[]')).toEqual([]);
+  });
+
+  it('linkHeldSaid: the chooser headline opens the reply', () => {
+    expect(linkHeldSaid('Android has not opened https://x.test yet: its chooser (android/com.android.internal.app.ResolverActivity) is in front')).toBe(true);
+    expect(linkHeldSaid('note: Android has not opened https://x.test yet: its chooser (android/x) is in front')).toBe(false);
   });
 });
