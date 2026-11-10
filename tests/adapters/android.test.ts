@@ -174,7 +174,7 @@ describe('parseUiautomatorXml', () => {
     };
 
     it('D71: `1 ` typed after `1` without clear, the `1` dropped, reads `1 ` — refused with the select-all hedge, never Filled', async () => {
-      expect(await typedOver('1', '1 ', (t) => t.slice(1))).toEqual({ kind: 'missed', observed: '1 ', again: [], differs: { kind: 'length', wholeToo: true } });
+      expect(await typedOver('1', '1 ', (t) => t.slice(1))).toEqual({ kind: 'missed', observed: '1 ', again: [], differs: { kind: 'length', wholeToo: true, equal: { why: 'value-itself', appendWouldShow: 3 } } });
     });
 
     it('`Jan ` appended to `Jan` without clear lands (`JanJan `)', async () => {

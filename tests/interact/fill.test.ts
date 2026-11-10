@@ -1112,6 +1112,26 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     expect(result).toMatchObject({ cleared: 'unmeasured', readBack: { kind: 'not-taken' }, notInput: { input: expect.objectContaining({ identifier: 'name' }) } });
   });
 
+  // D79 code review (spec NIT): a `not-taken` reading (a non-input showing its own text) is worded only after a retry
+  // (fill-type.ts). Through fillField its earlier text is its own text — the post-focus re-read is made only of an empty
+  // or all-bullet one (fill.ts) — so its own text again reads `unchanged`, an equal count that says why; no `equal`
+  // clause reaches this route (the fill-landing rows of `55` after `5` and `1 ` after `1` are Differences no reply
+  // words). Pinned: a text `55` that takes the typing (`5555`), then shows its own text after the wipe and retype.
+  it('a non-input showing its own `55` again after the retype: worded as unchanged, never bare equal counts (D79)', async () => {
+    resetLayout();
+    const title = node({ role: 'text', identifier: 'title', value: '55', rect: { x: 0, y: 0, width: 100, height: 10 } });
+    const fake = new FakeAdapter({ s: screen(title, el({ role: 'textfield', identifier: 'name' })) }, 's');
+    const live = () => fake.live().children[0];
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      live().value = fake.typed.length === 1 ? `55${text}` : '55'; // it takes the first typing, then shows its own text again
+    };
+    await expect(fillField(fake, 'id:title', '55', { ...FAST, clear: true })).rejects.toThrow(
+      /^fill: typed 2 characters \(after one wipe and retype\) but the field shows 2 — the field did not change: the typing did not reach it, or the field refused it \(content withheld from this error\); the matched node is role text/,
+    );
+    expect(fake.typed).toEqual(['55', '55']);
+  });
+
   it('a non-input that shows the typed text but never exactly the value fails after the retry, and the error names the input it is not', async () => {
     resetLayout();
     const title = node({ role: 'text', identifier: 'title', value: null, rect: { x: 0, y: 0, width: 100, height: 10 } });
@@ -1823,8 +1843,36 @@ describe('fillField — the review probes of the hint-aware clear (2026-10-09)',
       if (fake.focused) fake.focused.value = 'Company'; // the app rejected the input and emptied the field
     };
     await expect(fillField(fake, { id: 'last_name' }, 'company', FAST)).rejects.toThrow(
-      'fill: typed 7 characters but the field shows 7 (content withheld from this error)',
+      // D79: the two counts are equal, and the reading is exactly the placeholder — an emptied field (as here) or
+      // typing the app turned into that text; the tree cannot tell which, and the reply says so (review round 2, MINOR-1)
+      'fill: typed 7 characters but the field shows 7, exactly its placeholder: empty, or the typing turned into that text — the tree cannot tell which (content withheld from this error)',
     );
+  });
+
+  // D79 review round 2, MINOR-1: the other reading of the same shape — iOS auto-capitalisation turns a typed `search`
+  // into `Search`, the named placeholder's text, in a field that selected its earlier `foo` on focus. The field holds the
+  // typing; the reply must not say no key landed. (With clear the same first reading is typed once more and the last
+  // reading is `unchanged`; without, it is the final one.)
+  it('`search` typed over `foo`, auto-capitalised to the named placeholder `Search`: the reply names both readings, no content (D79)', async () => {
+    const { fake } = hintedField('foo', { hint: 'Search', named: true });
+    fake.typingDelivery = 'may-arrive-late';
+    fake.typeText = async (t: string) => {
+      fake.typed.push(t);
+      if (fake.focused) fake.focused.value = t.charAt(0).toUpperCase() + t.slice(1); // select-all, auto-capitalised
+    };
+    const error: Error = await fillField(fake, { id: 'last_name' }, 'search', FAST).then(
+      () => {
+        throw new Error('Filled');
+      },
+      (e: Error) => e,
+    );
+    expect(fake.focused?.value).toBe('Search'); // the field holds the typing
+    expect(error.message).toBe(
+      'fill: typed 6 characters but the field shows 6, exactly its placeholder: empty, or the typing turned into that text — ' +
+        'the tree cannot tell which (content withheld from this error)',
+    );
+    expect(error.message).not.toMatch(/search/i);
+    expect(fake.typed).toEqual(['search']);
   });
 
   it('D2: no clear, the typing dropped on a field holding text that matches the value but for case: "did not change"', async () => {
@@ -1850,7 +1898,10 @@ describe('fillField — the review probes of the hint-aware clear (2026-10-09)',
       fake.typed.push(t);
       if (fake.focused) fake.focused.value = '•'.repeat(t.length - 1) + t.slice(-1);
     };
-    await expect(fillField(fake, { id: 'amount_input' }, 'secret', FAST)).rejects.toThrow('fill: typed 6 characters but the field shows 6 (content withheld from this error)');
+    await expect(fillField(fake, { id: 'amount_input' }, 'secret', FAST)).rejects.toThrow(
+      // D79 review round 1: the two counts are equal — the reply says some are bullets, not comparable
+      'fill: typed 6 characters but the field shows 6, some of them bullets: the typing cannot be compared with them (content withheld from this error)',
+    );
   });
 
   it('I: an unchanged reading after the deletes costs one poll cadence and one tree read more — then the late deletes are seen', async () => {
@@ -2123,9 +2174,85 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
     dropping(fake, 1);
     await expect(fillField(fake, { id: 'amount_input' }, '55', FAST)).rejects.toHaveProperty(
       'message',
-      'fill: typed 2 characters but the field shows 2 — the field may have replaced its text (select-all): fill with `clear: true` (content withheld from this error)',
+      'fill: typed 2 characters but the field shows only the typed text, where an append would show 3 — ' +
+        'the field may have replaced its text (select-all): fill with `clear: true` (content withheld from this error)',
     );
     expect(fake.typed).toEqual(['55']);
+  });
+
+  // D79: D71's refusal of a reading that is the value itself read as equal counts ("typed 2 characters but the field
+  // shows 2"), the class of docs/bugs/2026-10-09-fill-mismatch-error-says-equal-counts-when-app-transforms-text.md. It
+  // says now what an append would have shown — the earlier text's count and the typed one — and no content.
+  it.each([
+    ['55', '5', 3],
+    ['1212', '12', 6],
+    ['-5', '-', 3],
+  ])('`%s` typed after `%s` into a select-all field: no equal counts, the append count %i, the hedge, no content (D79)', async (value, before, appended) => {
+    const fake = formFake(before);
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      if (fake.focused) fake.focused.value = text; // select-all: the typing replaced the text
+    };
+    const error: Error = await fillField(fake, { id: 'amount_input' }, value, FAST).then(
+      () => {
+        throw new Error('Filled');
+      },
+      (e: Error) => e,
+    );
+    expect(error.message).not.toMatch(new RegExp(`typed ${value.length} characters? but the field shows ${value.length}\\b`));
+    expect(error.message).toBe(
+      `fill: typed ${value.length} characters but the field shows only the typed text, where an append would show ${appended} — ` +
+        'the field may have replaced its text (select-all): fill with `clear: true` (content withheld from this error)',
+    );
+    expect(error.message).not.toContain(value);
+    expect(fake.typed).toEqual([value]);
+  });
+
+  // D79 review round 1, MAJOR-1: any `length` whose earlier text pads the reading up to the typed count read as equal
+  // counts too ("typed 2 characters but the field shows 2"). It says how many of them are past the earlier text.
+  it.each(['15', '1-', '1 '])('`11` typed after `1`, read `%s`: no bare equal counts, the count past the earlier text (D79)', async (shown) => {
+    const fake = formFake('1');
+    fake.typingDelivery = 'may-arrive-late';
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      if (fake.focused) fake.focused.value = shown;
+    };
+    await expect(fillField(fake, { id: 'amount_input' }, '11', FAST)).rejects.toHaveProperty(
+      'message',
+      'fill: typed 2 characters but the field shows 2, only 1 of them past its earlier text (content withheld from this error)',
+    );
+  });
+
+  it('`12` typed after `1`, read `11` (the `2` dropped, nothing typed again): the count past the earlier text (D79)', async () => {
+    const fake = formFake('1');
+    fake.typingDelivery = 'may-arrive-late';
+    dropping(fake, 1);
+    await expect(fillField(fake, { id: 'amount_input' }, '12', FAST)).rejects.toHaveProperty(
+      'message',
+      'fill: typed 2 characters but the field shows 2, only 1 of them past its earlier text (content withheld from this error)',
+    );
+    expect(fake.typed).toEqual(['12']);
+  });
+
+  // D79: a reading shorter or longer than typed keeps its two counts — they differ, and say what is missing or added.
+  it('a short landing still reads its two counts (D79 pin)', async () => {
+    const fake = formFake(null);
+    fake.typingDelivery = 'may-arrive-late';
+    dropping(fake, 3);
+    await expect(fillField(fake, { id: 'amount_input' }, 'Jan Novak', FAST)).rejects.toHaveProperty(
+      'message',
+      'fill: typed 9 characters but the field shows 3 (content withheld from this error)',
+    );
+  });
+
+  it('a reading longer than typed still reads its two counts (D79 pin)', async () => {
+    const fake = formFake('12');
+    fake.typingDelivery = 'may-arrive-late';
+    dropping(fake, 1);
+    await expect(fillField(fake, { id: 'amount_input' }, '34', FAST)).rejects.toHaveProperty(
+      'message',
+      'fill: typed 2 characters but the field shows 3 (content withheld from this error)',
+    );
   });
 
   // D71 review round 1, m1 (ADR 0034's residual 12): an UNNAMED placeholder (idb) with no letter or digit that the
@@ -2198,6 +2325,8 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
         'content withheld from this error',
     ],
     ['-5-', '-5', '-5', '5', 'fill: typed 2 characters but the field shows 3 (content withheld from this error)'],
+    // D79 review round 1, NIT-2: the value itself, the hedge gone, the append count kept
+    ['55', '55', '5', '5', 'fill: typed 2 characters but the field shows only the typed text, where an append would show 3 (content withheld from this error)'],
   ])('`%s` for `%s` after `%s`, a sibling gaining `%s`: the reply names the other input, without the select-all hedge', async (shown, value, before, gained, reply) => {
     resetLayout();
     const field = el({ role: 'textfield', identifier: 'f', value: before });

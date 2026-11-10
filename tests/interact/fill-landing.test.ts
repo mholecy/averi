@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { Difference } from '../../src/interact/fill-facts.js';
+import { heldText, type Difference } from '../../src/interact/fill-facts.js';
 import { landingOf, needsHeldCount, readingOf, withoutWholeToo, type Expectation, type Reading } from '../../src/interact/fill-landing.js';
 import { SEPARATORS } from '../../src/interact/fill-reformat.js';
+import { fillFailureText } from '../../src/interact/fill-text.js';
 import { isMaskedValue } from '../../src/ui-tree/masked-value.js';
 
 /**
@@ -113,12 +114,12 @@ describe('readingOf — the whole answer about one reading', () => {
     // D71: the value itself, reached by a typing that moved the reading, is no landing where it is a prefix of what the
     // field should hold too (`5` then `55`, the second key dropped) — a length that is a whole landing too, never typed
     // again
-    ['the value itself, a prefix of what the field should hold too: a length that is a whole landing too', '55', { value: '55', before: '5' }, { kind: 'missed', tail: { missing: '5', retypable: false }, differs: { kind: 'length', wholeToo: true } }],
+    ['the value itself, a prefix of what the field should hold too: a length that is a whole landing too', '55', { value: '55', before: '5' }, { kind: 'missed', tail: { missing: '5', retypable: false }, differs: { kind: 'length', wholeToo: true, equal: { why: 'value-itself', appendWouldShow: 3 } } }],
     ['the value decorated, inside the earlier text\'s span: never typed again', '-5-', { value: '-5', before: '-5' }, { kind: 'missed', tail: { missing: '5', retypable: false }, differs: { kind: 'length', wholeToo: true } }],
     // D71 review round 1, n1: the select-all hedge is of a reading that took the text — a non-input showing its own
     // text is not-taken, unmarked; its tail is held back as before (a whole landing too), so nothing is typed again
-    ['a non-input showing its own text, the value with a tail too: not-taken, no hedge', '55', { value: '55', before: '5', isInput: false, resolvedValue: '55' }, { kind: 'not-taken', tail: { missing: '5', retypable: false }, differs: { kind: 'length' } }],
-    ['a non-input showing its own text, the value, no tail: not-taken, no hedge', '1 ', { value: '1 ', before: '1', isInput: false, resolvedValue: '1 ' }, { kind: 'not-taken', differs: { kind: 'length' } }],
+    ['a non-input showing its own text, the value with a tail too: not-taken, no hedge', '55', { value: '55', before: '5', isInput: false, resolvedValue: '55' }, { kind: 'not-taken', tail: { missing: '5', retypable: false }, differs: { kind: 'length', equal: { why: 'padded', typedPart: 1 } } }],
+    ['a non-input showing its own text, the value, no tail: not-taken, no hedge', '1 ', { value: '1 ', before: '1', isInput: false, resolvedValue: '1 ' }, { kind: 'not-taken', differs: { kind: 'length', equal: { why: 'padded', typedPart: 1 } } }],
     ['no prefix: no tail', 'the', { value: 'teh' }, { kind: 'missed', differs: { kind: 'same-length', positions: 2 } }],
     ['bullets prove no prefix', '••', { value: '12345' }, { kind: 'missed', differs: { kind: 'masked', held: 0 } }],
   ];
@@ -158,12 +159,37 @@ describe('readingOf — the whole answer about one reading', () => {
                     if (r.kind === 'not-taken') throw wrong('a not-taken is never marked wholeToo');
                     seen.add('wholeToo');
                   }
+                  // D79: why a `length` of the typed count is no match — said there and nowhere else (code review: one
+                  // discriminated `equal`). The value itself refused says the append count: the earlier text's count
+                  // (its named placeholder aside, review round 1, NIT-3) plus the typed one
+                  const priorCount = clear ? 0 : heldText(before, placeholder).length;
+                  const isValueItself = differs.kind === 'length' && differs.wholeToo === true && observed === value;
+                  if (differs.kind === 'length' && (differs.equal !== undefined) !== (observed.length === value.length)) throw wrong('equal is of a length of the typed count alone');
+                  const equal = differs.kind === 'length' ? differs.equal : undefined;
+                  if (isValueItself !== (equal?.why === 'value-itself')) throw wrong('the value itself refused says its append count, and only it');
+                  if (equal?.why === 'value-itself') {
+                    if (equal.appendWouldShow !== priorCount + value.length) throw wrong('the append count is the earlier count plus the typed');
+                    seen.add('value-itself');
+                  }
+                  if (equal?.why === 'padded') {
+                    if (equal.typedPart !== heldText(observed, placeholder).length - priorCount || equal.typedPart < 1) throw wrong('padded: the held count less the earlier one');
+                    seen.add('padded');
+                  }
+                  if (equal?.why === 'placeholder') throw wrong('the sweep reaches no placeholder reading as long as the value');
+                  if ((equal?.why === 'partly-masked') !== (differs.kind === 'length' && equal !== undefined && observed.includes('•'))) throw wrong('partly-masked is of an equal count with bullets');
+                  if (equal?.why === 'partly-masked') seen.add('partly-masked');
+                  if (differs.kind === 'length' && r.kind === 'missed') {
+                    const reply = fillFailureText({ code: 'mismatch', typed: value.length, shows: observed.length, differs });
+                    const bare = /^fill: typed (\d+) characters? but the field shows (\d+)(?: \(| —|$)/.exec(reply);
+                    if (bare !== null && bare[1] === bare[2]) throw wrong(`two bare equal counts: ${reply}`);
+                    if (observed.length === value.length) seen.add('equal counts said');
+                  }
                   if (differs.kind === 'dropped-tail' && tail?.missing.length !== differs.dropped) throw wrong('a dropped-tail names the tail');
                   if (tail?.retypable === true && observed.includes('•')) throw wrong('a bullet proves no tail');
                   if (tail?.retypable === true && differs.kind === 'unchanged') seen.add('retypable and unchanged');
                 }
     expect([...seen].sort()).toEqual(
-      ['case', 'dropped-tail', 'landed', 'length', 'masked', 'masked-said-plain', 'missed', 'not-taken', 'placeholder', 'retypable and unchanged', 'said-plain', 'same-length', 'separated', 'unchanged', 'wholeToo'].sort(),
+      ['case', 'dropped-tail', 'landed', 'length', 'masked', 'masked-said-plain', 'missed', 'not-taken', 'placeholder', 'retypable and unchanged', 'said-plain', 'same-length', 'separated', 'unchanged', 'wholeToo', 'value-itself', 'padded', 'partly-masked', 'equal counts said'].sort(),
     );
   });
 });
@@ -173,6 +199,7 @@ describe('withoutWholeToo — a Difference without its whole-landing hedge', () 
   it('a dropped tail keeps its counts, a length its kind: the key itself is gone', () => {
     expect(withoutWholeToo({ kind: 'dropped-tail', landed: 1, dropped: 2, grouped: true, wholeToo: true })).toStrictEqual({ kind: 'dropped-tail', landed: 1, dropped: 2, grouped: true });
     expect(withoutWholeToo({ kind: 'length', wholeToo: true })).toStrictEqual({ kind: 'length' });
+    expect(withoutWholeToo({ kind: 'length', wholeToo: true, equal: { why: 'value-itself', appendWouldShow: 3 } })).toStrictEqual({ kind: 'length', equal: { why: 'value-itself', appendWouldShow: 3 } }); // D79: the count stays
   });
 
   it('a Difference without the hedge is as it was', () => {
@@ -749,7 +776,8 @@ describe('the difference — what a missed read-back differs by, without content
     ['bullets onto held bullets, no clear', { observed: '•'.repeat(32), before: '•'.repeat(20), value: 'x'.repeat(16), held: 20 }, { kind: 'masked', held: 20 }],
     ['bullets with clear: no held count (the clear emptied it)', { observed: '•••••', value: 'secret', clear: true, held: 4 }, { kind: 'masked', held: undefined }],
     // 3. partly masked
-    ['show-the-last-character (`•••••t`): lengths only', { observed: '•••••t', value: 'secret' }, { kind: 'length' }],
+    ['show-the-last-character (`•••••t`): lengths only, as many as typed and some bullets (D79)', { observed: '•••••t', value: 'secret' }, { kind: 'length', equal: { why: 'partly-masked' } }],
+    ['show-the-last-character, one short: lengths only (D79 pin)', { observed: '••••t', value: 'secret' }, { kind: 'length' }],
     // 4. held text compared
     ['auto-capitalised, no clear', { observed: 'Hello', value: 'hello' }, { kind: 'case', positions: 1 }],
     ['auto-capitalised, with clear', { observed: 'Hello world', value: 'hello world', clear: true }, { kind: 'case', positions: 1 }],
@@ -765,7 +793,7 @@ describe('the difference — what a missed read-back differs by, without content
     // `separated` called directly); a mark outside SEPARATORS keeps the row a length
     ['a mask that inserts marks the fill does not take (`(`, `)`)', { observed: '(12) 345', value: '12345' }, { kind: 'length' }],
     ['typing onto a field showing only its placeholder: the placeholder is no held text, so nothing is sliced off', { observed: 'Searchx', before: 'Search', value: 'searchx', placeholder: 'Search' }, { kind: 'case', positions: 1 }],
-    ['a field that fell back to its named placeholder holds no text: never "but for case"', { observed: 'Company', before: 'Zed', value: 'company', placeholder: 'Company' }, { kind: 'length' }],
+    ['a field that fell back to its named placeholder holds no text: never "but for case"', { observed: 'Company', before: 'Zed', value: 'company', placeholder: 'Company' }, { kind: 'length', equal: { why: 'placeholder' } }],
     ['a pair equal only upper-cased (dotless `ı`, `i`) is case too', { observed: 'ıd', value: 'id', clear: true }, { kind: 'case', positions: 1 }],
     ['a pair equal only lower-cased (the Kelvin sign `\u212A`, `k`) is case too', { observed: '\u212Ad', value: 'kd', clear: true }, { kind: 'case', positions: 1 }],
     ['`ß`/`SS` differ in length: a plain difference, never case', { observed: 'SS', value: 'ß', clear: true }, { kind: 'length' }],
@@ -816,14 +844,14 @@ describe('without clear, the value itself lands only as the earlier text or the 
   const e = (value: string, before: string | null, f: Partial<Expectation> = {}) => expecting({ value, before, ...f });
 
   it.each([
-    ['55', '5', 'the second key dropped, or a select-all field'],
-    ['1212', '12', 'the second `12` dropped, or a select-all field'],
-    ['1 ', '1', 'the trailing space typed alone, or a select-all field'],
-    ['-5', '-', 'an earlier text with no letter or digit'],
-  ])('`%s` after `%s` (%s): no landing, nothing typed again, a length that is a whole landing too', (value, before) => {
+    ['55', '5', 'the second key dropped, or a select-all field', 3],
+    ['1212', '12', 'the second `12` dropped, or a select-all field', 6],
+    ['1 ', '1', 'the trailing space typed alone, or a select-all field', 3],
+    ['-5', '-', 'an earlier text with no letter or digit', 3],
+  ])('`%s` after `%s` (%s): no landing, nothing typed again, a length that is a whole landing too, an append showing %i (D79)', (value, before, _why, appended) => {
     expect(landingOf(value, e(value, before))).toBeUndefined();
     expect(retypableTailOf(value, e(value, before))).toBeUndefined();
-    expect(notLandedDiffers(value, e(value, before))).toEqual({ kind: 'length', wholeToo: true });
+    expect(notLandedDiffers(value, e(value, before))).toEqual({ kind: 'length', wholeToo: true, equal: { why: 'value-itself', appendWouldShow: appended } });
   });
 
   it.each([

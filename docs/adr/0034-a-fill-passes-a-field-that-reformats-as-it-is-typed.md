@@ -1018,6 +1018,82 @@ residual-10 MISMATCH, filed with g2 (`android uiautomator g2|rfe3`); rfe1 and rf
 **Residuals, stated.** Residual 10 now holds on Android too. A label still loses its outer spaces on Android, as
 before (iOS's label keeps what WDA or idb gives it); no case asks for them.
 
+## Amendment: a mismatch never reads as two bare equal counts (2026-11-10, D79)
+
+**Context.** Found at D71's review (m3), kept as decided there and filed as backlog row D79. D71's refusal of a reading
+that is the value itself (`55` typed after `5` without clear, read `55`) is a `length` whose two counts are equal by
+construction — the field's count is the typed one: "typed 2 characters but the field shows 2 — the field may have
+replaced its text (select-all): fill with `clear: true`". Two equal counts read as a match, the class of
+docs/bugs/2026-10-09-fill-mismatch-error-says-equal-counts-when-app-transforms-text.md (`case` and `same-length` closed
+it for a transformed input, not for a `length`). D79's review (round 1, MAJOR-1) found the class wider than D71's
+refusal: any `length` whose field count is the typed one reads so — an earlier text that pads the reading (`11` typed
+after `1`, read `15`, `1-` or `1 `; `12` after `1` read `11`, nothing typed again), a field fallen back to its named
+placeholder of the value's length (`Company` for a typed `company`), a partly masked reading (Android's
+show-the-last-character `•••••t` for a typed `secret`). The class is closed here, not filed.
+
+**Decision.** fill-facts.ts#Difference: a `length` whose field count is the typed one carries `equal`, one
+fill-facts.ts#EqualCount — why the two equal numbers are no match — set in `fill-landing.ts#differenceOf` (the condition
+computed once there; `equalCountOf` picks the reason) and nowhere else; fill-text.ts's `lengthShowsText` words the
+mismatch's second count from it, one sentence per reason, the rest of the reply as it was (every hedge and remedy
+unchanged). Counts only, as every fill error (fill-text.ts#fillFailureText: no row is handed the typed value or the
+field's text; ADR 0043 keeps a typing out of a failed command's words the same way).
+- `value-itself`, with `appendWouldShow` — the earlier text's count (`priorText`, the named placeholder aside) plus the
+  typed — on a `length` that is a whole landing too whose held text is the value itself: exactly D71's refusal. "fill:
+  typed 2 characters but the field shows only the typed text, where an append would show 3 — the field may have replaced
+  its text (select-all): fill with `clear: true` (content withheld from this error)". `1212` after `12` says 6; `-5`
+  after `-` and `1 ` after `1` say 3.
+- `padded`, with `typedPart`: the earlier text pads a short typing up to the typed count — how many of the field's
+  characters are past it, the typing's part (`typedPartOf`), which there is the held count less the earlier one; at
+  least 1 and fewer than typed (past it, the reading would compare whole: `same-length` or `case`). "typed 2 characters
+  but the field shows 2, only 1 of them past its earlier text".
+- `placeholder`: the reading is exactly the named placeholder (nothing held). "typed 7 characters but the field shows 7,
+  exactly its placeholder: empty, or the typing turned into that text — the tree cannot tell which" (review round 2,
+  MINOR-1: until then "none of them typed: its placeholder", which asserted an empty field; a typed `search` that iOS
+  auto-capitalises to a named `Search` reads so too, and the field then holds the typing — fill.test.ts pins both
+  readings).
+- `partly-masked`, on the partly masked `length` of the typed count (its content is not comparable): "typed 6 characters
+  but the field shows 6, some of them bullets: the typing cannot be compared with them".
+`withoutWholeToo` keeps `equal`: keys proven typed elsewhere take the hedge off, not the count (fill-type.test.ts and
+fill.test.ts pin `55` after `5` with a sibling that gained a key).
+
+**Rejected.** A new Difference kind: each reading is a `length` as before, and every consumer (the sweep, the reply,
+`withoutWholeToo`) reads it so; a field set only where the counts are equal is the narrowest change, and leaves every
+other reply byte-identical. Three flat optional fields (`appended`, `past`, `partlyMasked`, the branch as first built)
+or one per reason: they are exclusive, and a flat shape let two be set at once and hid the placeholder case in a magic
+`past === 0` (the code review); one discriminated union states the exclusivity, names the placeholder case, and lets the
+wording table be checked whole by the compiler. `typedPart` as the held count less the earlier one, as review round 1
+sketched: equal to the typing's part wherever the reading holds text, but 0 or below on a placeholder reading — now its
+own reason.
+
+**Consequences.** Only wordings change, and only where the counts are equal; pass and fail do not, and nothing else is
+typed. A reading shorter or longer than typed keeps its two counts (pinned). The sweep in fill-landing.test.ts holds the
+class as a property: no missed `length` over its alphabet replies two bare equal counts, and `equal` is set exactly
+where the counts are equal, each reason where it should be. Every other kind that can print equal counts says why after
+them: `case`, `same-length`, `masked` (the held count), `dropped-tail` (what landed), `unchanged` (the field did not
+change); `separated` always shows more. Under an unnamed placeholder (residual 12: `+447700900123` after idb's `+`) the
+append count is the placeholder's plus the typed (14): an append to the text the tree showed; the hedge names the
+select-all reading, and the remedy is the same. A non-input's `not-taken` Difference carries `equal` too (the
+fill-landing rows of `55` after `5` and `1 ` after `1`: `padded`), but no reply words it: a `not-taken` is worded only
+after a retry, and through fillField a non-input's earlier text is its own (fill.ts re-reads after focus only an empty
+or all-bullet text), so its own text again reads `unchanged` — pinned in fill.test.ts with a text `55` (the code
+review's spec NIT, which asked for `padded` there: unreachable, brute-forced).
+
+**Mutation-checked** by hand over the interact and adapters tests, each killed. As first built (3696): `appended`'s
+`held === value` gate always true (7 fail) or false (14), its earlier count dropped, subtracted or taken from the
+reading (14 each), the `wholeToo` guard dropped (37); `past` never set (9), always set (45), one more (9), the held
+count less the earlier one (2: the placeholder rows); `partlyMasked` never (3) or always (3); each wording never chosen
+(8, 6, 2, 3). Review round 2, by the auto-capitalised `search` row: the placeholder wording never chosen, put back as it
+was, or its clause dropped (1 each). The union (3698): the equal-count condition always true (47) or false (27),
+`value-itself` without its `wholeToo` gate (3), `placeholder` dropped (3), `typedPart` as the held count (7), no `equal`
+wording (16), the `padded` wording off (6); the `not-taken` pin, by fill-type.ts returning `not-taken` after a retry too
+(1). fill-landing, narrowed cold: see the baseline in scripts/mutation/scope.json.
+
+**Golden and live.** The golden replays tree reads and never types: Changed 0 against main 41055181. No live record
+reads these shapes (D71's live run reached none of its refusals). The unit tests are the evidence: fill.test.ts's D79
+rows (`55`/`5`, `1212`/`12`, `-5`/`-`; `15`, `1-`, `1 ` for `11` after `1`; `11` for `12` after `1`), the two moved pins
+(`Company`, `•••••t`), the auto-capitalised `search` read as its named placeholder `Search`, the `not-taken` route, and
+the short and long landing pins.
+
 ## Residuals accepted
 
 1. **A split inside a code, or between a letter and a digit, passes as a reformat** (review round 3, MINOR-1;

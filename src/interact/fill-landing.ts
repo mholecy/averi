@@ -22,7 +22,7 @@
 
 import { INPUT_ROLE, type UiNode } from '../adapters/types.js';
 import { hasBullet, isMaskedValue } from '../ui-tree/masked-value.js';
-import { heldText, type Difference, type FocusUnread, type Reformat } from './fill-facts.js';
+import { heldText, type Difference, type EqualCount, type FocusUnread, type Reformat } from './fill-facts.js';
 import { maskTemplate, prefixOf, reformatOf, separatedOf, skeleton } from './fill-reformat.js';
 
 /** What the field should hold after the typing, and what the reading is judged against. */
@@ -387,10 +387,12 @@ function wholeLandingToo(held: string, e: TextExpectation): boolean {
  */
 function differenceOf(observed: string, e: Pick<Expectation, keyof TextExpectation | 'held'>, tail: Tail | undefined, wholeToo: boolean): Difference {
   const { value, clear } = e;
+  // D79: the field's count is the typed one — a `length` then says why that is no match (`EqualCount`)
+  const showsTypedCount = observed.length === value.length;
   if (bulletsSaidPlain(observed, e)) return { kind: 'masked-said-plain' };
   if (observed === e.before) return { kind: 'unchanged' };
   if (isMaskedValue(observed)) return { kind: 'masked', held: clear ? undefined : heldCount(e) };
-  if (hasBullet(observed)) return { kind: 'length' };
+  if (hasBullet(observed)) return showsTypedCount ? { kind: 'length', equal: { why: 'partly-masked' } } : { kind: 'length' };
   const held = heldText(observed, e.placeholder);
   // D28: a reformatted strict prefix with some of the typing in it is a dropped tail, never "transformed".
   if (landedSome(tail) && tail.reformatted !== undefined) {
@@ -417,10 +419,25 @@ function differenceOf(observed: string, e: Pick<Expectation, keyof TextExpectati
   }
   if (caseOnly !== undefined) return { kind: 'case', positions: caseOnly };
   // an exact strict prefix ends here: its typed part is shorter than the value, so no run is compared
-  if (typed.length !== value.length) return wholeToo ? { kind: 'length', wholeToo: true } : { kind: 'length' };
+  if (typed.length !== value.length) {
+    const d: Difference = wholeToo ? { kind: 'length', wholeToo: true } : { kind: 'length' };
+    return showsTypedCount ? { ...d, equal: equalCountOf(held, typed, wholeToo, e) } : d;
+  }
   let differ = 0;
   for (let i = 0; i < value.length; i++) if (typed[i] !== value[i]) differ++;
   return { kind: 'same-length', positions: differ };
+}
+
+/**
+ * Why a `length` of the typed count is no match (D79, fill-facts.ts#EqualCount), of a held reading, its typing
+ * (`typedPartOf`) and `differenceOf`'s `wholeToo`: the value itself refused as a whole landing too (D71's refusal; a
+ * non-input's own text equal to the value is no such refusal, and reads padded), exactly the named placeholder
+ * (nothing held), else padded by the earlier text. Pure.
+ */
+function equalCountOf(held: string, typed: string, wholeToo: boolean, e: Pick<Expectation, keyof TextExpectation>): EqualCount {
+  if (wholeToo && held === e.value) return { why: 'value-itself', appendWouldShow: priorText(e).length + e.value.length };
+  if (held === '') return { why: 'placeholder' };
+  return { why: 'padded', typedPart: typed.length };
 }
 
 /**
