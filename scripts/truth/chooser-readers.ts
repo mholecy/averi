@@ -7,9 +7,10 @@ import { LAB_APP } from './lab-device.js';
  * need, moved here from lab-chooser.ts, which re-exports it. A leaf: it imports src's shellQuote and lab-device.ts's
  * LAB_APP, nothing of batch/ and nothing live-*, so a batch loads no live module through it. The preferred-activities
  * text (only its `Preferred Activities User N:` block), a lab default (`mAlways=true`, a leak) told from the
- * last-chosen entry "Just once" writes (`mAlways=false`), a link's handler query and its count, and the hand lines
- * that clear a default or read the chooser back. A failed call is the caller's to say: lab-chooser.ts#preferredOf and
- * #handlersOf over a batch's CallResult, chooser-premise.ts over adb's error.
+ * last-chosen entry "Just once" writes (`mAlways=false`), a link's handler query and its count, an entry as a line
+ * quotes it, and the hand lines that clear a default or read the chooser back. A failed call is the caller's to tell,
+ * its words worded here (preferredUnread, handlersUnread): lab-chooser.ts#preferredOf and #handlersOf give a batch's
+ * exit, chooser-premise.ts adb's error.
  */
 
 /**
@@ -107,6 +108,18 @@ export function preferredIn(out: string): PreferredRead {
   return { state: 'read', users, lab };
 }
 
+/** The preferred read that failed, `why` the caller's words for it (a batch's exit, adb's error). */
+export const preferredUnread = (why: string): PreferredRead => ({
+  state: 'unread',
+  why: `${PREFERRED_ARGV.join(' ')}: ${why}`,
+});
+
+/** How much of an entry's text a line quotes, before `…`. */
+export const ENTRY_CHARS = 200;
+/** An entry's text as a line quotes it: ENTRY_CHARS at most, then `…`. */
+export const entryText = (e: LabEntry): string =>
+  e.text.length > ENTRY_CHARS ? `${e.text.slice(0, ENTRY_CHARS)}…` : e.text;
+
 /** The leaks: the lab's defaults (`mAlways=true`). */
 export const leaksOf = (p: { lab: readonly LabEntry[] }): LabEntry[] => p.lab.filter((e) => e.always === true);
 /** Entries with no mAlways line: neither a default nor last-chosen as read — they cannot be compared, so unproven. */
@@ -129,6 +142,9 @@ export const handlersArgv = (url: string): string[] => [
  * The handler query's text counted (a call that answered): the component lines, which must be as many as its `N
  * activities found:` line says (`No activities found` is 0); else why not.
  */
+/** The handler query that failed, `why` the caller's words for it (a batch's exit, adb's error). */
+export const handlersUnread = (why: string): { why: string } => ({ why: `query-activities: ${why}` });
+
 export function handlersIn(text: string): number | { why: string } {
   const out = text.replace(/\r/g, '');
   if (/^No activities found\s*$/m.test(out)) return 0;
@@ -160,7 +176,7 @@ export const adbLine = (serial: string, words: readonly string[]): string =>
  * pulled none), how.
  */
 export interface DefaultCause {
-  predates?: string;
+  predates?: 'the batch' | 'this run';
   build?: string;
 }
 

@@ -6,13 +6,15 @@ import {
   adbLine,
   checkHand,
   defaultHand,
+  entryText,
   HAND_PREFIX,
   handlersIn,
+  handlersUnread,
   LAB_PACKAGE,
   lastChosenOf,
   leaksOf,
-  PREFERRED_ARGV,
   preferredIn,
+  preferredUnread,
   unflaggedOf,
   type HandBase,
   type LabEntry,
@@ -74,7 +76,7 @@ export const CENTRE_SLACK_PX = 2;
  * command's output), is unread.
  */
 export function preferredOf(r: CallResult): PreferredRead {
-  return failedCall(r) ? { state: 'unread', why: `${PREFERRED_ARGV.join(' ')}: ${exitText(r)}` } : preferredIn(r.out);
+  return failedCall(r) ? preferredUnread(exitText(r)) : preferredIn(r.out);
 }
 
 /** A last-chosen entry a batch accepts as the lab's known state (batch-12's README), by Authority and component. */
@@ -153,10 +155,6 @@ export const CHECK_OUTCOME: Readonly<Record<CheckExit, CheckOutcome>> = {
 };
 export const checkWordOf = (exit: CheckExit): Verdict => CHECK_OUTCOME[exit].word;
 
-/** How much of an entry's text a line quotes, before `…`. */
-const ENTRY_CHARS = 200;
-const cut = (s: string, n: number): string => (s.length > n ? `${s.slice(0, n)}…` : s);
-
 /** What a focus read says in a line. */
 const focusText = (f: FocusRead): string =>
   f.state === 'unread' ? `chooser unread (${f.why})` : f.chooser === undefined ? 'chooser no' : `chooser yes (${f.chooser})`;
@@ -171,7 +169,7 @@ export function checkWhy(focus: FocusRead, preferred: PreferredRead, accepted: r
   const ok = last.filter((e) => acceptedOf(e, accepted) !== undefined).length;
   const unflagged = unflaggedOf(preferred).length;
   const counts = `defaults ${leaksOf(preferred).length}, last-chosen ${last.length}${last.length > 0 ? `, accepted ${ok}` : ''}${unflagged > 0 ? `, no mAlways ${unflagged}` : ''}`;
-  const first = preferred.lab.length > 0 ? `; first: ${cut(preferred.lab[0].text, ENTRY_CHARS)}` : '';
+  const first = preferred.lab.length > 0 ? `; first: ${entryText(preferred.lab[0])}` : '';
   const users = `${preferred.users} user${preferred.users === 1 ? '' : 's'}`;
   return `${focusText(focus)}; preferred read (${users}); lab entries ${preferred.lab.length} (${counts})${first}`;
 }
@@ -221,7 +219,7 @@ export function comparedLine(label: string, c: ReadCompared): string {
  * must be as many as its `N activities found:` line says (`No activities found` is 0); else why not.
  */
 export function handlersOf(r: CallResult): number | { why: string } {
-  return failedCall(r) ? { why: `query-activities: ${exitText(r)}` } : handlersIn(r.out);
+  return failedCall(r) ? handlersUnread(exitText(r)) : handlersIn(r.out);
 }
 
 /** Why `adb get-state` says the emulator cannot be asked (not `device`), or undefined when it can. */

@@ -2,14 +2,17 @@ import { shellQuote } from '../../src/adapters/adb-shell.js';
 import {
   adbLine,
   defaultHand,
+  entryText,
   HAND_PREFIX,
   handlersArgv,
   handlersIn,
+  handlersUnread,
   LAB_PACKAGE,
   lastChosenOf,
   leaksOf,
   PREFERRED_ARGV,
   preferredIn,
+  preferredUnread,
   unflaggedOf,
   type HandBase,
   type LabEntry,
@@ -61,9 +64,6 @@ export const SHARED_HANDLERS = 2;
  * `gradlew assembleDebug`, under JDK 17), from the checkout's root.
  */
 export const APK_BUILD = 'from the checkout root, under JDK 17: cd fixtures/apps/android && ./gradlew assembleDebug';
-/** How much of an entry's text a line quotes, before `…` (lab-chooser.ts's checkWhy quotes as much). */
-const ENTRY_CHARS = 200;
-const cut = (s: string, n: number): string => (s.length > n ? `${s.slice(0, n)}…` : s);
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
 
 /** What the premise asks of the lab: AndroidLab's guard, its adb and its focus read (lab-device.ts). */
@@ -108,13 +108,13 @@ function defaultFact(p: PreferredRead, b: HandBase): PremiseFact {
   const leaks = leaksOf(p);
   if (leaks.length > 0) {
     const defaults = plural(leaks.length, 'lab default', 'lab defaults');
-    const why = `${defaults} (mAlways=true) for ${LAB_PACKAGE}, first: ${cut(leaks[0].text, ENTRY_CHARS)}`;
+    const why = `${defaults} (mAlways=true) for ${LAB_PACKAGE}, first: ${entryText(leaks[0])}`;
     return { fact, state: 'stale', why, hand: defaultHand(b, { predates: 'this run', build: APK_BUILD }) };
   }
   const unflagged = unflaggedOf(p);
   if (unflagged.length > 0) {
     const entries = plural(unflagged.length, 'lab entry', 'lab entries');
-    const first = cut(unflagged[0].text, ENTRY_CHARS);
+    const first = entryText(unflagged[0]);
     const why = `the preferred activities not proven: ${entries} with no mAlways line, first: ${first}`;
     return { fact, state: 'unread', why };
   }
@@ -139,7 +139,14 @@ function stackFact(read: FocusRead, b: HandBase): PremiseFact {
   return { fact, state: 'stale', why: `a chooser on the stack (${up.join(', ')})`, hand: stackHand(b) };
 }
 
-/** HOME as live-chooser.ts#homeOf reads it: the platform's chooser (two Home apps, none chosen) or the lab is stale. */
+/**
+ * HOME as live-chooser.ts#homeOf reads it: stale only when it is the platform's chooser (two Home apps, none chosen)
+ * or the lab. A negative rule on purpose: it is the judges' own (live-chooser.ts#launcherPremise wants the HOME
+ * activity in front and no lab or chooser record on the stack, so a HOME that is the lab or the chooser always SKIPs
+ * there), so the premise never disagrees with the cases; a positive list of launchers would be a guess. Known fresh
+ * but wrong, for both: Settings' FallbackHome (`com.android.settings/.FallbackHome`, HOME while the device is still
+ * locked after a boot), which no launcher case should start from.
+ */
 function homeFact(resolved: string | { why: string }, b: HandBase): PremiseFact {
   const fact = 'home';
   if (typeof resolved !== 'string') return { fact, state: 'unread', why: `HOME unread (${resolved.why})` };
@@ -167,7 +174,7 @@ function premiseLines(state: PremiseState, facts: readonly PremiseFact[], last: 
   const lastChosen = plural(last.length, 'last-chosen lab entry', 'last-chosen lab entries');
   // The first entry quoted; none, no line.
   const said = `Chooser premise: WARN — ${lastChosen} (mAlways=false: no default; no reinstall clears it), first: `;
-  const warn = last.slice(0, 1).map((e) => said + cut(e.text, ENTRY_CHARS));
+  const warn = last.slice(0, 1).map((e) => said + entryText(e));
   return [head, ...hands, ...warn];
 }
 
@@ -196,12 +203,7 @@ export async function readChooserPremise(
     }
   };
   const base: HandBase = { serial: lab.serial, apk: APK_PATH, then: rerunLine(lab.serial) };
-  const preferredUnread = (why: string): PreferredRead => ({
-    state: 'unread',
-    why: `${PREFERRED_ARGV.join(' ')}: ${why}`,
-  });
   const preferred = await shell(PREFERRED_ARGV, preferredIn, preferredUnread);
-  const handlersUnread = (why: string): { why: string } => ({ why: `query-activities: ${why}` });
   const handlers = await shell<number | { why: string }>(handlersArgv(SHARED_LINK), handlersIn, handlersUnread);
   const stack = stackFact(await lab.focus(), base);
   const home = await shell([HOME_COMMAND], (resolved) => homeOf({ resolved }), (error) => homeOf({ error }));

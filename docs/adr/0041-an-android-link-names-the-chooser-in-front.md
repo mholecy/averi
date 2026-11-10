@@ -703,9 +703,14 @@ and before anything else touches the device, read only (`readPremiseInto` in `sc
 the lab's guard): `dumpsys package preferred` (no lab default for `dev.averi.lab`), `cmd package query-activities
 --brief -a android.intent.action.VIEW -d averilab://shared/open` (two handlers, the lab's `.MainActivity` and
 `.Twin`), `AndroidLab.focus` (no ResolverActivity or ChooserActivity record on the stack), and HOME_COMMAND (HOME
-neither the platform's chooser — two Home apps, none chosen — nor the lab). Each fact is fresh, stale (with the
-owner's hand line) or unread; the record keeps them with the summary's lines (`chooserPremise`), and the lines are
-said on stderr at once, so the owner can stop a run on a stale lab before its cases.
+neither the platform's chooser — two Home apps, none chosen — nor the lab). The HOME rule is negative on purpose: it
+is the judges' own (`launcherPremise` in `live-chooser.ts` wants the HOME activity in front and no lab or chooser
+record on the stack, so a HOME that is the lab or the chooser always SKIPs there), so the premise never disagrees
+with the cases, and a positive list of launchers would be a guess. Fresh but wrong for both alike: Settings'
+FallbackHome (`com.android.settings/.FallbackHome`, HOME while the device is still locked after a boot). Each fact is
+fresh, stale (with the owner's hand line) or unread; the record keeps them with the summary's lines
+(`chooserPremise`), and the lines are said on stderr at once, so the owner can stop a run on a stale lab before its
+cases.
 - A stale fact: `CHOOSER PREMISE: stale — <every fact> — the run fails`, a hand line per stale fact under it, exit 1.
   The default's is the batches' own (`defaultHand`, given its cause: it "predates this run", and the APK is the
   checkout's build, `APK_PATH` in `lab-device.ts`, built first from the checkout root with `gradlew assembleDebug`
@@ -727,9 +732,11 @@ said on stderr at once, so the owner can stop a run on a stale lab before its ca
 
 The readers both sides need moved, not copied, into `scripts/truth/chooser-readers.ts`, a leaf that imports nothing of
 batch/ and nothing live-*: the preferred block's parse (`preferredIn`), the leak rule (`leaksOf`, `unflaggedOf`,
-`lastChosenOf`), the handler query and its count (`handlersArgv`, `handlersIn`), and the hand lines' parts
-(`adbLine`, `defaultHand`, `checkHand`, `HAND_PREFIX`, `LAB_PACKAGE`, `PREFERRED_ARGV`). `lab-chooser.ts` re-exports
-them and keeps its CallResult wrappers (`preferredOf`, `handlersOf`: a failed call unread), behaviour unchanged. The
+`lastChosenOf`), the handler query and its count (`handlersArgv`, `handlersIn`), the unread reads' words
+(`preferredUnread`, `handlersUnread`), an entry as a line quotes it (`ENTRY_CHARS`, `entryText`), and the hand lines'
+parts (`adbLine`, `defaultHand`, `checkHand`, `HAND_PREFIX`, `LAB_PACKAGE`, `PREFERRED_ARGV`). `lab-chooser.ts`
+re-exports what it exported before and keeps its CallResult wrappers (`preferredOf`, `handlersOf`: a failed call
+unread), behaviour unchanged. The
 premise itself (its facts, lines and new hand lines) is live-side, in `chooser-premise.ts`, which no batch imports; it
 reads the stack and HOME with `frontOf`, `homeOf` and `isChooser` in `live-chooser.ts`, the judges' own readers.
 
