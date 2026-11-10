@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Case } from '../../scripts/truth/live-cases.js';
+import { type Case, rejudge, type RunRecord, selectCases, summarize, THIS_CHECKOUT } from '../../scripts/truth/live-cases.js';
 import type { FocusRead } from '../../scripts/truth/lab-device.js';
 import type { LiveVerdict } from '../../scripts/truth/live-visibility.js';
 import { runCase, type CaseRig } from '../../scripts/truth/run-case.js';
@@ -265,14 +265,6 @@ describe('runCase: the rig\'s defaults', () => {
 describe('runCase: after the calls', () => {
   const NOT: LiveVerdict = { outcome: 'MISMATCH', why: 'claimed' };
 
-  // Today's behaviour, pinned (backlog T10): the app wrote no state to read, and the judge meets undefined.
-  it('no state after the calls: a judge that reads it throws a TypeError out of the case, and nothing is recorded', async () => {
-    const lab = new FakeLab({ launched: read('launch'), states: [undefined] });
-    const judge: Case['judge'] = (s) => (s.events.length === 0 ? OK : NOT);
-    await expect(runCase(aCase({ judge }), 'idb', rigOver(lab))).rejects.toThrow(TypeError);
-    expect(lab.log).toEqual(['launch c', 'call tap under idb-x1.yaml', 'pause 800', 'state']);
-  });
-
   it('not ok with keepShot: one screenshot once judged, named by source, case and clock, after the late read', async () => {
     const lab = new FakeLab({ launched: read('launch'), states: [read('first'), read('late')] });
     const kept: [string, string][] = [];
@@ -317,7 +309,91 @@ describe('runCase: after the calls', () => {
     expect(lab.log).toEqual(['launch c']);
   });
 });
+describe('runCase: no first state, the app wrote none (T10)', () => {
+  const NO_STATE: LiveVerdict = { outcome: 'LOUD', cls: 'no-state', why: 'no first state for x1: the app wrote none after the calls' };
+  /** A judge that reads its state, as every judge does: handed none, it would throw a TypeError. */
+  const reads: Case['judge'] = (s) => (s.events.length === 0 ? OK : { outcome: 'MISMATCH', why: 'fired' });
 
+  it('a LOUD failure named with the case\'s id, the judge never asked, no late read, the record with no state', async () => {
+    const lab = new FakeLab({ launched: read('launch'), states: [undefined, read('late')] });
+    const run = await runCase(aCase({ judge: reads }), 'idb', rigOver(lab));
+    expect(run.verdict).toEqual(NO_STATE);
+    expect(lab.log).toEqual(['launch c', 'call tap under idb-x1.yaml', 'pause 800', 'state']);
+    expect(run.record).toStrictEqual({ source: 'idb', id: 'x1', replies: ['Tapped a'], launched: read('launch'), after: [], state: undefined });
+  });
+
+  it('not ok, so its screenshot is kept', async () => {
+    const lab = new FakeLab({ launched: read('launch'), states: [undefined] });
+    const kept: string[] = [];
+    await runCase(aCase({ judge: reads }), 'idb', rigOver(lab, ['r'], { keepShot: async (name) => void kept.push(name) }));
+    expect(lab.log.at(-1)).toBe('screenshot');
+    expect(kept).toEqual(['idb-x1-1000000.png']);
+  });
+
+  it('measuresPanel: no second panel read, there is no state to keep it on', async () => {
+    const lab = new FakeAndroidLab({ launched: read('launch'), states: [undefined], touchable: ['at launch', 'after calls'] });
+    const run = await runCase(aCase({ measuresPanel: true, judge: reads }), 'uiautomator', rigOver(lab));
+    expect(lab.log).toEqual(['launch c', 'guard', 'imeTouchable', 'call tap under uiautomator-x1.yaml', 'pause 800', 'state']);
+    expect(run.verdict.cls).toBe('no-state');
+  });
+
+  it('the focus is still read after the calls, and a chooser left in front still dropped', async () => {
+    const front = (c: string): FocusRead => ({ window: `  mFocusedApp=ActivityRecord{1 u0 ${c}} t1}\n`, activities: `    * Hist  #0: ActivityRecord{1 u0 ${c}} t1}\n` });
+    const LAB = front('dev.averi.lab/.MainActivity');
+    const CHOOSER = front('android/com.android.internal.app.ResolverActivity');
+    const lab = new FakeAndroidLab({ launched: read('launch'), states: [undefined], focus: [LAB, CHOOSER, LAB] });
+    const run = await runCase(aCase({ reads: { focus: true }, judge: reads }), 'uiautomator', rigOver(lab));
+    expect(lab.log).toEqual(['launch c', 'focus', 'call tap under uiautomator-x1.yaml', 'pause 800', 'state', 'focus', 'back', 'focus']);
+    expect(run.record.focus).toEqual({ before: LAB, between: [], after: CHOOSER, teardown: LAB });
+    expect(run.verdict.cls).toBe('no-state');
+  });
+
+  it('the run goes on: the next case on the same rig runs and is judged', async () => {
+    const lab = new FakeLab({ launched: read('launch'), states: [undefined, read('next')] });
+    const rig = rigOver(lab, ['1', '2']);
+    expect((await runCase(aCase({ judge: reads }), 'idb', rig)).verdict).toEqual(NO_STATE);
+    const next = await runCase(aCase({ id: 'x2', judge: reads }), 'idb', rig);
+    expect(next.verdict).toEqual(OK);
+    expect(next.record.state).toEqual({ ...read('next'), readAt: 1000 });
+  });
+
+  it('the summary counts it loud and the run fails on it, named; the record rejudged says the same', async () => {
+    const [b1] = await selectCases({ platform: 'ios', app: 'native', groups: ['forms'], only: ['b1'] });
+    const [b3] = await selectCases({ platform: 'ios', app: 'native', groups: ['forms'], only: ['b3'] });
+    const lab = new FakeLab({ launched: read('launch'), states: [undefined] });
+    const run = await runCase(b1, 'idb', rigOver(lab, ['Tapped']));
+    const why = 'no first state for b1: the app wrote none after the calls';
+    expect(run.verdict).toEqual({ outcome: 'LOUD', cls: 'no-state', why });
+    // A skipped case beside it, which fails nothing: the exit code is the missing state's.
+    const skipped = { verdict: { outcome: 'SKIP', why: 'no IME at launch' } as LiveVerdict, record: { source: 'idb' as const, id: 'b3', skip: 'no IME at launch', replies: [], launched: read('launch'), after: [], state: undefined } };
+    const live = summarize({ platform: 'ios', sources: ['idb'], side: THIS_CHECKOUT, results: [{ source: 'idb', c: b1, verdict: run.verdict, replies: run.record.replies }, { source: 'idb', c: b3, verdict: skipped.verdict, replies: [] }] });
+    expect(live.lines[1]).toBe('# Live golden: 2 cases, 0 ok, 1 loud, 0 mismatches (0 not known), 1 skipped');
+    expect(live.lines).toContain(`- LOUD (no-state) b1 ${b1.cell}: ${b1.says} — ${why}`);
+    expect(live.lines).toContain('NO FIRST STATE — the app wrote none, the run fails: idb b1');
+    expect(live.exitCode).toBe(1);
+    // The record as --record writes it (JSON drops the undefined state), judged again: the same verdict, no throw.
+    const record: RunRecord = JSON.parse(JSON.stringify({ platform: 'ios', side: THIS_CHECKOUT, results: [run.record, skipped.record] }));
+    const again = await rejudge(record, 'r.json', { groups: ['forms'] });
+    expect(again.lines.slice(1)).toEqual(live.lines.slice(1));
+    expect(again.exitCode).toBe(1);
+  });
+
+  it('without such a case the run does not fail: a SKIP and a plain LOUD stay as they were', () => {
+    const c = aCase();
+    const results = [{ source: 'idb' as const, c, verdict: { outcome: 'LOUD', cls: 'not-reached', why: 'honest' } as LiveVerdict, replies: ['r'] }, { source: 'idb' as const, c, verdict: { outcome: 'SKIP', why: 's' } as LiveVerdict, replies: [] }];
+    const { lines, exitCode } = summarize({ platform: 'ios', sources: ['idb'], side: THIS_CHECKOUT, results });
+    expect(lines.join('\n')).not.toContain('NO FIRST STATE');
+    expect(exitCode).toBe(0);
+  });
+
+  it("T7b's first state with no cell (a fresh process writes `cell: \"\"`) is a state: the judge is asked", async () => {
+    const lab = new FakeLab({ launched: read('launch'), states: [read('final', { cell: '' })] });
+    let judgedCell: string | undefined;
+    const run = await runCase(aCase({ judge: (s) => ((judgedCell = s.cell), OK) }), 'idb', rigOver(lab));
+    expect(judgedCell).toBe('');
+    expect(run.verdict).toEqual(OK);
+  });
+});
 
 describe('runCase: the focus reads and the launcher start (the chooser group, T7b)', () => {
   /** A focus read naming `focused` in front, its records the stack. */

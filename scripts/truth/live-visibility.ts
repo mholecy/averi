@@ -111,7 +111,10 @@ export type VerdictClass =
   | 'carousel-kind'
   | 'off-band'
   | 'unsettled-read'
-  | 'no-retry';
+  | 'no-retry'
+  // run-case.ts (T10): no first state to judge, the app wrote none after the calls (live-cases.ts#noFirstState) — a broken
+  // lab app, not averi's; it fails the run (summarize).
+  | 'no-state';
 
 export interface LiveVerdict {
   outcome: Outcome;
