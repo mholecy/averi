@@ -10,7 +10,7 @@ import { CHOOSER_CASES, type FocusReads } from './live-chooser.js';
 import { knownEntry, knownLive } from './live-known.js';
 import { judgeFullWindow, judgeHeldNo } from './live-ensure.js';
 import { FLOATING_PANEL_EVIDENCE, holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, refusedCapped, refusedKept, refusedOnFocus, refusedUnchanged, short, type Source, valueOf } from './live-forms.js';
-import { hedgedStops, hedgedStopsLine, judgeDismissal, PRESENTED_WINDOW_CELLS, presentedAssertCase, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
+import { hedgedStops, hedgedStopsLine, isJudged, judgeDismissal, PRESENTED_WINDOW_CELLS, presentedAssertCase, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
 import { allPassed, claimsTap, isError } from './replies.js';
 import { appOf, labId, labSelector, parseLabApp, type Catalog, type CellTruth, type HeldSpec, type LabApp, type LabState } from './schema.js';
 
@@ -849,7 +849,7 @@ export function summarize({ platform, sources, results, side, rejudgedFrom, devi
   const residuals = new Map(results.flatMap((r) => (r.verdict.accepted === undefined ? [] : [[r.verdict.accepted.id, r.verdict.accepted.residual] as const])));
   for (const [id, residual] of residuals) {
     const ids = new Set(results.filter((r) => r.verdict.accepted?.id === id).map((r) => r.c.id));
-    const of = results.filter((r) => ids.has(r.c.id) && r.verdict.outcome !== 'SKIP');
+    const of = results.filter((r) => ids.has(r.c.id) && isJudged(r.verdict));
     const counted = results.filter((r) => r.verdict.accepted?.id === id);
     lines.push(`Accepted under ${residual}: ${counted.length} of ${of.length} judged run(s) of ${[...ids].join(', ')}`, '');
   }

@@ -1,7 +1,7 @@
 import type { Point } from '../../src/adapters/types.js';
 import { pause } from './lab-device.js';
 import { short } from './live-forms.js';
-import { strokesSince, type LiveVerdict } from './live-visibility.js';
+import { isJudged, strokesSince, type LiveVerdict } from './live-visibility.js';
 import { carouselReply, heldCutHedged, inferredAxisSaid, isError, replyKind, snapshotNodes, swipesOf, type CarouselReply } from './replies.js';
 import type { Case, CaseReads, DeviceLog } from './live-cases.js';
 import { labId, labSelector, type LabState, type Rect } from './schema.js';
@@ -530,7 +530,7 @@ export const CEILING_MIN_LEGS = 3;
 /** A run's result as the ceiling reads it (live-cases.ts#Result: its case's id, its verdict). */
 export interface CeilingResult {
   c: { id: string };
-  verdict: Pick<LiveVerdict, 'outcome' | 'accepted'>;
+  verdict: Pick<LiveVerdict, 'outcome' | 'cls' | 'accepted'>;
 }
 
 /** `p` as a percentage, two significant digits: 2.7, 0.81. */
@@ -539,7 +539,7 @@ const percent = (p: number) => `${Number((p * 100).toPrecision(2))} %`;
 /**
  * The ceiling on D68_SPREAD's acceptance (live-cases.ts#summarize hands it the run's results): ADR 0021's D68
  * amendment measured the hedged bound on ~3 in 10 of the unaimable legs (HEDGED_RATE), so a run whose every judged leg
- * (not SKIP) ended hedged — CEILING_MIN_LEGS or more — reads as D68's stop reverted, not as chance (about 2.7 % with
+ * (live-visibility.ts#isJudged: not SKIP, not `no-state`) ended hedged — CEILING_MIN_LEGS or more — reads as D68's stop reverted, not as chance (about 2.7 % with
  * three; the 3 planned runs, 9 legs, make it negligible): MISMATCH-class, the run fails (`fails`; held only in a run of
  * this checkout — a `--side` one is a calibration). Fewer judged — any leg selected, even every one SKIPped: LOUD
  * (`loud`, counted in the summary's tally), no pass claimed, the exit untouched. "hedged N of M" whenever a leg was in
@@ -547,7 +547,7 @@ const percent = (p: number) => `${Number((p * 100).toPrecision(2))} %`;
  */
 export function hedgedCeiling(results: readonly CeilingResult[], ofThisCheckout: boolean): { lines: string[]; fails: boolean; loud: boolean; hedged: number; judged: number } {
   const legs = results.filter((r) => UNAIMABLE_LEGS.includes(r.c.id));
-  const judgedLegs = legs.filter((r) => r.verdict.outcome !== 'SKIP');
+  const judgedLegs = legs.filter((r) => isJudged(r.verdict));
   const hedged = judgedLegs.filter((r) => r.verdict.accepted?.id === D68_SPREAD.id).length;
   const judged = judgedLegs.length;
   const said = (line: string, more: { fails?: true; loud?: true } = {}) => ({ lines: [line], fails: more.fails === true, loud: more.loud === true, hedged, judged });

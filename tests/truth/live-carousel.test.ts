@@ -4,6 +4,7 @@ import type { Point } from '../../src/adapters/types.js';
 import { describeScrollResult } from '../../src/interact/scroll-text.js';
 import { CAROUSEL_CASES, CUT_TOLERANCE_PX, D68_SPREAD, hedgedCeiling, hookSwipes, judgeFully, LAB_CAROUSEL, NO_CLIP, preDrag, preDragOrSkip, preDragStroke, SwipeHook, UNAIMABLE_LEGS, type SwipeEntry } from '../../scripts/truth/live-carousel.js';
 import { TOUCH_SLACK } from '../../scripts/truth/truth.js';
+import type { LiveVerdict } from '../../scripts/truth/live-visibility.js';
 import { judged, rejudge, rejudgedResults, selectCases, summarize, type Case, type RunRecord } from '../../scripts/truth/live-cases.js';
 import type { LabState } from '../../scripts/truth/schema.js';
 
@@ -425,6 +426,13 @@ describe('lv-d62 and D68: the hedged bound accepted and counted where unaimable 
     expect(lines).toContain(`Accepted under ${D68_SPREAD.residual}: 1 of 2 judged run(s) of lv-d62-control`);
   });
 
+  it('a run with no first state (T10, `no-state`) is not a judged run of the residual\'s cases', () => {
+    const row = (verdict: LiveVerdict) => ({ source: 'uiautomator' as const, c: caseOf('lv-d62-control'), verdict, replies: [] });
+    const results = [row({ outcome: 'ok', why: '', accepted: D68_SPREAD }), row({ outcome: 'LOUD', cls: 'no-state', why: 'no first state for lv-d62-control: the app wrote none after the calls' })];
+    const { lines } = summarize({ platform: 'android', sources: ['uiautomator'], results, side: 'this checkout' });
+    expect(lines).toContain(`Accepted under ${D68_SPREAD.residual}: 1 of 1 judged run(s) of lv-d62-control`);
+  });
+
   it('two residuals in one run are counted apart, each by its id', () => {
     const other = { id: 'other', residual: 'residual:another' };
     const row = (id: string, accepted: { id: string; residual: string }) => ({ source: 'uiautomator' as const, c: caseOf(id), verdict: { outcome: 'ok' as const, why: '', accepted }, replies: [] });
@@ -683,6 +691,14 @@ describe('the hedged ceiling: a run whose every judged unaimable leg ends hedged
     expect(hedgedCeiling([row('lv-d62-control', 'ok', true), row('lv-d68-launch', 'ok', true), row('lv-d59b-recycler', 'LOUD', false), row('lv-d62-drop', 'ok', false)], true)).toMatchObject({ fails: false, hedged: 2, judged: 3 });
     expect(hedgedCeiling([row('lv-d62-control', 'ok', true), row('lv-d68-launch', 'ok', true), row('lv-d59b-recycler', 'ok', true), row('lv-d62-drop', 'ok', false)], true)).toMatchObject({ fails: true, hedged: 3, judged: 3 });
     expect(hedgedCeiling([row('lv-d62-control', 'ok', true), row('lv-d68-launch', 'ok', true), row('lv-d59b-recycler', 'SKIP', false)], true)).toMatchObject({ fails: false, hedged: 2, judged: 2 });
+  });
+
+  it('hedgedCeiling: a leg with no first state (T10, `no-state`) was judged by nothing, so it is not counted judged: no pass claimed', () => {
+    const row = (id: string) => ({ c: { id }, verdict: { outcome: 'ok' as const, accepted: D68_SPREAD } });
+    const stateless = { c: { id: 'lv-d59b-recycler' }, verdict: { outcome: 'LOUD' as const, cls: 'no-state' as const } };
+    const ceiling = hedgedCeiling([row('lv-d62-control'), row('lv-d68-launch'), stateless], true);
+    expect(ceiling).toMatchObject({ loud: true, fails: false, hedged: 2, judged: 2 });
+    expect(ceiling.lines).toEqual(['LOUD (hedged ceiling): hedged 2 of 2 judged unaimable leg(s) — fewer than 3 judged, the ceiling unjudged (no pass claimed)']);
   });
 });
 

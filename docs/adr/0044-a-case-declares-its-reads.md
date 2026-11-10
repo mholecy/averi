@@ -201,13 +201,18 @@ met `undefined`, and a judge that read it threw a raw TypeError that ended the w
 pinned it. T7b did not run into it (its fresh process writes `cell: ""`, a state), but a lab app that stops writing would.
 
 **Decision.** A first state that is undefined is the case's LOUD verdict of class `no-state`, named with the case's id
-(`noFirstState` in `scripts/truth/live-cases.ts`: `no first state for <id>: the app wrote none after the calls`), decided in `runCase` before
-any judge, never a SKIP (a SKIP reads as harmless and would hide a lab app that stopped writing). With no state there is
-no judge to ask, no late read (`wantsLateRead` asks the judge) and no second panel read (it is kept on the state); the
-focus read after the calls, the screenshot (the verdict is not ok) and the teardown run as for any case, and the record
-keeps `state` undefined with no `skip`. The run goes on to the next case. `summarize` counts it as loud and fails the run
-on it with a line of its own (`NO FIRST STATE — the app wrote none, the run fails: <source> <id>, …`), as it does a SKIP
-of a `skipFails` case. `rejudgedResults` gives such a record the same verdict (no committed record has one: each with no
-state has a `skip`, so every committed record rejudges as before; the old `no state recorded` SKIP is gone). The between-
-calls reads already keep an undefined state as it was read, and the late read already drops one, so neither changes.
-tests/truth/run-case.test.ts pins it, from the run to its summary and the rejudged record, in place of A11's pin.
+(`noFirstState` in `scripts/truth/live-cases.ts`: `no first state for <id>: the app wrote none after the calls`),
+decided in `runCase` before any judge, never a SKIP (a SKIP reads as harmless and would hide a lab app that stopped
+writing). With no state there is no judge to ask, no late read (`wantsLateRead` asks the judge) and no second panel read
+(it is kept on the state); the focus read after the calls, the screenshot (the verdict is not ok) and the teardown run
+as for any case, and the record keeps `state` undefined with no `skip`. The run goes on to the next case. `summarize`
+counts it as loud and fails the run on it, a `--side` run too (the lab app is broken whatever averi drove it), with a
+line of its own (`NO FIRST STATE — the app wrote none, the run fails: <source> <id>, …`), as it does a SKIP of a
+`skipFails` case. A `no-state` verdict is not a judged one: `isJudged` in `scripts/truth/live-visibility.ts` (not SKIP,
+not `no-state`) is what every count of judged runs asks — the carousel's hedged ceiling (`hedgedCeiling`) and the
+residual tally's "N of M judged run(s)" — so a leg nothing judged never turns the ceiling's "no pass claimed" into a
+pass. `rejudgedResults` gives such a record the same verdict (no committed record has one: each with no state has a
+`skip`, so every committed record rejudges as before; the old `no state recorded` SKIP is gone). The between-calls
+reads already keep an undefined state as it was read, and the late read already drops one, so neither changes.
+tests/truth/run-case.test.ts pins it, from the run to its summary and the rejudged record, in place of A11's pin;
+tests/truth/live-carousel.test.ts pins the ceiling and the residual tally.

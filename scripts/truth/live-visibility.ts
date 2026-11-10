@@ -132,6 +132,13 @@ export interface LiveVerdict {
   accepted?: { id: string; residual: string };
 }
 
+/**
+ * Whether a verdict was reached by a judge: not a SKIP, and not a case with no first state (T10, `no-state`), which no
+ * judge was asked about. Every count of "judged" runs or legs asks this (live-carousel.ts#hedgedCeiling, the residual
+ * tally in live-cases.ts#summarize), so a run nothing judged never makes one claim a pass.
+ */
+export const isJudged = (v: Pick<LiveVerdict, 'outcome' | 'cls'>): boolean => v.outcome !== 'SKIP' && v.cls !== 'no-state';
+
 /** What a tap or a stroke made the app log: every event but the touches and focus changes (tap, dismissed, button, tab, select, submit). */
 export function firedSince(state: Pick<LabState, 'events'>, launched: Pick<LabState, 'events'>): ProbeEvent[] {
   return state.events.slice(launched.events.length).filter((e) => e.kind !== 'touch' && e.kind !== 'focus').map(({ kind, tag }) => ({ kind, tag }));

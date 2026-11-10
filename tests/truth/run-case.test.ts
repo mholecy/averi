@@ -378,6 +378,13 @@ describe('runCase: no first state, the app wrote none (T10)', () => {
     expect(again.exitCode).toBe(1);
   });
 
+  it('a --side run (a calibration, held to no KNOWN entry) fails on it too: the lab app is broken whatever averi drove it', () => {
+    const results = [{ source: 'idb' as const, c: aCase(), verdict: { outcome: 'LOUD', cls: 'no-state', why: 'no first state for x1: the app wrote none after the calls' } as LiveVerdict, replies: ['r'] }];
+    const { lines, exitCode } = summarize({ platform: 'ios', sources: ['idb'], side: '<cal>/side-checkout', results });
+    expect(lines).toContain('NO FIRST STATE — the app wrote none, the run fails: idb x1');
+    expect(exitCode).toBe(1);
+  });
+
   it('without such a case the run does not fail: a SKIP and a plain LOUD stay as they were', () => {
     const c = aCase();
     const results = [{ source: 'idb' as const, c, verdict: { outcome: 'LOUD', cls: 'not-reached', why: 'honest' } as LiveVerdict, replies: ['r'] }, { source: 'idb' as const, c, verdict: { outcome: 'SKIP', why: 's' } as LiveVerdict, replies: [] }];
