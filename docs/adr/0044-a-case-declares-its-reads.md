@@ -210,12 +210,13 @@ as for any case, and the record keeps `state` undefined with no `skip`. The run 
 counts it as loud and fails the run on it, a `--side` run too (the lab app is broken whatever averi drove it), with a
 line of its own (`NO FIRST STATE — the app wrote none, the run fails: <source> <id>, …`), as it does a SKIP of a
 `skipFails` case. A `no-state` verdict is not a judged one: `isJudged` in `scripts/truth/live-visibility.ts` (not SKIP,
-not `no-state`) is what every count of judged runs asks — the carousel's hedged ceiling (`hedgedCeiling`) and the
-residual tally's "N of M judged run(s)" — so a leg nothing judged never turns the ceiling's "no pass claimed" into a
-pass. `rejudgedResults` gives such a record the same verdict (no committed record has one: each with no state has a
-`skip`, so every committed record rejudges as before; the old `no state recorded` SKIP is gone). The between-calls
-reads already keep an undefined state as it was read (every judge that reads one falls back to the final state or
-SKIPs, so none throws; pinned), and the late read already drops one, so neither changes. A `no-state` case carries no
-KNOWN or NOT-known mark in the summary (`isStateless`, beside `isJudged`): no averi behaviour was judged.
+not `no-state`) is what every count a pass is claimed on asks — the carousel's hedged ceiling (`hedgedCeiling`) and
+the residual tally's "N of M judged run(s)" — so a leg nothing judged never turns the ceiling's "no pass claimed" into a
+pass. `hedgedStops` deliberately does not ask it: it counts averi's real replies, so a `no-state` case's hedge stays,
+in the `other` bucket. `rejudgedResults` gives such a record the same verdict (no committed record has one: each with
+no state has a `skip`, so every committed record rejudges as before; the old `no state recorded` SKIP is gone). The
+between-calls reads already keep an undefined state as it was read (every judge that reads one falls back to the final
+state or SKIPs, so none throws; pinned), and the late read already drops one, so neither changes. A `no-state` case
+carries no KNOWN or NOT-known mark in the summary (`isStateless`, beside `isJudged`): no averi behaviour was judged.
 tests/truth/run-case.test.ts pins it, from the run to its summary and the rejudged record, in place of A11's pin;
 tests/truth/live-carousel.test.ts pins the ceiling and the residual tally.
