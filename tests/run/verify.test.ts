@@ -18,6 +18,7 @@ import {
 import { Verifier } from '../../src/verify/assert.js';
 import type { LayoutContract } from '../../src/verify/layout-contract.js';
 import { ocrEngineFor, ocrUnavailableReason, type OcrEngine } from '../../src/verify/ocr.js';
+import { escapeRegExp } from '../../src/verify/text-hint.js';
 import { FakeAdapter, node } from '../helpers/fake.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { boundReads } from '../helpers/terminal-read.js';
@@ -89,8 +90,6 @@ const request = (over: Partial<Parameters<typeof runVerification>[0]> = {}) => (
 });
 
 const contract = (anchors: LayoutContract['anchors']): LayoutContract => ({ screen: 's', anchors });
-
-const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 describe('runVerification legs', () => {
   it('reports both platforms in canonical order with one screenshot each', async () => {
