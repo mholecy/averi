@@ -1112,6 +1112,26 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     expect(result).toMatchObject({ cleared: 'unmeasured', readBack: { kind: 'not-taken' }, notInput: { input: expect.objectContaining({ identifier: 'name' }) } });
   });
 
+  // D79 code review (spec NIT): a `not-taken` reading (a non-input showing its own text) is worded only after a retry
+  // (fill-type.ts). Through fillField its earlier text is its own text — the post-focus re-read is made only of an empty
+  // or all-bullet one (fill.ts) — so its own text again reads `unchanged`, an equal count that says why; no `equal`
+  // clause reaches this route (the fill-landing rows of `55` after `5` and `1 ` after `1` are Differences no reply
+  // words). Pinned: a text `55` that takes the typing (`5555`), then shows its own text after the wipe and retype.
+  it('a non-input showing its own `55` again after the retype: worded as unchanged, never bare equal counts (D79)', async () => {
+    resetLayout();
+    const title = node({ role: 'text', identifier: 'title', value: '55', rect: { x: 0, y: 0, width: 100, height: 10 } });
+    const fake = new FakeAdapter({ s: screen(title, el({ role: 'textfield', identifier: 'name' })) }, 's');
+    const live = () => fake.live().children[0];
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      live().value = fake.typed.length === 1 ? `55${text}` : '55'; // it takes the first typing, then shows its own text again
+    };
+    await expect(fillField(fake, 'id:title', '55', { ...FAST, clear: true })).rejects.toThrow(
+      /^fill: typed 2 characters \(after one wipe and retype\) but the field shows 2 — the field did not change: the typing did not reach it, or the field refused it \(content withheld from this error\); the matched node is role text/,
+    );
+    expect(fake.typed).toEqual(['55', '55']);
+  });
+
   it('a non-input that shows the typed text but never exactly the value fails after the retry, and the error names the input it is not', async () => {
     resetLayout();
     const title = node({ role: 'text', identifier: 'title', value: null, rect: { x: 0, y: 0, width: 100, height: 10 } });

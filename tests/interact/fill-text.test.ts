@@ -401,26 +401,26 @@ describe('fillFailureText — every error a fill throws', () => {
   // D79: D71's refusal of the value itself read "typed 2 characters but the field shows 2" — equal counts read as a
   // match. It says the count an append would have shown instead, the field's own count left out (it is the typed one).
   it('a length that is the value itself says what an append would show, never two equal counts', () => {
-    expect(mismatch({ kind: 'length', wholeToo: true, appended: 3 }, 2, 2)).toBe(
+    expect(mismatch({ kind: 'length', wholeToo: true, equal: { why: 'value-itself', appendWouldShow: 3 } }, 2, 2)).toBe(
       'fill: typed 2 characters but the field shows only the typed text, where an append would show 3 — ' +
         'the field may have replaced its text (select-all): fill with `clear: true` (content withheld from this error)',
     );
     // without the hedge (keys proven typed elsewhere: fill-landing.ts#withoutWholeToo keeps the count)
-    expect(mismatch({ kind: 'length', appended: 6 }, 4, 4)).toBe(
+    expect(mismatch({ kind: 'length', equal: { why: 'value-itself', appendWouldShow: 6 } }, 4, 4)).toBe(
       'fill: typed 4 characters but the field shows only the typed text, where an append would show 6 (content withheld from this error)',
     );
   });
 
   // D79 review round 1, MAJOR-1: the rest of the class — a `length` whose field count is the typed one
   it('a length of as many characters as typed says how many are the typing, or that some are bullets', () => {
-    expect(mismatch({ kind: 'length', past: 1 }, 2, 2)).toBe('fill: typed 2 characters but the field shows 2, only 1 of them past its earlier text (content withheld from this error)');
-    expect(mismatch({ kind: 'length', past: 0 }, 7, 7)).toBe(
+    expect(mismatch({ kind: 'length', equal: { why: 'padded', typedPart: 1 } }, 2, 2)).toBe('fill: typed 2 characters but the field shows 2, only 1 of them past its earlier text (content withheld from this error)');
+    expect(mismatch({ kind: 'length', equal: { why: 'placeholder' } }, 7, 7)).toBe(
       'fill: typed 7 characters but the field shows 7, exactly its placeholder: empty, or the typing turned into that text — the tree cannot tell which (content withheld from this error)',
     );
-    expect(mismatch({ kind: 'length', partlyMasked: true }, 6, 6)).toBe(
+    expect(mismatch({ kind: 'length', equal: { why: 'partly-masked' } }, 6, 6)).toBe(
       'fill: typed 6 characters but the field shows 6, some of them bullets: the typing cannot be compared with them (content withheld from this error)',
     );
-    expect(mismatch({ kind: 'length', wholeToo: true, past: 1 }, 2, 2)).toBe(
+    expect(mismatch({ kind: 'length', wholeToo: true, equal: { why: 'padded', typedPart: 1 } }, 2, 2)).toBe(
       'fill: typed 2 characters but the field shows 2, only 1 of them past its earlier text — the field may have replaced its text (select-all): fill with `clear: true` (content withheld from this error)',
     );
   });

@@ -603,7 +603,7 @@ describe('typeAndConfirm — an earlier text that holds the value is no landing 
   // end Filled over `555`.
   it.each(['on-return', 'may-arrive-late'] as const)('%s: `55` after `5`, the second key dropped — missed, a length that is a whole landing too, nothing typed again', async (delivery) => {
     const { io, intent, typed } = scripted({ prefilled: '5', keep: [1] });
-    expect(await typeAndConfirm(io, { ...intent, value: '55', before: '5', delivery })).toEqual({ kind: 'missed', observed: '55', again: [], differs: { kind: 'length', wholeToo: true, appended: 3 } });
+    expect(await typeAndConfirm(io, { ...intent, value: '55', before: '5', delivery })).toEqual({ kind: 'missed', observed: '55', again: [], differs: { kind: 'length', wholeToo: true, equal: { why: 'value-itself', appendWouldShow: 3 } } });
     expect(typed).toEqual(['55']);
   });
 
@@ -622,7 +622,7 @@ describe('typeAndConfirm — an earlier text that holds the value is no landing 
     ['11 ', '11', '1', '1', { kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true }],
     ['-5-', '-5', '-5', '5', { kind: 'length' }],
     // D79 review round 1, NIT-2: the value itself, the hedge gone, the append count kept
-    ['55', '55', '5', '5', { kind: 'length', appended: 3 }],
+    ['55', '55', '5', '5', { kind: 'length', equal: { why: 'value-itself', appendWouldShow: 3 } }],
   ])('`%s` for `%s` after `%s`, a sibling gaining the missing `%s`: missed, elsewhere, no hedge', async (shown, value, before, gained, differs) => {
     const { io, intent, typed } = scripted({ prefilled: before, format: () => shown, elsewhere: () => gained });
     const missed = await typeAndConfirm(io, { ...intent, value, before });

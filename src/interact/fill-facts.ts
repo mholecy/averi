@@ -373,19 +373,10 @@ export interface OtherInput {
  *   (interact/fill-landing.ts#wholeLandingToo) — so nothing was typed again,
  *   and the reply names that reading and its remedy. A `length` carries it
  *   too: an exact strict prefix that is a whole landing as well (`-5-` for
- *   `-5` after `-5`, `xaa` for `aa` after `xa`). `appended` (D79): the
- *   reading is the value itself, refused without clear (D71: `55` after
- *   `5`), so its count is the typed one — the reply says instead the count
- *   an append would have shown (the earlier text's plus the typed), never
- *   two equal numbers (docs/bugs/2026-10-09-fill-mismatch-error-says-equal-
- *   counts-when-app-transforms-text.md's class). Two more of that class
- *   (D79 review round 1), set only where the field's count is the typed
- *   one: `past`, how many of the field's characters are past its earlier
- *   text (the typing's part: `12` after `1` read `11` — 1; 0 when the
- *   reading is exactly the named placeholder: an empty field, or typing
- *   the app turned into that text — the tree cannot tell which), and `partlyMasked`, a reading with
- *   bullets among its characters (`•1` for `11`), whose content cannot be
- *   compared.
+ *   `-5` after `-5`, `xaa` for `aa` after `xa`). `equal` (D79): the
+ *   field's count is the typed one, and why the two equal numbers are no
+ *   match (`EqualCount`; docs/bugs/2026-10-09-fill-mismatch-error-says-
+ *   equal-counts-when-app-transforms-text.md's class).
  * - `separated` (D53): every typed character is there, in order, with
  *   `added` separators (interact/fill-reformat.ts#SEPARATORS) and nothing
  *   else — separators ADR 0034's rules refuse as the field's grouping (a
@@ -406,4 +397,25 @@ export type Difference =
   | { kind: 'unchanged' }
   | { kind: 'dropped-tail'; landed: number; dropped: number; grouped: boolean; wholeToo?: true }
   | { kind: 'separated'; added: number }
-  | { kind: 'length'; wholeToo?: true; appended?: number; past?: number; partlyMasked?: true };
+  | { kind: 'length'; wholeToo?: true; equal?: EqualCount };
+
+/**
+ * Why a `length` whose field count is the typed one is no match (D79), one
+ * reason, set only there (interact/fill-landing.ts#differenceOf):
+ * - `value-itself`: the reading is the value, refused without clear (D71:
+ *   `55` after `5`); `appendWouldShow`, the earlier text's count plus the
+ *   typed.
+ * - `padded`: the earlier text pads a short typing up to the typed count
+ *   (`12` after `1` read `11`); `typedPart`, how many characters are past
+ *   it — at least 1, fewer than typed.
+ * - `placeholder`: the reading is exactly the named placeholder — an empty
+ *   field, or typing the app turned into that text; the tree cannot tell
+ *   which.
+ * - `partly-masked`: bullets among the characters (`•••••t` for `secret`),
+ *   whose content cannot be compared.
+ */
+export type EqualCount =
+  | { why: 'value-itself'; appendWouldShow: number }
+  | { why: 'padded'; typedPart: number }
+  | { why: 'placeholder' }
+  | { why: 'partly-masked' };

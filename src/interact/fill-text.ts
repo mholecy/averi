@@ -53,7 +53,7 @@
 import { INPUT_ROLE } from '../adapters/types.js';
 import { rectText } from '../ui-tree/geometry.js';
 import { charactersText, countOf } from '../util/count.js';
-import type { Difference, FillFailure, FillResult, LostWhy, Reformat, SentAgain } from './fill-facts.js';
+import type { Difference, EqualCount, FillFailure, FillResult, LostWhy, Reformat, SentAgain } from './fill-facts.js';
 import { judgeFill, type Caveat, type FillVerdict, type Reason, type Sent } from './fill-verdict.js';
 
 /** One flow trace line: the action column and its text. */
@@ -298,7 +298,7 @@ const FAILURE_SENTENCE: SentenceTable<FillFailure> = {
     'xcrun simctl list), then retry with clear: true so the field is reset',
   'clear-twice': ({ left, rounds }) => `fill: field still shows ${charactersText(left)} after clearing ${rounds === 2 ? 'twice' : `${rounds} times`}`,
   mismatch: ({ typed, shows, differs, notInput, again, elsewhere }) =>
-    `fill: typed ${charactersText(typed)}${again === undefined ? '' : ` (${againText(again)})`} but the field shows ${showsText(shows, differs)}` +
+    `fill: typed ${charactersText(typed)}${again === undefined ? '' : ` (${againText(again)})`} but the field shows ${differs.kind === 'length' ? lengthShowsText(shows, differs.equal) : shows}` +
     (DIFFERENCE_TEXT[differs.kind] as (d: Difference) => string)(differs) +
     (elsewhere === undefined
       ? ''
@@ -308,20 +308,23 @@ const FAILURE_SENTENCE: SentenceTable<FillFailure> = {
 };
 
 /**
- * The mismatch's second count: the field's — and (D79) where it is the typed count of a `length`, why the two equal
- * numbers are no match (docs/bugs/2026-10-09-fill-mismatch-error-says-equal-counts-when-app-transforms-text.md's
- * class): for the value itself, refused without clear (D71), what an append would have shown instead; how many of them
- * are past the earlier text; or that some are bullets. Counts only, no content.
+ * A `length` mismatch's second count: the field's — and (D79) where it is the typed count, why the two equal numbers
+ * are no match (fill-facts.ts#EqualCount; docs/bugs/2026-10-09-fill-mismatch-error-says-equal-counts-when-app-
+ * transforms-text.md's class). Counts only, no content.
  */
-function showsText(shows: number, d: Difference): string {
-  if (d.kind !== 'length') return `${shows}`;
-  if (d.appended !== undefined) return `only the typed text, where an append would show ${d.appended}`;
-  // review round 2: exactly the named placeholder is an empty field or typing turned into that text — never which
-  if (d.past === 0) return `${shows}, exactly its placeholder: empty, or the typing turned into that text — the tree cannot tell which`;
-  if (d.past !== undefined) return `${shows}, only ${d.past} of them past its earlier text`;
-  if (d.partlyMasked === true) return `${shows}, some of them bullets: the typing cannot be compared with them`;
-  return `${shows}`;
+function lengthShowsText(shows: number, equal: EqualCount | undefined): string {
+  if (equal === undefined) return `${shows}`;
+  return EQUAL_COUNT_TEXT[equal.why](equal as never, shows);
 }
+
+const EQUAL_COUNT_TEXT: { [W in EqualCount['why']]: (e: Extract<EqualCount, { why: W }>, shows: number) => string } = {
+  // D71's refusal: the field's count is the typed one; what an append would have shown instead
+  'value-itself': ({ appendWouldShow }) => `only the typed text, where an append would show ${appendWouldShow}`,
+  padded: ({ typedPart }, shows) => `${shows}, only ${typedPart} of them past its earlier text`,
+  // review round 2: an empty field or typing turned into that text — never which
+  placeholder: (_, shows) => `${shows}, exactly its placeholder: empty, or the typing turned into that text — the tree cannot tell which`,
+  'partly-masked': (_, shows) => `${shows}, some of them bullets: the typing cannot be compared with them`,
+};
 
 /**
  * What was sent again before the mismatch's read-back, in the order sent: a run of dropped tails as `retypedText`
