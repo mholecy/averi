@@ -648,7 +648,8 @@ Residuals, stated:
   lc4' (`launch_app` with no activity from the launcher answers `Launched`, the app `mFocusedApp`) and lc4'' (the same
   over `open_deep_link averilab://shared/open`'s chooser, no `ResolverActivity` left), since built (the T7b amendment
   below), are D73's net, run on demand with `live.ts --groups chooser` (lab, API 33); no recurring run includes it yet
-  (backlog T20b, a standing lab batch, and T20c, its schedule; T20a, the premise read before the cases, below).
+  (backlog T20b, a standing lab batch, and T20c, its schedule; T20a, the premise read before the cases, below). Since
+  T20b the standing batch exists (`npm run truth:lab`, the T20b amendment at the end); scheduling it is T20c.
 - D55b's proposed live case lc4 (the error naming the chooser) is void: monkey under the chooser now answers `Launched`.
   lc4' and lc4'' take its place.
 - ADR 0041's "The reply does not say what `launch_app` does with the chooser up, because that is unmeasured" is answered
@@ -681,7 +682,8 @@ chooser left on the stack" only on the settled read (the harness waits while `mC
 at most). A read whose wait runs out with a chooser record still listed is a MISMATCH (5 s, well past the ~1.3 s
 measured); with none listed, or an old record's unwaited read, what is left is unread (SKIP). Review round 1's three
 runs: 5 of 5 ok each. lc4' and lc4'' are D73's net, run on demand with `live.ts --groups chooser` (lab, API 33); no
-recurring run includes it yet (backlog T20b, a standing lab batch, and T20c, its schedule).
+recurring run includes it yet (backlog T20b, a standing lab batch, and T20c, its schedule). Since T20b the standing
+batch exists (the T20b amendment at the end); scheduling it is T20c.
 
 **Consequences.** The residual above, a monkey that exits 0 with the chooser still in front (API 34 and later,
 unmeasured), stands: the group runs on API 33 only. lc3's "one start" is not a check on this lab (`.MainActivity` is
@@ -742,10 +744,53 @@ reads the stack and HOME with `frontOf`, `homeOf` and `isChooser` in `live-choos
 
 **Consequences.** A stale lab is now a named failure with its remedy, not a quiet SKIP. Not done here: nothing clears
 the state (no reinstall, no key, no setting — the owner's hand lines do that), and no recurring run includes the group
-yet (backlog T20b, a standing lab batch, and T20c, its schedule). Not run on a device: the emulator was down when this
-was built, so the premise's lines are pinned on batch-10's API 33 reads and T7b's recorded launcher reads, through a
+yet (backlog T20b, a standing lab batch, and T20c, its schedule; since built, the T20b amendment below). Not run on a
+device: the emulator was down when this was built, so the premise's lines are pinned on batch-10's API 33 reads and T7b's recorded launcher reads, through a
 fake adb (tests/truth/chooser-premise.test.ts). What the tests pin is `readPremiseInto` (read, record, echo) and
 `summarizeRecord` (the record's labels into the summary, shared with `--rejudge`); live.ts's own two call lines are
 not pinned — its `readPremiseInto` call and the record it hands `summarizeRecord` (live.ts:264 and :288). Pinning them
 would take a test that runs live.ts in its run mode. T16's device reads are in the same place: ADR 0044's T16
 amendment pins device-state.ts's read over a fake exec, not live.ts's calls of it.
+
+## Amendment: the standing lab batch (2026-11-11, T20b)
+
+**Context.** The chooser group, D73's net (lc4', lc4'') among it, ran only when someone asked for it
+(`live.ts --groups chooser`). The composition a device run needs around it lived in numbered batches kept outside the
+repo (batch-11 to batch-13), each copying it: the lab build, the lab emulator's need, the handler counts, the chooser's
+dirty window and its cleanup.
+
+**Decision.** The composition has an in-repo home: `scripts/truth/batch/lab-run.ts`, run by
+`npm run truth:lab -- --out <dir> --serial <lab emulator>`. It is built from the lab plumbing's blocks only and does
+nothing to a device that the numbered batches did not do. Its run, through `runBatch`:
+
+- the `lab` block (`labBlock` in lab-build.ts): this checkout's lab APK built, installed with `-r`, and proven to
+  hold main's catalog;
+- the `chooser` block. Its needs are the android need and the handler counts it rests on (`handlersNeed`: shared 2,
+  cell 1). Its run: `--check` before (`readCheck` in lab-emu.ts, read only), then `live.ts --groups chooser` inside the
+  chooser's dirty window, then the window's cleanup, which is `--check` after (`chooserStretch` in android-lab.ts,
+  `cleanUp` in lab-emu.ts);
+- the `forms` block: `live.ts --groups forms`.
+
+`--groups chooser|forms|chooser,forms` picks the live blocks; the default is both. A run with no serial is refused
+before anything is done (exit 2). A serial that is not the lab AVD is refused by the lab guard, as in every batch: each
+block is INCONCLUSIVE, nothing is done to the device, and the run exits 2. Everything the run writes is under `--out`.
+
+- A `--check` before that does not prove the lab clean (a lab default, a chooser in front, a read that failed) leaves the
+  chooser group not run. Its line is a verdict, and its hand lines go to RESTORE, because the premise is not the batch's
+  to fix.
+- A default (`mAlways=true`) that `--check` after finds, where the `--check` before found none, is the run's own. It
+  fails the batch by name, `chooser left a default: FAIL`, beside the cleanup's own FAIL line. The cleanup clears it by
+  reinstalling the pulled APK (`clearLabEntry` in lab-emu.ts). That reinstall is why the batch is owner-run.
+- The chooser block has a state file (`state.json`, run-dir.ts's protocol): the window marks it dirty when it opens.
+  No probe keeps lab data here, so putting the state back is writing the file clean: at the run's end once the cleanup
+  proved the lab, after a proven reinstall, or in the abort's window restore (which writes it before its own
+  `--check`, as for a probe; a check that fails there still leaves RESTORE). A cleanup that does not prove the lab
+  leaves the file dirty, and the next run is refused naming it.
+- Each live block's verdict is main's rejudge exit code: 0 is PASS, 1 is FAIL. That covers an unknown MISMATCH, a stale
+  chooser premise (T20a) and a SKIP that proves nothing (`summarize` in live-cases.ts). The block is judged only once
+  its run is complete; an incomplete one gets the runner's backstop line.
+
+**Consequences.** The net has a stable home and one command. Not done: no schedule (backlog T20c: a launchd job on the
+owner's Mac, out of an agent's reach). It has not been run on a device: the emulator was down when it was built. Its
+tests run it under runBatch over the shared fake lab (tests/truth/batch/lab-run.test.ts, lab-fakes.ts). An agent never
+starts it, because its cleanup may uninstall and reinstall the lab app.

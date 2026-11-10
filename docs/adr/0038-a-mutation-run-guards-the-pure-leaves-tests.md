@@ -22,6 +22,7 @@ T2 amendment's T2c part below).
 Amended 2026-11-06 (A11: scripts/truth/run-case.ts joined the run — see the amendment at the end).
 Amended 2026-11-10 (T13: flush-check.ts, replies.ts, live-carousel.ts and live-visibility.ts joined the run — see the T13
 amendment at the end).
+Amended 2026-11-11 (T20b: scripts/truth/batch/lab-run.ts joined the run — see the T20b amendment at the end).
 
 ## Context
 
@@ -1498,3 +1499,15 @@ hand mutants showed.
   the live cases are built from (fixtures/apps/cells.json, read by catalogOf in scripts/truth/live-cases.ts).
 - **The cost**, measured cold on this branch (`npm run mutate -- --force`): core 266 s, lab 127 s, 393 s in all (core
   200 s and lab 62 s at T2b-2). The lab's three modules add about 65 s; flush-check about 15 s.
+
+## Amendment: the standing lab batch joins the run (2026-11-11, backlog T20b)
+
+scripts/truth/batch/lab-run.ts, the standing lab batch (ADR 0041's T20b amendment), is in the `lab` group against
+tests/truth/batch/lab-run.test.ts. It is mostly composition, but it holds logic worth scoring: `--groups`, the blocks it
+picks, the --check before that gates the chooser group, the FAIL line for a default the run left, the state file, and a
+live block's verdict from its rejudge. Cold: 94.12 %, 205 mutants, 7 survived, 5 without coverage, 1 runtime error;
+floor 92. Every survivor is argued equivalent or unreachable in its scope.json baseline: the entry guard's line, the two
+guards behind needs already met, and three that no test can observe without waiting out a bound. The cold full lab
+group run passed in 259 s, every module at or above its floor. The sandbox needs no new file: scripts/is-main.ts and
+scripts/truth/*.ts are already in it.
+

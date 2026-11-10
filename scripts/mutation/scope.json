@@ -233,6 +233,12 @@
     "floor": 98,
     "baseline": "100 % on 2026-11-05 (T2 batch-13 fixes: checkDevice joins the readying's warning and the build's; cold): 273 mutants, 0 survived; 100 % on 2026-11-05 (T2 S6b code review: checkDevice, GradleCall, the stop's reason; cold, final): 266 mutants, 0 survived; superseded: 100 % on 2026-11-05 (T2 S6b review round 2, cold): 241 mutants, 0 survived"
   },
+  "scripts/truth/batch/lab-run.ts": {
+    "group": "lab",
+    "tests": ["tests/truth/batch/lab-run.test.ts"],
+    "floor": 92,
+    "baseline": "94.12 % on 2026-11-11 (T20b, the standing lab batch, final; `npm run mutate -- --group lab --force --mutate scripts/truth/batch/lab-run.ts`, cold; 94.06 % of 203 mutants in the cold full lab group run, 259 s, every lab module at or above its floor, before the stateful hand line's command was shared with cleanState): 205 mutants, 7 survived, 5 without coverage, 1 runtime error — all equivalent or unreachable: the entry guard's line (`isMain`, never true under the tests: 2 without coverage, 1 survived, 1 runtime error); the chooser block's two guards after its needs were met (`!opened.ok`, `apk === undefined`: the android need's check ran the same guard and pulled the APK, so neither is reached — 2 survived, 3 without coverage); `summary ?? ''` seeded (no `# Live golden:` header either way); labBuild's `{ secs }` emptied (B_BUILD's default is BUILD_SECS, and no test waits out a build's bound); `lastly`'s gradle stop emptied (the fake's build stops its daemon itself, so the last step has nothing to stop); ACCEPTED seeded with a string (no last-chosen entry in any check, and a string matches none)"
+  },
   "scripts/truth/chooser-readers.ts": {
     "group": "lab",
     "tests": ["tests/truth/chooser-premise.test.ts", "tests/truth/batch/lab-chooser.test.ts", "tests/truth/batch/lab-emu.test.ts"],

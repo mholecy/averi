@@ -113,19 +113,20 @@ import { parseLabApp, type LabApp } from './schema.js';
  *
  * `chooser` (T7b, Android, not in the default groups): launch_app and open_deep_link around Android's "Open with"
  * chooser (live-chooser.ts) — lc1 the `-p` start that raises it, named; lc2 a one-handler link, no note; lc3 `.Twin`
- * named, no chooser; lc4' monkey from the launcher and lc4'' monkey over a link's chooser (D73's net, run on demand: no
- * recurring run includes it yet — a standing lab batch is backlog T20b, its schedule T20c). The oracle is the device's
- * focus and activity stack (AndroidLab.focus, the record's `focus`), read before, between and after the calls; a
- * chooser left in front is dropped with one BACK. A SKIP fails the run. Before the cases (T20a, ADR 0041's T20a
- * amendment), the group's premise is read once, read only (chooser-premise.ts#readPremiseInto): no lab default
- * (`mAlways=true`, `dumpsys package preferred`), two handlers for `averilab://shared/open`, no chooser on the stack,
- * HOME a launcher — into the record (`chooserPremise`), its lines said at once on stderr (stop the run there if you
- * like) and again in the summary. A stale fact is `CHOOSER PREMISE: stale — … — the run fails` with the owner's hand
- * line under it, and the exit code 1 — a `--side` run's too: the premise is the lab's state, not the averi under test,
- * so a calibration on a stale lab proves no more than a run of this checkout. The cases still run, their verdicts
- * unchanged: the line says why lc1 or lc4'' SKIPs. A last-chosen entry (`mAlways=false`) is a WARN line only; a read
- * that fails is `unread — <why>`, never a throw, the exit code untouched. `--rejudge` prints the record's lines as they
- * are, and only when a chooser case is among the cases it judges (`--groups forms` over a chooser record: nothing).
+ * named, no chooser; lc4' monkey from the launcher and lc4'' monkey over a link's chooser (D73's net: on demand, or in
+ * the standing lab batch, `npm run truth:lab`, scripts/truth/batch/lab-run.ts, T20b — owner-run; its schedule is
+ * backlog T20c). The oracle is the device's focus and activity stack (AndroidLab.focus, the record's `focus`), read
+ * before, between and after the calls; a chooser left in front is dropped with one BACK. A SKIP fails the run. Before
+ * the cases (T20a, ADR 0041's T20a amendment), the group's premise is read once, read only
+ * (chooser-premise.ts#readPremiseInto): no lab default (`mAlways=true`, `dumpsys package preferred`), two handlers for
+ * `averilab://shared/open`, no chooser on the stack, HOME a launcher — into the record (`chooserPremise`), its lines
+ * said at once on stderr (stop the run there if you like) and again in the summary. A stale fact is `CHOOSER PREMISE:
+ * stale — … — the run fails` with the owner's hand line under it, and the exit code 1 — a `--side` run's too: the
+ * premise is the lab's state, not the averi under test, so a calibration on a stale lab proves no more than a run of
+ * this checkout. The cases still run, their verdicts unchanged: the line says why lc1 or lc4'' SKIPs. A last-chosen
+ * entry (`mAlways=false`) is a WARN line only; a read that fails is `unread — <why>`, never a throw, the exit code
+ * untouched. `--rejudge` prints the record's lines as they are, and only when a chooser case is among the cases it
+ * judges (`--groups forms` over a chooser record: nothing).
  */
 
 const { values } = parseArgs({
