@@ -1481,6 +1481,35 @@ describe('scroll_until', () => {
   });
 });
 
+describe('scroll_until within (D78) — a selector or a rect, passed through; a malformed rect refused by the schema', () => {
+  it('a selector: resolved on the first read — one that matches nothing stops before any swipe', async () => {
+    const { call, fakes } = await connect();
+    const result = await call('scroll_until', { platform: 'android', selector: 'id:never_there', within: 'id:no_list', configPath: missing() });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('scroll_until id:never_there stopped before any swipe — within id:no_list matches nothing in the tree');
+    expect(fakes.android!.swipes).toEqual([]);
+  });
+
+  it('a rect: the scroll view of exactly that rect — none, refused naming it as given', async () => {
+    const { call, fakes } = await connect();
+    const result = await call('scroll_until', { platform: 'android', selector: 'id:never_there', within: { x: 1, y: 2, width: 3, height: 4 }, configPath: missing() });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('stopped before any swipe — within {"x":1,"y":2,"width":3,"height":4} is the rect of no scroll view in the tree');
+    expect(fakes.android!.swipes).toEqual([]);
+  });
+
+  it.each([
+    ['a rect missing its height', { x: 1, y: 2, width: 3 }],
+    ['a rect of strings', { x: '1', y: 2, width: 3, height: 4 }],
+    ['a number', 7],
+  ])('%s is refused before a device is bound', async (_, within) => {
+    const { call, bound } = await connect();
+    const result = await call('scroll_until', { platform: 'android', selector: 'id:x', within, configPath: missing() });
+    expect(result.isError).toBe(true);
+    expect(bound()).toEqual([]);
+  });
+});
+
 describe('swipe — by direction or by coordinates, exactly one (2026-10-08)', () => {
   it('direction swipes the finger over the device screen, as a flow swipe: step does, and the reply gives the stroke', async () => {
     const { call, fakes } = await connect();

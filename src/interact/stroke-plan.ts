@@ -43,11 +43,13 @@ import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION,
  * window of its own.
  *
  * WHICH SCROLL VIEW, and the axis. The candidates are the target's scroll views, nearest first (`targetScrollers`),
- * once a read has found it; before that the screen's largest scroller, then the scroll views nested in it, largest
- * first, text inputs left out (`candidatesOf`, D59b: the axis rule below takes a nested one only when the largest
- * scrolls across the stroke — a carousel in a vertical page, stroked `right` for a card not laid out yet, is stroked
- * inside, not across the page's centre row, ADR 0010's D59b amendment); none (the screen box) when the target was found
- * in none. Each is remembered with its AXIS and its nested scroll views' (`ScrollView.axes`, asked of the read's tree:
+ * once a read has found it; before that the screen's largest scroller — or the scroll view the caller NAMED in its
+ * place (`scroll_until`'s `within`, D78: `nameScrollView`, resolved by interact/within.ts; a row of a sibling list the
+ * largest scroller does not hold is reached only so, ADR 0010's D78 amendment) — then the scroll views nested in it,
+ * largest first, text inputs left out (`candidatesOf`, D59b: the axis rule below takes a nested one only when the
+ * largest scrolls across the stroke — a carousel in a vertical page, stroked `right` for a card not laid out yet, is
+ * stroked inside, not across the page's centre row, ADR 0010's D59b amendment); none (the screen box) when the target
+ * was found in none. Once a read has found the target the named scroll view counts no more. Each is remembered with its AXIS and its nested scroll views' (`ScrollView.axes`, asked of the read's tree:
  * ui-tree/geometry.ts#Clips.axesOf, per source ui-tree/scroll-containers.ts#scrollAxis — Android's class, WDA's
  * `Table`, else on WDA the content's extent past the frame; unknown for a Compose lazy list, a RecyclerView and on idb,
  * which lists no scroll view). The stroke box (`strokeRoom`) takes the first with room for the stroke as drawn
@@ -134,6 +136,13 @@ interface Memory {
    * it.
    */
   readonly target: readonly ScrollView[] | undefined;
+  /**
+   * The scroll view the caller named (`scroll_until`'s `within`, D78; interact/within.ts#resolveWithin), with what is
+   * drawn over it and its axes — the candidate in place of the screen's largest scroller until a read finds the target
+   * (`candidatesOf`), refreshed by every plan with that round's read, as `target` is; kept by a read that lost its rect.
+   * Undefined when none was named. Not `within`, which is the scroll view the last stroke went over.
+   */
+  readonly named: ScrollView | undefined;
   /** The candidates the last plan judged its stroke's scroll view from, for the stroke of a round whose tree did not read — judged again with that round's gesture box, cut by the rects they carry. */
   readonly last: readonly ScrollView[];
   /** The keyboard line the last read that READ stroked above (scroll-read.ts#strokeLine: the cover it applied — none when it applied none — and idb's band), for the stroke of a round whose tree did not read. */
@@ -157,7 +166,17 @@ const close = (m: Memory): StrokeMemory => m as unknown as StrokeMemory;
 
 /** The memory before any read: no scroll view known, no keyboard line, no stroke sent. */
 export function startStrokes(): StrokeMemory {
-  return close({ target: undefined, last: [], line: undefined, within: undefined, chosen: undefined, chosenAt: undefined, touchDowns: [], roomless: [], carry: undefined });
+  return close({ target: undefined, named: undefined, last: [], line: undefined, within: undefined, chosen: undefined, chosenAt: undefined, touchDowns: [], roomless: [], carry: undefined });
+}
+
+/**
+ * The memory with the scroll view of rect `rect` NAMED (`scroll_until`'s `within`, D78, resolved on `facts`' tree by
+ * interact/within.ts#resolveWithin): until a read finds the target the strokes go over it — then over the scroll views
+ * nested in it, as over the largest scroller's (`candidatesOf`) — never over the screen's largest scroller. Once a read
+ * has found the target its own scroll views are the candidates, and the named one counts no more.
+ */
+export function nameScrollView(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>, rect: Rect): StrokeMemory {
+  return close({ ...open(memory), named: { rect: { ...rect }, over: overIn(facts, rect) ?? [], axes: facts.scene.clips.axesOf(rect) } });
 }
 
 /** One read that read, as the plan keeps it (`seeRead`): its facts, the line its strokes stay above (scroll-read.ts#ReadJudgement.strokeLine), the target's node when it judged one, and the region the target's motion showed, read only on a tree that tells no scroll view of it (`ScrollRegion`). */
@@ -344,7 +363,12 @@ export function planStroke(memory: StrokeMemory, { toward, reach: turnsReach, ge
   const press = read === undefined || points === undefined ? undefined : read.facts.scene.presentedAt(points.from, read.target);
   const presented = press === undefined || points === undefined ? undefined : { ...press, touchDown: points.from };
   // The latest cut read for the target's scroll views is the one a later read that has lost a rect falls back to — not the oldest.
-  const planned: Memory = { ...m, last: candidates, ...(m.target !== undefined && read !== undefined && { target: candidates }) };
+  const planned: Memory = {
+    ...m,
+    last: candidates,
+    ...(m.target !== undefined && read !== undefined && { target: candidates }),
+    ...(m.target === undefined && m.named !== undefined && read !== undefined && { named: candidates[0] }),
+  };
   const chosenAt = points === undefined ? undefined : { ...points.from };
   return { stroke, presented, memory: close({ ...planned, chosen: room === undefined ? undefined : { ...room.within }, chosenAt, roomless: room?.roomless ?? [] }) };
 }
@@ -454,7 +478,8 @@ export function touchedOn(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>,
 export interface StrokedAcross {
   readonly rect: Rect;
   readonly axis: ScrollAxis;
-  readonly along?: { readonly view: QuotedNode; readonly noRoom?: true };
+  /** `targetRead` (D78): a read had found the target, so the candidates were its own scroll views and a `within` naming `view` would be ignored — absent while none had. */
+  readonly along?: { readonly view: QuotedNode; readonly noRoom?: true; readonly targetRead?: true };
 }
 
 /**
@@ -470,7 +495,7 @@ export interface StrokedAcross {
  * One walk of the tree, at the stop only.
  */
 export function strokedAcross(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene' | 'reading'>, toward: Direction, screen: Rect): StrokedAcross | undefined {
-  const { within, roomless } = open(memory);
+  const { within, roomless, target } = open(memory);
   if (within === undefined) return undefined;
   const { clips } = facts.scene;
   const way = axisOf(toward);
@@ -479,7 +504,7 @@ export function strokedAcross(memory: StrokeMemory, facts: Pick<TreeFacts, 'scen
   const [view] = toldLargestFirst(facts, way, screen);
   if (view === undefined) return { rect: within, axis };
   const judged = roomless.some((r) => sameRect(r, view.rect));
-  return { rect: within, axis, along: { view: quoted(view), ...(judged && { noRoom: true as const }) } };
+  return { rect: within, axis, along: { view: quoted(view), ...(judged && { noRoom: true as const }), ...(target !== undefined && { targetRead: true as const }) } };
 }
 
 /**
@@ -665,8 +690,10 @@ const overIn = (facts: Pick<TreeFacts, 'scene'>, rect: Rect): Rect[] | undefined
  * for `tabbar-floating`'s R touched down at y 175, in the header above its list (WDA's; idb's is the motion ledger's region).
  * docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md
  * docs/bugs/2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md
+ * Exported for `scroll_until`'s `within` (interact/within.ts#resolveWithin, D78): the scroll view an element names is
+ * its nearest one by this same rule.
  */
-function targetScrollers(facts: Pick<TreeFacts, 'scene'>, node: UiNode): readonly Rect[] {
+export function targetScrollers(facts: Pick<TreeFacts, 'scene'>, node: UiNode): readonly Rect[] {
   const { clips } = facts.scene;
   const chain = clips.scrollersOf(node);
   return chain.length > 0 ? chain : (toldFrame(clips.drawnIn(node))?.scrollers.map((n) => n.rect) ?? []);
@@ -676,7 +703,8 @@ function targetScrollers(facts: Pick<TreeFacts, 'scene'>, node: UiNode): readonl
  * The scroll views a round's stroke toward the target may go over, nearest first (`planStroke` judges their room):
  * with no read this round (`facts` undefined), the last plan's; once a read found the target, its scroll views — each
  * cut by what this read draws over it, or by what it carried, when this read has lost its rect — none when it was
- * found in none (the screen box); else the screen's largest scroller, then the scroll views nested in it — those the
+ * found in none (the screen box); else the scroll view the caller named (`Memory.named`, D78) or, none named, the
+ * screen's largest scroller, then the scroll views nested in it — those the
  * tree tells scroll along `toward` first, then the rest, each largest first (its `ScrollAxes.nested`, text inputs left
  * out: ui-tree/geometry.ts#Clips.axesOf) — or none. Told along before unknown (review round 1): a chips row (a
  * HorizontalScrollView) above a larger feed of unknown axis (a RecyclerView, most likely vertical) is the one a
@@ -694,15 +722,17 @@ function targetScrollers(facts: Pick<TreeFacts, 'scene'>, node: UiNode): readonl
  */
 function candidatesOf(m: Memory, facts: Pick<TreeFacts, 'scene' | 'mainScroller'> | undefined, toward: Direction): readonly ScrollView[] {
   if (facts === undefined) return m.last;
-  if (m.target !== undefined) return m.target.map(({ rect, over, axes }) => ({ rect, over: overIn(facts, rect) ?? over, axes: facts.scene.clips.axesOf(rect) ?? axes }));
-  const main = facts.mainScroller;
-  if (main === undefined) return [];
-  const axes = facts.scene.clips.axesOf(main);
+  const refreshed = ({ rect, over, axes }: ScrollView): ScrollView => ({ rect, over: overIn(facts, rect) ?? over, axes: facts.scene.clips.axesOf(rect) ?? axes });
+  if (m.target !== undefined) return m.target.map(refreshed);
+  // The named scroll view (`within`, D78) in place of the largest scroller — this read's cut, or the one it was named
+  // with when this read lost its rect — and the scroll views nested in it after it, as the largest scroller's.
+  const first = m.named !== undefined ? refreshed(m.named) : facts.mainScroller === undefined ? undefined : { rect: facts.mainScroller, over: overIn(facts, facts.mainScroller) ?? [], axes: facts.scene.clips.axesOf(facts.mainScroller) };
+  if (first === undefined) return [];
   const way = axisOf(toward);
-  const nested = [...(axes?.nested ?? [])]
+  const nested = [...(first.axes?.nested ?? [])]
     .sort((a, b) => Number(b.axis === way) - Number(a.axis === way) || rectArea(b.rect) - rectArea(a.rect))
     .map(({ rect }) => ({ rect, over: overIn(facts, rect) ?? [], axes: facts.scene.clips.axesOf(rect) }));
-  return [{ rect: main, over: overIn(facts, main) ?? [], axes }, ...nested];
+  return [first, ...nested];
 }
 
 /**
