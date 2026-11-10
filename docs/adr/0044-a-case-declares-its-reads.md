@@ -77,7 +77,7 @@ not do the work (`adb` is not on `CaseLab`). T7b can add the start verb at the s
 
 - The cycle has a test (tests/truth/run-case.test.ts): order, each read, each SKIP, the screenshot, no real sleep.
 - The cycle still throws a raw TypeError when the app wrote no state and the judge reads it, as the old loop did. A test
-  pins it; T10 is the row.
+  pins it; T10 is the row. (Superseded by the T10 amendment below: a named LOUD failure, the run goes on.)
 - A first verdict that asks for a late read now gets the case's stroke log, as `judged`'s does. The old loop asked without
   it. No case both logs strokes and takes a late read, so nothing changes today.
 - run-case.ts joins the mutation run (ADR 0038): every device call sits behind the rig, its tests take milliseconds, and
@@ -193,3 +193,30 @@ the label-group scripts stay as the evidence of the runs they labelled (a note b
 labelled run needs neither. The gfxinfo summariser T11 used (`fs.mjs`) is lost; `parseGfxinfo` reads only the four lines
 its outputs kept. device-state.ts is in the mutation scope (group `lab`), its read pinned over a fake exec through
 `AndroidLab`.
+
+## Amendment: no first state is a named failure (T10, 2026-11-10)
+
+**Context.** The cycle read the state after the calls as `stamped(await lab.state())!`: when the app wrote none, the
+judge met `undefined`, and a judge that read it threw a raw TypeError that ended the whole run. A11 kept that for byte
+parity and pinned it. T7b did not run into it (its fresh process writes `cell: ""`, a state), but a lab app that stops
+writing would.
+
+**Decision.** A first state that is undefined is the case's LOUD verdict of class `no-state`, named with the case's id
+(`noFirstState` in `scripts/truth/live-cases.ts`: `no first state for <id>: the app wrote none after the calls`),
+decided in `runCase` before any judge, never a SKIP (a SKIP reads as harmless and would hide a lab app that stopped
+writing). With no state there is no judge to ask, no late read (`wantsLateRead` asks the judge) and no second panel read
+(it is kept on the state); the focus read after the calls, the screenshot (the verdict is not ok) and the teardown run
+as for any case, and the record keeps `state` undefined with no `skip`. The run goes on to the next case. `summarize`
+counts it as loud and fails the run on it, a `--side` run too (the lab app is broken whatever averi drove it), with a
+line of its own (`NO FIRST STATE — the app wrote none, the run fails: <source> <id>, …`), as it does a SKIP of a
+`skipFails` case. A `no-state` verdict is not a judged one: `isJudged` in `scripts/truth/live-visibility.ts` (not SKIP,
+not `no-state`) is what every count a pass is claimed on asks — the carousel's hedged ceiling (`hedgedCeiling`) and
+the residual tally's "N of M judged run(s)" — so a leg nothing judged never turns the ceiling's "no pass claimed" into a
+pass. `hedgedStops` deliberately does not ask it: it counts averi's real replies, so a `no-state` case's hedge stays,
+in the `other` bucket. `rejudgedResults` gives such a record the same verdict (no committed record has one: each with
+no state has a `skip`, so every committed record rejudges as before; the old `no state recorded` SKIP is gone). The
+between-calls reads already keep an undefined state as it was read (every judge that reads one falls back to the final
+state or SKIPs, so none throws; pinned), and the late read already drops one, so neither changes. A `no-state` case
+carries no KNOWN or NOT-known mark in the summary (`isStateless`, beside `isJudged`): no averi behaviour was judged.
+tests/truth/run-case.test.ts pins it, from the run to its summary and the rejudged record, in place of A11's pin;
+tests/truth/live-carousel.test.ts pins the ceiling and the residual tally.

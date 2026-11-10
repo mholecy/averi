@@ -48,6 +48,8 @@ import { parseLabApp, type LabApp } from './schema.js';
  * Outcome per case:
  *  - ok: the model holds what the case asked for, and averi's reply does not contradict it;
  *  - LOUD: the model does not hold it, and averi said so (an error, or "NOT verified") — honest, not a pass;
+ *    a LOUD of class `no-state` is the lab's, not averi's: the app wrote no state after the calls, no judge asked, and
+ *    the run fails (T10);
  *  - MISMATCH: averi claimed what did not happen ("Filled", "Tapped" with the model unchanged), or failed what did;
  *  - SKIP: a keyboard case whose launch shows no soft keyboard — the simulator hides it once it has seen HID typing
  *    (idb ui text); IosLab.launch writes the simulator's keyboard preferences back before every launch, and the
@@ -60,13 +62,14 @@ import { parseLabApp, type LabApp } from './schema.js';
  * (`--cells` narrows them); `dismissal` (phase 5, iOS) a tap under the keyboard on the false-covers toolbar cells,
  * under the cell's own `keyboardDismiss` (CellConfig): the control focused, nothing typed. A case not ok prints its
  * whole replies, and every scroll case (and any case not ok) the app's state beneath it. A case not ok that an existing
- * note explains is KNOWN (live-known.ts) and marked so; the exit code is 1 on a MISMATCH not known, and — in a run of
- * this checkout, not a `--side` one — on a known case not `intermittent` that came out ok (fixed: strike it off, as the
- * static ratchet asks). The visibility group's hedged stops are counted under the cases, no exit code (T15: ADR 0013's
- * T15 paragraph). `--record <file>` writes every read (the launch state, the state between the calls, after them) as
- * JSON; `--rejudge <file>` judges such a record again with this checkout's judges, no device (live-cases.ts#rejudge,
- * which tests/truth/live-rejudge.test.ts calls in process). The cases, their judging and the summary live in
- * live-cases.ts, one case's device cycle in run-case.ts; this file is the CLI.
+ * note explains is KNOWN (live-known.ts) and marked so; the exit code is 1 on a MISMATCH not known, on a case whose app
+ * wrote no state after its calls (T10: LOUD, `no-state`; any run, `--side` too), and — in a run of this checkout, not a
+ * `--side` one — on a known case not `intermittent` that came out ok (fixed: strike it off, as the static ratchet
+ * asks). The visibility group's hedged stops are counted under the cases, no exit code (T15: ADR 0013's T15
+ * paragraph). `--record <file>` writes every read (the launch state, the state between the calls, after them) as JSON;
+ * `--rejudge <file>` judges such a record again with this checkout's judges, no device (live-cases.ts#rejudge, which
+ * tests/truth/live-rejudge.test.ts calls in process). The cases, their judging and the summary live in live-cases.ts,
+ * one case's device cycle in run-case.ts; this file is the CLI.
  *
  * `--app react-native` runs the cases of the React Native lab app's cells (fixtures/apps/rn, its own bundle and package:
  * lab-device.ts#LAB_APP; the visibility cases from its own truth runs, the manifests whose `app` is AveriLabRN) — the
@@ -250,8 +253,9 @@ if (rejudging !== undefined) {
     await lab.close();
     if (values.record !== undefined) await writeFile(values.record, JSON.stringify(record) + '\n');
   }
-  // The summary: every case, a known one marked with its note (live-known.ts); exit 1 on an unknown MISMATCH, and on a
-  // known case not intermittent that came out ok in a run of this checkout (fixed: strike it off).
+  // The summary: every case, a known one marked with its note (live-known.ts); exit 1 on an unknown MISMATCH, on a
+  // known case not intermittent that came out ok in a run of this checkout (fixed: strike it off), and on a case whose
+  // app wrote no first state (T10, live-cases.ts#noFirstState).
   const { lines, exitCode } = summarize({ platform, sources, results, side: values.side ?? THIS_CHECKOUT, device: record.deviceLabel });
   console.log(lines.join('\n'));
   process.exitCode = exitCode;

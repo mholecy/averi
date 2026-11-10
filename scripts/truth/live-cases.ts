@@ -10,7 +10,7 @@ import { CHOOSER_CASES, type FocusReads } from './live-chooser.js';
 import { knownEntry, knownLive } from './live-known.js';
 import { judgeFullWindow, judgeHeldNo } from './live-ensure.js';
 import { FLOATING_PANEL_EVIDENCE, holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, refusedCapped, refusedKept, refusedOnFocus, refusedUnchanged, short, type Source, valueOf } from './live-forms.js';
-import { hedgedStops, hedgedStopsLine, judgeDismissal, PRESENTED_WINDOW_CELLS, presentedAssertCase, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
+import { hedgedStops, hedgedStopsLine, isJudged, isStateless, judgeDismissal, PRESENTED_WINDOW_CELLS, presentedAssertCase, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
 import { allPassed, claimsTap, isError } from './replies.js';
 import { appOf, labId, labSelector, parseLabApp, type Catalog, type CellTruth, type HeldSpec, type LabApp, type LabState } from './schema.js';
 
@@ -752,6 +752,13 @@ export function judged(c: Case, r: CaseEvidence): LiveVerdict {
   return again.outcome === verdict.outcome ? verdict : { ...again, why: `${again.why} (only ${LATE_READ_MS / 1000} s later; first read: ${verdict.why})` };
 }
 
+/**
+ * The verdict of a case whose first state is undefined: the app wrote none after the calls, so no judge is asked (each
+ * reads its state). LOUD and named with the case's id, never a SKIP, which reads as harmless and would hide a lab app
+ * that stopped writing; summarize fails the run on it (backlog T10, ADR 0044's T10 amendment).
+ */
+export const noFirstState = (id: string): LiveVerdict => ({ outcome: 'LOUD', cls: 'no-state', why: `no first state for ${id}: the app wrote none after the calls` });
+
 /** `late` with the IME region read after the calls (`state.imeTouchable`), where it read none of its own. */
 export const lateWithPanel = (state: LabState, late: LabState): LabState =>
   late.imeTouchable !== undefined || state.imeTouchable === undefined ? late : { ...late, imeTouchable: state.imeTouchable };
@@ -763,15 +770,16 @@ export async function rejudgedResults(record: RunRecord, selection: RejudgeSelec
   for (const r of record.results) {
     const c = selected.find((x) => x.id === r.id);
     if (c === undefined) continue;
-    const verdict: LiveVerdict = r.skip !== undefined || r.state === undefined ? { outcome: 'SKIP', why: r.skip ?? 'no state recorded' } : judged(c, { ...r, state: r.state });
+    // A run that read no first state recorded none and no skip (run-case.ts): the verdict it was given, again.
+    const verdict: LiveVerdict = r.skip !== undefined ? { outcome: 'SKIP', why: r.skip } : r.state === undefined ? noFirstState(r.id) : judged(c, { ...r, state: r.state });
     results.push({ source: r.source, c, verdict, replies: r.replies });
   }
   return results;
 }
 
 // --- the summary: every case, a known one marked with its note (live-known.ts); exit 1 on an unknown MISMATCH, and on
-// a known case not intermittent that came out ok in a run of this checkout (fixed: strike it off), and on a SKIP of a
-// case marked skipFails ---
+// a known case not intermittent that came out ok in a run of this checkout (fixed: strike it off), on a SKIP of a case
+// marked skipFails, and on a case with no first state (T10) ---
 
 /** What a run (or a rejudged record) reports: the summary's lines, as live.ts prints them, and its exit code. */
 export interface Summary {
@@ -800,6 +808,8 @@ export function summarize({ platform, sources, results, side, rejudgedFrom, devi
   const fixed = ofThisCheckout ? cleared.filter((r) => knownEntry(platform, r.source, r.c.id)?.intermittent !== true) : [];
   /** A case whose SKIP proves nothing (Case.skipFails: the ensure cases, live-ensure.ts): the run fails on it. */
   const failingSkips = results.filter((r) => r.c.skipFails === true && r.verdict.outcome === 'SKIP');
+  /** A case with no first state (T10, noFirstState): the lab app wrote none, nothing judged; the run fails on it. */
+  const stateless = results.filter((r) => isStateless(r.verdict));
   /** The carousel group's ceiling on the hedged acceptance (live-carousel.ts#hedgedCeiling): its LOUD counts in the tally. */
   const ceiling = hedgedCeiling(results, ofThisCheckout);
   /** T15: the visibility group's hedged stops (live-visibility.ts#hedgedStops), counted once: the tally's line and each case's mark. */
@@ -818,6 +828,8 @@ export function summarize({ platform, sources, results, side, rejudgedFrom, devi
       const other = otherRule(r);
       const mark =
         r.verdict.outcome === 'ok' ? (entry === undefined ? '' : ` [known${entry.intermittent === true ? ' (intermittent)' : ''}, ok this run: ${entry.note}]`)
+        // T10: the lab app wrote no state, so no averi behaviour was judged: neither known nor NOT known.
+        : isStateless(r.verdict) ? ''
         : note !== undefined ? ` [known: ${note}]`
         : other !== undefined ? ` [NOT known: ${r.verdict.cls ?? '?'} on ${r.verdict.kind ?? '?'}, where KNOWN pins ${other.cls} on ${other.kind} (${other.note})]`
         : '';
@@ -833,12 +845,13 @@ export function summarize({ platform, sources, results, side, rejudgedFrom, devi
   if (cleared.length > 0) lines.push(`Known but ok this run: ${cleared.map((r) => `${r.source} ${r.c.id}`).join(', ')}`, '');
   if (fixed.length > 0) lines.push(`FIXED, not intermittent — strike off live-known.ts: ${fixed.map((r) => `${r.source} ${r.c.id}`).join(', ')}`, '');
   if (failingSkips.length > 0) lines.push(`SKIPPED where a skip proves nothing — the run fails: ${failingSkips.map((r) => `${r.source} ${r.c.id}`).join(', ')}`, '');
+  if (stateless.length > 0) lines.push(`NO FIRST STATE — the app wrote none, the run fails: ${stateless.map((r) => `${r.source} ${r.c.id}`).join(', ')}`, '');
   // An ok on a reply accepted under a residual (LiveVerdict.accepted): counted, per residual, against the runs of the
   // cases that accept it.
   const residuals = new Map(results.flatMap((r) => (r.verdict.accepted === undefined ? [] : [[r.verdict.accepted.id, r.verdict.accepted.residual] as const])));
   for (const [id, residual] of residuals) {
     const ids = new Set(results.filter((r) => r.verdict.accepted?.id === id).map((r) => r.c.id));
-    const of = results.filter((r) => ids.has(r.c.id) && r.verdict.outcome !== 'SKIP');
+    const of = results.filter((r) => ids.has(r.c.id) && isJudged(r.verdict));
     const counted = results.filter((r) => r.verdict.accepted?.id === id);
     lines.push(`Accepted under ${residual}: ${counted.length} of ${of.length} judged run(s) of ${[...ids].join(', ')}`, '');
   }
@@ -849,7 +862,7 @@ export function summarize({ platform, sources, results, side, rejudgedFrom, devi
   if (ceiling.lines.length > 0) lines.push(...ceiling.lines, '');
   // T16: the device's state around the carousel group's cases, only where the run read it — a label, no gate.
   if (device !== undefined) lines.push(deviceLine(device), '');
-  return { lines, exitCode: unknown.length > 0 || fixed.length > 0 || failingSkips.length > 0 || ceiling.fails ? 1 : 0 };
+  return { lines, exitCode: unknown.length > 0 || fixed.length > 0 || failingSkips.length > 0 || stateless.length > 0 || ceiling.fails ? 1 : 0 };
 }
 
 /**

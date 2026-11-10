@@ -1,6 +1,6 @@
 import { type FocusRead, type HomeRead, type LabDevice, pause as realPause, withMeasuredPanel } from './lab-device.js';
 import { type PreDragged, type PreDragLab, preDragOrSkip, type SwipeEntry, type SwipeHook } from './live-carousel.js';
-import { type Call, type Case, type CaseRecord, judged, LATE_READ_MS, wantsLateRead } from './live-cases.js';
+import { type Call, type Case, type CaseRecord, judged, LATE_READ_MS, noFirstState, wantsLateRead } from './live-cases.js';
 import { chooserInFront, type FocusReads } from './live-chooser.js';
 import type { Source } from './live-forms.js';
 import type { LiveVerdict } from './live-visibility.js';
@@ -19,7 +19,9 @@ import { labSelector, type LabState } from './schema.js';
  *
  * It knows nothing of argv, of which cases run, or of printing: live.ts is the CLI around it, and tests/truth/run-case.test.ts
  * runs the cycle over tests/helpers/fake-lab.ts. A failure of the harness itself (a call that throws, a guard that
- * refuses) throws out of here and stops the run, as it always did; a pre-drag that fails is the case's SKIP.
+ * refuses) throws out of here and stops the run, as it always did; a pre-drag that fails is the case's SKIP. A first
+ * state that is undefined (the app wrote none after the calls) is the case's named LOUD failure, judged by no judge,
+ * and fails the run (T10, live-cases.ts#noFirstState); the run goes on to the next case.
  */
 
 /** A lab a case runs on: Android's adds the raw stroke and the IME region; its `platform` tells them apart. */
@@ -132,18 +134,25 @@ export async function runCase(c: Case, source: Source, rig: CaseRig): Promise<Ca
   await pause(WRITE_SETTLE_MS);
   // Stamped with when it was read (LabState.readAt): the ensure judges ask it.
   const stamped = (s: LabState | undefined) => (s === undefined ? s : { ...s, readAt: now() / 1000 });
-  const read = stamped(await lab.state())!;
+  const read = stamped(await lab.state());
   // The second (D69): the panel again once the calls are done, kept on the final state — the judge holds the two reads
-  // to agree (live-forms.ts#panelAfterCalls); `late` gets it from there (live-cases.ts#judged).
-  const state = panelLab !== undefined ? await withMeasuredPanel(read, panelLab, note) : read;
+  // to agree (live-forms.ts#panelAfterCalls); `late` gets it from there (live-cases.ts#judged). None without a state.
+  const state = read !== undefined && panelLab !== undefined ? await withMeasuredPanel(read, panelLab, note) : read;
   const focus: FocusReads | undefined = focusLab === undefined ? undefined : { ...(home !== undefined && { home }), before: before!, between, after: await focusLab.focus() };
-  const evidence = { source, replies, launched, after, state, swipes, focus };
   let late: LabState | undefined;
-  if (wantsLateRead(c, evidence)) {
-    await pause(LATE_READ_MS);
-    late = stamped(await lab.state());
+  let verdict: LiveVerdict;
+  if (state === undefined) {
+    // T10: the app wrote no first state. No judge is asked (each reads its state) and no late read is taken: the case's
+    // named LOUD failure, which fails the run (live-cases.ts#noFirstState); its screenshot and teardown go on below.
+    verdict = noFirstState(c.id);
+  } else {
+    const evidence = { source, replies, launched, after, state, swipes, focus };
+    if (wantsLateRead(c, evidence)) {
+      await pause(LATE_READ_MS);
+      late = stamped(await lab.state());
+    }
+    verdict = judged(c, { ...evidence, late });
   }
-  const verdict = judged(c, { ...evidence, late });
   if (rig.keepShot !== undefined && verdict.outcome !== 'ok') await rig.keepShot(`${source}-${c.id}-${now()}.png`, await lab.screenshot());
   // The teardown: a chooser left in front is dropped with one BACK (batch-9: one dismissed it), so the next case does not
   // start over it; read again, and said when it is still there.
