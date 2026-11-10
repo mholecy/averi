@@ -647,7 +647,8 @@ Residuals, stated:
   (`lab-device.ts`), the perf baseline names `.MainActivity`, and the differential has no Android launch. Backlog T7b's
   lc4' (`launch_app` with no activity from the launcher answers `Launched`, the app `mFocusedApp`) and lc4'' (the same
   over `open_deep_link averilab://shared/open`'s chooser, no `ResolverActivity` left), since built (the T7b amendment
-  below), are D73's net, run on demand with `live.ts --groups chooser` (lab, API 33); no recurring run includes it yet (backlog T20).
+  below), are D73's net, run on demand with `live.ts --groups chooser` (lab, API 33); no recurring run includes it yet
+  (backlog T20b, a standing lab batch, and T20c, its schedule; T20a, the premise read before the cases, below).
 - D55b's proposed live case lc4 (the error naming the chooser) is void: monkey under the chooser now answers `Launched`.
   lc4' and lc4'' take its place.
 - ADR 0041's "The reply does not say what `launch_app` does with the chooser up, because that is unmeasured" is answered
@@ -679,9 +680,53 @@ added. The group judges `mFocusedApp === .MainActivity` on the first read (`Focu
 chooser left on the stack" only on the settled read (the harness waits while `mCurrentFocus` is null, 300 ms polls, 5 s
 at most). A read whose wait runs out with a chooser record still listed is a MISMATCH (5 s, well past the ~1.3 s
 measured); with none listed, or an old record's unwaited read, what is left is unread (SKIP). Review round 1's three
-runs: 5 of 5 ok each. lc4' and lc4'' are D73's net, run on demand with `live.ts --groups chooser` (lab, API 33); no recurring run includes it yet (backlog T20).
+runs: 5 of 5 ok each. lc4' and lc4'' are D73's net, run on demand with `live.ts --groups chooser` (lab, API 33); no
+recurring run includes it yet (backlog T20b, a standing lab batch, and T20c, its schedule).
 
 **Consequences.** The residual above, a monkey that exits 0 with the chooser still in front (API 34 and later,
 unmeasured), stands: the group runs on API 33 only. lc3's "one start" is not a check on this lab (`.MainActivity` is
 singleTop: the alias's start is delivered to the top instance); what catches a `-p` start there is the chooser on the
 stack.
+
+## Amendment: the chooser group's premise, read before its cases (2026-11-10, T20a)
+
+**Context.** The chooser group's cases rest on the lab's state, not on averi: lc1 and lc4'' need a chooser to rise for
+`averilab://shared/…`, which a lab default (`mAlways=true`) or a missing `.Twin` (one handler) prevents; lc1 and lc3 need
+none on the stack before their calls; lc4' and lc4'' start from the HOME activity the device resolves. When one of these
+did not hold, the case SKIPped ("no chooser raised and none named", "the link raised no chooser") and nothing said why,
+so a run on a stale lab read as a run with nothing to judge. The device batches read the same state (`lab-chooser.ts`,
+`--check`), but live.ts must not import the owner-run batch layer.
+
+**Decision.** A run on Android with a chooser case among the cases selected reads the premise once, before the cases and
+before anything else touches the device, read only (`readChooserPremise` in `scripts/truth/chooser-premise.ts`, after
+the lab's guard): `dumpsys package preferred` (no lab default for `dev.averi.lab`), `cmd package query-activities --brief -a
+android.intent.action.VIEW -d averilab://shared/open` (two handlers, the lab's `.MainActivity` and `.Twin`),
+`AndroidLab.focus` (no ResolverActivity or ChooserActivity record on the stack), and HOME_COMMAND (HOME neither the
+platform's chooser — two Home apps, none chosen — nor the lab). Each fact is fresh, stale or unread; the record keeps
+them with the summary's lines (`chooserPremise`).
+- A stale fact: `CHOOSER PREMISE: stale — <every fact> — the run fails`, a hand line per stale fact under it, exit 1.
+  The default's is the batches' own (`defaultHand`: uninstall and install the lab APK, which clears it; the checkout's
+  build path, `APK_PATH` in `lab-device.ts`, as no APK was pulled); the handlers', the stack's and HOME's are new, each
+  ending `then:` with the command that reads the premise again. The cases still run and are judged as before: a stale
+  premise explains a SKIP, it does not replace it.
+- A last-chosen entry (`mAlways=false`, "Just once"'s, which no reinstall clears): a `Chooser premise: WARN` line only,
+  as `--check`'s exit 6 is a warning.
+- A read that fails, or proves nothing (no `Preferred Activities User N:` block, a lab entry with no mAlways line, no
+  `N activities found:` line, no HOME component): that fact unread with adb's words, the premise `unread` when no fact
+  is stale, never a throw, the exit code untouched.
+- `--rejudge` prints the record's lines as they are and reads no device; a record without the key prints nothing, so
+  every record committed before T20a rejudges byte for byte as before (checked over all 699 records under docs/ and
+  tests/fixtures, with `--groups forms` and with every group, against 0b9cfbb0).
+
+The readers both sides need moved, not copied, into `chooser-premise.ts`: the preferred block's parse (`preferredIn`),
+the leak rule (`leaksOf`, `unflaggedOf`, `lastChosenOf`), the handler query and its count (`handlersArgv`,
+`handlersIn`), and the hand lines' parts (`adbLine`, `defaultHand`, `checkHand`, `HAND_PREFIX`, `LAB_PACKAGE`,
+`PREFERRED_ARGV`). `lab-chooser.ts` keeps its CallResult wrappers (`preferredOf`, `handlersOf`: a failed call unread),
+behaviour unchanged. The stack and HOME are read by `frontOf`, `homeOf` and `isChooser` in `live-chooser.ts`, the judges'
+own readers.
+
+**Consequences.** A stale lab is now a named failure with its remedy, not a quiet SKIP. Not done here: nothing clears
+the state (no reinstall, no key, no setting — the owner's hand lines do that), and no recurring run includes the group
+yet (backlog T20b, a standing lab batch, and T20c, its schedule). Not run on a device: the emulator was down when this
+was built, so the premise's lines are pinned on batch-10's API 33 reads and T7b's recorded launcher reads, through a
+fake adb (tests/truth/chooser-premise.test.ts).

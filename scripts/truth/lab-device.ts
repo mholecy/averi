@@ -142,6 +142,11 @@ export const DEVICE_CHECK_SIMULATOR = '37956039-94EA-4F51-93E5-94F7723A4578';
 export const isDeviceCheckSimulator = (udid: string): boolean => udid.toUpperCase() === DEVICE_CHECK_SIMULATOR;
 /** The lab's AVD (`adb emu avd name`); any other emulator or device is refused. */
 export const LAB_AVD = 'averi_lab';
+/**
+ * The native lab app's APK as the checkout builds it (batch-11.sh:48; batch/lab-build.ts builds it there): what a hand line
+ * installs when no APK was pulled from the device (chooser-premise.ts, T20a).
+ */
+export const APK_PATH = 'fixtures/apps/android/build/outputs/apk/debug/AveriLab-debug.apk';
 /** The device-check simulator's WebDriverAgent ports (averi gives the first simulator 8100, the next 8101): refused. */
 export const DEVICE_CHECK_WDA_PORTS: readonly number[] = [8100, 8101];
 
@@ -353,7 +358,7 @@ const firstSaid = (text: string): string => text.split(/\r?\n/).find((l) => l.tr
  * What adb said when a call of it failed: its stderr's first line (execFile's error, and bounded.ts#execOf's, carry
  * it), else the error's own first line (adb not started).
  */
-function adbSaid(e: unknown): string {
+export function adbSaid(e: unknown): string {
   const stderr = typeof e === 'object' && e !== null && 'stderr' in e && typeof e.stderr === 'string' ? firstSaid(e.stderr) : '';
   return stderr !== '' ? stderr : firstSaid(e instanceof Error ? e.message : String(e));
 }

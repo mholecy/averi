@@ -305,7 +305,7 @@ function judgeMonkeyLaunch(after: Front, reply: string, state: LabState): LiveVe
   );
 }
 
-/** lc4' (D73's net, run on demand: backlog T20): launch_app with no activity, from the launcher. */
+/** lc4' (D73's net, run on demand: backlog T20b/T20c): launch_app with no activity, from the launcher. */
 export const judgeFromLauncher: FrontJudge = ({ home, before, after }, [reply], state) => launcherPremise(before, home) ?? judgeMonkeyLaunch(after, reply, state);
 
 /**

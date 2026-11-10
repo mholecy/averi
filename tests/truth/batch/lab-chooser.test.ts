@@ -9,19 +9,15 @@ import {
   checkExit,
   cellsHand,
   CHECK_OUTCOME,
-  checkHand,
   checkLine,
   checkWhy,
   chooserOf,
   compareReads,
   comparedLine,
-  defaultHand,
   focusOf,
   handlersOf,
   installedOf,
   isAlways,
-  lastChosenOf,
-  leaksOf,
   missingHand,
   NOT_JUDGED,
   preferredOf,
@@ -31,16 +27,14 @@ import {
   stateFileHand,
   stateHand,
   treeOf,
-  unflaggedOf,
   unknownInstallHand,
   unreachableOf,
   type AcceptedEntry,
   type Dump,
-  type HandBase,
   type RawAttrs,
   type FocusRead,
-  type PreferredRead,
 } from '../../../scripts/truth/batch/lab-chooser.js';
+import { checkHand, defaultHand, lastChosenOf, leaksOf, unflaggedOf, type HandBase, type PreferredRead } from '../../../scripts/truth/chooser-premise.js';
 
 // scripts/truth/batch/lab-chooser.ts, the pure module: the preferred-activities read over API 33's real dumps (batch-9's
 // whole `dumpsys package`, batch-10's `preferred` block), --check's exit, safeTap over T4's committed resolver trees

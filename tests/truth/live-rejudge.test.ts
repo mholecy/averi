@@ -1287,3 +1287,31 @@ describe('T16: the carousel group\'s device label, printed from the record', () 
     expect(failed.exitCode).toBe(plain.exitCode);
   });
 });
+
+describe("T20a: the chooser group's premise, printed from the record", () => {
+  // T7b's review round 1, its first run: a chooser record from before T20a, so with no `chooserPremise`.
+  const RECORD = 't7b-chooser/review1-run-1.json';
+  const recorded = () => JSON.parse(readFileSync(resolve(ROOT, pathOf(RECORD)), 'utf8')) as RunRecord;
+  const facts = [{ fact: 'default' as const, state: 'fresh' as const, why: 'as recorded' }];
+  const premiseLines = (lines: string[]) => lines.filter((l) => /^(?:Chooser premise|CHOOSER PREMISE|D55 \(Android\))/.test(l));
+
+  it('a record with no `chooserPremise` prints no premise line; one with it, its lines byte for byte, last, and the rest the same', { timeout: 60_000 }, async () => {
+    const plain = await rejudgeRecord(recorded(), RECORD, { groups: ['chooser'] });
+    expect(plain.exitCode).toBe(0);
+    expect(premiseLines(plain.lines)).toEqual([]);
+    const lines = ['Chooser premise: fresh — as  recorded, not re-read ⏎', 'Chooser premise: WARN — 1 last-chosen lab entry (mAlways=false: no default; no reinstall clears it), first: 9d3a2b9 dev.averi.lab/.Twin'];
+    const fresh = await rejudgeRecord({ ...recorded(), chooserPremise: { state: 'fresh', facts, lines } }, RECORD, { groups: ['chooser'] });
+    expect(fresh.lines).toEqual([...plain.lines, ...lines, '']);
+    expect(fresh.exitCode).toBe(0);
+  });
+
+  it('a stale premise fails the run, its cases judged as before; an unread one leaves the exit code untouched', { timeout: 60_000 }, async () => {
+    const plain = await rejudgeRecord(recorded(), RECORD, { groups: ['chooser'] });
+    const lines = ['CHOOSER PREMISE: stale — 0 handlers for averilab://shared/open, not 2 — the run fails', 'D55 (Android): averilab://shared/open has 0 handlers'];
+    const stale = await rejudgeRecord({ ...recorded(), chooserPremise: { state: 'stale', facts, lines } }, RECORD, { groups: ['chooser'] });
+    expect(stale.lines).toEqual([...plain.lines, ...lines, '']);
+    expect(stale.exitCode).toBe(1);
+    const unread = await rejudgeRecord({ ...recorded(), chooserPremise: { state: 'unread', facts, lines: ['Chooser premise: unread — x'] } }, RECORD, { groups: ['chooser'] });
+    expect(unread.exitCode).toBe(0);
+  });
+});

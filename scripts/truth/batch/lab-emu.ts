@@ -1,30 +1,26 @@
 import { join } from 'node:path';
 import { adbShellArgv } from '../../../src/adapters/adb-shell.js';
 import { CHOOSER_FOCUS_COMMAND } from '../../../src/adapters/android-chooser.js';
+import { adbLine, checkHand, defaultHand, handlersArgv, LAB_PACKAGE, PREFERRED_ARGV, type HandBase, type PreferredRead } from '../chooser-premise.js';
 import { AndroidLab, pause } from '../lab-device.js';
 import { markDirty, type Putback, type WindowSpec } from './abort.js';
 import { execOf, type Call, type CallResult, type Run } from './bounded.js';
 import { nodeFs, type BatchFs } from './io.js';
 import { stateOf } from './run-dir.js';
 import {
-  adbLine,
   cellsHand,
   CHECK_EXIT,
   CHECK_OUTCOME,
   CLIPBOARD_ARGV,
   checkExit,
-  checkHand,
   checkLine,
   checkWhy,
   chooserOf,
   CLEANUP_LABEL,
-  defaultHand,
   focusOf,
   handlersOf,
   installedOf,
-  LAB_PACKAGE,
   missingHand,
-  PREFERRED_ARGV,
   preferredOf,
   ROLE_HOLDERS_ARGV,
   stateFileHand,
@@ -36,10 +32,8 @@ import {
   unreachableOf,
   type AcceptedEntry,
   type CheckExit,
-  type HandBase,
   type FocusRead,
   type Installed,
-  type PreferredRead,
   type ShellRead,
   type TapRefusal,
   type TapTarget,
@@ -193,7 +187,7 @@ export async function readClipboard(emu: LabEmu): Promise<ShellRead> {
 
 /** The activities handling `url` (batch-11.sh's handlers: shared 2, cell 1), or why not. */
 export async function handlers(emu: LabEmu, url: string): Promise<number | { why: string }> {
-  return handlersOf(await emu.shell(['cmd', 'package', 'query-activities', '--brief', '-a', 'android.intent.action.VIEW', '-d', url]));
+  return handlersOf(await emu.shell(handlersArgv(url)));
 }
 
 // ------------------------------------------------------------------------------------------------- the tap
