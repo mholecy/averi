@@ -414,7 +414,9 @@ describe('fillFailureText — every error a fill throws', () => {
   // D79 review round 1, MAJOR-1: the rest of the class — a `length` whose field count is the typed one
   it('a length of as many characters as typed says how many are the typing, or that some are bullets', () => {
     expect(mismatch({ kind: 'length', past: 1 }, 2, 2)).toBe('fill: typed 2 characters but the field shows 2, only 1 of them past its earlier text (content withheld from this error)');
-    expect(mismatch({ kind: 'length', past: 0 }, 7, 7)).toBe('fill: typed 7 characters but the field shows 7, none of them typed: its placeholder (content withheld from this error)');
+    expect(mismatch({ kind: 'length', past: 0 }, 7, 7)).toBe(
+      'fill: typed 7 characters but the field shows 7, exactly its placeholder: empty, or the typing turned into that text — the tree cannot tell which (content withheld from this error)',
+    );
     expect(mismatch({ kind: 'length', partlyMasked: true }, 6, 6)).toBe(
       'fill: typed 6 characters but the field shows 6, some of them bullets: the typing cannot be compared with them (content withheld from this error)',
     );

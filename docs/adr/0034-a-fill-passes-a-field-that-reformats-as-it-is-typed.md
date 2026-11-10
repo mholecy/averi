@@ -1044,8 +1044,10 @@ failed command's words the same way).
 - `past`, on any other such `length`: how many of the field's characters are past its earlier text — the typing's part
   (`typedPartOf`), which there is the held count less the earlier one, and 0 where the reading is the named placeholder
   (held empty; the held-less-earlier count would read 0 or below). "typed 2 characters but the field shows 2, only 1
-  of them past its earlier text"; for 0, "typed 7 characters but the field shows 7, none of them typed: its
-  placeholder". It is never the typed count: past it, the reading would compare whole (`same-length` or `case`).
+  of them past its earlier text"; for 0, "typed 7 characters but the field shows 7, exactly its placeholder: empty, or
+  the typing turned into that text — the tree cannot tell which" (review round 2, MINOR-1: until then "none of them
+  typed: its placeholder", which asserted an empty field; a typed `search` that iOS auto-capitalises to a named
+  `Search` reads so too, and the field then holds the typing — fill.test.ts pins both readings). It is never the typed count: past it, the reading would compare whole (`same-length` or `case`).
 - `partlyMasked`, on the partly masked `length` of the typed count (its content is not comparable): "typed 6
   characters but the field shows 6, some of them bullets: the typing cannot be compared with them".
 `withoutWholeToo` keeps all three: keys proven typed elsewhere take the hedge off, not the count (fill-type.test.ts
@@ -1071,13 +1073,14 @@ mismatch.
 gate always true (7 fail) or false (14), its earlier count dropped, subtracted or taken from the reading (14 each), the
 `wholeToo` guard dropped (37); `past` never set (9), always set (45), one more (9), the held count less the earlier one
 (2: the placeholder rows); `partlyMasked` never (3) or always (3); each wording in fill-text.ts never chosen (8, 6, 2,
-3). One equivalent, in fill-text.ts (not in the mutation scope): `showsText`'s `d.kind !== 'length'` guard dropped — no
+3); after review round 2, by the auto-capitalised `search` row: the placeholder wording never chosen, put back as it
+was, or its clause dropped (1 each); the branch widened to every `past` is killed by the `past` rows (5). One equivalent, in fill-text.ts (not in the mutation scope): `showsText`'s `d.kind !== 'length'` guard dropped — no
 other kind carries the three. fill-landing, narrowed cold: see the baseline in scripts/mutation/scope.json.
 
 **Golden and live.** The golden replays tree reads and never types: Changed 0 against main 41055181. No live record
 reads these shapes (D71's live run reached none of its refusals). The unit tests are the evidence: fill.test.ts's D79
 rows (`55`/`5`, `1212`/`12`, `-5`/`-`; `15`, `1-`, `1 ` for `11` after `1`; `11` for `12` after `1`), the two moved
-pins (`Company`, `•••••t`) and the short and long landing pins.
+pins (`Company`, `•••••t`), the auto-capitalised `search` read as its named placeholder `Search` and the short and long landing pins.
 
 ## Residuals accepted
 

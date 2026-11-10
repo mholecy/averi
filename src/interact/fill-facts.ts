@@ -382,7 +382,8 @@ export interface OtherInput {
  *   (D79 review round 1), set only where the field's count is the typed
  *   one: `past`, how many of the field's characters are past its earlier
  *   text (the typing's part: `12` after `1` read `11` — 1; 0 when the
- *   reading is the named placeholder), and `partlyMasked`, a reading with
+ *   reading is exactly the named placeholder: an empty field, or typing
+ *   the app turned into that text — the tree cannot tell which), and `partlyMasked`, a reading with
  *   bullets among its characters (`•1` for `11`), whose content cannot be
  *   compared.
  * - `separated` (D53): every typed character is there, in order, with

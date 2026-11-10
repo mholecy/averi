@@ -1823,9 +1823,36 @@ describe('fillField — the review probes of the hint-aware clear (2026-10-09)',
       if (fake.focused) fake.focused.value = 'Company'; // the app rejected the input and emptied the field
     };
     await expect(fillField(fake, { id: 'last_name' }, 'company', FAST)).rejects.toThrow(
-      // D79 review round 1: the two counts are equal — the reply says none of them is the typing
-      'fill: typed 7 characters but the field shows 7, none of them typed: its placeholder (content withheld from this error)',
+      // D79: the two counts are equal, and the reading is exactly the placeholder — an emptied field (as here) or
+      // typing the app turned into that text; the tree cannot tell which, and the reply says so (review round 2, MINOR-1)
+      'fill: typed 7 characters but the field shows 7, exactly its placeholder: empty, or the typing turned into that text — the tree cannot tell which (content withheld from this error)',
     );
+  });
+
+  // D79 review round 2, MINOR-1: the other reading of the same shape — iOS auto-capitalisation turns a typed `search`
+  // into `Search`, the named placeholder's text, in a field that selected its earlier `foo` on focus. The field holds the
+  // typing; the reply must not say no key landed. (With clear the same first reading is typed once more and the last
+  // reading is `unchanged`; without, it is the final one.)
+  it('`search` typed over `foo`, auto-capitalised to the named placeholder `Search`: the reply names both readings, no content (D79)', async () => {
+    const { fake } = hintedField('foo', { hint: 'Search', named: true });
+    fake.typingDelivery = 'may-arrive-late';
+    fake.typeText = async (t: string) => {
+      fake.typed.push(t);
+      if (fake.focused) fake.focused.value = t.charAt(0).toUpperCase() + t.slice(1); // select-all, auto-capitalised
+    };
+    const error: Error = await fillField(fake, { id: 'last_name' }, 'search', FAST).then(
+      () => {
+        throw new Error('Filled');
+      },
+      (e: Error) => e,
+    );
+    expect(fake.focused?.value).toBe('Search'); // the field holds the typing
+    expect(error.message).toBe(
+      'fill: typed 6 characters but the field shows 6, exactly its placeholder: empty, or the typing turned into that text — ' +
+        'the tree cannot tell which (content withheld from this error)',
+    );
+    expect(error.message).not.toMatch(/search/i);
+    expect(fake.typed).toEqual(['search']);
   });
 
   it('D2: no clear, the typing dropped on a field holding text that matches the value but for case: "did not change"', async () => {

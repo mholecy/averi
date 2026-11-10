@@ -316,7 +316,8 @@ const FAILURE_SENTENCE: SentenceTable<FillFailure> = {
 function showsText(shows: number, d: Difference): string {
   if (d.kind !== 'length') return `${shows}`;
   if (d.appended !== undefined) return `only the typed text, where an append would show ${d.appended}`;
-  if (d.past === 0) return `${shows}, none of them typed: its placeholder`;
+  // review round 2: exactly the named placeholder is an empty field or typing turned into that text — never which
+  if (d.past === 0) return `${shows}, exactly its placeholder: empty, or the typing turned into that text — the tree cannot tell which`;
   if (d.past !== undefined) return `${shows}, only ${d.past} of them past its earlier text`;
   if (d.partlyMasked === true) return `${shows}, some of them bullets: the typing cannot be compared with them`;
   return `${shows}`;
