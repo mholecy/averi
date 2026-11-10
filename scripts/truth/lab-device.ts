@@ -143,8 +143,8 @@ export const isDeviceCheckSimulator = (udid: string): boolean => udid.toUpperCas
 /** The lab's AVD (`adb emu avd name`); any other emulator or device is refused. */
 export const LAB_AVD = 'averi_lab';
 /**
- * The native lab app's APK as the checkout builds it (batch-11.sh:48; batch/lab-build.ts builds it there): what a hand line
- * installs when no APK was pulled from the device (chooser-premise.ts, T20a).
+ * The native lab app's APK as the checkout builds it (batch-11.sh:48; batch/lab-build.ts builds it there): what a
+ * hand line installs when no APK was pulled from the device (chooser-premise.ts, T20a).
  */
 export const APK_PATH = 'fixtures/apps/android/build/outputs/apk/debug/AveriLab-debug.apk';
 /** The device-check simulator's WebDriverAgent ports (averi gives the first simulator 8100, the next 8101): refused. */

@@ -1,12 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { readChooserPremise } from '../../scripts/truth/chooser-premise.js';
+import { readChooserPremise, readPremiseInto, type ChooserPremise } from '../../scripts/truth/chooser-premise.js';
 import { ACTIVITIES_COMMAND, AndroidLab, FOCUS_WINDOW_COMMAND, HOME_COMMAND, type Exec } from '../../scripts/truth/lab-device.js';
 
-// scripts/truth/chooser-premise.ts#readChooserPremise (T20a): the chooser group's premise, read once before its cases
-// through an AndroidLab over a fake adb — the API 33 reads batch-10 kept (tests/fixtures/batch) and T7b's review round 1
-// recorded (docs/truth/live-records/t7b-chooser/review1-run-1.json: the launcher in front, its HOME read).
+// scripts/truth/chooser-premise.ts (T20a): the chooser group's premise, read once before its cases through an
+// AndroidLab over a fake adb — the API 33 reads batch-10 kept (tests/fixtures/batch) and T7b's review round 1 recorded
+// (docs/truth/live-records/t7b-chooser/review1-run-1.json: the launcher in front, its HOME read).
 
 const BATCH = join(import.meta.dirname, '..', 'fixtures', 'batch');
 const fixture = (name: string): string => readFileSync(join(BATCH, name), 'utf8');
@@ -86,19 +86,22 @@ const entry = (flag: 'true' | 'false' | 'none', component = 'dev.averi.lab/.Twin
 const withEntries = (...entries: string[]): string => BLOCK.replace('  Schemes:\n', `  Schemes:\n${entries.join('\n')}\n`);
 const RERUN = 'node --import tsx scripts/truth/live.ts --serial emulator-5554 --groups chooser';
 const APK = 'fixtures/apps/android/build/outputs/apk/debug/AveriLab-debug.apk';
+const BUILD = 'build the APK first (from the checkout root, under JDK 17: cd fixtures/apps/android && ./gradlew assembleDebug), then';
 const FRESH_WHYS = ['no lab default (mAlways=true) for dev.averi.lab', '2 handlers for averilab://shared/open', 'no chooser on the stack', `HOME ${LAUNCHER}`];
 /** The fresh whys with `at` replaced. */
 const whys = (at: Record<number, string>): string => FRESH_WHYS.map((w, i) => at[i] ?? w).join('; ');
 const premiseOf = async (answers: Partial<Answers>) => (await readChooserPremise(fakeLab(answers).lab, chooser))!;
 
 describe('readChooserPremise: a stale premise — the run fails, and the owner\'s hand line', () => {
-  it('a lab default (mAlways=true): stale, the default named, and the hand line that clears it (chooser-premise.ts#defaultHand, as the batches clear it)', async () => {
+  it('a lab default (mAlways=true): stale, the default named, and the hand line that clears it (chooser-readers.ts#defaultHand, as the batches clear it, given this run as its cause)', async () => {
     const premise = await premiseOf({ preferred: withEntries(entry('true')) });
     expect(premise.state).toBe('stale');
     expect(premise.facts.map((f) => [f.fact, f.state])).toEqual([['default', 'stale'], ['handlers', 'fresh'], ['stack', 'fresh'], ['home', 'fresh']]);
     expect(premise.lines).toEqual([
       `CHOOSER PREMISE: stale — ${whys({ 0: '1 lab default (mAlways=true) for dev.averi.lab, first: 9d3a2b9 dev.averi.lab/.Twin | mMatch=0x300000 mAlways=true | Scheme: "averilab" | Authority: "shared": -1' })} — the run fails`,
-      `D55 (Android): a lab default (mAlways=true) is set — "Always" is never tapped, so it predates the batch or is a defect: adb -s emulator-5554 uninstall dev.averi.lab && adb -s emulator-5554 install ${APK} (clears it; wipes the lab's data); then: ${RERUN}`,
+      'D55 (Android): a lab default (mAlways=true) is set — "Always" is never tapped, so it predates this run or is a defect: ' +
+        `${BUILD} adb -s emulator-5554 uninstall dev.averi.lab && adb -s emulator-5554 install ${APK} (clears it; wipes the lab's data); ` +
+        `then: ${RERUN}`,
     ]);
   });
 
@@ -118,10 +121,13 @@ describe('readChooserPremise: a stale premise — the run fails, and the owner\'
     expect(one.state).toBe('stale');
     expect(one.lines).toEqual([
       `CHOOSER PREMISE: stale — ${whys({ 1: '1 handler for averilab://shared/open, not 2' })} — the run fails`,
-      `D55 (Android): averilab://shared/open has 1 handler, not the lab's 2 (.MainActivity and .Twin): adb -s emulator-5554 shell cmd package query-activities --brief -a android.intent.action.VIEW -d averilab://shared/open lists them; another app among them: uninstall it; the lab's .Twin missing: adb -s emulator-5554 install -r ${APK}; then: ${RERUN}`,
+      "D55 (Android): averilab://shared/open has 1 handler, not the lab's 2 (.MainActivity and .Twin): " +
+        'adb -s emulator-5554 shell cmd package query-activities --brief -a android.intent.action.VIEW -d averilab://shared/open lists ' +
+        "them; another app among them: uninstall it; the lab's .Twin missing: build the APK (from the checkout root, under JDK 17: " +
+        `cd fixtures/apps/android && ./gradlew assembleDebug), then adb -s emulator-5554 install -r ${APK}; then: ${RERUN}`,
     ]);
     const three = await premiseOf({ handlers: `${SHARED.replace('2 activities found:', '3 activities found:')}    dev.averi.lab.rn/.MainActivity\n` });
-    expect(three.facts[1]).toEqual({ fact: 'handlers', state: 'stale', why: '3 handlers for averilab://shared/open, not 2' });
+    expect(three.facts[1]).toEqual({ fact: 'handlers', state: 'stale', why: '3 handlers for averilab://shared/open, not 2', hand: three.lines[1] });
     expect(three.lines[1]).toContain('averilab://shared/open has 3 handlers, not');
     expect((await premiseOf({ handlers: 'No activities found\n' })).facts[1].why).toBe('0 handlers for averilab://shared/open, not 2');
   });
@@ -143,7 +149,8 @@ describe('readChooserPremise: a stale premise — the run fails, and the owner\'
       `CHOOSER PREMISE: stale — ${whys({ 3: "HOME is android/com.android.internal.app.ResolverActivity, the platform's chooser, not a launcher" })} — the run fails`,
       `D55 (Android): HOME is not a launcher: choose the launcher as the Home app on the emulator (Settings, Apps, Default apps, Home app), then adb -s emulator-5554 shell cmd package resolve-activity --brief -c android.intent.category.HOME -a android.intent.action.MAIN must name it; then: ${RERUN}`,
     ]);
-    expect((await premiseOf({ home: 'dev.averi.lab/.MainActivity\n' })).facts[3]).toEqual({ fact: 'home', state: 'stale', why: 'HOME is dev.averi.lab/.MainActivity, the lab, not a launcher' });
+    const lab = await premiseOf({ home: 'dev.averi.lab/.MainActivity\n' });
+    expect(lab.facts[3]).toEqual({ fact: 'home', state: 'stale', why: 'HOME is dev.averi.lab/.MainActivity, the lab, not a launcher', hand: resolver.lines[1] });
     expect((await premiseOf({ home: 'dev.averi.lab.rn/.MainActivity\n' })).facts[3].state).toBe('fresh');
   });
 
@@ -165,6 +172,8 @@ describe('readChooserPremise: a last-chosen entry is a warning only', () => {
     ]);
     const two = await premiseOf({ preferred: withEntries(entry('false'), entry('false', 'dev.averi.lab/.MainActivity')) });
     expect(two.lines[1]).toMatch(/^Chooser premise: WARN — 2 last-chosen lab entries \(/);
+    // One WARN line, quoting the first entry only.
+    expect(two.lines).toHaveLength(2);
   });
 
   it('beside a stale fact: the WARN after the hand lines', async () => {
@@ -229,5 +238,31 @@ describe('readChooserPremise: read only', () => {
       `shell ${ACTIVITIES_COMMAND}`,
       `shell ${HOME_COMMAND}`,
     ]);
+  });
+});
+
+describe("readPremiseInto: live.ts's step — read, kept in the record, echoed at once", () => {
+  it('a chooser run: the premise in the record, each of its lines echoed through note right after the read', async () => {
+    const record: { chooserPremise?: ChooserPremise } = {};
+    const notes: string[] = [];
+    await readPremiseInto(record, fakeLab({ preferred: withEntries(entry('true')) }).lab, chooser, { note: (l) => void notes.push(l) });
+    expect(record.chooserPremise?.state).toBe('stale');
+    expect(notes).toEqual(['chooser premise: reading it before the cases', ...record.chooserPremise!.lines]);
+    expect(notes).toHaveLength(3);
+  });
+
+  it('no note given: the premise kept all the same, nothing thrown', async () => {
+    const record: { chooserPremise?: ChooserPremise } = {};
+    await readPremiseInto(record, fakeLab().lab, chooser);
+    expect(record.chooserPremise?.state).toBe('fresh');
+  });
+
+  it('no chooser case, or no lab: the record untouched (no key), nothing said', async () => {
+    const record: { chooserPremise?: ChooserPremise } = {};
+    const notes: string[] = [];
+    await readPremiseInto(record, fakeLab().lab, [{ group: 'forms' }], { note: (l) => void notes.push(l) });
+    await readPremiseInto(record, undefined, chooser, { note: (l) => void notes.push(l) });
+    expect(Object.keys(record)).toEqual([]);
+    expect(notes).toEqual([]);
   });
 });

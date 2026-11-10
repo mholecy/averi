@@ -583,6 +583,11 @@ hand lines. lab-emu.ts holds, over the injected `Run` and `BatchFs`: `LabEmu` (h
 `dismissChooser`, `labInstalled`, `tapSafely`, `clearLabEntry`, `cleanUp` and `chooserWindow` (the chooser as abort.ts's
 dirty window). Two helpers moved to be shared: `exitText` to words.ts (from ios-defaults.ts) and `execOf` to bounded.ts
 (from ios-domains.ts), each now tested where it lives. The sandbox needs no new file: src/ and lab-device.ts are in it.
+Since T20a (2026-11-10) the preferred block's parse, the leak rule (`leaksOf`, `unflaggedOf`, `lastChosenOf`), the
+handler query and its count, and the hand lines' parts (`adbLine`, `defaultHand`, `checkHand`, `HAND_PREFIX`,
+`LAB_PACKAGE`, `PREFERRED_ARGV`) live in scripts/truth/chooser-readers.ts, a leaf outside batch/ that the live golden's
+chooser premise shares; lab-chooser.ts re-exports them and keeps `preferredOf` and `handlersOf` as its CallResult
+wrappers.
 
 Tests: lab-chooser.test.ts (the pure parts over the committed fixtures: batch-9's whole `dumpsys package` trimmed to its
 first lines, the Activity Resolver Table's averilab handlers as a decoy and the Preferred Activities block; batch-10's

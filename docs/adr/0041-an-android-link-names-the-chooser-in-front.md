@@ -690,40 +690,48 @@ stack.
 
 ## Amendment: the chooser group's premise, read before its cases (2026-11-10, T20a)
 
-**Context.** The chooser group's cases rest on the lab's state, not on averi: lc1 and lc4'' need a chooser to rise for
-`averilab://shared/…`, which a lab default (`mAlways=true`) or a missing `.Twin` (one handler) prevents; lc1 and lc3 need
-none on the stack before their calls; lc4' and lc4'' start from the HOME activity the device resolves. When one of these
-did not hold, the case SKIPped ("no chooser raised and none named", "the link raised no chooser") and nothing said why,
-so a run on a stale lab read as a run with nothing to judge. The device batches read the same state (`lab-chooser.ts`,
-`--check`), but live.ts must not import the owner-run batch layer.
+**Context.** The chooser group's cases rest on the lab's state, not on averi: lc1 and lc4'' need a chooser to rise
+for `averilab://shared/…`, which a lab default (`mAlways=true`) or a missing `.Twin` (one handler) prevents; lc1 and
+lc3 need none on the stack before their calls; lc4' and lc4'' start from the HOME activity the device resolves. When
+one of these did not hold, the case SKIPped ("no chooser raised and none named", "the link raised no chooser") and
+nothing said why, so a run on a stale lab read as a run with nothing to judge. The device batches read the same state
+(`lab-chooser.ts`, `--check`), but live.ts must not import the owner-run batch layer, and a batch must not load the
+live golden's modules.
 
-**Decision.** A run on Android with a chooser case among the cases selected reads the premise once, before the cases and
-before anything else touches the device, read only (`readChooserPremise` in `scripts/truth/chooser-premise.ts`, after
-the lab's guard): `dumpsys package preferred` (no lab default for `dev.averi.lab`), `cmd package query-activities --brief -a
-android.intent.action.VIEW -d averilab://shared/open` (two handlers, the lab's `.MainActivity` and `.Twin`),
-`AndroidLab.focus` (no ResolverActivity or ChooserActivity record on the stack), and HOME_COMMAND (HOME neither the
-platform's chooser — two Home apps, none chosen — nor the lab). Each fact is fresh, stale or unread; the record keeps
-them with the summary's lines (`chooserPremise`).
+**Decision.** A run on Android with a chooser case among the cases selected reads the premise once, before the cases
+and before anything else touches the device, read only (`readPremiseInto` in `scripts/truth/chooser-premise.ts`, after
+the lab's guard): `dumpsys package preferred` (no lab default for `dev.averi.lab`), `cmd package query-activities
+--brief -a android.intent.action.VIEW -d averilab://shared/open` (two handlers, the lab's `.MainActivity` and
+`.Twin`), `AndroidLab.focus` (no ResolverActivity or ChooserActivity record on the stack), and HOME_COMMAND (HOME
+neither the platform's chooser — two Home apps, none chosen — nor the lab). Each fact is fresh, stale (with the
+owner's hand line) or unread; the record keeps them with the summary's lines (`chooserPremise`), and the lines are
+said on stderr at once, so the owner can stop a run on a stale lab before its cases.
 - A stale fact: `CHOOSER PREMISE: stale — <every fact> — the run fails`, a hand line per stale fact under it, exit 1.
-  The default's is the batches' own (`defaultHand`: uninstall and install the lab APK, which clears it; the checkout's
-  build path, `APK_PATH` in `lab-device.ts`, as no APK was pulled); the handlers', the stack's and HOME's are new, each
-  ending `then:` with the command that reads the premise again. The cases still run and are judged as before: a stale
-  premise explains a SKIP, it does not replace it.
+  The default's is the batches' own (`defaultHand`, given its cause: it "predates this run", and the APK is the
+  checkout's build, `APK_PATH` in `lab-device.ts`, built first from the checkout root with `gradlew assembleDebug`
+  under JDK 17, as no APK was pulled; a batch's line is unchanged, "predates the batch"). The handlers', the stack's
+  and HOME's are new, each ending `then:` with the command that reads the premise again. The cases still run and are
+  judged as before: a stale premise explains a SKIP, it does not replace it.
+- A `--side` run fails on a stale premise too: the premise is the lab's state, the same whichever averi drives it, so
+  a calibration on a stale lab proves no more than a run of this checkout.
 - A last-chosen entry (`mAlways=false`, "Just once"'s, which no reinstall clears): a `Chooser premise: WARN` line only,
   as `--check`'s exit 6 is a warning.
 - A read that fails, or proves nothing (no `Preferred Activities User N:` block, a lab entry with no mAlways line, no
-  `N activities found:` line, no HOME component): that fact unread with adb's words, the premise `unread` when no fact
-  is stale, never a throw, the exit code untouched.
-- `--rejudge` prints the record's lines as they are and reads no device; a record without the key prints nothing, so
-  every record committed before T20a rejudges byte for byte as before (checked over all 699 records under docs/ and
-  tests/fixtures, with `--groups forms` and with every group, against 0b9cfbb0).
+  `N activities found:` line, no HOME component): that fact unread with adb's words, the premise `unread` when no
+  fact is stale, never a throw, the exit code untouched.
+- `--rejudge` prints the record's lines as they are and reads no device, and only when a chooser case is among the
+  cases it judges (`--groups forms` over a chooser record prints no premise and fails on none). A record without the
+  key prints nothing, so every record committed before T20a rejudges byte for byte as before (checked over all 699
+  records under docs/ and tests/fixtures, with `--groups forms` and with every group, against 0b9cfbb0). A run and its
+  rejudge read the record's labels in one place (`summarizeRecord` in `live-cases.ts`).
 
-The readers both sides need moved, not copied, into `chooser-premise.ts`: the preferred block's parse (`preferredIn`),
-the leak rule (`leaksOf`, `unflaggedOf`, `lastChosenOf`), the handler query and its count (`handlersArgv`,
-`handlersIn`), and the hand lines' parts (`adbLine`, `defaultHand`, `checkHand`, `HAND_PREFIX`, `LAB_PACKAGE`,
-`PREFERRED_ARGV`). `lab-chooser.ts` keeps its CallResult wrappers (`preferredOf`, `handlersOf`: a failed call unread),
-behaviour unchanged. The stack and HOME are read by `frontOf`, `homeOf` and `isChooser` in `live-chooser.ts`, the judges'
-own readers.
+The readers both sides need moved, not copied, into `scripts/truth/chooser-readers.ts`, a leaf that imports nothing of
+batch/ and nothing live-*: the preferred block's parse (`preferredIn`), the leak rule (`leaksOf`, `unflaggedOf`,
+`lastChosenOf`), the handler query and its count (`handlersArgv`, `handlersIn`), and the hand lines' parts
+(`adbLine`, `defaultHand`, `checkHand`, `HAND_PREFIX`, `LAB_PACKAGE`, `PREFERRED_ARGV`). `lab-chooser.ts` re-exports
+them and keeps its CallResult wrappers (`preferredOf`, `handlersOf`: a failed call unread), behaviour unchanged. The
+premise itself (its facts, lines and new hand lines) is live-side, in `chooser-premise.ts`, which no batch imports; it
+reads the stack and HOME with `frontOf`, `homeOf` and `isChooser` in `live-chooser.ts`, the judges' own readers.
 
 **Consequences.** A stale lab is now a named failure with its remedy, not a quiet SKIP. Not done here: nothing clears
 the state (no reinstall, no key, no setting — the owner's hand lines do that), and no recurring run includes the group

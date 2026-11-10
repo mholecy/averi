@@ -1314,4 +1314,13 @@ describe("T20a: the chooser group's premise, printed from the record", () => {
     const unread = await rejudgeRecord({ ...recorded(), chooserPremise: { state: 'unread', facts, lines: ['Chooser premise: unread — x'] } }, RECORD, { groups: ['chooser'] });
     expect(unread.exitCode).toBe(0);
   });
+
+  it('a selection with no chooser case (`--groups forms`): a stale premise in the record prints nothing and fails nothing', { timeout: 60_000 }, async () => {
+    const lines = ['CHOOSER PREMISE: stale — 0 handlers for averilab://shared/open, not 2 — the run fails'];
+    const forms = await rejudgeRecord({ ...recorded(), chooserPremise: { state: 'stale', facts, lines } }, RECORD, { groups: ['forms'] });
+    const plain = await rejudgeRecord(recorded(), RECORD, { groups: ['forms'] });
+    expect(forms.lines).toEqual(plain.lines);
+    expect(premiseLines(forms.lines)).toEqual([]);
+    expect(forms.exitCode).toBe(0);
+  });
 });

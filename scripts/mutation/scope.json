@@ -233,11 +233,17 @@
     "floor": 98,
     "baseline": "100 % on 2026-11-05 (T2 batch-13 fixes: checkDevice joins the readying's warning and the build's; cold): 273 mutants, 0 survived; 100 % on 2026-11-05 (T2 S6b code review: checkDevice, GradleCall, the stop's reason; cold, final): 266 mutants, 0 survived; superseded: 100 % on 2026-11-05 (T2 S6b review round 2, cold): 241 mutants, 0 survived"
   },
-  "scripts/truth/chooser-premise.ts": {
+  "scripts/truth/chooser-readers.ts": {
     "group": "lab",
     "tests": ["tests/truth/chooser-premise.test.ts", "tests/truth/batch/lab-chooser.test.ts", "tests/truth/batch/lab-emu.test.ts"],
     "floor": 98,
-    "baseline": "100 % on 2026-11-10 (T20a: the readers moved out of batch/lab-chooser.ts — preferredIn, the leak rule, handlersArgv and handlersIn, the hand lines' parts — and readChooserPremise, its four facts, its lines and the new hand lines; `npm run mutate -- --group lab --force`, cold, 260 s): 456 mutants, 0 survived, 0 timeouts; the first cold run scored 99.12 % (4 survived: the default's fresh state, the stack's join separator, the handler query's first line trimmed, the 200-character cut's boundary), each killed by a test since"
+    "baseline": "100 % on 2026-11-10 (T20a review round 1: split out of chooser-premise.ts as the leaf the batches and the live premise share — preferredIn, the leak rule, handlersArgv and handlersIn, the hand lines' parts, defaultHand given its cause; `npm run mutate -- --group lab --force`, cold, 249 s): 234 mutants, 0 survived, 0 timeouts"
+  },
+  "scripts/truth/chooser-premise.ts": {
+    "group": "lab",
+    "tests": ["tests/truth/chooser-premise.test.ts"],
+    "floor": 98,
+    "baseline": "100 % on 2026-11-10 (T20a review round 1: the premise alone, its readers in chooser-readers.ts — each fact carrying its hand, readPremiseInto, the WARN quoting the first entry by slice; cold, 249 s): 227 mutants, 0 survived, 0 timeouts; the round's first cold run scored 99.15 % (2 survived: readPremiseInto with no note, and the WARN's unused empty quote, designed away), the first killed by a test since; 100 % on 2026-11-10 (T20a: the readers moved out of batch/lab-chooser.ts — preferredIn, the leak rule, handlersArgv and handlersIn, the hand lines' parts — and readChooserPremise, its four facts, its lines and the new hand lines; `npm run mutate -- --group lab --force`, cold, 260 s): 456 mutants, 0 survived, 0 timeouts; the first cold run scored 99.12 % (4 survived: the default's fresh state, the stack's join separator, the handler query's first line trimmed, the 200-character cut's boundary), each killed by a test since"
   },
   "scripts/truth/device-state.ts": {
     "group": "lab",

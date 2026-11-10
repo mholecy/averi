@@ -17,7 +17,22 @@ import {
   type HandBase,
   type LabEntry,
   type PreferredRead,
-} from '../chooser-premise.js';
+} from '../chooser-readers.js';
+// Moved to the leaf module (T20a) and re-exported, so a batch that imports them from here still does.
+export {
+  adbLine,
+  checkHand,
+  defaultHand,
+  HAND_PREFIX,
+  LAB_PACKAGE,
+  lastChosenOf,
+  leaksOf,
+  PREFERRED_ARGV,
+  unflaggedOf,
+  type HandBase,
+  type LabEntry,
+  type PreferredRead,
+} from '../chooser-readers.js';
 import type { CallResult } from './bounded.js';
 import { exitText, failedCall, firstLineOf, messageOf, nameInLine, verdictLine, type Verdict } from './words.js';
 
@@ -30,9 +45,9 @@ import { exitText, failedCall, firstLineOf, messageOf, nameInLine, verdictLine, 
  * safeTap, the one point a batch may tap on the chooser, never "Always"; the reads that can come back unread (the role
  * holder, the clipboard, the install); and every line a batch prints of them.
  *
- * The readers the live golden's chooser premise reads too (T20a) live in ../chooser-premise.ts, outside the batch layer:
- * the preferred block's parse, the leak rule, the handler count, the default's and the check's hand lines. Here they are
- * wrapped over a CallResult (preferredOf, handlersOf: a failed call is unread).
+ * The readers the live golden's chooser premise reads too (T20a) live in ../chooser-readers.ts, a leaf outside the
+ * batch layer: the preferred block's parse, the leak rule, the handler count, the default's and the check's hand
+ * lines; re-exported here. Here they are wrapped over a CallResult (preferredOf, handlersOf: a failed call is unread).
  *
  * What is src's is reused, not copied: the focus is android-chooser.ts#chooserInFocus's, the tree src's own uiautomator
  * parser's (D66's UiNode.disabled), the fresh sheet android-chooser.ts#chooserSheet's, a hand line's quoting

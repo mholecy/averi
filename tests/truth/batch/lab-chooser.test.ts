@@ -34,7 +34,20 @@ import {
   type RawAttrs,
   type FocusRead,
 } from '../../../scripts/truth/batch/lab-chooser.js';
-import { checkHand, defaultHand, lastChosenOf, leaksOf, unflaggedOf, type HandBase, type PreferredRead } from '../../../scripts/truth/chooser-premise.js';
+import type {
+  HandBase as MovedHandBase,
+  LabEntry as MovedLabEntry,
+  PreferredRead as MovedPreferredRead,
+} from '../../../scripts/truth/batch/lab-chooser.js';
+import {
+  checkHand,
+  defaultHand,
+  lastChosenOf,
+  leaksOf,
+  unflaggedOf,
+  type HandBase,
+  type PreferredRead,
+} from '../../../scripts/truth/chooser-readers.js';
 
 // scripts/truth/batch/lab-chooser.ts, the pure module: the preferred-activities read over API 33's real dumps (batch-9's
 // whole `dumpsys package`, batch-10's `preferred` block), --check's exit, safeTap over T4's committed resolver trees
@@ -726,5 +739,28 @@ describe('safeTap fails closed (T2 S5 review round 1)', () => {
 
   it('an entry-shaped lab line under a later top-level section is no entry of the block', () => {
     expect(readOf(`${BLOCK}Domain verification status:\n  dev.averi.lab:\n        9d3a2b9 dev.averi.lab/.Twin\n         mMatch=0x300000 mAlways=true\n`)).toEqual({ state: 'read', users: 1, lab: [] });
+  });
+});
+
+describe("T20a: what moved to ../chooser-readers.ts is still lab-chooser.ts's to import (re-exported, not copied)", () => {
+  it('each name lab-chooser.ts exported before the move is the leaf module\'s own', async () => {
+    const batch = await import('../../../scripts/truth/batch/lab-chooser.js');
+    const leaf = await import('../../../scripts/truth/chooser-readers.js');
+    const MOVED = ['LAB_PACKAGE', 'HAND_PREFIX', 'PREFERRED_ARGV', 'leaksOf', 'unflaggedOf', 'lastChosenOf', 'adbLine', 'defaultHand', 'checkHand'] as const;
+    for (const name of MOVED) {
+      expect(batch, name).toHaveProperty(name);
+      expect((batch as Record<string, unknown>)[name], name).toBe(leaf[name]);
+    }
+    // The types too, re-exported: this file does not compile without them.
+    const typed: { entry?: MovedLabEntry; read?: MovedPreferredRead; base?: MovedHandBase } = {};
+    expect(typed).toEqual({});
+  });
+
+  it("the batch's default hand line unchanged by the cause the live premise gives it: 'predates the batch'", () => {
+    const base = { serial: 'emulator-5554', apk: '/run/lab/installed.apk', then: 'the probe --restore' };
+    expect(defaultHand(base)).toBe(
+      'D55 (Android): a lab default (mAlways=true) is set — "Always" is never tapped, so it predates the batch or is a defect: ' +
+        "adb -s emulator-5554 uninstall dev.averi.lab && adb -s emulator-5554 install /run/lab/installed.apk (clears it; wipes the lab's data); then: the probe --restore",
+    );
   });
 });

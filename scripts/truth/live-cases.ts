@@ -885,10 +885,28 @@ export function summarize({
   if (ceiling.lines.length > 0) lines.push(...ceiling.lines, '');
   // T16: the device's state around the carousel group's cases, only where the run read it — a label, no gate.
   if (device !== undefined) lines.push(deviceLine(device), '');
-  // T20a: the chooser group's premise, its lines as the run printed them (a rejudge reads no device); stale fails the run.
-  if (premise !== undefined) lines.push(...premise.lines, '');
-  const stalePremise = premise?.state === 'stale';
-  return { lines, exitCode: unknown.length > 0 || fixed.length > 0 || failingSkips.length > 0 || stateless.length > 0 || ceiling.fails || stalePremise ? 1 : 0 };
+  // T20a: the chooser group's premise, its lines as the run printed them (a rejudge reads no device); stale fails the
+  // run. Only where a chooser case is among the results: a rejudge of another group judges nothing it rests on.
+  const shown = results.some((r) => r.c.group === 'chooser') ? premise : undefined;
+  if (shown !== undefined) lines.push(...shown.lines, '');
+  const stalePremise = shown?.state === 'stale';
+  const counted = unknown.length > 0 || fixed.length > 0 || failingSkips.length > 0 || stateless.length > 0;
+  const fails = counted || ceiling.fails || stalePremise;
+  return { lines, exitCode: fails ? 1 : 0 };
+}
+
+/**
+ * A run's summary from its record (live.ts's, after the cases; `--rejudge`'s, below): its results, and the labels the
+ * record keeps beside them — the carousel group's device label (T16, `deviceLabel`) and the chooser group's premise
+ * (T20a, `chooserPremise`) — read from the record in this one place, so a run and its rejudge print them alike.
+ */
+export function summarizeRecord(
+  record: RunRecord,
+  results: readonly Result[],
+  { sources, side, rejudgedFrom }: { sources: readonly Source[]; side: string; rejudgedFrom?: string },
+): Summary {
+  const labels = { device: record.deviceLabel, premise: record.chooserPremise };
+  return summarize({ platform: record.platform, sources, results, side, rejudgedFrom, ...labels });
 }
 
 /**
@@ -898,5 +916,5 @@ export function summarize({
 export async function rejudge(record: RunRecord, from: string, selection: RejudgeSelection): Promise<Summary> {
   const results = await rejudgedResults(record, selection);
   const sources = [...new Set(record.results.map((r) => r.source))];
-  return summarize({ platform: record.platform, sources, results, side: record.side, rejudgedFrom: from, device: record.deviceLabel, premise: record.chooserPremise });
+  return summarizeRecord(record, results, { sources, side: record.side, rejudgedFrom: from });
 }

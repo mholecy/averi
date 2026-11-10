@@ -1,7 +1,16 @@
 import { join } from 'node:path';
 import { adbShellArgv } from '../../../src/adapters/adb-shell.js';
 import { CHOOSER_FOCUS_COMMAND } from '../../../src/adapters/android-chooser.js';
-import { adbLine, checkHand, defaultHand, handlersArgv, LAB_PACKAGE, PREFERRED_ARGV, type HandBase, type PreferredRead } from '../chooser-premise.js';
+import {
+  adbLine,
+  checkHand,
+  defaultHand,
+  handlersArgv,
+  LAB_PACKAGE,
+  PREFERRED_ARGV,
+  type HandBase,
+  type PreferredRead,
+} from '../chooser-readers.js';
 import { AndroidLab, pause } from '../lab-device.js';
 import { markDirty, type Putback, type WindowSpec } from './abort.js';
 import { execOf, type Call, type CallResult, type Run } from './bounded.js';
