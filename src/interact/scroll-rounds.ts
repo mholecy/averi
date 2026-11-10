@@ -260,6 +260,8 @@ export type RoundStep =
  * - `unaimable`: a `fully: true` match a probe proved cut at its flush edge, whose uncut side has less room left in its
  *   scroll container than a stroke of this call no longer than the next reveal carried it (flush-check.ts#FlushAim, D68):
  *   another swipe would most likely push that side out past the container, so none is sent.
+ * - `within`: the caller's `within` (D78) names no scroll view to stroke on the scroll's first read that read
+ *   (interact/within.ts#WithinRefusal) — no swipe sent, whatever that read held of the target.
  * - `changed`: the screen changed under the strokes (ui-tree/read-tree.ts#ScreenChange) — the
  *   first read after them is another screen than the read before them; no
  *   stop is judged on it and no further stroke sent, whether the target is

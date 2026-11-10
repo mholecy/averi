@@ -1057,7 +1057,9 @@ function boundBeside(beside: StrokedBeside | undefined, lead: ': ' | '; '): stri
  * across the scroll view it was drawn over, <rect>, which scrolls vertically, and` then what the whole tree shows the
  * other way. A scroll view told to scroll horizontally is named (`<node>, which scrolls horizontally, and which the
  * swipes did not go over`, or `…, but which had no room for a swipe` when the plan judged it without room), with
- * `swipe inside it (swipe, its coordinates), then scroll_until it`. Else `the tree shows no scroll view that may
+ * `scroll_until it again with within: <its rect>` (D78; `swipe inside it (swipe, its coordinates), then scroll_until it`
+ * where it had no room, or a read had found the target — its own scroll views are the candidates then, and `within` is
+ * ignored). Else `the tree shows no scroll view that may
  * scroll horizontally — if the element lies in a horizontal list the tree does not show as one, swipe inside that
  * list (swipe, its coordinates), then scroll_until it`. `boundText`'s; the troubleshooting reference pins it through
  * `boundText` (tests/mcp/tool-descriptions.test.ts).
@@ -1080,9 +1082,10 @@ function acrossText({ rect, axis, along }: StrokedAcross): string {
  * node clipping, before the target is read — `were drawn over the screen whole (aimed at no scroll view), touching down
  * at x,y inside the scroll view <rect>`), then `the tree shows another scroll view that scrolls vertically, which the
  * swipes did not go over: <node>` — several counted, the BESIDE_NAMED largest named and the rest counted (`and 2 more`)
- * — with `if the element lies in it, swipe inside it (swipe, its coordinates) until the element shows, then
- * scroll_until it`. "Did not go over": no swipe touched down in it. The remedy is the caller's: the swipes are not
- * tried there (D76's decision, ADR 0010's D76 amendment). `boundText`'s and `boundBeside`'s; the troubleshooting
+ * — with `if the element lies in it, scroll_until it again with within: {"x":…,"y":…,"width":…,"height":…}` (D78: its
+ * rect as `within` takes it, `withinRect`; several: `… in one of them, scroll_until it again with within: that one's
+ * rect`). "Did not go over": no swipe touched down in it. The remedy is the caller's: the swipes are not tried there
+ * (D76's decision, ADR 0010's D76 amendment). `boundText`'s and `boundBeside`'s; the troubleshooting
  * reference quotes it.
  */
 function besideText({ within, at, landed, axis, others }: StrokedBeside): string {

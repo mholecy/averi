@@ -534,8 +534,8 @@ const toldLargestFirst = (facts: Pick<TreeFacts, 'scene' | 'reading'>, way: Scro
  * (`Memory.touchDowns`: an earlier stroke inside a nested list and the last over the page holding it leave out both;
  * the scroll view each stroke went over holds its touch-down, so it is left out with it) — largest first. Before the
  * target is read the plan's candidates hold no sibling of the largest scroller (`candidatesOf`), so the stop's
- * sentence names them (scroll-text.ts#boundText) and the remedy is the caller's; why, and why the plan does not try
- * them in turn: ADR 0010's D76 amendment. Undefined once the target was found (its own scroll views are the
+ * sentence names them (scroll-text.ts#boundText) and the remedy is the caller's — `within` naming the one that holds the
+ * target (D78, `nameScrollView`); why, and why the plan does not try them in turn: ADR 0010's D76 amendment. Undefined once the target was found (its own scroll views are the
  * candidates), when the last stroke went ACROSS the scroll view it was drawn over (`strokedAcross` says that), and
  * when the tree tells no other — idb's flat list never does. One walk of the tree, at the stop only.
  */

@@ -610,9 +610,13 @@ axis the tree tells (`toldOn`): a Compose lazy list or a RecyclerView (axis unkn
 of a row inside it resolves to it. (3) The selector resolves on the first read only: a list laid out later is not
 found. (4) A `within` whose list scrolls away under the page (nested in the largest) is kept by its last rect: a
 stroke over that rect may land beside it, as a target's remembered scroll view may. (5) Not measured on a device (the
-emulator was down): a live case is on the owner's list — android `scroll-bounded` O and F with `within` = `lower`'s
-rect and `id:lab.scroll-bounded.S`, direction down, judged by the app's stroke log (every stroke inside `lower`, the
-target reached and tapped).
+emulator was down). The live cases are drafted (scripts/truth/live-visibility.ts, its `WITHIN` table, Android only):
+`within:scroll-bounded.O` with `lower`'s rect from the capture's `scrollViews`, `within:scroll-bounded.F` with
+`id:"lab.scroll-bounded.S"`, direction down, 12 swipes and 30 s (F lies ~2300 px down a 495-px list), judged by
+`judgeWithin` — judgeScroll's stop and tap from the app's stroke log (every stroke on `lower` bringing the target
+closer), a loud failure its MISMATCH. Their first run is on the owner's list. (6) A selector's match in no scroll
+view still names a scroll view that has its very rect (a wrapper laid exactly over its list): found by `Clips.axesOf`,
+as a rect is.
 
 **Golden.** Against the base JSON of `main` 4b6e3b56: Changed exactly 2, android `scroll-bounded` O and F
 `scroll_until`, the reply's wording only (D76's remedy now `within`), still green; Strike 0, COUNTS 0, Re-pin 0. The
@@ -632,7 +636,15 @@ re-pinned; the across clause with and without `targetRead`), tests/interact/scro
 stop re-pinned), tests/mcp/tools.test.ts (the schema takes a selector and a rect, passed through; a rect missing a
 side, of strings, or a number refused before a device is bound), tests/mcp/tool-descriptions.test.ts (the
 troubleshooting entry, its way out now `within`), tests/mcp/tool-surface-budget.test.ts (the budget raised from 31,000 —
-30,999 used — to 31,500 for the option's schema and description, 460 bytes).
+30,999 used — to 31,500 for the option's schema and description, 460 bytes), tests/truth/live-visibility.test.ts (the
+two within cases asked on Android only, their calls; `judgeWithin`). Hand mutants, each killed: the first-read guard
+(`treesRead === 1`) dropped, the refusal stop dropped, the plan not told the rect, the caller's direction for `down`,
+`within` not passed by the driver nor the MCP handler, the rect's height optional, the selector arm `z.any()`; the
+reply's rect fields reordered, the selector form said as a target, the count, `a`/`2` words, the other axis' directions,
+the stroke's direction dropped; `targetRead` inverted, its guard and `noRoom`'s each dropped; the plan's refresh of the
+named view dropped, its axes not kept by a read that lost it, named with no axes; the live cases' F by rect, on iOS
+too, 6 swipes, the LOUD not turned. One equivalent: `others[0]` as `others.at(-1)` where there is one. Mutation
+(scripts/mutation/scope.json, core): `src/interact/within.ts` 100 % (70 mutants), floor 98.
 
 ## Bug note
 

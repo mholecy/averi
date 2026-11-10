@@ -3280,6 +3280,14 @@ describe('round — `within`, the scroll view named for the strokes until the ta
     expect(play({ ...ANDROID, within: 'id:nope' }, [{ tree, found: [s] }]).outcome).toMatchObject({ kind: 'within', refused: { of: 'absent' } });
   });
 
+  it('resolved once: a later read that no longer lists the named rect (the list moved) is not refused — the strokes go on over the rect named', () => {
+    const tree = parseDump(BOUNDED);
+    const moved = node({ role: 'container', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'vertical', rect: { ...UPPER } })] });
+    const played = play({ ...ANDROID, maxSwipes: 2, timeoutMs: 15_000, within: LOWER }, [{ tree }, { tree: moved }, { tree: moved }]);
+    expect(strokesOf(played).map((st) => st.box)).toEqual([LOWER, LOWER]);
+    expect(played.outcome).toMatchObject({ kind: 'bound' });
+  });
+
   it('a failed first read strokes nothing and resolves nothing: the first read that reads does', () => {
     const tree = parseDump(BOUNDED);
     const played = play({ ...ANDROID, within: 'id:nope' }, [{ error: 'dump failed' }, { tree }]);

@@ -1,6 +1,6 @@
 import { type Rect, type ScrollAxis } from '../adapters/types.js';
 import { listsAncestry } from '../ui-tree/draw-order.js';
-import { quoted, type QuotedNode } from '../ui-tree/geometry.js';
+import { quoted, type QuotedNode, type ScrollAxes } from '../ui-tree/geometry.js';
 import { scrolls } from '../ui-tree/scroll-containers.js';
 import { findTarget, type Target } from '../ui-tree/selectors.js';
 import type { TreeFacts } from './scroll-read.js';
@@ -65,20 +65,23 @@ export function resolveWithin(facts: Pick<TreeFacts, 'tree' | 'scene' | 'reading
   const { clips } = facts.scene;
   const way = axisOf(direction);
   let rect: Rect;
+  let axes: ScrollAxes | undefined;
   if (isRect(within)) {
-    if (clips.axesOf(within) === undefined) return { refused: { of: 'stale', axis: way, told: clips.toldOn(way, screen, facts.reading.ofKeyboard).map(quoted) } };
     rect = { x: within.x, y: within.y, width: within.width, height: within.height };
+    axes = clips.axesOf(rect);
+    if (axes === undefined) return { refused: { of: 'stale', axis: way, told: clips.toldOn(way, screen, facts.reading.ofKeyboard).map(quoted) } };
   } else {
     const found = findTarget(facts.tree, within);
     if (found.length === 0) return { refused: { of: 'absent' } };
     if (found.length > 1) return { refused: { of: 'ambiguous', matches: found.map(quoted) } };
     const [node] = found;
-    const nearest = scrolls(node) ? node.rect : targetScrollers(facts, node)[0];
-    if (nearest === undefined) return { refused: { of: 'unscrolled', node: quoted(node) } };
-    rect = { ...nearest };
+    rect = { ...(scrolls(node) ? node.rect : (targetScrollers(facts, node)[0] ?? node.rect)) };
+    // Found by its rect as every remembered scroll view is (`Clips.axesOf`): none for a node in no scroll view — unless
+    // a scroll view has that very rect (a wrapper laid exactly over its list), which it then names.
+    axes = clips.axesOf(rect);
+    if (axes === undefined) return { refused: { of: 'unscrolled', node: quoted(node) } };
   }
-  const axes = clips.axesOf(rect);
-  const axis = axes?.axis;
-  if (axis !== undefined && axis !== way && !(axes?.nested ?? []).some((n) => n.axis === undefined || n.axis === way)) return { refused: { of: 'across', rect, axis, toward: direction } };
+  const { axis, nested } = axes;
+  if (axis !== undefined && axis !== way && !nested.some((n) => n.axis === undefined || n.axis === way)) return { refused: { of: 'across', rect, axis, toward: direction } };
   return { rect };
 }

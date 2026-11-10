@@ -658,6 +658,21 @@ describe('a named scroll view (`within`, D78) — the one the strokes go over un
     expect(planStroke(planned, { ...ask(bounded), read: undefined }).stroke.box).toEqual(LOWER);
   });
 
+  it('a read that lost it keeps its axes as named — its nested scroll views still candidates — and the latest cut drawn over it, not the first', () => {
+    const PAGE: Rect = { x: 0, y: 0, width: 1080, height: 1800 };
+    const INNER: Rect = { x: 0, y: 400, width: 1080, height: 800 };
+    const paged = screenOf([node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { ...PAGE }, children: [node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'vertical', rect: { ...INNER } })] })]);
+    const gone = screenOf([]);
+    expect(planStroke(nameScrollView(startStrokes(), factsOf(paged), PAGE), ask(gone)).stroke.box).toEqual(INNER);
+    // Named on a read with nothing over `lower`; the next read draws a bar over its lower part; the one after lost it.
+    const named = nameScrollView(startStrokes(), factsOf(bounded), LOWER);
+    const BAR: Rect = { x: 0, y: 1400, width: 1080, height: 141 };
+    const barred = screenOf([scroller(UPPER), scroller(LOWER), cover(BAR)]);
+    const cut = planStroke(named, ask(barred));
+    expect(cut.stroke.coverTop).toBe(BAR.y);
+    expect(planStroke(cut.memory, ask(gone)).stroke.coverTop).toBe(BAR.y);
+  });
+
   it('once a read finds the target, its own scroll views: `within` no longer counts', () => {
     const p = [...everyNode(bounded)].find((n) => n.identifier === 'lab.scroll-bounded.P')!;
     const named = nameScrollView(startStrokes(), factsOf(bounded), LOWER);
