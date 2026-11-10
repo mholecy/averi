@@ -694,6 +694,8 @@ describe('the hedged ceiling: a run whose every judged unaimable leg ends hedged
 describe('the carousel group\'s cases and verdicts, held (T13)', () => {
   const C = (cell: string, direction: 'left' | 'right') => ({ tool: 'scroll_until', args: { selector: `id:lab.${cell}.C`, direction, fully: true } });
   const READS = { swipes: {}, late: false };
+  /** `judge` on `r`'s record with no stroke log at all, or with `replies` in place of its own. */
+  const judgeWithoutLog = (judge: Case['judge'], r: Recorded, replies: string[] = r.replies) => judge(r.state!, replies, r.source, r.launched, r.after, undefined);
 
   it('each scroll_until case: its cell, its pre-drag, what it reads and drops, whether its SKIP fails the run, its calls', () => {
     const shown = CAROUSEL_CASES.filter((c) => !c.id.startsWith('d37-')).map(({ id, cell, preDrag: px, reads, skipFails, calls }) => ({ id, cell, preDrag: px, reads, skipFails, calls }));
@@ -755,9 +757,9 @@ describe('the carousel group\'s cases and verdicts, held (T13)', () => {
 
   it('a premise read with no log at all: SKIP, never thrown', () => {
     const drop = recorded('lv-d62-drop');
-    expect(caseOf('lv-d62-drop').judge(drop.state!, drop.replies, drop.source, drop.launched, drop.after, undefined)).toMatchObject({ outcome: 'SKIP', why: 'no stroke log: the drop unshown' });
+    expect(judgeWithoutLog(caseOf('lv-d62-drop').judge, drop)).toMatchObject({ outcome: 'SKIP', why: 'no stroke log: the drop unshown' });
     const lazy = recorded('lv-d59b-lazy');
-    expect(caseOf('lv-d59b-lazy').judge(lazy.state!, lazy.replies, lazy.source, lazy.launched, lazy.after, undefined)).toMatchObject({ outcome: 'SKIP', why: 'no stroke log: the band unjudged' });
+    expect(judgeWithoutLog(caseOf('lv-d59b-lazy').judge, lazy)).toMatchObject({ outcome: 'SKIP', why: 'no stroke log: the band unjudged' });
   });
 
   it('the words of an ok verdict: fully visible with C whole; a kind accepted under its residual', () => {
@@ -784,9 +786,9 @@ describe('the carousel group\'s cases and verdicts, held (T13)', () => {
     const r = recorded('d52-e2');
     const uncounted = r.replies[0].replace('failed after 3 swipes', 'failed');
     const judge = judgeFully({ kinds: ['unfit'] });
-    expect(judge(r.state!, [uncounted], r.source, r.launched, r.after, undefined)).toMatchObject({ outcome: 'ok' });
-    expect(judge(r.state!, recorded('lv-d59b-lazy').replies, r.source, r.launched, r.after, undefined)).toMatchObject({ outcome: 'ok' });
-    expect(judgeFully({ kinds: ['unaimable'], inferred: true })(r.state!, recorded('lv-d62-control').replies, r.source, r.launched, r.after, undefined)).toMatchObject({ outcome: 'ok' });
+    expect(judgeWithoutLog(judge, r, [uncounted])).toMatchObject({ outcome: 'ok' });
+    expect(judgeWithoutLog(judge, r, recorded('lv-d59b-lazy').replies)).toMatchObject({ outcome: 'ok' });
+    expect(judgeWithoutLog(judgeFully({ kinds: ['unaimable'], inferred: true }), r, recorded('lv-d62-control').replies)).toMatchObject({ outcome: 'ok' });
     expect(verdictOf({ ...r, replies: [uncounted] })).toMatchObject({ outcome: 'LOUD', cls: 'carousel-kind', why: `unfit after ? swipes, more than 3: ${uncounted.slice(0, 220)}` });
   });
 

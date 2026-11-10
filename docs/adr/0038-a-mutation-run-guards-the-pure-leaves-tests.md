@@ -1475,10 +1475,14 @@ floor held any of them. Each joins with its own floor, by the floor rule (two po
 | scripts/truth/live-carousel.ts | lab | live-carousel.test.ts | 98.88 % (800 valid, 8 survived, 1 without coverage) | 96 |
 | scripts/truth/live-visibility.ts | lab | live-visibility.test.ts | 72.70 % (1 293 mutants, 334 survived, 19 without coverage) | 70 |
 
-Each entry lists the module's own test only; replies.ts's score, measured with replies.test.ts as the group's only
-test, is the same 97.86 %. Every survivor of the first three is argued equivalent in its scope.json baseline. live-visibility.ts joins at its
-measured score, low on purpose like draw-order's: 90 % would take some 230 more kills over thirty judges, backlog row
-T21. Its T17 LOUD gate is held but for conjuncts that a cut geometry and a hedged lead already imply.
+Each entry lists the module's own test only; replies.ts's score, measured with replies.test.ts as the group's only test,
+is the same 97.86 %. Every survivor of the first three is argued equivalent in its scope.json baseline.
+live-visibility.ts joins at its measured score, low on purpose like draw-order's: 90 % would take some 230 more kills
+over thirty judges, backlog row T21. Its T17 LOUD gate is held but for conjuncts that a cut geometry and a hedged lead
+already imply: counted survivors (T21), not argued equivalent. T11's doubt sites in flush-check.ts — `!proof.doubted` (a
+held reveal doubted once), the held hedge's `checked: false, why: 'held'`, and `doubted || doubtedFirst` (no stop while
+a doubt is spent) — are killed by flush-check.test.ts and none is among its survivors: the floor now holds what T11's
+hand mutants showed.
 
 - **flush-check.ts's own tests only.** Its header names the round's play tables (scroll-flush-reveal.test.ts,
   scroll-rounds.test.ts) as its wiring's tests; with them in core's include the score was the same and core's cold run

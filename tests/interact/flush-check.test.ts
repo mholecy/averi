@@ -23,6 +23,10 @@ const SCREEN: UsableScreen = { box: SCREEN_BOX, boxes: [SCREEN_BOX], oriented: S
 const CAP = 177;
 /** A list of the lab's bounded-flush shape: `[0,1046][1080,1541]` — its axis untold, as a lazy list's, so it serves the left and right edges too. */
 const LIST: Rect = { x: 0, y: 1046, width: 1080, height: 495 };
+/** A page LIST is nested in, its bottom LIST's (T13: a match flush with the page alone). */
+const PAGE: Rect = { x: 0, y: 500, width: 1080, height: 1041 };
+/** A row from under a 100-px header pinned at LIST's top to LIST's bottom (T13). */
+const UNDER_HEADER: Rect = { x: 128, y: 1146, width: 825, height: 395 };
 const SWIPE: Stroke = { from: { x: 540, y: 1400 }, to: { x: 540, y: 1200 } };
 const TAP: Stroke = { from: { x: 540, y: 1443 }, to: { x: 540, y: 1425 } }; // 18 px, under twice the slop
 
@@ -538,18 +542,16 @@ describe('the flush check\'s bounds (T13)', () => {
   it('a probe after which the match lies flush on another edge, of an outer scroller: no proof — a first probe toward that edge', () => {
     // The list nested in a page whose bottom is the list's: the row, flush on the list's top, grows to fill the list —
     // flush now only on the page's bottom, though its top stayed put and it grew.
-    const page: Rect = { x: 0, y: 500, width: 1080, height: 1041 };
-    const inFlight = sent(seeFlush(startFlush('up'), stopAt(flushOn('top', 22), { within: page })).verdict);
-    const filled = seeFlush(inFlight, stopAt({ x: 128, y: 1046, width: 825, height: 495 }, { within: page }));
+    const inFlight = sent(seeFlush(startFlush('up'), stopAt(flushOn('top', 22), { within: PAGE })).verdict);
+    const filled = seeFlush(inFlight, stopAt({ x: 128, y: 1046, width: 825, height: 495 }, { within: PAGE }));
     expect(filled).toMatchObject({ settles: false, waits: true });
     expect(said(filled)).toMatchObject({ of: 'probe', toward: 'down', reach: 0.25 });
   });
 
   it('flush with an outer scroller only: the probe is drawn over that one, never over the list nested in it', () => {
     // The row fills its list; the list's bottom is the page's: flush on the page's bottom alone.
-    const page: Rect = { x: 0, y: 500, width: 1080, height: 1041 };
-    const seen = seeFlush(startFlush('down'), stopAt(LIST, { axis: 'vertical', within: page }));
-    expect(seen.verdict).toMatchObject({ of: 'probe', toward: 'down', stroke: { box: page } });
+    const seen = seeFlush(startFlush('down'), stopAt(LIST, { axis: 'vertical', within: PAGE }));
+    expect(seen.verdict).toMatchObject({ of: 'probe', toward: 'down', stroke: { box: PAGE } });
   });
 
   it('a keyboard cover the read applied: no witness asked, even with another one offered — the probe drawn above the applied one', () => {
@@ -582,17 +584,14 @@ describe('the flush check\'s bounds (T13)', () => {
   const pinnedHeader = () => node({ role: 'container', identifier: 'H', rect: { x: 0, y: 1046, width: 1080, height: 100 }, children: [node({ role: 'text', label: 'Section', rect: { x: 400, y: 1070, width: 281, height: 52 } })] });
 
   it('a row from under a pinned header to its list\'s bottom fills the list: `fills`, top first, the header named', () => {
-    const row: Rect = { x: 128, y: 1146, width: 825, height: 395 };
-    expect(said(seeFlush(startFlush('down'), stopAt(row, { after: [pinnedHeader()] })))).toEqual({
+    expect(said(seeFlush(startFlush('down'), stopAt(UNDER_HEADER, { after: [pinnedHeader()] })))).toEqual({
       of: 'flush',
       flush: { edges: ['top', 'bottom'], container: LIST, pinned: expect.objectContaining({ identifier: 'H' }), checked: false, why: 'fills' },
     });
   });
 
   it('a node pinned in the nearest list counts for that list alone: filling it, the row is asked on the one edge of the page it lies flush with', () => {
-    const page: Rect = { x: 0, y: 500, width: 1080, height: 1041 };
-    const row: Rect = { x: 128, y: 1146, width: 825, height: 395 };
-    expect(seeFlush(startFlush('down'), stopAt(row, { after: [pinnedHeader()], within: page })).verdict).toMatchObject({ of: 'probe', toward: 'down', stroke: { box: page } });
+    expect(seeFlush(startFlush('down'), stopAt(UNDER_HEADER, { after: [pinnedHeader()], within: PAGE })).verdict).toMatchObject({ of: 'probe', toward: 'down', stroke: { box: PAGE } });
   });
 
   it('a pinned edge across the scroll\'s axis is no flush edge: a row flush on its list\'s left under a header pinned at its top, scrolled sideways, is asked its left edge alone', () => {

@@ -1,11 +1,21 @@
 import { readFileSync } from 'node:fs';
+import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { describe, expect, it } from 'vitest';
 import { everyNode, type PresentationKind, type Rect, type UiNode } from '../../src/adapters/types.js';
 import type { MarkedLayer } from '../../src/ui-tree/presentation.js';
 import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, missNote, withMissNote } from '../../src/ui-tree/miss.js';
 import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
 import { boundText, describeScrollResult, flushText } from '../../src/interact/scroll-text.js';
-import { CAROUSEL_REPLY_WORDS, carouselReply, fullyHedged, hedgedLead, replyKind, VISIBLE_STOP, MAX_SWIPES, flushProbedSide, flushProbesSaid, idbReasonsSaid, inferredAxisSaid, noIdListedSaid, OCR_FAILED_CLOSED, presentedRemedySaid, windowHintSaid, heldCutHedged, bandSaid, directionNamed, UNCHANGED_SAID, LIVE_REPLY_WORDS, refusedUnsentSaid, scrollVerdictSaid, underBarRemedySaid, untriedSideSaid } from '../../scripts/truth/replies.js';
+import {
+  CAROUSEL_REPLY_WORDS, carouselReply, fullyHedged, hedgedLead, replyKind, VISIBLE_STOP, MAX_SWIPES, flushProbedSide,
+  flushProbesSaid, idbReasonsSaid, inferredAxisSaid, noIdListedSaid, OCR_FAILED_CLOSED, presentedRemedySaid,
+  windowHintSaid, heldCutHedged, bandSaid, directionNamed, UNCHANGED_SAID, LIVE_REPLY_WORDS, refusedUnsentSaid,
+  scrollVerdictSaid, underBarRemedySaid, untriedSideSaid, chooserSaid, launchedAs, linkHeldSaid, namesUntried,
+  warnedSaid, allPassed, ASSERT_SUMMARY, ASSERTS_FAILED, bareEntry, callReply, claimsDone, claimsVisible,
+  dismissalCover, failedClosedUnchecked, firstLine, focusTextNotReadSaid, hedgesCut, keyboardUnlistedSaid,
+  missedTarget, movedTap, namesKeyboard, notInTree, ownWords, readingOf, readSomething, screenChangedSaid,
+  screenUnchangedFor, scrollAdvice, snapshotNodes, swipesOf, turnsSaid, claimsTap, heldStill, refusedAfterDismissal,
+} from '../../scripts/truth/replies.js';
 import { refusalOf, type Typeable } from '../../src/adapters/typeable.js';
 import { revealText } from '../../src/ui-tree/sides.js';
 import { untriedSideText } from '../../src/interact/target-text.js';
@@ -15,16 +25,9 @@ import { failureOf, play, resultOf, type Row } from '../helpers/rounds.js';
 import type { AppHolder } from '../../src/adapters/types.js';
 import { appHolderText } from '../../src/interact/app-holder-text.js';
 import { deepLinkText, launchText } from '../../src/mcp/tool-text.js';
-import { chooserSaid, launchedAs, linkHeldSaid, namesUntried, warnedSaid } from '../../scripts/truth/replies.js';
-import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { FOCUS_TEXT_NOT_READ } from '../../src/interact/fill-text.js';
 import { UNTRIED_END, UNTRIED_LEAD } from '../../src/interact/scroll-text.js';
 import { KEYBOARD_UNLISTED } from '../../src/ui-tree/miss.js';
-import {
-  allPassed, ASSERT_SUMMARY, ASSERTS_FAILED, bareEntry, callReply, claimsDone, claimsVisible, dismissalCover, failedClosedUnchecked, firstLine,
-  focusTextNotReadSaid, hedgesCut, keyboardUnlistedSaid, missedTarget, movedTap, namesKeyboard, notInTree, ownWords, readingOf, readSomething,
-  screenChangedSaid, screenUnchangedFor, scrollAdvice, snapshotNodes, swipesOf, turnsSaid, claimsTap, heldStill, refusedAfterDismissal,
-} from '../../scripts/truth/replies.js';
 
 /**
  * A src file's code without its comments, so a phrase that only a comment still says counts as no longer written. It
