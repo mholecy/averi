@@ -4,9 +4,10 @@ import { escapeRegExp } from '../../src/verify/text-hint.js';
 /**
  * The expected string, escaped, matches as literal text: its consumers — the
  * text hint's recommended `match:`, scripts/truth/replies.ts#BAND_SAID and
- * tests/run/verify.test.ts — rely on it. Pinned directly since T18: the one
- * indirect test ("1 of 13 selected") has no regex metacharacter, so a broken
- * escape passed it.
+ * tests/run/verify.test.ts — rely on it. Pinned directly since T18: the
+ * indirect tests through textHint pin only `.` (tests/verify/assert.test.ts,
+ * "1,250.00 MDL"; the "1 of 13 selected" one has no metacharacter at all), so
+ * the other 13 characters of the class were unpinned.
  */
 describe('escapeRegExp', () => {
   // Every character the escape's class claims: . * + ? ^ $ { } ( ) | [ ] \
