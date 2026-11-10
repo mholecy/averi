@@ -563,7 +563,8 @@ screen's largest scroller and the scroll views nested in it (`stroke-plan.ts#can
 
 **Decision.** (a) `scroll_until` takes `within`: a selector of the scroll view or of an element inside it, or the
 scroll view's rect (`{"x":…,"y":…,"width":…,"height":…}`, as `ui_snapshot` and a failure reply quote it; the MCP
-schema a string or that object, strict). `ScrollOptions.within` (interact/scroll.ts) is a `Target` or a `Rect`.
+schema a string or that object, strict). `ScrollOptions.within` (interact/scroll.ts) is a selector string or a `Rect` — no element spec (the code review: the flow
+YAML, which would need one, is out of scope, (f)).
 
 (b) It is resolved ONCE, at the scroll's first read that reads, before anything of that read is judged
 (`interact/within.ts#resolveWithin`, called by `scroll-rounds.ts#round`): a selector must match exactly one node; a
@@ -586,8 +587,10 @@ of it) every stroke for O touches down inside `lower`, not at `upper`'s (540,788
 (d) Refused before any swipe — a new stop, `ScrollOutcome`'s `within` (`swipes: 0`), its sentence `scroll_until <target>
 stopped before any swipe — within <as given> …` (`scroll-text.ts#withinText`) — when it names no scroll view to
 stroke: the selector matches nothing, or several (each listed, as the tap's ambiguous refusal lists them), or one in no
-scroll view; no listed scroll view has that rect (the scroll views the tree tells scroll along the stroke are listed,
-each with its rect as `within` takes it, `Clips.toldOn`); the named scroll view is told to scroll only across the stroke
+scroll view; no listed scroll view has that rect (every scroll view the rect path would accept is listed — told to scroll along the
+stroke, or of an axis the tree does not tell, marked `(its axis not told)` — each with its rect as `within` takes it,
+`Clips.scrollViewsOn`; with none, `no scroll view that may scroll <axis> — the N it shows scroll <other>`, or `no scroll
+view` only when the tree lists none); the named scroll view is told to scroll only across the stroke
 and holds none nested that is told along it or of unknown axis (the other axis' directions and "another scroll view"
 offered; unknown axis proceeds); or the tree lists no scroll view at all (idb's flat list: `set app.ios.treeSource:
 wda, or swipe inside it by coordinates`). Never a silent fallback to the largest scroller: a caller who named a list
@@ -605,14 +608,14 @@ found the target (`StrokedAcross.along.targetRead`: its own scroll views were th
 ignored).
 
 (f) **Not in scope:** the flow YAML (`src/flow/config.ts#ScrollUntilSpec`) does not take `within` yet — a follow-up;
-`ScrollOptions.within` already accepts an element spec for it.
+it adds what it needs (an element spec) then.
 
 **Residuals.** (1) A named scroll view with no room for a stroke (under `MIN_STROKE_BOX`, or cut to nothing by what is
 drawn over it) falls to `strokeRoom`'s own fallbacks — a nested one, else the gesture box WHOLE — as the largest
 scroller's would; not refused, as room is judged per round. Over the gesture box whole the stroke may touch down on
-another scroll view than the one named (a follow-up row is filed for it). (2) A stale rect's refusal lists only scroll views whose
-axis the tree tells (`toldOn`): a Compose lazy list or a RecyclerView (axis unknown) is not listed, though a selector
-of a row inside it resolves to it. (3) The selector resolves on the first read only: a list laid out later is not
+another scroll view than the one named (a follow-up row is filed for it). (2) ~~A stale rect's refusal lists only scroll views whose
+axis the tree tells~~ — closed by the code review: it lists those of unknown axis too (a Compose lazy list, a
+RecyclerView), marked so, as the rect path accepts them. (3) The selector resolves on the first read only: a list laid out later is not
 found. (4) A `within` whose list scrolls away under the page (nested in the largest) is kept by its last rect: a
 stroke over that rect may land beside it, as a target's remembered scroll view may. (5) Not measured on a device (the
 emulator was down). The live cases are drafted (scripts/truth/live-visibility.ts, its `WITHIN` table, Android only):
@@ -654,7 +657,15 @@ too, 6 swipes, the LOUD not turned. One equivalent: `others[0]` as `others.at(-1
 100 % (86 mutants). Review round 1's tests: `checkWithin` (both repros, an exact value no regex, a rect and a spec not
 parsed) and the driver refusing before any device read; one rule for a match — a same-rect wrapper at the root and
 inside a vertical page both name the list, a node in no scroll view of no scroll view's rect refused; the several-views
-form's `as within:`. Its hand mutants, each killed: the regex not compiled, the driver's check dropped, the `within`
+form's `as within:`. The code review's: `Within` a selector or a rect only; the stale refusal's offers through
+`Clips.scrollViewsOn` (geometry.ts — every scroll view with its told axis, `toldOn` now those told on one axis), the
+unknown ones marked, the across ones counted (a RecyclerView-style fixture pins it); the old `within` of the stroke plan
+(the scroll view the last stroke went over: `Memory`, `carry`, `StrokedBeside`) renamed `strokedOver` and
+`StrokeRoom`'s `scrollView`, so `within` names only the option; `scrollViewOn` (stroke-plan.ts) for the scroll view a
+read gives a rect, `asWithin` and `OTHER_AXIS` (scroll-text.ts) each one helper. Their hand mutants, each killed: the
+unknown axis dropped from the offers, its mark dropped, `across` uncounted; `scrollViewsOn`'s axis and screen filter;
+the `no scroll view` and `the one`/`a scroll view` words, the mark inverted, the other axis said as the stroke's or
+broken; the largest scroller's branch dropped. Review round 1's hand mutants, each killed: the regex not compiled, the driver's check dropped, the `within`
 prefix dropped, a spec parsed as a string, the same-rect rule dropped, the `as within:` dropped and given to the one
 view too.
 

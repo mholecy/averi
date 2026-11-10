@@ -1,7 +1,7 @@
 import type { Rect, ScrollAxis } from '../adapters/types.js';
 import { listsAncestry } from '../ui-tree/draw-order.js';
 import { quoted, type QuotedNode, type ScrollAxes } from '../ui-tree/geometry.js';
-import { findTarget, parseSelector, type Target } from '../ui-tree/selectors.js';
+import { findAll, parseSelector } from '../ui-tree/selectors.js';
 import type { TreeFacts } from './scroll-read.js';
 import { targetScrollers } from './stroke-plan.js';
 import { axisOf, type Direction } from './swipe.js';
@@ -12,7 +12,7 @@ import { axisOf, type Direction } from './swipe.js';
  * (interact/stroke-plan.ts#candidatesOf), so a row of a SIBLING list (the lab's `scroll-bounded`: O and F, rows of
  * `lower`, beside the larger `upper`) was never reached; D76's exhausted reply named such lists and left the remedy
  * manual. Named here as the caller can name it (ADR 0010's D78 amendment):
- * - a SELECTOR (or a flow's element spec) of exactly one node, by one rule: the scroll view of that node's very rect
+ * - a SELECTOR of exactly one node, by one rule: the scroll view of that node's very rect
  *   (ui-tree/scroll-containers.ts#isScrollViewOf, through `Clips.axesOf` — the node itself when it scrolls, the list
  *   a wrapper is laid exactly over, and so too the list an unrelated overlay of its rect lies over: the rect is that
  *   scroll view's), else the NEAREST scroll view of the node, by the rule that takes a found target's
@@ -32,11 +32,18 @@ import { axisOf, type Direction } from './swipe.js';
  *
  * Resolved ONCE, at the scroll's first read that reads (scroll-rounds.ts#round), before any swipe; the plan remembers
  * the rect (stroke-plan.ts#nameScrollView). Pure: no adapter, no clock. Cost: a walk of the tree for the selector, one
- * for `axesOf`, one more for `toldOn` on a stale rect only.
+ * for `axesOf`, one more for `scrollViewsOn` on a stale rect only. A flow's element spec is not taken: the flow's
+ * `scroll_until` does not take `within` yet (ADR 0010's D78 amendment, (f)), and that follow-up adds what it needs.
  */
 
-/** What the caller names: a selector or element spec of the scroll view or of an element inside it, or the scroll view's rect. */
-export type Within = Target | Rect;
+/** What the caller names: a selector of the scroll view or of an element inside it, or the scroll view's rect. */
+export type Within = string | Rect;
+
+/** A scroll view a stale rect's refusal offers in its place (`WithinRefusal`'s `stale`): `untold` when the tree does not tell its axis. */
+export interface OfferedScrollView {
+  readonly node: QuotedNode;
+  readonly untold?: true;
+}
 
 /** Why a `within` names no scroll view to stroke — each with the facts its sentence quotes (scroll-text.ts#withinText). */
 export type WithinRefusal =
@@ -46,8 +53,12 @@ export type WithinRefusal =
   | { readonly of: 'absent' }
   /** The selector's one match neither scrolls nor lies in anything that scrolls. */
   | { readonly of: 'unscrolled'; readonly node: QuotedNode }
-  /** No listed scroll view has exactly this rect: `told`, every scroll view the tree tells scrolls on `axis`, the stroke's (ui-tree/geometry.ts#Clips.toldOn), in tree order. */
-  | { readonly of: 'stale'; readonly axis: ScrollAxis; readonly told: readonly QuotedNode[] }
+  /**
+   * No listed scroll view has exactly this rect: `views`, every scroll view a rect could name for a stroke on `axis` —
+   * told to scroll on it, or of an axis the tree does not tell (`untold`), as the rect path itself accepts them — in
+   * tree order (ui-tree/geometry.ts#Clips.scrollViewsOn); `across`, how many more it lists, told to scroll across it.
+   */
+  | { readonly of: 'stale'; readonly axis: ScrollAxis; readonly views: readonly OfferedScrollView[]; readonly across: number }
   /** The named scroll view (`rect`) is told to scroll on `axis`, across a stroke `toward`, and holds none that may scroll along it. */
   | { readonly of: 'across'; readonly rect: Rect; readonly axis: ScrollAxis; readonly toward: Direction }
   /** The tree lists no scroll view (idb's flat list). */
@@ -56,7 +67,7 @@ export type WithinRefusal =
 /**
  * A string `within` parsed as a selector, its regexes compiled, before the scroll reads anything (interact/scroll.ts):
  * a selector that does not parse throws `within <it>: <why>` — else it would throw from inside the round, at the first
- * read, without saying it was `within`'s. A rect or an element spec has nothing to parse.
+ * read, without saying it was `within`'s. A rect has nothing to parse.
  */
 export function checkWithin(within: Within): void {
   if (typeof within !== 'string') return;
@@ -68,8 +79,8 @@ export function checkWithin(within: Within): void {
   }
 }
 
-/** `within` read as a rect, not a target: a rect has a width; neither a selector nor an element spec does. */
-export const isRect = (within: Within): within is Rect => typeof within === 'object' && 'width' in within;
+/** `within` read as a rect, not a selector. */
+export const isRect = (within: Within): within is Rect => typeof within !== 'string';
 
 /**
  * The scroll view `within` names on this read's tree, as a rect — or why none: `facts` the read's (its tree, scene and
@@ -85,9 +96,13 @@ export function resolveWithin(facts: Pick<TreeFacts, 'tree' | 'scene' | 'reading
   if (isRect(within)) {
     rect = { x: within.x, y: within.y, width: within.width, height: within.height };
     axes = clips.axesOf(rect);
-    if (axes === undefined) return { refused: { of: 'stale', axis: way, told: clips.toldOn(way, screen, facts.reading.ofKeyboard).map(quoted) } };
+    if (axes === undefined) {
+      const listed = clips.scrollViewsOn(screen, facts.reading.ofKeyboard);
+      const views = listed.filter((v) => v.axis === undefined || v.axis === way).map((v): OfferedScrollView => ({ node: quoted(v.node), ...(v.axis === undefined && { untold: true as const }) }));
+      return { refused: { of: 'stale', axis: way, views, across: listed.length - views.length } };
+    }
   } else {
-    const found = findTarget(facts.tree, within);
+    const found = findAll(facts.tree, within);
     if (found.length === 0) return { refused: { of: 'absent' } };
     if (found.length > 1) return { refused: { of: 'ambiguous', matches: found.map(quoted) } };
     const [node] = found;

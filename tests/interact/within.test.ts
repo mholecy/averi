@@ -81,12 +81,23 @@ describe('resolveWithin — one rule for a match that does not scroll: a scroll 
 
 describe('resolveWithin — a rect: the listed scroll view of exactly that rect', () => {
   it('a rect a pixel off every listed scroll view: refused, naming the scroll views the tree tells along the stroke', () => {
-    expect(resolveWithin(factsOf(ANDROID), { ...LOWER, height: 496 }, 'down', ANDROID_SCREEN)).toEqual({ refused: { of: 'stale', axis: 'vertical', told: [list(UPPER), list(LOWER)] } });
-    expect(resolveWithin(factsOf(WDA), { ...WDA_LOWER, y: 381 }, 'up', PHONE)).toEqual({ refused: { of: 'stale', axis: 'vertical', told: [list(WDA_UPPER), list(WDA_LOWER)] } });
+    expect(resolveWithin(factsOf(ANDROID), { ...LOWER, height: 496 }, 'down', ANDROID_SCREEN)).toEqual({ refused: { of: 'stale', axis: 'vertical', views: [{ node: list(UPPER) }, { node: list(LOWER) }], across: 0 } });
+    expect(resolveWithin(factsOf(WDA), { ...WDA_LOWER, y: 381 }, 'up', PHONE)).toEqual({ refused: { of: 'stale', axis: 'vertical', views: [{ node: list(WDA_UPPER) }, { node: list(WDA_LOWER) }], across: 0 } });
   });
 
-  it('none told along the stroke: refused with none named', () => {
-    expect(resolveWithin(factsOf(ANDROID), { ...LOWER, height: 496 }, 'left', ANDROID_SCREEN)).toEqual({ refused: { of: 'stale', axis: 'horizontal', told: [] } });
+  it('none that may scroll along the stroke: refused, counting those across it; a tree of none: none counted', () => {
+    expect(resolveWithin(factsOf(ANDROID), { ...LOWER, height: 496 }, 'left', ANDROID_SCREEN)).toEqual({ refused: { of: 'stale', axis: 'horizontal', views: [], across: 2 } });
+    const bare: UiNode = { role: 'container', label: null, identifier: null, value: null, rect: ANDROID_SCREEN, children: [] };
+    expect(resolveWithin(factsOf(bare), LOWER, 'down', ANDROID_SCREEN)).toEqual({ refused: { of: 'stale', axis: 'vertical', views: [], across: 0 } });
+  });
+
+  it('a scroll view whose axis the tree does not tell (a RecyclerView, a Compose lazy list) is listed too, marked so — the rect path accepts it', () => {
+    const RV: Rect = { x: 0, y: 1600, width: 1080, height: 500 };
+    const recycler: UiNode = { role: 'container', label: null, identifier: 'feed', value: null, clipsDescendants: true, rect: { ...RV }, children: [] };
+    const tree: UiNode = { ...ANDROID, children: [...ANDROID.children, recycler] };
+    const refused = resolveWithin(factsOf(tree), { ...RV, y: 1601 }, 'left', ANDROID_SCREEN);
+    expect(refused).toEqual({ refused: { of: 'stale', axis: 'horizontal', views: [{ node: { role: 'container', label: null, identifier: 'feed', rect: RV }, untold: true }], across: 2 } });
+    expect(resolveWithin(factsOf(tree), RV, 'left', ANDROID_SCREEN)).toEqual({ rect: RV });
   });
 
   it('a rect of a node that does not scroll is no scroll view', () => {
@@ -129,10 +140,9 @@ describe('checkWithin — a string `within` parsed before anything is read, its 
     expect(() => checkWithin('text~"("')).toThrow(/^within text~"\(": Invalid regular expression/);
   });
 
-  it('an exact value is no regex, and a rect or an element spec has nothing to parse', () => {
+  it('an exact value is no regex, and a rect has nothing to parse', () => {
     expect(() => checkWithin('text:"("')).not.toThrow();
     expect(() => checkWithin('id:lab.scroll-bounded.S label~"Target.*"')).not.toThrow();
     expect(() => checkWithin({ x: 0, y: 0, width: 1, height: 1 })).not.toThrow();
-    expect(() => checkWithin({ text: '(' })).not.toThrow();
   });
 });

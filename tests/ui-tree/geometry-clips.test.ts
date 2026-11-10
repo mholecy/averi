@@ -237,6 +237,18 @@ describe('Clips.axesOf — a scroll view\'s axis and those of the scroll views n
     expect(clips.toldOn('horizontal', PAGE, (n) => n === chips)).toEqual([inner]);
   });
 
+  it('scrollViewsOn: every scroll view of the tree with the axis it is told, unknown included, in tree order — a text input, a plain container not; meeting the screen, none of the keyboard\'s own; none on a flat list (D78)', () => {
+    const chips = scroller(rect(0, 100, 402, 60), 'horizontal');
+    const lazy = scroller(rect(0, 500, 402, 100), undefined);
+    const field = node({ role: 'textfield', rect: rect(24, 300, 354, 60), clipsDescendants: true, scrollAxis: 'horizontal' });
+    const page = scroller(PAGE, 'vertical', field, lazy);
+    const tree = iphone(chips, page, box(rect(0, 700, 402, 100)));
+    const clips = clipsOf(tree, UIAUTOMATOR);
+    expect(clips.scrollViewsOn(PAGE, () => false)).toEqual([{ node: chips, axis: 'horizontal' }, { node: page, axis: 'vertical' }, { node: lazy, axis: undefined }]);
+    expect(clips.scrollViewsOn(rect(0, 200, 402, 600), (n) => n === lazy)).toEqual([{ node: page, axis: 'vertical' }]);
+    expect(clipsOf(tree, FLAT).scrollViewsOn(PAGE, () => false)).toEqual([]);
+  });
+
   it("each axis as the tree's dialect reads it: inferred from content on unclipped frames, unknown on cut ones", () => {
     const { tree } = scrollBounded({ axis: 'untold' });
     expect(clipsOf(tree, WDA).axesOf(LOWER)).toEqual({ axis: 'vertical', nested: [] });

@@ -538,7 +538,7 @@ describe('strokedBeside — the listed scroll views along the stroke the swipes 
     const tree = bounded();
     const { memory, drawn } = sentOn(tree, 'down');
     expect(drawn !== undefined && containsPoint(UPPER, drawn.from)).toBe(true);
-    expect(strokedBeside(memory, factsOf(tree), 'down', BOX)).toEqual({ axis: 'vertical', within: UPPER, others: [{ role: 'scrollable', label: null, identifier: 'lower', rect: LOWER }] });
+    expect(strokedBeside(memory, factsOf(tree), 'down', BOX)).toEqual({ axis: 'vertical', strokedOver: UPPER, others: [{ role: 'scrollable', label: null, identifier: 'lower', rect: LOWER }] });
     // No other list along the stroke: nothing to name.
     const alone = screenOf([list(UPPER)]);
     const one = sentOn(alone, 'down');
@@ -682,7 +682,7 @@ describe('a named scroll view (`within`, D78) — the one the strokes go over un
 
   it('strokedBeside names `upper`, the list the named strokes did not go over', () => {
     const plan = planStroke(nameScrollView(startStrokes(), factsOf(bounded), LOWER), ask(bounded));
-    expect(strokedBeside(strokeSent(plan.memory), factsOf(bounded), 'down', BOX)).toEqual({ axis: 'vertical', within: LOWER, others: [{ role: 'scrollable', label: null, identifier: null, rect: UPPER }] });
+    expect(strokedBeside(strokeSent(plan.memory), factsOf(bounded), 'down', BOX)).toEqual({ axis: 'vertical', strokedOver: LOWER, others: [{ role: 'scrollable', label: null, identifier: null, rect: UPPER }] });
   });
 });
 

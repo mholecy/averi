@@ -1443,8 +1443,7 @@ describe('scroll_until within (D78): a selector that does not parse is refused b
     await expect(scrollUntilVisible(adapter, 'id:x', { ...FAST, within: 'text~"("' })).rejects.toThrow(/^within text~"\(": Invalid regular expression/);
   });
 
-  it('a rect and an element spec are not parsed: the device is asked', async () => {
+  it('a rect is not parsed: the device is asked', async () => {
     await expect(scrollUntilVisible(adapter, 'id:x', { ...FAST, within: { x: 0, y: 0, width: 1, height: 1 } })).rejects.toThrow('test: the device was asked');
-    await expect(scrollUntilVisible(adapter, 'id:x', { ...FAST, within: { id: 'list' } })).rejects.toThrow('test: the device was asked');
   });
 });
