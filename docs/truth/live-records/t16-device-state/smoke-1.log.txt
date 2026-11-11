@@ -1,0 +1,16 @@
+lab: emulator-5554, AVD averi_lab
+averi: <repo>
+device: reading the state before the cases
+uiautomator lv-d62-control ok: unaimable, C cut L 0 R 17: ERROR scroll_until id:lab.carousel-recycler-free.C stopped after 6 swipes, without swiping further — element is on screen but its right edge still lies on its scroll container's (66,380 948x234), where Android cuts a nod
+device: reading the state after the cases
+<!-- averi: this checkout -->
+# Live golden: 1 cases, 1 ok, 1 loud, 0 mismatches (0 not known), 0 skipped
+
+## uiautomator
+- ok lv-d62-control carousel-recycler-free: D62/D68 control: after the 440-px pre-drag, fully: true left on the RecyclerView card: `unaimable` (hedged maxSwipes accepted, counted: ADR 0021 D68), never "fully visible" with C cut — unaimable, C cut L 0 R 17: ERROR scroll_until id:lab.carousel-recycler-free.C stopped after 6 swipes, without swiping further — element is on screen but its right edge still lies on its scroll container's (66,380 948x234), where Android cuts a nod
+    app: C cut L 0 R 17; offset 931, index 1; 6 carousel stroke(s) since the call
+
+LOUD (hedged ceiling): hedged 0 of 1 judged unaimable leg(s) — fewer than 3 judged, the ceiling unjudged (no pass claimed)
+
+Device: before fast 0/16, after fast 0/16 (frames p50 18 ms → 17 ms)
+

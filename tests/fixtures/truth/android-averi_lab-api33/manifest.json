@@ -291,6 +291,17 @@
       "truth": "scroll-collapsing.truth.json"
     },
     {
+      "file": "carousel-in-list-cut.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "carousel-in-list-cut.png",
+      "truth": "carousel-in-list-cut.truth.json"
+    },
+    {
       "file": "carousel-lazy.xml",
       "source": "uiautomator",
       "form": "raw",
@@ -454,6 +465,28 @@
       },
       "screenshot": "held-no-spinner.png",
       "truth": "held-no-spinner.truth.json"
+    },
+    {
+      "file": "views-banner.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "views-banner.png",
+      "truth": "views-banner.truth.json"
+    },
+    {
+      "file": "views-drawn-over.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "views-drawn-over.png",
+      "truth": "views-drawn-over.truth.json"
     }
   ]
 }

@@ -1530,6 +1530,8 @@ describe('Scene.standing — the drawn frame on Android: bounds uiautomator did 
     }
     expect(cut).toEqual([
       'android-lab-form-keyboard-k7-stop.xml lab.form-keyboard.reference',
+      // T6d: C dumped at x 44, past its clip at 66 (uncut), as predicted.
+      'truth/android-averi_lab-api33/carousel-in-list-cut.xml lab.carousel-in-list-cut.C',
       'truth/android-averi_lab-api33/carousel-in-list.xml lab.carousel-in-list.C',
       'truth/android-averi_lab-api33/form-picker.xml lab.form-picker.country.FO',
       'truth/android-averi_lab-api33/scroll-bounded-flush.xml Target P',

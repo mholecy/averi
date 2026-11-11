@@ -1,0 +1,39 @@
+{
+  "cell": "views-drawn-over",
+  "ready": true,
+  "screen": {
+    "x": 0,
+    "y": 0,
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "density": 2.75,
+  "frames": {
+    "A": {
+      "x": 127,
+      "y": 303,
+      "width": 825,
+      "height": 176
+    },
+    "B": {
+      "x": 182,
+      "y": 331,
+      "width": 825,
+      "height": 121
+    },
+    "A2": {
+      "x": 127,
+      "y": 798,
+      "width": 825,
+      "height": 176
+    },
+    "B2": {
+      "x": 182,
+      "y": 826,
+      "width": 825,
+      "height": 121
+    }
+  },
+  "events": []
+}

@@ -16,10 +16,17 @@ import { ANDROID_RN, IOS_RN, type KnownFile } from './known.js';
 // children by location. Green since D75 (the parser marks such a run `readingOrder`; the eyes tell each cover over its
 // target: every tap refused, every colour assert failing closed; ADR 0015's amendment "Android Views list children by
 // location").
+// rn-banner-role (backlog D77, sub-case b; captured 2026-11-11): rn-banner with each target and its cover in a slot View
+// of role `toolbar`, dumped as `android.view.View` (slot left 72.5 px, dumped 73) — the run stays unmarked and LR4's lie
+// survives, as predicted: every tap `Tapped` at the target's centre (on the cover), every colour assert passing on the
+// cover. ADR 0015's React Native role residual (amendment "Android Views list children by location") — filed without
+// `as:`: that residual is unnumbered, and lab-notes.test.ts accepts only a numbered ADR residual or a calibration status.
 
 const IDB_COVER_UNSEEN = 'residual:ADR 0015 residual 4 — idb lists no bare React Native View, and reads a cover above its top-bar line as the bar';
 const BANNER_IDB = `${IOS_RN}/rn-banner.idb.json`;
 const BANNER_ANDROID = `${ANDROID_RN}/rn-banner.xml`;
+const ROLE_UNMARKED = 'ADR 0015\'s React Native role residual (amendment "Android Views list children by location", unnumbered, so no `as:` yet): a `toolbar`-role slot dumps as android.view.View, the run stays unmarked';
+const BANNER_ROLE = `${ANDROID_RN}/rn-banner-role.xml`;
 
 export const reactNative: KnownFile = {
   family: 'react-native',
@@ -28,12 +35,17 @@ export const reactNative: KnownFile = {
       [`${BANNER_IDB} ${t} tap`, { cls: 'Tapped', kind: 'Tapped' as const, calls: [`idb ui tap 201 ${({ T: 142, U: 322, C: 502 } as const)[t]}`], note: 'idb: the cover is not listed, or read as the top bar', as: IDB_COVER_UNSEEN }] as const,
       [`${BANNER_IDB} ${t} colour`, { cls: 'passed on #263238', kind: 'PASS' as const, calls: [], note: 'idb: the cover is not listed, or read as the top bar', as: IDB_COVER_UNSEEN }] as const,
     ]),
+    ...(['T', 'U', 'C'] as const).flatMap((t) => [
+      [`${BANNER_ROLE} ${t} tap`, { cls: 'Tapped', kind: 'Tapped' as const, calls: [`adb shell input tap 541 ${({ T: 391, U: 886, C: 1381 } as const)[t]}`], note: `${ROLE_UNMARKED} — the cover read beneath the target` }] as const,
+      [`${BANNER_ROLE} ${t} colour`, { cls: 'passed on #263238', kind: 'PASS' as const, calls: [], note: `${ROLE_UNMARKED} — the cover measured as the target` }] as const,
+    ]),
   ]),
   counts: {
     [`${ANDROID_RN}/rn-field.xml`]: 10,
     [`${ANDROID_RN}/rn-format.xml`]: 8,
     [`${ANDROID_RN}/rn-format-eager.xml`]: 8,
     [BANNER_ANDROID]: 6,
+    [BANNER_ROLE]: 6,
     [`${IOS_RN}/rn-field.idb.json`]: 10,
     [`${IOS_RN}/rn-field.wda.json`]: 10,
     [BANNER_IDB]: 6,
