@@ -251,10 +251,10 @@ export class IosAdapter implements DeviceAdapter {
   }
 
   /**
-   * `idb ui text --udid U -- <text>`, the one argv that types (D74): after `--` argparse takes the text as its positional
-   * whatever it starts with, so `-h` is typed rather than answered with help (exit 0, nothing typed) and `-hunter2` or
-   * `--log=s3cret` is no option (runIdb puts the --udid before the `--`: withUdid). The text's index is declared typed
-   * (A17, ExecOptions.typed), so no failure shows it.
+   * `idb ui text --udid U -- <text>`, the one argv that types (D74): after `--` argparse takes the text as its
+   * positional whatever it starts with, so `-h` is typed rather than answered with help (exit 0, nothing typed) and
+   * `-hunter2` or `--log=s3cret` is no option (runIdb puts the --udid before the `--`: withUdid). The text's index is
+   * declared typed (A17, ExecOptions.typed), so no failure shows it.
    */
   private idbText(text: string) {
     return runIdb(this.exec, this.udid, ['ui', 'text', '--', text], { helper: this.idbHelper, typed: [3] });
@@ -764,8 +764,8 @@ export class IosAdapter implements DeviceAdapter {
       await this.sourceTyper(text);
       return;
     }
-    // Every typing here goes through idbText: `ui text --udid U -- <text>`, so a leading dash is typed (D74), and its text
-    // declared typed (A17), so no failure shows it.
+    // Every typing here goes through idbText: `ui text --udid U -- <text>`, so a leading dash is typed (D74), and its
+    // text declared typed (A17), so no failure shows it.
     // An app seen dropping a tail (D24, FIRST_KEY_ALONE_MS): its first character alone, a wait, then the rest. The
     // first character is a grapheme (Intl.Segmenter), so a surrogate pair or a letter with its combining mark is never
     // split between two idb calls. A one-character text has no rest: one call, no wait.

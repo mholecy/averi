@@ -251,7 +251,10 @@ export class IdbHelper {
    * indexes of `argv` that hold typed text (ExecOptions.typed), keeps it out of a timeout's message. The text itself
    * goes to the helper on its stdin, which nothing prints.
    */
-  run(argv: readonly string[], opts: { env?: Record<string, string>; timeoutMs: number; typed?: readonly number[] }): Promise<IdbHelperReply> | undefined {
+  run(
+    argv: readonly string[],
+    opts: { env?: Record<string, string>; timeoutMs: number; typed?: readonly number[] },
+  ): Promise<IdbHelperReply> | undefined {
     if (idbHelperDisabled()) return undefined;
     if (this.state === 'idle') {
       void this.start(opts.env);

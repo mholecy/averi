@@ -1,8 +1,12 @@
 import { execFile } from 'node:child_process';
 import { homedir } from 'node:os';
-import { commandFailureText, lastResortText, shownArgs, shownCommand, withoutHostPaths, type CommandFailure } from './failure-text.js';
-
-export { shownArgs, shownCommand };
+import {
+  commandFailureText,
+  lastResortText,
+  shownCommand,
+  withoutHostPaths,
+  type CommandFailure,
+} from './failure-text.js';
 
 /** stdout stays a Buffer — screenshots come through this path as binary PNG. */
 export interface ExecResult {
@@ -19,12 +23,21 @@ export interface ExecOptions {
   /**
    * The indexes into `args` whose word is typed text (A17, ADR 0043's amendment): a failure shows `<typed text>` there,
    * in ExecError's `command`, its message and node's own `Command failed: <argv>` line. Every typing call site declares
-   * its own (ios.ts#idbText, android.ts#typeText); a fake ExecFn honours it by building its command with shownCommand.
+   * its own (ios.ts#idbText, android.ts#typeText); a fake ExecFn honours it by building its command with
+   * failure-text.ts#shownCommand.
    */
   typed?: readonly number[];
 }
 
 export type ExecFn = (cmd: string, args: string[], opts?: ExecOptions) => Promise<ExecResult>;
+
+/**
+ * A call's budget and typed indexes as ExecOptions, each only when given: how runIdb and android.ts#runAdb build
+ * them.
+ */
+export function execOptions(timeoutMs?: number, typed?: readonly number[]): ExecOptions {
+  return { ...(timeoutMs ? { timeoutMs } : {}), ...(typed ? { typed } : {}) };
+}
 
 /**
  * The host's home, or none: `os.homedir()` throws when $HOME is unset and the uid has no passwd entry (a container's), and
@@ -105,11 +118,12 @@ export const exec: ExecFn = (cmd, args, opts = {}) =>
         const stderrText = stderr.toString('utf8');
         if (err) {
           const command = shownCommand(cmd, args, opts.typed);
-          // node's message for a silent child is `Command failed: <argv>`, its own join of the argv: the shown one stands there.
-          const nodeSaid = err.message.split([cmd, ...args].join(' ')).join(command);
+          // node's message for a silent child is `Command failed: <argv>`, its own join of the argv: the shown one
+          // stands there.
+          const nodeLineShown = err.message.split([cmd, ...args].join(' ')).join(command);
           const timedOut = err.killed === true || err.signal === 'SIGKILL';
           const exitCode = typeof err.code === 'number' ? err.code : null;
-          reject(new ExecError(command, exitCode, stderrText || nodeSaid, timedOut, stdout));
+          reject(new ExecError(command, exitCode, stderrText || nodeLineShown, timedOut, stdout));
         } else {
           resolve({ stdout, stderr: stderrText });
         }

@@ -10,8 +10,8 @@ import { tapElement } from '../../src/interact/tap.js';
 import { launchText } from '../../src/mcp/tool-text.js';
 import { worded } from '../helpers/app-holder.js';
 import { AndroidAdapter, parseImeInsets, parseInputShown, parseNavigationBand, parseStatusBand, parseTouchableRegion, parseUiautomatorXml } from '../../src/adapters/android.js';
-import { ExecError, shownCommand, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
-import { execErrorLikeExec } from '../helpers/exec-error.js';
+import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
+import { execErrorLikeExec, typingExecError } from '../helpers/exec-error.js';
 import { GBOARD, GBOARD_PANEL, GBOARD_STRIP, INPUT_SHOWN_LINE, parseDump, drawnOverStrip } from '../helpers/android-dumps.js';
 import { everyNode, type DeviceAdapter, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
@@ -2407,7 +2407,7 @@ describe('a host path in the stderr the dump\'s diagnosis quotes leaves it (ADR 
 describe('a failed typing keeps its text out of the error (D70, A17, ADR 0043)', () => {
   it('each character is one call, which a whole-secret redaction could not match: the call declares it typed, and it stays out', async () => {
     const exec: ExecFn = async (cmd, args, opts) => {
-      throw new ExecError(shownCommand(cmd, args, opts?.typed), 1, "adb: device 'emulator-9998' not found\n");
+      throw typingExecError(cmd, args, opts?.typed, 1, "adb: device 'emulator-9998' not found\n");
     };
     const typing = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-9998', exec }).typeText('h');
     await expect(typing).rejects.toThrow(/^Command failed \(exit 1\): adb -s emulator-9998 shell input text <typed text>\nadb: device 'emulator-9998' not found$/);

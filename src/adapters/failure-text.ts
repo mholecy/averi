@@ -67,7 +67,10 @@ export function shownCommand(cmd: string, args: readonly string[], typed: readon
   return [cmd, ...shownArgs(args, typed)].join(' ');
 }
 
-/** `args` as shownCommand shows them, word by word: what a channel or a log publishes (idb.ts#IDB_HELPER_CALL_START). */
+/**
+ * `args` as shownCommand shows them, word by word: what a channel or a log publishes
+ * (idb.ts#IDB_HELPER_CALL_START).
+ */
 export function shownArgs(args: readonly string[], typed: readonly number[]): string[] {
   return args.map((word, at) => (typed.includes(at) ? TYPED_TEXT : word));
 }
@@ -149,5 +152,6 @@ export function commandFailureText(failure: CommandFailure, home: string): strin
   const { command, exitCode, stderr, timedOut, note } = failure;
   const tail = note === undefined ? '' : `\n${note}`;
   if (timedOut) return withoutHostPaths(`Command timed out: ${command}${tail}`, home);
-  return withoutHostPaths(`Command failed (exit ${exitCode}): ${command}\n${stderrForAgent(command, stderr, home)}${tail}`, home);
+  const said = stderrForAgent(command, stderr, home);
+  return withoutHostPaths(`Command failed (exit ${exitCode}): ${command}\n${said}${tail}`, home);
 }

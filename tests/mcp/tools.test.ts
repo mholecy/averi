@@ -1,4 +1,5 @@
-import { ExecError, shownCommand } from '../../src/adapters/exec.js';
+import { ExecError } from '../../src/adapters/exec.js';
+import { typingExecError } from '../helpers/exec-error.js';
 import { noLinkHandler } from '../../src/adapters/ios-link-failure.js';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -670,7 +671,7 @@ describe('what a failed host command replies (D70, D65; ADR 0043): the tools quo
   it('type_text: a crash, its one line, no frame, no home, no typed text', async () => {
     const ios = home();
     ios.typeText = async () => {
-      throw new ExecError(shownCommand('idb', ['ui', 'text', '--udid', 'U', '--', 'hunter2'], [5]), 1, '2026-10-19 05:39:32,796 [ERROR] - root - Exception thrown in main\nTraceback (most recent call last):\n  File "/Users/me/.local/idb/main.py", line 313, in gen_main\nException: gone\n');
+      throw typingExecError('idb', ['ui', 'text', '--udid', 'U', '--', 'hunter2'], [5], 1, '2026-10-19 05:39:32,796 [ERROR] - root - Exception thrown in main\nTraceback (most recent call last):\n  File "/Users/me/.local/idb/main.py", line 313, in gen_main\nException: gone\n');
     };
     const { call } = await connect({ ios });
     const result = await call('type_text', { platform: 'ios', text: 'hunter2', configPath: missing() });

@@ -142,8 +142,8 @@ word `-` and cannot form an option (`android-input-dash.sh` below reads that bac
 **Decision, A17.** A typing call declares which of its argv's words are typed text: `ExecOptions.typed`, indexes into
 `args`. `failure-text.ts#shownCommand(cmd, args, typed)` is exec's own join with `<typed text>` at those indexes, and
 every shown argv is built with it:
-- `exec.ts` builds `ExecError.command` with it and puts the shown command in place of node's own join in node's
-  `Command failed: <argv>` line (exec's stderr for a silent child);
+- `exec.ts` builds `ExecError.command` with it and puts the shown command in place of node's own join in node's `Command
+  failed: <argv>` line (exec's stderr for a silent child);
 - `runIdb` takes `typed`, moves the indexes past the `--udid` it puts in, hands them to exec, and on the helper's path
   builds the nonzero answer's, the timeout's and `inputLost`'s command with it; `IDB_HELPER_CALL_START`/`END` publish
   the shown argv (`shownArgs`), and `IdbHelperTimeout`'s message is the shown command;
@@ -157,22 +157,22 @@ an `ExecError` honours the declaration by building its command with `shownComman
 tools' tests do). `android-start.ts#withStdoutTail` rebuilds an error from an `ExecError`'s `command`, already shown.
 
 **§3's argparse branch is deleted.** Behind `--` no text reaches argparse as an option: the parse was probed on fb-idb
-(`gen_main(['ui', 'text', '--udid', 'U', '--', t])` in idb's own Python, `TextCommand` stubbed to print what it got)
-for `-h`, `-abc`, `-hunter2`, `--log=s3cret`, `--`, `a b`, `--udid` and `plain`, each reaching the command unchanged
-with the udid `U`. So the branch could only fire on a text that cannot reach it, and an exit 2 now keeps argparse's
-line like any other tool's. The table's row "A typing idb's argparse refuses" (above) is superseded: that argv is no
-longer sent. A typing's failure now reads `Command failed (exit 1): idb ui text --udid U -- <typed text>⏎…` and
-`Command timed out: idb ui text --udid U -- <typed text>` (illustrative; the order of the words is D74's).
+(`gen_main(['ui', 'text', '--udid', 'U', '--', t])` in idb's own Python, `TextCommand` stubbed to print what it got) for
+`-h`, `-abc`, `-hunter2`, `--log=s3cret`, `--`, `a b`, `--udid` and `plain`, each reaching the command unchanged with
+the udid `U`. So the branch could only fire on a text that cannot reach it, and an exit 2 now keeps argparse's line like
+any other tool's. The table's row "A typing idb's argparse refuses" (above) is superseded: that argv is no longer sent.
+A typing's failure now reads `Command failed (exit 1): idb ui text --udid U -- <typed text>⏎…` and `Command timed out:
+idb ui text --udid U -- <typed text>` (illustrative; the order of the words is D74's).
 
 **What is not masked.** Stderr. Android types one character per call, so masking it in stderr would mangle unrelated
 lines (every `e` of an error); idb's typing prints nothing that quotes the text bar §3's residual (`No keycode found for
-Š`, one character, refused before idb by ADR 0037). One argparse residual stays: `unrecognized arguments: …` quotes every word after `--`, the text with them, and
-argparse prints it at exit 2. Behind averi's fixed argv it is unreachable — `ui text` takes the `--udid` and one
-positional, and the contract test's `-h`, `-hunter2` and `--log=s3cret` reach the companion — unless a later idb stops
-accepting `--udid` on `ui text`; the contract test, which runs this argv on the installed fb-idb, is where that would
-show. The helper's stdin carries the raw text, as it must, and nothing
-prints it. `scripts/perf/instrument.ts`'s execFile wrapper sees the raw argv and records only its label, the first words
-with every `-…` word and the udid dropped (`idb ui text`, `adb shell input text`).
+Š`, one character, refused before idb by ADR 0037). One argparse residual stays: `unrecognized arguments: …` quotes
+every word after `--`, the text with them, and argparse prints it at exit 2. Behind averi's fixed argv it is unreachable
+— `ui text` takes the `--udid` and one positional, and the contract test's `-h`, `-hunter2` and `--log=s3cret` reach the
+companion — unless a later idb stops accepting `--udid` on `ui text`; the contract test, which runs this argv on the
+installed fb-idb, is where that would show. The helper's stdin carries the raw text, as it must, and nothing prints it.
+`scripts/perf/instrument.ts`'s execFile wrapper sees the raw argv and records only its label, the first words with every
+`-…` word and the udid dropped (`idb ui text`, `adb shell input text`).
 
 **The guard against forgetting.** With no shape recognised, a typing call site that declares nothing is quoted whole.
 `tests/adapters/typed-text-leak.test.ts` drives both adapters' `typeText` through every way a typing fails — the CLI
@@ -180,20 +180,22 @@ with every `-…` word and the udid dropped (`idb ui text`, `adb shell input tex
 nonzero answer, silent or not, exit 2, a death after it took the input, its timeout, a request it never took and then
 the CLI), the helper off, and D24's split failing on either call; Android on each character — and asserts no piece of
 the text in the error's command, message, stack, `inspect` of it, or what the helper's channel published. Dropping the
-declaration at either adapter's call site, the index shift in `withUdid` or `shell`, the channel's mask, runIdb's hand-off
-to exec, or exec's mask of node's line each fails it (checked by hand, 2026-11-11). A new typing verb needs its own
-declaration and its own rows there.
+declaration at either adapter's call site, the index shift in `withUdid` or `shell`, the channel's mask, runIdb's
+hand-off to exec, or exec's mask of node's line each fails it (checked by hand, 2026-11-11). A new typing verb needs its
+own declaration and its own rows there.
 
 **Evidence and what is not proven.**
 - The contract test (`tests/adapters/idb-helper-contract.test.ts`, real fb-idb, companion `localhost:1`) runs the new
   argv for `a`, `Jan Nováček 😀`, `-x`, `-h`, `-hunter2` and `--log=s3cret`: helper and CLI give the same code and
-  stderr, and the code is 1 (the companion unreachable), not 0 (`-h`'s help) or 2 (argparse). Put back to `--udid`
-  last, all six fail. By hand on the same idb: `ui text -h --udid U` exits 0, `ui text --udid U -- -h` exits 1.
+  stderr, and the code is 1 (the companion unreachable), not 0 (`-h`'s help) or 2 (argparse). Put back to `--udid` last,
+  all six fail. By hand on the same idb: `ui text -h --udid U` exits 0, `ui text --udid U -- -h` exits 1.
 - Golden against T10's base: 1667 checks, Changed 0.
-- Cold mutation run (ADR 0038, `npm run mutate -- --group core --force`): `failure-text.ts` 99.00 %, 200 mutants, 2 survivors, both equivalent (`exceptionUnder`'s above, and `shownCommand`'s default `typed = []` filled with a string, which holds no index either); floor 97 kept.
+- Cold mutation run (ADR 0038, `npm run mutate -- --group core --force`): `failure-text.ts` 99.00 %, 200 mutants, 2
+  survivors, both equivalent (`exceptionUnder`'s above, and `shownCommand`'s default `typed = []` filled with a string,
+  which holds no index either); floor 97 kept.
 - Not run on a simulator or an emulator (none was up, and no device setting may change): the owner's check is
   `docs/truth/live-records/d74-dash-text/run.sh` — the reset sequence, the lab's form-basic name field, each of `-h`,
   `-abc`, `-hunter2`, `--log=s3cret`, `--` and `a-b` typed with the new argv by hand (exit 0, no stdout, the field's
   AXValue the text), the old argv's `-h` as the control (exit 0, the usage, the field unchanged), then through averi's
-  typeText (`type-via-averi.ts`) with the helper on and with `AVERI_IDB_HELPER=off`. Android's `input text -`, and
-  `-h` as averi sends it, are read back by `android-input-dash.sh` beside it, when the emulator is up.
+  typeText (`type-via-averi.ts`) with the helper on and with `AVERI_IDB_HELPER=off`. Android's `input text -`, and `-h`
+  as averi sends it, are read back by `android-input-dash.sh` beside it, when the emulator is up.

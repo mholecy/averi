@@ -11,7 +11,7 @@ import { IDB_SETTLE_CADENCE_MS, IdbEmptyTreeError, IdbTreeSource, parseIdbDescri
 import { WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
 import { ReadHandOff } from '../../src/ui-tree/read-handoff.js';
 import { fakeFetch, fakeSpawn } from '../helpers/fake-wda.js';
-import { ExecError, shownCommand, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
+import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
 import { NoLinkHandlerError } from '../../src/adapters/ios-link-failure.js';
 import { captureRefusal } from '../../src/verify/capture.js';
 import type { IdbHelper } from '../../src/adapters/idb-helper.js';
@@ -20,7 +20,7 @@ import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { fillField } from '../../src/interact/fill.js';
 import { typeIntoFocused } from '../../src/interact/type-text.js';
 import { el, FAST, resetLayout, screen } from '../helpers/fake.js';
-import { execErrorLikeExec } from '../helpers/exec-error.js';
+import { execErrorLikeExec, typingExecError } from '../helpers/exec-error.js';
 import { appinfo } from '../helpers/simctl-appinfo.js';
 
 // The one sleep owner, recorded and not waited on: uiTree's settle re-read
@@ -1254,7 +1254,7 @@ describe('a failed typing keeps its text out of the error (D70, A17, ADR 0043)',
   const secret = 'hunter2secret';
   /** An exec that fails `ui text` as exec does: its command shown with the typed words the call declared (ExecOptions.typed). */
   const failingText = (stderr: string): ExecFn => async (cmd, args, opts) => {
-    if (args[1] === 'text') throw new ExecError(shownCommand(cmd, args, opts?.typed), 1, stderr);
+    if (args[1] === 'text') throw typingExecError(cmd, args, opts?.typed, 1, stderr);
     return { stdout: Buffer.alloc(0), stderr: '' };
   };
 

@@ -1,5 +1,5 @@
 import { XMLParser } from 'fast-xml-parser';
-import { exec as defaultExec, ExecError, hostPathsOut, type ExecFn } from './exec.js';
+import { exec as defaultExec, ExecError, execOptions, hostPathsOut, type ExecFn } from './exec.js';
 import { adbShellArgv, shellCommandLine } from './adb-shell.js';
 import { CONTROL_CHAR_RE, controlCharRemedy, inputTextControlFate } from './input-text.js';
 import { NOT_PRINTABLE_ASCII, refusalOf, type Typeable } from './typeable.js';
@@ -21,9 +21,9 @@ interface AdbCallOptions {
 }
 
 /**
- * A `shell` call's options: its budget, and the indexes of its DEVICE argv that are typed text (ExecOptions.typed, A17).
- * Only `shell` takes them, and it alone moves them to exec's (past `-s S shell`): `adb`, `execOut` and `rawShell` take
- * AdbCallOptions, so no caller can declare a typed word where it would be moved wrongly.
+ * A `shell` call's options: its budget, and the indexes of its DEVICE argv that are typed text (ExecOptions.typed,
+ * A17). Only `shell` takes them, and it alone moves them to exec's (past adbShellArgv's `-s S shell`): `adb`,
+ * `execOut` and `rawShell` take AdbCallOptions, so no caller can declare a typed word where it would be moved wrongly.
  */
 interface ShellCallOptions extends AdbCallOptions {
   typed?: readonly number[];
@@ -257,8 +257,7 @@ export class AndroidAdapter implements DeviceAdapter {
 
   /** The `adb` binary with a complete argv — `adb` and `shell` both end here; `typed` indexes this argv (exec's). */
   private runAdb(argv: string[], opts: ShellCallOptions) {
-    const execOpts = { ...(opts.timeoutMs ? { timeoutMs: opts.timeoutMs } : {}), ...(opts.typed ? { typed: opts.typed } : {}) };
-    return this.exec('adb', argv, Object.keys(execOpts).length > 0 ? execOpts : undefined);
+    return this.exec('adb', argv, execOptions(opts.timeoutMs, opts.typed));
   }
 
   /**
@@ -270,8 +269,9 @@ export class AndroidAdapter implements DeviceAdapter {
    * builds a `shell` argv of its own.
    */
   private shell(argv: readonly string[], opts: ShellCallOptions = {}) {
-    // adbShellArgv is `-s S shell` and then the device argv word for word: a typed index moves three on.
-    return this.runAdb(adbShellArgv(this.serial, argv), { ...opts, typed: opts.typed?.map((i) => i + 3) });
+    // adbShellArgv is its prefix (`-s S shell`) and then the device argv word for word: a typed index moves past it.
+    const prefix = adbShellArgv(this.serial, []).length;
+    return this.runAdb(adbShellArgv(this.serial, argv), { ...opts, typed: opts.typed?.map((i) => i + prefix) });
   }
 
   /**
@@ -925,8 +925,9 @@ export class AndroidAdapter implements DeviceAdapter {
     // a direct caller cannot leave the field half-typed. An ASCII value pays one regex test, no device call.
     const refusal = refusalOf(text, this.typeable);
     if (refusal !== undefined) throw new Error(`typeText ${refusal}`);
-    // Each character is declared typed (A17, ExecOptions.typed): no failure shows it. A leading `-` cannot form an option
-    // (D74): it is the one word `-` (by code; read back by docs/truth/live-records/d74-dash-text/android-input-dash.sh).
+    // Each character is declared typed (A17, ExecOptions.typed): no failure shows it. A leading `-` cannot form an
+    // option (D74): it is the one word `-` (by code; read back by
+    // docs/truth/live-records/d74-dash-text/android-input-dash.sh).
     for (const ch of text) {
       await this.shell(['input', 'text', ch === ' ' ? '%s' : ch], { typed: [2] });
       await sleep(TYPING_PACE_MS);
