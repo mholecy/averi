@@ -1628,6 +1628,6 @@ fill-reformat.ts, 21 in all (16 outside fill-type), in 371 s. Both runs are unde
 
 ## Amendment: live-finish.ts joins the run (2026-11-11, backlog D82)
 
-scripts/truth/live-finish.ts (`finishRun`, live.ts's finish: the record written before the closes, every closer tried)
-joins the `lab` group against tests/truth/live-finish.test.ts, at 100 % cold (21 mutants, 0 survived; narrowed with
-`--mutate`, whose exit 1 is the fill-type amendment's): floor 98.
+`finishRun` in scripts/truth/live-finish.ts (live.ts's finish: the record written before the closes, every closer
+tried) joins the `lab` group against tests/truth/live-finish.test.ts, at 100 % cold (20 mutants, 0 survived; narrowed
+with `--mutate`, whose exit 1 is the fill-type amendment's): floor 98.

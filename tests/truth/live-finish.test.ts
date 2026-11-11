@@ -108,18 +108,21 @@ describe('finishRun: the record before the closes (D82)', () => {
     expect(lines[1]).toBe(`close: lab failed — ${OFFLINE}`);
   });
 
-  it("review round 1: the write's failure is said even when a case's throw is what live.ts's finally lets through", async () => {
-    // live.ts: `try { cases } finally { await finishRun(…) }` — here the case's error first, the finish's throw last.
+  it("a case threw and the write fails: the write's error replaces the case's in the throw, both said on stderr — the case's first (live.ts's catch), then the write's", async () => {
+    // live.ts's shape: `try { cases } catch { say it; rethrow } finally { await finishRun(…) }`.
     const path = join(dir(), 'no-such-dir', 'r.json');
     const lines: string[] = [];
     const run = async (): Promise<void> => {
       try {
         throw new Error('case lv-d62-control threw');
+      } catch (e) {
+        lines.push(`run: threw — ${(e as Error).message}`);
+        throw e;
       } finally {
         await finishRun({ record: ran(), recordPath: path, closers: [], note: (l) => lines.push(l) });
       }
     };
     await expect(run()).rejects.toThrow(/ENOENT/);
-    expect(lines).toEqual([expect.stringMatching(/^record: .*r\.json not written — ENOENT: /)]);
+    expect(lines).toEqual(['run: threw — case lv-d62-control threw', expect.stringMatching(/^record: .*r\.json not written — ENOENT: /)]);
   });
 });

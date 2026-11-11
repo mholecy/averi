@@ -7,6 +7,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import type { DeviceAdapter } from '../../src/adapters/types.js';
 import { listIosDevices } from '../../src/adapters/discovery.js';
+import { errorMessage } from '../../src/util/error-message.js';
 import type { Platform } from '../differential/corpus.js';
 import { loadSide } from '../differential/side.js';
 import { readPremiseInto } from './chooser-premise.js';
@@ -280,10 +281,12 @@ if (rejudging !== undefined) {
       }
     }
     await deviceReads?.read('after');
+  } catch (e) {
+    // Said here: a record write that fails throws from the `finally` below, and that error replaces this one (D82).
+    console.error(`run: threw — ${errorMessage(e)}`);
+    throw e;
   } finally {
-    // D82 (live-finish.ts#finishRun): the label, the record written, then each close tried whatever the other threw —
-    // a failed close one stderr line, never thrown past the record or the summary (T16's first smoke lost its record to
-    // a force-stop on an offline emulator). A write that fails still throws, after the closes.
+    // The record before the closes, each close tried: `finishRun` in live-finish.ts (D82).
     await finishRun({
       record,
       recordPath: values.record,

@@ -267,7 +267,7 @@
     "group": "lab",
     "tests": ["tests/truth/live-finish.test.ts"],
     "floor": 98,
-    "baseline": "100 % on 2026-11-11 (D82, finishRun: the record written before the closes, each closer tried, a failed close and a failed write said on stderr; `npm run mutate -- --group lab --force --mutate scripts/truth/live-finish.ts --tempDirName .stryker-tmp-d82`, cold, 24 s): 21 mutants, 21 killed, 0 timeouts, 0 survived, 0 without coverage"
+    "baseline": "100 % on 2026-11-11 (D82 code review: the message from src/util/error-message.ts#errorMessage, the local copy gone; `npm run mutate -- --group lab --force --mutate scripts/truth/live-finish.ts --tempDirName .stryker-tmp-d82b`, cold, 13 s): 20 mutants, 20 killed, 0 survived, 0 without coverage; 100 % on 2026-11-11 (D82, finishRun: the record written before the closes, each closer tried, a failed close and a failed write said on stderr; `npm run mutate -- --group lab --force --mutate scripts/truth/live-finish.ts --tempDirName .stryker-tmp-d82`, cold, 24 s): 21 mutants, 21 killed, 0 timeouts, 0 survived, 0 without coverage"
   },
   "scripts/truth/run-case.ts": {
     "group": "lab",
