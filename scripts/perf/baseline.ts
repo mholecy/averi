@@ -292,8 +292,8 @@ async function runOnce(s: Scenario, r: number): Promise<Run> {
 }
 
 // Whatever ends the runs, what was measured is written first (D82: a close that hangs or throws on a device gone cannot
-// cost it), then the connection closed — the registry's shutdown stops a WebDriverAgent it started on the lab's port;
-// a close that fails is one stderr line — and the temp config removed.
+// cost it), the temp config removed, then the connection closed — the registry's shutdown stops a WebDriverAgent it
+// started on the lab's port; a close that fails is one stderr line.
 try {
   const selected = await call('select_device', { device });
   if (isError(selected)) throw new Error(`select_device ${device}: ${selected}`);
@@ -317,8 +317,8 @@ try {
   try {
     await report();
   } finally {
-    await close().catch((e: unknown) => console.error(`close: mcp (client, server, registry) failed — ${errorMessage(e)}`));
     await rm(configDir, { recursive: true, force: true }).catch(() => undefined);
+    await close().catch((e: unknown) => console.error(`close: mcp (client, server, registry) failed — ${errorMessage(e)}`));
   }
 }
 

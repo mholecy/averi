@@ -2087,3 +2087,14 @@ unreadable file (with its line) but keeping a current one, and both acting on a 
 group by planRuns. tests/mutation/group.test.ts pins every group's temp dir under reports/mutation/, and checks that
 vitest.config.ts's exclude covers a sandbox copy under each one while keeping vitest's defaults. Each test was shown
 failing under its mutant of the fix. No module in scope.json changed, so no floor moved.
+
+## Amendment: connection.ts joins the run (2026-11-12, backlog A33)
+
+`connectInProcess` in scripts/differential/connection.ts (the in-process server and client that live.ts,
+differential.ts and perf/baseline.ts open and close: every close tried, the first failure thrown after the last, D82;
+ADR 0032's A33 amendment) joins the `lab` group against tests/differential/connection.test.ts, as live-finish.ts joined
+it for D82. The sandbox's allowlist (stryker.config.mjs) takes that one file of scripts/differential/, never the
+replay's corpus. Cold lab group run (`npm run mutate -- --group lab --force --tempDirName
+reports/mutation/stryker-tmp-a33`, 315 s): 96.00 % (25 mutants, 1 survived, 0 without coverage), floor 94. The
+survivor is the client's version `'0'` emptied: nothing reads the client's version, so it is equivalent. Every other
+lab module stayed at or above its floor.

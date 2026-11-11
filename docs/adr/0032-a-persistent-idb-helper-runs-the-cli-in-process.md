@@ -839,7 +839,8 @@ Consequences:
   transport's. For transport parity, run both sides with `AVERI_IDB_HELPER=off` in the environment: both are then on
   the CLI, and the after side's `ios:` line says the helper is off.
 - Not done here (review card 5's second step, TL6): one in-process connection module for live.ts, differential.ts and
-  perf/baseline.ts. Each still builds registry, server and client and closes them in its own order (D82).
+  perf/baseline.ts. Each still builds registry, server and client and closes them in its own order (D82). (Done: the
+  A33 amendment below.)
 
 Tests: `tests/truth/live-ios-wiring.test.ts`, through the side seam live.ts reads and live.ts's factory. A side with
 `iosAdapterFor` gets that function, with the udid, kind and deps passed through. The tag follows the side's own
@@ -898,14 +899,14 @@ report after the closes.
 `createAveriServer` (this checkout's for the baseline), the registry the caller built, and a name: the client's name
 and the server's reported version. It returns the client and one `close`.
 
-- Open: the server connects before the client. An open that fails closes what it opened, the registry included, and
-  throws the open's own error.
+- Open: the server connects before the client. An open that fails, a server that cannot be built included, closes
+  what it opened, the registry included, and throws the open's own error.
 - Close: the client, then the server, then the registry's shutdown (what stops WebDriverAgent and the idb helper).
   Each is tried whatever the one before threw, and the first failure is thrown after the last (D82). A side's registry
   from before f9b4a67f (2026-09-18) has no shutdown and is not asked.
 
 Each caller keeps its own registry and its own reply encoding. live.ts and baseline.ts read a reply through
-scripts/truth/replies.ts#callReply. The replay keeps its own encoding (image blocks hashed, temp paths blurred,
+`callReply` in scripts/truth/replies.ts. The replay keeps its own encoding (image blocks hashed, temp paths blurred,
 `THROW` for a client throw), which the golden base pins. The connection hands out the client and does not encode.
 
 What moved:
@@ -922,4 +923,5 @@ What moved:
 Tests: tests/differential/connection.test.ts drives this checkout's server through the module. The client reaches the
 server under the given name. The close order is client, server, registry. Every close is tried when earlier ones
 throw, and the first failure is thrown. A later failure is thrown when the earlier closes held. A registry without
-shutdown still closes. A failed open closes the server and the registry and throws its own error.
+shutdown still closes. A failed open closes the server and the registry and throws its own error. A server that cannot be built still
+leaves the registry shut down.

@@ -111,4 +111,15 @@ describe('connectInProcess: one averi server and its client in this process', ()
     ).rejects.toThrow('no transport');
     expect(log).toEqual(['server connect', 'server', 'registry']);
   });
+
+  it('a server that cannot be built: the registry handed in is still shut down, and the build’s error thrown', async () => {
+    const log: string[] = [];
+    const unbuildable = {
+      createAveriServer: (): never => {
+        throw new Error('no tools');
+      },
+    };
+    await expect(connectInProcess(unbuildable, registryLogging(log), 'live-golden')).rejects.toThrow('no tools');
+    expect(log).toEqual(['registry']);
+  });
 });

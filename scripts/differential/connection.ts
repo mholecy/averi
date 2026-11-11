@@ -13,7 +13,8 @@ import type { Side } from './side.js';
  *
  * The connection owns the registry once handed it:
  *  - open: the server connects before the client (the client's initialize needs it listening). An open that fails
- *    closes what it opened, the registry included, and throws its own error, not a close's.
+ *    (a server that cannot be built too) closes what it opened, the registry included, and throws its own error, not
+ *    a close's.
  *  - close: the client, then the server, then the registry's shutdown — what stops the adapters' child processes
  *    (WebDriverAgent, the idb helper), so node can exit. Each is tried whatever the one before it threw (D82: a
  *    dead device must not keep the server's processes alive); the first failure is thrown after the last. A side's
@@ -28,20 +29,22 @@ export interface InProcess {
 }
 
 export async function connectInProcess(averi: Pick<Side, 'createAveriServer'>, registry: AdapterRegistry, name: string): Promise<InProcess> {
-  const server = averi.createAveriServer({ registry, version: name });
   const client = new Client({ name, version: '0' });
+  let server: ReturnType<Side['createAveriServer']> | undefined;
   // Typed as this checkout's registry; an older side's may lack shutdown.
   const shutdown = (registry as { shutdown?: () => Promise<void> }).shutdown?.bind(registry);
   const close = async (): Promise<void> => {
     const failures: unknown[] = [];
-    for (const step of [() => client.close(), () => server.close(), shutdown]) {
+    for (const step of [() => client.close(), server === undefined ? undefined : () => server!.close(), shutdown]) {
       if (step === undefined) continue;
       await step().catch((e: unknown) => failures.push(e));
     }
     if (failures.length > 0) throw failures[0];
   };
-  const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
   try {
+    // Inside the try: a server that cannot be built still leaves the registry shut down.
+    server = averi.createAveriServer({ registry, version: name });
+    const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
     await server.connect(serverSide);
     await client.connect(clientSide);
   } catch (e) {

@@ -48,8 +48,9 @@ describe('checkFloors — the failure lines of a run', () => {
 
   it('scope.json: every module names its tests and a floor between 0 and 100', () => {
     for (const [file, m] of Object.entries(readScope())) {
-      // scripts/release/: the release gate's pure modules (T24), in stryker.config.mjs's allowlist too.
-      expect(file).toMatch(/^((src|scripts\/truth\/batch)\/[^/]+(\/[^/]+)*|scripts\/(truth|release)\/[^/]+)\.ts$/);
+      // scripts/release/: the release gate's pure modules (T24), in stryker.config.mjs's allowlist too; of
+      // scripts/differential/, the harnesses' in-process connection alone (A33), the one file that allowlist takes.
+      expect(file).toMatch(/^((src|scripts\/truth\/batch)\/[^/]+(\/[^/]+)*|scripts\/(truth|release)\/[^/]+|scripts\/differential\/connection)\.ts$/);
       expect(m.tests.length).toBeGreaterThan(0);
       expect(m.floor).toBeGreaterThan(0);
       expect(m.floor).toBeLessThanOrEqual(100);
