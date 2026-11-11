@@ -21,7 +21,8 @@ export type IdbHelperReply = { kind: 'answer'; code: number; stdout: Buffer; std
 
 /**
  * The caller's timeout ran out with the request in the helper: the helper was killed, and nothing is retried. Its
- * message names the argv as shown (shownCommand, A17): a typed word is `<typed text>` in it.
+ * message names the argv as shown (shownCommand, A17): a typed word is `<typed text>` in it. Defence in depth: runIdb
+ * never lets this error out, it throws its own ExecError, masked alike, in its place.
  */
 export class IdbHelperTimeout extends Error {
   constructor(argv: readonly string[], typed?: readonly number[]) {

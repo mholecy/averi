@@ -147,7 +147,8 @@ every shown argv is built with it:
 - `runIdb` takes `typed`, moves the indexes past the `--udid` it puts in, hands them to exec, and on the helper's path
   builds the nonzero answer's, the timeout's and `inputLost`'s command with it; `IDB_HELPER_CALL_START`/`END` publish
   the shown argv (`shownArgs`), and `IdbHelperTimeout`'s message is the shown command;
-- Android's `AdbCallOptions` carries `typed`; `shell` moves it three on (`-s S shell`), and `typeText` passes `[2]`.
+- Android's `shell` alone takes `typed` (`ShellCallOptions`; `adb`, `execOut` and `rawShell` take none, so no caller
+  declares one where it would be moved wrongly), moves it three on (`-s S shell`), and `typeText` passes `[2]`.
 
 So **`ExecError.command` no longer holds the text** (the Decision's "`ExecError.command` still holds the text" no longer
 holds), and `commandFailureText` quotes the command as given: `IDB_TYPING`, `ADB_TYPING` and `withoutTypedText` are
@@ -165,7 +166,11 @@ longer sent. A typing's failure now reads `Command failed (exit 1): idb ui text 
 
 **What is not masked.** Stderr. Android types one character per call, so masking it in stderr would mangle unrelated
 lines (every `e` of an error); idb's typing prints nothing that quotes the text bar §3's residual (`No keycode found for
-Š`, one character, refused before idb by ADR 0037). The helper's stdin carries the raw text, as it must, and nothing
+Š`, one character, refused before idb by ADR 0037). One argparse residual stays: `unrecognized arguments: …` quotes every word after `--`, the text with them, and
+argparse prints it at exit 2. Behind averi's fixed argv it is unreachable — `ui text` takes the `--udid` and one
+positional, and the contract test's `-h`, `-hunter2` and `--log=s3cret` reach the companion — unless a later idb stops
+accepting `--udid` on `ui text`; the contract test, which runs this argv on the installed fb-idb, is where that would
+show. The helper's stdin carries the raw text, as it must, and nothing
 prints it. `scripts/perf/instrument.ts`'s execFile wrapper sees the raw argv and records only its label, the first words
 with every `-…` word and the udid dropped (`idb ui text`, `adb shell input text`).
 

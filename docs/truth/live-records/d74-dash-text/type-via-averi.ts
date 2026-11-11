@@ -17,10 +17,15 @@ IDB_HELPER_CALL_START.subscribe((m) => void served.push((m as IdbHelperCall).arg
 
 const helper = new IdbHelper();
 // The helper serves only once it is ready: the first call starts it, and reads go to it from then on.
+// A failed read stops the warm-up with one line: node's own dump of it would put this checkout's paths in the log.
 if (!idbHelperDisabled()) {
-  for (let i = 0; i < 20 && served.length === 0; i++) {
-    await runIdb(exec, udid, ['ui', 'describe-all', '--json'], { helper });
-    await new Promise((r) => setTimeout(r, 300));
+  try {
+    for (let i = 0; i < 20 && served.length === 0; i++) {
+      await runIdb(exec, udid, ['ui', 'describe-all', '--json'], { helper });
+      await new Promise((r) => setTimeout(r, 300));
+    }
+  } catch (e) {
+    console.log(`WARN: warm-up read failed: ${e instanceof Error ? e.message : String(e)}`);
   }
   if (served.length === 0) console.log('WARN: the helper never served a read; the typing goes to the CLI');
 }

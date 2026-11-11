@@ -1,5 +1,6 @@
 import { channel } from 'node:diagnostics_channel';
-import { DEFAULT_TIMEOUT_MS, ExecError, shownArgs, shownCommand, type ExecFn, type ExecResult } from './exec.js';
+import { DEFAULT_TIMEOUT_MS, ExecError, type ExecFn, type ExecResult } from './exec.js';
+import { shownArgs, shownCommand } from './failure-text.js';
 import { IdbHelperTimeout, type IdbHelper } from './idb-helper.js';
 import { detectXcodeEnv } from './xcode-env.js';
 
@@ -20,8 +21,9 @@ type Word = string | RegExp | typeof NUMS;
  *   its timeout is the caller's (ios.ts, 15 s as describe-all's) and counts toward TIMEOUTS_IN_A_ROW like any other.
  *   `screenshot <file>` (or none) is the CLI's: averi never sends it.
  * - D7b: every HID argv IosAdapter sends (ios.ts) — tap, longPress (`tap … --duration`), swipe, typeText (D24's split
- *   included: two `ui text`; since D74 the text after `--`, so none is taken for an option), clearText (`key-sequence` 42… then 76…), pressKey (`key 40`, `button HOME`). Input: a
- *   helper that dies under one is NOT retried — the event may have reached the simulator (HID_ARGV, runIdb).
+ *   included: two `ui text`; since D74 the text after `--`, so none is taken for an option), clearText (`key-sequence`
+ *   42… then 76…), pressKey (`key 40`, `button HOME`). Input: a helper that dies under one is NOT retried — the event
+ *   may have reached the simulator (HID_ARGV, runIdb).
  * Exactly these shapes and nothing near them: an argv averi does not send, or a word out of shape (a number that is
  * no plain decimal, another button), is the CLI's, as before D7. `describe --json` (the memoized viewport, one call an
  * adapter) stays on the CLI: not worth a shape.
@@ -89,8 +91,9 @@ export function inputLost(command: string): ExecError {
 
 /**
  * A helper call, as the D0 harness sees it (scripts/perf/instrument.ts): it is no process, so the execFile wrapper
- * never sees it. `start` is published with `{ argv }` (as shown: a typed word is `<typed text>`, A17) when the helper takes a call, `end` with the same object and
- * `ok` set when it answers (a nonzero code, a death, a timeout: not ok) — the subscriber keys its record by the object.
+ * never sees it. `start` is published with `{ argv }` (as shown: a typed word is `<typed text>`, A17) when the helper
+ * takes a call, `end` with the same object and `ok` set when it answers (a nonzero code, a death, a timeout: not ok) —
+ * the subscriber keys its record by the object.
  */
 export const IDB_HELPER_CALL_START = channel('averi:idb-helper:start');
 export const IDB_HELPER_CALL_END = channel('averi:idb-helper:end');
@@ -168,7 +171,8 @@ export async function runIdb(
     }
     end(reply.kind === 'answer' && reply.code === 0);
     if (reply.kind === 'answer') {
-      // exec passes node's own message when stderr is empty: `Command failed: <command>\n` (child_process.execFile), the shown command in it.
+      // exec passes node's own message when stderr is empty: `Command failed: <command>\n` (child_process.execFile),
+      // the shown command in it.
       if (reply.code !== 0) throw new ExecError(command, reply.code, reply.stderr || `Command failed: ${command}\n`, false, reply.stdout);
       return { stdout: reply.stdout, stderr: reply.stderr };
     }

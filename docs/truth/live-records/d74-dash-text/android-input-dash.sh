@@ -1,11 +1,12 @@
 #!/bin/zsh
 # D74's Android read-back (to run when emulator-5554, the averi_lab AVD, is up; written, not run, by the D74 + A17
 # change): `input text -` — the one word averi sends for a leading dash (android.ts#typeText, one `input text` per
-# character, each quoted for the device's sh) — and then `-h` as averi sends it, `'-'` then `'h'`. It reads the field
-# back from uiautomator. No setting is changed: the lab app is launched on its form-basic cell, typed into, and stopped.
+# character; adb-shell.ts#shellQuote leaves `-` and `h` bare, so these are averi's bytes) — and then `-h` as averi sends
+# it, `input text -` then `input text h`. It reads the field back from uiautomator. No setting is changed: the lab
+# app is launched on its form-basic cell, typed into, and stopped.
 # Writes android-input-dash.log.txt beside this script; no absolute path goes into it.
 # usage: android-input-dash.sh
-export PATH=$PATH:$HOME/Library/Android/sdk/platform-tools
+export PATH=/opt/homebrew/opt/node@22/bin:$PATH:$HOME/Library/Android/sdk/platform-tools
 S=emulator-5554; PKG=dev.averi.lab; CELL=form-basic; FIELD=lab.form-basic.name
 O=${0:A:h}; L=$O/android-input-dash.log.txt
 A() { adb -s $S shell "$@"; }
@@ -28,11 +29,11 @@ XY=($(field centre)); [[ ${#XY} == 2 ]] || die "no $FIELD in the dump"
 clear_field() { A input tap $XY[1] $XY[2]; sleep 0.5; A input keyevent 123; for i in {1..40}; do A input keyevent 67; done; sleep 0.5; }
 
 clear_field
-out=$(A input text "'-'" 2>&1); rc=$?; sleep 1
-log "input text '-' exit=$rc said=$(printf %q "$out") (want '') text=$(field text) (want \"-\")"
+out=$(A input text - 2>&1); rc=$?; sleep 1
+log "input text - exit=$rc said=$(printf %q "$out") (want '') text=$(field text) (want \"-\")"
 
 clear_field
-out=$( { A input text "'-'"; A input text "'h'"; } 2>&1); rc=$?; sleep 1
-log "input text '-' then 'h' (averi's -h) exit=$rc said=$(printf %q "$out") (want '') text=$(field text) (want \"-h\")"
+out=$( { A input text -; A input text h; } 2>&1); rc=$?; sleep 1
+log "input text - then input text h (averi's -h) exit=$rc said=$(printf %q "$out") (want '') text=$(field text) (want \"-h\")"
 
 A am force-stop $PKG
