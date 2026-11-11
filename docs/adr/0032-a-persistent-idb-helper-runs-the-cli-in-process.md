@@ -30,6 +30,8 @@ Amended 2026-11-06 (A10: the alert goes up as a fact, on both verbs, and its wor
 amendment below; replies byte for byte).
 Amended 2026-11-11 (A30: the D41 invariant is held by behaviour, every tool called in a wda project, not by a count of
 `registry.get(` in the source — see the amendment below; replies byte for byte).
+Amended 2026-11-11 (A33: live.ts, differential.ts and perf/baseline.ts open and close their in-process server through
+one module — see the amendment at the end; golden Changed 0).
 
 ## Context
 
@@ -883,3 +885,41 @@ missing-package refusal names `treeSource: wda`), as Android's launch refusals n
 (docs/architecture-reviews/2026-10-07-after-ios-idb-keyboard-fixes.html, #3) called this a config leak and proposed one remedy
 owner above the seam. It was not taken (recorded 2026-10-08): a typed error translated above would be one sentence with
 a translation site per caller. Until A32 this was written only in ARCHITECTURE.md §3.
+
+## Amendment: one in-process connection for the three harnesses (2026-11-11, backlog A33)
+
+A23's amendment left review card 5's second step (TL6) open: live.ts, differential.ts and perf/baseline.ts each built
+registry, server and client, and each closed them in its own way. live.ts closed client, server and registry in turn and
+stopped at the first throw. It relied on the argument that none of them can throw. differential.ts closed the client
+and the server and never shut its registry down. baseline.ts tried all three and swallowed any failure, then wrote its
+report after the closes.
+
+`connectInProcess` in scripts/differential/connection.ts now does this for all three. It takes the side's
+`createAveriServer` (this checkout's for the baseline), the registry the caller built, and a name: the client's name
+and the server's reported version. It returns the client and one `close`.
+
+- Open: the server connects before the client. An open that fails closes what it opened, the registry included, and
+  throws the open's own error.
+- Close: the client, then the server, then the registry's shutdown (what stops WebDriverAgent and the idb helper).
+  Each is tried whatever the one before threw, and the first failure is thrown after the last (D82). A side's registry
+  from before f9b4a67f (2026-09-18) has no shutdown and is not asked.
+
+Each caller keeps its own registry and its own reply encoding. live.ts and baseline.ts read a reply through
+scripts/truth/replies.ts#callReply. The replay keeps its own encoding (image blocks hashed, temp paths blurred,
+`THROW` for a client throw), which the golden base pins. The connection hands out the client and does not encode.
+
+What moved:
+
+- live.ts: its `close` is still one closer for finishRun (scripts/truth/live-finish.ts). A throw in the client's
+  close no longer skips the registry's shutdown. Records and replies are unchanged.
+- differential.ts (and golden.ts through `connect`): the registry is now shut down at each variant's close, so a
+  replayed adapter is disposed. That happens after the variant's last call, and the fake device's log is reset at
+  each call, so no outcome moves (golden: 1691 checks, Changed 0).
+- baseline.ts: the report is written before the connection closes, as D82 has live.ts write its record. A close that
+  hangs on a device gone cannot cost the measurements. A close that fails is one stderr line, `close: mcp (client,
+  server, registry) failed — <why>`, which replaces `registry shutdown: <why>`.
+
+Tests: tests/differential/connection.test.ts drives this checkout's server through the module. The client reaches the
+server under the given name. The close order is client, server, registry. Every close is tried when earlier ones
+throw, and the first failure is thrown. A later failure is thrown when the earlier closes held. A registry without
+shutdown still closes. A failed open closes the server and the registry and throws its own error.

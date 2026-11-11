@@ -2,9 +2,8 @@ import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { escapeRegExp } from '../../src/util/regex.js';
+import { connectInProcess } from './connection.js';
 import type { Platform, Recording, Screen } from './corpus.js';
 import { resetClock, wallNow } from './clock.js';
 import { deviceCalls, paintFrame, REPLAYED_APP, resetDevice, type DeviceProfile, type Paint } from './fake-device.js';
@@ -20,7 +19,8 @@ import type { CellConfig } from '../truth/schema.js';
  *     in averi.yaml; VARIANTS below), one MCP server
  *     per side, built by the side's own `createAveriServer` over a registry
  *     whose factory hands out the side's adapter over the recording
- *     (side.ts#recordedAdapter) — as tests/mcp/tools.test.ts builds one;
+ *     (side.ts#recordedAdapter) — as tests/mcp/tools.test.ts builds one,
+ *     opened and closed by connection.ts;
  *  2. `ui_snapshot` on both sides; its trees name the TARGETS — every node a
  *     selector can address on either side: a unique identifier (`id:`), else
  *     a unique text (`text:`, label or value), else a unique `label:` or
@@ -362,11 +362,8 @@ export async function connect(side: Side, recording: Recording, profile: DeviceP
     discovery: async (platform) =>
       platform === recording.platform ? [{ id: device, platform, name: 'differential', osVersion: '0', state: 'booted' }] : [],
   });
-  const server = side.createAveriServer({ registry, version: 'differential' });
-  const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
-  await server.connect(serverSide);
-  const client = new Client({ name: 'differential', version: '0' });
-  await client.connect(clientSide);
+  // Opened and closed by connection.ts (the registry's shutdown too); the reply encoded here, as the golden base has it.
+  const { client, close } = await connectInProcess(side, registry, 'differential');
   return {
     async call(call, configPath) {
       resetDevice();
@@ -383,10 +380,7 @@ export async function connect(side: Side, recording: Recording, profile: DeviceP
       }
       return { reply, device: deviceCalls() };
     },
-    async close() {
-      await client.close();
-      await server.close();
-    },
+    close,
   };
 }
 

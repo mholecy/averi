@@ -7,7 +7,9 @@ device check ever saved, without a device.
 It depends on each side through two interfaces (`side.ts`), and two shims for older sides:
 
 - the **tool interface**: the side's own `createAveriServer` over an `AdapterRegistry`, called through an in-memory MCP
-  client exactly as `tests/mcp/tools.test.ts` does — the reply an agent would read;
+  client exactly as `tests/mcp/tools.test.ts` does — the reply an agent would read. `connection.ts#connectInProcess`
+  opens and closes it (the registry's shutdown included, each close tried: D82), for this harness, the live golden
+  (`scripts/truth/live.ts`) and the performance baseline alike; the replay encodes its replies itself;
 - the **adapter seam**: the side's own adapters over a recorded payload. Nothing behind the tools (standing, scroll
   rounds, tap judgement, the pixel poll …) is imported, so a refactor inside averi needs no change here;
 - the **legacy-registry shim** (`side.ts#registry`): since 8413120 (2026-10-08) the registry is constructed with
