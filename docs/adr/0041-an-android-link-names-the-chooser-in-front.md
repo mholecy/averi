@@ -850,4 +850,6 @@ The same change judges `--check`'s focus read (`focusOf` in lab-chooser.ts) with
 group's (`focusedAppOf` and `isChooser`, moved from live-chooser.ts to chooser-readers.ts so the batch loads no live
 module), not src's `chooserInFocus` (review card TL5; ADR 0020: a lab check does not judge with the code under test).
 That reader decides by the focused activity alone, so a read without an `mFocusedApp=` line is now unread (`--check`
-exit 3) where src's parser fell back to the focused window.
+exit 3) where src's parser fell back to the focused window. So is a line it cannot parse: only `mFocusedApp=null` reads
+as no chooser (fail closed). It reads the first `mFocusedApp=` line across displays, not display 0's block as src's
+parser does; the lab emulator has one display.

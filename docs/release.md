@@ -115,7 +115,8 @@ It builds the lab app from this checkout under JDK 17 and installs it, runs the 
 a check of the chooser's lab defaults before and after, then live.ts's other Android groups, `forms`, `visibility`,
 `ensure` and `carousel`, each as its own block (backlog A22). The `dismissal` group is iOS only: Gate C runs it. It
 bounds itself (each live run 1800 s, the build 2400 s; standing.ts's KNOBS), each call in a process group of its own,
-so a run past its bound leaves no `adb` behind and its block is INCONCLUSIVE.
+so a run past its bound leaves no `adb` behind and its block is INCONCLUSIVE. After such an INCONCLUSIVE, `adb -s
+emulator-5554 shell echo ok` must answer before you report the run; if it does not, stop and tell the owner.
 
 It passes only on **exit 0**: every block PASS, and no INCONCLUSIVE or ERROR line. Exit 1 is a FAIL or a `RESTORE.txt`
 to act on by hand, and it goes to the owner. Exit 2 means refused, and 3 means unproven. Neither is a pass. Any line in

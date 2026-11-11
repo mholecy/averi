@@ -169,7 +169,12 @@ export function handlersIn(text: string): number | { why: string } {
 export const ACTIVITY_RECORD = String.raw`ActivityRecord\{[0-9a-f]+ u\d+ ([^\s}/]+\/[^\s}]+)[\s}]`;
 const FOCUSED_APP = new RegExp(String.raw`mFocusedApp=[^\n]*?${ACTIVITY_RECORD}`);
 
-/** The focused activity's component: the first `mFocusedApp` line's ActivityRecord; none when no line names one. */
+/**
+ * The focused activity's component: the first `mFocusedApp` line's ActivityRecord; none when no line names one. Not
+ * scoped to a display: `dumpsys window displays` prints one pair per display, and this reads the first line across
+ * all of them (unlike src's chooserInFocus, which reads display 0's block). The lab emulator has one display, so the
+ * first line is display 0's.
+ */
 export const focusedAppOf = (text: string): string | undefined => FOCUSED_APP.exec(text)?.[1];
 
 /** The packages the platform's chooser runs in (AOSP: the framework's; later releases' IntentResolver module). */

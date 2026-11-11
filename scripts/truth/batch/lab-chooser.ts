@@ -106,14 +106,16 @@ export const chooserOf = (f: FocusRead): string | undefined => (f.state === 'rea
  * CHOOSER_FOCUS_COMMAND's read, judged by the harness's own reader of the focused activity (chooser-readers.ts
  * #focusedAppOf, #isChooser: the chooser group's oracle, not src's chooserInFocus — TL5). Read only when it exited 0
  * and holds an `mFocusedApp=` line, the one that reader decides by: its grep exits 1 when nothing matched, and a read
- * with the focused window alone proves no "no chooser". A line naming no activity (`mFocusedApp=null`) is read: no
- * chooser.
+ * with the focused window alone proves no "no chooser". Only a line that names no activity (`mFocusedApp=null`) is read
+ * as no chooser; a line the reader cannot parse is unread with its own reason (fail closed: --check's exit 3).
  */
 export function focusOf(r: CallResult): FocusRead {
   if (failedCall(r)) return { state: 'unread', why: `the focus read: ${exitText(r)}` };
   if (!r.out.includes('mFocusedApp=')) return { state: 'unread', why: 'the focus read holds no mFocusedApp= line' };
   const focused = focusedAppOf(r.out);
-  return { state: 'read', chooser: isChooser(focused) ? focused : undefined };
+  if (focused !== undefined) return { state: 'read', chooser: isChooser(focused) ? focused : undefined };
+  if (/mFocusedApp=null[ \t\r]*$/m.test(r.out)) return { state: 'read', chooser: undefined };
+  return { state: 'unread', why: "the focus read's mFocusedApp= line names no activity the reader can parse" };
 }
 
 // ---------------------------------------------------------------------------------------------------- --check

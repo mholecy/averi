@@ -217,6 +217,13 @@ describe('focusOf — the chooser in front by the harness\'s own reader of the f
     const resolverWindow = '  mCurrentFocus=Window{db0395f u0 android/com.android.internal.app.ResolverActivity}\n';
     expect(focusOf(ok(resolverWindow))).toEqual({ state: 'unread', why: 'the focus read holds no mFocusedApp= line' });
     expect(focusOf(ok('  mCurrentFocus=null\n')).state).toBe('unread');
+    // Fail closed: an mFocusedApp= line the reader cannot parse is unread with its own reason; only `null` reads none.
+    const garbled = { state: 'unread', why: 'the focus read\'s mFocusedApp= line names no activity the reader can parse' };
+    expect(focusOf(ok('  mFocusedApp=ActivityRecord{zz u0 NotAComponent}\n'))).toEqual(garbled);
+    expect(focusOf(ok('  mFocusedApp=Token{1 something new}\n'))).toEqual(garbled);
+    expect(focusOf(ok('  mFocusedApp=nullish\n'))).toEqual(garbled);
+    expect(focusOf(ok('  mFocusedApp=null\r\n'))).toEqual({ state: 'read', chooser: undefined });
+    expect(checkExit(focusOf(ok('  mFocusedApp=Token{1 something new}\n')), readOf(BLOCK), [])).toBe(CHECK_EXIT.unproven);
     // The chooser's activity under a window still null (batch-10: the window follows once drawn): the chooser.
     expect(focusOf(ok(fixture('../dumpsys-window-focus-api33-b10-chooser-window-null.txt')))).toEqual({ state: 'read', chooser: 'android/com.android.internal.app.ResolverActivity' });
     // An app's activity under the chooser's window (a chooser on its way out): no chooser.
