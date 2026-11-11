@@ -24,6 +24,7 @@ Amended 2026-11-10 (T13: flush-check.ts, replies.ts, live-carousel.ts and live-v
 amendment at the end).
 Amended 2026-11-11 (T20b: scripts/truth/batch/lab-run.ts joined the run — see the T20b amendment at the end).
 Amended 2026-11-11 (T9: src/interact/fill-type.ts joined the run — see the T9 amendment at the end).
+Amended 2026-11-11 (T22: src/util/regex.ts joined the run — see the T22 amendment at the end).
 
 ## Context
 
@@ -1664,6 +1665,6 @@ likely left out by T21's count. They rejudge identically here too.
 T22 gives `escapeRegExp` one home, src/util/regex.ts#escapeRegExp, and every private copy imports it, failure-text.ts's
 among them, whose copy the run mutated. So the run does not lose that class, regex.ts joins the `core` group against
 tests/util/regex.test.ts (the helper's direct pins, moved from tests/verify/text-hint.test.ts) and
-tests/verify/assert.test.ts (`regexSource`'s refusals): 100 % cold (10 mutants, 9 killed, 1 runtime error; narrowed with
-`--mutate`, whose exit 1 is the fill-type amendment's): floor 98. failure-text.ts reads 98.98 % (197 mutants, the
-3 fewer the private copy's; the same survivors), floor 97 kept.
+tests/verify/assert.test.ts (`regexSource`'s refusals): 100 % cold (10 mutants, 9 killed, 1 runtime error; narrowed
+with `--mutate`, which exits 1 by design: see the T9 amendment): floor 98. failure-text.ts reads 98.98 % (197 mutants,
+the 3 fewer the private copy's; the same survivors), floor 97 kept.

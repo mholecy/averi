@@ -2,15 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { escapeRegExp } from '../../src/util/regex.js';
 
 /**
- * The expected string, escaped, matches as literal text: its consumers — the
- * text hint's recommended `match:`, `BAND_SAID` in scripts/truth/replies.ts,
- * the failure text's own-home scrub (src/adapters/failure-text.ts), the
- * scripts' and tests' patterns built from a path or a word — rely on it.
- * Pinned directly since T18: the indirect tests through textHint pin only `.`
- * (tests/verify/assert.test.ts, "1,250.00 MDL"; the "1 of 13 selected" one has
- * no metacharacter at all), so the other 13 characters of the class were
- * unpinned. In tests/verify/text-hint.test.ts until T22 moved the helper to
- * src/util/regex.ts, its one copy.
+ * A string, escaped, matches as literal text, and the escaped text itself is pinned: the text hint shows it verbatim as
+ * the `match:` to write. Pinned directly since T18: the indirect tests through textHint pin only `.`
+ * (tests/verify/assert.test.ts, "1,250.00 MDL"), so the other 13 characters of the class were unpinned. In
+ * tests/verify/text-hint.test.ts until T22 moved the helper to src/util/regex.ts.
  */
 describe('escapeRegExp', () => {
   // Every character the escape's class claims: . * + ? ^ $ { } ( ) | [ ] \
@@ -64,8 +59,7 @@ describe('escapeRegExp', () => {
     expect(escapeRegExp('$9.99')).toBe('\\$9\\.99');
   });
 
-  it('`-` passes through, so a pattern with it compiles under `u` too (`\\-` outside a class is a syntax error there)', () => {
-    // What ocr-fold.ts's own variant escapes and this one does not (T22).
+  it('`-` passes through, so the pattern compiles under `u` too: `\\-` outside a class is a syntax error there', () => {
     expect(escapeRegExp('2026-11-11')).toBe('2026-11-11');
     expect(new RegExp(`^${escapeRegExp('a-b.c')}$`, 'u').test('a-b.c')).toBe(true);
   });
