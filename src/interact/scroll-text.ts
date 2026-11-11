@@ -572,12 +572,29 @@ const pointText = (p: Point): string => `(${p.x},${p.y})`;
  * at any swipe held a match and the last read succeeded, so an `optional:`
  * scroll_until to an element not on this screen is skipped "(not present)"
  * like a tap or a fill would be. `describe` is the target as
- * the caller spelled it (resolve.ts#describeTarget).
+ * the caller spelled it (resolve.ts#describeTarget). `within` a WithinRefusedError, its refusal's kind on it (D81).
+ * `bySpec`: the caller names elements by element spec (a flow, D81) — a remedy naming a scroll view to pass as `within`
+ * then asks for an element spec of it, never its rect, which a flow cannot give.
  */
-export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: string): Error {
-  const { message, absence } = failureText(o, describe);
+export function scrollFailure(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: string, bySpec = false): Error {
+  const { message, absence } = failureText(o, describe, bySpec);
   const full = `${message}${endTurnText(o.endTurn)}${detentText(o.detent)}`;
+  if (o.kind === 'within') return new WithinRefusedError(full, o.refused.of);
   return absence === undefined ? new Error(full) : absenceError(full, absence);
+}
+
+/**
+ * A `within` that names no scroll view to stroke (D78's stop before any swipe), the refusal's kind on it: a flow's
+ * `optional:` skips an `absent` one — the list, like an interstitial, may not be on this screen — and fails on every
+ * other, an authoring error no screen cures (flow/engine.ts, D81).
+ */
+export class WithinRefusedError extends Error {
+  constructor(
+    message: string,
+    readonly refused: WithinRefusal['of'],
+  ) {
+    super(message);
+  }
 }
 
 /** Where a scroll view's content stops short of the element it cuts (ui-tree/standing.ts#ScrollViewCut's `stopsShort`), as the stuck sentence says it. */
@@ -588,7 +605,7 @@ const CONTENT_STOPS_SHORT: Record<ScrollViewCut['stopsShort'], string> = {
 };
 
 /** `scrollFailure`'s sentence, one case per kind, and the evidence of absence for the kinds judged by it (`covered`, `bound`). */
-function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: string): { message: string; absence?: WaitEvidence } {
+function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: string, bySpec: boolean): { message: string; absence?: WaitEvidence } {
   switch (o.kind) {
     case 'stuck': {
       const { short, viewport } = o;
@@ -811,7 +828,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
         o.presented === undefined
           ? ''
           : `. The next swipe would have touched down at ${pointText(o.presented.touchDown)} on ${coverText(o.presented.surface, o.presented.reach)} — ${presentedRemedy('it', o.presented.layer)}`;
-      return { message: `scroll_until ${describe} failed ${boundText(o.by, o.swipes)} — ${shortText(o.short)}${turned}${shown}${unlocated}${presented}`, absence: o.evidence };
+      return { message: `scroll_until ${describe} failed ${boundText(o.by, o.swipes, bySpec)} — ${shortText(o.short)}${turned}${shown}${unlocated}${presented}`, absence: o.evidence };
     }
     case 'changed':
       return { message: changedText(o, describe) };
@@ -999,7 +1016,7 @@ function shortClause(judged: Judged): string {
 }
 
 /** Which bound ended it, as the failure's cause. Exported for the troubleshooting reference (tests/mcp/tool-descriptions.test.ts pins the proven end's rendering). */
-export function boundText(by: BoundBy, swipes: number): string {
+export function boundText(by: BoundBy, swipes: number, bySpec = false): string {
   switch (by.of) {
     case 'exhausted': {
       // `tree`: there is no match to watch, so the sentence
@@ -1022,11 +1039,11 @@ export function boundText(by: BoundBy, swipes: number): string {
       const untaken = `${others}, or the swipes were not taken${by.unlisted !== undefined ? ` — ${TOP_LAYER_ONLY_HINT[by.unlisted]}` : ''}`;
       const why =
         by.touched !== undefined
-          ? `${touchedText(by.touched)} (else: ${by.beside === undefined ? '' : `${besideText(by.beside)}; else: `}${others})`
+          ? `${touchedText(by.touched)} (else: ${by.beside === undefined ? '' : `${besideText(by.beside, bySpec)}; else: `}${others})`
           : by.across !== undefined
-            ? `${acrossText(by.across)}; else: ${untaken}`
+            ? `${acrossText(by.across, bySpec)}; else: ${untaken}`
             : by.beside !== undefined
-              ? `${besideText(by.beside)}; else: ${untaken}`
+              ? `${besideText(by.beside, bySpec)}; else: ${untaken}`
               : untaken;
       return `after ${swipesText(swipes)} (the last ${UNMOVED_STROKES_EXHAUST}, swiping ${by.lastStroke}, ${verb}: ${why})`;
     }
@@ -1034,9 +1051,9 @@ export function boundText(by: BoundBy, swipes: number): string {
       // The text drawn over it moves with it (scroll-rounds.ts#BoundBy's `movesWith`): an app layout fact, no remedy.
       return `after ${swipesText(swipes)} (the text drawn over it moved with it, both by ${by.offset.dx},${by.offset.dy} since a screenshot saw it there: it scrolls with the element, so no swipe brings the element out from under it)`;
     case 'maxSwipes':
-      return `after ${swipesText(swipes)} (maxSwipes${boundBeside(by.beside, ': ')})`;
+      return `after ${swipesText(swipes)} (maxSwipes${boundBeside(by.beside, ': ', bySpec)})`;
     case 'timeout':
-      return timeoutText(by, swipes);
+      return timeoutText(by, swipes, bySpec);
   }
 }
 
@@ -1047,11 +1064,11 @@ export function boundText(by: BoundBy, swipes: number): string {
  * restarting under the scroll) does not read as content that never came into view. Exported for the troubleshooting
  * reference, which quotes one rendering (tests/mcp/tool-descriptions.test.ts pins it).
  */
-export function timeoutText(by: Extract<BoundBy, { of: 'timeout' }>, swipes: number): string {
+export function timeoutText(by: Extract<BoundBy, { of: 'timeout' }>, swipes: number, bySpec = false): string {
   const sent = swipes === 0 ? 'no swipe was sent' : `${swipesText(swipes)} sent`;
   const { count, totalMs, lastMs } = by.reads;
   const reads = `${countOf(count, 'tree read')} took ${totalMs}ms${count > 1 ? `, the last ${lastMs}ms` : ''}`;
-  return `after ${by.elapsedMs}ms (timeout ${by.timeoutMs}ms; ${sent}; ${reads}${boundBeside(by.beside, '; ')})`;
+  return `after ${by.elapsedMs}ms (timeout ${by.timeoutMs}ms; ${sent}; ${reads}${boundBeside(by.beside, '; ', bySpec)})`;
 }
 
 /**
@@ -1060,8 +1077,8 @@ export function timeoutText(by: Extract<BoundBy, { of: 'timeout' }>, swipes: num
  * the element may lie further along the list swiped; `lead` the separator from the bound's own words (`: ` after
  * `maxSwipes`, `; ` after the timeout's reads, a clause of their own). Empty without them.
  */
-function boundBeside(beside: StrokedBeside | undefined, lead: ': ' | '; '): string {
-  return beside === undefined ? '' : `${lead}${besideText(beside)}; else: raise maxSwipes or timeoutMs`;
+function boundBeside(beside: StrokedBeside | undefined, lead: ': ' | '; ', bySpec: boolean): string {
+  return beside === undefined ? '' : `${lead}${besideText(beside, bySpec)}; else: raise maxSwipes or timeoutMs`;
 }
 
 /**
@@ -1076,13 +1093,16 @@ function boundBeside(beside: StrokedBeside | undefined, lead: ': ' | '; '): stri
  * list (swipe, its coordinates), then scroll_until it`. `boundText`'s; the troubleshooting reference pins it through
  * `boundText` (tests/mcp/tool-descriptions.test.ts).
  */
-function acrossText({ rect, axis, along }: StrokedAcross): string {
+function acrossText({ rect, axis, along }: StrokedAcross, bySpec: boolean): string {
   const way = OTHER_AXIS[axis];
   const drawn = `each went across the scroll view it was drawn over, ${rectText(rect)}, which scrolls ${axis}ly, and the tree shows`;
   if (along !== undefined) {
     const why = along.noRoom === true ? 'but which had no room for a swipe' : 'and which the swipes did not go over';
     // D78: one the swipes did not go over, the target not read yet, is the next call's `within`; else the way in by hand.
-    const into = along.noRoom === true || along.targetRead === true ? 'swipe inside it (swipe, its coordinates), then scroll_until it' : `scroll_until it again with within: ${withinRect(along.view.rect)}`;
+    const into =
+      along.noRoom === true || along.targetRead === true
+        ? 'swipe inside it (swipe, its coordinates), then scroll_until it'
+        : `scroll_until it again ${bySpec ? BY_SPEC : `with within: ${withinRect(along.view.rect)}`}`;
     return `${drawn} ${nodeText(along.view)}, which scrolls ${way}ly, ${why} — ${into}`;
   }
   return `${drawn} no scroll view that may scroll ${way}ly — if the element lies in a ${way} list the tree does not show as one, swipe inside that list (swipe, its coordinates), then scroll_until it`;
@@ -1100,7 +1120,7 @@ function acrossText({ rect, axis, along }: StrokedAcross): string {
  * (D76's decision, ADR 0010's D76 amendment). `boundText`'s and `boundBeside`'s; the troubleshooting
  * reference quotes it.
  */
-function besideText({ strokedOver, at, landed, axis, others }: StrokedBeside): string {
+function besideText({ strokedOver, at, landed, axis, others }: StrokedBeside, bySpec: boolean): string {
   const where = at === undefined ? '' : `, touching down at ${at.x},${at.y}${landed === undefined ? '' : ` inside the scroll view ${rectText(landed)}`}`;
   const went = strokedOver === undefined ? `the swipes were drawn over the screen whole (aimed at no scroll view)${where}` : `the swipes went over the scroll view ${rectText(strokedOver)} only`;
   const one = others.length === 1;
@@ -1108,12 +1128,22 @@ function besideText({ strokedOver, at, landed, axis, others }: StrokedBeside): s
   // Several: each named with its rect as `within` takes it, as the stale refusal lists them (D78); one: its rect is the remedy's.
   const named = others
     .slice(0, BESIDE_NAMED)
-    .map((n) => (one ? nodeText(n) : asWithin(n)))
+    .map((n) => (one || bySpec ? nodeText(n) : asWithin(n)))
     .join(', ');
   const names = others.length > BESIDE_NAMED ? `${named} and ${others.length - BESIDE_NAMED} more` : named;
-  const remedy = one ? `it, scroll_until it again with within: ${withinRect(others[0].rect)}` : `one of them, scroll_until it again with that one's within`;
+  const remedy = bySpec
+    ? `${one ? 'it' : 'one of them'}, scroll_until it again ${BY_SPEC}`
+    : one
+      ? `it, scroll_until it again with within: ${withinRect(others[0].rect)}`
+      : `one of them, scroll_until it again with that one's within`;
   return `${went}; the tree shows ${some} ${axis}ly, ${UNTRIED_LEAD}${names}${UNTRIED_END}${remedy}`;
 }
+
+/**
+ * The way a caller naming elements by spec (a flow, D81) passes a scroll view the reply names as `within`: an element
+ * spec of it — a flow takes no rect (flow/config.ts). `besideText`'s and `acrossText`'s.
+ */
+const BY_SPEC = 'naming that scroll view by an element spec of it (within: { id: … })';
 
 /** `besideText`'s words around the scroll views it names — exported for `namesUntried` in scripts/truth/replies.ts, which reads the names between them. */
 export const UNTRIED_LEAD = 'which the swipes did not go over: ';

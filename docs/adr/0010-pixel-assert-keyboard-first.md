@@ -701,11 +701,25 @@ selector string`; otherwise the element spec schema's own (`element spec needs a
 `— give an element spec of the scroll view or of an element inside it` and `— narrow it so exactly one matches`. The
 MCP tool's words are unchanged. A flow's success line carries no `within`, as the tool's reply carries none.
 
-**Residuals.** (1) The exhausted reply's D76/D78 remedy (`scroll_until it again with within: {"x":…}`) quotes a rect
-in a flow's trace too, which a flow cannot paste: the author names the list by an element spec of it instead (the
-reply names its node). Not reworded: the reply does not know its caller. (2) Inside `optional:` a `within` refusal is
-skipped with its own headline, as any non-absence failure is — not a config refusal. (3) Not measured on a device; no
-lab flow uses it yet.
+(e) Review round 1 (MINOR-2): a flow's exhausted reply offers no rect either. Where the tool's reply says `scroll_until
+it again with within: {"x":…}` (D76's scroll views beside, at the exhausted, maxSwipes and timeout bounds; D59b's
+named across clause), a caller naming its target by spec says `scroll_until it again naming that scroll view by an
+element spec of it (within: { id: … })`, and several beside are named without their `as within: {…}`. The driver
+tells the caller by its target's form (`src/interact/scroll.ts#scrollUntilVisible`: an element spec is a flow's,
+with or without `within`), handed to `src/interact/scroll-text.ts#scrollFailure` as `bySpec`; `boundText` and
+`timeoutText` default it false, so the tool's words, the troubleshooting reference's and golden's are byte-identical.
+
+(f) Review round 1 (MINOR-1, the coordinator's decision): inside `optional:` a `within` refusal that is an authoring
+error fails the flow. The refusal is a `WithinRefusedError` (`src/interact/scroll-text.ts#WithinRefusedError`) carrying
+its kind (`WithinRefusal['of']`); the engine's `notSkippable` (`src/flow/engine.ts`) turns every kind but `absent` —
+several matches, a match in no scroll view, across the stroke, idb's flat list (and `stale`, which a flow cannot
+reach) — into the terminal `OptionalNotSkipped`, `optional step not skipped: its within names no scroll view to
+swipe, which no screen cures — …`; as for a refused tap, a reach ladder then checks `detect` once and does not
+escalate. An `absent` one is skipped with its own sentence: the list, like the interstitial, may not be on this
+screen. Outside `optional:` every kind is the step's plain failure, as before.
+
+**Residuals.** (1) ~~The exhausted reply's remedy quotes a rect in a flow's trace~~ — closed by (e). (2) ~~Inside
+`optional:` a `within` refusal is skipped~~ — decided by (f). (3) Not measured on a device; no lab flow uses it yet.
 
 **Golden.** Golden calls `scroll_until` without `within`: Changed 0, Strike 0, COUNTS 0, Re-pin 0.
 
@@ -714,12 +728,21 @@ lab flow uses it yet.
 a spec), tests/interact/scroll-rounds.test.ts (the round with a spec: every stroke inside `lower`; a spec's absent,
 ambiguous and unscrolled sentences, no rect offered), tests/flow/config.test.ts (accepted, the spec kept; a rect whole
 and one side refused with the words; `{}`, an unknown key and a selector string refused), tests/flow/engine.test.ts
-(the step's `within` reaches the scroll: a spec that matches nothing stops it before any swipe, the tool's sentence).
+(the step's `within` reaches the scroll: a spec that matches nothing stops it before any swipe, the tool's sentence;
+inside `optional:` an absent `within` skipped and the flow run on, an ambiguous, unscrolled, across and idb one each
+failing the flow with no swipe sent; a flow's exhausted reply over the real `scroll-bounded` dump naming `lower` by
+spec, no `"x":`). Review round 1's in tests/interact/scroll-rounds.test.ts: `boundText` by spec — one, several, at
+maxSwipes and the timeout, the across clause, no rect; a refusal a `WithinRefusedError` carrying its kind.
 Hand mutants, each killed: a spec not matched (`findTarget` given a never-matching selector for it), `isRect` without
 its `x`, the spec words never and always chosen, the rect clause's `''` not empty, the spec said as JSON, the string
 refusal on numbers, `RECT_SIDES.some` as `every`, `height` dropped from `RECT_SIDES`, the rect refusal dropped,
 `within` as `z.any()`, the engine dropping `within`. One equivalent, removed: `spec` first read `typeof within ===
-'object' && !isRect(within)` — a rect is never absent nor ambiguous, so it is `typeof within !== 'string'`. Mutation
+'object' && !isRect(within)` — a rect is never absent nor ambiguous, so it is `typeof within !== 'string'`. Review
+round 1's hand mutants, each killed: `notSkippable` taking every `within` refusal, only `untold`, and sparing each of
+`across`, `unscrolled`, `ambiguous` in turn; the not-skipped words; the refusal a plain Error, its kind `absent`
+always; the driver not passing `bySpec`, `failureText` not passing it, `besideText`, `acrossText`, `boundBeside`
+(twice) and `timeoutText` each given false; several named `as within:` by spec; `one of them` said `it`; the across
+remedy always the rect and always the spec; the beside remedy always the spec. Mutation
 (scripts/mutation/scope.json, core): `src/interact/within.ts` 100 % (105 mutants, narrowed cold run), floor 98.
 
 ## Bug note

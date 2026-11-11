@@ -10,7 +10,7 @@ import { scrollFailure, scrollResult, type ScrollUntilResult } from './scroll-te
 import { dragMs, screenBox, type Direction, type ScreenBox } from './swipe.js';
 import { checkWithin, type Within } from './within.js';
 
-export { describeScrollResult, HEDGE_WHATS, HEDGED_LEAD, stopHedges, type ScrollUntilResult } from './scroll-text.js';
+export { describeScrollResult, HEDGE_WHATS, HEDGED_LEAD, stopHedges, WithinRefusedError, type ScrollUntilResult } from './scroll-text.js';
 
 /** The scroll's budget when the caller has none — the MCP scroll_until tool's documented default is derived from it. */
 export const DEFAULT_SCROLL_TIMEOUT_MS = 15_000;
@@ -40,8 +40,9 @@ export interface ScrollOptions {
   eyes?: Eyes;
   /**
    * The scroll view to stroke until the target is first read (D78; interact/within.ts): a selector of it or of an
-   * element inside it — a selector string, or an element spec (a flow's, D81) — (the scroll view of its exact rect, else its nearest), or its rect. Resolved at the first read that reads; one
-   * that names no scroll view stops the scroll there, before any swipe. Default: the screen's largest scroller.
+   * element inside it — a selector string, or an element spec (a flow's, D81) — (the scroll view of its exact rect,
+   * else its nearest), or its rect. Resolved at the first read that reads; one that names no scroll view stops the
+   * scroll there, before any swipe. Default: the screen's largest scroller.
    */
   within?: Within;
 }
@@ -386,7 +387,8 @@ export async function scrollUntilVisible(
     if (step.do === 'stop') {
       const { outcome } = step;
       if (outcome.kind === 'visible') return scrollResult(outcome);
-      throw scrollFailure(outcome, describe);
+      // A flow names its elements by spec (D81): a remedy then asks for a spec of a scroll view, never its rect.
+      throw scrollFailure(outcome, describe, typeof target !== 'string');
     }
     if (step.do === 'stroke') {
       // The stroke is the round's, made by its plan (`step.points`, interact/stroke-plan.ts#planStroke, or
