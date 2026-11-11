@@ -7,7 +7,7 @@ import { axisOf, type Direction } from './swipe.js';
 /**
  * D59: THE AXIS OF A ROOM-GIVER THE TREE DOES NOT TELL, from the call's own evidence. `scroll_until`'s `unfit` stop
  * (scroll-read.ts#unfitAlong) needs the axis its room-giving scroll view scrolls on. Android tells it by class only
- * (adapters/android.ts's AXIS_BY_CLASS), so a Compose LazyRow, dumped as a plain `android.view.View`, tells none, and a
+ * (adapters/android-tree-dialect.ts's AXIS_BY_CLASS), so a Compose LazyRow, dumped as a plain `android.view.View`, tells none, and a
  * card as wide as such a carousel swung to maxSwipes (ADR 0021's residual 3). Here the axis is taken as the one the
  * call measures along only when the tree and this call's strokes together say so (`inferredAlong`).
  *

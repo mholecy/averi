@@ -148,7 +148,7 @@ describe('c5–c7: an assert and a flow\'s wait: on name beneath form-picker\'s 
 
 /**
  * D67: the kf cases' floating panel is the one the IME window's touchable region names at launch (LabState.imeTouchable,
- * read by live.ts through LabDevice.imeTouchable, parsed by averi's own src/adapters/android.ts#parseTouchableRegion),
+ * read by live.ts through LabDevice.imeTouchable, parsed by averi's own src/adapters/android-wm.ts#parseTouchableRegion),
  * not a fixed list of hand placements. The dump's shape is the committed capture's (form-keyboard-floating.ime.json,
  * `shown.touchable`), its region set per test: the records below read none, so each test gives its launch the region of
  * the panel its replies quote.

@@ -1,0 +1,635 @@
+import { readFile } from 'node:fs/promises';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { landingOf, type Expectation } from '../../src/interact/fill-landing.js';
+import { fillReply } from '../../src/interact/fill-text.js';
+import { typeAndConfirm, type FieldIo } from '../../src/interact/fill-type.js';
+import { clearStep, startClear } from '../../src/interact/fill-clear.js';
+import { tapElement } from '../../src/interact/tap.js';
+import { parseUiautomatorXml } from '../../src/adapters/android-tree-dialect.js';
+import { parseDump, UIAUTOMATOR_XML } from '../helpers/android-dumps.js';
+import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
+import { drawOrder } from '../../src/ui-tree/draw-order.js';
+import { findAll } from '../../src/ui-tree/selectors.js';
+import { scrollUntilVisible } from '../../src/interact/scroll.js';
+import { resolveSettled } from '../../src/interact/resolve.js';
+import { FakeAdapter } from '../helpers/fake.js';
+import { resetSleeps } from '../helpers/sleep-recorder.js';
+
+// The one sleep owner (util/sleep.ts) is recorded, not waited on (tests/helpers/sleep-recorder.ts): the scroll and fill
+// plays below cost no wall clock (T1).
+vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
+beforeEach(() => {
+  resetSleeps();
+});
+
+
+describe('parseUiautomatorXml', () => {
+  const tree = parseDump(UIAUTOMATOR_XML.slice(0, UIAUTOMATOR_XML.lastIndexOf('>') + 1));
+
+  // D72: a text input's value keeps its outer spaces, as the app holds them (iOS's too, ios-node.ts), and so does a
+  // hint; what names a node — its label, content-desc, resource-id — is trimmed as before, so matching through the
+  // label is unchanged, while the `value` path (`value:`, and `text:`, which asks the value too) sees the real text.
+  describe("a value's outer spaces (D72)", () => {
+    it('an EditText holding `Jan ` reads value `Jan `, labelled `Jan`', () => {
+      const field = parseDump('<hierarchy><node class="android.widget.EditText" text="Jan " bounds="[0,0][100,100]" /></hierarchy>');
+      expect(field).toMatchObject({ role: 'textfield', value: 'Jan ', label: 'Jan' });
+    });
+
+    it('a Compose input (a focusable, long-clickable scroll view) holding `Jan ` reads value `Jan `, labelled `Jan`', () => {
+      const field = parseDump('<hierarchy><node class="android.widget.HorizontalScrollView" focusable="true" long-clickable="true" text="Jan " bounds="[0,0][100,100]" /></hierarchy>');
+      expect(field).toMatchObject({ role: 'textfield', value: 'Jan ', label: 'Jan' });
+    });
+
+    it('a label drawn from text, a content-desc and a resource-id are trimmed as before', () => {
+      const tree = parseDump(`<hierarchy><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+        <node class="android.widget.TextView" text=" Close " bounds="[0,0][100,100]" />
+        <node class="android.widget.Button" content-desc=" Send " resource-id=" app:id/send " bounds="[0,100][100,200]" />
+      </node></hierarchy>`);
+      expect(tree.children[0]).toMatchObject({ label: 'Close', value: null });
+      expect(tree.children[1]).toMatchObject({ label: 'Send', identifier: 'send' });
+    });
+
+    it('an input holding only spaces keeps them as its value, and has no label', () => {
+      const field = parseDump('<hierarchy><node class="android.widget.EditText" text="  " bounds="[0,0][100,100]" /></hierarchy>');
+      expect(field).toMatchObject({ value: '  ', label: null });
+    });
+
+    it('a newline at the edge, written `&#10;`, still decodes and stays, in a value and in a label', () => {
+      const tree = parseDump(`<hierarchy><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+        <node class="android.widget.EditText" text="Jan&#10; " bounds="[0,0][100,100]" />
+        <node class="android.widget.Button" content-desc=" &#10;Send " bounds="[0,100][100,200]" />
+      </node></hierarchy>`);
+      expect(tree.children[0]).toMatchObject({ value: 'Jan\n ', label: 'Jan\n' });
+      expect(tree.children[1]).toMatchObject({ label: '\nSend' });
+    });
+
+    /** An Android field holding `held`, as its dump reads (the parser is the seam: base trimmed `Jan ` to `Jan`). */
+    const dumped = (held: string): UiNode =>
+      parseDump(`<hierarchy><node class="android.widget.EditText" resource-id="app:id/f" text="${held}" bounds="[0,0][100,20]" /></hierarchy>`);
+
+    it('typeAndConfirm with clear, `Jan ` of `Jan Novak` landed: the wipe deletes 4, not 3, and the retype lands', async () => {
+      let held = '';
+      const wipes: number[] = [];
+      let typings = 0;
+      const io: FieldIo = {
+        type: async (text) => {
+          held += typings++ === 0 ? text.slice(0, 4) : text;
+        },
+        wipe: async (count) => {
+          wipes.push(count);
+          held = held.slice(0, Math.max(0, held.length - count));
+        },
+        read: async () => dumped(held).value ?? '',
+        screen: () => dumped(held),
+        reportDroppedTail: () => undefined,
+      };
+      const out = await typeAndConfirm(io, {
+        value: 'Jan Novak', clear: true, isInput: true, resolvedValue: null, before: '', placeholder: undefined, held: 0, pollMs: 1,
+        field: dumped(''), delivery: 'may-arrive-late',
+      });
+      expect(wipes).toEqual([4]);
+      expect(out).toMatchObject({ kind: 'landed', observed: 'Jan Novak' });
+      expect(held).toBe('Jan Novak'); // base: `JJan Novak`
+    });
+
+    // Review round 1, MAJOR-1: matching through the LABEL is unchanged; the `value` path sees the field's real text, as
+    // on iOS — a flow that matched a trimmed Android value quotes the space or uses `~`.
+    it('an input named by its content-desc: `text:"Jan"` no longer matches its value, `text:"Jan "` and `value:"Jan "` do', () => {
+      const tree = parseDump('<hierarchy><node class="android.widget.EditText" content-desc="First name" text="Jan " bounds="[0,0][100,100]" /></hierarchy>');
+      expect(findAll(tree, 'text:"Jan"')).toHaveLength(0);
+      expect(findAll(tree, 'text:"Jan "')).toHaveLength(1);
+      expect(findAll(tree, 'value:"Jan "')).toHaveLength(1);
+      expect(findAll(tree, 'value:Jan')).toHaveLength(0);
+      expect(findAll(tree, 'value~^Jan$')).toHaveLength(0);
+    });
+
+    it('an input with no content-desc still matches `text:Jan` through its label', () => {
+      const tree = parseDump('<hierarchy><node class="android.widget.EditText" text="Jan " bounds="[0,0][100,100]" /></hierarchy>');
+      expect(findAll(tree, 'text:Jan')).toHaveLength(1);
+    });
+
+    // Review round 1, MINOR-1: a hint is the same kind of string as text, compared with a reading exactly — kept untrimmed,
+    // so an empty field showing `Name ` reads empty, not as 5 characters to clear.
+    it('an empty input whose dump names `hint="Name "` and shows it as `text="Name "` reads empty', () => {
+      const field = parseDump('<hierarchy><node class="android.widget.EditText" text="Name " hint="Name " bounds="[0,0][100,100]" /></hierarchy>');
+      expect(field.placeholder).toBe('Name ');
+      const first = clearStep(startClear(field.placeholder), { value: field.value });
+      expect(first.step).toEqual({ do: 'done', facts: { cleared: 0, end: { kind: 'empty', placeholder: 'shown' } } });
+    });
+
+    // After D71 (ADR 0034's D71 amendment), with D72's readings: no clear, the field already holding `held`, `value` typed,
+    // the field keeping `keep` of it (its first keys dropped) — `before` and every reading through the dump's parser.
+    const typedOver = async (held: string, value: string, keep: (typed: string) => string) => {
+      let text = held;
+      const io: FieldIo = {
+        type: async (typed) => {
+          text += keep(typed);
+        },
+        wipe: async () => undefined,
+        read: async () => dumped(text).value ?? '',
+        screen: () => dumped(text),
+        reportDroppedTail: () => undefined,
+      };
+      return typeAndConfirm(io, {
+        value, clear: false, isInput: true, resolvedValue: null, before: dumped(held).value ?? '', placeholder: undefined, held: 0, pollMs: 1,
+        field: dumped(held), delivery: 'may-arrive-late',
+      });
+    };
+
+    it('D71: `1 ` typed after `1` without clear, the `1` dropped, reads `1 ` — refused with the select-all hedge, never Filled', async () => {
+      expect(await typedOver('1', '1 ', (t) => t.slice(1))).toEqual({ kind: 'missed', observed: '1 ', again: [], differs: { kind: 'length', wholeToo: true, equal: { why: 'value-itself', appendWouldShow: 3 } } });
+    });
+
+    it('`Jan ` appended to `Jan` without clear lands (`JanJan `)', async () => {
+      expect(await typedOver('Jan', 'Jan ', (t) => t)).toMatchObject({ kind: 'landed', observed: 'JanJan ' });
+    });
+
+    it('`Jan ` typed after `Jan ` without clear, no key landing, still lands — ADR 0034 residual 7, the value already shown', async () => {
+      expect(await typedOver('Jan ', 'Jan ', () => '')).toMatchObject({ kind: 'landed', observed: 'Jan ' });
+    });
+
+    it('the clear of a field holding `Jan ` deletes 4', () => {
+      const first = clearStep(startClear(undefined), { value: dumped('Jan ').value });
+      expect(first.step).toEqual({ do: 'delete', count: 4 });
+    });
+  });
+
+  // D64b-3 (ADR 0028's amendment), re-pinned by D72: the parser no longer trims a value's outer spaces, so the ⚠ line
+  // counts what the app holds (5, where it counted 4), and a typed `+421` over an inserted `+421 ` is no longer silent.
+  describe('a field holding `+421 `, the re-read skipped: the reading is `+421 `', () => {
+    const reading = parseDump('<hierarchy><node class="android.widget.EditText" text="+421 " password="false" bounds="[0,0][100,100]" /></hierarchy>').value ?? '';
+    const expecting = (value: string): Expectation => ({ value, clear: false, before: '', placeholder: undefined, isInput: true, resolvedValue: null, held: 'unread' });
+
+    it('`421` typed: the line says 5 characters, as the app holds', () => {
+      const landing = landingOf(reading, expecting('421'));
+      expect(landing).toEqual({ kind: 'landed', focusUnread: { shows: 5 } });
+      const focusUnread = landing?.kind === 'landed' ? landing.focusUnread : undefined;
+      expect(fillReply({ role: 'textfield', typed: 3, readBack: { kind: 'landed' }, focusUnread }, 'id:dial')).toContain('\n⚠ the field shows 5 characters for the 3 typed,');
+    });
+
+    it('`+421` typed: the reading is not the value typed, so the ⚠ line, where it was silent (ADR 0028 residual 3, D72)', () => {
+      const landing = landingOf(reading, expecting('+421'));
+      expect(landing).toEqual({ kind: 'landed', focusUnread: { shows: 5 } });
+      const focusUnread = landing?.kind === 'landed' ? landing.focusUnread : undefined;
+      expect(fillReply({ role: 'textfield', typed: 4, readBack: { kind: 'landed' }, focusUnread }, 'id:dial')).toContain('\n⚠ the field shows 5 characters for the 4 typed,');
+    });
+  });
+
+  it('normalizes roles, identifiers, labels and bounds', () => {
+    expect(tree.role).toBe('container');
+    const keyboard = tree.children[0];
+    expect(keyboard.identifier).toBe('pin_keyboard');
+    expect(keyboard.label).toBe('PIN keyboard');
+    expect(keyboard.children[0]).toMatchObject({
+      role: 'button', identifier: 'pin_key_1', label: '1',
+      rect: { x: 0, y: 1200, width: 360, height: 300 },
+    });
+  });
+
+  it("marks the root with the source's dialect: it cuts a node's bounds at the screen's edge (`boundsCutAtScreen`, D17) — one window or several", () => {
+    expect(tree.boundsCutAtScreen).toBe(true);
+    const two = parseDump('<hierarchy><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]" /><node class="android.widget.FrameLayout" bounds="[0,1500][1080,2220]" /></hierarchy>');
+    expect(two.boundsCutAtScreen).toBe(true);
+  });
+
+  it('exposes EditText text as value', () => {
+    const username = tree.children[1];
+    expect(username).toMatchObject({
+      role: 'textfield', identifier: 'username_field', value: 'user@bank.md',
+    });
+  });
+
+  it('maps TextView to text with a null identifier for empty resource-id', () => {
+    expect(tree.children[2]).toMatchObject({ role: 'text', label: 'Log in', identifier: null });
+  });
+
+  it('recognizes Compose text inputs dumped as focusable+long-clickable scroll views', () => {
+    // Measured 2026-08-05: the login username field dumps as
+    // HorizontalScrollView with the content in `text` — no EditText anywhere.
+    const composeXml = `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="app" content-desc="" bounds="[0,0][1080,2400]">
+    <node index="0" text="Martha.Key" resource-id="app:id/login.username.input" class="android.widget.HorizontalScrollView" package="app" content-desc="" focusable="true" long-clickable="true" bounds="[44,511][1036,654]"/>
+    <node index="1" text="" resource-id="app:id/real_scroller" class="android.widget.HorizontalScrollView" package="app" content-desc="" focusable="false" long-clickable="false" scrollable="true" bounds="[0,700][1080,900]"/>
+  </node>
+</hierarchy>`;
+    const t = parseDump(composeXml);
+    expect(t.children[0]).toMatchObject({
+      role: 'textfield',
+      identifier: 'login.username.input',
+      value: 'Martha.Key',
+    });
+    expect(t.children[1]).toMatchObject({ role: 'scrollable', value: null });
+  });
+
+  it('marks a node uiautomator dumps scrollable="true" as clipping its descendants — a Compose scroller keeps its role (container), only the flag says it scrolls; scrollable="false" and absent are not marked', () => {
+    // 2026-10-09, docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md: the SWIFT form's scroller.
+    const t = parseDump(`<hierarchy rotation="0">
+<node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+  <node class="android.view.View" scrollable="true" bounds="[0,242][1080,1978]">
+    <node class="android.view.View" resource-id="app:id/fees_select" bounds="[66,242][1014,334]" />
+  </node>
+  <node class="androidx.recyclerview.widget.RecyclerView" scrollable="false" bounds="[0,1979][1080,2111]"><node class="android.widget.TextView" text="x" bounds="[0,1979][100,2000]" /></node>
+</node>
+</hierarchy>`);
+    expect(t.children[0]).toMatchObject({ role: 'container', clipsDescendants: true });
+    expect(t.children[0].children[0].clipsDescendants).toBeUndefined();
+    expect(t.children[1].clipsDescendants).toBeUndefined();
+    expect('clipsDescendants' in t).toBe(false); // absent, not false: ui_snapshot prints the tree as JSON
+  });
+});
+
+describe('parseUiautomatorXml — a node cut short of its own descendants is widened to them (docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md)', () => {
+  // The measured Account Detail shape (run9-android, 5e5a3d1, after the second drag): row_0's testTag node cut at its sticky
+  // date header's bottom (480) to 66,480 948x66, its own label and button the true rect 66,403 948x143, the header listed after
+  // the rows inside the scrolling list.
+  const ACCOUNT_DETAIL = `<hierarchy rotation="0">
+<node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+  <node class="android.view.View" resource-id="transactions.list.container" scrollable="true" bounds="[0,401][1080,2154]">
+    <node class="android.view.View" resource-id="transactions.list.row_0" bounds="[66,480][1014,546]">
+      <node class="android.view.View" content-desc="Loan repayment, 17.07.2026, +602.00 EUR" bounds="[66,403][1014,546]" />
+      <node class="android.view.View" bounds="[116,480][204,552]"><node class="android.widget.TextView" text="LR" bounds="[136,484][184,533]" /></node>
+      <node class="android.widget.Button" bounds="[66,403][1014,546]" />
+    </node>
+    <node class="android.view.View" resource-id="transactions.list.row_1" bounds="[66,592][1014,735]">
+      <node class="android.view.View" content-desc="Loan repayment, 16.07.2026, +250.00 EUR" bounds="[66,592][1014,735]" />
+      <node class="android.widget.Button" bounds="[66,592][1014,735]" />
+    </node>
+    <node class="android.view.View" resource-id="transactions.list.date_header_0" bounds="[0,401][1080,480]">
+      <node class="android.widget.TextView" text="17.07.2026" bounds="[66,415][286,465]" />
+    </node>
+  </node>
+</node>
+</hierarchy>`;
+  const tree = parseDump(ACCOUNT_DETAIL);
+  const byIdIn = (t: UiNode, id: string) => [...everyNode(t)].find((n) => n.identifier === id)!;
+  const byId = (id: string) => byIdIn(tree, id);
+  const PIXEL = { x: 0, y: 0, width: 1080, height: 2220 };
+
+  it('row_0 reads its descendants\' union, the dumped bounds kept as cutBounds; a whole row and the header are left as dumped', () => {
+    expect(byId('transactions.list.row_0')).toMatchObject({ rect: { x: 66, y: 403, width: 948, height: 143 }, cutBounds: { x: 66, y: 480, width: 948, height: 66 } });
+    expect(byId('transactions.list.row_1').rect).toEqual({ x: 66, y: 592, width: 948, height: 143 });
+    expect(byId('transactions.list.row_1')).not.toHaveProperty('cutBounds');
+    expect(byId('transactions.list.date_header_0')).not.toHaveProperty('cutBounds');
+    expect([...everyNode(tree)].filter((n) => 'cutBounds' in n)).toHaveLength(1); // absent, not undefined: ui_snapshot prints the tree as JSON
+  });
+
+  it('…so the row reads under the header drawn after it: 66 of its 143 px show', () => {
+    const seen = drawOrder(tree).exposure(byId('transactions.list.row_0'), PIXEL);
+    expect(seen.covers.map(({ node: c }) => c.identifier)).toContain('transactions.list.date_header_0');
+    expect(seen.shows).toBeCloseTo(66 / 143, 9);
+  });
+
+  it('…and `scroll_until id:row_0 fully` turns at once (the label selector\'s measured stroke, content down) instead of "fully visible after 0 swipes"', async () => {
+    const fake = new FakeAdapter({ list: tree }, 'list');
+    const outcome = await scrollUntilVisible(fake, 'id:transactions.list.row_0', { fully: true, maxSwipes: 1, timeoutMs: 2_000, settleMs: 1 }).catch((e: unknown) => e);
+    expect(outcome).toBeInstanceOf(Error);
+    expect(fake.swipes).toHaveLength(1);
+    expect(fake.swipes[0].to.y).toBeGreaterThan(fake.swipes[0].from.y);
+  });
+
+  it('a tap on the widened row aims at the part clear of the header (66 px), and is refused when what shows is under the minimum tap piece (a 30-px strip) — before, it tapped the strip that showed', async () => {
+    const fake = new FakeAdapter({ list: tree }, 'list');
+    await tapElement(fake, 'id:transactions.list.row_0', { ambiguous: 'refuse', timeoutMs: 200, pollMs: 2 });
+    expect(fake.taps).toHaveLength(1);
+    const thin = parseDump(ACCOUNT_DETAIL.replace('bounds="[66,480][1014,546]"', 'bounds="[66,516][1014,546]"').replace('[0,401][1080,480]', '[0,401][1080,516]'));
+    expect(byIdIn(thin, 'transactions.list.row_0').rect).toEqual({ x: 66, y: 403, width: 948, height: 143 });
+    const refused = new FakeAdapter({ list: thin }, 'list');
+    const error = await tapElement(refused, 'id:transactions.list.row_0', { ambiguous: 'refuse', timeoutMs: 200, pollMs: 2 }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('date_header_0');
+    expect(refused.taps).toEqual([]);
+  });
+
+  /** A list holding `rows`, and — when `overlay` — a bar listed after it over the whole list, drawing (it says something), as a sticky header or a tab bar is drawn over the rows it cuts. */
+  const listOf = (rows: string, overlay: boolean) =>
+    parseDump(`<hierarchy rotation="0">
+<node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+  <node class="android.view.View" scrollable="true" bounds="[0,400][1080,2000]">${rows}</node>
+  <node class="android.view.View" resource-id="unscrolled" bounds="[66,2100][1014,2150]"><node class="android.widget.Button" bounds="[66,2050][1014,2150]" /></node>
+  ${overlay ? '<node class="android.view.View" resource-id="overlay" content-desc="Header" bounds="[0,400][1080,2000]" />' : ''}
+</node>
+</hierarchy>`);
+  const ROWS = `
+    <node class="android.view.View" resource-id="cut_row" bounds="[66,1500][1014,1550]"><node class="android.widget.Button" bounds="[66,1450][1014,1550]" /></node>
+    <node class="android.view.View" resource-id="badge_row" bounds="[66,500][1014,600]"><node class="android.widget.TextView" text="badge" bounds="[900,470][1000,530]" /></node>
+    <node class="android.view.View" resource-id="wider_row" bounds="[66,700][1014,760]"><node class="android.widget.Button" bounds="[0,680][1080,760]" /></node>
+    <node class="android.view.View" resource-id="both_sides" bounds="[66,1200][1014,1300]"><node class="android.widget.Button" bounds="[66,1190][1014,1310]" /></node>
+    <node class="android.view.View" resource-id="edge_row" bounds="[66,1950][1014,2000]"><node class="android.widget.Button" bounds="[66,1950][1014,2093]" /></node>
+    <node class="android.view.View" resource-id="overhang" bounds="[0,1900][1080,2060]"><node class="android.widget.Button" bounds="[0,1850][1080,2060]" /></node>
+    <node class="android.view.View" resource-id="top_edge_row" bounds="[0,400][1080,450]"><node class="android.widget.Button" bounds="[0,400][1080,450]" /></node>
+    <node class="android.view.View" resource-id="top_cut_row" bounds="[66,430][1014,470]"><node class="android.widget.Button" bounds="[66,380][1014,470]" /></node>
+    <node class="android.view.View" resource-id="collapsed" bounds="[66,1000][66,1000]"><node class="android.widget.Button" bounds="[66,1000][1014,1100]" /></node>`;
+
+  it('under a node drawn after it: a row whose own button has its exact x and width and reaches past ONE edge is widened along y — no other shape is', () => {
+    const t = listOf(ROWS, true);
+    const of = (id: string) => [...everyNode(t)].find((n) => n.identifier === id)!;
+    expect(of('cut_row')).toMatchObject({ rect: { x: 66, y: 1450, width: 948, height: 100 }, cutBounds: { x: 66, y: 1500, width: 948, height: 50 } });
+    expect(of('badge_row')).not.toHaveProperty('cutBounds'); // a badge hanging off it
+    expect(of('wider_row')).not.toHaveProperty('cutBounds'); // a full-bleed child: not its exact x and width (code review P1)
+    expect(of('wider_row').rect).toEqual({ x: 66, y: 700, width: 948, height: 60 });
+    expect(of('both_sides')).not.toHaveProperty('cutBounds'); // past both edges: overflow, not a cut (code review P3)
+    expect(of('edge_row')).not.toHaveProperty('cutBounds'); // past the list's edge only: the flush probe's case
+    expect(of('collapsed')).not.toHaveProperty('cutBounds');
+    expect(of('unscrolled')).not.toHaveProperty('cutBounds'); // in no scroll container
+    expect(of('top_edge_row')).not.toHaveProperty('cutBounds');
+    // The gained TOP strip is cut at the list's top edge (400): its button dumped from 380 reaches no higher.
+    expect(of('top_cut_row')).toMatchObject({ rect: { x: 66, y: 400, width: 948, height: 70 }, cutBounds: { x: 66, y: 430, width: 948, height: 40 } });
+    // What is gained is cut to the list; what was dumped past it stays: grown up to 1850, its bottom kept at 2060.
+    expect(of('overhang')).toMatchObject({ rect: { x: 0, y: 1850, width: 1080, height: 210 }, cutBounds: { x: 0, y: 1900, width: 1080, height: 160 } });
+  });
+
+  it('…and with nothing listed after it on the strip gained, not even that row: its own overflow, not an overlay\'s cut (code review P3)', () => {
+    expect([...everyNode(listOf(ROWS, false))].filter((n) => 'cutBounds' in n)).toEqual([]);
+  });
+
+  /** One row of a list cut 50 px short of its own button's bottom (1550 of 1600), and `after` listed after the list. */
+  const rowWith = (inList: string, after: string) =>
+    parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+<node class="android.view.View" scrollable="true" bounds="[0,400][1080,2000]">
+ <node class="android.view.View" resource-id="row" bounds="[66,1500][1014,1550]"><node class="android.widget.Button" bounds="[66,1500][1014,1600]" /></node>${inList}
+</node>${after}
+</node></hierarchy>`);
+  const rowOf = (t: UiNode) => [...everyNode(t)].find((n) => n.identifier === 'row')!;
+
+  it('the parser widens only where the draw order says something is drawn over the strip: a screen-sized snackbar host listed after the list, its snackbar elsewhere, draws nothing there — the row stays as dumped and ui_snapshot shows no cutBounds', () => {
+    const t = rowWith('', `<node class="android.view.View" resource-id="host" bounds="[0,0][1080,2220]"><node class="android.view.View" resource-id="snack" content-desc="Saved" bounds="[30,2050][1050,2180]" /></node>`);
+    expect(rowOf(t).rect).toEqual({ x: 66, y: 1500, width: 948, height: 50 });
+    expect(rowOf(t)).not.toHaveProperty('cutBounds');
+  });
+
+  it('…nor a bare structural overlay (childless, nothing said, no id) — and the same overlay saying something, or a host whose tab lies on the strip, still widens it', () => {
+    expect(rowOf(rowWith('', '<node class="android.view.View" bounds="[0,1540][1080,2000]" />'))).not.toHaveProperty('cutBounds');
+    expect(rowOf(rowWith('', '<node class="android.view.View" resource-id="overlay" content-desc="Banner" bounds="[0,1540][1080,2000]" />'))).toHaveProperty('cutBounds');
+    const tabHost = '<node class="android.view.View" bounds="[0,0][1080,2220]"><node class="android.view.View" resource-id="tabs" bounds="[66,1550][1014,1800]"><node class="android.view.View" content-desc="Home" bounds="[100,1560][300,1700]" /></node></node>';
+    expect(rowOf(rowWith('', tabHost))).toMatchObject({ rect: { x: 66, y: 1500, width: 948, height: 100 }, cutBounds: { x: 66, y: 1500, width: 948, height: 50 } });
+  });
+
+  it('a bare overlay the app NAMED (only an id), in a classic run listed in location order (the root: the list, then the overlay, one left edge, the higher top first — marked readingOrder, D75): drawn, as LR3 has it under WDA, so the row widens', () => {
+    const t = rowWith('', '<node class="android.view.View" resource-id="overlay" bounds="[0,1540][1080,2000]" />');
+    expect(t.readingOrder).toBe(true);
+    expect(rowOf(t)).toHaveProperty('cutBounds');
+  });
+
+  it('every target-column excuse applies, those measured on iOS too: a childless full-screen scrim listed after the list widens nothing, nor a classic list sheet (a RecyclerView) whose rows lie on the strip — its rows are another scroller\'s content, its frame no surface', () => {
+    expect(rowOf(rowWith('', '<node class="android.view.View" resource-id="scrim" bounds="[0,0][1080,2220]" />'))).not.toHaveProperty('cutBounds');
+    const sheet = `<node class="androidx.recyclerview.widget.RecyclerView" resource-id="sheet" scrollable="false" bounds="[0,1520][1080,2220]">
+  <node class="android.widget.TextView" resource-id="sheet_row" text="Share" bounds="[0,1540][1080,1700]" />
+</node>`;
+    expect(rowOf(rowWith('', sheet))).not.toHaveProperty('cutBounds');
+  });
+
+  it('…unless the sheet lies in a LATER stacked screen: the same RecyclerView sheet wrapped in a full-screen layer, over a list in the screen\'s own full-screen layer, widens the row (draw-order.ts\'s scrolledContent row)', () => {
+    const t = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+<node class="android.view.View" bounds="[0,0][1080,2220]">
+ <node class="android.view.View" scrollable="true" bounds="[0,400][1080,2000]">
+  <node class="android.view.View" resource-id="row" bounds="[66,1500][1014,1550]"><node class="android.widget.Button" bounds="[66,1500][1014,1600]" /></node>
+ </node>
+</node>
+<node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+ <node class="androidx.recyclerview.widget.RecyclerView" resource-id="sheet" scrollable="false" bounds="[0,1520][1080,2220]">
+  <node class="android.widget.TextView" resource-id="sheet_row" text="Share" bounds="[0,1540][1080,1700]" />
+ </node>
+</node>
+</node></hierarchy>`);
+    expect(rowOf(t)).toMatchObject({ rect: { x: 66, y: 1500, width: 948, height: 100 }, cutBounds: { x: 66, y: 1500, width: 948, height: 50 } });
+  });
+
+  it('the strip is judged with the dump\'s mark in place (paddedTouchTargets): a label cut short of its text whose own icon button, padded evenly in their wrapper and centred on it, lies on the strip is not widened under its own control', () => {
+    const t = rowWith(`
+ <node class="android.view.View" resource-id="wrapper" bounds="[100,1000][400,1300]">
+  <node class="android.view.View" resource-id="label" bounds="[150,1100][350,1200]"><node class="android.widget.TextView" text="Edit" bounds="[150,1050][350,1200]" /></node>
+  <node class="android.widget.Button" bounds="[150,1050][350,1250]" />
+ </node>`, '');
+    expect([...everyNode(t)].find((n) => n.identifier === 'label')).not.toHaveProperty('cutBounds');
+  });
+
+  it('the residual, pinned (permanent): the NEXT row of the same list, listed after the row and lying on the strip its touch target overflows into, is drawn there exactly as a sticky header is — the row is widened as if cut', () => {
+    const t = rowWith('<node class="android.view.View" resource-id="next" content-desc="Next" bounds="[66,1550][1014,1700]" />', '');
+    expect(rowOf(t)).toMatchObject({ rect: { x: 66, y: 1500, width: 948, height: 100 }, cutBounds: { x: 66, y: 1500, width: 948, height: 50 } });
+  });
+
+  it('the parser asks the port it is handed, once per dump, with the tree as read and each candidate\'s gained strip — and widens exactly where it answers yes', () => {
+    const xml = `<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+<node class="android.view.View" scrollable="true" bounds="[0,400][1080,2000]">
+ <node class="android.view.View" resource-id="row" bounds="[66,1500][1014,1550]"><node class="android.widget.Button" bounds="[66,1500][1014,1600]" /></node>
+</node></node></hierarchy>`;
+    const asked: { root: UiNode; node: string | null; strip: Rect }[] = [];
+    const marked: (true | undefined)[] = [];
+    const judge = (answer: boolean) => (root: UiNode) => {
+      marked.push(root.paddedTouchTargets);
+      return (node: UiNode, strip: Rect) => {
+        asked.push({ root, node: node.identifier, strip });
+        return answer;
+      };
+    };
+    const no = parseUiautomatorXml(xml, judge(false));
+    expect(rowOf(no)).not.toHaveProperty('cutBounds');
+    expect(asked).toEqual([{ root: no, node: 'row', strip: { x: 66, y: 1550, width: 948, height: 50 } }]);
+    expect(rowOf(parseUiautomatorXml(xml, judge(true)))).toHaveProperty('cutBounds');
+    expect(marked).toEqual([true, true]); // one tree per dump, the root's mark set before the judge reads it
+  });
+
+  it('the residual, pinned (review round 2): a card cut at BOTH ends — between the sticky header and the floating tab bar, dumped 66,480 948x1360 over its own 66,420 948x1480 — is not widened and reads whole', () => {
+    const t = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+<node class="android.view.View" scrollable="true" bounds="[0,401][1080,2154]">
+ <node class="android.view.View" resource-id="card" bounds="[66,480][1014,1840]"><node class="android.widget.Button" bounds="[66,420][1014,1900]" /></node>
+ <node class="android.view.View" resource-id="date_header_0" bounds="[0,401][1080,480]" />
+</node>
+<node class="android.view.View" resource-id="tab_bar_host" bounds="[66,1840][1014,2088]" />
+</node></hierarchy>`);
+    const card = [...everyNode(t)].find((n) => n.identifier === 'card')!;
+    expect(card.rect).toEqual({ x: 66, y: 480, width: 948, height: 1360 });
+    expect(card).not.toHaveProperty('cutBounds');
+    expect(drawOrder(t).exposure(card, PIXEL).shows).toBe(1);
+  });
+
+  it('code review P1: a card whose carousel breaks out of its padding is not widened sideways — its own button still spans it, and the button\'s label shows whole (the round-6 own-button refusal stays fixed)', () => {
+    const t = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+<node class="android.view.View" scrollable="true" bounds="[0,400][1080,2000]">
+ <node class="android.view.View" resource-id="card" bounds="[66,500][1014,900]">
+  <node class="android.widget.TextView" text="Pay now" bounds="[100,520][980,600]" />
+  <node class="android.widget.Button" bounds="[66,500][1014,620]" />
+  <node class="android.view.View" scrollable="true" resource-id="carousel" bounds="[0,640][1080,880]" />
+ </node>
+</node></node></hierarchy>`);
+    const card = [...everyNode(t)].find((n) => n.identifier === 'card')!;
+    expect(card.rect).toEqual({ x: 66, y: 500, width: 948, height: 400 });
+    expect(card).not.toHaveProperty('cutBounds');
+    const label = [...everyNode(t)].find((n) => n.label === 'Pay now')!;
+    expect(drawOrder(t).exposure(label, PIXEL)).toMatchObject({ covers: [], shows: 1 });
+  });
+
+  it('code review P3: a full-width child overflowing its row by 10 px each side does not widen the row over the next one — row_a is not covered by row_b', () => {
+    const t = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+<node class="android.view.View" scrollable="true" bounds="[0,400][1080,2000]">
+ <node class="android.view.View" resource-id="row_a" bounds="[0,600][1080,705]">
+  <node class="android.view.View" content-desc="A" clickable="true" bounds="[0,590][1080,716]" />
+ </node>
+ <node class="android.view.View" resource-id="row_b" bounds="[0,705][1080,810]">
+  <node class="android.view.View" content-desc="B" clickable="true" bounds="[0,695][1080,821]" />
+ </node>
+</node></node></hierarchy>`);
+    const a = [...everyNode(t)].find((n) => n.identifier === 'row_a')!;
+    expect(a.rect).toEqual({ x: 0, y: 600, width: 1080, height: 105 });
+    expect(drawOrder(t).exposure(a, PIXEL).covers.map(({ node: c }) => c.identifier)).not.toContain('row_b');
+  });
+
+  it('the round-5 ui_snapshots, re-dumped through the parser: only the two rows cut at the floating tab bar widen — every other rect, Contacts\' padded icons (wrapper 132, control 110, label 66) and the IME-cut "Add fields"/"Add phone" among them, stays as dumped', async () => {
+    const fixture = JSON.parse(await readFile(new URL('../fixtures/android-ui-snapshot-compose.json', import.meta.url), 'utf8')) as { screens: Record<string, UiNode> };
+    const CLASS: Record<string, string> = { button: 'android.widget.Button', text: 'android.widget.TextView', textfield: 'android.widget.EditText', image: 'android.widget.ImageView' };
+    const attr = (v: string) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    const toXml = (n: UiNode): string => {
+      const { x, y, width, height } = n.rect;
+      const attrs = [
+        `class="${CLASS[n.role] ?? 'android.view.View'}"`,
+        `bounds="[${x},${y}][${x + width},${y + height}]"`,
+        n.identifier !== null ? `resource-id="${attr(n.identifier)}"` : '',
+        n.label !== null ? `content-desc="${attr(n.label)}"` : '',
+        n.clipsDescendants === true ? 'scrollable="true"' : '',
+      ].join(' ');
+      return `<node ${attrs}>${n.children.map(toXml).join('')}</node>`;
+    };
+    const widened: string[] = [];
+    for (const [screen, dumped] of Object.entries(fixture.screens)) {
+      const parsed = parseDump(`<hierarchy rotation="0">${toXml(dumped)}</hierarchy>`);
+      const before = [...everyNode(dumped)];
+      const after = [...everyNode(parsed)];
+      expect(after).toHaveLength(before.length);
+      after.forEach((n, i) => {
+        if (n.cutBounds === undefined) expect(n.rect).toEqual(before[i].rect);
+        else {
+          expect(n.cutBounds).toEqual(before[i].rect);
+          widened.push(`${screen} ${n.identifier} ${n.rect.y} ${n.rect.height}`);
+        }
+      });
+    }
+    expect(widened).toEqual(['accountDetail transactions.list.row_29 1784 143', 'accountDetail transactions.list.row_30 2044 143']);
+  });
+});
+
+describe('parseUiautomatorXml — bounds dumped inverted are a node clipped out of its container (docs/bugs/2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md)', () => {
+  // Settings' homepage, its first rows scrolled under the collapsing app bar (run9-android, 5e5a3d1): uiautomator's raw bounds.
+  const SETTINGS = `<hierarchy rotation="0">
+<node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+  <node class="android.view.View" resource-id="com.android.settings:id/collapsing_toolbar" bounds="[0,66][1080,297]">
+    <node class="android.widget.TextView" resource-id="com.android.settings:id/homepage_title" text="Settings" bounds="[66,66][428,44]" />
+  </node>
+  <node class="androidx.recyclerview.widget.RecyclerView" resource-id="com.android.settings:id/recycler_view" scrollable="true" bounds="[0,297][1080,2220]">
+    <node class="android.widget.LinearLayout" bounds="[0,297][1080,58]">
+      <node class="android.widget.TextView" resource-id="android:id/title" text="Apps" bounds="[198,297][324,58]" />
+      <node class="android.widget.TextView" resource-id="android:id/summary" text="Assistant, recent apps, default apps" bounds="[198,297][819,111]" />
+    </node>
+    <node class="android.widget.LinearLayout" bounds="[0,400][1080,600]"><node class="android.widget.TextView" text="Display" bounds="[198,450][400,520]" /></node>
+    <node class="android.widget.LinearLayout" bounds="[0,2400][1080,2220]"><node class="android.widget.TextView" text="System" bounds="[198,2450][400,2220]" /></node>
+    <node class="android.widget.HorizontalScrollView" bounds="[1200,500][1080,600]" />
+  </node>
+</node>
+</hierarchy>`;
+  const tree = parseDump(SETTINGS);
+  const byLabel = (label: string) => [...everyNode(tree)].find((n) => n.label === label)!;
+
+  it('clamped to zero size at the container\'s edge, the side it lies past kept: above (Apps, its summary, the title under the app bar), below (System), right of', () => {
+    expect(byLabel('Apps')).toMatchObject({ rect: { x: 198, y: 297, width: 126, height: 0 }, clippedOut: 'top' });
+    expect(byLabel('Assistant, recent apps, default apps')).toMatchObject({ rect: { x: 198, y: 297, width: 621, height: 0 }, clippedOut: 'top' });
+    expect(byLabel('Settings')).toMatchObject({ rect: { x: 66, y: 66, width: 362, height: 0 }, clippedOut: 'top' });
+    expect(byLabel('System')).toMatchObject({ rect: { x: 198, y: 2220, width: 202, height: 0 }, clippedOut: 'bottom' });
+    const sideways = tree.children[1].children[3];
+    expect(sideways).toMatchObject({ rect: { x: 1080, y: 500, width: 0, height: 100 }, clippedOut: 'right' });
+  });
+
+  it('no negative side anywhere; a node dumped the right way round carries no mark', () => {
+    for (const n of everyNode(tree)) expect([n.rect.width, n.rect.height].every((side) => side >= 0)).toBe(true);
+    expect(byLabel('Display')).not.toHaveProperty('clippedOut');
+    expect(byLabel('Display').rect).toEqual({ x: 198, y: 450, width: 202, height: 70 });
+  });
+
+  it('tap text:"Apps" says where it went and the way back — not "0×0"', async () => {
+    const error = await resolveSettled(new FakeAdapter({ s: tree }, 's'), 'text:"Apps"', { ambiguous: 'refuse', timeoutMs: 20, pollMs: 2 }).catch((e: unknown) => e);
+    expect((error as Error).message).toBe(
+      'Timed out after 20ms waiting for element text:"Apps" to appear\n  (it matched only nodes clipped out above its scroll container (scrolled past it) — scroll_until it with direction: "up" first)',
+    );
+  });
+});
+
+describe('parseUiautomatorXml — character references in attribute values', () => {
+  // uiautomator writes a newline, a tab and any code point outside the BMP (an emoji) as a numeric
+  // character reference; the tree holds the character, as the same string reads on iOS.
+  const xml = `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="app" content-desc="" bounds="[0,0][1080,2220]">
+    <node index="0" text="Welcome.&#10;&#10;Sign in to continue." resource-id="" class="android.widget.TextView" package="app" content-desc="" bounds="[0,100][1080,300]"/>
+    <node index="1" text="" resource-id="app:id/account" class="android.widget.FrameLayout" package="app" content-desc="Signed in as Jane Doe&#10;Account and settings." clickable="true" bounds="[900,100][1040,200]"/>
+    <node index="2" text="Name&#9;Value" resource-id="" class="android.widget.TextView" package="app" content-desc="" bounds="[0,300][1080,350]"/>
+    <node index="3" text="&#x1F1FA;&#x1F1F8; +1" resource-id="" class="android.widget.TextView" package="app" content-desc="" bounds="[0,350][1080,375]"/>
+    <node index="4" text="" resource-id="" class="android.widget.ImageView" package="app" content-desc="&#127482;&#127480;" bounds="[0,375][1080,400]"/>
+    <node index="5" text="&amp;#10; is how XML spells a newline" resource-id="" class="android.widget.TextView" package="app" content-desc="" bounds="[0,400][1080,450]"/>
+    <node index="6" text="Wallpaper &amp; style &lt;new&gt;" resource-id="" class="android.widget.TextView" package="app" content-desc="" bounds="[0,450][1080,500]"/>
+    <node index="7" text="" hint="Line one&#10;line two" resource-id="app:id/notes&#46;input" class="android.widget.EditText" package="app" content-desc="" bounds="[0,500][1080,600]"/>
+  </node>
+</hierarchy>`;
+  const [welcome, account, tabbed, hexFlag, decimalFlag, literal, named, notes] = parseDump(xml).children;
+
+  it('a newline in text and in content-desc is the newline itself', () => {
+    expect(welcome.label).toBe('Welcome.\n\nSign in to continue.');
+    expect(account.label).toBe('Signed in as Jane Doe\nAccount and settings.');
+  });
+
+  it('a tab', () => {
+    expect(tabbed.label).toBe('Name\tValue');
+  });
+
+  it('an emoji spelled as hex references, in text', () => {
+    expect(hexFlag.label).toBe('\u{1F1FA}\u{1F1F8} +1');
+  });
+
+  it('the same emoji spelled as decimal references, in content-desc', () => {
+    expect(decimalFlag.label).toBe('\u{1F1FA}\u{1F1F8}');
+  });
+
+  it('every attribute: resource-id and hint too', () => {
+    expect(notes).toMatchObject({ identifier: 'notes.input', placeholder: 'Line one\nline two' });
+  });
+
+  it('text that really reads `&#10;` (dumped as `&amp;#10;`) stays those five characters — decoded once, not twice', () => {
+    expect(literal.label).toBe('&#10; is how XML spells a newline');
+  });
+
+  it('the XML named entities decode as before', () => {
+    expect(named.label).toBe('Wallpaper & style <new>');
+  });
+});
+
+describe('parseUiautomatorXml — a text input\'s hint (2026-10-09)', () => {
+  // docs/bugs/2026-10-09-android-clear-reads-edittext-hint-as-content.md: the
+  // API 33 dump of an EMPTY EditText carries its hint as `text` and no `hint`
+  // attribute (the first node below is that measured shape). A dump that
+  // names the hint gets it as the node's placeholder — on text inputs only.
+  const xml = `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="app" content-desc="" bounds="[0,0][1080,2220]">
+    <node index="0" text="Last name" resource-id="" class="android.widget.EditText" package="com.google.android.contacts" content-desc="" focused="true" bounds="[132,1223][948,1383]"/>
+    <node index="1" text="Search settings" hint="Search settings" resource-id="com.android.settings:id/open_search_view_edit_text" class="android.widget.EditText" package="com.android.settings" content-desc="" bounds="[0,0][1080,150]"/>
+    <node index="2" text="wifi" hint="Search settings" resource-id="app:id/filled" class="android.widget.EditText" package="app" content-desc="" bounds="[0,200][1080,350]"/>
+    <node index="3" text="Hello" hint="ignored" resource-id="app:id/label" class="android.widget.TextView" package="app" content-desc="" bounds="[0,400][1080,450]"/>
+    <node index="4" text="x" hint="" resource-id="app:id/blank_hint" class="android.widget.EditText" package="app" content-desc="" bounds="[0,500][1080,550]"/>
+  </node>
+</hierarchy>`;
+  const [measured, hinted, filled, textView, blankHint] = parseDump(xml).children;
+
+  it('the measured API 33 shape: the hint is the value, and nothing says so', () => {
+    expect(measured).toMatchObject({ role: 'textfield', value: 'Last name' });
+    expect(measured).not.toHaveProperty('placeholder');
+  });
+
+  it('a dump\'s `hint` attribute rides beside the value on a text input, the value as dumped', () => {
+    expect(hinted).toMatchObject({ role: 'textfield', identifier: 'open_search_view_edit_text', value: 'Search settings', placeholder: 'Search settings' });
+    expect(filled).toMatchObject({ value: 'wifi', placeholder: 'Search settings' });
+  });
+
+  it('not on a non-input, and not when the attribute is empty', () => {
+    expect(textView).toMatchObject({ role: 'text', label: 'Hello' });
+    expect(textView).not.toHaveProperty('placeholder');
+    expect(blankHint).not.toHaveProperty('placeholder');
+  });
+});

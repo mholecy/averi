@@ -430,7 +430,7 @@ class PixelPollMemory {
  *
  * The reading's two rects are in the same units: on Android both are device
  * pixels, read from the same `[l,t][r,b]` notation by the same
- * `parseBounds` (adapters/android.ts — a uiautomator node's `bounds` and
+ * `parseBounds` (adapters/android-bounds.ts — a uiautomator node's `bounds` and
  * the IME `InsetsSource` entry's `frame=`); on iOS both are points of one
  * WDA tree; and the tree rect reaches this poll unscaled. `state()` never
  * throws (KeyboardOracle's contract), so no catch. A floating keyboard's

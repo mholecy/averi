@@ -270,7 +270,7 @@ function overhangs(tree: UiNode, window: Rect): boolean {
  * The root is it when the root has one. When the root has NO usable rect the
  * window is one level down: idb's flat `describe-all` and uiautomator's
  * multi-root dump are normalized under a synthetic 0x0 root (adapters/ios-tree-source.ts,
- * adapters/android.ts), and WDA's live /source roots a sheet tree in a node
+ * adapters/android-tree-dialect.ts), and WDA's live /source roots a sheet tree in a node
  * carrying no `rect` at all, which the parser zero-fills — in all three the
  * real window sits among the children (measured: the iOS filter
  * sheet's `Application "Skeleton Internal"` at {0,0,402,874}).
@@ -794,7 +794,7 @@ export interface Clips {
    * that rect, as `DrawOrder.drawnOver` finds its container — for `scroll_until`'s stroke plan
    * (interact/stroke-plan.ts#strokeRoom): the axis it scrolls on, and every scroll view nested in it (its descendants
    * that scroll, at any depth; one of its own rect left out; a text input left out — a Compose text field dumps as a
-   * scrolling (Horizontal)ScrollView, role `textfield` (`INPUT_ROLE`), adapters/android.ts — so a stroke the plan sends
+   * scrolling (Horizontal)ScrollView, role `textfield` (`INPUT_ROLE`), adapters/android-tree-dialect.ts — so a stroke the plan sends
    * inside a nested scroll view never lands in a field, D59b; Android's case: WDA marks no node clipping, and a
    * scrolling WDA text view is a scroll view of its own role) with theirs, each as scroll-containers.ts#scrollAxis says
    * on this tree's dialect (`unclipped`), undefined where it cannot tell. Undefined when the tree holds no scroll
@@ -1279,7 +1279,7 @@ export interface Cut {
  * - At ANY edge, with no area: it was dumped wholly past THIS edge
  *   (`UiNode.clippedOut` equal to it) and clamped onto it, within a pixel.
  *   The parser clamps every node uiautomator
- *   dumped inverted to zero size at the clip (adapters/android.ts
+ *   dumped inverted to zero size at the clip (adapters/android-tree-dialect.ts
  *   #nodeBounds), so the content past the edge reaches here with no rect to
  *   lie past it with: a classic-View Settings row cut to `0,297 1080x33` at
  *   its list's top, its icon cut with it to the row's own height, its title
@@ -1316,7 +1316,7 @@ export interface Cut {
  * with it, never past — unless one lies wholly past it, dumped inverted:
  * then its `clippedOut` is the evidence), and so does a node whose
  * descendant was dumped inverted on BOTH axes and is cut at a side: the
- * parser names the vertical side (android.ts#nodeBounds, `vertical ??
+ * parser names the vertical side (android-tree-dialect.ts#nodeBounds, `vertical ??
  * sideways`), so a card cut to 40 px at a carousel's left edge, its title
  * dumped `[0,450][-100,440]`, carries `clippedOut: 'top'` and its left cut
  * is missed. The other way, a whole node whose content runs to its top or

@@ -5,7 +5,7 @@ Status: accepted, 2026-10-12 (owner).
 ## Context
 
 The Android adapter reads a bottom system band beside the status band. It is the visible navigation bar's frame, ending
-at the screen's bottom (`adapters/android.ts#parseNavigationBand`). Two measurements on a 2220-px Pixel_3a led to this
+at the screen's bottom (`adapters/android-wm.ts#parseNavigationBand`). Two measurements on a 2220-px Pixel_3a led to this
 decision:
 
 - On mp-native's Account Detail, drawn edge to edge, `row_4` lies wholly in 2154–2220, under the navigation bar. A tap

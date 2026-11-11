@@ -59,7 +59,7 @@ export const CLASSIC_VIEWS = {
  * (`[0,297][1080,330]`) and its icon with it (`[66,297][132,330]`, the
  * row's own height: no inside evidence), while the title and the summary,
  * wholly above the cut, come out inverted and are clamped to zero area at
- * 297 with `clippedOut: 'top'` (android.ts#nodeBounds) — the only evidence
+ * 297 with `clippedOut: 'top'` (android-tree-dialect.ts#nodeBounds) — the only evidence
  * of the cut the dump gives. The row below is whole.
  */
 export const SETTINGS_ROW_SLIVER = `<hierarchy rotation="0">

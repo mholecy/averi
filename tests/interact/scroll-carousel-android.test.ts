@@ -316,7 +316,7 @@ describe('course.ts#unknownCentreNeeds — what one more stroke needs for a targ
 /**
  * D59: the same E2 course on a carousel the tree does not say scrolls sideways — the lab's `carousel-lazy-free`, a
  * Compose LazyRow dumped as a plain `android.view.View` (tests/fixtures/uiautomator-lab-carousel-lazy-free-launch.xml,
- * no axis: adapters/android.ts's AXIS_BY_CLASS names none). Its axis is inferred from the call's own evidence
+ * no axis: adapters/android-tree-dialect.ts's AXIS_BY_CLASS names none). Its axis is inferred from the call's own evidence
  * (interact/unfit-axis.ts#inferredAlong): the carousel is C's nearest scroll view, the call runs along x, C is cut at
  * the carousel's own edge, and a stroke over the carousel earlier in this call moved C along x. batch-9's record
  * (tests/fixtures/d59-b9-lazy-predrag.json) ran 6 strokes and 3 turns to maxSwipes on it.

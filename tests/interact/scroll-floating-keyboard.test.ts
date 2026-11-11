@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { KeyboardTouchable, Point, Rect, SoftKeyboard } from '../../src/adapters/types.js';
-import { parseTouchableRegion } from '../../src/adapters/android.js';
+import { parseTouchableRegion } from '../../src/adapters/android-wm.js';
 import { describeScrollResult, scrollUntilVisible } from '../../src/interact/scroll.js';
 import { GBOARD, GBOARD_PANEL, GBOARD_STRIP } from '../helpers/android-dumps.js';
 import { FakeAdapter, node, resetLayout } from '../helpers/fake.js';

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DeviceScreen, FocusedWindow, UiNode } from '../../src/adapters/types.js';
-import { parseFocusedWindow } from '../../src/adapters/android.js';
+import { parseFocusedWindow } from '../../src/adapters/android-wm.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
 import { walkOf } from '../../src/ui-tree/placed.js';
 import { presentationOf } from '../../src/ui-tree/presentation.js';

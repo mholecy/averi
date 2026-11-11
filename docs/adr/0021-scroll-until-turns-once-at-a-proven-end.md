@@ -34,7 +34,7 @@ implemented on `feat/d59`); it narrows residual 3, whose accepted text stands.
 coordinator's decision, owner's mandate: backlog D68's option B, its second slice; implemented on `feat/d68`); it
 narrows residual 3 again, whose accepted text stands.
 2026-11-11 (performance backlog T6d): the amendment "a golden row for D52's `unfit`" (below): a lab cell, a golden row
-and their pins; src's behaviour unchanged, src only exporting android.ts#AXIS_BY_CLASS for the harness to read;
+and their pins; src's behaviour unchanged, src only exporting android-tree-dialect.ts#AXIS_BY_CLASS for the harness to read;
 implemented on `feat/t6d-unfit-cell`. Its capture is the owner's.
 
 ## Context
@@ -764,7 +764,7 @@ also View-cut flush, never `clipped`.
    as a region, outside unfitAlong. Along an axis, vertical first, the frame runs past the drawn frame, with both its
    sides on the screen. The room-giver is the smallest of its scroll views along that axis, and the tree tells its axis
    as that one (`scrollAxisToldIn` in scripts/truth/truth.ts: a `scrollable` uiautomator node at that rect whose class
-   fixes its axis, by src's own android.ts#AXIS_BY_CLASS). The drawn frame and the frame are each at least that room
+   fixes its axis, by src's own android-tree-dialect.ts#AXIS_BY_CLASS). The drawn frame and the frame are each at least that room
    less 1 (FIT_ROOM_PX): an outer scroll view that cuts the room shorter keeps R-fully. The row asks `fully: true`
    toward the cut side and expects `unfit` (`carouselReply` in scripts/truth/replies.ts) after no swipe, with no
    inferred-axis clause. Any other reply is red, its kind said.

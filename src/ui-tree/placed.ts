@@ -124,7 +124,7 @@ export const isUnnamedWrapper = (n: UiNode): boolean => STRUCTURAL_ROLES.has(n.r
 /**
  * A descendant that cannot be an item, and the wrapper a field's outermost self passes through (draw-order.ts's
  * `nothingBut`): an unnamed wrapper (`isUnnamedWrapper`) of the named wrapper type, `container` — not `other`, the
- * role the sources give a node they know no type for (adapters/android.ts: a class off the role map with no children;
+ * role the sources give a node they know no type for (adapters/android-tree-dialect.ts: a class off the role map with no children;
  * adapters/ios-node.ts: a type off its map), which may be something drawn rather than a wrapper (draw-order.ts's
  * `itemlessToolbar` row).
  */

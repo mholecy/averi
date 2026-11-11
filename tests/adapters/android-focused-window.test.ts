@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { AndroidAdapter, FOCUSED_WINDOW_COMMAND, parseFocusedWindow } from '../../src/adapters/android.js';
+import { AndroidAdapter } from '../../src/adapters/android.js';
+import { FOCUSED_WINDOW_COMMAND, parseFocusedWindow } from '../../src/adapters/android-wm.js';
 import { ExecError, type ExecFn } from '../../src/adapters/exec.js';
 import { WINDOW_MANAGER_WORD } from '../../scripts/truth/schema.js';
 import { drawnOverStrip } from '../helpers/android-dumps.js';

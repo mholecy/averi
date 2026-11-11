@@ -1,4 +1,4 @@
-import { parseUiautomatorXml } from '../../src/adapters/android.js';
+import { parseUiautomatorXml } from '../../src/adapters/android-tree-dialect.js';
 import type { UiNode } from '../../src/adapters/types.js';
 import { drawnOverStrip } from '../../src/ui-tree/draw-order.js';
 
@@ -12,6 +12,20 @@ export { drawnOverStrip };
 
 /** `parseUiautomatorXml` with the port production wires — what a test parses a dump with. */
 export const parseDump = (xml: string): UiNode => parseUiautomatorXml(xml, drawnOverStrip);
+
+/** `uiautomator dump /dev/tty` as exec-out prints it, trimmed from a real one: hierarchy root, nested nodes, PIN field, button. */
+export const UIAUTOMATOR_XML = `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="md.bank.app" content-desc="" bounds="[0,0][1080,2400]">
+    <node index="0" text="" resource-id="md.bank.app:id/pin_keyboard" class="android.view.ViewGroup" package="md.bank.app" content-desc="PIN keyboard" bounds="[0,1200][1080,2400]">
+      <node index="0" text="1" resource-id="md.bank.app:id/pin_key_1" class="android.widget.Button" package="md.bank.app" content-desc="" bounds="[0,1200][360,1500]"/>
+      <node index="1" text="2" resource-id="md.bank.app:id/pin_key_2" class="android.widget.Button" package="md.bank.app" content-desc="" bounds="[360,1200][720,1500]"/>
+    </node>
+    <node index="1" text="user@bank.md" resource-id="md.bank.app:id/username_field" class="android.widget.EditText" package="md.bank.app" content-desc="" bounds="[100,400][980,520]"/>
+    <node index="2" text="Log in" resource-id="" class="android.widget.TextView" package="md.bank.app" content-desc="" bounds="[100,600][980,700]"/>
+  </node>
+</hierarchy>
+UI hierchary dumped to: /dev/tty`;
 
 /**
  * The line `adb shell "dumpsys input_method | grep -m1 mInputShown"` prints —

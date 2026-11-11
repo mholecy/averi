@@ -4,7 +4,7 @@ import { everyNode, KEYBOARD_ROLE, type KeyboardWitness, type SoftKeyboard, type
 import { drawOrder, type DrawOrder } from '../../src/ui-tree/draw-order.js';
 import { readKeyboard, type KeyboardCover, type KeyboardReading } from '../../src/ui-tree/keyboard-cover.js';
 import { coverLine, keyboardPosition, type KeyboardLine } from '../../src/ui-tree/keyboard-position.js';
-import { parseInputShown, parseTouchableRegion } from '../../src/adapters/android.js';
+import { parseInputShown, parseTouchableRegion } from '../../src/adapters/android-wm.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { strokeLine } from '../../src/interact/scroll-read.js';

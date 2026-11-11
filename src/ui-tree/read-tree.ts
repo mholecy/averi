@@ -503,7 +503,7 @@ export function sameTreeWithinPixel(a: UiNode, b: UiNode): boolean {
 
 /**
  * The tree shows a progress indicator: a `progress` node with area —
- * Android's ProgressBar (adapters/android.ts's role map), which a Compose
+ * Android's ProgressBar (adapters/android-tree-dialect.ts's role map), which a Compose
  * CircularProgressIndicator / LinearProgressIndicator also dumps as (its
  * progress-range semantics give the node that class name); iOS's
  * ProgressIndicator; through WDA an ActivityIndicator — React Native's

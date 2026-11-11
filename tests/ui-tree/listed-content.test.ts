@@ -92,7 +92,7 @@ describe('Clips.contentToward — blank: the scroll view lists none of its conte
 
 describe('Clips.contentToward — a scroll view of the other axis holding one that may scroll on the stroke\'s (uiautomator)', () => {
   /**
-   * A classic tab screen: a ViewPager (horizontal by its class, adapters/android.ts#AXIS_BY_CLASS) at 0,200 1080x1800
+   * A classic tab screen: a ViewPager (horizontal by its class, adapters/android-tree-dialect.ts#AXIS_BY_CLASS) at 0,200 1080x1800
    * holding a RecyclerView of its very rect, the vertical list a down stroke moves. The pager is the scroll view of
    * that rect the tree lists first, so the stroke's `within` names it: its read must still answer `blank` when the
    * list under it lists none of its content (lab note LV1's shape under a pager), and `listed` when it does. A

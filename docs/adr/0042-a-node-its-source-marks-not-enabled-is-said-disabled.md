@@ -11,7 +11,7 @@ one optional field, `disabled?: true`. No tool description changes.
 - Every tree source says whether an element is enabled, and no parser carried it. uiautomator prints
   `enabled="true"/"false"` on every node; WDA's `/source` prints `isEnabled` as `"1"`/`"0"` (a string, like
   `isVisible`, and a `NotEnabled` trait beside it); idb's `describe-all --json` prints `enabled` as a JSON boolean on
-  every element of a full capture. `android.ts#normalizeNode`, `wda-source.ts#toUiNode` and
+  every element of a full capture. `android-tree-dialect.ts#normalizeNode`, `wda-source.ts#toUiNode` and
   `ios-tree-source.ts#idbTree` dropped it.
 - So a tap on a disabled control replied a bare `Tapped` while nothing happened. Batch-10's chooser dump
   (`tests/fixtures/uiautomator-lab-resolver.xml`, API 33, the fresh layout) holds "Just once" and "Always"
@@ -31,7 +31,7 @@ one optional field, `disabled?: true`. No tool description changes.
 **A node its source marks not enabled carries `disabled: true`; absent is enabled or unknown, never `false`. One
 line per parser reads it:**
 
-- uiautomator: `enabled === 'false'` (`android.ts#normalizeNode`).
+- uiautomator: `enabled === 'false'` (`android-tree-dialect.ts#normalizeNode`).
 - WDA: `isEnabled` `"0"` or `0`, through the file's one flag reading (`wda-source.ts#isZero`, as `isVisible` is read).
   The `NotEnabled` trait agrees in both captures and is not read: one field, one rule.
 - idb: `enabled === false`, strictly (`ios-tree-source.ts#idbTree`).

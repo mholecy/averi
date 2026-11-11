@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { everyNode, type FocusedWindow, type UiNode } from '../../src/adapters/types.js';
-import { parseFocusedWindow } from '../../src/adapters/android.js';
+import { parseFocusedWindow } from '../../src/adapters/android-wm.js';
 import { markByWindow, markedForMiss } from '../../src/ui-tree/window-mark.js';
 import { missNote, missOf, presentedAloneHeadline, type Miss } from '../../src/ui-tree/miss.js';
 import { presentationOf } from '../../src/ui-tree/presentation.js';

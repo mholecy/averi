@@ -213,7 +213,7 @@ export interface DrawOrder {
    * target (`NOT_DRAWN`'s `target` column, judged with `node` as the
    * target). Unlike `exposure`, `region` may lie anywhere — outside `node`'s
    * own rect too: the uiautomator parser asks it of the strip a node cut
-   * short of its own content would gain (adapters/android.ts#widenUnderCovers,
+   * short of its own content would gain (adapters/android-tree-dialect.ts#widenUnderCovers,
    * through types.ts#DrawnOverStrip). Rects as the tree gives them — no
    * flat-list reach, no tab-bar item listed before the node: a nested tree's
    * order is its draw order. Empty for a node not in this tree. The parser
@@ -642,7 +642,7 @@ const NOT_DRAWN = {
    *
    * `drawnOver`: only a structural LEAF with no label and no value is
    * excused (a spacer, an empty Box — empty area). A Compose tree is all
-   * `container`/`other` (adapters/android.ts maps `android.view.View` so),
+   * `container`/`other` (adapters/android-tree-dialect.ts maps `android.view.View` so),
    * so a structural role is no evidence of nothing drawn: measured on
    * mp-native's Account Detail (the floating-tab-bar stroke note below), the floating tab
    * bar's host — an unlabelled `container` `66,1840 948x248` after the

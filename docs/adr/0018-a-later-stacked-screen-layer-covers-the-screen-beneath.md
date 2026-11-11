@@ -767,10 +767,10 @@ else, and knew no fact of its own.
 **Decision.**
 
 1. **A root mark of the source's dialect: `UiNode.activeWindowOnly`** — set by the uiautomator parser on every tree's
-   root (`android.ts#parseUiautomatorXml`), in the dialect of `flatList` and `unclippedFrames`: the tree lists the window
+   root (`android-tree-dialect.ts#parseUiautomatorXml`), in the dialect of `flatList` and `unclippedFrames`: the tree lists the window
    that has focus, nothing beneath it. `presentation.ts#presentationOf` picks the uiautomator adapter by it;
    `paddedTouchTargets` keeps its one meaning (Compose's padded touch targets, draw order's `ownControl` row).
-2. **The parser marks the window presented, as the WDA parser marks WDA's layers** (`android.ts#presentedWindow`,
+2. **The parser marks the window presented, as the WDA parser marks WDA's layers** (`android-tree-dialect.ts#presentedWindow`,
    `UiNode.presentation` on the root), since it reads what ui-tree never sees — the scrim's `clickable`:
    - `dialog` — a new `PresentationKind`, typed by the window's own shape (the window is its own cover, no element):
      a window of some area that FLOATS OFF THE SCREEN'S EDGES ON BOTH AXES (its left edge past x 0 and its top edge
@@ -888,7 +888,7 @@ where the scrim does) — and of some height. Read against the SCRIM's edges, no
 bars); by the entry, not the full id (the package is the app's; the ids are never localized). Not a relaxation of the
 labelled scrim to unlabelled leaves: an unlabelled full-width clickable leaf over a full-width sibling is common app
 content, and the label was that rule's guard — the ids are this one's. The parser now asks the window of an ordered
-list of named recognizers (`android.ts#PRESENTED_WINDOWS`: `floatingDialog`, `composeSheetScrim`, `materialSheetDialog`),
+list of named recognizers (`android-tree-dialect.ts#PRESENTED_WINDOWS`: `floatingDialog`, `composeSheetScrim`, `materialSheetDialog`),
 the one place that answers whether the window is presented and as what. Decisions 3 and 4 read the mark as any other:
 the tap's wait ends with the presented remedy ("a screen is presented over it (a modal or a sheet) — close it first"),
 `scroll_until` stops before any stroke — none on the scrim, so nothing is dismissed.
@@ -1228,7 +1228,7 @@ sheet-medium, bottom-sheet-dialog and form-picker `[0,0][1080,2220]`, dialog-ful
 fitted insets): `[0,0][1080,2220]`, an activity's very shape, which `mTopFullscreenOpaqueWindowState` reads as the
 focus too; the plain screen's focus is the activity's own window with no other window of an app visible (the
 launcher's and another app's activity windows listed `isVisible=false`). One shell line
-(adapters/android.ts#FOCUSED_WINDOW_COMMAND: the focus and `DisplayFrames` out of `displays`, then `windows`), 41 KB,
+(adapters/android-wm.ts#FOCUSED_WINDOW_COMMAND: the focus and `DisplayFrames` out of `displays`, then `windows`), 41 KB,
 25–26 ms through execFile, ten runs.
 
 **Decision.**

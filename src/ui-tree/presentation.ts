@@ -14,7 +14,7 @@ import { scrolls } from './scroll-containers.js';
  * - BY MARKS (`byMarks`): the layers the tree SOURCE marks presented (`UiNode.presentation` on the layer,
  *   `UiNode.presentationElement` on a typed layer's element) — the WDA parser's facts (adapters/wda-source.ts#
  *   presentedLayers, by element type and by WDA's own visibility flags), the uiautomator parser's (adapters/
- *   android.ts#presentedWindow: the one window it dumps, on its root, a `dialog` or a `screen`) and idb's
+ *   android-tree-dialect.ts#presentedWindow: the one window it dumps, on its root, a `dialog` or a `screen`) and idb's
  *   (adapters/ios-tree-source.ts#listsPresentedLayer: its flat list, on its root, a `screen` when UIKit's dismiss
  *   region lies over the whole screen); read on every tree, since a flagless WDA payload still types an alert. A
  *   ROOT the source marks is a presented layer listed ALONE — the screen beneath it is not in the tree, so a target
