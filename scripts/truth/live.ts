@@ -7,12 +7,14 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import type { DeviceAdapter } from '../../src/adapters/types.js';
 import { listIosDevices } from '../../src/adapters/discovery.js';
+import { errorMessage } from '../../src/util/error-message.js';
 import type { Platform } from '../differential/corpus.js';
 import { loadSide } from '../differential/side.js';
 import { readPremiseInto } from './chooser-premise.js';
 import { deviceLabelling, type DeviceReadMode } from './device-state.js';
 import { AndroidLab, IosLab, LAB_AVD, LAB_WDA_DERIVED_DATA } from './lab-device.js';
 import { hookSwipes, SwipeHook } from './live-carousel.js';
+import { finishRun } from './live-finish.js';
 import {
   type Call,
   type Case,
@@ -82,7 +84,8 @@ import { parseLabApp, type LabApp } from './schema.js';
  * paragraph). `--record <file>` writes every read (the launch state, the state between the calls, after them) as JSON;
  * `--rejudge <file>` judges such a record again with this checkout's judges, no device (live-cases.ts#rejudge, which
  * tests/truth/live-rejudge.test.ts calls in process). The cases, their judging and the summary live in live-cases.ts,
- * one case's device cycle in run-case.ts; this file is the CLI.
+ * one case's device cycle in run-case.ts, the finish (the record written before anything closes, D82) in
+ * live-finish.ts; this file is the CLI.
  *
  * `--app react-native` runs the cases of the React Native lab app's cells (fixtures/apps/rn, its own bundle and package:
  * lab-device.ts#LAB_APP; the visibility cases from its own truth runs, the manifests whose `app` is AveriLabRN) — the
@@ -211,6 +214,9 @@ async function connect(): Promise<{ client: Client; close(): Promise<void> }> {
   await client.connect(clientSide);
   return {
     client,
+    // One closer for finishRun (D82), not three: InMemoryTransport's close only drops references and the registry's
+    // shutdown disposes each adapter quietly (src/mcp/registry.ts#shutdown), so a dead device cannot throw out of it
+    // and leave the server's processes alive.
     async close() {
       await client.close();
       await server.close();
@@ -275,11 +281,22 @@ if (rejudging !== undefined) {
       }
     }
     await deviceReads?.read('after');
+  } catch (e) {
+    // Said here: a record write that fails throws from the `finally` below, and that error replaces this one (D82).
+    console.error(`run: threw — ${errorMessage(e)}`);
+    throw e;
   } finally {
-    if (deviceReads !== undefined) record.deviceLabel = deviceReads.label();
-    await close();
-    await lab.close();
-    if (values.record !== undefined) await writeFile(values.record, JSON.stringify(record) + '\n');
+    // The record before the closes, each close tried: `finishRun` in live-finish.ts (D82).
+    await finishRun({
+      record,
+      recordPath: values.record,
+      ...(deviceReads !== undefined && { deviceLabel: () => deviceReads.label() }),
+      closers: [
+        { name: 'mcp (client, server, registry)', close },
+        { name: `lab (${platform === 'android' ? 'am force-stop' : 'WDA shutdown, simctl terminate'})`, close: () => lab.close() },
+      ],
+      note: (line) => console.error(line),
+    });
   }
   // The summary: every case, a known one marked with its note (live-known.ts); exit 1 on an unknown MISMATCH, on a
   // known case not intermittent that came out ok in a run of this checkout (fixed: strike it off), and on a case whose
