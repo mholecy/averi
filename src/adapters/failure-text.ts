@@ -1,5 +1,6 @@
 /** What exec knows of a failed host command: ExecError's own fields, which keep every byte for detectors and logs. */
 export interface CommandFailure {
+  /** The argv as shown (shownCommand): a typed text is `<typed text>` in it already, here and in ExecError.command. */
   command: string;
   exitCode: number | null;
   stderr: string;
@@ -57,25 +58,19 @@ function stderrForAgent(command: string, stderr: string, home: string): string {
 const TYPED_TEXT = '<typed text>';
 
 /**
- * The two argvs that hold a typed text: `idb ui text <text> --udid U` (ios.ts#typeText), `adb [-s S] shell input text
- * <one character>` (android.ts#typeText). Their shapes are those adapters'; a comment at each site names this list, and
- * the adapters' own tests drive their real argv through it.
+ * A command as a failure shows it (A17, ADR 0043's amendment): exec's own join, `cmd` and its args by spaces, with
+ * `<typed text>` at each index of `args` the caller declared typed (ExecOptions.typed). No argv is recognised by its
+ * shape: a typing verb that declares nothing is quoted whole, so each typing call site declares its own, and the leak
+ * sweep (tests/adapters/typed-text-leak.test.ts) drives every one through every way a call fails.
  */
-const IDB_TYPING = /^(idb ui text )[\s\S]*( --udid \S+)$/;
-// The empty group: withoutTypedText's one replacement names `$2` for both shapes.
-const ADB_TYPING = /^(adb(?: -s \S+)? shell input text )[\s\S]*()$/;
+export function shownCommand(cmd: string, args: readonly string[], typed: readonly number[] = []): string {
+  return [cmd, ...shownArgs(args, typed)].join(' ');
+}
 
-const withoutTypedText = (command: string): string =>
-  [IDB_TYPING, ADB_TYPING].reduce((out, argv) => out.replace(argv, `$1${TYPED_TEXT}$2`), command);
-
-/**
- * argparse's own line, `idb[ …]: error: <why>`, whose why quotes a text taken for an option (`-hunter2`, `--log=s3cret`),
- * across lines if the text holds one. argparse exits right after it, with 2 (idb-helper-script.ts keeps that code), so it
- * goes to stderr's end.
- */
-const ARGPARSE_ERROR = /^idb[^:\n]*: error: [\s\S]*/m;
-const ARGPARSE_EXIT = 2;
-const IDB_REJECTED = 'idb rejected its arguments (its error line, which can quote the typed text, is left out)';
+/** `args` as shownCommand shows them, word by word: what a channel or a log publishes (idb.ts#IDB_HELPER_CALL_START). */
+export function shownArgs(args: readonly string[], typed: readonly number[]): string[] {
+  return args.map((word, at) => (typed.includes(at) ? TYPED_TEXT : word));
+}
 
 /** Where a path word ends: the marks around a path in a message, whitespace. */
 const STOP = String.raw`\s"'` + '`' + String.raw`()\[\],<>`;
@@ -146,18 +141,13 @@ export function lastResortText({ command, exitCode, timedOut }: CommandFailure):
 
 /**
  * The message of a failed host command (D70, ADR 0043). exec's shape, `Command failed (exit N): <argv>⏎<stderr>` or
- * `Command timed out: <argv>`, byte for byte, except that a Python traceback shrinks to one line, a typed text leaves
- * the argv and argparse's line, and host paths leave the whole text. `home` is a parameter so this stays pure: ExecError
- * passes the host's.
+ * `Command timed out: <argv>`, byte for byte, except that a Python traceback shrinks to one line and host paths leave
+ * the whole text. The argv is quoted as given: a typed text is out of it already (shownCommand, A17). `home` is a
+ * parameter so this stays pure: ExecError passes the host's.
  */
 export function commandFailureText(failure: CommandFailure, home: string): string {
-  const { exitCode, stderr, timedOut, note } = failure;
-  const command = withoutTypedText(failure.command);
+  const { command, exitCode, stderr, timedOut, note } = failure;
   const tail = note === undefined ? '' : `\n${note}`;
   if (timedOut) return withoutHostPaths(`Command timed out: ${command}${tail}`, home);
-  // Node's own `Command failed: <argv>` stands in stderr for a silent child (exec.ts), with the text in it.
-  const withoutArgvText = stderr.split(failure.command).join(command);
-  const argparseRefused = exitCode === ARGPARSE_EXIT && IDB_TYPING.test(failure.command);
-  const said = stderrForAgent(command, argparseRefused ? withoutArgvText.replace(ARGPARSE_ERROR, IDB_REJECTED) : withoutArgvText, home);
-  return withoutHostPaths(`Command failed (exit ${exitCode}): ${command}\n${said}${tail}`, home);
+  return withoutHostPaths(`Command failed (exit ${exitCode}): ${command}\n${stderrForAgent(command, stderr, home)}${tail}`, home);
 }

@@ -15,9 +15,11 @@ import { everyNode, rectArea, rectIntersection, zeroRect, type ClippedSide, type
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
-/** One adb call's options: its own budget. */
+/** One adb call's options: its own budget, and the indexes of its argv that are typed text (ExecOptions.typed, A17). */
 interface AdbCallOptions {
   timeoutMs?: number;
+  /** Indexes into the argv this call's caller passed (`shell`'s device argv, `adb`'s): each layer moves them to exec's. */
+  typed?: readonly number[];
 }
 
 /** uiautomator's "the app has no window yet" status — a transient, not a failure. */
@@ -243,12 +245,13 @@ export class AndroidAdapter implements DeviceAdapter {
    * for `exec-out` adb escapes them itself (see execOut).
    */
   private adb(args: string[], opts: AdbCallOptions = {}) {
-    return this.runAdb(['-s', this.serial, ...args], opts);
+    return this.runAdb(['-s', this.serial, ...args], { ...opts, typed: opts.typed?.map((i) => i + 2) });
   }
 
   /** The `adb` binary with a complete argv — `adb` and `shell` both end here. */
   private runAdb(argv: string[], opts: AdbCallOptions) {
-    return this.exec('adb', argv, opts.timeoutMs ? { timeoutMs: opts.timeoutMs } : undefined);
+    const execOpts = { ...(opts.timeoutMs ? { timeoutMs: opts.timeoutMs } : {}), ...(opts.typed ? { typed: opts.typed } : {}) };
+    return this.exec('adb', argv, Object.keys(execOpts).length > 0 ? execOpts : undefined);
   }
 
   /**
@@ -260,7 +263,8 @@ export class AndroidAdapter implements DeviceAdapter {
    * builds a `shell` argv of its own.
    */
   private shell(argv: readonly string[], opts: AdbCallOptions = {}) {
-    return this.runAdb(adbShellArgv(this.serial, argv), opts);
+    // adbShellArgv is `-s S shell` and then the device argv word for word: a typed index moves three on.
+    return this.runAdb(adbShellArgv(this.serial, argv), { ...opts, typed: opts.typed?.map((i) => i + 3) });
   }
 
   /**
@@ -914,9 +918,10 @@ export class AndroidAdapter implements DeviceAdapter {
     // a direct caller cannot leave the field half-typed. An ASCII value pays one regex test, no device call.
     const refusal = refusalOf(text, this.typeable);
     if (refusal !== undefined) throw new Error(`typeText ${refusal}`);
-    // This argv's shape is in failure-text.ts's typing list (ADB_TYPING): what is typed stays out of a failure's message.
+    // Each character is declared typed (A17, ExecOptions.typed): no failure shows it. A leading `-` cannot form an option
+    // (D74): it is the one word `-`.
     for (const ch of text) {
-      await this.shell(['input', 'text', ch === ' ' ? '%s' : ch]);
+      await this.shell(['input', 'text', ch === ' ' ? '%s' : ch], { typed: [2] });
       await sleep(TYPING_PACE_MS);
     }
     // Force the IME to COMMIT the final composing character: GBoard holds the

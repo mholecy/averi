@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { exec, ExecError } from '../../src/adapters/exec.js';
+import { withUdid } from '../../src/adapters/idb.js';
 import { IdbHelper, idbInterpreter, type IdbHelperReply } from '../../src/adapters/idb-helper.js';
 
 // The helper's contract with fb-idb (D7a): `gen_main` run in-process by the helper's script answers as the `idb` CLI
@@ -81,23 +82,29 @@ describe.skipIf(found === undefined)('the idb helper against the idb CLI (real f
   }, 60_000);
 
   // D7b: every HID argv IosAdapter sends (ios.ts), against a companion that is not there — the same failure, the same
-  // code and stderr as the CLI. A text that starts with a dash is argparse's error in both (exit 2, the usage).
+  // code and stderr as the CLI, the --udid where runIdb puts it (withUdid). D74: a text after `--` is the positional
+  // whatever it starts with, so `-h` is no help (exit 0, nothing typed) and `-hunter2` no option (argparse's exit 2):
+  // every typing reaches the companion, and fails to connect with 1.
   it.each([
     ['ui', 'tap', '1', '1'],
     ['ui', 'tap', '1', '1', '--duration', '0.8'],
     ['ui', 'swipe', '200', '700', '200', '176', '--duration', '0.3'],
-    ['ui', 'text', 'a'],
-    ['ui', 'text', 'Jan Nováček 😀'],
-    ['ui', 'text', '-x'],
+    ['ui', 'text', '--', 'a'],
+    ['ui', 'text', '--', 'Jan Nováček 😀'],
+    ['ui', 'text', '--', '-x'],
+    ['ui', 'text', '--', '-h'],
+    ['ui', 'text', '--', '-hunter2'],
+    ['ui', 'text', '--', '--log=s3cret'],
     ['ui', 'key', '4'],
     ['ui', 'key-sequence', '42', '42', '76'],
     ['ui', 'button', 'HOME'],
   ].map((a) => [a.join(' '), a]))('fails `%s` with the same code and stderr as the CLI', async (_, args) => {
-    const argv = ['--companion', 'localhost:1', ...args, '--udid', UDID];
+    const argv = ['--companion', 'localhost:1', ...withUdid(args, UDID).argv];
     const [byHelper, byCli] = [await viaHelper(argv), await cli(argv)];
     expect(byHelper.kind).toBe('answer');
     if (byHelper.kind !== 'answer') return;
     expect(byCli.code).not.toBe(0);
+    if (args[1] === 'text') expect(byCli.code).toBe(1);
     expect(byHelper.code).toBe(byCli.code);
     expect(byHelper.stderr).toBe(byCli.stderr);
     expect(byHelper.stdout.equals(byCli.stdout)).toBe(true);

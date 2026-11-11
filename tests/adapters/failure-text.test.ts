@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { commandFailureText, lastResortText, withoutHostPaths } from '../../src/adapters/failure-text.js';
+import { commandFailureText, lastResortText, shownCommand, withoutHostPaths } from '../../src/adapters/failure-text.js';
 
 const HOME = '/Users/me';
 /** Roots tests/docs/path-hygiene.test.ts strikes in a committed file, spelled apart: here they are the subject, no machine's. */
@@ -283,62 +283,33 @@ describe('commandFailureText: host paths', () => {
   });
 });
 
-describe('commandFailureText: typed text', () => {
-  it('stays out of an idb ui text argv, whatever it holds', () => {
-    expect(failed('idb ui text hunter2 --udid U', 'e')).toBe('Command failed (exit 1): idb ui text <typed text> --udid U\ne');
-    expect(failed('idb ui text a b --udid c --udid U', 'e', { timedOut: true })).toBe('Command timed out: idb ui text <typed text> --udid U');
-    expect(failed('idb ui text a --udid AAAA-1111', 'e').split('\n')[0]).toBe('Command failed (exit 1): idb ui text <typed text> --udid AAAA-1111');
-    expect(failed('idb ui text line\ntwo --udid U', 'e')).toBe('Command failed (exit 1): idb ui text <typed text> --udid U\ne');
+describe('shownCommand: a typed text never stands in the argv a failure shows (A17)', () => {
+  it('writes <typed text> at the indexes the caller declared, and only there', () => {
+    expect(shownCommand('idb', ['ui', 'text', '--udid', 'U', '--', '-hunter2'], [5])).toBe('idb ui text --udid U -- <typed text>');
+    expect(shownCommand('adb', ['-s', 'emulator-5554', 'shell', 'input', 'text', "'h'"], [5])).toBe('adb -s emulator-5554 shell input text <typed text>');
+    expect(shownCommand('x', ['a', 'b', 'c'], [0, 2])).toBe('x <typed text> b <typed text>');
   });
 
-  it('stays out of an adb input text argv, one character or many', () => {
-    expect(failed("adb -s emulator-5554 shell input text 'h'", 'e')).toBe('Command failed (exit 1): adb -s emulator-5554 shell input text <typed text>\ne');
-    expect(failed("adb shell input text '%s'", 'e', { timedOut: true })).toBe('Command timed out: adb shell input text <typed text>');
+  it('a text of any shape goes whole: a newline, a home, the word --udid, an empty word', () => {
+    expect(shownCommand('idb', ['ui', 'text', '--udid', 'U', '--', 'line\ntwo /Users/me/x --udid V'], [5])).toBe('idb ui text --udid U -- <typed text>');
+    expect(shownCommand('idb', ['ui', 'text', '--udid', 'U', '--', ''], [5])).toBe('idb ui text --udid U -- <typed text>');
   });
 
-  it('stays out of node\'s own line, which exec puts in stderr for a silent child', () => {
-    expect(failed('idb ui text hunter2 --udid U', 'Command failed: idb ui text hunter2 --udid U\n'))
-      .toBe('Command failed (exit 1): idb ui text <typed text> --udid U\nCommand failed: idb ui text <typed text> --udid U');
+  it('with nothing declared, or an index past the argv, it is exec\'s own join', () => {
+    expect(shownCommand('idb', ['ui', 'tap', '1', '2'])).toBe('idb ui tap 1 2');
+    expect(shownCommand('idb', ['ui', 'tap', '1', '2'], [])).toBe('idb ui tap 1 2');
+    expect(shownCommand('idb', ['ui', 'tap'], [7])).toBe('idb ui tap');
+  });
+});
+
+describe('commandFailureText: the command as the caller showed it (A17: no argv is recognised by its shape)', () => {
+  it('quotes a typing\'s argv as given: what masks it is shownCommand, upstream', () => {
+    expect(failed('idb ui text --udid U -- <typed text>', 'e')).toBe('Command failed (exit 1): idb ui text --udid U -- <typed text>\ne');
+    expect(failed('idb ui text hunter2 --udid U', 'e')).toBe('Command failed (exit 1): idb ui text hunter2 --udid U\ne');
+    expect(failed("adb -s emulator-5554 shell input text 'h'", 'e', { timedOut: true })).toBe("Command timed out: adb -s emulator-5554 shell input text 'h'");
   });
 
-  it('leaves every other argv as it is', () => {
-    for (const command of ['idb ui tap 1 2 --udid U', 'idb ui key 40 --udid U', 'adb -s S shell input tap 1 2', 'adb -s S shell input keyevent 66', 'xcrun simctl openurl U ui text', 'echo idb ui text a --udid U', 'idb ui text a --udid U and more']) {
-      expect(failed(command, 'e')).toBe(`Command failed (exit 1): ${command}\ne`);
-    }
-  });
-
-  it('idb\'s argparse line leaves a typing\'s stderr, whatever it quotes; the usage stays', () => {
-    const rejected = 'idb rejected its arguments (its error line, which can quote the typed text, is left out)';
-    expect(failed('idb ui text --log=s3cret --udid U', "usage: idb [-h]\nidb: error: argument --log: invalid choice: 's3cret'\n", { exitCode: 2 }))
-      .toBe(`Command failed (exit 2): idb ui text <typed text> --udid U\nusage: idb [-h]\n${rejected}`);
-    expect(failed('idb ui text -abc --udid U', 'idb ui text: error: the following arguments are required: text\n', { exitCode: 2 }).split('\n')[1]).toBe(rejected);
-  });
-
-  it('a line before argparse\'s stays, argparse\'s goes wherever it stands, and all it echoes goes with it: argparse exits right after it', () => {
-    const rejected = 'idb rejected its arguments (its error line, which can quote the typed text, is left out)';
-    expect(failed('idb ui text -hunter2 --udid U', "log: error: earlier\nidb ui text: error: ignored explicit argument 'unter2'\n", { exitCode: 2 }).split('\n').slice(1))
-      .toEqual(['log: error: earlier', rejected]);
-    expect(failed('idb ui text --c=a\nsecret --udid U', 'idb: error: ambiguous option: --c=a\nsecret could match --companion\n', { exitCode: 2 }).split('\n').slice(1)).toEqual([rejected]);
-  });
-
-  it('only exit 2 is argparse, and only a line naming idb: another tool\'s error keeps its words', () => {
-    expect(failed('idb ui text a --udid U', 'idb ui text: error: gone', { exitCode: 1 }).split('\n')[1]).toBe('idb ui text: error: gone');
-    expect(failed('idb ui text a --udid U', 'grpc: error: connection refused to companion', { exitCode: 2 }).split('\n')[1]).toBe('grpc: error: connection refused to companion');
-    expect(failed('idb ui text a --udid U', 'my idb: error: x', { exitCode: 2 }).split('\n')[1]).toBe('my idb: error: x');
-    expect(failed('idb ui text a --udid U', 'idb: x: error: y', { exitCode: 2 }).split('\n')[1]).toBe('idb: x: error: y');
-  });
-
-  it('that line stays on every other command, and on Android\'s typing, whose adb errors name the device', () => {
-    const line = 'idb describe: error: bad choice';
-    expect(failed('idb describe --udid U', line, { exitCode: 2 }).split('\n')[1]).toBe(line);
-    expect(failed('adb -s S shell input text h', 'adb: error: connect failed: closed').split('\n')[1]).toBe('adb: error: connect failed: closed');
-  });
-
-  it('a stderr line that merely holds the words stays on a typing', () => {
-    expect(failed('idb ui text a --udid U', 'x: y: error: z\nerror: gone').split('\n').slice(1)).toEqual(['x: y: error: z', 'error: gone']);
-  });
-
-  it('a home in a typed text goes with the text', () => {
-    expect(failed('idb ui text /Users/me/x --udid U', 'e')).toBe('Command failed (exit 1): idb ui text <typed text> --udid U\ne');
+  it('argparse\'s line keeps its words, at exit 2 too: behind `--` no text reaches argparse (D74)', () => {
+    expect(failed('idb ui text --udid U -- <typed text>', 'idb ui text: error: gone\n', { exitCode: 2 }).split('\n')[1]).toBe('idb ui text: error: gone');
   });
 });

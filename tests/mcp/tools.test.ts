@@ -1,4 +1,4 @@
-import { ExecError } from '../../src/adapters/exec.js';
+import { ExecError, shownCommand } from '../../src/adapters/exec.js';
 import { noLinkHandler } from '../../src/adapters/ios-link-failure.js';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -670,13 +670,13 @@ describe('what a failed host command replies (D70, D65; ADR 0043): the tools quo
   it('type_text: a crash, its one line, no frame, no home, no typed text', async () => {
     const ios = home();
     ios.typeText = async () => {
-      throw new ExecError('idb ui text hunter2 --udid U', 1, '2026-10-19 05:39:32,796 [ERROR] - root - Exception thrown in main\nTraceback (most recent call last):\n  File "/Users/me/.local/idb/main.py", line 313, in gen_main\nException: gone\n');
+      throw new ExecError(shownCommand('idb', ['ui', 'text', '--udid', 'U', '--', 'hunter2'], [5]), 1, '2026-10-19 05:39:32,796 [ERROR] - root - Exception thrown in main\nTraceback (most recent call last):\n  File "/Users/me/.local/idb/main.py", line 313, in gen_main\nException: gone\n');
     };
     const { call } = await connect({ ios });
     const result = await call('type_text', { platform: 'ios', text: 'hunter2', configPath: missing() });
     expect(result.isError).toBe(true);
     expect(result.text).toBe(
-      'Command failed (exit 1): idb ui text <typed text> --udid U\nidb crashed: Exception: gone (Python traceback left out: run the command by hand, with the real text and paths, to see it)',
+      'Command failed (exit 1): idb ui text --udid U -- <typed text>\nidb crashed: Exception: gone (Python traceback left out: run the command by hand, with the real text and paths, to see it)',
     );
   });
 

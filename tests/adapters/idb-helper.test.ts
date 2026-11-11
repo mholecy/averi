@@ -6,8 +6,8 @@ import { PassThrough } from 'node:stream';
 import type { ChildProcess } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExecError, type ExecFn } from '../../src/adapters/exec.js';
-import { runIdb } from '../../src/adapters/idb.js';
-import { IdbHelper, idbInterpreter, killIdbHelpersOnExit, MAX_FAILURES_IN_A_ROW, type IdbHelperSpawn } from '../../src/adapters/idb-helper.js';
+import { IDB_HELPER_CALL_START, runIdb, type IdbHelperCall } from '../../src/adapters/idb.js';
+import { IdbHelper, IdbHelperTimeout, idbInterpreter, killIdbHelpersOnExit, MAX_FAILURES_IN_A_ROW, type IdbHelperSpawn } from '../../src/adapters/idb-helper.js';
 import { IosAdapter } from '../../src/adapters/ios.js';
 import { createIosTreeSource } from '../../src/adapters/ios-tree-source.js';
 
@@ -190,6 +190,7 @@ describe('runIdb with an IdbHelper', () => {
     ['an empty key sequence', ['ui', 'key-sequence']],
     ['a key sequence with a word that is no number', ['ui', 'key-sequence', '42', 'x']],
     ['a read with a flag more', ['ui', 'describe-all', '--json', '--nested']],
+    ['a text with no `--` before it, the form D74 retired', ['ui', 'text', 'abc']],
   ])('sends a call it does not allowlist to the CLI — %s', async (_, args) => {
     const { helper, s, cli } = await readyHelper();
     await runIdb(cli.exec, UDID, args, { helper });
@@ -499,8 +500,10 @@ const HID: readonly (readonly string[])[] = [
   ['ui', 'tap', '120', '640'],
   ['ui', 'tap', '120', '640', '--duration', '0.8'],
   ['ui', 'swipe', '200', '700', '200', '176', '--duration', '0.3'],
-  ['ui', 'text', 'Jan Novak Bratislava'],
-  ['ui', 'text', 'J'],
+  ['ui', 'text', '--', 'Jan Novak Bratislava'],
+  ['ui', 'text', '--', 'J'],
+  ['ui', 'text', '--', '-hunter2'],
+  ['ui', 'text', '--', '--'],
   ['ui', 'key-sequence', '42', '42', '42'],
   ['ui', 'key-sequence', '76'],
   ['ui', 'key', '40'],
@@ -508,11 +511,12 @@ const HID: readonly (readonly string[])[] = [
 ];
 
 describe('runIdb with an IdbHelper — input (D7b)', () => {
-  it.each(HID.map((a) => [a.join(' '), a]))('serves `%s` from the helper once it is ready, the --udid last', async (_, args) => {
+  it.each(HID.map((a) => [a.join(' '), a]))('serves `%s` from the helper once it is ready, the --udid last or before `--`', async (_, args) => {
     const { helper, s, cli } = await readyHelper();
     const call = runIdb(cli.exec, UDID, [...args], { helper });
     await settle();
-    expect(s.children[0].requests).toEqual([{ id: 1, argv: [...args, '--udid', UDID] }]);
+    const argv = args[1] === 'text' ? ['ui', 'text', '--udid', UDID, '--', args[3]] : [...args, '--udid', UDID];
+    expect(s.children[0].requests).toEqual([{ id: 1, argv }]);
     s.children[0].answer(0, '');
     expect((await call).stdout.toString()).toBe('');
     expect(cli.idbCalls).toEqual([CLI_ARGV]); // the starting call only
@@ -523,9 +527,9 @@ describe('runIdb with an IdbHelper — input (D7b)', () => {
     ['a NUL (execFile refuses the argv; the helper would type it)', 'a\u0000b'],
   ])('leaves a text the two would type differently to the CLI — %s', async (_, text) => {
     const { helper, s, cli } = await readyHelper();
-    await runIdb(cli.exec, UDID, ['ui', 'text', text], { helper });
+    await runIdb(cli.exec, UDID, ['ui', 'text', '--', text], { helper });
     expect(s.children[0].requests).toEqual([]);
-    expect(cli.idbCalls.at(-1)).toEqual(['ui', 'text', text, '--udid', UDID]);
+    expect(cli.idbCalls.at(-1)).toEqual(['ui', 'text', '--udid', UDID, '--', text]);
   });
 
   it('does NOT retry an input the helper died under — it may have landed — and says so, ExecError-shaped', async () => {
@@ -609,10 +613,10 @@ describe('runIdb with an IdbHelper — input (D7b)', () => {
   it('runs an input on the CLI when writing it to the helper failed — a pipe with no reader took none of it', async () => {
     const { helper, s, cli } = await readyHelper();
     s.children[0].breakPipe();
-    const text = await runIdb(cli.exec, UDID, ['ui', 'text', 'abc'], { helper });
+    const text = await runIdb(cli.exec, UDID, ['ui', 'text', '--', 'abc'], { helper });
     expect(text.stdout.toString()).toBe('cli');
     expect(s.children[0].requests).toEqual([]);
-    expect(cli.idbCalls).toEqual([CLI_ARGV, ['ui', 'text', 'abc', '--udid', UDID]]);
+    expect(cli.idbCalls).toEqual([CLI_ARGV, ['ui', 'text', '--udid', UDID, '--', 'abc']]);
     s.children[0].die(); // the exit that follows: no second answer, no second CLI call
     await settle();
     expect(cli.idbCalls).toHaveLength(2);
@@ -643,7 +647,7 @@ describe('runIdb with an IdbHelper — input (D7b)', () => {
 
   it('reports an input in flight when the adapter is disposed under it — not retried either', async () => {
     const { helper, s, cli } = await readyHelper();
-    const text = runIdb(cli.exec, UDID, ['ui', 'text', 'abc'], { helper });
+    const text = runIdb(cli.exec, UDID, ['ui', 'text', '--', 'abc'], { helper });
     await settle();
     s.children[0].ack();
     await settle();
@@ -651,6 +655,68 @@ describe('runIdb with an IdbHelper — input (D7b)', () => {
     expect(((await text.catch((e: unknown) => e)) as ExecError).message).toMatch(/\nthe idb helper exited during this input; it may or may not have reached the simulator/);
     expect(s.children[0].requests).toHaveLength(1);
     expect(cli.idbCalls).toEqual([CLI_ARGV]);
+  });
+});
+
+describe('runIdb with a typed word (A17): the text never in a shown argv, on either path', () => {
+  const TEXT = ['ui', 'text', '--', 'hunter2'];
+  const SHOWN = `idb ui text --udid ${UDID} -- <typed text>`;
+
+  it('hands the CLI the typed index where the word stands once the --udid is in', async () => {
+    const seen: { args: string[]; typed?: readonly number[] }[] = [];
+    const exec: ExecFn = async (cmd, args, opts) => {
+      if (cmd !== 'xcrun') seen.push({ args, typed: opts?.typed });
+      return { stdout: Buffer.from(''), stderr: '' };
+    };
+    await runIdb(exec, UDID, TEXT, { typed: [3] });
+    expect(seen).toEqual([{ args: ['ui', 'text', '--udid', UDID, '--', 'hunter2'], typed: [5] }]);
+  });
+
+  it('a nonzero answer from the helper, silent: the command, the message and node\'s line all shown', async () => {
+    const { helper, s, cli } = await readyHelper();
+    const call = runIdb(cli.exec, UDID, TEXT, { helper, typed: [3] });
+    await settle();
+    expect(s.children[0].requests[0].argv).toEqual(['ui', 'text', '--udid', UDID, '--', 'hunter2']); // the helper types the text
+    s.children[0].answer(1, '');
+    const got = (await call.catch((e: unknown) => e)) as ExecError;
+    expect(got.command).toBe(SHOWN);
+    expect(got.message).toBe(`Command failed (exit 1): ${SHOWN}\nCommand failed: ${SHOWN}`);
+  });
+
+  it('a helper that died under it, and one that timed out: shown alike', async () => {
+    const died = await readyHelper();
+    const call = runIdb(died.cli.exec, UDID, TEXT, { helper: died.helper, typed: [3] });
+    await settle();
+    died.s.children[0].ack();
+    await settle();
+    died.s.children[0].die();
+    expect(((await call.catch((e: unknown) => e)) as ExecError).command).toBe(SHOWN);
+    const late = await readyHelper();
+    const got = (await runIdb(late.cli.exec, UDID, TEXT, { helper: late.helper, typed: [3], timeoutMs: 10 }).catch((e: unknown) => e)) as ExecError;
+    expect(got.message).toBe(`Command timed out: ${SHOWN}`);
+  });
+
+  it('the helper\'s own timeout names the argv as shown', async () => {
+    const { helper } = await readyHelper();
+    const got = await helper.run(['ui', 'text', '--udid', UDID, '--', 'hunter2'], { timeoutMs: 10, typed: [5] })!.catch((e: unknown) => e);
+    expect(got).toBeInstanceOf(IdbHelperTimeout);
+    expect((got as Error).message).toBe(`idb helper timed out: ${SHOWN}`);
+  });
+
+  it('publishes the shown argv on the helper\'s instrumentation channel', async () => {
+    const published: string[][] = [];
+    const listen = (m: unknown) => void published.push([...(m as IdbHelperCall).argv]);
+    IDB_HELPER_CALL_START.subscribe(listen);
+    try {
+      const { helper, s, cli } = await readyHelper();
+      const call = runIdb(cli.exec, UDID, TEXT, { helper, typed: [3] });
+      await settle();
+      s.children[0].answer(0, '');
+      await call;
+    } finally {
+      IDB_HELPER_CALL_START.unsubscribe(listen);
+    }
+    expect(published).toEqual([['ui', 'text', '--udid', UDID, '--', '<typed text>']]);
   });
 });
 

@@ -251,6 +251,16 @@ export class IosAdapter implements DeviceAdapter {
   }
 
   /**
+   * `idb ui text --udid U -- <text>`, the one argv that types (D74): after `--` argparse takes the text as its positional
+   * whatever it starts with, so `-h` is typed rather than answered with help (exit 0, nothing typed) and `-hunter2` or
+   * `--log=s3cret` is no option (runIdb puts the --udid before the `--`: withUdid). The text's index is declared typed
+   * (A17, ExecOptions.typed), so no failure shows it.
+   */
+  private idbText(text: string) {
+    return runIdb(this.exec, this.udid, ['ui', 'text', '--', text], { helper: this.idbHelper, typed: [3] });
+  }
+
+  /**
    * The source's read, and with `settle` (DeviceAdapter.uiTree — a one-shot
    * caller, `ui_snapshot` today) one bounded retry of an idb read that came
    * back with no tree: IdbEmptyTreeError, once, after IDB_EMPTY_RETRY_MS —
@@ -754,7 +764,8 @@ export class IosAdapter implements DeviceAdapter {
       await this.sourceTyper(text);
       return;
     }
-    // This argv's shape is in failure-text.ts's typing list (IDB_TYPING): what is typed stays out of a failure's message.
+    // Every typing here goes through idbText: `ui text --udid U -- <text>`, so a leading dash is typed (D74), and its text
+    // declared typed (A17), so no failure shows it.
     // An app seen dropping a tail (D24, FIRST_KEY_ALONE_MS): its first character alone, a wait, then the rest. The
     // first character is a grapheme (Intl.Segmenter), so a surrogate pair or a letter with its combining mark is never
     // split between two idb calls. A one-character text has no rest: one call, no wait.
@@ -762,13 +773,13 @@ export class IosAdapter implements DeviceAdapter {
     if (key !== undefined && this.dropsTail.has(key)) {
       const [first] = new Intl.Segmenter().segment(text);
       if (first !== undefined && first.segment.length < text.length) {
-        await this.idbUi(['text', first.segment]);
+        await this.idbText(first.segment);
         await sleep(FIRST_KEY_ALONE_MS);
-        await this.idbUi(['text', text.slice(first.segment.length)]);
+        await this.idbText(text.slice(first.segment.length));
         return;
       }
     }
-    await this.idbUi(['text', text]);
+    await this.idbText(text);
   }
 
   /**
