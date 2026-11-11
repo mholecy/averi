@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { parse as parseYaml } from 'yaml';
 import { describe, expect, it } from 'vitest';
 import {
   childSteps,
@@ -102,16 +104,116 @@ flows:
     expect((err.cause as Error).name).toBe('YAMLParseError');
   });
 
-  // Review of the device check: a step with an unknown key used to carry a
-  // second, misleading line from the platform-override member of the union.
-  it('an unknown step key is reported alone — no "platform override" noise beside it', () => {
-    expect(() => parseConfig('app: {}\nflows:\n  f:\n    steps:\n      - tapp: { id: x }\n')).toThrow(
-      /^Invalid averi\.yaml:\n {2}flows\.f\.steps\.0: Unrecognized key\(s\) in object: 'tapp'$/,
-    );
-  });
+  // D86: a step is judged by its one key — the kind it names — and that kind's own issues are said with their path.
+  // Under the union of every kind, a wrong TYPE inside a step's object collapsed to "Unrecognized key(s) in object:
+  // 'scroll_until'" at the step: zod's union reported the last member's key error.
+  describe('a step is judged by its one key, and its own issues are said with their path (D86)', () => {
+    const load = (stepYaml: string) => () => parseConfig(`app: {}\nflows:\n  f:\n    steps:\n      ${stepYaml}\n`);
+    const only = (line: string) => new RegExp(`^Invalid averi\\.yaml:\\n {2}${line.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
+    const ONE_OF = 'one of: launch, tap, type, type_pin, swipe, scroll_until, fill, assert, wait, branch, optional, or a platform override (android and/or ios)';
 
-  it('a real override naming neither platform still says so', () => {
-    expect(() => parseConfig('app: {}\nflows:\n  f:\n    steps:\n      - {}\n')).toThrow('platform override needs android and/or ios');
+    it.each([
+      ['within: { id: 5 }', '- scroll_until: { element: { id: x }, within: { id: 5 } }', 'flows.f.steps.0.scroll_until.within.id: Expected string, received number'],
+      ['within: ~', '- scroll_until: { element: { id: x }, within: ~ }', 'flows.f.steps.0.scroll_until.within: Expected object, received null'],
+      ['element: { id: 5 }', '- scroll_until: { element: { id: 5 } }', 'flows.f.steps.0.scroll_until.element.id: Expected string, received number'],
+      ['fully: 3', '- scroll_until: { element: { id: x }, fully: 3 }', 'flows.f.steps.0.scroll_until.fully: Expected boolean, received number'],
+      ['wait: { element: { id: 5 } }', '- wait: { element: { id: 5 } }', 'flows.f.steps.0.wait.element.id: Expected string, received number'],
+    ])('a wrong type inside a step (%s) names the field and the type it takes', (_, stepYaml, line) => {
+      expect(load(stepYaml)).toThrow(only(line));
+    });
+
+    it('a kind\'s own unknown key is said at the kind, not at the step', () => {
+      expect(load('- tap: { id: x, timeoutt: 3 }')).toThrow(only("flows.f.steps.0.tap: Unrecognized key(s) in object: 'timeoutt'"));
+    });
+
+    it('nested steps — in a platform override, an optional, a branch arm — say their issues at their own path', () => {
+      expect(load('- android: { tap: { id: 5 } }')).toThrow(only('flows.f.steps.0.android.tap.id: Expected string, received number'));
+      expect(load('- optional: [ { tap: { id: 5 } } ]')).toThrow(only('flows.f.steps.0.optional.0.tap.id: Expected string, received number'));
+      expect(load('- branch: [ { when: { state: s }, do: [ { swipe: { direction: sideways } } ] } ]')).toThrow(
+        /^Invalid averi\.yaml:\n {2}flows\.f\.steps\.0\.branch\.0\.do\.0\.swipe\.direction: Invalid enum value\. Expected 'up' \| 'down' \| 'left' \| 'right', received 'sideways'$/,
+      );
+    });
+
+    it('a platform override takes android, ios or both; any other key beside them makes the step one of several keys', () => {
+      const cfg = parseConfig('app: {}\nflows:\n  f:\n    steps:\n      - { android: { tap: { id: a } }, ios: { tap: { id: i } } }\n      - ios: { swipe: { direction: up } }\n');
+      expect(cfg.flows.f.steps).toEqual([{ android: { tap: { id: 'a' } }, ios: { tap: { id: 'i' } } }, { ios: { swipe: { direction: 'up' } } }]);
+      expect(load('- { android: { tap: { id: x } }, tap: { id: y } }')).toThrow(only(`flows.f.steps.0: a step has exactly one key, ${ONE_OF}; this one has 2: android, tap`));
+    });
+
+    it('an unknown step names itself and the kinds there are — and is said alone, no "platform override" noise beside it', () => {
+      expect(load('- tapp: { id: x }')).toThrow(only(`flows.f.steps.0: unknown step 'tapp': a step is ${ONE_OF}`));
+    });
+
+    it('a step with no key, or with several, says a step has exactly one', () => {
+      expect(load('- {}')).toThrow(only(`flows.f.steps.0: a step has exactly one key, ${ONE_OF}; this one has none`));
+      expect(load('- { tap: { id: x }, swipe: { direction: up } }')).toThrow(only(`flows.f.steps.0: a step has exactly one key, ${ONE_OF}; this one has 2: tap, swipe`));
+      // The mis-indented field: `timeout` at the step's level instead of inside the tap.
+      expect(load('- tap: { id: x }\n        timeout: 3')).toThrow(only(`flows.f.steps.0: a step has exactly one key, ${ONE_OF}; this one has 2: tap, timeout`));
+    });
+
+    it.each([
+      ['null', '- ~'],
+      ['string', '- tap'],
+      ['array', '- [ { tap: { id: x } } ]'],
+      ['number', '- 3'],
+    ])('a step that is no mapping (%s) says what a step is and what it got', (got, stepYaml) => {
+      expect(load(stepYaml)).toThrow(only(`flows.f.steps.0: a step is a mapping of one key, ${ONE_OF} — received ${got}`));
+    });
+
+    // The repo keeps no averi.yaml of its own; its machine-readable flows are the docs' yaml examples. Every one that
+    // holds whole flows (references/averi-yaml.md's are fragments, `steps: [ … ]`) parses — given an empty `app:` where
+    // the example leaves it out — to the very steps it was written as.
+    it.each(['README.md', 'SETUP.md', 'ARCHITECTURE.md', 'skill/SKILL.md'])(
+      'every flow example in %s parses to the steps it was written as',
+      (doc) => {
+        const md = readFileSync(new URL(`../../${doc}`, import.meta.url), 'utf8');
+        const examples = [...md.matchAll(/```ya?ml\n([\s\S]*?)```/g)]
+          .map((m) => { try { return parseYaml(m[1]) as unknown; } catch { return undefined; } })
+          .filter((raw): raw is { app?: unknown; flows: Record<string, { steps: unknown }> } =>
+            typeof raw === 'object' && raw !== null && 'flows' in raw && Object.values((raw as { flows: Record<string, { steps: unknown }> }).flows).every((f) => Array.isArray(f.steps) && f.steps.every((st) => typeof st === 'object')));
+        expect(examples.length).toBeGreaterThan(0);
+        for (const raw of examples) {
+          const cfg = parseConfig(JSON.stringify({ app: {}, ...raw }), doc);
+          for (const [name, flow] of Object.entries(raw.flows)) expect(cfg.flows[name].steps).toEqual(flow.steps);
+        }
+      },
+    );
+
+    it.each([
+      ['a keypad with both patterns', '- type_pin: { value: "1", keypad: { id_pattern: k, text_pattern: t } }', 'flows.f.steps.0.type_pin.keypad: keypad needs exactly one of: id_pattern, text_pattern'],
+      ['a keypad with neither', '- type_pin: { value: "1", keypad: {} }', 'flows.f.steps.0.type_pin.keypad: keypad needs exactly one of: id_pattern, text_pattern'],
+      ['a wait on both', '- wait: { element: { id: x }, state: s }', 'flows.f.steps.0.wait: wait needs exactly one of: element, state'],
+      ['a wait on neither', '- wait: { timeout: 2s }', 'flows.f.steps.0.wait: wait needs exactly one of: element, state'],
+      ['a swipe of no times', '- swipe: { direction: up, times: 0 }', 'flows.f.steps.0.swipe.times: Number must be greater than or equal to 1'],
+    ])('a kind\'s own refinement is said at the kind (%s)', (_, stepYaml, line) => {
+      expect(load(stepYaml)).toThrow(only(line));
+    });
+
+    it('each kind\'s valid forms still parse', () => {
+      const cfg = parseConfig(`app: {}
+states:
+  s: { detect: { element: { id: s } } }
+flows:
+  f:
+    steps:
+      - type_pin: { value: "1", keypad: { id_pattern: "k{digit}" } }
+      - type_pin: { value: "1", keypad: { text_pattern: "{digit}" } }
+      - swipe: { direction: up, times: 2 }
+      - scroll_until: { element: { id: a }, direction: down }
+      - scroll_until: { element: { id: a }, direction: left }
+      - scroll_until: { element: { id: a }, direction: right }
+      - wait: { state: s }
+`);
+      expect(cfg.flows.f.steps).toHaveLength(7);
+    });
+
+    it('a valid step parses to the very value it was written as', () => {
+      const cfg = parseConfig('app: {}\nflows:\n  f:\n    steps:\n      - optional: [ { tap: { id: x, timeout: 2s } } ]\n      - android: { branch: [ { when: { element: { id: y } }, do: [ { fill: { id: z, value: v, clear: true } } ] } ] }\n');
+      expect(cfg.flows.f.steps).toEqual([
+        { optional: [{ tap: { id: 'x', timeout: '2s' } }] },
+        { android: { branch: [{ when: { element: { id: 'y' } }, do: [{ fill: { id: 'z', value: 'v', clear: true } }] }] } },
+      ]);
+    });
   });
 
   it('rejects reach references to unknown flows', () => {
