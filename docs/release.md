@@ -111,13 +111,25 @@ or restart anything to bring it up.
 npm run truth:lab -- --out "$OUT/truth-lab" --serial emulator-5554
 ```
 
-It builds the lab app from this checkout under JDK 17 and installs it, runs the live golden's `chooser` group between
-a check of the chooser's lab defaults before and after, then live.ts's other Android groups, `forms`, `visibility`,
+It builds the lab app from this checkout under JDK 17 and installs it, runs the live golden's `chooser` group between a
+check of the chooser's lab defaults before and after, then live.ts's other Android groups, `forms`, `visibility`,
 `ensure` and `carousel`, each as its own block (backlog A22). The `dismissal` group is iOS only: Gate C runs it. It
-bounds itself (each live run 1800 s, the build 2400 s; standing.ts's KNOBS), each call in a process group of its own,
-which a run past its bound has killed whole (the `adb` it started among it), and its block is INCONCLUSIVE. After such
-an INCONCLUSIVE, `adb -s
+bounds itself: each live run 1800 s (`B_LIVE`'s default, standing.ts's KNOBS), the visibility group 3000 s of its own
+(lab-run.ts's LIVE_SECS, backlog A34), the build 2400 s. Setting `B_LIVE` bounds every other live run with it, and can
+only raise the visibility group's 3000 s: that group takes the larger of the two, so `B_LIVE=1800` leaves it at 3000 s
+and `B_LIVE=3600` raises it to 3600 s. Each call runs in a process group of its own, which a run past its bound has
+killed whole (the `adb` it started among it), and its block is INCONCLUSIVE; each live run's header in the run's output
+names its bound (`== visibility live android-visibility (bound 3000 s; log: …) ==`). After such an INCONCLUSIVE, `adb -s
 emulator-5554 shell echo ok` must answer before you report the run; if it does not, stop and tell the owner.
+
+**Its wall time.** About 52 min at the pace of A22's first run on main (2026-11-11, docs/truth/live-records/a22-gate-b/,
+its load not recorded): the build and the chooser group a few minutes, `forms` about 12 min, `visibility` about 31 min
+(181 cases, about 10 s each), `ensure` under 2 min, `carousel` about 5 min. Other agents' mutation runs on the same
+machine stretch every group: in A34's runs of the visibility group alone (docs/truth/live-records/a34-visibility/) a
+case took about 10 s while the load stayed under 15 and about 28 s at 50–65, which would take the group about 85 min,
+past its own bound, and the emulator's framework restarted under it both times. Run Gate B when the machine is not
+loaded. Setting `B_LIVE` (seconds, up to 7200) is the way to give a slow run more time: every live run gets at least
+that much.
 
 It passes only on **exit 0**: every block PASS, and no INCONCLUSIVE or ERROR line. Exit 1 is a FAIL or a `RESTORE.txt`
 to act on by hand, and it goes to the owner. Exit 2 means refused, and 3 means unproven. Neither is a pass. Any line in

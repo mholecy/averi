@@ -3,10 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
-import { cleanState, LAB_RUN_STANDING, labRun, leftLine, stateHand } from '../../../scripts/truth/batch/lab-run.js';
+import { cleanState, LAB_RUN_STANDING, labRun, leftLine, LIVE_SECS, stateHand } from '../../../scripts/truth/batch/lab-run.js';
 import type { LiveCases, LiveTable } from '../../../scripts/truth/batch/live-table.js';
 import type { StartOptions } from '../../../scripts/truth/batch/proc.js';
-import { groupsOf, onlyWith, STANDING_EXIT as LAB_RUN_EXIT } from '../../../scripts/truth/batch/standing.js';
+import { groupsOf, KNOBS, onlyWith, STANDING_EXIT as LAB_RUN_EXIT } from '../../../scripts/truth/batch/standing.js';
 import { LIVE_GOLDEN_HEADER } from '../../../scripts/truth/batch/steps.js';
 import { CATALOG, FakeSeam, FOCUS_CHOOSER, LAB_SERIAL, labWorld, PREFERRED_WITH_DEFAULT, rejudgeWith, until, type Answer, type LabWorld, type Rejudged, type WorldOptions } from './lab-fakes.js';
 
@@ -351,6 +351,40 @@ describe('the refusals and the lab guard: nothing done to a device that is not t
     expect(new Set(world.calls.filter((c) => c.startsWith('adb ')).map((c) => c.split(' ').slice(3).join(' ')))).toEqual(new Set(['emu avd name']));
     // Nothing built for a device that is not the lab's: the build is asked only after the guard.
     expect(seam.words.some((w) => w.includes('gradlew') || w.includes('catalog.ts'))).toBe(false);
+  });
+
+  it('a live group\'s own bound (A34): visibility\'s, sized from its run on the lab, above B_LIVE\'s default (so B_LIVE can only raise it) and within its rule', () => {
+    const { max, default: byDefault } = KNOBS.counts.B_LIVE;
+    expect(LIVE_SECS).toEqual({ visibility: 3000 });
+    for (const secs of Object.values(LIVE_SECS)) expect(secs > byDefault && secs <= max).toBe(true);
+  });
+
+  /** Each live.ts run's block and bound, as its header in the run's output names them. */
+  const liveBounds = () => [...outText().matchAll(/^== (\w+) live android-\w+ \(bound (\d+) s; log: /gm)].map((m) => [m[1], Number(m[2])]);
+
+  it('the bound each live.ts run is given: visibility its own 3000 s, forms B_LIVE\'s 1800 s — each named in its header', async () => {
+    expect(await go(['--groups', 'forms,visibility'])).toBe(0);
+    expect(liveBounds()).toEqual([
+      ['forms', 1800],
+      ['visibility', 3000],
+    ]);
+    expect(outText()).toContain(`== visibility live android-visibility (bound 3000 s; log: ${join(dirOf('visibility'), 'android-visibility.log')}) ==`);
+  });
+
+  it('B_LIVE given: every group with no bound of its own takes it; visibility the larger of the two — B_LIVE raises it, never lowers it', async () => {
+    expect(await go(['--groups', 'forms,visibility'], { B_LIVE: '600' })).toBe(0);
+    expect(liveBounds()).toEqual([
+      ['forms', 600],
+      ['visibility', 3000],
+    ]);
+  });
+
+  it('B_LIVE given above visibility\'s own: every group takes it', async () => {
+    expect(await go(['--groups', 'forms,visibility'], { B_LIVE: '3600' })).toBe(0);
+    expect(liveBounds()).toEqual([
+      ['forms', 3600],
+      ['visibility', 3600],
+    ]);
   });
 
   it('a bad knob refuses the run: exit 2', async () => {

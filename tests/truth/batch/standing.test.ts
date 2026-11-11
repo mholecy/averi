@@ -1,10 +1,12 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
 import { NO_SERIAL, NO_UDID } from '../../../scripts/truth/batch/runner-lines.js';
-import { cleanStateCommand, deviceInHand, liveJudge, liveVerdictLine, noDeviceReason, standingExitOf, STANDING_EXIT } from '../../../scripts/truth/batch/standing.js';
+import type { Asked } from '../../../scripts/truth/batch/cases.js';
+import type { BlockCtx, LiveOutcome } from '../../../scripts/truth/batch/runner.js';
+import { cleanStateCommand, deviceInHand, keptLiveRun, KNOBS, liveJudge, liveSecsOf, liveVerdictLine, noDeviceReason, standingExitOf, STANDING_EXIT } from '../../../scripts/truth/batch/standing.js';
 import { verdictLine, type Summary } from '../../../scripts/truth/batch/words.js';
 import type { ChooserPremise } from '../../../scripts/truth/chooser-premise.js';
 import { failuresJson } from '../../../scripts/truth/rejudge-failures.js';
@@ -147,6 +149,40 @@ describe('liveJudge over summarize\'s own output: the reasons the rejudge writes
     expect(r.failures).toEqual([]);
     expect(r.line).toBe(`x verdict: PASS — r: main's rejudge exit 0 (${r.header})`);
     expect(r.header).toMatch(/^# Live golden: 4 cases, 3 ok, 2 loud,/);
+  });
+});
+
+describe('a live run\'s bound (A34): B_LIVE, or the larger of B_LIVE and the block\'s own', () => {
+  it('no bound of its own: B_LIVE, its default or the value given, above or under the default', () => {
+    expect(liveSecsOf({ B_LIVE: KNOBS.counts.B_LIVE.default }, undefined)).toBe(1800);
+    expect(liveSecsOf({ B_LIVE: 600 }, undefined)).toBe(600);
+    expect(liveSecsOf({ B_LIVE: 3600 }, undefined)).toBe(3600);
+  });
+  it('a bound of its own: the larger — B_LIVE raises it, never brings it under it', () => {
+    expect(liveSecsOf({ B_LIVE: KNOBS.counts.B_LIVE.default }, 3000)).toBe(3000);
+    expect(liveSecsOf({ B_LIVE: 600 }, 3000)).toBe(3000);
+    expect(liveSecsOf({ B_LIVE: 3600 }, 3000)).toBe(3600);
+  });
+
+  it('keptLiveRun: the run bounded by liveSecsOf over ctx.knobs and the block\'s own bound; its outcome written beside its record', async () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'standing-kept-')));
+    try {
+      const asked: Asked = { platform: 'android', app: 'native', sources: ['uiautomator'], cases: [], groups: ['visibility'] };
+      const outcome: LiveOutcome = { live: { word: 'OK', why: 'exit 0' } };
+      const bounds: number[] = [];
+      const ctx = {
+        dir,
+        fs: nodeFs,
+        knobs: { B_LIVE: 1800 },
+        liveRun: async (_name: string, _asked: Asked, o: { secs: number }) => (bounds.push(o.secs), outcome),
+      } as unknown as BlockCtx<{ B_LIVE: number }>;
+      await keptLiveRun(ctx, 'android-visibility', asked, 3000);
+      await keptLiveRun(ctx, 'android-forms', asked);
+      expect(bounds).toEqual([3000, 1800]);
+      expect(JSON.parse(readFileSync(join(dir, 'android-visibility.outcome.json'), 'utf8'))).toEqual(outcome);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

@@ -85,6 +85,15 @@ export const LAB_RUN_STANDING: Standing<LabRunGroup> = {
   blocksOf: (g) => [g],
 };
 
+/**
+ * A live group's own bound, in seconds, where B_LIVE's default (1800 s) does not fit its run (A34): the visibility
+ * group, 181 cases over 32 cells, ran past 1800 s in A22's first Gate B on main (173 cases logged) and takes about
+ * 1880 s at that run's pace (about 10.4 s a case; ADR 0041's A34 amendment) — its bound about 1.6 times that. Every
+ * other group keeps B_LIVE's default, so a hung forms, ensure or carousel run is still cut at 1800 s. Each is above
+ * B_LIVE's default: B_LIVE given can only raise it (standing.ts#liveSecsOf).
+ */
+export const LIVE_SECS: Readonly<Partial<Record<LabRunGroup, number>>> = { visibility: 3000 };
+
 /** The need on the handler counts the chooser group rests on (batch-11's D55: shared 2, cell 1). */
 export const HANDLERS_NEED = 'handlers';
 /** The counts it expects, by URL (android-lab.ts#HANDLER_URLS, in its order). */
@@ -202,7 +211,8 @@ export async function labRun(o: StandingOptions): Promise<StandingExit> {
   const build = labBuild({ ...(pre.ok ? { secs: pre.values.B_BUILD } : {}), jvms: o.jvms });
   const android = androidLab({ build: build.android, settle: o.wait });
 
-  const liveRun = (ctx: BlockCtx<StandingKnobs>, group: LabRunGroup): Promise<void> => keptLiveRun(ctx, runName(group), askedOf(group));
+  const liveRun = (ctx: BlockCtx<StandingKnobs>, group: LabRunGroup): Promise<void> =>
+    keptLiveRun(ctx, runName(group), askedOf(group), LIVE_SECS[group]);
 
   const chooser: Block<StandingKnobs> = {
     ...liveBlock('chooser'),

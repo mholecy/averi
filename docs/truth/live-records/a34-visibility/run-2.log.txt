@@ -1,0 +1,49 @@
+lab: emulator-5554, AVD averi_lab
+averi: <repo>
+uiautomator tap:open.A ok: Tapped id:"lab.open.A"
+uiautomator tap:open.B ok: Tapped id:"lab.open.B"
+uiautomator tap:open.C ok: Tapped id:"lab.open.C"
+uiautomator tap:open.D ok: Tapped id:"lab.open.D"
+uiautomator tap:sheet-medium.A ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.sheet-medium.A" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no scroll move
+uiautomator scroll:sheet-medium.A ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.sheet-medium.A" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,444) on other "Close sheet" (0,0 1080x1110) — a screen is presented over it (a modal or a sheet) — close it first; no 
+uiautomator tap:sheet-medium.B ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.sheet-medium.B" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no scroll move
+uiautomator scroll:sheet-medium.B ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.sheet-medium.B" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,444) on other "Close sheet" (0,0 1080x1110) — a screen is presented over it (a modal or a sheet) — close it first; no 
+uiautomator tap:sheet-medium.C ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.sheet-medium.C" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no scroll move
+uiautomator scroll:sheet-medium.C ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.sheet-medium.C" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (0,1243 1080x977) — a screen is presented over it (a modal or a sheet) — close it first; no scroll 
+uiautomator tap:sheet-medium.D ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.sheet-medium.D" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no scroll move
+uiautomator scroll:sheet-medium.D ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.sheet-medium.D" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (0,1243 1080x977) — a screen is presented over it (a modal or a sheet) — close it first; no scroll 
+uiautomator tap:sheet-medium.S ok: Tapped id:"lab.sheet-medium.S"
+uiautomator tap:alert-dim.A ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.alert-dim.A" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a dialog is presented over it — close it first
+uiautomator scroll:alert-dim.A ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.alert-dim.A" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,444) on the dim outside container (155,851 770x517) — a dialog is presented over it — close it first, and a swipe would l
+uiautomator tap:alert-dim.B ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.alert-dim.B" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a dialog is presented over it — close it first
+uiautomator scroll:alert-dim.B ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.alert-dim.B" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,444) on the dim outside container (155,851 770x517) — a dialog is presented over it — close it first, and a swipe would l
+uiautomator tap:alert-dim.C ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.alert-dim.C" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a dialog is presented over it — close it first
+uiautomator scroll:alert-dim.C ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.alert-dim.C" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on the dim outside container (155,851 770x517) — a dialog is presented over it — close it first, and a swipe would 
+uiautomator tap:alert-dim.D ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.alert-dim.D" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a dialog is presented over it — close it first
+uiautomator scroll:alert-dim.D ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.alert-dim.D" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on the dim outside container (155,851 770x517) — a dialog is presented over it — close it first, and a swipe would 
+uiautomator tap:dialog-fullscreen.A ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.dialog-fullscreen.A" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no scroll
+uiautomator scroll:dialog-fullscreen.A ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.dialog-fullscreen.A" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,444) on text "Lab full-screen dialog" (315,396 451x66) — a screen is presented over it (a modal or a sheet) — clo
+uiautomator tap:dialog-fullscreen.B ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.dialog-fullscreen.B" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no scroll
+uiautomator scroll:dialog-fullscreen.B ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.dialog-fullscreen.B" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,444) on text "Lab full-screen dialog" (315,396 451x66) — a screen is presented over it (a modal or a sheet) — clo
+uiautomator tap:dialog-fullscreen.C ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.dialog-fullscreen.C" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no scroll
+uiautomator scroll:dialog-fullscreen.C ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.dialog-fullscreen.C" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (0,66 1080x2087) — a screen is presented over it (a modal or a sheet) — close it first; no scr
+uiautomator tap:dialog-fullscreen.D ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.dialog-fullscreen.D" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no scroll
+uiautomator scroll:dialog-fullscreen.D ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.dialog-fullscreen.D" failed after 23113ms (timeout 15000ms; no swipe was sent; 2 tree reads took 20473ms, the last 14444ms) — element never appeared in the tree (a sheet or modal is presented over it, and the tree lists only that win
+uiautomator tap:dialog-fullscreen.S ok: Tapped id:"lab.dialog-fullscreen.S"
+uiautomator assert:dialog-fullscreen.A ok: failed, nothing fired: 1/1 asserts FAILED
+run: threw — cell dialog-fullscreen: the app did not report ready within 10 s
+close: lab (am force-stop) failed — Command failed: adb -s emulator-5554 shell am force-stop dev.averi.lab
+cmd: Can't find service: activity
+
+<repo>/scripts/truth/lab-device.ts:132
+  throw new Error(`cell ${cell}: the app did not report ready within 10 s`);
+        ^
+
+Error: cell dialog-fullscreen: the app did not report ready within 10 s
+    at settled (<repo>/scripts/truth/lab-device.ts:132:9)
+    at async runCase (<repo>/scripts/truth/run-case.ts:90:18)
+    at async <anonymous> (<repo>/scripts/truth/live.ts:284:21)
+
+Node.js v22.23.4
+node --import tsx scripts/truth/live.ts --serial emulator-5554 --groups     6.10s user 3.88s system 1% cpu 12:26.63 total
+exit=1
