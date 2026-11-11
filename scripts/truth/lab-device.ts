@@ -332,7 +332,7 @@ export const windowInTransition = (window: string): boolean => /mCurrentFocus=nu
 export type HomeRead = { resolved: string } | { error: string };
 
 /**
- * The chooser group's focus read (live-chooser.ts, T7b), the harness's own, beside src's (android-chooser.ts
+ * The chooser group's focus read (live-chooser.ts, T7b), the harness's own, beside src's (android-wm.ts
  * #CHOOSER_FOCUS_COMMAND) and not imported from it, so the oracle does not share the code it judges: the window
  * manager's focus lines, and every activity record on the stack (`* Hist  #<n>: ActivityRecord{…}`, top first).
  */

@@ -55,8 +55,19 @@ export const TOUCHABLE_COMMAND = `${INPUT_SHOWN_COMMAND}; dumpsys window InputMe
  */
 export const FOCUSED_WINDOW_COMMAND = "dumpsys window displays | grep -E 'mCurrentFocus=|DisplayFrames w='; dumpsys window windows";
 
-/** The focused window's hash: `mCurrentFocus=Window{c6f91da u0 dev.averi.lab/…}` (`mCurrentFocus=null` in a transition). */
-const CURRENT_FOCUS_RE = /mCurrentFocus=Window\{([0-9a-f]+) /;
+/**
+ * The focused window, one line a display: `mCurrentFocus=Window{c6f91da u0 dev.averi.lab/…}` (`mCurrentFocus=null` in
+ * a transition) — its hash, and its component when the record names one (`u<user> <pkg>/<class>}`, ended by the
+ * record's `}`; a window named by a title, `Window{… u0 NotificationShade}`, has none). ONE reader for both readers of
+ * the line (A27): parseFocusedWindow asks the hash, defaultDisplayFocus the component. The hash is read of any
+ * `Window{<hash> ` record, the component of the user-token shape only, as the two regexes before A27 read them (every
+ * captured line has the token: tests/adapters/android-wm.test.ts).
+ */
+const CURRENT_FOCUS_RE = /mCurrentFocus=Window\{([0-9a-f]+) (?:u\d+ ([^\s/}]+\/[^\s}]+)\})?/g;
+
+/** Each focus line of `dump`, in its order: the window's hash, and its component when the record names one. */
+const focusLines = (dump: string): { hash: string; component: string | undefined }[] =>
+  [...dump.matchAll(CURRENT_FOCUS_RE)].map(([, hash, component]) => ({ hash, component }));
 /** One window's block of `dumpsys window windows`: its header, `  Window #9 Window{c6f91da u0 …}:`. */
 const WINDOW_HEADER_RE = /^ {2}Window #\d+ Window\{([0-9a-f]+) [^\n]*:$/gm;
 /** A window's type, the first `ty=` of its block — `mAttrs`'s (its `paramsForRotation` follow): a name, or a number for a type with none. */
@@ -108,7 +119,7 @@ interface WmWindow {
  * uiautomator root is, is not decided here: ui-tree/window-mark.ts matches the frame.
  */
 export function parseFocusedWindow(dump: string): FocusedWindow {
-  const focus = CURRENT_FOCUS_RE.exec(dump)?.[1];
+  const focus = focusLines(dump)[0]?.hash;
   const [, w, h] = /DisplayFrames w=(\d+) h=(\d+)/.exec(dump) ?? [];
   if (focus === undefined || w === undefined) return { of: 'unknown' };
   const screen = { width: Number(w), height: Number(h) };
@@ -392,4 +403,59 @@ export function parseNavigationBand(dump: string): number | undefined {
   }
   const [band] = entries;
   return entries.size === 1 && band !== 'none' ? band : undefined;
+}
+
+/**
+ * Each display's focus lines, in one shell line, under its header (`Display: mDisplayId=0 …`): `mCurrentFocus` (the
+ * focused window, `Window{<hash> u0 <component>}`, or `null` in a transition) and `mFocusedApp` (the focused
+ * activity: `ActivityRecord{<hash> u0 <component>} t<task>}` on API 33, `… u0 <component> t<task>}` on API 36; API 29
+ * wraps it in its window token). `dumpsys window displays` prints one pair per display, on API 29 and later
+ * (measured on 33; the API 36 fixture holds them too). When nothing prints, grep exits 1 and the call fails: no
+ * chooser. Every word a constant. The chooser's read (android-chooser.ts#chooserInFocus), read by defaultDisplayFocus.
+ */
+export const CHOOSER_FOCUS_COMMAND = "dumpsys window displays | grep -E 'Display: mDisplayId=|mCurrentFocus=|mFocusedApp='";
+
+// The component capture is written twice, here and in CURRENT_FOCUS_RE, on purpose: Stryker mutates only regex
+// literals (code review, D55).
+/**
+ * The focused activity's component: an ActivityRecord anywhere on the `mFocusedApp` line — the line itself on API 30
+ * and later, inside `AppWindowToken{… token=Token{… ActivityRecord{…}}}` on API 29 (AOSP 10's dump, not captured).
+ * Only a space or `}` ends the component: `}` on API 33 (`…ResolverActivity} t2641}`: batch-9's and batch-10's every
+ * read), the space before the task on API 36 (`…NexusLauncherActivity t2}`). A line cut right after the component,
+ * at a newline or the end, names nothing. Why API 33's brace was missed until D55r: ADR 0041's D55r amendment.
+ */
+const FOCUSED_APP_RE = /mFocusedApp=[^\n]*?ActivityRecord\{[0-9a-f]+ u\d+ ([^\s/}]+\/[^\s}]+)[ }]/;
+
+/** What opens each display's block in the dump, its id after it: `Display: mDisplayId=0 (organized)`. */
+const DISPLAY_HEADER = 'Display: mDisplayId=';
+
+/** The id of the default display, where `am start` with no `--display` starts the link. */
+const DEFAULT_DISPLAY = 0;
+
+/**
+ * The default display's block of the dump, from its header to the next one: display 0's, else the first display's
+ * (no dump of averi's has lacked a display 0). A dump with no header (focus lines read alone) is one display's, whole.
+ */
+function defaultDisplayBlock(dump: string): string {
+  const [whole = dump, ...displays] = dump.split(DISPLAY_HEADER);
+  return displays.find((block) => Number.parseInt(block, 10) === DEFAULT_DISPLAY) ?? displays[0] ?? whole;
+}
+
+/** The default display's focus as CHOOSER_FOCUS_COMMAND prints it: the focused activity's component and the focused window's. */
+export interface DisplayFocus {
+  /** `mFocusedApp`'s component, when its line names one. */
+  app?: string;
+  /** `mCurrentFocus`'s component: the first focus line's of the block that names one. */
+  window?: string;
+}
+
+/**
+ * The focused activity and window of the default display (defaultDisplayBlock), so both are one display's pair: another
+ * display's focus is not a link's started on display 0. Which of the two decides is the reader's (android-chooser.ts#chooserInFocus).
+ */
+export function defaultDisplayFocus(dump: string): DisplayFocus {
+  const block = defaultDisplayBlock(dump);
+  const app = FOCUSED_APP_RE.exec(block)?.[1];
+  const window = focusLines(block).find((line) => line.component !== undefined)?.component;
+  return { ...(app !== undefined && { app }), ...(window !== undefined && { window }) };
 }

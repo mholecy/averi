@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { adbShellArgv } from '../../../src/adapters/adb-shell.js';
-import { CHOOSER_FOCUS_COMMAND } from '../../../src/adapters/android-chooser.js';
+import { CHOOSER_FOCUS_COMMAND } from '../../../src/adapters/android-wm.js';
 import {
   adbLine,
   checkHand,

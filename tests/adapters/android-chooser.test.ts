@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { CHOOSER_FOCUS_COMMAND, chooserAlsoInFront, chooserInFocus, chooserSheet } from '../../src/adapters/android-chooser.js';
+import { chooserAlsoInFront, chooserInFocus, chooserSheet } from '../../src/adapters/android-chooser.js';
+import { CHOOSER_FOCUS_COMMAND } from '../../src/adapters/android-wm.js';
 import { everyNode, type ChooserSheet, type UiNode } from '../../src/adapters/types.js';
 import { parseDump } from '../helpers/android-dumps.js';
 

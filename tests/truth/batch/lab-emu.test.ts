@@ -2,7 +2,7 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { CHOOSER_FOCUS_COMMAND } from '../../../src/adapters/android-chooser.js';
+import { CHOOSER_FOCUS_COMMAND } from '../../../src/adapters/android-wm.js';
 import { TIMED_OUT, type Call, type CallResult, type Run } from '../../../scripts/truth/batch/bounded.js';
 import type { AcceptedEntry } from '../../../scripts/truth/batch/lab-chooser.js';
 import {
