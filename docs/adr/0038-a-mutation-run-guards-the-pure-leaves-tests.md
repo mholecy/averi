@@ -1678,8 +1678,13 @@ unproven. `jdk17Of` in lab-lines.ts replaces `javaHomeOf` with this order, each 
 it failed: JAVA_HOME; `java_home -v 17`; the first `*.jdk` (sorted) in /Library/Java/JavaVirtualMachines, then in
 ~/Library/Java/JavaVirtualMachines. A home counts when its release file says `JAVA_VERSION="17"` or `"17.…"` and it
 has `bin/javac` (a JRE would fail Gradle). The probes are injected (the env, the call, the folders, the fs), so the
-lookup stays a pure leaf. The build's LAB line names the JDK and its source (`JDK 17: <home> (from JAVA_HOME |
-java_home | JavaVirtualMachines)`). It is a WARN when an earlier source was passed over (JAVA_HOME set but not a JDK
-17, java_home failing), naming what each said. None found, the build's why lists every source tried and what it said.
-Both modules stay in the `lab` group, floor 98: lab-lines.ts 100 % (350 mutants) and lab-build.ts 100 % (284), cold,
-narrowed with `--mutate` (whose exit 1 is the fill-type amendment's).
+lookup stays a pure leaf. A met build's JDK (`JDK 17: <home> (from JAVA_HOME | java_home | JavaVirtualMachines)`) is
+in the `android-build` need's how, and reaches the device need through `askBuild` (BuildRef's `under`), whose line
+names it: lab-run.ts, which lists no build need, prints `LAB android: OK — …; this run's build installed under JDK 17:
+<home> (from …); …`. When an earlier source was passed over (JAVA_HOME set but not a JDK 17, java_home failing), the
+build's warning (`<what each said> — the build used JDK 17: <home> (from …)`) is carried there too: `LAB android:
+WARN — …`, the lab check still PASS and the exit 0. None found, the build's why lists every source tried and what it
+said: nothing built, the lab check WARNs and lab-run exits 3.
+The modules stay in the `lab` group: lab-lines.ts 100 % (351 mutants) and lab-build.ts 100 % (303), floor 98;
+lab-run.ts (its `jvms` option, a test's own folders) 94.95 % (516), floor 93 — cold, narrowed with `--mutate` (whose exit
+1 is the fill-type amendment's).

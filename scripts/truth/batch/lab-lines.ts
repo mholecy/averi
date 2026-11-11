@@ -198,9 +198,12 @@ export type JdkFrom = 'JAVA_HOME' | 'java_home' | 'JavaVirtualMachines';
 export interface Jdk17 {
   home: string;
   from: JdkFrom;
-  /** `<what the passed-over sources said> — the build used the one from <source>`; none when none was passed over. */
+  /** `<what the passed-over sources said> — the build used <jdkLine>`; none when none was passed over. */
   warning?: string;
 }
+
+/** The JDK the build ran under, for its line: `JDK 17: <home> (from <source>)`. */
+export const jdkLine = (jdk: { home: string; from: JdkFrom }): string => `JDK 17: ${nameInLine(jdk.home)} (from ${jdk.from})`;
 
 /** What the JDK lookup asks (T23), each answer injected: lab-build.ts gives the config's env, the call, the fs. */
 export interface JdkProbes {
@@ -240,7 +243,7 @@ const notJdk17 = (home: string, p: JdkProbes): string | undefined => {
 export async function jdk17Of(p: JdkProbes): Promise<Jdk17 | { why: string }> {
   const passed: string[] = [];
   const found = (home: string, from: JdkFrom): Jdk17 =>
-    passed.length === 0 ? { home, from } : { home, from, warning: `${passed.join('; ')} — the build used the one from ${from}` };
+    passed.length === 0 ? { home, from } : { home, from, warning: `${passed.join('; ')} — the build used ${jdkLine({ home, from })}` };
   const env = p.javaHomeEnv ?? '';
   if (env !== '') {
     const why = notJdk17(env, p);
@@ -269,5 +272,3 @@ export async function jdk17Of(p: JdkProbes): Promise<Jdk17 | { why: string }> {
   return { why: `no JDK 17 (${[...(env === '' ? ['JAVA_HOME unset'] : []), ...passed].join('; ')})` };
 }
 
-/** The JDK the build ran under, for its line: `JDK 17: <home> (from <source>)`. */
-export const jdkLine = (jdk: { home: string; from: JdkFrom }): string => `JDK 17: ${nameInLine(jdk.home)} (from ${jdk.from})`;

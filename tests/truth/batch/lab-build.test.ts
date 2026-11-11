@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DEVICE_CHECK_SIMULATOR } from '../../../scripts/truth/lab-device.js';
 import type { Run } from '../../../scripts/truth/batch/bounded.js';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
-import { ANDROID_BUILD_NEED, APK_PATH, BUILD_SECS, checkDevice, CATALOG_SECS, GRADLE_STOP_SECS, IOS_APP_PATH, IOS_BUILD_NEED, JAVA_HOME, JAVA_HOME_SECS, LAB_BLOCK, labBlock, labBuild } from '../../../scripts/truth/batch/lab-build.js';
+import { ANDROID_BUILD_NEED, APK_PATH, askBuild, BUILD_SECS, checkDevice, CATALOG_SECS, GRADLE_STOP_SECS, IOS_APP_PATH, IOS_BUILD_NEED, JAVA_HOME, JAVA_HOME_SECS, LAB_BLOCK, labBlock, labBuild } from '../../../scripts/truth/batch/lab-build.js';
 import type { NeedCtx } from '../../../scripts/truth/batch/runner.js';
 import { CATALOG, LAB_UDID, labWorld, runOf, type LabWorld, type WorldOptions } from './lab-fakes.js';
 
@@ -163,7 +163,7 @@ describe('the Android build (batch-11.sh:298, 308–314): JDK 17, gradlew assemb
     expect(s).toEqual({
       ok: true,
       how: expect.stringContaining(`under JDK 17: ${zulu} (from JavaVirtualMachines);`),
-      warning: `java_home -v 17 → nothing: exit 1 Unable to find any JVMs matching version "17"; ${join(dir, 'none')}: no *.jdk (or unreadable) — the build used the one from JavaVirtualMachines`,
+      warning: `java_home -v 17 → nothing: exit 1 Unable to find any JVMs matching version "17"; ${join(dir, 'none')}: no *.jdk (or unreadable) — the build used JDK 17: ${zulu} (from JavaVirtualMachines)`,
     });
     expect(sandboxed.seen.find((c) => c.words.endsWith('assembleDebug'))?.env).toEqual({ JAVA_HOME: zulu });
     // A JRE 17 (no bin/javac) is passed over: Gradle needs the compiler.
@@ -297,5 +297,25 @@ describe("checkDevice's warnings (batch-13): the readying's (the companion entry
     expect(await checkDevice(ctx, {}, device('entry stale'))).toStrictEqual({ ok: true, how: "the device; not rebuilt; cells main's", warning: 'entry stale' });
     expect(await checkDevice(ctx, { build: failed }, device('entry stale'))).toStrictEqual({ ok: true, how: "the device; not rebuilt; cells main's", warning: 'entry stale; the build failed; the app already installed is used' });
     expect(await checkDevice(ctx, { build: failed }, device())).toStrictEqual({ ok: true, how: "the device; not rebuilt; cells main's", warning: 'the build failed; the app already installed is used' });
+  });
+
+  it('T23: a met build — what it was built under in the how, its own warning said (lab-run reaches the build only here)', async () => {
+    const met = (warning?: string, under?: string) => ({
+      ensure: async () => ({ ok: true as const, how: 'built', ...(warning !== undefined && { warning }) }),
+      built: () => '/app.apk',
+      ...(under !== undefined && { under: () => under }),
+    });
+    const jdk = 'JDK 17: /jdk (from java_home)';
+    expect(await checkDevice(ctx, { build: met(undefined, jdk) }, device())).toStrictEqual({ ok: true, how: `the device; this run's build installed under ${jdk}; cells main's` });
+    expect(await checkDevice(ctx, { build: met() }, device())).toStrictEqual({ ok: true, how: "the device; this run's build installed; cells main's" });
+    expect(await checkDevice(ctx, { build: { ...met(undefined, jdk), under: () => undefined } }, device())).toStrictEqual({ ok: true, how: "the device; this run's build installed; cells main's" });
+    expect(await checkDevice(ctx, { build: met('java_home → nothing', jdk) }, device('entry stale'))).toStrictEqual({
+      ok: true,
+      how: `the device; this run's build installed under ${jdk}; cells main's`,
+      warning: 'entry stale; java_home → nothing',
+    });
+    // askBuild's own answer: no under, no warning key when the build has none.
+    expect(await askBuild(ctx, { build: met() })).toStrictEqual({ built: '/app.apk' });
+    expect(await askBuild(ctx, { build: met('w', jdk) })).toStrictEqual({ built: '/app.apk', under: jdk, warning: 'w' });
   });
 });

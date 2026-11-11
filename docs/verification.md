@@ -283,9 +283,12 @@ that is not the lab AVD before anything is built.
 
 The Android build runs under JDK 17, looked up in this order: JAVA_HOME, then `/usr/libexec/java_home -v 17`, then
 the first `*.jdk` in `/Library/Java/JavaVirtualMachines` and then in `~/Library/Java/JavaVirtualMachines`. A home
-counts when its `release` file says 17 and it has `bin/javac`. The build's LAB line names the JDK and where it came
-from, and is a WARN naming what an earlier source said when one was passed over. When none is found, the line says what
-each source gave.
+counts when its `release` file says 17 and it has `bin/javac`. The SUMMARY's `LAB android:` line names it: `this run's
+build installed under JDK 17: <home> (from JAVA_HOME | java_home | JavaVirtualMachines)`. When an earlier source was
+passed over (JAVA_HOME set but not a JDK 17, or `java_home` finding none, as inside the agent's sandbox), that line is
+a WARN that starts with what each passed-over source said and `— the build used JDK 17: <home> (from …)`. The lab check
+still passes and the exit code is unchanged. When no JDK 17 is found, nothing is built: the lab check WARNs with the
+build's reason, which lists every source and what it gave, and the run ends unproven (exit 3).
 
 Only the owner runs it. A chooser run that leaves a lab default behind fails the run by name, and the cleanup clears
 that default by uninstalling and reinstalling the lab app. Everything it writes goes under `--out`, apart from the

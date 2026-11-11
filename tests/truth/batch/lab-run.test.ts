@@ -175,7 +175,7 @@ describe('lab-run.ts: a clean run, the blocks\' order and the lab block', () => 
     expect(s.slice(0, 4)).toEqual([
       '======== SUMMARY',
       "OK checkout: main's HEAD aaaaaaaa, clean",
-      `LAB android: OK — averi_lab emulator ${LAB_SERIAL}; this run's build installed; the APK's assets/cells.json is main's (pulled: ${apk}); handlers: averilab://shared/open 2, averilab://cell/open 1`,
+      `LAB android: OK — averi_lab emulator ${LAB_SERIAL}; this run's build installed under JDK 17: ${join(root, 'jdk17')} (from java_home); the APK's assets/cells.json is main's (pulled: ${apk}); handlers: averilab://shared/open 2, averilab://cell/open 1`,
       'LAB handlers: OK — handlers as expected: averilab://shared/open 2, averilab://cell/open 1',
     ]);
     const after = s.slice(4);
@@ -203,6 +203,25 @@ describe('lab-run.ts: a clean run, the blocks\' order and the lab block', () => 
     // Its state file clean: the next run is not refused.
     expect(JSON.parse(readFileSync(join(dirOf('chooser'), 'state.json'), 'utf8'))).toEqual({ dirty: false });
     expect(seam.exits).toEqual([0]);
+  });
+
+  it('T23, the agent\'s sandbox: java_home finds no JDK, one in a JVM folder builds — the android line WARNs naming both, the lab check PASS, exit 0', async () => {
+    fresh({ buildFails: 'java' });
+    const jvms = join(root, 'jvms');
+    const zulu = join(jvms, 'zulu-17.jdk', 'Contents', 'Home');
+    mkdirSync(join(zulu, 'bin'), { recursive: true });
+    writeFileSync(join(zulu, 'release'), 'JAVA_VERSION="17.0.12"\n');
+    writeFileSync(join(zulu, 'bin', 'javac'), '');
+    const argv = ['--out', out, '--repo', repo, '--serial', LAB_SERIAL, '--groups', 'forms'];
+    expect(await labRun({ argv, env: {}, io: io(), wait: noWait, jvms: [join(root, 'none'), jvms] })).toBe(0);
+    const s = summary();
+    const jdk = `JDK 17: ${zulu} (from JavaVirtualMachines)`;
+    const passed = `java_home -v 17 → nothing: exit 1 Unable to find any JVMs matching version "17"; ${join(root, 'none')}: no *.jdk (or unreadable)`;
+    expect(s.find((l) => l.startsWith('LAB android:'))).toBe(
+      `LAB android: WARN — ${passed} — the build used ${jdk}: averi_lab emulator ${LAB_SERIAL}; this run's build installed under ${jdk}; the APK's assets/cells.json is main's (pulled: ${join(dirOf('lab'), 'installed.apk')}); handlers: averilab://shared/open 2, averilab://cell/open 1`,
+    );
+    expect(s.find((l) => l.startsWith('lab check:'))).toMatch(/^lab check: PASS — /);
+    expect(seam.words.find((w) => w.endsWith('assembleDebug'))).toBeDefined();
   });
 
   it('this run\'s build failing: the lab check WARNs naming it; the live groups run on the APK already installed; unproven, exit 3', async () => {

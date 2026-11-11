@@ -204,7 +204,7 @@ describe('a fake lab batch under runBatch: the lab lines from the needs, the rea
       '======== SUMMARY',
       "OK checkout: main's HEAD aaaaaaaa, clean",
       `LAB android-build: OK — built from the checkout under test (${join(repo, 'fixtures/apps/android/build/outputs/apk/debug/AveriLab-debug.apk')}) under JDK 17: ${join(root, 'jdk17')} (from java_home); its assets/cells.json main's; the Gradle daemon stopped`,
-      `LAB android: OK — averi_lab emulator ${LAB_SERIAL}; this run's build installed; the APK's assets/cells.json is main's (pulled: ${apk}); handlers: averilab://shared/open 2, averilab://cell/open 1`,
+      `LAB android: OK — averi_lab emulator ${LAB_SERIAL}; this run's build installed under JDK 17: ${join(root, 'jdk17')} (from java_home); the APK's assets/cells.json is main's (pulled: ${apk}); handlers: averilab://shared/open 2, averilab://cell/open 1`,
       "LAB ios: OK — averi-lab iPhone 17 simulator, iOS 27.0, reset; not rebuilt; the installed cells.json is main's",
       "lab check: PASS — every lab need met: android-build, android (each one's LAB line above)",
       'D55 browser role: WARN — not compared: before: exit 255 Unknown command: get-role-holders; after: exit 255 Unknown command: get-role-holders',
