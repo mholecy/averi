@@ -226,7 +226,9 @@ the MCP tools. Its modules, by verb:
   view the motion shows on idb's flat list), `flush-check.ts` (the `fully: true` stop's flush probe, ADR 0013),
   `margin-memo.ts` (ADR 0026), `aim-floor.ts` and `unfit-axis.ts` (proofs from the call's own evidence, D68, D59),
   `within.ts` (the scroll view the caller names, D78), `scroll-text.ts` (every sentence: `describeScrollResult`,
-  `scrollFailure`). `swipe.ts`: a direction over the device box, `swipe.ts#screenBox`.
+  `scrollFailure`). `swipe.ts`: a direction over the device box, `swipe.ts#screenBox`. Its orientation read is the
+  one reader of the read seam that opts out of its throw: a failure no wait cures loses only the witness, the swipe goes
+  over the device box and its note quotes the failure (ADR 0036).
 - **What holds the app** — `app-holder-text.ts` (A10): the words over the adapters' `AppHolder`.
 
 Vocabulary: **resolve** / **settle** — find a target / see it at the same rect twice; **guard** — the keyboard check
@@ -646,7 +648,8 @@ only what the tool descriptions do not already say:
   case, never inferred. ADR 0020: the truth outranks a hand-written expectation.
 - **A mutation run guards the pure leaves' tests** (`npm run mutate`, ADR 0038): Stryker mutates the modules
   `scripts/mutation/scope.json` names, in four groups (`core`, `android`, `scene`, `lab`), and fails when a module's
-  score drops below its floor. scope.json holds each module's floor and latest baseline; earlier baselines are in
+  score drops below its floor; each group is one Stryker process bounded at 600 s. A branch that touches a scoped
+  module, its tests or anything they import runs it cold (`npm run mutate -- --force`) before merging. scope.json holds each module's floor and latest baseline; earlier baselines are in
   docs/mutation-ledger.md.
 - **Releases** follow docs/release.md: gates A (off-device), B (Android) and C (iOS) before any version commit.
 

@@ -90,6 +90,8 @@ named modules' doc comments, which the new ARCHITECTURE.md names in the layer's 
 - A new decision gets an ADR (or an amendment), a row of work a backlog row; ARCHITECTURE.md changes only where the
   layering, a module's job or a word of a layer's vocabulary changes, and says it without a date.
 - A reader who wants the history of a paragraph starts at the table above, then at the long form in git.
+- A citation in `src/` of a moved paragraph (`ARCHITECTURE.md §N, "…"`) resolves through the table above, and is
+  repointed when its file is next touched; A32 changed no source file.
 - tests/docs/references.test.ts still resolves every symbol reference in ARCHITECTURE.md, the skill docs and the ADRs;
   the new text names fewer symbols, each of which resolves.
 - The package is about 290 KB smaller.

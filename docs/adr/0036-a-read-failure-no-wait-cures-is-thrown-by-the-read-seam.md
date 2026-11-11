@@ -35,7 +35,8 @@ Amended 2026-11-01 (D42: the keyboard guard's looks pass a terminal failure thro
   failing result) and the flow engine's `isTerminal` (flow/engine.ts). They decide what a terminal failure MEANS to
   their caller, which is not a read's question.
 - One reader opts out on purpose: the swipe's orientation read (interact/swipe.ts#swipeScreen) catches it, and loses
-  only its witness — the swipe is sent over the device box and its note quotes the failure (ARCHITECTURE.md).
+  only its witness — the swipe is sent over the device box and its note quotes the failure (this ADR; ARCHITECTURE.md §2,
+  Interaction).
 - fill's not-input hint read (interact/fill.ts, `notInput`) still reads raw and swallows any failure, the terminal one
   included: it is a hint, read only when no re-read happened. Whether it should stop on a terminal failure is left open.
 - The raw `uiTree()` calls outside src/adapters and the seam are pinned, with the reason each may read raw, by
