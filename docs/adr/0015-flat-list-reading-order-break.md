@@ -43,6 +43,12 @@ The row is `ui-tree/draw-order.ts`'s `flatListReadingOrder`, and only the `targe
    applying to every WDA run in reading order, SwiftUI's and UIKit's too; the amendment "React Native's covers listed before
    the target" below): idb lists no bare View, and reads a cover above its flat list's top-bar line as the bar — the lab's
    rn-banner under idb: every tap `Tapped`, every colour assert passing on the cover. Remedy: `treeSource: wda`.
+5. **React Native's role-carrying container leaves LR4's lie on Android** (D75 round 1, not narrowed by the owner;
+   numbered 2026-11-11, D85; the amendment "Android Views list children by location" below, its React Native role
+   residual): a View whose accessibility role React Native dumps as `android.view.View` (`toolbar`, `alert`, `header`,
+   `tablist`, …) reads as a node provider's host, so the uiautomator parser marks nothing under it, and a target with
+   its later-drawn cover inside it keeps the location order as draw order — the lab's rn-banner-role (D77, captured
+   live 2026-11-11): every tap `Tapped` at the centre, on the cover, every colour assert passing on the cover.
 
 ## Amendment: covers listed before the target (2026-10-19, round 8)
 
@@ -415,7 +421,7 @@ is AOSP's, every classic ViewGroup's).
   everything under it stay unmarked: an RN container with one of those roles holding a target and its cover keeps
   LR4's lie (a `Tapped` on the cover). A view with such a role as a CHILD (a toast with `role="alert"`) does not unmark
   its parent's run. Not narrowed (the owner's decision, D75 round 1); backlog D77 asks for an RN banner cell whose
-  container carries such a role.
+  container carries such a role. Measured live 2026-11-11 (rn-banner-role) and numbered residual 5 above (D85).
 - Every marked run pays what WDA's does (this ADR's second residual and the LR3 amendment's third): two overlapping
   siblings that are really drawn in list order — a badge over an avatar, a label laid over its field — ask the eyes,
   and are refused where a screenshot cannot tell them apart. The lab's classic-Views twin of rn-banner is not built
