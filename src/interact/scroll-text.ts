@@ -15,10 +15,10 @@ import { absenceError, describeTarget, type WaitEvidence } from './resolve.js';
 import { fullyClaimed, shortOf, unfitRoom, type AppliedKeyboard, type Judged, type Unfit } from './scroll-read.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type FlushCut, type FlushPlace, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 import type { CarriedUnder, UnseenStrokes } from './motion-ledger.js';
-import { MIN_STROKE_BOX, type NamedNoRoom, type PresentedTouchDown, type StrokedAcross, type StrokedBeside, type TouchedOn } from './stroke-plan.js';
+import { MIN_STROKE_BOX, type PresentedTouchDown, type StrokedAcross, type StrokedBeside, type TouchedOn } from './stroke-plan.js';
 import { axisOf, EDGE_TOWARD, OPPOSITE, type Direction } from './swipe.js';
 import { isRect, WithinRefusedError, type Within, type WithinRefusal } from './within.js';
-import { cutByRemedy, cutRemedy, cutSliverText, dismissKeyboardFirstText, hideClause, hideKeyboardHow, pastSideText, ridingKeyboard, underKeyboardText, untriedSideText, wholeThinWayPast, type KeyboardUp } from './target-text.js';
+import { cutByRemedy, cutRemedy, cutSliverText, dismissKeyboardFirstText, hideClause, hideKeyboardBriefly, hideKeyboardHow, hideKeyboardInFlow, pastSideText, ridingKeyboard, underKeyboardText, untriedSideText, wholeThinWayPast, type KeyboardUp } from './target-text.js';
 
 /**
  * Every sentence `scroll_until` says: the reply for a stop (`describeScrollResult`, over the result
@@ -857,8 +857,8 @@ export interface WithinRemedy {
   readonly intoOneOf: string;
   readonly absent: string;
   readonly ambiguous: string;
-  /** D80: how the caller hides the keyboard that leaves a named scroll view no room, before scrolling it again. */
-  readonly hideKeyboard: string;
+  /** D80: how the caller hides the keyboard that leaves a named scroll view no room, by the adapter's `dismissal`. */
+  readonly hideKeyboard: (remedy: KeyboardRemedy) => string;
 }
 
 /**
@@ -878,7 +878,7 @@ export const WITHIN_REMEDY = {
     intoOneOf: "with that one's within",
     absent: 'give a selector of the scroll view or of an element inside it, or its rect (ui_snapshot)',
     ambiguous: ", or give the scroll view's rect",
-    hideKeyboard: 'hide the keyboard (tap a neutral element such as the screen title)',
+    hideKeyboard: hideKeyboardBriefly,
   },
   spec: {
     listed: nodeText,
@@ -886,7 +886,7 @@ export const WITHIN_REMEDY = {
     intoOneOf: SPEC_REMEDY_SENTENCE,
     absent: 'give an element spec of the scroll view or of an element inside it',
     ambiguous: '',
-    hideKeyboard: 'hide the keyboard in an earlier step (a fill with dismissKeyboard: true, or a tap on a neutral element)',
+    hideKeyboard: hideKeyboardInFlow,
   },
 } as const satisfies Record<string, WithinRemedy>;
 
@@ -895,9 +895,10 @@ export type WithinRemedyForm = keyof typeof WITHIN_REMEDY;
 
 /**
  * Why `within` names no scroll view to stroke (interact/within.ts#WithinRefusal, D78), after `stopped before any
- * swipe — ` (or, `noRoom`, after `stopped after N swipes, without swiping further — `, D80): what it matched or is the rect of, and the way out — a narrower selector, a rect the tree lists (each
- * scroll view told along the stroke given as `within` takes it, `withinRect`), another direction or another scroll
- * view, or, on idb, the tree source that lists scroll views. The way out of an absent or ambiguous one is `remedy`'s:
+ * swipe — ` (or, `noRoom`, after `stopped after N swipes, without swiping further — `, D80): what it matched or is
+ * the rect of, and the way out — a narrower selector, a rect the tree lists (each scroll view told along the stroke
+ * given as `within` takes it, `withinRect`), another direction or another scroll view, or, on idb, the tree source
+ * that lists scroll views. The way out of an absent or ambiguous one is `remedy`'s:
  * a flow (D81) is offered no rect.
  */
 function withinText(within: Within, refused: WithinRefusal, remedy: WithinRemedy): string {
@@ -932,22 +933,28 @@ function withinText(within: Within, refused: WithinRefusal, remedy: WithinRemedy
 }
 
 /**
- * D80: why the named scroll view had no room for the round's stroke (stroke-plan.ts#NamedNoRoom), after `within <it> `:
- * the keyboard over it, from its top (a vertical stroke's), and the length left of it — under MIN_STROKE_BOX, or at
- * least that and cut under it by what is drawn over it — then the way out: the keyboard hidden (`remedy`'s, the MCP
- * tool's words or a flow's) when it covers the scroll view, else more of the scroll view brought on screen.
+ * D80: why the named scroll view had no room for the round's stroke (within.ts#WithinRefusal's `noRoom`), after
+ * `within <it> `: the keyboard over it, from its top (a vertical stroke's), and the length left of it — under
+ * MIN_STROKE_BOX, or at least that and cut under it by what is drawn over it — then the way out: more of the scroll
+ * view brought on screen, or, when the keyboard covers it, the keyboard hidden first — how, by what the adapter hides
+ * it with (target-text.ts#hideClause over `remedy`'s form: the MCP tools' `press_key back` or a neutral tap, a flow's
+ * step before this one), and where no key hides it the adapter's own advice after.
  */
-function noRoomText({ rect, toward, room, keyboardTop }: NamedNoRoom, remedy: WithinRemedy): string {
+function noRoomText({ rect, toward, room, keyboard }: Extract<WithinRefusal, { of: 'noRoom' }>, remedy: WithinRemedy): string {
   const side = axisOf(toward) === 'vertical' ? 'height' : 'width';
-  const keyboard = keyboardTop === undefined ? '' : `the keyboard covers it from y ${keyboardTop}, `;
+  const covers = keyboard === undefined ? '' : `the keyboard covers it from y ${keyboard.lineY}, `;
   const short =
     room < MIN_STROKE_BOX
-      ? `${keyboard === '' ? `${room} of its ${side} lies on the screen` : `${keyboard}leaving ${room} of its ${side}`}, under the ${MIN_STROKE_BOX} a swipe needs`
-      : keyboard === ''
+      ? `${covers === '' ? `${room} of its ${side} lies on the screen` : `${covers}leaving ${room} of its ${side}`}, under the ${MIN_STROKE_BOX} a swipe needs`
+      : covers === ''
         ? `what is drawn over it leaves too little of the ${room} of its ${side} on the screen`
-        : `${keyboard}and what is drawn over it leaves too little of the ${room} of its ${side} left`;
-  const hide = keyboard === '' ? '' : `${remedy.hideKeyboard}, or `;
-  return `names the scroll view ${rectText(rect)}, which has no room for a swipe ${toward}: ${short} — ${hide}swipe the screen so more of the scroll view shows, then scroll_until it again`;
+        : `${covers}and what is drawn over it leaves too little of the ${room} of its ${side} left`;
+  const swipe = 'swipe the screen so more of the scroll view shows';
+  const way =
+    keyboard === undefined
+      ? `${swipe}, then scroll_until it again`
+      : hideClause(keyboard.remedy, `${swipe}, or hide the keyboard first (${remedy.hideKeyboard(keyboard.remedy)}), then scroll_until it again`);
+  return `names the scroll view ${rectText(rect)}, which has no room for a swipe ${toward}: ${short} — ${way}`;
 }
 
 /** The words of an axis for `unfitText`: how a target's size along it is said. */

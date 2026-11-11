@@ -130,6 +130,14 @@ export const hideKeyboardHow = ({ dismissal }: KeyboardRemedy): string =>
  */
 export const hideKeyboardBriefly = ({ dismissal }: KeyboardRemedy): string => (dismissal === 'back' ? 'press_key back' : NEUTRAL_TAP);
 
+/**
+ * `hideKeyboardHow`'s FLOW form alone, for a reply only a flow reads (scroll-text.ts#WITHIN_REMEDY's `spec`, D80):
+ * `` `dismissKeyboard: true` on the fill before this step ``, or `tap a neutral element such as the screen title — a
+ * tap: step before this one` — keyed on the same `dismissal` as the MCP tools' `hideKeyboardBriefly`.
+ */
+export const hideKeyboardInFlow = ({ dismissal }: KeyboardRemedy): string =>
+  dismissal === 'back' ? '`dismissKeyboard: true` on the fill before this step' : `${NEUTRAL_TAP} — a tap: step before this one`;
+
 /** `the soft keyboard is up (its top edge at y 590)`: the one phrase of `dismissKeyboardFirstText` and `keyboardMayCoverText`. */
 export const keyboardUpText = (lineY: number): string => `the soft keyboard is up (its top edge at y ${lineY})`;
 

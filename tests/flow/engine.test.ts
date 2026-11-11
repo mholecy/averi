@@ -1808,7 +1808,7 @@ flows:
       fake.attachKeyboard({ state: 'shown', frame: { x: 0, y: 1100, width: 1080, height: 1120 } }, 'shown');
       const run = FlowEngine.run(optionalScroll('{ element: { id: lab.scroll-bounded.O }, within: { id: lab.scroll-bounded.S } }'), fake, FAST, { flow: 'f' });
       await expect(run).rejects.toThrow(
-        'optional step not skipped: its within names a scroll view on this screen with no room to swipe it, which an earlier step must make — scroll_until id:"lab.scroll-bounded.O" stopped before any swipe — within id:"lab.scroll-bounded.S" names the scroll view 0,1046 1080x495, which has no room for a swipe down: the keyboard covers it from y 1100, leaving 54 of its height, under the 80 a swipe needs — hide the keyboard in an earlier step (a fill with dismissKeyboard: true, or a tap on a neutral element), or swipe the screen so more of the scroll view shows, then scroll_until it again',
+        'optional step not skipped: its within names a scroll view on this screen with no room to swipe it, which an earlier step must make — scroll_until id:"lab.scroll-bounded.O" stopped before any swipe — within id:"lab.scroll-bounded.S" names the scroll view 0,1046 1080x495, which has no room for a swipe down: the keyboard covers it from y 1100, leaving 54 of its height, under the 80 a swipe needs — swipe the screen so more of the scroll view shows, or hide the keyboard first (`dismissKeyboard: true` on the fill before this step), then scroll_until it again',
       );
       expect(fake.swipes).toHaveLength(0);
       expect(fake.taps).toHaveLength(0);

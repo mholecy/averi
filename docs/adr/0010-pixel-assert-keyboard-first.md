@@ -766,14 +766,14 @@ dropped. Mutation
 ## Amendment: D80 — a named scroll view with no room for a stroke stops the scroll, never the gesture box whole (2026-11-11)
 
 **Context.** D78's residual 1: when the scroll view `within` names, and every one nested in it, leaves no room for a
-stroke (`MIN_STROKE_BOX` along it, above the keyboard and clear of what is drawn over it), `planStroke` fell back to
-the gesture box WHOLE, as it does for the screen's largest scroller. Over android `scroll-bounded`'s real dump with a
+stroke (`MIN_STROKE_BOX` along it, above the keyboard and clear of what is drawn over it), `planStroke` fell back to the
+gesture box WHOLE, as it does for the screen's largest scroller. Over android `scroll-bounded`'s real dump with a
 keyboard whose top lies at 1100 — `lower` (1046–1541) left 54 of its height — the stroke for O touched down at
 (540,880), inside `upper`: the list the caller did not name, and the reply would read as `lower`'s.
 
 **Decision.** (a) Where the fallback happens: `src/interact/stroke-plan.ts#planStroke`, its `strokeRoom` answering no
-room. The plan now says so (`StrokePlan.noRoom`, a `src/interact/stroke-plan.ts#NamedNoRoom`) when no room was found,
-a scroll view is named (`Memory.named`), no read has found the target yet, the round has a gesture box and the stroke is
+room. The plan now says so (`StrokePlan.noRoom`, a `src/interact/stroke-plan.ts#NamedNoRoom`) when no room was found, a
+scroll view is named (`Memory.named`), no read has found the target yet, the round has a gesture box and the stroke is
 not one the motion ledger keeps over the screen box (`StrokeAsk.screenBox`). Without `within`, and once the target is
 read (its own scroll views the candidates, `within` counting no more), the fallback is as before. A nested scroll view
 with room still takes the stroke (D59b): only "none of them" stops. The stroke is still planned — the plan decides, the
@@ -781,32 +781,42 @@ round acts — so its memory is kept as before.
 
 (b) Judged EVERY round, where the plan judges room, not once at the read that resolved `within`: a keyboard up after a
 swipe inside the list stops the next round, after that swipe. The round (`src/interact/scroll-rounds.ts`, after the
-bound — no stroke would be sent at a bound either — and before the presented hold) stops `within`, the stroke not
-sent. `ScrollOutcome`'s `within` now carries `swipes: number`, said by `stoppedWhen` (`stopped before any swipe`, or
-`stopped after N swipes, without swiping further`).
+bound — no stroke would be sent at a bound either — and before the presented hold) stops `within`, the stroke not sent —
+said before the presented hold, as no stroke is sent either way. `ScrollOutcome`'s `within` now carries `swipes:
+number`, said by `stoppedWhen` (`stopped before any swipe`, or `stopped after N swipes, without swiping further`). A
+round whose tree did not read (review round 1, MINOR-4, the coordinator's decision) does not stop on the last read's
+keyboard line: it holds for a read (`confirm`), as the presented stop does; with no confirming read left it stops on the
+last read that read — still never the stroke over the gesture box whole.
 
 (c) A new refusal kind, `noRoom` (`src/interact/within.ts#WithinRefusal`): the named rect, the stroke's direction, the
-room — its length along the stroke on the gesture box, above the keyboard's top for a vertical stroke (0 when none of
-it lies there), and `keyboardTop` when the keyboard cuts that part. Raised through the same `WithinRefusedError`, so a
-flow sees the kind.
+room — its length along the stroke on the gesture box, above the keyboard's top for a vertical stroke (0 when none of it
+lies there) — and `keyboard` (a `src/interact/target-text.ts#KeyboardUp`: its top and the adapter's remedy) when the
+keyboard cuts that part; the plan gives the top (`NamedNoRoom.keyboardTop`), the round the remedy. Raised through the
+same `WithinRefusedError`, so a flow sees the kind.
 
 (d) Its words (`src/interact/scroll-text.ts`, `noRoomText`), one sentence, both remedy forms: `within <it> names the
 scroll view 0,1046 1080x495, which has no room for a swipe down: the keyboard covers it from y 1100, leaving 54 of its
-height, under the 80 a swipe needs — hide the keyboard (tap a neutral element such as the screen title), or swipe the
-screen so more of the scroll view shows, then scroll_until it again`. No keyboard over it: `54 of its height lies on the
-screen, under the 80 a swipe needs`, the hide clause dropped. Room of 80 or more cut by what is drawn over it: `what is
+height, under the 80 a swipe needs — swipe the screen so more of the scroll view shows, or hide the keyboard first
+(press_key back), then scroll_until it again`. No keyboard over it: `54 of its height lies on the screen, under the 80 a
+swipe needs — swipe the screen …, then scroll_until it again`. Room of 80 or more cut by what is drawn over it: `what is
 drawn over it leaves too little of the N of its height` (`… left` after the keyboard clause). A sideways stroke: `of its
-width`. The keyboard's way out is `WithinRemedy.hideKeyboard`: the MCP tool's (`rect`) a tap on a neutral element, a
-flow's (`spec`) `hide the keyboard in an earlier step (a fill with dismissKeyboard: true, or a tap on a neutral
-element)`. No `within` is offered: the one given is right, only the screen is not.
+width`. How to hide the keyboard follows the platform's `KeyboardRemedy` (review round 1, MAJOR-1), one source: the
+round carries the applied cover's remedy (`lastCover`) into the refusal (`keyboard: KeyboardUp`), and
+`WithinRemedy.hideKeyboard` words it by `dismissal` through the shared helpers — the MCP tool's
+`src/interact/target-text.ts#hideKeyboardBriefly` (`press_key back`, or a neutral tap where no key hides it), a flow's
+`src/interact/target-text.ts#hideKeyboardInFlow` (`` `dismissKeyboard: true` on the fill before this step ``, or a
+neutral tap in a `tap:` step before this one) — composed by `src/interact/target-text.ts#hideClause`, which adds the
+adapter's own advice where no key hides it (`; this adapter cannot hide it on its own (…)`), as the bound's whole-screen
+advice (`hideToJudgeWholeScreen` in scroll-text.ts) does. No `within` is offered: the one given is right, only the
+screen is not.
 
 (e) Inside `optional:` (`src/flow/engine.ts`, `notSkippable`, unchanged: every kind but `absent`) a `noRoom` fails the
 flow, terminal, with its own reason — `optional step not skipped: its within names a scroll view on this screen with no
 room to swipe it, which an earlier step must make — …`. Why not skip it like `absent`: `absent` is skipped because the
 list, like an interstitial, may not be on this screen; here it IS on this screen (resolved), so a skip would run on as
-if it had been scrolled. And not "no screen cures" (the other kinds' authoring error): the keyboard is a screen state
-an earlier step changes, as a refused tap's cover is — the same terminal class (a ladder probes `detect` once and does
-not escalate).
+if it had been scrolled. And not "no screen cures" (the other kinds' authoring error): the keyboard is a screen state an
+earlier step changes, as a refused tap's cover is — the same terminal class (a ladder probes `detect` once and does not
+escalate).
 
 **Residuals.** (1) The keyboard is said only when its line cuts the named view's part on the gesture box; a view cut by
 a system band and the keyboard below it is said as "on the screen". (2) The check covers the strokes toward the target
@@ -822,16 +832,26 @@ gesture box 0; a gesture box cut at 1100 54 and no keyboard said, a keyboard bel
 `screenBox` and no gesture box none; a 60-wide strip stroked sideways 60; a 120-high one cut by a bar `noRoom` 120),
 tests/interact/scroll-rounds.test.ts (by rect and by selector: no stroke, the outcome and the exact sentence, a
 `WithinRefusedError` `noRoom`; no `within`: `upper` stroked; the keyboard up after one swipe: stopped after it; the spec
-form's sentence; the no-keyboard, cut and sideways words, at 80 and 120), tests/interact/scroll.test.ts (the driver
-with the keyboard oracle's IME frame: no swipe, the MCP sentence), tests/flow/engine.test.ts (inside `optional:` a
-`noRoom` fails the flow with its own reason, no swipe, nothing after it run). Hand mutants (22), each killed: the plan's gate without its no-room, gesture-box,
-screen-box, target-unread conjuncts in turn; off the gesture box 1 for 0; the sideways branch dropped; the keyboard's
-`>=` as `>`; `Math.max(0, …)` dropped; the keyboard said when it does not cut, and not said when it does; the round's
-stop dropped; its `swipes` 0; `stoppedWhen` as `before any swipe`; `room < MIN_STROKE_BOX` as `<=`; `height` for a
-sideways stroke; the hide clause dropped, and always the rect form's; the short clause's keyboard branch, and the cut
-clause's, dropped; the direction said `down` always; the engine's `noRoom` reason never and always chosen. One
-equivalent, kept: the round's guard `s.rules.within !== undefined` as `true` — the plan names a scroll view only when
-`within` was given (`nameScrollView`), so `noRoom` implies it; the guard is there for the type. stroke-plan.ts,
+form's sentence; the no-keyboard, cut and sideways words, at 80 and 120), tests/interact/scroll.test.ts (the driver with
+the keyboard oracle's IME frame: no swipe, the MCP sentence), tests/flow/engine.test.ts (inside `optional:` a `noRoom`
+fails the flow with its own reason, no swipe, nothing after it run). Review round 1's tests: the way out by `dismissal`
+(an Android dump with a `back` cover: `press_key back`; a cover of dismissal `none`: a neutral tap, then the advice; the
+spec form's `tap:` step); a round whose tree did not read held for a read, and with none left stopped on the last one's
+facts; a horizontal view running past the gesture box judged on its 30 of 200. Hand mutants (22), each killed: the
+plan's gate without its no-room, gesture-box, screen-box, target-unread conjuncts in turn; off the gesture box 1 for 0;
+the sideways branch dropped; the keyboard's `>=` as `>`; `Math.max(0, …)` dropped; the keyboard said when it does not
+cut, and not said when it does; the round's stop dropped; its `swipes` 0; `stoppedWhen` as `before any swipe`; `room <
+MIN_STROKE_BOX` as `<=`; `height` for a sideways stroke; the hide clause dropped, and always the rect form's; the short
+clause's keyboard branch, and the cut clause's, dropped; the direction said `down` always; the engine's `noRoom` reason
+never and always chosen. One equivalent, kept: the round's guard `s.rules.within !== undefined` as `true` — the plan
+names a scroll view only when `within` was given (`nameScrollView`), so `noRoom` implies it; the guard is there for the
+type. Review round 1's hand mutants (12), 11 killed: the unread round's hold dropped, and its `mayConfirm` dropped; the
+remedy a constant `back` in place of `lastCover`'s; the `keyboard` dropped from the refusal; each form's `hideKeyboard`
+the other's; `hideClause` dropped; the way out keyed on a constant `back`; `hideKeyboardInFlow`'s branch inverted, its
+tap's step dropped; the horizontal room `rect.width` for the part on the gesture box. One equivalent, kept: the round's
+`s.lastCover === undefined` conjunct dropped — the plan's keyboard line is the applied cover's (scroll-read.ts's
+`strokeLine`: a reading's line once corroborated, which applies its cover, or idb's band, applied as one), so a
+`keyboardTop` comes with a `lastCover` set at that read; the conjunct is there for the type. stroke-plan.ts,
 scroll-rounds.ts, scroll-text.ts and engine.ts are not in scripts/mutation/scope.json, hence the hand mutants. Mutation
 (core): `src/interact/within.ts` 100 % (106 mutants, narrowed cold run), floor 98 — its change a type and comments.
 

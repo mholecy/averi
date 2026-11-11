@@ -321,16 +321,17 @@ export interface StrokePlan {
    * D80: the scroll view the caller named (`within`) — and every one nested in it — leaves no room for this stroke,
    * before a read has found the target: the stroke is NOT to be sent (scroll-rounds.ts stops `within`, its refusal
    * `noRoom`), since its fallback, the gesture box whole, may touch down on another scroll view than the one named.
-   * Undefined otherwise — none named, the target found, a stroke over the screen box (`StrokeAsk.screenBox`), no gesture box.
+   * Undefined otherwise — none named, the target found, a stroke over the screen box (`StrokeAsk.screenBox`), no
+   * gesture box.
    */
   readonly noRoom: NamedNoRoom | undefined;
 }
 
 /**
  * What a named scroll view had of room when it had none (`StrokePlan.noRoom`): its `rect`, the stroke's `toward`, and
- * `room`, its length along the stroke on the gesture box — above the keyboard's top (`keyboardTop`, said only when the
- * keyboard cuts that part) for a vertical stroke; 0 when none of it lies there. Under MIN_STROKE_BOX, or at least it
- * and cut under it by what is drawn over the scroll view (`overlayTop`).
+ * `room`, its length along the stroke on the gesture box — above the keyboard's top (`keyboardTop`, said only when
+ * the keyboard cuts that part) for a vertical stroke; 0 when none of it lies there. Under MIN_STROKE_BOX, or at least
+ * it and cut under it by what is drawn over the scroll view (`overlayTop`).
  */
 export interface NamedNoRoom {
   readonly rect: Rect;

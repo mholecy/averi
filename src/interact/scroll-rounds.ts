@@ -323,9 +323,9 @@ export type ScrollOutcome = (
     }
   | { kind: 'changed'; swipes: number; change: ScreenChange; found: boolean }
   /**
-   * D78: the caller's `within` names no scroll view to stroke (interact/within.ts#WithinRefusal) — stopped at the first
-   * read that read, before any swipe; or, D80, the one it names has no room for the next stroke (`noRoom`), at any
-   * round before a read finds the target — after the swipes sent so far.
+   * D78: the caller's `within` names no scroll view to stroke (interact/within.ts#WithinRefusal) — stopped at
+   * the first read that read, before any swipe; or, D80, the one it names has no room for the next stroke
+   * (`noRoom`), at any round before a read finds the target — after the swipes sent so far.
    */
   | { kind: 'within'; swipes: number; within: Within; refused: WithinRefusal }
 ) & { detent?: DetentMove; endTurn?: EndTurn };
@@ -1263,7 +1263,17 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // may touch down on another scroll view, and the reply would read as the named one's. Stopped, the stroke not sent;
   // judged every round where the plan judges room, so a keyboard up after a swipe stops the next. A bound above wins:
   // no stroke would be sent then either.
-  if (plan.noRoom !== undefined && s.rules.within !== undefined) return stop(s, { kind: 'within', swipes: s.swipes, within: s.rules.within, refused: { of: 'noRoom', ...plan.noRoom } });
+  // A round whose tree did not read holds for one read rather than stop on the last read's keyboard line (review
+  // round 1, the coordinator's decision): a terminal stop rests on a read that read, as the presented stop's does;
+  // with no confirming read left it stops on the last read that read — never the stroke over the gesture box whole.
+  // Said before the presented hold: no stroke is sent either way. The keyboard's remedy is the applied cover's
+  // (`lastCover`, set at the read whose line the plan kept).
+  if (plan.noRoom !== undefined && s.rules.within !== undefined) {
+    if (read === undefined && mayConfirm(s, seen.elapsedMs)) return confirm(s);
+    const { keyboardTop, ...noRoom } = plan.noRoom;
+    const keyboard = keyboardTop === undefined || s.lastCover === undefined ? undefined : { lineY: keyboardTop, remedy: s.lastCover.remedy };
+    return stop(s, { kind: 'within', swipes: s.swipes, within: s.rules.within, refused: { of: 'noRoom', ...noRoom, ...(keyboard !== undefined && { keyboard }) } });
+  }
   if (plan.presented !== undefined) {
     return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, viewport, next: plan.presented }, current === 'settle' && presentedBefore, seen.elapsedMs);
   }

@@ -709,7 +709,7 @@ describe('a named scroll view (`within`, D78) — the one the strokes go over un
     expect(planStroke(keyboardAt(900, nameScrollView(startStrokes(), factsOf(bounded), LOWER)), ask(bounded)).noRoom).toEqual({ rect: LOWER, toward: 'down', room: 0, keyboardTop: 900 });
   });
 
-  it('…a round whose tree did not read judges it as the last plan did: still no room', () => {
+  it('…a round whose tree did not read judges it as the last plan did: still no room (the round holds for a read before it stops on it, scroll-rounds.ts)', () => {
     const first = planStroke(keyboardAt(1100, nameScrollView(startStrokes(), factsOf(bounded), LOWER)), ask(bounded));
     expect(planStroke(first.memory, { ...ask(bounded), read: undefined }).noRoom).toEqual({ rect: LOWER, toward: 'down', room: 54, keyboardTop: 1100 });
   });
@@ -741,6 +741,10 @@ describe('a named scroll view (`within`, D78) — the one the strokes go over un
     const tree = screenOf([node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { ...STRIP } })]);
     const named = seeRead(nameScrollView(startStrokes(), factsOf(tree), STRIP), { facts: factsOf(tree), line: { y: 700, witnessed: true }, target: undefined });
     expect(planStroke(named, { kind: 'full', toward: 'right', reach: 1, gesture: BOX, read: { facts: factsOf(tree), target: undefined } }).noRoom).toEqual({ rect: STRIP, toward: 'right', room: 60 });
+    // Review round 1, MINOR-2: one running past the gesture box is judged on its part on it — 30 of its 200.
+    const PAST: Rect = { x: 1050, y: 400, width: 200, height: 600 };
+    const past = screenOf([node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { ...PAST } })]);
+    expect(planStroke(nameScrollView(startStrokes(), factsOf(past), PAST), { kind: 'full', toward: 'right', reach: 1, gesture: BOX, read: { facts: factsOf(past), target: undefined } }).noRoom).toEqual({ rect: PAST, toward: 'right', room: 30 });
   });
 
   it('…room cut by what is drawn over it: the named one\'s 120 above the keyboard is enough by itself, a bar over its lower half leaves too little — `noRoom` with the 120', () => {
