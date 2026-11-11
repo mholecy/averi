@@ -81,7 +81,8 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
 
   it('a landed typing sends nothing again', async () => {
     const { io, intent, typed, dropped } = scripted();
-    expect(await typeAndConfirm(io, intent)).toEqual({ kind: 'landed', observed: 'Jan Novak', again: [] });
+    // strict: an exact landing carries no `reformatted` or `focusUnread` key at all (Typed: absent when exact)
+    expect(await typeAndConfirm(io, intent)).toStrictEqual({ kind: 'landed', observed: 'Jan Novak', again: [] });
     expect(typed).toEqual(['Jan Novak']);
     expect(dropped).toEqual([]);
   });
@@ -629,5 +630,93 @@ describe('typeAndConfirm — an earlier text that holds the value is no landing 
     expect(missed).toEqual({ kind: 'missed', observed: shown, again: [], differs, elsewhere: { role: 'textfield', identifier: 'o', rect: { x: 0, y: 40, width: 100, height: 20 } } });
     expect(missed.kind === 'missed' && missed.differs).toStrictEqual(differs);
     expect(typed).toEqual([value]);
+  });
+});
+
+/**
+ * T9: the edges A9's hand mutants did not reach and the mutation run found unpinned — a reading withheld, a clear over a
+ * field that holds nothing of ours, and what `whereTyped` takes for another input.
+ */
+describe('typeAndConfirm — the reading withheld, a wipe of nothing, and which nodes are other inputs (T9)', () => {
+  it('a field whose text is withheld (or not found) on two reads running is unread: two reads, nothing sent again', async () => {
+    const s = scripted();
+    let reads = 0;
+    const io: FieldIo = { ...s.io, read: async () => (reads++, undefined) };
+    expect(await typeAndConfirm(io, { ...s.intent, clear: true })).toEqual({ kind: 'unread' });
+    expect(reads).toBe(2);
+    expect(s.typed).toEqual(['Jan Novak']);
+  });
+
+  it('a field not found on the first read is read again: found on the second with the value, it landed', async () => {
+    const s = scripted();
+    let reads = 0;
+    const io: FieldIo = { ...s.io, read: async () => (++reads === 1 ? undefined : s.io.read()) };
+    expect(await typeAndConfirm(io, s.intent)).toEqual({ kind: 'landed', observed: 'Jan Novak', again: [] });
+    expect(reads).toBe(2);
+  });
+
+  it('with clear, a field that shows only its placeholder gets no deletes: the whole retype, said not wiped', async () => {
+    const s = scripted({ keep: [0], unnamed: 'Name' });
+    const wipes: number[] = [];
+    const io: FieldIo = { ...s.io, wipe: async (count) => (wipes.push(count), s.io.wipe(count)) };
+    expect(await typeAndConfirm(io, { ...s.intent, clear: true, placeholder: 'Name' })).toEqual({
+      kind: 'landed',
+      observed: 'Jan Novak',
+      again: [{ kind: 'whole', wiped: false }],
+    });
+    expect(wipes).toEqual([]);
+    expect(s.typed).toEqual(['Jan Novak', 'Jan Novak']);
+  });
+
+  it('a read-back without a tree proves nothing: no tail typed again', async () => {
+    const s = scripted({ keep: [3] });
+    let screens = 0;
+    const io: FieldIo = { ...s.io, screen: () => (screens++ === 0 ? s.io.screen() : undefined) };
+    expect(await typeAndConfirm(io, s.intent)).toEqual({ kind: 'missed', observed: 'Jan', again: [], differs: { kind: 'length' } });
+    expect(s.typed).toEqual(['Jan Novak']);
+  });
+
+  it('a sibling that gained text beside a reading that is no prefix proves nothing: no missing part to hold it to', async () => {
+    const s = scripted({ keep: [3], format: (t) => t.toLowerCase(), elsewhere: () => 'x' });
+    const out = await typeAndConfirm(s.io, s.intent);
+    expect(out).toMatchObject({ kind: 'missed', observed: 'jan', again: [] });
+    expect(out).not.toHaveProperty('elsewhere');
+    expect(s.typed).toEqual(['Jan Novak']);
+  });
+
+  it('a non-input that echoes the typing (a live preview) is no other input: the dropped tail is still typed', async () => {
+    const s = scripted({ keep: [3] });
+    const io: FieldIo = {
+      ...s.io,
+      screen: () => {
+        const tree = s.io.screen();
+        if (tree === undefined) return undefined;
+        const echo = node({ role: 'text', identifier: 'preview', rect: { x: 0, y: 80, width: 100, height: 20 }, value: tree.children[0].value });
+        return { ...tree, children: [...tree.children, echo] };
+      },
+    };
+    expect(await typeAndConfirm(io, s.intent)).toEqual({ kind: 'landed', observed: 'Jan Novak', again: [{ kind: 'tail', length: 6 }] });
+    expect(s.typed).toEqual(['Jan Novak', ' Novak']);
+  });
+
+  it('an input laid over the field\'s own rect is told from it by its identifier: its gain of the missing part is proof', async () => {
+    const s = scripted({ keep: [3], elsewhere: (t) => t.slice(3) });
+    const fieldRect = { x: 0, y: 0, width: 100, height: 20 };
+    const io: FieldIo = {
+      ...s.io,
+      screen: () => {
+        const tree = s.io.screen();
+        if (tree === undefined) return undefined;
+        return { ...tree, children: tree.children.map((c) => (c.identifier === 'o' ? { ...c, rect: fieldRect } : c)) };
+      },
+    };
+    expect(await typeAndConfirm(io, s.intent)).toEqual({
+      kind: 'missed',
+      observed: 'Jan',
+      again: [],
+      differs: { kind: 'length' },
+      elsewhere: { role: 'textfield', identifier: 'o', rect: fieldRect },
+    });
+    expect(s.typed).toEqual(['Jan Novak']);
   });
 });

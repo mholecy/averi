@@ -23,6 +23,7 @@ Amended 2026-11-06 (A11: scripts/truth/run-case.ts joined the run — see the am
 Amended 2026-11-10 (T13: flush-check.ts, replies.ts, live-carousel.ts and live-visibility.ts joined the run — see the T13
 amendment at the end).
 Amended 2026-11-11 (T20b: scripts/truth/batch/lab-run.ts joined the run — see the T20b amendment at the end).
+Amended 2026-11-11 (T9: src/interact/fill-type.ts joined the run — see the T9 amendment at the end).
 
 ## Context
 
@@ -1562,3 +1563,56 @@ filter, first counted equivalent, is not: another view's still stroke reads as a
 review's counterexample, now a test).
 
 The cold lab group after the change ran in 265 s, every module at or above its floor.
+
+## Amendment: fill-type.ts joins the run (2026-11-11, backlog T9)
+
+`src/interact/fill-type.ts` decides when typed text has landed, how long the poll waits for it and what is sent again
+(ADR 0023). It had no floor. At A9's review, hand mutants found three gaps in its switch, each since pinned in
+tests/interact/fill-type.test.ts. It joins the `core` group against that one test file.
+
+| Measured (cold, `npm run mutate -- --group core --force --mutate src/interact/fill-type.ts`) | Score | Mutants | Survived | Without coverage | Timeouts |
+| --- | --- | --- | --- | --- | --- |
+| before T9's tests | 86.32 % | 234 | 20 | 12 | 5 |
+| after T9's tests | 94.02 % | 234 | 9 | 5 | 5 |
+
+Its floor is 92, two points under the whole number.
+
+**The poll's sleeps cost the run nothing.** `pollValue` sleeps `pollMs` between its reads through src/util/sleep.ts,
+up to five reads a poll. fill-type.test.ts mocks that module (`vi.mock`), as read-tree.test.ts and the verify tests do,
+and Stryker's vitest runner keeps the mock. The file's 55 tests take 10 ms. With the real sleep at their `pollMs: 1`
+they take 443 ms, which would be paid again by each of the 234 mutants' runs. The narrowed run takes 16 s in all, with no
+src change: the module needs no sleeper seam of its own.
+
+T9 adds seven tests (one describe block) and makes one exact-landing assertion strict. Each was checked red under its
+hand mutant. They pin:
+
+- the `unread` arm: a field withheld on two reads running is unread after exactly two reads, and one not found on the
+  first read is read again;
+- a clear over a field that shows only its placeholder: no deletes sent, and the retype said `wiped: false`;
+- a read-back without a tree: `unproven`, so no tail is typed;
+- a sibling that gains text while the reading is no prefix: proves nothing, and nothing throws on the missing
+  `missing`;
+- a non-input that echoes the typing: not another input;
+- an input laid over the field's own rect: told from the field by its identifier;
+- an exact landing: carries no `reformatted` or `focusUnread` key. The Typed doc says they are absent. Before T9 those
+  two mutants survived as undefined keys, the kind this ADR's Consequences count rather than hide.
+
+The 14 not killed are argued in its scope.json baseline:
+
+- equivalent (12):
+  - `whereTyped`'s `unproven` emptied (4): a Whereabouts is read only as `field` or `elsewhere`.
+  - `pollValue`'s `steady` on a landing or on an undefined reading (4): `steady` is never read there.
+  - the sentinel strings (4): a key compared only with keys, and a gain that is no part of the missing text.
+- unreachable (2): the switch's `never` default and its block.
+
+The cold full core group, measured on this branch:
+
+| Run | Wall time | Mutants | Tests in the dry run |
+| --- | --- | --- | --- |
+| before (main 62af3b2a's scope) | 344 s | 7 201 | 1 811 |
+| after | 402 s | 7 435 | 1 866 |
+
+Every module was at or above its floor. Every other module's score was unchanged.
+
+Part of the 58 s added is load, not fill-type. Its own mutants take 15 s narrowed, and the other modules' timeouts rose
+from 17 to 34 between the two runs, their code and tests unchanged. That is still under T13's ~480 s line.
