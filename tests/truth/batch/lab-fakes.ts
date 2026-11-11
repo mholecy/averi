@@ -378,8 +378,6 @@ export interface Answer {
  */
 export abstract class FakeSeam implements ProcessSeam {
   readonly words: string[] = [];
-  /** Each call's bound as the seam was given it (StartOptions.secs), beside its words, in order. */
-  readonly bounds: { words: string; secs: number | undefined }[] = [];
   readonly exits: number[] = [];
   handlers: Handlers | undefined;
   /** A call whose words include this runs until its group is signalled (the first one only). */
@@ -402,7 +400,6 @@ export abstract class FakeSeam implements ProcessSeam {
   start(cmd: string, args: readonly string[], options: StartOptions): Started {
     const said = `${cmd === process.execPath ? 'node' : cmd} ${args.join(' ')}`;
     this.words.push(said);
-    this.bounds.push({ words: said, secs: options.secs });
     const a = cmd === 'git' ? this.git(args) : this.answer(cmd, args, options);
     if (a === undefined) throw new Error(`no answer for ${said}`);
     if (options.logFd !== undefined) writeSync(options.logFd, `${a.out}${a.err}`);

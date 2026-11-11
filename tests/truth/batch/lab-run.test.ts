@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
-import { cleanState, LAB_RUN_GROUPS, LAB_RUN_STANDING, labLiveSecs, labRun, leftLine, LIVE_SECS, stateHand } from '../../../scripts/truth/batch/lab-run.js';
+import { cleanState, LAB_RUN_STANDING, labRun, leftLine, LIVE_SECS, stateHand } from '../../../scripts/truth/batch/lab-run.js';
 import type { LiveCases, LiveTable } from '../../../scripts/truth/batch/live-table.js';
 import type { StartOptions } from '../../../scripts/truth/batch/proc.js';
 import { groupsOf, KNOBS, onlyWith, STANDING_EXIT as LAB_RUN_EXIT } from '../../../scripts/truth/batch/standing.js';
@@ -353,36 +353,38 @@ describe('the refusals and the lab guard: nothing done to a device that is not t
     expect(seam.words.some((w) => w.includes('gradlew') || w.includes('catalog.ts'))).toBe(false);
   });
 
-  it('each live block\'s bound (A34): visibility its own, sized from its run on the lab; every other B_LIVE\'s default; B_LIVE given, every one', () => {
-    const { min, max, default: byDefault } = KNOBS.counts.B_LIVE;
+  it('a live group\'s own bound (A34): visibility\'s, sized from its run on the lab, above B_LIVE\'s default (so B_LIVE can only raise it) and within its rule', () => {
+    const { max, default: byDefault } = KNOBS.counts.B_LIVE;
     expect(LIVE_SECS).toEqual({ visibility: 3000 });
-    for (const secs of Object.values(LIVE_SECS)) expect(secs >= min && secs <= max).toBe(true);
-    const knobs = { B_LIVE: byDefault };
-    expect(LAB_RUN_GROUPS.map((g) => labLiveSecs(g, {}, knobs))).toEqual([1800, 1800, 3000, 1800, 1800]);
-    expect(LAB_RUN_GROUPS.map((g) => labLiveSecs(g, { B_LIVE: '600' }, { B_LIVE: 600 }))).toEqual([600, 600, 600, 600, 600]);
+    for (const secs of Object.values(LIVE_SECS)) expect(secs > byDefault && secs <= max).toBe(true);
   });
 
-  /** Each live.ts run's group and the bound the seam was given for it (`--rejudge` ones left out). */
-  const liveBounds = () =>
-    seam.bounds.filter((b) => b.words.includes('live.ts') && !b.words.includes('--rejudge')).map((b) => [b.words.split(' ')[b.words.split(' ').indexOf('--groups') + 1], b.secs]);
+  /** Each live.ts run's block and bound, as its header in the run's output names them. */
+  const liveBounds = () => [...outText().matchAll(/^== (\w+) live android-\w+ \(bound (\d+) s; log: /gm)].map((m) => [m[1], Number(m[2])]);
 
-  it('the bound each live.ts run is given (A34): visibility its own 3000 s, forms B_LIVE\'s 1800 s; each named in its run\'s header', async () => {
+  it('the bound each live.ts run is given: visibility its own 3000 s, forms B_LIVE\'s 1800 s — each named in its header', async () => {
     expect(await go(['--groups', 'forms,visibility'])).toBe(0);
     expect(liveBounds()).toEqual([
       ['forms', 1800],
       ['visibility', 3000],
     ]);
-    expect(outText()).toContain(`== forms live android-forms (bound 1800 s; log: ${join(dirOf('forms'), 'android-forms.log')}) ==`);
     expect(outText()).toContain(`== visibility live android-visibility (bound 3000 s; log: ${join(dirOf('visibility'), 'android-visibility.log')}) ==`);
   });
 
-  it('B_LIVE given bounds every live.ts run alike, visibility\'s too', async () => {
+  it('B_LIVE given: every group with no bound of its own takes it; visibility the larger of the two — B_LIVE raises it, never lowers it', async () => {
     expect(await go(['--groups', 'forms,visibility'], { B_LIVE: '600' })).toBe(0);
     expect(liveBounds()).toEqual([
       ['forms', 600],
-      ['visibility', 600],
+      ['visibility', 3000],
     ]);
-    expect(outText()).toContain('== visibility live android-visibility (bound 600 s; log: ');
+  });
+
+  it('B_LIVE given above visibility\'s own: every group takes it', async () => {
+    expect(await go(['--groups', 'forms,visibility'], { B_LIVE: '3600' })).toBe(0);
+    expect(liveBounds()).toEqual([
+      ['forms', 3600],
+      ['visibility', 3600],
+    ]);
   });
 
   it('a bad knob refuses the run: exit 2', async () => {

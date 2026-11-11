@@ -4,7 +4,7 @@ import { runFiles, type Asked } from './cases.js';
 import { nodeProcess } from './proc.js';
 import { runBatch, type Block, type BlockCtx, type BlockFiles, type LiveOutcome, type RunBatchOptions, type RunIo } from './runner.js';
 import { configOf, NO_SERIAL, NO_UDID, SERIAL_FLAGS, UDID_FLAGS, type ConfigRead, type Env } from './runner-lines.js';
-import { knobGiven, selectBlocks, type KnobValues, type Selection } from './select.js';
+import { selectBlocks, type KnobValues, type Selection } from './select.js';
 import { shellQuote } from './shell.js';
 import { EXIT, exitCodeOf, parseVerdictLine, refusedLine, verdictLine, type Summary, type Verdict } from './words.js';
 
@@ -16,7 +16,7 @@ import { EXIT, exitCodeOf, parseVerdictLine, refusedLine, verdictLine, type Summ
  * - the selection (Standing, groupsOf, onlyWith, noLiveGroup, standingSelection): `--groups` as ONLY= is, every block
  *   staying the batch's, refused with every reason;
  * - the knobs (KNOBS: the live runs', the build's and a window's restore bound) and a live run's own bound
- *   (liveSecsOf: a block's own unless B_LIVE is given, A34);
+ *   (liveSecsOf: the larger of B_LIVE and the block's own, A34);
  * - a live block's run and judge (keptLiveRun, liveJudge, liveVerdictLine): main's rejudge's exit code, its FAIL naming
  *   the failure reasons the rejudge wrote as data beside its summary (../rejudge-failures.ts#failuresOf) — a file
  *   missing, not JSON or at odds with the exit code is INCONCLUSIVE, never a PASS;
@@ -71,8 +71,8 @@ export function standingExitOf(s: Summary, wanted: readonly string[]): StandingE
 }
 
 /**
- * The knobs (select.ts): the live runs' bound, the build's, a window's restore (the chooser's, a WDA window's). B_LIVE's
- * default bounds a live block that has no bound of its own (liveSecsOf); given, it bounds every live block.
+ * The knobs (select.ts): the live runs' bound, the build's, a window's restore (the chooser's, a WDA window's). B_LIVE
+ * bounds a live block that has no bound of its own, and can only raise one that has (liveSecsOf).
  */
 export const KNOBS = {
   counts: {
@@ -226,17 +226,19 @@ export function liveVerdictLine(
 const outcomeFile = (dir: string, name: string): string => join(dir, `${name}.outcome.json`);
 
 /**
- * A live run's bound, in seconds (A34): B_LIVE when the env gives it — the override, every live block alike — else the
- * block's own (`own`: a group that does not fit B_LIVE's default, sized from its run on the lab), else B_LIVE's default.
+ * A live run's bound, in seconds (A34): B_LIVE (its default, or the value given) for a block with no bound of its own;
+ * for one with its own (`own`: a group that does not fit B_LIVE's default, sized from its run on the lab), the larger of
+ * the two — B_LIVE can raise a block's own bound, never bring it back under it. An own bound is above B_LIVE's default
+ * (lab-run.ts#LIVE_SECS), so with B_LIVE not given it is the own bound.
  */
-export const liveSecsOf = (env: Env, knobs: { B_LIVE: number }, own: number | undefined): number => (knobGiven(env, 'B_LIVE') ? knobs.B_LIVE : (own ?? knobs.B_LIVE));
+export const liveSecsOf = (knobs: { B_LIVE: number }, own: number | undefined): number => (own === undefined ? knobs.B_LIVE : Math.max(knobs.B_LIVE, own));
 
 /**
- * A live block's run: ctx.liveRun bounded by `secs` (B_LIVE when none is given: liveSecsOf), its outcome then written
- * beside its record for the block's judge (liveJudge).
+ * A live block's run: ctx.liveRun bounded by liveSecsOf over the run's B_LIVE and the block's own bound (none: B_LIVE),
+ * its outcome then written beside its record for the block's judge (liveJudge).
  */
-export async function keptLiveRun(ctx: BlockCtx<{ B_LIVE: number }>, name: string, asked: Asked, secs: number = ctx.knobs.B_LIVE): Promise<void> {
-  const outcome = await ctx.liveRun(name, asked, { secs });
+export async function keptLiveRun(ctx: BlockCtx<{ B_LIVE: number }>, name: string, asked: Asked, own?: number): Promise<void> {
+  const outcome = await ctx.liveRun(name, asked, { secs: liveSecsOf(ctx.knobs, own) });
   ctx.fs.createExclusive(outcomeFile(ctx.dir, name), `${JSON.stringify(outcome)}\n`);
 }
 

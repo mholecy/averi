@@ -152,20 +152,19 @@ describe('liveJudge over summarize\'s own output: the reasons the rejudge writes
   });
 });
 
-describe('a live run\'s bound (A34): the block\'s own unless B_LIVE is given', () => {
-  const knobs = { B_LIVE: 2400 };
-  it('B_LIVE given: its value for every live block, a block\'s own bound or none', () => {
-    expect(liveSecsOf({ B_LIVE: '2400' }, knobs, 3600)).toBe(2400);
-    expect(liveSecsOf({ B_LIVE: '2400' }, knobs, undefined)).toBe(2400);
+describe('a live run\'s bound (A34): B_LIVE, or the larger of B_LIVE and the block\'s own', () => {
+  it('no bound of its own: B_LIVE, its default or the value given, above or under the default', () => {
+    expect(liveSecsOf({ B_LIVE: KNOBS.counts.B_LIVE.default }, undefined)).toBe(1800);
+    expect(liveSecsOf({ B_LIVE: 600 }, undefined)).toBe(600);
+    expect(liveSecsOf({ B_LIVE: 3600 }, undefined)).toBe(3600);
   });
-  it('B_LIVE not given (unset or empty): the block\'s own bound, else the knob\'s default', () => {
-    const byDefault = { B_LIVE: KNOBS.counts.B_LIVE.default };
-    expect(liveSecsOf({}, byDefault, 3600)).toBe(3600);
-    expect(liveSecsOf({ B_LIVE: '' }, byDefault, 3600)).toBe(3600);
-    expect(liveSecsOf({}, byDefault, undefined)).toBe(1800);
+  it('a bound of its own: the larger — B_LIVE raises it, never brings it under it', () => {
+    expect(liveSecsOf({ B_LIVE: KNOBS.counts.B_LIVE.default }, 3000)).toBe(3000);
+    expect(liveSecsOf({ B_LIVE: 600 }, 3000)).toBe(3000);
+    expect(liveSecsOf({ B_LIVE: 3600 }, 3000)).toBe(3600);
   });
 
-  it('keptLiveRun: the run bounded by the secs given, else by B_LIVE; its outcome written beside its record', async () => {
+  it('keptLiveRun: the run bounded by liveSecsOf over ctx.knobs and the block\'s own bound; its outcome written beside its record', async () => {
     const dir = realpathSync(mkdtempSync(join(tmpdir(), 'standing-kept-')));
     try {
       const asked: Asked = { platform: 'android', app: 'native', sources: ['uiautomator'], cases: [], groups: ['visibility'] };
@@ -177,9 +176,9 @@ describe('a live run\'s bound (A34): the block\'s own unless B_LIVE is given', (
         knobs: { B_LIVE: 1800 },
         liveRun: async (_name: string, _asked: Asked, o: { secs: number }) => (bounds.push(o.secs), outcome),
       } as unknown as BlockCtx<{ B_LIVE: number }>;
-      await keptLiveRun(ctx, 'android-visibility', asked, 3600);
+      await keptLiveRun(ctx, 'android-visibility', asked, 3000);
       await keptLiveRun(ctx, 'android-forms', asked);
-      expect(bounds).toEqual([3600, 1800]);
+      expect(bounds).toEqual([3000, 1800]);
       expect(JSON.parse(readFileSync(join(dir, 'android-visibility.outcome.json'), 'utf8'))).toEqual(outcome);
     } finally {
       rmSync(dir, { recursive: true, force: true });

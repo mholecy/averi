@@ -32,6 +32,7 @@ Amended 2026-11-11 (A21: scripts/truth/batch/standing.ts, scripts/truth/rejudge-
 run — see the A21 amendment at the end).
 Amended 2026-11-11 (A27: Android's parsers, split from android.ts, and android-chooser.ts joined the run as a fourth
 group, `android` — see the A27 amendment at the end).
+Amended 2026-11-11 (A34: runner.ts, standing.ts and lab-run.ts changed — the A34 line at the end).
 
 ## Context
 
@@ -2013,3 +2014,9 @@ Every captured dump holds one display: 35 `dumpsys window displays` dumps and 29
 them, display 0's block reads the same as the whole dump, so no fixture can say which rule is right for two displays.
 tests/adapters/android-wm.test.ts pins that census, and synthetic two-display dumps pin where the rules differ today.
 Merging them needs a dump from a device with two displays.
+
+**A34 (2026-11-11).** Each live block's bound (ADR 0041's A34 amendment) changed three lab-group modules: runner.ts (a
+live run's header names its bound), standing.ts (`liveSecsOf`, and `keptLiveRun` applying it) and lab-run.ts
+(`LIVE_SECS`). bounded.ts was changed in a review round and changed back: it is as on main. A cold lab run on the
+branch, 548 s at load 53–57, was load-inflated and before the review's changes; the modules' cold scores are recorded at
+the merge, from a cold run of every group on main.

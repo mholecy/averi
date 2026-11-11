@@ -896,15 +896,16 @@ activity`; `sys.system_server.start_count` rising) — the load's doing, not a b
 **Decision.** One bound sized for the longest group would let a hung forms, ensure or carousel run hold the device as
 long, so the bound is per group: `LIVE_SECS` (lab-run.ts) gives the visibility group its own, 3000 s, about 1.6 times
 its run; every other group keeps `B_LIVE`'s default, 1800 s. `B_LIVE` stays the override and keeps its rule (300 to 7200
-s): given, it bounds every live block alike, the visibility group's too — `B_LIVE=1800` replaces its 3000 s
-(`liveSecsOf` in standing.ts, given as select.ts's `knobGiven` reads it: unset or empty is not given). Each live run's
-header names the bound it got (`== visibility live android-visibility (bound 3000 s; log: …) ==`), so a block past its
-bound says which bound it passed, and bounded.ts tells the process seam each call's bound (`StartOptions.secs`, which
-the real seam ignores) so the batch's tests pin the bound every live.ts run was given. lab-run-ios.ts keeps `B_LIVE` for
-every iOS block (backlog A36).
+s), but it can only raise a group's own bound: given, it bounds every group with none, and a group with one takes the
+larger of the two (`liveSecsOf` in standing.ts, the one home of the rule; `keptLiveRun` applies it, every caller passing
+the block's own bound or none). So `B_LIVE=1800` leaves the visibility group at 3000 s, never back at the bound it
+failed, and `B_LIVE=3600` raises it. An own bound is above `B_LIVE`'s default (lab-run.test.ts checks it), so the rule
+needs no word of whether `B_LIVE` was given: the knob's value, read once by the runner, is enough. Each live run's
+header names the bound it got (`== visibility live android-visibility (bound 3000 s; log: …) ==`, runner.ts), so a block
+past its bound says which bound it passed, and lab-run.test.ts pins every live.ts run's bound through it. lab-run-ios.ts
+keeps `B_LIVE` for every iOS block (backlog A36).
 
 **Consequences.** Gate B's wall time is about 52 min at the pace of A22's first run on main (docs/release.md). On a
 loaded machine the visibility group can pass even its own bound, and the emulator's framework may not hold: Gate B is run
 when the machine is not loaded. The lab mutation baseline A34 recorded, 548 s at load 53–57
-(scripts/mutation/scope.json), is load-inflated, as A22's first 562 s at load 45–38 was; the coordinator reruns the lab
-group cold on main.
+(scripts/mutation/scope.json), is load-inflated, as A22's first 562 s at load 45–38 was; a cold rerun on main replaces it.

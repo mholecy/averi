@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { knobGiven, knobs, selectBlocks, type KnobSpec } from '../../../scripts/truth/batch/select.js';
+import { knobs, selectBlocks, type KnobSpec } from '../../../scripts/truth/batch/select.js';
 
 // scripts/truth/batch/select.ts: which blocks a run does (ONLY=) and what its knobs are — both decided before any
 // device call, and a refusal exits 2 with "nothing was done". Pure: the env is a plain record.
@@ -173,15 +173,5 @@ describe('knobs — every knob checked before anything is done (batch-10 → bat
   it('a knob name the env cannot hold is refused when the spec is read', () => {
     for (const name of ['kf-runs', 'xK', 'K-x', '1K', '']) expect(() => knobs({ counts: { [name]: { default: 1, min: 0 } } }, {}), name).toThrow(`knob name ${JSON.stringify(name)}`);
     expect(() => knobs({ counts: { K: { default: 1, min: 0 } }, texts: { K: { default: '', pattern: /x/, what: '' } } }, {})).toThrow(/knob K is declared twice/);
-  });
-});
-
-describe('knobGiven — whether the env sets a knob, by the rule knobs() reads it with (A34)', () => {
-  it('set: any value, a bad one too (knobs() refuses that one); unset or empty: not given, the knob\'s default', () => {
-    expect(knobGiven({ B_LIVE: '3600' }, 'B_LIVE')).toBe(true);
-    expect(knobGiven({ B_LIVE: '5' }, 'B_LIVE')).toBe(true);
-    expect(knobGiven({ B_LIVE: '' }, 'B_LIVE')).toBe(false);
-    expect(knobGiven({}, 'B_LIVE')).toBe(false);
-    expect(knobGiven({ B_BUILD: '900' }, 'B_LIVE')).toBe(false);
   });
 });
