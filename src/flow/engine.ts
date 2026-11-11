@@ -4,7 +4,8 @@ import { fillStepText } from '../interact/fill-text.js';
 import { typeIntoFocused } from '../interact/type-text.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS, ElementNotFoundError, isRefusedOnPresentElement, resolvePresent, type Ambiguity, type RefusedOnPresentElement } from '../interact/resolve.js';
 import { movedTapText } from '../interact/tap-judgement.js';
-import { describeScrollResult, scrollUntilVisible, stopHedges, WithinRefusedError } from '../interact/scroll.js';
+import { describeScrollResult, scrollUntilVisible, stopHedges } from '../interact/scroll.js';
+import { WithinRefusedError } from '../interact/within.js';
 import { eyesOn } from '../verify/eyes.js';
 import { swipeScreen } from '../interact/swipe.js';
 import { dismissKeyboard, KeyboardGuardError, type DismissResult, type GuardOptions } from '../interact/keyboard.js';
@@ -211,11 +212,11 @@ class ReentryError extends Error {
  * owner chose "never escalate past a present-but-refused element". The refusal is the
  * `cause`; the message says why it was not skipped, then quotes it.
  *
- * Since 2026-11-11 (D81 review round 1, the coordinator's decision) a `scroll_until` whose `within` names no scroll view
- * for any reason but `absent` (interact/scroll-text.ts#WithinRefusedError): several matches, a match in no scroll view,
- * one that scrolls only across the stroke, a tree that lists no scroll view (idb) — an authoring error no screen cures,
- * terminal like a config refusal. An `absent` one is skipped: the list, like the interstitial, may not be on this
- * screen.
+ * Since 2026-11-11 (D81 review round 1, the coordinator's decision) a `scroll_until` whose `within` names no
+ * scroll view for any reason but `absent` (interact/within.ts#WithinRefusedError): several matches, a match in no
+ * scroll view, one that scrolls only across the stroke, a tree that lists no scroll view (idb) — an authoring error
+ * no screen cures, terminal like a config refusal. An `absent` one is skipped: the list, like the interstitial, may
+ * not be on this screen.
  *
  * Only an `optional:` raises it. The same refusal outside one is the step's
  * plain failure and a rung that throws it escalates as before — the owner's
@@ -245,7 +246,10 @@ const notSkippedWhy = (e: NotSkippable): string =>
 /** What an enclosing `optional:` fails on instead of skipping (OptionalNotSkipped). */
 type NotSkippable = (Error & (RefusedOnPresentElement | FillValueFailure)) | WithinRefusedError;
 
-/** Does an enclosing `optional:` turn `e` into OptionalNotSkipped instead of skipping it? A `within` refusal only when it is not `absent` (D81). */
+/**
+ * Does an enclosing `optional:` turn `e` into OptionalNotSkipped instead of skipping it? A `within` refusal only when
+ * it is not `absent` (D81).
+ */
 const notSkippable = (e: unknown): e is NotSkippable =>
   isRefusedOnPresentElement(e) || e instanceof FillValueFailure || (e instanceof WithinRefusedError && e.refused !== 'absent');
 
@@ -1358,6 +1362,8 @@ export class FlowEngine {
     // next device run should look at `scroll_until` steps.
     const result = await scrollUntilVisible(this.adapter, element, {
       ...rest,
+      // A flow names a scroll view by element spec, never by rect (D81): a failure's way into one asks for a spec.
+      remedy: 'spec',
       // The eyes a `fully visible` claim is confirmed with (ui-tree/eyes.ts), wired here: interact/ may not import verify/.
       eyes: eyesOn(this.adapter),
       timeoutMs: timeout === undefined ? undefined : parseDuration(timeout),

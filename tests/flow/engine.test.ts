@@ -1814,7 +1814,7 @@ flows:
       - scroll_until: { element: { id: lab.scroll-bounded.O }, maxSwipes: 4 }
 `);
     const failure = FlowEngine.run(flow, fake, FAST, { flow: 'f' });
-    await expect(failure).rejects.toThrow('— if the element lies in it, scroll_until it again naming that scroll view by an element spec of it (within: { id: … }); else:');
+    await expect(failure).rejects.toThrow('— if the element lies in it, scroll_until it again naming that scroll view by an element spec of it or of an element inside it (within: { id: … }); else:');
     await expect(failure).rejects.not.toThrow('"x":');
   });
 

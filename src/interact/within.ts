@@ -70,6 +70,21 @@ export type WithinRefusal =
   | { readonly of: 'untold' };
 
 /**
+ * A `within` that names no scroll view to stroke (D78's stop before any swipe; interact/scroll-text.ts#scrollFailure),
+ * the refusal's kind on it: a flow's `optional:` skips an `absent` one — the list, like an interstitial, may not be
+ * on this screen — and fails on every other, an authoring error no screen cures (flow/engine.ts, D81).
+ */
+export class WithinRefusedError extends Error {
+  constructor(
+    message: string,
+    readonly refused: WithinRefusal['of'],
+  ) {
+    super(message);
+    this.name = 'WithinRefusedError';
+  }
+}
+
+/**
  * A string `within` parsed as a selector, its regexes compiled, before the scroll reads anything (interact/scroll.ts):
  * a selector that does not parse throws `within <it>: <why>` — else it would throw from inside the round, at the first
  * read, without saying it was `within`'s. A rect has nothing to parse, nor has an element spec (exact values only).
@@ -84,7 +99,10 @@ export function checkWithin(within: Within): void {
   }
 }
 
-/** `within` read as a rect, not a selector (a string) nor an element spec (whose fields are strings, none of them `x`). */
+/**
+ * `within` read as a rect, not a selector (a string) nor an element spec (whose fields are strings, none of them
+ * `x`).
+ */
 export const isRect = (within: Within): within is Rect => typeof within !== 'string' && 'x' in within;
 
 /**

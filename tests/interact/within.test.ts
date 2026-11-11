@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Rect, UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
-import { checkWithin, isRect, resolveWithin } from '../../src/interact/within.js';
+import { checkWithin, isRect, resolveWithin, WithinRefusedError } from '../../src/interact/within.js';
 import { lookAt } from '../../src/ui-tree/look.js';
 import { parseDump } from '../helpers/android-dumps.js';
 
@@ -174,5 +174,15 @@ describe('checkWithin — a string `within` parsed before anything is read, its 
     expect(() => checkWithin({ x: 0, y: 0, width: 1, height: 1 })).not.toThrow();
     // An element spec (a flow's, D81): its fields are exact values, nothing to parse.
     expect(() => checkWithin({ text: '(' })).not.toThrow();
+  });
+});
+
+describe('WithinRefusedError — the refusal\'s kind on the error (D81: a flow\'s `optional:` tells `absent` from the rest)', () => {
+  it('an Error named so, its message as given, its kind kept', () => {
+    const e = new WithinRefusedError('scroll_until id:x stopped before any swipe — within id:"y" …', 'across');
+    expect(e).toBeInstanceOf(Error);
+    expect(e.name).toBe('WithinRefusedError');
+    expect(e.message).toBe('scroll_until id:x stopped before any swipe — within id:"y" …');
+    expect(e.refused).toBe('across');
   });
 });

@@ -1,6 +1,6 @@
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
-import type { LaunchIntent, Platform } from '../adapters/types.js';
+import type { LaunchIntent, Platform, Rect } from '../adapters/types.js';
 import { DEFAULT_IOS_TREE_SOURCE, IOS_TREE_SOURCE_KINDS, type IosTreeSourceKind } from '../adapters/ios-node.js';
 import {
   elementSpecObject,
@@ -209,9 +209,12 @@ const launchIntent: z.ZodType<LaunchIntent> = z
   .strict();
 
 /** A rect's sides — the MCP `scroll_until`'s other form of `within`, which a flow's refuses (D81). */
-const RECT_SIDES = ['x', 'y', 'width', 'height'];
+const RECT_SIDES = ['x', 'y', 'width', 'height'] as const satisfies readonly (keyof Rect)[];
 
-/** Why a flow's `within` takes no rect, said where one is given: a rect is one device's layout, a flow runs on others. */
+/**
+ * Why a flow's `within` takes no rect, said where one is given: a rect is one device's layout, a flow runs on
+ * others.
+ */
 const WITHIN_NO_RECT = 'within takes an element spec (id, text, role, label) of the scroll view or of an element inside it, not a rect: a rect is device-specific';
 
 /** Why a flow's `within` takes no selector string, the MCP tool's other form: a flow names an element by spec. */
@@ -220,8 +223,9 @@ const WITHIN_NO_STRING = 'within takes an element spec ({ id: … }), as the ste
 /**
  * A flow's `scroll_until` `within` (D81): the step's own `element` vocabulary, an element spec. The MCP tool's two
  * other forms are refused naming why — anything carrying a rect's side (`WITHIN_NO_RECT`), a selector string
- * (`WITHIN_NO_STRING`) — as the issue alone: the pipe stops at it, so neither the spec's "Unrecognized key(s)" nor the
- * step union's bare refusal of `scroll_until` is said instead. Anything else is the element spec schema's to judge.
+ * (`WITHIN_NO_STRING`) — as the issue alone: the pipe stops at it, so neither the spec's "Unrecognized key(s)" nor
+ * the step union's bare refusal of `scroll_until` is said instead. Anything else is the element spec schema's to
+ * judge.
  */
 const withinSpec: z.ZodType<ElementSpec> = z
   // `any`, not `unknown`: the step's input type is `Step`, so its `within` must read as a spec on the way in too.

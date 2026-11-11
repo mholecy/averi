@@ -6,11 +6,11 @@ import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js
 import { sleep } from '../util/sleep.js';
 import { describeTarget, matchesToJudge, type Target } from './resolve.js';
 import { round, startRounds, type RoundSeen, type Rounds, type RoundStep } from './scroll-rounds.js';
-import { scrollFailure, scrollResult, type ScrollUntilResult } from './scroll-text.js';
+import { scrollFailure, scrollResult, type ScrollUntilResult, type WithinRemedyForm } from './scroll-text.js';
 import { dragMs, screenBox, type Direction, type ScreenBox } from './swipe.js';
 import { checkWithin, type Within } from './within.js';
 
-export { describeScrollResult, HEDGE_WHATS, HEDGED_LEAD, stopHedges, WithinRefusedError, type ScrollUntilResult } from './scroll-text.js';
+export { describeScrollResult, HEDGE_WHATS, HEDGED_LEAD, stopHedges, type ScrollUntilResult } from './scroll-text.js';
 
 /** The scroll's budget when the caller has none — the MCP scroll_until tool's documented default is derived from it. */
 export const DEFAULT_SCROLL_TIMEOUT_MS = 15_000;
@@ -45,6 +45,12 @@ export interface ScrollOptions {
    * scroll there, before any swipe. Default: the screen's largest scroller.
    */
   within?: Within;
+  /**
+   * How a failure asks the caller to name a scroll view as `within` (scroll-text.ts#WITHIN_REMEDY): `rect`, the
+   * default — the MCP tool's, a rect as `within` takes it; `spec` — a flow's (flow/engine.ts, D81), an element spec
+   * of it or of an element inside it, since a flow takes no rect.
+   */
+  remedy?: WithinRemedyForm;
 }
 
 /**
@@ -387,8 +393,7 @@ export async function scrollUntilVisible(
     if (step.do === 'stop') {
       const { outcome } = step;
       if (outcome.kind === 'visible') return scrollResult(outcome);
-      // A flow names its elements by spec (D81): a remedy then asks for a spec of a scroll view, never its rect.
-      throw scrollFailure(outcome, describe, typeof target !== 'string');
+      throw scrollFailure(outcome, describe, opts.remedy);
     }
     if (step.do === 'stroke') {
       // The stroke is the round's, made by its plan (`step.points`, interact/stroke-plan.ts#planStroke, or
