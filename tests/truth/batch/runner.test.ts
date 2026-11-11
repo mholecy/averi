@@ -1413,7 +1413,7 @@ describe('liveRun: the .cases first, live.ts with its record, then its rejudge â
     expect(JSON.parse(text(join(dirOf('kf'), 'android-kf-1.cases')))).toEqual(KF);
     expect(got).toEqual({ live: { word: 'OK', why: 'exit 0' }, rejudge: { word: 'OK', why: 'exit 0' } });
     expect(text(join(dirOf('kf'), 'android-kf-1.rejudge.txt'))).toContain(LIVE_GOLDEN_HEADER);
-    expect(outText()).toContain(`\n== kf live android-kf-1 (log: ${join(dirOf('kf'), 'android-kf-1.log')}) ==\n`);
+    expect(outText()).toContain(`\n== kf live android-kf-1 (bound 60 s; log: ${join(dirOf('kf'), 'android-kf-1.log')}) ==\n`);
     expect(outText()).toContain('OK   kf live android-kf-1\n');
     expect(outText()).toContain('OK   kf rejudge android-kf-1\n');
   });

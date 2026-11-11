@@ -749,7 +749,7 @@ class BatchRun<K> {
       this.log.step('FAIL', `${what}: ${device.why}`);
       return { live: { word: 'FAIL', why: device.why } };
     }
-    this.log.print(`== ${what} (log: ${f.log}) ==`);
+    this.log.print(`== ${what} (bound ${o.secs} s; log: ${f.log}) ==`);
     const calls = liveCalls({ ...o, repo, files: f });
     const r = await bounded(process.execPath, liveArgs({ repo, asked, device: device.args, record: f.record }), calls.live);
     const live = stepOutcome(r.code, fs.read(f.log) ?? '');

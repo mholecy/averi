@@ -362,6 +362,29 @@ describe('the refusals and the lab guard: nothing done to a device that is not t
     expect(LAB_RUN_GROUPS.map((g) => labLiveSecs(g, { B_LIVE: '600' }, { B_LIVE: 600 }))).toEqual([600, 600, 600, 600, 600]);
   });
 
+  /** Each live.ts run's group and the bound the seam was given for it (`--rejudge` ones left out). */
+  const liveBounds = () =>
+    seam.bounds.filter((b) => b.words.includes('live.ts') && !b.words.includes('--rejudge')).map((b) => [b.words.split(' ')[b.words.split(' ').indexOf('--groups') + 1], b.secs]);
+
+  it('the bound each live.ts run is given (A34): visibility its own 3000 s, forms B_LIVE\'s 1800 s; each named in its run\'s header', async () => {
+    expect(await go(['--groups', 'forms,visibility'])).toBe(0);
+    expect(liveBounds()).toEqual([
+      ['forms', 1800],
+      ['visibility', 3000],
+    ]);
+    expect(outText()).toContain(`== forms live android-forms (bound 1800 s; log: ${join(dirOf('forms'), 'android-forms.log')}) ==`);
+    expect(outText()).toContain(`== visibility live android-visibility (bound 3000 s; log: ${join(dirOf('visibility'), 'android-visibility.log')}) ==`);
+  });
+
+  it('B_LIVE given bounds every live.ts run alike, visibility\'s too', async () => {
+    expect(await go(['--groups', 'forms,visibility'], { B_LIVE: '600' })).toBe(0);
+    expect(liveBounds()).toEqual([
+      ['forms', 600],
+      ['visibility', 600],
+    ]);
+    expect(outText()).toContain('== visibility live android-visibility (bound 600 s; log: ');
+  });
+
   it('a bad knob refuses the run: exit 2', async () => {
     expect(await go([], { B_LIVE: '5' })).toBe(2);
     expect(seam.words).toEqual([]);

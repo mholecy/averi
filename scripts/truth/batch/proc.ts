@@ -25,6 +25,11 @@ export interface StartOptions {
    * the caller closes after start — the child holds its own copy.
    */
   logFd?: number;
+  /**
+   * The call's bound in seconds, as bounded.ts enforces it with its own timer (A34): told to the seam so a fake one can
+   * record it; the real seam (nodeProcess) does nothing with it.
+   */
+  secs?: number;
 }
 
 /** How a child ended: its code or its signal; `error` when it never started (no such command). */

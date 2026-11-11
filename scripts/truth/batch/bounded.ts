@@ -346,7 +346,7 @@ export class Calls {
     let started: Started;
     try {
       // The log through io.ts, the one fs seam: opened for append, its fd handed to the child, closed after the start.
-      started = log === undefined ? this.seam.start(cmd, args, { cwd, env }) : this.fs.withAppend(log, (logFd) => this.seam.start(cmd, args, { cwd, env, logFd }));
+      started = log === undefined ? this.seam.start(cmd, args, { cwd, env, secs: bound }) : this.fs.withAppend(log, (logFd) => this.seam.start(cmd, args, { cwd, env, logFd, secs: bound }));
     } catch (e) {
       return { code: NOT_STARTED, timedOut: false, signal: null, out: '', err: messageOf(e) };
     }

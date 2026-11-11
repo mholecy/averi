@@ -90,7 +90,7 @@ export const LAB_RUN_STANDING: Standing<LabRunGroup> = {
 /**
  * A live group's own bound, in seconds, where B_LIVE's default (1800 s) does not fit its run (A34): the visibility
  * group, 181 cases over 32 cells, ran past 1800 s in A22's first Gate B on main (173 cases logged) and takes about
- * 1880 s at a load under 17 (about 10.4 s a case; ADR 0041's A34 amendment) — its bound about 1.6 times that. Every
+ * 1880 s at that run's pace (about 10.4 s a case; ADR 0041's A34 amendment) — its bound about 1.6 times that. Every
  * other group keeps B_LIVE's default, so a hung forms, ensure or carousel run is still cut at 1800 s. B_LIVE given
  * bounds every group alike (standing.ts#liveSecsOf).
  */

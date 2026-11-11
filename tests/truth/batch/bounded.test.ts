@@ -285,7 +285,17 @@ describe('Calls.bounded — a call in a process group of its own, ended whole pa
     seam.calls[0].end({ code: 0, signal: null });
     await r;
     expect(opened).toEqual(['the.log']);
-    expect(seam.options).toEqual([{ cwd: 'the-dir', env: { A: '1' }, logFd: 7 }]);
+    expect(seam.options).toEqual([{ cwd: 'the-dir', env: { A: '1' }, logFd: 7, secs: boundFor('adb', ['devices']) }]);
+  });
+
+  it('the bound the call was given reaches the seam as it is enforced, its secs (A34: what a fake seam records)', async () => {
+    const seam = new FakeSeam();
+    const calls = new Calls(seam);
+    const r = calls.bounded('node', ['live.ts'], { secs: 3000 });
+    await tick();
+    seam.calls[0].end({ code: 0, signal: null });
+    await r;
+    expect(seam.options).toStrictEqual([{ cwd: undefined, env: undefined, secs: 3000 }]);
   });
 
   it('with no log: the folder and env reach the seam, and no fd', async () => {
@@ -295,7 +305,7 @@ describe('Calls.bounded — a call in a process group of its own, ended whole pa
     await tick();
     seam.calls[0].end({ code: 0, signal: null });
     await r;
-    expect(seam.options).toStrictEqual([{ cwd: 'the-dir', env: { A: '1' } }]);
+    expect(seam.options).toStrictEqual([{ cwd: 'the-dir', env: { A: '1' }, secs: boundFor('adb', ['devices']) }]);
   });
 
   it('a log that cannot be opened: 127 and why, as a command that cannot start; nothing started', async () => {
