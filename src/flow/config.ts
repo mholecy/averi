@@ -223,9 +223,8 @@ const WITHIN_NO_STRING = 'within takes an element spec ({ id: … }), as the ste
 /**
  * A flow's `scroll_until` `within` (D81): the step's own `element` vocabulary, an element spec. The MCP tool's two
  * other forms are refused naming why — anything carrying a rect's side (`WITHIN_NO_RECT`), a selector string
- * (`WITHIN_NO_STRING`) — as the issue alone: the pipe stops at it, so neither the spec's "Unrecognized key(s)" nor
- * the step union's bare refusal of `scroll_until` is said instead. Anything else is the element spec schema's to
- * judge.
+ * (`WITHIN_NO_STRING`) — as the issue alone: the pipe stops at it, so the spec's "Unrecognized key(s)" is not said
+ * beside it. Anything else is the element spec schema's to judge.
  */
 const withinSpec: z.ZodType<ElementSpec> = z
   // `any`, not `unknown`: the step's input type is `Step`, so its `within` must read as a spec on the way in too.
@@ -238,112 +237,172 @@ const withinSpec: z.ZodType<ElementSpec> = z
   })
   .pipe(elementSpecSchema);
 
-/** The platform-override step's refinement message — named, because parseConfig drops it where it is noise (withoutMootOverrideIssues). */
-const OVERRIDE_NEEDS_PLATFORM = 'platform override needs android and/or ios';
+/**
+ * The platform override's keys, the source of PlatformKey (and through it of ContainerKind): a step of one or both of
+ * them is the override, `{ android?: Step; ios?: Step }`. A tuple the type is read from, so the two cannot differ.
+ */
+const PLATFORM_KEYS = ['android', 'ios'] as const;
+type PlatformKey = (typeof PLATFORM_KEYS)[number];
+const isPlatformKey = (k: string): k is PlatformKey => (PLATFORM_KEYS as readonly string[]).includes(k);
 
-const step: z.ZodType<Step> = z.lazy(() =>
-  z.union([
-    z
-      .object({
-        launch: z
-          .object({
-            clearState: z.boolean().optional(),
-            activity: z.string().optional(),
-            intent: launchIntent.optional(),
-          })
-          .strict(),
-      })
-      .strict(),
-    z
-      .object({
-        tap: elementSpecObject
-          .extend({ timeout: timeout.optional() })
-          .refine(hasSelector, { message: 'tap needs at least one of: id, text, role, label' }),
-      })
-      .strict(),
-    z.object({ type: z.object({ value: z.string() }).strict() }).strict(),
-    z
-      .object({
-        type_pin: z
-          .object({
-            value: z.string(),
-            keypad: z
-              .object({
-                id_pattern: z.string().optional(),
-                text_pattern: z.string().optional(),
-              })
-              .strict()
-              .refine((k) => (k.id_pattern === undefined) !== (k.text_pattern === undefined), {
-                message: 'keypad needs exactly one of: id_pattern, text_pattern',
-              })
-              .optional(),
-            twice: z.boolean().optional(),
-          })
-          .strict(),
-      })
-      .strict(),
-    z
-      .object({
-        swipe: z
-          .object({
-            direction: z.enum(['up', 'down', 'left', 'right']),
-            times: z.number().int().min(1).optional(),
-          })
-          .strict(),
-      })
-      .strict(),
-    z
-      .object({
-        scroll_until: z
-          .object({
-            element: elementSpecSchema,
-            direction: z.enum(['up', 'down', 'left', 'right']).optional(),
-            maxSwipes: z.number().int().min(1).optional(),
-            fully: z.boolean().optional(),
-            timeout: timeout.optional(),
-            within: withinSpec.optional(),
-          })
-          .strict(),
-      })
-      .strict(),
-    z
-      .object({
-        fill: elementSpecObject
-          .extend({
-            value: z.string(),
-            clear: z.boolean().optional(),
-            dismissKeyboard: z.boolean().optional(),
-          })
-          .refine(hasSelector, { message: 'fill needs at least one of: id, text, role, label' }),
-      })
-      .strict(),
-    z.object({ assert: z.array(elementAssertSchema).min(1) }).strict(),
-    z
-      .object({
-        wait: z
-          .object({
-            element: elementSpecSchema.optional(),
-            state: z.string().optional(),
-            timeout: timeout.optional(),
-          })
-          .strict()
-          .refine((w) => (w.element === undefined) !== (w.state === undefined), {
-            message: 'wait needs exactly one of: element, state',
-          }),
-      })
-      .strict(),
-    z
-      .object({ branch: z.array(z.object({ when: condition, do: z.array(step) }).strict()).min(1) })
-      .strict(),
-    z.object({ optional: z.array(step).min(1) }).strict(),
-    z
-      .object({ android: step.optional(), ios: step.optional() })
-      .strict()
-      .refine((s) => s.android !== undefined || s.ios !== undefined, {
-        message: OVERRIDE_NEEDS_PLATFORM,
-      }),
-  ]),
-);
+/** A step nested in a container — `branch`'s arms, `optional`, a platform override — judged as any step is. */
+const nestedStep: z.ZodType<Step> = z.lazy(() => step);
+
+/**
+ * Every step kind but the platform override, by its one key: the schema of the value under that key. `tsc` holds it
+ * to Step (the `satisfies`): a key for every kind, and each schema yields what its Step member holds under that key,
+ * so a kind added to Step, or one whose schema drifts from its type, fails to compile.
+ */
+const STEP_KINDS = {
+  launch: z
+    .object({
+      clearState: z.boolean().optional(),
+      activity: z.string().optional(),
+      intent: launchIntent.optional(),
+    })
+    .strict(),
+  tap: elementSpecObject
+    .extend({ timeout: timeout.optional() })
+    .refine(hasSelector, { message: 'tap needs at least one of: id, text, role, label' }),
+  type: z.object({ value: z.string() }).strict(),
+  type_pin: z
+    .object({
+      value: z.string(),
+      keypad: z
+        .object({
+          id_pattern: z.string().optional(),
+          text_pattern: z.string().optional(),
+        })
+        .strict()
+        .refine((k) => (k.id_pattern === undefined) !== (k.text_pattern === undefined), {
+          message: 'keypad needs exactly one of: id_pattern, text_pattern',
+        })
+        .optional(),
+      twice: z.boolean().optional(),
+    })
+    .strict(),
+  swipe: z
+    .object({
+      direction: z.enum(['up', 'down', 'left', 'right']),
+      times: z.number().int().min(1).optional(),
+    })
+    .strict(),
+  scroll_until: z
+    .object({
+      element: elementSpecSchema,
+      direction: z.enum(['up', 'down', 'left', 'right']).optional(),
+      maxSwipes: z.number().int().min(1).optional(),
+      fully: z.boolean().optional(),
+      timeout: timeout.optional(),
+      within: withinSpec.optional(),
+    })
+    .strict(),
+  fill: elementSpecObject
+    .extend({
+      value: z.string(),
+      clear: z.boolean().optional(),
+      dismissKeyboard: z.boolean().optional(),
+    })
+    .refine(hasSelector, { message: 'fill needs at least one of: id, text, role, label' }),
+  assert: z.array(elementAssertSchema).min(1),
+  wait: z
+    .object({
+      element: elementSpecSchema.optional(),
+      state: z.string().optional(),
+      timeout: timeout.optional(),
+    })
+    .strict()
+    .refine((w) => (w.element === undefined) !== (w.state === undefined), {
+      message: 'wait needs exactly one of: element, state',
+    }),
+  branch: z.array(z.object({ when: condition, do: z.array(nestedStep) }).strict()).min(1),
+  optional: z.array(nestedStep).min(1),
+} satisfies {
+  [K in Exclude<StepKind, PlatformKey>]: z.ZodType<Extract<Step, Record<K, unknown>>[K], z.ZodTypeDef, unknown>;
+};
+
+const platformOverride: z.ZodType<{ android?: Step; ios?: Step }, z.ZodTypeDef, unknown> = z
+  .object({ android: nestedStep.optional(), ios: nestedStep.optional() })
+  .strict();
+
+/** What a step may be, said wherever one is not. */
+const STEP_ONE_OF = `one of: ${Object.keys(STEP_KINDS).join(', ')}, or a platform override (android and/or ios)`;
+
+/**
+ * How a step is judged: the schema, what it parses (the step itself, or the value under its key), where its issues sit
+ * under the step (`[]`, or `[key]`), and how its result becomes the step again — or why no schema judges it.
+ */
+type StepRoute =
+  | { schema: z.ZodTypeAny; input: unknown; path: string[]; wrap: (data: unknown) => Step }
+  | { refused: string };
+
+/** The platform override's route: the step parsed whole, its issues at the step, its result the step. */
+const overrideRoute = (v: unknown): StepRoute => ({
+  schema: platformOverride,
+  input: v,
+  path: [],
+  wrap: (data) => data as Step,
+});
+
+/**
+ * Which schema judges this step, picked by its one key — or why none does. A step is a mapping of exactly one key
+ * that names its kind, or of `android` and/or `ios` (the platform override).
+ */
+function routeStep(v: unknown): StepRoute {
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) {
+    return { refused: `a step is a mapping of one key, ${STEP_ONE_OF} — received ${z.getParsedType(v)}` };
+  }
+  const keys = Object.keys(v);
+  const others = keys.filter((k) => !isPlatformKey(k));
+  if (keys.length > 0 && others.length === 0) return overrideRoute(v);
+  // Beside a platform key, the one other key that is no kind either: a misspelt platform (`iOS`) or a misspelt step.
+  if (others.length === 1 && keys.length > 1 && !Object.hasOwn(STEP_KINDS, others[0])) {
+    const odd = others[0];
+    return { refused: `unknown key '${odd}' beside a platform override: a platform override takes android and/or ios` };
+  }
+  if (keys.length !== 1) {
+    const has = keys.length === 0 ? 'none' : `${keys.length}: ${keys.join(', ')}`;
+    return { refused: `a step has exactly one key, ${STEP_ONE_OF}; this one has ${has}` };
+  }
+  const [key] = keys;
+  if (!Object.hasOwn(STEP_KINDS, key)) return { refused: `unknown step '${key}': a step is ${STEP_ONE_OF}` };
+  return {
+    schema: STEP_KINDS[key as keyof typeof STEP_KINDS],
+    input: (v as Record<string, unknown>)[key],
+    path: [key],
+    wrap: (data) => ({ [key]: data }) as Step,
+  };
+}
+
+/**
+ * A step, judged by its one key (D86): the kind it names parses the value under that key, and the kind's own issues
+ * are said with their path — `steps.3.scroll_until.within.id: Expected string, received number`. Until D86 the step
+ * was a `z.union` of every kind, and a wrong type inside a step's object collapsed to the union's bare
+ * "Unrecognized key(s) in object: 'scroll_until'" at the step: when every member fails, zod's union reports the first
+ * member that failed only softly, and that was the platform override, the last member — its fields all optional, it
+ * failed on the unknown key alone — never the member the step's key named. A discriminated union needs a literal
+ * field to pick by, which a one-key step lacks — so the key is found here, and the step's shape (no key, several, an
+ * unknown one, no mapping at all) is refused in words of its own.
+ *
+ * A check over a whole step belongs in validateReferences, never as a refine over this schema or a container of it: a
+ * refused step's value here is z.NEVER, and a refine further up would still be handed it.
+ */
+const step: z.ZodType<Step> = z
+  // `any`, not `unknown`: a container's schema (`optional`, `branch`'s `do`) must read as Step[] on the way in too.
+  .any()
+  .transform((v: unknown, ctx): Step => {
+    const route = routeStep(v);
+    if ('refused' in route) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: route.refused });
+      return z.NEVER;
+    }
+    const parsed = route.schema.safeParse(route.input);
+    if (!parsed.success) {
+      for (const issue of parsed.error.issues) ctx.addIssue({ ...issue, path: [...route.path, ...issue.path] });
+      return z.NEVER;
+    }
+    return route.wrap(parsed.data);
+  });
 
 const configSchema = z
   .object({
@@ -489,29 +548,13 @@ export function parseConfig(yamlText: string, source = 'averi.yaml'): AveriConfi
   }
   const result = configSchema.safeParse(raw);
   if (!result.success) {
-    const issues = withoutMootOverrideIssues(result.error.issues)
+    const issues = result.error.issues
       .map((i) => `  ${i.path.join('.') || '(root)'}: ${i.message}`)
       .join('\n');
     throw new Error(`Invalid ${source}:\n${issues}`);
   }
   validateReferences(result.data, source);
   return result.data;
-}
-
-/**
- * A step with an unknown key (`tapp:`) fails every member of the step union,
- * and zod reports the member that failed only "softly": the platform-override
- * object, `.strict()` and then refined. Strict-mode's unrecognized key does
- * not stop the refinement, so beside the useful `Unrecognized key(s) in
- * object: 'tapp'` came `platform override needs android and/or ios` at the
- * same path — noise, since the step was never meant as an override. The
- * refinement's issue is dropped wherever an unrecognized-key issue sits at
- * the same path; a real override naming neither platform (`{}` alone) still
- * gets it.
- */
-function withoutMootOverrideIssues(issues: z.ZodIssue[]): z.ZodIssue[] {
-  const unknownAt = new Set(issues.filter((i) => i.code === 'unrecognized_keys').map((i) => i.path.join('.')));
-  return issues.filter((i) => !(i.message === OVERRIDE_NEEDS_PLATFORM && unknownAt.has(i.path.join('.'))));
 }
 
 /** What a launch call says about its entry point — a flow `launch:` step or a `launch_app` call. */
@@ -750,9 +793,11 @@ type StepKind = Step extends infer S ? (S extends unknown ? keyof S : never) : n
  * `repeat:` as safe to re-run — the fail-unsafe answer to a check that exists
  * to make the decision explicit. tests/flow/config.test.ts pins that every
  * kind named here is one `childSteps` descends into, so the two lists cannot
- * drift apart.
+ * drift apart. Its schema goes in `STEP_KINDS` (the step's key routes to it);
+ * the platform keys come from `PLATFORM_KEYS`, so a new container is never a
+ * platform by accident.
  */
-export type ContainerKind = 'branch' | 'optional' | 'android' | 'ios';
+export type ContainerKind = 'branch' | 'optional' | PlatformKey;
 /** Every leaf kind a flow may repeat without consequence; `launch` decides for itself. Containers never belong here (see ContainerKind). */
 const SAFE_LEAVES = {
   tap: true,
