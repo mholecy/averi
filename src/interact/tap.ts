@@ -1,7 +1,6 @@
 import { resolveClearOfKeyboard, type GuardOptions } from './keyboard.js';
 import type { KeyboardAdapter } from './keyboard-model.js';
 import type { Target } from './resolve.js';
-import type { OrderEyes } from '../ui-tree/eyes.js';
 
 /**
  * What a tap on a resolved node needs of the device: the keyboard guard's
@@ -12,14 +11,12 @@ import type { OrderEyes } from '../ui-tree/eyes.js';
 export type TapAdapter = KeyboardAdapter;
 
 /**
- * The guard's options with the eyes REQUIRED (A30; ADR 0024, amendment A30): the order question a centre covered by a
- * control the listing does not order asks (tap-judgement.ts#TapAsks). The composition root wires
- * verify/eyes.ts#eyesOn (mcp/tools.ts, flow/engine.ts), a test a fake — no caller can forget them and typecheck. The
- * guard below the verb keeps them optional (GuardOptions.eyes): its own tests ask no order.
+ * What a tap takes: the keyboard guard's options (keyboard-model.ts#GuardOptions), eyes REQUIRED (A30; ADR 0024,
+ * amendment A30) — the order question a centre covered by a control the listing does not order asks
+ * (tap-judgement.ts#TapAsks). The composition roots wire verify/eyes.ts#eyesOn (mcp/tools.ts, flow/engine.ts), a test
+ * a fake: no caller can forget them and typecheck.
  */
-export interface TapOptions extends GuardOptions {
-  eyes: OrderEyes;
-}
+export type TapOptions = GuardOptions;
 
 /**
  * The warning on a tap whose node the tree marks disabled (adapters/types.ts#UiNode.disabled) — warned, never refused:

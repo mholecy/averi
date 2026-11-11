@@ -105,7 +105,7 @@ const environment = z
   .describe("Credential environment from averi.yaml `environments:`, for a build that points at another backend. Default $AVERI_ENV, then `defaultEnvironment:`");
 
 /**
- * What one tool call is served with, by the composition root's ONE call per handler (`serve`, A30): the config the
+ * What one tool call is served with, by this composition root's ONE call per handler (`serve`, A30): the config the
  * call read (flow/tool-config.ts#loadForCall under its TOOL_CONFIG entry), the iOS settings of that config, the
  * project's adapter for the platform's device (D41), and the eyes over that adapter (verify/eyes.ts#eyesOn, ADR 0024)
  * — handed together, so no handler assembles them. The engine tools resolve their adapter lazily, through the same
@@ -247,9 +247,6 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
   // share.
   const session = new EngineSession();
 
-  /** The registry's adapter for settings already worked out — `deviceFor`'s and `serve`'s one `registry.get`. */
-  const adapterOf = (p: Platform, settings: IosToolSettings): Promise<DeviceAdapter> => registry.get(p, { treeSource: settings.treeSource });
-
   /**
    * The ONE way a handler reaches a device (D41, 2026-11-01): the registry's adapter for the platform's bound device
    * and the project's iOS tree source — the `iosToolSettings` of the config the call loaded (android gets none; no
@@ -260,14 +257,18 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
    * calls every tool of the policy table in a wda project and pins that one wda adapter alone is bound (ADR 0032,
    * amendment A30).
    */
-  const deviceFor = (p: Platform, cfg: AveriConfig | undefined): Promise<DeviceAdapter> => adapterOf(p, iosToolSettings(cfg, p));
+  const deviceFor = (p: Platform, cfg: AveriConfig | undefined): Promise<DeviceAdapter> =>
+    registry.get(p, { treeSource: iosToolSettings(cfg, p).treeSource });
 
-  /** The handler's one call (A30): read the config under the tool's policy, then the device and its eyes (`Served`). */
+  /**
+   * The handler's one call (A30): read the config under the tool's policy, then the device through `deviceFor` and
+   * its eyes (`Served`). The settings are the same pure answer `deviceFor` asks of the config (iosToolSettings), read
+   * here for the dismissals.
+   */
   const serve = async (p: Platform, policy: ConfigPolicy, cp: string | undefined): Promise<Served> => {
     const { cfg } = await loadForCall(policy, cp);
-    const settings = iosToolSettings(cfg, p);
-    const adapter = await adapterOf(p, settings);
-    return { cfg, settings, adapter, eyes: eyesOn(adapter) };
+    const adapter = await deviceFor(p, cfg);
+    return { cfg, settings: iosToolSettings(cfg, p), adapter, eyes: eyesOn(adapter) };
   };
 
   registerTool(
@@ -459,14 +460,13 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     },
     async ({ platform: p, selector, x, y, configPath: cp }) => {
       const served = await serve(p, TOOL_CONFIG.tap(p), cp);
-      const { adapter } = served;
       if (selector !== undefined) {
-        return text(tapText(selector, await tapElement(adapter, selector, acting(served))));
+        return text(tapText(selector, await tapElement(served.adapter, selector, acting(served))));
       }
       if (x === undefined || y === undefined) {
         throw new Error('Provide either selector or both x and y');
       }
-      await adapter.tap(x, y);
+      await served.adapter.tap(x, y);
       return text(`Tapped (${x}, ${y})`);
     },
   );
@@ -536,13 +536,12 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     },
     async ({ platform: p, text: value, selector, clear, configPath: cp }) => {
       const served = await serve(p, TOOL_CONFIG.type_text(p), cp);
-      const { adapter } = served;
       if (selector === undefined) {
         if (clear) throw new Error('clear requires a selector (the field whose content to measure)');
-        await typeIntoFocused(adapter, value);
+        await typeIntoFocused(served.adapter, value);
         return text(typedText(value.length));
       }
-      const fill = await fillField(adapter, selector, value, { ...acting(served), clear });
+      const fill = await fillField(served.adapter, selector, value, { ...acting(served), clear });
       return text(fillReply(fill, selector));
     },
   );

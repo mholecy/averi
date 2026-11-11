@@ -249,15 +249,18 @@ production sites had to remember to call `eyesOn(adapter)`: `mcp/tools.ts`'s tap
 and it silently lost this ADR: the tap's order stayed untold, and every `fully visible` claim the eyes would have
 checked was said as the tree's ("… a screenshot could not tell (no screenshot was taken)").
 
-Decision: each verb's options REQUIRE the eyes. These are `interact/tap.ts#TapOptions` and
-`interact/fill.ts#FillOptions` (the order question, which a fill's focus tap asks as a tap does) and
-`interact/scroll.ts#ScrollOptions` (both questions). A caller that omits them no longer compiles.
+Decision: each verb's options REQUIRE the eyes. The order question's are the keyboard guard's,
+`interact/keyboard-model.ts#GuardOptions` — a tap's options (`interact/tap.ts#TapOptions`) and, through them, a fill's
+(`interact/fill.ts#FillOptions`), whose focus tap asks the question as a tap does; both questions' are
+`interact/scroll.ts#ScrollOptions`. A caller that omits them no longer compiles.
 `tests/architecture/eyes-required.test.ts` pins the three types under `npm run lint`. The composition roots hand them
-in. In `mcp/tools.ts`, the handler's one call, `serve`, returns the eyes with the adapter (ADR 0032, amendment A30).
+in: `mcp/tools.ts` for a tool call and `flow/engine.ts` for a run (`mcp/registry.ts` only chooses and caches the
+adapters). In `mcp/tools.ts`, the handler's one call, `serve`, returns the eyes with the adapter (ADR 0032, amendment
+A30).
 `flow/engine.ts` makes them once per run over the adapter it acts through and hands the same eyes to `acting` and to
-`scroll_until:`. The keyboard guard below the verbs (`interact/keyboard-model.ts#GuardOptions`) keeps `eyes`
-optional: only the verbs are entry points, and the guard's own tests ask no order. `scroll_until`'s "no eyes" branch
-is gone, since nothing reaches it. Its wording lives on in the tests' `NO_EYES` (`tests/helpers/eyes.ts`), which a
+`scroll_until:`. The guard's own tests hand them too (their shared options carry `NO_EYES`), so no caller at any
+level can leave them out. The "no eyes" branches are gone, since nothing reaches them: `scroll_until`'s, and the
+guard's choice to ask the tap's judgement without eyes. Its wording lives on in the tests' `NO_EYES` (`tests/helpers/eyes.ts`), which a
 test that is not about the eyes hands in. That fake answers `fully` as an absent `eyes` did, and `order` with no pair
 seen. Replies are byte for byte unchanged: production always wired the eyes, and golden shows Changed 0.
 

@@ -149,8 +149,8 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
   // scroll view scrolls back down). The screen comes from the first look —
   // the orientation does not turn inside one tap — or from the re-read a
   // refusal makes first.
-  // The eyes' order question, when the caller wired them (GuardOptions.eyes).
-  const asks = opts.eyes === undefined ? {} : { eyes: opts.eyes };
+  // The eyes' order question (GuardOptions.eyes, required since A30).
+  const asks = { eyes: opts.eyes };
   const judge = await judgeTap(adapter, target, first, await usableScreen(adapter, first.look), asks);
   const { screen } = judge;
   const at = tapPoint(first.node);

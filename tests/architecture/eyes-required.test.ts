@@ -6,7 +6,7 @@ import type { Eyes, OrderEyes } from '../../src/ui-tree/eyes.js';
 
 /**
  * A30 (ADR 0024, amendment A30): the verbs that ask the eyes take them as a REQUIRED option, so a caller cannot forget
- * them — the composition root (mcp/tools.ts, flow/engine.ts) wires verify/eyes.ts#eyesOn, a test hands a fake
+ * them — the composition roots (mcp/tools.ts, flow/engine.ts) wire verify/eyes.ts#eyesOn, a test hands a fake
  * (tests/helpers/eyes.ts). Until A30 `eyes?` was optional at each verb, and a production site that forgot
  * `eyesOn(adapter)` typechecked and silently lost ADR 0024: the tap's order untold, `scroll_until`'s `fully visible`
  * said as the tree's, "no screenshot was taken".

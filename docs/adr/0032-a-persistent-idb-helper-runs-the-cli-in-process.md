@@ -847,7 +847,7 @@ none. One test pins the words of a line. This checkout's adapter is an `IosAdapt
 factory hands iOS calls to `liveIos` with the call's kind (idb when none) and the WDA deps, hooks Android's strokes,
 and refuses a side with no live adapter.
 
-## Amendment: the composition root serves config, device and eyes in one call (2026-11-11, backlog A30)
+## Amendment: the tools' composition root serves config, device and eyes in one call (2026-11-11, backlog A30)
 
 The architecture review of 2026-11-11 (card 12) found the D41 invariant spelled out in every handler: each one wrote
 `loadForCall`, `iosToolSettings` and `deviceFor` itself (about seventeen times), and only a regex test,
