@@ -4,16 +4,16 @@
 that require a login step.*
 
 This file is the current design: the layers, what each owns, and the words each uses. It is written for a reader who
-is about to change the code. It is not a history. Why a rule is the way it is, and when it became so, lives in three
-places, and this file points at them rather than retelling them:
+is about to change the code. It is not a history. Why a rule is the way it is, and when it became so, lives in its
+records (ADR 0045), and this file points at them rather than retelling them:
 
 - **docs/adr/** — every owner decision, with its measurements and residuals, amended in place as it moves.
 - **docs/plans/2026-10-30-performance-backlog.md** — every row of work (Dn, An, Tn), with its commit.
 - **the code's own docs** — a module or symbol named here holds its rule, its measured device shapes and its stated
-  residuals in its doc comment. docs/bugs/ holds the finding behind a rule.
-
-The long form this file replaced (dated history inline, 293 KB) is `git show 57ba80d8:ARCHITECTURE.md`; ADR 0045
-says where each of its paragraphs went.
+  residuals in its doc comment.
+- **docs/bugs/** and **docs/architecture-reviews/** — the finding behind a rule, and the reviews that shaped a layer.
+- **the long form** this file replaced (dated history inline, 301,741 bytes, ≈295 KB) — `git show
+  57ba80d8:ARCHITECTURE.md`; ADR 0045 maps each of its paragraphs to the records above.
 
 ---
 
@@ -330,12 +330,20 @@ A number a description quotes as a default is built from the constant that owns 
 `tests/mcp/tool-descriptions.test.ts` pins each. Their size is held to the budget
 `tests/mcp/tool-surface-budget.test.ts` pins.
 
+Vocabulary: **tool** — one MCP entry, its schema, description and handler; **handler** — the one call to `serve` and
+one delegation; **policy** — what a tool reads of averi.yaml (`none`, `optional`, `required`, §5); **composition
+root** — where adapters are chosen by platform (`registry.ts`) and the eyes handed in (`tools.ts`); **registry** —
+one cached adapter per device; **`configPath`** — where the call's averi.yaml is.
+
 #### util (`util/`)
 
 Leaves every layer may reach: `duration.ts` (`durationSchema`, the one parser of a timeout, refused at load),
 `count.ts`, `error-message.ts`, `regex.ts` (a regex field validated where it is parsed), `sleep.ts` (one owner, so
 "waits, not sleeps" stays a rule), `version.ts` (the package version, read at runtime).
 
+
+Vocabulary: **duration** — a timeout as written (`"15s"`) or as a number of ms, parsed by one schema;
+**count** — a number with its noun (`1 swipe`, `3 swipes`).
 ---
 
 ## 3. Device Adapter layer (raw adb + simctl/idb)
@@ -415,7 +423,7 @@ error and trace line says the same, host paths stripped; the error's fields keep
   as a value (`flow/tool-config.ts#iosToolSettings` → `registry.get` → the factory); the adapter never reads the file.
   What does cross is words: a refusal may name the config key that is the reader's next move (`keyboardAdvice` names
   `app.ios.keyboardDismiss`, `IdbEmptyTreeError` names `treeSource: wda`), as Android's launch refusals name theirs —
-  a typed error translated above the seam would need a translation site per caller (ADR 0045).
+  a typed error translated above the seam would need a translation site per caller (ADR 0032, A32 note).
 - **Shutdown** runs down the ownership chain, never across it: WDA child ← `WdaServer` ← `WdaTreeSource` ←
   `IosAdapter` ← `AdapterRegistry` ← `mcp/lifecycle.ts`, which handles SIGTERM/SIGINT/SIGHUP within a 1.5 s budget.
 
@@ -649,8 +657,8 @@ only what the tool descriptions do not already say:
 - **A mutation run guards the pure leaves' tests** (`npm run mutate`, ADR 0038): Stryker mutates the modules
   `scripts/mutation/scope.json` names, in four groups (`core`, `android`, `scene`, `lab`), and fails when a module's
   score drops below its floor; each group is one Stryker process bounded at 600 s. A branch that touches a scoped
-  module, its tests or anything they import runs it cold (`npm run mutate -- --force`) before merging. scope.json holds each module's floor and latest baseline; earlier baselines are in
-  docs/mutation-ledger.md.
+  module, its tests or anything they import runs it cold (`npm run mutate -- --force`) before merging. scope.json
+  holds each module's floor and latest baseline; earlier baselines are in docs/mutation-ledger.md.
 - **Releases** follow docs/release.md: gates A (off-device), B (Android) and C (iOS) before any version commit.
 
 ---

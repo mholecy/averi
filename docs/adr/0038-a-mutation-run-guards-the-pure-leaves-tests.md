@@ -76,8 +76,8 @@ score drops below its own floor. A merge runs it cold.**
 
 ## Consequences
 
-- A branch that touches a module in scope.json (65 at A32; five when this ADR was accepted), its tests or a module
-  they import runs `npm run mutate -- --force` before merging.
+- A branch that touches one of the five modules, their tests or a module they import runs `npm run mutate -- --force`
+  before merging.
 - A module joins the run only with direct tests of its own. Adding it is one edit: an entry in scope.json with its
   tests, its floor and its baseline.
 - geometry.ts stays out until its direct tests exist. That is a backlog row of its own.
@@ -2036,3 +2036,7 @@ since the module joined, newest first, on one line. A floor change was a diff of
   brackets), the first entry kept and the rest moved in order. Every module's old field equals its new `baseline` and
   its ledger entries joined with `; `, checked for all 65 modules. No floor, test list or group changed, so no Stryker
   run was needed: the run reads the same scope.
+- The scope has 65 modules at A32, not the five this ADR began with; the merge rule in Consequences applies to every
+  one of them, its tests and what they import.
+- An older amendment that says a reason or survivor is in "its scope.json baseline" (or "scope.json's baseline") means
+  the baseline of that time: unless it is still the latest, it is now in docs/mutation-ledger.md, under the module.

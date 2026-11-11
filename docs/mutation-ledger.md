@@ -1,9 +1,8 @@
 # Mutation ledger
 
 The earlier baselines of the modules `scripts/mutation/scope.json` scores, newest first under each module.
-scope.json keeps each module's floor and its latest baseline only; when a run records a new baseline there, the
-one it replaces moves to the top of that module's list here (docs/adr/0038-a-mutation-run-guards-the-pure-leaves-tests.md,
-the A32 amendment). A floor lowered gives its reason in the new baseline, as before.
+What goes here, and when, is ADR 0038's rule (docs/adr/0038-a-mutation-run-guards-the-pure-leaves-tests.md, the A32
+amendment).
 
 Moved here from scope.json by backlog A32 (2026-11-11), entry by entry and unedited.
 

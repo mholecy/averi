@@ -874,3 +874,12 @@ only `loadForCall` can mint, and that the registry's `get` would require, would 
 But it would put a flow/ type on the registry's interface and rewrite its 56 test calls. It would also guard less
 than the behavioural test: a brand cannot see a handler that never resolves a device at all.
 
+## Note: the iOS tree source's words cross the seam (2026-11-11, moved here by backlog A32)
+
+The iOS stack is shaped by a config key, `app.ios.treeSource`, but never reads averi.yaml: the kind arrives as a
+value. What crosses the seam is words: a refusal may name the config key that is the reader's next move
+(`IosAdapter.keyboardAdvice` names `app.ios.keyboardDismiss`, `IdbEmptyTreeError` names `treeSource: wda`, `WdaServer`'s
+missing-package refusal names `treeSource: wda`), as Android's launch refusals name theirs. The review of 2026-10-07
+(docs/architecture-reviews/2026-10-07-ios-adapter-stack.html, #3) called this a config leak and proposed one remedy
+owner above the seam. It was not taken (recorded 2026-10-08): a typed error translated above would be one sentence with
+a translation site per caller. Until A32 this was written only in ARCHITECTURE.md §3.
