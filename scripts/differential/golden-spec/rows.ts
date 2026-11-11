@@ -3,7 +3,7 @@ import { FIT_ROOM_PX } from '../../../src/interact/scroll-read.js';
 import type { Platform } from '../corpus.js';
 import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
-import { axisOf, bandsOf, directionOf, edgesWithinPixel, intersect, otherAxis, navigationBandTakes, parseGeometry, rectInside, regionOverlap, sampleOf, selectorOf, type Direction } from '../../truth/truth.js';
+import { axisOf, directionOf, edgesWithinPixel, intersect, otherAxis, navigationBandTakes, parseGeometry, rectInside, regionOverlap, sampleOf, selectorOf, type Direction } from '../../truth/truth.js';
 import { bandNamed, isBand, judgedContext, type StopAsk, type TapAsk, type TargetContract } from '../../truth/target-contract.js';
 import { ASSERTS_FAILED, carouselReply, claimsTap, claimsVisible, dismissalCover, flushProbedSide, inferredAxisSaid, isError, namesUntried, notInTree, replyRect, scrollAdvice } from '../../truth/replies.js';
 import { BUDGET_MS, first, landed, notTapped, passed, passes, pointsText, reachedWithNoSwipe, said, strokes, strokesOff, swipes, tapPoints, touchDowns, within, type Expectation } from './judges.js';
@@ -380,31 +380,28 @@ const UNFIT_SPANS = [
  *   Compose node, a View) is never `clipped`;
  * - its scroll views are its own clip (cell.scrollViews[t.scrollView]) and every other the truth reports overlapping
  *   that clip and not lying inside it (the truth names no nesting: one that holds or cuts the clip stands in for an
- *   enclosing one, one inside it is one it holds); the drawn frame is where they all and the USABLE screen overlap —
- *   the screen less its system bands (truth.ts#bandsOf), the frame src judges in (unfitAlong's `judgedInDrawn`);
+ *   enclosing one, one inside it is one it holds); the drawn frame is where they all and the screen overlap — the
+ *   panel as built, bands and all, as src's `fully` stop judges in it (ui-tree/standing.ts#inStopFrame: the usable
+ *   screen's box, cut by the keyboard line only); the system bands are judged after, as a region, outside unfitAlong;
  * - judged along each axis, vertical first, as unfitAlong: the frame runs past the drawn frame there, with both its
  *   sides on the screen (uiautomator cuts a node at the screen's edge: D17);
  * - the room-giver is the smallest of its scroll views along the axis (its own clip on a tie), and the tree tells
  *   its axis as that one: no cross-axis `unfit`, and none of D59's inferred axis (a replayed tree never moves);
- * - the drawn frame is at least that room less FIT_ROOM_PX there (no outer scroll view or band cuts it shorter: the
- *   card would have more room once it moves), and so is the frame.
+ * - the drawn frame is at least that room less FIT_ROOM_PX there (no outer scroll view cuts it shorter: the card
+ *   would have more room once that one moves), and so is the frame.
  * Cut on both sides (larger than its room), the deeper cut names the side (up, left on a tie).
- * Not modelled: the soft keyboard's line, which also cuts src's judged frame — no edges cell shows a keyboard; and a
- * scroller the replayed tree lists but the lab's state does not report (CellTruth.scrollViews): invisible here, so an
- * enclosing one of those that cuts the room is not seen (the lab reports every scroll view its cells build).
+ * Not modelled: the soft keyboard's line, the one cut of src's judged frame left out — no edges cell shows a
+ * keyboard. Not seen: a scroller the replayed tree lists but the lab's state does not report (CellTruth.scrollViews),
+ * so an enclosing one of those that cuts the room is missed (the lab reports every scroll view its cells build).
  */
-export function unfitSide(t: Pick<TargetTruth, 'frame' | 'scrollView'>, cell: Pick<CellTruth, 'screen' | 'scrollViews' | 'safeArea'>, reading: UnfitReading): Direction | undefined {
+export function unfitSide(t: Pick<TargetTruth, 'frame' | 'scrollView'>, cell: Pick<CellTruth, 'screen' | 'scrollViews'>, reading: UnfitReading): Direction | undefined {
   const own = t.scrollView === undefined ? undefined : cell.scrollViews?.[t.scrollView];
   if (own === undefined || !reading.listed.some((r) => edgesWithinPixel(r, t.frame))) return undefined;
   const holds = (r: Rect) => intersect(r, own) !== null && !(rectInside(r, own) && !edgesWithinPixel(r, own));
   const others = Object.entries(cell.scrollViews ?? {}).flatMap(([name, r]) => (name !== t.scrollView && holds(r) ? [r] : []));
   const views = [own, ...others];
   const screen = { x: 0, y: 0, width: cell.screen.width, height: cell.screen.height };
-  // The usable screen src judges in: the screen less its system bands (truth.ts#bandsOf).
-  const { status, nav } = bandsOf(screen, cell.safeArea);
-  const top = status === undefined ? 0 : status.height;
-  const usable = { x: 0, y: top, width: screen.width, height: (nav === undefined ? screen.height : nav.y) - top };
-  const drawn = views.reduce<Rect | null>((d, r) => (d === null ? null : intersect(d, r)), usable);
+  const drawn = views.reduce<Rect | null>((d, r) => (d === null ? null : intersect(d, r)), screen);
   if (drawn === null) return undefined;
   const f = t.frame;
   for (const { axis, at, extent, sides } of UNFIT_SPANS) {

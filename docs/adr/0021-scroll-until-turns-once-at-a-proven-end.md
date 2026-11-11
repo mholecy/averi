@@ -759,14 +759,15 @@ also View-cut flush, never `clipped`.
    the target whole, where the app reports its frame, within a pixel: a card listed cut flush to its clip is never
    `clipped`. Its scroll views are its own clip and every other the truth reports overlapping the clip and not lying
    inside it; the truth names no nesting, so such a scroll view stands in for an enclosing one. The drawn frame is where
-   they all and the usable screen overlap: the screen less its system bands, the frame src judges in. Along an axis,
-   vertical first, the frame runs past the drawn frame, with both its sides on the screen. The room-giver is the
-   smallest of its scroll views along that axis, and the tree tells its axis as that one (`scrollAxisToldIn` in
-   scripts/truth/truth.ts: a `scrollable` uiautomator node at that rect whose class fixes its axis, by src's own
-   android.ts#AXIS_BY_CLASS). The drawn frame and the frame are each at least that room less 1 (FIT_ROOM_PX): an outer
-   scroll view or a system band that cuts the room shorter keeps R-fully. The row asks `fully: true` toward the cut side
-   and expects `unfit` (`carouselReply` in scripts/truth/replies.ts) after no swipe, with no inferred-axis clause. Any
-   other reply is red, its kind said.
+   they all and the screen overlap: the panel as built, bands and all, as src's `fully` stop judges in it
+   (standing.ts#inStopFrame, the usable screen's box cut by the keyboard line only); the system bands are judged after,
+   as a region, outside unfitAlong. Along an axis, vertical first, the frame runs past the drawn frame, with both its
+   sides on the screen. The room-giver is the smallest of its scroll views along that axis, and the tree tells its axis
+   as that one (`scrollAxisToldIn` in scripts/truth/truth.ts: a `scrollable` uiautomator node at that rect whose class
+   fixes its axis, by src's own android.ts#AXIS_BY_CLASS). The drawn frame and the frame are each at least that room
+   less 1 (FIT_ROOM_PX): an outer scroll view that cuts the room shorter keeps R-fully. The row asks `fully: true`
+   toward the cut side and expects `unfit` (`carouselReply` in scripts/truth/replies.ts) after no swipe, with no
+   inferred-axis clause. Any other reply is red, its kind said.
 3. *The pins, before the capture.* tests/interact/scroll-carousel-unfit-cell.test.ts reads `CUT` from Edges.kt and pins
    the layout arithmetic and the truth's geometry from it. Over carousel-in-list's real dump with C moved to 44 and
    renamed, it also pins that `fully: true` left ends `unfit` on the first read, with no swipe and the reply's exact
@@ -783,6 +784,6 @@ conditions, so nothing is asked differently until the capture. With it, golden i
 (wda-source.ts), which the harness does not read, and idb lists no scroll view. No iOS twin is built: the L7 carousel
 cells are Android-only, and iOS has no clipping container that cuts a card's frame (a WDA card is listed where it lies,
 D52's WDA twin is unit-pinned). D59's inferred axis stays live-only: a replayed tree shows no stroke that moved the
-card. Two cuts of src's judged frame are not modelled: the soft keyboard's line (no edges cell shows a keyboard), and a
-scroller the replayed tree lists but the lab's state does not report, which the harness cannot see (the lab reports
-every scroll view its cells build).
+card. The soft keyboard's line, the one cut of src's judged frame, is not modelled (no edges cell shows a keyboard). A
+scroller the replayed tree lists but the lab's state does not report is not seen by the harness (the lab reports every
+scroll view its cells build).

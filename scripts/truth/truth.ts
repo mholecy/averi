@@ -16,7 +16,10 @@ import { DRAWN, pct, type CatalogField, type CatalogForm, type CellTruth, type D
  * so the two cannot drift: the IME window's touchable region (src/adapters/android.ts#parseInputShown,
  * #parseTouchableRegion: one parser of the dump, D69), and the axis a uiautomator class fixes (AXIS_BY_CLASS, read by
  * scrollAxisToldIn: golden asks D52's `unfit` exactly where averi reads a told axis — what is judged there is the stop,
- * not the class table).
+ * not the class table) — and plain utilities and types (sameRect, ScrollAxis). Both WDA_SCROLLERS and AXIS_BY_CLASS
+ * name a source's scroller types, but they serve different judges: WDA_SCROLLERS decides where the strokes MUST land
+ * (golden-spec/rows.ts#strokeRow holds averi to it), so it is a rule restated, while AXIS_BY_CLASS only decides
+ * whether the unfit row is asked, the stop itself judged by its reply, so it is a reading imported.
  */
 
 /** A probe's touch counts as the tap's when it lies this close to the tapped point (the tree's units). */

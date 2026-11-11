@@ -730,18 +730,14 @@ describe('R-unfit: a target as wide as its scroll view, drawn cut by it, where t
     expect(fullyOf(C(AT_44), dump(AT_44), 'uiautomator', c).call.args).toMatchObject({ direction: 'left', fully: true });
   });
 
-  it('(bands) its drawn frame is cut by the system bands, as src judges in the usable screen: a list running under the navigation band keeps R-fully', () => {
+  it('(bands) the system bands do not cut its drawn frame: src judges unfitAlong in the panel as built (bands and all, the keyboard line its only cut), the bands after, as a region', () => {
     // A vertical list 1800–2220, under the 66-px navigation band (2154–2220); a row as tall as it, cut 10 at its top,
-    // both its sides on the screen. In the usable screen the list shows 354 of its 420 px: the row would fit once it
-    // moved out from under the band.
+    // both its sides on the screen: as tall as its list, unfit — asked up — though the band lies over its foot.
     const list = rect(0, 1800, 1080, 420);
     const c = { ...cell, scrollViews: { ...cell.scrollViews, list } };
     const row = rect(0, 1790, 1080, 420);
-    const t = C(row, { scrollView: 'list', visible: rect(0, 1800, 1080, 354) });
-    expect(fullyOf(t, dump(row, [['android.widget.ScrollView', list]]), 'uiautomator', c).says).toMatch(/^R-fully:/);
-    // With no bands (no safe area), the same list gives the room: R-unfit, asked up.
-    const bare = { ...c, safeArea: { top: 0, left: 0, bottom: 0, right: 0 } };
-    expect(fullyOf(t, dump(row, [['android.widget.ScrollView', list]]), 'uiautomator', bare).call.args).toMatchObject({ direction: 'up', fully: true });
+    const t = C(row, { scrollView: 'list', visible: rect(0, 1800, 1080, 420) });
+    expect(fullyOf(t, dump(row, [['android.widget.ScrollView', list]]), 'uiautomator', c).call.args).toMatchObject({ direction: 'up', fully: true });
   });
 
   it('vertical first, then horizontal, as unfitAlong: cut on both axes, the tree telling only the horizontal one — asked left', () => {
