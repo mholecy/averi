@@ -718,7 +718,7 @@ function fromWindowLeft(rects: Map<string, Rect>, left: number | undefined): Map
 /**
  * Single-element rect check, same normalization rules as the whole-screen
  * comparator. Unlike the table it gets no frame: the `rect` assert polls
- * bare trees (Verifier.assertRect, through the tree poll — no capture), so
+ * bare trees (Verifier.planRect, through the tree poll — no capture), so
  * its caller asks `windowWidth(tree, screen)` for each round's tree against
  * the adapter's memoized screen. Same trust module, no second rule. `y` is measured and reported but NEVER fails the assert —
  * absolute y drifts with device aspect ratio alone; whole-screen gap rows

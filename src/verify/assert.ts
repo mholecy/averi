@@ -4,7 +4,7 @@ import pixelmatch from 'pixelmatch';
 import { z } from 'zod';
 import { PersistentReadError, type DeviceAdapter, type UiNode } from '../adapters/types.js';
 import { describeElementSpec, elementSpecSchema, type ElementSpec } from '../ui-tree/element-spec.js';
-import { pollOnVerdict, pollTree, Undecided, type FirstSample, type PollOutcome } from '../ui-tree/read-tree.js';
+import { pollOnVerdict, pollTree, Undecided, type FirstSample } from '../ui-tree/read-tree.js';
 import { ReadHandOff } from '../ui-tree/read-handoff.js';
 import { markedForMiss } from '../ui-tree/window-mark.js';
 import { formatSeconds, parseDuration } from '../util/duration.js';
@@ -243,8 +243,17 @@ export interface VerifierOptions {
 /** VerifierOptions.persistentRead: whether an assert throws a read no wait cures (`throw`) or fails on it (`fail`). */
 export type PersistentReadMode = 'throw' | 'fail';
 
-interface PollSpec {
+/**
+ * One assert, planned and not yet run (A20): what it checks, and the run — a tree poll, a pixel poll, or the
+ * screenshot diff — whose verdict becomes the result. `Verifier.decided` runs every plan, so whatever a run throws
+ * meets the persistentRead policy there and nowhere else.
+ */
+interface PlannedAssert {
   description: string;
+  run: () => Promise<PollVerdict>;
+}
+
+interface PollSpec {
   timeoutMs: number;
   /**
    * Detail for the failing result at the deadline, from the last non-passing
@@ -313,31 +322,51 @@ export class Verifier {
    * ocr and screenshot asserts locate pixels in a frame of their own.
    */
   async assert(spec: AssertSpec): Promise<AssertResult> {
-    return this.handOff.producing(() => this.assertOne(spec));
+    return this.handOff.producing(() => this.decided(this.plan(spec)));
   }
 
-  private async assertOne(spec: AssertSpec): Promise<AssertResult> {
+  /**
+   * The one step every assert runs through (A20): run its plan — whichever poll it is — and map the verdict to the
+   * AssertResult, applying VerifierOptions.persistentRead once. A PersistentReadError (D21 — a read no wait cures,
+   * which every poll throws at once, after its one read) is the assert's failing result under `fail`, its message the
+   * detail; under `throw`, and for any other error, it propagates as it came. Until A20 the tree poll caught it and
+   * each pixel assert by a hand `.catch`: one forgotten would have rejected a whole verify leg (run/verify.ts),
+   * losing its frame, screenshot and health line — what D21 round 2 set `fail` up to keep.
+   */
+  private async decided({ description, run }: PlannedAssert): Promise<AssertResult> {
+    try {
+      const { pass, detail } = await run();
+      return { description, pass, detail };
+    } catch (e) {
+      if (this.persistentRead === 'fail' && e instanceof PersistentReadError) {
+        return { description, pass: false, detail: e.message };
+      }
+      throw e;
+    }
+  }
+
+  private plan(spec: AssertSpec): PlannedAssert {
     if ('screenshot' in spec) {
-      return this.assertScreenshot(spec.screenshot.baseline, spec.screenshot.threshold ?? 0.01);
+      return this.planScreenshot(spec.screenshot.baseline, spec.screenshot.threshold ?? 0.01);
     }
     const pixel = 'color' in spec || 'ocr' in spec;
     const timeoutMs =
       spec.timeout !== undefined ? parseDuration(spec.timeout)
       : (this.timeoutMs ?? (pixel ? PIXEL_ASSERT_TIMEOUT_MS : ASSERT_TIMEOUT_MS));
-    if ('rect' in spec) return this.assertRect(spec.element, spec.rect, timeoutMs);
-    if ('color' in spec) return this.assertColor(spec.element, spec.color, timeoutMs);
-    if ('ocr' in spec) return this.assertOcr(spec.element, spec.ocr, timeoutMs);
-    if (spec.absent) return this.assertAbsent(spec.element, timeoutMs);
-    return this.assertElement(spec.element, spec.text, spec.match, spec.error, timeoutMs);
+    if ('rect' in spec) return this.planRect(spec.element, spec.rect, timeoutMs);
+    if ('color' in spec) return this.planColor(spec.element, spec.color, timeoutMs);
+    if ('ocr' in spec) return this.planOcr(spec.element, spec.ocr, timeoutMs);
+    if (spec.absent) return this.planAbsent(spec.element, timeoutMs);
+    return this.planElement(spec.element, spec.text, spec.match, spec.error, timeoutMs);
   }
 
-  private async assertElement(
+  private planElement(
     element: ElementSpec,
     text: string | undefined,
     match: string | undefined,
     error: string | undefined,
     timeoutMs: number,
-  ): Promise<AssertResult> {
+  ): PlannedAssert {
     const wants =
       text !== undefined ? ` with text ${JSON.stringify(text)}`
       : match !== undefined ? ` matching /${match}/`
@@ -364,41 +393,42 @@ export class Verifier {
     // by an unrelated node elsewhere on screen — and widens to the whole tree
     // only when the spec found nothing to talk about.
     let hintScope: UiNode[] | undefined;
-    return this.poll(
-      (tree) => {
-        const found = findBySpec(tree, element);
-        hintScope = found.length > 0 ? found : flattenTree(tree);
-        if (found.some(contentMatches)) return { pass: true };
-        if (found.length === 0) return undefined;
-        // The element is there but says the wrong thing — worth reporting at
-        // the deadline, not worth ending the poll for.
-        return {
-          pass: false,
-          detail: found
-            .slice(0, 3)
-            .map((n) => JSON.stringify(error !== undefined ? (n.error ?? null) : (n.label ?? n.value)))
-            .join(', '),
-        };
-      },
-      {
-        description,
-        timeoutMs,
-        missing: element,
-        first: this.handOff,
-        timeoutDetail: ({ detail, readError, lastTree }) => {
-          if (readError !== undefined) return notFound(timeoutMs, { readError }, element);
-          const base =
-            detail !== undefined ?
-              `element found but ${error !== undefined ? 'error' : 'content'} was: ${detail}`
-            : notFound(timeoutMs, { lastTree }, element);
-          const hint =
-            exactText === undefined || hintScope === undefined ?
-              undefined
-            : textHint(hintScope, exactText);
-          return hint === undefined ? base : `${base}\n  ${hint}`;
+    const run = (): Promise<PollVerdict> =>
+      this.treePoll(
+        (tree) => {
+          const found = findBySpec(tree, element);
+          hintScope = found.length > 0 ? found : flattenTree(tree);
+          if (found.some(contentMatches)) return { pass: true };
+          if (found.length === 0) return undefined;
+          // The element is there but says the wrong thing — worth reporting at
+          // the deadline, not worth ending the poll for.
+          return {
+            pass: false,
+            detail: found
+              .slice(0, 3)
+              .map((n) => JSON.stringify(error !== undefined ? (n.error ?? null) : (n.label ?? n.value)))
+              .join(', '),
+          };
         },
-      },
-    );
+        {
+          timeoutMs,
+          missing: element,
+          first: this.handOff,
+          timeoutDetail: ({ detail, readError, lastTree }) => {
+            if (readError !== undefined) return notFound(timeoutMs, { readError }, element);
+            const base =
+              detail !== undefined ?
+                `element found but ${error !== undefined ? 'error' : 'content'} was: ${detail}`
+              : notFound(timeoutMs, { lastTree }, element);
+            const hint =
+              exactText === undefined || hintScope === undefined ?
+                undefined
+              : textHint(hintScope, exactText);
+            return hint === undefined ? base : `${base}\n  ${hint}`;
+          },
+        },
+      );
+    return { description, run };
   }
 
   /**
@@ -410,32 +440,33 @@ export class Verifier {
    * Polls like the other asserts: mid-animation geometry may legitimately be
    * off for a frame, so only the state at timeout is the verdict.
    */
-  private async assertRect(
-    element: ElementSpec,
-    expected: RectExpectation,
-    timeoutMs: number,
-  ): Promise<AssertResult> {
+  private planRect(element: ElementSpec, expected: RectExpectation, timeoutMs: number): PlannedAssert {
     const tolerance = expected.tolerancePct ?? DEFAULT_TOLERANCE_PCT;
     const description = `element ${describeElementSpec(element)} rect within ${tolerance}% of screen width (figma frame ${expected.frameWidth})`;
     // The witness, read once (memoized by the adapter), and re-read fresh at
     // most once for the whole assert, before a wider-than-screen refusal
     // (capture.ts#ScreenWitness). A failed read is not a failed assert: the
     // width is then the tree's alone, and windowWidth says so in the detail —
-    // the degradation captureFrame applies to the table.
-    const witness = await ScreenWitness.read(this.adapter);
-    return this.poll(
-      async (tree) => {
-        // First occurrence wins — the same duplicate-id rule as rect-parity.
-        const found = findBySpec(tree, element);
-        return found.length === 0 ? undefined : evaluateRectAssert(found[0].rect, expected, await witness.judge(tree));
-      },
-      {
-        description,
-        timeoutMs,
-        missing: element,
-        timeoutDetail: ({ detail, ...last }) => detail ?? notFound(timeoutMs, last, element),
-      },
-    );
+    // the degradation captureFrame applies to the table. So no read of the
+    // witness ever reaches `decided`: witnessScreen and `judge`'s re-read
+    // swallow every error, a PersistentReadError included — only the tree
+    // poll's reads meet the persistentRead policy here.
+    const run = async (): Promise<PollVerdict> => {
+      const witness = await ScreenWitness.read(this.adapter);
+      return this.treePoll(
+        async (tree) => {
+          // First occurrence wins — the same duplicate-id rule as rect-parity.
+          const found = findBySpec(tree, element);
+          return found.length === 0 ? undefined : evaluateRectAssert(found[0].rect, expected, await witness.judge(tree));
+        },
+        {
+          timeoutMs,
+          missing: element,
+          timeoutDetail: ({ detail, ...last }) => detail ?? notFound(timeoutMs, last, element),
+        },
+      );
+    };
+    return { description, run };
   }
 
   /**
@@ -453,33 +484,29 @@ export class Verifier {
    * Unavailable OCR fails the assert with the reason rather than skipping it:
    * a check the caller asked for and did not get must never read as a pass.
    */
-  private async assertOcr(
-    element: ElementSpec,
-    expectation: OcrExpectation,
-    timeoutMs: number,
-  ): Promise<AssertResult> {
+  private planOcr(element: ElementSpec, expectation: OcrExpectation, timeoutMs: number): PlannedAssert {
     const wants = [
       expectation.text !== undefined ? `text ${JSON.stringify(expectation.text)}` : undefined,
       expectation.match !== undefined ? `matching /${expectation.match}/` : undefined,
       expectation.heightPct !== undefined ? `ink height ${expectation.heightPct}% of width` : undefined,
     ].filter((v): v is string => v !== undefined);
     const description = `element ${describeElementSpec(element)} renders ${wants.join(' and ')}`;
-    const { engine, unavailable } = (this.ocr ??= ocrEngineFor());
-    if (unavailable !== undefined) {
-      return { description, pass: false, detail: failClosed(unavailable, 'rendered text') };
-    }
-    // The rect is the FIRST match's (the pixel poll's rule, the same as
-    // rect-parity's). The whole-screen text table deliberately does the
-    // opposite; here the caller named ONE element and gets that element's rect.
-    const result = await pollPixels(this.adapter, {
-      element,
-      timeoutMs,
-      pollMs: this.pollMs,
-      unchecked: 'rendered text',
-      glyphs: true,
-      measure: (input) => measureOcrAssert(engine, input, expectation),
-    }).catch((e: unknown) => this.failedOnPersistentRead(description, e));
-    return { description, ...result };
+    const run = async (): Promise<PollVerdict> => {
+      const { engine, unavailable } = (this.ocr ??= ocrEngineFor());
+      if (unavailable !== undefined) return { pass: false, detail: failClosed(unavailable, 'rendered text') };
+      // The rect is the FIRST match's (the pixel poll's rule, the same as
+      // rect-parity's). The whole-screen text table deliberately does the
+      // opposite; here the caller named ONE element and gets that element's rect.
+      return pollPixels(this.adapter, {
+        element,
+        timeoutMs,
+        pollMs: this.pollMs,
+        unchecked: 'rendered text',
+        glyphs: true,
+        measure: (input) => measureOcrAssert(engine, input, expectation),
+      });
+    };
+    return { description, run };
   }
 
   /**
@@ -491,37 +518,22 @@ export class Verifier {
    * A frame that did not settle is a miss, never a sample — measuring the
    * last of six differing captures would call a number a verdict.
    */
-  private async assertColor(
-    element: ElementSpec,
-    expectation: ColorExpectation,
-    timeoutMs: number,
-  ): Promise<AssertResult> {
+  private planColor(element: ElementSpec, expectation: ColorExpectation, timeoutMs: number): PlannedAssert {
     const tol = expectation.deltaE ?? DEFAULT_TOLERANCE_DE;
     const expectedHex = normalizeHex(expectation.expected);
     const description =
       `element ${describeElementSpec(element)} fill within dE00 ${tol} of ${expectedHex}` +
       (expectation.theme !== undefined ? ` (${expectation.theme} theme)` : '');
-    const result = await pollPixels(this.adapter, {
-      element,
-      timeoutMs,
-      pollMs: this.pollMs,
-      unchecked: 'color',
-      reads: colorSampleRect,
-      measure: ({ rect, measured }) => evaluateColorAssert(rect, expectation, measured),
-    }).catch((e: unknown) => this.failedOnPersistentRead(description, e));
-    return { description, ...result };
-  }
-
-  /**
-   * A poll's error, as this Verifier answers it (VerifierOptions.persistentRead): a PersistentReadError (D21 — a read
-   * no wait cures, which pollTree throws at once) is the assert's failing result under `fail`, its message the detail;
-   * under `throw`, and for any other error, it propagates as it came.
-   */
-  private failedOnPersistentRead(description: string, e: unknown): AssertResult {
-    if (this.persistentRead === 'fail' && e instanceof PersistentReadError) {
-      return { description, pass: false, detail: e.message };
-    }
-    throw e;
+    const run = (): Promise<PollVerdict> =>
+      pollPixels(this.adapter, {
+        element,
+        timeoutMs,
+        pollMs: this.pollMs,
+        unchecked: 'color',
+        reads: colorSampleRect,
+        measure: ({ rect, measured }) => evaluateColorAssert(rect, expectation, measured),
+      });
+    return { description, run };
   }
 
   /**
@@ -533,8 +545,9 @@ export class Verifier {
    *
    * The loop itself is `pollTree` (ui-tree/read-tree.ts), written once
    * rather than copied per assert. What stays here
-   * is the verifier's vocabulary: a PollVerdict in, an AssertResult out, and
-   * the per-assert timeout wording.
+   * is the verifier's vocabulary: an evaluator's verdict in, the poll's PollVerdict out, and
+   * the per-assert timeout wording. A read no wait cures propagates from here
+   * as from the pixel poll: `decided` alone applies the policy (A20).
    *
    * `pollMs` is the cadence of the rounds (reads start at least pollMs
    * apart: pollTree sleeps what the read left of it) and NOTHING else: forwarded to
@@ -563,30 +576,23 @@ export class Verifier {
    * what is gone is the capture budget spent on top of it, and the verdict
    * from a frame that was still moving.
    */
-  private async poll(
+  private async treePoll(
     evaluate: (tree: UiNode) => PollVerdict | typeof Undecided | undefined | Promise<PollVerdict | typeof Undecided | undefined>,
     spec: PollSpec,
-  ): Promise<AssertResult> {
-    const { description, timeoutMs } = spec;
-    let outcome: PollOutcome<{ detail?: string }>;
-    try {
-      outcome = await pollTree(this.adapter, async (tree) => {
-        const verdict = await evaluate(tree);
-        return verdict === Undecided ? Undecided : verdictToPoll(verdict);
-      }, {
-        timeoutMs,
-        pollMs: this.pollMs,
-        ...(spec.first !== undefined && { first: spec.first }),
-      });
-    } catch (e) {
-      return this.failedOnPersistentRead(description, e);
-    }
-    if (!outcome.timedOut) return { description, pass: true, detail: outcome.value.detail };
+  ): Promise<PollVerdict> {
+    const outcome = await pollTree(this.adapter, async (tree) => {
+      const verdict = await evaluate(tree);
+      return verdict === Undecided ? Undecided : verdictToPoll(verdict);
+    }, {
+      timeoutMs: spec.timeoutMs,
+      pollMs: this.pollMs,
+      ...(spec.first !== undefined && { first: spec.first }),
+    });
+    if (!outcome.timedOut) return { pass: true, detail: outcome.value.detail };
     // The window manager's word on the last tree's window, asked now the poll has given up on a target it never found
     // (ui-tree/window-mark.ts): a detail is the finding, and no not-found is worded beside it.
     const lastTree = await markedForMiss(this.adapter, outcome, outcome.detail === undefined ? spec.missing : undefined);
     return {
-      description,
       pass: false,
       detail: spec.timeoutDetail({ detail: outcome.detail, readError: outcome.readError, undecidedTree: outcome.undecidedTree, lastTree }),
     };
@@ -607,38 +613,51 @@ export class Verifier {
    * the wording an unreadable tree already had — both are "we could not
    * tell", never "still visible".
    */
-  private async assertAbsent(element: ElementSpec, timeoutMs: number): Promise<AssertResult> {
+  private planAbsent(element: ElementSpec, timeoutMs: number): PlannedAssert {
     const description = `element ${describeElementSpec(element)} is absent`;
-    // Read before polling: a viewport that cannot be read is an error, not a
-    // failed assert — absence is meaningless without a reference frame.
-    // (Memoized by the adapter — adapters/types.ts — so this is one device
-    // read per adapter, not per assert.)
-    const viewport = await this.adapter.viewport();
-    return this.poll(
-      (tree) => {
-        const found = findBySpec(tree, element);
-        return pollOnVerdict(absenceVerdict(found, viewport, tree), {
-          pass: true,
-          detail:
-            found.length > 0 ? `${found.length} node(s) in tree but none intersect the viewport` : undefined,
-        });
-      },
-      {
-        description,
-        timeoutMs,
-        // An unreadable tree is NOT evidence of absence — it is why we could
-        // not tell, so it outranks "still visible"; and the last read failing
-        // is the fresher fact than the bare tree before it.
-        timeoutDetail: ({ readError, undecidedTree }) =>
-          readError !== undefined ? `could not verify within ${formatSeconds(timeoutMs)} (last UI tree read failed: ${readError.message})`
-          : undecidedTree !== undefined ? `could not verify within ${formatSeconds(timeoutMs)} (${bareTimeoutNote(undecidedTree)})`
-          : `still visible after ${formatSeconds(timeoutMs)}`,
-      },
-    );
+    const run = async (): Promise<PollVerdict> => {
+      // Read before polling: a viewport that cannot be read is an error, not a
+      // failed assert — absence is meaningless without a reference frame. A
+      // PersistentReadError from it meets the policy in `decided`, as any read's does.
+      // (Memoized by the adapter — adapters/types.ts — so this is one device
+      // read per adapter, not per assert.)
+      const viewport = await this.adapter.viewport();
+      return this.treePoll(
+        (tree) => {
+          const found = findBySpec(tree, element);
+          return pollOnVerdict(absenceVerdict(found, viewport, tree), {
+            pass: true,
+            detail:
+              found.length > 0 ? `${found.length} node(s) in tree but none intersect the viewport` : undefined,
+          });
+        },
+        {
+          timeoutMs,
+          // An unreadable tree is NOT evidence of absence — it is why we could
+          // not tell, so it outranks "still visible"; and the last read failing
+          // is the fresher fact than the bare tree before it.
+          timeoutDetail: ({ readError, undecidedTree }) =>
+            readError !== undefined ? `could not verify within ${formatSeconds(timeoutMs)} (last UI tree read failed: ${readError.message})`
+            : undecidedTree !== undefined ? `could not verify within ${formatSeconds(timeoutMs)} (${bareTimeoutNote(undecidedTree)})`
+            : `still visible after ${formatSeconds(timeoutMs)}`,
+        },
+      );
+    };
+    return { description, run };
   }
 
-  private async assertScreenshot(name: string, threshold: number): Promise<AssertResult> {
-    const description = `screenshot matches baseline "${name}" (threshold ${threshold * 100}%)`;
+  private planScreenshot(name: string, threshold: number): PlannedAssert {
+    return {
+      description: `screenshot matches baseline "${name}" (threshold ${threshold * 100}%)`,
+      run: () => this.screenshotVerdict(name, threshold),
+    };
+  }
+
+  /**
+   * The screenshot assert's run: it reads no tree, and a capture the adapter refuses fails it closed — so nothing it
+   * does meets the persistentRead policy, though it runs through `decided` like every assert.
+   */
+  private async screenshotVerdict(name: string, threshold: number): Promise<PollVerdict> {
     const path = join(this.baselineDir, this.adapter.platform, `${name}.png`);
     // The SETTLED frame (verify/capture.ts, png-only arm, the one stability
     // budget). A bare screenshot here would let a baseline diff compare two
@@ -685,7 +704,7 @@ export class Verifier {
       try {
         candidate = await captureBaselineFrame(this.adapter);
       } catch (e) {
-        return { description, pass: false, detail: screenshotFailed(captureRefusal(e), 'baseline match') };
+        return { pass: false, detail: screenshotFailed(captureRefusal(e), 'baseline match') };
       }
       // Fail closed: ONLY a confirmed window creates.
       // The first cut refused on `confirmed === false`, so a frame without
@@ -693,17 +712,17 @@ export class Verifier {
       // would have been stored unexamined. Each refusal is worded for what
       // was actually seen.
       if (candidate.confirmed !== true) {
-        return { description, pass: false, detail: `baseline not created: ${baselineRefusal(candidate)}` };
+        return { pass: false, detail: `baseline not created: ${baselineRefusal(candidate)}` };
       }
       await mkdir(dirname(path), { recursive: true });
       await writeFile(path, await candidate.shot.png());
-      return { description, pass: true, detail: `baseline created at ${path}` };
+      return { pass: true, detail: `baseline created at ${path}` };
     }
     let frame: Frame;
     try {
       frame = await captureFrame(this.adapter);
     } catch (e) {
-      return { description, pass: false, detail: screenshotFailed(captureRefusal(e), 'baseline match') };
+      return { pass: false, detail: screenshotFailed(captureRefusal(e), 'baseline match') };
     }
     const note = unsettledNote(frame);
     const withNote = (detail: string): string => (note === undefined ? detail : `${detail}\n${note}`);
@@ -712,7 +731,6 @@ export class Verifier {
     const b = frame.shot.decode();
     if (a.width !== b.width || a.height !== b.height) {
       return {
-        description,
         pass: false,
         detail: withNote(`size mismatch: baseline ${a.width}x${a.height}, current ${b.width}x${b.height}`),
       };
@@ -725,7 +743,6 @@ export class Verifier {
     const ratio = diffPixels / (a.width * rows);
     const pct = (ratio * 100).toFixed(2);
     return {
-      description,
       pass: ratio <= threshold,
       detail: withNote(`${pct}% of pixels differ${band > 0 ? ` (status band excluded: the top ${band} px rows)` : ''}`),
     };

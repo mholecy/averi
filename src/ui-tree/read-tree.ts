@@ -346,7 +346,7 @@ export interface PollRound {
 /**
  * Poll the UI tree until the predicate returns a value, or the deadline
  * passes. The one owner of the deadline loop (ARCHITECTURE.md §8, "waits,
- * not sleeps"): before 2026-10-03 it was written out in `Verifier.poll`,
+ * not sleeps"): before 2026-10-03 it was written out in `Verifier.treePoll`,
  * `FlowEngine.pollUntil` and `FlowEngine.detects`, and the third copy had
  * quietly dropped the read error — an adb that was gone showed up as
  * "not in state" with no trace of why.
@@ -385,7 +385,7 @@ export interface PollRound {
  *   timeout — a static element threw after one read at 615 ms of 1500) and
  *   refusing a round after a pause that crossed the deadline (it turned two
  *   found-late cases into timeouts AT the deadline). The before/after
- *   figures are kept once, on `Verifier.poll` (verify/assert.ts).
+ *   figures are kept once, on `Verifier.treePoll` (verify/assert.ts).
  * - The pause after a round is `pauseAfterRead` of the round's READ
  *   (docs/adr/0029-poll-cadence-counts-the-read.md), timed on `Date.now()`,
  *   the clock the deadline already uses, so a test that fakes Date

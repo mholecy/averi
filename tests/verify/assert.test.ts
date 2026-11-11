@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { PNG } from 'pngjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { assertSpecSchema, scanForCrashes, Verifier } from '../../src/verify/assert.js';
+import { elementAssertSchema } from '../../src/verify/element-assert.js';
+import type { z } from 'zod';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 import { KEYBOARD_ROLE, PersistentReadError, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { findBySpec } from '../../src/ui-tree/selectors.js';
@@ -73,40 +75,122 @@ function drawnAt(rect: Rect, hex: string, { width, height } = { width: 402, heig
 // default it is thrown as it came, after the one read: a flow's `assert:` step must reach the engine's isTerminal
 // with the named error (review round 2), not as a plain "flow asserts failed". Reads are bounded to the ones each test
 // expects (D38, tests/helpers/terminal-read.ts).
+//
+// A20 (2026-11-11): the policy is applied once, by the Verifier's one step every assert runs through (`decided`) — not
+// by each poll, nor by a hand `.catch` at each pixel assert, one of which forgotten rejected a whole verify leg. So
+// EVERY assert kind is looped here, under both settings. The screenshot assert is the one that reads no tree: a capture
+// the adapter refuses fails it closed under either setting (pixel-poll.ts's header), pinned with the rest.
 describe('asserts on a tree read no wait cures', () => {
+  const WEDGED = 'wedged until a reboot\nthe cure';
   const wedgedFake = (expectedReads: number) => {
     const fake = dashboardFake();
     let reads = 0;
     fake.uiTree = boundReads(expectedReads, async () => {
       reads++;
-      throw new PersistentReadError('wedged until a reboot\nthe cure');
+      throw new PersistentReadError(WEDGED);
     });
+    // The screenshot assert's only read: the adapter refuses it with the same error.
+    fake.screenshot = async () => {
+      throw new PersistentReadError(WEDGED);
+    };
     return { fake, reads: () => reads };
   };
+  const verifier = (fake: FakeAdapter, persistentRead?: 'fail' | 'throw') =>
+    new Verifier(fake, {
+      pollMs: 5,
+      timeoutMs: 60_000,
+      ocr: { engine: { recognize: async () => [] } },
+      baselineDir: '/nonexistent-averi-baselines',
+      ...(persistentRead !== undefined && { persistentRead }),
+    });
 
-  it.each([
+  const wedgeableKinds = [
     ['present', { element: { id: 'balance' } }],
+    ['text', { element: { id: 'balance' }, text: '1,250.00' }],
+    ['match', { element: { id: 'balance' }, match: '^1' }],
+    ['error', { element: { id: 'balance' }, error: 'Required' }],
     ['absent', { element: { id: 'balance' }, absent: true }],
+    ['rect', { element: { id: 'balance' }, rect: { x: 0, w: 200, frameWidth: 1000 } }],
     ['color', { element: { id: 'balance' }, color: { expected: '#FDFDFD' } }],
-  ] as const)('%s, under persistentRead: \'fail\': fails after one read, the detail the error\'s message, and the next assert still runs', async (_kind, spec) => {
+    ['ocr', { element: { id: 'balance' }, ocr: { text: '1,250.00' } }],
+  ] as const;
+
+  const screenshotSpec = { screenshot: { baseline: 'never-there' } } as const;
+
+  it('every kind the schema has is looped here: each top-level option, and each element-assert flag', () => {
+    // Each spec is valid, and each top-level schema option accepts at least one spec of the loop or the screenshot
+    // test: a new top-level kind fails here until it is added.
+    const specs = [...wedgeableKinds.map(([, spec]) => spec), screenshotSpec];
+    for (const spec of specs) expect(assertSpecSchema.safeParse(spec).success).toBe(true);
+    const uncovered = assertSpecSchema.options
+      .map((option, i) => ({ i, covered: specs.some((spec) => option.safeParse(spec).success) }))
+      .filter(({ covered }) => !covered);
+    expect(uncovered).toEqual([]);
+    // The element assert's variants share one schema arm: each flag of its shape (all but the element and the
+    // timeout) is a kind of its own, and the bare `present` the one with none — a new flag fails here until looped.
+    const flags = Object.keys((elementAssertSchema as unknown as z.ZodEffects<z.AnyZodObject>).innerType().shape).filter(
+      (key) => key !== 'element' && key !== 'timeout',
+    );
+    expect(flags.length).toBeGreaterThan(0);
+    const looped = new Set(wedgeableKinds.flatMap(([, spec]) => Object.keys(spec)));
+    expect(flags.filter((flag) => !looped.has(flag))).toEqual([]);
+    expect(wedgeableKinds.some(([, spec]) => Object.keys(spec).length === 1 && 'element' in spec)).toBe(true);
+  });
+
+  // The one read before polling that meets the policy (A20): the absent assert's viewport, its reference frame. The
+  // rect assert's witness read swallows every error (capture.ts#witnessScreen), so it has no such path.
+  it.each([
+    ['fail', { pass: false, detail: WEDGED }],
+    ['throw', 'rejects'],
+    [undefined, 'rejects'],
+  ] as const)('absent, a PersistentReadError from its viewport read under persistentRead: %s', async (persistentRead, expected) => {
+    const { fake, reads } = wedgedFake(0);
+    fake.viewport = async () => {
+      throw new PersistentReadError(WEDGED);
+    };
+    const spec = { element: { id: 'balance' }, absent: true } as const;
+    const outcome = await verifier(fake, persistentRead).assert(spec).catch((e: unknown) => e);
+    if (expected === 'rejects') {
+      expect(outcome).toBeInstanceOf(PersistentReadError);
+    } else {
+      expect(outcome).toEqual({ description: expect.stringMatching(/balance.*absent/), ...expected });
+    }
+    expect(reads()).toBe(0);
+  });
+
+  it.each(wedgeableKinds)('%s, under persistentRead: \'fail\': fails after one read, the detail the error\'s message, and the next assert still runs', async (_kind, spec) => {
     const { fake, reads } = wedgedFake(2);
-    const results = await new Verifier(fake, { pollMs: 5, timeoutMs: 60_000, persistentRead: 'fail' }).assertAll([spec, spec]);
+    const results = await verifier(fake, 'fail').assertAll([spec, spec]);
     expect(results.map((r) => ({ pass: r.pass, detail: r.detail }))).toEqual([
-      { pass: false, detail: 'wedged until a reboot\nthe cure' },
-      { pass: false, detail: 'wedged until a reboot\nthe cure' },
+      { pass: false, detail: WEDGED },
+      { pass: false, detail: WEDGED },
     ]);
     expect(results[0]!.description).toMatch(/balance/);
     expect(reads()).toBe(2);
   });
 
-  it.each([
-    ['present', { element: { id: 'balance' } }],
-    ['absent', { element: { id: 'balance' }, absent: true }],
-    ['color', { element: { id: 'balance' }, color: { expected: '#FDFDFD' } }],
-  ] as const)('%s, by default: thrown as it came after one read', async (_kind, spec) => {
-    const { fake, reads } = wedgedFake(1);
-    await expect(new Verifier(fake, { pollMs: 5, timeoutMs: 60_000 }).assertAll([spec, spec])).rejects.toBeInstanceOf(PersistentReadError);
-    expect(reads()).toBe(1);
+  it.each(wedgeableKinds.flatMap(([kind, spec]) => [[kind, 'unset (the default)', spec, undefined], [kind, 'throw', spec, 'throw']] as const))(
+    '%s, under persistentRead: %s: thrown as it came after one read',
+    async (_kind, _setting, spec, persistentRead) => {
+      const { fake, reads } = wedgedFake(1);
+      const wedged = await verifier(fake, persistentRead).assertAll([spec, spec]).catch((e: unknown) => e);
+      expect(wedged).toBeInstanceOf(PersistentReadError);
+      expect((wedged as Error).message).toBe(WEDGED);
+      expect(reads()).toBe(1);
+    },
+  );
+
+  it.each([undefined, 'throw', 'fail'] as const)('screenshot, under persistentRead: %s: reads no tree, its refused capture fails it closed', async (persistentRead) => {
+    const { fake, reads } = wedgedFake(0);
+    const results = await verifier(fake, persistentRead).assertAll([screenshotSpec]);
+    expect(results).toEqual([
+      {
+        description: expect.stringContaining('never-there'),
+        pass: false,
+        detail: expect.stringMatching(/^screenshot failed: wedged until a reboot/),
+      },
+    ]);
+    expect(reads()).toBe(0);
   });
 });
 
@@ -1353,7 +1437,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
    * and never returns the same frame twice, the uiautomator dump 1.5 s. The
    * mocked sleep advances the same clock. This is the explorer's 2026-10-05
    * measurement scenario (real Verifier, 3 s timeout, 300 ms poll) replayed
-   * deterministically; the real-time figures are on `Verifier.poll`.
+   * deterministically; the real-time figures are on `Verifier.treePoll`.
    */
   const slowNeverSettling = () => {
     const fake = cardFake();
@@ -1733,7 +1817,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
    * 4954ab4 the capture honours the deadline (before it, the round overran
    * the 3 s budget by ~1.3 s and that overrun was the only reason it
    * passed). The device numbers below are the ones measured that day; the
-   * 1.5 s / 300 ms fakes of `Verifier.poll`'s table are what hid this.
+   * 1.5 s / 300 ms fakes of `Verifier.treePoll`'s table are what hid this.
    */
   const deviceTimed = (live: boolean) => {
     const fake = cardFake();

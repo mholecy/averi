@@ -67,3 +67,20 @@ without knowing it exists" holds for the guard too. The cost: the step's trace h
 what the guard did before the wedge, as with the post-fill dismissal's confirming read. Pinned by
 tests/interact/keyboard-window.test.ts and tests/interact/keyboard-in-tree.test.ts (each model's look: the same
 instance, `toBe`), and by tests/flow/engine.test.ts ("a wedged read on the look after back stops the ladder").
+
+## Amendment: the Verifier's policy is one site (2026-11-11, backlog A20)
+
+"The policy sites keep their `instanceof`" named `Verifier`'s `persistentRead` as one site, but inside assert.ts it was
+three: the tree asserts' `Verifier.poll` caught the error, and the color and ocr asserts each by a hand
+`.catch(failedOnPersistentRead)` around `pollPixels`. A pixel assert that forgot its catch would have rejected a whole
+`verify` leg (run/verify.ts) and lost its frame, screenshot and health line, the thing D21 round 2 set `fail` up to
+keep.
+
+Every assert is now planned (`PlannedAssert`: its description and its run) and run by one private step,
+`Verifier.decided`, which maps the run's verdict to the `AssertResult` and holds the only `instanceof
+PersistentReadError` in verify/assert.ts. The tree poll (`Verifier.treePoll`) and the pixel poll
+(verify/pixel-poll.ts#pollPixels) both let the error propagate. The reads an assert makes before polling (the absent
+assert's viewport, the rect assert's screen witness, the ocr engine choice) run inside its run too. The screenshot
+assert goes through the same step; it reads no tree, and a capture the adapter refuses fails it closed under either
+setting. Wording is unchanged. Pinned by tests/verify/assert.test.ts ("asserts on a tree read no wait cures"), which
+loops over every assert kind (present, text, match, error, absent, rect, color, ocr, screenshot) under each setting.

@@ -26,7 +26,7 @@ import { findTarget, type Target } from './selectors.js';
  * Asked on a MISS only, never per poll — the call is one adb round trip, about 26 ms (adapters/android.ts
  * #focusedWindow) — and the rule of when is here, in its two doors: `markedForMiss`, the last read of a wait that gave
  * up with its target in no read it can still type (interact/resolve.ts#notFound: the tap's, fill's and the presence
- * check's; verify/assert.ts#Verifier.poll and verify/pixel-poll.ts: every assert's not-found; the flow's `wait:`,
+ * check's; verify/assert.ts#Verifier.treePoll and verify/pixel-poll.ts: every assert's not-found; the flow's `wait:`,
  * flow/engine.ts#pollUntil) — never for a wait whose reply words no not-found (an `absent` check still visible, an
  * element found with the wrong content, a condition of no element, a flow's wait whose last read was bare: those
  * callers hand no target), a failed read, or a

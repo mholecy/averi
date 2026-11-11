@@ -7,12 +7,12 @@ import type { MeasuredFrame } from './capture.js';
 import type { Shot } from './shot.js';
 
 /**
- * The verifier's poll vocabulary, shared by `Verifier.poll` (the tree-only
+ * The verifier's poll vocabulary, shared by `Verifier.treePoll` (the tree-only
  * asserts) and `pollPixels` (verify/pixel-poll.ts, the color and ocr asserts).
  * A leaf module since 2026-10-06, for the reason fail-closed.ts is one: both
  * need it and assert.ts imports the other. Until then the verdict-to-poll
  * translation and the not-found sentence lived inside assert.ts, and the
- * pixel asserts reached them only by running through `Verifier.poll`. The
+ * pixel asserts reached them only by running through `Verifier.treePoll`. The
  * tree poll (ui-tree/read-tree.ts) does not learn any of this: it speaks
  * value-or-`PollMiss`, and the translation is the verifier's.
  */

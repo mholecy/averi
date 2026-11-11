@@ -165,7 +165,7 @@ import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } fro
  * description and the `AssertResult` (the Verifier's), the tree poll's loop
  * (ui-tree/read-tree.ts) and the capture's budget (verify/capture.ts). The
  * before/after figures for threading the deadline in stay where they were
- * measured, on `Verifier.poll` (verify/assert.ts).
+ * measured, on `Verifier.treePoll` (verify/assert.ts).
  */
 
 interface PixelPollSpec {
