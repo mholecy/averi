@@ -44,6 +44,7 @@ import {
   CHOOSER_PACKAGES,
   defaultHand,
   focusedAppOf,
+  focusedChooserOf,
   isChooser,
   lastChosenOf,
   leaksOf,
@@ -224,6 +225,9 @@ describe('focusOf — the chooser in front by the harness\'s own reader of the f
     expect(focusOf(ok('  mFocusedApp=nullish\n'))).toEqual(garbled);
     expect(focusOf(ok('  mFocusedApp=null\r\n'))).toEqual({ state: 'read', chooser: undefined });
     expect(checkExit(focusOf(ok('  mFocusedApp=Token{1 something new}\n')), readOf(BLOCK), [])).toBe(CHECK_EXIT.unproven);
+    const twoDisplays = '  mFocusedApp=ActivityRecord{1 u0 dev.averi.lab/.MainActivity} t1}\n  mFocusedApp=ActivityRecord{2 u0 android/com.android.internal.app.ResolverActivity} t2}\n';
+    expect(focusOf(ok(twoDisplays)).state).toBe('unread');
+    expect(checkExit(focusOf(ok(twoDisplays)), readOf(BLOCK), [])).toBe(CHECK_EXIT.unproven);
     // The chooser's activity under a window still null (batch-10: the window follows once drawn): the chooser.
     expect(focusOf(ok(fixture('../dumpsys-window-focus-api33-b10-chooser-window-null.txt')))).toEqual({ state: 'read', chooser: 'android/com.android.internal.app.ResolverActivity' });
     // An app's activity under the chooser's window (a chooser on its way out): no chooser.
@@ -246,6 +250,25 @@ describe('the harness\'s focus reader (chooser-readers.ts, live-chooser.ts\'s, -
     expect(focusedAppOf('  mFocusedApp=ActivityRecord{1 u0 a/.First}\n  mFocusedApp=ActivityRecord{2 u0 b/.Second}\n')).toBe('a/.First');
   });
 
+  it('focusedChooserOf: exactly one mFocusedApp= line, read fail closed — `null` is no chooser, anything else unparsable unread', () => {
+    const resolver = '  mFocusedApp=ActivityRecord{5846a8b u0 android/com.android.internal.app.ResolverActivity} t2642}';
+    const launcher = '  mFocusedApp=ActivityRecord{c72a554 u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity} t1620}';
+    expect(focusedChooserOf(`${resolver}\n`)).toEqual({ state: 'read', chooser: 'android/com.android.internal.app.ResolverActivity' });
+    expect(focusedChooserOf(`  Display: mDisplayId=0 (organized)\n  mCurrentFocus=null\n${launcher}\n`)).toEqual({ state: 'read', chooser: undefined });
+    expect(focusedChooserOf('  mFocusedApp=null\n')).toEqual({ state: 'read', chooser: undefined });
+    expect(focusedChooserOf('  mFocusedApp=null \r\n')).toEqual({ state: 'read', chooser: undefined });
+    expect(focusedChooserOf('  mCurrentFocus=null\n')).toEqual({ state: 'unread', why: 'the focus read holds no mFocusedApp= line' });
+    // Two displays' lines (or one line twice): which display the link went to is not this reader's to guess.
+    const two = { state: 'unread', why: 'the focus read holds 2 mFocusedApp= lines, not one (one display\'s expected)' };
+    expect(focusedChooserOf(`  Display: mDisplayId=0\n${launcher}\n  Display: mDisplayId=2\n${resolver}\n`)).toEqual(two);
+    expect(focusedChooserOf(`${resolver}\n${resolver}\n`)).toEqual(two);
+    // An unparsable line beside a null one: two lines, unread — never read as the null's "no chooser".
+    expect(focusedChooserOf('  mFocusedApp=Token{1 something new}\n  mFocusedApp=null\n')).toEqual(two);
+    const garbled = { state: 'unread', why: "the focus read's mFocusedApp= line names no activity the reader can parse" };
+    expect(focusedChooserOf('  mFocusedApp=Token{1 something new}\n')).toEqual(garbled);
+    expect(focusedChooserOf('  mFocusedApp=nullish\n')).toEqual(garbled);
+  });
+
   it('isChooser: the platform\'s package and a Resolver or Chooser activity class; nothing else, nothing at all none', () => {
     expect([...CHOOSER_PACKAGES]).toEqual(['android', 'com.android.intentresolver']);
     expect(isChooser('android/com.android.internal.app.ResolverActivity')).toBe(true);
@@ -253,6 +276,10 @@ describe('the harness\'s focus reader (chooser-readers.ts, live-chooser.ts\'s, -
     expect(isChooser('android/com.android.internal.app.ResolverActivityX')).toBe(false);
     expect(isChooser('android/ResolverActivity')).toBe(false);
     expect(isChooser('dev.averi.lab/.ResolverActivity')).toBe(false);
+    expect(isChooser('android/com.android.internal.app.ChooserActivity')).toBe(true);
+    expect(isChooser('android/.ResolverActivity')).toBe(true);
+    expect(isChooser('android/com.android.internal.app.NotResolverActivity')).toBe(false);
+    expect(isChooser('dev.averi.lab/.MainActivity')).toBe(false);
     expect(isChooser(undefined)).toBe(false);
   });
 });

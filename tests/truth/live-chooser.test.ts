@@ -3,7 +3,7 @@ import type { AppHolder } from '../../src/adapters/types.js';
 import { appHolderText } from '../../src/interact/app-holder-text.js';
 import { deepLinkText, launchText } from '../../src/mcp/tool-text.js';
 import type { FocusRead } from '../../scripts/truth/lab-device.js';
-import { CHOOSER_CASES, chooserInFront, frontOf, homeOf, isChooser, type FocusReads } from '../../scripts/truth/live-chooser.js';
+import { CHOOSER_CASES, chooserInFront, frontOf, homeOf, type FocusReads } from '../../scripts/truth/live-chooser.js';
 import type { LiveVerdict } from '../../scripts/truth/live-visibility.js';
 import type { LabState } from '../../scripts/truth/schema.js';
 
@@ -62,18 +62,6 @@ describe('frontOf: what one read says is in front, and on the stack', () => {
     expect(frontOf({ window: '  mCurrentFocus=null\n', activities: hist(MAIN, 1) })).toEqual({ why: 'the focus read holds no mFocusedApp line' });
     expect(frontOf({ window: '  mFocusedApp=null\n', activities: hist(MAIN, 1) })).toEqual({ why: 'the focus read holds no mFocusedApp line' });
     expect(frontOf({ window: windowOf(MAIN), activities: '' })).toEqual({ why: 'the activities read lists no record' });
-  });
-
-  it('isChooser: the platform\'s resolver or chooser, by package and class; never an app\'s activity of that name', () => {
-    expect(isChooser(RESOLVER)).toBe(true);
-    expect(isChooser('android/com.android.internal.app.ChooserActivity')).toBe(true);
-    expect(isChooser('com.android.intentresolver/.ChooserActivity')).toBe(true);
-    expect(isChooser('android/.ResolverActivity')).toBe(true);
-    expect(isChooser('dev.averi.lab/.ResolverActivity')).toBe(false);
-    expect(isChooser('android/com.android.internal.app.ResolverActivityX')).toBe(false);
-    expect(isChooser('android/com.android.internal.app.NotResolverActivity')).toBe(false);
-    expect(isChooser(MAIN)).toBe(false);
-    expect(isChooser(undefined)).toBe(false);
   });
 
   it('chooserInFront: the chooser the settled read has focused, else none (an unread read, a record below, a chooser only in the first read)', () => {

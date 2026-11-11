@@ -115,7 +115,8 @@ It builds the lab app from this checkout under JDK 17 and installs it, runs the 
 a check of the chooser's lab defaults before and after, then live.ts's other Android groups, `forms`, `visibility`,
 `ensure` and `carousel`, each as its own block (backlog A22). The `dismissal` group is iOS only: Gate C runs it. It
 bounds itself (each live run 1800 s, the build 2400 s; standing.ts's KNOBS), each call in a process group of its own,
-so a run past its bound leaves no `adb` behind and its block is INCONCLUSIVE. After such an INCONCLUSIVE, `adb -s
+which a run past its bound has killed whole (the `adb` it started among it), and its block is INCONCLUSIVE. After such
+an INCONCLUSIVE, `adb -s
 emulator-5554 shell echo ok` must answer before you report the run; if it does not, stop and tell the owner.
 
 It passes only on **exit 0**: every block PASS, and no INCONCLUSIVE or ERROR line. Exit 1 is a FAIL or a `RESTORE.txt`
@@ -129,7 +130,8 @@ known: …]` (every mismatch must be one live-known.ts lists), `FIXED, not inter
 `SKIPPED where a skip proves nothing`, `NO FIRST STATE`, `MISMATCH (hedged ceiling)`, a stale chooser premise. The
 block's line quotes the summary's header, `# Live golden: N cases, … M mismatches (0 not known), …`, and its rejudge
 summary (`android-<group>.rejudge.txt`) holds the rest. The carousel group reads the device's state before and after
-its cases (about 55 s each) into that summary's `Device:` line. That line is a label, not a gate: record it.
+its cases (about 55 s each) into the `Device:` line of its rejudge summary,
+`carousel/run-<id>/android-carousel.rejudge.txt`. That line is a label, not a gate: record it.
 
 **A `loud` count above 0 does not fail the gate.** A LOUD case is one where the app's model does not hold what the case
 asked and averi said so (an error, or `NOT verified`): honest, not a pass of that case, and not counted against the run
@@ -215,7 +217,8 @@ Only after A, B and C passed, on the commit they tested:
 | A golden diff | Strike 0, COUNTS 0, Re-pin 0 | vX.Y.Z/golden-against.log.txt |
 | A mutation | core PASS, scene PASS, lab PASS (cold) | vX.Y.Z/mutate.log.txt |
 | A package | release smoke: PASS (N files, 18 tools) | vX.Y.Z/release-smoke.log.txt |
-| B truth:lab | exit 0: lab, chooser, forms, visibility, ensure, carousel PASS; Device: <label> | vX.Y.Z/android-truth-lab.log.txt |
+| B truth:lab | exit 0: lab, chooser, forms, visibility, ensure, carousel PASS | vX.Y.Z/android-truth-lab.log.txt |
+| B carousel label | Device: <label> | vX.Y.Z/android-carousel.rejudge.log.txt (from `android-carousel.rejudge.txt`) |
 | C iOS | exit 0: lab, 4 idb and 4 wda blocks PASS (or: not run, and why) | vX.Y.Z/ios-truth-lab.log.txt |
 
 Not proven: <anything skipped or unproven, or "nothing">.

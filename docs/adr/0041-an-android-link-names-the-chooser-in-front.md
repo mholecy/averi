@@ -840,8 +840,8 @@ behind, and its summary read by eye. Those three groups now join `LAB_RUN_GROUPS
 per group, the way `forms` is and the way lab-run-ios.ts runs its groups: each outside the chooser's window (no case of
 theirs opens a link), needing only the android need, judged by `liveJudge` from main's rejudge and the failure reasons
 it wrote (A21), so a hedged-ceiling MISMATCH or a `[NOT known]` case is the block's named FAIL and the run's exit 1.
-Each live run is bounded by `B_LIVE` (1800 s) in a process group of its own, so a run past its bound leaves no `adb`
-behind and its block is INCONCLUSIVE (exit 3). `--groups` takes any of the five, comma-joined. The rules of the live
+Each live run is bounded by `B_LIVE` (1800 s) in a process group of its own; past its bound the runner kills that
+group (the `adb` it started among it) and its block is INCONCLUSIVE (exit 3). `--groups` takes any of the five, comma-joined. The rules of the live
 golden do not change, only who applies them: the runner, not a reader of the summary. What the hand run kept and the
 batch does not: `--shots` (the screen of each case not ok); a record's cases are in `android-<group>.json` beside the
 rejudge summary.
@@ -849,7 +849,13 @@ rejudge summary.
 The same change judges `--check`'s focus read (`focusOf` in lab-chooser.ts) with the harness's own reader, the chooser
 group's (`focusedAppOf` and `isChooser`, moved from live-chooser.ts to chooser-readers.ts so the batch loads no live
 module), not src's `chooserInFocus` (review card TL5; ADR 0020: a lab check does not judge with the code under test).
-That reader decides by the focused activity alone, so a read without an `mFocusedApp=` line is now unread (`--check`
-exit 3) where src's parser fell back to the focused window. So is a line it cannot parse: only `mFocusedApp=null` reads
-as no chooser (fail closed). It reads the first `mFocusedApp=` line across displays, not display 0's block as src's
-parser does; the lab emulator has one display.
+The rule is one reader beside them, `focusedChooserOf`, and it fails closed: the read must hold exactly one
+`mFocusedApp=` line. None is unread, where src's parser fell back to the focused window. More than one (a second
+display's, or a doubled line) is unread too, so whose link it was is never guessed. On that one line the activity
+decides; only `mFocusedApp=null` reads as no chooser, and a line it cannot parse is unread with its own reason. Each
+unread is `--check`'s exit 3. The lab emulator has one display, so one line.
+
+**Not yet proven on the device.** A22's one device run (docs/truth/live-records/a22-truth-lab/lab-run-1.log.txt) was
+refused by the checkout precondition, nothing ran: the feature branch's HEAD is not main's, and truth:lab runs only on
+main's. Exit 2, no build, no call to the emulator. The Gate B proof of the five-group run is the first truth:lab on main
+after the merge.

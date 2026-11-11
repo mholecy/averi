@@ -86,9 +86,6 @@ export function homeOf(read: HomeRead): string | { why: string } {
   return /^[\w.]+\/[\w.$]+$/.test(last) ? last : { why: `the HOME activity read names no component: ${last}` };
 }
 
-/** The platform's resolver or chooser activity (chooser-readers.ts's reader, this group's own). */
-export { isChooser };
-
 // --- the judges ---
 
 /** The lab app (the native one: its manifest declares `.Twin` and the `shared` and `cell` hosts). */

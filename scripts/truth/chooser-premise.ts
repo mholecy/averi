@@ -6,6 +6,7 @@ import {
   handlersArgv,
   handlersIn,
   handlersUnread,
+  isChooser,
   LAB_PACKAGE,
   lastChosenOf,
   leaksOf,
@@ -19,7 +20,7 @@ import {
 } from './chooser-readers.js';
 import { shellQuote } from './batch/shell.js';
 import { adbSaid, APK_PATH, HOME_COMMAND, type FocusRead } from './lab-device.js';
-import { frontOf, homeOf, isChooser } from './live-chooser.js';
+import { frontOf, homeOf } from './live-chooser.js';
 
 /**
  * The live golden's chooser premise (T20a; docs/adr/0041's T20a amendment): what the chooser group's cases rest on,
