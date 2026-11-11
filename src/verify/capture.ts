@@ -90,7 +90,7 @@ import { pngScale, windowWidth, type PngScale, type WindowWidth } from './scale.
  * - `CaptureOptions.deadline` lets a caller with a budget of its own bound
  *   the wait: a re-capture that would end after the deadline is not taken,
  *   and the frame comes back `moving` (or `unjudged`, with one capture). The
- *   before/after figures (2026-10-05) are kept ONCE, on `Verifier.poll` in
+ *   before/after figures (2026-10-05) are kept ONCE, on `Verifier.treePoll` in
  *   assert.ts; passing the deadline in is the pixel poll's since 2026-10-06
  *   (verify/pixel-poll.ts).
  *
@@ -639,7 +639,7 @@ export const witnessScreen = (adapter: Pick<DeviceAdapter, 'viewport'>): Promise
 
 /**
  * The device screen as the WINDOW's witness, for one frame (`captureFrame`)
- * or one `rect` assert's rounds (Verifier.assertRect): the memoized screen,
+ * or one `rect` assert's rounds (Verifier.planRect): the memoized screen,
  * re-read FRESH at most once — when a window reads wider than the side it
  * faces (`WindowWidth.widerThanScreen`), the one refusal a stale screen can
  * cause — and the window judged again against what the device says now.

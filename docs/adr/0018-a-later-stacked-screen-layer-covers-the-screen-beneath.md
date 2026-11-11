@@ -1250,7 +1250,7 @@ launcher's and another app's activity windows listed `isVisible=false`). One she
    one door that owns the rule (`ui-tree/window-mark.ts#markedForMiss`: a read that did not fail, an unmarked window,
    and no match of the target whose not-found the reply words — none for an `absent` assert still visible, an element
    found with the wrong content, a condition of no element) — the tap's, fill's and presence check's
-   (interact/resolve.ts#notFound), every assert's (verify/assert.ts#Verifier.poll, verify/pixel-poll.ts), a flow's
+   (interact/resolve.ts#notFound), every assert's (verify/assert.ts#Verifier.treePoll, verify/pixel-poll.ts), a flow's
    `wait:` (flow/engine.ts#pollUntil) — and by `scroll_until` before a stroke for a
    target its read does not hold, once per window (`CallWindow`: later reads of the same root bounds marked by the same
    word; a read of other bounds asked again). A flow's detect probe does not ask: it words no miss. A found target

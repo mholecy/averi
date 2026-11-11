@@ -9,7 +9,7 @@ Amended 2026-11-02 (D35: the settle's `pollMs` is the adapter's — see the amen
 ## Context
 
 - `ui-tree/read-tree.ts#pollTree` is the one tree-side deadline loop: the settle wait of every tap, fill and flow step
-  (`interact/resolve.ts#resolveSettled`), the asserts (`Verifier.poll`, `verify/pixel-poll.ts#pollPixels`), the flow
+  (`interact/resolve.ts#resolveSettled`), the asserts (`Verifier.treePoll`, `verify/pixel-poll.ts#pollPixels`), the flow
   engine's waits and its state-detect probe. Each round reads the tree once, runs the predicate, checks the deadline,
   and then slept the whole `pollMs`.
 - So a read's own cost was added to the cadence on top of the pause. On idb (~167 ms a read) a 500 ms poll was a
