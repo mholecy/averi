@@ -41,7 +41,10 @@ import type {
 } from '../../../scripts/truth/batch/lab-chooser.js';
 import {
   checkHand,
+  CHOOSER_PACKAGES,
   defaultHand,
+  focusedAppOf,
+  isChooser,
   lastChosenOf,
   leaksOf,
   unflaggedOf,
@@ -197,7 +200,7 @@ describe('acceptedOf — the last-chosen entries a batch accepts as the lab\'s k
   });
 });
 
-describe('focusOf — the chooser in front by src\'s chooserInFocus over CHOOSER_FOCUS_COMMAND\'s read', () => {
+describe('focusOf — the chooser in front by the harness\'s own reader of the focused activity over CHOOSER_FOCUS_COMMAND\'s read', () => {
   it("batch-10's chooser read names it; its launcher read none", () => {
     expect(chooserUp).toEqual({ state: 'read', chooser: 'android/com.android.internal.app.ResolverActivity' });
     expect(launcher).toEqual({ state: 'read', chooser: undefined });
@@ -206,9 +209,44 @@ describe('focusOf — the chooser in front by src\'s chooserInFocus over CHOOSER
   it('a read that failed (grep found nothing: exit 1), passed its bound, or holds no focus line is unread', () => {
     expect(focusOf(exit(1))).toEqual({ state: 'unread', why: 'the focus read: exit 1' });
     expect(focusOf(timedOut).state).toBe('unread');
-    expect(focusOf(ok('  Display: mDisplayId=0 (organized)\n'))).toEqual({ state: 'unread', why: 'the focus read holds no mCurrentFocus= or mFocusedApp= line' });
+    expect(focusOf(ok('  Display: mDisplayId=0 (organized)\n'))).toEqual({ state: 'unread', why: 'the focus read holds no mFocusedApp= line' });
     expect(focusOf(ok('  mFocusedApp=null\n'))).toEqual({ state: 'read', chooser: undefined });
-    expect(focusOf(ok('  mCurrentFocus=null\n'))).toEqual({ state: 'read', chooser: undefined });
+  });
+
+  it('TL5: the focused activity decides, by itself — the focused window alone is unread, never "no chooser" and never a chooser', () => {
+    const resolverWindow = '  mCurrentFocus=Window{db0395f u0 android/com.android.internal.app.ResolverActivity}\n';
+    expect(focusOf(ok(resolverWindow))).toEqual({ state: 'unread', why: 'the focus read holds no mFocusedApp= line' });
+    expect(focusOf(ok('  mCurrentFocus=null\n')).state).toBe('unread');
+    // The chooser's activity under a window still null (batch-10: the window follows once drawn): the chooser.
+    expect(focusOf(ok(fixture('../dumpsys-window-focus-api33-b10-chooser-window-null.txt')))).toEqual({ state: 'read', chooser: 'android/com.android.internal.app.ResolverActivity' });
+    // An app's activity under the chooser's window (a chooser on its way out): no chooser.
+    const outgoing = '  mCurrentFocus=Window{db0395f u0 android/com.android.internal.app.ResolverActivity}\n  mFocusedApp=ActivityRecord{c72a554 u0 dev.averi.lab/.MainActivity} t1620}\n';
+    expect(focusOf(ok(outgoing))).toEqual({ state: 'read', chooser: undefined });
+    // API 36's record, ended by the space before its task; the IntentResolver module's chooser; an app's own ResolverActivity is none.
+    const api36 = (c: string) => ok(`  mFocusedApp=ActivityRecord{1a2b u0 ${c} t7}\n`);
+    expect(focusOf(api36('com.android.intentresolver/.ChooserActivity'))).toEqual({ state: 'read', chooser: 'com.android.intentresolver/.ChooserActivity' });
+    expect(focusOf(api36('com.example/.ResolverActivity'))).toEqual({ state: 'read', chooser: undefined });
+    expect(focusOf(api36('android/com.android.internal.app.ResolverActivityX'))).toEqual({ state: 'read', chooser: undefined });
+  });
+});
+
+describe('the harness\'s focus reader (chooser-readers.ts, live-chooser.ts\'s, --check\'s since TL5)', () => {
+  it('focusedAppOf: the first mFocusedApp line\'s record, ended by `}` (API 33) or a space (API 36); none without one naming a component', () => {
+    expect(focusedAppOf('  mFocusedApp=ActivityRecord{5846a8b u0 android/com.android.internal.app.ResolverActivity} t2642}\n')).toBe('android/com.android.internal.app.ResolverActivity');
+    expect(focusedAppOf('  mFocusedApp=ActivityRecord{c u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity t2}\n')).toBe('com.google.android.apps.nexuslauncher/.NexusLauncherActivity');
+    expect(focusedAppOf('  mFocusedApp=ActivityRecord{c u0 NotAComponent}\n')).toBeUndefined();
+    expect(focusedAppOf('  mFocusedApp=null\n  mCurrentFocus=Window{d u0 a/.B}\n')).toBeUndefined();
+    expect(focusedAppOf('  mFocusedApp=ActivityRecord{1 u0 a/.First}\n  mFocusedApp=ActivityRecord{2 u0 b/.Second}\n')).toBe('a/.First');
+  });
+
+  it('isChooser: the platform\'s package and a Resolver or Chooser activity class; nothing else, nothing at all none', () => {
+    expect([...CHOOSER_PACKAGES]).toEqual(['android', 'com.android.intentresolver']);
+    expect(isChooser('android/com.android.internal.app.ResolverActivity')).toBe(true);
+    expect(isChooser('com.android.intentresolver/.ChooserActivity')).toBe(true);
+    expect(isChooser('android/com.android.internal.app.ResolverActivityX')).toBe(false);
+    expect(isChooser('android/ResolverActivity')).toBe(false);
+    expect(isChooser('dev.averi.lab/.ResolverActivity')).toBe(false);
+    expect(isChooser(undefined)).toBe(false);
   });
 });
 

@@ -815,8 +815,9 @@ starts it, because its cleanup may uninstall and reinstall the lab app.
 **Context.** T20c was to schedule the standing batch: a launchd job on the owner's Mac. The owner decided otherwise.
 The net is needed when a new averi version goes out, not on a clock.
 
-**Decision.** `npm run truth:lab` is Gate B of every release (docs/release.md), together with live.ts's visibility,
-ensure and carousel groups on the same emulator. It passes only on exit 0. A FAIL, a RESTORE, a refusal and an
+**Decision.** `npm run truth:lab` is Gate B of every release (docs/release.md), and since A22 all of it: live.ts's
+visibility, ensure and carousel groups, run beside it by hand until then, are its blocks (see A22 below). It passes
+only on exit 0. A FAIL, a RESTORE, a refusal and an
 unproven run (exit 3) each stop the release. The agent that prepares a release runs it on `emulator-5554`. This
 replaces the T20b amendment's "an agent never starts it": the cleanup's uninstall and reinstall of the lab APK is a lab
 APK install, and the release's device rules allow it. They do not allow an AVD start or restart, `pm clear` or a
@@ -832,3 +833,21 @@ outside the agent's sandbox.
 
 **Consequences.** Every release runs the net, so a chooser regression cannot ship between scheduled runs. The cost is
 one batch per platform per release, not one per night. Between releases the net runs only when someone asks for it.
+
+**A22 (2026-11-11): Gate B is one command.** Until A22, Gate B was `truth:lab` plus a second run by hand: live.ts
+`--groups visibility,ensure,carousel` under a `perl … alarm` bound, a `pgrep` for the `adb` a run past its bound left
+behind, and its summary read by eye. Those three groups now join `LAB_RUN_GROUPS` (lab-run.ts) as live blocks, one
+per group, the way `forms` is and the way lab-run-ios.ts runs its groups: each outside the chooser's window (no case of
+theirs opens a link), needing only the android need, judged by `liveJudge` from main's rejudge and the failure reasons
+it wrote (A21), so a hedged-ceiling MISMATCH or a `[NOT known]` case is the block's named FAIL and the run's exit 1.
+Each live run is bounded by `B_LIVE` (1800 s) in a process group of its own, so a run past its bound leaves no `adb`
+behind and its block is INCONCLUSIVE (exit 3). `--groups` takes any of the five, comma-joined. The rules of the live
+golden do not change, only who applies them: the runner, not a reader of the summary. What the hand run kept and the
+batch does not: `--shots` (the screen of each case not ok); a record's cases are in `android-<group>.json` beside the
+rejudge summary.
+
+The same change judges `--check`'s focus read (`focusOf` in lab-chooser.ts) with the harness's own reader, the chooser
+group's (`focusedAppOf` and `isChooser`, moved from live-chooser.ts to chooser-readers.ts so the batch loads no live
+module), not src's `chooserInFocus` (review card TL5; ADR 0020: a lab check does not judge with the code under test).
+That reader decides by the focused activity alone, so a read without an `mFocusedApp=` line is now unread (`--check`
+exit 3) where src's parser fell back to the focused window.

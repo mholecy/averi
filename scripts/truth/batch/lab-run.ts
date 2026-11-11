@@ -28,9 +28,10 @@ import { verdictLine, type Verdict } from './words.js';
 
 /**
  * The standing lab batch (backlog T20b; docs/verification.md's "standing lab run", ADR 0041's T20b amendment): the
- * chooser group (D73's net among it: lc1–lc4'', live-chooser.ts) and the forms group, run on the lab emulator through
- * runBatch, in the repo rather than in a numbered batch kept outside it. Composed of the lab plumbing's blocks only,
- * nothing new done to a device:
+ * chooser group (D73's net among it: lc1–lc4'', live-chooser.ts) and live.ts's other Android groups (forms,
+ * visibility, ensure, carousel: A22, so Gate B is this one command), run on the lab emulator through runBatch, in the
+ * repo rather than in a numbered batch kept outside it. Composed of the lab plumbing's blocks only, nothing new done to
+ * a device:
  *
  * - the `lab` block (lab-build.ts#labBlock over the android need and, with the chooser block wanted, the handler
  *   counts): the guard first, then this checkout's lab APK built, installed and proven main's catalog;
@@ -38,7 +39,8 @@ import { verdictLine, type Verdict } from './words.js';
  *   HANDLER_URLS: shared 2, cell 1): --check before (lab-emu.ts#readCheck, read only), the group's live run inside the
  *   chooser's dirty window (lab-emu.ts#chooserWindow), and the window's cleanup, --check after (lab-emu.ts#cleanUp: a
  *   lab default left is cleared by a reinstall of the pulled APK);
- * - the `forms` block, its live run, outside the window: no forms case opens a link.
+ * - then one block per other group, `forms`, `visibility`, `ensure` and `carousel`, each its live run, outside the
+ *   window: no case of theirs opens a link (each launch names the lab's activity: lab-device.ts#launch).
  *
  *     npm run truth:lab -- --out <dir outside the checkout> --serial emulator-5554 [--groups chooser|forms|…]
  *
@@ -64,8 +66,11 @@ import { verdictLine, type Verdict } from './words.js';
  * the ERROR section is empty; 1 a FAIL or a RESTORE; 2 refused or nothing ran; 3 unproven; 130 interrupted.
  */
 
-/** The live groups the batch runs, in its order. */
-export const LAB_RUN_GROUPS = ['chooser', 'forms'] as const;
+/**
+ * The live groups the batch runs, in its order: the chooser group, then live.ts's other Android groups (dismissal is
+ * iOS only: lab-run-ios.ts runs it).
+ */
+export const LAB_RUN_GROUPS = ['chooser', 'forms', 'visibility', 'ensure', 'carousel'] as const;
 export type LabRunGroup = (typeof LAB_RUN_GROUPS)[number];
 /** The batch's blocks, in its order. */
 const BLOCK_IDS = ['lab', ...LAB_RUN_GROUPS] as const;
@@ -75,7 +80,7 @@ export const LAB_RUN_STANDING: Standing<LabRunGroup> = {
   batch: 'lab-run',
   device: 'serial',
   groups: LAB_RUN_GROUPS,
-  hint: 'chooser, forms or chooser,forms',
+  hint: `${LAB_RUN_GROUPS.join(', ')}, or several joined by commas`,
   blockIds: BLOCK_IDS,
   blocksOf: (g) => [g],
 };
@@ -238,11 +243,12 @@ export async function labRun(o: StandingOptions): Promise<StandingExit> {
     },
   };
 
-  const forms: Block<StandingKnobs> = { ...liveBlock('forms'), needs: ['android'], run: (ctx) => liveRun(ctx, 'forms') };
+  /** A group outside the chooser's window: its live run alone. */
+  const outside = (group: Exclude<LabRunGroup, 'chooser'>): Block<StandingKnobs> => ({ ...liveBlock(group), needs: ['android'], run: (ctx) => liveRun(ctx, group) });
 
   // The guard first: the android need asks the build itself, after the lab guard (lab-build.ts#checkDevice).
   const lab = labBlock(['android', ...(wanted.includes('chooser') ? [HANDLERS_NEED] : [])], { build });
-  const blocks = [lab, chooser, forms];
+  const blocks = [lab, chooser, ...LAB_RUN_GROUPS.filter((g) => g !== 'chooser').map(outside)];
   return standingRun(o, LAB_RUN_STANDING, {
     blocks,
     wanted,

@@ -7,10 +7,11 @@ import { LAB_APP } from './lab-device.js';
  * need, moved here from lab-chooser.ts, which re-exports it. A leaf: it imports src's shellQuote and lab-device.ts's
  * LAB_APP, nothing of batch/ and nothing live-*, so a batch loads no live module through it. The preferred-activities
  * text (only its `Preferred Activities User N:` block), a lab default (`mAlways=true`, a leak) told from the
- * last-chosen entry "Just once" writes (`mAlways=false`), a link's handler query and its count, an entry as a line
- * quotes it, and the hand lines that clear a default or read the chooser back. A failed call is the caller's to tell,
- * its words worded here (preferredUnread, handlersUnread): lab-chooser.ts#preferredOf and #handlersOf give a batch's
- * exit, chooser-premise.ts adb's error.
+ * last-chosen entry "Just once" writes (`mAlways=false`), a link's handler query and its count, the focused activity
+ * and whether it is the platform's chooser (the chooser group's own reader, live-chooser.ts's, moved here so --check
+ * reads the focus with it: TL5), an entry as a line quotes it, and the hand lines that clear a default or read the
+ * chooser back. A failed call is the caller's to tell, its words worded here (preferredUnread, handlersUnread):
+ * lab-chooser.ts#preferredOf and #handlersOf give a batch's exit, chooser-premise.ts adb's error.
  */
 
 /**
@@ -155,6 +156,30 @@ export function handlersIn(text: string): number | { why: string } {
   const listed = out.split('\n').filter((l) => /^\s*[\w.]+\/[\w.$]+\s*$/.test(l)).length;
   if (listed === Number(said[1])) return listed;
   return { why: `query-activities said ${said[1]} activities but listed ${listed}` };
+}
+
+// ------------------------------------------------------------------------------------------------ the focus
+
+/**
+ * An ActivityRecord's component: after its hash and user, ended by a space (API 36: the task follows) or `}` (API 33).
+ * The harness's own reading of the window manager's lines (live-chooser.ts's, T7b), written apart from src's
+ * android-chooser.ts#chooserInFocus and never importing it: an oracle that does not share the code it judges (ADR
+ * 0020). --check's focus read (batch/lab-chooser.ts#focusOf) is judged by it too (TL5, A22).
+ */
+export const ACTIVITY_RECORD = String.raw`ActivityRecord\{[0-9a-f]+ u\d+ ([^\s}/]+\/[^\s}]+)[\s}]`;
+const FOCUSED_APP = new RegExp(String.raw`mFocusedApp=[^\n]*?${ACTIVITY_RECORD}`);
+
+/** The focused activity's component: the first `mFocusedApp` line's ActivityRecord; none when no line names one. */
+export const focusedAppOf = (text: string): string | undefined => FOCUSED_APP.exec(text)?.[1];
+
+/** The packages the platform's chooser runs in (AOSP: the framework's; later releases' IntentResolver module). */
+export const CHOOSER_PACKAGES: ReadonlySet<string> = new Set(['android', 'com.android.intentresolver']);
+
+/** The platform's resolver or chooser activity: its package one of CHOOSER_PACKAGES, its class `….ResolverActivity` or `….ChooserActivity`. */
+export function isChooser(component: string | undefined): boolean {
+  if (component === undefined) return false;
+  const [pkg, cls] = component.split('/');
+  return CHOOSER_PACKAGES.has(pkg) && /\.(?:Resolver|Chooser)Activity$/.test(cls);
 }
 
 // ---------------------------------------------------------------------------------------------- the hand lines

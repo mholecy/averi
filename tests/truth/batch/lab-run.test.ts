@@ -25,7 +25,9 @@ const ID = '20261111-101500-4242';
 const clock = () => new Date(2026, 10, 11, 10, 15, 0);
 
 /** The cases each group selects in the fake table. */
-const GROUP_CASES: Record<string, string[]> = { chooser: ['lc1', 'lc2'], forms: ['f1'] };
+const GROUP_CASES: Record<string, string[]> = { chooser: ['lc1', 'lc2'], forms: ['f1'], visibility: ['v1', 'v2', 'v3'], ensure: ['e1'], carousel: ['c1', 'c2'] };
+/** live.ts's other Android groups (A22), outside the chooser's window, in the batch's order. */
+const OUTSIDE = ['forms', 'visibility', 'ensure', 'carousel'];
 
 /** What a fake live.ts run does: its exit and its rejudge's, and a change to the lab while it runs. */
 interface LiveScript {
@@ -117,7 +119,7 @@ const dirtyState = (): string => {
 const callAt = (text: string, from = 0) => seam.words.findIndex((w, i) => i >= from && w.includes(text));
 
 describe('lab-run.ts: a clean run, the blocks\' order and the lab block', () => {
-  it('a clean run of both groups: every line in the blocks\' order, the checks around the chooser run, exit 0', async () => {
+  it('a clean run of every group: every line in the blocks\' order, the checks around the chooser run, exit 0', async () => {
     expect(await go()).toBe(0);
     const s = summary();
     const apk = join(dirOf('lab'), 'installed.apk');
@@ -132,18 +134,31 @@ describe('lab-run.ts: a clean run, the blocks\' order and the lab block', () => 
     expect(after[1]).toMatch(/^chooser check before: OK — chooser no; preferred read \(1 user\); lab entries 0 \(defaults 0, last-chosen 0\)$/);
     expect(after[2]).toMatch(/^chooser check after: OK — chooser no; preferred read \(1 user\); lab entries 0 /);
     expect(after[3]).toMatch(/^chooser verdict: PASS — android-chooser: main's rejudge exit 0 \(# Live golden: 2 cases, 2 ok\)$/);
-    expect(after[4]).toMatch(/^forms verdict: PASS — android-forms: main's rejudge exit 0 \(# Live golden: 1 cases, 1 ok\)$/);
-    expect(after[5]).toBe('RESTORE: none — everything dirty was put back and verified');
+    expect(after.slice(4, 8)).toEqual([
+      "forms verdict: PASS — android-forms: main's rejudge exit 0 (# Live golden: 1 cases, 1 ok)",
+      "visibility verdict: PASS — android-visibility: main's rejudge exit 0 (# Live golden: 3 cases, 3 ok)",
+      "ensure verdict: PASS — android-ensure: main's rejudge exit 0 (# Live golden: 1 cases, 1 ok)",
+      "carousel verdict: PASS — android-carousel: main's rejudge exit 0 (# Live golden: 2 cases, 2 ok)",
+    ]);
+    expect(after[8]).toBe('RESTORE: none — everything dirty was put back and verified');
     // Built from this checkout, after the guard: the build's own call after the emulator's AVD was read.
     expect(callAt('assembleDebug')).toBeGreaterThan(callAt('emu avd name'));
-    // The device's order: the --check before, the chooser group's run, the --check after; then the forms group.
+    // The device's order: the --check before, the chooser group's run, the --check after; then the other groups.
     const before = callAt('dumpsys package preferred', callAt('query-activities'));
     const chooser = callAt('--groups chooser');
     const check = callAt('dumpsys package preferred', chooser);
     const forms = callAt('--groups forms');
     expect([before, chooser, check, forms].every((n) => n >= 0)).toBe(true);
     expect(before < chooser && chooser < check && check < forms).toBe(true);
-    expect(liveGroups()).toEqual(['chooser', 'forms']);
+    expect(liveGroups()).toEqual(['chooser', ...OUTSIDE]);
+    // Each group outside the window its own block: its own folder, `.cases`, record and rejudge, of that group alone.
+    for (const g of OUTSIDE) {
+      expect(JSON.parse(readFileSync(join(dirOf(g), `android-${g}.cases`), 'utf8'))).toEqual({ platform: 'android', app: 'native', sources: ['uiautomator'], cases: [], groups: [g] });
+      expect(seam.words.filter((w) => w.includes(`--groups ${g} `))).toEqual([
+        `node --import tsx ${join(repo, 'scripts/truth/live.ts')} --serial ${LAB_SERIAL} --groups ${g} --record ${join(dirOf(g), `android-${g}.json`)}`,
+        `node --import tsx ${join(repo, 'scripts/truth/live.ts')} --rejudge ${join(dirOf(g), `android-${g}.json`)} --groups ${g} --failures ${join(dirOf(g), `android-${g}.rejudge.json`)}`,
+      ]);
+    }
     // The chooser's asked run: all of the group's cases on the lab emulator, its record under --out.
     expect(JSON.parse(readFileSync(join(dirOf('chooser'), 'android-chooser.cases'), 'utf8'))).toEqual({ platform: 'android', app: 'native', sources: ['uiautomator'], cases: [], groups: ['chooser'] });
     expect(seam.words.find((w) => w.includes('--groups chooser') && !w.includes('--rejudge'))).toBe(
@@ -231,10 +246,21 @@ describe('--groups: a selection, as ONLY= is — every block stays the batch\'s'
     expect(liveGroups()).toEqual(['chooser', 'forms']);
   });
 
+  it('--groups carousel,visibility (A22): those blocks alone, in the batch\'s order; no chooser block, no handlers need', async () => {
+    expect(await go(['--groups', 'carousel,visibility'])).toBe(0);
+    expect(liveGroups()).toEqual(['visibility', 'carousel']);
+    const s = summary();
+    expect(s.filter((l) => / verdict: /.test(l))).toEqual([
+      "visibility verdict: PASS — android-visibility: main's rejudge exit 0 (# Live golden: 3 cases, 3 ok)",
+      "carousel verdict: PASS — android-carousel: main's rejudge exit 0 (# Live golden: 2 cases, 2 ok)",
+    ]);
+    expect(s.some((l) => l.startsWith('LAB handlers') || l.startsWith('chooser'))).toBe(false);
+  });
+
   it.each([
-    [['--groups', 'carousel'], "--groups names 'carousel', which is no group of lab-run (chooser, forms)"],
-    [['--groups'], '--groups needs a value (chooser, forms or chooser,forms)'],
-    [['--groups', '--udid'], '--groups needs a value (chooser, forms or chooser,forms)'],
+    [['--groups', 'dismissal'], "--groups names 'dismissal', which is no group of lab-run (chooser, forms, visibility, ensure, carousel)"],
+    [['--groups'], '--groups needs a value (chooser, forms, visibility, ensure, carousel, or several joined by commas)'],
+    [['--groups', '--udid'], '--groups needs a value (chooser, forms, visibility, ensure, carousel, or several joined by commas)'],
     [['--groups', 'forms', '--groups', 'chooser'], '--groups is given twice'],
   ])('%j is refused: exit 2, nothing done', async (argv, why) => {
     expect(await go(argv)).toBe(2);
@@ -279,7 +305,7 @@ describe('--groups: a selection, as ONLY= is — every block stays the batch\'s'
     [['--groups', 'chooser,forms'], { ONLY: 'lab' }, 'ONLY=lab --groups chooser,forms'],
   ])('%j with %j selects no live group: refused up front, named, exit 2, nothing done', async (argv, env, said) => {
     expect(await go(argv, env)).toBe(LAB_RUN_EXIT.nothingDone);
-    expect(printed.join('')).toContain(`${said} selects no live group of lab-run (chooser, forms): a standing run that runs none proves nothing`);
+    expect(printed.join('')).toContain(`${said} selects no live group of lab-run (chooser, forms, visibility, ensure, carousel): a standing run that runs none proves nothing`);
     expect(seam.words).toEqual([]);
   });
 
@@ -345,7 +371,7 @@ describe('the --check before: read only, in its own words; only a default goes t
     expect(readFileSync(join(out, 'RESTORE.txt'), 'utf8')).toContain(
       `adb -s ${LAB_SERIAL} uninstall dev.averi.lab && adb -s ${LAB_SERIAL} install ${join(dirOf('lab'), 'installed.apk')} (clears it; wipes the lab's data); then: adb -s ${LAB_SERIAL} shell dumpsys package preferred`,
     );
-    expect(liveGroups()).toEqual(['forms']);
+    expect(liveGroups()).toEqual(OUTSIDE);
     // Read only: no reinstall, no key pressed.
     expect(world.calls.some((c) => / (uninstall|shell input) /.test(c))).toBe(false);
     expect(existsSync(join(dirOf('chooser'), 'state.json'))).toBe(false);
@@ -359,7 +385,7 @@ describe('the --check before: read only, in its own words; only a default goes t
     expect(s).toContain('RESTORE: none — everything dirty was put back and verified');
     expect(existsSync(join(out, 'RESTORE.txt'))).toBe(false);
     expect(world.calls.some((c) => c.includes('keyevent'))).toBe(false);
-    expect(liveGroups()).toEqual(['forms']);
+    expect(liveGroups()).toEqual(OUTSIDE);
   });
 
   it('the preferred block unread before the run: ERROR, no RESTORE; exit 3', async () => {

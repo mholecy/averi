@@ -1,4 +1,4 @@
-import { chooserInFocus, chooserSheet } from '../../../src/adapters/android-chooser.js';
+import { chooserSheet } from '../../../src/adapters/android-chooser.js';
 import { parseUiautomatorXml } from '../../../src/adapters/android.js';
 import { everyNode, labelOf, rectCentre, type DrawnOverStrip, type Point, type Rect, type UiNode } from '../../../src/adapters/types.js';
 import {
@@ -6,9 +6,11 @@ import {
   checkHand,
   defaultHand,
   entryText,
+  focusedAppOf,
   HAND_PREFIX,
   handlersIn,
   handlersUnread,
+  isChooser,
   LAB_PACKAGE,
   lastChosenOf,
   leaksOf,
@@ -51,8 +53,11 @@ import { exitText, failedCall, firstLineOf, messageOf, nameInLine, verdictLine, 
  * batch layer: the preferred block's parse, the leak rule, the handler count, the default's and the check's hand
  * lines; re-exported here. Here they are wrapped over a CallResult (preferredOf, handlersOf: a failed call is unread).
  *
- * What is src's is reused, not copied: the focus is android-chooser.ts#chooserInFocus's, the tree src's own uiautomator
- * parser's (D66's UiNode.disabled), the fresh sheet android-chooser.ts#chooserSheet's, an adb word's quoting
+ * The focus is judged by the harness's own reader (chooser-readers.ts#focusedAppOf and #isChooser, the chooser group's,
+ * live-chooser.ts's), never by src's android-chooser.ts#chooserInFocus: a lab check does not judge with the code under
+ * test (ADR 0020; TL5, A22). What is src's and no judge is reused, not copied: the read's command
+ * (CHOOSER_FOCUS_COMMAND), the tree src's own uiautomator parser's (D66's UiNode.disabled), the fresh sheet
+ * android-chooser.ts#chooserSheet's, an adb word's quoting
  * adb-shell.ts#shellQuote's (through chooser-readers.ts#adbLine). A host path in a hand line is quoted by shell.ts, the
  * batches' one host-shell quoter.
  */
@@ -98,13 +103,17 @@ export type FocusRead = { state: 'read'; chooser: string | undefined } | { state
 export const chooserOf = (f: FocusRead): string | undefined => (f.state === 'read' ? f.chooser : undefined);
 
 /**
- * CHOOSER_FOCUS_COMMAND's read, judged by android-chooser.ts#chooserInFocus. Read only when it exited 0 and holds a
- * focus line: its grep exits 1 when nothing matched, which proves no "no chooser".
+ * CHOOSER_FOCUS_COMMAND's read, judged by the harness's own reader of the focused activity (chooser-readers.ts
+ * #focusedAppOf, #isChooser: the chooser group's oracle, not src's chooserInFocus — TL5). Read only when it exited 0
+ * and holds an `mFocusedApp=` line, the one that reader decides by: its grep exits 1 when nothing matched, and a read
+ * with the focused window alone proves no "no chooser". A line naming no activity (`mFocusedApp=null`) is read: no
+ * chooser.
  */
 export function focusOf(r: CallResult): FocusRead {
   if (failedCall(r)) return { state: 'unread', why: `the focus read: ${exitText(r)}` };
-  if (!/mCurrentFocus=|mFocusedApp=/.test(r.out)) return { state: 'unread', why: 'the focus read holds no mCurrentFocus= or mFocusedApp= line' };
-  return { state: 'read', chooser: chooserInFocus(r.out) };
+  if (!r.out.includes('mFocusedApp=')) return { state: 'unread', why: 'the focus read holds no mFocusedApp= line' };
+  const focused = focusedAppOf(r.out);
+  return { state: 'read', chooser: isChooser(focused) ? focused : undefined };
 }
 
 // ---------------------------------------------------------------------------------------------------- --check

@@ -272,14 +272,15 @@ still fail the run. Single-element form:
 The harness's own net on the Android lab emulator, in one command:
 
 ```
-npm run truth:lab -- --out <dir outside the checkout> --serial emulator-5554 [--groups chooser|forms|chooser,forms]
+npm run truth:lab -- --out <dir outside the checkout> --serial emulator-5554 [--groups chooser|forms|visibility|…]
 ```
 
 `scripts/truth/batch/lab-run.ts` checks that the emulator is the `averi_lab` AVD, then builds the lab app from the
 checkout and installs it. It runs the live golden's `chooser` group (launch_app and open_deep_link around Android's
 "Open with" chooser) between a read-only `--check` of the lab's defaults before and a cleanup check after, then the
-`forms` group. Both groups run by default. It refuses to start with no serial, and the lab guard refuses any emulator
-that is not the lab AVD before anything is built.
+live golden's other Android groups, `forms`, `visibility`, `ensure` and `carousel`, each its own block with its own
+verdict (backlog A22). Every group runs by default; `--groups` names some of them, comma-joined. It refuses to start
+with no serial, and the lab guard refuses any emulator that is not the lab AVD before anything is built.
 
 The Android build runs under JDK 17, looked up in this order: JAVA_HOME, then `/usr/libexec/java_home -v 17`, then
 the first `*.jdk` in `/Library/Java/JavaVirtualMachines` and then in `~/Library/Java/JavaVirtualMachines`. A home
