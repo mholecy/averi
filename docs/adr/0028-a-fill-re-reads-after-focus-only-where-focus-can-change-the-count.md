@@ -273,8 +273,14 @@ behaviour, timing or wording changed: the same reads at the same moments, in the
   uiautomator does, so a sole `id` skips the re-read there as on a device.
 
 Proof: unit tests only — the golden replay never types (Changed 0 by construction); every existing fill test kept green,
-unchanged but for fill-type.test.ts's scripted reads now answering a node. fill-refetch.ts joins the mutation scope's
-core group (ADR 0038), its floor provisional (80) until its first cold run. A forms A/B on a device, which the review card recommends for FK2, is not run here.
+unchanged but for fill-type.test.ts's scripted reads now answering a node, and one test there split in two: "a field
+whose text is withheld (or not found) on two reads running is unread" became "a field not found on two reads running is
+unread, said why (`lost`)" and "a non-input that withholds its text on two reads running is unread, no `lost`". Two
+tests were added there: "A28: `lost` is the LAST read's" (lost then withheld is no `lost`; withheld then lost is) and
+"an input whose value is null reads empty, not withheld" (fill-facts.ts#shownText through the poll). New:
+tests/interact/fill-refetch.test.ts, and fill-landing.test.ts's `postFocusReadOf` and `heldCountOf` tables.
+fill-refetch.ts joins the mutation scope's core group (ADR 0038). A forms A/B on a device, which the review card
+recommends for FK2, is not run here.
 
 ## Residuals accepted
 

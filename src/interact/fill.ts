@@ -167,8 +167,8 @@ export async function fillField(
   // - the newest tree read, whose screen becomes the guard of the twin fallback (fill-refetch.ts#sameField) when typing
   //   starts (fill-refetch.ts#TwinGuard). The fallback is asked only when the selector stops matching; an `id` keeps
   //   matching through typing, while a label, hint or value selector may stop (the field's text changed), and without
-  //   a pre-typing read the fallback is off (`typing-unread`). Hence the sole-id gate. NOT seeded from the pre-tap tree: a field's own clear button
-  //   appearing on focus changed that screen's identity
+  //   a pre-typing read the fallback is off (`typing-unread`). Hence the sole-id gate. NOT seeded from the pre-tap
+  //   tree: a field's own clear button appearing on focus changed that screen's identity
   //   (docs/bugs/2026-10-09-ios-fill-screen-changed-from-fields-own-clear-button.md). That tree only words a `lost`
   //   (fill-refetch.ts#findAgain).
   // - the other inputs `whereTyped` compares (fill-type.ts), keyed by rect: read off the resolution's tree instead,
@@ -183,9 +183,14 @@ export async function fillField(
   const focusRead = postFocusReadOf({ value, clear: clear === true, field: node, soleId: soleIdOf(target) !== undefined, retypesTail: retypesTail(delivery) });
   // Every read of the field from here on, and why it was lost when it was (fill-refetch.ts). Skipped: the screen the
   // field was resolved on words a `lost` alone.
-  const field = fieldRefetch(adapter, target, opts, node, focusRead === 'skipped' ? screenIdentity(resolvedIn) : undefined, (e) =>
-    failure({ code: 'reread-failed', target: describeTarget(target), cause: e.message }),
-  );
+  const field = fieldRefetch({
+    adapter,
+    target,
+    resolve: opts,
+    chosen: node,
+    ...(focusRead === 'skipped' && { resolvedOn: screenIdentity(resolvedIn) }),
+    unreadable: (e) => failure({ code: 'reread-failed', target: describeTarget(target), cause: e.message }),
+  });
   const startTyping = async (text: string): Promise<void> => {
     field.typingStarts();
     await adapter.typeText(text);

@@ -80,25 +80,32 @@ export interface FieldRefetch {
   lastTree(): UiNode | undefined;
 }
 
-/**
- * The reads of the field `chosen` (resolved by `target` on `opts`'s policy). `resolvedOn`: the screen it was resolved
- * on, given when the post-focus read was skipped (fill-landing.ts#postFocusReadOf) — the wording of a `lost` alone.
- */
-export function fieldRefetch(
-  adapter: Pick<DeviceAdapter, 'uiTree'>,
-  target: Target,
-  opts: ResolveOptions,
-  chosen: UiNode,
-  resolvedOn: ScreenIdentity | undefined,
-  unreadable: (e: Error) => Error,
-): FieldRefetch {
+/** What `fieldRefetch` reads, and what it looks for. */
+export interface RefetchOf {
+  adapter: Pick<DeviceAdapter, 'uiTree'>;
+  /** The selector the field was resolved by, and the resolution's policy (resolveNow). */
+  target: Target;
+  resolve: ResolveOptions;
+  /** The node chosen at focus — the identity `sameField` looks for. */
+  chosen: UiNode;
+  /**
+   * The screen the field was resolved on, given when the post-focus read was skipped (fill-landing.ts#postFocusReadOf)
+   * — the wording of a `lost` alone.
+   */
+  resolvedOn?: ScreenIdentity;
+  /** The error a tree that cannot be read throws, of the read's own. */
+  unreadable: (e: Error) => Error;
+}
+
+/** The reads of the field `chosen` (see the module doc). */
+export function fieldRefetch({ adapter, target, resolve, chosen, resolvedOn, unreadable }: RefetchOf): FieldRefetch {
   let last: UiNode | undefined;
   let guard: TwinGuard = { phase: 'before-typing' };
   return {
     read: async () => {
       const tree = await readTreeOrThrow(adapter, unreadable);
       last = tree;
-      return findAgain(tree, resolveNow(tree, target, opts)?.node, chosen, guard);
+      return findAgain(tree, resolveNow(tree, target, resolve)?.node, chosen, guard);
     },
     typingStarts: () => {
       if (guard.phase !== 'before-typing') return;

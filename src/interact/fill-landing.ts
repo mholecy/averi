@@ -527,7 +527,8 @@ export function postFocusReadOf(f: FocusFacts): PostFocusRead {
  *
  * `maskedAppend`: bullets SEEN after focus (`count`) — the length rule cannot see content, so a password typed onto an
  * autofilled one reads as a perfect append (finportal 2026-09-17: backend `invalid_grant`); fill.ts says so where the
- * trace is read (FillResult.maskedAppend). (A28: until then fill.ts derived both; A2 had left them there.) Pure.
+ * trace is read (FillResult.maskedAppend). (A28: until then fill.ts derived both; A2 had left them there.) The `clear`
+ * row has no consumer: a clear alone types nothing, so its count reaches no read-back — it answers like `none`. Pure.
  */
 export function heldCountOf(read: PostFocusRead, shown: string): { held: number | 'unread'; maskedAppend?: { held: number } } {
   if (read === 'skipped') return { held: 'unread' };
