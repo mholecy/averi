@@ -541,7 +541,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
           .boolean()
           .optional()
           .describe('Require the element ENTIRELY inside the viewport and uncovered, not just its centre. Default false'),
-        timeoutMs: z.number().optional().describe(`Default ${DEFAULT_SCROLL_TIMEOUT_MS}`),
+        timeoutMs: z.number().nonnegative().finite().optional().describe(`Default ${DEFAULT_SCROLL_TIMEOUT_MS}`),
         within: z
           .union([z.string(), z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }).strict()])
           .optional()

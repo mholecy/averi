@@ -908,8 +908,11 @@ plain Error when the step ran: not terminal (`src/flow/engine.ts#isTerminal`), s
 **Decision.** (a) `src/util/duration.ts#durationSchema` is the one schema of a duration, used by every `timeout` field;
 a value parseDuration would refuse is refused there with parseDuration's own message, so averi.yaml fails at load on
 D86's path (`flows.f.steps.0.wait.timeout: Invalid duration "5 sec" — use e.g. 500ms, 15s, 2m`) and an `assert` call
-before any device is bound. The MCP tools' other budgets (`scroll_until`'s `timeoutMs`, `swipe`'s `durationMs`) are
-plain numbers of ms and stay so.
+before any device is bound. The MCP `scroll_until` tool's `timeoutMs` stays a plain number of ms, but under the same
+rule as (c): non-negative and finite (`z.number().nonnegative().finite()`), so the tool refuses at parse the budget the
+flow step refuses at load. `swipe`'s `durationMs` is left as it is: a gesture's length handed to the device, not a
+budget averi waits out — no ladder or `optional:` reads its failure, and what a device makes of an odd one is the
+adapter's question.
 
 (b) The schema keeps the value as written, not ms: the spec types stay `string | number` for the code and tests that
 build specs directly, every consumer still converts with parseDuration — which a parsed value cannot make throw — and no

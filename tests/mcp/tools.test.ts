@@ -1511,6 +1511,17 @@ describe('scroll_until', () => {
     expect(sleeps.length).toBe(fake.swipes.length);
     expect(new Set(sleeps)).toEqual(new Set([400]));
   });
+
+  // A19: the flow step's `timeout:` refuses a negative budget at load (durationSchema); the tool's timeoutMs refuses it
+  // at parse too, before a device is bound. (Infinity cannot cross JSON; `.finite()` holds it for any other caller.)
+  it('a negative timeoutMs is refused at parse, nothing bound', async () => {
+    const { call, bound } = await connect();
+    const result = await call('scroll_until', { platform: 'android', selector: 'id:never_there', timeoutMs: -1, configPath: missing() });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('timeoutMs');
+    expect(result.text).toContain('Number must be greater than or equal to 0');
+    expect(bound()).toEqual([]);
+  });
 });
 
 describe('scroll_until within (D78) — a selector or a rect, passed through; a malformed rect refused by the schema', () => {

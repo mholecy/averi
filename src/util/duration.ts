@@ -7,24 +7,28 @@ import { z } from 'zod';
  * scroll_until — and none of them owns the notion of a duration.
  */
 
-/** Why `value` is no duration, in the words parseDuration throws and durationSchema refuses with; undefined when it is one. */
-function durationIssue(value: string | number): string | undefined {
-  const ok = typeof value === 'number' ? Number.isFinite(value) && value >= 0 : DURATION.test(value);
-  return ok ? undefined : `Invalid duration ${typeof value === 'number' ? value : `"${value}"`} — use e.g. 500ms, 15s, 2m`;
-}
-
 const DURATION = /^(\d+(?:\.\d+)?)(ms|s|m)$/;
 
 /**
- * "15s" | "500ms" | "2m" | number(ms) → ms. A number is ms as it is, and a negative or non-finite one is no duration
- * (A19). Every value that reaches it from averi.yaml or a tool argument passed durationSchema, so there it cannot throw.
+ * The one reader of a duration: its ms, or why it is no duration — in the words parseDuration throws and
+ * durationSchema refuses with. A number is ms as it is; a negative or non-finite one is no duration (A19).
+ */
+function readDuration(value: string | number): { ms: number } | { issue: string } {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value >= 0 ? { ms: value } : { issue: `Invalid duration ${value} — use e.g. 500ms, 15s, 2m` };
+  }
+  const m = DURATION.exec(value);
+  return m ? { ms: Number(m[1]) * (m[2] === 'ms' ? 1 : m[2] === 's' ? 1000 : 60_000) } : { issue: `Invalid duration "${value}" — use e.g. 500ms, 15s, 2m` };
+}
+
+/**
+ * "15s" | "500ms" | "2m" | number(ms) → ms. Every value that reaches it from averi.yaml or a tool argument passed
+ * durationSchema, so there it cannot throw.
  */
 export function parseDuration(value: string | number): number {
-  const issue = durationIssue(value);
-  if (issue !== undefined) throw new Error(issue);
-  if (typeof value === 'number') return value;
-  const [, n, unit] = DURATION.exec(value) as RegExpExecArray;
-  return unit === 'ms' ? Number(n) : unit === 's' ? Number(n) * 1000 : Number(n) * 60_000;
+  const read = readDuration(value);
+  if ('issue' in read) throw new Error(read.issue);
+  return read.ms;
 }
 
 /**
@@ -36,10 +40,12 @@ export function parseDuration(value: string | number): number {
  * `string | number` for the code and tests that build specs directly, and each consumer converts with parseDuration,
  * which a value that passed here cannot make throw — util/regex.ts#regexSource's shape.
  */
-export const durationSchema = z.union([z.number(), z.string()]).superRefine((value, ctx) => {
-  const issue = durationIssue(value);
-  if (issue !== undefined) ctx.addIssue({ code: z.ZodIssueCode.custom, message: issue });
-});
+export const durationSchema: z.ZodEffects<z.ZodUnion<[z.ZodNumber, z.ZodString]>> = z
+  .union([z.number(), z.string()])
+  .superRefine((value, ctx) => {
+    const read = readDuration(value);
+    if ('issue' in read) ctx.addIssue({ code: z.ZodIssueCode.custom, message: read.issue });
+  });
 
 /**
  * ms → "N s", the way a tool description or a message quotes a budget
