@@ -425,7 +425,7 @@ flows:
 describe('reach: is an escalation ladder, not a script', () => {
   // The 2026-08-26 finding: a cheap, idempotent prelude cannot protect a
   // destructive flow behind it if every rung runs unconditionally.
-  const cfg = parseConfig(`
+  const cfgYaml = `
 app:
   android: { package: md.bank.app }
 states:
@@ -439,7 +439,8 @@ flows:
   login:
     steps:
       - launch: { clearState: true }
-`);
+`;
+  const cfg = parseConfig(cfgYaml);
 
   const screens = () => {
     resetLayout();
@@ -618,6 +619,19 @@ flows:
     const entry = (error as FlowError).trace.find((t) => t.action.startsWith('\u26a0 reach'));
     expect(entry?.action).toBe('\u26a0 reach dismiss_prompt');
     expect(entry?.detail).toMatch(/failed, escalating to login — /);
+  });
+
+  // A19: until a duration was one schema, `timeout: 5 sec` loaded clean and parseDuration threw a plain Error when the
+  // rung ran — not terminal (engine.ts#isTerminal), so the ladder escalated past the typo into the clearState login.
+  // Now the config never loads: no step runs, no rung escalates, nothing is wiped.
+  it('a rung with a bad duration cannot escalate into the wipe — the config is refused at load, before any step', async () => {
+    const fake = new FakeAdapter(screens(), 'biometrics_prompt');
+    const typo = cfgYaml.replace('- tap: { id: not_now }', '- tap: { id: not_now, timeout: 5 sec }');
+    await expect(async () => FlowEngine.run(parseConfig(typo), fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' })).rejects.toThrow(
+      /flows\.dismiss_prompt\.steps\.0\.tap\.timeout: Invalid duration "5 sec" — use e\.g\. 500ms, 15s, 2m/,
+    );
+    expect(fake.taps).toEqual([]);
+    expect(fake.launches).toEqual([]);
   });
 
   it('a rung that threw AFTER reaching the state does not escalate', async () => {
@@ -1391,7 +1405,7 @@ flows:
 
   // 2026-10-03, decided: app.android.activity applies only when the step
   // names neither an activity nor an intent — the launch_app rule, now the
-  // one rule (flow/config.ts#resolveLaunchActivity). This test pinned the
+  // one rule (flow/launch.ts#resolveLaunchActivity). This test pinned the
   // opposite until then. The adapter scopes the activity-less intent to the
   // package (tests/adapters/android.test.ts).
   it('a step with an intent and no activity launches with the intent alone — app.android.activity stays out of it', async () => {

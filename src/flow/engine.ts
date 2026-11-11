@@ -1540,8 +1540,8 @@ export class FlowEngine {
 
   private async runOptionalSteps(steps: StepPayload<'optional'>): Promise<void> {
     for (const s of steps) {
-      // Split OUTSIDE the try: a malformed `timeout:` is a config error, not
-      // an absent element — it must fail the flow, never log as "skipped".
+      // A tap's `timeout:` cannot be malformed here: durationSchema refused
+      // it when averi.yaml loaded (A19), so the split cannot throw.
       const tap = 'tap' in s ? splitTapSpec(s.tap) : undefined;
       // Set from interact's answer, not deduced: resolvePresent returned a
       // sighting. After it, an ElementNotFoundError from the committed tap
@@ -1566,10 +1566,9 @@ export class FlowEngine {
         if (tap && isRefusedOnPresentElement(e)) throw this.failed(s, new OptionalNotSkipped(e));
         // A config refusal is not an absent interstitial (2026-10-08, review
         // of after-ios-idb #4): an empty secret, a `type_pin` value with no
-        // digits, an undeclared credential — the same rule as the
-        // malformed `timeout:` above, which is split outside the try for
-        // exactly this reason. Skipping it would let the flow run on with
-        // the login half-typed and fail a screen later, the shape
+        // digits, an undeclared credential (a malformed `timeout:` was one
+        // too, until A19 refused it at load). Skipping it would let the flow
+        // run on with the login half-typed and fail a screen later, the shape
         // flow/credentials.ts exists to prevent. `isTerminal` is the ladder's
         // own "re-running cannot fix this" set: a SetupError, and an
         // UnreadTreeRefusal, which no step inside an `optional:` can raise

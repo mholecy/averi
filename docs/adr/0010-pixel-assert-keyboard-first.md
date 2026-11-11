@@ -897,6 +897,30 @@ schema — 253 valid ones deep-equal, 35 refusals word for word, 3 changed as in
 (d) A routed step that fails yields `z.NEVER`, and a refine over a step schema or a container of it would still be
 handed that value: a check over a whole step belongs in `validateReferences`, after the parse, not on the schema.
 
+## Amendment: A19 — a duration is one schema, checked at load (2026-11-11)
+
+**Context.** Architecture review 2026-11-11, card 1. Every `timeout` — a flow's `tap:`, `scroll_until:` and `wait:`
+steps, and the four assert specs (element, rect, color, ocr) the `assert` tool and an `assert:` step share — was
+`z.union([z.number(), z.string()])`. `timeout: 5 sec` loaded clean, and `src/util/duration.ts#parseDuration` threw a
+plain Error when the step ran: not terminal (`src/flow/engine.ts#isTerminal`), so a reach rung escalated past the typo
+(possibly into a clearState login), and under `optional:` the step logged as skipped.
+
+**Decision.** (a) `src/util/duration.ts#durationSchema` is the one schema of a duration, used by every `timeout` field;
+a value parseDuration would refuse is refused there with parseDuration's own message, so averi.yaml fails at load on
+D86's path (`flows.f.steps.0.wait.timeout: Invalid duration "5 sec" — use e.g. 500ms, 15s, 2m`) and an `assert` call
+before any device is bound. The MCP tools' other budgets (`scroll_until`'s `timeoutMs`, `swipe`'s `durationMs`) are
+plain numbers of ms and stay so.
+
+(b) The schema keeps the value as written, not ms: the spec types stay `string | number` for the code and tests that
+build specs directly, every consumer still converts with parseDuration — which a parsed value cannot make throw — and no
+reply or trace changes (none quotes the written timeout). `src/util/regex.ts#regexSource`'s shape.
+
+(c) A number is ms, and a negative or non-finite one is no duration: `-5` and `Infinity` are refused with the same
+message (`Invalid duration -5 — …`), NaN by zod's number type. `0` stays a duration: one read, no wait.
+
+(d) The engine's optional-tap split (`runOptionalSteps`) stays outside its `try` — the `catch` reads it — but no longer
+for the malformed `timeout:` it was put there for: that cannot reach it.
+
 ## Bug note
 
 docs/bugs/2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md

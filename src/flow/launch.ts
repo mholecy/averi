@@ -1,6 +1,6 @@
-import type { DeviceAdapter, Platform } from '../adapters/types.js';
+import type { DeviceAdapter, LaunchIntent, Platform } from '../adapters/types.js';
 import { appHolderText } from '../interact/app-holder-text.js';
-import { resolveLaunchActivity, type AveriConfig, type LaunchEntry } from './config.js';
+import type { AveriConfig } from './config.js';
 
 /**
  * One launch: the flow's `launch:` step and the `launch_app` tool, written
@@ -49,6 +49,83 @@ export class EngineSession {
   recordClearState(): number {
     return ++this.#clearStateCount;
   }
+}
+
+/** What a launch call says about its entry point — a flow `launch:` step or a `launch_app` call. */
+export interface LaunchEntry {
+  platform: Platform;
+  appId: string;
+  activity?: string;
+  intent?: LaunchIntent;
+}
+
+/**
+ * WHEN a launch falls back to averi.yaml's `app.android.activity`: on
+ * android, and only when the caller named NEITHER an activity NOR an intent.
+ *
+ * Exported beside the rule below for the one caller that has to know the
+ * answer before it has a config: `launch_app`, whose entry in the policy
+ * table (mcp/config-policy.ts#TOOL_CONFIG) reads averi.yaml only when the
+ * fallback can apply. Everyone else calls `resolveLaunchActivity`, which
+ * asks this itself.
+ */
+export function launchConsultsConfigActivity({ platform, activity, intent }: Omit<LaunchEntry, 'appId'>): boolean {
+  return platform === 'android' && activity === undefined && intent === undefined;
+}
+
+/**
+ * The activity a launch starts: the one the caller names, else — when the
+ * caller names neither an activity nor an intent — averi.yaml's
+ * `app.android.activity`, and only for the very package the config
+ * describes. Not android, no config, another package, no activity
+ * configured, or an intent given → `undefined`, and the adapter's own rule
+ * applies: `monkey -c LAUNCHER` with nothing named (documented on the schema
+ * field, flow/config.ts), the intent scoped to the package (`am start -p`) with an
+ * intent.
+ *
+ * One owner since 2026-10-03. The rule was written twice — in the flow
+ * engine's `launch` step and in the MCP `launch_app` handler — and the
+ * handler's copy sat in a module no test could import (review 2026-08-14,
+ * S1). Both now call this. The engine's app id always IS the config's
+ * package, so the comparison is vacuous there; it is kept in the one place
+ * rather than split into "with check" and "without", because a second
+ * variant is how the two copies came to exist.
+ *
+ * Decided 2026-10-03 (owner): an intent without an activity is delivered
+ * WITHIN THE APP'S PACKAGE, and the config activity stays out of it — for
+ * the flow step and for `launch_app` alike. Until then WHEN the fallback
+ * was consulted stayed with each caller, and the two disagreed:
+ *
+ * - a flow step consulted it whenever the step named no activity, even
+ *   beside an `intent` → `am start -n <package>/<config activity> -a ACTION`:
+ *   the intent was forced onto the launcher activity, which defeats the one
+ *   reason to write an intent — exercising a NON-launcher entry point;
+ * - `launch_app` skipped it beside an intent, and the adapter then sent
+ *   `am start -a ACTION` with no package at all: an implicit intent the
+ *   system may resolve to another app, or to a chooser.
+ *
+ * Neither was right. The "when" is now `launchConsultsConfigActivity` above
+ * (the tool's old "when", for both), and the Android adapter scopes an
+ * activity-less intent to the package, so Android's own intent resolution
+ * picks the activity whose filter matches — and fails loudly when none does
+ * (adapters/android.ts#launch).
+ *
+ * Rejected: keeping the flow rule and documenting it. A flow that WANTS the
+ * intent on a particular activity says so with `activity:` on the step,
+ * which is explicit and survives a change of `app.android.activity`; the
+ * silent fallback made "which activity got this intent" depend on a config
+ * key written for a different purpose (pinning the launcher against
+ * LeakCanary). Rejected too: resolving the activity ourselves (`cmd package
+ * query-activities`) and passing `-n` — a second resolver beside Android's.
+ *
+ * Who is affected: a flow whose `launch:` step has an `intent` and no
+ * `activity`, in a project that sets `app.android.activity`. To get the old
+ * behaviour back, write `activity:` on that step.
+ */
+export function resolveLaunchActivity(cfg: AveriConfig | undefined, entry: LaunchEntry): string | undefined {
+  if (!launchConsultsConfigActivity(entry)) return entry.activity;
+  const android = cfg?.app.android;
+  return android?.package === entry.appId ? android.activity : undefined;
 }
 
 /** A launch as its caller asks for it: the app id resolved, the platform the adapter's. */
@@ -100,7 +177,7 @@ export const WIPE_LABEL = '⚠ clearState';
 
 /**
  * Launch `request.appId` on `adapter`: the activity resolved against
- * averi.yaml (flow/config.ts#resolveLaunchActivity — `cfg` undefined when
+ * averi.yaml (resolveLaunchActivity above — `cfg` undefined when
  * there is none), the adapter's launch, and a wipe counted against
  * `session`. Throws what the adapter throws; a wipe is counted only once the
  * launch returned.

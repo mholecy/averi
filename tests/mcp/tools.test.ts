@@ -1411,6 +1411,37 @@ describe('assert — results always, health only with a loadable averi.yaml', ()
  * failed", a flow's loaded clean and failed mid-run, and get_logs' grep threw
  * after the logs were pulled.
  */
+/**
+ * A19: a duration is one schema (util/duration.ts#durationSchema), so a `timeout` parseDuration cannot read is refused
+ * where the arguments are parsed — not thrown mid-poll, after a device was bound — in every assert kind that takes one.
+ */
+describe('a duration that does not parse is refused at parse, before a device is bound (A19)', () => {
+  it.each([
+    ['element', { element: { id: 'home_root' }, timeout: '5 sec' }],
+    ['rect', { element: { id: 'home_root' }, rect: { x: 0, frameWidth: 100 }, timeout: '5 sec' }],
+    ['color', { element: { id: 'home_root' }, color: { expected: '#FFFFFF' }, timeout: '5 sec' }],
+    ['ocr', { element: { id: 'home_root' }, ocr: { text: 'x' }, timeout: '5 sec' }],
+    ['element (negative ms)', { element: { id: 'home_root' }, timeout: -1 }],
+  ])('assert: a bad timeout on an %s assert → isError naming the duration, nothing bound', async (_, bad) => {
+    const { call, bound } = await connect();
+    const result = await call('assert', { platform: 'android', asserts: [{ element: { id: 'home_root' } }, bad], configPath: missing() });
+    expect(result.isError).toBe(true);
+    // The SDK's refusal quotes zod's issues as JSON, so the string's quotes arrive escaped.
+    expect(result.text).toMatch(/Invalid duration (?:\\"5 sec\\"|-1) — use e\.g\. 500ms, 15s, 2m/);
+    expect(bound()).toEqual([]);
+  });
+
+  it('run_flow: averi.yaml with a bad wait timeout → a config error naming the field, nothing bound', async () => {
+    const configPath = await file('averi.yaml', `${VALID_CONFIG}  waits_home:\n    steps:\n      - wait: { element: { id: home_root }, timeout: 5 sec }\n`);
+    const { call, bound } = await connect();
+    const result = await call('run_flow', { platform: 'android', flow: 'touch_home', configPath });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain(configPath);
+    expect(result.text).toContain('flows.waits_home.steps.0.wait.timeout: Invalid duration "5 sec" — use e.g. 500ms, 15s, 2m');
+    expect(bound()).toEqual([]);
+  });
+});
+
 describe('a regex that does not compile is refused at parse, before a device is bound', () => {
   it.each([
     ['element match', { element: { id: 'home_root' }, match: '(' }],

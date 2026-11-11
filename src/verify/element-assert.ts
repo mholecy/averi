@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { elementSpecSchema, type ElementSpec } from '../ui-tree/element-spec.js';
+import { durationSchema } from '../util/duration.js';
 import { regexSource } from '../util/regex.js';
 
 /**
@@ -32,7 +33,7 @@ export const elementAssertSchema: z.ZodType<ElementAssert> = z
     /** Unanchored, no flags — assert.ts compiles it as `new RegExp(match)`; refused at parse when it does not compile. */
     match: regexSource().optional(),
     error: z.string().optional(),
-    timeout: z.union([z.number(), z.string()]).optional(),
+    timeout: durationSchema.optional(),
   })
   .strict()
   .refine(

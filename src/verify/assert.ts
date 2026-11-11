@@ -7,7 +7,7 @@ import { describeElementSpec, elementSpecSchema, type ElementSpec } from '../ui-
 import { pollOnVerdict, pollTree, Undecided, type FirstSample, type PollOutcome } from '../ui-tree/read-tree.js';
 import { ReadHandOff } from '../ui-tree/read-handoff.js';
 import { markedForMiss } from '../ui-tree/window-mark.js';
-import { formatSeconds, parseDuration } from '../util/duration.js';
+import { durationSchema, formatSeconds, parseDuration } from '../util/duration.js';
 import { regexSource } from '../util/regex.js';
 import { elementAssertSchema } from './element-assert.js';
 import {
@@ -80,7 +80,7 @@ const rectAssert = z
         message:
           "rect needs at least one of: x, w, h — y alone can never fail (y is measured but not a failure source; use verify's contract gap rows for vertical position)",
       }),
-    timeout: z.union([z.number(), z.string()]).optional(),
+    timeout: durationSchema.optional(),
   })
   .strict();
 
@@ -110,7 +110,7 @@ const colorAssert = z
         theme: z.enum(['light', 'dark']).optional(),
       })
       .strict(),
-    timeout: z.union([z.number(), z.string()]).optional(),
+    timeout: durationSchema.optional(),
   })
   .strict();
 
@@ -149,7 +149,7 @@ const ocrAssert = z
       .refine((o) => !(o.text !== undefined && o.match !== undefined), {
         message: 'ocr takes text OR match, not both',
       }),
-    timeout: z.union([z.number(), z.string()]).optional(),
+    timeout: durationSchema.optional(),
   })
   .strict();
 
