@@ -1,8 +1,8 @@
 # Releasing averi
 
-The gates a new averi version passes before it is tagged, and who runs each. The standing lab run (`npm run
-truth:lab`) and the live golden are run here, before a release, and not on a schedule (backlog T24, which replaced
-T20c).
+The gates a new averi version passes before it is tagged, and who runs each. The standing lab runs (`npm run
+truth:lab` on Android, `npm run truth:lab:ios` on iOS), which run the live golden's groups, are run here, before a
+release, and not on a schedule (backlog T24, which replaced T20c).
 
 ## When this applies
 
@@ -99,52 +99,46 @@ before touching it). Never start, restart, cold-boot or kill an AVD or emulator 
 emu kill`, wipe-data). Never `pm clear`, and never dexopt or recompile (`cmd package compile`, `bg-dexopt-job`).
 Installing, uninstalling and reinstalling the lab APK is allowed: truth:lab's build and cleanup do it. Run one agent on
 the device at a time: before starting, check that no other live.ts or lab-run.ts is running (`pgrep -fl
-'live.ts|lab-run.ts'`). Run everything timed (the bounds below), in the background, and wait for its exit.
+'live.ts|lab-run.ts'`). Run it in the background and wait for its exit.
 
 **When the emulator is not up.** `adb devices` must list `emulator-5554` as `device`. If it is missing, `offline` or
 `unauthorized`, or the lab guard refuses it, stop the release at Gate B and tell the owner what you saw. Do not start
 or restart anything to bring it up.
 
-1. **The standing lab run** (docs/verification.md, "Standing lab run": the chooser and forms groups, the lab app built
-   from this checkout under JDK 17 and installed, and the chooser's lab defaults checked before and after):
+**The standing lab run** (docs/verification.md, "Standing lab run"), one command with one exit code:
 
-   ```
-   npm run truth:lab -- --out "$OUT/truth-lab" --serial emulator-5554
-   ```
+```
+npm run truth:lab -- --out "$OUT/truth-lab" --serial emulator-5554
+```
 
-   It bounds itself (each live run 1800 s, the build 2400 s; standing.ts's KNOBS). It passes only on **exit 0**: every
-   block PASS, and no INCONCLUSIVE or ERROR line. Exit 1 is a FAIL or a `RESTORE.txt` to act on by hand, and it goes
-   to the owner. Exit 2 means refused, and 3 means unproven. Neither is a pass. Any line in the SUMMARY's ERROR
-   section makes the run unproven (exit 3), an unread log's NOTE included. The record keeps the SUMMARY
-   (`$OUT/truth-lab/meta/run-<id>/summary.txt`), cleaned.
+It builds the lab app from this checkout under JDK 17 and installs it, runs the live golden's `chooser` group between
+a check of the chooser's lab defaults before and after, then live.ts's other Android groups, `forms`, `visibility`,
+`ensure` and `carousel`, each as its own block (backlog A22). The `dismissal` group is iOS only: Gate C runs it. It
+bounds itself (each live run 1800 s, the build 2400 s; standing.ts's KNOBS), each call in a process group of its own,
+which a run past its bound has killed whole (the `adb` it started among it), and its block is INCONCLUSIVE. After such
+an INCONCLUSIVE, `adb -s
+emulator-5554 shell echo ok` must answer before you report the run; if it does not, stop and tell the owner.
 
-2. **The live golden's other Android groups:**
+It passes only on **exit 0**: every block PASS, and no INCONCLUSIVE or ERROR line. Exit 1 is a FAIL or a `RESTORE.txt`
+to act on by hand, and it goes to the owner. Exit 2 means refused, and 3 means unproven. Neither is a pass. Any line in
+the SUMMARY's ERROR section makes the run unproven (exit 3), an unread log's NOTE included. The record keeps the
+SUMMARY (`$OUT/truth-lab/meta/run-<id>/summary.txt`), cleaned.
 
-   ```
-   perl -e 'alarm shift; exec @ARGV' 3600 \
-     node --import tsx scripts/truth/live.ts --serial emulator-5554 --groups visibility,ensure,carousel \
-       --record "$OUT/android-live.json" --shots "$OUT/android-live-shots" > "$OUT/android-live.txt" 2>&1
-   ```
+Each live block's verdict is main's rejudge of its run (`summarize` in live-cases.ts), and its FAIL names the failure
+reasons the rejudge wrote beside its summary (`<block>/run-<id>/android-<group>.rejudge.json`): a case marked `[NOT
+known: …]` (every mismatch must be one live-known.ts lists), `FIXED, not intermittent — strike off live-known.ts`,
+`SKIPPED where a skip proves nothing`, `NO FIRST STATE`, `MISMATCH (hedged ceiling)`, a stale chooser premise. The
+block's line quotes the summary's header, `# Live golden: N cases, … M mismatches (0 not known), …`, and its rejudge
+summary (`android-<group>.rejudge.txt`) holds the rest. The carousel group reads the device's state before and after
+its cases (about 55 s each) into the `Device:` line of its rejudge summary,
+`carousel/run-<id>/android-carousel.rejudge.txt`. That line is a label, not a gate: record it.
 
-   `perl … alarm` bounds the run at one hour (macOS has no `timeout`). An exit of 142 (SIGALRM) means the run went
-   past its bound: unproven. The alarm kills node alone: an `adb` it started may still run. After a run past its
-   bound, `pgrep -fl 'adb -s emulator-5554'` must list nothing (end a leftover by its pid, never the adb server), and
-   `adb -s emulator-5554 shell echo ok` must answer within a few seconds; if it does not, stop and tell the owner.
-   `--record` writes every read as JSON, and `--shots` keeps the screen of each case that is
-   not ok. The `dismissal` group is iOS only: Gate C runs it. The carousel group reads the device's state before and
-   after its cases (about 55 s each) into the summary's `Device:` line. That line is a label, not a gate: record it.
-
-   It passes only on **exit 0** (the summary's rules: `summarize` in live-cases.ts). The header line reads `# Live
-   golden: N cases, … M mismatches (0 not known), …`, so every mismatch is one live-known.ts lists (marked `[known:
-   …]`). None of these lines appear: `FIXED, not intermittent — strike off live-known.ts`, `SKIPPED where a skip
-   proves nothing`, `NO FIRST STATE`, `MISMATCH (hedged ceiling)`. A case marked `[NOT known: …]` fails the run.
-
-   **A `loud` count above 0 does not fail the gate.** A LOUD case is one where the app's model does not hold what the
-   case asked and averi said so (an error, or `NOT verified`): honest, not a pass of that case, and not counted
-   against the run by `summarize` in live-cases.ts. Two LOUD kinds do fail it there: a case whose app wrote no state
-   (class `no-state`, the `NO FIRST STATE` line) and the carousel's hedged ceiling when it is a MISMATCH. Its
-   unjudged form (`LOUD (hedged ceiling): … fewer than … judged`) is a LOUD, said in the record. The record lists
-   every LOUD case by id and class, Gate B's and Gate C's alike.
+**A `loud` count above 0 does not fail the gate.** A LOUD case is one where the app's model does not hold what the case
+asked and averi said so (an error, or `NOT verified`): honest, not a pass of that case, and not counted against the run
+by `summarize`. Two LOUD kinds do fail it there: a case whose app wrote no state (class `no-state`, the `NO FIRST
+STATE` line) and the carousel's hedged ceiling when it is a MISMATCH. Its unjudged form (`LOUD (hedged ceiling): …
+fewer than … judged`) is a LOUD, said in the record. The record lists every LOUD case by id and class, Gate B's and
+Gate C's alike.
 
 ## Gate C: iOS (owner, outside the agent's sandbox)
 
@@ -223,8 +217,8 @@ Only after A, B and C passed, on the commit they tested:
 | A golden diff | Strike 0, COUNTS 0, Re-pin 0 | vX.Y.Z/golden-against.log.txt |
 | A mutation | core PASS, scene PASS, lab PASS (cold) | vX.Y.Z/mutate.log.txt |
 | A package | release smoke: PASS (N files, 18 tools) | vX.Y.Z/release-smoke.log.txt |
-| B truth:lab | exit 0: lab, chooser, forms PASS | vX.Y.Z/android-truth-lab.log.txt |
-| B live | exit 0: N cases, M mismatches (0 not known); Device: <label> | vX.Y.Z/android-live.log.txt |
+| B truth:lab | exit 0: lab, chooser, forms, visibility, ensure, carousel PASS | vX.Y.Z/android-truth-lab.log.txt |
+| B carousel label | Device: <label> | vX.Y.Z/android-carousel.rejudge.log.txt (from `android-carousel.rejudge.txt`) |
 | C iOS | exit 0: lab, 4 idb and 4 wda blocks PASS (or: not run, and why) | vX.Y.Z/ios-truth-lab.log.txt |
 
 Not proven: <anything skipped or unproven, or "nothing">.

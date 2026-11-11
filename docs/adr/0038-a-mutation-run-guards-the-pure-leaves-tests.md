@@ -1839,3 +1839,29 @@ branch, under load (9 at its start, 58 at its end, from other worktrees' Stryker
 of 7 427 mutants; it proves nothing either way. At merge (main abd2b878, with A21's shell.ts in core), the cold
 `npm run mutate -- --force` passed every group: core 461 s, scene 144 s, lab 315 s (load average 4 at its start, about
 25 during core), every module at or above its floor (standing.ts 95.49 % in that run).
+
+## Amendment: Gate B's live groups and the harness's own focus reader (2026-11-11, backlog A22)
+
+A22 (the 2026-11-11 architecture review's card 4, with TL5) changes three lab-group modules and adds no module to the
+run:
+
+- scripts/truth/batch/lab-run.ts runs five live groups, not two (visibility, ensure and carousel join chooser and
+  forms as blocks): 93.37 %, 182 mutants, 6 survived, 6 without coverage, 1 runtime error — the T24 classes, none in
+  the new blocks. Floor 93 kept.
+- scripts/truth/chooser-readers.ts takes the chooser group's own focus reader from live-chooser.ts (`ACTIVITY_RECORD`,
+  `focusedAppOf`, `CHOOSER_PACKAGES`, `isChooser`) and the fail-closed rule --check reads the focus with
+  (`focusedChooserOf`: exactly one `mFocusedApp=` line, `null` no chooser, anything else unread): 100 %, 299 mutants.
+  Floor 98 kept.
+- scripts/truth/batch/lab-chooser.ts's `focusOf` calls `focusedChooserOf` instead of src's `chooserInFocus` (ADR
+  0020); tests/truth/batch/lab-chooser-oracle.test.ts, which pins that with src's parser mocked both ways, joins its
+  tests: 99.85 %, 649 mutants, 1 survived (the same equivalent, `chooserOf`), 1 timeout. Floor 97 kept.
+
+The hedged-ceiling test through labRun (tests/truth/batch/lab-run-hedged.test.ts) imports live-cases.ts and is in no
+group's tests, so the lab group's import graph does not grow (the A21 amendment's reason).
+
+The run's time: the cold full lab group (`npm run mutate -- --group lab --force`, worktree-local tempDir) on main
+c5227d28 with A22 passed in **319 s at a load average of 6 to 17**, against main's own cold lab group at 315 s (load
+4 to 25): under the ~480 s line, so no regrouping. A first run on the A22 branch took 562 s at a load of 45 to 38
+(other agents' runs on the machine); as the A21 amendment decided, a load-inflated figure is recorded as such and not
+held against the line.
+

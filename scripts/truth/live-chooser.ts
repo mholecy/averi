@@ -1,3 +1,4 @@
+import { ACTIVITY_RECORD, CHOOSER_PACKAGES, focusedAppOf, isChooser } from './chooser-readers.js';
 import { LAB_APP, windowInTransition, type FocusRead, type HomeRead } from './lab-device.js';
 import type { Call, Case, CaseReads, DeviceLog } from './live-cases.js';
 import type { LiveVerdict } from './live-visibility.js';
@@ -42,10 +43,8 @@ export interface Front {
   records: string[];
 }
 
-/** An ActivityRecord's component: after its hash and user, ended by a space (API 36: the task follows) or `}` (API 33). */
-const RECORD = String.raw`ActivityRecord\{[0-9a-f]+ u\d+ ([^\s}/]+\/[^\s}]+)[\s}]`;
-const FOCUSED_APP = new RegExp(String.raw`mFocusedApp=[^\n]*?${RECORD}`);
-const HIST = new RegExp(String.raw`\* Hist +#\d+: ${RECORD}`, 'g');
+/** An activity record on the stack, top first (chooser-readers.ts#ACTIVITY_RECORD's component). */
+const HIST = new RegExp(String.raw`\* Hist +#\d+: ${ACTIVITY_RECORD}`, 'g');
 
 /**
  * The read's wait: its `settle`, or — a record of T7b's review round 1 — `waitedMs` and `firstWindow` at its top (the
@@ -60,10 +59,10 @@ function waitOf(read: Extract<FocusRead, { window: string }>): { waitedMs: numbe
 /** The read as a Front, or unread with why: a failed read or one with no focused activity proves nothing. */
 export function frontOf(read: FocusRead): Front | { why: string } {
   if ('error' in read) return { why: `the focus read failed: ${read.error}` };
-  const focusedSettled = FOCUSED_APP.exec(read.window)?.[1];
+  const focusedSettled = focusedAppOf(read.window);
   if (focusedSettled === undefined) return { why: 'the focus read holds no mFocusedApp line' };
   const wait = waitOf(read);
-  const focusedFirst = wait?.firstWindow === undefined ? focusedSettled : FOCUSED_APP.exec(wait.firstWindow)?.[1];
+  const focusedFirst = wait?.firstWindow === undefined ? focusedSettled : focusedAppOf(wait.firstWindow);
   if (focusedFirst === undefined) return { why: 'the first focus read holds no mFocusedApp line' };
   const records = [...read.activities.matchAll(HIST)].map((m) => m[1]);
   if (records.length === 0) return { why: 'the activities read lists no record' };
@@ -85,16 +84,6 @@ export function homeOf(read: HomeRead): string | { why: string } {
   if ('error' in read) return { why: `the HOME activity read failed: ${read.error}` };
   const last = read.resolved.trim().split('\n').pop()!.trim();
   return /^[\w.]+\/[\w.$]+$/.test(last) ? last : { why: `the HOME activity read names no component: ${last}` };
-}
-
-/** The packages the platform's chooser runs in (AOSP: the framework's; later releases' IntentResolver module). */
-const CHOOSER_PACKAGES: ReadonlySet<string> = new Set(['android', 'com.android.intentresolver']);
-
-/** The platform's resolver or chooser activity: its package one of CHOOSER_PACKAGES, its class `….ResolverActivity` or `….ChooserActivity`. */
-export function isChooser(component: string | undefined): boolean {
-  if (component === undefined) return false;
-  const [pkg, cls] = component.split('/');
-  return CHOOSER_PACKAGES.has(pkg) && /\.(?:Resolver|Chooser)Activity$/.test(cls);
 }
 
 // --- the judges ---

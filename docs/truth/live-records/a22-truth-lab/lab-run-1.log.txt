@@ -1,0 +1,18 @@
+
+> averi@0.9.0 truth:lab
+> node --import tsx scripts/truth/batch/lab-run.ts --out $OUT --serial emulator-5554
+
+lab-run run 20261111-191542-56112: blocks lab,chooser,forms,visibility,ensure,carousel — writing $OUT/meta/run-20261111-191542-56112/lab-run.out (also $OUT/lab-run.out); tail -f it; the SUMMARY follows here at the end.
+======== SUMMARY
+ERROR checkout: the checkout's HEAD (0fa6b7bb) is not main's (619bb921) — git switch main, then rerun — every block INCONCLUSIVE, none run
+lab check: INCONCLUSIVE — precondition: the checkout's HEAD (0fa6b7bb) is not main's (619bb921) — git switch main, then rerun
+chooser verdict: INCONCLUSIVE — precondition: the checkout's HEAD (0fa6b7bb) is not main's (619bb921) — git switch main, then rerun
+forms verdict: INCONCLUSIVE — precondition: the checkout's HEAD (0fa6b7bb) is not main's (619bb921) — git switch main, then rerun
+visibility verdict: INCONCLUSIVE — precondition: the checkout's HEAD (0fa6b7bb) is not main's (619bb921) — git switch main, then rerun
+ensure verdict: INCONCLUSIVE — precondition: the checkout's HEAD (0fa6b7bb) is not main's (619bb921) — git switch main, then rerun
+carousel verdict: INCONCLUSIVE — precondition: the checkout's HEAD (0fa6b7bb) is not main's (619bb921) — git switch main, then rerun
+NOTE no wanted block ran (each one's why above)
+RESTORE: none — everything dirty was put back and verified
+======== SUMMARY end (run 20261111-191542-56112)
+exit=2
+duration=0s

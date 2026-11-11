@@ -7,10 +7,11 @@ import { LAB_APP } from './lab-device.js';
  * need, moved here from lab-chooser.ts, which re-exports it. A leaf: it imports src's shellQuote and lab-device.ts's
  * LAB_APP, nothing of batch/ and nothing live-*, so a batch loads no live module through it. The preferred-activities
  * text (only its `Preferred Activities User N:` block), a lab default (`mAlways=true`, a leak) told from the
- * last-chosen entry "Just once" writes (`mAlways=false`), a link's handler query and its count, an entry as a line
- * quotes it, and the hand lines that clear a default or read the chooser back. A failed call is the caller's to tell,
- * its words worded here (preferredUnread, handlersUnread): lab-chooser.ts#preferredOf and #handlersOf give a batch's
- * exit, chooser-premise.ts adb's error.
+ * last-chosen entry "Just once" writes (`mAlways=false`), a link's handler query and its count, the focused activity
+ * and whether it is the platform's chooser (the chooser group's own reader, live-chooser.ts's, moved here so --check
+ * reads the focus with it: TL5), an entry as a line quotes it, and the hand lines that clear a default or read the
+ * chooser back. A failed call is the caller's to tell, its words worded here (preferredUnread, handlersUnread):
+ * lab-chooser.ts#preferredOf and #handlersOf give a batch's exit, chooser-premise.ts adb's error.
  */
 
 /**
@@ -155,6 +156,55 @@ export function handlersIn(text: string): number | { why: string } {
   const listed = out.split('\n').filter((l) => /^\s*[\w.]+\/[\w.$]+\s*$/.test(l)).length;
   if (listed === Number(said[1])) return listed;
   return { why: `query-activities said ${said[1]} activities but listed ${listed}` };
+}
+
+// ------------------------------------------------------------------------------------------------ the focus
+
+/**
+ * An ActivityRecord's component: after its hash and user, ended by a space (API 36: the task follows) or `}` (API 33).
+ * The harness's own reading of the window manager's lines (live-chooser.ts's, T7b), written apart from src's
+ * android-chooser.ts#chooserInFocus and never importing it: an oracle that does not share the code it judges (ADR
+ * 0020). --check's focus read (batch/lab-chooser.ts#focusOf) is judged by it too, through focusedChooserOf (TL5, A22).
+ */
+export const ACTIVITY_RECORD = String.raw`ActivityRecord\{[0-9a-f]+ u\d+ ([^\s}/]+\/[^\s}]+)[\s}]`;
+const FOCUSED_APP = new RegExp(String.raw`mFocusedApp=[^\n]*?${ACTIVITY_RECORD}`);
+
+/**
+ * The focused activity's component: the first `mFocusedApp` line's ActivityRecord; none when no line names one. Not
+ * scoped to a display: `dumpsys window displays` prints one pair per display, and this reads the first line across
+ * all of them (unlike src's chooserInFocus, which reads display 0's block): the chooser group's reads, on the lab
+ * emulator's one display. --check reads through focusedChooserOf, which asks for exactly one line.
+ */
+export const focusedAppOf = (text: string): string | undefined => FOCUSED_APP.exec(text)?.[1];
+
+/** The packages the platform's chooser runs in (AOSP: the framework's; later releases' IntentResolver module). */
+export const CHOOSER_PACKAGES: ReadonlySet<string> = new Set(['android', 'com.android.intentresolver']);
+
+/** The platform's resolver or chooser activity: its package one of CHOOSER_PACKAGES, its class `….ResolverActivity` or `….ChooserActivity`. */
+export function isChooser(component: string | undefined): boolean {
+  if (component === undefined) return false;
+  const [pkg, cls] = component.split('/');
+  return CHOOSER_PACKAGES.has(pkg) && /\.(?:Resolver|Chooser)Activity$/.test(cls);
+}
+
+/** A focus read as --check takes it: the chooser in front (its component) or not (undefined), or unread with why. */
+export type FocusedChooser = { state: 'read'; chooser: string | undefined } | { state: 'unread'; why: string };
+
+/**
+ * The chooser a focus read shows, fail closed (TL5, A22): exactly one `mFocusedApp=` line, or unread — none proves no
+ * "no chooser" (the focused window alone is not this reader's word), and more than one is a second display's (or a
+ * doubled line), whose link this reader does not guess. That line's activity decides: the platform's chooser, or none.
+ * Only `mFocusedApp=null` reads as no activity, so no chooser; any other line it cannot parse is unread with its own
+ * reason. The lab emulator has one display, so one line.
+ */
+export function focusedChooserOf(text: string): FocusedChooser {
+  const lines = text.split('\n').filter((l) => l.includes('mFocusedApp='));
+  if (lines.length === 0) return { state: 'unread', why: 'the focus read holds no mFocusedApp= line' };
+  if (lines.length > 1) return { state: 'unread', why: `the focus read holds ${lines.length} mFocusedApp= lines, not one (one display's expected)` };
+  const focused = focusedAppOf(lines[0]);
+  if (focused !== undefined) return { state: 'read', chooser: isChooser(focused) ? focused : undefined };
+  if (/mFocusedApp=null[ \t\r]*$/.test(lines[0])) return { state: 'read', chooser: undefined };
+  return { state: 'unread', why: "the focus read's mFocusedApp= line names no activity the reader can parse" };
 }
 
 // ---------------------------------------------------------------------------------------------- the hand lines
