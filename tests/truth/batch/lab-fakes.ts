@@ -2,10 +2,10 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, writeSync }
 import { join } from 'node:path';
 import { CHOOSER_FOCUS_COMMAND } from '../../../src/adapters/android-chooser.js';
 import { DEVICE_CHECK_SIMULATOR, DEVICE_CHECK_WDA_PORTS, LAB_APP } from '../../../scripts/truth/lab-device.js';
+import { failuresJson } from '../../../scripts/truth/rejudge-failures.js';
 import type { Run } from '../../../scripts/truth/batch/bounded.js';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
 import type { Ended, Handlers, KillResult, ProcessSeam, StartOptions, Started } from '../../../scripts/truth/batch/proc.js';
-import { failuresJson } from '../../../scripts/truth/batch/cases.js';
 import { DOMAINS, PROTECTED, type KeyVal } from '../../../scripts/truth/batch/ios-defaults.js';
 
 // The lab devices as fakes, shared by the S6b tests (ios-lab, android-lab, lab-build, and lab-batch through runBatch):
@@ -419,6 +419,11 @@ export abstract class FakeSeam implements ProcessSeam {
   install(h: Handlers): void {
     this.handlers = h;
   }
+  /** The exit codes runBatch left for the process (ProcessSeam.setExitCode). */
+  readonly exitCodes: number[] = [];
+  setExitCode(code: number): void {
+    this.exitCodes.push(code);
+  }
   exit(code: number): void {
     this.exits.push(code);
   }
@@ -434,8 +439,8 @@ export interface Rejudged {
 
 /**
  * `live.ts --rejudge … --failures <file>` as a fake answers it: its summary and exit code, and its failure reasons
- * written where `--failures` names, as scripts/truth/live.ts writes them (cases.ts#failuresJson). No live-cases.ts
- * here: the standing batches' run-level tests stay light; summarize's own output is standing.test.ts's.
+ * written where `--failures` names, as scripts/truth/live.ts writes them (rejudge-failures.ts#failuresJson). No
+ * live-cases.ts here: the standing batches' run-level tests stay light; summarize's own output is standing.test.ts's.
  */
 export function rejudgeWith(args: readonly string[], r: Rejudged): Answer {
   if (r.failures !== undefined) writeFileSync(args[args.indexOf('--failures') + 1], failuresJson(r.failures));

@@ -6,8 +6,7 @@ import { nodeFs } from '../../../scripts/truth/batch/io.js';
 import { cleanState, LAB_RUN_STANDING, labRun, leftLine, stateHand } from '../../../scripts/truth/batch/lab-run.js';
 import type { LiveCases, LiveTable } from '../../../scripts/truth/batch/live-table.js';
 import type { StartOptions } from '../../../scripts/truth/batch/proc.js';
-import { groupsOf, onlyWith } from '../../../scripts/truth/batch/standing.js';
-import { STANDING_EXIT as LAB_RUN_EXIT } from '../../../scripts/truth/batch/words.js';
+import { groupsOf, onlyWith, STANDING_EXIT as LAB_RUN_EXIT } from '../../../scripts/truth/batch/standing.js';
 import { LIVE_GOLDEN_HEADER } from '../../../scripts/truth/batch/steps.js';
 import { CATALOG, FakeSeam, FOCUS_CHOOSER, LAB_SERIAL, labWorld, PREFERRED_WITH_DEFAULT, rejudgeWith, until, type Answer, type LabWorld, type Rejudged, type WorldOptions } from './lab-fakes.js';
 
@@ -488,7 +487,7 @@ describe('each live block\'s verdict: main\'s rejudge exit code, its FAIL naming
   });
 });
 
-describe('the exit code (words.ts#STANDING_EXIT, over the SUMMARY runBatch returns): 0 only when every selected block PASSed', () => {
+describe('the exit code (standing.ts#STANDING_EXIT, over the SUMMARY runBatch returns): 0 only when every selected block PASSed', () => {
   it('the codes', () => {
     expect(LAB_RUN_EXIT).toEqual({ ok: 0, failed: 1, nothingDone: 2, interrupted: 130, unproven: 3 });
   });

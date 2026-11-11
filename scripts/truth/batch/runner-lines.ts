@@ -378,7 +378,7 @@ export const liveCalls = ({ repo, secs, rejudgeSecs, files }: LiveBounds & { rep
 
 /**
  * live.ts's rejudge of a record: main's judges, the same groups (batch-11.sh:479); its failure reasons written to
- * `failures` (cases.ts#failuresJson, A21).
+ * `failures` (../rejudge-failures.ts, A21).
  */
 export const rejudgeArgs = ({ repo, asked, record, failures }: LiveRunSpec & { failures: string }): string[] => [
   ...liveTs(repo),

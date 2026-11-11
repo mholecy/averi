@@ -75,10 +75,10 @@ export interface ProcessSeam {
   /** End the runner with `code`. Called once, after the abort has put back what it could. */
   exit(code: number): void;
   /**
-   * The code the process ends with when nothing exits it (runBatch's backstop, A21: a batch that forgets its exit still
-   * fails as its run did). The real seam's `process.exitCode`; a fake may keep it, or have none.
+   * The code the process ends with when nothing exits it: runBatch sets it to its run's exit, a backstop behind the
+   * batch's own `process.exit` (A21). The real seam's `process.exitCode`.
    */
-  setExitCode?(code: number): void;
+  setExitCode(code: number): void;
   /** The last place to say something when the run's own files cannot be written. Never throws. */
   stderr(text: string): void;
 }

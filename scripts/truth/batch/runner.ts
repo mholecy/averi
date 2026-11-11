@@ -108,8 +108,8 @@ import { canonicalJson, EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parse
  *       config: configOf(process.argv.slice(2), process.env, repo) });
  *     process.exit(r.exit);                                           // at once: runBatch leaves the exit to its caller
  *
- * The rejudge is asked for its failure reasons (`--failures`, A21): a batch pointed at a checkout from before A21, whose
- * live.ts knows no such flag, sees every rejudge refused, so every live block INCONCLUSIVE — fail closed, never a pass.
+ * The rejudge is asked for its failure reasons (`--failures`, A21): a batch pointed at a checkout from before A21,
+ * whose live.ts knows no such flag, sees every rejudge refused, so every live block INCONCLUSIVE — fail closed.
  *
  * A need is checked by the first block naming it and rechecked (its `alive`) before each later one, and its `end` runs
  * once the last block is done (the ios need's: the finportal key's second read, its line in the SUMMARY — a CHANGED key
@@ -333,16 +333,17 @@ export type BatchResult =
 /**
  * The run's whole: the order above. Resolves to what it came to; the process's exit is its caller's — call it with
  * `exit` at once, no await of anything else between (a signal arriving after the SUMMARY would start the abort's own).
- * Only the abort exits by itself (130), through the seam: a signal has no caller to return to. As a backstop the seam's
- * exit code is set to `exit` (ProcessSeam.setExitCode: the real one's `process.exitCode`), so a batch that forgets its
- * exit still ends with the run's code, never 0 by default.
+ * Only the abort exits by itself (130), through the seam: a signal has no caller to return to. The seam's exit code is
+ * set to `exit` too (ProcessSeam.setExitCode: the real one's `process.exitCode`), a backstop behind the caller's own
+ * exit, not in place of it: a caller whose code is its own (the standing batches' standingExitOf) must still
+ * `process.exit(await …)` it, or the process ends with the runner's.
  */
 export async function runBatch<S extends KnobSpec>(o: RunBatchOptions<S>): Promise<BatchResult> {
   const needs = o.needs ?? {};
   assertBlocks(o.blocks, needs);
   const base = { fs: nodeFs, seam: nodeProcess, terminal: terminalOf(), clock: () => new Date(), pid: process.pid, ...o.io };
   const r = await runOn(o, needs, base);
-  base.seam.setExitCode?.(r.exit);
+  base.seam.setExitCode(r.exit);
   return r;
 }
 

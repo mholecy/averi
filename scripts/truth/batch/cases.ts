@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { FAILURES_SUFFIX } from '../rejudge-failures.js';
 import { NOT_STARTED, TIMED_OUT } from './bounded.js';
 import { isEexist, nodeFs, type BatchFs } from './io.js';
 import { DEFAULT_GROUPS, unreadLive, type LiveSelection, type LiveTable } from './live-table.js';
@@ -12,7 +13,7 @@ import { nameInLine, verdictLine } from './words.js';
  * not complete, an INCONCLUSIVE, never a missing line (batch-9's finding: such a run vanished from the analysis).
  * Beside it the run leaves `<name>.json` (live.ts --record), `<name>.log` (its output), `<name>.rejudge.txt` (main's
  * `--rejudge` summary, live-cases.ts#summarize) and `<name>.rejudge.json` (that summary's failure reasons, as data:
- * failuresJson, written by the rejudge's `--failures`).
+ * ../rejudge-failures.ts, written by the rejudge's `--failures`).
  *
  * A run counts only when complete (b11-analyze.ts:1–23): its `.cases`, a record, live.ts's `# Live golden:` line in
  * both its log and its summary (printed only once live.ts has judged), and every case main's selectCases picks for
@@ -45,29 +46,8 @@ export const runFiles = (dir: string, name: string) => ({
   record: join(dir, `${name}.json`),
   log: join(dir, `${name}.log`),
   summary: join(dir, `${name}.rejudge.txt`),
-  failures: join(dir, `${name}.rejudge.json`),
+  failures: join(dir, `${name}${FAILURES_SUFFIX}`),
 });
-
-/**
- * A rejudge's failure reasons as `live.ts --rejudge … --failures <file>` writes them beside its summary (A21): one
- * JSON object, `{"failures": [...]}` — live-cases.ts#Summary's `failures`, each one reason the run fails (none: it
- * does not), in the words the summary says it. What a standing batch's judge names, never a grep of the prose.
- */
-export const failuresJson = (failures: readonly string[]): string => `${JSON.stringify({ failures })}\n`;
-
-/**
- * failuresJson's text read back, fail closed: the reasons, or undefined when there is no text, no JSON, or not that
- * shape (no `failures` array, an entry not a string).
- */
-export function failuresOf(text: string | undefined): string[] | undefined {
-  try {
-    // No text parses as `undefined`, which is no JSON: the throw below.
-    const failures = (JSON.parse(String(text)) as { failures?: unknown } | null)?.failures;
-    return Array.isArray(failures) && failures.every((f) => typeof f === 'string') ? failures : undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 const CASES_EXT = '.cases';
 

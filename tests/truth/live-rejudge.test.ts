@@ -5,9 +5,9 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
-import { failuresJson, failuresOf } from '../../scripts/truth/batch/cases.js';
 import { type Case, judged, rejudge as rejudgeRecord, ROOT, type RunRecord } from '../../scripts/truth/live-cases.js';
 import type { LiveVerdict } from '../../scripts/truth/live-visibility.js';
+import { failuresJson, failuresOf } from '../../scripts/truth/rejudge-failures.js';
 import { hedgedLead } from '../../scripts/truth/replies.js';
 import type { LabState } from '../../scripts/truth/schema.js';
 import { readLiveRecord, type LiveRecord, type RecordedCase, withFieldValue } from '../helpers/live-records.js';
@@ -66,7 +66,7 @@ describe('live.ts --rejudge, the CLI: argv in, the summary on stdout, the exit c
 });
 
 // live-cases.ts#judged: a forms case not ok is read again 3 s later (`late`) — a model that catches up was the app's lag.
-describe('live.ts --rejudge --failures <file>: the summary\'s failure reasons as data beside it (A21, batch/cases.ts#failuresJson)', () => {
+describe('live.ts --rejudge --failures <file>: the summary\'s failure reasons as data beside it (A21, rejudge-failures.ts#failuresJson)', () => {
   it.each([
     ['ios-wda-long-list-parked-2.json', 'visibility'],
     ['ios-forms-r8-l2-before.json', 'forms'],

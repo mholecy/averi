@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { readChooserPremise, readPremiseInto, type ChooserPremise } from '../../scripts/truth/chooser-premise.js';
+import { readChooserPremise, readPremiseInto, rerunLine, type ChooserPremise } from '../../scripts/truth/chooser-premise.js';
 import { ACTIVITIES_COMMAND, AndroidLab, FOCUS_WINDOW_COMMAND, HOME_COMMAND, type Exec } from '../../scripts/truth/lab-device.js';
 
 // scripts/truth/chooser-premise.ts (T20a): the chooser group's premise, read once before its cases through an
@@ -264,5 +264,13 @@ describe("readPremiseInto: live.ts's step — read, kept in the record, echoed a
     await readPremiseInto(record, undefined, chooser, { note: (l) => void notes.push(l) });
     expect(Object.keys(record)).toEqual([]);
     expect(notes).toEqual([]);
+  });
+});
+
+describe('rerunLine — the premise read again, a host-shell line (A21: quoted by batch/shell.ts)', () => {
+  it('a plain serial as given, `=` too (the host quoter\'s rule); anything else single-quoted', () => {
+    expect(rerunLine('emulator-5554')).toBe(RERUN);
+    expect(rerunLine('a=b')).toBe('node --import tsx scripts/truth/live.ts --serial a=b --groups chooser');
+    expect(rerunLine("it's")).toBe("node --import tsx scripts/truth/live.ts --serial 'it'\\''s' --groups chooser");
   });
 });

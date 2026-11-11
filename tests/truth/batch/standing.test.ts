@@ -2,17 +2,18 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { failuresJson } from '../../../scripts/truth/batch/cases.js';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
 import { NO_SERIAL, NO_UDID } from '../../../scripts/truth/batch/runner-lines.js';
-import { cleanStateCommand, deviceInHand, liveJudge, liveVerdictLine, noDeviceReason } from '../../../scripts/truth/batch/standing.js';
+import { cleanStateCommand, deviceInHand, liveJudge, liveVerdictLine, noDeviceReason, standingExitOf, STANDING_EXIT } from '../../../scripts/truth/batch/standing.js';
+import { verdictLine, type Summary } from '../../../scripts/truth/batch/words.js';
 import type { ChooserPremise } from '../../../scripts/truth/chooser-premise.js';
+import { failuresJson } from '../../../scripts/truth/rejudge-failures.js';
 import type { Result as LiveResult } from '../../../scripts/truth/live-cases.js';
 import { hedgedLegs, liveResult, liveSummary } from './standing-fakes.js';
 
 // scripts/truth/batch/standing.ts: the standing lab batches' kit (A21), its device-free parts on their own — a live
-// block's verdict from its run, its summary and the failure reasons its rejudge wrote, its judge from the block's folder
-// alone, and what that judge says over summarize's own output (live-cases.ts#summarize through
+// block's verdict from its run, its summary and the failure reasons its rejudge wrote, its judge from the block's
+// folder alone, and what that judge says over summarize's own output (live-cases.ts#summarize through
 // standing-fakes.ts#liveSummary: the hedged ceiling, a LOUD that fails nothing, a stale premise), the words both
 // batches' hand lines share. The selection and the run are pinned through each batch (lab-run.test.ts,
 // lab-run-ios.test.ts), which import no live-cases.ts.
@@ -166,5 +167,60 @@ describe('the words both batches\' hand lines and refusals share', () => {
   it('noDeviceReason: the runner\'s words for the id not given, then the batch\'s device', () => {
     expect(noDeviceReason({ batch: 'lab-run', device: 'serial' })).toBe(`${NO_SERIAL}: lab-run runs on the lab emulator only`);
     expect(noDeviceReason({ batch: 'lab-run-ios', device: 'udid' })).toBe(`${NO_UDID}: lab-run-ios runs on the lab simulator only`);
+  });
+});
+
+/** A SUMMARY whose every line passes (words.ts#Summary), as words.test.ts's. */
+const base: Summary = {
+  name: 'batch-n',
+  runId: '20261104-094426-2763',
+  checkout: "OK checkout: main's HEAD f7ea6e07, clean",
+  labs: ['LAB android: OK — the installed APK is main\'s'],
+  blocks: [
+    { block: 'kf', lines: ['kf live verdict: PASS — kf1, kf2, kf3 ok'] },
+    { block: 'E5', lines: ['E5 cleanup: OK — exit 5', 'E5 verdict: PASS — a PASS, c PASS'] },
+  ],
+  protectedLines: ["OK   com.apple.launchservices.schemeapproval's key unchanged"],
+  restore: { file: 'RESTORE.txt', written: [] },
+  errors: [],
+};
+
+describe('standingExitOf — a standing batch\'s exit over the same SUMMARY (A21: lab-run\'s, lab-run-ios\'s; 0 only when proven)', () => {
+  const wanted = ['kf live verdict', 'E5 verdict'];
+  const blocks = (lines: string[]) => [...base.blocks, { block: 'x', lines }];
+
+  it('the codes: a batch\'s and unproven (3)', () => {
+    expect(STANDING_EXIT).toEqual({ ok: 0, failed: 1, nothingDone: 2, interrupted: 130, unproven: 3 });
+  });
+
+  it('every wanted label PASS, OK and WARN lines beside, the ERROR section empty: 0', () => {
+    expect(standingExitOf({ ...base, blocks: blocks([verdictLine('x check', 'WARN', 'said')]) }, wanted)).toBe(0);
+    expect(standingExitOf(base, [])).toBe(0);
+  });
+
+  it('exitCodeOf\'s 1, 2 and 130 stand, whatever else the SUMMARY holds', () => {
+    expect(standingExitOf({ ...base, blocks: blocks([verdictLine('x', 'FAIL'), verdictLine('y', 'INCONCLUSIVE')]) }, wanted)).toBe(1);
+    expect(standingExitOf({ ...base, noneRan: true, errors: ['ERROR x'] }, wanted)).toBe(2);
+    expect(standingExitOf({ ...base, interrupted: { at: '10:12:00' } }, wanted)).toBe(130);
+  });
+
+  it('unproven (3): an INCONCLUSIVE or ERROR among the blocks\', the labs\' or the protected keys\' lines', () => {
+    expect(standingExitOf({ ...base, blocks: blocks([verdictLine('x check', 'INCONCLUSIVE', 'r')]) }, wanted)).toBe(3);
+    expect(standingExitOf({ ...base, blocks: blocks([verdictLine('x check', 'ERROR', 'r')]) }, wanted)).toBe(3);
+    expect(standingExitOf({ ...base, labs: [verdictLine('LAB handlers', 'ERROR', 'r')] }, wanted)).toBe(3);
+    expect(standingExitOf({ ...base, labs: [verdictLine('LAB handlers', 'INCONCLUSIVE', 'r')] }, wanted)).toBe(3);
+    expect(standingExitOf({ ...base, protectedLines: [verdictLine('key', 'ERROR', 'unread')] }, wanted)).toBe(3);
+  });
+
+  it('unproven (3): any line in the ERROR section — an ERROR, or a log not read (what it held is not known)', () => {
+    expect(standingExitOf({ ...base, errors: ['10:15:00 ERROR forms live android-forms (exit 2)'] }, wanted)).toBe(3);
+    expect(standingExitOf({ ...base, errors: ['NOTE forms/x.log not read: unreadable'] }, wanted)).toBe(3);
+  });
+
+  it('unproven (3): a wanted label with no PASS line — another verdict, or no line of it', () => {
+    const kfSkip = [{ block: 'kf', lines: [verdictLine('kf live verdict', 'SKIP', 'x')] }, base.blocks[1]];
+    expect(standingExitOf({ ...base, blocks: kfSkip }, wanted)).toBe(3);
+    expect(standingExitOf({ ...base, blocks: [base.blocks[1]] }, wanted)).toBe(3);
+    expect(standingExitOf(base, [...wanted, 'forms verdict'])).toBe(3);
   });
 });

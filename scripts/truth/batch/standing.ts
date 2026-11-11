@@ -1,10 +1,11 @@
 import { join } from 'node:path';
-import { failuresOf, runFiles, type Asked } from './cases.js';
+import { failuresOf } from '../rejudge-failures.js';
+import { runFiles, type Asked } from './cases.js';
 import { runBatch, type Block, type BlockCtx, type BlockFiles, type LiveOutcome, type RunBatchOptions, type RunIo } from './runner.js';
 import { configOf, NO_SERIAL, NO_UDID, SERIAL_FLAGS, UDID_FLAGS, type ConfigRead, type Env } from './runner-lines.js';
 import { selectBlocks, type KnobValues, type Selection } from './select.js';
 import { shellQuote } from './shell.js';
-import { refusedLine, standingExitOf, verdictLine, type Verdict } from './words.js';
+import { EXIT, exitCodeOf, parseVerdictLine, refusedLine, verdictLine, type Summary, type Verdict } from './words.js';
 
 /**
  * The standing lab batches' kit (backlog A21, the review's CH3): what lab-run.ts (Android, Gate B) and lab-run-ios.ts
@@ -15,10 +16,10 @@ import { refusedLine, standingExitOf, verdictLine, type Verdict } from './words.
  *   staying the batch's, refused with every reason;
  * - the knobs (KNOBS: the live runs', the build's and a window's restore bound);
  * - a live block's run and judge (keptLiveRun, liveJudge, liveVerdictLine): main's rejudge's exit code, its FAIL naming
- *   the failure reasons the rejudge wrote as data beside its summary (cases.ts#failuresOf) — a file missing, not JSON
- *   or at odds with the exit code is INCONCLUSIVE, never a PASS;
- * - the run (standingRun): runBatch's result as data, its exit the standing rule over the SUMMARY it returns
- *   (words.ts#standingExitOf); the device not given, refused;
+ *   the failure reasons the rejudge wrote as data beside its summary (../rejudge-failures.ts#failuresOf) — a file
+ *   missing, not JSON or at odds with the exit code is INCONCLUSIVE, never a PASS;
+ * - the run (standingRun): runBatch's result as data, its exit the standing rule (standingExitOf) over the SUMMARY it
+ *   returns, read beside words.ts#exitCodeOf from the same data; the device not given, refused;
  * - the words both batches' hand lines share: the clean state file's command (cleanStateCommand) and a lab device's id
  *   or how to give it (deviceInHand).
  */
@@ -41,6 +42,27 @@ export interface Standing<G extends string = string> {
   hint: string;
   blockIds: readonly string[];
   blocksOf(group: G): readonly string[];
+}
+
+/** A standing batch's exit codes: a batch's (words.ts#EXIT), and `unproven` for a run that proved nothing. */
+export const STANDING_EXIT = { ...EXIT, unproven: 3 } as const;
+export type StandingExit = (typeof STANDING_EXIT)[keyof typeof STANDING_EXIT];
+
+/**
+ * A standing batch's exit code, read from the same SUMMARY as words.ts#exitCodeOf and stricter: exitCodeOf's 1, 2 and
+ * 130 stand; its 0 is 0 only when no judged line (the checkout's, the labs', the blocks', the protected keys') says
+ * INCONCLUSIVE or ERROR, the ERROR section is empty (an unread log's NOTE in it too: what it held is not known) and
+ * every label in `wanted` has a PASS line — else unproven (3).
+ */
+export function standingExitOf(s: Summary, wanted: readonly string[]): StandingExit {
+  const code = exitCodeOf(s);
+  if (code !== EXIT.ok) return code;
+  const judged = [s.checkout, ...s.labs, ...s.blocks.flatMap((b) => b.lines), ...s.protectedLines].map(parseVerdictLine).filter((v) => v !== undefined);
+  const proven =
+    s.errors.length === 0 &&
+    !judged.some((v) => v.verdict === 'INCONCLUSIVE' || v.verdict === 'ERROR') &&
+    wanted.every((l) => judged.some((v) => v.label === l && v.verdict === 'PASS'));
+  return proven ? STANDING_EXIT.ok : STANDING_EXIT.unproven;
 }
 
 /** The knobs (select.ts): the live runs' bound, the build's, a window's restore (the chooser's, a WDA window's). */
@@ -165,9 +187,9 @@ const REJUDGE_FAILED = 'DONE';
 
 /**
  * A live block's verdict from its run (LiveOutcome), its summary (the header quoted) and the failure reasons its
- * rejudge wrote (cases.ts#failuresOf; undefined: missing or unreadable). Main's rejudge exit 0 and no reason: PASS;
- * exit 1 and a reason: FAIL naming each; else INCONCLUSIVE naming why — no rejudge, not judged, past its bound, the
- * reasons unread, or at odds with the exit code.
+ * rejudge wrote (../rejudge-failures.ts#failuresOf; undefined: missing or unreadable). Main's rejudge exit 0 and no
+ * reason: PASS; exit 1 and a reason: FAIL naming each; else INCONCLUSIVE naming why — no rejudge, not judged, past its
+ * bound, the reasons unread, or at odds with the exit code.
  */
 export function liveVerdictLine(
   label: string,
@@ -218,14 +240,14 @@ export function liveJudge(label: string, name: string): (j: BlockFiles) => Promi
 
 /**
  * A standing batch run through runBatch, its exit its own: runBatch's result as it returns it — refused or interrupted,
- * its exit; ended, the standing rule over its SUMMARY and the wanted blocks' labels (words.ts#standingExitOf). A run
+ * its exit; ended, the standing rule over its SUMMARY and the wanted blocks' labels (standingExitOf). A run
  * whose device was not given is refused (noDeviceReason). The process's exit is the CLI entry's.
  */
 export async function standingRun<G extends string>(
   o: Pick<StandingOptions, 'io'>,
   st: Standing<G>,
   b: Pick<RunBatchOptions<typeof KNOBS>, 'needs' | 'lastly' | 'config'> & { blocks: readonly Block<StandingKnobs>[]; wanted: readonly string[] },
-): Promise<number> {
+): Promise<StandingExit> {
   const given = b.config.ok && b.config.config[st.device] !== undefined;
   const batchReasons = b.config.ok && !given ? [noDeviceReason(st)] : [];
   const r = await runBatch({ name: st.batch, blocks: b.blocks, needs: b.needs, lastly: b.lastly, config: b.config, batchReasons, knobs: KNOBS, io: o.io });

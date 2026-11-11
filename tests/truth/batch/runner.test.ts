@@ -346,9 +346,6 @@ describe('refused to start: exit 2, nothing done — no folder, no call (batch-1
     const r = await runBatch({ name: 'batch-t', blocks: [plain('kf')], config: { ok: false, errors: ['ERROR no out folder: pass --out <dir> or set AVERI_BATCH_OUT — nothing was done'] }, io: { seam, terminal: (t) => void terminal.push(t) } });
     expect(r).toEqual({ exit: 2, refused: ['ERROR no out folder: pass --out <dir> or set AVERI_BATCH_OUT — nothing was done'] });
     expect(seam.exitCodes).toEqual([2]);
-    // A seam with no exit code to set (setExitCode is optional): the same result, nothing thrown.
-    const bare: ProcessSeam = { start: (c, a, o) => seam.start(c, a, o), killGroup: (p, s) => seam.killGroup(p, s), install: (h) => seam.install(h), exit: (c) => seam.exit(c), stderr: () => {} };
-    expect(await runBatch({ name: 'batch-t', blocks: [plain('kf')], config: { ok: false, errors: ['ERROR x — nothing was done'] }, io: { seam: bare, terminal: () => {} } })).toEqual({ exit: 2, refused: ['ERROR x — nothing was done'] });
     expect(terminal).toEqual(['ERROR no out folder: pass --out <dir> or set AVERI_BATCH_OUT — nothing was done\n']);
   });
 

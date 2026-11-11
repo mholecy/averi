@@ -615,7 +615,8 @@ describe('the hedged ceiling: a run whose every judged unaimable leg ends hedged
     const { exitCode, lines, failures } = await run(legsRecord(UNAIMABLE_LEGS));
     expect(exitCode).toBe(1);
     const line = lines.find((l) => l.includes('hedged 3 of 3'));
-    // A21: its line, whole, is the run's one failure reason — what the standing lab batch names (the prose grep missed it).
+    // A21: its line, whole, is the run's one failure reason — what the standing lab batch names (the prose grep
+    // missed it).
     expect(failures).toEqual([line]);
     expect(line).toMatch(/^MISMATCH \(hedged ceiling\): hedged 3 of 3 judged unaimable leg\(s\)/);
     expect(line).toMatch(/ADR 0021/);

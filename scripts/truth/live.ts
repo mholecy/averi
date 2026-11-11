@@ -10,7 +10,6 @@ import { listIosDevices } from '../../src/adapters/discovery.js';
 import { errorMessage } from '../../src/util/error-message.js';
 import type { Platform } from '../differential/corpus.js';
 import { loadSide } from '../differential/side.js';
-import { failuresJson } from './batch/cases.js';
 import { readPremiseInto } from './chooser-premise.js';
 import { deviceLabelling, type DeviceReadMode } from './device-state.js';
 import { AndroidLab, IosLab, LAB_AVD, LAB_WDA_DERIVED_DATA } from './lab-device.js';
@@ -31,6 +30,7 @@ import {
 } from './live-cases.js';
 import type { Source } from './live-forms.js';
 import { callReply } from './replies.js';
+import { failuresJson } from './rejudge-failures.js';
 import { type CaseRig, runCase } from './run-case.js';
 import { parseLabApp, type LabApp } from './schema.js';
 
@@ -85,7 +85,8 @@ import { parseLabApp, type LabApp } from './schema.js';
  * paragraph). `--record <file>` writes every read (the launch state, the state between the calls, after them) as JSON;
  * `--rejudge <file>` judges such a record again with this checkout's judges, no device (live-cases.ts#rejudge, which
  * tests/truth/live-rejudge.test.ts calls in process); with `--failures <file>` it writes the summary's failure reasons
- * there as JSON (batch/cases.ts#failuresJson: what the standing lab batch names, A21). The cases, their judging and the summary live in live-cases.ts,
+ * there as JSON (rejudge-failures.ts#failuresJson: what the standing lab batch names, A21). The cases, their judging
+ * and the summary live in live-cases.ts,
  * one case's device cycle in run-case.ts, the finish (the record written before anything closes, D82) in
  * live-finish.ts; this file is the CLI.
  *

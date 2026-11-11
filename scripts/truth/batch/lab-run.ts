@@ -20,6 +20,7 @@ import {
   standingRun,
   standingSelection,
   type Standing,
+  type StandingExit,
   type StandingKnobs,
   type StandingOptions,
 } from './standing.js';
@@ -58,7 +59,7 @@ import { verdictLine, type Verdict } from './words.js';
  * judged from the block's folder once its run is complete (runner.ts's assess; standing.ts#liveJudge).
  *
  * The selection, the knobs, the live runs and their judge, and the run come from standing.ts, which lab-run-ios.ts
- * shares. The exit code (words.ts#STANDING_EXIT) is the standing net's, stricter than a numbered batch's, read from
+ * shares. The exit code (standing.ts#STANDING_EXIT) is the standing net's, stricter than a numbered batch's, read from
  * the SUMMARY runBatch returns: 0 only when every wanted block's verdict is PASS, no line is INCONCLUSIVE or ERROR and
  * the ERROR section is empty; 1 a FAIL or a RESTORE; 2 refused or nothing ran; 3 unproven; 130 interrupted.
  */
@@ -186,8 +187,8 @@ export function leftLine(c: { line: string; check: Pick<Check, 'focus' | 'prefer
   return verdictLine(AFTER_LABEL, 'FAIL', `${said}${c.line.slice(at)}`);
 }
 
-/** The run, start to end: its exit code (words.ts#STANDING_EXIT), for the CLI entry to exit with. */
-export async function labRun(o: StandingOptions): Promise<number> {
+/** The run, start to end: its exit code (standing.ts#STANDING_EXIT), for the CLI entry to exit with. */
+export async function labRun(o: StandingOptions): Promise<StandingExit> {
   const { wanted, config } = standingSelection(o, LAB_RUN_STANDING);
   const serial = config.ok ? config.config.serial : undefined;
   // The build's bound is given before runBatch reads the knobs (the blocks read theirs from ctx.knobs); a bad knob

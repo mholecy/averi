@@ -9,7 +9,8 @@ import { runBatch } from '../../../scripts/truth/batch/runner.js';
 // main there (repo/: the checkout under test), and runs two blocks into out/: kf, which only says PASS, and E5, which
 // opens a dirty window (its restore a detached proc-child.mjs `slow` writing E5.started and E5.done), starts a probe (a
 // `tree`: a child and a grandchild, pids in probe.pids), writes `ready` and waits for the probe — until the test
-// interrupts it (`int`), or, `quick`, a probe that ends at once; `noexit` as `quick`, kf FAILing, and no process.exit after.
+// interrupts it (`int`), or, `quick`, a probe that ends at once; `noexit` as `quick`, kf FAILing, and no process.exit
+// after.
 
 const [dir, scenario] = process.argv.slice(2);
 const HELPER = join(import.meta.dirname, 'proc-child.mjs');

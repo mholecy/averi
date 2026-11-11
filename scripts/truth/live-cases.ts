@@ -791,8 +791,8 @@ export async function rejudgedResults(record: RunRecord, selection: RejudgeSelec
 
 /**
  * What a run (or a rejudged record) reports: the summary's lines, as live.ts prints them; its failure reasons, as data
- * (A21: what a standing batch names — written beside the rejudge's summary, batch/cases.ts#failuresJson); and its exit
- * code, 1 exactly when there is a failure reason.
+ * (A21: what a standing batch names — written beside the rejudge's summary, rejudge-failures.ts#failuresJson); and
+ * its exit code, 1 exactly when there is a failure reason.
  */
 export interface Summary {
   lines: string[];

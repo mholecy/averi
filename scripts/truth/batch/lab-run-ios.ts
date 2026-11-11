@@ -14,6 +14,7 @@ import {
   standingRun,
   standingSelection,
   type Standing,
+  type StandingExit,
   type StandingKnobs,
   type StandingOptions,
 } from './standing.js';
@@ -42,9 +43,9 @@ import {
  *
  * The owner's, outside the agent's sandbox (simctl, idb, xcodebuild and WebDriverAgent do not run inside it). Its
  * selection, knobs, live runs, judge and run are standing.ts's, shared with lab-run.ts and imported from neither batch.
- * The exit code is the standing one (words.ts#standingExitOf): 0 only when every wanted block PASSed and no line is INCONCLUSIVE or ERROR; 1 a FAIL
- * or a RESTORE; 2 refused (no udid, a group that is none, an earlier window's state file dirty) or nothing ran; 3
- * unproven; 130 interrupted.
+ * The exit code is the standing one (standing.ts#standingExitOf): 0 only when every wanted block PASSed and no line is
+ * INCONCLUSIVE or ERROR; 1 a FAIL or a RESTORE; 2 refused (no udid, a group that is none, an earlier window's state
+ * file dirty) or nothing ran; 3 unproven; 130 interrupted.
  */
 
 /** live.ts's iOS groups, in the batch's order. */
@@ -90,8 +91,8 @@ export function windowStateHand(udid: string | undefined, file: string): string 
   );
 }
 
-/** The run, start to end: its exit code (words.ts#STANDING_EXIT), for the CLI entry to exit with. */
-export async function labRunIos(o: StandingOptions): Promise<number> {
+/** The run, start to end: its exit code (standing.ts#STANDING_EXIT), for the CLI entry to exit with. */
+export async function labRunIos(o: StandingOptions): Promise<StandingExit> {
   const { wanted, config } = standingSelection(o, IOS_STANDING);
   const udid = config.ok ? config.config.udid : undefined;
   const pre = readKnobs(KNOBS, o.env);

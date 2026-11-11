@@ -63,6 +63,11 @@ class LabSeam implements ProcessSeam {
   install(h: { signal(name: NodeJS.Signals): void; fatal(error: unknown): void }): void {
     this.handlers = h;
   }
+  /** The exit codes runBatch left for the process (ProcessSeam.setExitCode). */
+  readonly exitCodes: number[] = [];
+  setExitCode(code: number): void {
+    this.exitCodes.push(code);
+  }
   exit(code: number): void {
     this.exits.push(code);
   }

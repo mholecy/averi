@@ -827,7 +827,7 @@ plumbing: the lab block (the guard, the reset, this checkout's app built and ins
 iOS groups (forms, visibility, dismissal, ensure) after its health check, then every WebDriverAgent run in its own D43
 settings window. The two batches share a standing kit, `scripts/truth/batch/standing.ts` since A21 (lab-run.ts's
 until then): the selection (`Standing`, `standingSelection`), live run and judge (`keptLiveRun`, `liveJudge`) and the
-run with its exit rule (`standingRun` over the SUMMARY runBatch returns, `standingExitOf` in words.ts). The owner runs it,
+run with its exit rule (`standingRun` over the SUMMARY runBatch returns, `standingExitOf` beside it). The owner runs it,
 outside the agent's sandbox.
 
 **Consequences.** Every release runs the net, so a chooser regression cannot ship between scheduled runs. The cost is

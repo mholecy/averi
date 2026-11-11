@@ -94,6 +94,7 @@ class FakeSeam implements ProcessSeam {
 
   install(): void {}
   exit(): void {}
+  setExitCode(): void {}
   stderr(): void {}
 }
 
