@@ -135,7 +135,12 @@ npm test           # vitest
 npm run lint       # typecheck src + tests
 npm run mutate     # mutation run over the pure leaves' tests (ARCHITECTURE.md §8)
 npm run build      # tsc → dist/
+npm run release:smoke  # pack the package, start its bin, list its tools (after build; docs/release.md)
 npm run dev        # run the MCP server over stdio from source
 ```
 
 Layout (each layer imports only those after it): `src/mcp/` (tool surface, no logic) · `src/run/` (tool commands, verify runs) · `src/flow/` (yaml schema, credentials, engine) · `src/interact/` (tap/type/fill/scroll/swipe, keyboard guard) · `src/verify/` (asserts, baselines, pixel poll, parity tables, crash scan) · `src/ui-tree/` (selectors, geometry, tree verdicts) · `src/adapters/` (adb, simctl/idb, opt-in WDA tree source, one normalized tree) · `src/util/` · `skill/` · `docs/plans/`.
+
+## Releasing
+
+A new version is released only after the gates in [docs/release.md](docs/release.md) pass: lint, tests, build, the golden, a cold mutation run and a smoke test of the packed bin; the standing lab run and the live golden on the Android lab emulator; and the live golden on the iOS lab simulator. Tagging, pushing and `npm publish` are the owner's.

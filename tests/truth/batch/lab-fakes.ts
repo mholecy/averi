@@ -1,8 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, writeSync } from 'node:fs';
 import { join } from 'node:path';
 import { CHOOSER_FOCUS_COMMAND } from '../../../src/adapters/android-chooser.js';
 import { DEVICE_CHECK_SIMULATOR, DEVICE_CHECK_WDA_PORTS, LAB_APP } from '../../../scripts/truth/lab-device.js';
 import type { Run } from '../../../scripts/truth/batch/bounded.js';
+import { nodeFs } from '../../../scripts/truth/batch/io.js';
+import type { Ended, Handlers, KillResult, ProcessSeam, StartOptions, Started } from '../../../scripts/truth/batch/proc.js';
 import { DOMAINS, PROTECTED, type KeyVal } from '../../../scripts/truth/batch/ios-defaults.js';
 
 // The lab devices as fakes, shared by the S6b tests (ios-lab, android-lab, lab-build, and lab-batch through runBatch):
@@ -359,4 +361,72 @@ export function runOf(w: LabWorld): Run & { seen: { words: string; secs?: number
   }) as Run & { seen: typeof seen };
   run.seen = seen;
   return run;
+}
+
+/** What a fake seam answers a call with. */
+export interface Answer {
+  code: number;
+  out: string;
+  err: string;
+}
+
+/**
+ * The standing batches' fake process seam (lab-run.test.ts, lab-run-ios.test.ts): every call's words kept, answered by
+ * the subclass's `answer`; git answered for a clean main at `head`; one call matching `hang` runs until its group is
+ * signalled; the exits and the signal handlers kept.
+ */
+export abstract class FakeSeam implements ProcessSeam {
+  readonly words: string[] = [];
+  readonly exits: number[] = [];
+  handlers: Handlers | undefined;
+  /** A call whose words include this runs until its group is signalled (the first one only). */
+  hang: string | undefined;
+  private nextPid = 100;
+  private readonly ends = new Map<number, (e: Ended) => void>();
+  private readonly ended = new Set<number>();
+  constructor(
+    public world: LabWorld,
+    private readonly head: string,
+  ) {}
+  protected abstract answer(cmd: string, args: readonly string[], options: StartOptions): Answer | undefined;
+  /** git for a clean main at the given head: the toplevel, the HEAD, and nothing else said. */
+  protected git(args: readonly string[]): Answer {
+    const said = args.slice(2).join(' ');
+    if (said === 'rev-parse --show-toplevel') return { code: 0, out: `${nodeFs.real(args[1])}\n`, err: '' };
+    if (said.startsWith('rev-parse --verify')) return { code: 0, out: `${this.head}\n`, err: '' };
+    return { code: 0, out: '', err: '' };
+  }
+  start(cmd: string, args: readonly string[], options: StartOptions): Started {
+    const said = `${cmd === process.execPath ? 'node' : cmd} ${args.join(' ')}`;
+    this.words.push(said);
+    const a = cmd === 'git' ? this.git(args) : this.answer(cmd, args, options);
+    if (a === undefined) throw new Error(`no answer for ${said}`);
+    if (options.logFd !== undefined) writeSync(options.logFd, `${a.out}${a.err}`);
+    const pid = this.nextPid++;
+    let end!: (e: Ended) => void;
+    const exited = new Promise<Ended>((r) => (end = r));
+    this.ends.set(pid, (e) => (this.ended.add(pid), end(e)));
+    if (this.hang === undefined || !said.includes(this.hang)) this.ends.get(pid)!({ code: a.code, signal: null });
+    else this.hang = undefined;
+    return { pid, exited, closed: exited.then(() => {}), out: () => (options.logFd === undefined ? a.out : ''), err: () => (options.logFd === undefined ? a.err : ''), release: () => {} };
+  }
+  killGroup(pid: number, signal: NodeJS.Signals | 0): KillResult {
+    if (this.ended.has(pid)) return 'gone';
+    if (signal !== 0) this.ends.get(pid)?.({ code: null, signal });
+    return 'sent';
+  }
+  install(h: Handlers): void {
+    this.handlers = h;
+  }
+  exit(code: number): void {
+    this.exits.push(code);
+  }
+  stderr(): void {}
+}
+
+export const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
+/** Wait until `ok` holds (polled every 2 ms), or throw past `ms`. */
+export async function until(ok: () => boolean, ms = 1500): Promise<void> {
+  for (const end = Date.now() + ms; Date.now() < end; await tick(2)) if (ok()) return;
+  throw new Error('the condition never held');
 }

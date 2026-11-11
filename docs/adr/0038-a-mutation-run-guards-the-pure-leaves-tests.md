@@ -26,6 +26,8 @@ Amended 2026-11-11 (T20b: scripts/truth/batch/lab-run.ts joined the run — see 
 Amended 2026-11-11 (T9: src/interact/fill-type.ts joined the run — see the T9 amendment at the end).
 Amended 2026-11-11 (T22: src/util/regex.ts joined the run — see the T22 amendment at the end).
 Amended 2026-11-11 (T23: the Android build's JDK 17 lookup — see the T23 amendment at the end).
+Amended 2026-11-11 (T24: lab-run-ios.ts, scripts/release/pack-files.ts and clean-log.ts joined the run — see the T24
+amendment at the end).
 
 ## Context
 
@@ -1690,3 +1692,35 @@ said: nothing built, the lab check WARNs and lab-run exits 3.
 The modules stay in the `lab` group: lab-lines.ts 100 % (350 mutants) and lab-build.ts 100 % (312), floor 98;
 lab-run.ts (its `jvms` option, a test's own folders) at its floor 93 — cold, narrowed with `--mutate` (whose exit 1 is
 the fill-type amendment's); the figures are in scope.json.
+
+## Amendment: the release gate's modules join the run (2026-11-11, backlog T24)
+
+T24 made the lab runs a release gate (docs/release.md). Three of its modules hold logic worth scoring and join the
+`lab` group, each against its own direct tests:
+
+- scripts/truth/batch/lab-run-ios.ts, Gate C's iOS standing batch (ADR 0041's T24 amendment), against
+  tests/truth/batch/lab-run-ios.test.ts: 87.07 %, 117 mutants, 8 survived, 7 without coverage, 1 runtime error. Floor
+  84.
+- scripts/release/pack-files.ts, the smoke's file list, import and tool checks, against
+  tests/release/pack-files.test.ts: 98.06 %, 155 mutants, 2 survived, 1 without coverage. Floor 96.
+- scripts/release/clean-log.ts, the record's path scrubber, against tests/release/clean-log.test.ts: 79.66 %, 59
+  mutants, 2 survived, 10 without coverage. Floor 77.
+
+lab-run.ts lends lab-run-ios.ts its selection (`Standing`, `standingSelection`), live run and judge (`keptLiveRun`,
+`liveJudge`) and the run with its exit rule (`standingRun`), so tests/truth/batch/lab-run-ios.test.ts joins its tests.
+It scores 95.42 % (525 mutants, 15 survived, 2 timeouts counted killed, 9 without coverage, 1 runtime error), at its
+floor 93.
+
+What is not killed, split in the scope.json baselines:
+
+- the command-line entries (`isMain`): lab-run-ios.ts's line, and clean-log.ts's whole stdin-to-stdout body, which no
+  test spawns (its argument parsing moved to the tested `subsOf`);
+- unreachable: `!sim.ok` in each lab-run-ios block, since the ios need was met first and its guard passed;
+- not staged by the fake lab: the WebDriverAgent work's own health check failing after the window's check passed;
+  untested: the build's `B_BUILD` bound;
+- pack-files.ts: a dynamic import's `\s*` around its quotes made `\s`, which a one-space `import( 'x' )` still matches.
+
+The sandbox gains one entry, `!/scripts/release/`, in stryker.config.mjs's allowlist; tests/mutation/mutate.test.ts's
+path rule admits scripts/release/. The figures above come from narrowed cold runs (`--mutate` over the four modules,
+then over the two batches, `--tempDirName reports/mutation/stryker-tmp-t24`, whose exit 1 is a narrowed run's). The cold
+full lab group took about 300 s (the reviewer measured 299 s) and exits 0.

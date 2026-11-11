@@ -42,7 +42,9 @@
     "test:watch": "vitest",
     "lint": "tsc --noEmit && tsc -p tsconfig.test.json",
     "mutate": "node --import tsx scripts/mutation/mutate.ts",
-    "truth:lab": "node --import tsx scripts/truth/batch/lab-run.ts"
+    "truth:lab": "node --import tsx scripts/truth/batch/lab-run.ts",
+    "truth:lab:ios": "node --import tsx scripts/truth/batch/lab-run-ios.ts",
+    "release:smoke": "node --import tsx scripts/release/pack-smoke.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",

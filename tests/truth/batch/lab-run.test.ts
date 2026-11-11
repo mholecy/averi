@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync, writeSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -8,6 +8,7 @@ import {
   failuresIn,
   groupsOf,
   LAB_RUN_EXIT,
+  LAB_RUN_STANDING,
   labRun,
   labRunExit,
   leftLine,
@@ -16,9 +17,9 @@ import {
   onlyWith,
 } from '../../../scripts/truth/batch/lab-run.js';
 import type { LiveCases, LiveTable } from '../../../scripts/truth/batch/live-table.js';
-import type { Ended, Handlers, KillResult, ProcessSeam, StartOptions, Started } from '../../../scripts/truth/batch/proc.js';
+import type { StartOptions } from '../../../scripts/truth/batch/proc.js';
 import { LIVE_GOLDEN_HEADER } from '../../../scripts/truth/batch/steps.js';
-import { CATALOG, FOCUS_CHOOSER, LAB_SERIAL, labWorld, PREFERRED_WITH_DEFAULT, type LabWorld, type WorldOptions } from './lab-fakes.js';
+import { CATALOG, FakeSeam, FOCUS_CHOOSER, LAB_SERIAL, labWorld, PREFERRED_WITH_DEFAULT, until, type Answer, type LabWorld, type WorldOptions } from './lab-fakes.js';
 
 // The standing lab batch (T20b, scripts/truth/batch/lab-run.ts) under runBatch, over the shared fake lab
 // (lab-fakes.ts) and a fake process seam that answers git and live.ts — its `--groups` run and its `--rejudge` —
@@ -47,54 +48,16 @@ interface LiveScript {
   during?: (w: LabWorld) => void;
 }
 
-class RunSeam implements ProcessSeam {
-  readonly words: string[] = [];
-  readonly exits: number[] = [];
-  handlers: Handlers | undefined;
-  /** A call whose words include this runs until its group is signalled (the first one only). */
-  hang: string | undefined;
+class RunSeam extends FakeSeam {
   /** The first `gradlew --stop` fails (exit 1): the daemon left to the run's last step. */
   stopFailsOnce = false;
-  private nextPid = 100;
-  private readonly ends = new Map<number, (e: Ended) => void>();
-  private readonly ended = new Set<number>();
   /** What each group's live.ts run does. */
   live: Record<string, LiveScript> = {};
   private readonly asked = new Map<string, string>();
-  constructor(public world: LabWorld) {}
-  start(cmd: string, args: readonly string[], options: StartOptions): Started {
-    const said = `${cmd === process.execPath ? 'node' : cmd} ${args.join(' ')}`;
-    this.words.push(said);
-    const a = this.answer(cmd, args, options);
-    if (a === undefined) throw new Error(`no answer for ${said}`);
-    if (options.logFd !== undefined) writeSync(options.logFd, `${a.out}${a.err}`);
-    const pid = this.nextPid++;
-    let end!: (e: Ended) => void;
-    const exited = new Promise<Ended>((r) => (end = r));
-    this.ends.set(pid, (e) => (this.ended.add(pid), end(e)));
-    if (this.hang === undefined || !said.includes(this.hang)) this.ends.get(pid)!({ code: a.code, signal: null });
-    else this.hang = undefined;
-    return { pid, exited, closed: exited.then(() => {}), out: () => (options.logFd === undefined ? a.out : ''), err: () => (options.logFd === undefined ? a.err : ''), release: () => {} };
+  constructor(world: LabWorld) {
+    super(world, HEAD);
   }
-  killGroup(pid: number, signal: NodeJS.Signals | 0): KillResult {
-    if (this.ended.has(pid)) return 'gone';
-    if (signal !== 0) this.ends.get(pid)?.({ code: null, signal });
-    return 'sent';
-  }
-  install(h: Handlers): void {
-    this.handlers = h;
-  }
-  exit(code: number): void {
-    this.exits.push(code);
-  }
-  stderr(): void {}
-  private answer(cmd: string, args: readonly string[], options: StartOptions): { code: number; out: string; err: string } | undefined {
-    if (cmd === 'git') {
-      const said = args.slice(2).join(' ');
-      if (said === 'rev-parse --show-toplevel') return { code: 0, out: `${nodeFs.real(args[1])}\n`, err: '' };
-      if (said.startsWith('rev-parse --verify')) return { code: 0, out: `${HEAD}\n`, err: '' };
-      return { code: 0, out: '', err: '' };
-    }
+  protected answer(cmd: string, args: readonly string[], options: StartOptions): Answer | undefined {
     if (cmd === process.execPath && args.some((a) => a.endsWith('live.ts'))) {
       const at = (flag: string) => args[args.indexOf(flag) + 1];
       const group = at('--groups');
@@ -152,11 +115,6 @@ const go = (argv: readonly string[] = [], env: Record<string, string> = {}): Pro
 /** The live.ts calls, by their groups (`--rejudge` ones left out). */
 const liveGroups = () => seam.words.filter((w) => w.includes('live.ts') && !w.includes('--rejudge')).map((w) => w.split(' ')[w.split(' ').indexOf('--groups') + 1]);
 const outText = () => readFileSync(join(dirOf('meta'), 'lab-run.out'), 'utf8');
-const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
-async function until(ok: () => boolean, ms = 1500): Promise<void> {
-  for (const end = Date.now() + ms; Date.now() < end; await tick(2)) if (ok()) return;
-  throw new Error('the condition never held');
-}
 /** A dirty state file an earlier run of the chooser block left. */
 const dirtyState = (): string => {
   const file = join(out, 'chooser', 'run-20261110-090000-1', 'state.json');
@@ -336,19 +294,19 @@ describe('--groups: a selection, as ONLY= is — every block stays the batch\'s'
 
   describe('onlyWith and groupsOf: --groups as ONLY=', () => {
     it('no --groups: ONLY as given', () => {
-      expect(onlyWith(undefined, undefined)).toStrictEqual({});
-      expect(onlyWith(undefined, 'forms')).toStrictEqual({ only: 'forms' });
-      expect(groupsOf(['--out', '/x'])).toStrictEqual({ rest: ['--out', '/x'], errors: [] });
+      expect(onlyWith(undefined, undefined, LAB_RUN_STANDING)).toStrictEqual({});
+      expect(onlyWith(undefined, 'forms', LAB_RUN_STANDING)).toStrictEqual({ only: 'forms' });
+      expect(groupsOf(['--out', '/x'], LAB_RUN_STANDING)).toStrictEqual({ rest: ['--out', '/x'], errors: [] });
     });
     it('--groups alone: the lab block and the groups', () => {
-      expect(onlyWith(['forms'], undefined)).toEqual({ only: 'lab,forms' });
-      expect(onlyWith(['chooser', 'forms'], '')).toEqual({ only: 'lab,chooser,forms' });
+      expect(onlyWith(['forms'], undefined, LAB_RUN_STANDING)).toEqual({ only: 'lab,forms' });
+      expect(onlyWith(['chooser', 'forms'], '', LAB_RUN_STANDING)).toEqual({ only: 'lab,chooser,forms' });
     });
     it('with ONLY: the names both allow, a name that is no block kept for the runner\'s WARN; none left refused', () => {
-      expect(onlyWith(['chooser', 'forms'], 'forms  lab,nope')).toEqual({ only: 'forms,lab,nope' });
-      expect(onlyWith(['forms'], 'chooser,forms')).toEqual({ only: 'forms' });
-      expect(onlyWith(['chooser'], 'forms,nope')).toEqual({ why: expect.stringContaining('ONLY=forms,nope and --groups chooser leave no block of lab-run to run') });
-      expect(onlyWith(['chooser', 'forms'], 'nope')).toEqual({ why: expect.stringContaining('ONLY=nope and --groups chooser,forms leave no block') });
+      expect(onlyWith(['chooser', 'forms'], 'forms  lab,nope', LAB_RUN_STANDING)).toEqual({ only: 'forms,lab,nope' });
+      expect(onlyWith(['forms'], 'chooser,forms', LAB_RUN_STANDING)).toEqual({ only: 'forms' });
+      expect(onlyWith(['chooser'], 'forms,nope', LAB_RUN_STANDING)).toEqual({ why: expect.stringContaining('ONLY=forms,nope and --groups chooser leave no block of lab-run to run') });
+      expect(onlyWith(['chooser', 'forms'], 'nope', LAB_RUN_STANDING)).toEqual({ why: expect.stringContaining('ONLY=nope and --groups chooser,forms leave no block') });
     });
   });
 });
