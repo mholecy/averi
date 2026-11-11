@@ -148,7 +148,7 @@ sheet's form; never a
 control, a bar the layer carries or any other labelled node, which cover anyway (Safari's capsule bar). Carried as
 `StandingFacts.presented`. When a target has any such surface among its covers,
 whichever cover is on top at its centre (the modal's card over the dim), its sentences say so
-(ui-tree/standing.ts#presentedRemedy), in place of "scroll_until it first" and of the pinned-bar "layout defect":
+(ui-tree/remedy-text.ts#presentedRemedy), in place of "scroll_until it first" and of the pinned-bar "layout defect":
 
 - the tap: `lang_sk is under container id:forgot_overlay (0,0 402x874) at its centre (290,251), drawn over it; nothing
   of it shows — a screen is presented over it (a modal or a sheet) — close it first; no scroll moves it out from under
@@ -464,7 +464,7 @@ Window: the keyboard is drawn over the app's windows (a key of an alert's text f
 Residual (accepted on the slice's review): with the soft keyboard up beneath an alert, a target of the screen beneath
 whose centre lies under the keyboard gets the keyboard's refusal first, not the alert's — nothing is tapped either way.
 
-Wording (Q2): the presented remedy names the alert by its label (`ui-tree/standing.ts#presentedRemedy`, the remedy's
+Wording (Q2): the presented remedy names the alert by its label (`ui-tree/remedy-text.ts#presentedRemedy`, the remedy's
 `layer`) — the tap `… is under container "Exit confirmation" (41,365 320x172, reaching 0,0 402x874) at its centre
 (201,602), drawn over it;
 nothing of it shows — an alert is presented over it ("Exit confirmation") — close it first; nothing was tapped`; the
@@ -1097,7 +1097,7 @@ card row S without it, three strokes on the dim) — 3 golden checks more, the t
 
 **Its own kind, its own words (code review, 2026-10-22).** The mark rests on one empty element WDA lists over the
 whole screen, which an overlay that lets touches through matches too (the first residual below), so it is not told as
-a sheet or modal: the refusal names the evidence and the way out a screenshot gives (ui-tree/standing.ts#
+a sheet or modal: the refusal names the evidence and the way out a screenshot gives (ui-tree/remedy-text.ts#
 presentedRemedy) — "a menu's backdrop is presented over it (an empty element WDA lists over the whole screen, after the
 screen's content) — close it first (if a screenshot shows no menu up, the backdrop is an overlay that lets touches
 through: tap the target by its coordinates (its centre from ui_snapshot)); no scroll moves it out from under that

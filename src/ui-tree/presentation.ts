@@ -79,7 +79,7 @@ export interface Presentation {
 
 /**
  * A presented layer the tree source marks (`UiNode.presentation`), as a sentence names it: its kind and its label (its
- * element's, for a typed layer). What the remedy words (standing.ts#presentedRemedy, #presentedStop).
+ * element's, for a typed layer). What the remedy words (remedy-text.ts#presentedRemedy, #presentedStop).
  */
 export interface MarkedLayer {
   readonly kind: PresentationKind;
@@ -234,7 +234,7 @@ const markOf = (layer: Placed, order: readonly Placed[]): PresentedLayer | undef
  * reaching the whole screen with its own nodes covering where they draw — each that screen's surface; a `backdrop`
  * (WDA's in-window backdrop, a childless node inside a layer) judged as a `screen` layer, its own cover with no nodes
  * of its own, whatever is listed after it outside it (its menu card) not beneath it — only its words differ
- * (standing.ts#presentedRemedy). No stacked-screens, window or bare-frame condition: those are the shape fallback's
+ * (remedy-text.ts#presentedRemedy). No stacked-screens, window or bare-frame condition: those are the shape fallback's
  * inferences (`byShape`), which the mark makes moot. A marked ROOT is a layer listed ALONE (`alone`): uiautomator's
  * one window, idb's flat list — nothing of the tree lies outside it, so it covers no target, and for no target its
  * cover takes every touch-down (`topmostAt`).

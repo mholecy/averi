@@ -1865,3 +1865,44 @@ c5227d28 with A22 passed in **319 s at a load average of 6 to 17**, against main
 (other agents' runs on the machine); as the A21 amendment decided, a load-inflated figure is recorded as such and not
 held against the line.
 
+## Amendment: the remedy's words join the run (2026-11-11, backlog A26)
+
+A26 split the remedy's words from its decision (ADR 0015's A26 amendment). Two of the new modules are pure leaves of
+remedy sentences that every touch verb, and in one case the pixel assert, quote. They join `scene` beside standing.ts,
+whose tests already build their scenes:
+
+| Module | Group | Tests | Score | Floor |
+| --- | --- | --- | --- | --- |
+| src/ui-tree/remedy-text.ts | scene | presented-remedy.test.ts, interact/touch-remedy.test.ts, interact/remedy-agreement.test.ts, adapters/idb-presented-layer.test.ts, adapters/android-presented-window.test.ts | 98.37 % (123 mutants, 2 survived) | 96 |
+| src/interact/touch-remedy.ts | scene | interact/touch-remedy.test.ts, interact/remedy-agreement.test.ts | 97.06 % (102 mutants, 1 survived, 2 without coverage) | 95 |
+
+Both are `scene`, not `core`, because touch-remedy.test.ts imports remedy-text.ts and touch-remedy.ts imports it
+(tests/mutation/group.test.ts: a scoped test that imports a module of a group belongs to that group or a group above
+it). verify/pixel-text.ts, the pixel verb's words, stays out of the run for now. Its sentences are pinned through the
+poll (pixel-poll.ts#overElement in pixel-chrome.test.ts and the agreement rows), and A26 measured no floor for it.
+
+The scores are the run at merge, rebased on main ad6ac3ec (below); neither module had a timeout in it. What is not
+killed, each equivalent: in remedy-text.ts, `layer?.label` where a typed layer is defined (2; standing.ts had these
+until A26). In touch-remedy.ts, the `never` arm (2, no coverage), and `stackedOnKeyboard`'s `gap >= 0` as `> 0` (1: a
+gap of 0 is within the minimum, so the bar rides, and `ridingKeyboard` is asked first). The joining run's third
+survivor, the `'touch'` purpose emptied in `noScrollRemedyText`'s call for a cut, is gone: since the review, a cut's
+clause is `cutPinnedRemedyText`, which takes no purpose. touch-remedy.ts's floor is 95, raised from the 93 it joined
+with at 95.56 % (90 mutants). touch-remedy.test.ts's first run left 11 more,
+killed by its boundary rows: the stacked bar exactly its own height above the line, a bar reaching below the line, and
+the positioner's quarter, a larger child, a non-control, a child of no area and a non-structural host.
+
+standing.ts drops to 95.26 % (1 119 mutants, 47 survived, 6 without coverage; floor 93 kept). Its words had been mostly
+killed mutants. The survivors are the A25 set less the two `layer?.label` that moved. A26's one new survivor,
+`noScrollStanding`'s kind test emptied to true (it reads the remedy of a reachable standing, which has none), is killed
+by a reachable row in remedy-agreement.test.ts.
+
+The runs, one group at a time, with a worktree-local temp dir (`--tempDirName reports/mutation/stryker-tmp-a26`):
+`npm run mutate -- --group scene --force`, cold, passed in 151 s (load average 14 at its start, 29 at its end, from
+other worktrees' runs). Every scene module was at or above its floor: later-edges.ts 97.35 %, reading-order.ts 88.11 %,
+unchanged. At merge, rebased on main ad6ac3ec (after A23 and A22), the cold `npm run mutate -- --group scene --force`
+passed in 279 s, load average 5 at its start and 55 at its end, from another agent's runs. Every module was at or above
+its floor: remedy-text.ts 98.37 %, touch-remedy.ts 97.06 %, later-edges.ts 97.35 %, standing.ts 96.34 % (16 timeouts
+counted killed) and reading-order.ts 97.30 % (44 timeouts counted killed). The last two read high under that load, as
+A25 records; the quiet run's 95.26 % and 88.11 % are the figures to compare. A26 changes only comments in core's geometry.ts, draw-order.ts and cover.ts, and an import in assert.test.ts.
+After it, the cold `npm run mutate -- --group core --force` passed in 408 s (load average 27 at its start, 18 at its
+end), every module at or above its floor (draw-order.ts 89.87 %, geometry.ts 95.34 %).

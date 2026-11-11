@@ -1,5 +1,5 @@
 import type { DeviceScreen, Rect, ScrollAxis, UiNode } from '../adapters/types.js';
-import { axisOfEdge, largestScroller, rectIntersection, rectWithin, toldFrame, type Clips, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { axisOfEdge, largestScroller, rectIntersection, rectWithin, toldFrame, type Clips, type Edge } from '../ui-tree/geometry.js';
 import type { Cover } from '../ui-tree/cover.js';
 import type { SurfaceFinding } from '../ui-tree/eyes.js';
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
@@ -557,7 +557,8 @@ export type InFrameShort =
   | { of: 'covered'; judged: Judged; cover: Cover }
   /** `band`: the band's rect when the region, not the centre, lies in it (a `fully` stop, ui-tree/standing.ts#Standing). */
   | { of: 'systemBar'; judged: Judged; bar: SystemBar; band?: Rect }
-  | { of: 'sliver'; judged: Judged; cut: Cut; minPiece: number }
+  /** `standing`: the match's, a `cut` — its cut and the minimum its sentence quotes, and its remedy the touch remedy words (touch-remedy.ts). */
+  | { of: 'sliver'; judged: Judged; standing: Extract<Standing, { readonly kind: 'cut' }> }
   /** A `fully: true` stop the eyes refused (ui-tree/eyes.ts): a band of a surface the tree does not list over the match's edge — never `shortOf`'s, the round's (scroll-rounds.ts#round). */
   | {
       of: 'unlisted';
@@ -592,7 +593,7 @@ export function shortOf(j: Judged): Exclude<InFrameShort, { of: 'unlisted' | 'ca
     case 'systemBar':
       return { of: 'systemBar', judged: j, bar: s.bar, ...(s.band !== undefined && { band: s.band }) };
     case 'cut':
-      return { of: 'sliver', judged: j, cut: s.cut, minPiece: s.minPiece };
+      return { of: 'sliver', judged: j, standing: s };
     case 'covered':
       return { of: 'covered', judged: j, cover: s.cover };
     case 'reachable':

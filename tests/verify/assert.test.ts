@@ -14,7 +14,7 @@ import { boundReads } from '../helpers/terminal-read.js';
 import { captureFrame, STABILITY_DELAY_MS } from '../../src/verify/capture.js';
 import { OcrUnavailableError } from '../../src/verify/ocr.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
-import { bothPinnedRemedyText } from '../../src/ui-tree/standing.js';
+import { bothPinnedRemedyText } from '../../src/ui-tree/remedy-text.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on
 // (tests/helpers/sleep-recorder.ts): since 2026-10-05 the stability delay

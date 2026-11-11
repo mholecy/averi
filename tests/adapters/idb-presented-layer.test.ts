@@ -5,7 +5,7 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { walkOf } from '../../src/ui-tree/placed.js';
 import { presentationOf } from '../../src/ui-tree/presentation.js';
 import { missNote, missOf } from '../../src/ui-tree/miss.js';
-import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
+import { presentedRemedy, presentedStop } from '../../src/ui-tree/remedy-text.js';
 import { ElementNotFoundError, resolveSettled } from '../../src/interact/resolve.js';
 import { failureOf, play, resultOf, type Row } from '../helpers/rounds.js';
 
@@ -133,7 +133,7 @@ describe('tap: the wait for a target beneath idb\'s presented layer names the la
     expect(error).not.toBeInstanceOf(ElementNotFoundError);
     expect(error.message).toBe(
       'Timed out after 30ms: element id:"lab.sheet-medium.A" is not in the tree, which lists only the layer presented on top (the tree source lists nothing ' +
-        `beneath a presented layer) — ${presentedRemedy('it', { kind: 'screen' })}`,
+        `beneath a presented layer) — ${presentedRemedy('touch', { kind: 'screen' })}`,
     );
   });
 

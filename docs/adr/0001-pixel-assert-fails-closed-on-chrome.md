@@ -63,4 +63,4 @@ This note is not tracked yet. The measurements are recorded above.
 
 ## Where
 
-`verify/pixel-poll.ts#judgeOver` words the miss. `ui-tree/standing.ts#Scene` judges it, with the pixel purpose.
+`verify/pixel-text.ts#pixelMissText` words the miss. `ui-tree/standing.ts#Scene` judges it, with the pixel purpose.

@@ -4,7 +4,7 @@ import type { AdapterRegistry } from './registry.js';
 import { BARE_TREE_CONTENTS } from '../ui-tree/bare-tree.js';
 import { findAll } from '../ui-tree/selectors.js';
 import { ACTIVE_WINDOW_HINT } from '../ui-tree/miss.js';
-import { presentedRemedy, presentedStop } from '../ui-tree/standing.js';
+import { presentedRemedy, presentedStop } from '../ui-tree/remedy-text.js';
 import { fillField } from '../interact/fill.js';
 import { fillReply } from '../interact/fill-text.js';
 import { typeIntoFocused } from '../interact/type-text.js';
@@ -413,7 +413,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'A refusal taps nothing and names its cause and remedy: a centre off the screen, under the status bar, outside its scroll view (iOS wda), or a target cut to a strip too thin to tap → "scroll_until it first" (the refusal says when no scroll moves it); ' +
         'a centre under another element of the app drawn over it (a pinned button bar, a floating tab bar) → tapped on an uncovered part when enough shows (the reply says where), else REFUSED naming the cover; ' +
         'two controls iOS lists in reading order → one screenshot tells which is on top, and a refusal advises no scroll (close the menu or popover; if the target is on top, tap it by coordinates). ' +
-        `Under a screen presented over the target the refusal says '${presentedRemedy('it')}' instead, whatever else is wrong. ` +
+        `Under a screen presented over the target the refusal says '${presentedRemedy('touch')}' instead, whatever else is wrong. ` +
         `On Android the tree lists the active window only: a target beneath a dialog or sheet is not in it, and the wait ends "… is not in the tree, which lists only the window presented on top …", or, when the window manager does not confirm the app\'s screen alone, "… to appear" with "(${ACTIVE_WINDOW_HINT})". ` +
         'A selector target under the soft keyboard: Android hides it (back) first; iOS wda taps the first on-screen entry of averi.yaml app.ios.keyboardDismiss, then tries averi\'s own drag — never the return key (it submits) — and when nothing hides it REFUSES: hide it yourself (tap a neutral element such as a title), then tap again; iOS idb marks no keyboard and refuses a centre below the keyboard\'s top line likewise. The keyboard\'s own keys and toolbar are tappable. ' +
         'iOS idb lists no scroll view, so a target past its scroll view\'s clip may be tapped on what lies there — set app.ios.treeSource: wda to have scroll views judged. ' +
@@ -625,7 +625,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'ocr — the text the element RENDERS, read off the screenshot, which the tree often lacks (iOS merges a button into an authored a11y summary): exact with whitespace runs folded and case kept, a reading differing only in what the recognizer cannot tell apart (typographic punctuation, diacritics) passes with a note; heightPct = ink height in % of screen width, single-line only; macOS-only, fails closed elsewhere; ' +
         'screenshot pixel-diff vs a stored baseline (created on first use under .averi/baselines/; on iOS the status band (top safe area) is left out of a baseline diff). Prefer element asserts (deterministic, cheap) over screenshots. ' +
         'A color/ocr assert never measures what covers its element: under the soft keyboard, the status bar or the Android navigation bar, another element of the app drawn over it, off the screen, or outside its scroll view (iOS wda), it fails closed naming what and where, and the poll goes on — scroll_until it with fully: true first, or assert something clear of it; ' +
-        `under a screen presented over the element it says '${presentedRemedy('the element')}'. Under iOS idb, which lists no scroll view, a color region reading as the screen beside it fails closed — measure under treeSource: wda. ` +
+        `under a screen presented over the element it says '${presentedRemedy('pixel')}'. Under iOS idb, which lists no scroll view, a color region reading as the screen beside it fails closed — measure under treeSource: wda. ` +
         'On Android an element not in the tree may lie beneath a dialog or sheet (only the active window is listed): the "not found within …" says so. ' +
         'A match (element or ocr) that is not a valid JavaScript regex is refused before any device is touched. With averi.yaml naming the app, an appAlive health line follows the results. ' +
         `Budgets: an assert without its own timeout waits up to ${ASSERT_BUDGET} (tree asserts) or ${PIXEL_ASSERT_BUDGET} (color/ocr); a pass returns at once, a failing color/ocr assert polls out its whole budget — pass timeout to shorten it — and one that can never be measured (a refused screenshot, no usable recognizer) fails after one read. ` +

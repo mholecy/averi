@@ -110,7 +110,8 @@ describe('THE REMEDY, per kind — the pixel assert, which judges a region', () 
     // Exactly 90 % of the box, not at its top: the screen still.
     expect(covered({ x: 0, y: 80, width: 400, height: 720 })).toEqual({ kind: 'covered', remedy: { of: 'fixed', what: 'screen' } });
     expect(covered({ x: 0, y: 0, width: 400, height: 100 })).toEqual({ kind: 'covered', remedy: { of: 'fixed', what: 'header' } });
-    expect(covered({ x: 50, y: 0, width: 100, height: 100 })).toEqual({ kind: 'covered', remedy: { of: 'bothPinned' } });
+    // A26: the no-scroll remedy carries what the element is pinned under — here its cover's node.
+    expect(covered({ x: 50, y: 0, width: 100, height: 100 })).toEqual({ kind: 'covered', remedy: { of: 'bothPinned', under: expect.objectContaining({ identifier: 'over' }) } });
   });
 
   it('covered: idb\'s flat-list root under the content listed on it is `fixed` as the root', async () => {

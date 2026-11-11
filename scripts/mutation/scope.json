@@ -69,7 +69,7 @@
     "group": "scene",
     "tests": ["tests/ui-tree/standing.test.ts", "tests/ui-tree/standing-remedy.test.ts", "tests/ui-tree/presented-remedy.test.ts", "tests/ui-tree/overlaid-edge.test.ts", "tests/ui-tree/heading-listed-before.test.ts", "tests/ui-tree/keyboard-position.test.ts", "tests/ui-tree/listed-content.test.ts", "tests/interact/remedy-agreement.test.ts", "tests/verify/eyes-views-drawn-over.test.ts", "tests/verify/assert.test.ts"],
     "floor": 93,
-    "baseline": "96.23 % on 2026-11-11 (A25, joined; `npm run mutate -- --group scene --force --mutate src/ui-tree/standing.ts`, cold): 1220 mutants, 40 survived, 6 without coverage — ADR 0038's A25 amendment lists them"
+    "baseline": "96.34 % on 2026-11-11 (A26 at merge, rebased on main ad6ac3ec; `npm run mutate -- --group scene --force`, cold, 279 s, load 5 → 55): 1119 mutants, 35 survived, 16 timeouts counted killed, 6 without coverage — the load reads it high (ADR 0038's A25 amendment); 95.26 % on 2026-11-11 (A26, its clauses moved to ui-tree/remedy-text.ts, `bothPinned` carrying `under`, `noScrollStanding`; `npm run mutate -- --group scene --force`, cold, 151 s): 1119 mutants, 47 survived, 6 without coverage — the A25 run's set less the two `layer?.label` that moved, no new one (`noScrollStanding`'s kind test killed by remedy-agreement.test.ts); 96.23 % on 2026-11-11 (A25, joined; `npm run mutate -- --group scene --force --mutate src/ui-tree/standing.ts`, cold): 1220 mutants, 40 survived, 6 without coverage — ADR 0038's A25 amendment lists them"
   },
   "src/ui-tree/reading-order.ts": {
     "group": "scene",
@@ -82,6 +82,18 @@
     "tests": ["tests/ui-tree/later-edges.test.ts", "tests/ui-tree/overlaid-edge.test.ts"],
     "floor": 95,
     "baseline": "97.35 % on 2026-11-11 (A25, joined; `npm run mutate -- --group scene --force`, cold): 151 mutants, 4 survived — ADR 0038's A25 amendment lists them"
+  },
+  "src/ui-tree/remedy-text.ts": {
+    "group": "scene",
+    "tests": ["tests/ui-tree/presented-remedy.test.ts", "tests/interact/touch-remedy.test.ts", "tests/interact/remedy-agreement.test.ts", "tests/adapters/idb-presented-layer.test.ts", "tests/adapters/android-presented-window.test.ts"],
+    "floor": 96,
+    "baseline": "98.37 % on 2026-11-11 (A26 at merge, rebased on main ad6ac3ec; `npm run mutate -- --group scene --force`, cold, 279 s, load 5 → 55, no timeout in this module): 123 mutants, 121 killed, 2 survived — `layer?.label` where a typed layer is defined (2), equivalent, which standing.ts carried before A26; 98.31 % the same day (A26, joined, before the review's one purpose union and cutPinnedRemedyText): 118 mutants, the same 2 survived"
+  },
+  "src/interact/touch-remedy.ts": {
+    "group": "scene",
+    "tests": ["tests/interact/touch-remedy.test.ts", "tests/interact/remedy-agreement.test.ts"],
+    "floor": 95,
+    "baseline": "97.06 % on 2026-11-11 (A26 at merge, rebased on main ad6ac3ec; `npm run mutate -- --group scene --force`, cold, 279 s, load 5 → 55, no timeout in this module): 102 mutants, 99 killed, 1 survived, 2 without coverage — the `never` arm (2, no coverage) and `stackedOnKeyboard`'s `gap >= 0` as `> 0` (1: a gap of 0 is within the minimum, so the bar rides and `ridingKeyboard` is asked first), each equivalent; floor 95 (raised from 93); 95.56 % the same day (A26, joined, before the review's stuckCutText and cutPinnedRemedyText): 90 mutants"
   },
   "src/adapters/failure-text.ts": {
     "group": "core",

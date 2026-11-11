@@ -230,7 +230,7 @@ export const ownWords = (reply: string) => reply.replace(/\b[a-z]+:"(?:[^"\\]|\\
 
 /**
  * The reply's remedy for a target under a presented screen, in its own words: "<a layer> is presented over it (or the
- * element) … — close it first" (src/ui-tree/standing.ts#presentedRemedy, and #presentedStop, which ends with it). Not
+ * element) … — close it first" (src/ui-tree/remedy-text.ts#presentedRemedy, and #presentedStop, which ends with it). Not
  * the conditional active-window hint, whose "close it first" follows "if a sheet or a dialog is open" (`windowHintSaid`):
  * that one says a window MAY hide the target, this one that one does.
  */

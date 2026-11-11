@@ -573,7 +573,7 @@ ancestry (idb's flat list) keeps the old cases. Since D84 views-drawn-over's A n
 is an untold peer, 2.); the targets that do are pinned-bar P and text-under-bar P under Continue (WDA, Compose) and
 rn-banner's "Saved".
 
-Every verb renders `bothPinned` with one clause (ui-tree/standing.ts#bothPinnedRemedyText):
+Every verb renders `bothPinned` with one clause (ui-tree/remedy-text.ts#bothPinnedRemedyText):
 
 - the tap refuses with "no scroll moves it out from under that: neither lies in a scroll view — if it is a menu or a
   popover, close it first; if a screenshot shows this element on top, tap it by coordinates" — no "layout defect", which
@@ -635,7 +635,7 @@ evidence is Compose's (ui-tree/later-edges.ts#laterEdgesIn).
 The cut stays ambiguous. The dump cannot tell the rest lying under that node from a whole control only that thin laid
 flush against it. No scroll changes either case, so stopping before any swipe is sound. The words keep the cut's own way
 past rather than the cover's "if a screenshot shows this element on top": a coordinate tap on a cut strip is the tap the
-refusal exists to prevent (ui-tree/standing.ts#bothPinnedRemedyText, `cutBy`). Every verb renders it with D87's clause:
+refusal exists to prevent (ui-tree/remedy-text.ts#cutPinnedRemedyText since A26). Every verb renders it with D87's clause:
 
 - the tap refuses with the cut sentence, then "no scroll moves it out from under that: neither lies in a scroll view — if
   it is a menu or a popover, close it first; only if a screenshot shows it whole — a control that thin laid flush against
@@ -645,7 +645,7 @@ refusal exists to prevent (ui-tree/standing.ts#bothPinnedRemedyText, `cutBy`). E
   and the same clause;
 - with the soft keyboard up and that node riding on it (interact/target-text.ts#ridingKeyboard), both name the keyboard
   first: "the soft keyboard is up (…): dismiss it first (…) — a bar riding on it goes down with it — else" and the clause.
-  Hiding the keyboard moves a riding bar even where no scroll does (interact/target-text.ts#cutByPinnedRemedy);
+  Hiding the keyboard moves a riding bar even where no scroll does (interact/touch-remedy.ts#cutByPinnedRemedy);
 - with the keyboard up and that node not read as riding but possibly stacked in a bar that does (ADR 0013's stacked
   buttons: it ends more than the tap minimum above the line, but no more than its own height),
   both say "the soft keyboard is up (…): hiding it may move that <role> (…) — else" and the clause. ADR 0013 kept the
@@ -674,3 +674,82 @@ not cut (110 px tall), and its `fully` stop already said `bothPinned` as `covere
   form-keyboard field lies in its form's scroll view and keeps the scroll. The "may" is a hedge, not a promise: a
   button that is not stacked in a riding bar but ends within its own height above the line is told it too, and hiding
   the keyboard moves nothing there. Stacked buttons taller apart than one's own height get no keyboard words.
+
+## Amendment: one touch-remedy sentence (2026-11-11, backlog A26)
+
+### Context
+
+D87 and D88 decided one remedy per target in ui-tree/standing.ts (`remedied`), but the way from a decided remedy to a
+sentence was written four times. The tap (interact/tap-judgement.ts#tapOutcome) chose between a container cut's advice,
+`cutByRemedy` and `cutByPinnedRemedy`; `scroll_until`'s round (interact/scroll-rounds.ts) tested `kind === 'cut' &&
+noScrollHelps && Cut.by` again and needed a type of its own for it (`CutByLater`); its failures (interact/scroll-text.ts)
+rebuilt the tap's sentence in their quote "a tap refuses it so cut (…)"; and `cutByPinnedRemedy` built its own
+`{ of: 'bothPinned' }` instead of reading the standing's. The rebuilt quote had already drifted: for a cut at a clipping
+container's edge it said the scroll alone, "(scroll_until it first)", while the tap says the scroll and the way past
+for a node that only reads cut. D87 and D88 each had to touch four or five files, and the remedy clauses lived in the
+module that decides (standing.ts), the pixel verb's sentences in its poll (verify/pixel-poll.ts).
+
+### Decision
+
+- **The touch remedy is one function**, interact/touch-remedy.ts#touchRemedyText(standing, keyboard?), of a `cut` or
+  `covered` standing (standing.ts#TouchRemedied) and the soft keyboard when it is up. The tap's refusal, the
+  `overlapped` stop and the bound's sliver failure call it, so the bound's quote of the tap is the tap's sentence
+  word for word. It lives in interact/ because it composes interact/target-text.ts's keyboard and cut phrases, which
+  ui-tree/ may not import (tests/architecture/layering.test.ts: interact → verify → ui-tree). It is below both verbs
+  and is not in verify/, which the pixel assert would need, because the pixel assert says none of it. The tap's
+  positioner hint (a FAB's host) moved with it. `scroll_until` never stops on a `covered` target whose remedy is
+  `scroll`, so it never says that hint.
+- **A no-scroll standing carries what it is pinned under.** `bothPinned` now has `under`: the cover's node, or the node
+  a cut is cut by. standing.ts#noScrollStanding is the one question `scroll_until`'s round asks of a `covered` and a
+  `cut` target alike, and the `overlapped` stop carries the narrowed standing. `CutByLater` and the cut's own
+  `{ of: 'bothPinned' }` are gone.
+- **The clauses every verb quotes moved out of standing.ts** into ui-tree/remedy-text.ts: `presentedRemedy`,
+  `presentedStop`, `presentedLayerName`, `orderRemedyText`, `bothPinnedRemedyText`, `cutPinnedRemedyText` and
+  `noScrollRemedyText`. The module also has `presentedOr`, the one "presented first, else the verb's own words" test,
+  which replaces the two copies of `advice()` (tap-judgement.ts and pixel-poll.ts). Each clause takes one `purpose`,
+  `touch` or `pixel`, and derives the node's pronoun from it (`it`, `the element`); before A26, the presented clauses
+  took the pronoun itself as a second union. A touch's cut by a node drawn after it gets its own clause,
+  `cutPinnedRemedyText`, which names the remedy's `under`; before, a `cutBy` parameter rode on the cover's. The touch
+  remedy chooses between the two by the standing's kind. standing.ts decides and words nothing.
+- **The pixel verb's words moved out of its poll** into verify/pixel-text.ts: `pixelMissText` (one sentence per pixel
+  standing), `keyboardOver`, `coverRemedy` and the miss heads the references quote (`OFF_THE_SCREEN` and the rest).
+  pixel-poll.ts judges what lies over the element and words none of it. Its own sentences of timing and capture (a
+  region that moved, no time left, a screenshot that failed) stay with the poll.
+- **`scroll_until`'s sliver failures are framed, not worded, by scroll-text.ts.** The bound's quote of the tap is
+  `touchRemedyText`, after a colon: "— a tap refuses it so cut: <the tap's remedy>". This way the remedy's own
+  parentheses do not nest in the quote's. The stuck failure's whole sentence after "no longer moves it" is
+  touch-remedy.ts#stuckCutText, for a container's cut and a cut by a later node alike. It covers what keeps the rest
+  from showing, the riding keyboard (`ridingFirst`, the tap's own choice), and the quote of the tap. Because the
+  content is exhausted and the scroll half of the tap's remedy is moot, the quote is the tap's way past
+  (`cutWayPast`). Beneath a presented screen, it is that screen's remedy, as the tap says it. The stuck quote keeps
+  its parentheses, "a tap refuses it so cut (…)", unlike the bound's colon. This is an exception made for the corpus:
+  both stuck rows in it say it so, and a colon would move the cut-by row, which nothing else changes.
+
+The wording changes, each toward what the tap says (no other reply changed):
+
+1. The bound's sliver failure: "(last rect …) — a tap refuses it so cut (scroll_until it first)" became "… — a tap
+   refuses it so cut: scroll_until it first (if it is whole and only its own content runs to that edge, …)". It now
+   carries the tap's way past, after a colon. A cut by a later node: "(<the tap's remedy>)" became ": <the tap's
+   remedy>". Tests: tests/interact/scroll.test.ts ("at the bound, the quote of the tap is the tap's own refusal's
+   remedy, word for word", the bound rows, and the form-keyboard bound row).
+2. The stuck failure of a container's cut: "a tap refuses it so cut (scroll_until it first)" became "(if it is whole
+   and only its own content runs to that edge, no scroll shows more: tap a child of it that lies clear of that edge, or
+   tap by coordinates)". The cut-by stuck arm already gave the way past (D88), and "scroll_until it first" contradicted
+   the "no longer moves it" said just before. Tests: tests/interact/scroll.test.ts (the whole 50-px row at the list's
+   top), tests/interact/touch-remedy.test.ts (`stuckCutText`).
+3. The stuck failure beneath a presented screen, whose standing's remedy is `presented` (a surface judged of the node
+   alone, so the round did not stop `presented`): it quoted the way past and now quotes the presented remedy, as the
+   tap does. Test: tests/interact/touch-remedy.test.ts, "beneath a presented screen: the tap quoted as it says it
+   there". The bound's sliver failure under one quotes the presented remedy too, through `touchRemedyText`.
+
+Golden moved exactly the one predicted row: android scroll-bounded-flush S `scroll_until`, change 2 above. The verdict
+is the same, and the mismatches are unchanged (126). The corpus has no bound sliver failure and no stuck failure
+beneath a presented screen, so changes 1 and 3 move no row. Every other reply is byte-identical.
+
+### Not done here (review 2026-11-11)
+
+- ST2: whether a node rides the soft keyboard (interact/target-text.ts#ridingKeyboard, and touch-remedy.ts's stacked
+  test) is still a geometric judgement among the words. The tap's reading line and `scroll_until`'s applied cover hand
+  it two different keyboard lines. Making it a standing fact judged on one line is its own change, and it may need a lab
+  check on Android IME bars.
+- ST3: the order of the no-stroke stops in scroll-rounds.ts#round (presented, overlapped, unfit, …) as one ordered table.

@@ -67,7 +67,7 @@ scroll alone, without "dismiss the keyboard first" — the safe direction, a rem
 that misleads. Since D88 (ADR 0015's D88 amendment), where neither the field nor that node lies in a scroll view there is
 no scroll to name: with the keyboard up and that node ending within its own height above the line (room for the riding
 button beneath it), the remedy says hiding it may move that node, then that no scroll moves it out
-(`interact/target-text.ts#cutByPinnedRemedy`) — the same safe direction. A node farther above (a top bar) gets the
+(`interact/touch-remedy.ts#cutByPinnedRemedy`) — the same safe direction. A node farther above (a top bar) gets the
 no-scroll words alone.
 
 Bug note: docs/bugs/2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md
@@ -78,8 +78,8 @@ Three points the device check left open (docs/truth/live-android-2026-10-18-visi
 
 1. **The way past stays, after the remedy.** "only if a screenshot shows it whole — … no scroll shows more: tap by
    coordinates" is KEPT; in every reply of the family — a control cut by a node drawn after it (with the keyboard up
-   or down: `interact/target-text.ts#cutByRemedy`, `#wholeThinWayPast`; `scroll_until`'s stuck failure and its bound,
-   scroll-text.ts) and a sliver of its scroll container (`interact/tap-judgement.ts#OWN_CUT_WAY_PAST`,
+   or down: `interact/touch-remedy.ts#cutByRemedy`, `interact/target-text.ts#wholeThinWayPast`; `scroll_until`'s stuck failure and its bound,
+   scroll-text.ts) and a sliver of its scroll container (`interact/touch-remedy.ts#OWN_CUT_WAY_PAST`,
    `INHERITED_CUT_WAY_PAST`) — every remedy it names (dismiss the keyboard first, scroll) comes BEFORE the coordinate
    escape, which closes its sentence. Every reply already so ordered; pinned over the lab's real form-keyboard captures
    (tests/helpers/escape-order.ts, read by tests/interact/tap-judgement.test.ts and scroll.test.ts). A later

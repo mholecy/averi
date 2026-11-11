@@ -5,7 +5,7 @@ import { Verifier } from '../../src/verify/assert.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { FakeAdapter } from '../helpers/fake.js';
 import { resetSleeps } from '../helpers/sleep-recorder.js';
-import { bothPinnedRemedyText } from '../../src/ui-tree/standing.js';
+import { bothPinnedRemedyText } from '../../src/ui-tree/remedy-text.js';
 
 // THE PIXEL ASSERT ON A NODE COMPOSE CUT AT AN OVERLAY (ui-tree/later-edges.ts#OverlaidEdge): the tree shows the pinned
 // button only by the cut, so the assert fails closed naming it, saying the element may run on

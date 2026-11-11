@@ -4,7 +4,7 @@ import { presentationOf, type MarkedLayer } from './presentation.js';
 import { clips } from './scroll-containers.js';
 import { findTarget, hasArea, soleIdOf, type Target } from './selectors.js';
 import { clippedOutText, revealText } from './sides.js';
-import { presentedLayerName, presentedRemedy } from './standing.js';
+import { presentedLayerName, presentedRemedy } from './remedy-text.js';
 import { isBareTreeMemo } from './verdict.js';
 
 /**
@@ -262,7 +262,7 @@ const scrollFirst = (layer: MarkedLayer): string =>
  */
 export const presentedAloneHeadline = (subject: string, { layer, listed, mayLieIn }: Extract<Miss, { of: 'presented' }>): string =>
   `${subject} is not in the tree, which ${PRESENTED_ALONE[listed]} — ` +
-  (mayLieIn === undefined ? presentedRemedy('it', layer) : scrollFirst(layer));
+  (mayLieIn === undefined ? presentedRemedy('touch', layer) : scrollFirst(layer));
 
 /** A one-line not-found `what`, the miss's note after it in a parenthesis when it has one. */
 export const withMissNote = (what: string, miss: Miss | undefined): string => {

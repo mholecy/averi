@@ -3,7 +3,6 @@ import { cutAtLaterText } from '../ui-tree/cover.js';
 import { outsideScrollViewText, rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { clippedOutText, SIDES } from '../ui-tree/sides.js';
-import { noScrollRemedyText } from '../ui-tree/standing.js';
 
 /**
  * The phrases a target cut to a sliver, lying past a side, or lying under
@@ -14,9 +13,10 @@ import { noScrollRemedyText } from '../ui-tree/standing.js';
  * cover (`coverName`), kept beside geometry.ts#nodeText as a choice, not as
  * the shared wording. Phrases, not policies: what counts as cut is
  * geometry.ts#Clips.cutSliver's, and which phrase a reply says is its
- * caller's switch. The remedy for a target under a screen presented over its
- * own, a case of ui-tree/standing.ts#Remedy, is not here: its words are
- * ui-tree/standing.ts#presentedRemedy's, which every verb calls. Shallow by
+ * caller's switch. The touch remedy's sentence, which composes these with a
+ * standing's remedy (ui-tree/standing.ts#Remedy), is touch-remedy.ts's; the
+ * clauses every verb quotes (a presented screen's, a no-scroll cover's) are
+ * ui-tree/remedy-text.ts's. Shallow by
  * design, like ui-tree/system-bar.ts: delete it and each shared sentence
  * reappears in its two or three callers.
  *
@@ -92,7 +92,7 @@ export function cutSliverText(cut: Cut, shown: Rect, minPiece: number, lineY?: n
  * shows lies, the rect it was dumped with, cut above the keyboard's top edge when one is known (`lineY`: the lab's
  * phone, dumped to 1412, shows 28 of its 42 px above the line at 1398); the depth stays the dump's.
  * "May": the dump cannot tell a cut from a WHOLE control that thin laid flush against that node (standing.ts
- * #cutByLater's residual), so the remedy carries that case's way past (`cutByRemedy`, `WHOLE_THIN_WAY_PAST`).
+ * #cutByLater's residual), so the remedy carries that case's way past (touch-remedy.ts#cutWayPast, `wholeThinWayPast`).
  */
 function cutByText(by: UiNode, cut: Cut, rect: Rect, minPiece: number, lineY: number | undefined): string {
   const above = lineY !== undefined && lineY < rect.y + rect.height;
@@ -194,62 +194,15 @@ export function ridingKeyboard(by: UiNode, keyboard: KeyboardUp | undefined, min
 }
 
 /**
- * The remedy for a node cut by a node drawn after it (`Cut.by`) whose standing's remedy is `scroll`
- * (ui-tree/standing.ts#Remedy), as the tap's refusal and `scroll_until`'s bound failure say it: with the soft keyboard
- * up and that node riding on it (`ridingKeyboard`), dismiss it first, or scroll the list (`dismissKeyboardFirstText`);
- * else scroll the list — `scroll_until it out from under that container first`. Not `cutRemedy`'s scroll toward the
- * edge: the rest lies under the node, not past the edge of anything that scrolls.
- */
-export function cutByRemedy(by: UiNode, up: KeyboardUp | undefined, minPiece: number): string {
-  return ridingFirst(by, up, minPiece, 'or', `scroll_until it out from under that ${by.role} first (${wholeThinWayPast(by)})`);
-}
-
-/**
- * `cutByRemedy`'s for a remedy `bothPinned` (D88: neither lies in a scroll view), as the tap's refusal and
- * `scroll_until`'s stop before any swipe say it: no scroll — THE clause every verb quotes for it
- * (ui-tree/standing.ts#noScrollRemedyText, with the cut's way past). With the soft keyboard up and that node riding on
- * it, dismiss it first all the same: a bar riding on it goes down with it, scroll view or none. With the keyboard up and
- * that node NOT read as riding but possibly stacked in a bar that does (`stackedOnKeyboard`: buttons stacked in a
- * riding bar, the cut one on top), hiding it is named as a way that MAY move that node (`keyboardMayMoveText`): with no
- * scroll to fall back on, saying nothing of the keyboard would mislead where it does — the safe direction, as
- * `cutByRemedy`'s scroll is there. A node far above the line (a top bar) gets the clause alone.
- */
-export function cutByPinnedRemedy(by: UiNode, up: KeyboardUp | undefined, minPiece: number): string {
-  const way = noScrollRemedyText({ of: 'bothPinned' }, 'touch', by);
-  if (ridingKeyboard(by, up, minPiece) === undefined && up !== undefined && stackedOnKeyboard(by, up)) return `${keyboardMayMoveText(up, by)} — else ${way}`;
-  return ridingFirst(by, up, minPiece, 'else', way);
-}
-
-/**
- * Whether `by` MAY be stacked in a bar riding on the keyboard though not read as riding (`ridingKeyboard`): it ends at
- * or above the keyboard's line, no further above it than its own height — room for one more such node beneath it (the
- * lab's Continue is 132 tall, stacked on another, 66 above the line). Not the cut's edge: a riding bar cuts a field it
- * has scrolled under at the field's TOP (the lab's phone, 1370..1412 under a bar ending at 1370), as a top bar does.
- */
-function stackedOnKeyboard(by: UiNode, { lineY }: KeyboardUp): boolean {
-  const gap = lineY - (by.rect.y + by.rect.height);
-  return gap >= 0 && gap <= by.rect.height;
-}
-
-/** `the soft keyboard is up (its top edge at y 1398): hiding it may move that button (press_key back …)` — `cutByPinnedRemedy`'s for a node not read as riding on it. */
-const keyboardMayMoveText = ({ lineY, remedy }: KeyboardUp, by: UiNode): string => `${keyboardUpText(lineY)}: hiding it may move that ${by.role} (${hideClause(remedy)})`;
-
-/** `way`, after "dismiss it first" (`dismissKeyboardFirstText`) and `join` when that node rides on the keyboard (`ridingKeyboard`). */
-function ridingFirst(by: UiNode, up: KeyboardUp | undefined, minPiece: number, join: 'or' | 'else', way: string): string {
-  const keyboard = ridingKeyboard(by, up, minPiece);
-  return keyboard === undefined ? way : `${dismissKeyboardFirstText(keyboard)} — ${join} ${way}`;
-}
-
-/**
  * The way past a node cut by a node drawn after it should it only READ cut (standing.ts#cutByLater's residual: a
- * whole control that thin, laid flush against that node) — as `OWN_CUT_WAY_PAST` is for a container's cut
- * (tap-judgement.ts): no scroll shows more of it, so a coordinate tap. Conditioned on what a screenshot shows, so the
+ * whole control that thin, laid flush against that node) — touch-remedy.ts#cutWayPast's for such a cut, as it has its
+ * own for a container's: no scroll shows more of it, so a coordinate tap. Conditioned on what a screenshot shows, so the
  * way past is not read as the remedy: in the owner's own case (the lab's phone under the riding bar) the field is NOT
  * whole, and a coordinate tap on the strip is the very tap the refusal exists to prevent.
  */
 export const wholeThinWayPast = (by: UiNode): string => `only if a screenshot shows it whole — a control that thin laid flush against that ${by.role} — no scroll shows more: tap by coordinates`;
 
-/** The remedy for a target cut at `edge`: a scroll toward where the rest of it lies (ui-tree/sides.ts#SIDES) — down, `scroll_until`'s default (scroll.ts), needs no word. Quoted by `scroll_until`'s sliver failures too (scroll-text.ts). */
+/** The remedy for a target cut at `edge`: a scroll toward where the rest of it lies (ui-tree/sides.ts#SIDES) — down, `scroll_until`'s default (scroll.ts), needs no word. The touch remedy's for a container's cut (touch-remedy.ts#touchRemedyText). */
 export function cutRemedy(edge: Edge): string {
   const direction = SIDES[edge].reveals;
   return direction === 'down' ? 'scroll_until it first' : `scroll_until it with direction: ${direction} first`;

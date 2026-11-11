@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { everyNode, type PresentationKind, type Rect, type UiNode } from '../../src/adapters/types.js';
 import type { MarkedLayer } from '../../src/ui-tree/presentation.js';
 import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, KEYBOARD_UNLISTED, missNote, withMissNote } from '../../src/ui-tree/miss.js';
-import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
+import { presentedRemedy, presentedStop } from '../../src/ui-tree/remedy-text.js';
 import { boundText, describeScrollResult, flushText, UNTRIED_END, UNTRIED_LEAD } from '../../src/interact/scroll-text.js';
 import {
   CAROUSEL_REPLY_WORDS, carouselReply, fullyHedged, hedgedLead, hedgeWhy, replyKind, VISIBLE_STOP, MAX_SWIPES, flushProbedSide,
@@ -39,7 +39,7 @@ const src = (file: string) =>
     .replace(/^\s*\/\/.*$/gm, '');
 
 // The two "close it first" the harness reads apart (scripts/truth/replies.ts): the presented remedy, driven here by
-// src's own builders (ui-tree/standing.ts#presentedRemedy, #presentedStop) over every layer they word, and the
+// src's own builders (ui-tree/remedy-text.ts#presentedRemedy, #presentedStop) over every layer they word, and the
 // active-window hint (#ACTIVE_WINDOW_HINT), which is no presented remedy.
 
 /** Every presentation kind — the type check below fails when src adds one this list lacks. */
@@ -49,9 +49,9 @@ const everyKind: Exclude<PresentationKind, (typeof KINDS)[number]> extends never
 const LAYERS: readonly (MarkedLayer | undefined)[] = [undefined, ...KINDS.flatMap((kind) => [{ kind }, { kind, label: 'Delete account?' }])];
 
 describe('presentedRemedySaid: the presented remedy in every wording src builds', () => {
-  it.each(LAYERS.flatMap((layer) => (['it', 'the element'] as const).map((what) => [what, layer] as const)))('presentedRemedy(%s, %o)', (what, layer) => {
+  it.each(LAYERS.flatMap((layer) => (['touch', 'pixel'] as const).map((purpose) => [purpose, layer] as const)))('presentedRemedy(%s, %o)', (purpose, layer) => {
     expect(everyKind).toBe(true);
-    const remedy = presentedRemedy(what, layer);
+    const remedy = presentedRemedy(purpose, layer);
     expect(presentedRemedySaid(`ERROR id:"lab.x" is under … — ${remedy}; nothing was tapped`)).toBe(true);
     expect(windowHintSaid(remedy)).toBe(false);
   });
@@ -79,7 +79,7 @@ describe('idbReasonsSaid: idb\'s reasons, read off both of its dialect notes (sr
   it('not a bare not-found, nor the other notes (the active-window hint, the presented remedy)', () => {
     expect(idbReasonsSaid('ERROR Timed out after 5000ms waiting for element id:"lab.x" to appear')).toBe(false);
     expect(idbReasonsSaid(`… (${ACTIVE_WINDOW_HINT})`)).toBe(false);
-    expect(idbReasonsSaid(`… (${presentedRemedy('it', { kind: 'alert' })})`)).toBe(false);
+    expect(idbReasonsSaid(`… (${presentedRemedy('touch', { kind: 'alert' })})`)).toBe(false);
     // the reasons without the remedy, or the remedy alone, are not both
     expect(idbReasonsSaid(`… (${IDB_UNLISTS})`)).toBe(false);
     expect(idbReasonsSaid(`… (${COVERED_FIRST})`)).toBe(false);
@@ -341,7 +341,7 @@ describe('LIVE_REPLY_WORDS: the words the live forms and turn judges key on, eac
   const WRITTEN_IN: Record<(typeof LIVE_REPLY_WORDS)[number], string> = {
     'Refused before anything was sent': 'src/adapters/typeable.ts',
     'did not change': 'src/interact/fill-text.ts',
-    'scroll_until it out from under': 'src/interact/target-text.ts',
+    'scroll_until it out from under': 'src/interact/touch-remedy.ts',
     'dismiss it first': 'src/interact/target-text.ts',
     'PARTLY UNDER a surface': 'src/interact/scroll-text.ts',
     'direction: "': 'src/ui-tree/sides.ts',

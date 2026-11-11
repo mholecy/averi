@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { describeScrollResult, scrollUntilVisible } from '../../src/interact/scroll.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { FakeAdapter } from '../helpers/fake.js';
-import { bothPinnedRemedyText } from '../../src/ui-tree/standing.js';
+import { bothPinnedRemedyText } from '../../src/ui-tree/remedy-text.js';
 
 /**
  * `scroll_until` ON A NODE COMPOSE CUT AT AN OVERLAY (ui-tree/later-edges.ts#OverlaidEdge), over the lab's real captures

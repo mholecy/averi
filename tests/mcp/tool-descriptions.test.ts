@@ -60,22 +60,22 @@ vi.mock('../../src/flow/engine.js', async (orig) => ({
   DEFAULT_ENSURE_TIMEOUT_MS: 20_250,
 }));
 
-// The presented remedy a description quotes has one owner too — ui-tree/standing.ts, whose words every verb says:
-// `presentedRemedy` (of "it" for the tap, of "the element" for the pixel assert) and scroll_until's stop on it
+// The presented remedy a description quotes has one owner too — ui-tree/remedy-text.ts, whose words every verb says:
+// `presentedRemedy` (of `touch` for the tap, of `pixel` for the pixel assert) and scroll_until's stop on it
 // (`presentedStop`). Replaced by sentinels the descriptions must quote; the troubleshooting reference, a file no import
 // reaches, is pinned against the real sentences (`actualSentences`).
-vi.mock('../../src/ui-tree/standing.js', async (orig) => ({
-  ...(await orig<typeof import('../../src/ui-tree/standing.js')>()),
-  presentedRemedy: (what: 'it' | 'the element', layer?: { kind: string; label?: string }) =>
-    `<the presented remedy, as ui-tree/standing.ts renders it of "${what}"${layer === undefined ? '' : ` under an ${layer.kind} titled ${layer.label}`}>`,
-  presentedStop: (layer?: { kind: string; label?: string }) => `<the presented stop's remedy, as ui-tree/standing.ts renders it${layer === undefined ? '' : ` under an ${layer.kind} titled ${layer.label}`}>`,
+vi.mock('../../src/ui-tree/remedy-text.js', async (orig) => ({
+  ...(await orig<typeof import('../../src/ui-tree/remedy-text.js')>()),
+  presentedRemedy: (purpose: 'touch' | 'pixel', layer?: { kind: string; label?: string }) =>
+    `<the presented remedy, as ui-tree/remedy-text.ts renders it for "${purpose}"${layer === undefined ? '' : ` under an ${layer.kind} titled ${layer.label}`}>`,
+  presentedStop: (layer?: { kind: string; label?: string }) => `<the presented stop's remedy, as ui-tree/remedy-text.ts renders it${layer === undefined ? '' : ` under an ${layer.kind} titled ${layer.label}`}>`,
 }));
-vi.mock('../../src/verify/pixel-poll.js', async (orig) => ({
-  ...(await orig<typeof import('../../src/verify/pixel-poll.js')>()),
-  OFF_THE_SCREEN: '<the off-screen miss, as verify/pixel-poll.ts renders it>',
-  TOO_THIN_ON_THE_SCREEN: '<the thin-sliver miss, as verify/pixel-poll.ts renders it>',
-  OUTSIDE_ITS_SCROLL_VIEW: '<the outside-its-scroll-view miss, as verify/pixel-poll.ts renders it>',
-  TOO_THIN_IN_ITS_SCROLL_VIEW: '<the scroll view\'s thin-sliver miss, as verify/pixel-poll.ts renders it>',
+vi.mock('../../src/verify/pixel-text.js', async (orig) => ({
+  ...(await orig<typeof import('../../src/verify/pixel-text.js')>()),
+  OFF_THE_SCREEN: '<the off-screen miss, as verify/pixel-text.ts renders it>',
+  TOO_THIN_ON_THE_SCREEN: '<the thin-sliver miss, as verify/pixel-text.ts renders it>',
+  OUTSIDE_ITS_SCROLL_VIEW: '<the outside-its-scroll-view miss, as verify/pixel-text.ts renders it>',
+  TOO_THIN_IN_ITS_SCROLL_VIEW: '<the scroll view\'s thin-sliver miss, as verify/pixel-text.ts renders it>',
 }));
 
 // The pixel slack a description quotes (a sliver no thicker than it, an overlap no thicker than it) has one owner too.
@@ -158,14 +158,14 @@ describe('tool descriptions quote each operation default from its owner', () => 
   });
 
   it('ui_snapshot and scroll_until: the alert\'s remedy is quoted from its owner (ui-tree/standing.ts) — of "it" for tap and scroll_until, of "the element" for color/ocr — never typed out', async () => {
-    const { presentedRemedy, presentedStop } = await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js');
+    const { presentedRemedy, presentedStop } = await vi.importActual<typeof import('../../src/ui-tree/remedy-text.js')>('../../src/ui-tree/remedy-text.js');
     const alert = { kind: 'alert', label: '…' } as const;
     expect(full('ui_snapshot')).toContain(
-      `tap and scroll_until refuse a target there naming the alert ('${presentedRemedy('it', alert)}'), ` +
-        `color/ocr fail closed likewise ('${presentedRemedy('the element', alert)}')`,
+      `tap and scroll_until refuse a target there naming the alert ('${presentedRemedy('touch', alert)}'), ` +
+        `color/ocr fail closed likewise ('${presentedRemedy('pixel', alert)}')`,
     );
     expect(full('ui_snapshot')).toContain(
-      `an action sheet or a popover is named the same way; under a "screen" layer they name what of that layer lies at the point — the layer itself where nothing of it draws — and say '${presentedRemedy('it')}'`,
+      `an action sheet or a popover is named the same way; under a "screen" layer they name what of that layer lies at the point — the layer itself where nothing of it draws — and say '${presentedRemedy('touch')}'`,
     );
     expect(full('scroll_until')).toContain(`on … — ${presentedStop(alert)}, so none was sent"`);
     for (const tool of ['ui_snapshot', 'scroll_until']) expect(description(tool)).not.toContain('an alert is presented over');
@@ -365,10 +365,10 @@ async function actualSentences(): Promise<{
   OUTSIDE_ITS_SCROLL_VIEW: string;
   TOO_THIN_IN_ITS_SCROLL_VIEW: string;
 }> {
-  const { presentedRemedy, presentedStop } = await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js');
-  const [PRESENTED_OVER, PRESENTED_STOP, PRESENTED_OVER_THE_ELEMENT] = [presentedRemedy('it'), presentedStop(), presentedRemedy('the element')];
-  const { OFF_THE_SCREEN, TOO_THIN_ON_THE_SCREEN, OUTSIDE_ITS_SCROLL_VIEW, TOO_THIN_IN_ITS_SCROLL_VIEW } = await vi.importActual<typeof import('../../src/verify/pixel-poll.js')>(
-    '../../src/verify/pixel-poll.js',
+  const { presentedRemedy, presentedStop } = await vi.importActual<typeof import('../../src/ui-tree/remedy-text.js')>('../../src/ui-tree/remedy-text.js');
+  const [PRESENTED_OVER, PRESENTED_STOP, PRESENTED_OVER_THE_ELEMENT] = [presentedRemedy('touch'), presentedStop(), presentedRemedy('pixel')];
+  const { OFF_THE_SCREEN, TOO_THIN_ON_THE_SCREEN, OUTSIDE_ITS_SCROLL_VIEW, TOO_THIN_IN_ITS_SCROLL_VIEW } = await vi.importActual<typeof import('../../src/verify/pixel-text.js')>(
+    '../../src/verify/pixel-text.js',
   );
   return { PRESENTED_OVER, PRESENTED_STOP, PRESENTED_OVER_THE_ELEMENT, OFF_THE_SCREEN, TOO_THIN_ON_THE_SCREEN, OUTSIDE_ITS_SCROLL_VIEW, TOO_THIN_IN_ITS_SCROLL_VIEW };
 }
@@ -381,9 +381,9 @@ async function actualSlack(): Promise<number> {
 /** A screen presented over the target (ADR 0018): the tap's and scroll_until's own sentences, and the troubleshooting entry. */
 describe('tool descriptions on a screen presented over the target', () => {
   const TROUBLESHOOTING = readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8');
-  const TAP_SENTINEL = '<the presented remedy, as ui-tree/standing.ts renders it of "it">';
-  const PIXEL_SENTINEL = '<the presented remedy, as ui-tree/standing.ts renders it of "the element">';
-  const STOP_SENTINEL = '<the presented stop\'s remedy, as ui-tree/standing.ts renders it>';
+  const TAP_SENTINEL = '<the presented remedy, as ui-tree/remedy-text.ts renders it for "touch">';
+  const PIXEL_SENTINEL = '<the presented remedy, as ui-tree/remedy-text.ts renders it for "pixel">';
+  const STOP_SENTINEL = '<the presented stop\'s remedy, as ui-tree/remedy-text.ts renders it>';
 
   it('every description quotes the owners\' sentences, never a copy of them', async () => {
     const { PRESENTED_OVER, PRESENTED_STOP, PRESENTED_OVER_THE_ELEMENT } = await actualSentences();
@@ -430,7 +430,7 @@ describe('tool descriptions on a screen presented over the target', () => {
   });
 
   it('tap, scroll_until, ui_snapshot and the troubleshooting reference: on Android a presented window is listed alone, and a target not in it gets the presented remedy', async () => {
-    const { presentedRemedy, presentedStop } = await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js');
+    const { presentedRemedy, presentedStop } = await vi.importActual<typeof import('../../src/ui-tree/remedy-text.js')>('../../src/ui-tree/remedy-text.js');
     expect(full('tap')).toContain('On Android uiautomator lists the active window only: with a dialog or a bottom sheet up the tree holds that window alone');
     expect(full('scroll_until')).toContain('The same on Android when the tree is a presented window (ui_snapshot\'s root carries "presentation": "dialog" or "screen"; or, for a target its read does not hold, the window manager names the window a Dialog\'s — asked once before the first swipe');
     expect(full('ui_snapshot')).toContain('"activeWindowOnly": true under Android — uiautomator lists the active window only');
@@ -438,7 +438,7 @@ describe('tool descriptions on a screen presented over the target', () => {
     expect(full('tap')).toContain('and the wait for it (this tap\'s, and fill\'s) ends');
     expect(description('tap')).toContain('On Android the tree lists the active window only: a target beneath a dialog or sheet is not in it, and the wait ends "… is not in the tree, which lists only the window presented on top …"');
     expect(description('ui_snapshot')).toContain('"activeWindowOnly" (Android: only the active window is listed)');
-    expect(TROUBLESHOOTING).toContain(`is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — ${presentedRemedy('it', { kind: 'dialog' })}\`** (tap, fill; Android)`);
+    expect(TROUBLESHOOTING).toContain(`is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — ${presentedRemedy('touch', { kind: 'dialog' })}\`** (tap, fill; Android)`);
     expect(TROUBLESHOOTING).toContain(`— ${presentedStop({ kind: 'dialog' })}, so none was sent\``);
   });
 
@@ -505,18 +505,18 @@ describe('tool descriptions on a screen presented over the target', () => {
   });
 
   it('troubleshooting: under an alert — the tap\'s, scroll_until\'s (its swipe would land on the alert; a target not in the tree included), the picker\'s and color/ocr\'s words, as the owner renders them', async () => {
-    const { presentedRemedy, presentedStop } = await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js');
+    const { presentedRemedy, presentedStop } = await vi.importActual<typeof import('../../src/ui-tree/remedy-text.js')>('../../src/ui-tree/remedy-text.js');
     const alert = { kind: 'alert', label: '…' } as const;
-    expect(TROUBLESHOOTING).toContain(`- **\`… ${presentedRemedy('it', alert)}\`** (tap or \`scroll_until\`; iOS with \`treeSource: wda\`)`);
+    expect(TROUBLESHOOTING).toContain(`- **\`… ${presentedRemedy('touch', alert)}\`** (tap or \`scroll_until\`; iOS with \`treeSource: wda\`)`);
     expect(TROUBLESHOOTING).toContain(`\`scroll_until\` says it as \`… ${presentedStop(alert)}, so none was sent\` (or \`so no further swipe was sent\`)`);
     expect(TROUBLESHOOTING).toContain(`\`scroll_until … stopped before any swipe — element is not in the tree, and the next swipe would touch down at (x,y) on … — ${presentedStop(alert)}, so none was sent\``);
-    expect(TROUBLESHOOTING).toContain(`  - \`${presentedRemedy('it', alert)}\` (iOS with \`treeSource: wda\`): an alert is up over the entry's screen`);
-    expect(TROUBLESHOOTING).toContain(`the message ends \`… ${presentedRemedy('the element', alert)}\` instead: tap the alert's button that closes it`);
+    expect(TROUBLESHOOTING).toContain(`  - \`${presentedRemedy('touch', alert)}\` (iOS with \`treeSource: wda\`): an alert is up over the entry's screen`);
+    expect(TROUBLESHOOTING).toContain(`the message ends \`… ${presentedRemedy('pixel', alert)}\` instead: tap the alert's button that closes it`);
   });
 
   it('troubleshooting: an action sheet or a popover reads as the alert, named by its kind; a layer WDA shows presented stops a swipe for a target not in the tree, but on its own scroll view', async () => {
-    const { presentedRemedy } = await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js');
-    expect(TROUBLESHOOTING).toContain(`\`… ${presentedRemedy('it', { kind: 'actionSheet', label: '…' })}\``);
+    const { presentedRemedy } = await vi.importActual<typeof import('../../src/ui-tree/remedy-text.js')>('../../src/ui-tree/remedy-text.js');
+    expect(TROUBLESHOOTING).toContain(`\`… ${presentedRemedy('touch', { kind: 'actionSheet', label: '…' })}\``);
     expect(TROUBLESHOOTING).toContain('`ui_snapshot` marks its layer `"presentation": "alert"` and the Alert itself `"presentationElement": true`');
     expect(TROUBLESHOOTING).toContain('`ui_snapshot` marks the layer `"presentation": "screen"`');
     expect(TROUBLESHOOTING).toContain(

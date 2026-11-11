@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { everyNode, type DeviceScreen, type Rect, type UiNode } from '../../src/adapters/types.js';
 import type { KeyboardLine } from '../../src/ui-tree/keyboard-position.js';
 import { lookAt, lookOn } from '../../src/ui-tree/look.js';
-import { orderRemedyText, presentedRemedy, sceneOf, bothPinnedRemedyText } from '../../src/ui-tree/standing.js';
+import { noScrollStanding, sceneOf } from '../../src/ui-tree/standing.js';
+import { bothPinnedRemedyText, cutPinnedRemedyText, orderRemedyText, presentedRemedy } from '../../src/ui-tree/remedy-text.js';
 import type { PairQuestion } from '../../src/ui-tree/eyes.js';
 import type { OrderSeen } from '../../src/ui-tree/seen-order.js';
 import { judgeOrder } from '../../src/verify/eyes.js';
@@ -126,8 +127,8 @@ function beneathDim(box: Rect, content: UiNode[], dimmed = true): UiNode {
   return full([full([full(content), ...(dimmed ? [full([full([], { identifier: 'dim' })])] : [])])]);
 }
 
-const PRESENTED_FOR_THE_ELEMENT = presentedRemedy('the element');
-const PRESENTED_OVER = presentedRemedy('it');
+const PRESENTED_FOR_THE_ELEMENT = presentedRemedy('pixel');
+const PRESENTED_OVER = presentedRemedy('touch');
 
 describe('one remedy for a target beneath a presented screen — the tap, the pixel assert and scroll_until agree', () => {
   /** The cases: the probe, and the real ui_snapshots' targets on which the verbs disagreed. */
@@ -351,7 +352,7 @@ describe('a target wholly out of the judged frame beneath a presented screen —
 
   it('each verb says "close it first": the tap refuses, the ocr and colour asserts miss, scroll_until stops before any swipe', async () => {
     for (const [name, tree, target, layer] of await cases()) {
-      const [over, forTheElement] = [presentedRemedy('it', layer), presentedRemedy('the element', layer)];
+      const [over, forTheElement] = [presentedRemedy('touch', layer), presentedRemedy('pixel', layer)];
       expect({ name, tap: (await tapSaid(tree, target)).endsWith(` — ${over}; nothing was tapped`) }).toEqual({ name, tap: true });
       expect({ name, ocr: (await pixelSaid(tree, target))?.endsWith(forTheElement) }).toEqual({ name, ocr: true });
       expect({ name, colour: (await colourSaid(tree, target))?.endsWith(forTheElement) }).toEqual({ name, colour: true });
@@ -658,7 +659,7 @@ describe('a target not in the tree beneath a marked presented screen — scroll_
     const failure = failureOf(played, 'text:"Nothing like this"');
     expect(failure.message).toBe(
       'scroll_until text:"Nothing like this" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (201,699) on ' +
-        `container id:sheet.form (0,118 402x756) — ${presentedRemedy('it')}, and a swipe on it may dismiss it, so none was sent.`,
+        `container id:sheet.form (0,118 402x756) — ${presentedRemedy('touch')}, and a swipe on it may dismiss it, so none was sent.`,
     );
   });
 
@@ -987,9 +988,32 @@ describe('one remedy for a target cut by a later node where neither lies in a sc
     }
   });
 
+  // A26: a no-scroll standing carries what it is pinned under — the node a cut is cut by, as a cover's names its cover —
+  // so scroll_until asks one question of either kind (ui-tree/standing.ts#noScrollStanding).
+  it('the cut\'s `bothPinned` remedy carries the node it is pinned under, Continue — and scroll_until\'s one question holds for it', () => {
+    const { tree, t } = textUnderBar('none');
+    const scene = sceneOf(tree);
+    for (const of of ['tap', 'stop', 'fully'] as const) {
+      const s = scene.standing(t, ON_PIXEL.usable, { of });
+      expect({ of, kind: s.kind, under: s.kind === 'cut' && s.remedy.of === 'bothPinned' ? s.remedy.under.identifier : undefined, noScroll: noScrollStanding(s) }).toEqual({
+        of,
+        kind: 'cut',
+        under: 'lab.continue',
+        noScroll: true,
+      });
+    }
+    // Either in a scroll view: the scroll, no stop.
+    const scrolled = textUnderBar('both', 'android.widget.Button');
+    expect(noScrollStanding(sceneOf(scrolled.tree).standing(scrolled.t, ON_PIXEL.usable, { of: 'stop' }))).toBe(false);
+    // A reachable standing carries no remedy: asked of one, the answer is no — never a read of a remedy it does not have.
+    const w = [...everyNode(tree)].find((n) => n.identifier === 'lab.w')!;
+    const reached = scene.standing(w, ON_PIXEL.usable, { of: 'stop' });
+    expect({ kind: reached.kind, noScroll: noScrollStanding(reached) }).toEqual({ kind: 'reachable', noScroll: false });
+  });
+
   it('word for word: the tap refuses with the one clause and the cut\'s way past; scroll_until (plain and fully) stops before any swipe', async () => {
     const { tree, t } = textUnderBar('none');
-    expect(bothPinnedRemedyText("touch", [...everyNode(tree)].find((n) => n.identifier === "lab.continue"))).toBe(PINNED_CUT);
+    expect(cutPinnedRemedyText({ of: 'bothPinned', under: [...everyNode(tree)].find((n) => n.identifier === 'lab.continue')! })).toBe(PINNED_CUT);
     expect(await tapSaid(tree, t, ON_PIXEL)).toBe(`id:t is ${CUT}; only a 825x22 part of it shows, at 127,1934, 22 deep across that edge, under the 65 a tap needs — ${PINNED_CUT}; nothing was tapped`);
     for (const fully of [false, true]) {
       const played = strokes(tree, t, ON_PIXEL, fully, 1);

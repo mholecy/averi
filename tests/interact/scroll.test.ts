@@ -762,9 +762,21 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
     const fake = new SwiftForm(1000);
     await expect(scrollUntilVisible(fake, 'id:details_toggle', { ...FAST, maxSwipes: 0 })).rejects.toThrow(
       "failed after 0 swipes (maxSwipes) — element reached the viewport but stayed cut at its scroll container's bottom edge (container 0,242 1080x1736); only a 948x55 part of it shows, 55 deep across that edge, " +
-        'under the 65 a tap needs (last rect {"x":66,"y":1924,"width":948,"height":55}) — a tap refuses it so cut (scroll_until it first)',
+        'under the 65 a tap needs (last rect {"x":66,"y":1924,"width":948,"height":55}) — a tap refuses it so cut: scroll_until it first (if it is whole and only its own content runs to that edge, no scroll shows more: tap a child of it that lies clear of that edge, or tap by coordinates)',
     );
     expect(fake.swipes).toEqual([]);
+  });
+
+  // A26: the bound's quote of the tap is the tap's own remedy, word for word (interact/touch-remedy.ts#touchRemedyText) —
+  // before, it said the scroll alone, without the way past the tap gives a node that only reads cut.
+  it('at the bound, the quote of the tap is the tap\'s own refusal\'s remedy, word for word — the way past included', async () => {
+    const fake = new SwiftForm(1000);
+    const failed = await scrollUntilVisible(fake, 'id:details_toggle', { ...FAST, maxSwipes: 0 }).catch((e: Error) => e.message);
+    const refused = await tapElement(fake, 'id:details_toggle', { ambiguous: 'refuse', timeoutMs: 60, pollMs: 2 }).catch((e: Error) => e.message);
+    const tapRemedy = /under the 65 a tap needs — (.*); nothing was tapped$/.exec(String(refused))?.[1];
+    expect(tapRemedy).toBe('scroll_until it first (if it is whole and only its own content runs to that edge, no scroll shows more: tap a child of it that lies clear of that edge, or tap by coordinates)');
+    expect(failed).toMatch(/ — a tap refuses it so cut: (.*)$/);
+    expect(/ — a tap refuses it so cut: (.*)$/.exec(String(failed))?.[1]).toBe(tapRemedy);
   });
 
   // Cut before cover (ui-tree/standing.ts#Scene): a covered sliver fails naming the cut and its edge, so "that edge" is one the sentence named.
@@ -779,7 +791,7 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
   it('a sliver also covered at its centre, at the bound (maxSwipes: 0): what it was short of is the cut, with its direction', async () => {
     await expect(scrollUntilVisible(new SwiftForm(1000, false, true), 'id:details_toggle', { ...FAST, maxSwipes: 0 })).rejects.toThrow(
       "failed after 0 swipes (maxSwipes) — element reached the viewport but stayed cut at its scroll container's bottom edge (container 0,242 1080x1736); only a 948x55 " +
-        'part of it shows, 55 deep across that edge, under the 65 a tap needs (last rect {"x":66,"y":1924,"width":948,"height":55}) — a tap refuses it so cut (scroll_until it first)',
+        'part of it shows, 55 deep across that edge, under the 65 a tap needs (last rect {"x":66,"y":1924,"width":948,"height":55}) — a tap refuses it so cut: scroll_until it first (if it is whole and only its own content runs to that edge, no scroll shows more: tap a child of it that lies clear of that edge, or tap by coordinates)',
     );
   });
 
@@ -819,7 +831,7 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
       "scroll_until id:row failed after 2 swipes — element is in the viewport but cut at its scroll container's top edge (container 0,242 1080x1736); only a 948x50 part of it shows, 50 deep across that edge, " +
         'under the 65 a tap needs — and the content is exhausted: swiping up no longer moves it, and swiping down would only push it out through that edge. ' +
         "The rest of it stays past its container's edge at the end of the content — a layout defect (no room beyond it?), or its own content runs to its edge, which reads as cut; " +
-        'a tap refuses it so cut (scroll_until it with direction: up first). Last rect {"x":66,"y":242,"width":948,"height":50} in a 1080x2220 viewport',
+        'a tap refuses it so cut (if it is whole and only its own content runs to that edge, no scroll shows more: tap a child of it that lies clear of that edge, or tap by coordinates). Last rect {"x":66,"y":242,"width":948,"height":50} in a 1080x2220 viewport',
     );
     expect(fake.swipes).toEqual([
       { from: { x: 540, y: 589 }, to: { x: 540, y: 1110 } },
@@ -1341,9 +1353,9 @@ describe('scrollUntilVisible — a control cut by a node drawn after it is no st
     const fake = await fakeOf('android-lab-form-keyboard.xml');
     fake.attachKeyboard({ state: 'shown', frame: IME }, 'shown');
     await expect(scrollUntilVisible(fake, 'id:"lab.form-keyboard.phone"', { ...FAST, maxSwipes: 0 })).rejects.toThrow(
-      `element reached the viewport but stayed ${CUT} (last rect {"x":55,"y":1370,"width":970,"height":42}) — a tap refuses it so cut (the soft keyboard is up (its top edge at y 1398): ` +
+      `element reached the viewport but stayed ${CUT} (last rect {"x":55,"y":1370,"width":970,"height":42}) — a tap refuses it so cut: the soft keyboard is up (its top edge at y 1398): ` +
         'dismiss it first (press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) — a bar riding on it goes down with it — ' +
-        'or scroll_until it out from under that container first (only if a screenshot shows it whole — a control that thin laid flush against that container — no scroll shows more: tap by coordinates))',
+        'or scroll_until it out from under that container first (only if a screenshot shows it whole — a control that thin laid flush against that container — no scroll shows more: tap by coordinates)',
     );
     expect(fake.swipes).toEqual([]);
   });
