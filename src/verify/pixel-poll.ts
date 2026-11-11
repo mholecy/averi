@@ -10,7 +10,7 @@ import { markedForMiss } from '../ui-tree/window-mark.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { coverClause } from '../ui-tree/cover.js';
-import { orderRemedyText, outsideItsScrollView, presentedRemedy, type PixelRegionOf, type PixelStanding, type Remedy } from '../ui-tree/standing.js';
+import { orderRemedyText, outsideItsScrollView, presentedRemedy, bothPinnedRemedyText, type PixelRegionOf, type PixelStanding, type Remedy } from '../ui-tree/standing.js';
 import { systemBarName } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame, type TreeRequestedFrame } from './capture.js';
@@ -656,7 +656,8 @@ function advice<R extends Exclude<Remedy, { readonly of: 'presented' }>>(remedy:
  * LEADS with the child, then says why: the element is the screen itself (`screen`, screen-sized); laid from the
  * screen's top edge at full width (`header`, a full-bleed header, whose title, clear of the band, is what to assert);
  * a full-width surface laid to the screen's bottom edge (`footer`, a bottom sheet, whose content above the bar is what
- * to assert); idb's flat-list root (`root`), whose cover is the app's own content laid on its background;
+ * to assert); idb's flat-list root (`root`), whose cover is the app's own content laid on its background; `bothPinned`
+ * — neither the element nor its cover lies in a scroll view (D87): something of it clear of the cover;
  * `presented` — a screen is presented over the element, which no scroll moves it out from under: close that screen
  * first. `keyboard` is never worded here: a standing under a bar or a cover cannot carry it (`CoverRemedy`).
  * docs/adr/0001-pixel-assert-fails-closed-on-chrome.md
@@ -677,6 +678,8 @@ const coverRemedy = (remedy: CoverRemedy): string => {
       return `the capture may show it, not the element; ${orderRemedyText(remedy, 'pixel')}`;
     case 'seenOver':
       return `the capture would show it, not the element; ${orderRemedyText(remedy, 'pixel')}`;
+    case 'bothPinned':
+      return `the capture would show it, not the element; ${bothPinnedRemedyText('pixel')}`;
   }
 };
 

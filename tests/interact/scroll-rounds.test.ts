@@ -1804,7 +1804,7 @@ describe('round — the Android navigation band (Spec B, D7): a centre in it is 
 
   it('fully: true stops at 0 swipes on content in no scroll view that no scroll lifts out of a band: an edge-to-edge app bar 0,0 1080x210, a screen-sized node 0,40 1080x2180, a bottom sheet 0,1100 1080x1120 — no stroke over a modal sheet', () => {
     for (const rect of [{ x: 0, y: 0, width: 1080, height: 210 }, { x: 0, y: 40, width: 1080, height: 2180 }, { x: 0, y: 1100, width: 1080, height: 1120 }]) {
-      expect(resultOf(play({ ...ANDROID, fully: true }, [{ found: [match(rect, 'hero')], screen: NAV }]))).toMatchObject({ swipes: 0, visible: 1 });
+      expect(resultOf(play({ ...ANDROID, fully: true }, [{ found: [match(rect, 'hero')], screen: NAV, unscrolled: true }]))).toMatchObject({ swipes: 0, visible: 1 });
     }
   });
 
@@ -1819,7 +1819,7 @@ describe('round — the Android navigation band (Spec B, D7): a centre in it is 
   it('…and on an iOS hero 0,0 402x300 under the 62-pt status bar', () => {
     const box: Rect = { x: 0, y: 0, width: 402, height: 874 };
     const screen: UsableScreen = { box, boxes: [box], oriented: box, from: 'device', statusBand: 62 };
-    expect(resultOf(play({ ...IPHONE, fully: true }, [{ found: [match({ x: 0, y: 0, width: 402, height: 300 }, 'hero')], screen }]))).toMatchObject({ swipes: 0, visible: 1 });
+    expect(resultOf(play({ ...IPHONE, fully: true }, [{ found: [match({ x: 0, y: 0, width: 402, height: 300 }, 'hero')], screen, unscrolled: true }]))).toMatchObject({ swipes: 0, visible: 1 });
   });
 });
 

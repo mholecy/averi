@@ -47,11 +47,12 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  * `scroll_until`'s stop and the pixel assert. Facts cross this seam, and —
  * for a node not reachable — its REMEDY, one closed set of cases decided
  * here with one precedence, presented first (`Remedy`). WHO OWNS A REMEDY'S
- * WORDS: each verb owns its sentences, save one clause — the presented
- * screen's (`presentedRemedy`, and `scroll_until`'s stop on it,
- * `presentedStop`), which lives here because interact/ and verify/ both say
- * it and verify/ may not import interact/; each verb calls it inside its own
- * sentence.
+ * WORDS: each verb owns its sentences, save the clauses every verb quotes —
+ * the presented screen's (`presentedRemedy`, and `scroll_until`'s stop on it,
+ * `presentedStop`), a reading-order cover's (`orderRemedyText`) and a cover
+ * where neither lies in a scroll view (`bothPinnedRemedyText`) — which live
+ * here because interact/ and verify/ both say them and verify/ may not import
+ * interact/; each verb calls them inside its own sentence.
  * The keyboard actions stay with the callers, and the keyboard guard (K1)
  * alone acts on the keyboard.
  *
@@ -575,6 +576,19 @@ export const orderRemedyText = (remedy: RemedyCase<'unordered' | 'seenOver'>, pu
 };
 
 /**
+ * THE remedy's words for a node under a cover where neither lies in a scroll view (`Remedy`'s `bothPinned`), for a
+ * touch (the tap, `scroll_until`) or the pixel assert — the one wording every verb quotes: no scroll moves either, so
+ * none is advised; a menu or popover drawn over it is closed first; the way out where the tree's order is not the
+ * frame's (a sibling raised by elevation or `zIndex`, which the listing does not tell): a tap by coordinates when a
+ * screenshot shows the target on top — the pixel assert, something of the element clear of the cover; else (the
+ * touch) the app lays the cover over it, the stuck stop's "layout defect" said without the strokes that proved it.
+ */
+export const bothPinnedRemedyText = (purpose: 'touch' | 'pixel'): string =>
+  purpose === 'touch'
+    ? 'no scroll moves it out from under that: neither lies in a scroll view — if it is a menu or a popover, close it first; if a screenshot shows this element on top, tap it by coordinates; else a layout defect (no clearance for a pinned bar?)'
+    : 'no scroll moves the element out from under that: neither lies in a scroll view — if it is a menu or a popover, close it first; else assert something in the element that lies clear of it';
+
+/**
  * THE REMEDY for a node that does not stand `reachable`: what would bring it within reach, as one closed set of cases
  * decided once, here (`remedied`), for every purpose — the verbs only render a case in their own words (the tap's
  * refusal, interact/tap-judgement.ts; the pixel assert's miss, verify/pixel-poll.ts#coverRemedy; `scroll_until`'s
@@ -612,14 +626,21 @@ export const orderRemedyText = (remedy: RemedyCase<'unordered' | 'seenOver'>, pu
  *    — under a system bar, content no scroll lifts out of a band (`pinnedSurface`: the screen itself, a full-bleed
  *    header or footer); under a cover, idb's flat-list root (`covered.overRoot`, `root`), a screen-sized element
  *    (`screen`) or a full-bleed header (`header`). Act on something in it clear of that.
- * 5. `pinned` — under a system bar or (the pixel assert) a cover, in no scroll view as the tree says
+ * 5. `bothPinned` — `covered` by a cover the tree orders over it (`drawn`, or `overlaid`), where NEITHER lies in a
+ *    scroll view as the tree says (geometry.ts#Clips.inScroller false for the node and for its cover — siblings of one
+ *    unmarked run with no scroll view above it, Compose's or a Views run's): no scroll moves either (D87: views-drawn-over's
+ *    A swiped 3 times, then "a layout defect"). Not where either lies in one, though nothing scrolls between the two: a
+ *    pinned section header lies in its scroll view's one content container beside its rows (scroll-sticky.wda), and a
+ *    stroke moves the rows from under it. Not where the tree cannot say (idb's flat list). `bothPinnedRemedyText`.
+ *    docs/adr/0015-flat-list-reading-order-break.md (its D87 amendment)
+ * 6. `pinned` — under a system bar or (the pixel assert) a cover, in no scroll view as the tree says
  *    (geometry.ts#Clips.inScroller false): no scroll moves it out.
- * 6. `stuck` — a scroll may not move it out: the tree cannot say whether it lies in a scroll view (idb's flat list,
+ * 7. `stuck` — a scroll may not move it out: the tree cannot say whether it lies in a scroll view (idb's flat list,
  *    `inScroller` undefined), or — the pixel assert — it is laid from the screen's top edge under the status bar, or
  *    the cover's reach holds it whole.
- * 7. `scroll` — a scroll moves it into reach: off the screen, clipped (a `fully` stop), cut to a sliver (toward the
- *    standing's `cut.edge`), under a cover over its centre (the touch purposes: the tap may refine it, its
- *    positioner hint, interact/tap-judgement.ts#positionerRemedy), or in a scroll view under a bar.
+ * 8. `scroll` — a scroll moves it into reach: off the screen, clipped (a `fully` stop), cut to a sliver (toward the
+ *    standing's `cut.edge`), under a cover a scroll may separate from it over its centre (the touch purposes: the tap
+ *    may refine it, its positioner hint, interact/tap-judgement.ts#positionerRemedy), or in a scroll view under a bar.
  *
  * One precedence for every verb: the same target is told the same remedy by the tap, the pixel assert and
  * `scroll_until`'s stop.
@@ -631,8 +652,8 @@ export const orderRemedyText = (remedy: RemedyCase<'unordered' | 'seenOver'>, pu
  * presented first.
  *
  * Cost: the tree's scroll ancestry (geometry.ts#Clips.inScroller, one walk of the tree, kept by the scene) is asked
- * only for a node under a system bar or — the pixel assert's — a cover with no presented surface; a touch purpose's
- * cover asks nothing (its remedy is `scroll`).
+ * only for a node under a system bar or a cover with no presented surface — for a cover whose order the tree tells, of
+ * the node and of its cover (`bothPinned`): two map reads.
  *
  * Each kind carries only the cases it can take (`TouchRemedies`, `PixelRemedies`), so a verb's sentence for a kind
  * words those and the compiler refuses one it cannot (a keyboard remedy under a bar, say).
@@ -641,6 +662,7 @@ export type Remedy =
   | { readonly of: 'presented'; readonly cover?: Cover; readonly layer?: MarkedLayer }
   | { readonly of: 'unordered'; readonly why?: string }
   | { readonly of: 'seenOver' }
+  | { readonly of: 'bothPinned' }
   | { readonly of: 'keyboard' }
   | { readonly of: 'fixed'; readonly what: 'screen' | 'header' | 'footer' | 'root' }
   | { readonly of: 'pinned' }
@@ -650,7 +672,7 @@ export type Remedy =
 /** One case of `Remedy`. */
 type RemedyCase<O extends Remedy['of']> = Extract<Remedy, { readonly of: O }>;
 
-/** 5.–7. of THE PRECEDENCE: what a scroll may do for a node under a bar or (the pixel assert's) a cover (`scrollable`). */
+/** 6.–8. of THE PRECEDENCE: what a scroll may do for a node under a bar or (the pixel assert's) a cover (`scrollable`). */
 export type ScrollableRemedy = RemedyCase<'pinned' | 'stuck' | 'scroll'>;
 
 /** The remedies each touch kind (the tap, the stops) can carry — `fixed` never: only the pixel assert's region judges it. */
@@ -659,7 +681,7 @@ interface TouchRemedies {
   readonly systemBar: RemedyCase<'presented'> | ScrollableRemedy;
   readonly clipped: RemedyCase<'presented' | 'scroll'>;
   readonly cut: RemedyCase<'presented' | 'scroll'>;
-  readonly covered: RemedyCase<'presented' | 'unordered' | 'seenOver' | 'scroll'>;
+  readonly covered: RemedyCase<'presented' | 'unordered' | 'seenOver' | 'bothPinned' | 'scroll'>;
   readonly underKeyboard: RemedyCase<'presented' | 'keyboard'>;
 }
 
@@ -668,7 +690,7 @@ interface PixelRemedies {
   readonly offScreen: RemedyCase<'presented' | 'scroll'>;
   readonly systemBar: RemedyCase<'presented' | 'fixed'> | ScrollableRemedy;
   readonly cut: RemedyCase<'presented' | 'scroll'>;
-  readonly covered: RemedyCase<'presented' | 'unordered' | 'seenOver' | 'fixed'> | ScrollableRemedy;
+  readonly covered: RemedyCase<'presented' | 'unordered' | 'seenOver' | 'fixed' | 'bothPinned'> | ScrollableRemedy;
   readonly underKeyboard: RemedyCase<'presented' | 'keyboard'>;
 }
 
@@ -852,10 +874,10 @@ function remedied(
       case 'underKeyboard':
         return { ...touch, remedy: { of: 'keyboard' } };
       case 'covered':
-        // 2. Under a cover whose order the tree does not tell: no scroll tells it. 7. Else a touch's cover over the
-        // centre: scroll it clear (the stop's stuck sentence names a cover no scroll clears).
-        return { ...touch, remedy: orderRemedy(scene, node, touch) ?? { of: 'scroll' } };
-      // 7. What a scroll brings within reach whatever lies around it.
+        // 2. Under a cover whose order the tree does not tell: no scroll tells it. 5. Neither in a scroll view.
+        // 8. Else a touch's cover over the centre: scroll it clear (the stop's stuck sentence names a cover no scroll clears).
+        return { ...touch, remedy: orderRemedy(scene, node, touch) ?? bothPinned(scene, node, touch) ?? { of: 'scroll' } };
+      // 8. What a scroll brings within reach whatever lies around it.
       case 'offScreen':
       case 'clipped':
       case 'cut':
@@ -873,7 +895,7 @@ function remedied(
     // 3. The keyboard.
     case 'underKeyboard':
       return { ...pixel, remedy: { of: 'keyboard' } };
-    // 7. What a scroll brings within reach whatever lies around it.
+    // 8. What a scroll brings within reach whatever lies around it.
     case 'offScreen':
     case 'cut':
       return { ...pixel, remedy: { of: 'scroll' } };
@@ -896,7 +918,8 @@ function remedied(
       if (pixel.overRoot === true) return { ...pixel, remedy: { of: 'fixed', what: 'root' } };
       if (screenSized(node.rect, box)) return { ...pixel, remedy: { of: 'fixed', what: 'screen' } };
       if (fullBleedHeader(node.rect, box)) return { ...pixel, remedy: { of: 'fixed', what: 'header' } };
-      return { ...pixel, remedy: scrollable(scene.clips.inScroller(node), rectWithin(node.rect, pixel.cover.reach)) };
+      // 5. Neither in a scroll view.
+      return { ...pixel, remedy: bothPinned(scene, node, pixel) ?? scrollable(scene.clips.inScroller(node), rectWithin(node.rect, pixel.cover.reach)) };
     default: {
       const unhandled: never = pixel;
       return unhandled;
@@ -918,7 +941,16 @@ function orderRemedy(scene: Scene, node: UiNode, { cover }: { readonly cover: Co
 }
 
 /**
- * 5.–7. of THE PRECEDENCE for a node under a bar or a cover: `pinned` in no scroll view; `stuck` where the tree
+ * 5. of THE PRECEDENCE for a `covered` node whose cover's order the tree tells (2. took the rest): `bothPinned` when
+ * neither it nor its cover lies in a scroll view (geometry.ts#Clips.inScroller false for both); undefined where either
+ * may, or the tree cannot say.
+ */
+function bothPinned(scene: Scene, node: UiNode, { cover }: { readonly cover: Cover }): RemedyCase<'bothPinned'> | undefined {
+  return scene.clips.inScroller(node) === false && scene.clips.inScroller(cover.node) === false ? { of: 'bothPinned' } : undefined;
+}
+
+/**
+ * 6.–8. of THE PRECEDENCE for a node under a bar or a cover: `pinned` in no scroll view; `stuck` where the tree
  * cannot say (idb's flat list), or where `stuckInPlace` — the pixel assert's node laid from the box's top edge under
  * the status bar, or held whole by its cover's reach — a scroll in a scroll view may still not move it out; else
  * `scroll`.

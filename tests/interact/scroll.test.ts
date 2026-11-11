@@ -41,7 +41,8 @@ const FAST = { maxSwipes: 4, timeoutMs: 2_000, settleMs: 1 };
 function scrollingFake(startY: number, perSwipe = 600, height = 40) {
   resetLayout();
   const target = node({ role: 'button', identifier: 'submit_button', rect: { x: 0, y: startY, width: 100, height } });
-  const form = screen(el({ identifier: 'form_root' }), target);
+  // The target moves with each swipe: it lies in a scroll view (WDA's unclipped `scrollable`, screen-sized), as content a stroke moves does (D87).
+  const form = screen(el({ identifier: 'form_root' }), node({ role: 'scrollable', rect: { x: 0, y: 0, width: 1000, height: 2000 }, children: [target] }));
   class ScrollingFake extends FakeAdapter {
     override async swipe(from: { x: number; y: number }, to: { x: number; y: number }): Promise<void> {
       await super.swipe(from, to);
@@ -900,7 +901,8 @@ describe('scrollUntilVisible — nested clipping containers and a loading list (
  */
 describe('scrollUntilVisible — the match the next tap acts on (code review P2)', () => {
   const ios = (children: UiNode[]) => {
-    const fake = new FakeAdapter({ s: node({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 }, children }) }, 's');
+    // idb's flat list, as the 0×0 root says: no ancestry told.
+    const fake = new FakeAdapter({ s: node({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 }, flatList: true, children }) }, 's');
     fake.platform = 'ios';
     fake.keyboard = undefined;
     fake.viewportSize = { width: 402, height: 874 };
@@ -917,7 +919,7 @@ describe('scrollUntilVisible — the match the next tap acts on (code review P2)
       BAR,
     ]);
     await expect(scrollUntilVisible(fake, 'id:prio', { maxSwipes: 0, settleMs: 0 })).rejects.toThrow(
-      'scroll_until id:prio failed after 0 swipes (maxSwipes) — element reached the viewport but stayed under button "Continue" (24,780 354x44) at its centre (201,797), drawn over it — 17% of it shows (last rect {"x":24,"y":771,"width":354,"height":52})',
+      'scroll_until id:prio failed after 0 swipes (maxSwipes) — element reached the viewport but stayed under button "Continue" (24,780 354x44, reaching 24,780 354x94) at its centre (201,797), drawn over it — 17% of it shows (last rect {"x":24,"y":771,"width":354,"height":52})',
     );
   });
 

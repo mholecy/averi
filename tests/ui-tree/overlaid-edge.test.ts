@@ -59,20 +59,21 @@ describe('OverlaidEdge — pinned-bar P: dumped 127,1846 825x110, ending where C
     const t = await lab('pinned-bar');
     const p = byId(t, 'lab.pinned-bar.P');
     const s = standing(t, p, FULLY);
-    expect(said(s)).toEqual({ kind: 'covered', cover: 'lab.pinned-bar.continue', remedy: 'scroll' });
+    // Neither P nor Continue lies in a scroll view (the cell lists none): no scroll moves either (D87).
+    expect(said(s)).toEqual({ kind: 'covered', cover: 'lab.pinned-bar.continue', remedy: 'bothPinned' });
     // The exposure found no cover: the tree shows the button only by the cut — its one cover, the overlaid edge's, which
     // the standing names.
     const button = byId(t, 'lab.pinned-bar.continue');
     expect(s.facts.covers).toEqual([{ node: button, reach: button.rect, order: { kind: 'overlaid', edge: 'bottom' }, presented: false }]);
     expect(s.kind === 'covered' && s.cover).toBe(s.facts.covers[0]);
   });
-  it('the colour assert and the ocr assert: covered by Continue, its rect the reach — in no scroll view, `pinned`', async () => {
+  it('the colour assert and the ocr assert: covered by Continue, its rect the reach — neither in a scroll view, `bothPinned` (D87)', async () => {
     const t = await lab('pinned-bar');
     const p = byId(t, 'lab.pinned-bar.P');
     const cover = { reach: { x: 66, y: 1956, width: 948, height: 154 }, order: { kind: 'overlaid', edge: 'bottom' } };
     for (const purpose of [COLOUR, OCR]) {
       const s = standing(t, p, purpose);
-      expect(said(s)).toEqual({ kind: 'covered', cover: 'lab.pinned-bar.continue', remedy: 'pinned' });
+      expect(said(s)).toEqual({ kind: 'covered', cover: 'lab.pinned-bar.continue', remedy: 'bothPinned' });
       expect(s).toMatchObject({ cover });
       expect(overlaidOf(s)).toBe(s.kind === 'covered' && s.cover);
     }
@@ -97,7 +98,7 @@ describe('OverlaidEdge — text-under-bar P: a role-less clickable dumped as the
   it('the colour assert: covered by Continue', async () => {
     const t = await lab('text-under-bar');
     const s = standing(t, byId(t, 'lab.text-under-bar.P'), COLOUR);
-    expect(said(s)).toEqual({ kind: 'covered', cover: 'lab.text-under-bar.continue', remedy: 'pinned' });
+    expect(said(s)).toEqual({ kind: 'covered', cover: 'lab.text-under-bar.continue', remedy: 'bothPinned' });
     expect(s).toMatchObject({ cover: { reach: { x: 66, y: 1956, width: 948, height: 154 }, order: { kind: 'overlaid', edge: 'bottom' } } });
   });
 });

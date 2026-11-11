@@ -297,12 +297,13 @@ export type ScrollOutcome = (
   /**
    * Under a cover the tree lists in reading order with it (ui-tree/standing.ts#Remedy's `unordered`, the order not
    * told — `remedy.untold` when a screenshot could not tell either —, or `seenOver`, a screenshot saw it drawn over the
-   * target): stopped without a swipe — no scroll tells which is drawn on top or moves the target out from under it, and
-   * a stroke beside an in-screen menu lands on its backdrop.
+   * target), or one where neither lies in a scroll view (`bothPinned`, D87: siblings of an unmarked run in none):
+   * stopped without a swipe — no scroll tells which is drawn on top or moves the target out from under it, and a stroke
+   * beside an in-screen menu lands on its backdrop.
    * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
    * docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
    */
-  | { kind: 'overlapped'; swipes: number; judged: Judged; viewport: Rect; cover: Cover; remedy: Extract<Remedy, { of: 'unordered' | 'seenOver' }> }
+  | { kind: 'overlapped'; swipes: number; judged: Judged; viewport: Rect; cover: Cover; remedy: Extract<Remedy, { of: 'unordered' | 'seenOver' | 'bothPinned' }> }
   /** D52: too large for its scroll view to show whole (scroll-read.ts#Unfit) — `fully: true` only. */
   | { kind: 'unfit'; swipes: number; judged: Judged; viewport: Rect; unfit: Unfit }
   /** D68: a proven cut another swipe would most likely not bring whole (flush-check.ts#FlushAim) — `fully: true` only. */
@@ -1063,9 +1064,9 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // stroke's to ask, at its touch-down (the stroke plan's `presented`): a stroke that misses that screen is sent.
     const remedy = best.standing.kind === 'reachable' ? undefined : best.standing.remedy;
     if (remedy?.of === 'presented' && remedy.cover !== undefined) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: remedy.cover, viewport, ...(remedy.layer !== undefined && { layer: remedy.layer }) }, current === 'settle' && presentedBefore, seen.elapsedMs);
-    // Under a cover listed in reading order with it — the order untold, or seen by a screenshot — no swipe tells which is
-    // on top or moves it out from under the other: stop.
-    if (best.standing.kind === 'covered' && (best.standing.remedy.of === 'unordered' || best.standing.remedy.of === 'seenOver')) {
+    // Under a cover listed in reading order with it — the order untold, or seen by a screenshot — or one where neither
+    // lies in a scroll view (`bothPinned`, D87), no swipe tells which is on top or moves it out from under the other: stop.
+    if (best.standing.kind === 'covered' && (best.standing.remedy.of === 'unordered' || best.standing.remedy.of === 'seenOver' || best.standing.remedy.of === 'bothPinned')) {
       return stop(s, { kind: 'overlapped', swipes: s.swipes, judged: best, viewport, cover: best.standing.cover, remedy: best.standing.remedy });
     }
     // `fully: true` on a match as wide or as tall as its scroll view, or more (scroll-read.ts#unfitAlong): fully shown at

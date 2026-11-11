@@ -6,7 +6,7 @@ import { tapPoint } from '../ui-tree/selectors.js';
 import { TOP_LAYER_ONLY_HINT, withMissNote } from '../ui-tree/miss.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { coverClause, marginBand, type Cover } from '../ui-tree/cover.js';
-import { outsideItsScrollView, orderRemedyText, presentedRemedy, presentedStop, type ScrollViewCut } from '../ui-tree/standing.js';
+import { outsideItsScrollView, orderRemedyText, presentedRemedy, presentedStop, bothPinnedRemedyText, type ScrollViewCut } from '../ui-tree/standing.js';
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
 import { revealText, SIDES } from '../ui-tree/sides.js';
 import { countOf } from '../util/count.js';
@@ -782,13 +782,14 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       };
     }
     case 'overlapped': {
-      // Under a cover listed in reading order with it (ui-tree/standing.ts#Remedy's `unordered` or `seenOver`): stopped
-      // without a swipe, as under a presented screen. A plain Error, as `stuck`: the element was there and seen.
+      // Under a cover listed in reading order with it (ui-tree/standing.ts#Remedy's `unordered` or `seenOver`), or one where
+      // neither lies in a scroll view (`bothPinned`): stopped without a swipe, as under a presented screen. A plain Error, as
+      // `stuck`: the element was there and seen.
       const { judged, viewport, remedy } = o;
       return {
         message:
           `scroll_until ${describe} stopped ${stoppedWhen(o.swipes)} — element is in the viewport but ${underText({ judged, cover: o.cover })}; ` +
-            `${o.swipes === 0 ? 'no swipe' : 'no further swipe'} was sent — ${orderRemedyText(remedy, 'touch')}. ` +
+            `${o.swipes === 0 ? 'no swipe' : 'no further swipe'} was sent — ${remedy.of === 'bothPinned' ? bothPinnedRemedyText('touch') : orderRemedyText(remedy, 'touch')}. ` +
             `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
       };
     }

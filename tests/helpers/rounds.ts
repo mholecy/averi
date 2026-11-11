@@ -41,8 +41,15 @@ export interface Row {
   remedy?: KeyboardRemedy;
   /** Every match's nearest clipping scroll container — shorthand for `scrollers: [scroller]`. */
   scroller?: Rect;
-  /** Every match's clipping ancestors, nearest first — clipping nodes the matches are put inside; default none (an iOS tree, or a match with no clipping ancestor). */
+  /**
+   * Every match's clipping ancestors, nearest first — clipping nodes the matches are put inside; default none (an iOS
+   * tree, or a match with no clipping ancestor): the matches then lie in an unclipped screen-sized scroll view, as a
+   * WDA tree lists one (role `scrollable`) — content strokes move lies in a scroll view (ui-tree/standing.ts#Remedy's
+   * `bothPinned`, D87), unless `unscrolled`.
+   */
   scrollers?: readonly Rect[];
+  /** The matches lie in no scroll view at all (no `scroller(s)` with it): content no scroll moves — a hero, an app bar, a sheet laid in the screen. Default false. */
+  unscrolled?: boolean;
   /** Another clipping container in the tree, beside the matches' (the screen's own list, for geometry.ts#largestScroller); default none. */
   mainScroller?: Rect;
   /**
@@ -110,7 +117,8 @@ export const drawnFor = (step: Extract<RoundStep, { do: 'stroke' }>): Stroke => 
 
 /**
  * The tree a row read: the screen, the matches inside their clipping
- * containers (outermost first, each `clipsDescendants`), `mainScroller`
+ * containers (outermost first, each `clipsDescendants`; with none, one
+ * screen-sized `scrollable` unless `unscrolled`), `mainScroller`
  * beside them (listing `mainContent`), the nodes drawn `over` them, a progress node when `loading`,
  * and `rest`. The round
  * derives every tree fact from it (scroll-read.ts#TreeFacts) as it does
@@ -129,7 +137,12 @@ export function treeOf(row: Row, screen: DeviceScreen): UiNode {
     const application = node({ role: 'other', rect: { x: 0, y: 0, ...screen } });
     return node({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 }, flatList: true, children: [application, ...matches, ...(row.over ?? []), ...(row.rest !== undefined ? [node({ role: 'text', label: row.rest })] : [])] });
   }
-  const inScrollers = chain.reduce<UiNode[]>((inside, rect) => [node({ role: 'container', rect: { ...rect }, clipsDescendants: true, children: inside })], matches);
+  const inScrollers =
+    chain.length > 0
+      ? chain.reduce<UiNode[]>((inside, rect) => [node({ role: 'container', rect: { ...rect }, clipsDescendants: true, children: inside })], matches)
+      : row.unscrolled === true || matches.length === 0
+        ? matches
+        : [node({ role: 'scrollable', rect: { x: 0, y: 0, ...screen }, children: matches })];
   return node({
     role: 'container',
     rect: { x: 0, y: 0, ...screen },
