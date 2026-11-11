@@ -1,7 +1,9 @@
+import type { ScrollAxis } from '../../../src/adapters/types.js';
+import { FIT_ROOM_PX } from '../../../src/interact/scroll-read.js';
 import type { Platform } from '../corpus.js';
 import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
-import { axisOf, directionOf, type scrollAxisToldIn, otherAxis, navigationBandTakes, parseGeometry, rectInside, regionOverlap, sampleOf, selectorOf, type Direction } from '../../truth/truth.js';
+import { axisOf, bandsOf, directionOf, edgesWithinPixel, intersect, otherAxis, navigationBandTakes, parseGeometry, rectInside, regionOverlap, sampleOf, selectorOf, type Direction } from '../../truth/truth.js';
 import { bandNamed, isBand, judgedContext, type StopAsk, type TapAsk, type TargetContract } from '../../truth/target-contract.js';
 import { ASSERTS_FAILED, carouselReply, claimsTap, claimsVisible, dismissalCover, flushProbedSide, inferredAxisSaid, isError, namesUntried, notInTree, replyRect, scrollAdvice } from '../../truth/replies.js';
 import { BUDGET_MS, first, landed, notTapped, passed, passes, pointsText, reachedWithNoSwipe, said, strokes, strokesOff, swipes, tapPoints, touchDowns, within, type Expectation } from './judges.js';
@@ -352,8 +354,6 @@ export function fullyRow(platform: Platform, t: TargetTruth, cell: CellTruth, as
   };
 }
 
-/** ADR 0021's FIT_ROOM_PX (src/interact/scroll-read.ts): the room a card as large as its scroll view may lack. */
-const FIT_ROOM = 1;
 
 /** The edge a `fully: true` call toward `d` names: the side the target is cut on, its content lying past it. */
 const EDGE_OF: Readonly<Record<Direction, string>> = { up: 'top', down: 'bottom', left: 'left', right: 'right' };
@@ -361,7 +361,7 @@ const EDGE_OF: Readonly<Record<Direction, string>> = { up: 'top', down: 'bottom'
 /** What unfitSide asks of the replayed tree: the axis it tells of a scroll view's rect, the target's listed frames. */
 export interface UnfitReading {
   /** The axis the tree tells of the scroller at `clip` (truth.ts#scrollAxisToldIn), undefined where it tells none. */
-  told: (clip: Rect) => ReturnType<typeof scrollAxisToldIn>;
+  told: (clip: Rect) => ScrollAxis | undefined;
   /** The frames the tree lists the target at (truth.ts#nodeFramesIn). */
   listed: readonly Rect[];
 }
@@ -371,58 +371,51 @@ const UNFIT_SPANS = [
   { axis: 'horizontal', at: 'x', extent: 'width', sides: ['left', 'right'] },
 ] as const;
 
-/** Each edge of `a` within FIT_ROOM of `b`'s. */
-const sameWithin = (a: Rect, b: Rect) =>
-  Math.abs(a.x - b.x) <= FIT_ROOM &&
-  Math.abs(a.y - b.y) <= FIT_ROOM &&
-  Math.abs(a.x + a.width - (b.x + b.width)) <= FIT_ROOM &&
-  Math.abs(a.y + a.height - (b.y + b.height)) <= FIT_ROOM;
-
-/** The overlap of two rects, or undefined when they do not overlap. */
-function overlapOf(a: Rect, b: Rect): Rect | undefined {
-  const x = Math.max(a.x, b.x);
-  const y = Math.max(a.y, b.y);
-  const width = Math.min(a.x + a.width, b.x + b.width) - x;
-  const height = Math.min(a.y + a.height, b.y + b.height) - y;
-  return width > 0 && height > 0 ? { x, y, width, height } : undefined;
-}
-
 /**
  * Where D52's `unfit` is the truth's answer to `fully: true` on a target (T6d): the direction of the side it is cut on
  * (`up` its top), or undefined. The conditions are src's (scroll-read.ts#unfitAlong), read from the truth and the
  * replayed tree (`reading`):
- * - the tree lists the target whole, where the app reports its frame (within FIT_ROOM, each edge): src judges the
- *   listed rect, and a node listed cut flush to its clip (a non-clickable Compose node, a View) is never `clipped`;
+ * - the tree lists the target whole, where the app reports its frame (each edge within a pixel,
+ *   truth.ts#edgesWithinPixel): src judges the listed rect, and a node listed cut flush to its clip (a non-clickable
+ *   Compose node, a View) is never `clipped`;
  * - its scroll views are its own clip (cell.scrollViews[t.scrollView]) and every other the truth reports overlapping
  *   that clip and not lying inside it (the truth names no nesting: one that holds or cuts the clip stands in for an
- *   enclosing one, one inside it is one it holds); the drawn frame is where they all and the screen overlap;
+ *   enclosing one, one inside it is one it holds); the drawn frame is where they all and the USABLE screen overlap —
+ *   the screen less its system bands (truth.ts#bandsOf), the frame src judges in (unfitAlong's `judgedInDrawn`);
  * - judged along each axis, vertical first, as unfitAlong: the frame runs past the drawn frame there, with both its
  *   sides on the screen (uiautomator cuts a node at the screen's edge: D17);
  * - the room-giver is the smallest of its scroll views along the axis (its own clip on a tie), and the tree tells
  *   its axis as that one: no cross-axis `unfit`, and none of D59's inferred axis (a replayed tree never moves);
- * - the drawn frame is at least that room less FIT_ROOM there (no outer scroll view cuts it shorter: the card would
- *   have more room once that one moves), and so is the frame.
+ * - the drawn frame is at least that room less FIT_ROOM_PX there (no outer scroll view or band cuts it shorter: the
+ *   card would have more room once it moves), and so is the frame.
  * Cut on both sides (larger than its room), the deeper cut names the side (up, left on a tie).
+ * Not modelled: the soft keyboard's line, which also cuts src's judged frame — no edges cell shows a keyboard; and a
+ * scroller the replayed tree lists but the lab's state does not report (CellTruth.scrollViews): invisible here, so an
+ * enclosing one of those that cuts the room is not seen (the lab reports every scroll view its cells build).
  */
-export function unfitSide(t: Pick<TargetTruth, 'frame' | 'scrollView'>, cell: Pick<CellTruth, 'screen' | 'scrollViews'>, reading: UnfitReading): Direction | undefined {
+export function unfitSide(t: Pick<TargetTruth, 'frame' | 'scrollView'>, cell: Pick<CellTruth, 'screen' | 'scrollViews' | 'safeArea'>, reading: UnfitReading): Direction | undefined {
   const own = t.scrollView === undefined ? undefined : cell.scrollViews?.[t.scrollView];
-  if (own === undefined || !reading.listed.some((r) => sameWithin(r, t.frame))) return undefined;
-  const holds = (r: Rect) => overlapOf(r, own) !== undefined && !(rectInside(r, own) && !sameWithin(r, own));
+  if (own === undefined || !reading.listed.some((r) => edgesWithinPixel(r, t.frame))) return undefined;
+  const holds = (r: Rect) => intersect(r, own) !== null && !(rectInside(r, own) && !edgesWithinPixel(r, own));
   const others = Object.entries(cell.scrollViews ?? {}).flatMap(([name, r]) => (name !== t.scrollView && holds(r) ? [r] : []));
   const views = [own, ...others];
   const screen = { x: 0, y: 0, width: cell.screen.width, height: cell.screen.height };
-  const drawn = views.reduce<Rect | undefined>((d, r) => (d === undefined ? undefined : overlapOf(d, r)), screen);
-  if (drawn === undefined) return undefined;
+  // The usable screen src judges in: the screen less its system bands (truth.ts#bandsOf).
+  const { status, nav } = bandsOf(screen, cell.safeArea);
+  const top = status === undefined ? 0 : status.height;
+  const usable = { x: 0, y: top, width: screen.width, height: (nav === undefined ? screen.height : nav.y) - top };
+  const drawn = views.reduce<Rect | null>((d, r) => (d === null ? null : intersect(d, r)), usable);
+  if (drawn === null) return undefined;
   const f = t.frame;
-  for (const { at, extent, sides } of UNFIT_SPANS) {
+  for (const { axis, at, extent, sides } of UNFIT_SPANS) {
     const before = drawn[at] - f[at];
     const after = f[at] + f[extent] - (drawn[at] + drawn[extent]);
     if (before <= 0 && after <= 0) continue;
     if (f[at] < 0 || f[at] + f[extent] > screen[extent]) continue;
     const roomGiver = views.reduce((least, r) => (r[extent] < least[extent] ? r : least));
-    if (reading.told(roomGiver) !== UNFIT_SPANS.find((s) => s.at === at)!.axis) continue;
+    if (reading.told(roomGiver) !== axis) continue;
     const room = roomGiver[extent];
-    if (drawn[extent] >= room - FIT_ROOM && f[extent] >= room - FIT_ROOM) return before >= after ? sides[0] : sides[1];
+    if (drawn[extent] >= room - FIT_ROOM_PX && f[extent] >= room - FIT_ROOM_PX) return before >= after ? sides[0] : sides[1];
   }
   return undefined;
 }

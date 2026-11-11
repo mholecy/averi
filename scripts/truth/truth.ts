@@ -8,6 +8,15 @@ import { DRAWN, pct, type CatalogField, type CatalogForm, type CellTruth, type D
  * lies from the app's frames, what a probe tap's events say (reached, delivered, another control fired), and whether a
  * capture's sources tell one story. The capture (capture-run.ts) and the golden mode (scripts/differential/golden.ts)
  * both read it; tests/truth/truth.test.ts pins it.
+ *
+ * What it takes from averi's code (src) and what it restates. A RULE the truth judges averi by is restated here, never
+ * imported, so a change to averi's rule cannot move the truth with it: the sliver's fraction (SLIVER_FRACTION), WDA's
+ * scroller types (WDA_SCROLLERS, held equal to src's by a test, as the harness reads the raw tree on its own). A
+ * READING of a source's own words, where the question is what averi reads, not whether its rule is right, is imported,
+ * so the two cannot drift: the IME window's touchable region (src/adapters/android.ts#parseInputShown,
+ * #parseTouchableRegion: one parser of the dump, D69), and the axis a uiautomator class fixes (AXIS_BY_CLASS, read by
+ * scrollAxisToldIn: golden asks D52's `unfit` exactly where averi reads a told axis — what is judged there is the stop,
+ * not the class table).
  */
 
 /** A probe's touch counts as the tap's when it lies this close to the tapped point (the tree's units). */
@@ -158,8 +167,8 @@ function rawFrame(o: Record<string, unknown>, source: SourceKind): Rect | undefi
 
 /**
  * WDA's element types of a scroller: a node of one of these scrolls what it holds. A deliberate copy of
- * src/adapters/wda-source.ts#SCROLL_TYPES (the harness reads the raw tree without averi's code);
- * tests/truth/truth.test.ts holds the two equal.
+ * src/adapters/wda-source.ts#SCROLL_TYPES (a rule restated, as the header says: the harness reads the raw tree on its
+ * own); tests/truth/truth.test.ts holds the two equal.
  */
 export const WDA_SCROLLERS: ReadonlySet<string> = new Set(['ScrollView', 'Table', 'CollectionView']);
 
@@ -173,12 +182,20 @@ export const WDA_SCROLLERS: ReadonlySet<string> = new Set(['ScrollView', 'Table'
 export function scrollerListedIn(payload: string, source: SourceKind, clip: Rect): boolean {
   if (source === 'idb') return false;
   const scroller = (o: Record<string, unknown>) => (source === 'uiautomator' ? o.scrollable === 'true' : typeof o.type === 'string' && WDA_SCROLLERS.has(o.type));
-  const near = (a: number, b: number) => Math.abs(a - b) <= 1;
-  return rawNodes(payload, source).some((o) => {
-    if (!scroller(o)) return false;
-    const r = rawFrame(o, source);
-    return r !== undefined && near(r.x, clip.x) && near(r.y, clip.y) && near(r.x + r.width, clip.x + clip.width) && near(r.y + r.height, clip.y + clip.height);
-  });
+  return rawNodes(payload, source).some((o) => scroller(o) && atClip(o, source, clip));
+}
+
+/** Each edge of `a` within a pixel or point of `b`'s: the same place, a rounding of the source's bounds apart. */
+export const edgesWithinPixel = (a: Rect, b: Rect): boolean =>
+  Math.abs(a.x - b.x) <= 1 &&
+  Math.abs(a.y - b.y) <= 1 &&
+  Math.abs(a.x + a.width - (b.x + b.width)) <= 1 &&
+  Math.abs(a.y + a.height - (b.y + b.height)) <= 1;
+
+/** Whether a raw node's frame (rawFrame) is `clip`, each edge within a pixel or point (edgesWithinPixel). */
+function atClip(o: Record<string, unknown>, source: SourceKind, clip: Rect): boolean {
+  const r = rawFrame(o, source);
+  return r !== undefined && edgesWithinPixel(r, clip);
 }
 
 /**
@@ -191,11 +208,8 @@ export function scrollerListedIn(payload: string, source: SourceKind, clip: Rect
  */
 export function scrollAxisToldIn(payload: string, source: SourceKind, clip: Rect): ScrollAxis | undefined {
   if (source !== 'uiautomator') return undefined;
-  const near = (a: number, b: number) => Math.abs(a - b) <= 1;
   for (const o of rawNodes(payload, source)) {
-    if (o.scrollable !== 'true') continue;
-    const r = rawFrame(o, source);
-    if (r === undefined || !(near(r.x, clip.x) && near(r.y, clip.y) && near(r.x + r.width, clip.x + clip.width) && near(r.y + r.height, clip.y + clip.height))) continue;
+    if (o.scrollable !== 'true' || !atClip(o, source, clip)) continue;
     const axis = AXIS_BY_CLASS[typeof o.class === 'string' ? (o.class.split('.').pop() ?? '') : ''];
     if (axis !== undefined) return axis;
   }
