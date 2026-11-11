@@ -1013,7 +1013,7 @@ export type AppHolder =
  *
  * Here, not in ios-foreground.ts, since A16: the launch_app and open_deep_link descriptions quote it
  * (mcp/tools.ts#FOREGROUND_BUDGET), and mcp/ imports no platform module outside its composition root (mcp/registry.ts;
- * tests/mcp/layering.test.ts). The interface module is the one both may read.
+ * tests/architecture/layering.test.ts). The interface module is the one both may read.
  */
 export const FOREGROUND_WAIT_MS = 3_000;
 
