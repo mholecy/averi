@@ -43,32 +43,33 @@ const INTERACT = join(SRC, 'interact');
 const COMPOSITION_ROOT = join(MCP, 'registry.ts');
 const TYPES = 'the DeviceAdapter interface, its types and the constants both sides quote';
 
-const LAYERS: readonly Layer[] = [
-  {
-    dir: MCP,
-    exempt: new Map([[COMPOSITION_ROOT, 'the composition root: it chooses the adapter by platform']]),
-    neutral: new Map([[adapter('types.ts'), TYPES]]),
-    exceptions: [],
-  },
-  {
-    dir: INTERACT,
-    exempt: new Map(),
-    neutral: new Map([
-      [adapter('types.ts'), TYPES],
-      [
-        adapter('typeable.ts'),
-        "DeviceAdapter.typeable's shape and refusalOf, its one reader (ADR 0037), a leaf importing nothing",
-      ],
-    ]),
-    exceptions: [
-      {
-        from: join(INTERACT, 'type-text.ts'),
-        to: adapter('input-text.ts'),
-        why: "Android's `input text` control-character vocabulary, which the refusal words before any device call",
-      },
+const MCP_LAYER: Layer = {
+  dir: MCP,
+  exempt: new Map([[COMPOSITION_ROOT, 'the composition root: it chooses the adapter by platform']]),
+  neutral: new Map([[adapter('types.ts'), TYPES]]),
+  exceptions: [],
+};
+
+const INTERACT_LAYER: Layer = {
+  dir: INTERACT,
+  exempt: new Map(),
+  neutral: new Map([
+    [adapter('types.ts'), TYPES],
+    [
+      adapter('typeable.ts'),
+      "DeviceAdapter.typeable's shape and refusalOf, its one reader (ADR 0037), a leaf importing nothing",
     ],
-  },
-];
+  ]),
+  exceptions: [
+    {
+      from: join(INTERACT, 'type-text.ts'),
+      to: adapter('input-text.ts'),
+      why: "Android's `input text` control-character vocabulary, which the refusal words before any device call",
+    },
+  ],
+};
+
+const LAYERS: readonly Layer[] = [MCP_LAYER, INTERACT_LAYER];
 
 /** Whether `layer`'s `file` importing `target` breaks the layering: an adapters/ module it does not allow. */
 const breaks = (layer: Layer, file: string, target: string): boolean =>
@@ -113,27 +114,26 @@ const offending = (layer: Layer): string[] =>
 
 const TITLE = 'a layer above adapters/ imports only the adapters/ modules its row allows (ARCHITECTURE.md, A16, A18)';
 describe(TITLE, () => {
-  const [mcp, interact] = LAYERS as [Layer, Layer];
 
   it('the check sees what it guards: the composition root imports the platform adapters, each of them flagged', () => {
     expect(modulesOf(MCP)).toContain(COMPOSITION_ROOT);
     const platform = importsOf(COMPOSITION_ROOT)
-      .filter((t) => breaks(mcp, COMPOSITION_ROOT, t))
+      .filter((t) => breaks(MCP_LAYER, COMPOSITION_ROOT, t))
       .map(rel);
     expect(platform).toEqual(
       expect.arrayContaining(['adapters/ios.ts', 'adapters/android.ts', 'adapters/discovery.ts']),
     );
-    expect(breaks(mcp, join(MCP, 'tools.ts'), adapter('ios-foreground.ts'))).toBe(true);
-    expect(breaks(mcp, join(MCP, 'tools.ts'), adapter('discovery.ts'))).toBe(true);
-    expect(breaks(mcp, join(MCP, 'tools.ts'), adapter('types.ts'))).toBe(false);
+    expect(breaks(MCP_LAYER, join(MCP, 'tools.ts'), adapter('ios-foreground.ts'))).toBe(true);
+    expect(breaks(MCP_LAYER, join(MCP, 'tools.ts'), adapter('discovery.ts'))).toBe(true);
+    expect(breaks(MCP_LAYER, join(MCP, 'tools.ts'), adapter('types.ts'))).toBe(false);
   });
 
-  it("an exception is one importer's: input-text.ts is allowed to type-text.ts, flagged from any other module", () => {
-    expect(breaks(interact, join(INTERACT, 'type-text.ts'), adapter('input-text.ts'))).toBe(false);
-    expect(breaks(interact, join(INTERACT, 'fill-type.ts'), adapter('input-text.ts'))).toBe(true);
-    expect(breaks(mcp, join(MCP, 'tools.ts'), adapter('input-text.ts'))).toBe(true);
-    expect(breaks(interact, join(INTERACT, 'type-text.ts'), adapter('android.ts'))).toBe(true);
-    expect(breaks(interact, join(INTERACT, 'type-text.ts'), join(SRC, 'ui-tree', 'geometry.ts'))).toBe(false);
+  it('type-text.ts alone may import input-text.ts; any other importer is flagged', () => {
+    expect(breaks(INTERACT_LAYER, join(INTERACT, 'type-text.ts'), adapter('input-text.ts'))).toBe(false);
+    expect(breaks(INTERACT_LAYER, join(INTERACT, 'fill-type.ts'), adapter('input-text.ts'))).toBe(true);
+    expect(breaks(MCP_LAYER, join(MCP, 'tools.ts'), adapter('input-text.ts'))).toBe(true);
+    expect(breaks(INTERACT_LAYER, join(INTERACT, 'type-text.ts'), adapter('android.ts'))).toBe(true);
+    expect(breaks(INTERACT_LAYER, join(INTERACT, 'type-text.ts'), join(SRC, 'ui-tree', 'geometry.ts'))).toBe(false);
   });
 
   it('a specifier is read in either quote style', () => {
