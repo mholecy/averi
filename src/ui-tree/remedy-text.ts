@@ -1,4 +1,4 @@
-import { isTyped, type TypedPresentationKind, type UiNode } from '../adapters/types.js';
+import { isTyped, type TypedPresentationKind } from '../adapters/types.js';
 import type { MarkedLayer } from './presentation.js';
 import type { NoScrollRemedy, Remedy, RemedyCase } from './standing.js';
 
@@ -7,27 +7,37 @@ import type { NoScrollRemedy, Remedy, RemedyCase } from './standing.js';
  * words nothing; each verb owns its sentence, and the clauses more than one verb says live here — beneath a presented
  * screen (`presentedRemedy`, `presentedOr`, and `scroll_until`'s stop on it, `presentedStop`), under a cover listed in
  * reading order with the node (`orderRemedyText`), and where neither lies in a scroll view (`bothPinnedRemedyText`),
- * the last two said as one (`noScrollRemedyText`); and a presented layer's name in a miss's note
+ * the last two said as one (`noScrollRemedyText`; a touch's cut by a node drawn after it, `cutPinnedRemedyText`); and a presented layer's name in a miss's note
  * (`presentedLayerName`, ui-tree/miss.ts). In ui-tree/ because interact/ (the tap, `scroll_until`) and verify/ (the
  * pixel assert) both say them, and verify/ may not import interact/ (tests/architecture/layering.test.ts). The touch
  * verbs' one sentence of a `cut` or `covered` remedy, which composes these with the keyboard's and the cut's words, is
  * interact/touch-remedy.ts's; the pixel verb's is verify/pixel-text.ts's.
  *
  * A leaf: types from standing.ts only, so the decision and its words are two modules, and either changes alone.
+ *
+ * One `purpose` names whose sentence a clause sits in — `touch` (the tap, `scroll_until`) or `pixel` (the pixel assert)
+ * — and the node's pronoun follows from it (`pronoun`): `it` in a touch's sentence, `the element` in the pixel
+ * assert's, whose "it" is already the cover.
  */
 
+/** Whose sentence a clause sits in: a touch verb's (the tap, `scroll_until`) or the pixel assert's. */
+export type RemedyPurpose = 'touch' | 'pixel';
+
+/** The node as `purpose`'s sentence names it: `it` for a touch, `the element` for the pixel assert. */
+const pronoun = (purpose: RemedyPurpose): 'it' | 'the element' => (purpose === 'touch' ? 'it' : 'the element');
+
 /**
- * The advice for a standing's remedy, in any verb: beneath a presented screen, that screen's (`presentedRemedy`, of
- * `what` — `it` in a touch's sentence, `the element` in the pixel assert's), whatever the kind; else `otherwise`, told
+ * The advice for a standing's remedy, in any verb: beneath a presented screen, that screen's (`presentedRemedy`, in
+ * `purpose`'s words), whatever the kind; else `otherwise`, told
  * the remedy's other case — what each verb and kind words (a scroll, the system bar's three, the keyboard's hiding).
  * The one test of `presented` before a verb's own words: the tap's, `scroll_until`'s and the pixel assert's.
  */
 export function presentedOr<R extends Exclude<Remedy, { readonly of: 'presented' }>>(
   remedy: RemedyCase<'presented'> | R,
-  what: 'it' | 'the element',
+  purpose: RemedyPurpose,
   otherwise: (remedy: R) => string,
 ): string {
-  return remedy.of === 'presented' ? presentedRemedy(what, remedy.layer) : otherwise(remedy);
+  return remedy.of === 'presented' ? presentedRemedy(purpose, remedy.layer) : otherwise(remedy);
 }
 
 /** A presented layer the source TYPES, as the words name it (`presentedRemedy`): its article and its noun. */
@@ -67,27 +77,32 @@ export const presentedLayerName = (layer: MarkedLayer | undefined): string => {
  */
 const BACKDROP = "a menu's backdrop";
 /**
- * The `backdrop` remedy over `what`, its way out (`wayOut`: what to do by coordinates or on the screenshot) in a
+ * The `backdrop` remedy over the node (`purpose`'s pronoun), its way out (`wayOut`: what to do by coordinates or on the screenshot) in a
  * parenthesis right after "close it first" — so what a caller appends ("; nothing was tapped", ", so none was sent")
  * follows the refusal's own clause, never the way out.
  */
-const backdropRemedy = (what: 'it' | 'the element', wayOut: string): string =>
-  `${BACKDROP} is presented over ${what} (an empty element WDA lists over the whole screen, after the screen's content) — close it first ` +
-  `(if a screenshot shows no menu up, the backdrop is an overlay that lets touches through: ${wayOut}); no scroll moves ${what} out from under that backdrop`;
+const backdropRemedy = (purpose: RemedyPurpose, wayOut: string): string => {
+  const what = pronoun(purpose);
+  return (
+    `${BACKDROP} is presented over ${what} (an empty element WDA lists over the whole screen, after the screen's content) — close it first ` +
+  `(if a screenshot shows no menu up, the backdrop is an overlay that lets touches through: ${wayOut}); no scroll moves ${what} out from under that backdrop`
+  );
+};
 
 /**
- * THE remedy's words for a node beneath a screen presented over its own (standing.ts#Remedy's `presented`), the node named as
- * `what` — `it` in the tap's refusal and `scroll_until`'s stop (and the tap and `scroll_until` descriptions), `the element`
- * in the pixel assert's sentence, whose "it" is already the cover (verify/pixel-text.ts): close that screen first,
+ * THE remedy's words for a node beneath a screen presented over its own (standing.ts#Remedy's `presented`), the node named
+ * by `purpose` (`pronoun`) — `it` in the tap's refusal and `scroll_until`'s stop (and the tap and `scroll_until`
+ * descriptions), `the element` in the pixel assert's sentence (verify/pixel-text.ts): close that screen first,
  * since no scroll moves the node out from under it. A layer the tree source types (an alert, an action sheet, a
  * popover; Android's floating window, a dialog: `layer`) is named by its kind and label; a `backdrop` by its evidence,
  * with the way out when a screenshot shows no menu (`backdropRemedy`); a `screen` layer, or none, is "a screen … (a
  * modal or a sheet)".
  * One clause of a remedy kept here, in the UI-tree layer both verbs and the pixel assert may import (the module's doc).
  */
-export const presentedRemedy = (what: 'it' | 'the element', layer?: MarkedLayer): string => {
-  // `it` is a touch's sentence (tap, scroll_until), `the element` the pixel assert's: each its own way out.
-  if (layer?.kind === 'backdrop') return backdropRemedy(what, what === 'it' ? 'tap the target by its coordinates (its centre from ui_snapshot)' : 'judge the element on that screenshot');
+export const presentedRemedy = (purpose: RemedyPurpose, layer?: MarkedLayer): string => {
+  // A touch's sentence (tap, scroll_until) and the pixel assert's: each its own way out.
+  if (layer?.kind === 'backdrop') return backdropRemedy(purpose, purpose === 'touch' ? 'tap the target by its coordinates (its centre from ui_snapshot)' : 'judge the element on that screenshot');
+  const what = pronoun(purpose);
   const typed = typedWords(layer);
   return typed !== undefined
     ? `${typed.article} ${typed.noun} is presented over ${what}${layer?.label ? ` (${JSON.stringify(layer.label)})` : ''} — close it first`
@@ -101,9 +116,9 @@ export const presentedRemedy = (what: 'it' | 'the element', layer?: MarkedLayer)
  * `scroll_until` description quotes (mcp/tools.ts).
  */
 export const presentedStop = (layer?: MarkedLayer): string => {
-  if (layer?.kind === 'backdrop') return `${backdropRemedy('it', 'swipe, then tap the target, by coordinates')}, and a swipe on it may close the menu`;
+  if (layer?.kind === 'backdrop') return `${backdropRemedy('touch', 'swipe, then tap the target, by coordinates')}, and a swipe on it may close the menu`;
   const typed = typedWords(layer);
-  return `${presentedRemedy('it', layer)}, ${typed === undefined ? 'and a swipe on it may dismiss it' : `and a swipe would land on the ${typed.noun}`}`;
+  return `${presentedRemedy('touch', layer)}, ${typed === undefined ? 'and a swipe on it may dismiss it' : `and a swipe would land on the ${typed.noun}`}`;
 };
 
 /**
@@ -120,7 +135,7 @@ export const presentedStop = (layer?: MarkedLayer): string => {
  *   pixel assert, something of the element clear of it.
  *   docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
  */
-export const orderRemedyText = (remedy: RemedyCase<'unordered' | 'seenOver'>, purpose: 'touch' | 'pixel'): string => {
+export const orderRemedyText = (remedy: RemedyCase<'unordered' | 'seenOver'>, purpose: RemedyPurpose): string => {
   if (remedy.of === 'seenOver')
     return purpose === 'touch'
       ? 'if it is a menu or a popover, close it first; no scroll moves it out from under it'
@@ -131,26 +146,33 @@ export const orderRemedyText = (remedy: RemedyCase<'unordered' | 'seenOver'>, pu
     : `no scroll tells which is on top: ${look} — if the other is drawn over the element (a menu, a popover), close it first; if the element is the one on top, assert something in it that lies clear of the other`;
 };
 
+/** The head every touch's `bothPinned` clause shares, a cover's or a cut's: no scroll, and a menu or popover closed first. */
+const PINNED_TOUCH = 'no scroll moves it out from under that: neither lies in a scroll view — if it is a menu or a popover, close it first;';
+
 /**
- * THE remedy's words for a node under a cover, or cut by a node drawn after it, where neither lies in a scroll view
- * (standing.ts#Remedy's `bothPinned`), for a touch (the tap, `scroll_until`) or the pixel assert — the one wording every verb
- * quotes: no scroll moves either, so none is advised; a menu or popover drawn over it is closed first; the way out where
- * the tree's order is not the frame's (a sibling raised by elevation or `zIndex`, which the listing does not tell): a
- * tap by coordinates when a screenshot shows the target on top — the pixel assert, something of the element clear of
- * the cover. No "layout defect": with no stroke sent, nothing proved one.
- *
- * `cutBy`: the node a touch's target is CUT by (geometry.ts#Cut.by, D88; the `bothPinned` remedy's `under` then), whose way out is the cut's own: the dump
- * cannot tell a cut from a whole control that thin laid flush against that node (standing.ts#cutByLater's residual), and a
- * coordinate tap on the strip of a cut one is the tap its refusal prevents — so a tap by coordinates only if a
- * screenshot shows it whole. Thin or cut, no scroll changes it.
+ * THE remedy's words for a node under a cover where neither lies in a scroll view (standing.ts#Remedy's `bothPinned`
+ * of a `covered` node), for a touch (the tap, `scroll_until`) or the pixel assert — the one wording every verb quotes:
+ * no scroll moves either, so none is advised; a menu or popover drawn over it is closed first; the way out where the
+ * tree's order is not the frame's (a sibling raised by elevation or `zIndex`, which the listing does not tell): a tap
+ * by coordinates when a screenshot shows the target on top — the pixel assert, something of the element clear of the
+ * cover. No "layout defect": with no stroke sent, nothing proved one. A touch's CUT by a node drawn after it words its
+ * own way out (`cutPinnedRemedyText`).
  */
-export const bothPinnedRemedyText = (purpose: 'touch' | 'pixel', cutBy?: UiNode): string =>
+export const bothPinnedRemedyText = (purpose: RemedyPurpose): string =>
   purpose === 'pixel'
     ? 'no scroll moves the element out from under that: neither lies in a scroll view — if it is a menu or a popover, close it first; else assert something in the element that lies clear of it'
-    : `no scroll moves it out from under that: neither lies in a scroll view — if it is a menu or a popover, close it first; ${
-        cutBy === undefined ? 'if a screenshot shows this element on top,' : `only if a screenshot shows it whole — a control that thin laid flush against that ${cutBy.role} —`
-      } tap it by coordinates`;
+    : `${PINNED_TOUCH} if a screenshot shows this element on top, tap it by coordinates`;
 
-/** THE words for a `NoScrollRemedy`, for a touch or the pixel assert: `orderRemedyText`'s, or `bothPinnedRemedyText`'s (`cutBy`, a touch's cut target's). */
-export const noScrollRemedyText = (remedy: NoScrollRemedy, purpose: 'touch' | 'pixel', cutBy?: UiNode): string =>
-  remedy.of === 'bothPinned' ? bothPinnedRemedyText(purpose, cutBy) : orderRemedyText(remedy, purpose);
+/**
+ * `bothPinnedRemedyText`'s for a touch's target CUT by a node drawn after it (geometry.ts#Cut.by, D88) — the node the
+ * remedy is pinned under (`under`), whose way out is the cut's own: the dump cannot tell a cut from a whole control
+ * that thin laid flush against that node (standing.ts#cutByLater's residual), and a coordinate tap on the strip of a
+ * cut one is the tap its refusal prevents — so a tap by coordinates only if a screenshot shows it whole. Thin or cut,
+ * no scroll changes it. Only a touch says it: the pixel assert judges that target `covered` (`bothPinnedRemedyText`).
+ */
+export const cutPinnedRemedyText = ({ under }: RemedyCase<'bothPinned'>): string =>
+  `${PINNED_TOUCH} only if a screenshot shows it whole — a control that thin laid flush against that ${under.role} — tap it by coordinates`;
+
+/** THE words for a `NoScrollRemedy` of a `covered` node, for a touch or the pixel assert: `orderRemedyText`'s, or `bothPinnedRemedyText`'s. */
+export const noScrollRemedyText = (remedy: NoScrollRemedy, purpose: RemedyPurpose): string =>
+  remedy.of === 'bothPinned' ? bothPinnedRemedyText(purpose) : orderRemedyText(remedy, purpose);

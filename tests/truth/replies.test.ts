@@ -49,9 +49,9 @@ const everyKind: Exclude<PresentationKind, (typeof KINDS)[number]> extends never
 const LAYERS: readonly (MarkedLayer | undefined)[] = [undefined, ...KINDS.flatMap((kind) => [{ kind }, { kind, label: 'Delete account?' }])];
 
 describe('presentedRemedySaid: the presented remedy in every wording src builds', () => {
-  it.each(LAYERS.flatMap((layer) => (['it', 'the element'] as const).map((what) => [what, layer] as const)))('presentedRemedy(%s, %o)', (what, layer) => {
+  it.each(LAYERS.flatMap((layer) => (['touch', 'pixel'] as const).map((purpose) => [purpose, layer] as const)))('presentedRemedy(%s, %o)', (purpose, layer) => {
     expect(everyKind).toBe(true);
-    const remedy = presentedRemedy(what, layer);
+    const remedy = presentedRemedy(purpose, layer);
     expect(presentedRemedySaid(`ERROR id:"lab.x" is under … — ${remedy}; nothing was tapped`)).toBe(true);
     expect(windowHintSaid(remedy)).toBe(false);
   });
@@ -79,7 +79,7 @@ describe('idbReasonsSaid: idb\'s reasons, read off both of its dialect notes (sr
   it('not a bare not-found, nor the other notes (the active-window hint, the presented remedy)', () => {
     expect(idbReasonsSaid('ERROR Timed out after 5000ms waiting for element id:"lab.x" to appear')).toBe(false);
     expect(idbReasonsSaid(`… (${ACTIVE_WINDOW_HINT})`)).toBe(false);
-    expect(idbReasonsSaid(`… (${presentedRemedy('it', { kind: 'alert' })})`)).toBe(false);
+    expect(idbReasonsSaid(`… (${presentedRemedy('touch', { kind: 'alert' })})`)).toBe(false);
     // the reasons without the remedy, or the remedy alone, are not both
     expect(idbReasonsSaid(`… (${IDB_UNLISTS})`)).toBe(false);
     expect(idbReasonsSaid(`… (${COVERED_FIRST})`)).toBe(false);

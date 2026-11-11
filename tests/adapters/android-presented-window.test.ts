@@ -258,20 +258,20 @@ describe('tap: the wait for a target the tree cannot list beneath the presented 
     expect(error).not.toBeInstanceOf(ElementNotFoundError);
     expect(error.message).toBe(
       'Timed out after 30ms: element id:"lab.alert-dim.A" is not in the tree, which lists only the window presented on top (the tree source lists the ' +
-        `active window alone) — ${presentedRemedy('it', { kind: 'dialog' })}`,
+        `active window alone) — ${presentedRemedy('touch', { kind: 'dialog' })}`,
     );
   });
 
   it('sheet-medium: the presented screen\'s remedy', async () => {
     const error = await waitFails(capture('sheet-medium'), 'id:"lab.sheet-medium.A"');
-    expect(error.message).toContain(presentedRemedy('it', { kind: 'screen' }));
+    expect(error.message).toContain(presentedRemedy('touch', { kind: 'screen' }));
     expect(error.message).not.toMatch(/to appear/);
   });
 
   it('bottom-sheet-dialog: the presented screen\'s remedy, not the active-window hint', async () => {
     const error = await waitFails(capture('bottom-sheet-dialog'), 'id:"lab.bottom-sheet-dialog.A"');
     expect(error).not.toBeInstanceOf(ElementNotFoundError);
-    expect(error.message).toContain(presentedRemedy('it', { kind: 'screen' }));
+    expect(error.message).toContain(presentedRemedy('touch', { kind: 'screen' }));
     expect(error.message).not.toContain(ACTIVE_WINDOW_HINT);
   });
 
@@ -401,7 +401,7 @@ describe('a not-found on a tree listing a presented window alone says the presen
   it('the tap\'s wait says the same remedy in its headline (unchanged)', async () => {
     const error = await resolveSettled({ uiTree: async () => capture('alert-dim') }, 'id:"lab.alert-dim.A"', { ambiguous: 'first', timeoutMs: 30, pollMs: 2 }).catch((e: unknown) => e as Error);
     expect((error as Error).message).toBe(
-      `Timed out after 30ms: element id:"lab.alert-dim.A" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — ${presentedRemedy('it', { kind: 'dialog' })}`,
+      `Timed out after 30ms: element id:"lab.alert-dim.A" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — ${presentedRemedy('touch', { kind: 'dialog' })}`,
     );
   });
 });
@@ -452,14 +452,14 @@ describe('a miss on an unmarked uiautomator tree asks the window manager', () =>
     expect(error).not.toBeInstanceOf(ElementNotFoundError);
     expect(error.message).toBe(
       'Timed out after 30ms: element id:"lab.dialog-fullscreen.A" is not in the tree, which lists only the window presented on top (the tree source lists the ' +
-        `active window alone) — ${presentedRemedy('it', { kind: 'screen' })}`,
+        `active window alone) — ${presentedRemedy('touch', { kind: 'screen' })}`,
     );
     expect(asked).toHaveLength(1);
   });
 
   it('…the presence check and every assert say it too', async () => {
     const { fake } = device(lab('dialog-fullscreen'), word('dialog-fullscreen'));
-    expect((await fails(resolvePresent(fake, 'id:"lab.dialog-fullscreen.A"', FAST))).message).toContain(presentedRemedy('it', { kind: 'screen' }));
+    expect((await fails(resolvePresent(fake, 'id:"lab.dialog-fullscreen.A"', FAST))).message).toContain(presentedRemedy('touch', { kind: 'screen' }));
     const v = new Verifier(fake, { pollMs: 2, timeoutMs: 30 });
     const note = `not found within ${formatSeconds(30)} (a sheet or modal is presented over it, and the tree lists only that window — close it first)`;
     expect((await v.assert({ element: { id: 'lab.dialog-fullscreen.A' } })).detail).toBe(note);
@@ -468,7 +468,7 @@ describe('a miss on an unmarked uiautomator tree asks the window manager', () =>
 
   it('the Views dialog at an activity\'s shape (dialog-views-fullscreen): the same remedy; the expanded picker (form-picker), whose sheet holds its own list: scroll_until there first, close it only if not', async () => {
     const { fake } = device(lab('dialog-views-fullscreen'), word('dialog-views-fullscreen'));
-    expect((await fails(resolveSettled(fake, 'id:"lab.dialog-views-fullscreen.A"', FAST))).message).toContain(presentedRemedy('it', { kind: 'screen' }));
+    expect((await fails(resolveSettled(fake, 'id:"lab.dialog-views-fullscreen.A"', FAST))).message).toContain(presentedRemedy('touch', { kind: 'screen' }));
     const picker = device(lab('form-picker'), word('form-picker')).fake;
     const message = (await fails(resolveSettled(picker, 'id:"lab.form-picker.country.ST"', FAST))).message;
     expect(message).toContain('— scroll_until it in that window\'s own list first; if it is not there, a sheet or modal is presented over it — close it first');

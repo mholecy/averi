@@ -228,7 +228,7 @@ function configuredStrategy(d: KeyboardDismissal): DismissalStrategy {
  */
 function whyNotTapped(standing: TapStanding, node: UiNode): string | undefined {
   // Beneath a presented layer the tree marks (an alert), whatever the kind: the alert's words, as the tap refuses it.
-  if (standing.kind !== 'reachable' && standing.remedy.of === 'presented' && standing.remedy.layer !== undefined) return presentedRemedy('it', standing.remedy.layer);
+  if (standing.kind !== 'reachable' && standing.remedy.of === 'presented' && standing.remedy.layer !== undefined) return presentedRemedy('touch', standing.remedy.layer);
   switch (standing.kind) {
     case 'reachable': {
       if (standing.moved !== undefined) return `covered by ${coverName(standing.moved.cover.node)}`;

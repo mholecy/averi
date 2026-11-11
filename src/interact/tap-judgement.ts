@@ -372,7 +372,7 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
       // the type still lets this kind carry it, and the agreement rows (tests/interact/remedy-agreement.test.ts) pin
       // its rendering.
       throw new CoveredRefusal(
-        told.refusal(`${underKeyboardText(centre, standing.line.y)}, where a tap presses the keyboard — ${presentedOr(standing.remedy, 'it', () => `scroll_until it first, or ${hideIt(told.remedy)}`)}`),
+        told.refusal(`${underKeyboardText(centre, standing.line.y)}, where a tap presses the keyboard — ${presentedOr(standing.remedy, 'touch', () => `scroll_until it first, or ${hideIt(told.remedy)}`)}`),
       );
     default: {
       const unhandled: never = standing;
@@ -385,23 +385,23 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
 function offScreenRefusal(standing: OffTheScreen, { node, refusal }: Told, { judged, reread = '' }: JudgedScreen): OffScreenRefusal {
   if (standing.kind === 'systemBar') {
     const { edge } = standing.bar;
-    return new OffScreenRefusal(refusal(`${underSystemBar(standing.at, standing.bar)} (rect ${rectText(node.rect)}) — ${presentedOr(standing.remedy, 'it', (bar) => systemBarRemedy(edge, bar))}`));
+    return new OffScreenRefusal(refusal(`${underSystemBar(standing.at, standing.bar)} (rect ${rectText(node.rect)}) — ${presentedOr(standing.remedy, 'touch', (bar) => systemBarRemedy(edge, bar))}`));
   }
   const { at, visible } = standing;
   if (outsideItsScrollView(standing)) {
     // On the screen, but outside what its scroll view draws: that scroll view's edge is the edge.
     const drawn =
       visible > 0
-        ? `only ${Math.round(visible * 100)}% of it (rect ${rectText(node.rect)}) is drawn, and a tap goes to its centre — ${presentedOr(standing.remedy, 'it', () => 'scroll_until it with fully: true first')}`
-        : `nothing of it is drawn (rect ${rectText(node.rect)}) — ${presentedOr(standing.remedy, 'it', () => 'scroll_until it first')}`;
+        ? `only ${Math.round(visible * 100)}% of it (rect ${rectText(node.rect)}) is drawn, and a tap goes to its centre — ${presentedOr(standing.remedy, 'touch', () => 'scroll_until it with fully: true first')}`
+        : `nothing of it is drawn (rect ${rectText(node.rect)}) — ${presentedOr(standing.remedy, 'touch', () => 'scroll_until it first')}`;
     return new OffScreenRefusal(refusal(`${outsideScrollViewText(standing.scroller)} at (${at.x},${at.y}): ${drawn}`));
   }
   const size = `${judged.box.width}x${judged.box.height}`;
   const where = `at (${at.x},${at.y}) on a ${size} screen${judged.boxes.length > 1 ? ' either way up' : ''}${reread}`;
   const part =
     visible > 0
-      ? ` — only ${Math.round(visible * 100)}% of it (rect ${rectText(node.rect)}) is on screen, and a tap goes to its centre — ${presentedOr(standing.remedy, 'it', () => 'scroll_until it with fully: true first')}`
-      : ` (rect ${rectText(node.rect)}) — ${presentedOr(standing.remedy, 'it', () => 'scroll_until it first')}`;
+      ? ` — only ${Math.round(visible * 100)}% of it (rect ${rectText(node.rect)}) is on screen, and a tap goes to its centre — ${presentedOr(standing.remedy, 'touch', () => 'scroll_until it with fully: true first')}`
+      : ` (rect ${rectText(node.rect)}) — ${presentedOr(standing.remedy, 'touch', () => 'scroll_until it first')}`;
   return new OffScreenRefusal(refusal(`off screen ${where}${part}`));
 }
 

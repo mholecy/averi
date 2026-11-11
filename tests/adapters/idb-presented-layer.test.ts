@@ -133,7 +133,7 @@ describe('tap: the wait for a target beneath idb\'s presented layer names the la
     expect(error).not.toBeInstanceOf(ElementNotFoundError);
     expect(error.message).toBe(
       'Timed out after 30ms: element id:"lab.sheet-medium.A" is not in the tree, which lists only the layer presented on top (the tree source lists nothing ' +
-        `beneath a presented layer) — ${presentedRemedy('it', { kind: 'screen' })}`,
+        `beneath a presented layer) — ${presentedRemedy('touch', { kind: 'screen' })}`,
     );
   });
 

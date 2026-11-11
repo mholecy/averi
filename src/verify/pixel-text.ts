@@ -10,7 +10,8 @@ import { systemBarName } from '../ui-tree/system-bar.js';
  * THE PIXEL VERB'S WORDS (A26, VR1): every sentence the pixel assert (the color and ocr asserts' poll,
  * pixel-poll.ts) says of what lies over its element — the soft keyboard (`keyboardOver`), and each kind of a
  * standing not reachable with its remedy (`pixelMissText`) — rendered here, from facts the poll judged; pixel-poll.ts
- * judges and words nothing. The remedy's case and its precedence are ui-tree/standing.ts#Remedy's; the clauses every
+ * judges what lies over the element and words none of it (its own sentences of timing and capture — a region that
+ * moved, no time left, a screenshot that failed — stay with the poll). The remedy's case and its precedence are ui-tree/standing.ts#Remedy's; the clauses every
  * verb quotes are ui-tree/remedy-text.ts's (a presented screen's, `presentedOr`; a no-scroll cover's). A leaf: it
  * imports no verify/ module, so a sentence is pinned without a capture.
  */
@@ -95,7 +96,7 @@ const hideKeyboard = ({ dismissal, advice }: KeyboardRemedy): string =>
  * content drawn over the root's background.
  *
  * Beneath a screen PRESENTED over the element (a modal's dim, a sheet — ADR 0018), first of every case: no scroll
- * moves it out from under that screen, and the remedy is `presentedRemedy('the element')` in place of every other,
+ * moves it out from under that screen, and the remedy is `presentedRemedy('pixel')` in place of every other,
  * whatever lies over it — a cover, a system bar, the navigation bar's cut, idb's keyboard band — the sentence still
  * naming what is drawn over the element, and only the advice after " — " the presented screen's.
  * docs/adr/0001-pixel-assert-fails-closed-on-chrome.md
@@ -110,23 +111,23 @@ export function pixelMissText(standing: Exclude<PixelStanding, { readonly kind: 
         // On the screen, but outside what its scroll view draws: what lies there is not the element.
         const view = nodeText(standing.scroller);
         const where = standing.sliver === undefined ? `${OUTSIDE_ITS_SCROLL_VIEW} ${view} ${at}` : `${TOO_THIN_IN_ITS_SCROLL_VIEW} ${view} ${at}, drawn ${rectText(standing.sliver)}`;
-        return `${where}, screen ${rectText(standing.box)}) — ${presentedOr(standing.remedy, 'the element', () => 'scroll it into view: scroll_until the element first and re-run')}`;
+        return `${where}, screen ${rectText(standing.box)}) — ${presentedOr(standing.remedy, 'pixel', () => 'scroll it into view: scroll_until the element first and re-run')}`;
       }
       const where = standing.sliver === undefined ? `${OFF_THE_SCREEN} ${at}` : `${TOO_THIN_ON_THE_SCREEN} ${at}, on the screen ${rectText(standing.sliver)}`;
-      return `${where}, screen ${rectText(standing.box)}) — ${presentedOr(standing.remedy, 'the element', () => 'scroll it on-screen: scroll_until the element first and re-run')}`;
+      return `${where}, screen ${rectText(standing.box)}) — ${presentedOr(standing.remedy, 'pixel', () => 'scroll it on-screen: scroll_until the element first and re-run')}`;
     }
     case 'underKeyboard':
       // Its presented remedy is unreachable while idb's band is found only in a flat list, which holds no presented
       // screen (ui-tree/presentation.ts#presentedOver, the shape adapter's: the holder is the root); the type still lets this kind
       // carry it, and the agreement rows (tests/interact/remedy-agreement.test.ts) pin its rendering.
-      return `${keyboardCovers(element.rect, standing.band)} — ${presentedOr(standing.remedy, 'the element', () => hideKeyboard(keyboard))}`;
+      return `${keyboardCovers(element.rect, standing.band)} — ${presentedOr(standing.remedy, 'pixel', () => hideKeyboard(keyboard))}`;
     case 'systemBar': {
       const bar = systemBarName(standing.bar.edge);
       return `the ${bar} is drawn over the element ${at}, ${bar} ${rectText(standing.band)}) — ${coverRemedy(standing.remedy)}`;
     }
     case 'cut': {
       const cut = `the element may be cut at the navigation bar ${at}, navigation bar from y ${standing.bar.top}): it ends on the bar's top edge, as its scroll container ${rectText(standing.container)} does, so the crop may read only what shows of it`;
-      return `${cut} — ${presentedOr(standing.remedy, 'the element', () => 'scroll it up: scroll_until the element with `fully: true` first and re-run')}`;
+      return `${cut} — ${presentedOr(standing.remedy, 'pixel', () => 'scroll it up: scroll_until the element with `fully: true` first and re-run')}`;
     }
     case 'covered': {
       // The cover as the tree orders it against the element: drawn over it, its order untold or seen by a screenshot, or
@@ -144,7 +145,7 @@ export function pixelMissText(standing: Exclude<PixelStanding, { readonly kind: 
 /**
  * The head of the miss for an element NOTHING of which — of what the assert reads — lies on the screen judged
  * (ui-tree/standing.ts's pixel `offScreen`: below the fold, above the screen's top, past a side): no capture shows any
- * of it. Its remedy is the standing's: beneath a presented screen, close it first (ui-tree/remedy-text.ts#presentedRemedy, of "the element"); else
+ * of it. Its remedy is the standing's: beneath a presented screen, close it first (ui-tree/remedy-text.ts#presentedRemedy, for `pixel`); else
  * scroll it on-screen. The one sentence head the full tool reference (skill/references/tools.md, `assert`) and the
  * troubleshooting reference quote.
  */
@@ -194,7 +195,7 @@ const coverRemedy = (remedy: CoverRemedy): string => {
   const scroll = 'the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run';
   switch (remedy.of) {
     case 'presented':
-      return `the capture would show it, not the element; ${presentedRemedy('the element', remedy.layer)}`;
+      return `the capture would show it, not the element; ${presentedRemedy('pixel', remedy.layer)}`;
     case 'fixed':
       return FIXED_REMEDY[remedy.what];
     case 'pinned':

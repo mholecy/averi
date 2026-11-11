@@ -262,7 +262,7 @@ const scrollFirst = (layer: MarkedLayer): string =>
  */
 export const presentedAloneHeadline = (subject: string, { layer, listed, mayLieIn }: Extract<Miss, { of: 'presented' }>): string =>
   `${subject} is not in the tree, which ${PRESENTED_ALONE[listed]} — ` +
-  (mayLieIn === undefined ? presentedRemedy('it', layer) : scrollFirst(layer));
+  (mayLieIn === undefined ? presentedRemedy('touch', layer) : scrollFirst(layer));
 
 /** A one-line not-found `what`, the miss's note after it in a parenthesis when it has one. */
 export const withMissNote = (what: string, miss: Miss | undefined): string => {

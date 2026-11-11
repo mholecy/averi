@@ -1,6 +1,6 @@
 import { rectArea, STRUCTURAL_ROLES, type UiNode } from '../adapters/types.js';
 import { nodeText, type Cut } from '../ui-tree/geometry.js';
-import { noScrollRemedyText, presentedOr } from '../ui-tree/remedy-text.js';
+import { cutPinnedRemedyText, noScrollRemedyText, presentedOr } from '../ui-tree/remedy-text.js';
 import { isInteractive } from '../ui-tree/selectors.js';
 import { noScrollHelps, type RemedyCase, type TouchRemedied } from '../ui-tree/standing.js';
 import { cutRemedy, dismissKeyboardFirstText, hideClause, keyboardUpText, ridingKeyboard, wholeThinWayPast, type KeyboardUp } from './target-text.js';
@@ -33,18 +33,19 @@ export function touchRemedyText(standing: TouchRemedied, keyboard?: KeyboardUp):
   switch (standing.kind) {
     case 'cut': {
       const { cut, minPiece } = standing;
-      return presentedOr(standing.remedy, 'it', (remedy) =>
+      const { by } = cut;
+      return presentedOr(standing.remedy, 'touch', (remedy) =>
         remedy.of === 'bothPinned'
           ? cutByPinnedRemedy(remedy, keyboard, minPiece)
-          : cut.by === undefined
+          : by === undefined
             ? `${cutRemedy(cut.edge)} (${cutWayPast(cut)})`
-            : cutByRemedy(cut.by, keyboard, minPiece),
+            : cutByRemedy(cut, by, keyboard, minPiece),
       );
     }
     case 'covered':
       // A scroll, refined for a wrapper that may only position its one child by the tap's own positioner hint — or, under
       // a cover whose order the tree does not tell, one a screenshot saw drawn over it, or one where neither lies in a scroll view, no scroll.
-      return presentedOr(standing.remedy, 'it', (remedy) => (noScrollHelps(remedy) ? noScrollRemedyText(remedy, 'touch') : (positionerRemedy(standing.cover.node) ?? 'scroll_until it first')));
+      return presentedOr(standing.remedy, 'touch', (remedy) => (noScrollHelps(remedy) ? noScrollRemedyText(remedy, 'touch') : (positionerRemedy(standing.cover.node) ?? 'scroll_until it first')));
     default: {
       const unhandled: never = standing;
       return unhandled;
@@ -75,14 +76,14 @@ export const cutWayPast = (cut: Cut): string =>
   cut.by !== undefined ? wholeThinWayPast(cut.by) : cut.within === undefined ? OWN_CUT_WAY_PAST : INHERITED_CUT_WAY_PAST;
 
 /**
- * The remedy for a node cut by a node drawn after it (`Cut.by`, here `by`) whose standing's remedy is `scroll`
+ * The remedy for a node cut (`cut`) by a node drawn after it (`Cut.by`, here `by`) whose standing's remedy is `scroll`
  * (ui-tree/standing.ts#Remedy): with the soft keyboard up and that node riding on it (target-text.ts#ridingKeyboard),
  * dismiss it first, or scroll the list (target-text.ts#dismissKeyboardFirstText); else scroll the list — `scroll_until
- * it out from under that container first`, with the cut's way past (`cutWayPast`'s for it). Not target-text.ts#cutRemedy's
+ * it out from under that container first`, with the cut's way past (`cutWayPast`). Not target-text.ts#cutRemedy's
  * scroll toward the edge: the rest lies under the node, not past the edge of anything that scrolls.
  */
-function cutByRemedy(by: UiNode, up: KeyboardUp | undefined, minPiece: number): string {
-  const way = `scroll_until it out from under that ${by.role} first (${wholeThinWayPast(by)})`;
+function cutByRemedy(cut: Cut, by: UiNode, up: KeyboardUp | undefined, minPiece: number): string {
+  const way = `scroll_until it out from under that ${by.role} first (${cutWayPast(cut)})`;
   return ridingFirst(by, up, minPiece, (dismiss) => `${dismiss} — or ${way}`, way);
 }
 
@@ -98,7 +99,7 @@ function cutByRemedy(by: UiNode, up: KeyboardUp | undefined, minPiece: number): 
  */
 function cutByPinnedRemedy(remedy: RemedyCase<'bothPinned'>, up: KeyboardUp | undefined, minPiece: number): string {
   const by = remedy.under;
-  const way = noScrollRemedyText(remedy, 'touch', by);
+  const way = cutPinnedRemedyText(remedy);
   if (ridingKeyboard(by, up, minPiece) === undefined && up !== undefined && stackedOnKeyboard(by, up)) return `${keyboardMayMoveText(up, by)} — else ${way}`;
   return ridingFirst(by, up, minPiece, (dismiss) => `${dismiss} — else ${way}`, way);
 }
@@ -121,7 +122,7 @@ const keyboardMayMoveText = ({ lineY, remedy }: KeyboardUp, by: UiNode): string 
 /**
  * THE riding-keyboard choice of every cut-by sentence: `riding`, told "dismiss it first" (target-text.ts#dismissKeyboardFirstText),
  * when `by` rides on the soft keyboard (target-text.ts#ridingKeyboard); else `not`. The tap's remedy and the stuck
- * failure's clause (`stuckCutByText`) word the two cases around it.
+ * failure's (`stuckCutText`) word the two cases around it.
  */
 function ridingFirst(by: UiNode, up: KeyboardUp | undefined, minPiece: number, riding: (dismiss: string) => string, not: string): string {
   const keyboard = ridingKeyboard(by, up, minPiece);
@@ -129,20 +130,26 @@ function ridingFirst(by: UiNode, up: KeyboardUp | undefined, minPiece: number, r
 }
 
 /**
- * `scroll_until`'s STUCK failure of a target cut by a node drawn after it (`Cut.by`, here `by`), the content exhausted:
- * what keeps the rest under that node — with the soft keyboard up and that node riding on it, dismiss it first and
- * scroll again (`ridingFirst`, the tap's own choice); else a layout defect, no clearance for a pinned bar. A container's
- * cut has no such clause (scroll-text.ts#failureText words its own).
+ * `scroll_until`'s STUCK failure of a target cut to a sliver, the content exhausted — the whole of it after "no longer
+ * moves it", which scroll-text.ts#failureText only frames:
+ * - what keeps the rest from showing: past its container's edge (`Cut.by` absent) — a layout defect, or its own
+ *   content runs to its edge and reads as cut; or under the node drawn after it — with the soft keyboard up and that
+ *   node riding on it, dismiss it first and scroll again (`ridingFirst`, the tap's own choice), else a layout defect
+ *   (no clearance for a pinned bar), or it is only that thin;
+ * - then the tap's refusal, quoted by its way past (`cutWayPast`: the scroll half of the tap's remedy is moot once the
+ *   content is exhausted) — or, beneath a presented screen, that screen's remedy, as the tap says it (`presentedOr`).
+ * The quote keeps its parentheses, "a tap refuses it so cut (…)", unlike the bound's colon (scroll-text.ts#shortText):
+ * the corpus's stuck rows already say it so (ADR 0015's A26 amendment).
  */
-export const stuckCutByText = (by: UiNode, minPiece: number, keyboard?: KeyboardUp): string =>
-  ridingFirst(by, keyboard, minPiece, (dismiss) => `${dismiss}, and scroll again`, 'a layout defect (no clearance for a pinned bar?)');
-
-/**
- * The tap's refusal as `scroll_until`'s STUCK failure quotes it, the content exhausted so the scroll half moot: beneath
- * a presented screen, that screen's remedy (ui-tree/remedy-text.ts#presentedOr), as the tap says it; else the cut's way
- * past (`cutWayPast`).
- */
-export const stuckTapQuote = (standing: Extract<TouchRemedied, { kind: 'cut' }>): string => presentedOr(standing.remedy, 'it', () => cutWayPast(standing.cut));
+export function stuckCutText(standing: Extract<TouchRemedied, { kind: 'cut' }>, keyboard?: KeyboardUp): string {
+  const { cut, minPiece } = standing;
+  const quote = presentedOr(standing.remedy, 'touch', () => cutWayPast(cut));
+  const rest =
+    cut.by === undefined
+      ? "The rest of it stays past its container's edge at the end of the content — a layout defect (no room beyond it?), or its own content runs to its edge, which reads as cut"
+      : `The rest of it may stay under that ${cut.by.role} at the end of the content — ${ridingFirst(cut.by, keyboard, minPiece, (dismiss) => `${dismiss}, and scroll again`, 'a layout defect (no clearance for a pinned bar?)')} — or it is only that thin, laid flush against it`;
+  return `${rest}; a tap refuses it so cut (${quote})`;
+}
 
 /** The most of a wrapper's area its one child may take and still count as SMALL for `positionerRemedy`: a quarter. */
 const SMALL_CHILD_FRACTION = 0.25;
