@@ -558,7 +558,11 @@ take 2.) when NEITHER the target NOR its cover lies in a scroll view as the tree
 for both). With no scroll view above either, no scroll moves either. The cover's own side is asked too, because a cover
 in a scroll view could be stroked away. The draw order already excuses scroll content over a node outside its scroll
 view (draw-order.ts's `scrolledContent` row) unless that content lies in a later screen, which takes `presented` first.
-So the cover's half is defence in depth. Undefined ancestry (idb's flat list) keeps the old cases.
+So the cover's half is defence in depth, and so is `pinned` under a cover in the pixel assert, which now arises only
+for such a cover: their Stryker survivors (standing.ts's cover half, pixel-poll.ts's words) are known. Undefined
+ancestry (idb's flat list) keeps the old cases. Since D84 views-drawn-over's A no longer reaches this case (its cover B
+is an untold peer, 2.); the targets that do are pinned-bar P and text-under-bar P under Continue (WDA, Compose) and
+rn-banner's "Saved".
 
 Every verb renders `bothPinned` with one clause (ui-tree/standing.ts#bothPinnedRemedyText):
 
@@ -585,7 +589,13 @@ scroll.test.ts mark their idb-shaped trees `flatList`.
 ### Residuals
 
 - Content a scroll moves without an ancestor the tree marks as scrolling is read as still. Examples: a collapsing app
-  bar that a list's nested scroll folds, and any scroll view a source does not mark. `pinned` already trusts the same
-  fact for the system bars. Not measured.
-- Two siblings inside one scroll view's content still swipe until exhausted (a Views run in a ScrollView). The tree cannot
-  tell them from a pinned section header and its rows (scroll-sticky.wda), so the scroll stays.
+  bar that a list's nested scroll folds, and any scroll view a source does not mark. A cover that is itself a scroll
+  container takes `bothPinned` too (an Android clipping container listed after the target and drawn over it: its own
+  ancestors do not scroll), though under a CoordinatorLayout its frame moves with the scroll
+  (`appbar_scrolling_view_behavior`, `overlapTop`). `pinned` already trusts the same fact for the system bars. Not
+  measured.
+- Two siblings inside one scroll view's content still swipe until exhausted (a Compose Column in a `verticalScroll`). The
+  tree cannot tell them from a pinned section header and its rows (scroll-sticky.wda), so the scroll stays.
+- A `cut` whose `by` is a later sibling, neither in a scroll view (Android text-under-bar P, cut to 825x22 by
+  Continue), still swipes and the tap still advises `scroll_until`: `bothPinned` decides `covered` only. The pixel
+  assert, which judges that target `covered`, already says `bothPinned`, so the verbs disagree on it. Not extended here.

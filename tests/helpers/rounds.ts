@@ -44,8 +44,8 @@ export interface Row {
   /**
    * Every match's clipping ancestors, nearest first — clipping nodes the matches are put inside; default none (an iOS
    * tree, or a match with no clipping ancestor): the matches then lie in an unclipped screen-sized scroll view, as a
-   * WDA tree lists one (role `scrollable`) — content strokes move lies in a scroll view (ui-tree/standing.ts#Remedy's
-   * `bothPinned`, D87), unless `unscrolled`.
+   * WDA tree lists one (role `scrollable`) — an Android-shaped row with no clipping ancestor gets the same wrap — so
+   * content strokes move lies in a scroll view (ui-tree/standing.ts#Remedy's `bothPinned`, D87), unless `unscrolled`.
    */
   scrollers?: readonly Rect[];
   /** The matches lie in no scroll view at all (no `scroller(s)` with it): content no scroll moves — a hero, an app bar, a sheet laid in the screen. Default false. */

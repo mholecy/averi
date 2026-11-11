@@ -833,9 +833,10 @@ describe('one remedy for a target under a cover a screenshot saw drawn over it �
 });
 
 // D87: a cover the draw order puts over the target (`drawn`), where neither lies in a scroll view as the tree says —
-// siblings of an unmarked run (Compose's, a Views run) with no scroll view above it — is one no scroll moves the target
-// out from under (ui-tree/standing.ts#Remedy's `bothPinned`): every verb says so, and scroll_until stops before any swipe
-// instead of stroking until exhausted and blaming "a layout defect" (views-drawn-over's A, before D84: 3 swipes). Where
+// siblings with no scroll view above them, as the lab's pinned-bar P and text-under-bar P under Continue (WDA, Compose)
+// and rn-banner's "Saved" — is one no scroll moves the target out from under (ui-tree/standing.ts#Remedy's
+// `bothPinned`): every verb says so, and scroll_until stops before any swipe instead of stroking until exhausted and
+// blaming "a layout defect" (pinned-bar P: 3 swipes; views-drawn-over's A, before D84, too). Where
 // either lies in a scroll view a stroke may separate them, though no scroll view lies between the two: a pinned section
 // header in its scroll view's one content container beside its rows (scroll-sticky.wda's SwiftUI shape), a sticky
 // header and a row both children of the scroll view, a FAB outside the scroll view. And idb's flat list tells no

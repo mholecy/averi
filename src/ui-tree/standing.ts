@@ -627,14 +627,18 @@ export const bothPinnedRemedyText = (purpose: 'touch' | 'pixel'): string =>
  *    header or footer); under a cover, idb's flat-list root (`covered.overRoot`, `root`), a screen-sized element
  *    (`screen`) or a full-bleed header (`header`). Act on something in it clear of that.
  * 5. `bothPinned` — `covered` by a cover the tree orders over it (`drawn`, or `overlaid`), where NEITHER lies in a
- *    scroll view as the tree says (geometry.ts#Clips.inScroller false for the node and for its cover — siblings of one
- *    unmarked run with no scroll view above it, Compose's or a Views run's): no scroll moves either (D87: views-drawn-over's
- *    A swiped 3 times, then "a layout defect"). Not where either lies in one, though nothing scrolls between the two: a
+ *    scroll view as the tree says (geometry.ts#Clips.inScroller false for the node and for its cover — the lab's
+ *    pinned-bar P and text-under-bar P under Continue, on WDA and Compose; rn-banner's "Saved"): no scroll moves either
+ *    (D87; the shape views-drawn-over's A had before D84, when it swiped 3 times, then "a layout defect" — since D84 A's
+ *    cover is an untold peer, 2.). Not where either lies in one, though nothing scrolls between the two: a
  *    pinned section header lies in its scroll view's one content container beside its rows (scroll-sticky.wda), and a
  *    stroke moves the rows from under it. Not where the tree cannot say (idb's flat list). `bothPinnedRemedyText`.
  *    docs/adr/0015-flat-list-reading-order-break.md (its D87 amendment)
  * 6. `pinned` — under a system bar or (the pixel assert) a cover, in no scroll view as the tree says
- *    (geometry.ts#Clips.inScroller false): no scroll moves it out.
+ *    (geometry.ts#Clips.inScroller false): no scroll moves it out. Under a cover it now arises only for a cover in a
+ *    scroll view over a node in none, which the draw order excuses (draw-order.ts's `scrolledContent` row) save in a
+ *    later screen, `presented` first — defence in depth: a mutant of 5.'s cover half (and of the pixel assert's
+ *    `pinned` words under a cover) survives, as known (ADR 0015's D87 amendment).
  * 7. `stuck` — a scroll may not move it out: the tree cannot say whether it lies in a scroll view (idb's flat list,
  *    `inScroller` undefined), or — the pixel assert — it is laid from the screen's top edge under the status bar, or
  *    the cover's reach holds it whole.
@@ -946,6 +950,7 @@ function orderRemedy(scene: Scene, node: UiNode, { cover }: { readonly cover: Co
  * may, or the tree cannot say.
  */
 function bothPinned(scene: Scene, node: UiNode, { cover }: { readonly cover: Cover }): RemedyCase<'bothPinned'> | undefined {
+  // The cover's half is defence in depth: the draw order finds no cover in a scroll view over a node in none (ADR 0015's D87 amendment).
   return scene.clips.inScroller(node) === false && scene.clips.inScroller(cover.node) === false ? { of: 'bothPinned' } : undefined;
 }
 
