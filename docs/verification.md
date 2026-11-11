@@ -302,6 +302,10 @@ Its iOS counterpart, `npm run truth:lab:ios -- --out <dir> --udid <lab simulator
 owner's), runs live.ts's iOS groups on the lab simulator: every idb run first, then every WebDriverAgent run in its own
 D43 settings window, with the same exit codes.
 
+For a batch author: `runBatch` (scripts/truth/batch/runner.ts) returns the run's result, its `exit` among it, and
+leaves the process's exit to the batch. End the batch with `process.exit(result.exit)` right after it; a batch that
+forgets still ends with the run's code, which runBatch sets as `process.exitCode`.
+
 The exit code is stricter than a device batch's, so a release can gate on it (only 0 passes):
 
 | Code | Meaning |

@@ -74,6 +74,11 @@ export interface ProcessSeam {
   install(handlers: Handlers): void;
   /** End the runner with `code`. Called once, after the abort has put back what it could. */
   exit(code: number): void;
+  /**
+   * The code the process ends with when nothing exits it (runBatch's backstop, A21: a batch that forgets its exit still
+   * fails as its run did). The real seam's `process.exitCode`; a fake may keep it, or have none.
+   */
+  setExitCode?(code: number): void;
   /** The last place to say something when the run's own files cannot be written. Never throws. */
   stderr(text: string): void;
 }
@@ -134,6 +139,9 @@ export const nodeProcess: ProcessSeam = {
   },
   exit(code) {
     process.exit(code);
+  },
+  setExitCode(code) {
+    process.exitCode = code;
   },
   stderr(text) {
     try {

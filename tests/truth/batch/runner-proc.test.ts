@@ -92,4 +92,10 @@ describe('runBatch on the real process seam (T2 S6a; b11-dry int.sh under the ru
     expect(run.stdout()).toContain(s.join('\n'));
     expect(run.stderr()).toBe('');
   });
+
+  it('a batch that never calls exit (A21): the process ends with its run\'s code all the same — exit 1 for a FAIL, never 0', async () => {
+    const run = start('noexit');
+    expect(await exited(run)).toEqual({ code: 1, signal: null });
+    expect(summary()).toContain('kf live verdict: FAIL — a fixture');
+  });
 });

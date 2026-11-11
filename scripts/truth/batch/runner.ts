@@ -108,6 +108,9 @@ import { canonicalJson, EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parse
  *       config: configOf(process.argv.slice(2), process.env, repo) });
  *     process.exit(r.exit);                                           // at once: runBatch leaves the exit to its caller
  *
+ * The rejudge is asked for its failure reasons (`--failures`, A21): a batch pointed at a checkout from before A21, whose
+ * live.ts knows no such flag, sees every rejudge refused, so every live block INCONCLUSIVE — fail closed, never a pass.
+ *
  * A need is checked by the first block naming it and rechecked (its `alive`) before each later one, and its `end` runs
  * once the last block is done (the ios need's: the finportal key's second read, its line in the SUMMARY — a CHANGED key
  * fails the run, no block need judge it; T2b). The WDA window is a dirty window, so the abort puts it back the same way;
@@ -330,12 +333,21 @@ export type BatchResult =
 /**
  * The run's whole: the order above. Resolves to what it came to; the process's exit is its caller's — call it with
  * `exit` at once, no await of anything else between (a signal arriving after the SUMMARY would start the abort's own).
- * Only the abort exits by itself (130), through the seam: a signal has no caller to return to.
+ * Only the abort exits by itself (130), through the seam: a signal has no caller to return to. As a backstop the seam's
+ * exit code is set to `exit` (ProcessSeam.setExitCode: the real one's `process.exitCode`), so a batch that forgets its
+ * exit still ends with the run's code, never 0 by default.
  */
 export async function runBatch<S extends KnobSpec>(o: RunBatchOptions<S>): Promise<BatchResult> {
   const needs = o.needs ?? {};
   assertBlocks(o.blocks, needs);
   const base = { fs: nodeFs, seam: nodeProcess, terminal: terminalOf(), clock: () => new Date(), pid: process.pid, ...o.io };
+  const r = await runOn(o, needs, base);
+  base.seam.setExitCode?.(r.exit);
+  return r;
+}
+
+/** runBatch's run over its io: the steps above, from the config on. */
+async function runOn<S extends KnobSpec>(o: RunBatchOptions<S>, needs: Readonly<Record<string, NeedSpec>>, base: Omit<RunIo, 'table'> & Partial<Pick<RunIo, 'table'>>): Promise<BatchResult> {
   const refused = (lines: readonly string[]): BatchResult => {
     for (const l of lines) base.terminal(`${l}\n`);
     return { exit: EXIT.nothingDone, refused: lines };

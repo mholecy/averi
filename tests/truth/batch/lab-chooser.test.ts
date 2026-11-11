@@ -525,6 +525,9 @@ describe('the hand lines — each names the exact step and its commands, every w
     expect(stateFileHand(B, 's.json', 'unreadable', 'node probe.ts --state s.json')).toBe(
       "D55 (Android): no reinstall was done: the probe's state file s.json was not marked dirty (unreadable); run node probe.ts --state s.json first, then clear the default by hand: adb -s LAB-1 uninstall dev.averi.lab && adb -s LAB-1 install 'lab dir/installed.apk'",
     );
+    // A21: a host path is quoted by shell.ts, the batches' one host-shell quoter — `=` plain (adb-shell.ts quotes it).
+    expect(stateFileHand(B, 'k=v/s.json', 'missing')).toContain("the probe's state file k=v/s.json was not marked dirty");
+    expect(cellsHand(B, 'a=b/cells.json', 'x')).toContain('assets/cells.json must equal a=b/cells.json; if not');
     expect(checkHand("it's")).toBe(
       "D55 (Android): the chooser and the preferred activities not proven put back: adb -s 'it'\\''s' shell dumpsys package preferred (no lab entry with mAlways=true may be left); a chooser in front: adb -s 'it'\\''s' shell input keyevent KEYCODE_BACK",
     );

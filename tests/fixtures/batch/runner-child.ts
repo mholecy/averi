@@ -9,7 +9,7 @@ import { runBatch } from '../../../scripts/truth/batch/runner.js';
 // main there (repo/: the checkout under test), and runs two blocks into out/: kf, which only says PASS, and E5, which
 // opens a dirty window (its restore a detached proc-child.mjs `slow` writing E5.started and E5.done), starts a probe (a
 // `tree`: a child and a grandchild, pids in probe.pids), writes `ready` and waits for the probe — until the test
-// interrupts it (`int`), or, `quick`, a probe that ends at once.
+// interrupts it (`int`), or, `quick`, a probe that ends at once; `noexit` as `quick`, kf FAILing, and no process.exit after.
 
 const [dir, scenario] = process.argv.slice(2);
 const HELPER = join(import.meta.dirname, 'proc-child.mjs');
@@ -26,7 +26,7 @@ const result = await runBatch({
   name: 'batch-r',
   needs: {},
   blocks: [
-    { id: 'kf', label: 'kf live verdict', needs: [], run: async (ctx) => ctx.verdict('PASS', 'a fixture') },
+    { id: 'kf', label: 'kf live verdict', needs: [], run: async (ctx) => (scenario === 'noexit' ? ctx.verdict('FAIL', 'a fixture') : ctx.verdict('PASS', 'a fixture')) },
     {
       id: 'E5',
       label: 'E5 verdict',
@@ -40,7 +40,7 @@ const result = await runBatch({
             return r.code === 0 && existsSync(at('E5.done')) ? { ok: true, how: 'its state read back' } : { ok: false, why: `its restore exit ${r.code}` };
           },
         });
-        const probe = scenario === 'quick' ? ctx.bounded(node, [HELPER, 'echo', 'probe done'], { secs: 10 }) : ctx.bounded(node, [HELPER, 'tree', at('probe.pids')], { secs: 30 });
+        const probe = scenario !== 'int' ? ctx.bounded(node, [HELPER, 'echo', 'probe done'], { secs: 10 }) : ctx.bounded(node, [HELPER, 'tree', at('probe.pids')], { secs: 30 });
         writeFileSync(at('ready'), String(process.pid));
         await probe;
         ctx.close('E5');
@@ -50,5 +50,6 @@ const result = await runBatch({
   ],
   config: configOf(['--out', at('out'), '--repo', repo], {}),
 });
-// runBatch leaves the exit to its caller (A21): at once, as a batch's CLI entry does.
-process.exit(result.exit);
+// runBatch leaves the exit to its caller (A21): at once, as a batch's CLI entry does — unless `noexit`, a batch that
+// forgets it: its run's code is the process's still (the real seam's exitCode, runBatch's backstop).
+if (scenario !== 'noexit') process.exit(result.exit);

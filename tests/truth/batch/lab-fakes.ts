@@ -5,6 +5,7 @@ import { DEVICE_CHECK_SIMULATOR, DEVICE_CHECK_WDA_PORTS, LAB_APP } from '../../.
 import type { Run } from '../../../scripts/truth/batch/bounded.js';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
 import type { Ended, Handlers, KillResult, ProcessSeam, StartOptions, Started } from '../../../scripts/truth/batch/proc.js';
+import { failuresJson } from '../../../scripts/truth/batch/cases.js';
 import { DOMAINS, PROTECTED, type KeyVal } from '../../../scripts/truth/batch/ios-defaults.js';
 
 // The lab devices as fakes, shared by the S6b tests (ios-lab, android-lab, lab-build, and lab-batch through runBatch):
@@ -422,6 +423,23 @@ export abstract class FakeSeam implements ProcessSeam {
     this.exits.push(code);
   }
   stderr(): void {}
+}
+
+/** What a fake rejudge says: its exit code, its summary, and the failure reasons it writes (none given: no file). */
+export interface Rejudged {
+  code: number;
+  out: string;
+  failures?: readonly string[];
+}
+
+/**
+ * `live.ts --rejudge … --failures <file>` as a fake answers it: its summary and exit code, and its failure reasons
+ * written where `--failures` names, as scripts/truth/live.ts writes them (cases.ts#failuresJson). No live-cases.ts
+ * here: the standing batches' run-level tests stay light; summarize's own output is standing.test.ts's.
+ */
+export function rejudgeWith(args: readonly string[], r: Rejudged): Answer {
+  if (r.failures !== undefined) writeFileSync(args[args.indexOf('--failures') + 1], failuresJson(r.failures));
+  return { code: r.code, out: r.out, err: '' };
 }
 
 export const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));

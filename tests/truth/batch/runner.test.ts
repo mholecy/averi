@@ -89,6 +89,11 @@ class FakeSeam implements ProcessSeam {
   install(handlers: { signal(name: NodeJS.Signals): void; fatal(error: unknown): void }): void {
     this.handlers = handlers;
   }
+  /** The exit codes runBatch left for the process (ProcessSeam.setExitCode). */
+  readonly exitCodes: number[] = [];
+  setExitCode(code: number): void {
+    this.exitCodes.push(code);
+  }
   exit(code: number): void {
     this.exits.push(code);
   }
@@ -301,6 +306,8 @@ describe('a fake two-block batch, one Android and one iOS block: the whole SUMMA
     seam.rules = [git(), probes, live({ logExtra: 'ERROR the lab app did not launch on the first try\n' })];
     const r = await result([kfBlock(), d43Block()]);
     expect(seam.exits).toEqual([]);
+    // The backstop: the process's exit code set to the run's, for a batch that forgets its exit.
+    expect(seam.exitCodes).toEqual([1]);
     if (!('summary' in r)) throw new Error(`no SUMMARY: ${JSON.stringify(r)}`);
     expect([r.exit, r.runId]).toEqual([1, ID]);
     expect(summaryLines(r.summary)).toEqual(summary());
@@ -338,6 +345,10 @@ describe('refused to start: exit 2, nothing done — no folder, no call (batch-1
   it('the config read with errors (no out folder): its lines, exit 2', async () => {
     const r = await runBatch({ name: 'batch-t', blocks: [plain('kf')], config: { ok: false, errors: ['ERROR no out folder: pass --out <dir> or set AVERI_BATCH_OUT — nothing was done'] }, io: { seam, terminal: (t) => void terminal.push(t) } });
     expect(r).toEqual({ exit: 2, refused: ['ERROR no out folder: pass --out <dir> or set AVERI_BATCH_OUT — nothing was done'] });
+    expect(seam.exitCodes).toEqual([2]);
+    // A seam with no exit code to set (setExitCode is optional): the same result, nothing thrown.
+    const bare: ProcessSeam = { start: (c, a, o) => seam.start(c, a, o), killGroup: (p, s) => seam.killGroup(p, s), install: (h) => seam.install(h), exit: (c) => seam.exit(c), stderr: () => {} };
+    expect(await runBatch({ name: 'batch-t', blocks: [plain('kf')], config: { ok: false, errors: ['ERROR x — nothing was done'] }, io: { seam: bare, terminal: () => {} } })).toEqual({ exit: 2, refused: ['ERROR x — nothing was done'] });
     expect(terminal).toEqual(['ERROR no out folder: pass --out <dir> or set AVERI_BATCH_OUT — nothing was done\n']);
   });
 

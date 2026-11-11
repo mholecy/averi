@@ -1,9 +1,9 @@
 /**
  * The batches' one host-shell quoter (backlog A21, the review's TL8): a word in a hand line a person pastes into their
- * own shell — a RESTORE line, a state file's clean command, a `pkill -f` pattern, a `defaults` key. A leaf: every
- * batch module that prints such a line imports it from here (ios-defaults.ts, run-dir.ts, the lab plumbing, the
- * standing batches), none keeps a copy. The device's `sh` (adb shell) has its own, src/adapters/adb-shell.ts's, which
- * the chooser's hand lines use for the words adb carries (chooser-readers.ts#adbLine).
+ * own shell — a RESTORE line, a state file's clean command, a `pkill -f` pattern, a `defaults` key, a host path. A
+ * leaf: every batch module that prints such a word imports it from here (ios-defaults.ts, run-dir.ts, lab-chooser.ts,
+ * the lab plumbing, the standing batches), none keeps a copy. The words an `adb` line carries are quoted by
+ * src/adapters/adb-shell.ts's own (chooser-readers.ts#adbLine), which also quotes `=`: they reach the device's `sh`.
  */
 
 /** A word single-quoted whatever it holds: nothing in it expands, a `'` written as `'\''`. */

@@ -8,17 +8,17 @@ import type { LiveCases, LiveTable } from '../../../scripts/truth/batch/live-tab
 import type { StartOptions } from '../../../scripts/truth/batch/proc.js';
 import { groupsOf, onlyWith } from '../../../scripts/truth/batch/standing.js';
 import { STANDING_EXIT as LAB_RUN_EXIT } from '../../../scripts/truth/batch/words.js';
-import type { ChooserPremise } from '../../../scripts/truth/chooser-premise.js';
-import type { Result as LiveResult } from '../../../scripts/truth/live-cases.js';
-import { CATALOG, FakeSeam, FOCUS_CHOOSER, LAB_SERIAL, labWorld, PREFERRED_WITH_DEFAULT, until, type Answer, type LabWorld, type WorldOptions } from './lab-fakes.js';
-import { hedgedLegs, liveResult, liveSummary, rejudgeAnswer } from './standing-fakes.js';
+import { LIVE_GOLDEN_HEADER } from '../../../scripts/truth/batch/steps.js';
+import { CATALOG, FakeSeam, FOCUS_CHOOSER, LAB_SERIAL, labWorld, PREFERRED_WITH_DEFAULT, rejudgeWith, until, type Answer, type LabWorld, type Rejudged, type WorldOptions } from './lab-fakes.js';
 
 // The standing lab batch (T20b, scripts/truth/batch/lab-run.ts) under runBatch, over the shared fake lab
-// (lab-fakes.ts) and a fake process seam that answers git and live.ts — its `--groups` run and its `--rejudge` —
-// with real files in a temp dir, a fixed clock and pid — its summary live-cases.ts#summarize's own, over the results a
-// test gives (standing-fakes.ts#rejudgeAnswer), its failure reasons written where `--failures` names. The blocks' order and the device calls' order; `--groups` as
-// the selection; the refusals (no serial, a group that is none, a dirty state file) and the lab guard's; the --check
-// before and after the chooser group, a default the run left failing the batch by name; the exit codes 0, 1, 2, 3, 130.
+// (lab-fakes.ts) and a fake process seam that answers git and live.ts — its `--groups` run and its `--rejudge`, the
+// rejudge's failure reasons written where `--failures` names (lab-fakes.ts#rejudgeWith) — with real files in a temp
+// dir, a fixed clock and pid. The blocks' order and the device calls' order; `--groups` as the selection; the refusals
+// (no serial, a group that is none, a dirty state file) and the lab guard's; the --check before and after the chooser
+// group, a default the run left failing the batch by name; the exit codes 0, 1, 2, 3, 130. What summarize itself
+// names (the hedged ceiling, a LOUD that fails nothing, a stale premise) is standing.test.ts's: live-cases.ts stays out
+// of this file's imports, which the lab group's cold mutation run pays for every mutant (ADR 0038's A21 amendment).
 // Every call is checked for b11-dry's VIOLATIONs (afterEach). No device.
 
 const HEAD = 'a'.repeat(40);
@@ -31,12 +31,8 @@ const GROUP_CASES: Record<string, string[]> = { chooser: ['lc1', 'lc2'], forms: 
 /** What a fake live.ts run does: its exit and its rejudge's, and a change to the lab while it runs. */
 interface LiveScript {
   code?: number;
-  /** What its rejudge judged, case by case (each case of its group ok unless given). */
-  rejudged?: LiveResult[];
-  /** The chooser premise its record kept. */
-  premise?: ChooserPremise;
-  /** Its rejudge's answer as given, nothing summarized and no failure reasons written. */
-  rejudgeRaw?: Answer;
+  /** What its rejudge says (every case of its group ok, no failure reason, unless given). */
+  rejudge?: Rejudged;
   /** live.ts wrote no record and never judged (cut at its bound). */
   noRecord?: boolean;
   /** A line live.ts prints into its log before its summary. */
@@ -58,12 +54,12 @@ class RunSeam extends FakeSeam {
       const at = (flag: string) => args[args.indexOf(flag) + 1];
       const group = at('--groups');
       const script = this.live[group] ?? {};
-      if (args.includes('--rejudge')) return script.rejudgeRaw ?? rejudgeAnswer(args, 'android', script.rejudged ?? okResults(group), script.premise);
+      if (args.includes('--rejudge')) return rejudgeWith(args, script.rejudge ?? { code: 0, out: summaryOf(GROUP_CASES[group]), failures: [] });
       this.asked.set(at('--record'), group);
       script.during?.(this.world);
       if (script.noRecord === true) return { code: script.code ?? 0, out: '', err: '' };
       writeFileSync(at('--record'), '{"results":[]}');
-      return { code: script.code ?? 0, out: `${script.logLine === undefined ? '' : `${script.logLine}\n`}${liveSummary('android', okResults(group)).lines.join('\n')}\n`, err: '' };
+      return { code: script.code ?? 0, out: `${script.logLine === undefined ? '' : `${script.logLine}\n`}${summaryOf(GROUP_CASES[group])}`, err: '' };
     }
     if (cmd.endsWith('gradlew') && args.includes('--stop') && this.stopFailsOnce) {
       this.stopFailsOnce = false;
@@ -72,8 +68,7 @@ class RunSeam extends FakeSeam {
     return this.world.answer(cmd, args, { cwd: options.cwd });
   }
 }
-/** Each case of a group, ok, as its run judged it. */
-const okResults = (group: string): LiveResult[] => GROUP_CASES[group].map((id) => liveResult(id, 'uiautomator', undefined, group as 'chooser' | 'forms'));
+const summaryOf = (ids: readonly string[]) => [`${LIVE_GOLDEN_HEADER} ${ids.length} cases, ${ids.length} ok`, '', '## uiautomator', ...ids.map((id) => `- ok ${id} open: says — fine`), ''].join('\n');
 
 const table: LiveTable = async () =>
   ({
@@ -137,8 +132,8 @@ describe('lab-run.ts: a clean run, the blocks\' order and the lab block', () => 
     expect(after[0]).toBe('lab check: PASS — every lab need met: android, handlers (each one\'s LAB line above)');
     expect(after[1]).toMatch(/^chooser check before: OK — chooser no; preferred read \(1 user\); lab entries 0 \(defaults 0, last-chosen 0\)$/);
     expect(after[2]).toMatch(/^chooser check after: OK — chooser no; preferred read \(1 user\); lab entries 0 /);
-    expect(after[3]).toMatch(/^chooser verdict: PASS — android-chooser: main's rejudge exit 0 \(# Live golden: 2 cases, 2 ok, 0 loud, 0 mismatches \(0 not known\), 0 skipped\)$/);
-    expect(after[4]).toMatch(/^forms verdict: PASS — android-forms: main's rejudge exit 0 \(# Live golden: 1 cases, 1 ok, 0 loud, 0 mismatches \(0 not known\), 0 skipped\)$/);
+    expect(after[3]).toMatch(/^chooser verdict: PASS — android-chooser: main's rejudge exit 0 \(# Live golden: 2 cases, 2 ok\)$/);
+    expect(after[4]).toMatch(/^forms verdict: PASS — android-forms: main's rejudge exit 0 \(# Live golden: 1 cases, 1 ok\)$/);
     expect(after[5]).toBe('RESTORE: none — everything dirty was put back and verified');
     // Built from this checkout, after the guard: the build's own call after the emulator's AVD was read.
     expect(callAt('assembleDebug')).toBeGreaterThan(callAt('emu avd name'));
@@ -461,62 +456,19 @@ describe('the --check after and the chooser block\'s state file', () => {
 });
 
 describe('each live block\'s verdict: main\'s rejudge exit code, its FAIL naming the failure reasons the rejudge wrote (A21)', () => {
-  /** The verdict line the chooser block gives over these results: summarize's header and failure reasons, as the rejudge wrote them. */
-  const chooserFail = (results: LiveResult[], premise?: ChooserPremise) => {
-    const s = liveSummary('android', results, { premise });
-    const header = s.lines.find((l) => l.startsWith('# Live golden:'))!;
-    return `chooser verdict: FAIL — android-chooser: main's rejudge exit 1 — ${s.failures.join('; ')} (${header})`;
-  };
-  const chooserLine = () => summary().find((l) => l.startsWith('chooser verdict:'));
+  const header = `${LIVE_GOLDEN_HEADER} 3 cases, 1 ok, 1 loud, 1 mismatches (1 not known), 0 skipped`;
+  const failed = [header, '', '## uiautomator', '- MISMATCH (tap-claim) lc1 open: says — x', '- LOUD (x) lc9 open: says — y', '- ok lc2 open: says — fine', ''].join('\n');
 
-  it('an unknown MISMATCH: the block FAILs naming it; a SKIP and a LOUD beside it are no failure, not named', async () => {
-    const rejudged = [
-      liveResult('lc1', 'uiautomator', { outcome: 'MISMATCH', cls: 'tap-claim', why: 'the lab not in front' }, 'chooser'),
-      liveResult('lc2', 'uiautomator', { outcome: 'SKIP', why: 'unread' }, 'chooser'),
-      liveResult('lc9', 'uiautomator', { outcome: 'LOUD', cls: 'loud-untouched', why: 'loud' }, 'chooser'),
-    ];
-    seam.live.chooser = { code: 1, rejudged };
+  it('a rejudge exit 1: the block FAILs naming the reasons its rejudge wrote, in their order — never what its summary\'s prose seems to say', async () => {
+    seam.live.chooser = { code: 1, rejudge: { code: 1, out: failed, failures: ['MISMATCH lc1', 'MISMATCH (hedged ceiling): hedged 3 of 3 — the run fails'] } };
     expect(await go()).toBe(1);
-    expect(chooserLine()).toBe(chooserFail(rejudged));
-    expect(chooserLine()).toMatch(/main's rejudge exit 1 — MISMATCH lc1 \(# Live golden: 3 cases, 0 ok, 1 loud, 1 mismatches \(1 not known\), 1 skipped\)$/);
-  });
-
-  it('a stale chooser premise (T20a): the FAIL quotes the premise line and its hand line, not its last-chosen WARN', async () => {
-    const lines = [
-      'CHOOSER PREMISE: stale — a lab default (mAlways=true) for averilab://shared — the run fails',
-      `D55 (Android): a lab default: adb -s ${LAB_SERIAL} uninstall dev.averi.lab`,
-      'Chooser premise: WARN — 1 last-chosen lab entry (mAlways=false: no default; no reinstall clears it), first: 9d3a2b9 dev.averi.lab/.Twin',
-    ];
-    const premise: ChooserPremise = { state: 'stale', facts: [], lines };
-    const rejudged = okResults('chooser');
-    seam.live.chooser = { code: 1, rejudged, premise };
-    expect(await go()).toBe(1);
-    expect(chooserLine()).toBe(chooserFail(rejudged, premise));
-    expect(chooserLine()).toContain(`main's rejudge exit 1 — ${lines[0]} | ${lines[1]} (# Live golden:`);
-  });
-
-  it('the hedged ceiling\'s MISMATCH (every unaimable leg hedged, live-carousel.ts): a failure the block names — the prose grep missed it', async () => {
-    const rejudged = [...okResults('chooser'), ...hedgedLegs('uiautomator')];
-    seam.live.chooser = { rejudged };
-    expect(await go()).toBe(1);
-    expect(chooserLine()).toBe(chooserFail(rejudged));
-    expect(chooserLine()).toMatch(/main's rejudge exit 1 — MISMATCH \(hedged ceiling\): hedged 3 of 3 judged unaimable leg\(s\) — .* — the run fails \(# Live golden: /);
-  });
-
-  it('a LOUD alone — a case, or the hedged ceiling unjudged — fails nothing: main\'s rejudge exit 0, PASS, exit 0', async () => {
-    const rejudged = [
-      ...okResults('chooser'),
-      liveResult('lc9', 'uiautomator', { outcome: 'LOUD', cls: 'loud-untouched', why: 'loud' }, 'chooser'),
-      ...hedgedLegs('uiautomator').slice(0, 2),
-    ];
-    expect(liveSummary('android', rejudged).lines).toContain('LOUD (hedged ceiling): hedged 2 of 2 judged unaimable leg(s) — fewer than 3 judged, the ceiling unjudged (no pass claimed)');
-    seam.live.chooser = { rejudged };
-    expect(await go()).toBe(0);
-    expect(chooserLine()).toMatch(/^chooser verdict: PASS — android-chooser: main's rejudge exit 0 \(# Live golden: 5 cases, 4 ok, 2 loud,/);
+    expect(summary().find((l) => l.startsWith('chooser verdict:'))).toBe(
+      `chooser verdict: FAIL — android-chooser: main's rejudge exit 1 — MISMATCH lc1; MISMATCH (hedged ceiling): hedged 3 of 3 — the run fails (${header})`,
+    );
   });
 
   it('the failure reasons not written beside the summary: INCONCLUSIVE, unproven (3) — never read as "no failure"', async () => {
-    seam.live.forms = { rejudgeRaw: { code: 0, out: `${liveSummary('android', okResults('forms')).lines.join('\n')}\n`, err: '' } };
+    seam.live.forms = { rejudge: { code: 0, out: summaryOf(GROUP_CASES.forms) } };
     expect(await go(['--groups', 'forms'])).toBe(LAB_RUN_EXIT.unproven);
     expect(summary().find((l) => l.startsWith('forms verdict:'))).toBe(
       "forms verdict: INCONCLUSIVE — android-forms: main's rejudge exit 0, its failure reasons unread (android-forms.rejudge.json): read android-forms.rejudge.txt",

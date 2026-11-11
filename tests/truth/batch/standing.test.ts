@@ -6,12 +6,16 @@ import { failuresJson } from '../../../scripts/truth/batch/cases.js';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
 import { NO_SERIAL, NO_UDID } from '../../../scripts/truth/batch/runner-lines.js';
 import { cleanStateCommand, deviceInHand, liveJudge, liveVerdictLine, noDeviceReason } from '../../../scripts/truth/batch/standing.js';
-import { liveResult, liveSummary } from './standing-fakes.js';
+import type { ChooserPremise } from '../../../scripts/truth/chooser-premise.js';
+import type { Result as LiveResult } from '../../../scripts/truth/live-cases.js';
+import { hedgedLegs, liveResult, liveSummary } from './standing-fakes.js';
 
 // scripts/truth/batch/standing.ts: the standing lab batches' kit (A21), its device-free parts on their own — a live
-// block's verdict from its run, its summary and the failure reasons its rejudge wrote (live-cases.ts#summarize's own,
-// standing-fakes.ts#liveSummary), its judge from the block's folder alone, the words both batches' hand lines share. The
-// selection and the run are pinned through each batch (lab-run.test.ts, lab-run-ios.test.ts).
+// block's verdict from its run, its summary and the failure reasons its rejudge wrote, its judge from the block's folder
+// alone, and what that judge says over summarize's own output (live-cases.ts#summarize through
+// standing-fakes.ts#liveSummary: the hedged ceiling, a LOUD that fails nothing, a stale premise), the words both
+// batches' hand lines share. The selection and the run are pinned through each batch (lab-run.test.ts,
+// lab-run-ios.test.ts), which import no live-cases.ts.
 
 const ok = { word: 'OK' as const, why: 'exit 0' };
 const judged = { word: 'DONE' as const, why: 'judged' };
@@ -85,6 +89,63 @@ describe('liveJudge: device-free, from the block\'s folder alone', () => {
     expect(await judge({ dir, fs: nodeFs })).toEqual(["x verdict: INCONCLUSIVE — r: main's rejudge exit 1, its failure reasons unread (r.rejudge.json): read r.rejudge.txt"]);
     writeFileSync(join(dir, 'r.outcome.json'), 'not json');
     expect(await judge({ dir, fs: nodeFs })).toEqual(['x verdict: INCONCLUSIVE — r: its outcome file r.outcome.json is unreadable']);
+  });
+});
+
+describe('liveJudge over summarize\'s own output: the reasons the rejudge writes, named — the prose grep missed some, named others', () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = join(realpathSync(mkdtempSync(join(tmpdir(), 'batch-standing-'))), 'judged');
+    mkdirSync(dir);
+  });
+  afterEach(() => rmSync(join(dir, '..'), { recursive: true, force: true }));
+
+  /** The block's folder as a run and its rejudge (live.ts --failures) leave it over these results; its judge's line. */
+  async function judged(results: LiveResult[], premise?: ChooserPremise): Promise<{ line: string; header: string; failures: string[] }> {
+    const s = liveSummary('android', results, { rejudgedFrom: join(dir, 'r.json'), premise });
+    writeFileSync(join(dir, 'r.outcome.json'), JSON.stringify({ live: ok, rejudge: s.exitCode === 0 ? ok : { word: 'DONE', why: 'judged' } }));
+    writeFileSync(join(dir, 'r.rejudge.txt'), `${s.lines.join('\n')}\n`);
+    writeFileSync(join(dir, 'r.rejudge.json'), failuresJson(s.failures));
+    const [line] = await liveJudge('x verdict', 'r')({ dir, fs: nodeFs });
+    return { line, header: s.lines.find((l) => l.startsWith('# Live golden:'))!, failures: s.failures };
+  }
+  const chooser = (id: string, verdict?: Parameters<typeof liveResult>[2]) => liveResult(id, 'uiautomator', verdict, 'chooser');
+
+  it('an unknown MISMATCH: FAIL naming it; a SKIP and a LOUD beside it are no failure, not named', async () => {
+    const r = await judged([
+      chooser('lc1', { outcome: 'MISMATCH', cls: 'tap-claim', why: 'the lab not in front' }),
+      chooser('lc2', { outcome: 'SKIP', why: 'unread' }),
+      chooser('lc9', { outcome: 'LOUD', cls: 'loud-untouched', why: 'loud' }),
+    ]);
+    expect(r.header).toBe('# Live golden: 3 cases, 0 ok, 1 loud, 1 mismatches (1 not known), 1 skipped');
+    expect(r.line).toBe(`x verdict: FAIL — r: main's rejudge exit 1 — MISMATCH lc1 (${r.header})`);
+  });
+
+  it('a stale chooser premise (T20a): its line and its hand line, `|`-joined — not its last-chosen WARN', async () => {
+    const lines = [
+      'CHOOSER PREMISE: stale — a lab default (mAlways=true) for averilab://shared — the run fails',
+      'D55 (Android): a lab default: adb -s LAB-SERIAL uninstall dev.averi.lab',
+      'Chooser premise: WARN — 1 last-chosen lab entry (mAlways=false: no default; no reinstall clears it), first: 9d3a2b9 dev.averi.lab/.Twin',
+    ];
+    const r = await judged([chooser('lc1'), chooser('lc2')], { state: 'stale', facts: [], lines });
+    expect(r.line).toBe(`x verdict: FAIL — r: main's rejudge exit 1 — ${lines[0]} | ${lines[1]} (${r.header})`);
+  });
+
+  it('the hedged ceiling\'s MISMATCH (every unaimable leg hedged, live-carousel.ts): a failure the block names, its line whole', async () => {
+    const r = await judged([chooser('lc1'), ...hedgedLegs('uiautomator')]);
+    expect(r.failures).toHaveLength(1);
+    expect(r.failures[0]).toMatch(/^MISMATCH \(hedged ceiling\): hedged 3 of 3 judged unaimable leg\(s\) — .* — the run fails$/);
+    expect(r.line).toBe(`x verdict: FAIL — r: main's rejudge exit 1 — ${r.failures[0]} (${r.header})`);
+  });
+
+  it('a LOUD alone — a case, or the hedged ceiling unjudged — fails nothing: main\'s rejudge exit 0, PASS', async () => {
+    const r = await judged([chooser('lc1'), chooser('lc9', { outcome: 'LOUD', cls: 'loud-untouched', why: 'loud' }), ...hedgedLegs('uiautomator').slice(0, 2)]);
+    expect(liveSummary('android', [...hedgedLegs('uiautomator').slice(0, 2)]).lines).toContain(
+      'LOUD (hedged ceiling): hedged 2 of 2 judged unaimable leg(s) — fewer than 3 judged, the ceiling unjudged (no pass claimed)',
+    );
+    expect(r.failures).toEqual([]);
+    expect(r.line).toBe(`x verdict: PASS — r: main's rejudge exit 0 (${r.header})`);
+    expect(r.header).toMatch(/^# Live golden: 4 cases, 3 ok, 2 loud,/);
   });
 });
 
