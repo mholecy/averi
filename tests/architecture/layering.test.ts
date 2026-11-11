@@ -8,7 +8,8 @@ import { describe, expect, it } from 'vitest';
  *
  * The layer ORDER (A24): `mcp → run → flow → interact → verify → ui-tree → adapters`, with `util/` a leaf every layer
  * may import and that imports no other layer. A module imports only from its own layer or one below it; interact/ also
- * skips verify/ (it imports ui-tree, adapters and util only — verify/'s judge is handed in at the composition roots).
+ * skips verify/ (it imports ui-tree, adapters and util only: verify/ stays reachable from both engines without knowing
+ * how an element is acted on).
  * Fail closed: an import upward, or sideways out of util/, fails naming the edge, and a directory of src/ the order does
  * not name fails until it is placed in it.
  *
@@ -143,7 +144,7 @@ const SKIPS: readonly { readonly from: string; readonly to: string; readonly why
   {
     from: 'interact',
     to: 'verify',
-    why: 'verify/ stays reachable from both engines; its judge (the eyes) is handed in at the composition roots',
+    why: 'verify/ stays reachable from both engines without knowing how an element is acted on (ARCHITECTURE.md §2)',
   },
 ];
 
@@ -183,11 +184,14 @@ function specifiers(source: string): string[] {
   return found;
 }
 
-/** The src files a module imports, resolved (`.js` → `.ts`). */
-const importsOf = (file: string): string[] =>
-  specifiers(readFileSync(file, 'utf8'))
+/** The src files `source`, the text of `file`, imports, resolved (`.js` → `.ts`). */
+const importsIn = (file: string, source: string): string[] =>
+  specifiers(source)
     .filter((s) => s.startsWith('.'))
     .map((s) => resolve(dirname(file), s).replace(/\.js$/, '.ts'));
+
+/** The src files a module imports. */
+const importsOf = (file: string): string[] => importsIn(file, readFileSync(file, 'utf8'));
 
 const rel = (file: string): string => relative(SRC, file);
 
@@ -219,7 +223,15 @@ describe(ORDER_TITLE, () => {
   it('every src/ module lives in a layer the order names', () => {
     const entries = readdirSync(SRC, { withFileTypes: true });
     expect(entries.filter((e) => !e.isDirectory()).map((e) => e.name)).toEqual([]);
-    expect(entries.map((e) => e.name).sort()).toEqual([...ORDER, LEAF].sort());
+    const placed: readonly string[] = [...ORDER, LEAF];
+    const unplaced = entries.filter((e) => e.isDirectory() && !placed.includes(e.name)).map((e) => e.name);
+    expect(
+      unplaced,
+      unplaced
+        .map((d) => `src/${d} is not in ARCHITECTURE.md §2's order — place it in ORDER (and the doc) or move its modules`)
+        .join('; '),
+    ).toEqual([]);
+    expect(entries.map((e) => e.name).sort()).toEqual([...placed].sort());
   });
 
   it('the check sees what it guards: down and into util/ pass; up, a skip, out of util/ or an unplaced layer fail', () => {
@@ -238,6 +250,23 @@ describe(ORDER_TITLE, () => {
     expect(upward(join(VERIFY, 'eyes.ts'), join(SRC, 'cli', 'main.ts'))).toBe(true);
   });
 
+  it('a planted source is read end to end: its upward imports, in any form, are the ones flagged', () => {
+    const file = join(VERIFY, 'planted.ts');
+    const source = [
+      `import { a } from '../ui-tree/geometry.js';`,
+      `import type { B } from "../adapters/types.js";`,
+      `import { sleep } from '../util/sleep.js';`,
+      `import { c } from './png.js';`,
+      `export { d } from "../interact/resolve.js";`,
+      `const e = () => import('../flow/engine.js');`,
+      `import '../mcp/tools.js';`,
+    ].join('\n');
+    const flagged = importsIn(file, source)
+      .filter((target) => upward(file, target))
+      .map(rel);
+    expect(flagged).toEqual(['interact/resolve.ts', 'flow/engine.ts', 'mcp/tools.ts']);
+  });
+
   it('no src/ module imports against the order', () => {
     expect(modulesOf(SRC).length).toBeGreaterThan(100);
     const found = againstTheOrder();
@@ -252,7 +281,6 @@ describe(ORDER_TITLE, () => {
 
 const TITLE = 'a layer above adapters/ imports only the adapters/ modules its row allows (ARCHITECTURE.md, A16, A18, A24)';
 describe(TITLE, () => {
-
   it('the check sees what it guards: the composition root imports the platform adapters, each of them flagged', () => {
     expect(modulesOf(MCP)).toContain(COMPOSITION_ROOT);
     const platform = importsOf(COMPOSITION_ROOT)
