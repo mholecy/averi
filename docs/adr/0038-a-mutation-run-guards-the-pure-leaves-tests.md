@@ -25,6 +25,7 @@ amendment at the end).
 Amended 2026-11-11 (T20b: scripts/truth/batch/lab-run.ts joined the run — see the T20b amendment at the end).
 Amended 2026-11-11 (T9: src/interact/fill-type.ts joined the run — see the T9 amendment at the end).
 Amended 2026-11-11 (T22: src/util/regex.ts joined the run — see the T22 amendment at the end).
+Amended 2026-11-11 (T23: the Android build's JDK 17 lookup — see the T23 amendment at the end).
 
 ## Context
 
@@ -1668,3 +1669,24 @@ tests/util/regex.test.ts (the helper's direct pins, moved from tests/verify/text
 tests/verify/assert.test.ts (`regexSource`'s refusals): 100 % cold (10 mutants, 9 killed, 1 runtime error; narrowed
 with `--mutate`, which exits 1 by design: see the T9 amendment): floor 98. failure-text.ts reads 98.98 % (197 mutants,
 the 3 fewer the private copy's; the same survivors), floor 97 kept.
+
+## Amendment: the Android build's JDK 17 lookup (2026-11-11, backlog T23)
+
+S6b's Android build took its JDK from `java_home -v 17` alone. Inside the agent's sandbox that finds nothing ("Unable
+to locate a Java Runtime") although zulu-17.jdk is installed, so T20b's first run could not build and ended exit 3
+unproven. `jdk17Of` in lab-lines.ts replaces `javaHomeOf` with this order, each source asked only when the ones before
+it failed: JAVA_HOME; `java_home -v 17`; the first `*.jdk` (sorted) in /Library/Java/JavaVirtualMachines, then in
+~/Library/Java/JavaVirtualMachines. A home counts when its release file says `JAVA_VERSION="17"` or `"17.…"` and it
+has `bin/javac` (a JRE would fail Gradle). The probes are injected (the env, the call, the folders, the fs), so the
+lookup stays a pure leaf. A met build's JDK (`JDK 17: <home> (from JAVA_HOME | java_home | JavaVirtualMachines)`) is
+in the `android-build` need's how, and reaches the device need through `askBuild` (BuildRef's `under`), whose line
+names it: lab-run.ts, which lists no build need, prints `LAB android: OK — …; this run's build installed under JDK 17:
+<home> (from …); …`. When an earlier source was passed over (JAVA_HOME set but not a JDK 17, java_home failing), the
+build's warning (`<what each said> — the build used the one from <source>`) is carried there too: `LAB android:
+WARN — …`, the lab check still PASS and the exit 0. The warning is said once: the first line asking the build keeps it
+(a batch that lists `android-build` before `android`, as batch-11's lab block does, says it on the build need's line),
+later answers come without it. None found, the build's why lists every source tried and what it
+said: nothing built, the lab check WARNs and lab-run exits 3.
+The modules stay in the `lab` group: lab-lines.ts 100 % (350 mutants) and lab-build.ts 100 % (312), floor 98;
+lab-run.ts (its `jvms` option, a test's own folders) at its floor 93 — cold, narrowed with `--mutate` (whose exit 1 is
+the fill-type amendment's); the figures are in scope.json.

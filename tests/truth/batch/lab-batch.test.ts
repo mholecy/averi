@@ -6,7 +6,7 @@ import { androidLab, withReads } from '../../../scripts/truth/batch/android-lab.
 import type { Asked } from '../../../scripts/truth/batch/cases.js';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
 import { iosCheck, iosLab, wdaWindow } from '../../../scripts/truth/batch/ios-lab.js';
-import { labBlock, labBuild } from '../../../scripts/truth/batch/lab-build.js';
+import { APK_PATH, labBlock, labBuild } from '../../../scripts/truth/batch/lab-build.js';
 import type { LiveCases, LiveTable } from '../../../scripts/truth/batch/live-table.js';
 import type { Ended, KillResult, ProcessSeam, StartOptions, Started } from '../../../scripts/truth/batch/proc.js';
 import { runBatch, type Block } from '../../../scripts/truth/batch/runner.js';
@@ -135,9 +135,9 @@ const P7W: Asked = { platform: 'ios', app: 'native', sources: ['wda'], cases: ['
  * health check first (`beforeWork` changes the lab before it), a check not fit its INCONCLUSIVE naming why; each
  * window's outcome kept in `windows`.
  */
-function batch(o: { labNeeds?: string[]; d55First?: boolean; beforeWork?: () => void } = {}) {
+function batch(o: { labNeeds?: string[]; d55First?: boolean; beforeWork?: () => void; jvms?: string[] } = {}) {
   const windows: Awaited<ReturnType<typeof wdaWindow>>[] = [];
-  const build = labBuild();
+  const build = labBuild({ jvms: o.jvms });
   const android = androidLab({ build: build.android, settle: noWait });
   const ios = iosLab({ wait: noWait });
   const judgeOf = (label: string) => async () => [`${label}: PASS — its runs complete`];
@@ -203,8 +203,8 @@ describe('a fake lab batch under runBatch: the lab lines from the needs, the rea
     expect(summary()).toEqual([
       '======== SUMMARY',
       "OK checkout: main's HEAD aaaaaaaa, clean",
-      `LAB android-build: OK — built from the checkout under test (${join(repo, 'fixtures/apps/android/build/outputs/apk/debug/AveriLab-debug.apk')}); its assets/cells.json main's; the Gradle daemon stopped`,
-      `LAB android: OK — averi_lab emulator ${LAB_SERIAL}; this run's build installed; the APK's assets/cells.json is main's (pulled: ${apk}); handlers: averilab://shared/open 2, averilab://cell/open 1`,
+      `LAB android-build: OK — built from the checkout under test (${join(repo, 'fixtures/apps/android/build/outputs/apk/debug/AveriLab-debug.apk')}) under JDK 17: ${join(root, 'jdk17')} (from java_home); its assets/cells.json main's; the Gradle daemon stopped`,
+      `LAB android: OK — averi_lab emulator ${LAB_SERIAL}; this run's build installed under JDK 17: ${join(root, 'jdk17')} (from java_home); the APK's assets/cells.json is main's (pulled: ${apk}); handlers: averilab://shared/open 2, averilab://cell/open 1`,
       "LAB ios: OK — averi-lab iPhone 17 simulator, iOS 27.0, reset; not rebuilt; the installed cells.json is main's",
       "lab check: PASS — every lab need met: android-build, android (each one's LAB line above)",
       'D55 browser role: WARN — not compared: before: exit 255 Unknown command: get-role-holders; after: exit 255 Unknown command: get-role-holders',
@@ -222,6 +222,24 @@ describe('a fake lab batch under runBatch: the lab lines from the needs, the rea
     expect(gradle.map((w) => w.split(' ').slice(1).join(' '))).toEqual(['--console=plain assembleDebug', '--stop']);
     expect(seam.words.slice(-5)).toEqual(['pkill -f DerivedData/averi-wda-lab([/ ]|$)', `pkill -f Devices/${LAB_UDID}/.*WebDriverAgentRunner`, 'lsof -t -n -P -sTCP:LISTEN -i tcp:8120', `pkill -f idb_companion --udid ${LAB_UDID}`, `idb disconnect ${LAB_UDID}`]);
     expect(outText()).toContain(`NOTE the lab's WebDriverAgent (port 8120 free) and idb_companion of ${LAB_UDID} ended`);
+  });
+
+  it('T23 code review: a JDK source passed over is said once — on the first LAB line asking the build, the build need\'s here', async () => {
+    fresh({ buildFails: 'java' });
+    const jvms = join(root, 'jvms');
+    const zulu = join(jvms, 'zulu-17.jdk', 'Contents', 'Home');
+    mkdirSync(join(zulu, 'bin'), { recursive: true });
+    writeFileSync(join(zulu, 'release'), 'JAVA_VERSION="17.0.12"\n');
+    writeFileSync(join(zulu, 'bin', 'javac'), '');
+    const warning = 'java_home -v 17 → nothing: exit 1 Unable to find any JVMs matching version "17" — the build used the one from JavaVirtualMachines';
+    const jdk = `JDK 17: ${zulu} (from JavaVirtualMachines)`;
+    expect(await go(batch({ jvms: [jvms] }))).toBe(0);
+    const lab = summary().filter((l) => l.startsWith('LAB android'));
+    expect(lab).toEqual([
+      `LAB android-build: WARN — ${warning}: built from the checkout under test (${join(repo, APK_PATH)}) under ${jdk}; its assets/cells.json main's; the Gradle daemon stopped`,
+      `LAB android: OK — averi_lab emulator ${LAB_SERIAL}; this run's build installed under ${jdk}; the APK's assets/cells.json is main's (pulled: ${join(dirOf('lab'), 'installed.apk')}); handlers: averilab://shared/open 2, averilab://cell/open 1`,
+    ]);
+    expect(summary().find((l) => l.startsWith('lab check:'))).toMatch(/^lab check: PASS/);
   });
 
   it('a late writer after the restore: the compare WARN, its hand lines in RESTORE, exit 1; the finportal key CHANGED a FAIL line, from the ios need\'s end (T2b batch-13 gap 4)', async () => {

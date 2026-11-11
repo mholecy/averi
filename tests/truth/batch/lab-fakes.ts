@@ -335,6 +335,8 @@ export function labWorld(o: WorldOptions) {
   };
   mkdirSync(join(o.dir, 'jdk17'), { recursive: true });
   writeFileSync(join(o.dir, 'jdk17', 'release'), 'JAVA_VERSION="17.0.12"\n');
+  mkdirSync(join(o.dir, 'jdk17', 'bin'), { recursive: true });
+  writeFileSync(join(o.dir, 'jdk17', 'bin', 'javac'), '');
   /** The WDA window's work started the lab's WebDriverAgent: listening on 8120, its exit to flip Accessibility. */
   const startWda = () => {
     st.wda = true;

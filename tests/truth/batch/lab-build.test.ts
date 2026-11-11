@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DEVICE_CHECK_SIMULATOR } from '../../../scripts/truth/lab-device.js';
 import type { Run } from '../../../scripts/truth/batch/bounded.js';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
-import { ANDROID_BUILD_NEED, APK_PATH, BUILD_SECS, checkDevice, CATALOG_SECS, GRADLE_STOP_SECS, IOS_APP_PATH, IOS_BUILD_NEED, JAVA_HOME, JAVA_HOME_SECS, LAB_BLOCK, labBlock, labBuild } from '../../../scripts/truth/batch/lab-build.js';
+import { ANDROID_BUILD_NEED, APK_PATH, askBuild, BUILD_SECS, checkDevice, CATALOG_SECS, GRADLE_STOP_SECS, IOS_APP_PATH, IOS_BUILD_NEED, JAVA_HOME, JAVA_HOME_SECS, LAB_BLOCK, labBlock, labBuild } from '../../../scripts/truth/batch/lab-build.js';
 import type { NeedCtx } from '../../../scripts/truth/batch/runner.js';
 import { CATALOG, LAB_UDID, labWorld, runOf, type LabWorld, type WorldOptions } from './lab-fakes.js';
 
@@ -113,7 +113,8 @@ describe('the Android build (batch-11.sh:298, 308–314): JDK 17, gradlew assemb
     const run = runOf(world);
     const r = await need(b, ANDROID_BUILD_NEED).check(needCtx(run, LAB_UDID, { PATH: '/bin', ANDROID_HOME: '/sdk' }));
     const apk = join(repo, APK_PATH);
-    expect(r).toEqual({ ok: true, how: `built from the checkout under test (${apk}); its assets/cells.json main's; the Gradle daemon stopped` });
+    // Strict: nothing passed over, so no warning key at all.
+    expect(r).toStrictEqual({ ok: true, how: `built from the checkout under test (${apk}) under JDK 17: ${join(dir, 'jdk17')} (from java_home); its assets/cells.json main's; the Gradle daemon stopped` });
     const cwd = join(repo, 'fixtures/apps/android');
     const log = join(dir, 'lab', 'android-build.log');
     const env = { PATH: '/bin', ANDROID_HOME: '/sdk', JAVA_HOME: join(dir, 'jdk17') };
@@ -140,6 +141,46 @@ describe('the Android build (batch-11.sh:298, 308–314): JDK 17, gradlew assemb
     expect(bare.seen.find((s) => s.words.endsWith('assembleDebug'))?.env).toEqual({ JAVA_HOME: join(dir, 'jdk17') });
   });
 
+  it('T23: JAVA_HOME when a JDK 17 (java_home never asked); else java_home; else a JVM folder\'s first JDK 17', async () => {
+    const own = join(dir, 'own17');
+    mkdirSync(join(own, 'bin'), { recursive: true });
+    writeFileSync(join(own, 'release'), 'JAVA_VERSION="17.0.19"\n');
+    writeFileSync(join(own, 'bin', 'javac'), '');
+    const run = runOf(world);
+    const r = await need(labBuild(), ANDROID_BUILD_NEED).check(needCtx(run, LAB_UDID, { JAVA_HOME: own }));
+    expect(r).toEqual({ ok: true, how: expect.stringContaining(`under JDK 17: ${own} (from JAVA_HOME);`) });
+    expect(run.seen.some((s) => s.words.startsWith(JAVA_HOME))).toBe(false);
+    expect(run.seen.find((s) => s.words.endsWith('assembleDebug'))?.env).toEqual({ JAVA_HOME: own });
+    // The agent's sandbox: java_home finds none; the JDK is in a JVM folder (zulu-17.jdk on the owner's host).
+    fresh({ buildFails: 'java' });
+    const jvms = join(dir, 'jvms');
+    const zulu = join(jvms, 'zulu-17.jdk', 'Contents', 'Home');
+    mkdirSync(join(zulu, 'bin'), { recursive: true });
+    writeFileSync(join(zulu, 'release'), 'JAVA_VERSION="17.0.12"\n');
+    writeFileSync(join(zulu, 'bin', 'javac'), '');
+    const sandboxed = runOf(world);
+    const kit = labBuild({ jvms: [join(dir, 'none'), jvms] });
+    const s = await need(kit, ANDROID_BUILD_NEED).check(needCtx(sandboxed, LAB_UDID, { JAVA_HOME: '' }));
+    const how = `built from the checkout under test (${join(repo, APK_PATH)}) under JDK 17: ${zulu} (from JavaVirtualMachines); its assets/cells.json main's; the Gradle daemon stopped`;
+    expect(s).toStrictEqual({
+      ok: true,
+      how,
+      warning: `java_home -v 17 → nothing: exit 1 Unable to find any JVMs matching version "17"; ${join(dir, 'none')}: no *.jdk (or unreadable) — the build used the one from JavaVirtualMachines`,
+    });
+    // Said once (code review): the build's later answers — the device need's ensure, a recheck — come without it.
+    expect(await kit.android.ensure(needCtx(sandboxed))).toStrictEqual({ ok: true, how });
+    expect(await need(kit, ANDROID_BUILD_NEED).check(needCtx(sandboxed))).toStrictEqual({ ok: true, how });
+    expect(kit.android.builtUnder?.()).toBe(`JDK 17: ${zulu} (from JavaVirtualMachines)`);
+    // A failed build stays failed for every asker.
+    const noJdk = labBuild({ jvms: [join(dir, 'none')] });
+    const failedAgain = [await noJdk.android.ensure(needCtx(sandboxed)), await need(noJdk, ANDROID_BUILD_NEED).check(needCtx(sandboxed))];
+    expect(failedAgain.map((r) => (r as { ok: boolean }).ok)).toEqual([false, false]);
+    expect(sandboxed.seen.find((c) => c.words.endsWith('assembleDebug'))?.env).toEqual({ JAVA_HOME: zulu });
+    // A JRE 17 (no bin/javac) is passed over: Gradle needs the compiler.
+    rmSync(join(zulu, 'bin', 'javac'));
+    expect(await need(labBuild({ jvms: [jvms] }), ANDROID_BUILD_NEED).check(needCtx())).toMatchObject({ ok: false, why: expect.stringContaining('zulu-17.jdk (no bin/javac (a JRE))') });
+  });
+
   it('a build that fails: --stop still called after it, then not met naming its log', async () => {
     fresh({ buildFails: 'gradlew' });
     const run = runOf(world);
@@ -154,10 +195,14 @@ describe('the Android build (batch-11.sh:298, 308–314): JDK 17, gradlew assemb
     expect(r).toMatchObject({ ok: true });
     expect(steps).toEqual(['WARN lab android: gradlew --stop: exit 1 no daemon — the Gradle daemon may still be running']);
     fresh({ buildFails: 'java' });
-    expect(await need(labBuild(), ANDROID_BUILD_NEED).check(needCtx())).toEqual({ ok: false, why: 'no JDK 17 (java_home -v 17 → nothing: exit 1 Unable to find any JVMs matching version "17")' });
+    const jvms = [join(dir, 'jvms')];
+    expect(await need(labBuild({ jvms }), ANDROID_BUILD_NEED).check(needCtx())).toEqual({
+      ok: false,
+      why: `no JDK 17 (JAVA_HOME unset; java_home -v 17 → nothing: exit 1 Unable to find any JVMs matching version "17"; ${jvms[0]}: no *.jdk (or unreadable))`,
+    });
     fresh();
     writeFileSync(join(dir, 'jdk17', 'release'), 'JAVA_VERSION="21"\n');
-    expect(await need(labBuild(), ANDROID_BUILD_NEED).check(needCtx())).toMatchObject({ ok: false, why: expect.stringContaining('its release says no 17') });
+    expect(await need(labBuild({ jvms }), ANDROID_BUILD_NEED).check(needCtx())).toMatchObject({ ok: false, why: expect.stringContaining('its release says no 17') });
     fresh();
     rmSync(join(repo, APK_PATH), { force: true });
     const noApk = await need(labBuild(), ANDROID_BUILD_NEED).check(needCtx(async (cmd, args, call) => (args.includes('assembleDebug') ? { code: 0, timedOut: false, signal: null, out: '', err: '' } : runOf(world)(cmd, args, call))));
@@ -262,5 +307,25 @@ describe("checkDevice's warnings (batch-13): the readying's (the companion entry
     expect(await checkDevice(ctx, {}, device('entry stale'))).toStrictEqual({ ok: true, how: "the device; not rebuilt; cells main's", warning: 'entry stale' });
     expect(await checkDevice(ctx, { build: failed }, device('entry stale'))).toStrictEqual({ ok: true, how: "the device; not rebuilt; cells main's", warning: 'entry stale; the build failed; the app already installed is used' });
     expect(await checkDevice(ctx, { build: failed }, device())).toStrictEqual({ ok: true, how: "the device; not rebuilt; cells main's", warning: 'the build failed; the app already installed is used' });
+  });
+
+  it('T23: a met build — what it was built under in the how, its own warning said (lab-run reaches the build only here)', async () => {
+    const met = (warning?: string, builtUnder?: string) => ({
+      ensure: async () => ({ ok: true as const, how: 'built', ...(warning !== undefined && { warning }) }),
+      built: () => '/app.apk',
+      ...(builtUnder !== undefined && { builtUnder: () => builtUnder }),
+    });
+    const jdk = 'JDK 17: /jdk (from java_home)';
+    expect(await checkDevice(ctx, { build: met(undefined, jdk) }, device())).toStrictEqual({ ok: true, how: `the device; this run's build installed under ${jdk}; cells main's` });
+    expect(await checkDevice(ctx, { build: met() }, device())).toStrictEqual({ ok: true, how: "the device; this run's build installed; cells main's" });
+    expect(await checkDevice(ctx, { build: { ...met(undefined, jdk), builtUnder: () => undefined } }, device())).toStrictEqual({ ok: true, how: "the device; this run's build installed; cells main's" });
+    expect(await checkDevice(ctx, { build: met('java_home → nothing', jdk) }, device('entry stale'))).toStrictEqual({
+      ok: true,
+      how: `the device; this run's build installed under ${jdk}; cells main's`,
+      warning: 'entry stale; java_home → nothing',
+    });
+    // askBuild's own answer: no builtUnder, no warning key when the build has none.
+    expect(await askBuild(ctx, { build: met() })).toStrictEqual({ built: '/app.apk' });
+    expect(await askBuild(ctx, { build: met('w', jdk) })).toStrictEqual({ built: '/app.apk', builtUnder: jdk, warning: 'w' });
   });
 });

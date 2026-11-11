@@ -1,8 +1,9 @@
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { APK_PATH, isDeviceCheckSimulator } from '../lab-device.js';
 import type { CallResult, Run } from './bounded.js';
 import { CELLS_ENTRY, UNZIP_SECS } from './lab-emu.js';
-import { CATALOG_PATH, cellsWhy, javaHomeOf, NOT_REBUILT, REBUILT, RERUN_HINT, type Opened } from './lab-lines.js';
+import { CATALOG_PATH, cellsWhy, jdk17Of, jdkLine, jvmDirs, NOT_REBUILT, REBUILT, RERUN_HINT, type Opened } from './lab-lines.js';
 import type { Block, LastStep, Need, NeedCtx, NeedSpec } from './runner.js';
 import { NO_UDID, type NeedResult } from './runner-lines.js';
 import { exitText, failedCall, nameInLine } from './words.js';
@@ -12,11 +13,12 @@ import { exitText, failedCall, nameInLine } from './words.js';
  * block names — `ios-build`, `android-build` — so a build that fails makes every block needing it INCONCLUSIVE naming
  * why (the runner's need rule), and a block that does not need it runs on the app already installed: main's catalog
  * `--check`ed first, once for both (S3's not-ported row: a stale cells.json builds nothing); the iOS build (xcodegen,
- * xcodebuild) and the Android build (`gradlew assembleDebug` under JDK 17), each a bounded step logged in the lab
- * folder, its product's cells.json main's; then `gradlew --stop`, after every Android build: the Gradle daemon leaves
- * the call's group by design, so S2's group kill cannot reach it. xcodebuild needs no pkill: its group ends with it
- * (S2). The devices' needs (ios-lab.ts, android-lab.ts) install this run's build (`built`) before their cells check;
- * and `labBlock` is batch-11's and batch-12's `lab` block — `ONLY=lab` runs just its needs.
+ * xcodebuild) and the Android build (`gradlew assembleDebug` under JDK 17: `jdk17Of` in lab-lines.ts, T23), each a
+ * bounded step logged in the lab folder, its product's cells.json main's; then `gradlew --stop`, after every Android
+ * build: the Gradle daemon leaves the call's group by design, so S2's group kill cannot reach it. xcodebuild needs no
+ * pkill: its group ends with it (S2). The devices' needs (ios-lab.ts, android-lab.ts) install this run's build
+ * (`built`) before their cells check; and `labBlock` is batch-11's and batch-12's `lab` block — `ONLY=lab` runs just
+ * its needs.
  */
 
 /** A build's bound when the batch names none (batch-11's B_BUILD). */
@@ -42,10 +44,12 @@ export const LAB_BLOCK = 'lab';
 /**
  * One platform's build as a device need asks it (T2 S6b review round 1, MAJOR 2): `ensure` runs it once for the run —
  * whoever asks first, the device need or the build need's own check — and `built` is its product once it was met.
+ * `builtUnder`: what it was built under, once met, for the device's line (the Android build's JDK, T23).
  */
 export interface BuildRef {
   ensure(c: NeedCtx): Promise<NeedResult>;
   built(): string | undefined;
+  builtUnder?(): string | undefined;
 }
 
 export interface LabBuild {
@@ -60,18 +64,25 @@ export interface LabBuild {
   lastly: LastStep;
 }
 
-/** What a device need does with its build: install this product (none: not rebuilt), with a warning; or not met. */
-export type BuildAnswer = { built?: string; warning?: string } | { why: string };
+/**
+ * What a device need does with its build: install this product (none: not rebuilt) built under `builtUnder`, with a
+ * warning; or not met.
+ */
+export type BuildAnswer = { built?: string; builtUnder?: string; warning?: string } | { why: string };
 
 /**
  * A device need's build (T2 S6b review round 1, MAJOR 2): asked by the need itself, so the order of a block's needs
- * does not matter. None wanted: nothing to install. Met: its product. Failed: not met when the batch requires it, else
- * batch-11's way — a warning, the app already installed is used.
+ * does not matter. None wanted: nothing to install. Met: its product, what it was built under, and the build's own
+ * warning (T23: a JDK source passed over) — lab-run.ts reaches the build only through here. Failed: not met when the
+ * batch requires it, else batch-11's way — a warning, the app already installed is used.
  */
 export async function askBuild(c: NeedCtx, o: { build?: BuildRef; requireBuild?: boolean }): Promise<BuildAnswer> {
   if (o.build === undefined) return {};
   const r = await o.build.ensure(c);
-  if (r.ok) return { built: o.build.built() };
+  if (r.ok) {
+    const builtUnder = o.build.builtUnder?.();
+    return { built: o.build.built(), ...(builtUnder !== undefined && { builtUnder }), ...(r.warning !== undefined && { warning: r.warning }) };
+  }
   if (o.requireBuild === true) return { why: `this run's build failed, and the batch requires it: ${r.why}` };
   return { warning: `${r.why}; the app already installed is used` };
 }
@@ -106,10 +117,16 @@ export async function checkDevice<T>(c: NeedCtx, o: { build?: BuildRef; requireB
   }
   const cells = await d.cells(device);
   if ('why' in cells) return { ok: false, why: `${cells.why} ${RERUN_HINT}` };
-  const how = `${d.describe(device)}; ${asked.built === undefined ? NOT_REBUILT : REBUILT}; ${cells.how}`;
+  const how = `${d.describe(device)}; ${installedText(asked)}; ${cells.how}`;
   const warnings = [opened.warning, asked.warning].filter((w) => w !== undefined);
   return warnings.length === 0 ? { ok: true, how } : { ok: true, how, warning: warnings.join('; ') };
 }
+
+/** What the device's line says of its build: not rebuilt, or this run's build installed — under its JDK when named. */
+const installedText = (a: { built?: string; builtUnder?: string }): string => {
+  if (a.built === undefined) return NOT_REBUILT;
+  return a.builtUnder === undefined ? REBUILT : `${REBUILT} under ${a.builtUnder}`;
+};
 
 /** A Gradle call's whole: its wrapper, its folder, its env (the JDK, the SDK) and its log. */
 export interface GradleCall {
@@ -127,15 +144,19 @@ const failedText = (what: string, r: CallResult, log: string): string => `${what
 
 /**
  * The lab builds. Each need checks main's catalog first (one `catalog.ts --check` for the run, from the checkout under
- * test), then builds; met, its product's cells.json is main's. `alive`: the product still there.
+ * test), then builds; met, its product's cells.json is main's. `alive`: the product still there. `jvms`: the folders
+ * the JDK lookup tries last (jvmDirs: the system's, then the user's; a test's own).
  */
-export function labBuild(o: { secs?: number } = {}): LabBuild {
+export function labBuild(o: { secs?: number; jvms?: readonly string[] } = {}): LabBuild {
   const secs = o.secs ?? BUILD_SECS;
+  const jvms = o.jvms ?? jvmDirs(homedir());
   let catalog: Promise<string | undefined> | undefined;
   const built: { ios?: string; android?: string } = {};
   const failed = new Map<string, string>();
   /** The Android build's call, once started, until its own --stop returned: what the last step stops. */
   let gradle: { call: GradleCall; why: string } | undefined;
+  /** The Android build's JDK, once it was met (jdkLine): the device's line names it. */
+  let jdk: string | undefined;
   const catalogFresh = (c: NeedCtx): Promise<string | undefined> =>
     (catalog ??= (async () => {
       const log = join(c.labDir, 'catalog-check.log');
@@ -167,7 +188,15 @@ export function labBuild(o: { secs?: number } = {}): LabBuild {
   const android = async (c: NeedCtx): Promise<NeedResult> => {
     const stale = await catalogFresh(c);
     if (stale !== undefined) return { ok: false, why: `${stale} — nothing built` };
-    const checked = javaHomeOf(await c.bounded(JAVA_HOME, ['-v', '17'], { secs: JAVA_HOME_SECS }), (home) => c.fs.read(join(home, 'release')));
+    // JAVA_HOME, else java_home, else the JVM folder (T23: java_home finds none inside the agent's sandbox).
+    const checked = await jdk17Of({
+      javaHomeEnv: c.config.env.JAVA_HOME,
+      javaHome: () => c.bounded(JAVA_HOME, ['-v', '17'], { secs: JAVA_HOME_SECS }),
+      jvms,
+      list: (d) => c.fs.list(d),
+      release: (home) => c.fs.read(join(home, 'release')),
+      javac: (home) => c.fs.exists(join(home, 'bin', 'javac')),
+    });
     if ('why' in checked) return { ok: false, why: checked.why };
     const cwd = join(c.config.repo, 'fixtures/apps/android');
     const log = join(c.labDir, 'android-build.log');
@@ -190,7 +219,10 @@ export function labBuild(o: { secs?: number } = {}): LabBuild {
     const why = cellsWhy(failedCall(cells) ? undefined : cells.out, catalogText(c), 'the built APK');
     if (why !== undefined) return { ok: false, why };
     built.android = apk;
-    return { ok: true, how: `built from the checkout under test (${nameInLine(apk)}); its ${CELLS_ENTRY} main's; the Gradle daemon stopped` };
+    jdk = jdkLine(checked);
+    const how = `built from the checkout under test (${nameInLine(apk)}) under ${jdk}; its ${CELLS_ENTRY} main's; the Gradle daemon stopped`;
+    // A source passed over (JAVA_HOME not a JDK 17, java_home failing) is said: the build ran, but not where asked.
+    return checked.warning === undefined ? { ok: true, how } : { ok: true, how, warning: checked.warning };
   };
 
   const stillThere = (product: () => string | undefined) => async (c: NeedCtx): Promise<NeedResult> => {
@@ -198,14 +230,27 @@ export function labBuild(o: { secs?: number } = {}): LabBuild {
     if (p === undefined) return { ok: false, why: "this run's build is gone (none)" };
     return c.fs.exists(p) ? { ok: true, how: `${nameInLine(p)} still there` } : { ok: false, why: `this run's build is gone (${nameInLine(p)})` };
   };
-  /** A build run once for the run, its failure kept for failures(). */
+  /**
+   * A build run once for the run, its failure kept for failures(). A met build's warning is said once (T23 code
+   * review): the first asker's line keeps it — the build need's own, when the batch lists it first, else the device
+   * need's — and every later answer comes without it, so the SUMMARY never says it twice.
+   */
   const once = (need: string, build: (c: NeedCtx) => Promise<NeedResult>) => {
     let run: Promise<NeedResult> | undefined;
-    return (c: NeedCtx): Promise<NeedResult> =>
-      (run ??= build(c).then((r) => {
+    // Said once: the first asker's line carries the warning. If that asker's line then reports its own failure
+    // instead (a device need whose install fails), the warning is not repeated on a later line — the run is
+    // unproven then anyway (T23 review round 4, NIT-1).
+    let said = false;
+    return async (c: NeedCtx): Promise<NeedResult> => {
+      const r = await (run ??= build(c).then((r) => {
         if (!r.ok) failed.set(need, r.why);
         return r;
       }));
+      if (!r.ok) return r;
+      const first = !said;
+      said = true;
+      return first ? r : { ok: true, how: r.how };
+    };
   };
   const iosOnce = once(IOS_BUILD_NEED, ios);
   const androidOnce = once(ANDROID_BUILD_NEED, android);
@@ -215,7 +260,7 @@ export function labBuild(o: { secs?: number } = {}): LabBuild {
       [ANDROID_BUILD_NEED]: { check: androidOnce, alive: stillThere(() => built.android) },
     },
     ios: { ensure: iosOnce, built: () => built.ios },
-    android: { ensure: androidOnce, built: () => built.android },
+    android: { ensure: androidOnce, built: () => built.android, builtUnder: () => jdk },
     failures: () => [...failed].map(([need, why]) => `${need}: ${why}`),
     async lastly({ run, step }) {
       if (gradle === undefined) return;

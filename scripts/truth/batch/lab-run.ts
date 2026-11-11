@@ -331,6 +331,8 @@ export interface LabRunOptions {
   io?: Partial<RunIo>;
   /** The lab plumbing's waits (tests pass one that does not wait). */
   wait?: (ms: number) => Promise<unknown>;
+  /** The JVM folders the build's JDK lookup tries last (lab-lines.ts#jvmDirs by default; a test's own). */
+  jvms?: readonly string[];
 }
 
 /** The run, start to end: its exit code (LAB_RUN_EXIT), the one the seam's exit is called with. */
@@ -350,7 +352,7 @@ export async function labRun(o: LabRunOptions): Promise<number> {
   // The build's bound is given before runBatch reads the knobs (the blocks read theirs from ctx.knobs); a bad knob
   // refuses there, with nothing built.
   const pre = readKnobs(KNOBS, o.env);
-  const build = labBuild(pre.ok ? { secs: pre.values.B_BUILD } : {});
+  const build = labBuild({ ...(pre.ok ? { secs: pre.values.B_BUILD } : {}), jvms: o.jvms });
   const android = androidLab({ build: build.android, settle: o.wait });
 
   const liveRun = async (ctx: BlockCtx<LabRunKnobs>, group: LabRunGroup): Promise<void> => {
