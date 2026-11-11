@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { FAILURES_SUFFIX } from '../rejudge-failures.js';
 import { NOT_STARTED, TIMED_OUT } from './bounded.js';
 import { isEexist, nodeFs, type BatchFs } from './io.js';
 import { DEFAULT_GROUPS, unreadLive, type LiveSelection, type LiveTable } from './live-table.js';
@@ -10,8 +11,9 @@ import { nameInLine, verdictLine } from './words.js';
  * A live run's own record of what it was asked, and when it counts. A block that runs live.ts writes `<name>.cases`
  * first — before the run's health check, before anything of it runs — so a run that never ran is seen as asked and
  * not complete, an INCONCLUSIVE, never a missing line (batch-9's finding: such a run vanished from the analysis).
- * Beside it the run leaves `<name>.json` (live.ts --record), `<name>.log` (its output) and `<name>.rejudge.txt` (main's
- * `--rejudge` summary, live-cases.ts#summarize).
+ * Beside it the run leaves `<name>.json` (live.ts --record), `<name>.log` (its output), `<name>.rejudge.txt` (main's
+ * `--rejudge` summary, live-cases.ts#summarize) and `<name>.rejudge.json` (that summary's failure reasons, as data:
+ * ../rejudge-failures.ts, written by the rejudge's `--failures`).
  *
  * A run counts only when complete (b11-analyze.ts:1–23): its `.cases`, a record, live.ts's `# Live golden:` line in
  * both its log and its summary (printed only once live.ts has judged), and every case main's selectCases picks for
@@ -38,12 +40,13 @@ export interface Asked {
   groups?: readonly string[];
 }
 
-/** A run's four files, by its name: `<name>.cases`, `.json`, `.log`, `.rejudge.txt`. */
+/** A run's five files, by its name: `<name>.cases`, `.json`, `.log`, `.rejudge.txt`, `.rejudge.json`. */
 export const runFiles = (dir: string, name: string) => ({
   cases: join(dir, `${name}.cases`),
   record: join(dir, `${name}.json`),
   log: join(dir, `${name}.log`),
   summary: join(dir, `${name}.rejudge.txt`),
+  failures: join(dir, `${name}${FAILURES_SUFFIX}`),
 });
 
 const CASES_EXT = '.cases';

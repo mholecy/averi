@@ -1,6 +1,7 @@
 import { basename, dirname, join } from 'node:path';
 import { escapeRegExp } from '../../../src/util/regex.js';
 import type { CallResult } from './bounded.js';
+import { shellQuote } from './shell.js';
 import { exitText, nameInLine, stepLine, verdictLine } from './words.js';
 
 /**
@@ -173,9 +174,6 @@ export function defaultsArgv(udid: string, args: readonly string[]): string[] {
   }
   return ['simctl', 'spawn', udid, 'defaults', ...args];
 }
-
-/** A word as a shell reads it back: as given when plain, else single-quoted (a `'` in it as `'\''`). */
-export const shellQuote = (s: string): string => (/^[\w@%+=:,./-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`);
 
 // ------------------------------------------------------------------------------------------------ the restore rule
 

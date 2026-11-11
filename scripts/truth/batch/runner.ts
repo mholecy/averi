@@ -47,7 +47,7 @@ import {
 } from './runner-lines.js';
 import { knobs as readKnobs, selectBlocks, type KnobSpec, type KnobValues } from './select.js';
 import { StepLog, terminalOf, type Terminal } from './steps.js';
-import { canonicalJson, EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parseVerdictLine, summaryLines, timeOf, verdictLine, type StepWord, type Verdict } from './words.js';
+import { canonicalJson, EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parseVerdictLine, summaryLines, timeOf, verdictLine, type StepWord, type Summary, type Verdict } from './words.js';
 
 /**
  * runBatch: a device batch's run, start to end, composed of the module's parts — a batch, kept outside the repo, gives
@@ -70,7 +70,7 @@ import { canonicalJson, EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parse
  * 7. the normal end: each need met that has an `end`, once (NeedSpec: the ios need's finportal read, its protected-key
  *    line); every window still open to RESTORE (finish); each block that ran with no verdict of its own judged
  *    (`judge`, device-free); the backstop for a wanted block still without one; the details; the SUMMARY; the exit code
- *    (words.ts#exitCodeOf).
+ *    (words.ts#exitCodeOf), returned with the SUMMARY's parts (BatchResult) — the process's exit is the caller's.
  *
  * A block gets, through its ctx: the steps (`step`, `note`, `err`), bounded probes (its `bounded`), dirty windows
  * (`open`, `close`), its folder, its verdict lines (several allowed), `restoreHand` (RESTORE now, exit 1),
@@ -103,9 +103,14 @@ import { canonicalJson, EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parse
  *       const warnings = [...w.warnings, ...said];                   // the window's two checks', then the work's
  *       if (warnings.length > 0) ctx.step('WARN', `D43: ${warnings.join('; ')}`);
  *     }, judge };                                                     // the finportal key: the ios need's end reads it
- *     await runBatch({ name: 'batch-13', knobs, blocks: [labBlock(['android', 'ios'], { build }), kf, D43],
+ *     const r = await runBatch({ name: 'batch-13', knobs, blocks: [labBlock(['android', 'ios'], { build }), kf, D43],
  *       needs: { ...build.needs, android: android.need, ios: ios.need }, lastly: [ios.lastly, build.lastly],
  *       config: configOf(process.argv.slice(2), process.env, repo) });
+ *     process.exit(r.exit);                                           // at once: runBatch leaves the exit to its
+ *                                                                     // caller
+ *
+ * The rejudge is asked for its failure reasons (`--failures`, A21): a batch pointed at a checkout from before A21,
+ * whose live.ts knows no such flag, sees every rejudge refused, so every live block INCONCLUSIVE — fail closed.
  *
  * A need is checked by the first block naming it and rechecked (its `alive`) before each later one, and its `end` runs
  * once the last block is done (the ios need's: the finportal key's second read, its line in the SUMMARY — a CHANGED key
@@ -316,15 +321,38 @@ function assertBlocks(blocks: readonly Block<never>[], needs: Readonly<Record<st
   }
 }
 
-/** The run's whole: the order above. Resolves to the exit code; the seam's exit is called with it too. */
-export async function runBatch<S extends KnobSpec>(o: RunBatchOptions<S>): Promise<number> {
+/**
+ * What a run of runBatch came to (A21: its caller's data, not a folder to find and a SUMMARY to read again): refused
+ * before anything was done, its lines printed; interrupted, the abort's SUMMARY printed (and on the real seam the
+ * process already ended, 130); or ended, its exit code exitCodeOf's over the SUMMARY it printed, given whole.
+ */
+export type BatchResult =
+  | { exit: typeof EXIT.nothingDone; refused: readonly string[] }
+  | { exit: typeof EXIT.interrupted; runId: string }
+  | { exit: ReturnType<typeof exitCodeOf>; runId: string; summary: Summary };
+
+/**
+ * The run's whole: the order above. Resolves to what it came to; the process's exit is its caller's — call it with
+ * `exit` at once, no await of anything else between (a signal arriving after the SUMMARY would start the abort's own).
+ * Only the abort exits by itself (130), through the seam: a signal has no caller to return to. The seam's exit code is
+ * set to `exit` too (ProcessSeam.setExitCode: the real one's `process.exitCode`), a backstop behind the caller's own
+ * exit, not in place of it: a caller whose code is its own (the standing batches' standingExitOf) must still
+ * `process.exit(await …)` it, or the process ends with the runner's.
+ */
+export async function runBatch<S extends KnobSpec>(o: RunBatchOptions<S>): Promise<BatchResult> {
   const needs = o.needs ?? {};
   assertBlocks(o.blocks, needs);
   const base = { fs: nodeFs, seam: nodeProcess, terminal: terminalOf(), clock: () => new Date(), pid: process.pid, ...o.io };
-  const refused = (lines: readonly string[]): number => {
+  const r = await runOn(o, needs, base);
+  base.seam.setExitCode(r.exit);
+  return r;
+}
+
+/** runBatch's run over its io: the steps above, from the config on. */
+async function runOn<S extends KnobSpec>(o: RunBatchOptions<S>, needs: Readonly<Record<string, NeedSpec>>, base: Omit<RunIo, 'table'> & Partial<Pick<RunIo, 'table'>>): Promise<BatchResult> {
+  const refused = (lines: readonly string[]): BatchResult => {
     for (const l of lines) base.terminal(`${l}\n`);
-    base.seam.exit(EXIT.nothingDone);
-    return EXIT.nothingDone;
+    return { exit: EXIT.nothingDone, refused: lines };
   };
   if (!o.config.ok) return refused(o.config.errors);
   const config = o.config.config;
@@ -424,26 +452,27 @@ class BatchRun<K> {
   }
 
   /** Steps 4 to 7. The abort, once begun, prints its own SUMMARY and exits: the body only stops then. */
-  async go(): Promise<number> {
+  async go(): Promise<BatchResult> {
+    const interrupted: BatchResult = { exit: EXIT.interrupted, runId: this.runId };
     try {
       return await this.guard.run(async () => {
         const pre = await this.preconditions();
         for (const b of this.blocks) {
-          if (this.guard.interrupted) return EXIT.interrupted;
+          if (this.guard.interrupted) return interrupted;
           await this.runBlock(b, pre.get(b.id));
         }
         // Interrupted meanwhile, endNeeds calls no end, and the body stops right after it.
         await this.endNeeds();
-        if (this.guard.interrupted) return EXIT.interrupted;
+        if (this.guard.interrupted) return interrupted;
         const restore = await this.guard.finish();
         // A block not run has its INCONCLUSIVE line already: only the blocks that ran are judged.
         for (const b of this.blocks) await this.settle(b);
-        if (this.guard.interrupted) return EXIT.interrupted;
+        if (this.guard.interrupted) return interrupted;
         return this.end(restore);
       });
     } catch {
       // The abort ran (guard.run rejects only then): it printed its SUMMARY and called exit(130).
-      return EXIT.interrupted;
+      return interrupted;
     }
   }
 
@@ -729,7 +758,7 @@ class BatchRun<K> {
       this.log.step('FAIL', `${b.id} ${name}: no record written (${f.record})`);
       return { live };
     }
-    const rj = await bounded(process.execPath, rejudgeArgs({ repo, asked, record: f.record }), calls.rejudge);
+    const rj = await bounded(process.execPath, rejudgeArgs({ repo, asked, record: f.record, failures: f.failures }), calls.rejudge);
     const rejudge = stepOutcome(rj.code, fs.read(f.summary) ?? '');
     this.log.step(rejudge.word, liveStepText(`${b.id} rejudge ${name}`, rejudge, f.summary));
     return { live, rejudge };
@@ -843,8 +872,8 @@ class BatchRun<K> {
     return logErrors([steps, ...logs]);
   }
 
-  /** The details, then the SUMMARY; the exit called with its code. */
-  private end(restore: readonly string[]): number {
+  /** The details, then the SUMMARY; what the run came to, for its caller. */
+  private end(restore: readonly string[]): BatchResult {
     const { fs } = this.io;
     this.takeLateEnds();
     const checkout = this.checkout!;
@@ -857,7 +886,7 @@ class BatchRun<K> {
       out: this.config.out,
     });
     for (const l of details) this.log.print(l);
-    const summary = {
+    const summary: Summary = {
       name: this.name,
       runId: this.runId,
       checkout,
@@ -869,10 +898,7 @@ class BatchRun<K> {
       noneRan: !this.anyRan,
     };
     this.log.summary(summaryLines(summary));
-    const code = exitCodeOf(summary);
-    // Synchronously after the SUMMARY: no signal can come between them and start an abort SUMMARY too.
-    this.io.seam.exit(code);
-    return code;
+    return { exit: exitCodeOf(summary), runId: this.runId, summary };
   }
 }
 

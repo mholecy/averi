@@ -1,4 +1,3 @@
-import { shellQuote } from '../../src/adapters/adb-shell.js';
 import {
   adbLine,
   defaultHand,
@@ -18,6 +17,7 @@ import {
   type LabEntry,
   type PreferredRead,
 } from './chooser-readers.js';
+import { shellQuote } from './batch/shell.js';
 import { adbSaid, APK_PATH, HOME_COMMAND, type FocusRead } from './lab-device.js';
 import { frontOf, homeOf, isChooser } from './live-chooser.js';
 
@@ -74,7 +74,10 @@ export interface PremiseLab {
   focus(): Promise<FocusRead>;
 }
 
-/** The command that reads the premise again: the chooser group on the same emulator. */
+/**
+ * The command that reads the premise again: the chooser group on the same emulator — a host-shell line, its serial
+ * quoted by batch/shell.ts (a leaf, the batches' one host quoter), not by adb-shell.ts's device quoter.
+ */
 export const rerunLine = (serial: string): string =>
   `node --import tsx scripts/truth/live.ts --serial ${shellQuote(serial)} --groups chooser`;
 

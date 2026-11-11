@@ -75,7 +75,9 @@ them in the background.
    this host: …)`. That is expected there; say it in the record. On the owner's Mac nothing is skipped.
 
 6. **Mutation, cold:** `npm run mutate -- --force` (both groups, core then lab, each bounded at 600 s), exit 0. Each
-   group's floors are met (`checkFloors` in mutate.ts). Keep the per-module score lines and the last lines.
+   group's floors are met (`checkFloors` in mutate.ts). Keep the per-module score lines and the last lines, and record
+   each group's time (`npm run mutate: <group> passed in N s`); a group over ~480 s on a quiet host means the next
+   change to it moves a module out or adds a group (ADR 0038's threshold rule and its A21 amendment).
 7. **The package:** `npm pack --dry-run` lists what ships. Then `npm run release:smoke` (after the build in step 4;
    `pack-smoke.ts` in scripts/release) packs the real tarball into a temporary folder and checks it. Its file list
    must hold the bin's target (`dist/mcp/server.js`), every `files` entry (dist, skill, SETUP.md, ARCHITECTURE.md),
@@ -110,9 +112,10 @@ or restart anything to bring it up.
    npm run truth:lab -- --out "$OUT/truth-lab" --serial emulator-5554
    ```
 
-   It bounds itself (each live run 1800 s, the build 2400 s; lab-run.ts's KNOBS). It passes only on **exit 0**: every
+   It bounds itself (each live run 1800 s, the build 2400 s; standing.ts's KNOBS). It passes only on **exit 0**: every
    block PASS, and no INCONCLUSIVE or ERROR line. Exit 1 is a FAIL or a `RESTORE.txt` to act on by hand, and it goes
-   to the owner. Exit 2 means refused, and 3 means unproven. Neither is a pass. The record keeps the SUMMARY
+   to the owner. Exit 2 means refused, and 3 means unproven. Neither is a pass. Any line in the SUMMARY's ERROR
+   section makes the run unproven (exit 3), an unread log's NOTE included. The record keeps the SUMMARY
    (`$OUT/truth-lab/meta/run-<id>/summary.txt`), cleaned.
 
 2. **The live golden's other Android groups:**

@@ -14,7 +14,6 @@ import {
   PROTECTED,
   protectedLine,
   restoreDomain,
-  shellQuote,
   stateIn,
   TYPED_PY,
   backupPathOf,
@@ -289,17 +288,6 @@ describe('defaultsArgv — the only `defaults` builder; only the three domains w
   it('a verb it does not run, an option first, or no verb: thrown', () => {
     expect(() => defaultsArgv(UDID, ['-currentHost', 'write', A11Y, 'k', '-int', '1'])).toThrow('defaults "-currentHost": not a verb this module runs (read, export, write, delete, import)');
     expect(() => defaultsArgv(UDID, [])).toThrow('defaults "": not a verb');
-  });
-});
-
-describe('shellQuote — a hand line a person pastes (d43-gate.ts\'s shq, renamed in the T2 S4 code review)', () => {
-  it('a plain word as given; anything else single-quoted, a quote in it as \'\\\'\'', () => {
-    expect(shellQuote('com.apple.Accessibility')).toBe('com.apple.Accessibility');
-    expect(shellQuote('a@b%c+d=e:f,g./h-i_9')).toBe('a@b%c+d=e:f,g./h-i_9');
-    expect(shellQuote('a b')).toBe("'a b'");
-    expect(shellQuote("it's")).toBe("'it'\\''s'");
-    expect(shellQuote('')).toBe("''");
-    expect(shellQuote('x\ny')).toBe("'x\ny'");
   });
 });
 

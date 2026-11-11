@@ -1,5 +1,6 @@
 import { join, relative, sep } from 'node:path';
 import { isEexist, type BatchFs } from './io.js';
+import { singleQuoted } from './shell.js';
 import { firstLineOf, messageOf, NOTHING_DONE, oneLine, refusedLine, stepLine, twoDigits } from './words.js';
 
 /**
@@ -26,9 +27,6 @@ export type DirtyState = 'dirty' | 'clean' | 'unreadable';
 
 /** The RESTORE file's name, at the top of the out folder. */
 export const RESTORE_FILE = 'RESTORE.txt';
-
-/** A path as one single-quoted shell word: nothing in it expands, a `'` written as `'\''`. */
-const shellQuoted = (path: string): string => `'${path.replaceAll("'", "'\\''")}'`;
 
 /** The state file's name in a stateful block's run folder (the probes' `--state` file). */
 export const STATE_FILE = 'state.json';
@@ -103,8 +101,8 @@ export function refusals(
     lines.push(`${restore} exists (an earlier run left state not provably put back):`);
     lines.push(...text.split('\n').filter((l) => l !== ''));
     // Each path single-quoted; only the date is left to the shell: <out>/RESTORE.done-<date>.txt.
-    const done = `${shellQuoted(join(out, 'RESTORE.done-'))}"$(date +%Y%m%d-%H%M%S)"'.txt'`;
-    lines.push(`  → run its hand commands, then: mv ${shellQuoted(restore)} ${done}`);
+    const done = `${singleQuoted(join(out, 'RESTORE.done-'))}"$(date +%Y%m%d-%H%M%S)"'.txt'`;
+    lines.push(`  → run its hand commands, then: mv ${singleQuoted(restore)} ${done}`);
   }
   for (const s of stateful) {
     for (const run of fs.list(join(out, s.block)).filter((n) => n.startsWith('run-'))) {

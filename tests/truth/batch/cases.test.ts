@@ -95,9 +95,15 @@ describe('writeCases — what a run was asked, written before anything of it run
   });
 });
 
-describe('runFiles and runsIn — a run\'s four files, and the runs a block folder asked', () => {
-  it('runFiles: <name>.cases, .json (live.ts --record), .log, .rejudge.txt', () => {
-    expect(runFiles('d', 'x')).toEqual({ cases: join('d', 'x.cases'), record: join('d', 'x.json'), log: join('d', 'x.log'), summary: join('d', 'x.rejudge.txt') });
+describe('runFiles and runsIn — a run\'s five files, and the runs a block folder asked', () => {
+  it('runFiles: <name>.cases, .json (live.ts --record), .log, .rejudge.txt, .rejudge.json (A21)', () => {
+    expect(runFiles('d', 'x')).toEqual({
+      cases: join('d', 'x.cases'),
+      record: join('d', 'x.json'),
+      log: join('d', 'x.log'),
+      summary: join('d', 'x.rejudge.txt'),
+      failures: join('d', 'x.rejudge.json'),
+    });
   });
 
   it('runsIn: every .cases\'s name, sorted; a record without one (ime.json, d62.json) is no run; a missing folder has none', () => {

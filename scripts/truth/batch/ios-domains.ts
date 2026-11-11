@@ -23,7 +23,6 @@ import {
   restoreDomain,
   restoredLine,
   restoreFileLines,
-  shellQuote,
   stateIn,
   TYPED_PY,
   typedMapOf,
@@ -36,6 +35,7 @@ import {
   type KeyVal,
   type ProtectedRead,
 } from './ios-defaults.js';
+import { shellQuote } from './shell.js';
 import { exitText, firstLineOf, messageOf, nameInLine, stepLine, verdictLine } from './words.js';
 
 /**

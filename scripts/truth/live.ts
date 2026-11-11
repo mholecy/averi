@@ -30,6 +30,7 @@ import {
 } from './live-cases.js';
 import type { Source } from './live-forms.js';
 import { callReply } from './replies.js';
+import { failuresJson } from './rejudge-failures.js';
 import { type CaseRig, runCase } from './run-case.js';
 import { parseLabApp, type LabApp } from './schema.js';
 
@@ -83,7 +84,9 @@ import { parseLabApp, type LabApp } from './schema.js';
  * asks). The visibility group's hedged stops are counted under the cases, no exit code (T15: ADR 0013's T15
  * paragraph). `--record <file>` writes every read (the launch state, the state between the calls, after them) as JSON;
  * `--rejudge <file>` judges such a record again with this checkout's judges, no device (live-cases.ts#rejudge, which
- * tests/truth/live-rejudge.test.ts calls in process). The cases, their judging and the summary live in live-cases.ts,
+ * tests/truth/live-rejudge.test.ts calls in process); with `--failures <file>` it writes the summary's failure reasons
+ * there as JSON (rejudge-failures.ts#failuresJson: what the standing lab batch names, A21). The cases, their judging
+ * and the summary live in live-cases.ts,
  * one case's device cycle in run-case.ts, the finish (the record written before anything closes, D82) in
  * live-finish.ts; this file is the CLI.
  *
@@ -145,6 +148,7 @@ const { values } = parseArgs({
     side: { type: 'string' },
     record: { type: 'string' },
     rejudge: { type: 'string' },
+    failures: { type: 'string' },
     app: { type: 'string' },
     'device-read': { type: 'string' },
   },
@@ -152,8 +156,9 @@ const { values } = parseArgs({
 // `--rejudge`'s record (live-cases.ts#RunRecord): read here, judged by live-cases.ts#rejudge.
 const rejudging = values.rejudge === undefined ? undefined : (JSON.parse(await readFile(values.rejudge, 'utf8')) as RunRecord);
 if (rejudging === undefined && (values.udid === undefined) === (values.serial === undefined)) {
-  throw new Error('usage: live.ts --udid <lab simulator> [--wda-port 8120] [--sources idb,wda] [--groups forms,visibility,dismissal,ensure,carousel,chooser] [--cells …] [--cases …] [--side <checkout>] [--record <file>] | --serial <lab emulator> […] [--device-read none] | --rejudge <record>');
+  throw new Error('usage: live.ts --udid <lab simulator> [--wda-port 8120] [--sources idb,wda] [--groups forms,visibility,dismissal,ensure,carousel,chooser] [--cells …] [--cases …] [--side <checkout>] [--record <file>] | --serial <lab emulator> […] [--device-read none] | --rejudge <record> [--failures <file>]');
 }
+if (values.failures !== undefined && rejudging === undefined) throw new Error('--failures: only a rejudge writes its failure reasons; pass --rejudge <record>');
 // `--device-read none`: the carousel group's device reads skipped (device-state.ts#deviceLabelling). A rejudge reads no
 // device, so the flag is refused there rather than ignored.
 const deviceReadFlag = values['device-read'];
@@ -241,7 +246,9 @@ function callTool(client: Client, call: Call, configPath: string): Promise<strin
 
 if (rejudging !== undefined) {
   // No device: each recorded case judged again by this checkout's judges (live-cases.ts#rejudge, in process for the tests).
-  const { lines, exitCode } = await rejudge(rejudging, values.rejudge!, { groups, only, onlyCells, app });
+  const { lines, failures, exitCode } = await rejudge(rejudging, values.rejudge!, { groups, only, onlyCells, app });
+  // The reasons first: a summary printed with no file beside it is read as unproven, never as "no failure".
+  if (values.failures !== undefined) await writeFile(values.failures, failuresJson(failures));
   console.log(lines.join('\n'));
   process.exitCode = exitCode;
 } else {

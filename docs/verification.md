@@ -294,11 +294,17 @@ It runs as Gate B of every release ([docs/release.md](release.md)), on `emulator
 release (the owner's decision, backlog T24) or by the owner. A chooser run that leaves a lab default behind fails the
 run by name, and the cleanup clears that default by uninstalling and reinstalling the lab app. Everything it writes
 goes under `--out`, apart from the git-ignored Gradle build products in the checkout: a `<block>/run-<id>` folder per
-block, holding the live records, logs and rejudge summaries, and `meta/run-<id>/summary.txt`, the SUMMARY.
+block, holding the live records, logs and rejudge summaries (each with its failure reasons beside it as JSON,
+`<run>.rejudge.json`, which a live block's FAIL names; one missing or unreadable makes the block INCONCLUSIVE), and
+`meta/run-<id>/summary.txt`, the SUMMARY.
 
 Its iOS counterpart, `npm run truth:lab:ios -- --out <dir> --udid <lab simulator>` (lab-run-ios.ts, Gate C, the
 owner's), runs live.ts's iOS groups on the lab simulator: every idb run first, then every WebDriverAgent run in its own
 D43 settings window, with the same exit codes.
+
+For a batch author: `runBatch` (scripts/truth/batch/runner.ts) returns the run's result, its `exit` among it, and
+leaves the process's exit to the batch. End the batch with `process.exit(result.exit)` right after it; a batch that
+forgets still ends with the run's code, which runBatch sets as `process.exitCode`.
 
 The exit code is stricter than a device batch's, so a release can gate on it (only 0 passes):
 

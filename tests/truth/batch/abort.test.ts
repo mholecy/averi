@@ -60,6 +60,11 @@ class FakeSeam implements ProcessSeam {
     this.handlers = handlers;
     this.installs++;
   }
+  /** The exit codes runBatch left for the process (ProcessSeam.setExitCode). */
+  readonly exitCodes: number[] = [];
+  setExitCode(code: number): void {
+    this.exitCodes.push(code);
+  }
   exit(code: number): void {
     this.exits.push(code);
     this.exited(code);

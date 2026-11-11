@@ -359,8 +359,10 @@ describe('deviceArgs, liveArgs and rejudgeArgs — live_run\'s argv (batch-11.sh
   });
 
   it('the rejudge: main\'s judges over the record, the same groups', () => {
-    expect(rejudgeArgs({ repo: '/r', asked: kf, record: '/d/k.json' })).toEqual(['--import', 'tsx', join('/r', 'scripts/truth/live.ts'), '--rejudge', '/d/k.json', '--groups', 'forms']);
-    expect(rejudgeArgs({ repo: '/r', asked: p7w, record: '/d/p.json' }).slice(-2)).toEqual(['--groups', 'forms,ensure']);
+    expect(rejudgeArgs({ repo: '/r', asked: kf, record: '/d/k.json', failures: '/d/k.rejudge.json' })).toEqual([
+      '--import', 'tsx', join('/r', 'scripts/truth/live.ts'), '--rejudge', '/d/k.json', '--groups', 'forms', '--failures', '/d/k.rejudge.json',
+    ]);
+    expect(rejudgeArgs({ repo: '/r', asked: p7w, record: '/d/p.json', failures: '/d/f' }).slice(-4, -2)).toEqual(['--groups', 'forms,ensure']);
   });
 
   it('the step\'s text: OK bare; DONE and FAIL with why and the log to read (batch-11.sh:234–237)', () => {

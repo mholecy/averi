@@ -28,6 +28,8 @@ Amended 2026-11-11 (T22: src/util/regex.ts joined the run — see the T22 amendm
 Amended 2026-11-11 (T23: the Android build's JDK 17 lookup — see the T23 amendment at the end).
 Amended 2026-11-11 (T24: lab-run-ios.ts, scripts/release/pack-files.ts and clean-log.ts joined the run — see the T24
 amendment at the end).
+Amended 2026-11-11 (A21: scripts/truth/batch/standing.ts, scripts/truth/rejudge-failures.ts and shell.ts joined the
+run — see the A21 amendment at the end).
 
 ## Context
 
@@ -1724,3 +1726,40 @@ The sandbox gains one entry, `!/scripts/release/`, in stryker.config.mjs's allow
 path rule admits scripts/release/. The figures above come from narrowed cold runs (`--mutate` over the four modules,
 then over the two batches, `--tempDirName reports/mutation/stryker-tmp-t24`, whose exit 1 is a narrowed run's). The cold
 full lab group took about 300 s (the reviewer measured 299 s) and exits 0.
+
+## Amendment: the standing kit and its leaves join the run (2026-11-11, backlog A21)
+
+A21 (the 2026-11-11 architecture review's card 3) gives the standing batches runBatch's result as data and a module of
+their own. runBatch now returns its BatchResult (refused, interrupted, or ended with its exit, run id and SUMMARY),
+sets the run's exit as the process's exit code (a backstop behind the caller's own exit), and leaves the exit itself
+to its caller; only the abort still exits by itself. The T24 list above changes so:
+
+- scripts/truth/batch/standing.ts, the standing kit lab-run.ts lent lab-run-ios.ts until now, with the standing exit
+  rule (`STANDING_EXIT`, `standingExitOf`), joins the `lab` group against tests/truth/batch/standing.test.ts,
+  lab-run.test.ts and lab-run-ios.test.ts: 99.31 %, 289 mutants, 1 survived (equivalent), 1 without coverage. Floor 97.
+- scripts/truth/rejudge-failures.ts, the `.rejudge.json` format (a rejudge's failure reasons: live.ts writes them, the
+  standing judge reads them), a leaf, joins the `lab` group against tests/truth/rejudge-failures.test.ts: 94.12 %, 17
+  mutants, 1 survived — the catch emptied, equivalent (what it leaves undefined is read as undefined after it). Floor
+  92: one mutant is 6 points of so small a module.
+- lab-run.ts is held against its own lab-run.test.ts alone (lab-run-ios.ts imports nothing from it any more): 93.14 %,
+  floor 93. The margin is thin because the kit's well-killed code left it with standing.ts: what stays is the chooser
+  block and the entry, whose untested and unreachable mutants (the B_BUILD bound, `!opened.ok`, `apk === undefined`,
+  the entry guard's line) are the same in number as before but a larger share; the floor stays, and the next mutant
+  lab-run.ts gains needs its test.
+- lab-run-ios.ts: 85.98 % (floor 84), the same classes.
+- scripts/truth/batch/shell.ts, the batches' one host-shell quoter (the review's TL8), joins the `core` group against
+  tests/truth/batch/shell.test.ts: 100 %, 10 mutants. Floor 98.
+
+The run's time. A first cut of A21 ran lab-run.test.ts and lab-run-ios.test.ts through `summarize` in
+scripts/truth/live-cases.ts; the cold lab group then passed the 600 s hard bound, as the case tables are a heavy import
+and every live-carousel.ts and live-visibility.ts mutant ran those files too. live-cases.ts is now out of their import
+graph: their fake rejudge writes the failure reasons it is given (tests/truth/batch/lab-fakes.ts), and the cases where
+what `summarize` names matters (the hedged ceiling, a LOUD that fails nothing, a stale premise) are standing.test.ts's
+alone, through tests/truth/batch/standing-fakes.ts. The cold full lab group then passed in 489 s at a load average of
+14 to 37, and, after the review round's moves, in 367 s at a load of 30 falling to 10 (another worktree's core run
+both times); T24's quiet-host figure was 279 s.
+
+**Decision.** Neither figure was measured on a quiet host, so neither is held against the ~480 s line above. Gate A's
+cold mutate (docs/release.md), run on a quiet host, records the lab group's time in the release record. If that time is
+over ~480 s, the next change that touches the lab group moves a module out of it or adds a group, as this ADR's
+threshold rule asks.

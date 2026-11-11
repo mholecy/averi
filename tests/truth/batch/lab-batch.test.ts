@@ -63,6 +63,11 @@ class LabSeam implements ProcessSeam {
   install(h: { signal(name: NodeJS.Signals): void; fatal(error: unknown): void }): void {
     this.handlers = h;
   }
+  /** The exit codes runBatch left for the process (ProcessSeam.setExitCode). */
+  readonly exitCodes: number[] = [];
+  setExitCode(code: number): void {
+    this.exitCodes.push(code);
+  }
   exit(code: number): void {
     this.exits.push(code);
   }
@@ -186,7 +191,7 @@ function go(b: ReturnType<typeof batch>, env: Record<string, string> = {}): Prom
     lastly: b.lastly,
     config: { ok: true, config: { out, repo, udid: LAB_UDID, serial: LAB_SERIAL, env } },
     io: { fs: nodeFs, seam, terminal: () => {}, clock, pid: 4242, table, graceMs: 5 },
-  });
+  }).then((r) => r.exit);
 }
 
 const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));

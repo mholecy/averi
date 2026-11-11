@@ -6,9 +6,10 @@ import type { Asked } from '../../../scripts/truth/batch/cases.js';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
 import type { LiveCases, LiveTable } from '../../../scripts/truth/batch/live-table.js';
 import type { Ended, KillResult, ProcessSeam, StartOptions, Started } from '../../../scripts/truth/batch/proc.js';
-import { NEED_END_SECS, runBatch, type Block, type NeedCheck as NeedCtxCheck, type NeedCtx, type NeedEndCtx, type NeedSpec, type RunBatchOptions, type RunIo } from '../../../scripts/truth/batch/runner.js';
+import { NEED_END_SECS, runBatch, type BatchResult, type Block, type NeedCheck as NeedCtxCheck, type NeedCtx, type NeedEndCtx, type NeedSpec, type RunBatchOptions, type RunIo } from '../../../scripts/truth/batch/runner.js';
 import { LIVE_GOLDEN_HEADER } from '../../../scripts/truth/batch/steps.js';
 import type { KnobSpec } from '../../../scripts/truth/batch/select.js';
+import { exitCodeOf, summaryLines } from '../../../scripts/truth/batch/words.js';
 import { BATCH_FAKE_MS, advanceUntil, onFakeTime } from './fake-time.js';
 
 // scripts/truth/batch/runner.ts: runBatch over a fake process seam — git, the probes and live.ts answered by rules —
@@ -87,6 +88,11 @@ class FakeSeam implements ProcessSeam {
   }
   install(handlers: { signal(name: NodeJS.Signals): void; fatal(error: unknown): void }): void {
     this.handlers = handlers;
+  }
+  /** The exit codes runBatch left for the process (ProcessSeam.setExitCode). */
+  readonly exitCodes: number[] = [];
+  setExitCode(code: number): void {
+    this.exitCodes.push(code);
   }
   exit(code: number): void {
     this.exits.push(code);
@@ -170,7 +176,8 @@ const needs = {
   ios: async () => ({ ok: true as const, how: 'averi-lab iPhone 17' }),
 };
 
-function go(blocks: Block[], over: Partial<Pick<RunBatchOptions<KnobSpec>, 'knobs' | 'needs' | 'batchReasons' | 'lastly'>> & { env?: Record<string, string>; argv?: string[]; io?: Partial<RunIo> } = {}): Promise<number> {
+/** The batch run, what it came to (BatchResult). */
+function result(blocks: Block[], over: Partial<Pick<RunBatchOptions<KnobSpec>, 'knobs' | 'needs' | 'batchReasons' | 'lastly'>> & { env?: Record<string, string>; argv?: string[]; io?: Partial<RunIo> } = {}): Promise<BatchResult> {
   const { env = {}, argv = ['--out', out, '--repo', repo, '--serial', 'emulator-5554', '--udid', 'U-1'], io, ...rest } = over;
   return runBatch({
     name: 'batch-t',
@@ -181,6 +188,8 @@ function go(blocks: Block[], over: Partial<Pick<RunBatchOptions<KnobSpec>, 'knob
     ...rest,
   });
 }
+/** The batch run, its exit code. */
+const go = (...args: Parameters<typeof result>): Promise<number> => result(...args).then((r) => r.exit);
 /** argv as configOf reads it, without its checks (they are runner-lines.test.ts's). */
 function configFrom(argv: string[], env: Record<string, string>) {
   const at = (flag: string) => (argv.includes(flag) ? argv[argv.indexOf(flag) + 1] : undefined);
@@ -238,7 +247,7 @@ describe('a fake two-block batch, one Android and one iOS block: the whole SUMMA
     seam.rules = [git(), probes, live({ logExtra: 'ERROR the lab app did not launch on the first try\n' })];
     const code = await go([kfBlock(), d43Block()]);
     expect(code).toBe(1);
-    expect(seam.exits).toEqual([1]);
+    expect(seam.exits).toEqual([]);
     const restore = join(out, 'RESTORE.txt');
     expect(summary()).toEqual([
       '======== SUMMARY',
@@ -269,7 +278,7 @@ describe('a fake two-block batch, one Android and one iOS block: the whole SUMMA
       'git rev-parse --verify refs/heads/main^{commit}',
       'git --no-optional-locks status --porcelain -z --untracked-files=no',
       `node --import tsx ${join(repo, 'scripts/truth/live.ts')} --serial emulator-5554 --groups forms --cases kf1,kf2,kf3 --record ${join(dirOf('kf'), 'android-kf-1.json')}`,
-      `node --import tsx ${join(repo, 'scripts/truth/live.ts')} --rejudge ${join(dirOf('kf'), 'android-kf-1.json')} --groups forms`,
+      `node --import tsx ${join(repo, 'scripts/truth/live.ts')} --rejudge ${join(dirOf('kf'), 'android-kf-1.json')} --groups forms --failures ${join(dirOf('kf'), 'android-kf-1.rejudge.json')}`,
       'probe d43',
     ]);
     const o = outText();
@@ -293,6 +302,23 @@ describe('a fake two-block batch, one Android and one iOS block: the whole SUMMA
     expect(details).toContain(`== DONE — all outputs in ${out}/<block>/run-${ID} ==`);
   });
 
+  it('what the run came to, for its caller (A21): the exit, the run id and the SUMMARY it printed, as data — the exit left to the caller', async () => {
+    seam.rules = [git(), probes, live({ logExtra: 'ERROR the lab app did not launch on the first try\n' })];
+    const r = await result([kfBlock(), d43Block()]);
+    expect(seam.exits).toEqual([]);
+    // The backstop: the process's exit code set to the run's, for a batch that forgets its exit.
+    expect(seam.exitCodes).toEqual([1]);
+    if (!('summary' in r)) throw new Error(`no SUMMARY: ${JSON.stringify(r)}`);
+    expect([r.exit, r.runId]).toEqual([1, ID]);
+    expect(summaryLines(r.summary)).toEqual(summary());
+    expect(r.summary.blocks).toEqual([
+      { block: 'kf', lines: ['kf live kf1: PASS', 'kf live verdict: PASS — kf1, kf2, kf3 ok'] },
+      { block: 'D43', lines: [COMPARE_WARN, 'D43 live verdict: PASS — p7w ok under wda'] },
+    ]);
+    expect(r.summary.errors).toContain('ERROR the lab app did not launch on the first try');
+    expect(exitCodeOf(r.summary)).toBe(r.exit);
+  });
+
   it('each block\'s verdict lines kept in its verdict.txt too, as batch-11\'s verdict() tee\'d them', async () => {
     await go([kfBlock(), d43Block()]);
     expect(text(join(dirOf('D43'), 'verdict.txt'))).toBe(`${COMPARE_WARN}\nD43 live verdict: PASS — p7w ok under wda\n`);
@@ -311,14 +337,15 @@ describe('refused to start: exit 2, nothing done — no folder, no call (batch-1
     const knobs = { counts: { KF_RUNS: { default: 1, min: 1 } } };
     expect(await go([plain('kf')], { knobs, env: { KF_RUNS: '0' } })).toBe(2);
     expect(terminal).toEqual(['ERROR KF_RUNS=0: a whole number >= 1 is needed — nothing was done\n']);
-    expect(seam.exits).toEqual([2]);
+    expect(seam.exits).toEqual([]);
     expect(seam.calls).toEqual([]);
     expect(existsSync(join(out, 'meta'))).toBe(false);
   });
 
   it('the config read with errors (no out folder): its lines, exit 2', async () => {
-    const code = await runBatch({ name: 'batch-t', blocks: [plain('kf')], config: { ok: false, errors: ['ERROR no out folder: pass --out <dir> or set AVERI_BATCH_OUT — nothing was done'] }, io: { seam, terminal: (t) => void terminal.push(t) } });
-    expect(code).toBe(2);
+    const r = await runBatch({ name: 'batch-t', blocks: [plain('kf')], config: { ok: false, errors: ['ERROR no out folder: pass --out <dir> or set AVERI_BATCH_OUT — nothing was done'] }, io: { seam, terminal: (t) => void terminal.push(t) } });
+    expect(r).toEqual({ exit: 2, refused: ['ERROR no out folder: pass --out <dir> or set AVERI_BATCH_OUT — nothing was done'] });
+    expect(seam.exitCodes).toEqual([2]);
     expect(terminal).toEqual(['ERROR no out folder: pass --out <dir> or set AVERI_BATCH_OUT — nothing was done\n']);
   });
 
@@ -363,7 +390,7 @@ describe('refused to start: exit 2, nothing done — no folder, no call (batch-1
     const fs = { ...nodeFs, mkdirExclusive: () => { throw Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' }); } };
     expect(await go([plain('kf')], { io: { fs } })).toBe(2);
     expect(terminal).toEqual([`ERROR the run folder ${dirOf('meta')} cannot be made (EPERM); made before it: none — nothing was done\n`]);
-    expect(seam.exits).toEqual([2]);
+    expect(seam.exits).toEqual([]);
     expect(seam.calls).toEqual([]);
     expect(existsSync(out)).toBe(false);
   });
@@ -468,7 +495,7 @@ describe('preconditions: a failed one makes the block INCONCLUSIVE, never a refu
     const ran: string[] = [];
     const code = await go([kfBlock({ run: async () => void ran.push('kf') }), d43Block({ run: async () => void ran.push('D43'), preconditions: [async (k) => k.ancestor('c'.repeat(40), 'M_D43')] })]);
     expect(code).toBe(2);
-    expect(seam.exits).toEqual([2]);
+    expect(seam.exits).toEqual([]);
     const why = "the checkout's HEAD (aaaaaaaa) is not main's (bbbbbbbb) — git switch main, then rerun";
     expect(summary()).toEqual([
       '======== SUMMARY',

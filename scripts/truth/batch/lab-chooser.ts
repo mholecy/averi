@@ -1,6 +1,5 @@
 import { chooserInFocus, chooserSheet } from '../../../src/adapters/android-chooser.js';
 import { parseUiautomatorXml } from '../../../src/adapters/android.js';
-import { shellQuote } from '../../../src/adapters/adb-shell.js';
 import { everyNode, labelOf, rectCentre, type DrawnOverStrip, type Point, type Rect, type UiNode } from '../../../src/adapters/types.js';
 import {
   adbLine,
@@ -36,6 +35,7 @@ export {
   type PreferredRead,
 } from '../chooser-readers.js';
 import type { CallResult } from './bounded.js';
+import { shellQuote } from './shell.js';
 import { exitText, failedCall, firstLineOf, messageOf, nameInLine, verdictLine, type Verdict } from './words.js';
 
 /**
@@ -52,8 +52,9 @@ import { exitText, failedCall, firstLineOf, messageOf, nameInLine, verdictLine, 
  * lines; re-exported here. Here they are wrapped over a CallResult (preferredOf, handlersOf: a failed call is unread).
  *
  * What is src's is reused, not copied: the focus is android-chooser.ts#chooserInFocus's, the tree src's own uiautomator
- * parser's (D66's UiNode.disabled), the fresh sheet android-chooser.ts#chooserSheet's, a hand line's quoting
- * adb-shell.ts#shellQuote's.
+ * parser's (D66's UiNode.disabled), the fresh sheet android-chooser.ts#chooserSheet's, an adb word's quoting
+ * adb-shell.ts#shellQuote's (through chooser-readers.ts#adbLine). A host path in a hand line is quoted by shell.ts, the
+ * batches' one host-shell quoter.
  */
 
 /** --check's verdict label (d55-b11.ts's `D55 check:` line). */

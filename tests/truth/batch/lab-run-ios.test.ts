@@ -13,11 +13,11 @@ import {
   labRunIos,
   windowStateHand,
 } from '../../../scripts/truth/batch/lab-run-ios.js';
-import { groupsOf, LAB_RUN_EXIT, onlyWith } from '../../../scripts/truth/batch/lab-run.js';
 import type { LiveCases, LiveTable } from '../../../scripts/truth/batch/live-table.js';
 import type { StartOptions } from '../../../scripts/truth/batch/proc.js';
+import { groupsOf, onlyWith, STANDING_EXIT as LAB_RUN_EXIT } from '../../../scripts/truth/batch/standing.js';
 import { LIVE_GOLDEN_HEADER } from '../../../scripts/truth/batch/steps.js';
-import { CATALOG, FakeSeam, LAB_UDID, labWorld, until, type Answer, type LabWorld, type WorldOptions } from './lab-fakes.js';
+import { CATALOG, FakeSeam, LAB_UDID, labWorld, rejudgeWith, until, type Answer, type LabWorld, type Rejudged, type WorldOptions } from './lab-fakes.js';
 
 // The standing lab batch on the lab simulator (T24, scripts/truth/batch/lab-run-ios.ts) under runBatch, over the shared
 // fake lab (lab-fakes.ts) and a fake process seam that answers git and live.ts — its run and its `--rejudge` — with
@@ -34,9 +34,9 @@ const GROUPS = ['forms', 'visibility', 'dismissal', 'ensure'] as const;
 /** What a fake live.ts run does, by its run name (`ios-<source>-<group>`). */
 interface LiveScript {
   code?: number;
-  rejudgeCode?: number;
   noRecord?: boolean;
-  rejudgeOut?: string;
+  /** What its rejudge says (its one case ok, no failure reason, unless given): lab-fakes.ts#rejudgeWith. */
+  rejudge?: Rejudged;
   /** A change to the lab while it runs (a health check after it then finds it sick). */
   during?: (w: LabWorld, seam: IosSeam) => void;
 }
@@ -56,7 +56,7 @@ class IosSeam extends FakeSeam {
       if (args.includes('--rejudge')) {
         const name = at('--rejudge').split('/').at(-1)!.replace(/\.json$/, '');
         const script = this.live[name] ?? {};
-        return { code: script.rejudgeCode ?? 0, out: script.rejudgeOut ?? summaryOf(name), err: '' };
+        return rejudgeWith(args, script.rejudge ?? { code: 0, out: summaryOf(name), failures: [] });
       }
       const name = `ios-${at('--sources')}-${at('--groups')}`;
       const script = this.live[name] ?? {};
@@ -176,7 +176,7 @@ describe('lab-run-ios.ts: a clean run — the lab, every idb run, then every Web
     }
     // The lab's processes ended at the run's end.
     expect(seam.words.slice(-2)).toEqual([`pkill -f idb_companion --udid ${LAB_UDID}`, `idb disconnect ${LAB_UDID}`]);
-    expect(seam.exits).toEqual([0]);
+    expect(seam.exits).toEqual([]);
     // Its output is lab-run-ios's; no check left a warning, so no run's WARN step.
     expect(outText()).not.toMatch(/WARN ios-/);
   });
@@ -260,7 +260,7 @@ describe('the refusals, the guard and a simulator not up: nothing done to a devi
 describe('the verdicts and the exit code: 0 only when every wanted block PASSed', () => {
   it('a rejudge exit 1 on an unknown MISMATCH: the block FAILs naming it, exit 1', async () => {
     const said = [`${LIVE_GOLDEN_HEADER} 1 cases, 0 ok, 0 loud, 1 mismatches (1 not known), 0 skipped`, '', '## wda', '- MISMATCH (claim) c1 form-basic: says — filled nothing', ''].join('\n');
-    seam.live['ios-wda-forms'] = { code: 1, rejudgeCode: 1, rejudgeOut: said };
+    seam.live['ios-wda-forms'] = { code: 1, rejudge: { code: 1, out: said, failures: ['MISMATCH c1'] } };
     expect(await go(['--groups', 'forms'])).toBe(LAB_RUN_EXIT.failed);
     expect(summary()).toContain(`ios wda forms verdict: FAIL — ios-wda-forms: main's rejudge exit 1 — MISMATCH c1 (${LIVE_GOLDEN_HEADER} 1 cases, 0 ok, 0 loud, 1 mismatches (1 not known), 0 skipped)`);
   });

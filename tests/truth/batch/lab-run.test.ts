@@ -3,29 +3,21 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
-import {
-  cleanState,
-  failuresIn,
-  groupsOf,
-  LAB_RUN_EXIT,
-  LAB_RUN_STANDING,
-  labRun,
-  labRunExit,
-  leftLine,
-  liveJudge,
-  liveVerdictLine,
-  onlyWith,
-} from '../../../scripts/truth/batch/lab-run.js';
+import { cleanState, LAB_RUN_STANDING, labRun, leftLine, stateHand } from '../../../scripts/truth/batch/lab-run.js';
 import type { LiveCases, LiveTable } from '../../../scripts/truth/batch/live-table.js';
 import type { StartOptions } from '../../../scripts/truth/batch/proc.js';
+import { groupsOf, onlyWith, STANDING_EXIT as LAB_RUN_EXIT } from '../../../scripts/truth/batch/standing.js';
 import { LIVE_GOLDEN_HEADER } from '../../../scripts/truth/batch/steps.js';
-import { CATALOG, FakeSeam, FOCUS_CHOOSER, LAB_SERIAL, labWorld, PREFERRED_WITH_DEFAULT, until, type Answer, type LabWorld, type WorldOptions } from './lab-fakes.js';
+import { CATALOG, FakeSeam, FOCUS_CHOOSER, LAB_SERIAL, labWorld, PREFERRED_WITH_DEFAULT, rejudgeWith, until, type Answer, type LabWorld, type Rejudged, type WorldOptions } from './lab-fakes.js';
 
 // The standing lab batch (T20b, scripts/truth/batch/lab-run.ts) under runBatch, over the shared fake lab
-// (lab-fakes.ts) and a fake process seam that answers git and live.ts — its `--groups` run and its `--rejudge` —
-// with real files in a temp dir, a fixed clock and pid. The blocks' order and the device calls' order; `--groups` as
-// the selection; the refusals (no serial, a group that is none, a dirty state file) and the lab guard's; the --check
-// before and after the chooser group, a default the run left failing the batch by name; the exit codes 0, 1, 2, 3, 130.
+// (lab-fakes.ts) and a fake process seam that answers git and live.ts — its `--groups` run and its `--rejudge`, the
+// rejudge's failure reasons written where `--failures` names (lab-fakes.ts#rejudgeWith) — with real files in a temp
+// dir, a fixed clock and pid. The blocks' order and the device calls' order; `--groups` as the selection; the refusals
+// (no serial, a group that is none, a dirty state file) and the lab guard's; the --check before and after the chooser
+// group, a default the run left failing the batch by name; the exit codes 0, 1, 2, 3, 130. What summarize itself
+// names (the hedged ceiling, a LOUD that fails nothing, a stale premise) is standing.test.ts's: live-cases.ts stays out
+// of this file's imports, which the lab group's cold mutation run pays for every mutant (ADR 0038's A21 amendment).
 // Every call is checked for b11-dry's VIOLATIONs (afterEach). No device.
 
 const HEAD = 'a'.repeat(40);
@@ -38,13 +30,12 @@ const GROUP_CASES: Record<string, string[]> = { chooser: ['lc1', 'lc2'], forms: 
 /** What a fake live.ts run does: its exit and its rejudge's, and a change to the lab while it runs. */
 interface LiveScript {
   code?: number;
-  rejudgeCode?: number;
+  /** What its rejudge says (every case of its group ok, no failure reason, unless given). */
+  rejudge?: Rejudged;
   /** live.ts wrote no record and never judged (cut at its bound). */
   noRecord?: boolean;
   /** A line live.ts prints into its log before its summary. */
   logLine?: string;
-  /** What its rejudge prints (the cases' summary unless given). */
-  rejudgeOut?: string;
   during?: (w: LabWorld) => void;
 }
 
@@ -62,7 +53,7 @@ class RunSeam extends FakeSeam {
       const at = (flag: string) => args[args.indexOf(flag) + 1];
       const group = at('--groups');
       const script = this.live[group] ?? {};
-      if (args.includes('--rejudge')) return { code: script.rejudgeCode ?? 0, out: script.rejudgeOut ?? summaryOf(GROUP_CASES[group]), err: '' };
+      if (args.includes('--rejudge')) return rejudgeWith(args, script.rejudge ?? { code: 0, out: summaryOf(GROUP_CASES[group]), failures: [] });
       this.asked.set(at('--record'), group);
       script.during?.(this.world);
       if (script.noRecord === true) return { code: script.code ?? 0, out: '', err: '' };
@@ -160,7 +151,7 @@ describe('lab-run.ts: a clean run, the blocks\' order and the lab block', () => 
     );
     // Its state file clean: the next run is not refused.
     expect(JSON.parse(readFileSync(join(dirOf('chooser'), 'state.json'), 'utf8'))).toEqual({ dirty: false });
-    expect(seam.exits).toEqual([0]);
+    expect(seam.exits).toEqual([]);
   });
 
   it('T23, the agent\'s sandbox: java_home finds no JDK, one in a JVM folder builds — the android line WARNs naming both, the lab check PASS, exit 0', async () => {
@@ -444,6 +435,15 @@ describe('the --check after and the chooser block\'s state file', () => {
     expect(leftLine({ line: 'chooser check after: FAIL — another wording', check })).toBe('chooser check after: FAIL — another wording');
   });
 
+  it('stateHand: the chooser state file\'s hand line — the serial given, or where to give it; the run\'s pulled APK; the file written clean last', () => {
+    const file = '/out/chooser/run-20261111-101500-4242/state.json';
+    const tail = (s: string) =>
+      `adb -s ${s} shell dumpsys package preferred: a lab entry with mAlways=true left, adb -s ${s} uninstall dev.averi.lab && adb -s ${s} install /out/lab/run-20261111-101500-4242/installed.apk; ` +
+      `a chooser in front, adb -s ${s} shell input keyevent KEYCODE_BACK; adb -s ${s} shell pm path dev.averi.lab (installed); then: printf '%s\\n' '{"dirty":false}' > ${file}`;
+    expect(stateHand('emulator-5554', file)).toBe(`  → ${tail('emulator-5554')}`);
+    expect(stateHand(undefined, file)).toBe(`  → ${tail("'<the lab emulator: --serial or AVERI_LAB_SERIAL>'")}`);
+  });
+
   it('cleanState: the file written `{"dirty":false}` whole, said so; its hand command writes the same', async () => {
     const file = join(root, 'state.json');
     writeFileSync(file, '{"dirty":true,"kept":1}');
@@ -454,42 +454,23 @@ describe('the --check after and the chooser block\'s state file', () => {
   });
 });
 
-describe('each live block\'s verdict: main\'s rejudge exit code, judged from the block\'s folder', () => {
-  it('a rejudge exit 1 on an unknown MISMATCH and a SKIP: the block FAILs naming them (a known MISMATCH not among them), exit 1', async () => {
-    const out = [
-      `${LIVE_GOLDEN_HEADER} 3 cases, 1 ok, 0 loud, 2 mismatches (1 not known), 1 skipped`,
-      '',
-      '## uiautomator',
-      '- MISMATCH (front) lc1 open: says — the lab not in front',
-      '    launch_app → Launched',
-      '- MISMATCH (front) lc2 open: says — known [known: D99]',
-      '- SKIP lc3 open: says — unread',
-      '- ok lc4 open: says — fine',
-      '',
-    ].join('\n');
-    seam.live.chooser = { code: 1, rejudgeCode: 1, rejudgeOut: out };
+describe('each live block\'s verdict: main\'s rejudge exit code, its FAIL naming the failure reasons the rejudge wrote (A21)', () => {
+  const header = `${LIVE_GOLDEN_HEADER} 3 cases, 1 ok, 1 loud, 1 mismatches (1 not known), 0 skipped`;
+  const failed = [header, '', '## uiautomator', '- MISMATCH (tap-claim) lc1 open: says — x', '- LOUD (x) lc9 open: says — y', '- ok lc2 open: says — fine', ''].join('\n');
+
+  it('a rejudge exit 1: the block FAILs naming the reasons its rejudge wrote, in their order — never what its summary\'s prose seems to say', async () => {
+    seam.live.chooser = { code: 1, rejudge: { code: 1, out: failed, failures: ['MISMATCH lc1', 'MISMATCH (hedged ceiling): hedged 3 of 3 — the run fails'] } };
     expect(await go()).toBe(1);
-    expect(summary()).toContain(
-      `chooser verdict: FAIL — android-chooser: main's rejudge exit 1 — MISMATCH lc1; SKIP lc3 (${LIVE_GOLDEN_HEADER} 3 cases, 1 ok, 0 loud, 2 mismatches (1 not known), 1 skipped)`,
+    expect(summary().find((l) => l.startsWith('chooser verdict:'))).toBe(
+      `chooser verdict: FAIL — android-chooser: main's rejudge exit 1 — MISMATCH lc1; MISMATCH (hedged ceiling): hedged 3 of 3 — the run fails (${header})`,
     );
   });
 
-  it('a rejudge exit 1 on a stale chooser premise (T20a): the FAIL quotes the premise line and its hand line', async () => {
-    const out = [
-      `${LIVE_GOLDEN_HEADER} 2 cases, 2 ok, 0 loud, 0 mismatches (0 not known), 0 skipped`,
-      '',
-      '## uiautomator',
-      '- ok lc1 open: says — fine',
-      '- ok lc2 open: says — fine',
-      '',
-      'CHOOSER PREMISE: stale — a lab default (mAlways=true) for averilab://shared — the run fails',
-      `D55 (Android): a lab default: adb -s ${LAB_SERIAL} uninstall dev.averi.lab`,
-      '',
-    ].join('\n');
-    seam.live.chooser = { code: 1, rejudgeCode: 1, rejudgeOut: out };
-    expect(await go()).toBe(1);
-    expect(summary()).toContain(
-      `chooser verdict: FAIL — android-chooser: main's rejudge exit 1 — CHOOSER PREMISE: stale — a lab default (mAlways=true) for averilab://shared — the run fails | D55 (Android): a lab default: adb -s ${LAB_SERIAL} uninstall dev.averi.lab (${LIVE_GOLDEN_HEADER} 2 cases, 2 ok, 0 loud, 0 mismatches (0 not known), 0 skipped)`,
+  it('the failure reasons not written beside the summary: INCONCLUSIVE, unproven (3) — never read as "no failure"', async () => {
+    seam.live.forms = { rejudge: { code: 0, out: summaryOf(GROUP_CASES.forms) } };
+    expect(await go(['--groups', 'forms'])).toBe(LAB_RUN_EXIT.unproven);
+    expect(summary().find((l) => l.startsWith('forms verdict:'))).toBe(
+      "forms verdict: INCONCLUSIVE — android-forms: main's rejudge exit 0, its failure reasons unread (android-forms.rejudge.json): read android-forms.rejudge.txt",
     );
   });
 
@@ -499,65 +480,14 @@ describe('each live block\'s verdict: main\'s rejudge exit code, judged from the
     expect(summary().find((l) => l.startsWith('forms verdict:'))).toMatch(/^forms verdict: INCONCLUSIVE/);
   });
 
-  describe('liveVerdictLine: a live block\'s verdict from its run and its summary', () => {
-    const ok = { word: 'OK' as const, why: 'exit 0' };
-    const header = '# Live golden: 2 cases, 2 ok';
-    it('never run: INCONCLUSIVE, said so', () => {
-      expect(liveVerdictLine('x verdict', 'r', undefined, undefined)).toBe('x verdict: INCONCLUSIVE — r: no rejudge of its record (live.ts: not run)');
-    });
-    it('run, no rejudge (no record): INCONCLUSIVE naming live.ts\'s why', () => {
-      expect(liveVerdictLine('x verdict', 'r', { live: { word: 'FAIL', why: 'timed out' } }, undefined)).toBe('x verdict: INCONCLUSIVE — r: no rejudge of its record (live.ts: timed out)');
-    });
-    it('the rejudge not judged: INCONCLUSIVE naming its why', () => {
-      expect(liveVerdictLine('x verdict', 'r', { live: ok, rejudge: { word: 'FAIL', why: 'exit 2' } }, header)).toBe("x verdict: INCONCLUSIVE — r: main's rejudge exit 2");
-    });
-    it('exit 0 PASS, exit 1 FAIL, the summary\'s header quoted when there is one', () => {
-      expect(liveVerdictLine('x verdict', 'r', { live: ok, rejudge: ok }, `<!-- averi -->\n${header}\n`)).toBe(`x verdict: PASS — r: main's rejudge exit 0 (${header})`);
-      expect(liveVerdictLine('x verdict', 'r', { live: ok, rejudge: ok }, 'no header\n')).toBe("x verdict: PASS — r: main's rejudge exit 0");
-      expect(liveVerdictLine('x verdict', 'r', { live: ok, rejudge: ok }, undefined)).toBe("x verdict: PASS — r: main's rejudge exit 0");
-      expect(liveVerdictLine('x verdict', 'r', { live: ok, rejudge: { word: 'DONE', why: 'judged' } }, header)).toBe(
-        `x verdict: FAIL — r: main's rejudge exit 1 — its summary names no case or premise: read r.rejudge.txt (${header})`,
-      );
-      const tallies = ['SKIPPED where a skip proves nothing — the run fails: uiautomator e1', 'NO FIRST STATE — the app wrote none, the run fails: uiautomator f2', 'FIXED, not intermittent — strike off live-known.ts: uiautomator f3'];
-      expect(liveVerdictLine('x verdict', 'r', { live: ok, rejudge: { word: 'DONE', why: 'judged' } }, ['- LOUD (x) f9 open: says — loud', ...tallies].join('\n'))).toBe(
-        `x verdict: FAIL — r: main's rejudge exit 1 — LOUD f9; ${tallies.join('; ')}`,
-      );
-    });
-  });
-
-  describe('liveJudge: device-free, from the block\'s folder alone', () => {
-    it('nothing written: "not run"; the outcome written beside its summary: its verdict', async () => {
-      const dir = join(root, 'judged');
-      mkdirSync(dir);
-      const judge = liveJudge('x verdict', 'r');
-      expect(await judge({ dir, fs: nodeFs })).toEqual(['x verdict: INCONCLUSIVE — r: no rejudge of its record (live.ts: not run)']);
-      writeFileSync(join(dir, 'r.outcome.json'), JSON.stringify({ live: { word: 'OK', why: 'exit 0' }, rejudge: { word: 'OK', why: 'exit 0' } }));
-      writeFileSync(join(dir, 'r.rejudge.txt'), `${LIVE_GOLDEN_HEADER} 1 cases, 1 ok\n`);
-      expect(await judge({ dir, fs: nodeFs })).toEqual([`x verdict: PASS — r: main's rejudge exit 0 (${LIVE_GOLDEN_HEADER} 1 cases, 1 ok)`]);
-      writeFileSync(join(dir, 'r.outcome.json'), 'not json');
-      expect(await judge({ dir, fs: nodeFs })).toEqual(['x verdict: INCONCLUSIVE — r: its outcome file r.outcome.json is unreadable']);
-    });
-
-    it('a live run writes its outcome beside its record', async () => {
-      expect(await go(['--groups', 'forms'])).toBe(0);
-      expect(JSON.parse(readFileSync(join(dirOf('forms'), 'android-forms.outcome.json'), 'utf8'))).toEqual({ live: { word: 'OK', why: 'exit 0' }, rejudge: { word: 'OK', why: 'exit 0' } });
-    });
-  });
-
-  describe('failuresIn: what a failed rejudge summary names', () => {
-    it('a premise first, its hand lines up to the next other line', () => {
-      const text = ['CHOOSER PREMISE: stale — a — the run fails', 'D55 (Android): one', 'D55 (Android): two', 'after', 'D55 (Android): not its'].join('\n');
-      expect(failuresIn(text)).toEqual(['CHOOSER PREMISE: stale — a — the run fails | D55 (Android): one | D55 (Android): two']);
-      expect(failuresIn('x\nCHOOSER PREMISE: stale — b — the run fails\nD55 (Android): h')).toEqual(['CHOOSER PREMISE: stale — b — the run fails | D55 (Android): h']);
-    });
-    it('only lines that start so: an indented reply or a quoted word is none', () => {
-      expect(failuresIn('    - MISMATCH lc1 open: x\n  SKIPPED where a skip proves nothing — the run fails: e\n- ok lc2 open: - MISMATCH lc9 \n')).toEqual([]);
-      expect(failuresIn('- LOUD f1 open: x\n- SKIP (c) s2 open: y')).toEqual(['LOUD f1', 'SKIP s2']);
-    });
+  it('a live run writes its outcome beside its record, and its rejudge its failure reasons', async () => {
+    expect(await go(['--groups', 'forms'])).toBe(0);
+    expect(JSON.parse(readFileSync(join(dirOf('forms'), 'android-forms.outcome.json'), 'utf8'))).toEqual({ live: { word: 'OK', why: 'exit 0' }, rejudge: { word: 'OK', why: 'exit 0' } });
+    expect(readFileSync(join(dirOf('forms'), 'android-forms.rejudge.json'), 'utf8')).toBe('{"failures":[]}\n');
   });
 });
 
-describe('the exit code (LAB_RUN_EXIT): 0 only when every selected block PASSed', () => {
+describe('the exit code (standing.ts#STANDING_EXIT, over the SUMMARY runBatch returns): 0 only when every selected block PASSed', () => {
   it('the codes', () => {
     expect(LAB_RUN_EXIT).toEqual({ ok: 0, failed: 1, nothingDone: 2, interrupted: 130, unproven: 3 });
   });
@@ -574,44 +504,26 @@ describe('the exit code (LAB_RUN_EXIT): 0 only when every selected block PASSed'
     expect(s.find((l) => l.startsWith('forms:'))).toMatch(/^forms: INTERRUPTED — not judged/);
   });
 
-  it('an earlier run\'s clean SUMMARY beside it is never read: this run unproven, exit 3', async () => {
+  it('an earlier run\'s clean SUMMARY beside it is never read: this run unproven, exit 3; neither run exits by itself (the CLI entry does)', async () => {
     expect(await go(['--groups', 'forms'])).toBe(0);
     seam.live.forms = { code: 142, noRecord: true };
     const later = { ...io(), clock: () => new Date(2026, 10, 11, 12, 0, 0) };
     expect(await labRun({ argv: ['--out', out, '--repo', repo, '--serial', LAB_SERIAL, '--groups', 'forms'], env: {}, io: later, wait: noWait })).toBe(LAB_RUN_EXIT.unproven);
-    expect(seam.exits).toEqual([0, 3]);
+    expect(seam.exits).toEqual([]);
   });
 
   it('an ERROR line in a live run\'s log, every block PASS: the SUMMARY\'s ERROR section makes it unproven, exit 3', async () => {
     seam.live.forms = { logLine: 'ERROR the lab app crashed once' };
     expect(await go(['--groups', 'forms'])).toBe(LAB_RUN_EXIT.unproven);
+    // The backstop carries the standing code, not the runner's 0: the last exit code set is 3 (fail closed).
+    expect(seam.exitCodes).toEqual([0, LAB_RUN_EXIT.unproven]);
     expect(summary()).toContain('ERROR the lab app crashed once');
     expect(summary().find((l) => l.startsWith('forms verdict:'))).toMatch(/^forms verdict: PASS/);
   });
 
-  describe('labRunExit: 0 only when every wanted block PASSed and no line is INCONCLUSIVE or ERROR', () => {
-    const pass = ['lab check: PASS — met', 'forms verdict: PASS — ok', 'LAB android: OK — fine', 'RESTORE: none — everything dirty was put back and verified', 'x step: WARN — said'];
-    const labels = ['lab check', 'forms verdict'];
-    it('an ERROR step line (steps.log, timed) or a log\'s ERROR line beside every block PASS: unproven, 3', () => {
-      expect(labRunExit(0, [...pass, '10:15:00 ERROR forms live android-forms (exit 2) — see x.log'], labels)).toBe(3);
-      expect(labRunExit(0, [...pass, 'ERROR something in a log (×2, in forms/android-forms.log)'], labels)).toBe(3);
-      expect(labRunExit(0, [...pass, '[forms/x.log] ERROR boom'], labels)).toBe(3);
-      expect(labRunExit(0, [...pass, 'ERRORS seen: none', 'x ERROR y'], labels)).toBe(0);
-    });
-
-    it('the runner\'s 1, 2 and 130 stand', () => {
-      for (const c of [1, 2, 130]) expect(labRunExit(c, pass, labels)).toBe(c);
-    });
-    it('every wanted block PASS, OK and WARN lines beside: 0', () => {
-      expect(labRunExit(0, pass, labels)).toBe(0);
-    });
-    it('unproven (3): the SUMMARY unread; an INCONCLUSIVE line; an ERROR line; a wanted block not PASS or missing', () => {
-      expect(labRunExit(0, undefined, labels)).toBe(3);
-      expect(labRunExit(0, [...pass, 'chooser check before: INCONCLUSIVE — x'], labels)).toBe(3);
-      expect(labRunExit(0, [...pass, 'LAB handlers: ERROR — x'], labels)).toBe(3);
-      expect(labRunExit(0, ['lab check: WARN — build failed', 'forms verdict: PASS — ok'], labels)).toBe(3);
-      expect(labRunExit(0, ['forms verdict: PASS — ok'], labels)).toBe(3);
-      expect(labRunExit(0, ['lab check: PASS — x', 'forms verdict: SKIP — x'], labels)).toBe(3);
-    });
+  it('a line in a live run\'s log that does not start with ERROR (`x ERROR y`): no ERROR section, exit 0', async () => {
+    seam.live.forms = { logLine: 'x ERROR y' };
+    expect(await go(['--groups', 'forms'])).toBe(0);
+    expect(summary().some((l) => l.includes('x ERROR y'))).toBe(false);
   });
 });

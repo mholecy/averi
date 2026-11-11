@@ -612,9 +612,12 @@ describe('the hedged ceiling: a run whose every judged unaimable leg ends hedged
   });
 
   it('a D68-revert record (all three hedged): exit 1, MISMATCH-class, "hedged 3 of 3", the measured ~3 in 10 and the 2.7 % chance named', async () => {
-    const { exitCode, lines } = await run(legsRecord(UNAIMABLE_LEGS));
+    const { exitCode, lines, failures } = await run(legsRecord(UNAIMABLE_LEGS));
     expect(exitCode).toBe(1);
     const line = lines.find((l) => l.includes('hedged 3 of 3'));
+    // A21: its line, whole, is the run's one failure reason — what the standing lab batch names (the prose grep
+    // missed it).
+    expect(failures).toEqual([line]);
     expect(line).toMatch(/^MISMATCH \(hedged ceiling\): hedged 3 of 3 judged unaimable leg\(s\)/);
     expect(line).toMatch(/ADR 0021/);
     expect(line).toMatch(/~3 in 10 \(batch-10 runs 0, 5, 6\)/);
@@ -646,6 +649,8 @@ describe('the hedged ceiling: a run whose every judged unaimable leg ends hedged
   it('fewer than 3 judged legs: LOUD, no pass claimed, the exit untouched — even all hedged; a SKIPped leg is not judged', async () => {
     const two = await run(legsRecord(['lv-d62-control', 'lv-d68-launch'], ['lv-d62-control', 'lv-d68-launch']));
     expect(two.exitCode).toBe(0);
+    // A21: its LOUD is no failure reason.
+    expect(two.failures).toEqual([]);
     expect(two.lines[1]).toBe('# Live golden: 2 cases, 2 ok, 1 loud, 0 mismatches (0 not known), 0 skipped');
     expect(two.lines).toContain('LOUD (hedged ceiling): hedged 2 of 2 judged unaimable leg(s) — fewer than 3 judged, the ceiling unjudged (no pass claimed)');
     const skipped = legsRecord(UNAIMABLE_LEGS);
