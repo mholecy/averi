@@ -532,3 +532,74 @@ None gains a tap point.
 - A later-listed sibling the draw order excuses as the target's own content (`onTarget`: narrower than the target, its
   centre on it, ending above its bottom) stays excused, as before D84. A touch layer of that shape is still read as
   content, a `Tapped` (draw-order.ts's stated residual).
+
+## Amendment: a cover where neither lies in a scroll view (2026-11-11, D87)
+
+### Context
+
+D84's analysis found that `scroll_until` still swipes under a `drawn` cover that no scroll can move: views-drawn-over's A,
+before D84, swiped 3 times, then blamed "a layout defect (no clearance for a pinned bar?)". THE remedy precedence
+(ui-tree/standing.ts#Remedy) gave every touch purpose's `covered` target the `scroll` remedy whenever its cover's order
+was told, and never asked the tree's ancestry. The lab's pinned-bar and text-under-bar cells (Compose and WDA) have the
+same shape: P and its Continue bar are siblings, and the tree lists no scroll view.
+
+The backlog's candidate was "the cover and the target share a parent, and no scroll view lies between them". The
+analysis generalised it to "no scroll view among the ancestors of either, up to their lowest common ancestor, that
+ancestor included". The corpus refutes that rule. On scroll-sticky.wda (SwiftUI, a pinned section header), R and the
+`Sticky header` lie in one Section container inside the ScrollView's one content container. No scroll view lies between
+them, and the LCA is not one. Yet a stroke moves R out from under the header, which stays pinned. The tree does not mark a
+header as pinned, and an Android ScrollView's single child looks the same.
+
+### Decision
+
+A new remedy case, `bothPinned`, sits 5th in THE PRECEDENCE: after `fixed` and before `pinned`, `stuck` and `scroll`. It
+is the remedy of a `covered` target whose cover's order the tree tells (`drawn` or `overlaid`; `untold` and `seenOver`
+take 2.) when NEITHER the target NOR its cover lies in a scroll view as the tree says (geometry.ts#Clips.inScroller false
+for both). With no scroll view above either, no scroll moves either. This is the backlog's candidate narrowed on
+ancestry and widened on kind and relation: it fires for `drawn` and `overlaid` covers alike, and for any cover outside
+every scroll view, not only a sibling of the target's run (a bar laid in another branch, a scroll container listed after
+the target — whence the CoordinatorLayout residual below). The cover's own side is asked too, because a cover
+in a scroll view could be stroked away. The draw order already excuses scroll content over a node outside its scroll
+view (draw-order.ts's `scrolledContent` row) unless that content lies in a later screen, which takes `presented` first.
+So the cover's half is defence in depth, and so is `pinned` under a cover in the pixel assert, which now arises only
+for such a cover: their hand-mutation / narrowed-run survivors (standing.ts's cover half, pixel-poll.ts's words) are
+known — standing.ts and pixel-poll.ts are not in ADR 0038's mutation run. Undefined
+ancestry (idb's flat list) keeps the old cases. Since D84 views-drawn-over's A no longer reaches this case (its cover B
+is an untold peer, 2.); the targets that do are pinned-bar P and text-under-bar P under Continue (WDA, Compose) and
+rn-banner's "Saved".
+
+Every verb renders `bothPinned` with one clause (ui-tree/standing.ts#bothPinnedRemedyText):
+
+- the tap refuses with "no scroll moves it out from under that: neither lies in a scroll view — if it is a menu or a
+  popover, close it first; if a screenshot shows this element on top, tap it by coordinates" — no "layout defect", which
+  no stroke proved;
+- `scroll_until` stops before any swipe (interact/scroll-rounds.ts's `overlapped` stop) with "no swipe was sent —" and
+  the same clause;
+- the pixel assert misses with "the capture would show it, not the element; no scroll moves the element out from under
+  that: neither lies in a scroll view — if it is a menu or a popover, close it first; else assert something in the
+  element that lies clear of it". This replaces `pinned`'s hedged "scroll_until … first — or, if no scroll moves it
+  out …".
+
+Golden moved 9 checks, all wording or swipe count with the same verdict. The `fully` / `scroll_until` checks stop with 0
+swipes instead of 3, and the tap and colour checks drop the scroll advice. They cover pinned-bar P (Android, WDA) and
+text-under-bar P (Android colour; WDA tap, colour and both `scroll_until` checks). Truth for those cells puts P under
+pinned chrome (`chrome-overlap:pinned`, `under-chrome:pinned`), so the new words are true there. The idb twins are
+unchanged.
+
+The test helpers that modelled scrolling content with no scroll view were also changed. tests/helpers/rounds.ts's
+`treeOf` now puts its matches in a screen-sized `scrollable` unless a row says `unscrolled`. resolve.test.ts and
+scroll.test.ts mark their idb-shaped trees `flatList`.
+
+### Residuals
+
+- Content a scroll moves without an ancestor the tree marks as scrolling is read as still. Examples: a collapsing app
+  bar that a list's nested scroll folds, and any scroll view a source does not mark. A cover that is itself a scroll
+  container takes `bothPinned` too (an Android clipping container listed after the target and drawn over it: its own
+  ancestors do not scroll), though under a CoordinatorLayout its frame moves with the scroll
+  (`appbar_scrolling_view_behavior`, `overlapTop`). `pinned` already trusts the same fact for the system bars. Not
+  measured.
+- Two siblings inside one scroll view's content still swipe until exhausted (a Compose Column in a `verticalScroll`). The
+  tree cannot tell them from a pinned section header and its rows (scroll-sticky.wda), so the scroll stays.
+- A `cut` whose `by` is a later sibling, neither in a scroll view (Android text-under-bar P, cut to 825x22 by
+  Continue), still swipes and the tap still advises `scroll_until`: `bothPinned` decides `covered` only. The pixel
+  assert, which judges that target `covered`, already says `bothPinned`, so the verbs disagree on it. Not extended here.

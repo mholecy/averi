@@ -12,6 +12,7 @@ import { boundReads } from '../helpers/terminal-read.js';
 import { captureFrame, STABILITY_DELAY_MS } from '../../src/verify/capture.js';
 import { OcrUnavailableError } from '../../src/verify/ocr.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
+import { bothPinnedRemedyText } from '../../src/ui-tree/standing.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on
 // (tests/helpers/sleep-recorder.ts): since 2026-10-05 the stability delay
@@ -2485,7 +2486,7 @@ describe('pixel asserts under chrome drawn over the element (round 8)', async ()
     expect(probe.recognized).toBe(0);
   });
 
-  it('the remedy names a child clear of it where no scroll may cure it: the same row in no scroll view (pinned under the bar), or a cover that holds the element whole', async () => {
+  it('the remedy names a child clear of it where no scroll may cure it: the same row and its bar in no scroll view (D87: no scroll moves either), or a cover that holds the element whole', async () => {
     resetLayout();
     const full = { x: 0, y: 0, width: 402, height: 874 };
     const title = node({ role: 'text', label: 'SWIFT PAYMENT', rect: { x: 135, y: 73, width: 131, height: 22 } });
@@ -2499,7 +2500,7 @@ describe('pixel asserts under chrome drawn over the element (round 8)', async ()
       return (await new Verifier(fake, FAST).assert({ element: { id: 'row_label' }, color: { expected: '#FFFFFF' } })).detail;
     };
     expect(await judged(node({ role: 'text', identifier: 'row_label', rect: { x: 24, y: 70, width: 354, height: 30 } }), false)).toBe(
-      `text "SWIFT PAYMENT" (135,73 131x22) is drawn over the element (element 24,70 354x30) — ${OR_CHILD}; failing closed, color unchecked`,
+      `text "SWIFT PAYMENT" (135,73 131x22) is drawn over the element (element 24,70 354x30) — the capture would show it, not the element; ${bothPinnedRemedyText('pixel')}; failing closed, color unchecked`,
     );
     expect(await judged(node({ role: 'text', identifier: 'row_label', rect: { x: 150, y: 76, width: 60, height: 16 } }), true)).toBe(
       `text "SWIFT PAYMENT" (135,73 131x22) is drawn over the element (element 150,76 60x16) — ${OR_CHILD}; failing closed, color unchecked`,

@@ -21,6 +21,7 @@ import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { CLASSIC_VIEWS, SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';
 import { bandNode, dropBand, el, FakeAdapter, iosLoginFake, node, recorded, resetLayout, screen } from '../helpers/fake.js';
 import { missNote } from '../../src/ui-tree/miss.js';
+import { bothPinnedRemedyText } from '../../src/ui-tree/standing.js';
 
 const FAST = { ambiguous: 'first' as const, timeoutMs: 60, pollMs: 2 };
 const FIRST = { ambiguous: 'first' as const };
@@ -611,7 +612,8 @@ describe('a tap target off the screen (2026-10-08)', () => {
  * LAST in idb's flat list; "Tapped" went to the disabled CONTINUE and nothing opened.
  */
 describe('a tap target under the app\'s chrome (2026-10-09)', () => {
-  const CONTINUE = 'button "Continue to summary" (24,780 354x44)';
+  /** CONTINUE as averi names it: listed last in idb's flat list, pinned at its bottom, so its reach runs to the screen's (draw-order.ts#bottomPinned). */
+  const CONTINUE = 'button "Continue to summary" (24,780 354x44, reaching 24,780 354x94)';
   /** The SWIFT form as idb lists it: flat under a 0×0 root, the Application first, the CONTINUE bar last; `priority_select` at `y`. */
   const swiftForm = (y = 771) => {
     const fake = new FakeAdapter(
@@ -619,6 +621,7 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
         form: node({
           role: 'container',
           rect: { x: 0, y: 0, width: 0, height: 0 },
+          flatList: true,
           children: [
             node({ role: 'other', label: 'mp-native', rect: { x: 0, y: 0, width: 402, height: 874 } }),
             node({ role: 'button', label: 'BackButton', identifier: 'back', rect: { x: 30, y: 70, width: 28, height: 28 } }),
@@ -762,8 +765,9 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     const banner = { role: 'container', label: '!, Open debugger to view warnings.', identifier: null, rect: { x: 10, y: 787, width: 382, height: 49 } };
     expect(await scrollUntilVisible(fake, 'id:placeholder_screen', { maxSwipes: 0, settleMs: 0 })).toEqual({ swipes: 0, visible: 1, clipped: [], covered: { by: banner, shows: expect.closeTo(0.915, 3) } });
     // `fully` is kept off by the dev build's warning banner at the bottom — a real cover — never by the screen's own text.
+    // Neither lies in a scroll view (the screen-sized placeholder, LogBox's banner beside it): stopped before any swipe (D87).
     await expect(scrollUntilVisible(fake, 'id:placeholder_screen', { maxSwipes: 0, settleMs: 0, fully: true })).rejects.toThrow(
-      'element reached the viewport but stayed under container "!, Open debugger to view warnings." (10,787 382x49), drawn over it — 91% of it shows',
+      `element is in the viewport but under container "!, Open debugger to view warnings." (10,787 382x49), drawn over it — 91% of it shows; no swipe was sent — ${bothPinnedRemedyText('touch')}`,
     );
     expect(await tapElement(fake, 'id:placeholder_screen', OPTS)).toEqual({ note: undefined, keyboardHidden: undefined, moved: undefined });
     expect(fake.tapPoints).toEqual([{ x: 201, y: 495 }]);
@@ -782,7 +786,7 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     expect(error).toBeInstanceOf(CoveredRefusal);
     expect((error as Error).message).toBe(
       'id:login_submit was not tapped: after id:"login_title" was tapped at (201,303) to hide the soft keyboard, it is under button "Pay" (0,540 402x80) ' +
-        'at its centre (107,571), drawn over it; nothing of it shows — scroll_until it first',
+        `at its centre (107,571), drawn over it; nothing of it shows — ${bothPinnedRemedyText('touch')}`,
     );
     expect(fake.taps).toEqual(['login_title']);
   });
@@ -912,13 +916,13 @@ describe('a Compose label under its own control (2026-10-09)', () => {
     expect([fake.tapPoints, fake.swipes]).toEqual([[{ x: 782, y: 1836 }], []]);
   });
 
-  it('a classic View\'s pinned CTA over a text in the same layout (review of fix/r6) stays a cover: tap text:"Forgot password?" is refused, never pressing LOG IN; scroll_until to the terms under CONTINUE keeps the layout-defect diagnosis', async () => {
+  it('a classic View\'s pinned CTA over a text in the same layout (review of fix/r6) stays a cover: tap text:"Forgot password?" is refused, never pressing LOG IN; scroll_until to the terms under CONTINUE stops before any swipe, no scroll advised — neither lies in a scroll view (D87)', async () => {
     const login = compose(CLASSIC_VIEWS.loginImeUp);
     await expect(tapElement(login, 'text:"Forgot password?"', OPTS)).rejects.toBeInstanceOf(CoveredRefusal);
     expect(login.tapPoints).toEqual([]);
     const terms = compose(CLASSIC_VIEWS.terms);
     await expect(scrollUntilVisible(terms, 'text:"By continuing you accept the terms"', { maxSwipes: 2, settleMs: 0 })).rejects.toThrow(
-      /under button "CONTINUE" \(40,1960 1000x130\) at its centre \(540,2015\), drawn over it — 0% of it shows — and the content is exhausted.* a layout defect/,
+      /^scroll_until .* stopped before any swipe — .*under button "CONTINUE" \(40,1960 1000x130\) at its centre \(540,2015\), drawn over it — 0% of it shows; no swipe was sent — no scroll moves it out from under that: neither lies in a scroll view — /,
     );
   });
 });

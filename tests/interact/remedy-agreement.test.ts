@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { everyNode, type DeviceScreen, type Rect, type UiNode } from '../../src/adapters/types.js';
 import type { KeyboardLine } from '../../src/ui-tree/keyboard-position.js';
 import { lookAt, lookOn } from '../../src/ui-tree/look.js';
-import { orderRemedyText, presentedRemedy, sceneOf } from '../../src/ui-tree/standing.js';
+import { orderRemedyText, presentedRemedy, sceneOf, bothPinnedRemedyText } from '../../src/ui-tree/standing.js';
 import type { PairQuestion } from '../../src/ui-tree/eyes.js';
 import type { OrderSeen } from '../../src/ui-tree/seen-order.js';
 import { judgeOrder } from '../../src/verify/eyes.js';
@@ -19,6 +19,7 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { failureOf, play, type Row } from '../helpers/rounds.js';
 import { stackedLayers } from '../helpers/stacked-layers.js';
 import { node } from '../helpers/fake.js';
+import { parseDump } from '../helpers/android-dumps.js';
 
 // ONE remedy for a target that is not reachable itself (ui-tree/standing.ts#Remedy), decided once by the standing with
 // one precedence — a screen presented over the target first (docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md),
@@ -829,5 +830,110 @@ describe('one remedy for a target under a cover a screenshot saw drawn over it �
     expect(await tapSaid(tree, byId(tree, 'lab.blur-menu.A'), ON_IPHONE, eyes.order)).toMatch(/^\{"point"/);
     expect(await colourSaid(tree, byId(tree, 'lab.blur-menu.A'), ON_IPHONE, eyes.order)).toBeUndefined();
     expect(eyes.asked).toEqual([]);
+  });
+});
+
+// D87: a cover the draw order puts over the target (`drawn`), where neither lies in a scroll view as the tree says —
+// siblings with no scroll view above them, as the lab's pinned-bar P and text-under-bar P under Continue (WDA, Compose)
+// and rn-banner's "Saved" — is one no scroll moves the target out from under (ui-tree/standing.ts#Remedy's
+// `bothPinned`): every verb says so, and scroll_until stops before any swipe instead of stroking until exhausted and
+// blaming "a layout defect" (pinned-bar P: 3 swipes; views-drawn-over's A, before D84, too). Where
+// either lies in a scroll view a stroke may separate them, though no scroll view lies between the two: a pinned section
+// header in its scroll view's one content container beside its rows (scroll-sticky.wda's SwiftUI shape), a sticky
+// header and a row both children of the scroll view, a FAB outside the scroll view. And idb's flat list tells no
+// ancestry. Those keep the scroll.
+describe('one remedy for a target under a drawn cover where neither lies in a scroll view (D87) — the tap, the pixel assert and scroll_until agree', () => {
+  const r = (y: number, height: number): Rect => ({ x: 0, y, width: 402, height });
+  const target = () => node({ role: 'button', label: 'T', identifier: 't', rect: r(400, 100) });
+  const card = () => node({ role: 'image', label: 'Card', rect: r(380, 140) });
+  const app = (children: UiNode[], extra: Partial<UiNode> = {}) => node({ role: 'other', rect: { ...BOX }, children, ...extra });
+  const scroller = (children: UiNode[]) => node({ role: 'scrollable', rect: r(100, 774), children });
+  const content = (children: UiNode[]) => node({ role: 'other', rect: r(100, 1600), children });
+  const shape = (build: (t: UiNode, c: UiNode) => UiNode) => {
+    const [t, c] = [target(), card()];
+    return { tree: build(t, c), t };
+  };
+  const RUN = (t: UiNode, c: UiNode) => app([node({ role: 'other', rect: r(300, 300), children: [t, c] })]);
+  const remedies = (tree: UiNode, t: UiNode) => {
+    const scene = sceneOf(tree);
+    const of = (s: { kind: string; remedy?: { of: string } }) => (s.kind === 'reachable' ? 'reachable' : s.remedy?.of);
+    return [
+      of(scene.standing(t, USABLE, { of: 'tap' })),
+      of(scene.standing(t, USABLE, { of: 'stop' })),
+      of(scene.standing(t, USABLE, { of: 'fully' })),
+      of(scene.standing(t, USABLE, { of: 'pixel', reads: colorSampleRect, glyphs: false })),
+    ];
+  };
+  const RULES = { direction: 'down', fully: false, maxSwipes: 1, timeoutMs: 30_000, screen: IPHONE } as const;
+  const UNDER = 'under image "Card" (0,380 402x140) at its centre (201,450), drawn over it';
+
+  it('the standing carries `bothPinned` for every purpose — siblings of a run in no scroll view, the cover listed after the target', () => {
+    const run = shape(RUN);
+    expect(remedies(run.tree, run.t)).toEqual(['bothPinned', 'bothPinned', 'bothPinned', 'bothPinned']);
+  });
+
+  it('word for word: the tap refuses, the colour assert misses, scroll_until stops before any swipe', async () => {
+    const run = shape(RUN);
+    expect(await tapSaid(run.tree, run.t)).toBe(`id:t is ${UNDER}; nothing of it shows — ${bothPinnedRemedyText('touch')}; nothing was tapped`);
+    expect(await colourSaid(run.tree, run.t)).toBe(
+      'image "Card" (0,380 402x140) is drawn over the element (element 0,400 402x100) — the capture would show it, not the element; ' +
+        'no scroll moves the element out from under that: neither lies in a scroll view — if it is a menu or a popover, close it first; else assert something in the element that lies clear of it',
+    );
+    const played = play(RULES, [{ tree: run.tree, found: [run.t], screen: USABLE }]);
+    expect(played.steps.filter((s) => s.do === 'stroke')).toEqual([]);
+    expect(failureOf(played, 'id:t').message).toBe(
+      `scroll_until id:t stopped before any swipe — element is in the viewport but ${UNDER} — 0% of it shows; no swipe was sent — ` +
+        'no scroll moves it out from under that: neither lies in a scroll view — if it is a menu or a popover, close it first; ' +
+        'if a screenshot shows this element on top, tap it by coordinates. ' +
+        'Last rect {"x":0,"y":400,"width":402,"height":100} in a 402x874 viewport',
+    );
+  });
+
+  it('either in a scroll view, or the ancestry untold, keeps the scroll — scroll_until strokes', () => {
+    const shapes = [
+      ['a pinned section header beside its rows in the scroll view\'s one content container', shape((t, c) => app([scroller([content([node({ role: 'other', rect: r(300, 300), children: [t, c] })])])]))],
+      ['a sticky header and a row, both children of the scroll view', shape((t, c) => app([scroller([t, c])]))],
+      ['a FAB outside the scroll view', shape((t, c) => app([scroller([content([t])]), c]))],
+      ["idb's flat list", shape((t, c) => app([t, c], { flatList: true }))],
+    ] as const;
+    for (const [name, { tree, t }] of shapes) {
+      // The touch purposes scroll; the pixel assert is `stuck`, the card's reach holding the element whole.
+      expect({ name, remedies: remedies(tree, t) }).toEqual({ name, remedies: ['scroll', 'scroll', 'scroll', 'stuck'] });
+      const row: Row = { tree, found: [t], screen: USABLE };
+      const played = play(RULES, [row, row]);
+      expect({ name, strokes: played.steps.filter((s) => s.do === 'stroke').length }).toEqual({ name, strokes: 1 });
+    }
+  });
+
+  // The spec's own shape (D87), uiautomator's: an unmarked Compose run, T and the card listed after it (drawn over its
+  // centre) siblings in one View, no scroll container above either — every verb `bothPinned`, scroll_until no stroke.
+  // Its twin, the same run inside a scroll container (`scrollable="true"`, a LazyColumn), keeps the scroll.
+  const dumpNode = (id: string, bounds: string, kids = '', extra = '') =>
+    `<node index="0" text="" resource-id="${id}" class="android.view.View" package="dev.averi.lab" content-desc="" clickable="${id === '' ? 'false' : 'true'}" enabled="true" ${extra}scrollable="${extra === '' ? 'false' : 'true'}" bounds="${bounds}">${kids}</node>`;
+  const composeRun = (scrolled: boolean): UiNode => {
+    const banner = '<node index="0" text="Banner" resource-id="" class="android.widget.TextView" package="dev.averi.lab" content-desc="" clickable="false" enabled="true" scrollable="false" bounds="[400,940][680,1010]" />';
+    const run = dumpNode('', '[0,0][1080,2220]', dumpNode('lab.t', '[127,800][952,1000]') + dumpNode('lab.card', '[66,850][1014,1100]', banner));
+    const compose = `<node index="0" text="" resource-id="" class="androidx.compose.ui.platform.ComposeView" package="dev.averi.lab" content-desc="" clickable="false" enabled="true" scrollable="false" bounds="[0,0][1080,2220]">${scrolled ? dumpNode('', '[0,0][1080,2220]', run, 'focusable="true" ') : run}</node>`;
+    return parseDump(`<?xml version='1.0' encoding='UTF-8' standalone='yes' ?><hierarchy rotation="0"><node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="dev.averi.lab" content-desc="" clickable="false" enabled="true" scrollable="false" bounds="[0,0][1080,2220]">${compose}</node></hierarchy>`);
+  };
+  const ANDROID_RULES = { direction: 'down', fully: false, maxSwipes: 1, timeoutMs: 30_000, screen: ON_PIXEL.device } as const;
+  const androidRemedies = (tree: UiNode, t: UiNode) => {
+    const scene = sceneOf(tree);
+    const of = (s: { kind: string; remedy?: { of: string } }) => (s.kind === 'reachable' ? 'reachable' : s.remedy?.of);
+    return (['tap', 'stop', 'fully'] as const).map((p) => of(scene.standing(t, ON_PIXEL.usable, { of: p }))).concat(of(scene.standing(t, ON_PIXEL.usable, { of: 'pixel', reads: colorSampleRect, glyphs: false })));
+  };
+
+  it('Compose, uiautomator-shaped: a drawn later sibling in an unmarked run, neither in a scroll container — `bothPinned`, scroll_until stops with no stroke; in a scroll container, it strokes', () => {
+    const run = composeRun(false);
+    const t = [...everyNode(run)].find((n) => n.identifier === 'lab.t')!;
+    expect(androidRemedies(run, t)).toEqual(['bothPinned', 'bothPinned', 'bothPinned', 'bothPinned']);
+    const played = play(ANDROID_RULES, [{ tree: run, found: [t], screen: ON_PIXEL.usable }]);
+    expect(played.steps.filter((s) => s.do === 'stroke')).toEqual([]);
+    expect(failureOf(played, 'id:t').message).toMatch(/^scroll_until id:t stopped before any swipe — element is in the viewport but under container id:lab\.card .*; no swipe was sent — no scroll moves it out from under that: neither lies in a scroll view — /);
+    const scrolled = composeRun(true);
+    const st = [...everyNode(scrolled)].find((n) => n.identifier === 'lab.t')!;
+    expect(androidRemedies(scrolled, st).includes('bothPinned')).toBe(false);
+    const row: Row = { tree: scrolled, found: [st], screen: ON_PIXEL.usable };
+    expect(play(ANDROID_RULES, [row, row]).steps.filter((s) => s.do === 'stroke')).toHaveLength(1);
   });
 });

@@ -5,6 +5,7 @@ import { Verifier } from '../../src/verify/assert.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { FakeAdapter } from '../helpers/fake.js';
 import { resetSleeps } from '../helpers/sleep-recorder.js';
+import { bothPinnedRemedyText } from '../../src/ui-tree/standing.js';
 
 // THE PIXEL ASSERT ON A NODE COMPOSE CUT AT AN OVERLAY (ui-tree/later-edges.ts#OverlaidEdge): the tree shows the pinned
 // button only by the cut, so the assert fails closed naming it, saying the element may run on
@@ -33,11 +34,11 @@ const colourOn = async (cell: string, id: string, expected: string): Promise<{ p
 const RUNS_ON = "drawn after it — the dump (Compose's, on Android) leaves out of a node's bounds what a later node covers, so the rest of the element may lie under that container";
 
 describe('the colour assert on a node cut at an overlay fails closed naming it', () => {
-  it('pinned-bar P under Continue (in no scroll view): the cut named, and the clear-child advice', async () => {
+  it('pinned-bar P under Continue (neither in a scroll view): the cut named, and the clear-child advice, no scroll (D87)', async () => {
     const { passed, detail } = await colourOn('pinned-bar', 'lab.pinned-bar.P', '#E53935');
     expect(passed).toBe(false);
     expect(detail).toContain(`container id:lab.pinned-bar.continue (66,1956 948x154) meets the element's bottom edge (element 127,1846 825x110), ${RUNS_ON}`);
-    expect(detail).toContain('assert something in it that lies clear of that; failing closed, color unchecked');
+    expect(detail).toContain(`the capture would show it, not the element; ${bothPinnedRemedyText('pixel')}; failing closed, color unchecked`);
   });
   it('bands Q above N\'s touch target, exactly as wide: no overlay — the colour is measured', async () => {
     expect((await colourOn('bands', 'lab.bands.Q', '#FB8C00')).passed).toBe(true);
