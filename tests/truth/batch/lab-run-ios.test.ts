@@ -199,16 +199,22 @@ describe('lab-run-ios.ts: a clean run — the lab, every idb run, then every Web
     expect(seam.words.find((w) => w.includes('--groups visibility') && w.includes('--sources idb') && !w.includes('--rejudge'))).toBe(
       `node --import tsx ${join(repo, 'scripts/truth/live.ts')} --udid ${LAB_UDID} --sources idb --groups visibility --record ${join(dirOf('idb-visibility'), 'ios-idb-visibility.json')}`,
     );
-    // No idb run inside a window: every idb run before the first backup, every WDA run between a backup and a restore.
+    // No idb run inside a window: every idb run before the first backup. Each WDA run between its window's backup and
+    // that window's restore (its own key writes or imports), and each backup after the previous window's restore.
     const firstExport = callAt('defaults export');
     expect(lastCallAt('--sources idb --groups')).toBeLessThan(firstExport);
+    const restoreAt = (from: number) => seam.words.findIndex((w, i) => i > from && / defaults (write|import) /.test(w));
+    let previous = lastCallAt('--sources idb --groups');
     for (const g of GROUPS) {
       const run = callAt(`--sources wda --groups ${g}`);
-      const backup = lastCallAt('defaults export', run);
-      const restored = callAt('DerivedData/averi-wda-lab', run);
-      expect(backup).toBeGreaterThan(-1);
+      const backup = callAt('defaults export', previous);
+      const restored = restoreAt(run);
+      expect(backup).toBeGreaterThan(previous);
+      expect(backup).toBeLessThan(run);
+      expect(restoreAt(backup)).toBe(restored);
       expect(restored).toBeGreaterThan(run);
       expect(JSON.parse(readFileSync(join(dirOf(`wda-${g}`), 'state.json'), 'utf8')).dirty).toBe(false);
+      previous = restored;
     }
     // The lab's processes ended at the run's end.
     expect(seam.words.slice(-2)).toEqual([`pkill -f idb_companion --udid ${LAB_UDID}`, `idb disconnect ${LAB_UDID}`]);
