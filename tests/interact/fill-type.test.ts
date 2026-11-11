@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
+import type { FieldRead } from '../../src/interact/fill-facts.js';
 import { MAX_TAIL_RETYPES, retypesTail, typeAndConfirm, type FieldIo, type TypingIntent } from '../../src/interact/fill-type.js';
 import { node } from '../helpers/fake.js';
 
@@ -10,6 +11,9 @@ vi.mock('../../src/util/sleep.js', () => ({ sleep: async () => undefined }));
  * one caller, fillField, pins it end to end (fill.test.ts). Whether a reading landed, and what tail it proves dropped,
  * is fill-landing.test.ts's.
  */
+
+/** A read that found the field showing `value` (FieldIo.read: a node, or why it was lost). */
+const shows = (value: string | null): FieldRead => ({ node: node({ role: 'textfield', identifier: 'f', rect: { x: 0, y: 0, width: 100, height: 20 }, value }) });
 
 /**
  * A scripted field: `typeText` lands what `keep` lets through of each typing (in order), a read returns the field's
@@ -46,7 +50,7 @@ function scripted(opts: { keep?: number[]; elsewhere?: (text: string) => string 
         pending = pending.slice(1);
       }
       last = snapshot();
-      return field.value || (opts.unnamed ?? '');
+      return shows(field.value || (opts.unnamed ?? ''));
     },
     screen: () => last,
     reportDroppedTail: () => dropped.push(typed.length),
@@ -413,7 +417,7 @@ describe('typeAndConfirm — the arms after a retry', () => {
       wipe: async () => undefined,
       read: async () => {
         const round = rounds[Math.min(typed.length - 1, rounds.length - 1)];
-        return round[Math.min(reads++, round.length - 1)];
+        return shows(round[Math.min(reads++, round.length - 1)]);
       },
       screen: () => node({ role: 'container', rect: { x: 0, y: 0, width: 400, height: 800 }, children: [field, sibling()] }),
       reportDroppedTail: () => {
@@ -508,7 +512,7 @@ describe('typeAndConfirm — a reading unchanged since typing began is no landin
       },
       read: async () => {
         reads++;
-        return arrives !== 'never' && reads >= arrives ? before + value : before;
+        return shows(arrives !== 'never' && reads >= arrives ? before + value : before);
       },
       screen: () => undefined,
       reportDroppedTail: () => {},
@@ -646,19 +650,48 @@ describe('typeAndConfirm — the reading withheld, a wipe of nothing, and which 
     },
   });
 
-  it('a field whose text is withheld (or not found) on two reads running is unread: two reads, nothing sent again', async () => {
+  it('a field not found on two reads running is unread, said why (`lost`): two reads, nothing sent again', async () => {
     const s = scripted();
     let reads = 0;
-    const io: FieldIo = { ...s.io, read: async () => (reads++, undefined) };
-    expect(await typeAndConfirm(io, { ...s.intent, clear: true })).toEqual({ kind: 'unread' });
+    const io: FieldIo = { ...s.io, read: async () => (reads++, { lost: 'unmatched' }) };
+    expect(await typeAndConfirm(io, { ...s.intent, clear: true })).toEqual({ kind: 'unread', lost: 'unmatched' });
     expect(reads).toBe(2);
     expect(s.typed).toEqual(['Jan Novak']);
+  });
+
+  it('a non-input that withholds its text on two reads running is unread, no `lost`: two reads, nothing sent again', async () => {
+    const s = scripted();
+    let reads = 0;
+    const io: FieldIo = { ...s.io, read: async () => (reads++, shows(null)) };
+    const out = await typeAndConfirm(io, { ...s.intent, clear: true, isInput: false });
+    expect(out).toEqual({ kind: 'unread' });
+    expect(out).not.toHaveProperty('lost');
+    expect(reads).toBe(2);
+    expect(s.typed).toEqual(['Jan Novak']);
+  });
+
+  it('A28: `lost` is the LAST read\'s — lost then withheld is no `lost`; withheld then lost is, with its why', async () => {
+    const s = scripted();
+    const twice = (first: FieldRead, second: FieldRead): FieldIo => {
+      let reads = 0;
+      return { ...s.io, read: async () => (reads++ === 0 ? first : second) };
+    };
+    const lostThenWithheld = await typeAndConfirm(twice({ lost: 'screen-changed' }, shows(null)), { ...s.intent, isInput: false });
+    expect(lostThenWithheld).toEqual({ kind: 'unread' });
+    expect(lostThenWithheld).not.toHaveProperty('lost');
+    expect(await typeAndConfirm(twice(shows(null), { lost: 'screen-changed' }), { ...s.intent, isInput: false })).toEqual({ kind: 'unread', lost: 'screen-changed' });
+  });
+
+  it('an input whose value is null reads empty, not withheld: the poll goes on, missed as `shows 0`', async () => {
+    const s = scripted();
+    const io: FieldIo = { ...s.io, read: async () => shows(null) };
+    expect(await typeAndConfirm(io, s.intent)).toMatchObject({ kind: 'missed', observed: '' });
   });
 
   it('a field not found on the first read is read again: found on the second with the value, it landed', async () => {
     const s = scripted();
     let reads = 0;
-    const io: FieldIo = { ...s.io, read: async () => (++reads === 1 ? undefined : s.io.read()) };
+    const io: FieldIo = { ...s.io, read: async () => (++reads === 1 ? { lost: 'unmatched' } : s.io.read()) };
     expect(await typeAndConfirm(io, s.intent)).toEqual({ kind: 'landed', observed: 'Jan Novak', again: [] });
     expect(reads).toBe(2);
   });

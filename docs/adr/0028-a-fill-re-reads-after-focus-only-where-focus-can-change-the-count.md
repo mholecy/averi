@@ -7,7 +7,8 @@ misses a transformed value is unacceptable). Implemented in 5ea9bfd2…546c8804,
 Amended 2026-11-03 (D64, docs only: the safety claim and cost C1 corrected — a focus-inserted prefix that holds the
 value passes with no key landed; residual 3 accepted; follow-up D64b). Amended 2026-11-05 (D64b-3: option B3b, a caveat
 where such a reading is not exactly the value; residual 3 restated). Amended 2026-11-09 (D72: Android's reading keeps
-outer spaces — the ⚠ line counts what the app holds; residual 3 narrowed).
+outer spaces — the ⚠ line counts what the app holds; residual 3 narrowed). Amended 2026-11-11 (A28: the gate is a row
+of one table in fill-landing.ts, the held count beside it; the field's reads one module; no behaviour changed).
 
 ## Context
 
@@ -242,6 +243,38 @@ source, a NON-empty plain field's `before` is its pre-tap reading, never re-read
 focus a text holding the value has the same hole, and no caveat, since `held` is not `'unread'` there. iOS: the owner's
 batch (rebuild the lab app, fp1 and fp2 three times, a forms regression) is still to be read; no change is expected, as
 the re-read runs there.
+
+## Amendment: the read after focus one table, the field's reads one module (2026-11-11, A28)
+
+Architecture review 2026-11-11 (docs/architecture-reviews/2026-11-11-ten-agent-review.html, card 10; backlog A28). No
+behaviour, timing or wording changed: the same reads at the same moments, in the same number.
+
+- **The read after the focus tap is one pure table**, `interact/fill-landing.ts#postFocusReadOf` → `count | clear |
+  skipped | none` from the value, `clear`, the field as resolved, a sole `id` and `retypesTail`. Until A28 fill.ts
+  decided it in four places: this ADR's gate (`skipped`), the masked count's re-read, a clear alone's re-read (inside
+  the clear branch), and the `held` it handed the typing. The gate is the table's `skipped` row, its clauses unchanged
+  (`needsHeldCount`, the sole id, `retypesTail`, no `clear`, a value); the decision above stands as written, only the
+  place it is written moved. The table is pinned row by row in tests/interact/fill-landing.test.ts.
+- **The held count is fill-landing.ts's** (`heldCountOf`, beside `needsHeldCount`), which finishes A2: the bullets-only
+  count the masked rule starts from (`Expectation.held`, `'unread'` on the skipped row) and the masked-append warning
+  were derived in fill.ts, inputs of the landing rule outside the landing module. fill.ts now performs the read the
+  table names and passes the count on.
+- **The field's reads are one module**, `interact/fill-refetch.ts` (`fieldRefetch`: `read`, `typingStarts`,
+  `lastTree`): the selector first, else `sameField`'s twin under the screen guard (`TwinGuard` — before typing freely;
+  after it only on the pre-typing read's screen; never when typing began with no read), else why it was lost
+  (`findAgain`, pure; the screen the field was resolved on words a `lost` on the skipped row, as before). Each read
+  answers the node or the why (`fill-facts.ts#FieldRead`). `FieldIo.read` (fill-type.ts, ADR 0023) answers the same,
+  so the typing's `unread` carries the last read's `lost`, and fill.ts's mutable `lostOnLastRead`, which the read-back
+  read off the closure while the clear got `{ lost }` explicitly, is gone. What a node shows is
+  `fill-facts.ts#shownText` (an input's null is ""), one rule for fill.ts and the typing.
+- **The adapter tests fill through fillField** (tests/adapters/android.test.ts's D72/D71/D64b-3 cases,
+  ios-tree-source.test.ts's D51 mask): they no longer re-wire fill.ts's glue by hand (`FieldIo`, `clearStep`,
+  `landingOf`'s `Expectation`), so a fault in the glue fails them. The Android dump says `password="false"` as
+  uiautomator does, so a sole `id` skips the re-read there as on a device.
+
+Proof: unit tests only — the golden replay never types (Changed 0 by construction); every existing fill test kept green,
+unchanged but for fill-type.test.ts's scripted reads now answering a node. fill-refetch.ts joins the mutation scope's
+core group (ADR 0038), its floor provisional (80) until its first cold run. A forms A/B on a device, which the review card recommends for FK2, is not run here.
 
 ## Residuals accepted
 

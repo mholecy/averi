@@ -3,20 +3,20 @@ import {
   INPUT_ROLE,
   rectArea,
   rectIntersection,
-  sameRect,
   type DeviceAdapter,
   type Rect,
   type UiNode,
 } from '../adapters/types.js';
-import { readTreeOrMiss, readTreeOrThrow, sameScreen, screenIdentity, type ScreenIdentity } from '../ui-tree/read-tree.js';
+import { readTreeOrMiss, screenIdentity } from '../ui-tree/read-tree.js';
 import { soleIdOf } from '../ui-tree/selectors.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { resolveClearOfKeyboard, type GuardOptions } from './keyboard.js';
-import { describeTarget, resolveNow, type Target } from './resolve.js';
+import { describeTarget, type Target } from './resolve.js';
 import { assertTypeable } from './type-text.js';
 import { fillFailureText, focusTapNote } from './fill-text.js';
-import { heldText, type FillFailure, type FillResult, type LostWhy, type NearbyInput, type ReadBack } from './fill-facts.js';
+import { heldText, shownText, type FillFailure, type FillResult, type NearbyInput, type ReadBack } from './fill-facts.js';
+import { fieldRefetch } from './fill-refetch.js';
 import { clearStep, startClear, type ClearFacts } from './fill-clear.js';
 import { heldCountOf, postFocusReadOf } from './fill-landing.js';
 import { retypesTail, typeAndConfirm } from './fill-type.js';
@@ -66,31 +66,6 @@ function rectGap(a: Rect, b: Rect): number {
   const dx = Math.max(0, a.x - (b.x + b.width), b.x - (a.x + a.width));
   const dy = Math.max(0, a.y - (b.y + b.height), b.y - (a.y + a.height));
   return Math.hypot(dx, dy);
-}
-
-/**
- * The node chosen at focus, found again in a fresh tree by identity — same
- * role, identifier and rect, exactly one such node. The read-back's
- * fallback when the selector no longer matches: a `value:"…"` selector
- * stops matching the moment the clear or the typing changes the value, and
- * until 2026-10-08 that read as "nothing there" (a clear counted as done,
- * a read-back as unverifiable). A field that MOVED (the keyboard pushed the
- * form up) is not found this way and stays unverifiable, as before.
- *
- * Identity is not screen identity: RN forms share one id across fields
- * (`TextFieldWithComponentStyle`), so a NEXT screen with a field at the same
- * rect is a twin too (review 2026-10-08: typing that navigated read the next
- * screen's field). After typing, fillField therefore asks it only while
- * the screen's identity (ui-tree/read-tree.ts#ScreenIdentity) is still the
- * last pre-typing read's (`sameScreen`) — and not at all when nothing was read
- * before typing. The limit: a next screen with the very same set of
- * identified nodes still passes.
- */
-function sameField(tree: UiNode, chosen: UiNode): UiNode | undefined {
-  const twins = [...everyNode(tree)].filter(
-    (n) => n.role === chosen.role && n.identifier === chosen.identifier && sameRect(n.rect, chosen.rect),
-  );
-  return twins.length === 1 ? twins[0] : undefined;
 }
 
 /**
@@ -180,16 +155,6 @@ export async function fillField(
   // A focus tap moved off a covered centre (tap-judgement.ts#TapJudge.aim) is said in the note, after what the
   // resolution said.
   const note = focusTapNote(resolutionNote, moved);
-  let lastTree: UiNode | undefined; // the newest tree refetch read — the not-input finding looks for the input in it
-  // sameField's guard (see there): before typing, the identity fallback is
-  // asked freely (a clear's deletes do not navigate); after it, only on the
-  // screen the last pre-typing read saw. `null`: typing started with no read.
-  let screenBeforeTyping: ScreenIdentity | null | undefined;
-  // Why the newest refetch found nothing (undefined: it found the field) —
-  // the read-back's `lost` when the poll ends on such a read (2026-10-08).
-  // The read-back (fill-type.ts) sees only the text; the clear reads `lost` off refetch's own
-  // answer, which carries the why with the missing field.
-  let lostOnLastRead: LostWhy | undefined;
   const isInput = node.role === INPUT_ROLE;
   // The one read after the focus tap, and what it is for, is fill-landing.ts#postFocusReadOf's table. It is SKIPPED
   // where nothing it feeds can change the verdict
@@ -199,13 +164,13 @@ export async function fillField(
   // re-read feeds, and why none of it matters there:
   // - the count the masked length rule starts from: the typing is told it is `'unread'` (fill-landing.ts#Expectation),
   //   and a field that shows bullets after all fails `masked-said-plain` there.
-  // - `lastTree`, which becomes `screenBeforeTyping` when typing starts — the screen sameField's twin fallback must
-  //   stay on. The fallback is asked only when the selector stops matching; an `id` keeps matching through typing,
-  //   while a label, hint or value selector may stop (the field's text changed), and without a pre-typing read the
-  //   fallback is off (`null`). Hence the sole-id gate. NOT seeded from the pre-tap tree: a field's own clear button
+  // - the newest tree read, whose screen becomes the guard of the twin fallback (fill-refetch.ts#sameField) when typing
+  //   starts (fill-refetch.ts#TwinGuard). The fallback is asked only when the selector stops matching; an `id` keeps
+  //   matching through typing, while a label, hint or value selector may stop (the field's text changed), and without
+  //   a pre-typing read the fallback is off (`typing-unread`). Hence the sole-id gate. NOT seeded from the pre-tap tree: a field's own clear button
   //   appearing on focus changed that screen's identity
   //   (docs/bugs/2026-10-09-ios-fill-screen-changed-from-fields-own-clear-button.md). That tree only words a `lost`
-  //   (`skipped.from`, in refetch).
+  //   (fill-refetch.ts#findAgain).
   // - the other inputs `whereTyped` compares (fill-type.ts), keyed by rect: read off the resolution's tree instead,
   //   so a layout that moves on focus (keyboard avoidance) reads `unproven` there. That proof gates only the dropped
   //   tail's retype — hence the delivery gate: iOS keeps the re-read, Android (never retyping a tail) skips it.
@@ -216,38 +181,13 @@ export async function fillField(
   //   the `'unread'` below; ADR 0028's D64b-3 amendment and residual 3).
   const delivery = adapter.typingDelivery ?? 'may-arrive-late';
   const focusRead = postFocusReadOf({ value, clear: clear === true, field: node, soleId: soleIdOf(target) !== undefined, retypesTail: retypesTail(delivery) });
-  // Skipped: the screen the field was resolved on — the wording of a `lost` alone (refetch).
-  const skipped: { from: ScreenIdentity } | undefined = focusRead === 'skipped' ? { from: screenIdentity(resolvedIn) } : undefined;
-  const refetch = async (): Promise<{ node: UiNode; lost?: undefined } | { node?: undefined; lost: LostWhy }> => {
-    // Only the READ is wrapped: a refusal from resolveNow (a second match
-    // appearing mid-fill — a suggestion row, a duplicated field) is a
-    // selector finding with its own wording, not a device that went away.
-    const tree = await readTreeOrThrow(adapter, (e) => failure({ code: 'reread-failed', target: describeTarget(target), cause: e.message }));
-    lastTree = tree;
-    lostOnLastRead = undefined;
-    const bySelector = resolveNow(tree, target, opts)?.node;
-    if (bySelector !== undefined) return { node: bySelector };
-    const screenChanged = screenBeforeTyping !== undefined && screenBeforeTyping !== null && !sameScreen(screenIdentity(tree), screenBeforeTyping);
-    const twin = screenBeforeTyping === undefined || (screenBeforeTyping !== null && !screenChanged) ? sameField(tree, node) : undefined;
-    if (twin !== undefined) return { node: twin };
-    // Without a pre-typing read (the re-read skipped), the screen the field was resolved on says whether the screen
-    // changed — for the wording only: the twin fallback above stays off.
-    const changedSinceResolved = screenBeforeTyping === null && skipped !== undefined && !sameScreen(screenIdentity(tree), skipped.from);
-    lostOnLastRead = screenChanged || changedSinceResolved ? 'screen-changed' : 'unmatched';
-    return { lost: lostOnLastRead };
-  };
-  const refetchNode = async (): Promise<UiNode | undefined> => (await refetch()).node;
-  // What the read-back compares: the field's text. An input's null value is
-  // EMPTY (types.ts#UiNode.value — both parsers map "" to null), so a field
-  // that dropped every typed character reads "" and fails as a mismatch
-  // (`shows 0`), never as `no-value` (2026-10-09, docs/bugs/2026-10-09-
-  // android-fill-into-a-field-that-drops-everything-reads-exposes-no-
-  // value.md: an Android digits-only field fed `abc` passed `optional:`).
-  // On any other role null is withheld text. undefined: no node read.
-  const valueOf = (n: UiNode | undefined): string | undefined => (n === undefined ? undefined : (n.value ?? (isInput ? '' : undefined)));
-  const refetchValue = async (): Promise<string | undefined> => valueOf(await refetchNode());
+  // Every read of the field from here on, and why it was lost when it was (fill-refetch.ts). Skipped: the screen the
+  // field was resolved on words a `lost` alone.
+  const field = fieldRefetch(adapter, target, opts, node, focusRead === 'skipped' ? screenIdentity(resolvedIn) : undefined, (e) =>
+    failure({ code: 'reread-failed', target: describeTarget(target), cause: e.message }),
+  );
   const startTyping = async (text: string): Promise<void> => {
-    screenBeforeTyping ??= lastTree === undefined ? null : screenIdentity(lastTree);
+    field.typingStarts();
     await adapter.typeText(text);
   };
   await adapter.tap(point.x, point.y);
@@ -255,7 +195,7 @@ export async function fillField(
 
   // What the field HOLDS, as opposed to what it SHOWS, is heldText's
   // (fill-facts.ts: a reading equal to the named placeholder is an empty
-  // field). The node's own placeholder is the field's: refetch finds the
+  // field). The node's own placeholder is the field's: every read finds the
   // same field.
   const placeholder = node.placeholder;
 
@@ -265,7 +205,7 @@ export async function fillField(
   // read-back behind it, so what its loop counts must be what the field holds after focus (2026-10-07). A field lost
   // on that read keeps its pre-tap node.
   let current: UiNode | undefined = node;
-  if (focusRead === 'count' || focusRead === 'clear') current = (await refetchNode()) ?? node;
+  if (focusRead === 'count' || focusRead === 'clear') current = (await field.read()).node ?? node;
   // What the masked read-back adds the typed length to, and the masked-append warning (fill-landing.ts#heldCountOf):
   // what the field HOLDS, not what it SHOWS (fill-facts.ts#heldText: a reading equal to the named placeholder is empty).
   const { held, maskedAppend } = heldCountOf(focusRead, heldText(current.value, placeholder));
@@ -289,7 +229,7 @@ export async function fillField(
     while (next.step.do === 'delete' || next.step.do === 'reread') {
       if (next.step.do === 'delete') await adapter.clearText(next.step.count);
       else await sleep(pollMs);
-      const read = await refetch();
+      const read = await field.read();
       current = read.node;
       next = clearStep(next.state, read.node === undefined ? { lost: read.lost } : { value: read.node.value });
     }
@@ -302,9 +242,9 @@ export async function fillField(
 
   // What the field showed when typing began — the read-back's mismatch error
   // says "did not change" when it still shows exactly this.
-  // An input's null is "" here too (valueOf), so a field that stays empty
-  // reads "did not change".
-  const shownBeforeTyping = valueOf(current) ?? null;
+  // An input's null is "" here too (fill-facts.ts#shownText), so a field that
+  // stays empty reads "did not change". None: the clear's last read lost it.
+  const shownBeforeTyping = (current === undefined ? undefined : shownText(current, isInput)) ?? null;
   // Nothing typed: the clear's lost field is the read-back's (nothing saw it
   // empty); a clear that ended on its placeholder is reported as a fact
   // (`clearPlaceholder`) and judged by judgeFill.
@@ -321,7 +261,7 @@ export async function fillField(
   // that SHOWS the text proves the node took it, whatever its role.
   const notInput = async (): Promise<FillResult['notInput']> => {
     if (isInput) return undefined;
-    let tree = lastTree;
+    let tree = field.lastTree();
     if (tree === undefined) {
       // Through the seam (D39, ADR 0036): a miss stays a hint, a read no wait cures stops the fill as it came.
       const read = await readTreeOrMiss(adapter);
@@ -342,8 +282,8 @@ export async function fillField(
       {
         type: startTyping,
         wipe: (count) => adapter.clearText(count),
-        read: refetchValue,
-        screen: () => lastTree ?? resolvedIn,
+        read: field.read,
+        screen: () => field.lastTree() ?? resolvedIn,
         // What the field showed is the adapter's to act on (iOS: the first key alone into this app from now on, D24);
         // an adapter without the method learns nothing.
         reportDroppedTail: () => adapter.noteDroppedTail?.(),
@@ -388,8 +328,8 @@ export async function fillField(
           : // No reading: when the last read did not find the field at all,
             // that is said as such (iOS device check 2026-10-08) — the node
             // was not seen, so it is not blamed for showing nothing.
-            lostOnLastRead !== undefined
-            ? { kind: 'lost', why: lostOnLastRead }
+            typed.lost !== undefined
+            ? { kind: 'lost', why: typed.lost }
             : { kind: 'no-value' };
   }
   return {
@@ -429,8 +369,8 @@ export async function fillField(
  * exactly the three `did-not-land` failures and the `refused` one: an error
  * thrown by the focus tap's `adapter.tap`, or by `adapter.typeText` or
  * `adapter.clearText` (a device error while typing — the known gap: the
- * field may hold partial text), and an AmbiguityRefusal from `refetch`'s
- * resolveNow mid-fill (a second match appearing).
+ * field may hold partial text), and an AmbiguityRefusal from a re-read's
+ * resolveNow mid-fill (fill-refetch.ts: a second match appearing).
  */
 export class FillValueFailure extends Error {
   readonly fillValue: 'did-not-land' | 'refused';

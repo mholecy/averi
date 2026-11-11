@@ -5,7 +5,8 @@
  * tap and the clear; nothing else types into a field it then reads back.
  *
  * Interface: `typeAndConfirm(io, intent) → Typed`. `io` is the device as the
- * field sees it (type, delete, read the field's text, the newest tree read);
+ * field sees it (type, delete, read the field — its node, or why it was lost —
+ * and the newest tree read);
  * `intent` is what the
  * field should end up holding and how to compare. The outcome is facts:
  * landed or not, the last reading, what was typed again, and for a typing that
@@ -66,7 +67,7 @@
 
 import { everyNode, INPUT_ROLE, type TypingDelivery, type UiNode } from '../adapters/types.js';
 import { sleep } from '../util/sleep.js';
-import { heldText, type Difference, type FocusUnread, type OtherInput, type Reformat, type SentAgain } from './fill-facts.js';
+import { heldText, shownText, type Difference, type FieldRead, type FocusUnread, type LostWhy, type OtherInput, type Reformat, type SentAgain } from './fill-facts.js';
 import { landingOf, readingOf, withoutWholeToo, type Expectation, type Landing } from './fill-landing.js';
 
 /** The field as the typing sees it: send text, delete characters, read what it shows. */
@@ -74,8 +75,11 @@ export interface FieldIo {
   type(text: string): Promise<void>;
   /** Delete `count` characters (DeviceAdapter.clearText). */
   wipe(count: number): Promise<void>;
-  /** The field's text on a fresh read — "" for an empty input; undefined when the node withholds text or was not found. */
-  read(): Promise<string | undefined>;
+  /**
+   * A fresh read of the field: its node, or why it was not found (fill-facts.ts#FieldRead; interact/fill-refetch.ts).
+   * Its text is the field's as fill-facts.ts#shownText says: "" for an empty input, none for a node that withholds it.
+   */
+  read(): Promise<FieldRead>;
   /** The newest tree read — before the typing, the screen it starts on; after it, the read-back's. undefined: none yet. */
   screen(): UiNode | undefined;
   /**
@@ -107,7 +111,7 @@ export interface TypingIntent extends Expectation {
  *   exactly the field's named placeholder (fill-landing.ts#Landing: not verified); `focusUnread` when it holds the value
  *   among text that may not all be the typing (fill-landing.ts#Landing, D64b-3);
  * - `not-taken`: a non-input whose reading never took the text — not the field;
- * - `unread`: no reading to compare (the node withholds its text, or the last read did not find the field);
+ * - `unread`: no reading to compare — the node withholds its text, or the last read did not find the field (`lost`, why);
  * - `missed`: the last reading is not the value after everything was sent again — `differs` what can be said of the
  *   difference (fill-landing.ts#NotLanded); `elsewhere` when another input changed while typing (the focus left the
  *   field — nothing was sent again then), `differs` without its whole-landing hedge then (fill-landing.ts#withoutWholeToo).
@@ -116,7 +120,7 @@ export interface TypingIntent extends Expectation {
 export type Typed =
   | { kind: 'landed'; observed: string; again: SentAgain[]; reformatted?: Reformat; placeholder?: true; focusUnread?: FocusUnread }
   | { kind: 'not-taken'; observed: string }
-  | { kind: 'unread' }
+  | { kind: 'unread'; lost?: LostWhy }
   | { kind: 'missed'; observed: string; again: SentAgain[]; differs: Difference; elsewhere?: OtherInput };
 
 /**
@@ -140,13 +144,18 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
   const before = io.screen();
   const others = before === undefined ? undefined : inputsOf(before, inputKey(intent.field));
   await io.type(value);
-  let read = await pollValue(io.read, landing, intent.pollMs);
+  // The field's text on a read, or why the field was lost.
+  const readText = async (): Promise<Shown> => {
+    const found = await io.read();
+    return found.node === undefined ? { lost: found.lost } : { observed: shownText(found.node, intent.isInput) };
+  };
+  let read = await pollValue(readText, landing, intent.pollMs);
   const again: SentAgain[] = [];
   const tails = () => again.filter((a) => a.kind === 'tail').length;
   for (;;) {
     const { observed } = read;
-    // undefined: the node withholds its text, or was not found — nothing to compare.
-    if (observed === undefined) return { kind: 'unread' };
+    // undefined: the node withholds its text, or was not found (`lost`) — nothing to compare.
+    if (observed === undefined) return read.lost === undefined ? { kind: 'unread' } : { kind: 'unread', lost: read.lost };
     // What the reading is, whole: the poll's landing where it ended on one, else a reading that missed.
     const answer = read.landed ?? readingOf(observed, intent);
     switch (answer.kind) {
@@ -204,7 +213,7 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
       return { kind: 'missed', observed, again, differs: answer.differs };
     }
     const prior = observed;
-    read = { ...(await pollValue(io.read, landing, intent.pollMs)), prior };
+    read = { ...(await pollValue(readText, landing, intent.pollMs)), prior };
   }
 }
 
@@ -266,6 +275,8 @@ function whereTyped(before: OtherInputs | undefined, now: UiNode | undefined, mi
  */
 interface PollEnd {
   observed: string | undefined;
+  /** Why the last read did not find the field; absent when it did. */
+  lost?: LostWhy;
   steady: boolean;
   prior?: string;
   /** The last reading landed, and how (fill-landing.ts#Landing); absent when it did not. */
@@ -290,18 +301,22 @@ const READ_BACK_POLLS = 5;
  * cost of a transformed value is paid on a fill that fails anyway; the price
  * of stopping early would be paid by ones that pass.
  */
-async function pollValue(read: () => Promise<string | undefined>, ok: (observed: string) => Landing | undefined, pollMs: number): Promise<PollEnd> {
+async function pollValue(read: () => Promise<Shown>, ok: (observed: string) => Landing | undefined, pollMs: number): Promise<PollEnd> {
   let observed: string | undefined;
   let previous: string | undefined;
   for (let i = 0; i < READ_BACK_POLLS; i++) {
     previous = observed;
-    observed = await read();
+    const shown = await read();
+    observed = shown.observed;
     const landed = observed === undefined ? undefined : ok(observed);
     if (landed !== undefined) return { observed, steady: false, landed };
     // No text (a non-input withholding it) or no field — stop waiting. An
     // empty input reads "" and keeps every round: its text may be late.
-    if (observed === undefined && i >= 1) return { observed, steady: false };
+    if (observed === undefined && i >= 1) return shown.lost === undefined ? { observed, steady: false } : { observed, steady: false, lost: shown.lost };
     await sleep(pollMs);
   }
   return { observed, steady: observed !== undefined && observed === previous };
 }
+
+/** One read's text (`observed`; undefined: withheld), or why the field was not found (`lost`). */
+type Shown = { observed: string | undefined; lost?: undefined } | { observed?: undefined; lost: LostWhy };
