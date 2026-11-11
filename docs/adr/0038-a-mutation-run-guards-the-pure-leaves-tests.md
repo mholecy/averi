@@ -1744,6 +1744,8 @@ standing.ts's is a narrowed cold run at the branch's head (`npm run mutate -- --
 src/ui-tree/standing.ts`), after review round 1's test — a reachable standing carries no remedy, for every purpose, a
 node beneath a presented screen too (standing-remedy.test.ts) — which kills all six mutants of a reachable standing
 passed to `remedied` (shown red on `tap.kind === 'reachable'` emptied to false); the measured run confirms it.
+standing.ts's floor stays 93: the measured 96.23 % includes kills that are tests timing out under load, and the quiet
+narrowed run gave 95.41 %, so the floor follows the quieter figure.
 
 The first run of standing.ts (84.92 %) showed its remedies untested where they matter most: the tables of
 standing.test.ts quote each standing's kind, never its remedy, so `keyboard`, `pinned`, `stuck` and `fixed` (and the

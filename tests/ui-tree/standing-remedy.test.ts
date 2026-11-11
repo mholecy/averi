@@ -25,6 +25,7 @@ const idb = (y: number): KeyboardLine => ({ y, witnessed: false });
 const TAP = { of: 'tap' } as const;
 const PLAIN = { of: 'stop' } as const;
 const FULLY = { of: 'fully' } as const;
+// `_n` unused: it keeps standing.test.ts's OCR signature.
 const OCR = (_n?: UiNode, keyboardTop?: KeyboardLine): PixelPurpose => ({ of: 'pixel', reads: (r) => r, glyphs: true, ...(keyboardTop !== undefined && { keyboardTop }) });
 const COLOUR: PixelPurpose = { of: 'pixel', reads: colorSampleRect, glyphs: false };
 
