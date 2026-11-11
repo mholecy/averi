@@ -24,6 +24,7 @@ Amended 2026-11-10 (T13: flush-check.ts, replies.ts, live-carousel.ts and live-v
 amendment at the end).
 Amended 2026-11-11 (T20b: scripts/truth/batch/lab-run.ts joined the run — see the T20b amendment at the end).
 Amended 2026-11-11 (T9: src/interact/fill-type.ts joined the run — see the T9 amendment at the end).
+Amended 2026-11-11 (T22: src/util/regex.ts joined the run — see the T22 amendment at the end).
 
 ## Context
 
@@ -1658,3 +1659,12 @@ live-android-forms-b10-kf-docked.json), 701 in all. T21 counted 699 with 696 und
 added or removed since T21's base 4ffcf635 (only D74's scripts), so the two extra are a counting rule: two files have
 no `platform` (android-hint-everywhere-e726c77-asserts.json and android-hint-everywhere-9fa59ae-asserts.json), most
 likely left out by T21's count. They rejudge identically here too.
+
+## Amendment: util/regex.ts joins the run (2026-11-11, backlog T22)
+
+T22 gives `escapeRegExp` one home, src/util/regex.ts#escapeRegExp, and every private copy imports it, failure-text.ts's
+among them, whose copy the run mutated. So the run does not lose that class, regex.ts joins the `core` group against
+tests/util/regex.test.ts (the helper's direct pins, moved from tests/verify/text-hint.test.ts) and
+tests/verify/assert.test.ts (`regexSource`'s refusals): 100 % cold (10 mutants, 9 killed, 1 runtime error; narrowed
+with `--mutate`, which exits 1 by design: see the T9 amendment): floor 98. failure-text.ts reads 98.98 % (197 mutants,
+the 3 fewer the private copy's; the same survivors), floor 97 kept.

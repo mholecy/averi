@@ -1,3 +1,5 @@
+import { escapeRegExp } from '../util/regex.js';
+
 /**
  * What a text recognizer may read the app's copy as — one notion of "a
  * recognizer difference", shared by the ocr assert, the text parity table's
@@ -64,9 +66,6 @@ const charsOf = (s: string): string[] => [...s.normalize('NFC')];
 /** The string as the recognizer could have read it: look-alikes to ASCII, combining marks dropped. */
 export const ocrFold = (s: string): string => charsOf(s).map(foldChar).join('');
 
-/** A regex source spelling `s` literally (outside a character class). */
-const literal = (s: string): string => s.replace(/[.*+?^${}()|[\]\\/-]/g, '\\$&');
-
 /** A character a class can list literally: escaped when the class syntax would read it. */
 const classMember = (c: string): string => (/[\]\\^-]/.test(c) ? `\\${c}` : c);
 
@@ -118,7 +117,7 @@ export function ocrFoldPattern(source: string): { source: string; folded: [strin
       if (next === 'b' || next === 'B') boundary = true;
       const lit = escapedLiteral(next);
       if (lit !== undefined) {
-        out += `(?:${literal(foldChar(lit))})`;
+        out += `(?:${escapeRegExp(foldChar(lit))})`;
         folded.push([lit, foldChar(lit)]);
       } else if (next === 'k' && cps[i + 2] === '<') {
         const end = cps.indexOf('>', i + 2);
@@ -154,7 +153,7 @@ export function ocrFoldPattern(source: string): { source: string; folded: [strin
     if (f === c) {
       out += c;
     } else {
-      out += `(?:${literal(f)})`;
+      out += `(?:${escapeRegExp(f)})`;
       folded.push([c, f]);
     }
   }

@@ -1,4 +1,5 @@
 import { everyNode, type UiNode } from '../adapters/types.js';
+import { escapeRegExp } from '../util/regex.js';
 import { namePairs, readingDifference, type RecognizerDifference } from './ocr-fold.js';
 import { normalizeText } from './text-parity.js';
 
@@ -150,6 +151,3 @@ function foldedTextHint(candidates: UiNode[], expected: string): string | undefi
     'expect the text as the node has it)'
   );
 }
-
-/** The expected string is literal text; as a regex its punctuation is not. */
-export const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

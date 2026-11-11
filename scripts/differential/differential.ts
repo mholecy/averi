@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { escapeRegExp } from '../../src/util/regex.js';
 import type { Platform, Recording, Screen } from './corpus.js';
 import { resetClock, wallNow } from './clock.js';
 import { deviceCalls, paintFrame, REPLAYED_APP, resetDevice, type DeviceProfile, type Paint } from './fake-device.js';
@@ -346,7 +347,7 @@ export interface Connection {
 }
 
 /** A temporary path in a reply (a screenshot's file in an error) names the call, not the code: `<tmp>`. */
-const TEMP = new RegExp(`${tmpdir().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/[^\\s;:,)]*`, 'g');
+const TEMP = new RegExp(`${escapeRegExp(tmpdir())}/[^\\s;:,)]*`, 'g');
 const untemp = (s: string) => s.replace(TEMP, '<tmp>');
 
 /** An image block as its size and a hash of its bytes — two frames of one size are told apart. */

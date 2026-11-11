@@ -41,3 +41,15 @@ export const regexSource = (flags = ''): z.ZodEffects<z.ZodString> =>
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: `not a valid regular expression — ${errorMessage(e)}` });
     }
   });
+
+/**
+ * `value` as a regex source matching it as literal text: a backslash before each of `. * + ? ^ $ { } ( ) | [ ] \`,
+ * nothing else. Valid with or without the `u` flag, and outside a character class only. `/` is left alone (a RegExp
+ * constructor needs no `/` escape) and so is `-` (literal outside a class, and `\-` there is a syntax error under `u`).
+ *
+ * The one escape for JS patterns (T22): the element assert's text hint shows its output verbatim as the `match:` to
+ * write (verify/text-hint.ts#textHint), and every other literal spliced into a pattern goes through it. Here, not in
+ * verify/, because every layer and the scripts can reach a util leaf. adapters/ios-liveness.ts#ereEscape escapes the
+ * same 14 characters for pgrep's POSIX ERE, another grammar.
+ */
+export const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

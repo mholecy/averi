@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir, userInfo } from 'node:os';
 import { join } from 'node:path';
+import { escapeRegExp } from '../../src/util/regex.js';
 
 /**
  * The path hygiene rules (T2 S1 seeded them over the batch module, T8 made them repo-wide): what no committed file may
@@ -21,7 +22,6 @@ export interface Rule {
 }
 
 export const SLASH = '/';
-export const escaped = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** Accents folded (NFD, the combining marks dropped): a name typed without its accents is still the name. */
 export const folded = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '');
 
@@ -38,7 +38,7 @@ export const asOwner = (name: string): string | undefined => {
   return parts.length >= 2 || (parts.length === 1 && [...parts[0]].length >= 4) ? parts.join(' ') : undefined;
 };
 /** A name (asOwner's) as whole words, any case, any spacing between its parts; read off a folded line (rulesHitting). */
-export const ownerRe = (name: string) => new RegExp(`(?<![\\p{L}\\p{N}_])${name.split(' ').map(escaped).join('\\s+')}(?![\\p{L}\\p{N}_])`, 'iu');
+export const ownerRe = (name: string) => new RegExp(`(?<![\\p{L}\\p{N}_])${name.split(' ').map(escapeRegExp).join('\\s+')}(?![\\p{L}\\p{N}_])`, 'iu');
 /** The owner's name as git knows it (`git config user.name`), read at run time so no name is ever written here. */
 function ownerAsGiven(): string | undefined {
   try {
@@ -64,7 +64,7 @@ export const HOME_RULE = "this machine's home directory";
  */
 export function homeRule(home: string): Rule | undefined {
   if (home.split(SLASH).filter((s) => s !== '').length < 2) return undefined;
-  return { what: HOME_RULE, re: new RegExp(`${escaped(folded(home))}${PATH_END}`) };
+  return { what: HOME_RULE, re: new RegExp(`${escapeRegExp(folded(home))}${PATH_END}`) };
 }
 
 const user = userInfo().username;
@@ -86,7 +86,7 @@ export const PATH_RULES: readonly Rule[] = [
   // A simulator runtime's image mounts under CoreSimulator/Volumes/: the lab's, no host's.
   { what: 'a mounted volume', re: new RegExp(`(?<!CoreSimulator)${SLASH}Volumes${SLASH}${SEG_START}`) },
   ...(machineHome === undefined ? [] : [machineHome]),
-  { what: "the user's home as ~user/", re: new RegExp(`~${escaped(folded(user))}${SLASH}`) },
+  { what: "the user's home as ~user/", re: new RegExp(`~${escapeRegExp(folded(user))}${SLASH}`) },
   ...(OWNER === undefined ? [] : [{ what: OWNER_RULE, re: ownerRe(OWNER) }]),
 ];
 
