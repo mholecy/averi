@@ -1,7 +1,7 @@
 import type { Rect, ScrollAxis } from '../adapters/types.js';
 import { listsAncestry } from '../ui-tree/draw-order.js';
 import { quoted, type QuotedNode, type ScrollAxes } from '../ui-tree/geometry.js';
-import { findAll, parseSelector } from '../ui-tree/selectors.js';
+import { findTarget, parseSelector, type Target } from '../ui-tree/selectors.js';
 import type { TreeFacts } from './scroll-read.js';
 import { targetScrollers } from './stroke-plan.js';
 import { axisOf, type Direction } from './swipe.js';
@@ -12,10 +12,12 @@ import { axisOf, type Direction } from './swipe.js';
  * (interact/stroke-plan.ts#candidatesOf), so a row of a SIBLING list (the lab's `scroll-bounded`: O and F, rows of
  * `lower`, beside the larger `upper`) was never reached; D76's exhausted reply named such lists and left the remedy
  * manual. Named here as the caller can name it (ADR 0010's D78 amendment):
- * - a SELECTOR of exactly one node, by one rule: the scroll view of that node's very rect
- *   (ui-tree/scroll-containers.ts#isScrollViewOf, through `Clips.axesOf` — the node itself when it scrolls, the list
- *   a wrapper is laid exactly over, and so too the list an unrelated overlay of its rect lies over: the rect is that
- *   scroll view's), else the NEAREST scroll view of the node, by the rule that takes a found target's
+ * - a SELECTOR of exactly one node — a selector string (the MCP tool's), or an element spec (a flow's `scroll_until`,
+ *   D81: matched as a step's `element` is, ui-tree/selectors.ts#findTarget, every field exact) — by one rule: the
+ *   scroll view of that node's very rect (ui-tree/scroll-containers.ts#isScrollViewOf, through `Clips.axesOf` — the
+ *   node itself when it scrolls, the list a wrapper is laid exactly over, and so too the list an unrelated overlay of
+ *   its rect lies over: the rect is that scroll view's), else the NEAREST scroll view of the node, by the rule that
+ *   takes a found target's
  *   (stroke-plan.ts#targetScrollers: Android's clipping chain, else the scrolling ancestors); a node under none is
  *   refused;
  * - a RECT, as ui_snapshot and a failure reply quote one: the listed scroll view of exactly that rect
@@ -32,12 +34,15 @@ import { axisOf, type Direction } from './swipe.js';
  *
  * Resolved ONCE, at the scroll's first read that reads (scroll-rounds.ts#round), before any swipe; the plan remembers
  * the rect (stroke-plan.ts#nameScrollView). Pure: no adapter, no clock. Cost: a walk of the tree for the selector, one
- * for `axesOf`, one more for `scrollViewsOn` on a stale rect only. A flow's element spec is not taken: the flow's
- * `scroll_until` does not take `within` yet (ADR 0010's D78 amendment, (f)), and that follow-up adds what it needs.
+ * for `axesOf`, one more for `scrollViewsOn` on a stale rect only. A flow names no rect (D81: device-specific; its
+ * loader refuses one, flow/config.ts), so a flow's `within` takes the selector path only.
  */
 
-/** What the caller names: a selector of the scroll view or of an element inside it, or the scroll view's rect. */
-export type Within = string | Rect;
+/**
+ * What the caller names: a selector of the scroll view or of an element inside it — a selector string or an element
+ * spec (`Target`, the two forms a target is named in; a flow's is a spec, D81) — or the scroll view's rect.
+ */
+export type Within = Target | Rect;
 
 /** A scroll view a stale rect's refusal offers in its place (`WithinRefusal`'s `stale`): `untold` when the tree does not tell its axis. */
 export interface OfferedScrollView {
@@ -65,9 +70,24 @@ export type WithinRefusal =
   | { readonly of: 'untold' };
 
 /**
+ * A `within` that names no scroll view to stroke (D78's stop before any swipe; interact/scroll-text.ts#scrollFailure),
+ * the refusal's kind on it: a flow's `optional:` skips an `absent` one — the list, like an interstitial, may not be
+ * on this screen — and fails on every other, an authoring error no screen cures (flow/engine.ts, D81).
+ */
+export class WithinRefusedError extends Error {
+  constructor(
+    message: string,
+    readonly refused: WithinRefusal['of'],
+  ) {
+    super(message);
+    this.name = 'WithinRefusedError';
+  }
+}
+
+/**
  * A string `within` parsed as a selector, its regexes compiled, before the scroll reads anything (interact/scroll.ts):
  * a selector that does not parse throws `within <it>: <why>` — else it would throw from inside the round, at the first
- * read, without saying it was `within`'s. A rect has nothing to parse.
+ * read, without saying it was `within`'s. A rect has nothing to parse, nor has an element spec (exact values only).
  */
 export function checkWithin(within: Within): void {
   if (typeof within !== 'string') return;
@@ -79,8 +99,11 @@ export function checkWithin(within: Within): void {
   }
 }
 
-/** `within` read as a rect, not a selector. */
-export const isRect = (within: Within): within is Rect => typeof within !== 'string';
+/**
+ * `within` read as a rect, not a selector (a string) nor an element spec (whose fields are strings, none of them
+ * `x`).
+ */
+export const isRect = (within: Within): within is Rect => typeof within !== 'string' && 'x' in within;
 
 /**
  * The scroll view `within` names on this read's tree, as a rect — or why none: `facts` the read's (its tree, scene and
@@ -102,7 +125,7 @@ export function resolveWithin(facts: Pick<TreeFacts, 'tree' | 'scene' | 'reading
       return { refused: { of: 'stale', axis: way, views, across: listed.length - views.length } };
     }
   } else {
-    const found = findAll(facts.tree, within);
+    const found = findTarget(facts.tree, within);
     if (found.length === 0) return { refused: { of: 'absent' } };
     if (found.length > 1) return { refused: { of: 'ambiguous', matches: found.map(quoted) } };
     const [node] = found;

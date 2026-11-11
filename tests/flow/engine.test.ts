@@ -1739,6 +1739,85 @@ flows:
     });
   });
 
+  // D81: the step's `within` reaches the scroll (interact/within.ts) — a spec that names no scroll view stops it
+  // before any swipe, said as the MCP tool's refusal is, the spec said as the step's element is.
+  it('`within` reaches the scroll: one that matches nothing stops it before any swipe', async () => {
+    const withinCfg = parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  to_submit:
+    steps:
+      - scroll_until: { element: { id: submit_button }, within: { id: nope }, maxSwipes: 4, timeout: 2s }
+`);
+    const fake = scrollingFake(3100);
+    await expect(FlowEngine.run(withinCfg, fake, FAST, { flow: 'to_submit' })).rejects.toThrow(
+      'scroll_until id:"submit_button" stopped before any swipe — within id:"nope" matches nothing in the tree, so it names no scroll view — give an element spec of the scroll view or of an element inside it',
+    );
+    expect(fake.swipes).toHaveLength(0);
+  });
+
+  // D81 review round 1, MINOR-1 (the coordinator's decision): inside `optional:` a `within` that names no scroll view
+  // fails the flow — an authoring error no screen cures — unless it is `absent`, which is skipped like an absent
+  // interstitial. Over android scroll-bounded's real dump (`upper` and `lower`, both vertical) and idb's flat list.
+  describe('`within` refused inside `optional:`', () => {
+    const BOUNDED = parseDump(readFileSync(new URL('../fixtures/truth/android-averi_lab-api33/scroll-bounded.xml', import.meta.url), 'utf8'));
+    const IDB = parseIdbDescribeAll(readFileSync(new URL('../fixtures/truth/ios-iphone17-ios27/scroll-bounded.idb.json', import.meta.url), 'utf8'));
+    const optionalScroll = (scroll: string) =>
+      parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  f:
+    steps:
+      - optional:
+          - scroll_until: ${scroll}
+      - tap: { id: after }
+`);
+    const withAfter = (tree: UiNode): UiNode => ({ ...tree, children: [...tree.children, node({ role: 'button', identifier: 'after', rect: { x: 10, y: 400, width: 100, height: 40 } })] });
+
+    it('absent: skipped with its sentence, no swipe sent, and the flow runs on', async () => {
+      const fake = new FakeAdapter({ s: withAfter(BOUNDED) }, 's');
+      const trace = await FlowEngine.run(optionalScroll('{ element: { id: lab.scroll-bounded.O }, within: { id: nope } }'), fake, FAST, { flow: 'f' });
+      expect(trace).toContainEqual({
+        action: 'optional',
+        detail: 'skipped step (scroll_until id:"lab.scroll-bounded.O" stopped before any swipe — within id:"nope" matches nothing in the tree, so it names no scroll view — give an element spec of the scroll view or of an element inside it)',
+      });
+      expect(fake.swipes).toHaveLength(0);
+      // The step after it ran (the fake records the node it hit at the tap's point).
+      expect(fake.taps).toHaveLength(1);
+    });
+
+    it.each([
+      ['ambiguous (several match)', BOUNDED, '{ element: { id: lab.scroll-bounded.O }, within: { role: scrollable } }', 'within role:"scrollable" matches 2 elements'],
+      ['unscrolled (its match in no scroll view)', BOUNDED, '{ element: { id: lab.scroll-bounded.O }, within: { id: content } }', 'within id:"content" matches container id:content'],
+      ['across (the view scrolls the other way)', BOUNDED, '{ element: { id: lab.scroll-bounded.O }, within: { id: lab.scroll-bounded.S }, direction: right }', 'which scrolls vertically and holds none that may scroll horizontally'],
+      ['untold (idb lists no scroll view)', IDB, '{ element: { id: lab.scroll-bounded.O }, within: { id: lab.scroll-bounded.S } }', 'cannot be resolved: idb lists no scroll view'],
+    ] as const)('%s: fails the flow, not skipped — no swipe sent, nothing after it run', async (_, tree, scroll, words) => {
+      const fake = new FakeAdapter({ s: withAfter(tree) }, 's');
+      const run = FlowEngine.run(optionalScroll(scroll), fake, FAST, { flow: 'f' });
+      await expect(run).rejects.toThrow(/^optional step not skipped: its within names no scroll view to swipe, which no screen cures — scroll_until id:"lab\.scroll-bounded\.O" stopped before any swipe — within /);
+      await expect(run).rejects.toThrow(words);
+      expect(fake.swipes).toHaveLength(0);
+      expect(fake.taps).toHaveLength(0);
+    });
+  });
+
+  // D81 review round 1, MINOR-2: a flow names elements by spec — the exhausted reply's way into a list it never swiped
+  // asks for a spec of it, not the rect a flow cannot give.
+  it('a flow\'s exhausted reply names the list beside by spec, never by rect', async () => {
+    const BOUNDED = parseDump(readFileSync(new URL('../fixtures/truth/android-averi_lab-api33/scroll-bounded.xml', import.meta.url), 'utf8'));
+    const fake = new FakeAdapter({ s: BOUNDED }, 's');
+    const flow = parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  f:
+    steps:
+      - scroll_until: { element: { id: lab.scroll-bounded.O }, maxSwipes: 4 }
+`);
+    const failure = FlowEngine.run(flow, fake, FAST, { flow: 'f' });
+    await expect(failure).rejects.toThrow('— if the element lies in it, scroll_until it again naming that scroll view by an element spec of it or of an element inside it (within: { id: … }); else:');
+    await expect(failure).rejects.not.toThrow('"x":');
+  });
+
   it('passes with 0 swipes when the element is already visible (fast path)', async () => {
     const fake = scrollingFake(500);
     const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'to_submit' });

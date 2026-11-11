@@ -607,8 +607,9 @@ plan judged that view without room (`noRoom`: a `within` naming it would have no
 found the target (`StrokedAcross.along.targetRead`: its own scroll views were the candidates, so `within` would be
 ignored).
 
-(f) **Not in scope:** the flow YAML (`src/flow/config.ts#ScrollUntilSpec`) does not take `within` yet — a follow-up;
-it adds what it needs (an element spec) then.
+(f) ~~**Not in scope:** the flow YAML (`src/flow/config.ts#ScrollUntilSpec`) does not take `within` yet — a follow-up;
+it adds what it needs (an element spec) then.~~ Closed by D81 (the amendment below): the flow step takes `within` as an
+element spec.
 
 **Residuals.** (1) A named scroll view with no room for a stroke (under `MIN_STROKE_BOX`, or cut to nothing by what is
 drawn over it) falls to `strokeRoom`'s own fallbacks — a nested one, else the gesture box WHOLE — as the largest
@@ -668,6 +669,98 @@ the `no scroll view` and `the one`/`a scroll view` words, the mark inverted, the
 broken; the largest scroller's branch dropped. Review round 1's hand mutants, each killed: the regex not compiled, the driver's check dropped, the `within`
 prefix dropped, a spec parsed as a string, the same-rect rule dropped, the `as within:` dropped and given to the one
 view too.
+
+## Amendment: D81 — a flow's `scroll_until` takes `within`, as an element spec (2026-11-11)
+
+**Context.** D78 built `within` for the MCP tool only ((f) above): a flow could not name the list a row lies in, so a
+flow reaching `scroll-bounded`'s O had to `swipe` by coordinates — the device-specific step `scroll_until` exists to
+replace.
+
+**Decision.** (a) `ScrollUntilSpec` (`src/flow/config.ts#ScrollUntilSpec`) takes `within?: ElementSpec` — the step's own
+`element` vocabulary, so an author sees one: `scroll_until: { element: { id: row_o }, within: { id: lower_list } }`.
+No rect: a rect is one device's layout, and a flow is replayed on others.
+
+(b) One resolver. `Within` (`src/interact/within.ts#Within`) widens from a selector string or a rect to `Target` (a
+selector string or an element spec, `src/ui-tree/selectors.ts#Target` — the two forms every target is named in) or a
+rect; `resolveWithin` finds the match with `findTarget`, the lookup a step's `element` is found with (every field
+exact; never a spec serialized into a selector string, which cannot quote a `"`), so the rule for a match and every
+refusal — absent, ambiguous, in no scroll view, across the stroke, idb's flat list — are D78's. `isRect` is a rect's
+`x`, not "not a string". `checkWithin` parses a string only: a spec's values are exact, nothing to parse, so no
+up-front refusal is needed or possible. The engine passes the step's `within` through untouched
+(`src/flow/engine.ts`, `runScrollUntil`'s spread), as it passes `direction`, `maxSwipes` and `fully`.
+
+(c) Load-time refusals (`src/flow/config.ts`, `withinSpec`), each said as the one issue at `….scroll_until.within`,
+not the step union's bare `Unrecognized key(s) in object: 'scroll_until'`: anything carrying a rect's side (`x`,
+`y`, `width`, `height` — the whole rect or one side beside a spec field) — `within takes an element spec (id, text,
+role, label) of the scroll view or of an element inside it, not a rect: a rect is device-specific`; a selector
+string, the MCP tool's other form — `within takes an element spec ({ id: … }), as the step's element does, not a
+selector string`; otherwise the element spec schema's own (`element spec needs at least one of: …`, an unknown key).
+
+(d) The refusal's words (`src/interact/scroll-text.ts`, `withinText`): a spec is said as a step's element is
+(`describeTarget`: `within id:"nope"`), and its absent and ambiguous refusals offer no rect, which a flow cannot give:
+`— give an element spec of the scroll view or of an element inside it` and `— narrow it so exactly one matches`. The
+MCP tool's words are unchanged. A flow's success line carries no `within`, as the tool's reply carries none.
+
+(e) Review round 1 (MINOR-2), as the code review shaped it: a flow's exhausted reply offers no rect either. Where
+the tool's reply says `scroll_until it again with within: {"x":…}` (D76's scroll views beside, at the exhausted,
+maxSwipes and timeout bounds; D59b's named across clause), a flow's says `scroll_until it again naming that scroll
+view by an element spec of it or of an element inside it (within: { id: … })` — a list with no id or text of its own
+(RN, Compose) is named through a row — and several beside are named without their `as within: {…}`. The caller says
+which it is, explicitly: `ScrollOptions.remedy` (`src/interact/scroll.ts`), `'rect'` by default — the MCP tool sets
+nothing — and `'spec'` set by the engine's `runScrollUntil`. `src/interact/scroll-text.ts#scrollFailure` turns it
+once into a `WithinRemedy` (`src/interact/scroll-text.ts#WITHIN_REMEDY`: how a scroll view is listed among several,
+the way into one, into one of several, and the absent and ambiguous refusals' ways out), handed down to `boundText`,
+`timeoutText`, `besideText`, `acrossText` and `withinText` unbranched — `withinText` takes its way out from the same
+form, not from `within`'s own type. `boundText` and `timeoutText` default to the rect form, so the tool's words, the
+troubleshooting reference's and golden's are byte-identical. `WithinRefusedError` lives beside `WithinRefusal`
+(`src/interact/within.ts#WithinRefusedError`).
+
+(f) Review round 1 (MINOR-1, the coordinator's decision): inside `optional:` a `within` refusal that is an authoring
+error fails the flow. The refusal is a `WithinRefusedError` (`src/interact/within.ts#WithinRefusedError`) carrying
+its kind (`WithinRefusal['of']`); the engine's `notSkippable` (`src/flow/engine.ts`) turns every kind but `absent` —
+several matches, a match in no scroll view, across the stroke, idb's flat list (and `stale`, which a flow cannot
+reach) — into the terminal `OptionalNotSkipped`, `optional step not skipped: its within names no scroll view to
+swipe, which no screen cures — …`; as for a refused tap, a reach ladder then checks `detect` once and does not
+escalate. An `absent` one is skipped with its own sentence: the list, like the interstitial, may not be on this
+screen. Outside `optional:` every kind is the step's plain failure, as before.
+
+**Residuals.** (1) ~~The exhausted reply's remedy quotes a rect in a flow's trace~~ — closed by (e). (2) ~~Inside
+`optional:` a `within` refusal is skipped~~ — decided by (f). (3) Not measured on a device; no lab flow uses it yet.
+(4) A list a flow cannot name: an element spec matches exact id, text, role and label only, so a scroll view with
+none that is unique (a bare RecyclerView or Compose lazy list, `role: scrollable` beside another) is named through a
+row inside it — and a list whose rows carry no unique field either cannot be named by a flow at all (the MCP tool's
+rect can). No spec form takes an index or a position; filed as a residual, not a row.
+
+**Golden.** Golden calls `scroll_until` without `within`: Changed 0, Strike 0, COUNTS 0, Re-pin 0.
+
+**Tests.** tests/interact/within.test.ts (a spec of a row of `lower` names `lower` on Android and WDA, of `upper`'s row
+`upper`; the same refusals for a spec; a spec's `text` no regex; `isRect` of a spec, a string, a rect; `checkWithin` of
+a spec), tests/interact/scroll-rounds.test.ts (the round with a spec: every stroke inside `lower`; a spec's absent,
+ambiguous and unscrolled sentences, no rect offered), tests/flow/config.test.ts (accepted, the spec kept; a rect whole
+and one side refused with the words; `{}`, an unknown key and a selector string refused), tests/flow/engine.test.ts
+(the step's `within` reaches the scroll: a spec that matches nothing stops it before any swipe, the tool's sentence;
+inside `optional:` an absent `within` skipped and the flow run on, an ambiguous, unscrolled, across and idb one each
+failing the flow with no swipe sent; a flow's exhausted reply over the real `scroll-bounded` dump naming `lower` by
+spec, no `"x":`), tests/interact/scroll.test.ts (review round 2's MINOR-A: the driver to the exhausted bound over the
+real dump with a selector and no `remedy` quotes `lower`'s rect, with `remedy: 'spec'` asks for a spec). Review round
+1's in tests/interact/scroll-rounds.test.ts: `boundText` by spec — one, several, at
+maxSwipes and the timeout, the across clause, no rect; a refusal a `WithinRefusedError` carrying its kind.
+Hand mutants, each killed: a spec not matched (`findTarget` given a never-matching selector for it), `isRect` without
+its `x`, the spec words never and always chosen, the rect clause's `''` not empty, the spec said as JSON, the string
+refusal on numbers, `RECT_SIDES.some` as `every`, `height` dropped from `RECT_SIDES`, the rect refusal dropped,
+`within` as `z.any()`, the engine dropping `within`. One equivalent, removed: `spec` first read `typeof within ===
+'object' && !isRect(within)` — a rect is never absent nor ambiguous, so it is `typeof within !== 'string'`. Review
+round 1's hand mutants, each killed: `notSkippable` taking every `within` refusal, only `untold`, and sparing each of
+`across`, `unscrolled`, `ambiguous` in turn; the not-skipped words; the refusal a plain Error, its kind `absent`
+always; the driver not passing `bySpec`, `failureText` not passing it, `besideText`, `acrossText`, `boundBeside`
+(twice) and `timeoutText` each given false; several named `as within:` by spec; `one of them` said `it`; the across
+remedy always the rect and always the spec; the beside remedy always the spec (then a `bySpec` boolean, now the
+`WithinRemedy` form). The code review's and review round 2's, each killed: the driver forcing the spec form and dropping
+the caller's `remedy`; the engine not setting `'spec'`; `scrollFailure`, `failureText`, `boundBeside` (twice) and
+`timeoutText` each handed the rect form; `withinText` given the rect form; the spec form's `listed`, `into`,
+`intoOneOf`, `absent` and `ambiguous` each changed; the across remedy always the rect; `WithinRefusedError`'s name
+dropped. Mutation
+(scripts/mutation/scope.json, core): `src/interact/within.ts` 100 % (105 mutants, narrowed cold run; 106 after the code review moved `WithinRefusedError` here), floor 98.
 
 ## Bug note
 

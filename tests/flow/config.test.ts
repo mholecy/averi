@@ -166,6 +166,39 @@ flows:
     expect(cfg.flows.f.steps).toHaveLength(2);
   });
 
+  // D81: the flow's `within` is an element spec, the step's own `element` vocabulary — never a rect, which is
+  // device-specific (the MCP tool takes one from ui_snapshot; a flow is replayed on other screens).
+  it('accepts scroll_until with `within`, an element spec of the scroll view or of an element inside it', () => {
+    const cfg = parseConfig(`
+app: {}
+flows:
+  f:
+    steps:
+      - scroll_until: { element: { id: row_o }, within: { id: lower_list } }
+      - scroll_until: { element: { text: "Row" }, within: { role: scrollable, label: Accounts }, direction: up }
+`);
+    expect(cfg.flows.f.steps).toEqual([
+      { scroll_until: { element: { id: 'row_o' }, within: { id: 'lower_list' } } },
+      { scroll_until: { element: { text: 'Row' }, within: { role: 'scrollable', label: 'Accounts' }, direction: 'up' } },
+    ]);
+  });
+
+  it.each([
+    ['the whole rect', '{ x: 0, y: 1046, width: 1080, height: 495 }'],
+    ['one side of it', '{ id: lower_list, height: 495 }'],
+  ])('refuses a rect as `within` (%s), saying why', (_, within) => {
+    expect(() => parseConfig(`app: {}\nflows:\n  f:\n    steps:\n      - scroll_until: { element: { id: x }, within: ${within} }\n`)).toThrow(
+      /^Invalid averi\.yaml:\n {2}flows\.f\.steps\.0\.scroll_until\.within: within takes an element spec \(id, text, role, label\) of the scroll view or of an element inside it, not a rect: a rect is device-specific$/,
+    );
+  });
+
+  it('refuses a `within` naming no selector field, an unknown key, or a selector string (a flow names elements by spec)', () => {
+    const load = (within: string) => () => parseConfig(`app: {}\nflows:\n  f:\n    steps:\n      - scroll_until: { element: { id: x }, within: ${within} }\n`);
+    expect(load('{}')).toThrow(/scroll_until\.within: element spec needs at least one of: id, text, role, label/);
+    expect(load('{ idd: lower }')).toThrow(/scroll_until\.within: Unrecognized key\(s\) in object: 'idd'/);
+    expect(load('"id:lower"')).toThrow(/^Invalid averi\.yaml:\n {2}flows\.f\.steps\.0\.scroll_until\.within: within takes an element spec \(\{ id: … \}\), as the step's element does, not a selector string$/);
+  });
+
   it('accepts tap with a timeout override, rejects tap with a timeout but no selector', () => {
     const cfg = parseConfig(`
 app: {}

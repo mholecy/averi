@@ -5,6 +5,7 @@ import { typeIntoFocused } from '../interact/type-text.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS, ElementNotFoundError, isRefusedOnPresentElement, resolvePresent, type Ambiguity, type RefusedOnPresentElement } from '../interact/resolve.js';
 import { movedTapText } from '../interact/tap-judgement.js';
 import { describeScrollResult, scrollUntilVisible, stopHedges } from '../interact/scroll.js';
+import { WithinRefusedError } from '../interact/within.js';
 import { eyesOn } from '../verify/eyes.js';
 import { swipeScreen } from '../interact/swipe.js';
 import { dismissKeyboard, KeyboardGuardError, type DismissResult, type GuardOptions } from '../interact/keyboard.js';
@@ -211,12 +212,18 @@ class ReentryError extends Error {
  * owner chose "never escalate past a present-but-refused element". The refusal is the
  * `cause`; the message says why it was not skipped, then quotes it.
  *
+ * Since 2026-11-11 (D81 review round 1, the coordinator's decision) a `scroll_until` whose `within` names no
+ * scroll view for any reason but `absent` (interact/within.ts#WithinRefusedError): several matches, a match in no
+ * scroll view, one that scrolls only across the stroke, a tree that lists no scroll view (idb) — an authoring error
+ * no screen cures, terminal like a config refusal. An `absent` one is skipped: the list, like the interstitial, may
+ * not be on this screen.
+ *
  * Only an `optional:` raises it. The same refusal outside one is the step's
  * plain failure and a rung that throws it escalates as before — the owner's
  * decision is about what `optional:` may swallow.
  */
 class OptionalNotSkipped extends Error {
-  constructor(refusal: Error & (RefusedOnPresentElement | FillValueFailure)) {
+  constructor(refusal: NotSkippable) {
     super(`optional step not skipped: ${notSkippedWhy(refusal)} — ${refusal.message}`, { cause: refusal });
     this.name = 'OptionalNotSkipped';
   }
@@ -230,14 +237,21 @@ class OptionalNotSkipped extends Error {
  * or averi refused its value before anything was typed (a broken value, not an
  * absent field — the field was never even looked for).
  */
-const notSkippedWhy = (e: RefusedOnPresentElement | FillValueFailure): string =>
-  !(e instanceof FillValueFailure) ? 'its element is present, but the tap was refused'
+const notSkippedWhy = (e: NotSkippable): string =>
+  e instanceof WithinRefusedError ? 'its within names no scroll view to swipe, which no screen cures'
+  : !(e instanceof FillValueFailure) ? 'its element is present, but the tap was refused'
   : e.fillValue === 'did-not-land' ? 'its field is present, but its value did not land'
   : 'averi refused its value before anything was typed';
 
-/** Does an enclosing `optional:` turn `e` into OptionalNotSkipped instead of skipping it? */
-const notSkippable = (e: unknown): e is Error & (RefusedOnPresentElement | FillValueFailure) =>
-  isRefusedOnPresentElement(e) || e instanceof FillValueFailure;
+/** What an enclosing `optional:` fails on instead of skipping (OptionalNotSkipped). */
+type NotSkippable = (Error & (RefusedOnPresentElement | FillValueFailure)) | WithinRefusedError;
+
+/**
+ * Does an enclosing `optional:` turn `e` into OptionalNotSkipped instead of skipping it? A `within` refusal only when
+ * it is not `absent` (D81).
+ */
+const notSkippable = (e: unknown): e is NotSkippable =>
+  isRefusedOnPresentElement(e) || e instanceof FillValueFailure || (e instanceof WithinRefusedError && e.refused !== 'absent');
 
 /**
  * An error the ladder must NOT escalate past, nor hand to salvage: re-running
@@ -1348,6 +1362,8 @@ export class FlowEngine {
     // next device run should look at `scroll_until` steps.
     const result = await scrollUntilVisible(this.adapter, element, {
       ...rest,
+      // A flow names a scroll view by element spec, never by rect (D81): a failure's way into one asks for a spec.
+      remedy: 'spec',
       // The eyes a `fully visible` claim is confirmed with (ui-tree/eyes.ts), wired here: interact/ may not import verify/.
       eyes: eyesOn(this.adapter),
       timeoutMs: timeout === undefined ? undefined : parseDuration(timeout),

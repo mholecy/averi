@@ -1447,3 +1447,26 @@ describe('scroll_until within (D78): a selector that does not parse is refused b
     await expect(scrollUntilVisible(adapter, 'id:x', { ...FAST, within: { x: 0, y: 0, width: 1, height: 1 } })).rejects.toThrow('test: the device was asked');
   });
 });
+
+/**
+ * D81 (review round 2, MINOR-A): the caller's remedy form is the caller's option (`ScrollOptions.remedy`) — the MCP
+ * tool sets none and keeps D78's rect form, a flow sets `spec` (its engine test pins that side). Driven to the
+ * exhausted bound over android scroll-bounded's real dump: O, a row of `lower`, the swipes over `upper`.
+ */
+describe('scrollUntilVisible — the remedy form of a failure naming the list beside (D81)', () => {
+  const bounded = async () => parseDump(await readFile(new URL('../fixtures/truth/android-averi_lab-api33/scroll-bounded.xml', import.meta.url), 'utf8'));
+
+  it('no `remedy` (the MCP tool, a selector string): the rect as `within` takes it', async () => {
+    const fake = new FakeAdapter({ s: await bounded() }, 's');
+    await expect(scrollUntilVisible(fake, 'id:lab.scroll-bounded.O', { ...FAST, maxSwipes: 4 })).rejects.toThrow(
+      '— if the element lies in it, scroll_until it again with within: {"x":0,"y":1046,"width":1080,"height":495}; else:',
+    );
+  });
+
+  it('`remedy: spec` (a flow): an element spec of it, no rect', async () => {
+    const fake = new FakeAdapter({ s: await bounded() }, 's');
+    const failure = scrollUntilVisible(fake, 'id:lab.scroll-bounded.O', { ...FAST, maxSwipes: 4, remedy: 'spec' });
+    await expect(failure).rejects.toThrow('— if the element lies in it, scroll_until it again naming that scroll view by an element spec of it or of an element inside it (within: { id: … }); else:');
+    await expect(failure).rejects.not.toThrow('"x":');
+  });
+});
