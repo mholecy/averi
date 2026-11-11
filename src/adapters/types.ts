@@ -1005,6 +1005,19 @@ export type AppHolder =
   | { holder: 'unknown'; wait: 'not-asked'; app: string };
 
 /**
+ * The bound of iOS's foreground wait (adapters/ios-foreground.ts), the wait whose end an `unknown` holder reports: a
+ * launch or a link waits at most this long for the tree source to name the app. Three seconds: the measured app-switch
+ * window was the first two reads (about a second) and, once, over 2 s; a cold launch's SpringBoard tree lasted ~2 s
+ * after `launch_app` returned. The once-over-2 s case can outlast it — the note is then the honest outcome, rather than
+ * a longer wait that every never-matching launch (a localized name) would pay.
+ *
+ * Here, not in ios-foreground.ts, since A16: the launch_app and open_deep_link descriptions quote it
+ * (mcp/tools.ts#FOREGROUND_BUDGET), and mcp/ imports no platform module outside its composition root (mcp/registry.ts;
+ * tests/mcp/layering.test.ts). The interface module is the one both may read.
+ */
+export const FOREGROUND_WAIT_MS = 3_000;
+
+/**
  * Android's chooser a link or a `-p` launch waits behind (D55, D55b, adapters/android-chooser.ts; the name is D55's, kept
  * through A10 as `LinkAlert`'s is): its component as the window manager names
  * it (`android/com.android.internal.app.ResolverActivity`), and, since D55c, `sheet`: what its tree shows, read once

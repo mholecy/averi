@@ -1,7 +1,7 @@
 import { IdbEmptyTreeError, type ApplicationLabel } from './ios-tree-source.js';
 import type { IosTreeSourceKind } from './ios-node.js';
 import { namesApp, titleAsksToOpen } from './ios-system-alert.js';
-import type { AppHolder, SystemAlert } from './types.js';
+import { FOREGROUND_WAIT_MS, type AppHolder, type SystemAlert } from './types.js';
 import { errorMessage } from '../util/error-message.js';
 import { formatSeconds } from '../util/duration.js';
 import { sleep } from '../util/sleep.js';
@@ -169,13 +169,9 @@ import { sleep } from '../util/sleep.js';
  */
 
 /**
- * The bound. Three seconds: the measured app-switch window was the first
- * two reads (about a second) and, once, over 2 s; a cold launch's SpringBoard
- * tree lasted ~2 s after `launch_app` returned. The once-over-2 s case can
- * outlast it — the note is then the honest outcome, rather than a longer
- * wait that every never-matching launch (a localized name) would pay.
+ * The bound is FOREGROUND_WAIT_MS, in adapters/types.ts beside AppHolder (A16): the MCP tool descriptions quote it,
+ * and mcp/ reads no platform module outside its composition root.
  */
-export const FOREGROUND_WAIT_MS = 3_000;
 
 /**
  * The pause between reads. Short: a describe-all already takes a few tenths
