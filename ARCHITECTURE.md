@@ -660,10 +660,9 @@ only what the tool descriptions do not already say:
 - **A mutation run guards the pure leaves' tests** (`npm run mutate`, ADR 0038): Stryker mutates the modules
   `scripts/mutation/scope.json` names, in four groups (`core`, `android`, `scene`, `lab`), and fails when a module's
   score drops below its floor; each group is one Stryker process bounded at 600 s. A branch that touches a scoped
-  module, its tests or anything they import runs it cold (`npm run mutate -- --force`, which removes each group's
-  incremental file first; each group's temp dir is the checkout's own reports/mutation/stryker-tmp-<group>, so a
-  worktree needs no `--tempDirName`) before merging. scope.json holds each module's floor and latest baseline;
-  earlier baselines are in docs/mutation-ledger.md.
+  module, its tests or anything they import runs it cold (`npm run mutate -- --force`) before merging; a cold run reads
+  no incremental file, and each group's temp dir is in the checkout's own reports/mutation/. scope.json holds each
+  module's floor and latest baseline; earlier baselines are in docs/mutation-ledger.md.
 - **Releases** follow docs/release.md: gates A (off-device), B (Android) and C (iOS) before any version commit.
 
 ---

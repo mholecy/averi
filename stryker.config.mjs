@@ -79,9 +79,7 @@ export default {
   clearTextReporter: { reportMutants: false },
   jsonReporter: { fileName: files.json },
   htmlReporter: { fileName: files.html },
-  // reports/mutation/stryker-tmp-<group>: this checkout's own, never node_modules, which a worktree shares through its
-  // symlink (A37); `npm run mutate -- --tempDirName <name>` still wins. vitest.config.ts keeps a leftover sandbox's
-  // copied tests out of `npx vitest run`.
+  // The checkout's own reports/mutation/, not node_modules, which worktrees share (ADR 0038, A37).
   tempDirName: files.tempDir,
   cleanTempDir: 'always',
 };

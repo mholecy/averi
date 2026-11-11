@@ -109,15 +109,17 @@ describe('isGroup and filesOf', () => {
     expect(filesOf(undefined).json).toBe('reports/mutation/mutation.json');
   });
 
-  it('A37: every temp dir is in the checkout\'s own reports/mutation/, never under node_modules (a worktree shares that)', () => {
-    for (const group of [...GROUPS, undefined]) expect(filesOf(group).tempDir).toMatch(/^reports\/mutation\/stryker-tmp(-[a-z]+)?$/);
+  it('A37: every temp dir is in the checkout\'s own reports/mutation/, never in node_modules (worktrees share it)', () => {
+    const own = /^reports\/mutation\/stryker-tmp(-[a-z]+)?$/;
+    for (const group of [...GROUPS, undefined]) expect(filesOf(group).tempDir).toMatch(own);
   });
 });
 
 describe('vitest.config.ts — `npx vitest run` collects no test a mutation sandbox copied (A37)', () => {
   it('its exclude covers a leftover sandbox under each temp dir, and keeps vitest\'s defaults', async () => {
     const { configDefaults } = await import('vitest/config');
-    // Should group.mjs ever join scope.json, this import breaks in Stryker's sandbox: vitest.config.ts is not in its allowlist.
+    // Should group.mjs ever join scope.json, this import breaks in Stryker's sandbox: vitest.config.ts is not in its
+    // allowlist.
     const exclude = (await import('../../vitest.config.js')).default.test?.exclude ?? [];
     expect(exclude).toEqual(expect.arrayContaining(configDefaults.exclude));
     for (const group of [...GROUPS, undefined]) {
