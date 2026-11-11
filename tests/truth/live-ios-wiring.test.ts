@@ -52,6 +52,22 @@ describe("live.ts's iOS adapter, from its side (side.ts#liveIos)", () => {
     expect(side.liveIos?.wiring).toBe('registry.ts#iosAdapterFor — the server\'s iOS wiring, its idb helper on (ADR 0032)');
   });
 
+  it('with the kill switch on (AVERI_IDB_HELPER=off) the line says the CLI carries every idb call — read when the side is loaded', async () => {
+    const root = await fakeSide({
+      'src/mcp/registry.ts': ['export class AdapterRegistry {}', 'export const defaultFactory = () => undefined;', 'export const iosAdapterFor = () => ({});'].join('\n'),
+    });
+    const before = process.env.AVERI_IDB_HELPER;
+    process.env.AVERI_IDB_HELPER = 'off';
+    try {
+      expect((await loadSide(root)).liveIos?.wiring).toBe(
+        "registry.ts#iosAdapterFor — the server's iOS wiring, its idb helper off (AVERI_IDB_HELPER=off): every idb call the CLI",
+      );
+    } finally {
+      if (before === undefined) delete process.env.AVERI_IDB_HELPER;
+      else process.env.AVERI_IDB_HELPER = before;
+    }
+  });
+
   it('a side without it (before D7a, 2026-10-31): its IosAdapter over its createIosTreeSource, no idb helper — the fallback said', async () => {
     const side = await loadSide(await fakeSide({}));
     const adapter = side.liveIos?.adapter('LAB-UDID', 'idb', DEPS) as unknown as { opts: unknown };
@@ -66,6 +82,8 @@ describe("live.ts's iOS adapter, from its side (side.ts#liveIos)", () => {
     expect(side.liveIos).toBeUndefined();
   });
 
+  // The helper is read off the adapter's private field: a public seam would need an idb call, which starts the helper
+  // (a spawned Python) and the CLI on the host.
   it("this checkout: the registry's own wiring, an IosAdapter holding its idb helper", async () => {
     const side = await loadSide(ROOT);
     expect(side.liveIos?.wiring).toMatch(/^registry\.ts#iosAdapterFor/);

@@ -200,7 +200,7 @@ if (averi !== undefined) console.error(`averi: ${averi.root}`);
 if (averi !== undefined && platform === 'ios') console.error(`ios: ${averi.liveIos?.wiring ?? 'none — the side has no iOS tree-source seam'}`);
 function iosAdapter(udid: string, source: IosTreeSourceKind): DeviceAdapter {
   const live = averi!.liveIos;
-  if (live === undefined) throw new Error(`side ${averi!.root}: no src/adapters/ios-tree-source.ts#createIosTreeSource — the live golden cannot build its tree source`);
+  if (live === undefined) throw new Error(`side ${averi!.root}: no registry.ts#iosAdapterFor nor src/adapters/ios-tree-source.ts#createIosTreeSource — the live golden cannot build its tree source`);
   return live.adapter(udid, source, { port, derivedDataPath: LAB_WDA_DERIVED_DATA });
 }
 

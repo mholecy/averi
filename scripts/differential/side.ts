@@ -5,6 +5,7 @@ import type { AdapterFactory, AdapterRegistry } from '../../src/mcp/registry.js'
 import type { DeviceDiscovery } from '../../src/adapters/discovery.js';
 import type { createAveriServer } from '../../src/mcp/tools.js';
 import type { IosAdapter } from '../../src/adapters/ios.js';
+import { idbHelperDisabled } from '../../src/adapters/idb-helper.js';
 import type { Recording } from './corpus.js';
 import { logCall, useDevice, type DeviceProfile } from './fake-device.js';
 import { RecordedTreeSource } from './recorded-source.js';
@@ -53,7 +54,8 @@ export interface Side {
    * gets the server's own wiring, its idb helper included (ADR 0032, A23), so Gate C runs the transport users get. An
    * older side gets the construction the live golden had before A23: its IosAdapter over its
    * src/adapters/ios-tree-source.ts#createIosTreeSource, no helper (every idb call the CLI). `wiring` names which, for
-   * the run's log. A side with neither has none.
+   * the run's log — and, read when the side is loaded, whether the kill switch (`AVERI_IDB_HELPER=off`) puts every idb
+   * call of the server's wiring on the CLI as well. A side with neither has none.
    */
   liveIos?: LiveIos;
 }
@@ -75,7 +77,9 @@ function liveIosOf(registry: Record<string, unknown>, treeSource: Record<string,
   if (typeof registry.iosAdapterFor === 'function') {
     return {
       adapter: registry.iosAdapterFor as LiveIos['adapter'],
-      wiring: "registry.ts#iosAdapterFor — the server's iOS wiring, its idb helper on (ADR 0032)",
+      wiring: idbHelperDisabled()
+        ? "registry.ts#iosAdapterFor — the server's iOS wiring, its idb helper off (AVERI_IDB_HELPER=off): every idb call the CLI"
+        : "registry.ts#iosAdapterFor — the server's iOS wiring, its idb helper on (ADR 0032)",
     };
   }
   if (typeof treeSource.createIosTreeSource !== 'function') return undefined;

@@ -815,7 +815,7 @@ on the line after `averi:`. With `iosAdapterFor` the line reads
 `ios: registry.ts#iosAdapterFor — the server's iOS wiring, its idb helper on (ADR 0032)`. The fallback line reads
 `ios: no registry.ts#iosAdapterFor in this side — … no idb helper: every idb call the CLI (the live golden before A23)`.
 The kill switch is unchanged. With `AVERI_IDB_HELPER=off` in the environment, a live run drives the CLI as the server
-would. The replay (golden, differential) is untouched: its fake device still sets the switch, since it answers
+would, and its `ios:` line says the helper is off and the CLI carries every idb call. The replay (golden, differential) is untouched: its fake device still sets the switch, since it answers
 execFile only.
 
 Consequences:
@@ -825,7 +825,8 @@ Consequences:
   move, or that a move is the helper's and a note explains it. No replayed check moves (golden Changed 0).
 - A live calibration (`calibration.json` `live`) whose before commit predates D7a runs that side on the CLI and the
   after side on the helper. The `ios:` line in each run's log says so, and a difference between them may be the
-  transport's.
+  transport's. For transport parity, run both sides with `AVERI_IDB_HELPER=off` in the environment: both are then on
+  the CLI, and the after side's `ios:` line says the helper is off.
 - Not done here (review card 5's second step, TL6): one in-process connection module for live.ts, differential.ts and
   perf/baseline.ts. Each still builds registry, server and client and closes them in its own order (D82).
 
