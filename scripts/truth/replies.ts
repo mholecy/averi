@@ -8,7 +8,7 @@ import { untriedSideText } from '../../src/interact/target-text.js';
 import { EDGES, rectText } from '../../src/ui-tree/geometry.js';
 import type { Rect } from '../../src/adapters/types.js';
 import type { Direction } from '../../src/ui-tree/sides.js';
-import { escapeRegExp } from '../../src/verify/text-hint.js';
+import { escapeRegExp } from '../../src/util/regex.js';
 
 /**
  * averi's reply wording, read in ONE place: every judge that reads what averi said — the replayed golden

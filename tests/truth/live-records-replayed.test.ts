@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
+import { escapeRegExp } from '../../src/util/regex.js';
 
 /**
  * Every committed live record is replayed: tests/truth/live-rejudge.test.ts runs a rejudge on it — passes it to
@@ -44,11 +45,9 @@ const stringOf = (node: ts.Node | undefined): string | undefined => (node !== un
 /** The record a table row names: a bare string, or an array literal's first element. */
 const rowRecord = (row: ts.Expression): string | undefined => (ts.isArrayLiteralExpression(row) ? stringOf(row.elements[0]) : stringOf(row))?.split('/').pop();
 
-const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
 /** A template's records, each placeholder a run number (`${n}`: digits alone), matched on the path's last part. */
 const templateOf = (node: ts.TemplateExpression): RegExp =>
-  new RegExp(`(?:^|/)${[node.head.text, ...node.templateSpans.map((span) => span.literal.text)].map(escape).join('\\d+')}$`);
+  new RegExp(`(?:^|/)${[node.head.text, ...node.templateSpans.map((span) => span.literal.text)].map(escapeRegExp).join('\\d+')}$`);
 
 /** A call to `rejudgeInProcess` or `rejudgeCli`. */
 const isRejudge = (node: ts.Node): node is ts.CallExpression =>

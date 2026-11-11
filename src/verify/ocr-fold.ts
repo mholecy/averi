@@ -64,7 +64,17 @@ const charsOf = (s: string): string[] => [...s.normalize('NFC')];
 /** The string as the recognizer could have read it: look-alikes to ASCII, combining marks dropped. */
 export const ocrFold = (s: string): string => charsOf(s).map(foldChar).join('');
 
-/** A regex source spelling `s` literally (outside a character class). */
+/**
+ * A regex source spelling `s` literally (outside a character class): a fold
+ * (`’` → `'`, `–` → `-`, `…` → `...`) spliced into the pattern being folded.
+ *
+ * Not util/regex.ts#escapeRegExp, deliberately (T22): it escapes `/` and `-`
+ * too. Those two are literal outside a class without an escape, so here the
+ * extra backslashes change nothing a pattern matches — the folded source is
+ * compiled without flags (text-parity.ts#foldedMatch), where `\-` and `\/` are
+ * identity escapes. The shared helper must not take them: its output must stay
+ * valid under `u`, where `\-` outside a class is a syntax error.
+ */
 const literal = (s: string): string => s.replace(/[.*+?^${}()|[\]\\/-]/g, '\\$&');
 
 /** A character a class can list literally: escaped when the class syntax would read it. */

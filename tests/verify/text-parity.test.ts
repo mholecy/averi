@@ -7,6 +7,7 @@ import { sizeOnlyPng } from '../helpers/fake.js';
 import type { PollVerdict } from '../../src/verify/poll-verdict.js';
 import { windowWidth } from '../../src/verify/scale.js';
 import { ocrFoldPattern } from '../../src/verify/ocr-fold.js';
+import { escapeRegExp } from '../../src/util/regex.js';
 import { parseLayoutContract, type LayoutContract } from '../../src/verify/layout-contract.js';
 import { OcrUnavailableError, ocrUnavailableReason, type OcrEngine, type OcrLine, type OcrRegion, type OcrRegionResult } from '../../src/verify/ocr.js';
 import {
@@ -1342,7 +1343,7 @@ describe('measureOcrAssert — the ocr assert\'s one measurement, every "not rea
         '(multi-line boxes do not compose into one height); failing closed, ink height unchecked',
     );
     expect((await measureOcrAssert(reading({ lines: [] }), at, { text: 'x' })).detail).toMatch(
-      new RegExp(`genuinely absent\\); ${note.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}; failing closed, rendered text unchecked$`),
+      new RegExp(`genuinely absent\\); ${escapeRegExp(note)}; failing closed, rendered text unchecked$`),
     );
     expect((await measureOcrAssert(reading({ lines: [line('x', 10)] }), at, { text: 'x' })).detail).toBe(`read "x"; vs expected "x" =; ${note}`);
   });

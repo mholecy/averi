@@ -1,4 +1,5 @@
 import { basename, dirname, join } from 'node:path';
+import { escapeRegExp } from '../../../src/util/regex.js';
 import type { CallResult } from './bounded.js';
 import { exitText, nameInLine, stepLine, verdictLine } from './words.js';
 
@@ -382,15 +383,12 @@ export function stateIn(text: string | undefined): DomainsState | string {
 
 // --------------------------------------------------------------------------------------- what defaults said
 
-/** A regex's text for `s` taken literally. */
-const literal = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
 /**
  * defaults' words for a read of a domain that is not there, naming this domain only: `Domain '<domain>' not found.` —
  * the host's defaults (Darwin 27, seen by the T2 S4 review) and the lab simulator's alike (iOS 27.0, batch-13: the
  * same words, byte for byte).
  */
-const notFoundSaid = (domain: string): RegExp => new RegExp(`\\bDomain '${literal(domain)}' not found\\.`);
+const notFoundSaid = (domain: string): RegExp => new RegExp(`\\bDomain '${escapeRegExp(domain)}' not found\\.`);
 
 /**
  * Whether a `defaults read <domain>` of a domain that exported empty says it is absent: exit 1 with that domain's
@@ -412,7 +410,7 @@ export type ProtectedRead = { state: 'value'; value: string } | { state: 'absent
  * The stderr of a read of the protected key that is not there: batch-8's and batch-9's words (`Could not find key '…'
  * in domain '…'.`), naming this key in this domain — a not-found naming another key is unexpected, so unreadable.
  */
-const ABSENT_KEY = new RegExp(`Could not find key '${literal(PROTECTED.key)}' in domain '${literal(PROTECTED.domain)}'`);
+const ABSENT_KEY = new RegExp(`Could not find key '${escapeRegExp(PROTECTED.key)}' in domain '${escapeRegExp(PROTECTED.domain)}'`);
 
 /**
  * What `defaults read <schemeapproval> <finportal key>` (batch-11.sh:337–340) gave: exit 0, its value (the output's

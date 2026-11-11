@@ -1,3 +1,5 @@
+import { escapeRegExp } from '../util/regex.js';
+
 /** What exec knows of a failed host command: ExecError's own fields, which keep every byte for detectors and logs. */
 export interface CommandFailure {
   /** The argv as shown (shownCommand): a typed text is `<typed text>` in it already, here and in ExecError.command. */
@@ -92,14 +94,12 @@ const HOST_FOLDERS: readonly (readonly [RegExp, string])[] = [
   [new RegExp(String.raw`${WORD_START}/(?:Volumes|opt)${PATH_REST}`, 'g'), '…'],
 ];
 
-const escaped = (literal: string): string => literal.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
-
 /** A home of two folders or more is the user's alone, so it goes anywhere; `/tmp` or `/root` may end any device path, so it goes at a word's start. */
 function withoutOwnHome(text: string, home: string): string {
   const folder = home.replace(/\/+$/, '');
   if (!folder.startsWith('/')) return text;
   const anywhere = folder.split('/').length > 2;
-  return text.replace(new RegExp(`${anywhere ? '' : WORD_START}${escaped(folder)}(?![\\w.-])`, 'gm'), '~');
+  return text.replace(new RegExp(`${anywhere ? '' : WORD_START}${escapeRegExp(folder)}(?![\\w.-])`, 'gm'), '~');
 }
 
 /** A word holding `scheme://` or starting `scheme:`: what looks like a path inside it is the URL's. `file:`'s is the host's. */

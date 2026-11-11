@@ -41,3 +41,18 @@ export const regexSource = (flags = ''): z.ZodEffects<z.ZodString> =>
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: `not a valid regular expression — ${errorMessage(e)}` });
     }
   });
+
+/**
+ * `value` as a regex source matching it as literal text: a backslash before
+ * each of `. * + ? ^ $ { } ( ) | [ ] \`, nothing else. Valid with or without
+ * the `u` flag, and outside a character class only. `/` is left alone (a
+ * RegExp constructor needs no `/` escape) and so is `-` (literal outside a
+ * class, and `\-` there is a syntax error under `u`).
+ *
+ * Its one copy (T22): the element assert's text hint shows it verbatim as the
+ * `match:` to write (verify/text-hint.ts#textHint), and adapters, scripts and
+ * tests build their patterns through it. Here, not in verify/, because every
+ * layer and the scripts can reach a util leaf. verify/ocr-fold.ts keeps its own
+ * variant, which escapes `/` and `-` too (said there).
+ */
+export const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
