@@ -186,7 +186,8 @@ function headingsOver(order: readonly Placed[], target: Placed): Placed[] {
  *
  * …and THE ORDER SEEN (`seen`, ui-tree/seen-order.ts): a peer a screenshot saw drawn UNDER the target is no peer — not
  * in `before`, `unordered` or `listedBefore`, and, listed after it, no cover by the draw order either (`seenUnder`: the
- * screenshot overrides the listing for exactly that pair): the lab's W, seen over C. A peer seen OVER it stays the
+ * screenshot overrides the listing for exactly that pair; only a peer in play as a cover — one listed after it that
+ * holds no part of its centre stays the draw order's, D84): the lab's W, seen over C. A peer seen OVER it stays the
  * cover the listing made it, named `seenOver` instead of `unordered`: C, under W. An untold pair is as with no
  * screenshot.
  */
@@ -237,11 +238,17 @@ function peersOf(
   const before = listedBefore.some(holdsCentre) ? listedBefore : [];
   const after = kept.filter((p) => p.at > target.at && holdsCentre(p));
   const overlapping = [...before, ...after];
+  // Dropped by what was seen: only a peer in play as a cover — listed before when one listed before holds the centre,
+  // listed after when it holds it itself (D84's review: a peer clear of the centre stays the draw order's to judge,
+  // whatever a seen order says of it; no question of the target asks about it).
+  const listedBeforeAll = peers.filter((p) => p.at < target.at);
+  const beforeInPlay = listedBeforeAll.some(holdsCentre) ? listedBeforeAll : [];
+  const inPlay = [...beforeInPlay, ...peers.filter((p) => p.at > target.at && holdsCentre(p))];
   return {
     before,
     unordered: new Set(overlapping.filter((p) => !overIt(p))),
     seenOver: new Set(overlapping.filter(overIt)),
-    seenUnder: new Set(peers.filter((p) => peerSeen(p) === 'under')),
+    seenUnder: new Set(inPlay.filter((p) => peerSeen(p) === 'under')),
     listedBefore,
     coversAfter: new Set(after),
   };

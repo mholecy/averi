@@ -225,4 +225,16 @@ describe('D84: a later-listed sibling clear of the target\'s centre stays the dr
     expect(tagged(e.covers)).toEqual([{ node: byId(t, 'lab.corner'), order: 'drawn', presented: false }]);
     expect(e.tapAt).toEqual({ point: { x: 540, y: 391 }, moved: false });
   });
+
+  it('a seen order that does say A over the corner (an answer no question of A asks) leaves it `drawn`: a peer clear of the centre is never dropped by what was seen', async () => {
+    const t = await withCorner();
+    const [a, corner] = [byId(t, cell('A')), byId(t, 'lab.corner')];
+    for (const seen of ['over', 'under'] as const) {
+      const e = exposureOf(t, a, [{ peer: corner, seen, overlap: '#1E88E5', own: '#1E88E5', other: '#000000' }]);
+      expect(tagged(e.covers)).toEqual([
+        { node: byId(t, cell('B')), order: 'untold', presented: false },
+        { node: corner, order: 'drawn', presented: false },
+      ]);
+    }
+  });
 });

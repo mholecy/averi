@@ -476,6 +476,9 @@ run lists by place, not by drawing, so neither side tells which is on top. Every
 
 The draw order's own-content excuse (draw-order.ts#NOT_DRAWN's `onTarget`) still judges a sibling listed after, in the
 covers. The idb flat list is untouched.
+A seen order drops (`seenUnder`) only a peer in play as a cover — listed before when one listed before holds the
+centre, listed after when it holds it — so a later-listed sibling clear of the centre stays the draw order's `drawn`
+cover whatever a seen order says of it (code review: defence in depth; no question of the target asks about it).
 
 This closes the later-listed half of the D75 residual above for non-controls. The direction is now measured, and averi
 reads A over B the way the frame shows it.
