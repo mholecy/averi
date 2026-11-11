@@ -109,8 +109,11 @@ export interface KeyboardUp {
   readonly remedy: KeyboardRemedy;
 }
 
-/** What hides the soft keyboard where no key does (`KeyboardRemedy.dismissal` `none`): both wordings below say it. */
+/** What hides the soft keyboard where no key does (`KeyboardRemedy.dismissal` `none`): every wording below says it. */
 const NEUTRAL_TAP = 'tap a neutral element such as the screen title';
+
+/** The flow step a neutral tap is, after `NEUTRAL_TAP`: `— a tap: step in a flow` (`hideKeyboardHow`), `… before this one` (`hideKeyboardInFlow`). */
+const A_TAP_STEP = ' — a tap: step';
 
 /**
  * HOW to hide the soft keyboard, by what the adapter hides it with (`KeyboardRemedy.dismissal`): `press_key back from
@@ -121,14 +124,22 @@ const NEUTRAL_TAP = 'tap a neutral element such as the screen title';
  * Names MCP tools and "a flow", the exception keyboard-window.ts records. Its short form, with no flow clause, is
  * `hideKeyboardBriefly`.
  */
-export const hideKeyboardHow = ({ dismissal }: KeyboardRemedy): string =>
-  dismissal === 'back' ? 'press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow' : `${NEUTRAL_TAP} — a tap: step in a flow`;
+export const hideKeyboardHow = (remedy: KeyboardRemedy): string =>
+  remedy.dismissal === 'back' ? `${hideKeyboardBriefly(remedy)} from the MCP tools; ${hideKeyboardInFlow(remedy)} in a flow` : `${NEUTRAL_TAP}${A_TAP_STEP} in a flow`;
 
 /**
  * `hideKeyboardHow`'s SHORT form, for a reply that must stay one actionable line (`keyboardMayCoverText`): the action
  * alone — `press_key back`, or `tap a neutral element such as the screen title` — no flow clause, no adapter advice.
  */
 export const hideKeyboardBriefly = ({ dismissal }: KeyboardRemedy): string => (dismissal === 'back' ? 'press_key back' : NEUTRAL_TAP);
+
+/**
+ * `hideKeyboardHow`'s FLOW form alone, for a reply only a flow reads (scroll-text.ts#WITHIN_REMEDY's `spec`, D80):
+ * `` `dismissKeyboard: true` on the fill before this step ``, or `tap a neutral element such as the screen title — a
+ * tap: step before this one` — keyed on the same `dismissal` as the MCP tools' `hideKeyboardBriefly`.
+ */
+export const hideKeyboardInFlow = ({ dismissal }: KeyboardRemedy): string =>
+  dismissal === 'back' ? '`dismissKeyboard: true` on the fill before this step' : `${NEUTRAL_TAP}${A_TAP_STEP} before this one`;
 
 /** `the soft keyboard is up (its top edge at y 590)`: the one phrase of `dismissKeyboardFirstText` and `keyboardMayCoverText`. */
 export const keyboardUpText = (lineY: number): string => `the soft keyboard is up (its top edge at y ${lineY})`;

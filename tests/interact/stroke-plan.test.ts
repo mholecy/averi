@@ -684,6 +684,75 @@ describe('a named scroll view (`within`, D78) — the one the strokes go over un
     const plan = planStroke(nameScrollView(startStrokes(), factsOf(bounded), LOWER), ask(bounded));
     expect(strokedBeside(strokeSent(plan.memory), factsOf(bounded), 'down', BOX)).toEqual({ axis: 'vertical', strokedOver: LOWER, others: [{ role: 'scrollable', label: null, identifier: null, rect: UPPER }] });
   });
+
+  // D80: a named scroll view with no room for a stroke — the keyboard over all of `lower` but 54 px of it (a keyboard
+  // whose top lies at 1100, `lower` 1046–1541) — is NO stroke: the plan says so (`noRoom`) rather than fall back to the
+  // gesture box whole, whose stroke would touch down on `upper` or anything else (ADR 0010's D78 residual 1).
+  const keyboardAt = (y: number, memory: StrokeMemory): StrokeMemory => seeRead(memory, { facts: factsOf(bounded), line: { y, witnessed: true }, target: undefined });
+
+  it('no room in the named one under the keyboard: `noRoom` names it, the room left and the keyboard\'s top — no fallback to the gesture box decided', () => {
+    const plan = planStroke(keyboardAt(1100, nameScrollView(startStrokes(), factsOf(bounded), LOWER)), ask(bounded));
+    expect(plan.noRoom).toEqual({ rect: LOWER, toward: 'down', room: 54, keyboardTop: 1100 });
+    // 80 above the keyboard is room: the stroke goes inside `lower`, above it.
+    const roomy = planStroke(keyboardAt(1046 + MIN_STROKE_BOX, nameScrollView(startStrokes(), factsOf(bounded), LOWER)), ask(bounded));
+    expect(roomy.noRoom).toBeUndefined();
+    expect(roomy.stroke).toMatchObject({ box: LOWER, coverTop: 1126 });
+  });
+
+  it('…and none named, the same keyboard over the largest scroller leaves the fallback as it was: the gesture box whole, no `noRoom`', () => {
+    const plan = planStroke(keyboardAt(305, startStrokes()), ask(bounded));
+    expect(plan.noRoom).toBeUndefined();
+    expect(plan.stroke).toMatchObject({ box: BOX, coverTop: 305 });
+  });
+
+  it('…a keyboard above the named one\'s top leaves it no room at all (0), not a negative one', () => {
+    expect(planStroke(keyboardAt(900, nameScrollView(startStrokes(), factsOf(bounded), LOWER)), ask(bounded)).noRoom).toEqual({ rect: LOWER, toward: 'down', room: 0, keyboardTop: 900 });
+  });
+
+  it('…a round whose tree did not read judges it as the last plan did: still no room (the round holds for a read before it stops on it, scroll-rounds.ts)', () => {
+    const first = planStroke(keyboardAt(1100, nameScrollView(startStrokes(), factsOf(bounded), LOWER)), ask(bounded));
+    expect(planStroke(first.memory, { ...ask(bounded), read: undefined }).noRoom).toEqual({ rect: LOWER, toward: 'down', room: 54, keyboardTop: 1100 });
+  });
+
+  it('…once a read has found the target, `within` counts no more, nor its room: the target\'s own scroll views, their fallback as before', () => {
+    const p = [...everyNode(bounded)].find((n) => n.identifier === 'lab.scroll-bounded.P')!;
+    const named = nameScrollView(startStrokes(), factsOf(bounded), LOWER);
+    const found = seeRead(named, { facts: factsOf(bounded), line: { y: 305, witnessed: true }, target: p });
+    const plan = planStroke(found, ask(bounded, p));
+    expect(plan.noRoom).toBeUndefined();
+    expect(plan.stroke.box).toEqual(BOX);
+  });
+
+  it('…no room off the screen: one the gesture box does not meet has 0; no keyboard cutting it, none said; a screen-box stroke and no gesture box ask nothing of it', () => {
+    const named = nameScrollView(startStrokes(), factsOf(bounded), LOWER);
+    const above: Rect = { x: 0, y: 0, width: 1080, height: 1000 };
+    expect(planStroke(named, { ...ask(bounded), gesture: above }).noRoom).toEqual({ rect: LOWER, toward: 'down', room: 0 });
+    // The gesture box cut at 1100 (a system band, say): 54 of it on screen, no keyboard said.
+    expect(planStroke(named, { ...ask(bounded), gesture: { x: 0, y: 0, width: 1080, height: 1100 } }).noRoom).toEqual({ rect: LOWER, toward: 'down', room: 54 });
+    // A keyboard below the part on screen, or at its very bottom, does not cut it: not said.
+    expect(planStroke(keyboardAt(1100, named), { ...ask(bounded), gesture: { x: 0, y: 0, width: 1080, height: 1100 } }).noRoom).toEqual({ rect: LOWER, toward: 'down', room: 54 });
+    expect(planStroke(keyboardAt(1300, named), { ...ask(bounded), gesture: { x: 0, y: 0, width: 1080, height: 1100 } }).noRoom).toEqual({ rect: LOWER, toward: 'down', room: 54 });
+    expect(planStroke(keyboardAt(1100, named), { ...ask(bounded), screenBox: true }).noRoom).toBeUndefined();
+    expect(planStroke(keyboardAt(1100, named), { ...ask(bounded), gesture: undefined }).noRoom).toBeUndefined();
+  });
+
+  it('…a sideways stroke is judged on the width, whatever the keyboard: a 60-wide named strip has 60', () => {
+    const STRIP: Rect = { x: 500, y: 400, width: 60, height: 600 };
+    const tree = screenOf([node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { ...STRIP } })]);
+    const named = seeRead(nameScrollView(startStrokes(), factsOf(tree), STRIP), { facts: factsOf(tree), line: { y: 700, witnessed: true }, target: undefined });
+    expect(planStroke(named, { kind: 'full', toward: 'right', reach: 1, gesture: BOX, read: { facts: factsOf(tree), target: undefined } }).noRoom).toEqual({ rect: STRIP, toward: 'right', room: 60 });
+    // Review round 1, MINOR-2: one running past the gesture box is judged on its part on it — 30 of its 200.
+    const PAST: Rect = { x: 1050, y: 400, width: 200, height: 600 };
+    const past = screenOf([node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { ...PAST } })]);
+    expect(planStroke(nameScrollView(startStrokes(), factsOf(past), PAST), { kind: 'full', toward: 'right', reach: 1, gesture: BOX, read: { facts: factsOf(past), target: undefined } }).noRoom).toEqual({ rect: PAST, toward: 'right', room: 30 });
+  });
+
+  it('…room cut by what is drawn over it: the named one\'s 120 above the keyboard is enough by itself, a bar over its lower half leaves too little — `noRoom` with the 120', () => {
+    const SHORT: Rect = { x: 0, y: 1000, width: 1080, height: 120 };
+    const tree = screenOf([scroller(SHORT), cover({ x: 0, y: 1070, width: 1080, height: 50 })]);
+    const plan = planStroke(nameScrollView(startStrokes(), factsOf(tree), SHORT), { kind: 'full', toward: 'down', reach: 1, gesture: BOX, read: { facts: factsOf(tree), target: undefined } });
+    expect(plan.noRoom).toEqual({ rect: SHORT, toward: 'down', room: 120 });
+  });
 });
 
 describe('the memory — what a plan keeps for a round whose tree did not read, and for a read that lost the target', () => {

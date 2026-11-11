@@ -216,7 +216,10 @@ class ReentryError extends Error {
  * scroll view for any reason but `absent` (interact/within.ts#WithinRefusedError): several matches, a match in no
  * scroll view, one that scrolls only across the stroke, a tree that lists no scroll view (idb) — an authoring error
  * no screen cures, terminal like a config refusal. An `absent` one is skipped: the list, like the interstitial, may
- * not be on this screen.
+ * not be on this screen. Since D80 one whose named scroll view has no room for a swipe (`noRoom`: the keyboard over
+ * it, too little of it on screen) is terminal too, with its own reason: the list IS on this screen, so skipping would
+ * run on as if it had been scrolled — the room is an earlier step's to make (hide the keyboard), as a refused tap's
+ * cover is.
  *
  * Only an `optional:` raises it. The same refusal outside one is the step's
  * plain failure and a rung that throws it escalates as before — the owner's
@@ -238,7 +241,10 @@ class OptionalNotSkipped extends Error {
  * absent field — the field was never even looked for).
  */
 const notSkippedWhy = (e: NotSkippable): string =>
-  e instanceof WithinRefusedError ? 'its within names no scroll view to swipe, which no screen cures'
+  e instanceof WithinRefusedError
+    ? e.refused === 'noRoom'
+      ? 'its within names a scroll view on this screen with no room to swipe it, which an earlier step must make'
+      : 'its within names no scroll view to swipe, which no screen cures'
   : !(e instanceof FillValueFailure) ? 'its element is present, but the tap was refused'
   : e.fillValue === 'did-not-land' ? 'its field is present, but its value did not land'
   : 'averi refused its value before anything was typed';
