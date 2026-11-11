@@ -14,8 +14,10 @@
  *   (`focusUnread`, D64b-3).
  * - `withoutWholeToo`: a difference without its whole-landing hedge, for keys proven typed elsewhere.
  * interact/fill-type.ts polls on the second and goes by the first, and fill.ts throws the difference that comes back.
- * fill.ts asks one more (`needsHeldCount`, of a node, not a reading): whether the field can hold bullets the masked
- * rule must count from — its post-focus re-read's gate. Pure: no device, no wait, no sentence. Its imports are the
+ * fill.ts asks two more, of the field before its typing, not of a reading — what the masked rule counts from (A28,
+ * finishing A2): `postFocusReadOf`, the one read after the focus tap as a table (ADR 0028's gate a row of it, asking
+ * `needsHeldCount`: whether the field can hold bullets), and `heldCountOf`, the count that read gives the typing
+ * (Expectation.held) and the masked-append warning. Pure: no device, no wait, no sentence. Its imports are the
  * facts (fill-facts.ts), the character rules of a reformatting field (fill-reformat.ts), the mask characters and the
  * input role.
  */
@@ -41,7 +43,7 @@ export interface Expectation {
   resolvedValue: string | null;
   /**
    * The bullets a masked field held after focus — a masked reading must show these plus the typed length. `'unread'`:
-   * fill.ts skipped the post-focus re-read (`needsHeldCount`; docs/adr/0028-a-fill-re-reads-after-focus-only-where-
+   * fill.ts skipped the post-focus re-read (`postFocusReadOf`; docs/adr/0028-a-fill-re-reads-after-focus-only-where-
    * focus-can-change-the-count.md), the field being said plain, so what it held is unknown and only the typed length
    * passes a masked reading (`landingOf`'s `said-plain`), and what the field holds besides the typing is unknown too:
    * a plain reading that is not exactly the value lands saying so (`Landing`'s `focusUnread`, D64b-3).
@@ -466,3 +468,69 @@ function typedPartOf(shown: string, prior: string): string {
  */
 export const needsHeldCount = (f: Pick<UiNode, 'role' | 'secure' | 'value' | 'placeholder'>): boolean =>
   !(f.role === INPUT_ROLE && f.secure === false && heldText(f.value, f.placeholder) === '');
+
+
+/** What fill.ts knows before its focus tap that decides the one read after it (`postFocusReadOf`). */
+export interface FocusFacts {
+  /** The value to type; `''`: none (a focus alone, or a clear alone). */
+  value: string;
+  clear: boolean;
+  /** The field as resolved before the tap. */
+  field: Pick<UiNode, 'role' | 'secure' | 'value' | 'placeholder'>;
+  /** The target is a sole `id` selector (ui-tree/selectors.ts#soleIdOf): it keeps matching while the field's text changes. */
+  soleId: boolean;
+  /** The adapter types a dropped tail again (fill-type.ts#retypesTail) — a proof (`whereTyped`) the read feeds. */
+  retypesTail: boolean;
+}
+
+/**
+ * The fill's one read after the focus tap, and what it is for (A28: one table where fill.ts had four conditions):
+ * - `count`: what the field holds after focus, which the masked rule counts from (`heldCountOf`) — the pre-tap read is
+ *   stale for exactly these fields: an autofill populates a password field on focus, a re-entry screen clears one;
+ * - `clear`: what a clear ALONE deletes — the field after focus (an autofill on focus would otherwise be kept, the one
+ *   fill shape whose whole point is an empty field);
+ * - `skipped`: ADR 0028's gate — nothing the read feeds can change the verdict; the count is `'unread'`;
+ * - `none`: nothing after focus is needed.
+ */
+export type PostFocusRead = 'count' | 'clear' | 'skipped' | 'none';
+
+/**
+ * The read after the focus tap (`PostFocusRead`), as a table, first row that holds:
+ * | value | clear | the field, the target, the adapter                                              | read      |
+ * | none  | yes   | an input                                                                        | `clear`   |
+ * | none  | —     | anything else (a focus alone; a non-input's clear sends no delete)              | `none`    |
+ * | typed | yes   | — (the read-back compares to the value, and wipes and retypes a mismatch)       | `none`    |
+ * | typed | no    | no held count needed (`needsHeldCount`), a sole `id`, no tail retype (ADR 0028) | `skipped` |
+ * | typed | no    | holds nothing, or bullets alone (fill-facts.ts#heldText)                        | `count`   |
+ * | typed | no    | plain content: an append is judged by where the value lies, never by a count   | `none`    |
+ * The gate's reasons — what the read feeds and why none of it matters on that row — are ADR 0028's and fill.ts's. Pure.
+ */
+export function postFocusReadOf(f: FocusFacts): PostFocusRead {
+  if (f.value === '') return f.clear && f.field.role === INPUT_ROLE ? 'clear' : 'none';
+  if (f.clear) return 'none';
+  if (!needsHeldCount(f.field) && f.soleId && !f.retypesTail) return 'skipped';
+  const held = heldText(f.field.value, f.field.placeholder);
+  return held === '' || isMaskedValue(held) ? 'count' : 'none';
+}
+
+/**
+ * What the masked rule counts from (Expectation.held), of the post-focus read and what the field held by then
+ * (`shown`, fill-facts.ts#heldText: after the read, else before the tap): `'unread'` when the read was skipped; else
+ * the bullets it held — and only bullets. A masked field's content reads as bullets on both platforms (2026-09-17), so
+ * a plain reading before typing was not its content: an Android password EditText that dumps its hint as `text` while
+ * empty (the API 33 rule measured 2026-10-09 on plain EditTexts; on a password field it is inferred, not yet seen on a
+ * device). Counted as held, that hint made `typed 6 but the field shows 6 (masked field — compared by length; it held
+ * 8 after focus)` of a fill that landed. The cost: a field showing its password in plain text before typing (a "show
+ * password" toggle) and masked after is checked against the typed length alone. Not fixed by this: a hinted password
+ * field that the source names no placeholder for reads non-empty before the tap, so the read is `none` and an autofill
+ * on focus goes unseen (no masked-append warning).
+ *
+ * `maskedAppend`: bullets SEEN after focus (`count`) — the length rule cannot see content, so a password typed onto an
+ * autofilled one reads as a perfect append (finportal 2026-09-17: backend `invalid_grant`); fill.ts says so where the
+ * trace is read (FillResult.maskedAppend). (A28: until then fill.ts derived both; A2 had left them there.) Pure.
+ */
+export function heldCountOf(read: PostFocusRead, shown: string): { held: number | 'unread'; maskedAppend?: { held: number } } {
+  if (read === 'skipped') return { held: 'unread' };
+  const held = isMaskedValue(shown) ? shown.length : 0;
+  return read === 'count' && held > 0 ? { held, maskedAppend: { held } } : { held };
+}

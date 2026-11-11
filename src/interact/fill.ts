@@ -8,7 +8,6 @@ import {
   type Rect,
   type UiNode,
 } from '../adapters/types.js';
-import { isMaskedValue } from '../ui-tree/masked-value.js';
 import { readTreeOrMiss, readTreeOrThrow, sameScreen, screenIdentity, type ScreenIdentity } from '../ui-tree/read-tree.js';
 import { soleIdOf } from '../ui-tree/selectors.js';
 import { errorMessage } from '../util/error-message.js';
@@ -19,7 +18,7 @@ import { assertTypeable } from './type-text.js';
 import { fillFailureText, focusTapNote } from './fill-text.js';
 import { heldText, type FillFailure, type FillResult, type LostWhy, type NearbyInput, type ReadBack } from './fill-facts.js';
 import { clearStep, startClear, type ClearFacts } from './fill-clear.js';
-import { needsHeldCount } from './fill-landing.js';
+import { heldCountOf, postFocusReadOf } from './fill-landing.js';
 import { retypesTail, typeAndConfirm } from './fill-type.js';
 
 /** Measured 2026-08-05: the keyboard needs about this long to come up after the focus tap. */
@@ -192,7 +191,8 @@ export async function fillField(
   // answer, which carries the why with the missing field.
   let lostOnLastRead: LostWhy | undefined;
   const isInput = node.role === INPUT_ROLE;
-  // The post-focus re-read (below, after the focus tap) is SKIPPED where nothing it feeds can change the verdict
+  // The one read after the focus tap, and what it is for, is fill-landing.ts#postFocusReadOf's table. It is SKIPPED
+  // where nothing it feeds can change the verdict
   // (docs/adr/0028-a-fill-re-reads-after-focus-only-where-focus-can-change-the-count.md): a value typed without
   // `clear` into a field whose held count the masked rule does not need (fill-landing.ts#needsHeldCount), named by a
   // sole `id` selector, on an adapter that never types a dropped tail again (fill-type.ts#retypesTail). What the
@@ -214,13 +214,10 @@ export async function fillField(
   //   text holds the value (`421` typed), and otherwise is worded as a length mismatch (or same-length), not as "did not
   //   change". The pass says so where the reading is not exactly the value (`focusUnread`: fill-landing.ts#Landing, from
   //   the `'unread'` below; ADR 0028's D64b-3 amendment and residual 3).
-  // undefined: the re-read is made. Else `from`, the screen the field was resolved on — the wording of a `lost`
-  // alone (refetch).
   const delivery = adapter.typingDelivery ?? 'may-arrive-late';
-  const skipped: { from: ScreenIdentity } | undefined =
-    value !== '' && !clear && !needsHeldCount(node) && soleIdOf(target) !== undefined && !retypesTail(delivery)
-      ? { from: screenIdentity(resolvedIn) }
-      : undefined;
+  const focusRead = postFocusReadOf({ value, clear: clear === true, field: node, soleId: soleIdOf(target) !== undefined, retypesTail: retypesTail(delivery) });
+  // Skipped: the screen the field was resolved on — the wording of a `lost` alone (refetch).
+  const skipped: { from: ScreenIdentity } | undefined = focusRead === 'skipped' ? { from: screenIdentity(resolvedIn) } : undefined;
   const refetch = async (): Promise<{ node: UiNode; lost?: undefined } | { node?: undefined; lost: LostWhy }> => {
     // Only the READ is wrapped: a refusal from resolveNow (a second match
     // appearing mid-fill — a suggestion row, a duplicated field) is a
@@ -262,45 +259,16 @@ export async function fillField(
   // same field.
   const placeholder = node.placeholder;
 
+  // The read after focus (fill-landing.ts#postFocusReadOf): `count` — the pre-tap read is stale for exactly the fields
+  // the length rule cares about (Android autofill POPULATES a password field on focus, and a re-entry screen CLEARS
+  // one: review 2026-09-18 measured both as false failures against a pre-tap count); `clear` — a clear ALONE has no
+  // read-back behind it, so what its loop counts must be what the field holds after focus (2026-10-07). A field lost
+  // on that read keeps its pre-tap node.
   let current: UiNode | undefined = node;
-  let preText = heldText(node.value, placeholder); // what the field holds when typing starts (the masked rule's count: fill-landing.ts#landingOf)
-  let maskedAppend: FillResult['maskedAppend'];
-  if (value !== '' && !clear && (preText === '' || isMaskedValue(preText)) && skipped === undefined) {
-    // The pre-tap read is stale for exactly the fields the length rule cares
-    // about: Android autofill POPULATES a password field on focus, and a
-    // re-entry screen CLEARS one on focus (review 2026-09-18 measured both as
-    // false failures against a pre-tap `preLen`). Re-read after focus. Plain
-    // fields with content skip this — `includes` never uses preLen. So does
-    // an empty value (2026-10-07): it is a focus without typing, which has no
-    // read-back to feed and nothing that could append, so the masked-append
-    // finding below would name a typing that never happened.
-    const focused = await refetchNode();
-    if (focused !== undefined) {
-      current = focused;
-      preText = heldText(focused.value, placeholder);
-    }
-    if (isMaskedValue(preText)) {
-      // The length rule cannot see content: a password typed onto an
-      // autofilled one reads as a perfect append (finportal 2026-09-17:
-      // backend `invalid_grant`). Say so where the trace is read.
-      maskedAppend = { held: preText.length };
-    }
-  }
-  // What a MASKED read-back must add the typed length to (fill-landing.ts#landingOf): the
-  // bullets the field held before typing — and only bullets. A masked
-  // field's content reads as bullets on both platforms (2026-09-17), so a
-  // plain reading before typing was not its content: an Android password
-  // EditText that dumps its hint as `text` while empty (the API 33 rule
-  // measured 2026-10-09 on plain EditTexts; on a password field it is
-  // inferred, not yet seen on a device). Counted as held, that hint made
-  // `typed 6 but the field shows 6 (masked field — compared by length; it
-  // held 8 after focus)` of a fill that landed. The cost: a field showing
-  // its password in plain text before typing (a "show password" toggle)
-  // and masked after is checked against the typed length alone. Not fixed
-  // by this: a hinted password field that the source names no placeholder
-  // for reads non-empty before the tap, so the post-focus re-read above is
-  // skipped and an autofill on focus goes unseen (no masked-append warning).
-  const maskedHeld = isMaskedValue(preText) ? preText.length : 0;
+  if (focusRead === 'count' || focusRead === 'clear') current = (await refetchNode()) ?? node;
+  // What the masked read-back adds the typed length to, and the masked-append warning (fill-landing.ts#heldCountOf):
+  // what the field HOLDS, not what it SHOWS (fill-facts.ts#heldText: a reading equal to the named placeholder is empty).
+  const { held, maskedAppend } = heldCountOf(focusRead, heldText(current.value, placeholder));
   let cleared: FillResult['cleared'];
   let clearUnchanged: FillResult['clearUnchanged'];
   // How the clear ended (fill-clear.ts#ClearFacts) — undefined without one.
@@ -314,18 +282,6 @@ export async function fillField(
     // sees its value move, and the mismatch retry below wipes and retypes.
     cleared = 'unmeasured';
   } else if (clear) {
-    if (value === '') {
-      // A clear ALONE has no read-back behind it, so what the loop counts
-      // must be what the field holds AFTER focus, not before the tap: a
-      // field that autofills on focus (Android, measured 2026-09-18) would
-      // otherwise read as empty from the pre-tap tree, be skipped, and keep
-      // the autofilled text — the one fill shape whose whole point is an
-      // empty field. A clear WITH a value needs no such read: its read-back
-      // compares the field to the value and wipes a mismatch before the
-      // retry. Same re-read as the `!clear` branch above (2026-10-07).
-      const focused = await refetchNode();
-      if (focused !== undefined) current = focused;
-    }
     // Every rule of the clear is fill-clear.ts's (clearStep): this loop only
     // performs the step it is given — the deletes, or the poll cadence's
     // wait — and hands back what the next read saw, in that order.
@@ -399,7 +355,7 @@ export async function fillField(
         resolvedValue: node.value,
         before: shownBeforeTyping,
         placeholder,
-        held: skipped === undefined ? maskedHeld : 'unread',
+        held,
         pollMs,
         field: current ?? node,
         delivery,
