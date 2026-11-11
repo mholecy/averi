@@ -183,6 +183,8 @@ function fakeDeps(o: { spawned?: Partial<Record<string, Partial<Spawned>>>; repo
       return Promise.resolve({ status: 0, signal: null, timedOut: false, interrupted: false, ...o.spawned?.[group] });
     },
     readReport: (path) => {
+      // No incremental file left from an earlier run (A37's own tests below have one).
+      if (path.includes('stryker-incremental')) return undefined;
       events.push(`read ${path}`);
       const group = /mutation-(\w+)\.json$/.exec(path)?.[1] ?? '';
       if (o.reports !== undefined && group in o.reports) return o.reports[group];
@@ -198,21 +200,25 @@ function fakeDeps(o: { spawned?: Partial<Record<string, Partial<Spawned>>>; repo
 }
 
 describe('main — the groups one after the other, the run failing if any fails (T2b-2)', () => {
-  it('no --group: core, android, scene then lab, each its report removed first, its own env and 600 s bound; all pass: 0', async () => {
+  it('no --group: core, android, scene then lab, each its report (and, --force, its incremental file) removed first, its own env and 600 s bound; all pass: 0', async () => {
     const { deps, events, out } = fakeDeps();
     expect(GROUP_BOUND_MS).toBe(600_000);
     expect(await main(['--force'], deps)).toBe(0);
     expect(events).toEqual([
       'remove reports/mutation/mutation-core.json',
+      'remove reports/mutation/stryker-incremental-core.json',
       'spawn core run --force 600000',
       'read reports/mutation/mutation-core.json',
       'remove reports/mutation/mutation-android.json',
+      'remove reports/mutation/stryker-incremental-android.json',
       'spawn android run --force 600000',
       'read reports/mutation/mutation-android.json',
       'remove reports/mutation/mutation-scene.json',
+      'remove reports/mutation/stryker-incremental-scene.json',
       'spawn scene run --force 600000',
       'read reports/mutation/mutation-scene.json',
       'remove reports/mutation/mutation-lab.json',
+      'remove reports/mutation/stryker-incremental-lab.json',
       'spawn lab run --force 600000',
       'read reports/mutation/mutation-lab.json',
     ]);
@@ -301,6 +307,83 @@ describe('main — the groups one after the other, the run failing if any fails 
     expect(await main([], bad.deps)).toBe(2);
     expect(bad.events).toEqual([]);
     expect(bad.out).toEqual(['E npm run mutate: src/b.ts: group "x" in scripts/mutation/scope.json is not core, android, scene or lab']);
+  });
+});
+
+// A37: a cold run is cold. Stryker (its IncrementalDiffer) keeps every mutant of its incremental file that this run
+// did not produce, --force or not: a module the file names but the group no longer mutates comes back in the report.
+
+/**
+ * Reports on disk, and a Stryker that writes the group's report as Stryker does: the group's own modules, plus every
+ * module its incremental file still names; then the incremental file is that report.
+ */
+function diskDeps(disk: Map<string, MutationReport>) {
+  const out: string[] = [];
+  const own: MutationReport = { files: { 'src/a.ts': { mutants: mutants({ Killed: 9, Survived: 1 }) } } };
+  const deps: MutateDeps = {
+    readScope: () => groups,
+    spawn: (_args, env) => {
+      const group = env[GROUP_ENV] ?? '';
+      const left = disk.get(`reports/mutation/stryker-incremental-${group}.json`);
+      const report = { files: { ...left?.files, ...own.files } };
+      disk.set(`reports/mutation/mutation-${group}.json`, report);
+      disk.set(`reports/mutation/stryker-incremental-${group}.json`, report);
+      return Promise.resolve({ status: 0, signal: null, timedOut: false, interrupted: false });
+    },
+    readReport: (path) => disk.get(path),
+    removeReport: (path) => disk.delete(path),
+    now: () => 0,
+    log: (line) => out.push(line),
+    error: (line) => out.push(`E ${line}`),
+  };
+  return { deps, out };
+}
+
+describe('main — a leftover incremental file cannot fail a run (A37)', () => {
+  const moved = 'src/adapters/android-chooser.ts';
+  // An incremental file from before the module moved to android (A27): it names a module core no longer has.
+  const stale = (): MutationReport => ({ files: { 'src/a.ts': { mutants: mutants({ Killed: 10 }) }, [moved]: { mutants: mutants({ Killed: 3 }) } } });
+
+  it('--force: the group\'s incremental file is removed before Stryker starts, so the run is cold', async () => {
+    const disk = new Map([['reports/mutation/stryker-incremental-core.json', stale()]]);
+    const { deps, out } = diskDeps(disk);
+    expect(await main(['--group', 'core', '--force'], deps)).toBe(0);
+    expect(out).not.toContain(`E \nnpm run mutate (core) failed:\n  ${moved}: mutated, but has no floor in scripts/mutation/scope.json`);
+    expect(Object.keys(disk.get('reports/mutation/mutation-core.json')?.files ?? {})).toEqual(['src/a.ts']);
+  });
+
+  it('--force: even an incremental file of the group\'s own modules goes (nothing of it is carried)', async () => {
+    const { deps, events } = fakeDeps();
+    expect(await main(['--group', 'lab', '--force'], deps)).toBe(0);
+    expect(events.slice(0, 3)).toEqual([
+      'remove reports/mutation/mutation-lab.json',
+      'remove reports/mutation/stryker-incremental-lab.json',
+      'spawn lab run --force 600000',
+    ]);
+  });
+
+  it('no --force: an incremental file naming a module outside the group is removed, saying so', async () => {
+    const disk = new Map([['reports/mutation/stryker-incremental-core.json', stale()]]);
+    const { deps, out } = diskDeps(disk);
+    expect(await main(['--group', 'core'], deps)).toBe(0);
+    expect(out).toContain(
+      `npm run mutate: core: reports/mutation/stryker-incremental-core.json names ${moved}, not in the group: removed, the run is cold`,
+    );
+  });
+
+  it('no --force: an incremental file of the group\'s own modules is kept (a plain run stays incremental)', async () => {
+    const own: MutationReport = { files: { 'src/a.ts': { mutants: mutants({ Killed: 10 }) } } };
+    const disk = new Map([['reports/mutation/stryker-incremental-core.json', own]]);
+    const removed: string[] = [];
+    const { deps, out } = diskDeps(disk);
+    const remove = deps.removeReport;
+    deps.removeReport = (path) => {
+      removed.push(path);
+      remove(path);
+    };
+    expect(await main(['--group', 'core'], deps)).toBe(0);
+    expect(removed).toEqual(['reports/mutation/mutation-core.json']);
+    expect(out.filter((l) => l.includes('incremental'))).toEqual([]);
   });
 });
 

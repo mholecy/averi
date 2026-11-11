@@ -15,6 +15,9 @@ import {
  *
  *   node --import tsx scripts/mutation/mutate.ts [--group core|android|scene|lab] [<stryker run argument> …]
  *   (npm run mutate -- --force: every group, cold; npm run mutate -- --group lab --force: lab alone, cold)
+ *
+ * Cold means cold: under --force each group's incremental file is removed before its Stryker starts (A37). Each group's
+ * temp dir is this checkout's reports/mutation/stryker-tmp-<group> (group.mjs#filesOf); no --tempDirName needed.
  */
 
 export type { Scope };
@@ -242,9 +245,20 @@ async function runGroup(run: GroupRun, scope: Scope, deps: MutateDeps): Promise<
     deps.error(`npm run mutate: ${group}: ${why}`);
     return code;
   };
-  const report = filesOf(group).json;
+  const { json: report, incremental } = filesOf(group);
+  const own = groupScope(scope, group);
   // A report left by an earlier run must not be read as this one's.
   deps.removeReport(report);
+  // Stryker keeps every mutant of its incremental file that this run did not produce, --force or not (A37). So a cold
+  // run starts without the file, and a plain one drops a file naming a module outside the group (a module moved since).
+  if (run.args.includes('--force')) deps.removeReport(incremental);
+  else {
+    const outside = Object.keys(deps.readReport(incremental)?.files ?? {}).filter((file) => !(file in own));
+    if (outside.length > 0) {
+      deps.removeReport(incremental);
+      deps.log(`npm run mutate: ${group}: ${incremental} names ${outside.join(', ')}, not in the group: removed, the run is cold`);
+    }
+  }
   const stryker = await deps.spawn(['run', ...run.args], { [GROUP_ENV]: group }, GROUP_BOUND_MS);
   const { interrupted } = stryker;
   if (stryker.timedOut) return { code: fail(`Stryker passed its ${GROUP_BOUND_MS / 1000} s bound and was stopped`), interrupted };
@@ -255,7 +269,6 @@ async function runGroup(run: GroupRun, scope: Scope, deps: MutateDeps): Promise<
   if (stryker.status !== 0) return { code: stryker.status, interrupted };
   const read = deps.readReport(report);
   if (read === undefined) return { code: fail(`Stryker wrote no report at ${report}: did it crash?`), interrupted };
-  const own = groupScope(scope, group);
   for (const file of Object.keys(read.files).sort()) deps.log(scoreLine(file, read, own));
   const failures = checkFloors(read, own);
   if (failures.length === 0) return { code: 0, interrupted };

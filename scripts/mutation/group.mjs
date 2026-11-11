@@ -87,6 +87,6 @@ export function filesOf(group) {
     incremental: `reports/mutation/stryker-incremental${suffix}.json`,
     json: `reports/mutation/mutation${suffix}.json`,
     html: `reports/mutation/mutation${suffix}.html`,
-    tempDir: `node_modules/.stryker-tmp${suffix}`,
+    tempDir: `reports/mutation/stryker-tmp${suffix}`,
   };
 }
