@@ -1,0 +1,6 @@
+text=-h exit=0 (want 0) stdout='' (want '') stderr='' value="-h" (want \"-h\")
+text=-abc exit=0 (want 0) stdout='' (want '') stderr='' value="-abc" (want \"-abc\")
+text=-hunter2 exit=0 (want 0) stdout='' (want '') stderr='' value="-hunter2" (want \"-hunter2\")
+text=--log=s3cret exit=0 (want 0) stdout='' (want '') stderr='' value="—log=s3cret" (want \"--log=s3cret\")
+text=-- exit=0 (want 0) stdout='' (want '') stderr='' value="—" (want \"--\")
+text=a-b exit=0 (want 0) stdout='' (want '') stderr='' value="a-b" (want \"a-b\")

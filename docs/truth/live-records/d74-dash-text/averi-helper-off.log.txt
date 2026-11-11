@@ -1,0 +1,6 @@
+text=-h exit=0 said=typed\ ok\ via\ cli value="-h" (want \"-h\"; said wants 'typed ok via cli')
+text=-abc exit=0 said=typed\ ok\ via\ cli value="-abc" (want \"-abc\"; said wants 'typed ok via cli')
+text=-hunter2 exit=0 said=typed\ ok\ via\ cli value="-hunter2" (want \"-hunter2\"; said wants 'typed ok via cli')
+text=--log=s3cret exit=0 said=typed\ ok\ via\ cli value="—log=s3cret" (want \"--log=s3cret\"; said wants 'typed ok via cli')
+text=-- exit=0 said=typed\ ok\ via\ cli value="—" (want \"--\"; said wants 'typed ok via cli')
+text=a-b exit=0 said=typed\ ok\ via\ cli value="a-b" (want \"a-b\"; said wants 'typed ok via cli')

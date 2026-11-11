@@ -1,0 +1,1 @@
+text=-h (old argv) exit=0 (want 0) stdout-first-line=usage:\ idb\ ui\ text\ \[-h\]\ \[--udid\ UDID\] (want usage: idb ui text …) value="e.g. Jan Šťastný" (want "" or null)

@@ -1,0 +1,6 @@
+text=-h exit=0 said=typed\ ok\ via\ helper\ \(ui\ text\ --udid\ D8DACDE6-6352-437C-AA22-86FB06275C3F\ --\ \<typed\ text\>\) value="-h" (want \"-h\"; said wants 'typed ok via helper')
+text=-abc exit=0 said=typed\ ok\ via\ helper\ \(ui\ text\ --udid\ D8DACDE6-6352-437C-AA22-86FB06275C3F\ --\ \<typed\ text\>\) value="-abc" (want \"-abc\"; said wants 'typed ok via helper')
+text=-hunter2 exit=0 said=typed\ ok\ via\ helper\ \(ui\ text\ --udid\ D8DACDE6-6352-437C-AA22-86FB06275C3F\ --\ \<typed\ text\>\) value="-hunter2" (want \"-hunter2\"; said wants 'typed ok via helper')
+text=--log=s3cret exit=0 said=typed\ ok\ via\ helper\ \(ui\ text\ --udid\ D8DACDE6-6352-437C-AA22-86FB06275C3F\ --\ \<typed\ text\>\) value="—log=s3cret" (want \"--log=s3cret\"; said wants 'typed ok via helper')
+text=-- exit=0 said=typed\ ok\ via\ helper\ \(ui\ text\ --udid\ D8DACDE6-6352-437C-AA22-86FB06275C3F\ --\ \<typed\ text\>\) value="—" (want \"--\"; said wants 'typed ok via helper')
+text=a-b exit=0 said=typed\ ok\ via\ helper\ \(ui\ text\ --udid\ D8DACDE6-6352-437C-AA22-86FB06275C3F\ --\ \<typed\ text\>\) value="a-b" (want \"a-b\"; said wants 'typed ok via helper')
