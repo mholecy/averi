@@ -147,8 +147,8 @@ function headingsOver(order: readonly Placed[], target: Placed): Placed[] {
  * The siblings whose ORDER against a target a listing given in reading order does not tell — two controls, as below;
  * and, in a nested run (`listsNestedReadingOrder`), any sibling listed before OR AFTER a target of any kind that draws
  * there (`ReadingOrderAbout.drawn`: the draw order's rows but its own-content one, a field's own floating label
- * excused), which then follows the same `before` / `unordered` / `seenOver` / `listedBefore` rules (lab note LR3; listed
- * after, backlog D84: the lab's views-drawn-over, ADR 0015's D84 amendment). The rest of this doc is the
+ * excused), which then follows the same `before` / `unordered` / `seenOver` / `listedBefore` rules (lab note LR3;
+ * listed after, backlog D84: the lab's views-drawn-over, ADR 0015's D84 amendment). The rest of this doc is the
  * controls'. The controls whose ORDER against a control target a listing given in reading order does not tell
  * (`listsInReadingOrder` of the target's parent, `about.target`): its siblings that are interactive and overlap it past
  * geometry.ts#PIXEL_OVERLAP_SLACK, neither holding the other whole nor of its frame (a control's own wrapper, its own
@@ -206,14 +206,14 @@ function peersOf(
   // own-content row, a field's own floating label excused) is a peer too, control or not, of any target, and LISTED
   // EITHER SIDE of it: such a run lists by place, not by drawing, so neither side tells which is on top. Listed BEFORE:
   // React Native's covers (lab note LR3) — WDA lists RN's views by their tops, so a later sibling drawn over the target
-  // (a toast, a banner) whose top lies above the target's is listed before it (the lab's rn-banner). Listed AFTER (D84):
-  // a sibling the run lists later may lie UNDER the target — the lab's views-drawn-over, A `127,303 825x176` drawn over
-  // the later-listed B `182,331 825x121` (child order; A2 over B2 by translationZ), the frame A's own #1E88E5 over the
-  // whole overlap: read as the draw order's `drawn` cover, which the eyes are never asked about, A was refused while
-  // from B's side A was the untold peer the eyes saw on top — each the other's cover. Untold, it is held to `after`'s
-  // gate below (it holds the target's centre), refused with no screenshot, and lifted only where the eyes see the target
-  // on top (`seen`, verify/eyes.ts#judgeOrder's guards: a translucent or drawing-nothing sibling, one of the target's
-  // colour, a blended overlap stay untold). Its own-content excuse still holds in the draw order's covers
+  // (a toast, a banner) whose top lies above the target's is listed before it (the lab's rn-banner). Listed AFTER
+  // (D84): a sibling the run lists later may lie UNDER the target — the lab's views-drawn-over, A `127,303 825x176`
+  // drawn over the later-listed B `182,331 825x121` (child order; A2 over B2 by translationZ), the frame A's own
+  // #1E88E5 over the whole overlap: read as the draw order's `drawn` cover, which the eyes are never asked about, A was
+  // refused while from B's side A was the untold peer the eyes saw on top — each the other's cover. Untold, it is held
+  // to `after`'s gate below (it holds the target's centre), refused with no screenshot, and lifted only where the eyes
+  // see the target on top (`seen`, verify/eyes.ts#judgeOrder's guards: a translucent or drawing-nothing sibling, one of
+  // the target's colour, a blended overlap stay untold). Its own-content excuse still holds in the draw order's covers
   // (draw-order.ts#NOT_DRAWN's `onTarget`, judged there of whatever is listed after). Residual (ADR 0015's D84
   // amendment): a later-listed sibling that draws nothing but takes touches, lifted where the opacity guard cannot see
   // past its edges — a false `Tapped`, ADR 0024's residual 2 widened to non-controls.

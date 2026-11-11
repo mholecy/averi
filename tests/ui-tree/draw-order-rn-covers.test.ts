@@ -36,9 +36,9 @@ describe('rn-banner under WDA: a later sibling drawn over the target is its cove
   });
 
   // Before D84 `drawn` (the draw order's own cover): a run listed by tops cannot tell a sibling listed after the target
-  // from one drawn under it (views-drawn-over's A over the later-listed B), so it is an untold peer as T's and U's are —
-  // still refused unseen, and the eyes see it over C (the golden's C: "drawn over it as a screenshot shows"). ADR 0015's
-  // D84 amendment.
+  // from one drawn under it (views-drawn-over's A over the later-listed B), so it is an untold peer as T's and U's
+  // are — still refused unseen, and the eyes see it over C (the golden's C: "drawn over it as a screenshot shows").
+  // ADR 0015's D84 amendment.
   it('C, the same bare View listed AFTER it (its top below C\'s): a cover whose order is not told, over its centre', async () => {
     const t = parseWdaSource(await capture('rn-banner.wda.json'));
     const [target, cover] = at(t, 'C');

@@ -234,3 +234,5 @@ Android (a cover listed before its target, a later JSX sibling) is refused "draw
 screenshot per tap, live and in golden. Nothing in ui-tree or verify knows Android; the frame is the device's
 screencap. One direction is unmeasured live (ADR 0015's D75 residual): a control listed AFTER the target over its
 centre, a `drawn` cover before the mark, is now an untold peer that a screenshot seeing the target on top lifts.
+Measured since (2026-11-11, D84 — ADR 0015's amendment "a sibling listed after the target, of any kind"): the
+lab's views-drawn-over, and a later-listed sibling of any kind is now such a peer; residual 2 widened to non-controls.

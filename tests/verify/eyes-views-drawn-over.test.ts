@@ -13,12 +13,12 @@ import { parseDump } from '../helpers/android-dumps.js';
 /**
  * D84 — views-drawn-over FROM A's SIDE (backlog D77's cell, captured 2026-11-11 on averi_lab, API 33): A
  * `127,303 825x176` and A2 are drawn OVER the later-listed B `182,331 825x121` and B2 (child order; translationZ 8 dp),
- * the frame showing A's own #1E88E5 (A2's #00897B) over the whole overlap. B, a clickable FrameLayout with no text, is no
- * control (role `other`), so before D84 it was a peer of A only when listed BEFORE it: listed after, the draw order made
- * it a cover `drawn` over A, which the eyes are never asked about — A refused as under B, while from B's side A was the
- * untold peer the eyes saw on top: each the other's cover. Now a nested run's later-listed sibling that draws over the
- * target is an untold peer too, of any kind (ui-tree/reading-order.ts#peersOf), and the eyes decide with every guard
- * they had (verify/eyes.ts#judgeOrder) — no screenshot, still refused. ADR 0015's D84 amendment.
+ * the frame showing A's own #1E88E5 (A2's #00897B) over the whole overlap. B, a clickable FrameLayout with no text, is
+ * no control (role `other`), so before D84 it was a peer of A only when listed BEFORE it: listed after, the draw order
+ * made it a cover `drawn` over A, which the eyes are never asked about — A refused as under B, while from B's side A
+ * was the untold peer the eyes saw on top: each the other's cover. Now a nested run's later-listed sibling that draws
+ * over the target is an untold peer too, of any kind (ui-tree/reading-order.ts#peersOf), and the eyes decide with every
+ * guard they had (verify/eyes.ts#judgeOrder) — no screenshot, still refused. ADR 0015's D84 amendment.
  */
 
 const ANDROID = '../fixtures/truth/android-averi_lab-api33';
