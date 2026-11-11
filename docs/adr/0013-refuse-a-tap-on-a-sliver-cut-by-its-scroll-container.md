@@ -61,7 +61,9 @@ refuse wrappers and containers that are no target.
 A bar riding on the keyboard whose cutting node (`interact/target-text.ts#ridingKeyboard`) ends more than the tap
 minimum above the keyboard's line (buttons stacked in it, the cut one on top) is not read as riding: its remedy is the
 scroll alone, without "dismiss the keyboard first" — the safe direction, a remedy that may not suffice rather than one
-that misleads.
+that misleads. Since D88 (ADR 0015's D88 amendment), where neither the field nor that node lies in a scroll view there is
+no scroll to name: with the keyboard up, the remedy says hiding it may move that node, then that no scroll moves it out
+(`interact/target-text.ts#cutByPinnedRemedy`) — the same safe direction.
 
 Bug note: docs/bugs/2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md
 

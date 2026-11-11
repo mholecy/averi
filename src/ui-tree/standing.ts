@@ -671,8 +671,9 @@ export const noScrollRemedyText = (remedy: NoScrollRemedy, purpose: 'touch' | 'p
  *    `inScroller` undefined), or — the pixel assert — it is laid from the screen's top edge under the status bar, or
  *    the cover's reach holds it whole.
  * 8. `scroll` — a scroll moves it into reach: off the screen, clipped (a `fully` stop), cut to a sliver (toward the
- *    standing's `cut.edge`; 5. took a cut by a node drawn after it where neither lies in a scroll view), under a cover a scroll may separate from it over its centre (the touch purposes: the tap
- *    may refine it, its positioner hint, interact/tap-judgement.ts#positionerRemedy), or in a scroll view under a bar.
+ *    standing's `cut.edge`; 5. took a cut by a node drawn after it where neither lies in a scroll view), under a cover
+ *    a scroll may separate from it over its centre (the touch purposes: the tap may refine it, its positioner hint,
+ *    interact/tap-judgement.ts#positionerRemedy), or in a scroll view under a bar.
  *
  * One precedence for every verb: the same target is told the same remedy by the tap, the pixel assert and
  * `scroll_until`'s stop.
@@ -1305,7 +1306,9 @@ const aboveLine = (box: Rect, line: KeyboardLine | undefined): Rect =>
  * A bar riding on the keyboard whose cutting node (interact/target-text.ts#ridingKeyboard) ends more than the tap
  * minimum above the keyboard's line (buttons stacked in it, the cut one on top) is not read as riding: its remedy is
  * the scroll alone, without "dismiss the keyboard first" — the safe direction, a remedy that may not suffice rather
- * than one that misleads.
+ * than one that misleads. Where neither lies in a scroll view (`Remedy`'s `bothPinned`, D88) there is no scroll to fall
+ * back on: with the keyboard up, hiding it is named as a way that MAY move that node, before the no-scroll clause
+ * (interact/target-text.ts#cutByPinnedRemedy) — the same safe direction.
  * docs/bugs/2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md
  */
 function cutByLater({ node, later }: Judged, minPiece: number): Cut | undefined {

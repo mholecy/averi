@@ -945,7 +945,7 @@ describe('one remedy for a target under a drawn cover where neither lies in a sc
 // instead of stroking until exhausted. The cut stays ambiguous — the dump cannot tell it from a control only that thin
 // laid flush against that node — and the words keep that way past; neither case is one a scroll changes. A cut by its
 // clipping container, or the same pair inside a scroll view, keeps the scroll. (idb's flat list, whose ancestry is untold,
-// never reads a cut by a later node: that evidence is Compose's, later-edges.ts#cutsAtLater.)
+// never reads a cut by a later node: that evidence is Compose's, later-edges.ts#laterEdgesIn's `cutsAtLater`.)
 describe('one remedy for a target cut by a later node where neither lies in a scroll view (D88) — the tap, the stops and the pixel assert agree', () => {
   const view = (id: string, bounds: string, kids = '', scrollable = false, cls = 'android.view.View') =>
     `<node index="0" text="" resource-id="${id}" class="${cls}" package="dev.averi.lab" content-desc="" clickable="${id === '' ? 'false' : 'true'}" enabled="true" ${scrollable ? 'focusable="true" ' : ''}scrollable="${scrollable}" bounds="${bounds}">${kids}</node>`;
@@ -1010,14 +1010,57 @@ describe('one remedy for a target cut by a later node where neither lies in a sc
     }
   });
 
+  /** A field `55,y 970x42` cut at its top by a bar laid after it ending at `barBottom`, neither in a scroll view; scroll_until with the keyboard's line at 1398. */
+  const underBar = (barBottom: number) => {
+    const field = node({ role: 'textfield', identifier: 't', rect: { x: 55, y: barBottom, width: 970, height: 42 } });
+    const tree = node({ role: 'container', rect: { ...PIXEL_BOX }, children: [field, node({ role: 'button', identifier: 'bar', rect: { x: 0, y: barBottom - 132, width: 1080, height: 132 } })] });
+    return play(rules(ON_PIXEL), [{ tree, found: [field], screen: ON_PIXEL.usable, cover: coverOver({ x: 0, y: 1398, width: 1080, height: 822 }) }]);
+  };
+  const HIDE = '(press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow)';
+
   it('a bar riding on the soft keyboard: scroll_until stops before any swipe, the keyboard named first — it moves that bar, though no scroll does', () => {
-    const field = node({ role: 'textfield', identifier: 't', rect: { x: 55, y: 1370, width: 970, height: 42 } });
-    const tree = node({ role: 'container', rect: { ...PIXEL_BOX }, children: [field, node({ role: 'button', identifier: 'bar', rect: { x: 0, y: 1238, width: 1080, height: 132 } })] });
-    const played = play(rules(ON_PIXEL), [{ tree, found: [field], screen: ON_PIXEL.usable, cover: coverOver({ x: 0, y: 1398, width: 1080, height: 822 }) }]);
+    const played = underBar(1370);
     expect(played.steps.filter((s) => s.do === 'stroke')).toEqual([]);
     expect(failureOf(played, 'id:t').message).toContain(
-      '; no swipe was sent — the soft keyboard is up (its top edge at y 1398): dismiss it first (press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) — a bar riding on it goes down with it — else no scroll moves it out from under that: neither lies in a scroll view — ',
+      `; no swipe was sent — the soft keyboard is up (its top edge at y 1398): dismiss it first ${HIDE} — a bar riding on it goes down with it — else no scroll moves it out from under that: neither lies in a scroll view — `,
     );
+  });
+
+  it('a bar 66 px above the line, not read as riding (ADR 0013\'s stacked buttons): hiding the keyboard named as a way that may move it — else the one clause', () => {
+    const played = underBar(1332);
+    expect(played.steps.filter((s) => s.do === 'stroke')).toEqual([]);
+    expect(failureOf(played, 'id:t').message).toContain(
+      `; no swipe was sent — the soft keyboard is up (its top edge at y 1398): hiding it may move that button ${HIDE} — else no scroll moves it out from under that: neither lies in a scroll view — `,
+    );
+  });
+
+  // The `overlapped` stop after strokes (scroll-text.ts: "no further swipe"): a target the strokes brought up from below
+  // the fold, then read under a cover — or cut by a node — where neither lies in a scroll view. Each read is its own tree.
+  it('reached by a stroke, then found `bothPinned` — under a drawn cover, or cut by a later node: "no further swipe was sent"', () => {
+    // Below the fold in a scroll view, under the role and identifier the next read lists it by (else the screen reads changed).
+    const below = ({ role, identifier }: UiNode): { tree: UiNode; t: UiNode } => {
+      const t = node({ role, label: 'T', identifier, rect: { x: 0, y: 2400, width: 1080, height: 100 } });
+      const scroller = node({ role: 'scrollable', rect: { x: 0, y: 100, width: 1080, height: 2000 }, children: [node({ role: 'other', rect: { x: 0, y: 100, width: 1080, height: 3000 }, children: [t] })] });
+      return { tree: node({ role: 'other', rect: { ...PIXEL_BOX }, children: [scroller] }), t };
+    };
+    const covered = (): { tree: UiNode; t: UiNode } => {
+      const t = node({ role: 'button', label: 'T', identifier: 't', rect: { x: 0, y: 1000, width: 1080, height: 100 } });
+      const card = node({ role: 'image', label: 'Card', rect: { x: 0, y: 980, width: 1080, height: 140 } });
+      return { tree: node({ role: 'other', rect: { ...PIXEL_BOX }, children: [node({ role: 'other', rect: { x: 0, y: 900, width: 1080, height: 300 }, children: [t, card] })] }), t };
+    };
+    for (const [name, then] of [['covered', covered], ['cut', () => textUnderBar('none')]] as const) {
+      const next = then();
+      const first = below(next.t);
+      const played = play({ ...rules(ON_PIXEL), maxSwipes: 3 }, [
+        { tree: first.tree, found: [first.t], screen: ON_PIXEL.usable },
+        { tree: next.tree, found: [next.t], screen: ON_PIXEL.usable },
+      ]);
+      expect({ name, strokes: played.steps.filter((s) => s.do === 'stroke').length, stop: played.outcome?.kind }).toEqual({ name, strokes: 1, stop: 'overlapped' });
+      expect({ name, said: failureOf(played, 'id:t').message }).toEqual({
+        name,
+        said: expect.stringMatching(/; no further swipe was sent — no scroll moves it out from under that: neither lies in a scroll view — /),
+      });
+    }
   });
 
   // A container that clips scrolls (scroll-containers.ts#scrolls): a node it cuts lies in a scroll view, so the explicit

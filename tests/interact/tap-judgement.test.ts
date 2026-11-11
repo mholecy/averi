@@ -672,8 +672,18 @@ describe('judgeTap(…).aim() — a cut by a later node names the keyboard only 
     const riding = said((await judge(pinnedAt(1370), 'field', { first: PIXEL }, { kb: reading(1398) })).outcome);
     expect(riding).toContain(' — a bar riding on it goes down with it — else no scroll moves it out from under that: neither lies in a scroll view — ');
     expect(riding).not.toContain('scroll_until');
-    const top = said((await judge(pinnedAt(300), 'field', { first: PIXEL }, { kb: reading(1398) })).outcome);
+    const top = said((await judge(pinnedAt(300), 'field', { first: PIXEL })).outcome);
     expect(top).toContain('under the 65 a tap needs — no scroll moves it out from under that: neither lies in a scroll view — ');
     expect(top).not.toContain('soft keyboard');
+  });
+  // ADR 0013's stacked-button residual under D88: a bar 66 px above the line is not read as riding, and with no scroll
+  // to fall back on, hiding the keyboard is named as a way that MAY move it — not dismissed, not left out.
+  it('neither in a scroll view, the keyboard up, the bar not read as riding (D88): hiding it may move that bar — else the one clause', async () => {
+    for (const barBottom of [1332, 300]) {
+      const reply = said((await judge(pinnedAt(barBottom), 'field', { first: PIXEL }, { kb: reading(1398) })).outcome);
+      expect({ barBottom, may: reply.includes('the soft keyboard is up (its top edge at y 1398): hiding it may move that button (press_key back') }).toEqual({ barBottom, may: true });
+      expect(reply).toContain(') — else no scroll moves it out from under that: neither lies in a scroll view — ');
+      expect(reply).not.toContain('dismiss it first');
+    }
   });
 });

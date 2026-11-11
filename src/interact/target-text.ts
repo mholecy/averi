@@ -208,11 +208,20 @@ export function cutByRemedy(by: UiNode, up: KeyboardUp | undefined, minPiece: nu
  * `cutByRemedy`'s for a remedy `bothPinned` (D88: neither lies in a scroll view), as the tap's refusal and
  * `scroll_until`'s stop before any swipe say it: no scroll — THE clause every verb quotes for it
  * (ui-tree/standing.ts#noScrollRemedyText, with the cut's way past). With the soft keyboard up and that node riding on
- * it, dismiss it first all the same: a bar riding on it goes down with it, scroll view or none.
+ * it, dismiss it first all the same: a bar riding on it goes down with it, scroll view or none. With the keyboard up and
+ * that node NOT read as riding (`ridingKeyboard`: it ends more than the tap minimum above the line — buttons stacked
+ * in a riding bar, the cut one on top — or below it), hiding it is named as a way that MAY move that node
+ * (`keyboardMayMoveText`): with no scroll to fall back on, saying nothing of the keyboard would mislead where it does —
+ * the safe direction, as `cutByRemedy`'s scroll is there.
  */
 export function cutByPinnedRemedy(by: UiNode, up: KeyboardUp | undefined, minPiece: number): string {
-  return ridingFirst(by, up, minPiece, 'else', noScrollRemedyText({ of: 'bothPinned' }, 'touch', by));
+  const way = noScrollRemedyText({ of: 'bothPinned' }, 'touch', by);
+  if (up !== undefined && ridingKeyboard(by, up, minPiece) === undefined) return `${keyboardMayMoveText(up, by)} — else ${way}`;
+  return ridingFirst(by, up, minPiece, 'else', way);
 }
+
+/** `the soft keyboard is up (its top edge at y 1398): hiding it may move that button (press_key back …)` — `cutByPinnedRemedy`'s for a node not read as riding on it. */
+const keyboardMayMoveText = ({ lineY, remedy }: KeyboardUp, by: UiNode): string => `${keyboardUpText(lineY)}: hiding it may move that ${by.role} (${hideClause(remedy)})`;
 
 /** `way`, after "dismiss it first" (`dismissKeyboardFirstText`) and `join` when that node rides on the keyboard (`ridingKeyboard`). */
 function ridingFirst(by: UiNode, up: KeyboardUp | undefined, minPiece: number, join: 'or' | 'else', way: string): string {

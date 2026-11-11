@@ -640,7 +640,11 @@ refusal exists to prevent (ui-tree/standing.ts#bothPinnedRemedyText, `cutBy`). E
   and the same clause;
 - with the soft keyboard up and that node riding on it (interact/target-text.ts#ridingKeyboard), both name the keyboard
   first: "the soft keyboard is up (…): dismiss it first (…) — a bar riding on it goes down with it — else" and the clause.
-  Hiding the keyboard moves a riding bar even where no scroll does (interact/target-text.ts#cutByPinnedRemedy).
+  Hiding the keyboard moves a riding bar even where no scroll does (interact/target-text.ts#cutByPinnedRemedy);
+- with the keyboard up and that node not read as riding (ADR 0013's stacked buttons: it ends more than the tap minimum
+  above the line), both say "the soft keyboard is up (…): hiding it may move that <role> (…) — else" and the clause.
+  ADR 0013 kept the scroll alone there as the safe direction; with no scroll to fall back on, leaving the keyboard out
+  would mislead where hiding it does move that node.
 
 Golden moved 1 check, the same verdict: android text-under-bar P.id `scroll_until` now stops with 0 swipes instead of 2,
 and its words change as above. Truth puts P under pinned chrome (`under-chrome:pinned`). The tap and the text-selector
@@ -653,6 +657,11 @@ not cut (110 px tall), and its `fully` stop already said `bothPinned` as `covere
   flush later node is the first in draw order, the outermost. A synthetic dump with a scroll view listed after the
   target, its row flush with the target, read the scroll view's own node, which lies in none, so the case took
   `bothPinned`. That is right (scrolling moves the row, not the scroll view's frame over the target), but no tree reaches
-  the half where that node is itself scroll content. D87's CoordinatorLayout residual applies to it too.
-- A cut whose `by` rides on the soft keyboard in no scroll view stops before any swipe and names the keyboard first. No
-  measured cell has that shape: the lab's form-keyboard field lies in its form's scroll view and keeps the scroll.
+  the half where that node is itself scroll content. D87's first residual applies to it too: content a scroll moves
+  without an ancestor the tree marks as scrolling is read as still — a collapsing app bar a list's nested scroll folds,
+  any scroll view a source does not mark, and a later scroll container whose frame a CoordinatorLayout moves with the
+  scroll.
+- A cut whose `by` rides on the soft keyboard in no scroll view stops before any swipe and names the keyboard first; one
+  not read as riding names it as a way that may move that node. No measured cell has either shape: the lab's
+  form-keyboard field lies in its form's scroll view and keeps the scroll. The "may" is said of any such node with the
+  keyboard up, a top bar too, where hiding the keyboard moves nothing: a hedge that may not help, not a promise.
