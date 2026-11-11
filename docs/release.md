@@ -159,7 +159,9 @@ This is lab-run-ios.ts in scripts/truth/batch, lab-run's iOS counterpart through
 guards the simulator (device-check's and any simulator not named `averi-lab …` are refused before any call), resets
 it, builds the lab app from the checkout and installs it, and checks that the installed `cells.json` is the
 checkout's. Then it runs live.ts once per iOS group (forms, visibility, dismissal, ensure) under idb, each after a
-health check. Then it runs each group under WebDriverAgent, each inside its own D43 settings window: the simulator's
+health check. live.ts builds the iOS adapter as the server does, the idb helper included (ADR 0032, amendment A23),
+and says so on its log's `ios:` line.
+Then it runs each group under WebDriverAgent, each inside its own D43 settings window: the simulator's
 settings backed up, the run, WebDriverAgent ended, the settings put back key by key and compared. The finportal key is
 read at the start and at the end, and a change fails the run. A signal puts an open window back and exits 130. Each
 live run is bounded (`B_LIVE`, 1800 s by default).

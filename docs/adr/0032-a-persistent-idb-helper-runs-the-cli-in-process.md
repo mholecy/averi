@@ -796,3 +796,51 @@ verbs on real adapters, MCP and flow): identical.
 Changed 0 (it replays tree reads, no launch or link seam).
 
 Residual: the amended text above names `alertNote` and `alertText`, which no longer exist, as they were at their date.
+
+## Amendment: the live golden drives the helper too (2026-11-11, backlog A23)
+
+The architecture review of 2026-11-11 (card 5) found that the release gate never ran the helper. `scripts/truth/live.ts`
+built its iOS adapter by hand, `IosAdapter` over the side's `createIosTreeSource`, with no `IdbHelper`. Every idb case
+of the live golden and of Gate C (`truth:lab:ios`, which runs live.ts per group) therefore went through the CLI path,
+which the server takes only with `AVERI_IDB_HELPER=off`. `mcp/registry.ts#iosAdapterFor` (this ADR's Node side) and
+`scripts/perf/baseline.ts` already added the helper.
+
+Decision: live.ts takes its iOS adapter from the side's composition root. `loadSide` in `scripts/differential/side.ts`
+gives each side a `liveIos`: the side's own `registry.ts#iosAdapterFor`, handed the lab's WebDriverAgent port and
+derived data as `deps`, as perf/baseline.ts hands them. One wiring then serves the server, the perf baseline and the
+live golden, and Gate C runs the transport users get. A `--side` checkout older than D7a (no `iosAdapterFor`, before
+2026-10-31) keeps the construction live.ts had, `IosAdapter` over its `createIosTreeSource` with no helper. A side
+with neither gets no live iOS adapter, and live.ts refuses, naming both seams. live.ts's adapter factory is
+`scripts/truth/live-factory.ts`: Android through the side's `defaultFactory` and the carousel's swipe hook, iOS
+through `liveIos` alone.
+
+`liveIos` carries a tag, not words: `registry-helper-on`, `registry-helper-off` or `fallback`. For the registry
+wiring, the kill switch is read when the side is loaded, by the side's own `idbHelperDisabled` in
+`src/adapters/idb-helper.ts` when it exports one, else by the same check on `AVERI_IDB_HELPER` in side.ts, and
+`switchReadBy` says which (`side`, `inline`). side.ts imports nothing but types from this checkout's `src`: the
+switch that decides is the side's. The tag is worded once (`liveIosLine`) for live.ts's `ios:` line on stderr, the
+line after `averi:`. On this checkout it reads `ios: registry.ts#iosAdapterFor — the server's iOS wiring, its idb
+helper on (ADR 0032; the side's idb-helper.ts#idbHelperDisabled)`. With `AVERI_IDB_HELPER=off` it says the helper
+is off and every idb call goes to the CLI, as the server would then do. The fallback line says there is no
+`iosAdapterFor` and no idb helper. The replay (golden, differential) is untouched: its fake device still sets the
+switch, since it answers execFile only.
+
+Consequences:
+
+- iOS verdicts of the live golden may move, because the helper is a different transport: its timing, the D7b input
+  path, and screenshots through the helper (D26b). The first Gate C after A23 is the owner's check that they did not
+  move, or that a move is the helper's and a note explains it. No replayed check moves (golden Changed 0).
+- A live calibration (`calibration.json` `live`) whose before commit predates D7a runs that side on the CLI and the
+  after side on the helper. The `ios:` line in each run's log says so, and a difference between them may be the
+  transport's. For transport parity, run both sides with `AVERI_IDB_HELPER=off` in the environment: both are then on
+  the CLI, and the after side's `ios:` line says the helper is off.
+- Not done here (review card 5's second step, TL6): one in-process connection module for live.ts, differential.ts and
+  perf/baseline.ts. Each still builds registry, server and client and closes them in its own order (D82).
+
+Tests: `tests/truth/live-ios-wiring.test.ts`, through the side seam live.ts reads and live.ts's factory. A side with
+`iosAdapterFor` gets that function, with the udid, kind and deps passed through. The tag follows the side's own
+`idbHelperDisabled` over the environment, and the environment when the side has none. A side without
+`iosAdapterFor` gets its `IosAdapter` over its `createIosTreeSource`, tagged `fallback`. A side with neither gets
+none. One test pins the words of a line. This checkout's adapter is an `IosAdapter` that holds an `IdbHelper`. The
+factory hands iOS calls to `liveIos` with the call's kind (idb when none) and the WDA deps, hooks Android's strokes,
+and refuses a side with no live adapter.
