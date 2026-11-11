@@ -129,9 +129,10 @@ export const fullyHedged = (reply: string) => hedgedLead(reply) !== undefined;
 
 /**
  * The hedge covers a cut (`WHOLE`, alone or with `UNCOVERED`): what a flush edge no probe checked leaves unconfirmed.
- * A guard: true only of a lead (live-visibility.ts#judgeScroll reads it after).
+ * A guard, true only of a lead that hedges a cut — false of no lead and of an UNCOVERED one alike
+ * (live-visibility.ts#judgeScroll reads the lead after it).
  */
-export const hedgesCut = (lead: HedgedLead | undefined): lead is HedgedLead => lead !== undefined && lead.what !== 'UNCOVERED';
+export const hedgesCut = (lead: HedgedLead | undefined): lead is HedgedLead & { what: Exclude<HedgeWhat, 'UNCOVERED'> } => lead !== undefined && lead.what !== 'UNCOVERED';
 
 /** The reply claims scroll_until's stop on its target (VISIBLE_STOP), fully or not. */
 export const claimsVisible = (reply: string) => VISIBLE_STOP.test(reply);

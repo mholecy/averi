@@ -260,6 +260,13 @@ describe('judgeAndroidTurn at its edges', () => {
     expect(judgeScroll({ ...c, unlisted: true }, [failed(4, 2)], s, launched)).toMatchObject({ outcome: 'LOUD', cls: 'not-reached' });
     expect(judgeAndroidTurn({ ...c, unlisted: true }, [failed(4, 2)], s, launched, s)).toEqual({ outcome: 'ok', kind: 'not found', why: `no turn on uiautomator (ADR 0021): 4 swipes, the last 2 unmoved, failed naming direction: "up" — ${failed(4, 2)}`, app: appText(s, 'android', 'A', 'list', launched) });
   });
+  it('a stop never passes as the turn rule\'s honest failure, even one that names the way (src names one only in a failure)', () => {
+    // A synthetic stop: A whole where it stopped, its two strokes away never turned back — R-direction on a stop.
+    const s = android({ frames: { A: { x: 127, y: 500, width: 825, height: 176 } }, offsets: { list: 2488 }, strokes: away });
+    const stop = 'Element id:"lab.scroll-collapsing.A" visible after 4 swipes — scroll_until it with direction: "up"';
+    expect(judgeScroll(c, [stop], s, launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'R-direction', kind: 'visible' });
+    expect(judgeAndroidTurn(c, [stop], s, launched, s)).toMatchObject({ outcome: 'MISMATCH', cls: 'R-direction', kind: 'visible' });
+  });
   it('the unmoved swipes are the swipes less the strokes that moved the list more than the slack: a still stroke, one of the slack, another view\'s, all unmoved', () => {
     for (const extra of [stroke(2488, 2488, 'list'), stroke(2488, 2489, 'list'), stroke(0, 300, 'upper')]) {
       const s = after([...away, extra]);
@@ -297,6 +304,7 @@ describe('the presented layer\'s judges, whole', () => {
     const s = state({ events: [{ kind: 'dismissed', tag: 'sheet', at }] });
     expect(asked.judge(s, ['0/1 asserts FAILED'], state(), 'uiautomator', [])).toEqual(judgePresentedAssert(['0/1 asserts FAILED'], s, state()));
   });
+  // Pinned by hand: a new presented-window cell (PRESENTED_WINDOW_CELLS) or a re-capture of these updates this list.
   it('the run asks it of round 7\'s presented windows alone, on Android (live-cases.ts#selectCases)', async () => {
     const asserts = async (platform: 'ios' | 'android') => (await selectCases({ platform, app: 'native', groups: ['visibility'] })).filter((x) => x.id.startsWith('assert:')).map((x) => x.id);
     expect(await asserts('android')).toEqual(['dialog-fullscreen', 'bottom-sheet-dialog', 'dialog-views-fullscreen'].flatMap((cell) => ['A', 'B', 'C', 'D'].map((tag) => `assert:${cell}.${tag}`)));
@@ -403,6 +411,14 @@ describe('the special cases\' judges at their edges', () => {
       expect(judgeCarry(reply, carried(1500, [[0, 1172], [1172, 2000], [2000, 1500]]), launched)).toMatchObject({ why: `R-direction (carry): a stroke back up (2000→1500): averi turned — averi: ${reply}` });
       expect(judgeCarry(reply, carried(1920, [[0, 1000], [1000, 1920]]), launched)).toMatchObject({ outcome: 'ok' });
     });
+    it('only the table\'s strokes are judged: another view\'s that moved nothing is no carry past the window', () => {
+      // The review's counterexample: a header over all but the table's last 32 pt (the region y 842, 32 tall), L at 830 at
+      // the launch, no frame of it at the stop; another view's stroke from rest to rest would read as a carry past.
+      const narrow = table({ chrome: { header: { x: 0, y: 62, width: 402, height: 780 } }, frames: { L: { x: 0, y: 830, width: 402, height: 64 } } });
+      const failed = 'ERROR scroll_until id:"lab.sheet-long-list.L" failed after 1 swipe (maxSwipes) — element never appeared in the tree';
+      const s = { ...narrow, frames: {}, strokes: [stroke(0, 0, 'other')] };
+      expect(judgeCarry(failed, s, narrow)).toMatchObject({ outcome: 'LOUD', cls: 'not-reached' });
+    });
     it('a stroke back by the slack, or one that moved nothing, is no turn', () => {
       expect(judgeCarry(reply, carried(1459, [[0, 1048], [1048, 1460], [1460, 1459], [1459, 1459]]), launched)).toMatchObject({ outcome: 'ok' });
     });
@@ -417,6 +433,7 @@ describe('the cases the live run asks of the committed static truth (tests/fixtu
   const truthOf = (platform: 'ios' | 'android', cell: string): CellTruth => JSON.parse(readFileSync(join(import.meta.dirname, '..', 'fixtures', 'truth', DIRS[platform], `${cell}.truth.json`), 'utf8')) as CellTruth;
   const arg = ([k, v]: [string, unknown]) => `${k} ${typeof v === 'string' ? v : JSON.stringify(v)}`;
   const line = (x: VisibilityCase) => `${x.id} ${x.calls.map((k) => `${k.tool}(${Object.entries(k.args).map(arg).join(', ')})`).join(' ')} | ${x.says}`;
+  // Pinned by hand from the committed truth: a re-capture of these cells, or a change to what they ask, updates this table.
   const ASKED: Record<string, string[]> = {
     'ios scroll-top-edge': [
       `tap:scroll-top-edge.A tap(selector id:"lab.scroll-top-edge.A") | tap A (off-screen): refused, nothing fires — or fires it alone`,

@@ -162,7 +162,7 @@ const touchesText = (state: Pick<LabState, 'events'>, launched: Pick<LabState, '
   return ts.length === 0 ? 'none' : touchPointsText(ts);
 };
 const eventsText = (es: readonly ProbeEvent[]) => (es.length === 0 ? 'nothing' : es.map((e) => `${e.kind} ${e.tag}`).join(', '));
-const rectText = (r: Rect | undefined | null) => (r === undefined || r === null ? 'none' : `${round(r.x)},${round(r.y)} ${round(r.width)}x${round(r.height)}`);
+const rectText = (r: Rect | undefined) => (r === undefined ? 'none' : `${round(r.x)},${round(r.y)} ${round(r.width)}x${round(r.height)}`);
 const round = (n: number) => Math.round(n * 10) / 10;
 export const short = (reply: string) => reply.split('\n')[0].slice(0, 260);
 

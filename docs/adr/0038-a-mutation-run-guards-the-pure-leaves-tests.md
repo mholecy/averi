@@ -1530,32 +1530,35 @@ verdicts whole: outcome, rule, reply kind, and the words live.ts prints and a re
 (the slack, the region's chrome, the window's), and pins the cases the live run asks of the committed static truth
 (tests/fixtures/truth, already in the sandbox).
 
-The rest is code, each change proven identical by the rejudge. Every committed RunRecord under docs/ and tests/fixtures
-(699) was rejudged in process (`rejudge` in live-cases.ts) with `--groups forms` and with all six groups. Against a
-`git archive` of the base 4ffcf635 the output was byte-identical: 1 398 rejudges, the same sha1. The golden stays
-Changed 0.
+The rest is code, each change behaviour-identical:
 
-- **T17's gate** loses its two redundant conjuncts. `!holds` goes because a cut geometry never holds a `fully` stop
-  (stopHolds). `lead !== undefined` goes because `hedgesCut` in replies.ts, false without a lead, is now the type guard.
-  `g !== undefined` stays for the narrowing, as an equivalent survivor.
-- **judgeCarry** reads the table's clip without a guard: it returns before that point when there is no region, and a
-  region is only ever cut from the clip.
-- **live-carousel.ts's judgeFully** loses its band block's `clip === undefined` arm and its "no carousel clip at launch"
-  words. A band case with no clip at the launch SKIPs NO_CLIP before any premise, so the arm was unreachable. Every
-  reachable input is judged as before.
+- **(a) T17's gate** loses its two redundant conjuncts. `!holds` goes because a cut geometry never holds a `fully` stop
+  (stopHolds, CUT_GEOMETRIES). `lead !== undefined` goes because `hedgesCut` in replies.ts, false without a lead, is now
+  the type guard. `g !== undefined` stays for the narrowing, as an equivalent survivor.
+- **(b) judgeCarry** reads the table's clip without a guard: it returns before that point when there is no region, and
+  showRegion only ever cuts a region from the clip.
+- **(c) live-carousel.ts's judgeFully** loses its band block's `clip === undefined` arm and its "no carousel clip at
+  launch" words. A band case with no clip at the launch SKIPs NO_CLIP before any premise, so the arm was unreachable.
+- rectText takes no `null`: its callers pass only LabState's rects, a Rect or absent.
+
+The committed RunRecords — 699: 696 under docs/truth/live-records and 3 under tests/fixtures — were rejudged in process
+(`rejudge` in live-cases.ts) with `--groups forms` and with all six groups. Against a `git archive` of the base
+4ffcf635 the output was byte-identical: 1 398 rejudges, the same sha1. That rejudge exercises (c): the D59b band cases
+are among the records. It does not reach (a), since no record holds a hedged-stop verdict, nor (b) past its early return,
+since every carry result is a MISMATCH. Those two rest on the stopHolds/CUT_GEOMETRIES and showRegion arguments above,
+confirmed by a differential fuzz in the review. The golden stays Changed 0.
 
 | Module | Before (cold) | After (cold) | Floor |
 | --- | --- | --- | --- |
-| scripts/truth/live-visibility.ts | 75.42 % (1 485 mutants, 345 survived, 20 without coverage) | 98.03 % (1 474 mutants, 28 survived, 1 without coverage) | 72 → 96 |
+| scripts/truth/live-visibility.ts | 75.42 % (1 485 mutants, 345 survived, 20 without coverage) | 98.37 % (1 470 mutants, 23 survived, 1 without coverage) | 72 → 96 |
 | scripts/truth/live-carousel.ts | 98.87 % (798 mutants, 8 survived, 1 without coverage) | 99.36 % (789 mutants, 5 survived, 0 without coverage) | 96 |
 
-live-visibility.ts's 29 not killed are split in its scope.json baseline:
+live-visibility.ts's 24 not killed are all equivalent, each argued in its scope.json baseline: the status trim and
+three chrome boundaries of showRegion, judgeScroll's `g !== undefined` twice and its tap/tapped pair,
+judgeAndroidTurn's `ok` clause (an ok verdict has no rule), the seeded `?? []`s, the platform words a judged context does
+not read, judgeAtRest's view filter (reached only on an ok verdict, which judgeScroll's R-direction already rules
+another view's moving stroke out of), touchTurns' halves swapped, and two guards kept for the type. judgeCarry's view
+filter, first counted equivalent, is not: another view's still stroke reads as a carry past a narrow window (the
+review's counterexample, now a test).
 
-- equivalent (26): the status trim and three chrome boundaries of showRegion, judgeScroll's `g !== undefined` twice and
-  its tap/tapped pair, judgeAndroidTurn's `ok` clause (an ok verdict has no rule), the seeded `?? []`s, the platform
-  words a judged context does not read, and the view filters that judgeScroll's R-direction already covers;
-- untested (2): judgeAndroidTurn's `v.kind === 'visible'`, which only a stop naming a direction reaches, and src never
-  writes one;
-- unreachable (1): rectText's `null` (LabState has no null rect).
-
-The cold lab group after the change ran in 267 s, every module at or above its floor.
+The cold lab group after the change ran in 265 s, every module at or above its floor.
