@@ -1836,5 +1836,6 @@ average 15 at its start, 45 at its end).
 
 Core's scope is unchanged by A25: its 33 modules and their tests as before (7 427 mutants). A cold core run on this
 branch, under load (9 at its start, 58 at its end, from other worktrees' Stryker runs), reached its 600 s bound at 7 135
-of 7 427 mutants; it proves nothing either way. Its post-split cold time is recorded at merge, in the "docs: A25 done"
-commit and here.
+of 7 427 mutants; it proves nothing either way. At merge (main abd2b878, with A21's shell.ts in core), the cold
+`npm run mutate -- --force` passed every group: core 461 s, scene 144 s, lab 315 s (load average 4 at its start, about
+25 during core), every module at or above its floor (standing.ts 95.49 % in that run).
