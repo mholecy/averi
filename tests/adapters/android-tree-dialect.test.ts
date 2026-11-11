@@ -23,7 +23,7 @@ beforeEach(() => {
 });
 
 /** A fill's options in these tests: the settle's and the value poll's cadence short, the fill's own rules as they are. */
-const FILL = { ambiguous: 'first' as const, timeoutMs: 200, pollMs: 2 };
+const FILL = { ambiguous: 'first' as const, timeoutMs: 200, pollMs: 2, eyes: NO_EYES };
 
 /**
  * One Android field (`id:f`) behind fillField, every tree read a fresh parse of its dump (the parser is the seam: base

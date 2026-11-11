@@ -864,9 +864,12 @@ names its build before a device is bound, so a config without one binds nothing,
 
 The regex test is gone. Its guarantee is now behavioural: `tests/mcp/tools.test.ts` calls EVERY tool of
 `mcp/config-policy.ts#TOOL_CONFIG` in one `treeSource: wda` project, with the calls keyed by the table so that a new
-tool fails to typecheck until it has a call. Each call must bind one wda adapter and nothing else. Any way a handler
-might reach another adapter shows up as an idb or a second binding: another kind, an alias of the registry, or a
-lazy resolver handed the wrong config. A type-level guarantee was weighed and rejected. A branded "loaded config" that
+tool fails to typecheck until it has a call. Each call must bind one wda adapter and nothing else. What it catches is
+a resolution of the WRONG kind: another kind, an alias of the registry asked with one, or a lazy resolver handed the
+wrong config, each of which binds an idb adapter. A second `get` of the SAME kind is the registry's cached adapter and
+goes unseen, and it breaks nothing D41 guards. Each tool is called once, so the test runs one branch of each handler.
+`swipe` is the exception: it is called twice, by direction and by coordinates. The other branches (tap and type_text
+with or without a selector, install_app without a path) go through the same resolution. A type-level guarantee was weighed and rejected. A branded "loaded config" that
 only `loadForCall` can mint, and that the registry's `get` would require, would hold the kind to the call's own read.
 But it would put a flow/ type on the registry's interface and rewrite its 56 test calls. It would also guard less
 than the behavioural test: a brand cannot see a handler that never resolves a device at all.

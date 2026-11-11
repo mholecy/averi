@@ -113,9 +113,11 @@ describe('scroll_until — the eyes confirm a fully claim', () => {
     );
   });
 
-  it('k7 with no eyes handed in: the tree\'s claim, unchecked, said so', async () => {
+  // Since A30 the eyes are required, so "no eyes" is no longer a path of scroll.ts: this pins how NO_EYES, the tests'
+  // fake (tests/helpers/eyes.ts), words its answer — ui-tree/eyes.ts#unseen's, the tree's claim, unchecked.
+  it('k7 under NO_EYES: unseen\'s wording — the tree\'s claim, unchecked, "no screenshot was taken"', async () => {
     const fake = await k7();
-    const reply = describeScrollResult(await scrollUntilVisible(fake, PHONE, FAST));
+    const reply = describeScrollResult(await scrollUntilVisible(fake, PHONE, { ...FAST, eyes: NO_EYES }));
     expect(reply).toMatch(/^fully visible by the tree after 0 swipes; its bottom edge lies flush with container id:lab\.form-keyboard\.submit .* \(no screenshot was taken\)$/);
     expect(fake.screenshots).toHaveLength(0);
   });

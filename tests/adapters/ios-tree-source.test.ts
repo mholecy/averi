@@ -13,6 +13,7 @@ import type { UiNode } from '../../src/adapters/types.js';
 import { fillField } from '../../src/interact/fill.js';
 import { fillReply } from '../../src/interact/fill-text.js';
 import { FakeAdapter } from '../helpers/fake.js';
+import { NO_EYES } from '../helpers/eyes.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on (tests/helpers/sleep-recorder.ts): the fill below
 // costs no focus delay and no poll's wall clock.
@@ -257,7 +258,7 @@ describe('parseIdbDescribeAll — batch-4\'s real form-format dump: an empty fie
       fake.typed.push(text);
       for (const digit of text) shown = shown.replace('_', digit);
     };
-    const result = await fillField(fake, 'id:lab.form-format.date', '31122026', { ambiguous: 'first', timeoutMs: 200, pollMs: 2 });
+    const result = await fillField(fake, 'id:lab.form-format.date', '31122026', { ambiguous: 'first', timeoutMs: 200, pollMs: 2, eyes: NO_EYES });
     expect(shown).toBe('31.12.2026');
     expect(result).toMatchObject({ readBack: { kind: 'landed' }, reformatted: { added: 2, respaced: 0 } });
     expect(fake.typed).toEqual(['31122026']); // nothing wiped or typed again

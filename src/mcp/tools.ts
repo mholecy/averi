@@ -247,6 +247,9 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
   // share.
   const session = new EngineSession();
 
+  /** The registry's adapter for settings already worked out — `deviceFor`'s and `serve`'s one `registry.get`. */
+  const adapterOf = (p: Platform, settings: IosToolSettings): Promise<DeviceAdapter> => registry.get(p, { treeSource: settings.treeSource });
+
   /**
    * The ONE way a handler reaches a device (D41, 2026-11-01): the registry's adapter for the platform's bound device
    * and the project's iOS tree source — the `iosToolSettings` of the config the call loaded (android gets none; no
@@ -257,14 +260,14 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
    * calls every tool of the policy table in a wda project and pins that one wda adapter alone is bound (ADR 0032,
    * amendment A30).
    */
-  const deviceFor = (p: Platform, cfg: AveriConfig | undefined): Promise<DeviceAdapter> =>
-    registry.get(p, { treeSource: iosToolSettings(cfg, p).treeSource });
+  const deviceFor = (p: Platform, cfg: AveriConfig | undefined): Promise<DeviceAdapter> => adapterOf(p, iosToolSettings(cfg, p));
 
   /** The handler's one call (A30): read the config under the tool's policy, then the device and its eyes (`Served`). */
   const serve = async (p: Platform, policy: ConfigPolicy, cp: string | undefined): Promise<Served> => {
     const { cfg } = await loadForCall(policy, cp);
-    const adapter = await deviceFor(p, cfg);
-    return { cfg, settings: iosToolSettings(cfg, p), adapter, eyes: eyesOn(adapter) };
+    const settings = iosToolSettings(cfg, p);
+    const adapter = await adapterOf(p, settings);
+    return { cfg, settings, adapter, eyes: eyesOn(adapter) };
   };
 
   registerTool(
