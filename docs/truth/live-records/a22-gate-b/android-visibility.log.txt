@@ -1,0 +1,175 @@
+lab: emulator-5554, AVD averi_lab
+averi: <repo>
+uiautomator tap:open.A ok: Tapped id:"lab.open.A"
+uiautomator tap:open.B ok: Tapped id:"lab.open.B"
+uiautomator tap:open.C ok: Tapped id:"lab.open.C"
+uiautomator tap:open.D ok: Tapped id:"lab.open.D"
+uiautomator tap:sheet-medium.A ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.sheet-medium.A" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no scroll move
+uiautomator scroll:sheet-medium.A ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.sheet-medium.A" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,444) on other "Close sheet" (0,0 1080x1110) — a screen is presented over it (a modal or a sheet) — close it first; no 
+uiautomator tap:sheet-medium.B ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.sheet-medium.B" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no scroll move
+uiautomator scroll:sheet-medium.B ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.sheet-medium.B" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,444) on other "Close sheet" (0,0 1080x1110) — a screen is presented over it (a modal or a sheet) — close it first; no 
+uiautomator tap:sheet-medium.C ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.sheet-medium.C" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no scroll move
+uiautomator scroll:sheet-medium.C ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.sheet-medium.C" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (0,1243 1080x977) — a screen is presented over it (a modal or a sheet) — close it first; no scroll 
+uiautomator tap:sheet-medium.D ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.sheet-medium.D" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no scroll move
+uiautomator scroll:sheet-medium.D ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.sheet-medium.D" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (0,1243 1080x977) — a screen is presented over it (a modal or a sheet) — close it first; no scroll 
+uiautomator tap:sheet-medium.S ok: Tapped id:"lab.sheet-medium.S"
+uiautomator tap:alert-dim.A ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.alert-dim.A" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a dialog is presented over it — close it first
+uiautomator scroll:alert-dim.A ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.alert-dim.A" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,444) on the dim outside container (155,851 770x517) — a dialog is presented over it — close it first, and a swipe would l
+uiautomator tap:alert-dim.B ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.alert-dim.B" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a dialog is presented over it — close it first
+uiautomator scroll:alert-dim.B ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.alert-dim.B" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,444) on the dim outside container (155,851 770x517) — a dialog is presented over it — close it first, and a swipe would l
+uiautomator tap:alert-dim.C ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.alert-dim.C" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a dialog is presented over it — close it first
+uiautomator scroll:alert-dim.C ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.alert-dim.C" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on the dim outside container (155,851 770x517) — a dialog is presented over it — close it first, and a swipe would 
+uiautomator tap:alert-dim.D ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.alert-dim.D" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a dialog is presented over it — close it first
+uiautomator scroll:alert-dim.D ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.alert-dim.D" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on the dim outside container (155,851 770x517) — a dialog is presented over it — close it first, and a swipe would 
+uiautomator tap:dialog-fullscreen.A ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.dialog-fullscreen.A" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no scroll
+uiautomator scroll:dialog-fullscreen.A ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.dialog-fullscreen.A" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,444) on text "Lab full-screen dialog" (315,396 451x66) — a screen is presented over it (a modal or a sheet) — clo
+uiautomator tap:dialog-fullscreen.B ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.dialog-fullscreen.B" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no scroll
+uiautomator scroll:dialog-fullscreen.B ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.dialog-fullscreen.B" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,444) on text "Lab full-screen dialog" (315,396 451x66) — a screen is presented over it (a modal or a sheet) — clo
+uiautomator tap:dialog-fullscreen.C ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.dialog-fullscreen.C" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no scroll
+uiautomator scroll:dialog-fullscreen.C ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.dialog-fullscreen.C" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (0,66 1080x2087) — a screen is presented over it (a modal or a sheet) — close it first; no scr
+uiautomator tap:dialog-fullscreen.D ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.dialog-fullscreen.D" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no scroll
+uiautomator scroll:dialog-fullscreen.D ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.dialog-fullscreen.D" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (0,66 1080x2087) — a screen is presented over it (a modal or a sheet) — close it first; no scr
+uiautomator tap:dialog-fullscreen.S ok: Tapped id:"lab.dialog-fullscreen.S"
+uiautomator assert:dialog-fullscreen.A ok: failed, nothing fired: 1/1 asserts FAILED
+uiautomator assert:dialog-fullscreen.B ok: failed, nothing fired: 1/1 asserts FAILED
+uiautomator assert:dialog-fullscreen.C ok: failed, nothing fired: 1/1 asserts FAILED
+uiautomator assert:dialog-fullscreen.D ok: failed, nothing fired: 1/1 asserts FAILED
+uiautomator tap:bottom-sheet-dialog.A ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.bottom-sheet-dialog.A" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no scro
+uiautomator scroll:bottom-sheet-dialog.A ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.bottom-sheet-dialog.A" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,444) on container (0,0 1080x2220) — a screen is presented over it (a modal or a sheet) — close it first; no scr
+uiautomator tap:bottom-sheet-dialog.B ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.bottom-sheet-dialog.B" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no scro
+uiautomator scroll:bottom-sheet-dialog.B ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.bottom-sheet-dialog.B" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,444) on container (0,0 1080x2220) — a screen is presented over it (a modal or a sheet) — close it first; no scr
+uiautomator tap:bottom-sheet-dialog.C ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.bottom-sheet-dialog.C" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no scro
+uiautomator scroll:bottom-sheet-dialog.C ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.bottom-sheet-dialog.C" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (0,1164 1080x990) — a screen is presented over it (a modal or a sheet) — close it first; no 
+uiautomator tap:bottom-sheet-dialog.D ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.bottom-sheet-dialog.D" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no scro
+uiautomator scroll:bottom-sheet-dialog.D ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.bottom-sheet-dialog.D" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (0,1164 1080x990) — a screen is presented over it (a modal or a sheet) — close it first; no 
+uiautomator tap:bottom-sheet-dialog.S ok: Tapped id:"lab.bottom-sheet-dialog.S"
+uiautomator assert:bottom-sheet-dialog.A ok: failed, nothing fired: 1/1 asserts FAILED
+uiautomator assert:bottom-sheet-dialog.B ok: failed, nothing fired: 1/1 asserts FAILED
+uiautomator assert:bottom-sheet-dialog.C ok: failed, nothing fired: 1/1 asserts FAILED
+uiautomator assert:bottom-sheet-dialog.D ok: failed, nothing fired: 1/1 asserts FAILED
+uiautomator tap:dialog-views-fullscreen.A ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.dialog-views-fullscreen.A" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no 
+uiautomator scroll:dialog-views-fullscreen.A ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.dialog-views-fullscreen.A" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,444) on container (0,190 1080x1964) — a screen is presented over it (a modal or a sheet) — close it first; 
+uiautomator tap:dialog-views-fullscreen.B ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.dialog-views-fullscreen.B" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no 
+uiautomator scroll:dialog-views-fullscreen.B ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.dialog-views-fullscreen.B" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,444) on container (0,190 1080x1964) — a screen is presented over it (a modal or a sheet) — close it first; 
+uiautomator tap:dialog-views-fullscreen.C ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.dialog-views-fullscreen.C" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no 
+uiautomator scroll:dialog-views-fullscreen.C ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.dialog-views-fullscreen.C" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (0,190 1080x1964) — a screen is presented over it (a modal or a sheet) — close it first;
+uiautomator tap:dialog-views-fullscreen.D ok: refused, nothing fired: ERROR Timed out after 5000ms: element id:"lab.dialog-views-fullscreen.D" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — a screen is presented over it (a modal or a sheet) — close it first; no 
+uiautomator scroll:dialog-views-fullscreen.D ok: refused, nothing moved or fired: ERROR scroll_until id:"lab.dialog-views-fullscreen.D" stopped before any swipe — element is not in the tree, and the next swipe would touch down at (540,1776) on container (0,190 1080x1964) — a screen is presented over it (a modal or a sheet) — close it first;
+uiautomator tap:dialog-views-fullscreen.S ok: Tapped id:"lab.dialog-views-fullscreen.S"
+uiautomator assert:dialog-views-fullscreen.A ok: failed, nothing fired: 1/1 asserts FAILED
+uiautomator assert:dialog-views-fullscreen.B ok: failed, nothing fired: 1/1 asserts FAILED
+uiautomator assert:dialog-views-fullscreen.C ok: failed, nothing fired: 1/1 asserts FAILED
+uiautomator assert:dialog-views-fullscreen.D ok: failed, nothing fired: 1/1 asserts FAILED
+uiautomator tap:scroll-bounded.W ok: Tapped id:"lab.scroll-bounded.W"
+uiautomator tap:scroll-bounded.P ok: Tapped id:"lab.scroll-bounded.P"
+uiautomator scroll:scroll-bounded.P ok: Element id:"lab.scroll-bounded.P" visible after 0 swipes — CLIPPED at bottom, 63% of it is in the viewport. A rect assert or screenshot on this element will measure the CLIPPED box; then Tapped id:"lab.scroll-bounded.P"
+uiautomator scroll:scroll-bounded.P.fully ok: Element id:"lab.scroll-bounded.P" fully visible after 1 swipe; then Tapped id:"lab.scroll-bounded.P"
+uiautomator tap:scroll-bounded.S ok: refused, nothing fired: ERROR id:"lab.scroll-bounded.S" is outside its scroll view scrollable (0,1046 1080x495) at (541,1563): only 25% of it (rect 128,1519 825x88) is drawn, and a tap goes to its centre — scroll_until it with fully: true first; nothing was tapped
+uiautomator scroll:scroll-bounded.S ok: Element id:"lab.scroll-bounded.S" fully visible after 1 swipe; then Tapped id:"lab.scroll-bounded.S"
+uiautomator scroll:scroll-bounded.S.fully ok: Element id:"lab.scroll-bounded.S" fully visible after 1 swipe; then Tapped id:"lab.scroll-bounded.S"
+uiautomator tap:scroll-bounded.O ok: refused, nothing fired: ERROR Timed out after 5000ms waiting for element id:"lab.scroll-bounded.O" to appear
+uiautomator scroll:scroll-bounded.O LOUD: not reached (outside-scroll-view), and averi said so (not in the tree: its strokes unjudged — stroked upper 0→431, upper 431→861, upper 861→1286, upper 1286→1320, not its own lower): ERROR scroll_until id:"lab.scroll-bounded.O" failed after 6 swipes (maxSwipes: the swipes went over the scroll view 0,303 1080x605 only; the tree shows another scroll view that scrolls vertically, which the swipes did not go over: scrollable (0,1046 1080x495) 
+uiautomator tap:scroll-bounded.F ok: refused, nothing fired: ERROR Timed out after 5000ms waiting for element id:"lab.scroll-bounded.F" to appear
+uiautomator scroll:scroll-bounded.F LOUD: not reached (off-screen), and averi said so (not in the tree: its strokes unjudged — stroked upper 0→440, upper 440→863, upper 863→1295, upper 1295→1320, not its own lower): ERROR scroll_until id:"lab.scroll-bounded.F" failed after 6 swipes (maxSwipes: the swipes went over the scroll view 0,303 1080x605 only; the tree shows another scroll view that scrolls vertically, which the swipes did not go over: scrollable (0,1046 1080x495) 
+uiautomator turn:scroll-bounded.F LOUD: not reached (off-screen), and averi said so (not in the tree: its strokes unjudged — 2 swipes, none of them brought it closer (0 stroke(s) logged)): ERROR scroll_until id:"lab.scroll-bounded.F" failed after 2 swipes (the last 2, swiping up, did not change the screen: the swipes went over the scroll view 0,303 1080x605 only; the tree shows another scroll view that scrolls vertically, which the swipes did no
+uiautomator within:scroll-bounded.O ok: Element id:"lab.scroll-bounded.O" fully visible after 1 swipe; then Tapped id:"lab.scroll-bounded.O"
+uiautomator within:scroll-bounded.F ok: Element id:"lab.scroll-bounded.F" fully visible after 7 swipes; then Tapped id:"lab.scroll-bounded.F"
+uiautomator tap:scroll-sticky.R ok: Tapped id:"lab.scroll-sticky.R"
+uiautomator scroll:scroll-sticky.R ok: Element id:"lab.scroll-sticky.R" visible after 0 swipes — PARTLY UNDER text "Sticky header" (400,347 281x66), drawn over it — 63% of it shows, its centre clear. A rect assert or screenshot on this element will measure what is drawn over it too; then Tapped id:"lab.scroll-sticky.R"
+uiautomator scroll:scroll-sticky.R.fully ok: Element id:"lab.scroll-sticky.R" fully visible after 3 swipes; its top edge lies on the edge of container id:lab.scroll-sticky.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, and 2 probe swipes toward it move; then Tapped id:"lab.scroll-sticky.R"
+uiautomator tap:scroll-bounded-flush.W ok: Tapped id:"lab.scroll-bounded-flush.W"
+uiautomator tap:scroll-bounded-flush.P ok: Tapped id:"lab.scroll-bounded-flush.P"
+uiautomator scroll:scroll-bounded-flush.P ok: Element id:"lab.scroll-bounded-flush.P" fully visible after 0 swipes; then Tapped id:"lab.scroll-bounded-flush.P"
+uiautomator scroll:scroll-bounded-flush.P.fully ok: Element id:"lab.scroll-bounded-flush.P" fully visible after 1 swipe; then Tapped id:"lab.scroll-bounded-flush.P"
+uiautomator tap:scroll-bounded-flush.S ok: refused, nothing fired: ERROR id:"lab.scroll-bounded-flush.S" is cut at its scroll container's bottom edge (container 0,1046 1080x495); only a 825x22 part of it shows, 22 deep across that edge, under the 65 a tap needs — scroll_until it first (if it is whole and only its own content 
+uiautomator scroll:scroll-bounded-flush.S ok: Element id:"lab.scroll-bounded-flush.S" fully visible after 1 swipe; then Tapped id:"lab.scroll-bounded-flush.S"
+uiautomator scroll:scroll-bounded-flush.S.fully ok: Element id:"lab.scroll-bounded-flush.S" fully visible after 2 swipes; then Tapped id:"lab.scroll-bounded-flush.S"
+uiautomator tap:scroll-sticky-cut.R ok: Tapped id:"lab.scroll-sticky-cut.R"
+uiautomator scroll:scroll-sticky-cut.R ok: Element id:"lab.scroll-sticky-cut.R" fully visible after 0 swipes; then Tapped id:"lab.scroll-sticky-cut.R"
+uiautomator scroll:scroll-sticky-cut.R.fully ok: Element id:"lab.scroll-sticky-cut.R" visible after 3 swipes, NOT CONFIRMED WHOLE: its top edge lies on the edge of container id:lab.scroll-sticky-cut.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, where Andr; then Tapped id:"lab.scroll-sticky-cut.R"
+uiautomator tap:scroll-sticky-rest.R ok: Tapped id:"lab.scroll-sticky-rest.R"
+uiautomator rest:scroll-sticky-rest.R.fully ok: Element id:"lab.scroll-sticky-rest.R" fully visible after 2 swipes; its top edge lies on the edge of container id:lab.scroll-sticky-rest.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, and 2 probe swipes towa; then Tapped id:"lab.scroll-sticky-rest.R"
+uiautomator tap:scroll-sticky-view.R ok: Tapped id:"lab.scroll-sticky-view.R"
+uiautomator scroll:scroll-sticky-view.R ok: Element id:"lab.scroll-sticky-view.R" visible after 0 swipes — PARTLY UNDER text "Sticky header" (400,347 281x66), drawn over it — 63% of it shows, its centre clear. A rect assert or screenshot on this element will measure what is drawn over it too; then Tapped id:"lab.scroll-sticky-view.R"
+uiautomator scroll:scroll-sticky-view.R.fully ok: Element id:"lab.scroll-sticky-view.R" fully visible after 3 swipes; its top edge lies on the edge of container id:lab.scroll-sticky-view.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, and 2 probe swipes towa; then Tapped id:"lab.scroll-sticky-view.R"
+uiautomator tap:scroll-top-edge.A ok: refused, nothing fired: ERROR Timed out after 5000ms waiting for element id:"lab.scroll-top-edge.A" to appear
+uiautomator scroll:scroll-top-edge.A ok: Element id:"lab.scroll-top-edge.A" fully visible after 1 swipe; then Tapped id:"lab.scroll-top-edge.A"
+uiautomator tap:scroll-top-edge.T ok: refused, nothing fired: ERROR id:"lab.scroll-top-edge.T" is under the status bar at (541,61), in the top 66 of the screen (tree units), where a tap goes to the status bar (rect 128,0 825x121) — it lies in a scroll view — scroll_until it first, to move it out from under the bar; nothi
+uiautomator scroll:scroll-top-edge.T ok: Element id:"lab.scroll-top-edge.T" fully visible after 1 swipe; then Tapped id:"lab.scroll-top-edge.T"
+uiautomator scroll:scroll-top-edge.T.fully ok: Element id:"lab.scroll-top-edge.T" fully visible after 1 swipe; then Tapped id:"lab.scroll-top-edge.T"
+uiautomator turn:scroll-top-edge.T ok: Element id:"lab.scroll-top-edge.T" fully visible after 1 swipe; then Tapped id:"lab.scroll-top-edge.T"
+uiautomator tap:scroll-top-edge-end.A ok: refused, nothing fired: ERROR Timed out after 5000ms waiting for element id:"lab.scroll-top-edge-end.A" to appear
+uiautomator scroll:scroll-top-edge-end.A ok: Element id:"lab.scroll-top-edge-end.A" fully visible after 1 swipe; then Tapped id:"lab.scroll-top-edge-end.A"
+uiautomator tap:scroll-top-edge-end.T ok: refused, nothing fired: ERROR id:"lab.scroll-top-edge-end.T" is under the status bar at (541,61), in the top 66 of the screen (tree units), where a tap goes to the status bar (rect 128,0 825x121) — it lies in a scroll view — scroll_until it first, to move it out from under the bar; n
+uiautomator scroll:scroll-top-edge-end.T ok: Element id:"lab.scroll-top-edge-end.T" fully visible after 1 swipe; then Tapped id:"lab.scroll-top-edge-end.T"
+uiautomator scroll:scroll-top-edge-end.T.fully ok: Element id:"lab.scroll-top-edge-end.T" fully visible after 1 swipe; then Tapped id:"lab.scroll-top-edge-end.T"
+uiautomator turn:scroll-top-edge-end.T ok: Element id:"lab.scroll-top-edge-end.T" fully visible after 1 swipe; then Tapped id:"lab.scroll-top-edge-end.T"
+uiautomator turn:scroll-top-edge-end.T.fully ok: Element id:"lab.scroll-top-edge-end.T" fully visible after 1 swipe; then Tapped id:"lab.scroll-top-edge-end.T"
+uiautomator tap:carousel-in-list.C ok: refused, nothing fired: ERROR id:"lab.carousel-in-list.C" is outside its scroll view scrollable (66,380 948x234) at (1047,497): nothing of it is drawn (rect 1014,380 66x234) — scroll_until it first; nothing was tapped
+uiautomator scroll:carousel-in-list.C ok: Element id:"lab.carousel-in-list.C" visible after 2 swipes — CLIPPED at right, at most 93% of it is in the viewport — uiautomator does not say how far it runs past the screen's right edge. A rect assert or screenshot on this element will measure the CLIPPED bo; then Tapped id:"lab.carousel-in-list.C"
+uiautomator tap:carousel-in-list.B ok: refused, nothing fired: ERROR Timed out after 5000ms waiting for element id:"lab.carousel-in-list.B" to appear
+uiautomator scroll:carousel-in-list.B ok: Element id:"lab.carousel-in-list.B" fully visible after 1 swipe; then Tapped id:"lab.carousel-in-list.B"
+uiautomator tap:carousel-in-list.U ok: refused, nothing fired: ERROR Timed out after 5000ms waiting for element id:"lab.carousel-in-list.U" to appear
+uiautomator scroll:carousel-in-list.U ok: Element id:"lab.carousel-in-list.U" fully visible after 1 swipe; then Tapped id:"lab.carousel-in-list.U"
+uiautomator tap:scroll-collapsing.A ok: refused, nothing fired: ERROR Timed out after 5000ms waiting for element id:"lab.scroll-collapsing.A" to appear
+uiautomator scroll:scroll-collapsing.A ok: Element id:"lab.scroll-collapsing.A" fully visible after 1 swipe; then Tapped id:"lab.scroll-collapsing.A"
+uiautomator tap:scroll-collapsing.D ok: Tapped id:"lab.scroll-collapsing.D"
+uiautomator scroll:scroll-collapsing.D ok: Element id:"lab.scroll-collapsing.D" fully visible after 0 swipes; then Tapped id:"lab.scroll-collapsing.D"
+uiautomator scroll:scroll-collapsing.D.fully ok: Element id:"lab.scroll-collapsing.D" fully visible after 1 swipe; then Tapped id:"lab.scroll-collapsing.D"
+uiautomator turn:scroll-collapsing.A ok: no turn on uiautomator (ADR 0021): 4 swipes, the last 2 unmoved, failed naming direction: "up" — ERROR scroll_until id:"lab.scroll-collapsing.A" failed after 4 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element was in the tree before the first swipe, clipped out above its 
+uiautomator tap:carousel-in-list-cut.C ok: Tapped id:"lab.carousel-in-list-cut.C"
+uiautomator scroll:carousel-in-list-cut.C ok: Element id:"lab.carousel-in-list-cut.C" visible after 0 swipes — CLIPPED at left, 98% of it is in the viewport. A rect assert or screenshot on this element will measure the CLIPPED box; then Tapped id:"lab.carousel-in-list-cut.C"
+uiautomator scroll:carousel-in-list-cut.C.fully LOUD: not reached (partly-centre-in), and averi said so: ERROR scroll_until id:"lab.carousel-in-list-cut.C" failed after 0 swipes — element is in the viewport but CLIPPED at left: 98% of it is drawn, and it is 948 wide (tree units), as wide as its scroll view scrollable (66,380 948x234): fully: true holds at one exa
+uiautomator tap:carousel-lazy.B ok: refused, nothing fired: ERROR Timed out after 5000ms waiting for element id:"lab.carousel-lazy.B" to appear
+uiautomator scroll:carousel-lazy.B ok: Element id:"lab.carousel-lazy.B" fully visible after 1 swipe; then Tapped id:"lab.carousel-lazy.B"
+uiautomator tap:carousel-lazy.U ok: refused, nothing fired: ERROR Timed out after 5000ms waiting for element id:"lab.carousel-lazy.U" to appear
+uiautomator scroll:carousel-lazy.U ok: Element id:"lab.carousel-lazy.U" fully visible after 1 swipe; then Tapped id:"lab.carousel-lazy.U"
+uiautomator tap:carousel-recycler.B ok: refused, nothing fired: ERROR Timed out after 5000ms waiting for element id:"lab.carousel-recycler.B" to appear
+uiautomator scroll:carousel-recycler.B ok: Element id:"lab.carousel-recycler.B" fully visible after 1 swipe; then Tapped id:"lab.carousel-recycler.B"
+uiautomator tap:carousel-recycler.U ok: refused, nothing fired: ERROR Timed out after 5000ms waiting for element id:"lab.carousel-recycler.U" to appear
+uiautomator scroll:carousel-recycler.U ok: Element id:"lab.carousel-recycler.U" fully visible after 1 swipe; then Tapped id:"lab.carousel-recycler.U"
+uiautomator tap:carousel-lazy-free.B ok: refused, nothing fired: ERROR Timed out after 5000ms waiting for element id:"lab.carousel-lazy-free.B" to appear
+uiautomator scroll:carousel-lazy-free.B ok: Element id:"lab.carousel-lazy-free.B" fully visible after 1 swipe; then Tapped id:"lab.carousel-lazy-free.B"
+uiautomator tap:carousel-lazy-free.U ok: refused, nothing fired: ERROR Timed out after 5000ms waiting for element id:"lab.carousel-lazy-free.U" to appear
+uiautomator scroll:carousel-lazy-free.U ok: Element id:"lab.carousel-lazy-free.U" fully visible after 1 swipe; then Tapped id:"lab.carousel-lazy-free.U"
+uiautomator tap:carousel-recycler-free.B ok: refused, nothing fired: ERROR Timed out after 5000ms waiting for element id:"lab.carousel-recycler-free.B" to appear
+uiautomator scroll:carousel-recycler-free.B ok: Element id:"lab.carousel-recycler-free.B" fully visible after 1 swipe; then Tapped id:"lab.carousel-recycler-free.B"
+uiautomator tap:carousel-recycler-free.U ok: refused, nothing fired: ERROR Timed out after 5000ms waiting for element id:"lab.carousel-recycler-free.U" to appear
+uiautomator scroll:carousel-recycler-free.U ok: Element id:"lab.carousel-recycler-free.U" fully visible after 1 swipe; then Tapped id:"lab.carousel-recycler-free.U"
+uiautomator tap:bands.S ok: refused, nothing fired: ERROR id:"lab.bands.S" is under the status bar at (540,28), in the top 66 of the screen (tree units), where a tap goes to the status bar (rect 127,0 825x55) — it lies in no scroll view, so no scroll moves it out: it is pinned under the status bar (a layout tha
+uiautomator tap:bands.O ok: Tapped id:"lab.bands.O"
+uiautomator tap:bands.W ok: Tapped id:"lab.bands.W"
+uiautomator tap:bands.Q ok: Tapped id:"lab.bands.Q"
+uiautomator tap:bands.N ok: refused, nothing fired: ERROR id:"lab.bands.N" is under the navigation bar at (540,2171), from y 2154 to the bottom of the screen (tree units), where a tap goes to the navigation bar (rect 127,2121 825x99) — it lies in no scroll view, so no scroll moves it out: it is pinned under the
+uiautomator tap:bands-three-button.S ok: refused, nothing fired: ERROR id:"lab.bands-three-button.S" is under the status bar at (540,28), in the top 66 of the screen (tree units), where a tap goes to the status bar (rect 127,0 825x55) — it lies in no scroll view, so no scroll moves it out: it is pinned under the status bar 
+uiautomator tap:bands-three-button.O ok: Tapped id:"lab.bands-three-button.O"
+uiautomator tap:bands-three-button.W ok: Tapped id:"lab.bands-three-button.W"
+uiautomator tap:bands-three-button.Q ok: Tapped id:"lab.bands-three-button.Q"
+uiautomator tap:bands-three-button.N ok: refused, nothing fired: ERROR id:"lab.bands-three-button.N" is under the navigation bar at (540,2171), from y 2154 to the bottom of the screen (tree units), where a tap goes to the navigation bar (rect 127,2121 825x99) — it lies in no scroll view, so no scroll moves it out: it is pin
+uiautomator tap:pinned-bar.W ok: Tapped id:"lab.pinned-bar.W"
+uiautomator tap:pinned-bar.P ok: Tapped id:"lab.pinned-bar.P"
+uiautomator tap:tabbar-floating.T ok: Tapped id:"lab.tabbar-floating.T"
+uiautomator tap:tabbar-floating.R ok: refused, nothing fired: ERROR id:"lab.tabbar-floating.R" is under container id:lab.tabbar-floating.tabBar (66,1860 948x239) at its centre (540,1871), drawn over it; only a 948x61 part of it shows, under the 65x65 a tap may be moved to — scroll_until it first; nothing was tapped
+uiautomator scroll:tabbar-floating.R ok: Element id:"lab.tabbar-floating.R" fully visible after 1 swipe; then Tapped id:"lab.tabbar-floating.R"
+uiautomator tap:tabbar-floating.F ok: refused, nothing fired: ERROR Timed out after 5000ms waiting for element id:"lab.tabbar-floating.F" to appear
+uiautomator scroll:tabbar-floating.F LOUD: not reached (off-screen), and averi said so: ERROR scroll_until id:"lab.tabbar-floating.F" failed after 15209ms (timeout 15000ms; 4 swipes sent; 5 tree reads took 11427ms, the last 2314ms) — element never appeared in the tree; after the last 2 swipes over the scroll container 0,550 1080x1670 the tree lis
+uiautomator blank:tabbar-floating.F ok: Element id:"lab.tabbar-floating.F" fully visible after 6 swipes; then Tapped id:"lab.tabbar-floating.F"
+uiautomator tap:fab.W ok: Tapped id:"lab.fab.W"
+uiautomator tap:fab.L LOUD: refused a target a tap reaches, nothing fired: ERROR id:"lab.fab.L" is under container id:lab.fab.host (0,1758 1080x352) at its centre (204,1934), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
+uiautomator tap:fab.K LOUD: refused a target a tap reaches, nothing fired: ERROR id:"lab.fab.K" is under container id:lab.fab.host (0,1758 1080x352) at its centre (876,1934), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
+uiautomator tap:own-parts.L ok: Tapped text:"LOGIN"
+uiautomator tap:own-parts.N ok: Tapped text:"Payee’s name"
+uiautomator tap:own-parts.I ok: Tapped label:"Close"
+uiautomator tap:text-sample.A ok: Tapped text:"Prihlásiť sa"
+uiautomator tap:text-sample.B ok: Tapped text:"Ľubomír Šťastný"
+uiautomator tap:text-sample.C ok: Tapped text:"Mäkčeň, dĺžeň a vokáň"
+uiautomator tap:text-sample.D ok: Tapped text:"Jiří Dvořák: věřitel, půjčka"
+uiautomator tap:text-sample.E ok: Tapped text:"Payee’s name"
+uiautomator tap:text-sample.F ok: Tapped text:"Poznámka “pre mňa” a ‘OK’"
+uiautomator tap:text-sample.G ok: Tapped text:"Splatnosť 1–15 — mesačne…"
+uiautomator tap:text-sample.H ok: Tapped text:"1 234,56 €"
+uiautomator tap:text-sample.I ok: Tapped text:"−12 345,00 EUR"
+uiautomator tap:text-sample.J ok: Tapped text:"SK31 1200 0000 1987 4263 7541"
+uiautomator tap:text-under-bar.S ok: refused, nothing fired: ERROR text:"Zostatok 1 234,56 €" is under the status bar at (541,33), in the top 66 of the screen (tree units), where a tap goes to the status bar (rect 395,11 291x44) — it lies in no scroll view, so no scroll moves it out: it is pinned under the status bar (a
+uiautomator tap:text-under-bar.W ok: Tapped text:"Šťastný účet"
+uiautomator tap:text-under-bar.P ok: refused, nothing fired: ERROR Timed out after 5000ms waiting for element text:"Pokračovať na súhrn" to appear

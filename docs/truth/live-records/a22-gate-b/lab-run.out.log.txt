@@ -1,0 +1,80 @@
+19:45:32 ---- lab-run run 20261111-194532-53860, blocks lab,chooser,forms,visibility,ensure,carousel
+19:45:32 OK checkout: main's HEAD ad6ac3ec, clean
+19:45:39 LAB android: WARN — java_home -v 17 → nothing: exit 1 The operation couldn’t be completed. Unable to locate a Java Runtime. — the build used the one from JavaVirtualMachines: averi_lab emulator emulator-5554; this run's build installed under JDK 17: <jdk17> (from JavaVirtualMachines); the APK's assets/cells.json is main's (pulled: <out>/lab/run-20261111-194532-53860/installed.apk); handlers: averilab://shared/open 2, averilab://cell/open 1
+19:45:39 LAB handlers: OK — handlers as expected: averilab://shared/open 2, averilab://cell/open 1
+== lab (<out>/lab/run-20261111-194532-53860/) ==
+lab check: PASS — every lab need met: android, handlers (each one's LAB line above)
+== chooser (<out>/chooser/run-20261111-194532-53860/) ==
+chooser check before: WARN — a last-chosen entry (mAlways=false: no default; no reinstall clears it): chooser no; preferred read (1 user); lab entries 2 (defaults 0, last-chosen 2, accepted 0); first: 18364f6 dev.averi.lab/.Twin | mMatch=0x300000 mAlways=false | Action: "android.intent.action.VIEW" | Category: "android.intent.category.DEFAULT" | Scheme: "averilab" | Authority: "shared": -1
+== chooser live android-chooser (log: <out>/chooser/run-20261111-194532-53860/android-chooser.log) ==
+19:46:01 OK   chooser live android-chooser
+19:46:01 OK   chooser rejudge android-chooser
+chooser check after: WARN — a last-chosen entry not accepted (mAlways=false: no default; no reinstall clears it, so none is tried — no RESTORE): chooser no; preferred read (1 user); lab entries 2 (defaults 0, last-chosen 2, accepted 0); first: 18364f6 dev.averi.lab/.Twin | mMatch=0x300000 mAlways=false | Action: "android.intent.action.VIEW" | Category: "android.intent.category.DEFAULT" | Scheme: "averilab" | Authority: "shared": -1
+== forms (<out>/forms/run-20261111-194532-53860/) ==
+== forms live android-forms (log: <out>/forms/run-20261111-194532-53860/android-forms.log) ==
+19:58:00 OK   forms live android-forms
+19:58:01 OK   forms rejudge android-forms
+== visibility (<out>/visibility/run-20261111-194532-53860/) ==
+== visibility live android-visibility (log: <out>/visibility/run-20261111-194532-53860/android-visibility.log) ==
+20:28:01 FAIL visibility live android-visibility (timed out (exit 142: past its bound)) — see <out>/visibility/run-20261111-194532-53860/android-visibility.log
+20:28:01 FAIL visibility android-visibility: no record written (<out>/visibility/run-20261111-194532-53860/android-visibility.json)
+== ensure (<out>/ensure/run-20261111-194532-53860/) ==
+== ensure live android-ensure (log: <out>/ensure/run-20261111-194532-53860/android-ensure.log) ==
+20:29:22 OK   ensure live android-ensure
+20:29:22 OK   ensure rejudge android-ensure
+== carousel (<out>/carousel/run-20261111-194532-53860/) ==
+== carousel live android-carousel (log: <out>/carousel/run-20261111-194532-53860/android-carousel.log) ==
+20:34:47 OK   carousel live android-carousel
+20:34:47 OK   carousel rejudge android-carousel
+20:34:47 OK   chooser analyze
+chooser verdict: PASS — android-chooser: main's rejudge exit 0 (# Live golden: 5 cases, 5 ok, 0 loud, 0 mismatches (0 not known), 0 skipped)
+20:34:47 OK   forms analyze
+forms verdict: PASS — android-forms: main's rejudge exit 0 (# Live golden: 58 cases, 55 ok, 2 loud, 1 mismatches (0 not known), 0 skipped)
+visibility verdict: INCONCLUSIVE — 1 of 1 run(s) incomplete: android-visibility — no record (android-visibility.json); android-visibility.log has no `# Live golden:` line (live.ts did not finish); no rejudge summary (android-visibility.rejudge.txt)
+20:34:47 OK   ensure analyze
+ensure verdict: PASS — android-ensure: main's rejudge exit 0 (# Live golden: 3 cases, 3 ok, 0 loud, 0 mismatches (0 not known), 0 skipped)
+20:34:47 OK   carousel analyze
+carousel verdict: PASS — android-carousel: main's rejudge exit 0 (# Live golden: 11 cases, 4 ok, 7 loud, 0 mismatches (0 not known), 0 skipped)
+
+================================ details ================================
+OK checkout: main's HEAD ad6ac3ec, clean
+-- steps of this run (20261111-194532-53860; the whole log: <out>/steps.log)
+19:45:32 ---- lab-run run 20261111-194532-53860, blocks lab,chooser,forms,visibility,ensure,carousel
+19:45:32 OK checkout: main's HEAD ad6ac3ec, clean
+19:45:39 LAB android: WARN — java_home -v 17 → nothing: exit 1 The operation couldn’t be completed. Unable to locate a Java Runtime. — the build used the one from JavaVirtualMachines: averi_lab emulator emulator-5554; this run's build installed under JDK 17: <jdk17> (from JavaVirtualMachines); the APK's assets/cells.json is main's (pulled: <out>/lab/run-20261111-194532-53860/installed.apk); handlers: averilab://shared/open 2, averilab://cell/open 1
+19:45:39 LAB handlers: OK — handlers as expected: averilab://shared/open 2, averilab://cell/open 1
+19:46:01 OK   chooser live android-chooser
+19:46:01 OK   chooser rejudge android-chooser
+19:58:00 OK   forms live android-forms
+19:58:01 OK   forms rejudge android-forms
+20:28:01 FAIL visibility live android-visibility (timed out (exit 142: past its bound)) — see <out>/visibility/run-20261111-194532-53860/android-visibility.log
+20:28:01 FAIL visibility android-visibility: no record written (<out>/visibility/run-20261111-194532-53860/android-visibility.json)
+20:29:22 OK   ensure live android-ensure
+20:29:22 OK   ensure rejudge android-ensure
+20:34:47 OK   carousel live android-carousel
+20:34:47 OK   carousel rejudge android-carousel
+20:34:47 OK   chooser analyze
+20:34:47 OK   forms analyze
+20:34:47 OK   ensure analyze
+20:34:47 OK   carousel analyze
+-- lab (<out>/lab/run-20261111-194532-53860/)
+-- chooser (<out>/chooser/run-20261111-194532-53860/)
+-- forms (<out>/forms/run-20261111-194532-53860/)
+-- visibility (<out>/visibility/run-20261111-194532-53860/)
+-- ensure (<out>/ensure/run-20261111-194532-53860/)
+-- carousel (<out>/carousel/run-20261111-194532-53860/)
+== DONE — all outputs in <out>/<block>/run-20261111-194532-53860 ==
+======== SUMMARY
+OK checkout: main's HEAD ad6ac3ec, clean
+LAB android: WARN — java_home -v 17 → nothing: exit 1 The operation couldn’t be completed. Unable to locate a Java Runtime. — the build used the one from JavaVirtualMachines: averi_lab emulator emulator-5554; this run's build installed under JDK 17: <jdk17> (from JavaVirtualMachines); the APK's assets/cells.json is main's (pulled: <out>/lab/run-20261111-194532-53860/installed.apk); handlers: averilab://shared/open 2, averilab://cell/open 1
+LAB handlers: OK — handlers as expected: averilab://shared/open 2, averilab://cell/open 1
+lab check: PASS — every lab need met: android, handlers (each one's LAB line above)
+chooser check before: WARN — a last-chosen entry (mAlways=false: no default; no reinstall clears it): chooser no; preferred read (1 user); lab entries 2 (defaults 0, last-chosen 2, accepted 0); first: 18364f6 dev.averi.lab/.Twin | mMatch=0x300000 mAlways=false | Action: "android.intent.action.VIEW" | Category: "android.intent.category.DEFAULT" | Scheme: "averilab" | Authority: "shared": -1
+chooser check after: WARN — a last-chosen entry not accepted (mAlways=false: no default; no reinstall clears it, so none is tried — no RESTORE): chooser no; preferred read (1 user); lab entries 2 (defaults 0, last-chosen 2, accepted 0); first: 18364f6 dev.averi.lab/.Twin | mMatch=0x300000 mAlways=false | Action: "android.intent.action.VIEW" | Category: "android.intent.category.DEFAULT" | Scheme: "averilab" | Authority: "shared": -1
+chooser verdict: PASS — android-chooser: main's rejudge exit 0 (# Live golden: 5 cases, 5 ok, 0 loud, 0 mismatches (0 not known), 0 skipped)
+forms verdict: PASS — android-forms: main's rejudge exit 0 (# Live golden: 58 cases, 55 ok, 2 loud, 1 mismatches (0 not known), 0 skipped)
+visibility verdict: INCONCLUSIVE — 1 of 1 run(s) incomplete: android-visibility — no record (android-visibility.json); android-visibility.log has no `# Live golden:` line (live.ts did not finish); no rejudge summary (android-visibility.rejudge.txt)
+ensure verdict: PASS — android-ensure: main's rejudge exit 0 (# Live golden: 3 cases, 3 ok, 0 loud, 0 mismatches (0 not known), 0 skipped)
+carousel verdict: PASS — android-carousel: main's rejudge exit 0 (# Live golden: 11 cases, 4 ok, 7 loud, 0 mismatches (0 not known), 0 skipped)
+RESTORE: none — everything dirty was put back and verified
+======== SUMMARY end (run 20261111-194532-53860)
