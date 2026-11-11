@@ -1521,3 +1521,41 @@ The 25 not killed, split in its scope.json baseline:
 - the entry guard's line (4).
 
 The sandbox needs no new file: scripts/is-main.ts and scripts/truth/*.ts are already in it.
+
+## Amendment: live-visibility.ts to its floor's rule (2026-11-11, backlog T21)
+
+live-visibility.ts joined at T13's measured score, its floor low on purpose (T13's amendment). T21 brings it to the floor
+rule. A second test, tests/truth/live-visibility-words.test.ts, joins its scope.json entry. It pins each judge's
+verdicts whole: outcome, rule, reply kind, and the words live.ts prints and a record keeps. It pins them at their edges
+(the slack, the region's chrome, the window's), and pins the cases the live run asks of the committed static truth
+(tests/fixtures/truth, already in the sandbox).
+
+The rest is code, each change proven identical by the rejudge. Every committed RunRecord under docs/ and tests/fixtures
+(699) was rejudged in process (live-cases.ts#rejudge) with `--groups forms` and with all six groups. Against a
+`git archive` of the base 4ffcf635 the output was byte-identical: 1 398 rejudges, the same sha1. The golden stays
+Changed 0.
+
+- **T17's gate** loses its two redundant conjuncts. `!holds` goes because a cut geometry never holds a `fully` stop
+  (stopHolds). `lead !== undefined` goes because replies.ts#hedgesCut, false without a lead, is now the type guard.
+  `g !== undefined` stays for the narrowing, as an equivalent survivor.
+- **judgeCarry** reads the table's clip without a guard: it returns before that point when there is no region, and a
+  region is only ever cut from the clip.
+- **live-carousel.ts's judgeFully** loses its band block's `clip === undefined` arm and its "no carousel clip at launch"
+  words. A band case with no clip at the launch SKIPs NO_CLIP before any premise, so the arm was unreachable. Every
+  reachable input is judged as before.
+
+| Module | Before (cold) | After (cold) | Floor |
+| --- | --- | --- | --- |
+| scripts/truth/live-visibility.ts | 75.42 % (1 485 mutants, 345 survived, 20 without coverage) | 98.03 % (1 474 mutants, 28 survived, 1 without coverage) | 72 → 96 |
+| scripts/truth/live-carousel.ts | 98.87 % (798 mutants, 8 survived, 1 without coverage) | 99.36 % (789 mutants, 5 survived, 0 without coverage) | 96 |
+
+live-visibility.ts's 29 not killed are split in its scope.json baseline:
+
+- equivalent (26): the status trim and three chrome boundaries of showRegion, judgeScroll's `g !== undefined` twice and
+  its tap/tapped pair, judgeAndroidTurn's `ok` clause (an ok verdict has no rule), the seeded `?? []`s, the platform
+  words a judged context does not read, and the view filters that judgeScroll's R-direction already covers;
+- untested (2): judgeAndroidTurn's `v.kind === 'visible'`, which only a stop naming a direction reaches, and src never
+  writes one;
+- unreachable (1): rectText's `null` (LabState has no null rect).
+
+The cold lab group after the change ran in 267 s, every module at or above its floor.
