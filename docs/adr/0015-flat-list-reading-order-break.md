@@ -50,10 +50,10 @@ The row is `ui-tree/draw-order.ts`'s `flatListReadingOrder`, and only the `targe
 5. **React Native's role-carrying container leaves LR4's lie on Android** (D75 round 1, not narrowed by the owner;
    numbered 2026-11-11, D85; the amendment "Android Views list children by location" below, its React Native role
    residual): a View whose accessibility role React Native dumps as `android.view.View` (`toolbar`, `alert`, `header`,
-   `tablist`, …) reads as a node provider's host (android.ts#providesNodes), so the uiautomator parser marks nothing
-   under it, and a target with its later-drawn cover inside it keeps the location order as draw order — the lab's
-   rn-banner-role (D77, captured live 2026-11-11): every tap `Tapped` at the centre, on the cover, every colour assert
-   passing on the cover. A false `Tapped`, the unsafe direction; no remedy (not narrowed).
+   `tablist`, …) reads as a node provider's host (android-tree-dialect.ts#providesNodes), so the uiautomator parser
+   marks nothing under it, and a target with its later-drawn cover inside it keeps the location order as draw order —
+   the lab's rn-banner-role (D77, captured live 2026-11-11): every tap `Tapped` at the centre, on the cover, every
+   colour assert passing on the cover. A false `Tapped`, the unsafe direction; no remedy (not narrowed).
 
 ## Amendment: covers listed before the target (2026-10-19, round 8)
 
@@ -350,15 +350,15 @@ drawn over it.
 - The uiautomator parser marks a node `readingOrder` (`UiNode.readingOrder`, as WDA's run) when its two or more
   children are listed in that location order: every consecutive pair compares at or before (≤ 0) under the stripe
   comparator, read off the dumped bounds (adapters/android-accessibility-order.ts#compareByLocation,
-  #markLocationSorted, called by android.ts#parseUiautomatorXml before the widening). A SORT CHECK, as WDA's: a run of
-  classic Views passes it; a run listed so by chance passes it too.
+  #markLocationSorted, called by android-tree-dialect.ts#parseUiautomatorXml before the widening). A SORT CHECK, as
+  WDA's: a run of classic Views passes it; a run listed so by chance passes it too.
 - LEFT-TO-RIGHT is assumed: the dump names no layout direction, so a right-to-left run (sorted by right edges) reads
   out of order and is not marked — it keeps its order as draw order, as before.
 - NOT a node a node provider lists: any node of the class `android.view.View` hosts virtual nodes (a plain View holds no
   child views, so any children it lists are virtual) — Compose's AndroidComposeView, under a `ComposeView` on a screen and under a bare
-  ViewGroup in a Compose dialog's window — and nothing under it is marked (android.ts#providesNodes). Compose's order is
-  composition order: form-shared-id lists each outlined field (left 55) before its label drawn over its outline (left
-  77) — location order by chance; marked, the five labels would gain their fields as untold covers.
+  ViewGroup in a Compose dialog's window — and nothing under it is marked (android-tree-dialect.ts#providesNodes).
+  Compose's order is composition order: form-shared-id lists each outlined field (left 55) before its label drawn over
+  its outline (left 77) — location order by chance; marked, the five labels would gain their fields as untold covers.
 - From there LR3's rules apply unchanged, through `listsNestedReadingOrder` (any nested run marked so):
   reading-order.ts#peersOf (a sibling listed before the target that draws there is a peer whose order the eyes tell,
   ADR 0024), placed.ts#FRAME_EXCUSES's `structural` (a childless leaf the app named is drawn unless it wraps a sibling),

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { capture } from '../../scripts/truth/capture-run.js';
 import { ACTIVITIES_COMMAND, AndroidLab, DEVICE_CHECK_SIMULATOR, FOCUS_WINDOW_COMMAND, HOME_COMMAND, windowInTransition, IosLab, withMeasuredPanel, type Exec } from '../../scripts/truth/lab-device.js';
-import { INPUT_SHOWN_COMMAND, TOUCHABLE_COMMAND } from '../../src/adapters/android.js';
+import { INPUT_SHOWN_COMMAND, TOUCHABLE_COMMAND } from '../../src/adapters/android-wm.js';
 import { parseLabApp, type CatalogCell, type LabState } from '../../scripts/truth/schema.js';
 
 // The lab devices' guards (scripts/truth/lab-device.ts): a capture or a live run touches the lab's own simulator or

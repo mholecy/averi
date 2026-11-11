@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { parseTouchableRegion } from '../../src/adapters/android.js';
+import { parseTouchableRegion } from '../../src/adapters/android-wm.js';
 import type { Rect } from '../../src/adapters/types.js';
 import { describeScrollResult, scrollUntilVisible } from '../../src/interact/scroll.js';
 import { parseDump } from '../helpers/android-dumps.js';

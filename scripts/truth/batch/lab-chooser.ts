@@ -1,5 +1,5 @@
 import { chooserSheet } from '../../../src/adapters/android-chooser.js';
-import { parseUiautomatorXml } from '../../../src/adapters/android.js';
+import { parseUiautomatorXml } from '../../../src/adapters/android-tree-dialect.js';
 import { everyNode, labelOf, rectCentre, type DrawnOverStrip, type Point, type Rect, type UiNode } from '../../../src/adapters/types.js';
 import {
   adbLine,

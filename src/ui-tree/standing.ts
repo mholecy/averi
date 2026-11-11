@@ -287,7 +287,7 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  * - The navigation bar's cut is read by shape: a whole last row resting
  *   flush with it fails an ocr assert closed too.
  * - Both system bands are cut from a PORTRAIT box only; the navigation band
- *   is read on portrait phones only (adapters/android.ts#parseNavigationBand).
+ *   is read on portrait phones only (adapters/android-wm.ts#parseNavigationBand).
  * - Android keeps its status bar at the top in landscape: a point under it
  *   there is judged on the screen.
  * - On a turn suggested but witnessed by no window, the tap accepts a point
@@ -1173,11 +1173,11 @@ const aboveLine = (box: Rect, line: KeyboardLine | undefined): Rect =>
  * extent there without holding the node itself — the edge, of the first such node in draw order (the outermost: the
  * submit bar, not its button), the first of top, bottom, left, right. Compose leaves out of a node's bounds what a
  * node drawn after it covers (the pinned-bar note; the parser widens a node whose own descendants still carry the cut
- * extent, adapters/android.ts#uncut, so this is the leaf's case): the lab's `phone` field, its 132-px touch target
- * from 1280, dumped `55,1370 970x42` under `Continue` `55,1238 970x132`, and after `back` `note` dumped `55,2126
- * 970x14`. The rest of it lies under that node: a tap at the strip's centre reached the field only because the lab's
- * bar lets touches through, and one at the field's own centre submitted the form. Only the shape a cut can leave: a
- * node narrower than the strip, or one a pixel away, leaves no rect that is a cut of the node, and a node holding the
+ * extent, adapters/android-tree-dialect.ts#uncut, so this is the leaf's case): the lab's `phone` field, its 132-px
+ * touch target from 1280, dumped `55,1370 970x42` under `Continue` `55,1238 970x132`, and after `back` `note` dumped
+ * `55,2126 970x14`. The rest of it lies under that node: a tap at the strip's centre reached the field only because the
+ * lab's bar lets touches through, and one at the field's own centre submitted the form. Only the shape a cut can leave:
+ * a node narrower than the strip, or one a pixel away, leaves no rect that is a cut of the node, and a node holding the
  * whole control is a cover (`exposure`'s). Only on a tree whose source cuts bounds so (later-edges.ts#laterEdgesIn's `cutsAtLater`: nested, frames
  * clipped — Android's): WDA reports frames unclipped (the same lab cell lists phone whole under the bar, covered at its
  * centre), and idb's flat list has no subtree to judge "after" by.

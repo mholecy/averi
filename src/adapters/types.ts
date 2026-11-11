@@ -51,7 +51,7 @@ export interface DeviceScreen {
    * - iOS: the status bar down to the safe area, by the screen's size
    *   (ios-status-band.ts, the measurement there) — always set;
    * - Android: the VISIBLE status bar's frame out of `dumpsys window
-   *   displays` (android.ts#parseStatusBand, 66 px on the measured 1080x2220
+   *   displays` (android-wm.ts#parseStatusBand, 66 px on the measured 1080x2220
    *   emulator) — unset when the bar is hidden (an immersive app) or the
    *   dump does not say (fail open). Its status bar does not lie outside
    *   the app's window for an app that draws edge-to-edge — Google Contacts
@@ -66,7 +66,7 @@ export interface DeviceScreen {
   /**
    * The TOP edge of the band at the bottom of the screen held upright that
    * is the system navigation bar's, in the tree's units — Android only
-   * (android.ts#parseNavigationBand: the VISIBLE bar's frame out of the same
+   * (android-wm.ts#parseNavigationBand: the VISIBLE bar's frame out of the same
    * `dumpsys window displays` as `statusBand`, across the bottom of the
    * display that dump describes; 2154 on the measured 1080x2220 emulator).
    * Unset when the bar is hidden, at a side, the display is turned
@@ -256,7 +256,7 @@ export const KEYBOARD_ROLE = 'keyboard';
 
 /**
  * The normalised role of every text input (adapters/ios-node.ts: TextField,
- * SecureTextField, TextView; adapters/android.ts: EditText,
+ * SecureTextField, TextView; adapters/android-tree-dialect.ts: EditText,
  * AutoCompleteTextView and the Compose input that dumps as a focusable,
  * long-clickable scroll view). Defined beside UiNode, as KEYBOARD_ROLE is,
  * because the adapters write it and both ui-tree (draw-order.ts: a text
@@ -289,12 +289,12 @@ export const SCREEN_SIZED_FRACTION = 0.9;
 /**
  * The kinds of PRESENTED LAYER a tree source marks (`UiNode.presentation`) — one closed set: three WDA types by an
  * element (`alert`, `actionSheet`, `popover`); `dialog`, the window uiautomator dumps when it floats over what it was
- * opened from (adapters/android.ts#presentedWindow); `screen`, a presented screen WDA shows by its visibility
- * flags, or the uiautomator window whose scrim lies above its sheet; and `backdrop`, an IN-WINDOW BACKDROP WDA's flags
- * show over the screen beneath it (adapters/wda-source.ts#inWindowBackdrops: a SwiftUI menu's dimmed tap-catcher in
- * the screen's own container) — judged as a `screen` layer is, but on weaker evidence: one empty element WDA lists
- * over the whole screen, which a hidden overlay that lets touches through matches too, so its remedy names that
- * evidence and the way out (ui-tree/remedy-text.ts#presentedRemedy).
+ * opened from (adapters/android-tree-dialect.ts#presentedWindow); `screen`, a presented screen WDA shows by its
+ * visibility flags, or the uiautomator window whose scrim lies above its sheet; and `backdrop`, an IN-WINDOW BACKDROP
+ * WDA's flags show over the screen beneath it (adapters/wda-source.ts#inWindowBackdrops: a SwiftUI menu's dimmed
+ * tap-catcher in the screen's own container) — judged as a `screen` layer is, but on weaker evidence: one empty element
+ * WDA lists over the whole screen, which a hidden overlay that lets touches through matches too, so its remedy names
+ * that evidence and the way out (ui-tree/remedy-text.ts#presentedRemedy).
  */
 export type PresentationKind = 'alert' | 'actionSheet' | 'popover' | 'dialog' | 'screen' | 'backdrop';
 
@@ -316,7 +316,7 @@ export interface UiNode {
   /**
    * Current value (text field contents, toggle state). A `textfield`'s null
    * value means EMPTY: both parsers map an empty or absent value to null
-   * (android.ts and ios-node.ts, `emptyToNull` — an empty Compose field
+   * (android-tree-dialect.ts and ios-node.ts, `emptyToNull` — an empty Compose field
    * dumps no `text` at all), so on an input null is "", never "withheld"
    * (interact/fill.ts reads it so). On any other role null is "no value
    * exposed".
@@ -350,7 +350,7 @@ export interface UiNode {
    * day), so `value` alone cannot tell "empty, showing `Company`" from
    * "holds `Company`". Set only where the source names the placeholder
    * separately: WDA's `placeholderValue` (wda-source.ts) and a uiautomator
-   * dump's `hint` attribute on a text input (android.ts — the API 33 dump
+   * dump's `hint` attribute on a text input (android-tree-dialect.ts — the API 33 dump
    * has none; newer dumps may). idb names none. Absent, never null or "",
    * when there is none, so trees that carry none are unchanged.
    *
@@ -412,8 +412,8 @@ export interface UiNode {
   clipsDescendants?: true;
   /**
    * The ONE axis this scroll view scrolls on, when the tree source says it by the node's type alone: Android's class
-   * (adapters/android.ts#AXIS_BY_CLASS — `ScrollView`, `NestedScrollView`, `ListView`, `GridView` vertical;
-   * `HorizontalScrollView`, `ViewPager` horizontal; a Compose `verticalScroll` dumps as `ScrollView` and a
+   * (adapters/android-tree-dialect.ts#AXIS_BY_CLASS — `ScrollView`, `NestedScrollView`, `ListView`, `GridView`
+   * vertical; `HorizontalScrollView`, `ViewPager` horizontal; a Compose `verticalScroll` dumps as `ScrollView` and a
    * `horizontalScroll` as `HorizontalScrollView`, while a lazy list or grid, which carries collection info, keeps
    * `android.view.View` and a RecyclerView dumps no orientation — neither says) and WDA's `Table` (vertical:
    * adapters/wda-source.ts). Absent where the type does not say: a WDA `ScrollView` or `CollectionView` — on a tree of
@@ -429,7 +429,7 @@ export interface UiNode {
    * The bounds the tree source dumped for this node, when they were CUT
    * short of its own descendants by something drawn over it, and `rect` is
    * widened to their extent (the bug note below): Android only, set by the uiautomator parser
-   * (adapters/android.ts#uncut, #widenUnderCovers).
+   * (adapters/android-tree-dialect.ts#uncut, #widenUnderCovers).
    * Compose subtracts what an overlay sibling covers from a node's bounds
    * but not from its descendants': mp-native's Account Detail row under its
    * sticky date header (`0,401 1080x79`) dumped as `66,480 948x66` while its
@@ -464,7 +464,7 @@ export interface UiNode {
   /**
    * The side of its container this node lies wholly PAST, when the tree
    * source dumped its bounds inverted (the bug note below): Android only, set by the uiautomator parser (adapters/
-   * android.ts#nodeBounds). uiautomator cuts a node's bounds to its
+   * android-tree-dialect.ts#nodeBounds). uiautomator cuts a node's bounds to its
    * container, and a node scrolled wholly past it keeps one edge of each —
    * Settings' `Apps` row under the collapsing app bar dumped
    * `[198,297][324,58]`, the list's top and the row's own bottom — which
@@ -505,7 +505,7 @@ export interface UiNode {
   /**
    * Set on the ROOT of a tree whose source lists a control's minimum TOUCH
    * TARGET as a wrapper of its own around it: uiautomator's
-   * (adapters/android.ts#parseUiautomatorXml) — Compose pads a control
+   * (adapters/android-tree-dialect.ts#parseUiautomatorXml) — Compose pads a control
    * smaller than 48 dp to a 48-dp touch target, and Google Contacts' Cancel
    * reaches the dump as `container 11,88 132x132` → the label node
    * `other 'Cancel' 44,121 66x66`, `button 22,99 110x110` (a 40-dp
@@ -521,19 +521,20 @@ export interface UiNode {
    */
   paddedTouchTargets?: true;
   /**
-   * Set on the ROOT of a tree whose source lists the ACTIVE WINDOW ONLY: uiautomator's (adapters/android.ts
-   * #parseUiautomatorXml) — `uiautomator dump` lists the window that has focus, so with a dialog or a bottom sheet up
-   * the dump IS that window, and the screen it was opened over is not in the tree at all (measured on the lab app's
-   * AlertDialog and ModalBottomSheet, docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md).
-   * So a target missing from such a tree may lie beneath a presented window rather than be absent: when the parser
-   * also marks the root presented (`presentation`), ui-tree/presentation.ts#Presentation.alone names that window, and
-   * the wait for a target "to appear" says close it first instead (interact/resolve.ts); when it does not, every
-   * not-found says the window may be one (ui-tree/miss.ts#ACTIVE_WINDOW_HINT). Read by ui-tree/miss.ts#missOf, for
-   * that hint and for the words of a window listed alone. A mark of the source, like `flatList`: ui-tree knows no
-   * platform. Absent on WDA's trees (every window of the app, the keyboard's too) and idb's flat list (which lists
-   * only a presented layer as well — measured on the lab's SwiftUI alert and sheets — but not by window: its parser
-   * marks the root presented only when the list holds UIKit's dismiss region, adapters/ios-tree-source.ts
-   * #listsPresentedLayer, and an idb miss names no presented layer otherwise, ADR 0018's residual 6).
+   * Set on the ROOT of a tree whose source lists the ACTIVE WINDOW ONLY: uiautomator's
+   * (adapters/android-tree-dialect.ts#parseUiautomatorXml) — `uiautomator dump` lists the window that has focus, so
+   * with a dialog or a bottom sheet up the dump IS that window, and the screen it was opened over is not in the tree at
+   * all (measured on the lab app's AlertDialog and ModalBottomSheet,
+   * docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md). So a target missing
+   * from such a tree may lie beneath a presented window rather than be absent: when the parser also marks the root
+   * presented (`presentation`), ui-tree/presentation.ts#Presentation.alone names that window, and the wait for a target
+   * "to appear" says close it first instead (interact/resolve.ts); when it does not, every not-found says the window
+   * may be one (ui-tree/miss.ts#ACTIVE_WINDOW_HINT). Read by ui-tree/miss.ts#missOf, for that hint and for the words of
+   * a window listed alone. A mark of the source, like `flatList`: ui-tree knows no platform. Absent on WDA's trees
+   * (every window of the app, the keyboard's too) and idb's flat list (which lists only a presented layer as well —
+   * measured on the lab's SwiftUI alert and sheets — but not by window: its parser marks the root presented only when
+   * the list holds UIKit's dismiss region, adapters/ios-tree-source.ts #listsPresentedLayer, and an idb miss names no
+   * presented layer otherwise, ADR 0018's residual 6).
    */
   activeWindowOnly?: true;
   /**
@@ -562,16 +563,16 @@ export interface UiNode {
   unclippedFrames?: true;
   /**
    * Set on the ROOT of a tree whose source CUTS a node's bounds AT THE SCREEN'S EDGE (the root's rect) even where the
-   * node lies past a scroll view that ends inside the screen: uiautomator's (adapters/android.ts#parseUiautomatorXml).
-   * Measured on the lab app's `carousel-in-list` (API 33): the carousel `[66,380][1014,614]` drawn at 1014, its card C
-   * laid at x 586 948 wide (the app's model) is dumped `[586,380][1080,614]` — cut at the screen's 1080, not at its
-   * 948 px — so its listed centre 833 lies inside the carousel while its true centre, 1060, lies past it. So where a
-   * node's side lies on the screen's edge and its drawn frame's matching side lies inside the screen, how far the
-   * node runs past that side is unknown (geometry.ts#DrawnFrame.unknownPast): its visible fraction is an upper bound,
-   * and its centre unknown along that axis. A full-width row in a full-width list is not such a node: its scroll
-   * view ends at the screen's edge too. Read by ui-tree/draw-order.ts#listsBoundsCutAtScreen. A mark of the source,
-   * like `flatList`: ui-tree knows no platform. Absent on WDA's trees (frames unclipped, `unclippedFrames`) and idb's
-   * flat list (no scroll view listed).
+   * node lies past a scroll view that ends inside the screen: uiautomator's
+   * (adapters/android-tree-dialect.ts#parseUiautomatorXml). Measured on the lab app's `carousel-in-list` (API 33): the
+   * carousel `[66,380][1014,614]` drawn at 1014, its card C laid at x 586 948 wide (the app's model) is dumped
+   * `[586,380][1080,614]` — cut at the screen's 1080, not at its 948 px — so its listed centre 833 lies inside the
+   * carousel while its true centre, 1060, lies past it. So where a node's side lies on the screen's edge and its drawn
+   * frame's matching side lies inside the screen, how far the node runs past that side is unknown
+   * (geometry.ts#DrawnFrame.unknownPast): its visible fraction is an upper bound, and its centre unknown along that
+   * axis. A full-width row in a full-width list is not such a node: its scroll view ends at the screen's edge too. Read
+   * by ui-tree/draw-order.ts#listsBoundsCutAtScreen. A mark of the source, like `flatList`: ui-tree knows no platform.
+   * Absent on WDA's trees (frames unclipped, `unclippedFrames`) and idb's flat list (no scroll view listed).
    * docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md (its amendment "a side cut at the screen's edge")
    */
   boundsCutAtScreen?: true;
@@ -612,13 +613,13 @@ export interface UiNode {
   /**
    * On an INPUT (`role` INPUT_ROLE), whether its source marks it a SECURE field — one that masks what it holds:
    * uiautomator's `password` attribute (`"true"`/`"false"` on every node it dumps; read on text inputs only,
-   * adapters/android.ts#normalizeNode), WDA's element type (`SecureTextField` → true, `TextField`/`TextView` → false,
-   * adapters/wda-source.ts#toUiNode), and on idb's `TextField`/`TextView` only, its `traits` naming `SecureTextField`
-   * or its `subrole` `AXSecureTextField` → true, traits printed naming neither → false (idb types a secure field
-   * `TextField` too: the lab's `lab.form-basic.pin`, adapters/ios-tree-source.ts#idbSecure). ABSENT is unknown, never
-   * plain: a node of another role, an input-like node of another one (an iOS search field reads `other`), a source or
-   * a dump that did not print it. The one reader: an Android fill's post-focus re-read is skipped for an empty input
-   * that says `false` (interact/fill.ts,
+   * adapters/android-tree-dialect.ts#normalizeNode), WDA's element type (`SecureTextField` → true,
+   * `TextField`/`TextView` → false, adapters/wda-source.ts#toUiNode), and on idb's `TextField`/`TextView` only, its
+   * `traits` naming `SecureTextField` or its `subrole` `AXSecureTextField` → true, traits printed naming neither →
+   * false (idb types a secure field `TextField` too: the lab's `lab.form-basic.pin`,
+   * adapters/ios-tree-source.ts#idbSecure). ABSENT is unknown, never plain: a node of another role, an input-like node
+   * of another one (an iOS search field reads `other`), a source or a dump that did not print it. The one reader: an
+   * Android fill's post-focus re-read is skipped for an empty input that says `false` (interact/fill.ts,
    * docs/adr/0028-a-fill-re-reads-after-focus-only-where-focus-can-change-the-count.md), and a field said plain that
    * reads as bullets then fails unless it shows exactly the typed length. A mark of the source, like `heading`:
    * ui-tree knows no platform. Printed by `ui_snapshot` only when `true` (mcp/tools.ts#snapshotJson).
@@ -656,7 +657,7 @@ export interface UiNode {
   hidden?: true;
   /**
    * Set on a node its source says is NOT ENABLED, as dumped and per node (no inheritance): uiautomator's
-   * `enabled="false"` (adapters/android.ts#normalizeNode), WDA's `isEnabled` "0" or 0
+   * `enabled="false"` (adapters/android-tree-dialect.ts#normalizeNode), WDA's `isEnabled` "0" or 0
    * (adapters/wda-source.ts#toUiNode), idb's `enabled: false` (adapters/ios-tree-source.ts#idbTree). Any other value —
    * the attribute missing, true, anything else — leaves it absent: absent is enabled OR unknown, never false (fail
    * open). Read by a tap by selector alone, which still taps and warns in the MCP reply and the flow's trace
@@ -670,9 +671,9 @@ export interface UiNode {
    * Set on a PRESENTED LAYER — a Window's direct child that the tree source itself says is presented over every
    * screen drawn before it (`PresentationKind`), or, under WDA, an in-window backdrop inside one (below) — by the WDA
    * parser (adapters/wda-source.ts#presentedLayers), one mark per layer, and by the uiautomator parser on the root,
-   * the one window it dumps (adapters/android.ts#presentedWindow: `dialog` for a window that floats off the screen's
-   * top and left edges both, and `screen` for one whose clickable, labelled scrim lies screen-wide above its sheet;
-   * the root also carries `activeWindowOnly`), and by the idb parser on the root of its flat list
+   * the one window it dumps (adapters/android-tree-dialect.ts#presentedWindow: `dialog` for a window that floats off
+   * the screen's top and left edges both, and `screen` for one whose clickable, labelled scrim lies screen-wide above
+   * its sheet; the root also carries `activeWindowOnly`), and by the idb parser on the root of its flat list
    * (adapters/ios-tree-source.ts#listsPresentedLayer: `screen`, the list holding UIKit's dismiss region over the whole
    * screen — the list is then the presented layer alone). One writer works after the read: on a miss only, the root of
    * a uiautomator tree its parser left unmarked is marked by the window manager's word on the focused window
@@ -768,7 +769,7 @@ export function* everyNode(root: UiNode): Generator<UiNode> {
  * Is anything drawn over `strip` of `node`? Asked of one tree, `root`, as
  * the tree source read it, for each node it asks about: the uiautomator
  * parser widens a node cut short of its own content only under something
- * drawn over the strip it would gain (android.ts#parseUiautomatorXml,
+ * drawn over the strip it would gain (android-tree-dialect.ts#parseUiautomatorXml,
  * `UiNode.cutBounds`). What draws is the UI-tree layer's judgement
  * (ui-tree/draw-order.ts#drawnOverStrip), which an adapter may not import;
  * so the parser is handed it, required — the composition root

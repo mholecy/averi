@@ -15,6 +15,8 @@ Amended 2026-11-06 (A10: the chooser goes up as a fact, on both verbs, and its w
 byte for byte; implemented on `arch/a10-app-holder`).
 Amended 2026-11-06 (D73: monkey's `** SYS_KEYS` line is why it stopped, not a warning; monkey starts over the chooser.
 This corrects D55b; implemented on `fix/d73-monkey-syskeys`).
+Amended 2026-11-11 (A27: the focus read moves to `adapters/android-wm.ts`, one `mCurrentFocus` reader; the judgement
+stays here, byte for byte; implemented on `refactor/a27-android-split`).
 
 ## Context
 
@@ -859,3 +861,20 @@ unread is `--check`'s exit 3. The lab emulator has one display, so one line.
 refused by the checkout precondition, nothing ran: the feature branch's HEAD is not main's, and truth:lab runs only on
 main's. Exit 2, no build, no call to the emulator. The Gate B proof of the five-group run is the first truth:lab on main
 after the merge.
+
+## Amendment: the focus read is the window manager module's (2026-11-11, A27)
+
+A27 split `adapters/android.ts` (ADR 0038's A27 amendment). The window manager's dumps are read in one module,
+`adapters/android-wm.ts`, and the chooser's focus read joins them: `CHOOSER_FOCUS_COMMAND`, `FOCUSED_APP_RE` and the
+default display's block move there, as `defaultDisplayFocus`, which answers the default display's focused activity and
+window components. `android-chooser.ts#chooserInFocus` keeps the judgement this ADR decided: the activity's line
+decides when it names one, the window's only when it does not, and only the platform's chooser is named.
+
+The focus line had two regexes, the focused window's hash for `parseFocusedWindow` and its component here. They are one,
+`CURRENT_FOCUS_RE`. The two did not read every line alike: the hash reader took any `Window{<hash> ` record, the
+component reader only `Window{<hash> u<user> <pkg>/<class>}`. Every captured line has the user token, so no fixture
+decides between them, and the one reader keeps both answers (tests/adapters/android-wm.test.ts pins the record with no
+user token and a block whose first focus line is a title). Since A22 the lab's `--check` no longer reads src's
+`chooserInFocus` (its own reader, above), so the move touches no lab judgement. The chooser's replies are byte for byte,
+and its display rule, display 0's block, is unchanged: A27 did not merge it with the window manager's other two (ADR
+0038's A27 amendment says why).

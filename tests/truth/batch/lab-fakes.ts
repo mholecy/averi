@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, writeSync } from 'node:fs';
 import { join } from 'node:path';
-import { CHOOSER_FOCUS_COMMAND } from '../../../src/adapters/android-chooser.js';
+import { CHOOSER_FOCUS_COMMAND } from '../../../src/adapters/android-wm.js';
 import { DEVICE_CHECK_SIMULATOR, DEVICE_CHECK_WDA_PORTS, LAB_APP } from '../../../scripts/truth/lab-device.js';
 import { failuresJson } from '../../../scripts/truth/rejudge-failures.js';
 import type { Run } from '../../../scripts/truth/batch/bounded.js';

@@ -354,7 +354,7 @@ export interface LabState {
   readAt?: number;
   /**
    * Not the app's: Android, a case that measures the floating panel (live-cases.ts Case.measuresPanel) — what averi's
-   * touchable query (src/adapters/android.ts#TOUCHABLE_COMMAND, LabDevice.imeTouchable) answered right after the
+   * touchable query (src/adapters/android-wm.ts#TOUCHABLE_COMMAND, LabDevice.imeTouchable) answered right after the
    * launch (on `launched`) and once the calls were done (on `state`, D69), raw; `{ error }` when the read failed past
    * the device guard (lab-device.ts#withMeasuredPanel). live-forms.ts#measuredPanel reads it. Absent from captures,
    * from every other case and from records before D67 (on `state`, before D69).
@@ -696,7 +696,7 @@ export const DRAWN = 0.95;
 export const pct = (f: number) => `${Math.round(f * 100)}%`;
 
 /**
- * The window manager's word on the focused window, as src/adapters/android.ts#FOCUSED_WINDOW_COMMAND asks it (pinned
+ * The window manager's word on the focused window, as src/adapters/android-wm.ts#FOCUSED_WINDOW_COMMAND asks it (pinned
  * equal in tests): the focus and the display's size out of `dumpsys window displays`, then `dumpsys window windows`.
  * The capture records its answer (CellTruth.windows), the golden mode's fake device serves it.
  */

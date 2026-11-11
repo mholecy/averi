@@ -1,4 +1,5 @@
-import { AXIS_BY_CLASS, parseInputShown, parseTouchableRegion } from '../../src/adapters/android.js';
+import { parseInputShown, parseTouchableRegion } from '../../src/adapters/android-wm.js';
+import { AXIS_BY_CLASS } from '../../src/adapters/android-tree-dialect.js';
 import { sameRect, type ScrollAxis } from '../../src/adapters/types.js';
 import type { Platform, SourceKind } from '../differential/corpus.js';
 import { DRAWN, pct, type CatalogField, type CatalogForm, type CellTruth, type Direction, type ControlTruth, type Geometry, type Insets, type LabState, type NavigationMode, type ProbeEvent, type Rect, type Situation, type TargetTruth } from './schema.js';
@@ -13,7 +14,7 @@ import { DRAWN, pct, type CatalogField, type CatalogForm, type CellTruth, type D
  * imported, so a change to averi's rule cannot move the truth with it: the sliver's fraction (SLIVER_FRACTION), WDA's
  * scroller types (WDA_SCROLLERS, held equal to src's by a test, as the harness reads the raw tree on its own). A
  * READING of a source's own words, where the question is what averi reads, not whether its rule is right, is imported,
- * so the two cannot drift: the IME window's touchable region (src/adapters/android.ts#parseInputShown,
+ * so the two cannot drift: the IME window's touchable region (src/adapters/android-wm.ts#parseInputShown,
  * #parseTouchableRegion: one parser of the dump, D69), and the axis a uiautomator class fixes (AXIS_BY_CLASS, read by
  * scrollAxisToldIn: golden asks D52's `unfit` exactly where averi reads a told axis — what is judged there is the stop,
  * not the class table) — and plain utilities and types (sameRect, ScrollAxis). Both WDA_SCROLLERS and AXIS_BY_CLASS
@@ -124,8 +125,8 @@ function rawNodes(payload: string, source: SourceKind): Record<string, unknown>[
  * target, labelled `text` (WDA's `label`, idb's `AXLabel`, uiautomator's `text` or `content-desc`) compared as
  * textListedIn compares a string: whitespace collapsed (spaced), so a string the app wraps onto lines is one node in
  * both readings; or, for a label target, its accessibility label exactly as averi reads it (WDA's `label`, idb's
- * `AXLabel`; uiautomator's `content-desc`, or its `text` where that is empty — src/adapters/android.ts#normalizeNode's
- * `label: contentDesc ?? text`).
+ * `AXLabel`; uiautomator's `content-desc`, or its `text` where that is empty —
+ * src/adapters/android-tree-dialect.ts#normalizeNode's `label: contentDesc ?? text`).
  */
 function isTarget(o: Record<string, unknown>, source: SourceKind, by: AssertElement): boolean {
   if ('id' in by) return (source === 'uiautomator' ? [o['resource-id']] : source === 'idb' ? [o.AXUniqueId] : [o.rawIdentifier, o.name]).some((v) => v === by.id);
@@ -204,8 +205,8 @@ function atClip(o: Record<string, unknown>, source: SourceKind, clip: Rect): boo
 /**
  * The axis a raw tree's payload TELLS of the scroller whose frame is `clip` (within a pixel, each edge), or undefined
  * when it tells none: a uiautomator node marked `scrollable="true"` whose class fixes its axis — averi's own table,
- * src/adapters/android.ts#AXIS_BY_CLASS, so the row asks `unfit` exactly where averi reads a told axis (a Compose
- * `horizontalScroll` dumps as `android.widget.HorizontalScrollView`; a LazyRow or a RecyclerView tells none).
+ * src/adapters/android-tree-dialect.ts#AXIS_BY_CLASS, so the row asks `unfit` exactly where averi reads a told axis (a
+ * Compose `horizontalScroll` dumps as `android.widget.HorizontalScrollView`; a LazyRow or a RecyclerView tells none).
  * Uiautomator only: WDA's axis comes from a node's type or its content's extent (src/adapters/wda-source.ts), which
  * the harness does not read, and idb lists no scroller (ADR 0010 residual 5). golden-spec/rows.ts#unfitSide asks it.
  */
@@ -697,7 +698,7 @@ export function outOfProcessKeyboard(platform: Platform, keyboard: Rect | undefi
  * the rects of the touchable region (`dumpsys window InputMethod`'s `touchable region=SkRegion((l,t,r,b)…)`, as
  * ImeCapture.shown.touchable holds it, read while the input method says it is shown) other than the band itself
  * (`band`, the keyboard frame the app hears of: under a floating Gboard only the 132-px strip at the screen's bottom,
- * `[0,2088][1080,2220]` on averi_lab). Parsed by averi's own readers (src/adapters/android.ts#parseInputShown,
+ * `[0,2088][1080,2220]` on averi_lab). Parsed by averi's own readers (src/adapters/android-wm.ts#parseInputShown,
  * #parseTouchableRegion: one parser of the dump, D69), but admitted by the harness's own rule — every rect but the band
  * — never by averi's (`ui-tree/keyboard-cover.ts#panelsBeyond`): the capture is ground truth, and must not share the
  * rule the golden checks (docs/bugs/2026-10-05-android-floating-gboard-keyboard.md). Docked, the region is the band:

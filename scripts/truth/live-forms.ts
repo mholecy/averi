@@ -2,7 +2,7 @@ import { minTapPiece } from '../../src/ui-tree/draw-order.js';
 import { frameText, rectText } from '../../src/ui-tree/geometry.js';
 import { firedSince, touchesSince, touchPointsText, type LiveVerdict } from './live-visibility.js';
 import { allPassed, ASSERTS_FAILED, bandSaid, claimsDone, claimsTap, UNCHANGED_SAID, firstLine, focusTextNotReadSaid, isError, missedTarget, presentedRemedySaid, refusedUnsentSaid, replyKind, scrollVerdictSaid, swipesOf, underBarRemedySaid, windowHintSaid } from './replies.js';
-import { parseInputShown, parseTouchableRegion } from '../../src/adapters/android.js';
+import { parseInputShown, parseTouchableRegion } from '../../src/adapters/android-wm.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import { rectIntersection, sameRect } from '../../src/adapters/types.js';
 import { panelsBeyond } from '../../src/ui-tree/keyboard-cover.js';
@@ -373,12 +373,12 @@ export function floatingAtLaunch(launched: LabState): LiveVerdict | undefined {
 
 /**
  * The floating panel, as the IME window's touchable region named it right after the launch (LabState.imeTouchable,
- * run-case.ts's first device read for the kf cases — averi's own query, src/adapters/android.ts#TOUCHABLE_COMMAND), read by
- * averi's own readers (src/adapters/android.ts#parseInputShown, #parseTouchableRegion) and admitted by averi's own
- * rules (src/ui-tree/keyboard-cover.ts#panelsBeyond, beside `strip`, the inset the app hears of) — no second parser,
- * no rule of the harness's. The panel lies wherever the hand dragged it: no list of placements. Anything but one
- * admitted panel is "no measured panel", saying why: no read (a record before D67), a failed read, the input method
- * not saying shown, a region that does not read, one that does not hold the strip, rects off the screen, no rect
+ * run-case.ts's first device read for the kf cases — averi's own query, src/adapters/android-wm.ts#TOUCHABLE_COMMAND),
+ * read by averi's own readers (src/adapters/android-wm.ts#parseInputShown, #parseTouchableRegion) and admitted by
+ * averi's own rules (src/ui-tree/keyboard-cover.ts#panelsBeyond, beside `strip`, the inset the app hears of) — no
+ * second parser, no rule of the harness's. The panel lies wherever the hand dragged it: no list of placements. Anything
+ * but one admitted panel is "no measured panel", saying why: no read (a record before D67), a failed read, the input
+ * method not saying shown, a region that does not read, one that does not hold the strip, rects off the screen, no rect
  * beyond the strip, or several panels. The read after the calls (D69, on the final state) is admitted by it too.
  */
 export function measuredPanel(launched: LabState, strip: Rect): { panel: Rect } | { why: string } {

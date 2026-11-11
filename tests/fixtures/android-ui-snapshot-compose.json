@@ -1,6 +1,6 @@
 {
   "_comment": [
-    "REAL ui_snapshot output (the normalized UiNode tree, adapters/android.ts#parseUiautomatorXml), emulator-5554,",
+    "REAL ui_snapshot output (the normalized UiNode tree, adapters/android-tree-dialect.ts#parseUiautomatorXml), emulator-5554,",
     "Pixel_3a AVD, Android 13, 1080x2220, 2026-10-09 — the round-5 device run of docs/bugs/2026-10-09-android-compose-",
     "button-text-refused-as-under-its-own-button.md. Whole screens, unedited; each key names its screen:",
     "loggedOut: mp-native inactivity \"Logged out\": LOGIN.",

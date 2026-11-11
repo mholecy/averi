@@ -1828,7 +1828,7 @@ describe('round — a target uiautomator dumped CLIPPED OUT of its scroll contai
   const scroller: Rect = { x: 0, y: 297, width: 1080, height: 1923 };
   /** `Apps` (126 wide at x 198), 60 tall at y. */
   const apps = (y: number): Row => ({ found: [match({ x: 198, y, width: 126, height: 60 }, 'apps')], scroller });
-  /** `Apps` dumped inverted past `side`, as the parser normalizes it (adapters/android.ts#nodeBounds): zero size at the list's edge, the side kept. */
+  /** `Apps` dumped inverted past `side`, as the parser normalizes it (adapters/android-tree-dialect.ts#nodeBounds): zero size at the list's edge, the side kept. */
   const clippedOut = (side: 'top' | 'bottom'): Row => ({
     found: [{ ...match({ x: 198, y: side === 'top' ? 297 : 2220, width: 126, height: 0 }, 'apps'), clippedOut: side }],
     scroller,

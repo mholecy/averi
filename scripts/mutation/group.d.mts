@@ -1,6 +1,6 @@
 // The types of group.mjs (plain JS so that stryker.config.mjs can load it without tsx), for mutate.ts and the tests.
 
-export declare const GROUPS: readonly ['core', 'scene', 'lab'];
+export declare const GROUPS: readonly ['core', 'android', 'scene', 'lab'];
 export type Group = (typeof GROUPS)[number];
 export declare const GROUP_ENV: 'AVERI_MUTATE_GROUP';
 export declare const GROUP_WORDS: string;

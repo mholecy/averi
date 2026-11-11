@@ -14,7 +14,7 @@
  * iOS adapter reports it with the screen (`DeviceScreen.statusBand`,
  * ios.ts#viewport) and interact/ only reads it — the one source of truth.
  * Android reports its own since 2026-10-12, read off the device rather than
- * a table (android.ts#parseStatusBand).
+ * a table (android-wm.ts#parseStatusBand).
  */
 
 /**

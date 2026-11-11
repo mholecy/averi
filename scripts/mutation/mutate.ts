@@ -9,11 +9,11 @@ import {
 } from './group.mjs';
 
 /**
- * `npm run mutate`: Stryker over the modules scope.json names, one group at a time (core, scene, then lab: one Stryker
- * process each, bounded at GROUP_BOUND_MS), then each module's score held to its own floor there. Fails if any
+ * `npm run mutate`: Stryker over the modules scope.json names, one group at a time (core, android, scene, then lab: one
+ * Stryker process each, bounded at GROUP_BOUND_MS), then each module's score held to its own floor there. Fails if any
  * group fails. Why, when, the groups and the floor rule: docs/adr/0038-a-mutation-run-guards-the-pure-leaves-tests.md.
  *
- *   node --import tsx scripts/mutation/mutate.ts [--group core|scene|lab] [<stryker run argument> …]
+ *   node --import tsx scripts/mutation/mutate.ts [--group core|android|scene|lab] [<stryker run argument> …]
  *   (npm run mutate -- --force: every group, cold; npm run mutate -- --group lab --force: lab alone, cold)
  */
 

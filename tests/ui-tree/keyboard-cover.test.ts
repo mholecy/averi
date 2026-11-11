@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { parseInputShown, parseTouchableRegion } from '../../src/adapters/android.js';
+import { parseInputShown, parseTouchableRegion } from '../../src/adapters/android-wm.js';
 import { KEYBOARD_ROLE, type KeyboardTouchable, type KeyboardWitness, type Rect, type SoftKeyboard, type UiNode } from '../../src/adapters/types.js';
 import { readKeyboard } from '../../src/ui-tree/keyboard-cover.js';
 import { GBOARD, GBOARD_PANEL, GBOARD_STRIP } from '../helpers/android-dumps.js';

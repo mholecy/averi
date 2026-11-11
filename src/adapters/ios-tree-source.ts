@@ -267,9 +267,9 @@ const DISMISS_REGION = 'PopoverDismissRegion';
  * is never in this tree: the presentation module reads the root's mark as Android's one presented window
  * (ui-tree/presentation.ts#byMarks: `scroll_until` sends no stroke for a target not in the tree — one at (201,175)
  * on the dim dismissed the sheet and read the target "fully visible after 1 swipe" — and the tap's wait says close it
- * first, `Presentation.alone`). Read here, where the raw element is, as android.ts#presentedWindow reads its dump.
- * Specific: of every idb capture committed (the lab's 31, tests/fixtures/idb-*.json) only those two hold the region.
- * Residuals, stated: a presentation UIKit lays with no dimming view — a large-detent or full-screen sheet
+ * first, `Presentation.alone`). Read here, where the raw element is, as android-tree-dialect.ts#presentedWindow reads
+ * its dump. Specific: of every idb capture committed (the lab's 31, tests/fixtures/idb-*.json) only those two hold the
+ * region. Residuals, stated: a presentation UIKit lays with no dimming view — a large-detent or full-screen sheet
  * (sheet-background.idb.json lists the sheet's button alone, no sign of the sheet), an alert, a transparent cover —
  * is no presented layer here; a dismiss region that does not reach the whole screen (a popover's on an iPad?
  * unmeasured) neither; and the screen beneath the region, were idb ever to list it too (unmeasured), reads as the

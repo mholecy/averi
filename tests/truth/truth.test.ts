@@ -202,7 +202,7 @@ describe('imePanels — a floating IME\'s panels, from the touchable region', ()
     expect(JSON.stringify(imePanels(await touchable('form-keyboard'), rect(0, 1398, 1080, 822)))).toBe('[]');
     expect(JSON.stringify(imePanels(await touchable('form-keyboard-floating'), BAND))).toBe('[{"x":71,"y":1092,"width":937,"height":792}]');
   });
-  // D69: parsed by averi's own readers (src/adapters/android.ts#parseInputShown, #parseTouchableRegion), the harness's
+  // D69: parsed by averi's own readers (src/adapters/android-wm.ts#parseInputShown, #parseTouchableRegion), the harness's
   // own rule kept — every rect but the band, no panelsBeyond (ground truth must not use the rule it checks).
   it('whitespace in the region is tolerated, as averi tolerates it', () => {
     expect(imePanels(`${shown}    touchable region=SkRegion( (71, 1092, 1008, 1884) (0,2088,1080,2220) )\n`, BAND)).toEqual([rect(71, 1092, 937, 792)]);

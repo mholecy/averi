@@ -3,7 +3,7 @@ import { homedir } from 'node:os';
 import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { INPUT_SHOWN_COMMAND, TOUCHABLE_COMMAND } from '../../src/adapters/android.js';
+import { INPUT_SHOWN_COMMAND, TOUCHABLE_COMMAND } from '../../src/adapters/android-wm.js';
 import type { Point } from '../../src/adapters/types.js';
 import { WdaServer } from '../../src/adapters/wda.js';
 import type { Platform, SourceKind } from '../differential/corpus.js';
@@ -96,9 +96,9 @@ export interface LabDevice {
    */
   ime?(): Promise<ImeCapture>;
   /**
-   * Android: averi's touchable query (src/adapters/android.ts#TOUCHABLE_COMMAND) now, raw — the IME window's touchable region beside `mInputShown`,
-   * read at a kf case's launch and again once its calls are done (run-case.ts, withMeasuredPanel; LabState.imeTouchable,
-   * D69). Leaves the keyboard up. Absent on iOS.
+   * Android: averi's touchable query (src/adapters/android-wm.ts#TOUCHABLE_COMMAND) now, raw — the IME window's
+   * touchable region beside `mInputShown`, read at a kf case's launch and again once its calls are done (run-case.ts,
+   * withMeasuredPanel; LabState.imeTouchable, D69). Leaves the keyboard up. Absent on iOS.
    */
   imeTouchable?(): Promise<string>;
   /**
@@ -332,7 +332,7 @@ export const windowInTransition = (window: string): boolean => /mCurrentFocus=nu
 export type HomeRead = { resolved: string } | { error: string };
 
 /**
- * The chooser group's focus read (live-chooser.ts, T7b), the harness's own, beside src's (android-chooser.ts
+ * The chooser group's focus read (live-chooser.ts, T7b), the harness's own, beside src's (android-wm.ts
  * #CHOOSER_FOCUS_COMMAND) and not imported from it, so the oracle does not share the code it judges: the window
  * manager's focus lines, and every activity record on the stack (`* Hist  #<n>: ActivityRecord{…}`, top first).
  */
@@ -509,8 +509,8 @@ export class AndroidLab implements LabDevice {
   }
 
   /**
-   * averi's own queries, imported (src/adapters/android.ts#INPUT_SHOWN_COMMAND, #TOUCHABLE_COMMAND): the capture asks
-   * the device what averi asks it, shown and again after a back hid the keyboard.
+   * averi's own queries, imported (src/adapters/android-wm.ts#INPUT_SHOWN_COMMAND, #TOUCHABLE_COMMAND): the capture
+   * asks the device what averi asks it, shown and again after a back hid the keyboard.
    */
   async ime(): Promise<ImeCapture> {
     await this.guard();

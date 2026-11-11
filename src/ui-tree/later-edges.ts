@@ -56,10 +56,10 @@ import { across, EDGES, flushEdges, rectWithin, type Clips, type Edge } from './
  * where no screenshot sees; `scroll_until fully: true` first brings it whole).
  * docs/bugs/2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md
  *
- * Not a reader: adapters/android.ts#widenUnderCovers. It is different evidence — the strip a node GAINS when the
- * parser widens it to its descendants' extent (a node whose own content still carries the cut extent), asked through
- * the `DrawnOverStrip` port (adapters/types.ts) while the dump is parsed, before any scene exists, in the adapter
- * layer. This module's evidence is the leaf's case: nothing of the node is left to widen it by.
+ * Not a reader: adapters/android-tree-dialect.ts#widenUnderCovers. It is different evidence — the strip a node GAINS
+ * when the parser widens it to its descendants' extent (a node whose own content still carries the cut extent), asked
+ * through the `DrawnOverStrip` port (adapters/types.ts) while the dump is parsed, before any scene exists, in the
+ * adapter layer. This module's evidence is the leaf's case: nothing of the node is left to widen it by.
  * docs/adr/0013-refuse-a-tap-on-a-sliver-cut-by-its-scroll-container.md (refined 2026-10-20)
  */
 

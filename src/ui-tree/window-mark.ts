@@ -6,9 +6,9 @@ import { findTarget, type Target } from './selectors.js';
  * decides what the focused window the window manager types (`DeviceAdapter.focusedWindow`, adapters/android.ts) says of
  * a tree that lists the active window only and whose parser marked no window presented — a full-screen dialog Compose
  * lays between the bars, a Views dialog laid full screen, an expanded sheet with no scrim, or a plain screen; the dump
- * cannot tell them apart (adapters/android.ts#presentedWindow's residuals).
+ * cannot tell them apart (adapters/android-tree-dialect.ts#presentedWindow's residuals).
  *
- * The word is tied to the dump by FRAME: the window's frame, clipped to the screen (adapters/android.ts
+ * The word is tied to the dump by FRAME: the window's frame, clipped to the screen (adapters/android-wm.ts
  * #parseFocusedWindow: the dump clips the root, the window manager may lay a window a pixel past the screen's edge,
  * `1081` of a 1080 screen), must be the root's bounds, x, y, width and height each within a pixel
  * (types.ts#sameRectWithinPixel, rounding between two readers of one layout), or nothing is marked (a window opened or
