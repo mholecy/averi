@@ -7,7 +7,8 @@ misses a transformed value is unacceptable). Implemented in 5ea9bfd2…546c8804,
 Amended 2026-11-03 (D64, docs only: the safety claim and cost C1 corrected — a focus-inserted prefix that holds the
 value passes with no key landed; residual 3 accepted; follow-up D64b). Amended 2026-11-05 (D64b-3: option B3b, a caveat
 where such a reading is not exactly the value; residual 3 restated). Amended 2026-11-09 (D72: Android's reading keeps
-outer spaces — the ⚠ line counts what the app holds; residual 3 narrowed).
+outer spaces — the ⚠ line counts what the app holds; residual 3 narrowed). Amended 2026-11-11 (A28: the gate is a row
+of one table in fill-landing.ts, the held count beside it; the field's reads one module; no behaviour changed).
 
 ## Context
 
@@ -242,6 +243,59 @@ source, a NON-empty plain field's `before` is its pre-tap reading, never re-read
 focus a text holding the value has the same hole, and no caveat, since `held` is not `'unread'` there. iOS: the owner's
 batch (rebuild the lab app, fp1 and fp2 three times, a forms regression) is still to be read; no change is expected, as
 the re-read runs there.
+
+## Amendment: the read after focus one table, the field's reads one module (2026-11-11, A28)
+
+Architecture review 2026-11-11 (docs/architecture-reviews/2026-11-11-ten-agent-review.html, card 10; backlog A28). No
+behaviour, timing or wording changed: the same reads at the same moments, in the same number.
+
+- **The read after the focus tap is one pure table**, `interact/fill-landing.ts#postFocusReadOf`, from the value,
+  `clear`, the field as resolved, a sole `id` and `retypesTail`, answering what fill.ts needs: `reads` (the field is
+  read after the tap) and `count`, where the masked rule's count comes from (`HeldFrom`: `after-focus`, `before-tap`,
+  or `unread` — the skip; absent when nothing is typed). Until A28 fill.ts decided it in four places: this ADR's gate,
+  the masked count's re-read, a clear alone's re-read (inside the clear branch), and the `held` it handed the typing.
+  The gate is the table's `unread` row, its clauses unchanged (`needsHeldCount`, the sole id, `retypesTail`, no
+  `clear`, a value); the decision above stands as written, only the place it is written moved. fill.ts reads the
+  answer's fields and switches on no kind of its own. The table is pinned row by row in
+  tests/interact/fill-landing.test.ts.
+- **The held count is fill-landing.ts's** (`heldCountOf(from, held)`, beside `needsHeldCount`), which finishes A2: the
+  bullets-only count the masked rule starts from (`Expectation.held`, `'unread'` on the skipped row) and the
+  masked-append warning (bullets seen `after-focus`) were derived in fill.ts, inputs of the landing rule outside the
+  landing module. fill.ts performs the read the table names and passes the count on; a fill that types nothing gets no
+  count at all.
+- **The field's reads are one module**, `interact/fill-refetch.ts` (`fieldRefetch`: `read`, `typingStarts`,
+  `lastTree`): the selector first, else `sameField`'s twin under the screen guard (`TwinGuard` — before typing freely;
+  after it only on the pre-typing read's screen; never when typing began with no read), else why it was lost
+  (`findAgain`, pure, one switch over the guard's phase; the screen the field was resolved on words a `lost` on the
+  skipped row, as before). Each read
+  answers the node or the why (`fill-facts.ts#FieldRead`). `FieldIo.read` (fill-type.ts, ADR 0023) answers the same,
+  so the typing's `unread` carries the last read's `lost`, and fill.ts's mutable `lostOnLastRead`, which the read-back
+  read off the closure while the clear got `{ lost }` explicitly, is gone. What a node shows is
+  `fill-facts.ts#shownText` (an input's null is ""), one rule for fill.ts and the typing; it takes the matched node's
+  input-ness as the boolean `Expectation.isInput` already is, so the typing's reading cannot follow a re-read node's
+  role.
+- **The adapter tests fill through fillField** (the Android parser's D72/D71/D64b-3 cases, in
+  tests/adapters/android-tree-dialect.test.ts since A27,
+  ios-tree-source.test.ts's D51 mask): they no longer re-wire fill.ts's glue by hand (`FieldIo`, `clearStep`,
+  `landingOf`'s `Expectation`), so a fault in the glue fails them. The Android dump says `password="false"` as
+  uiautomator does, so a sole `id` skips the re-read there as on a device.
+
+Proof: unit tests only — the golden replay never types (Changed 0 by construction); every existing fill test kept green,
+unchanged but for fill-type.test.ts's scripted reads now answering a node, and one test there split in two: "a field
+whose text is withheld (or not found) on two reads running is unread" became "a field not found on two reads running is
+unread, said why (`lost`)" and "a non-input that withholds its text on two reads running is unread, no `lost`". Two
+tests were added there: "A28: `lost` is the LAST read's" (lost then withheld is no `lost`; withheld then lost is) and
+"an input whose value is null reads empty, not withheld" (fill-facts.ts#shownText through the poll). New:
+tests/interact/fill-refetch.test.ts, and fill-landing.test.ts's `postFocusReadOf` and `heldCountOf` tables.
+fill-refetch.ts joins the mutation scope's core group (ADR 0038).
+
+Mutation: the full cold core group run is recorded at merge, on main, in the `docs: A28 done` commit. This branch ran
+the fill modules narrowed and cold (other agents' runs overlapping, load 50–64): fill-refetch 100 % (floor 98),
+fill-landing 98.83 % alone (floor 95 → 96), fill-type 93.83 % (floor 91), fill-reformat 94.80 % alone (floor 92),
+fill-verdict 99.35 % (floor 97). A module's narrowed figure moves with the tests that share its run: fill-landing
+scored 99.52 % and fill-reformat 97.98 % with all five fill modules' tests in one run, figures their floors do not rest
+on (scripts/mutation/scope.json). A forms A/B on a device, which the review card
+recommends for FK2, is not run here.
 
 ## Residuals accepted
 

@@ -528,7 +528,7 @@ export function showsProgress(tree: UiNode): boolean {
  * screen it is, as opposed to where its content lies. Values, labels and rects are left out: typing changes the one,
  * a scroll or the keyboard the others, while an identified node keeps its id wherever it is moved. Two questions are
  * asked of two reads' identities, by the two verbs that act between them:
- * - `sameScreen` (fill's read-back, interact/fill.ts#sameField): every id of the one is the other's and back — a
+ * - `sameScreen` (fill's read-back, interact/fill-refetch.ts#sameField): every id of the one is the other's and back — a
  *   node appearing with an id of its own (an inline error label) changes it, so the identity fallback refuses rather
  *   than read a next screen's twin field;
  * - `anotherScreen` (`scroll_until`'s stroke, `screenChangedUnder` below, which interact/scroll-rounds.ts#round calls): each read lists ids and

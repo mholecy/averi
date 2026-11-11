@@ -11,16 +11,18 @@
  * cycle, but a cycle in the module graph all the same (code review of the
  * deepening series, S8).
  *
- * One function lives here beside the types, `heldText`: not a judgement but
- * the DEFINITION every measurement of a field is taken in — what it holds as
- * opposed to what it shows — so the driver (fill.ts), the clear's rules
+ * Two functions live here beside the types, `heldText` and `shownText`: not
+ * judgements but the DEFINITIONS every measurement of a field is taken in —
+ * what it shows of a node (`shownText`, A28: fill.ts's and the typing's one
+ * rule), and what it holds as opposed to what it shows (`heldText`) — so the
+ * driver (fill.ts), the clear's rules
  * (fill-clear.ts) and the mismatch's classifier
  * (fill-landing.ts#readingOf) count the same characters (2026-10-09,
  * the fill-clear deepening; it was a closure inside fillField until then,
  * and only fillField could ask it).
  */
 
-import type { Rect } from '../adapters/types.js';
+import type { Rect, UiNode } from '../adapters/types.js';
 
 /**
  * What a field HOLDS, as opposed to what it SHOWS: a reading exactly equal
@@ -217,6 +219,23 @@ export type ClearPlaceholder = 'shown' | 'prefix' | 'other';
  *   twin), or nothing was read before typing to compare the screen with.
  */
 export type LostWhy = 'screen-changed' | 'unmatched';
+
+/**
+ * One read of the field after the focus tap (interact/fill-refetch.ts): the node, found by the selector or by
+ * identity, or why it was not found (`LostWhy`) — one answer, read by the clear and by the typing alike (A28: until
+ * then the typing got the text alone and fill.ts kept the why aside).
+ */
+export type FieldRead = { node: UiNode; lost?: undefined } | { node?: undefined; lost: LostWhy };
+
+/**
+ * The text a field's node shows, as the fill compares it. An input's null value is EMPTY (types.ts#UiNode.value —
+ * both parsers map "" to null), so a field that dropped every typed character reads "" and fails as a mismatch
+ * (`shows 0`), never as `no-value` (2026-10-09, docs/bugs/2026-10-09-android-fill-into-a-field-that-drops-everything-
+ * reads-exposes-no-value.md: an Android digits-only field fed `abc` passed `optional:`). On any other role null is
+ * withheld text: undefined. `isInput`: the matched node's role, as resolved before the tap, is INPUT_ROLE — the
+ * field's, whichever read found it.
+ */
+export const shownText = (n: Pick<UiNode, 'value'>, isInput: boolean): string | undefined => n.value ?? (isInput ? '' : undefined);
 
 /**
  * How the typed text was checked — one fact per kind, the reason carried
