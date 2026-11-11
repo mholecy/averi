@@ -11,7 +11,7 @@ import { cutRemedy, dismissKeyboardFirstText, hideClause, keyboardUpText, riding
  * its cut's `by` and `within`, its cover) and the soft keyboard when it is up (`KeyboardUp`), so the two touch verbs
  * cannot word one target two ways. Before A26 the tap (tap-judgement.ts#tapOutcome), `scroll_until`'s `overlapped`
  * stop and its sliver failures (scroll-text.ts) each routed (kind, remedy, cut.by, keyboard) to a sentence, and the
- * failure's quote of the tap ("a tap refuses it so cut (…)") had drifted from it: a container's cut lacked its way past.
+ * failure's quote of the tap ("a tap refuses it so cut …") had drifted from it: a container's cut lacked its way past.
  *
  * The cases, the remedy decided by ui-tree/standing.ts#Remedy (THE PRECEDENCE), worded here:
  * - `presented` (any kind): that screen's (ui-tree/remedy-text.ts#presentedOr).
@@ -82,7 +82,8 @@ export const cutWayPast = (cut: Cut): string =>
  * scroll toward the edge: the rest lies under the node, not past the edge of anything that scrolls.
  */
 function cutByRemedy(by: UiNode, up: KeyboardUp | undefined, minPiece: number): string {
-  return ridingFirst(by, up, minPiece, 'or', `scroll_until it out from under that ${by.role} first (${wholeThinWayPast(by)})`);
+  const way = `scroll_until it out from under that ${by.role} first (${wholeThinWayPast(by)})`;
+  return ridingFirst(by, up, minPiece, (dismiss) => `${dismiss} — or ${way}`, way);
 }
 
 /**
@@ -99,7 +100,7 @@ function cutByPinnedRemedy(remedy: RemedyCase<'bothPinned'>, up: KeyboardUp | un
   const by = remedy.under;
   const way = noScrollRemedyText(remedy, 'touch', by);
   if (ridingKeyboard(by, up, minPiece) === undefined && up !== undefined && stackedOnKeyboard(by, up)) return `${keyboardMayMoveText(up, by)} — else ${way}`;
-  return ridingFirst(by, up, minPiece, 'else', way);
+  return ridingFirst(by, up, minPiece, (dismiss) => `${dismiss} — else ${way}`, way);
 }
 
 /**
@@ -117,11 +118,31 @@ function stackedOnKeyboard(by: UiNode, { lineY }: KeyboardUp): boolean {
 /** `the soft keyboard is up (its top edge at y 1398): hiding it may move that button (press_key back …)` — `cutByPinnedRemedy`'s for a node not read as riding on it. */
 const keyboardMayMoveText = ({ lineY, remedy }: KeyboardUp, by: UiNode): string => `${keyboardUpText(lineY)}: hiding it may move that ${by.role} (${hideClause(remedy)})`;
 
-/** `way`, after "dismiss it first" (target-text.ts#dismissKeyboardFirstText) and `join` when that node rides on the keyboard (target-text.ts#ridingKeyboard). */
-function ridingFirst(by: UiNode, up: KeyboardUp | undefined, minPiece: number, join: 'or' | 'else', way: string): string {
+/**
+ * THE riding-keyboard choice of every cut-by sentence: `riding`, told "dismiss it first" (target-text.ts#dismissKeyboardFirstText),
+ * when `by` rides on the soft keyboard (target-text.ts#ridingKeyboard); else `not`. The tap's remedy and the stuck
+ * failure's clause (`stuckCutByText`) word the two cases around it.
+ */
+function ridingFirst(by: UiNode, up: KeyboardUp | undefined, minPiece: number, riding: (dismiss: string) => string, not: string): string {
   const keyboard = ridingKeyboard(by, up, minPiece);
-  return keyboard === undefined ? way : `${dismissKeyboardFirstText(keyboard)} — ${join} ${way}`;
+  return keyboard === undefined ? not : riding(dismissKeyboardFirstText(keyboard));
 }
+
+/**
+ * `scroll_until`'s STUCK failure of a target cut by a node drawn after it (`Cut.by`, here `by`), the content exhausted:
+ * what keeps the rest under that node — with the soft keyboard up and that node riding on it, dismiss it first and
+ * scroll again (`ridingFirst`, the tap's own choice); else a layout defect, no clearance for a pinned bar. A container's
+ * cut has no such clause (scroll-text.ts#failureText words its own).
+ */
+export const stuckCutByText = (by: UiNode, minPiece: number, keyboard?: KeyboardUp): string =>
+  ridingFirst(by, keyboard, minPiece, (dismiss) => `${dismiss}, and scroll again`, 'a layout defect (no clearance for a pinned bar?)');
+
+/**
+ * The tap's refusal as `scroll_until`'s STUCK failure quotes it, the content exhausted so the scroll half moot: beneath
+ * a presented screen, that screen's remedy (ui-tree/remedy-text.ts#presentedOr), as the tap says it; else the cut's way
+ * past (`cutWayPast`).
+ */
+export const stuckTapQuote = (standing: Extract<TouchRemedied, { kind: 'cut' }>): string => presentedOr(standing.remedy, 'it', () => cutWayPast(standing.cut));
 
 /** The most of a wrapper's area its one child may take and still count as SMALL for `positionerRemedy`: a quarter. */
 const SMALL_CHILD_FRACTION = 0.25;

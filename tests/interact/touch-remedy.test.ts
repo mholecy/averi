@@ -4,7 +4,7 @@ import type { Cover } from '../../src/ui-tree/cover.js';
 import type { Cut } from '../../src/ui-tree/geometry.js';
 import { noScrollRemedyText, presentedRemedy } from '../../src/ui-tree/remedy-text.js';
 import type { Remedy, StandingFacts, TouchRemedied } from '../../src/ui-tree/standing.js';
-import { cutWayPast, touchRemedyText } from '../../src/interact/touch-remedy.js';
+import { cutWayPast, stuckCutByText, stuckTapQuote, touchRemedyText } from '../../src/interact/touch-remedy.js';
 import type { KeyboardUp } from '../../src/interact/target-text.js';
 import { node } from '../helpers/fake.js';
 
@@ -18,7 +18,7 @@ const rect = (x: number, y: number, width: number, height: number): Rect => ({ x
 const CONTAINER = rect(0, 242, 1080, 1736);
 const bar = (y: number, height = 132): UiNode => node({ role: 'button', identifier: 'bar', rect: rect(0, y, 1080, height) });
 const cutAt = (extra: Partial<Cut> = {}): Cut => ({ edge: 'bottom', container: CONTAINER, depth: 55, ...extra });
-const cut = (c: Cut, remedy: Extract<TouchRemedied, { kind: 'cut' }>['remedy']): TouchRemedied => ({ kind: 'cut', cut: c, minPiece: 65, remedy, facts: FACTS });
+const cut = (c: Cut, remedy: Extract<TouchRemedied, { kind: 'cut' }>['remedy']): Extract<TouchRemedied, { kind: 'cut' }> => ({ kind: 'cut', cut: c, minPiece: 65, remedy, facts: FACTS });
 const coverOf = (n: UiNode): Cover => ({ node: n, reach: n.rect, order: { kind: 'drawn' }, presented: false }) as Cover;
 const covered = (cover: UiNode, remedy: Extract<TouchRemedied, { kind: 'covered' }>['remedy']): TouchRemedied => ({ kind: 'covered', cover: coverOf(cover), aboveKeyboard: false, remedy, facts: FACTS });
 /** The soft keyboard up, its top edge at 1398, hidden by `back` (Android's). */
@@ -63,9 +63,12 @@ describe('touchRemedyText — one sentence per (kind, remedy, cut.by, keyboard)'
     expect(touchRemedyText(pinned(bar(1398 - 132 - 133)), UP)).toBe(way);
     // A bar reaching below the line (its bottom past 1398) neither rides nor is stacked on it.
     expect(touchRemedyText(pinned(bar(1300)), UP)).toBe(way);
-    // The node named is the remedy's `under` (what it is pinned under), not a role guessed elsewhere.
+    // The node named is the remedy's `under` (what it is pinned under), read from the remedy — not the cut's `by`: given
+    // two different roles, the sentence names the remedy's.
     const toolbar = node({ role: 'toolbar', rect: rect(0, 0, 1080, 132) });
-    expect(touchRemedyText(cut(cutAt({ edge: 'top', by: toolbar }), { of: 'bothPinned', under: toolbar }))).toContain('laid flush against that toolbar');
+    const said = touchRemedyText(cut(cutAt({ edge: 'top', by: bar(0) }), { of: 'bothPinned', under: toolbar }));
+    expect(said).toContain('laid flush against that toolbar');
+    expect(said).not.toContain('that button');
   });
 
   it('covered, no scroll: the one clause every verb quotes (unordered, seenOver, bothPinned) — the keyboard never named', () => {
@@ -115,5 +118,19 @@ describe('cutWayPast — the way past a cut, which scroll_until\'s stuck failure
     expect(cutWayPast(cutAt({ by: bar(1238) }))).toBe(THIN('button'));
     // A cut by a later node inherits nothing: the node's own way past wins over `within`.
     expect(cutWayPast(cutAt({ by: bar(1238), within: rect(66, 1924, 948, 55) }))).toBe(THIN('button'));
+  });
+});
+
+describe('the stuck failure\'s words of the tap (the content exhausted) — routed through the touch remedy', () => {
+  it('stuckTapQuote: the way past — or, beneath a presented screen, that screen\'s remedy, as the tap says it', () => {
+    expect(stuckTapQuote(cut(cutAt(), { of: 'scroll' }))).toBe(OWN);
+    expect(stuckTapQuote(cut(cutAt({ by: bar(1238) }), { of: 'scroll' }))).toBe(THIN('button'));
+    expect(stuckTapQuote(cut(cutAt({ by: bar(1238) }), PRESENTED))).toBe(presentedRemedy('it', PRESENTED.layer));
+  });
+
+  it('stuckCutByText: the tap\'s riding choice — dismiss it first and scroll again, else a layout defect', () => {
+    expect(stuckCutByText(bar(1238), 65, UP)).toBe(`the soft keyboard is up (its top edge at y 1398): dismiss it first ${HIDE} — a bar riding on it goes down with it, and scroll again`);
+    expect(stuckCutByText(bar(1238), 65)).toBe('a layout defect (no clearance for a pinned bar?)');
+    expect(stuckCutByText(bar(0), 65, UP)).toBe('a layout defect (no clearance for a pinned bar?)');
   });
 });

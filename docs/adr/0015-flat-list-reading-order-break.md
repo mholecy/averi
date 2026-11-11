@@ -711,17 +711,20 @@ module that decides (standing.ts), the pixel verb's sentences in its poll (verif
   standing), `keyboardOver`, `coverRemedy` and the miss heads the references quote (`OFF_THE_SCREEN` and the rest).
   pixel-poll.ts judges; pixel-text.ts words.
 - **The one difference between the verbs, fixed toward the more complete sentence.** The bound's quote of a
-  container's cut now carries the way past, as the tap does. `scroll_until`'s stuck failure, where the content is
+  container's cut now carries the way past, as the tap does. The bound quotes the tap's sentence after a colon, "— a tap
+  refuses it so cut: <the tap's remedy>", so the remedy's own parentheses do not nest in the quote's. `scroll_until`'s stuck failure, where the content is
   exhausted and the stuck sentence has just said that no swipe moves the target, quotes the tap's way past alone
   (touch-remedy.ts#cutWayPast). The cut-by stuck arm already did this (D88). The container's stuck arm said "(scroll_until
   it first)" after "swiping down no longer moves it" and now gives the way past that the "its own content runs to its
   edge, which reads as cut" clause before it asks for. tests/interact/scroll.test.ts pins the bound's quote against
-  the tap's refusal, word for word.
+  the tap's refusal, word for word. The stuck failure's words of the tap come from touch-remedy.ts too: the quote is
+  `stuckTapQuote` (beneath a presented screen, that screen's remedy, as the tap says it; else the way past), and the
+  cut-by arm's keyboard clause is `stuckCutByText`, the tap's own riding choice (`ridingFirst`).
 
 Golden moved exactly the one predicted row: android scroll-bounded-flush S `scroll_until`, a stuck container cut, whose
 "a tap refuses it so cut (scroll_until it first)" became "(if it is whole and only its own content runs to that edge,
 no scroll shows more: tap a child of it that lies clear of that edge, or tap by coordinates)". The verdict is the same,
-and the mismatches are unchanged (126). No bound sliver failure of a container's cut is in the corpus. Every other
+and the mismatches are unchanged (126). No bound sliver failure is in the corpus, so the colon frame moves no row. Every other
 reply is byte-identical.
 
 ### Not done here (review 2026-11-11)

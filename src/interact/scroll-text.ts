@@ -19,8 +19,8 @@ import type { CarriedUnder, UnseenStrokes } from './motion-ledger.js';
 import { MIN_STROKE_BOX, type PresentedTouchDown, type StrokedAcross, type StrokedBeside, type TouchedOn } from './stroke-plan.js';
 import { axisOf, EDGE_TOWARD, OPPOSITE, type Direction } from './swipe.js';
 import { isRect, WithinRefusedError, type Within, type WithinRefusal } from './within.js';
-import { cutSliverText, dismissKeyboardFirstText, hideClause, hideKeyboardBriefly, hideKeyboardHow, hideKeyboardInFlow, pastSideText, ridingKeyboard, underKeyboardText, untriedSideText, type KeyboardUp } from './target-text.js';
-import { cutWayPast, touchRemedyText } from './touch-remedy.js';
+import { cutSliverText, hideClause, hideKeyboardBriefly, hideKeyboardHow, hideKeyboardInFlow, pastSideText, ridingKeyboard, underKeyboardText, untriedSideText, type KeyboardUp } from './target-text.js';
+import { stuckCutByText, stuckTapQuote, touchRemedyText } from './touch-remedy.js';
 
 /**
  * Every sentence `scroll_until` says: the reply for a stop (`describeScrollResult`, over the result
@@ -625,26 +625,22 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       }
       // Cut to a sliver by its scroll container at the end of the content (ui-tree/standing.ts#Scene.standing):
       // the rest stays past the container's edge however it is swiped — or the node only reads cut (geometry.ts#evidentCut's residual).
-      // Cut by a node drawn after it (geometry.ts#Cut.by): the rest stays under that node — with the keyboard up and that node riding on it (target-text.ts#ridingKeyboard), dismiss it first.
-      // The tap's refusal is quoted by its way past (touch-remedy.ts#cutWayPast): the content exhausted, its scroll half is moot.
-      const cutBy = short.of === 'sliver' ? short.standing.cut.by : undefined;
-      if (short.of === 'sliver' && cutBy !== undefined) {
-        const { cut, minPiece } = short.standing;
-        const keyboard = ridingKeyboard(cutBy, keyboardUp(judged), minPiece);
-        return {
-          message:
-            `scroll_until ${describe} failed after ${n} — element is in the viewport but ${sliverText(short)} — and the content is exhausted: ` +
-              `swiping ${o.lastStroke} no longer moves it${neither}. The rest of it may stay under that ${cutBy.role} at the end of the content — ` +
-              `${keyboard === undefined ? 'a layout defect (no clearance for a pinned bar?)' : `${dismissKeyboardFirstText(keyboard)}, and scroll again`} — ` +
-              `or it is only that thin, laid flush against it; a tap refuses it so cut (${cutWayPast(cut)}). ${last}`,
-        };
-      }
+      // Cut by a node drawn after it (geometry.ts#Cut.by): the rest stays under that node — with the keyboard up and that
+      // node riding on it, dismiss it first (touch-remedy.ts#stuckCutByText, the tap's riding choice).
+      // The tap's refusal is quoted by its way past, or beneath a presented screen that screen's remedy
+      // (touch-remedy.ts#stuckTapQuote): the content exhausted, its scroll half is moot.
       if (short.of === 'sliver') {
+        const { standing } = short;
+        const quote = stuckTapQuote(standing);
+        const { by } = standing.cut;
+        const rest =
+          by === undefined
+            ? `The rest of it stays past its container's edge at the end of the content — a layout defect (no room beyond it?), or its own content runs to its edge, which reads as cut`
+            : `The rest of it may stay under that ${by.role} at the end of the content — ${stuckCutByText(by, standing.minPiece, keyboardUp(judged))} — or it is only that thin, laid flush against it`;
         return {
           message:
             `scroll_until ${describe} failed after ${n} — element is in the viewport but ${sliverText(short)} — and the content is exhausted: ` +
-              `swiping ${o.lastStroke} no longer moves it${neither}. The rest of it stays past its container's edge at the end of the content — a layout ` +
-              `defect (no room beyond it?), or its own content runs to its edge, which reads as cut; a tap refuses it so cut (${cutWayPast(short.standing.cut)}). ${last}`,
+              `swiping ${o.lastStroke} no longer moves it${neither}. ${rest}; a tap refuses it so cut (${quote}). ${last}`,
         };
       }
       // A band of a surface the tree does not list, the eyes saw (ui-tree/eyes.ts), at the end of the content: the rest
@@ -1283,7 +1279,7 @@ function shortText(short: Shortfall): string {
     case 'sliver': {
       // The tap's refusal quoted word for word (touch-remedy.ts#touchRemedyText).
       const remedy = touchRemedyText(short.standing, keyboardUp(short.judged));
-      return `element reached the viewport but stayed ${sliverText(short)} (last rect ${JSON.stringify(short.judged.node.rect)}) — a tap refuses it so cut (${remedy})`;
+      return `element reached the viewport but stayed ${sliverText(short)} (last rect ${JSON.stringify(short.judged.node.rect)}) — a tap refuses it so cut: ${remedy}`;
     }
     case 'absent':
       return `${withMissNote('element never appeared in the tree', short.miss)}${short.unsearched !== undefined ? ` — ${untriedSideText(short.unsearched)}` : ''}${short.unseen !== undefined ? `; ${unseenText(short.unseen)}` : ''}`;
