@@ -1998,6 +1998,11 @@ passed in 23 s at load 2 to 9. android-tree-dialect.ts now scores 98.02 % (8 sur
 floor rises to 96; the other three are unchanged. What is left is equivalent, with the reason given in scope.json's
 baseline.
 
+After the rebase onto main ad6ac3ec (A22 and A23), the cold `android` group passed again in 23 s at load 3 to 15, with
+the same four scores. Because lab-chooser.ts's import moved, the cold `lab` group was run as well: it passed in 417 s
+at load 15 to 22 (one-minute average up to 29, with another agent's run on the machine). Every lab module is at or
+above its floor, and lab-chooser.ts holds A22's 99.85 %.
+
 **One multi-display rule was not taken.** The window manager's reads answer a second display in three ways:
 
 - every display must agree (the insets reads);
