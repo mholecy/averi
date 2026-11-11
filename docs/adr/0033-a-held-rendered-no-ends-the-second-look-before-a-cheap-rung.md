@@ -182,8 +182,13 @@ Both wrappers are gone, and with them their two entries in tests/ui-tree/raw-tre
 No behaviour moves (golden: Changed 0 against v6). The observer is told of exactly the reads the wrappers saw: the
 engine reads through ReadHandOff's watched proxy (ui-tree/read-handoff.ts), whose `async read` turns even a synchronous
 `uiTree` throw into a rejection, which the hold wrapper's `.catch` already saw; and the pixel wrapper set its start
-before calling `uiTree`, so a throw could not skip it. A single observer method, not timing on `PollRound` beside it, because both callers
-need the same fact — one fresh read as it ends — and the hold needs it for a round the predicate is never called on.
+before calling `uiTree`, so a throw could not skip it.
+
+Deviation from the review card: card 13 proposed that each round handed to the predicate carry its read's timing (on
+`PollRound`) and that `pollTree` report a failed read separately. Instead one observer method carries both, because both
+callers need the same fact — one fresh read as it ends — and the hold needs it for a round the predicate is never called
+on; timing on `PollRound` as well would be a second channel for the same read.
+
 Pinned in tests/ui-tree/read-tree.test.ts ("pollTree — the read observer"); the hold's restart by
-tests/flow/bare-tree-ladder.test.ts ("failed reads between two reads of the same screen restart the hold") and the
-round timing by tests/verify/assert.test.ts ("the timeout sentence quotes the SLOWEST round, not the last one").
+tests/flow/bare-tree-ladder.test.ts ("failed reads between two reads of the same screen restart the hold") and the round
+timing by tests/verify/assert.test.ts ("the timeout sentence quotes the SLOWEST round, not the last one").

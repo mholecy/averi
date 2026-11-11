@@ -624,9 +624,8 @@ export async function pollPixels(
     if (verdict.final) throw new FinalMiss(verdict.detail);
     return verdict;
   };
-  // Each round is timed from the start of its read, for the timeout wording: pollTree's observer tells when the read
-  // the predicate is about to see started.
-  // Only for definite assignment: the observer sets it before every predicate call.
+  // Each round is timed from the start of its read, for the timeout wording: pollTree's observer sets this before every
+  // predicate call, so the initial value only satisfies definite assignment.
   let readStarted = Date.now();
   const outcome = await pollTree(
     adapter,

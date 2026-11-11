@@ -188,35 +188,31 @@ export interface PollOptions {
   observer?: PollObserver;
 }
 
-/**
- * One fresh read of a poll, as its observer is told it: when it started and ended (`Date.now()`, the clock of the
- * deadline and the cadence), and `error` when it failed — a miss, `readTreeOrMiss`'s error, which the predicate never
- * sees.
- */
-export interface ObservedRead {
+/** When a tree read started and ended, on `Date.now()` — the clock of a poll's deadline and cadence. */
+export interface ReadSpan {
   startedAt: number;
   endedAt: number;
-  error?: Error;
 }
+
+/**
+ * One fresh read of a poll, as its observer is told it: its span, and `error` when it failed — a miss,
+ * `readTreeOrMiss`'s error, which the predicate never sees.
+ */
+export type ObservedRead = ReadSpan & { error?: Error };
 
 /**
  * What a caller learns of a poll's reads that the predicate is not told (A31, docs/adr/0033-a-held-rendered-no-ends-
  * the-second-look-before-a-cheap-rung.md, amendment "A poll observer"): `read` is called once per fresh read, as soon
  * as it ends and before the predicate sees its tree — a failed read included, a handed-on read (`first`) and a read no
  * wait cures (thrown, ending the poll) never. It observes and decides nothing: the poll's loop, cadence and outcome are
- * the same with or without it. Its two callers: the second look's hold (flow/engine.ts#detects), which a failed read
- * restarts, and the pixel poll (verify/pixel-poll.ts#pollPixels), which times each round from the start of its read.
+ * the same with or without it.
  */
 export interface PollObserver {
   read(read: ObservedRead): void;
 }
 
-/** A tree read handed on to a later poll, with when its read started and ended (`Date.now()`). */
-export interface HandedRead {
-  tree: UiNode;
-  startedAt: number;
-  endedAt: number;
-}
+/** A tree read handed on to a later poll, with its span. */
+export type HandedRead = ReadSpan & { tree: UiNode };
 
 /** Where a poll asks for a handed-on read: once, and an answer of `undefined` means read fresh. */
 export interface FirstSample {
