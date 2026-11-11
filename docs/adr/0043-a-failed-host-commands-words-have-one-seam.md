@@ -147,8 +147,9 @@ every shown argv is built with it:
 - `runIdb` takes `typed`, moves the indexes past the `--udid` it puts in, hands them to exec, and on the helper's path
   builds the nonzero answer's, the timeout's and `inputLost`'s command with it; `IDB_HELPER_CALL_START`/`END` publish
   the shown argv (`shownArgs`), and `IdbHelperTimeout`'s message is the shown command;
-- Android's `shell` alone takes `typed` (`ShellCallOptions`; `adb`, `execOut` and `rawShell` take none, so no caller
-  declares one where it would be moved wrongly), moves it three on (`-s S shell`), and `typeText` passes `[2]`.
+- Android's `shell` alone takes `typed` (`ShellCallOptions`; `adb`, `execOut` and `rawShell` take `typed?: never`, so
+  no caller declares one where it would be moved wrongly), moves it past adbShellArgv's prefix (`-s S shell`), and
+  `typeText` passes `[2]`.
 
 So **`ExecError.command` no longer holds the text** (the Decision's "`ExecError.command` still holds the text" no longer
 holds), and `commandFailureText` quotes the command as given: `IDB_TYPING`, `ADB_TYPING` and `withoutTypedText` are
@@ -190,9 +191,12 @@ own declaration and its own rows there.
   stderr, and the code is 1 (the companion unreachable), not 0 (`-h`'s help) or 2 (argparse). Put back to `--udid` last,
   all six fail. By hand on the same idb: `ui text -h --udid U` exits 0, `ui text --udid U -- -h` exits 1.
 - Golden against T10's base: 1667 checks, Changed 0.
-- Cold mutation run (ADR 0038, `npm run mutate -- --group core --force`): `failure-text.ts` 99.00 %, 200 mutants, 2
-  survivors, both equivalent (`exceptionUnder`'s above, and `shownCommand`'s default `typed = []` filled with a string,
-  which holds no index either); floor 97 kept.
+- Mutation (ADR 0038). Cold group run on 9f8bd349 (`npm run mutate -- --group core --force`): `failure-text.ts` 99.00 %,
+  200 mutants, 198 killed, 2 survived, both equivalent (`exceptionUnder`'s above, and `shownCommand`'s default `typed =
+  []` filled with a string, which holds no index either); floor 97 kept. Narrowed run on a81f0dbe (`--mutate
+  src/adapters/failure-text.ts`): 98.99 %, 200 mutants, 197 killed, the same 2 survived, 1 runtime error — a
+  StringLiteral mutant emptying a piece of `WORD_START`'s `String.raw`, which makes the RegExp built from it invalid
+  when the module loads, so no test runs and Stryker leaves it out of the score (the cold group run counted it killed).
 - Not run on a simulator or an emulator (none was up, and no device setting may change): the owner's check is
   `docs/truth/live-records/d74-dash-text/run.sh` — the reset sequence, the lab's form-basic name field, each of `-h`,
   `-abc`, `-hunter2`, `--log=s3cret`, `--` and `a-b` typed with the new argv by hand (exit 0, no stdout, the field's

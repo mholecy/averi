@@ -15,9 +15,13 @@ import { everyNode, rectArea, rectIntersection, zeroRect, type ClippedSide, type
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
-/** One adb call's options: its own budget. */
+/**
+ * One adb call's options: its own budget. `typed` is `never` here, so a ShellCallOptions value handed to `adb`,
+ * `execOut` or `rawShell` is a type error rather than a mask dropped on the way.
+ */
 interface AdbCallOptions {
   timeoutMs?: number;
+  typed?: never;
 }
 
 /**
@@ -25,7 +29,8 @@ interface AdbCallOptions {
  * A17). Only `shell` takes them, and it alone moves them to exec's (past adbShellArgv's `-s S shell`): `adb`,
  * `execOut` and `rawShell` take AdbCallOptions, so no caller can declare a typed word where it would be moved wrongly.
  */
-interface ShellCallOptions extends AdbCallOptions {
+interface ShellCallOptions {
+  timeoutMs?: number;
   typed?: readonly number[];
 }
 
