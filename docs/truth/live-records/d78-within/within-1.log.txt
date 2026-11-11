@@ -1,0 +1,15 @@
+lab: emulator-5554, AVD averi_lab
+averi: <repo>
+uiautomator within:scroll-bounded.O ok: Element id:"lab.scroll-bounded.O" fully visible after 1 swipe; then Tapped id:"lab.scroll-bounded.O"
+uiautomator within:scroll-bounded.F ok: Element id:"lab.scroll-bounded.F" fully visible after 7 swipes; then Tapped id:"lab.scroll-bounded.F"
+<!-- averi: this checkout -->
+# Live golden: 2 cases, 2 ok, 0 loud, 0 mismatches (0 not known), 0 skipped
+
+## uiautomator
+- ok within:scroll-bounded.O scroll-bounded: scroll_until O down with within naming lower (its rect), maxSwipes 12, timeoutMs 30000: every stroke on lower bringing it closer, it stops on O, then the tap fires it (D78) — Element id:"lab.scroll-bounded.O" fully visible after 1 swipe; then Tapped id:"lab.scroll-bounded.O"
+    app: O 128,1334 825x176 (whole); lower clip 0,1046 1080x495 offset 372 (launched 0); strokes lower 0→372; fired tap O; touches (540,1443) (541,1422)
+- ok within:scroll-bounded.F scroll-bounded: scroll_until F down with within naming lower (a row of it, id:"lab.scroll-bounded.S"), maxSwipes 12, timeoutMs 30000: every stroke on lower bringing it closer, it stops on F, then the tap fires it (D78) — Element id:"lab.scroll-bounded.F" fully visible after 7 swipes; then Tapped id:"lab.scroll-bounded.F"
+    app: F 128,1247 825x176 (whole); lower clip 0,1046 1080x495 offset 2549 (launched 0); strokes lower 0→364, lower 364→725, lower 725→1099, lower 1099→1468, lower 1468→1829, lower 1829→2186, lower 2186→2549; fired tap F; touches (540,1443) (540,1443) (540,1443) (540,1443) (540,1443) (540,1443) (540,1443) (541,1335)
+
+Hedged stops: 0 of 2 visible stops (target whole, ok: 0; cut, LOUD: 0)
+
