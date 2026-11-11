@@ -1,7 +1,7 @@
 import { everyNode, type UiNode } from '../adapters/types.js';
+import { escapeRegExp } from '../util/regex.js';
 import { namePairs, readingDifference, type RecognizerDifference } from './ocr-fold.js';
 import { normalizeText } from './text-parity.js';
-import { escapeRegExp } from '../util/regex.js';
 
 /**
  * Why an exact-text expectation missed when the string is nonetheless ON the
@@ -151,4 +151,3 @@ function foldedTextHint(candidates: UiNode[], expected: string): string | undefi
     'expect the text as the node has it)'
   );
 }
-

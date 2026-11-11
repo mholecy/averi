@@ -40,7 +40,9 @@ export function hostProcessPattern(info: AppBinary, udid: string): string | unde
 /**
  * Backslash before each POSIX-ERE special and nothing else: a backslash
  * before an ordinary character is undefined in ERE (so not a JS escaper
- * that also escapes `-` or `/`).
+ * that also escapes `-` or `/`). The same 14 characters as
+ * util/regex.ts#escapeRegExp, kept apart because ERE is another grammar
+ * (T22): a change to one JS escape is no change to what pgrep reads.
  */
 function ereEscape(text: string): string {
   return text.replace(/[\\.[\]()*+?{}|^$]/g, '\\$&');

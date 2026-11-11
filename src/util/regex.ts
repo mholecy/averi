@@ -49,10 +49,12 @@ export const regexSource = (flags = ''): z.ZodEffects<z.ZodString> =>
  * RegExp constructor needs no `/` escape) and so is `-` (literal outside a
  * class, and `\-` there is a syntax error under `u`).
  *
- * Its one copy (T22): the element assert's text hint shows it verbatim as the
- * `match:` to write (verify/text-hint.ts#textHint), and adapters, scripts and
- * tests build their patterns through it. Here, not in verify/, because every
- * layer and the scripts can reach a util leaf. verify/ocr-fold.ts keeps its own
- * variant, which escapes `/` and `-` too (said there).
+ * Its one copy for JS patterns (T22; adapters/ios-liveness.ts#ereEscape
+ * escapes the same 14 characters for pgrep's POSIX ERE, another grammar):
+ * the element assert's text hint shows it verbatim as the `match:` to write
+ * (verify/text-hint.ts#textHint), and adapters, scripts and tests build their
+ * patterns through it. Here, not in verify/, because every layer and the
+ * scripts can reach a util leaf. verify/ocr-fold.ts keeps its own variant,
+ * which escapes `/` and `-` too (said there).
  */
 export const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
