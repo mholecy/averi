@@ -101,6 +101,19 @@ describe('planRuns — which groups run, each with its Stryker arguments (T2b-2)
     expect(planRuns(['--tempDirName'], groups)).toEqual({ refusal: 'npm run mutate: --tempDirName needs a name' });
   });
 
+  it('--incrementalFile <file>: each group its own, the group before the extension (A37)', () => {
+    expect(planRuns(['--incrementalFile', 'reports/inc.json'], groups)).toEqual({
+      runs: [
+        { group: 'core', args: ['--incrementalFile', 'reports/inc-core.json'] },
+        { group: 'android', args: ['--incrementalFile', 'reports/inc-android.json'] },
+        { group: 'scene', args: ['--incrementalFile', 'reports/inc-scene.json'] },
+        { group: 'lab', args: ['--incrementalFile', 'reports/inc-lab.json'] },
+      ],
+    });
+    expect(planRuns(['--incrementalFile=inc', '--group', 'lab'], groups)).toEqual({ runs: [{ group: 'lab', args: ['--incrementalFile', 'inc-lab'] }] });
+    expect(planRuns(['--incrementalFile'], groups)).toEqual({ refusal: 'npm run mutate: --incrementalFile needs a file' });
+  });
+
   it('--mutate without --group: each file to its own group, a group none names not run', () => {
     expect(planRuns(['--mutate', 'src/a.ts,scripts/truth/batch/lab-x.ts:3-9'], groups)).toEqual({
       runs: [
@@ -317,17 +330,18 @@ describe('main — the groups one after the other, the run failing if any fails 
  * Reports on disk, and a Stryker that writes the group's report as Stryker does: the group's own modules, plus every
  * module its incremental file still names; then the incremental file is that report.
  */
-function diskDeps(disk: Map<string, MutationReport>) {
+function diskDeps(disk: Map<string, MutationReport>, incrementalFile?: string) {
   const out: string[] = [];
   const own: MutationReport = { files: { 'src/a.ts': { mutants: mutants({ Killed: 9, Survived: 1 }) } } };
   const deps: MutateDeps = {
     readScope: () => groups,
     spawn: (_args, env) => {
       const group = env[GROUP_ENV] ?? '';
-      const left = disk.get(`reports/mutation/stryker-incremental-${group}.json`);
+      const incremental = incrementalFile ?? `reports/mutation/stryker-incremental-${group}.json`;
+      const left = disk.get(incremental);
       const report = { files: { ...left?.files, ...own.files } };
       disk.set(`reports/mutation/mutation-${group}.json`, report);
-      disk.set(`reports/mutation/stryker-incremental-${group}.json`, report);
+      disk.set(incremental, report);
       return Promise.resolve({ status: 0, signal: null, timedOut: false, interrupted: false });
     },
     readReport: (path) => disk.get(path),
@@ -369,6 +383,24 @@ describe('main — a leftover incremental file cannot fail a run (A37)', () => {
     expect(out).toContain(
       `npm run mutate: core: reports/mutation/stryker-incremental-core.json names ${moved}, not in the group: removed, the run is cold`,
     );
+  });
+
+  it('--force=true is --force: even a current incremental file goes', async () => {
+    const { deps, events } = fakeDeps();
+    expect(await main(['--group', 'lab', '--force=true'], deps)).toBe(0);
+    expect(events).toContain('remove reports/mutation/stryker-incremental-lab.json');
+  });
+
+  it('--incrementalFile: --force removes, and a plain run checks, the file Stryker will use, not the default', async () => {
+    const given = 'reports/inc-core.json';
+    const cold = new Map([[given, stale()], ['reports/mutation/stryker-incremental-core.json', stale()]]);
+    const forced = diskDeps(cold, given);
+    expect(await main(['--group', 'core', '--force', '--incrementalFile', 'reports/inc.json'], forced.deps)).toBe(0);
+    expect(Object.keys(cold.get('reports/mutation/mutation-core.json')?.files ?? {})).toEqual(['src/a.ts']);
+    const plain = new Map([[given, stale()]]);
+    const { deps, out } = diskDeps(plain, given);
+    expect(await main(['--group', 'core', '--incrementalFile', 'reports/inc.json'], deps)).toBe(0);
+    expect(out).toContain(`npm run mutate: core: ${given} names ${moved}, not in the group: removed, the run is cold`);
   });
 
   it('no --force: an incremental file of the group\'s own modules is kept (a plain run stays incremental)', async () => {

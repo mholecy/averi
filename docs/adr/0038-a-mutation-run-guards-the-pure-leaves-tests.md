@@ -2058,6 +2058,9 @@ module that leaves a group does this once in every checkout holding that group's
   not in the group: removed, the run is cold`). A file that names only the group's own modules is kept, so a plain run
   stays incremental. Refusing such a module instead would leave the user to delete the file by hand, and only the
   runner knows which file that is.
+- **Both act on the file Stryker will use.** `--force=true` counts as `--force`. `--incrementalFile <file>` is read by
+  planRuns as `--tempDirName` is, and each group gets its own copy, the group before the extension (`inc.json` becomes
+  `inc-core.json`, …). The removal and the check then read that file, not the default.
 - **Each group's temp dir is `reports/mutation/stryker-tmp-<group>`** (group.mjs, `filesOf`; no group:
   `reports/mutation/stryker-tmp`). It was `node_modules/.stryker-tmp-<group>`. A worktree's node_modules is a symlink
   to main's, so every worktree's run of a group used, and `cleanTempDir: 'always'` deleted, the same directory. That is
@@ -2074,7 +2077,8 @@ symlink. It holds vitest's result cache, which only orders test files, so sharin
 Tests: tests/mutation/mutate.test.ts reproduces the failure without Stryker. Its fake Stryker writes the report as
 IncrementalDiffer does, with the group's own module plus every module the incremental file still names. A stale core
 file naming android-chooser.ts failed `--group core --force` with exit 1 before the fix and passes after it. The tests
-also cover `--force` removing even a current file, and a plain run removing a stale file (with its line) but keeping a
-current one. tests/mutation/group.test.ts pins every group's temp dir under reports/mutation/, and checks that
-vitest.config.ts's exclude covers a sandbox copy under each one while keeping vitest's defaults. Each test was shown
-failing under its mutant of the fix. No module in scope.json changed, so no floor moved.
+also cover `--force` (and `--force=true`) removing even a current file, a plain run removing a stale file (with its
+line) but keeping a current one, and both acting on a given `--incrementalFile`, suffixed per group by planRuns.
+tests/mutation/group.test.ts pins every group's temp dir under reports/mutation/, and checks that vitest.config.ts's
+exclude covers a sandbox copy under each one while keeping vitest's defaults. Each test was shown failing under its
+mutant of the fix. No module in scope.json changed, so no floor moved.

@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { readFileSync, rmSync } from 'node:fs';
 import * as nodePath from 'node:path';
-import { join } from 'node:path';
+import { extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isMain } from '../is-main.js';
 import {
@@ -16,8 +16,10 @@ import {
  *   node --import tsx scripts/mutation/mutate.ts [--group core|android|scene|lab] [<stryker run argument> …]
  *   (npm run mutate -- --force: every group, cold; npm run mutate -- --group lab --force: lab alone, cold)
  *
- * Cold means cold: under --force each group's incremental file is removed before its Stryker starts (A37). Each group's
- * temp dir is this checkout's reports/mutation/stryker-tmp-<group> (group.mjs#filesOf); no --tempDirName needed.
+ * Cold means cold: under --force (or --force=true) each group's incremental file is removed before its Stryker starts,
+ * and a plain run removes one that names a module outside the group, logging a line naming them (A37); either way the
+ * file is the one Stryker will use (--incrementalFile, or the default). Each group's temp dir is this checkout's
+ * reports/mutation/stryker-tmp-<group> (group.mjs#filesOf); no --tempDirName needed.
  */
 
 export type { Scope };
@@ -81,6 +83,7 @@ export interface GroupRun {
 const OPTIONS = {
   '--group': { slot: 'group', needs: `a group (${GROUP_WORDS})` },
   '--tempDirName': { slot: 'tempDir', needs: 'a name' },
+  '--incrementalFile': { slot: 'incremental', needs: 'a file' },
   '--mutate': { slot: 'mutate', needs: 'a file' },
   '-m': { slot: 'mutate', needs: 'a file' },
 } as const;
@@ -93,10 +96,17 @@ const nodeGlob = (nodePath as { matchesGlob?: GlobMatch }).matchesGlob;
 /** What makes a `--mutate` pattern a glob rather than a path. */
 const GLOB_CHARS = /[*?[\]{}!]/;
 
+/** `file` with `text` before its extension: `inc.json`, `-core`: `inc-core.json`. Pure. */
+const beforeExtension = (file: string, text: string): string => {
+  const ext = extname(file);
+  return `${file.slice(0, file.length - ext.length)}${text}${ext}`;
+};
+
 /**
  * The groups a run starts, in order, each with its Stryker arguments; or a refusal. `--group <name>` picks one group
  * (none: all, in GROUPS' order) and is not passed on. `--tempDirName <name>` becomes `<name>-<group>`, each group its
- * own sandbox. Without `--group`, each `--mutate` pattern (a path or a glob, a Stryker range after a path kept) is
+ * own sandbox; `--incrementalFile <file>` likewise, the group before its extension (`inc.json`: `inc-<group>.json`).
+ * Without `--group`, each `--mutate` pattern (a path or a glob, a Stryker range after a path kept) is
  * matched against scope.json's modules, and each group gets the modules it matched there (a glob as their paths); only
  * the groups matched run, and a pattern matching none is a refusal. A path is looked up as a scope.json key first; a
  * pattern with glob characters needs `glob` (node's path.matchesGlob, 20.17 and later), refused without it (null). With
@@ -108,7 +118,7 @@ export function planRuns(
   glob: GlobMatch | null = nodeGlob ?? null,
 ): { runs: GroupRun[] } | { refusal: string } {
   const refuse = (why: string) => ({ refusal: `npm run mutate: ${why}` });
-  const given: { group?: string; tempDir?: string; mutate?: string } = {};
+  const given: { group?: string; tempDir?: string; incremental?: string; mutate?: string } = {};
   const rest: string[] = [];
   for (let i = 0; i < args.length; i++) {
     const [name, inline] = args[i].includes('=') ? args[i].split(/=(.*)/s, 2) : [args[i], undefined];
@@ -122,12 +132,13 @@ export function planRuns(
     if (slot === 'group' && given.group !== undefined) return refuse('--group given twice: give one, or none for all');
     given[slot] = value;
   }
-  const { group, tempDir, mutate } = given;
+  const { group, tempDir, incremental, mutate } = given;
   if (group !== undefined && !isGroup(group)) return refuse(`--group ${group}: not a group (${GROUP_WORDS})`);
   const argsOf = (g: Group, files: string | undefined): string[] => [
     ...(files === undefined ? [] : ['--mutate', files]),
     ...rest,
     ...(tempDir === undefined ? [] : ['--tempDirName', `${tempDir}-${g}`]),
+    ...(incremental === undefined ? [] : ['--incrementalFile', beforeExtension(incremental, `-${g}`)]),
   ];
   if (group !== undefined) return { runs: [{ group, args: argsOf(group, mutate) }] };
   if (mutate === undefined) return { runs: GROUPS.map((g) => ({ group: g, args: argsOf(g, undefined) })) };
@@ -226,13 +237,13 @@ const realDeps: MutateDeps = {
   spawn: spawnBounded(STRYKER, ROOT),
   readReport: (path) => {
     try {
-      return JSON.parse(readFileSync(join(ROOT, path), 'utf8')) as MutationReport;
+      return JSON.parse(readFileSync(resolve(ROOT, path), 'utf8')) as MutationReport;
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
       throw e;
     }
   },
-  removeReport: (path) => rmSync(join(ROOT, path), { force: true }),
+  removeReport: (path) => rmSync(resolve(ROOT, path), { force: true }),
   now: () => Date.now(),
   log: (line) => console.log(line),
   error: (line) => console.error(line),
@@ -245,13 +256,16 @@ async function runGroup(run: GroupRun, scope: Scope, deps: MutateDeps): Promise<
     deps.error(`npm run mutate: ${group}: ${why}`);
     return code;
   };
-  const { json: report, incremental } = filesOf(group);
+  const { json: report } = filesOf(group);
+  // The incremental file Stryker will use: planRuns' --incrementalFile (always `--incrementalFile <file>`), or the default.
+  const given = run.args.indexOf('--incrementalFile');
+  const incremental = given === -1 ? filesOf(group).incremental : run.args[given + 1];
   const own = groupScope(scope, group);
   // A report left by an earlier run must not be read as this one's.
   deps.removeReport(report);
   // Stryker keeps every mutant of its incremental file that this run did not produce, --force or not (A37). So a cold
   // run starts without the file, and a plain one drops a file naming a module outside the group (a module moved since).
-  if (run.args.includes('--force')) deps.removeReport(incremental);
+  if (run.args.some((arg) => arg === '--force' || arg === '--force=true')) deps.removeReport(incremental);
   else {
     const outside = Object.keys(deps.readReport(incremental)?.files ?? {}).filter((file) => !(file in own));
     if (outside.length > 0) {

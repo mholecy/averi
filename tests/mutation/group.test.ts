@@ -117,6 +117,7 @@ describe('isGroup and filesOf', () => {
 describe('vitest.config.ts — `npx vitest run` collects no test a mutation sandbox copied (A37)', () => {
   it('its exclude covers a leftover sandbox under each temp dir, and keeps vitest\'s defaults', async () => {
     const { configDefaults } = await import('vitest/config');
+    // Should group.mjs ever join scope.json, this import breaks in Stryker's sandbox: vitest.config.ts is not in its allowlist.
     const exclude = (await import('../../vitest.config.js')).default.test?.exclude ?? [];
     expect(exclude).toEqual(expect.arrayContaining(configDefaults.exclude));
     for (const group of [...GROUPS, undefined]) {
