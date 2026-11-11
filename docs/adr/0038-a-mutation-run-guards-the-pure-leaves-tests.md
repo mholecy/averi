@@ -1625,3 +1625,9 @@ from 17 to 34, all of the extra ones in fill-landing.ts (1 to 11) and fill-refor
 run against fill-type.test.ts, which reaches them through `landingOf` and `readingOf`, so their tests did change. But a
 second cold run of the same commit, in review, did not reproduce the extra timeouts: 1 in fill-landing.ts and 1 in
 fill-reformat.ts, 21 in all (16 outside fill-type), in 371 s. Both runs are under T13's ~480 s line.
+
+## Amendment: live-finish.ts joins the run (2026-11-11, backlog D82)
+
+scripts/truth/live-finish.ts (`finishRun`, live.ts's finish: the record written before the closes, every closer tried)
+joins the `lab` group against tests/truth/live-finish.test.ts, at 100 % cold (21 mutants, 0 survived; narrowed with
+`--mutate`, whose exit 1 is the fill-type amendment's): floor 98.

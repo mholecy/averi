@@ -213,6 +213,9 @@ async function connect(): Promise<{ client: Client; close(): Promise<void> }> {
   await client.connect(clientSide);
   return {
     client,
+    // One closer for finishRun (D82), not three: InMemoryTransport's close only drops references and the registry's
+    // shutdown disposes each adapter quietly (src/mcp/registry.ts#shutdown), so a dead device cannot throw out of it
+    // and leave the server's processes alive.
     async close() {
       await client.close();
       await server.close();

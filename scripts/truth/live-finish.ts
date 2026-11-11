@@ -19,8 +19,8 @@ import type { RunRecord } from './live-cases.js';
  *     cleanup no part of it — when a dead device is why, the record's device label or a case's reads say so already,
  *     and lab-run (batch/lab-run.ts) judges a block by main's rejudge of the record, not by live.ts's exit code.
  *
- * A write that fails still throws (the run's evidence is lost: loud by design), but only after every closer ran: an
- * unclosed registry would keep node alive past the throw. The write is attempted first all the same, so a closer that
+ * A write that fails is said at once (`record: <path> not written — <why>`) and still throws (the run's evidence is
+ * lost: loud by design), but only after every closer ran: an unclosed registry would keep node alive past the throw. The write is attempted first all the same, so a closer that
  * hangs cannot cost the record.
  */
 
@@ -42,6 +42,8 @@ export interface Finish {
   note: (line: string) => void;
 }
 
+const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
 export async function finishRun({ record, recordPath, deviceLabel, closers, note }: Finish): Promise<void> {
   if (deviceLabel !== undefined) record.deviceLabel = deviceLabel();
   let lost: unknown;
@@ -52,13 +54,16 @@ export async function finishRun({ record, recordPath, deviceLabel, closers, note
     } catch (e) {
       failed = true;
       lost = e;
+      // Said here too (review round 1): a case's throw inside live.ts's try is what node reports when this throw does
+      // not replace it, and this throw would hide it the other way round — the line keeps the loss seen either way.
+      note(`record: ${recordPath} not written — ${messageOf(e)}`);
     }
   }
   for (const c of closers) {
     try {
       await c.close();
     } catch (e) {
-      note(`close: ${c.name} failed — ${e instanceof Error ? e.message : String(e)}`);
+      note(`close: ${c.name} failed — ${messageOf(e)}`);
     }
   }
   if (failed) throw lost;

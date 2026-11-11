@@ -1,7 +1,7 @@
-import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import type { DeviceLabel } from '../../scripts/truth/device-state.js';
 import { finishRun, type Closer } from '../../scripts/truth/live-finish.js';
 import type { RunRecord } from '../../scripts/truth/live-cases.js';
@@ -12,7 +12,13 @@ import type { RunRecord } from '../../scripts/truth/live-cases.js';
 // threw `adb: device offline`, and the write came after it.
 
 const OFFLINE = 'adb: device offline';
-const dir = () => mkdtempSync(join(tmpdir(), 'live-finish-'));
+const made: string[] = [];
+const dir = (): string => {
+  const d = mkdtempSync(join(tmpdir(), 'live-finish-'));
+  made.push(d);
+  return d;
+};
+afterAll(() => made.forEach((d) => rmSync(d, { recursive: true, force: true })));
 /** A record with one case ran (its reads beside the point here). */
 const ran = (): RunRecord => ({ platform: 'android', side: 'this checkout', results: [{ id: 'lv-d62-control', source: 'uiautomator' } as unknown as RunRecord['results'][number]] });
 /** T16's smoke: the before read taken, the after read failed. */
@@ -89,7 +95,7 @@ describe('finishRun: the record before the closes (D82)', () => {
     expect('deviceLabel' in record).toBe(false);
   });
 
-  it('a record write that fails still throws (the evidence is lost: loud) — after every closer ran, so node can exit', async () => {
+  it('a record write that fails still throws (the evidence is lost: loud) — said at once, then every closer ran, so node can exit', async () => {
     const path = join(dir(), 'no-such-dir', 'r.json');
     const log: string[] = [];
     const lines: string[] = [];
@@ -97,6 +103,23 @@ describe('finishRun: the record before the closes (D82)', () => {
       finishRun({ record: ran(), recordPath: path, closers: [closer('mcp', log, path), closer('lab', log, path, OFFLINE)], note: (l) => lines.push(l) }),
     ).rejects.toThrow(/ENOENT/);
     expect(log).toEqual(['mcp', 'lab']);
-    expect(lines).toEqual([`close: lab failed — ${OFFLINE}`]);
+    expect(lines).toHaveLength(2);
+    expect(lines[0].startsWith(`record: ${path} not written — ENOENT: `)).toBe(true);
+    expect(lines[1]).toBe(`close: lab failed — ${OFFLINE}`);
+  });
+
+  it("review round 1: the write's failure is said even when a case's throw is what live.ts's finally lets through", async () => {
+    // live.ts: `try { cases } finally { await finishRun(…) }` — here the case's error first, the finish's throw last.
+    const path = join(dir(), 'no-such-dir', 'r.json');
+    const lines: string[] = [];
+    const run = async (): Promise<void> => {
+      try {
+        throw new Error('case lv-d62-control threw');
+      } finally {
+        await finishRun({ record: ran(), recordPath: path, closers: [], note: (l) => lines.push(l) });
+      }
+    };
+    await expect(run()).rejects.toThrow(/ENOENT/);
+    expect(lines).toEqual([expect.stringMatching(/^record: .*r\.json not written — ENOENT: /)]);
   });
 });
