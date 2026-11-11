@@ -222,7 +222,7 @@ describe('the JDK for the Android build (batch-11.sh:309–310; T23: JAVA_HOME, 
     ];
     for (const [env, said] of cases) {
       const { p, asked } = probes({ env, javaHome: ok('/jdk17\n'), releases, jre: ['/jre17'] });
-      expect(await jdk17Of(p)).toEqual({ home: '/jdk17', from: 'java_home', warning: `${said} — the build used JDK 17: /jdk17 (from java_home)` });
+      expect(await jdk17Of(p)).toEqual({ home: '/jdk17', from: 'java_home', warning: `${said} — the build used the one from java_home` });
       expect(asked).toEqual([`release ${env}`, 'java_home', 'release /jdk17']);
     }
   });
@@ -236,14 +236,14 @@ describe('the JDK for the Android build (batch-11.sh:309–310; T23: JAVA_HOME, 
       '/J/d-17.jdk/Contents/Home': R17,
     };
     const { p, asked } = probes({ entries: { '/J': ['d-17.jdk', 'notes.txt', 'c.jdk', '0-jre17', 'b-jre.jdk', 'a-21.jdk'] }, releases, jre: ['/J/b-jre.jdk/Contents/Home'] });
-    expect(await jdk17Of(p)).toEqual({ home: '/J/c.jdk/Contents/Home', from: 'JavaVirtualMachines', warning: `java_home -v 17 → nothing: exit 1 ${NO_JRE} — the build used JDK 17: /J/c.jdk/Contents/Home (from JavaVirtualMachines)` });
+    expect(await jdk17Of(p)).toEqual({ home: '/J/c.jdk/Contents/Home', from: 'JavaVirtualMachines', warning: `java_home -v 17 → nothing: exit 1 ${NO_JRE} — the build used the one from JavaVirtualMachines` });
     expect(asked).toEqual(['java_home', 'list /J', 'release /J/a-21.jdk/Contents/Home', 'release /J/b-jre.jdk/Contents/Home', 'release /J/c.jdk/Contents/Home']);
     // The user's folder (~/Library/Java/JavaVirtualMachines) after the system one; the system one's misses passed over.
     const user = probes({ entries: { '/J': ['a.jdk'], '/U': ['azul-17.0.19.jdk'] }, releases: { '/U/azul-17.0.19.jdk/Contents/Home': R17 } });
     expect(await jdk17Of(user.p)).toEqual({
       home: '/U/azul-17.0.19.jdk/Contents/Home',
       from: 'JavaVirtualMachines',
-      warning: `java_home -v 17 → nothing: exit 1 ${NO_JRE}; /J: no JDK 17 among a.jdk (its release file not read) — the build used JDK 17: /U/azul-17.0.19.jdk/Contents/Home (from JavaVirtualMachines)`,
+      warning: `java_home -v 17 → nothing: exit 1 ${NO_JRE}; /J: no JDK 17 among a.jdk (its release file not read) — the build used the one from JavaVirtualMachines`,
     });
     expect(user.asked).toEqual(['java_home', 'list /J', 'release /J/a.jdk/Contents/Home', 'list /U', 'release /U/azul-17.0.19.jdk/Contents/Home']);
   });

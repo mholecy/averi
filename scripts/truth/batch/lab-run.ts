@@ -352,7 +352,7 @@ export async function labRun(o: LabRunOptions): Promise<number> {
   // The build's bound is given before runBatch reads the knobs (the blocks read theirs from ctx.knobs); a bad knob
   // refuses there, with nothing built.
   const pre = readKnobs(KNOBS, o.env);
-  const build = labBuild({ ...(pre.ok && { secs: pre.values.B_BUILD }), jvms: o.jvms });
+  const build = labBuild({ ...(pre.ok ? { secs: pre.values.B_BUILD } : {}), jvms: o.jvms });
   const android = androidLab({ build: build.android, settle: o.wait });
 
   const liveRun = async (ctx: BlockCtx<LabRunKnobs>, group: LabRunGroup): Promise<void> => {

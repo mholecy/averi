@@ -1682,9 +1682,11 @@ lookup stays a pure leaf. A met build's JDK (`JDK 17: <home> (from JAVA_HOME | j
 in the `android-build` need's how, and reaches the device need through `askBuild` (BuildRef's `under`), whose line
 names it: lab-run.ts, which lists no build need, prints `LAB android: OK — …; this run's build installed under JDK 17:
 <home> (from …); …`. When an earlier source was passed over (JAVA_HOME set but not a JDK 17, java_home failing), the
-build's warning (`<what each said> — the build used JDK 17: <home> (from …)`) is carried there too: `LAB android:
-WARN — …`, the lab check still PASS and the exit 0. None found, the build's why lists every source tried and what it
+build's warning (`<what each said> — the build used the one from <source>`) is carried there too: `LAB android:
+WARN — …`, the lab check still PASS and the exit 0. The warning is said once: the first line asking the build keeps it
+(a batch that lists `android-build` before `android`, as batch-11's lab block does, says it on the build need's line),
+later answers come without it. None found, the build's why lists every source tried and what it
 said: nothing built, the lab check WARNs and lab-run exits 3.
-The modules stay in the `lab` group: lab-lines.ts 100 % (351 mutants) and lab-build.ts 100 % (303), floor 98;
-lab-run.ts (its `jvms` option, a test's own folders) 94.95 % (516), floor 93 — cold, narrowed with `--mutate` (whose exit
-1 is the fill-type amendment's).
+The modules stay in the `lab` group: lab-lines.ts 100 % (350 mutants) and lab-build.ts 100 % (312), floor 98;
+lab-run.ts (its `jvms` option, a test's own folders) at its floor 93 — cold, narrowed with `--mutate` (whose exit 1 is
+the fill-type amendment's); the figures are in scope.json.

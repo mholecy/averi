@@ -218,10 +218,24 @@ describe('lab-run.ts: a clean run, the blocks\' order and the lab block', () => 
     const jdk = `JDK 17: ${zulu} (from JavaVirtualMachines)`;
     const passed = `java_home -v 17 → nothing: exit 1 Unable to find any JVMs matching version "17"; ${join(root, 'none')}: no *.jdk (or unreadable)`;
     expect(s.find((l) => l.startsWith('LAB android:'))).toBe(
-      `LAB android: WARN — ${passed} — the build used ${jdk}: averi_lab emulator ${LAB_SERIAL}; this run's build installed under ${jdk}; the APK's assets/cells.json is main's (pulled: ${join(dirOf('lab'), 'installed.apk')}); handlers: averilab://shared/open 2, averilab://cell/open 1`,
+      `LAB android: WARN — ${passed} — the build used the one from JavaVirtualMachines: averi_lab emulator ${LAB_SERIAL}; this run's build installed under ${jdk}; the APK's assets/cells.json is main's (pulled: ${join(dirOf('lab'), 'installed.apk')}); handlers: averilab://shared/open 2, averilab://cell/open 1`,
     );
     expect(s.find((l) => l.startsWith('lab check:'))).toMatch(/^lab check: PASS — /);
     expect(seam.words.find((w) => w.endsWith('assembleDebug'))).toBeDefined();
+  });
+
+  it('T23, no JDK 17 anywhere: nothing built, the android line WARNs (not rebuilt), the lab check WARNs naming every source, exit 3', async () => {
+    fresh({ buildFails: 'java' });
+    const none = join(root, 'none');
+    const argv = ['--out', out, '--repo', repo, '--serial', LAB_SERIAL, '--groups', 'forms'];
+    expect(await labRun({ argv, env: {}, io: io(), wait: noWait, jvms: [none] })).toBe(LAB_RUN_EXIT.unproven);
+    const s = summary();
+    const why = `no JDK 17 (JAVA_HOME unset; java_home -v 17 → nothing: exit 1 Unable to find any JVMs matching version "17"; ${none}: no *.jdk (or unreadable))`;
+    expect(s.find((l) => l.startsWith('LAB android:'))).toBe(
+      `LAB android: WARN — ${why}; the app already installed is used: averi_lab emulator ${LAB_SERIAL}; not rebuilt; the APK's assets/cells.json is main's (pulled: ${join(dirOf('lab'), 'installed.apk')}); handlers: averilab://shared/open 2, averilab://cell/open 1`,
+    );
+    expect(s.find((l) => l.startsWith('lab check:'))).toBe(`lab check: WARN — the lab devices checked, but this run's build failed (android-build: ${why}): the app already installed is used`);
+    expect(seam.words.some((w) => w.includes('gradlew'))).toBe(false);
   });
 
   it('this run\'s build failing: the lab check WARNs naming it; the live groups run on the APK already installed; unproven, exit 3', async () => {

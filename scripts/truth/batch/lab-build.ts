@@ -44,12 +44,12 @@ export const LAB_BLOCK = 'lab';
 /**
  * One platform's build as a device need asks it (T2 S6b review round 1, MAJOR 2): `ensure` runs it once for the run —
  * whoever asks first, the device need or the build need's own check — and `built` is its product once it was met.
- * `under`: what it was built under, once met, for the device's line (the Android build's JDK, T23).
+ * `builtUnder`: what it was built under, once met, for the device's line (the Android build's JDK, T23).
  */
 export interface BuildRef {
   ensure(c: NeedCtx): Promise<NeedResult>;
   built(): string | undefined;
-  under?(): string | undefined;
+  builtUnder?(): string | undefined;
 }
 
 export interface LabBuild {
@@ -65,10 +65,10 @@ export interface LabBuild {
 }
 
 /**
- * What a device need does with its build: install this product (none: not rebuilt) built under `under`, with a
+ * What a device need does with its build: install this product (none: not rebuilt) built under `builtUnder`, with a
  * warning; or not met.
  */
-export type BuildAnswer = { built?: string; under?: string; warning?: string } | { why: string };
+export type BuildAnswer = { built?: string; builtUnder?: string; warning?: string } | { why: string };
 
 /**
  * A device need's build (T2 S6b review round 1, MAJOR 2): asked by the need itself, so the order of a block's needs
@@ -80,8 +80,8 @@ export async function askBuild(c: NeedCtx, o: { build?: BuildRef; requireBuild?:
   if (o.build === undefined) return {};
   const r = await o.build.ensure(c);
   if (r.ok) {
-    const under = o.build.under?.();
-    return { built: o.build.built(), ...(under !== undefined && { under }), ...(r.warning !== undefined && { warning: r.warning }) };
+    const builtUnder = o.build.builtUnder?.();
+    return { built: o.build.built(), ...(builtUnder !== undefined && { builtUnder }), ...(r.warning !== undefined && { warning: r.warning }) };
   }
   if (o.requireBuild === true) return { why: `this run's build failed, and the batch requires it: ${r.why}` };
   return { warning: `${r.why}; the app already installed is used` };
@@ -117,11 +117,16 @@ export async function checkDevice<T>(c: NeedCtx, o: { build?: BuildRef; requireB
   }
   const cells = await d.cells(device);
   if ('why' in cells) return { ok: false, why: `${cells.why} ${RERUN_HINT}` };
-  const installed = asked.built === undefined ? NOT_REBUILT : asked.under === undefined ? REBUILT : `${REBUILT} under ${asked.under}`;
-  const how = `${d.describe(device)}; ${installed}; ${cells.how}`;
+  const how = `${d.describe(device)}; ${installedText(asked)}; ${cells.how}`;
   const warnings = [opened.warning, asked.warning].filter((w) => w !== undefined);
   return warnings.length === 0 ? { ok: true, how } : { ok: true, how, warning: warnings.join('; ') };
 }
+
+/** What the device's line says of its build: not rebuilt, or this run's build installed — under its JDK when named. */
+const installedText = (a: { built?: string; builtUnder?: string }): string => {
+  if (a.built === undefined) return NOT_REBUILT;
+  return a.builtUnder === undefined ? REBUILT : `${REBUILT} under ${a.builtUnder}`;
+};
 
 /** A Gradle call's whole: its wrapper, its folder, its env (the JDK, the SDK) and its log. */
 export interface GradleCall {
@@ -215,7 +220,7 @@ export function labBuild(o: { secs?: number; jvms?: readonly string[] } = {}): L
     if (why !== undefined) return { ok: false, why };
     built.android = apk;
     jdk = jdkLine(checked);
-    const how = `built from the checkout under test (${nameInLine(apk)}) under ${jdkLine(checked)}; its ${CELLS_ENTRY} main's; the Gradle daemon stopped`;
+    const how = `built from the checkout under test (${nameInLine(apk)}) under ${jdk}; its ${CELLS_ENTRY} main's; the Gradle daemon stopped`;
     // A source passed over (JAVA_HOME not a JDK 17, java_home failing) is said: the build ran, but not where asked.
     return checked.warning === undefined ? { ok: true, how } : { ok: true, how, warning: checked.warning };
   };
@@ -225,14 +230,24 @@ export function labBuild(o: { secs?: number; jvms?: readonly string[] } = {}): L
     if (p === undefined) return { ok: false, why: "this run's build is gone (none)" };
     return c.fs.exists(p) ? { ok: true, how: `${nameInLine(p)} still there` } : { ok: false, why: `this run's build is gone (${nameInLine(p)})` };
   };
-  /** A build run once for the run, its failure kept for failures(). */
+  /**
+   * A build run once for the run, its failure kept for failures(). A met build's warning is said once (T23 code
+   * review): the first asker's line keeps it — the build need's own, when the batch lists it first, else the device
+   * need's — and every later answer comes without it, so the SUMMARY never says it twice.
+   */
   const once = (need: string, build: (c: NeedCtx) => Promise<NeedResult>) => {
     let run: Promise<NeedResult> | undefined;
-    return (c: NeedCtx): Promise<NeedResult> =>
-      (run ??= build(c).then((r) => {
+    let said = false;
+    return async (c: NeedCtx): Promise<NeedResult> => {
+      const r = await (run ??= build(c).then((r) => {
         if (!r.ok) failed.set(need, r.why);
         return r;
       }));
+      if (!r.ok) return r;
+      const first = !said;
+      said = true;
+      return first ? r : { ok: true, how: r.how };
+    };
   };
   const iosOnce = once(IOS_BUILD_NEED, ios);
   const androidOnce = once(ANDROID_BUILD_NEED, android);
@@ -242,7 +257,7 @@ export function labBuild(o: { secs?: number; jvms?: readonly string[] } = {}): L
       [ANDROID_BUILD_NEED]: { check: androidOnce, alive: stillThere(() => built.android) },
     },
     ios: { ensure: iosOnce, built: () => built.ios },
-    android: { ensure: androidOnce, built: () => built.android, under: () => jdk },
+    android: { ensure: androidOnce, built: () => built.android, builtUnder: () => jdk },
     failures: () => [...failed].map(([need, why]) => `${need}: ${why}`),
     async lastly({ run, step }) {
       if (gradle === undefined) return;

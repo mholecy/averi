@@ -198,7 +198,10 @@ export type JdkFrom = 'JAVA_HOME' | 'java_home' | 'JavaVirtualMachines';
 export interface Jdk17 {
   home: string;
   from: JdkFrom;
-  /** `<what the passed-over sources said> — the build used <jdkLine>`; none when none was passed over. */
+  /**
+   * `<what the passed-over sources said> — the build used the one from <source>`; none when none was passed over. The
+   * home is not repeated: every line printing the warning names it (the build's how, the device's `under`).
+   */
   warning?: string;
 }
 
@@ -243,7 +246,7 @@ const notJdk17 = (home: string, p: JdkProbes): string | undefined => {
 export async function jdk17Of(p: JdkProbes): Promise<Jdk17 | { why: string }> {
   const passed: string[] = [];
   const found = (home: string, from: JdkFrom): Jdk17 =>
-    passed.length === 0 ? { home, from } : { home, from, warning: `${passed.join('; ')} — the build used ${jdkLine({ home, from })}` };
+    passed.length === 0 ? { home, from } : { home, from, warning: `${passed.join('; ')} — the build used the one from ${from}` };
   const env = p.javaHomeEnv ?? '';
   if (env !== '') {
     const why = notJdk17(env, p);

@@ -159,12 +159,22 @@ describe('the Android build (batch-11.sh:298, 308–314): JDK 17, gradlew assemb
     writeFileSync(join(zulu, 'release'), 'JAVA_VERSION="17.0.12"\n');
     writeFileSync(join(zulu, 'bin', 'javac'), '');
     const sandboxed = runOf(world);
-    const s = await need(labBuild({ jvms: [join(dir, 'none'), jvms] }), ANDROID_BUILD_NEED).check(needCtx(sandboxed, LAB_UDID, { JAVA_HOME: '' }));
-    expect(s).toEqual({
+    const kit = labBuild({ jvms: [join(dir, 'none'), jvms] });
+    const s = await need(kit, ANDROID_BUILD_NEED).check(needCtx(sandboxed, LAB_UDID, { JAVA_HOME: '' }));
+    const how = `built from the checkout under test (${join(repo, APK_PATH)}) under JDK 17: ${zulu} (from JavaVirtualMachines); its assets/cells.json main's; the Gradle daemon stopped`;
+    expect(s).toStrictEqual({
       ok: true,
-      how: expect.stringContaining(`under JDK 17: ${zulu} (from JavaVirtualMachines);`),
-      warning: `java_home -v 17 → nothing: exit 1 Unable to find any JVMs matching version "17"; ${join(dir, 'none')}: no *.jdk (or unreadable) — the build used JDK 17: ${zulu} (from JavaVirtualMachines)`,
+      how,
+      warning: `java_home -v 17 → nothing: exit 1 Unable to find any JVMs matching version "17"; ${join(dir, 'none')}: no *.jdk (or unreadable) — the build used the one from JavaVirtualMachines`,
     });
+    // Said once (code review): the build's later answers — the device need's ensure, a recheck — come without it.
+    expect(await kit.android.ensure(needCtx(sandboxed))).toStrictEqual({ ok: true, how });
+    expect(await need(kit, ANDROID_BUILD_NEED).check(needCtx(sandboxed))).toStrictEqual({ ok: true, how });
+    expect(kit.android.builtUnder?.()).toBe(`JDK 17: ${zulu} (from JavaVirtualMachines)`);
+    // A failed build stays failed for every asker.
+    const noJdk = labBuild({ jvms: [join(dir, 'none')] });
+    const failedAgain = [await noJdk.android.ensure(needCtx(sandboxed)), await need(noJdk, ANDROID_BUILD_NEED).check(needCtx(sandboxed))];
+    expect(failedAgain.map((r) => (r as { ok: boolean }).ok)).toEqual([false, false]);
     expect(sandboxed.seen.find((c) => c.words.endsWith('assembleDebug'))?.env).toEqual({ JAVA_HOME: zulu });
     // A JRE 17 (no bin/javac) is passed over: Gradle needs the compiler.
     rmSync(join(zulu, 'bin', 'javac'));
@@ -300,22 +310,22 @@ describe("checkDevice's warnings (batch-13): the readying's (the companion entry
   });
 
   it('T23: a met build — what it was built under in the how, its own warning said (lab-run reaches the build only here)', async () => {
-    const met = (warning?: string, under?: string) => ({
+    const met = (warning?: string, builtUnder?: string) => ({
       ensure: async () => ({ ok: true as const, how: 'built', ...(warning !== undefined && { warning }) }),
       built: () => '/app.apk',
-      ...(under !== undefined && { under: () => under }),
+      ...(builtUnder !== undefined && { builtUnder: () => builtUnder }),
     });
     const jdk = 'JDK 17: /jdk (from java_home)';
     expect(await checkDevice(ctx, { build: met(undefined, jdk) }, device())).toStrictEqual({ ok: true, how: `the device; this run's build installed under ${jdk}; cells main's` });
     expect(await checkDevice(ctx, { build: met() }, device())).toStrictEqual({ ok: true, how: "the device; this run's build installed; cells main's" });
-    expect(await checkDevice(ctx, { build: { ...met(undefined, jdk), under: () => undefined } }, device())).toStrictEqual({ ok: true, how: "the device; this run's build installed; cells main's" });
+    expect(await checkDevice(ctx, { build: { ...met(undefined, jdk), builtUnder: () => undefined } }, device())).toStrictEqual({ ok: true, how: "the device; this run's build installed; cells main's" });
     expect(await checkDevice(ctx, { build: met('java_home → nothing', jdk) }, device('entry stale'))).toStrictEqual({
       ok: true,
       how: `the device; this run's build installed under ${jdk}; cells main's`,
       warning: 'entry stale; java_home → nothing',
     });
-    // askBuild's own answer: no under, no warning key when the build has none.
+    // askBuild's own answer: no builtUnder, no warning key when the build has none.
     expect(await askBuild(ctx, { build: met() })).toStrictEqual({ built: '/app.apk' });
-    expect(await askBuild(ctx, { build: met('w', jdk) })).toStrictEqual({ built: '/app.apk', under: jdk, warning: 'w' });
+    expect(await askBuild(ctx, { build: met('w', jdk) })).toStrictEqual({ built: '/app.apk', builtUnder: jdk, warning: 'w' });
   });
 });

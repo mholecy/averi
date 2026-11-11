@@ -286,7 +286,7 @@ the first `*.jdk` in `/Library/Java/JavaVirtualMachines` and then in `~/Library/
 counts when its `release` file says 17 and it has `bin/javac`. The SUMMARY's `LAB android:` line names it: `this run's
 build installed under JDK 17: <home> (from JAVA_HOME | java_home | JavaVirtualMachines)`. When an earlier source was
 passed over (JAVA_HOME set but not a JDK 17, or `java_home` finding none, as inside the agent's sandbox), that line is
-a WARN that starts with what each passed-over source said and `— the build used JDK 17: <home> (from …)`. The lab check
+a WARN that starts with what each passed-over source said and `— the build used the one from <source>`. The lab check
 still passes and the exit code is unchanged. When no JDK 17 is found, nothing is built: the lab check WARNs with the
 build's reason, which lists every source and what it gave, and the run ends unproven (exit 3).
 
