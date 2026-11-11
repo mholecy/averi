@@ -55,115 +55,12 @@ const dump = (bounds: string, body: string): UiNode =>
 const raw = (bounds: string, attrs: { desc?: string; clickable?: boolean; scrollable?: boolean } = {}, children = ''): string =>
   `<node index="0" text="" resource-id="" class="android.view.View" package="p" content-desc="${attrs.desc ?? ''}" clickable="${attrs.clickable === true}" scrollable="${attrs.scrollable === true}" bounds="${bounds}"${children === '' ? ' />' : `>${children}</node>`}`;
 
-describe('the uiautomator parser marks its root: the dump lists the active window only', () => {
-  it('every dump\'s root carries `activeWindowOnly`, a plain screen\'s as a presented window\'s', () => {
-    for (const cell of ['open', 'alert-dim', 'sheet-medium', 'bottom-sheet-dialog', 'dialog-fullscreen', 'form-picker'] as const) {
-      expect(capture(cell).activeWindowOnly).toBe(true);
-    }
-  });
-
+describe('the presentation module asks the shape of a uiautomator root (it marks the listing, not a presentation)', () => {
   it('the presentation module asks the shape of it, as of any tree whose source did not judge (not by `paddedTouchTargets`)', () => {
     const tree = capture('open');
     expect(presentationOf(tree).fallback).toBe('shape');
     const { activeWindowOnly: _, ...unmarked } = tree;
     expect(presentationOf(unmarked).fallback).toBe('shape');
-  });
-});
-
-describe('the uiautomator parser marks the one window presented when the dump shows it is', () => {
-  it('measured, the AlertDialog (alert-dim): a window off the screen\'s top and left edges floats over what it was opened from — `dialog`', () => {
-    const tree = capture('alert-dim');
-    expect(tree.rect).toEqual({ x: 155, y: 851, width: 770, height: 517 });
-    expect(tree.presentation).toBe('dialog');
-  });
-
-  it('measured, the half-expanded ModalBottomSheet (sheet-medium): a screen-wide clickable labelled scrim from the window\'s top, the sheet beneath it to the bottom — `screen`', () => {
-    expect(capture('sheet-medium').presentation).toBe('screen');
-  });
-
-  it('measured, the Views BottomSheetDialog (bottom-sheet-dialog): Material\'s unlabelled `touch_outside` scrim and its `design_bottom_sheet`, laid between the bars — `screen`', () => {
-    const tree = capture('bottom-sheet-dialog');
-    expect(tree.rect).toEqual({ x: 0, y: 0, width: 1080, height: 2220 });
-    expect(tree.presentation).toBe('screen');
-  });
-
-  it('a plain screen (open) is no presented window; nor is the expanded picker sheet (form-picker), whose dump carries no scrim, nor the full-screen Compose dialog (dialog-fullscreen), laid between the bars against the left edge — residuals', () => {
-    expect(capture('open').presentation).toBeUndefined();
-    expect(capture('form-picker').presentation).toBeUndefined();
-    expect(capture('dialog-fullscreen').presentation).toBeUndefined();
-  });
-
-  it('Material\'s sheet dialog is read by its view ids\' entries, its geometry against the scrim\'s, not the window\'s', () => {
-    /** A raw node with a resource-id (`raw` writes none). */
-    const idNode = (id: string, bounds: string, attrs: { clickable?: boolean } = {}, children = ''): string =>
-      raw(bounds, attrs, children).replace('resource-id=""', `resource-id="${id}"`);
-    const S = raw('[128,1406][953,1582]', { desc: 'Target S', clickable: true });
-    const scrim = (attrs: { id?: string; bounds?: string; clickable?: boolean; child?: string } = {}) =>
-      idNode(attrs.id ?? 'dev.averi.lab:id/touch_outside', attrs.bounds ?? '[0,66][1080,2154]', { clickable: attrs.clickable ?? true }, attrs.child ?? '');
-    const sheet = (bounds = '[0,1164][1080,2154]', id = 'dev.averi.lab:id/design_bottom_sheet') => idNode(id, bounds, {}, S);
-    const window = (kids: string, coordinator = 'dev.averi.lab:id/coordinator') =>
-      dump('[0,0][1080,2220]', raw('[0,0][1080,2154]', {}, idNode(coordinator, '[0,66][1080,2154]', {}, kids)) + raw('[0,2154][1080,2220]'));
-    expect(window(scrim() + sheet()).presentation).toBe('screen');
-    // The entry is Material's; the package is the app's.
-    expect(window(scrim({ id: 'com.bank.app:id/touch_outside' }) + sheet('[0,1164][1080,2154]', 'com.bank.app:id/design_bottom_sheet'), 'com.bank.app:id/coordinator').presentation).toBe('screen');
-    // A fully expanded sheet starts where the scrim does (unmeasured; `>=`).
-    expect(window(scrim() + sheet('[0,66][1080,2154]')).presentation).toBe('screen');
-    // Another entry, or an id only ending in Material's: no mark.
-    expect(window(scrim({ id: 'dev.averi.lab:id/my_touch_outside' }) + sheet()).presentation).toBeUndefined();
-    expect(window(scrim() + sheet('[0,1164][1080,2154]', 'dev.averi.lab:id/bottom_sheet')).presentation).toBeUndefined();
-    expect(window(scrim() + sheet(), 'dev.averi.lab:id/container').presentation).toBeUndefined();
-    // The scrim must take the touch and hold nothing.
-    expect(window(scrim({ clickable: false }) + sheet()).presentation).toBeUndefined();
-    expect(window(scrim({ child: raw('[40,100][400,160]', { desc: 'x' }) }) + sheet()).presentation).toBeUndefined();
-    // The sheet right after the scrim, not before it nor apart from it.
-    expect(window(sheet() + scrim()).presentation).toBeUndefined();
-    expect(window(scrim() + raw('[0,66][1080,200]') + sheet()).presentation).toBeUndefined();
-    // The sheet shares the scrim's left, width and bottom, its top inside the scrim.
-    expect(window(scrim() + sheet('[40,1164][1120,2154]')).presentation).toBeUndefined();
-    expect(window(scrim() + sheet('[0,1164][1000,2154]')).presentation).toBeUndefined();
-    expect(window(scrim() + sheet('[0,1164][1080,2220]')).presentation).toBeUndefined();
-    expect(window(scrim() + sheet('[0,40][1080,2154]')).presentation).toBeUndefined();
-    expect(window(scrim() + sheet('[0,2154][1080,2154]')).presentation).toBeUndefined();
-  });
-
-  it('…not a relaxed scrim shape: the same nodes with no Material ids — an unlabelled full-width touch layer over a full-width sibling — are app content', () => {
-    const plain = dump(
-      '[0,0][1080,2220]',
-      raw('[0,0][1080,2220]', {}, raw('[0,0][1080,1110]', { clickable: true }) + raw('[0,1110][1080,2220]', {}, raw('[128,1406][953,1582]', { desc: 'x' }))),
-    );
-    expect(plain.presentation).toBeUndefined();
-  });
-
-  it('the scrim must be clickable, labelled, childless and screen-wide from the window\'s top, its sibling reaching the bottom from no lower than the scrim\'s', () => {
-    const sheet = raw('[0,1110][1080,2220]', {}, raw('[128,1353][953,1529]', { desc: 'Target S', clickable: true }));
-    const scrim = (attrs: Parameters<typeof raw>[1], bounds = '[0,0][1080,1110]') => raw(bounds, attrs);
-    const host = (first: string, second = sheet) => dump('[0,0][1080,2220]', raw('[0,0][1080,2220]', {}, first + second));
-    expect(host(scrim({ desc: 'Close sheet', clickable: true })).presentation).toBe('screen');
-    // A full-screen scrim behind the sheet (the Views BottomSheetDialog's `touch_outside` shape) holds too.
-    expect(host(scrim({ desc: 'Close sheet', clickable: true }, '[0,0][1080,2220]')).presentation).toBe('screen');
-    expect(host(scrim({ clickable: true })).presentation).toBeUndefined();
-    expect(host(scrim({ desc: 'Banner' })).presentation).toBeUndefined();
-    // A would-be scrim with a child of its own is content (a banner holding its text), no scrim.
-    expect(host(raw('[0,0][1080,1110]', { desc: 'Close sheet', clickable: true }, raw('[40,40][400,100]', { desc: 'x' }))).presentation).toBeUndefined();
-    expect(host(scrim({ desc: 'Close sheet', clickable: true }, '[0,66][1080,1110]')).presentation).toBeUndefined();
-    expect(host(scrim({ desc: 'Close sheet', clickable: true }, '[40,0][1040,1110]')).presentation).toBeUndefined();
-    // The next sibling stops short of the window's bottom, or begins below the scrim: no sheet.
-    expect(host(scrim({ desc: 'Close sheet', clickable: true }), raw('[0,1110][1080,2000]')).presentation).toBeUndefined();
-    expect(host(scrim({ desc: 'Close sheet', clickable: true }), raw('[0,1200][1080,2220]')).presentation).toBeUndefined();
-    // The scrim last, with nothing after it: no sheet either.
-    expect(dump('[0,0][1080,2220]', raw('[0,0][1080,2220]', {}, sheet + scrim({ desc: 'Close sheet', clickable: true }))).presentation).toBeUndefined();
-  });
-
-  it('a window against the screen\'s top or left edge is no dialog, however small or offset on the other axis; one of no area is none', () => {
-    expect(dump('[0,0][600,900]', raw('[0,0][600,900]', { desc: 'x' })).presentation).toBeUndefined();
-    // A full-height window offset sideways: landscape beside a cutout, a pillarboxed compat-mode app.
-    expect(dump('[120,0][1200,2220]', raw('[120,0][1200,2220]', { desc: 'x' })).presentation).toBeUndefined();
-    // A full-width window offset down: a split screen's lower window.
-    expect(dump('[0,1110][1080,2220]', raw('[0,1110][1080,2220]', { desc: 'x' })).presentation).toBeUndefined();
-    // The plain screen shifted 120 px right reads as no dialog either.
-    const shifted = readFileSync(new URL('../fixtures/uiautomator-lab-open.xml', import.meta.url), 'utf8').replace(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/g, (_m, l, t, r, b) => `bounds="[${+l + 120},${t}][${+r + 120},${b}]"`);
-    expect(parseDump(shifted.slice(0, shifted.lastIndexOf('>') + 1)).presentation).toBeUndefined();
-    expect(dump('[200,300][200,300]', '').presentation).toBeUndefined();
   });
 });
 

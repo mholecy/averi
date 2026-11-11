@@ -60,68 +60,71 @@ describe('checkFloors — the failure lines of a run', () => {
 // T2b-2: the run in groups (ADR 0038, the T2 amendment's T2b-2 part). planRuns and main over a fake spawner; no
 // Stryker starts here.
 
-const three: Scope = {
+const groups: Scope = {
   'src/a.ts': { tests: ['tests/a.test.ts'], floor: 90, baseline: '', group: 'core' },
+  'src/adapters/android-w.ts': { tests: ['tests/w.test.ts'], floor: 90, baseline: '', group: 'android' },
   'src/ui-tree/s.ts': { tests: ['tests/s.test.ts'], floor: 90, baseline: '', group: 'scene' },
   'scripts/truth/batch/lab-x.ts': { tests: ['tests/x.test.ts'], floor: 90, baseline: '', group: 'lab' },
 };
 
 describe('planRuns — which groups run, each with its Stryker arguments (T2b-2)', () => {
-  it('no --group: core, scene then lab, each given the same arguments', () => {
-    expect(planRuns([], three)).toEqual({ runs: [{ group: 'core', args: [] }, { group: 'scene', args: [] }, { group: 'lab', args: [] }] });
-    expect(planRuns(['--force'], three)).toEqual({
-      runs: [{ group: 'core', args: ['--force'] }, { group: 'scene', args: ['--force'] }, { group: 'lab', args: ['--force'] }],
+  it('no --group: core, android, scene then lab, each given the same arguments', () => {
+    expect(planRuns([], groups)).toEqual({ runs: [{ group: 'core', args: [] }, { group: 'android', args: [] }, { group: 'scene', args: [] }, { group: 'lab', args: [] }] });
+    expect(planRuns(['--force'], groups)).toEqual({
+      runs: [{ group: 'core', args: ['--force'] }, { group: 'android', args: ['--force'] }, { group: 'scene', args: ['--force'] }, { group: 'lab', args: ['--force'] }],
     });
   });
 
   it('--group <name> or --group=<name>: that group alone, the option not passed on to Stryker', () => {
-    expect(planRuns(['--group', 'lab', '--force'], three)).toEqual({ runs: [{ group: 'lab', args: ['--force'] }] });
-    expect(planRuns(['--force', '--group=core'], three)).toEqual({ runs: [{ group: 'core', args: ['--force'] }] });
+    expect(planRuns(['--group', 'lab', '--force'], groups)).toEqual({ runs: [{ group: 'lab', args: ['--force'] }] });
+    expect(planRuns(['--force', '--group=core'], groups)).toEqual({ runs: [{ group: 'core', args: ['--force'] }] });
   });
 
   it('an unknown group, a --group without its name, or two of them: a refusal naming it', () => {
-    expect(planRuns(['--group', 'all'], three)).toEqual({ refusal: 'npm run mutate: --group all: not a group (core, scene or lab)' });
-    expect(planRuns(['--group=Core'], three)).toEqual({ refusal: 'npm run mutate: --group Core: not a group (core, scene or lab)' });
-    expect(planRuns(['--group'], three)).toEqual({ refusal: 'npm run mutate: --group needs a group (core, scene or lab)' });
-    expect(planRuns(['--group', '--force'], three)).toEqual({ refusal: 'npm run mutate: --group needs a group (core, scene or lab)' });
-    expect(planRuns(['--group', 'core', '--group', 'lab'], three)).toEqual({ refusal: 'npm run mutate: --group given twice: give one, or none for all' });
+    expect(planRuns(['--group', 'all'], groups)).toEqual({ refusal: 'npm run mutate: --group all: not a group (core, android, scene or lab)' });
+    expect(planRuns(['--group=Core'], groups)).toEqual({ refusal: 'npm run mutate: --group Core: not a group (core, android, scene or lab)' });
+    expect(planRuns(['--group'], groups)).toEqual({ refusal: 'npm run mutate: --group needs a group (core, android, scene or lab)' });
+    expect(planRuns(['--group', '--force'], groups)).toEqual({ refusal: 'npm run mutate: --group needs a group (core, android, scene or lab)' });
+    expect(planRuns(['--group', 'core', '--group', 'lab'], groups)).toEqual({ refusal: 'npm run mutate: --group given twice: give one, or none for all' });
   });
 
   it('--tempDirName <name>: each group its own, the name suffixed with the group', () => {
-    expect(planRuns(['--force', '--tempDirName', '.stryker-tmp-7'], three)).toEqual({
+    expect(planRuns(['--force', '--tempDirName', '.stryker-tmp-7'], groups)).toEqual({
       runs: [
         { group: 'core', args: ['--force', '--tempDirName', '.stryker-tmp-7-core'] },
+        { group: 'android', args: ['--force', '--tempDirName', '.stryker-tmp-7-android'] },
         { group: 'scene', args: ['--force', '--tempDirName', '.stryker-tmp-7-scene'] },
         { group: 'lab', args: ['--force', '--tempDirName', '.stryker-tmp-7-lab'] },
       ],
     });
-    expect(planRuns(['--tempDirName=t', '--group', 'lab'], three)).toEqual({ runs: [{ group: 'lab', args: ['--tempDirName', 't-lab'] }] });
-    expect(planRuns(['--tempDirName'], three)).toEqual({ refusal: 'npm run mutate: --tempDirName needs a name' });
+    expect(planRuns(['--tempDirName=t', '--group', 'lab'], groups)).toEqual({ runs: [{ group: 'lab', args: ['--tempDirName', 't-lab'] }] });
+    expect(planRuns(['--tempDirName'], groups)).toEqual({ refusal: 'npm run mutate: --tempDirName needs a name' });
   });
 
   it('--mutate without --group: each file to its own group, a group none names not run', () => {
-    expect(planRuns(['--mutate', 'src/a.ts,scripts/truth/batch/lab-x.ts:3-9'], three)).toEqual({
+    expect(planRuns(['--mutate', 'src/a.ts,scripts/truth/batch/lab-x.ts:3-9'], groups)).toEqual({
       runs: [
         { group: 'core', args: ['--mutate', 'src/a.ts'] },
         { group: 'lab', args: ['--mutate', 'scripts/truth/batch/lab-x.ts:3-9'] },
       ],
     });
-    expect(planRuns(['-m', 'scripts/truth/batch/lab-x.ts', '--force'], three)).toEqual({
+    expect(planRuns(['-m', 'scripts/truth/batch/lab-x.ts', '--force'], groups)).toEqual({
       runs: [{ group: 'lab', args: ['--mutate', 'scripts/truth/batch/lab-x.ts', '--force'] }],
     });
-    expect(planRuns(['-m=src/a.ts'], three)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/a.ts'] }] });
-    expect(planRuns(['--mutate=src/a.ts:1:2-3:4'], three)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/a.ts:1:2-3:4'] }] });
+    expect(planRuns(['-m=src/a.ts'], groups)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/a.ts'] }] });
+    expect(planRuns(['--mutate=src/a.ts:1:2-3:4'], groups)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/a.ts:1:2-3:4'] }] });
   });
 
   it('--mutate without --group: a glob gives each group the modules it matches there, never the glob itself', () => {
-    expect(planRuns(['--mutate', 'src/*.ts', '--force'], three)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/a.ts', '--force'] }] });
-    expect(planRuns(['--mutate', 'scripts/truth/batch/lab-*.ts'], three)).toEqual({
+    expect(planRuns(['--mutate', 'src/*.ts', '--force'], groups)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/a.ts', '--force'] }] });
+    expect(planRuns(['--mutate', 'scripts/truth/batch/lab-*.ts'], groups)).toEqual({
       runs: [{ group: 'lab', args: ['--mutate', 'scripts/truth/batch/lab-x.ts'] }],
     });
-    const more: Scope = { ...three, 'src/b.ts': { tests: ['tests/b.test.ts'], floor: 90, baseline: '', group: 'core' } };
+    const more: Scope = { ...groups, 'src/b.ts': { tests: ['tests/b.test.ts'], floor: 90, baseline: '', group: 'core' } };
     expect(planRuns(['--mutate', '**/*.ts,src/a.ts:2-5'], more)).toEqual({
       runs: [
         { group: 'core', args: ['--mutate', 'src/a.ts,src/b.ts,src/a.ts:2-5'] },
+        { group: 'android', args: ['--mutate', 'src/adapters/android-w.ts'] },
         { group: 'scene', args: ['--mutate', 'src/ui-tree/s.ts'] },
         { group: 'lab', args: ['--mutate', 'scripts/truth/batch/lab-x.ts'] },
       ],
@@ -129,40 +132,40 @@ describe('planRuns — which groups run, each with its Stryker arguments (T2b-2)
   });
 
   it('--mutate without --group on a node without path.matchesGlob (before 20.17): exact paths work, a glob is refused', () => {
-    expect(planRuns(['--mutate', 'src/a.ts,scripts/truth/batch/lab-x.ts:3-9'], three, null)).toEqual({
+    expect(planRuns(['--mutate', 'src/a.ts,scripts/truth/batch/lab-x.ts:3-9'], groups, null)).toEqual({
       runs: [
         { group: 'core', args: ['--mutate', 'src/a.ts'] },
         { group: 'lab', args: ['--mutate', 'scripts/truth/batch/lab-x.ts:3-9'] },
       ],
     });
     for (const glob of ['src/*.ts', 'src/a.t?', 'src/[ab].ts', 'src/**']) {
-      expect(planRuns(['--mutate', glob], three, null)).toEqual({
+      expect(planRuns(['--mutate', glob], groups, null)).toEqual({
         refusal: `npm run mutate: --mutate ${glob}: a glob needs Node 20.17 or later (path.matchesGlob); give scripts/mutation/scope.json paths, or --group`,
       });
     }
     // A scope.json key is looked up as itself first, glob characters and all (one a glob would not match).
-    const bracketed: Scope = { ...three, 'src/[id].ts': { tests: ['tests/id.test.ts'], floor: 90, baseline: '', group: 'core' } };
+    const bracketed: Scope = { ...groups, 'src/[id].ts': { tests: ['tests/id.test.ts'], floor: 90, baseline: '', group: 'core' } };
     for (const glob of [null, undefined]) {
       expect(planRuns(['--mutate', 'src/[id].ts'], bracketed, glob)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/[id].ts'] }] });
     }
-    expect(planRuns(['--mutate', 'src/zz.ts'], three, null)).toEqual({
+    expect(planRuns(['--mutate', 'src/zz.ts'], groups, null)).toEqual({
       refusal: 'npm run mutate: --mutate src/zz.ts: matches no scripts/mutation/scope.json module (give --group to mutate it)',
     });
   });
 
   it('--mutate without --group: a pattern matching no scope entry, or no file, is a refusal', () => {
-    expect(planRuns(['--mutate', 'src/a.ts,src/zz/*.ts'], three)).toEqual({
+    expect(planRuns(['--mutate', 'src/a.ts,src/zz/*.ts'], groups)).toEqual({
       refusal: 'npm run mutate: --mutate src/zz/*.ts: matches no scripts/mutation/scope.json module (give --group to mutate it)',
     });
-    expect(planRuns(['--mutate', 'src/a'], three)).toEqual({
+    expect(planRuns(['--mutate', 'src/a'], groups)).toEqual({
       refusal: 'npm run mutate: --mutate src/a: matches no scripts/mutation/scope.json module (give --group to mutate it)',
     });
-    expect(planRuns(['--mutate'], three)).toEqual({ refusal: 'npm run mutate: --mutate needs a file' });
-    expect(planRuns(['-m', ''], three)).toEqual({ refusal: 'npm run mutate: --mutate needs a file' });
+    expect(planRuns(['--mutate'], groups)).toEqual({ refusal: 'npm run mutate: --mutate needs a file' });
+    expect(planRuns(['-m', ''], groups)).toEqual({ refusal: 'npm run mutate: --mutate needs a file' });
   });
 
   it('--mutate with --group: passed on as given, globs too', () => {
-    expect(planRuns(['--group', 'core', '--mutate', 'src/*.ts'], three)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/*.ts'] }] });
+    expect(planRuns(['--group', 'core', '--mutate', 'src/*.ts'], groups)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/*.ts'] }] });
   });
 });
 
@@ -172,18 +175,18 @@ function fakeDeps(o: { spawned?: Partial<Record<string, Partial<Spawned>>>; repo
   const out: string[] = [];
   let clock = 0;
   const deps: MutateDeps = {
-    readScope: () => o.scope ?? three,
+    readScope: () => o.scope ?? groups,
     spawn: (args, env, boundMs) => {
       const group = env[GROUP_ENV];
       events.push(`spawn ${group} ${args.join(' ')} ${boundMs}`);
-      clock += group === 'core' ? 212_400 : group === 'scene' ? 150_200 : 98_600;
+      clock += group === 'core' ? 212_400 : group === 'android' ? 180_300 : group === 'scene' ? 150_200 : 98_600;
       return Promise.resolve({ status: 0, signal: null, timedOut: false, interrupted: false, ...o.spawned?.[group] });
     },
     readReport: (path) => {
       events.push(`read ${path}`);
       const group = /mutation-(\w+)\.json$/.exec(path)?.[1] ?? '';
       if (o.reports !== undefined && group in o.reports) return o.reports[group];
-      const file = group === 'core' ? 'src/a.ts' : group === 'scene' ? 'src/ui-tree/s.ts' : 'scripts/truth/batch/lab-x.ts';
+      const file = group === 'core' ? 'src/a.ts' : group === 'android' ? 'src/adapters/android-w.ts' : group === 'scene' ? 'src/ui-tree/s.ts' : 'scripts/truth/batch/lab-x.ts';
       return { files: { [file]: { mutants: mutants({ Killed: 9, Survived: 1 }) } } };
     },
     removeReport: (path) => events.push(`remove ${path}`),
@@ -195,7 +198,7 @@ function fakeDeps(o: { spawned?: Partial<Record<string, Partial<Spawned>>>; repo
 }
 
 describe('main — the groups one after the other, the run failing if any fails (T2b-2)', () => {
-  it('no --group: core, scene then lab, each its report removed first, its own env and 600 s bound; all pass: 0', async () => {
+  it('no --group: core, android, scene then lab, each its report removed first, its own env and 600 s bound; all pass: 0', async () => {
     const { deps, events, out } = fakeDeps();
     expect(GROUP_BOUND_MS).toBe(600_000);
     expect(await main(['--force'], deps)).toBe(0);
@@ -203,6 +206,9 @@ describe('main — the groups one after the other, the run failing if any fails 
       'remove reports/mutation/mutation-core.json',
       'spawn core run --force 600000',
       'read reports/mutation/mutation-core.json',
+      'remove reports/mutation/mutation-android.json',
+      'spawn android run --force 600000',
+      'read reports/mutation/mutation-android.json',
       'remove reports/mutation/mutation-scene.json',
       'spawn scene run --force 600000',
       'read reports/mutation/mutation-scene.json',
@@ -212,9 +218,11 @@ describe('main — the groups one after the other, the run failing if any fails 
     ]);
     expect(out).toEqual([
       'src/a.ts: 90.00 % (floor 90 %)',
+      'src/adapters/android-w.ts: 90.00 % (floor 90 %)',
       'src/ui-tree/s.ts: 90.00 % (floor 90 %)',
       'scripts/truth/batch/lab-x.ts: 90.00 % (floor 90 %)',
       'npm run mutate: core passed in 212 s',
+      'npm run mutate: android passed in 180 s',
       'npm run mutate: scene passed in 150 s',
       'npm run mutate: lab passed in 99 s',
     ]);
@@ -225,18 +233,18 @@ describe('main — the groups one after the other, the run failing if any fails 
     expect(await main(['--group', 'core'], deps)).toBe(0);
   });
 
-  it('core below its floor: scene and lab still run, and the run fails (exit 1) naming core', async () => {
+  it('core below its floor: android, scene and lab still run, and the run fails (exit 1) naming core', async () => {
     const { deps, events, out } = fakeDeps({ reports: { core: { files: { 'src/a.ts': { mutants: mutants({ Killed: 8, Survived: 2 }) } } } } });
     expect(await main([], deps)).toBe(1);
     expect(events).toContain('spawn lab run 600000');
     expect(out).toContain('E \nnpm run mutate (core) failed:\n  src/a.ts: 80.00 % (floor 90 %) — below its floor: a weakened test, or new code no test checks');
-    expect(out.slice(-3)).toEqual(['npm run mutate: core failed (exit 1) in 212 s', 'npm run mutate: scene passed in 150 s', 'npm run mutate: lab passed in 99 s']);
+    expect(out.slice(-4)).toEqual(['npm run mutate: core failed (exit 1) in 212 s', 'npm run mutate: android passed in 180 s', 'npm run mutate: scene passed in 150 s', 'npm run mutate: lab passed in 99 s']);
   });
 
   it('lab\'s Stryker exits 3: the run exits 3, core\'s pass kept in the summary', async () => {
     const { deps, out } = fakeDeps({ spawned: { lab: { status: 3 } } });
     expect(await main([], deps)).toBe(3);
-    expect(out.slice(-3)).toEqual(['npm run mutate: core passed in 212 s', 'npm run mutate: scene passed in 150 s', 'npm run mutate: lab failed (exit 3) in 99 s']);
+    expect(out.slice(-4)).toEqual(['npm run mutate: core passed in 212 s', 'npm run mutate: android passed in 180 s', 'npm run mutate: scene passed in 150 s', 'npm run mutate: lab failed (exit 3) in 99 s']);
   });
 
   it('both fail: the first failure\'s exit', async () => {
@@ -257,14 +265,14 @@ describe('main — the groups one after the other, the run failing if any fails 
     expect(await main([], deps)).toBe(130);
     expect(events.filter((e) => e.startsWith('spawn'))).toEqual(['spawn core run 600000']);
     expect(out).toContain('E npm run mutate: core: Stryker did not run to an end: interrupted (SIGINT)');
-    expect(out.slice(-3)).toEqual(['npm run mutate: core failed (exit 130) in 212 s', 'npm run mutate: scene not run: the run was interrupted', 'npm run mutate: lab not run: the run was interrupted']);
+    expect(out.slice(-4)).toEqual(['npm run mutate: core failed (exit 130) in 212 s', 'npm run mutate: android not run: the run was interrupted', 'npm run mutate: scene not run: the run was interrupted', 'npm run mutate: lab not run: the run was interrupted']);
   });
 
   it('an interrupt Stryker handles itself (it exits, with 130): its exit, and no later group runs', async () => {
     const { deps, events, out } = fakeDeps({ spawned: { core: { status: 130, interrupted: true } } });
     expect(await main([], deps)).toBe(130);
     expect(events.filter((e) => e.startsWith('spawn'))).toEqual(['spawn core run 600000']);
-    expect(out.slice(-3)).toEqual(['npm run mutate: core failed (exit 130) in 212 s', 'npm run mutate: scene not run: the run was interrupted', 'npm run mutate: lab not run: the run was interrupted']);
+    expect(out.slice(-4)).toEqual(['npm run mutate: core failed (exit 130) in 212 s', 'npm run mutate: android not run: the run was interrupted', 'npm run mutate: scene not run: the run was interrupted', 'npm run mutate: lab not run: the run was interrupted']);
   });
 
   it('Stryker not started, or killed by a signal: a failure saying why', async () => {
@@ -286,13 +294,13 @@ describe('main — the groups one after the other, the run failing if any fails 
     const refused = fakeDeps();
     expect(await main(['--group', 'all'], refused.deps)).toBe(2);
     expect(refused.events).toEqual([]);
-    expect(refused.out).toEqual(['E npm run mutate: --group all: not a group (core, scene or lab)']);
+    expect(refused.out).toEqual(['E npm run mutate: --group all: not a group (core, android, scene or lab)']);
     // scope.json as read: its group not yet checked.
-    const unchecked: Scope = JSON.parse(JSON.stringify({ ...three, 'src/b.ts': { tests: ['tests/b.test.ts'], floor: 90, baseline: '', group: 'x' } }));
+    const unchecked: Scope = JSON.parse(JSON.stringify({ ...groups, 'src/b.ts': { tests: ['tests/b.test.ts'], floor: 90, baseline: '', group: 'x' } }));
     const bad = fakeDeps({ scope: unchecked });
     expect(await main([], bad.deps)).toBe(2);
     expect(bad.events).toEqual([]);
-    expect(bad.out).toEqual(['E npm run mutate: src/b.ts: group "x" in scripts/mutation/scope.json is not core, scene or lab']);
+    expect(bad.out).toEqual(['E npm run mutate: src/b.ts: group "x" in scripts/mutation/scope.json is not core, android, scene or lab']);
   });
 });
 
