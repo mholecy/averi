@@ -1,6 +1,6 @@
 # averi.yaml reference
 
-Read this when you write or change `averi.yaml`. The schema is strict: an unknown key is refused with an error that names it.
+Read this when you write or change `averi.yaml`. The schema is strict, and a load error says where: an unknown key is refused naming it, a value of the wrong type naming its path and the type it takes (`flows.login.steps.3.scroll_until.within.id: Expected string, received number`). A step has exactly one key, its kind (or `android`/`ios`, the platform override below); an unknown one is refused naming the kinds there are.
 
 If the config is not in the working directory, pass `configPath:` to the tools. Paths inside the yaml resolve against the yaml file itself.
 

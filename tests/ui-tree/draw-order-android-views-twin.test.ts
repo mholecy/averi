@@ -111,8 +111,8 @@ describe('P2 the same run in Compose AndroidView interop: unmarked, tapped at th
  * cover (the slot widened 20 dp left and right, 10 dp up and down), so no bound is clipped: a slot as small as its
  * target would clip the cover's dumped bounds to it (View#getBoundsOnScreen clips to each parent) and fail the location
  * check on its own — the cell would not tell the role rule from the clip. Here only the provider rule
- * (android.ts#providesNodes) leaves the run unmarked: LR4's lie is the EXPECTED prediction (ADR 0015's role residual,
- * not narrowed), to be filed in react-native.known.ts once captured.
+ * (android.ts#providesNodes) leaves the run unmarked: LR4's lie is the EXPECTED prediction (ADR 0015's residual 5,
+ * not narrowed), filed in react-native.known.ts as that residual since the capture (2026-11-11).
  */
 describe('P3 rn-banner-role: the slot container dumps as android.view.View — unmarked, tapped at the centre (LR4 survives)', () => {
   const cell = 'rn-banner-role';
