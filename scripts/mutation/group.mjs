@@ -2,20 +2,21 @@
 import { readFileSync } from 'node:fs';
 
 /**
- * The mutation run's groups: each scope.json entry names one (`core` or `lab`), and one Stryker process mutates one
- * group, against that group's tests only, with an incremental file, reports and temp dir of its own. Plain JS, so that
- * stryker.config.mjs (loaded by node, no tsx) reads it as vitest.mutation.config.ts and mutate.ts do. Why the groups
- * and which module is in which: docs/adr/0038-a-mutation-run-guards-the-pure-leaves-tests.md, the T2b-2 part.
+ * The mutation run's groups: each scope.json entry names one (`core`, `scene` or `lab`), and one Stryker process
+ * mutates one group, against that group's tests only, with an incremental file, reports and temp dir of its own. Plain
+ * JS, so that stryker.config.mjs (loaded by node, no tsx) reads it as vitest.mutation.config.ts and mutate.ts do. Why
+ * the groups and which module is in which: docs/adr/0038-a-mutation-run-guards-the-pure-leaves-tests.md, the T2b-2
+ * part (`scene`: its A25 amendment).
  */
 
 /** The groups, in the order a run without `--group` runs them. */
-export const GROUPS = /** @type {const} */ (['core', 'lab']);
+export const GROUPS = /** @type {const} */ (['core', 'scene', 'lab']);
 /** The variable mutate.ts sets for each Stryker process it starts: the group that process mutates. */
 export const GROUP_ENV = 'AVERI_MUTATE_GROUP';
 
 const SCOPE = 'scripts/mutation/scope.json';
-/** The groups in words, for a line naming them: `core or lab`. */
-export const GROUP_WORDS = GROUPS.join(' or ');
+/** The groups in words, for a line naming them: `core, scene or lab`. */
+export const GROUP_WORDS = `${GROUPS.slice(0, -1).join(', ')} or ${GROUPS[GROUPS.length - 1]}`;
 
 /**
  * Whether `name` is one of GROUPS.

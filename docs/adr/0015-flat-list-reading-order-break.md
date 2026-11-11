@@ -567,7 +567,8 @@ in a scroll view could be stroked away. The draw order already excuses scroll co
 view (draw-order.ts's `scrolledContent` row) unless that content lies in a later screen, which takes `presented` first.
 So the cover's half is defence in depth, and so is `pinned` under a cover in the pixel assert, which now arises only
 for such a cover: their hand-mutation / narrowed-run survivors (standing.ts's cover half, pixel-poll.ts's words) are
-known — standing.ts and pixel-poll.ts are not in ADR 0038's mutation run. Undefined
+known — standing.ts and pixel-poll.ts are not in ADR 0038's mutation run (standing.ts joined it at A25, where the
+cover half stays an equivalent survivor: ADR 0038's A25 amendment). Undefined
 ancestry (idb's flat list) keeps the old cases. Since D84 views-drawn-over's A no longer reaches this case (its cover B
 is an untold peer, 2.); the targets that do are pinned-bar P and text-under-bar P under Continue (WDA, Compose) and
 rn-banner's "Saved".

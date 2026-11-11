@@ -11,6 +11,7 @@ import { coverNodes, tagged } from '../helpers/covers.js';
 import { iosTrees } from '../helpers/ios-trees.js';
 import { screenOf } from '../../src/ui-tree/geometry.js';
 import { node } from '../helpers/fake.js';
+import { IPHONE_17 } from '../helpers/pixels.js';
 
 /**
  * A row past its scroll view's clip, in idb's flat list (which lists no scroll view): `scroll-bounded`'s O `51,620 300x64`, a
@@ -329,5 +330,29 @@ describe('the order a screenshot saw, handed to the draw order', () => {
     const listed = drawOrder(t).exposure(w, IPHONE);
     expect(told).toEqual(listed);
     expect(tagged(listed.covers)).toEqual([{ node: c, order: 'untold', presented: false }]);
+  });
+});
+
+/**
+ * idb's TOP BAR against its content in reading order (reading-order.ts#peersOf, `contentFrom`; ADR 0004, chrome before
+ * content): the bar's controls are no peers whose order is untold — of a content row scrolled under them, nor, for a
+ * bar control, a content row listed after it, which the draw order judges as before (drawn over it when it reaches past
+ * the bar's band).
+ */
+describe('idb\'s top bar and its content: no reading-order peers of each other', () => {
+  const el = (identifier: string, rect: UiNode['rect'], role = 'button'): UiNode => node({ role, identifier, rect });
+  const flat = (...children: UiNode[]): UiNode => node({ role: 'application', rect: IPHONE_17.box, flatList: true, readingOrder: true, children });
+  const covers = (t: UiNode, target: UiNode) => sceneOf(t).standing(target, IPHONE_17, { of: 'tap' }).facts.covers.map((c) => [c.node.identifier, c.order.kind]);
+
+  it('a content row scrolled under the bar\'s Back, which holds its centre: Back is no cover of it', () => {
+    const row = el('row', { x: 0, y: 70, width: 200, height: 60 });
+    const t = flat(el('back', { x: 0, y: 62, width: 120, height: 44 }), el('title', { x: 150, y: 62, width: 100, height: 44 }, 'text'), row, el('row2', { x: 0, y: 200, width: 402, height: 60 }));
+    expect(covers(t, row)).toEqual([]);
+  });
+
+  it('a content row listed after Back that reaches past the bar\'s band and holds its centre: drawn over it, its order told', () => {
+    const back = el('back', { x: 0, y: 62, width: 120, height: 44 });
+    const t = flat(back, el('row0', { x: 0, y: 300, width: 402, height: 60 }), el('row', { x: 0, y: 66, width: 402, height: 300 }));
+    expect(covers(t, back)).toEqual([['row', 'drawn']]);
   });
 });

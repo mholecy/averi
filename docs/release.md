@@ -74,10 +74,10 @@ them in the background.
    Inside the agent's sandbox the macOS Vision recognizer does not run, so the first line ends `, K skipped (no OCR on
    this host: …)`. That is expected there; say it in the record. On the owner's Mac nothing is skipped.
 
-6. **Mutation, cold:** `npm run mutate -- --force` (both groups, core then lab, each bounded at 600 s), exit 0. Each
-   group's floors are met (`checkFloors` in mutate.ts). Keep the per-module score lines and the last lines, and record
-   each group's time (`npm run mutate: <group> passed in N s`); a group over ~480 s on a quiet host means the next
-   change to it moves a module out or adds a group (ADR 0038's threshold rule and its A21 amendment).
+6. **Mutation, cold:** `npm run mutate -- --force` (every group: core, scene, then lab, each bounded at 600 s), exit 0.
+   Each group's floors are met (`checkFloors` in mutate.ts). Keep the per-module score lines and the last lines, and
+   record each group's time (`npm run mutate: <group> passed in N s`); a group over ~480 s on a quiet host means the
+   next change to it moves a module out or adds a group (ADR 0038's threshold rule and its A21 amendment).
 7. **The package:** `npm pack --dry-run` lists what ships. Then `npm run release:smoke` (after the build in step 4;
    `pack-smoke.ts` in scripts/release) packs the real tarball into a temporary folder and checks it. Its file list
    must hold the bin's target (`dist/mcp/server.js`), every `files` entry (dist, skill, SETUP.md, ARCHITECTURE.md),
@@ -219,7 +219,7 @@ Only after A, B and C passed, on the commit they tested:
 | A build | exit 0 | vX.Y.Z/build.log.txt |
 | A golden | N checks, M mismatches (M known, 0 new), 0 broken; K skipped (no OCR) | vX.Y.Z/golden.log.txt |
 | A golden diff | Strike 0, COUNTS 0, Re-pin 0 | vX.Y.Z/golden-against.log.txt |
-| A mutation | core PASS, lab PASS (cold) | vX.Y.Z/mutate.log.txt |
+| A mutation | core PASS, scene PASS, lab PASS (cold) | vX.Y.Z/mutate.log.txt |
 | A package | release smoke: PASS (N files, 18 tools) | vX.Y.Z/release-smoke.log.txt |
 | B truth:lab | exit 0: lab, chooser, forms PASS | vX.Y.Z/android-truth-lab.log.txt |
 | B live | exit 0: N cases, M mismatches (0 not known); Device: <label> | vX.Y.Z/android-live.log.txt |
