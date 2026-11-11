@@ -204,6 +204,8 @@ internal fun EdgesScreen(cell: Cell, lab: Lab) {
             StickyList(cell, lab)
         } else if (cell.id == "carousel-in-list") {
             CarouselInList(cell, lab, maxWidth, maxHeight)
+        } else if (cell.id == "carousel-in-list-cut") {
+            CarouselInList(cell, lab, maxWidth, maxHeight, cut = CarouselLayout.CUT)
         } else if (cell.id in L7_CAROUSELS) {
             L7CarouselInList(cell, lab, L7_CAROUSELS.getValue(cell.id), maxWidth, maxHeight)
         } else if (cell.id == "scroll-collapsing") {
@@ -319,16 +321,31 @@ private object CarouselLayout {
     val CARD_HEIGHT = 85.dp
     /** The cards in carousel order: a filler, C, a filler. */
     const val CARDS = 3
+    /**
+     * carousel-in-list-cut's cut (backlog T6d): how far past C's start the carousel is scrolled on appear, so C is drawn
+     * cut this much at the clip's LEFT edge — on averi_lab 22 px: the carousel at 948 + 22 = 970 px, C at 44–992 px in
+     * the clip 66–1014 (tests/interact/scroll-carousel-unfit-cell.test.ts). Under 24 dp (66 px) on purpose, so both of
+     * C's sides lie on the screen (no side unknown: uiautomator cuts a node at the screen's edge, D17) and C, a
+     * clickable node, is listed whole (its bounds run on up to 24 dp past a clipping container: SPLIT_CELLS' note).
+     */
+    val CUT = 8.dp
 }
 
+/**
+ * carousel-in-list, and carousel-in-list-cut (backlog T6d, `cut` given): the same page and told-axis carousel (a
+ * Compose horizontalScroll, dumped `android.widget.HorizontalScrollView`), the carousel scrolled on appear one card
+ * plus `cut` — C, as wide as the clip, drawn cut `cut` at its left edge: D52's `unfit` (ADR 0021) is asked of it on the
+ * first read. carousel-in-list (`cut` null) stays as captured: the carousel at 0, C right of the clip.
+ */
 @Composable
-private fun CarouselInList(cell: Cell, lab: Lab, screenWidth: Dp, screenHeight: Dp) {
+private fun CarouselInList(cell: Cell, lab: Lab, screenWidth: Dp, screenHeight: Dp, cut: Dp? = null) {
     val view = LocalView.current
     val density = LocalDensity.current
     val l = CarouselLayout
     val page = rememberScrollState(with(density) { l.OFFSET.roundToPx() })
-    val carousel = rememberScrollState(0)
     val cardWidth = screenWidth - l.CAROUSEL_X * 2
+    // The card's width in px as the Row lays it out (Modifier.size rounds it so), then the cut: 948 + 22 on averi_lab.
+    val carousel = rememberScrollState(if (cut == null) 0 else with(density) { cardWidth.roundToPx() + cut.roundToPx() })
     ReportScroll(lab, "page", { page.isScrollInProgress }, { page.value })
     ReportScroll(lab, "carousel", { carousel.isScrollInProgress }, { carousel.value })
     Box(

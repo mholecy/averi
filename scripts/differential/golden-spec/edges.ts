@@ -1,9 +1,9 @@
 import type { Platform, SourceKind } from '../corpus.js';
 import type { AbsentTarget, CellTruth, TargetTruth } from '../../truth/schema.js';
-import { directionOf, scrollerListedIn } from '../../truth/truth.js';
+import { directionOf, scrollAxisToldIn, scrollerListedIn } from '../../truth/truth.js';
 import { classed, type Expectation } from './judges.js';
 import { ABSENT_STOPS, askedUnlistedBy, unlistedBy, type TargetContract } from '../../truth/target-contract.js';
-import { absentFullyRow, colourFails, directionRow, fullyRow, stopRow, strokeRow, tapRow } from './rows.js';
+import { absentFullyRow, colourFails, directionRow, fullyRow, scrollAxisOf, stopRow, strokeRow, tapRow, unfitRow, unfitSide } from './rows.js';
 
 /**
  * The edge geometries' rows — a geometry group, named for the edges family (fixtures/apps/cells/edges.json, phase 3 B2)
@@ -16,9 +16,9 @@ import { absentFullyRow, colourFails, directionRow, fullyRow, stopRow, strokeRow
  * |---|---|
  * | off-screen | R-off tap, R-off colour, R-stroke, R-direction (live only: golden.ts never asks it) |
  * | outside-scroll-view | R-outside-sv tap, R-outside-sv colour (asked for the colour the screen shows there: a pass measured the background, #29), R-stroke, R-direction (live only) |
- * | sliver | R-sliver tap, R-sliver scroll_until, R-fully |
- * | partly-centre-in | R-land (Tapped inside what shows), R-fully |
- * | centre-out | R-land (refused, or Tapped inside its piece), R-fully |
+ * | sliver | R-sliver tap, R-sliver scroll_until, R-fully — or R-unfit |
+ * | partly-centre-in | R-land (Tapped inside what shows), R-fully — or R-unfit in its place (toldUnfitSide, T6d) |
+ * | centre-out | R-land (refused, or Tapped inside its piece), R-fully — or R-unfit |
  * | (none: CellTruth.absent) | R-absent: R-stroke and R-fully toward AbsentTarget.toward (absentRows) |
  *
  * What each row asks is the target contract's (`c`, scripts/truth/target-contract.ts#contractOf — the live golden's
@@ -42,7 +42,9 @@ export function edgeRows(platform: Platform, t: TargetTruth, cell: CellTruth, so
   // rows.ts#StrokeOptions.namedSuffices; D76).
   const namedSuffices = absent !== undefined && ownScrollerListed(t, cell, source, tree);
   const stroke = (row: string) => strokeRow(platform, t, cell, row, c.stop, directionOf(t, cell), { absent, ...(namedSuffices && { namedSuffices }) });
-  const fully = c.fully === undefined ? [] : [fullyRow(platform, t, cell, c.fully)];
+  // R-unfit in R-fully's place where D52's `unfit` is the truth's answer and the replayed tree tells the axis (T6d).
+  const unfit = c.fully === undefined ? undefined : toldUnfitSide(t, cell, source, tree);
+  const fully = c.fully === undefined ? [] : [unfit === undefined ? fullyRow(platform, t, cell, c.fully) : unfitRow(platform, t, c.fully, unfit)];
   switch (c.geometry) {
     case 'off-screen':
       return [
@@ -66,6 +68,18 @@ export function edgeRows(platform: Platform, t: TargetTruth, cell: CellTruth, so
     default:
       return [];
   }
+}
+
+/**
+ * The side R-unfit asks `fully: true` toward (rows.ts#unfitSide), where the replayed tree tells the target's scroll view's
+ * axis as the one it is cut along (truth.ts#scrollAxisToldIn) — undefined otherwise, and with no tree: no cross-axis
+ * `unfit`, and none of D59's inferred axis, which needs a stroke that moved the card, never seen in a replayed tree.
+ */
+function toldUnfitSide(t: TargetTruth, cell: CellTruth, source: SourceKind, tree: string | undefined) {
+  const side = unfitSide(t, cell);
+  const clip = t.scrollView === undefined ? undefined : cell.scrollViews?.[t.scrollView];
+  if (side === undefined || clip === undefined || tree === undefined) return undefined;
+  return scrollAxisToldIn(tree, source, clip) === scrollAxisOf(side) ? side : undefined;
 }
 
 /**

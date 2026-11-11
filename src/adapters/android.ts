@@ -190,7 +190,7 @@ const ROLE_MAP: Record<string, string> = {
  * (`LazyColumn` dumps as `android.view.View` — the lab's form picker and sticky list), a RecyclerView (either axis;
  * the dump names no orientation), a ViewPager2.
  */
-const AXIS_BY_CLASS: Readonly<Record<string, ScrollAxis>> = {
+export const AXIS_BY_CLASS: Readonly<Record<string, ScrollAxis>> = {
   ScrollView: 'vertical',
   NestedScrollView: 'vertical',
   ListView: 'vertical',
