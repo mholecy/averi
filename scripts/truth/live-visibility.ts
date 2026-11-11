@@ -909,7 +909,7 @@ export function touchTurns(state: Pick<LabState, 'events'>, launched: Pick<LabSt
  * ADR asks of the carry — no turn (a stroke of the table back up, a touch-down on the other half of it after one on the
  * first (touchTurns), or averi saying it turned (replies.ts#turnsSaid): the logged strokes alone miss turns merged into
  * a fling), none that carried the row from below its window to above it (the overshoot a full final stroke makes where
- * the window is narrower than its carry).
+ * the window is narrower than its carry) by a move of more than the slack.
  */
 export function judgeCarry(reply: string, state: LabState, start: LabState): LiveVerdict {
   const verdict = judgeScroll({ tag: CARRY.tag, view: CARRY.view, fully: false, platform: 'ios' }, [reply], state, start);
@@ -920,7 +920,9 @@ export function judgeCarry(reply: string, state: LabState, start: LabState): Liv
   const top = (o: number) => f0.y - (o - o0);
   const strokes = strokesSince(state, start).filter((s) => s.view === CARRY.view);
   const turned = strokes.filter((s) => s.to < s.from - MOVE_SLACK);
-  const past = strokes.filter((s) => top(s.from) + f0.height > region.y + region.height && top(s.to) < region.y);
+  // A move as well as the window test: L taller than its region and over both its edges is below its bottom and above
+  // its top at once, where a stroke that moved nothing carried nothing (D83).
+  const past = strokes.filter((s) => s.to - s.from > MOVE_SLACK && top(s.from) + f0.height > region.y + region.height && top(s.to) < region.y);
   // The table's clip is there: a region (showRegion) is only ever cut from it.
   const touched = touchTurns(state, start, start.scrollViews![CARRY.view]!);
   const said = turnsSaid(reply);

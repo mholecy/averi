@@ -1625,3 +1625,21 @@ from 17 to 34, all of the extra ones in fill-landing.ts (1 to 11) and fill-refor
 run against fill-type.test.ts, which reaches them through `landingOf` and `readingOf`, so their tests did change. But a
 second cold run of the same commit, in review, did not reproduce the extra timeouts: 1 in fill-landing.ts and 1 in
 fill-reformat.ts, 21 in all (16 outside fill-type), in 371 s. Both runs are under T13's ~480 s line.
+
+## Amendment: judgeCarry's view filter is equivalent after all (2026-11-11, backlog D83)
+
+D83 gives judgeCarry's carry past its window a move: a stroke counts only when it moved the table down by more than the
+slack (`MOVE_SLACK` in live-visibility.ts), beside the window test. Without it, a row taller than its region and over
+both its edges read as carried past by a stroke that moved nothing. That takes back what T21's amendment said of the
+view filter. Its counterexample, another view's still stroke read as a carry past a narrow window, moves nothing, so the
+move test rules it out too. Another view's stroke that moves more than the slack is judgeScroll's R-direction before
+the carry is read, a LOUD stop too, and one back by no more than the slack is no turn. The filter's two mutants are
+now argued equivalent in the scope.json baseline. The counterexample's test stays, as a pin on the verdict.
+
+| Module | Before (cold) | After (cold) | Floor |
+| --- | --- | --- | --- |
+| scripts/truth/live-visibility.ts | 98.37 % (1 470 mutants, 23 survived, 1 without coverage) | 98.24 % (1 476 mutants, 25 survived, 1 without coverage) | 96 |
+
+The move conjunct's 6 new mutants are all killed. Every committed RunRecord (698 under docs/truth/live-records, 3 under
+tests/fixtures) rejudges byte-identically against a `git archive` of fa817c29, with `--groups forms` and with all six
+groups.
