@@ -369,6 +369,8 @@ describe('the special cases\' judges at their edges', () => {
     const reply = 'Element id:"lab.sheet-long-list.L" visible after 2 swipes';
     const carried = (offset: number, strokes: Leg[], over: Partial<LabState> = {}) => table({ offsets: { list: offset }, strokes: strokes.map(([from, to]) => stroke(from, to, 'list')), ...over }) as LabState;
     type Leg = [number, number];
+    // A header over all but the table's last 32 pt (the region y 842, 32 tall), L's frame at the launch given.
+    const narrowed = (y: number, height: number, over: Partial<LabState> = {}) => table({ chrome: { header: { x: 0, y: 62, width: 402, height: 780 } }, frames: { L: { x: 0, y, width: 402, height } }, ...over }) as LabState;
     it('L cut at the table\'s bottom with its centre in: the plain stop holds', () => {
       expect(judgeCarry(reply, carried(1152, [[0, 1048], [1048, 1152]]), launched)).toMatchObject({ outcome: 'ok' });
     });
@@ -389,10 +391,29 @@ describe('the special cases\' judges at their edges', () => {
       expect(judgeCarry(reply, carried(1500, [[0, 1172], [1172, 2000], [2000, 1500]]), launched)).toMatchObject({ why: `R-direction (carry): a stroke back up (2000→1500): averi turned — averi: ${reply}` });
       expect(judgeCarry(reply, carried(1920, [[0, 1000], [1000, 1920]]), launched)).toMatchObject({ outcome: 'ok' });
     });
+    it('past its window takes a move by more than the slack: L taller than its window and over both its edges is not carried past by a stroke that moved nothing, or the slack', () => {
+      // D83's counterexample: a header over all but the table's last 32 pt (the region y 842, 32 tall) and L 33 pt tall,
+      // resting at 841.5 over both the region's edges, 1 from showing whole (all it can). Launched m above that rest (at
+      // offset 100, so a sum of the offsets is no move), L's bottom is below the region's and its top above it after a
+      // stroke of m — for m = 0 too, where nothing moved.
+      const narrow = (y: number, offset: number, strokes: Leg[] = []) => narrowed(y, 33, { offsets: { list: offset }, strokes: strokes.map(([from, to]) => stroke(from, to, 'list')) });
+      const carry = (m: number) => judgeCarry(reply, narrow(841.5, 100 + m, [[100, 100 + m]]), narrow(841.5 + m, 100));
+      expect(carry(0)).toMatchObject({ outcome: 'ok' });
+      expect(carry(1)).toMatchObject({ outcome: 'ok' });
+      expect(carry(1.5)).toEqual({
+        outcome: 'MISMATCH',
+        cls: 'R-direction',
+        kind: 'visible',
+        why: `R-direction (carry): a stroke carried it past its window (100→101.5: from below to above it) — averi: ${reply}`,
+        app: 'L 0,841.5 402x33 (partly-centre-in); list clip 0,62 402x812 offset 101.5 (launched 100); strokes list 100→101.5; fired nothing; touches none',
+      });
+    });
     it('only the table\'s strokes are judged: another view\'s that moved nothing is no carry past the window', () => {
       // The review's counterexample: a header over all but the table's last 32 pt (the region y 842, 32 tall), L at 830 at
-      // the launch, no frame of it at the stop; another view's stroke from rest to rest would read as a carry past.
-      const narrow = table({ chrome: { header: { x: 0, y: 62, width: 402, height: 780 } }, frames: { L: { x: 0, y: 830, width: 402, height: 64 } } });
+      // the launch, no frame of it at the stop; another view's stroke from rest to rest would read as a carry past. Since
+      // D83 the move test rules it out as well: the view filter is equivalent (another view's stroke that moves more than
+      // the slack is judgeScroll's R-direction first, even on a LOUD stop), and this pins the verdict, not the filter.
+      const narrow = narrowed(830, 64);
       const failed = 'ERROR scroll_until id:"lab.sheet-long-list.L" failed after 1 swipe (maxSwipes) — element never appeared in the tree';
       const s = { ...narrow, frames: {}, strokes: [stroke(0, 0, 'other')] };
       expect(judgeCarry(failed, s, narrow)).toMatchObject({ outcome: 'LOUD', cls: 'not-reached' });

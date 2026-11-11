@@ -909,7 +909,7 @@ export function touchTurns(state: Pick<LabState, 'events'>, launched: Pick<LabSt
  * ADR asks of the carry — no turn (a stroke of the table back up, a touch-down on the other half of it after one on the
  * first (touchTurns), or averi saying it turned (replies.ts#turnsSaid): the logged strokes alone miss turns merged into
  * a fling), none that carried the row from below its window to above it (the overshoot a full final stroke makes where
- * the window is narrower than its carry).
+ * the window is narrower than its carry) by a move of more than the slack.
  */
 export function judgeCarry(reply: string, state: LabState, start: LabState): LiveVerdict {
   const verdict = judgeScroll({ tag: CARRY.tag, view: CARRY.view, fully: false, platform: 'ios' }, [reply], state, start);
@@ -918,9 +918,14 @@ export function judgeCarry(reply: string, state: LabState, start: LabState): Liv
   if (verdict.outcome === 'MISMATCH' || f0 === undefined || region === undefined) return verdict;
   const o0 = start.offsets?.[CARRY.view] ?? 0;
   const top = (o: number) => f0.y - (o - o0);
+  // The view filter is kept for intent: equivalent since D83 (another view's stroke that moves is judgeScroll's first).
   const strokes = strokesSince(state, start).filter((s) => s.view === CARRY.view);
   const turned = strokes.filter((s) => s.to < s.from - MOVE_SLACK);
-  const past = strokes.filter((s) => top(s.from) + f0.height > region.y + region.height && top(s.to) < region.y);
+  // A move as well as the window test (D83). The window test alone implies a move of more than region.height −
+  // f0.height, so the move conjunct matters only when L is as tall as its region give or take the slack (f0.height >
+  // region.height − MOVE_SLACK): over both its edges it is below its bottom and above its top at once, and a stroke
+  // that moved nothing would read as a carry past. On every shorter row (the lab's) it changes nothing.
+  const past = strokes.filter((s) => s.to - s.from > MOVE_SLACK && top(s.from) + f0.height > region.y + region.height && top(s.to) < region.y);
   // The table's clip is there: a region (showRegion) is only ever cut from it.
   const touched = touchTurns(state, start, start.scrollViews![CARRY.view]!);
   const said = turnsSaid(reply);
