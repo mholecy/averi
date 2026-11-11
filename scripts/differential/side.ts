@@ -5,7 +5,8 @@ import type { AdapterFactory, AdapterRegistry } from '../../src/mcp/registry.js'
 import type { DeviceDiscovery } from '../../src/adapters/discovery.js';
 import type { createAveriServer } from '../../src/mcp/tools.js';
 import type { IosAdapter } from '../../src/adapters/ios.js';
-import { idbHelperDisabled } from '../../src/adapters/idb-helper.js';
+import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
+import type { IosTreeSourceDeps } from '../../src/adapters/ios-tree-source.js';
 import type { Recording } from './corpus.js';
 import { logCall, useDevice, type DeviceProfile } from './fake-device.js';
 import { RecordedTreeSource } from './recorded-source.js';
@@ -23,6 +24,7 @@ import { RecordedTreeSource } from './recorded-source.js';
  *   src/adapters/discovery.ts   discoveryOver, when the side has it (since A3) — its discovery over the harness's listing
  *   src/adapters/ios.ts         IosAdapter (takes any IosTreeSource)
  *   src/adapters/wda-source.ts  parseWdaSourceValue (WdaTreeSource's parser)
+ *   src/adapters/idb-helper.ts  idbHelperDisabled, when the side has it — the kill switch `liveIos` reports
  *
  * No module behind the tools (standing, scroll rounds, tap judgement …) is
  * imported, so a refactor inside averi needs no change here. The types are
@@ -53,41 +55,64 @@ export interface Side {
    * the lab simulator with; the replay does not use it. A side with src/mcp/registry.ts#iosAdapterFor (D7a, 2026-10-31)
    * gets the server's own wiring, its idb helper included (ADR 0032, A23), so Gate C runs the transport users get. An
    * older side gets the construction the live golden had before A23: its IosAdapter over its
-   * src/adapters/ios-tree-source.ts#createIosTreeSource, no helper (every idb call the CLI). `wiring` names which, for
-   * the run's log — and, read when the side is loaded, whether the kill switch (`AVERI_IDB_HELPER=off`) puts every idb
-   * call of the server's wiring on the CLI as well. A side with neither has none.
+   * src/adapters/ios-tree-source.ts#createIosTreeSource, no helper (every idb call the CLI). `wiring` tags which, and
+   * for the server's wiring whether the kill switch (`AVERI_IDB_HELPER=off`, read when the side is loaded) puts every
+   * idb call on the CLI as well; `liveIosLine` words it for the run's log. A side with neither has none.
    */
   liveIos?: LiveIos;
 }
 
+/**
+ * Which wiring builds a side's live iOS adapter: the side's registry.ts#iosAdapterFor with its idb helper on or off
+ * (the kill switch), or the fallback for a side without it.
+ */
+export type LiveIosWiring = 'registry-helper-on' | 'registry-helper-off' | 'fallback';
+
 /** A side's live iOS adapter (`Side.liveIos`): the adapter for one simulator and tree-source kind, and which wiring built it. */
 export interface LiveIos {
-  adapter(udid: string, kind: 'idb' | 'wda', deps: LiveIosDeps): DeviceAdapter;
-  wiring: string;
+  adapter(udid: string, kind: IosTreeSourceKind, deps: LiveIosDeps): DeviceAdapter;
+  wiring: LiveIosWiring;
+  /**
+   * For a registry wiring, who read the kill switch: the side's own src/adapters/idb-helper.ts `idbHelperDisabled`
+   * (`side`), or, for a side that does not export it, the same check on `AVERI_IDB_HELPER` here (`inline`).
+   */
+  switchReadBy?: 'side' | 'inline';
 }
 
 /** What the live golden hands the tree source: its own WebDriverAgent port and derived data (lab-device.ts). */
-export interface LiveIosDeps {
-  port?: number;
-  derivedDataPath?: string;
+export type LiveIosDeps = Pick<IosTreeSourceDeps, 'port' | 'derivedDataPath'>;
+
+/** A side's live iOS wiring in words, for the run's log (live.ts's `ios:` line); `undefined` is a side with no live iOS adapter. */
+export function liveIosLine(live: LiveIos | undefined): string {
+  if (live === undefined) return 'none — no registry.ts#iosAdapterFor nor src/adapters/ios-tree-source.ts#createIosTreeSource in this side';
+  if (live.wiring === 'fallback') {
+    return 'no registry.ts#iosAdapterFor in this side — IosAdapter over its createIosTreeSource, no idb helper: every idb call the CLI (the live golden before A23)';
+  }
+  const reader = live.switchReadBy === 'side' ? "the side's idb-helper.ts#idbHelperDisabled" : 'AVERI_IDB_HELPER read by side.ts: the side has no idbHelperDisabled';
+  return live.wiring === 'registry-helper-off'
+    ? `registry.ts#iosAdapterFor — the server's iOS wiring, its idb helper off (AVERI_IDB_HELPER=off; ${reader}): every idb call the CLI`
+    : `registry.ts#iosAdapterFor — the server's iOS wiring, its idb helper on (ADR 0032; ${reader})`;
 }
 
-/** `Side.liveIos` from the side's registry and tree-source modules (see there). */
-function liveIosOf(registry: Record<string, unknown>, treeSource: Record<string, unknown>, Ios: Side['IosAdapter']): LiveIos | undefined {
+/** `Side.liveIos` from the side's registry, tree-source and idb-helper modules (see there). */
+function liveIosOf(
+  registry: Record<string, unknown>,
+  treeSource: Record<string, unknown>,
+  idbHelper: Record<string, unknown>,
+  Ios: Side['IosAdapter'],
+): LiveIos | undefined {
   if (typeof registry.iosAdapterFor === 'function') {
+    const own = typeof idbHelper.idbHelperDisabled === 'function' ? (idbHelper.idbHelperDisabled as () => boolean) : undefined;
+    const off = own !== undefined ? own() : process.env.AVERI_IDB_HELPER === 'off';
     return {
       adapter: registry.iosAdapterFor as LiveIos['adapter'],
-      wiring: idbHelperDisabled()
-        ? "registry.ts#iosAdapterFor — the server's iOS wiring, its idb helper off (AVERI_IDB_HELPER=off): every idb call the CLI"
-        : "registry.ts#iosAdapterFor — the server's iOS wiring, its idb helper on (ADR 0032)",
+      wiring: off ? 'registry-helper-off' : 'registry-helper-on',
+      switchReadBy: own !== undefined ? 'side' : 'inline',
     };
   }
   if (typeof treeSource.createIosTreeSource !== 'function') return undefined;
-  const create = treeSource.createIosTreeSource as (kind: 'idb' | 'wda', udid: string, deps: LiveIosDeps) => ConstructorParameters<Side['IosAdapter']>[0]['treeSource'];
-  return {
-    adapter: (udid, kind, deps) => new Ios({ udid, treeSource: create(kind, udid, deps) }),
-    wiring: 'no registry.ts#iosAdapterFor in this side — IosAdapter over its createIosTreeSource, no idb helper: every idb call the CLI (the live golden before A23)',
-  };
+  const create = treeSource.createIosTreeSource as (kind: IosTreeSourceKind, udid: string, deps: LiveIosDeps) => ConstructorParameters<Side['IosAdapter']>[0]['treeSource'];
+  return { adapter: (udid, kind, deps) => new Ios({ udid, treeSource: create(kind, udid, deps) }), wiring: 'fallback' };
 }
 
 /** Which devices a platform has — what the harness fakes (adapters/discovery.ts#DeviceDiscovery's `list`). */
@@ -129,16 +154,17 @@ export async function loadSide(root: string): Promise<Side> {
     (await import(pathToFileURL(resolve(root, path)).href).catch(() => ({}))) as Record<string, unknown>;
   // Optional: a side without the seam loads all the same (the replay never needs it); a side before D48 has no
   // WdaServer.activeAppInfo (RecordedTreeSource then declines, as its WdaTreeSource did); a side before A3 lists
-  // through a discovery that is a plain function.
-  const [treeSource, wdaServer, discovery] = await Promise.all([
+  // through a discovery that is a plain function; a side before D7a has no idb helper (its kill switch then read here).
+  const [treeSource, wdaServer, discovery, idbHelper] = await Promise.all([
     optional('src/adapters/ios-tree-source.ts'),
     optional('src/adapters/wda.ts'),
     optional('src/adapters/discovery.ts'),
+    optional('src/adapters/idb-helper.ts'),
   ]);
   const over = typeof discovery.discoveryOver === 'function' ? (discovery.discoveryOver as DiscoveryOver) : undefined;
   const Registry = registry.AdapterRegistry as new (deps: { factory: AdapterFactory; discovery: DeviceDiscovery }) => AdapterRegistry;
   const discoverySeam = await takesDeps(Registry);
-  const liveIos = liveIosOf(registry, treeSource, ios.IosAdapter as Side['IosAdapter']);
+  const liveIos = liveIosOf(registry, treeSource, idbHelper, ios.IosAdapter as Side['IosAdapter']);
   return {
     root: resolve(root),
     createAveriServer: tools.createAveriServer as Side['createAveriServer'],

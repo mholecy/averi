@@ -5,15 +5,15 @@ import { parseArgs } from 'node:util';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
-import type { DeviceAdapter } from '../../src/adapters/types.js';
 import { listIosDevices } from '../../src/adapters/discovery.js';
 import { errorMessage } from '../../src/util/error-message.js';
 import type { Platform } from '../differential/corpus.js';
-import { loadSide } from '../differential/side.js';
+import { liveIosLine, loadSide } from '../differential/side.js';
 import { readPremiseInto } from './chooser-premise.js';
 import { deviceLabelling, type DeviceReadMode } from './device-state.js';
 import { AndroidLab, IosLab, LAB_AVD, LAB_WDA_DERIVED_DATA } from './lab-device.js';
-import { hookSwipes, SwipeHook } from './live-carousel.js';
+import { SwipeHook } from './live-carousel.js';
+import { liveFactory } from './live-factory.js';
 import { finishRun } from './live-finish.js';
 import {
   type Call,
@@ -193,23 +193,19 @@ if (rejudging === undefined) console.error(`lab: ${ios !== undefined ? await ios
  * The averi under test: this checkout's src, or `--side`'s (a checkout of another commit) — its tools, registry and
  * live iOS adapter, loaded by scripts/differential/side.ts#loadSide (the export guard, the old registry's shim). The iOS
  * adapter is the side's registry.ts#iosAdapterFor, the server's own wiring with its idb helper (A23, ADR 0032), or, for
- * a side older than it, IosAdapter over its createIosTreeSource with no helper — the `ios:` line says which.
+ * a side older than it, IosAdapter over its createIosTreeSource with no helper — the `ios:` line says which; the
+ * registry's adapters come from live-factory.ts#liveFactory.
  */
 const averi = rejudging === undefined ? await loadSide(values.side ?? ROOT) : undefined;
 if (averi !== undefined) console.error(`averi: ${averi.root}`);
-if (averi !== undefined && platform === 'ios') console.error(`ios: ${averi.liveIos?.wiring ?? 'none — the side has no iOS tree-source seam'}`);
-function iosAdapter(udid: string, source: IosTreeSourceKind): DeviceAdapter {
-  const live = averi!.liveIos;
-  if (live === undefined) throw new Error(`side ${averi!.root}: no registry.ts#iosAdapterFor nor src/adapters/ios-tree-source.ts#createIosTreeSource — the live golden cannot build its tree source`);
-  return live.adapter(udid, source, { port, derivedDataPath: LAB_WDA_DERIVED_DATA });
-}
+if (averi !== undefined && platform === 'ios') console.error(`ios: ${liveIosLine(averi.liveIos)}`);
 
 /** The carousel group's hook on the Android adapter's strokes (live-carousel.ts#SwipeHook): armed around a case's calls. */
 const swipeHook = new SwipeHook();
 
 async function connect(): Promise<{ client: Client; close(): Promise<void> }> {
   const registry = averi!.registry({
-    factory: (p, deviceId, opts) => (p === 'android' ? hookSwipes(averi!.defaultFactory(p, deviceId, opts), swipeHook) : iosAdapter(deviceId, opts?.treeSource ?? 'idb')),
+    factory: liveFactory(averi!, { wda: { port, derivedDataPath: LAB_WDA_DERIVED_DATA }, swipeHook }),
     // The lab device alone. Android: listed without asking adb (its listing runs getprop on every attached device).
     discovery: async (p) =>
       p !== platform ? []
