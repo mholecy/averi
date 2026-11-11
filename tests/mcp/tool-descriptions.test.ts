@@ -84,8 +84,8 @@ vi.mock('../../src/ui-tree/geometry.js', async (orig) => ({
   PIXEL_OVERLAP_SLACK: 2.25,
 }));
 
-vi.mock('../../src/adapters/ios-foreground.js', async (orig) => ({
-  ...(await orig<typeof import('../../src/adapters/ios-foreground.js')>()),
+vi.mock('../../src/adapters/types.js', async (orig) => ({
+  ...(await orig<typeof import('../../src/adapters/types.js')>()),
   FOREGROUND_WAIT_MS: 3_250,
 }));
 
@@ -192,7 +192,7 @@ describe('tool descriptions quote each operation default from its owner', () => 
     expect(description('ensure_state')).not.toMatch(/(?<![\d.])20 s\b/);
   });
 
-  it("launch_app: the iOS foreground wait's bound (adapters/ios-foreground.ts FOREGROUND_WAIT_MS)", () => {
+  it("launch_app: the iOS foreground wait's bound (adapters/types.ts FOREGROUND_WAIT_MS, ios-foreground.ts's)", () => {
     expect(description('launch_app')).toContain('waiting at most 3.25 s');
     expect(description('launch_app')).not.toMatch(/(?<![\d.])3 s\b/);
   });
@@ -627,7 +627,7 @@ describe('the full reference quotes each operation default as shipped', () => {
     const { formatSeconds } = await actual<typeof import('../../src/util/duration.js')>('../../src/util/duration.js');
     const { DEFAULT_SETTLE_TIMEOUT_MS } = await actual<typeof import('../../src/interact/resolve.js')>('../../src/interact/resolve.js');
     const { ASSERT_TIMEOUT_MS, PIXEL_ASSERT_TIMEOUT_MS } = await actual<typeof import('../../src/verify/assert.js')>('../../src/verify/assert.js');
-    const { FOREGROUND_WAIT_MS } = await actual<typeof import('../../src/adapters/ios-foreground.js')>('../../src/adapters/ios-foreground.js');
+    const { FOREGROUND_WAIT_MS } = await actual<typeof import('../../src/adapters/types.js')>('../../src/adapters/types.js');
     const { SWIPE_REACH_FRACTION } = await actual<typeof import('../../src/interact/swipe.js')>('../../src/interact/swipe.js');
     const { DEFAULT_MAX_SWIPES, DEFAULT_SCROLL_TIMEOUT_MS } = await actual<typeof import('../../src/interact/scroll.js')>('../../src/interact/scroll.js');
     const { DEFAULT_ENSURE_TIMEOUT_MS } = await actual<typeof import('../../src/flow/engine.js')>('../../src/flow/engine.js');

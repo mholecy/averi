@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IosAdapter } from '../../src/adapters/ios.js';
 import { IdbEmptyTreeError, type ApplicationLabel, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
-import { FOREGROUND_POLL_MS, FOREGROUND_WAIT_MS } from '../../src/adapters/ios-foreground.js';
+import { FOREGROUND_POLL_MS } from '../../src/adapters/ios-foreground.js';
 import type { ExecFn } from '../../src/adapters/exec.js';
 import { alertInWda } from '../../src/adapters/ios-system-alert.js';
-import type { AppHolder, UiNode } from '../../src/adapters/types.js';
+import { FOREGROUND_WAIT_MS, type AppHolder, type UiNode } from '../../src/adapters/types.js';
 import { launchTextOf, linkTextOf, worded } from '../helpers/app-holder.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { appinfo } from '../helpers/simctl-appinfo.js';

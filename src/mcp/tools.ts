@@ -29,8 +29,7 @@ import { baselineDirFor, runAsserts, runEnsureState, runNamedFlow } from '../run
 import { formatLogExcerpt, LOG_GREP_FLAGS, LOG_MAX_LINES, runVerification } from '../run/verify.js';
 import { normalizePlatforms } from './platforms.js';
 import { regexSource } from '../util/regex.js';
-import type { DeviceAdapter, Platform, UiNode } from '../adapters/types.js';
-import { FOREGROUND_WAIT_MS } from '../adapters/ios-foreground.js';
+import { FOREGROUND_WAIT_MS, type DeviceAdapter, type Platform, type UiNode } from '../adapters/types.js';
 import { PIXEL_OVERLAP_SLACK } from '../ui-tree/geometry.js';
 
 /**
@@ -151,7 +150,7 @@ const SETTLE_BUDGET = formatSeconds(DEFAULT_SETTLE_TIMEOUT_MS); // interact/reso
 const ASSERT_BUDGET = formatSeconds(ASSERT_TIMEOUT_MS); // verify/assert.ts
 const PIXEL_ASSERT_BUDGET = formatSeconds(PIXEL_ASSERT_TIMEOUT_MS); // verify/assert.ts
 const ENSURE_BUDGET = formatSeconds(DEFAULT_ENSURE_TIMEOUT_MS); // flow/engine.ts
-const FOREGROUND_BUDGET = formatSeconds(FOREGROUND_WAIT_MS); // adapters/ios-foreground.ts
+const FOREGROUND_BUDGET = formatSeconds(FOREGROUND_WAIT_MS); // adapters/types.ts (ios-foreground.ts's bound)
 const SLACK = PIXEL_OVERLAP_SLACK; // ui-tree/geometry.ts
 const SWIPE_REACH = `${Number((SWIPE_REACH_FRACTION * 100).toFixed(2))}%`; // interact/swipe.ts
 
