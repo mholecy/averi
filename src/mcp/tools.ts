@@ -26,7 +26,7 @@ import { captureFrame, unsettledNote } from '../verify/capture.js';
 import { CONTRACT_TOL_FACTOR, DEFAULT_TOLERANCE_DE } from '../verify/color-parity.js';
 import { DEFAULT_SIZE_TOLERANCE_PCT } from '../verify/text-parity.js';
 import { baselineDirFor, runAsserts, runEnsureState, runNamedFlow } from '../run/commands.js';
-import { formatLogExcerpt, LOG_GREP_FLAGS, LOG_MAX_LINES } from '../run/app-health.js';
+import { formatLogExcerpt, LOG_GREP_FLAGS, LOG_MAX_LINES } from '../run/log-excerpt.js';
 import { runVerification } from '../run/verify.js';
 import { normalizePlatforms } from './platforms.js';
 import { regexSource } from '../util/regex.js';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertSummary } from '../../src/run/leg-reply.js';
+import { assertSummary } from '../../src/run/run-reply.js';
 
 describe('assertSummary', () => {
   it('reads the same for the assert tool and a verify leg', () => {

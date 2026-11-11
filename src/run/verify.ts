@@ -7,7 +7,7 @@ import { refuseUnknownEnvironment } from './preflight.js';
 import { formatTrace, FlowEngine, runRequestOf, type EngineContext, type TraceEntry } from '../flow/engine.js';
 import { Verifier, type AssertResult, type AssertSpec } from '../verify/assert.js';
 import { appHealth } from './app-health.js';
-import { assertSummary, finalFrame, formatAsserts, screenshotFailedLine, type FinalFrame } from './leg-reply.js';
+import { assertSummary, finalFrame, formatAsserts, screenshotFailedLine, type FinalFrame } from './run-reply.js';
 import { ReadHandOff } from '../ui-tree/read-handoff.js';
 import { errorMessage } from '../util/error-message.js';
 import { unsettledNote, type MeasuredFrame, type TreeFrame } from '../verify/capture.js';
@@ -105,7 +105,7 @@ export interface VerificationOutput {
  * ended on — the png returned to the caller and, with a contract, the tree
  * and the one scale the parity tables measure against; absent parts carry
  * their reason (verify/capture.ts). Absent altogether, with `failed`, when
- * the capture itself threw (run/leg-reply.ts#finalFrame).
+ * the capture itself threw (run/run-reply.ts#finalFrame).
  */
 type VerificationLeg = {
   trace: TraceEntry[];

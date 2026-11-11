@@ -29,6 +29,7 @@ import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { Verifier } from '../verify/assert.js';
 import {
+  appIdOf,
   flowIsDestructive,
   flowItselfIsDestructive,
   keyboardDismissals,
@@ -1275,15 +1276,15 @@ export class FlowEngine {
   }
 
   private async runLaunch(spec: StepPayload<'launch'>): Promise<void> {
-    const app = this.cfg.app[this.adapter.platform];
-    if (!app) throw new SetupError(`averi.yaml has no app.${this.adapter.platform} section`);
+    const appId = appIdOf(this.cfg, this.adapter.platform);
+    if (appId === undefined) throw new SetupError(`averi.yaml has no app.${this.adapter.platform} section`);
     // The launch itself — activity, adapter call, wipe count, wording — is
     // flow/launch.ts's, shared with launch_app; the step's app id is the
     // config's. Its caveat and its wipe each get a `⚠` line right under the
     // line they qualify.
     const launched = await launchApp(this.adapter, this.cfg, this.session, {
       ...spec,
-      appId: 'package' in app ? app.package : app.bundleId,
+      appId,
     });
     this.log('launch', launchedLine(launched));
     if (launched.note !== undefined) this.log('⚠ launch', launched.note);

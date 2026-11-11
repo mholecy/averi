@@ -7,7 +7,7 @@ import { FlowEngine, formatTrace, type EngineContext, type RunRequest } from '..
 import { DEFAULT_BASELINE_DIR, Verifier, type AssertSpec } from '../verify/assert.js';
 import { unsettledNote } from '../verify/capture.js';
 import { appHealth } from './app-health.js';
-import { assertSummary, finalFrame, formatAsserts, screenshotFailedLine } from './leg-reply.js';
+import { assertSummary, finalFrame, formatAsserts, screenshotFailedLine } from './run-reply.js';
 
 /**
  * The single-platform tool compositions: what one `ensure_state`, `run_flow`
@@ -95,7 +95,7 @@ async function runOnEngine(
 /**
  * `ensure_state`: the trace and health line, and the frame the state was left
  * in — settled, as `screenshot` settles it. No `shot` when the capture itself
- * failed (2026-10-08, run/leg-reply.ts#finalFrame): the state WAS ensured, so the
+ * failed (2026-10-08, run/run-reply.ts#finalFrame): the state WAS ensured, so the
  * trace stands, with one `⚠ screenshot:` line where an unsettled frame's note goes.
  *
  * The health check and the capture run together (D13, see runOnEngine); the

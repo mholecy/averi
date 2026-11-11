@@ -129,19 +129,22 @@ is a readonly field on `AndroidAdapter` and `IosAdapter`, and both `logs` return
 was dead for every real adapter, and the three policies differed only for a fake.
 
 **Decision.** One module, `src/run/app-health.ts`: the crash signatures and their scan (now private: the line is
-their one reader), `appHealth`, and the log excerpt with its flags and budget. One policy, stated in its header:
-**`appHealth` words every device failure into the line, and catches nothing else.** Its four callers await it bare.
+their one reader) and `appHealth`. The app's id is read through `flow/config.ts#appIdOf`, the one owner the flow's
+`launch:` step reads too. `get_logs`' excerpt is not health and is a leaf of its own, `src/run/log-excerpt.ts`. One
+policy, stated in the module's header in the same words: **`appHealth` words every device failure into the line,
+and catches nothing else.** A question the device cannot answer is `appAlive: unknown`; a log read that rejects, or
+throws before it returns its promise (the call is made inside one), costs the excerpt. Its four callers await it bare.
 A broken adapter's throw is a bug and fails each call as any other throw in it does: `ensure_state`, `run_flow` and
 `assert` reject, and a `verify` leg is its `FAILED:` section (the leg's containment of any throw, not a health
 policy). `runAsserts`' catch is deleted. That is the one change of behaviour, and it is reachable only by a fake
 (`tests/run/commands.test.ts` pins it with a `logs` that resolves to `null`, as the ensure_state and verify-leg tests
-already did). No reply a real adapter can produce changed: the truth corpus' golden shows Changed 0.
+already did; `tests/run/app-health.test.ts` pins the `platform` breach and run_flow's own test the same). No reply a real adapter can produce changed: the truth corpus' golden shows Changed 0.
 
 The place is run/, by A24's order (`mcp → run → flow → interact → verify → ui-tree → adapters`,
 `tests/architecture/layering.test.ts`). The line asks about averi.yaml's app (`app.<platform>`, `flow/config.ts`), so
-verify/ would import flow/ upward. It is not a device command, so not adapters/. Its readers are run/'s compositions
-and mcp/'s `get_logs`, both at or above run/. The reply pieces the legs and the single-platform tools share
-(`finalFrame`, `screenshotFailedLine`, `formatAsserts`, `assertSummary`) moved to `src/run/leg-reply.ts` beside it,
+verify/ would import flow/ upward. It is not a device command, so not adapters/. Its readers are run/'s compositions;
+the log excerpt's is mcp/'s `get_logs`, above run/. The reply pieces the legs and the single-platform tools share
+(`finalFrame`, `screenshotFailedLine`, `formatAsserts`, `assertSummary`) moved to `src/run/run-reply.ts` beside it,
 and the `formatTrace` re-export is gone: `run/commands.ts` imports it from `flow/engine.ts`, its owner.
 
 **Rejected.** Making `appHealth` total, with a catch-all that turns any throw into a line. A contract breach would

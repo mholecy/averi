@@ -1320,7 +1320,7 @@ describe('color parity per-leg notes', () => {
  * A leg whose final capture THROWS (2026-10-08: the adapter refuses an empty
  * or non-PNG capture, adapters/screenshot-bytes.ts) keeps everything the leg
  * already did — trace, asserts, health — with one `⚠ screenshot:` line and no
- * image (run/leg-reply.ts#finalFrame). Until then the throw rejected the leg and
+ * image (run/run-reply.ts#finalFrame). Until then the throw rejected the leg and
  * the section read only "FAILED: …".
  */
 describe('a leg whose final screenshot is refused', () => {

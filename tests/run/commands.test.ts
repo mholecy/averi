@@ -225,6 +225,17 @@ describe('runNamedFlow', () => {
     expect(r.resolvedWith).toEqual([]);
   });
 
+  // The one failure policy (run/app-health.ts): a broken adapter's throw from the health check fails run_flow, as it
+  // fails ensure_state, assert and a verify leg.
+  it('a health check that throws fails the call', async () => {
+    const fake = home();
+    fake.appRunning = false;
+    fake.logs = async () => null as unknown as string[];
+    await expect(
+      runNamedFlow({ session: new EngineSession(), flow: 'open_menu', project: await validProject() }, resolver(fake).resolve),
+    ).rejects.toThrow(TypeError);
+  });
+
   it('the health line is the app\'s: a dead app is reported, not thrown', async () => {
     const fake = home();
     fake.appRunning = false;
@@ -290,7 +301,7 @@ describe('baselineDirFor', () => {
 });
 
 /**
- * ensure_state whose final capture throws (2026-10-08, run/leg-reply.ts#finalFrame):
+ * ensure_state whose final capture throws (2026-10-08, run/run-reply.ts#finalFrame):
  * the state WAS ensured — the trace and health line stand, one `⚠ screenshot:`
  * line says why there is no image, and no shot is returned.
  */

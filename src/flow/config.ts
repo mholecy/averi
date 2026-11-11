@@ -1,6 +1,6 @@
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
-import type { LaunchIntent, Rect } from '../adapters/types.js';
+import type { LaunchIntent, Platform, Rect } from '../adapters/types.js';
 import { DEFAULT_IOS_TREE_SOURCE, IOS_TREE_SOURCE_KINDS, type IosTreeSourceKind } from '../adapters/ios-node.js';
 import {
   elementSpecObject,
@@ -504,6 +504,16 @@ const configSchema = z
   .strict();
 
 export type AveriConfig = z.infer<typeof configSchema>;
+
+/**
+ * The app averi.yaml names for a platform — `app.android.package` or `app.ios.bundleId` — or undefined when it names
+ * none. One owner (A29) for the flow's `launch:` step (flow/engine.ts) and the health line (run/app-health.ts).
+ */
+export const appIdOf = (cfg: AveriConfig, platform: Platform): string | undefined => {
+  const app = cfg.app[platform];
+  if (app === undefined) return undefined;
+  return 'package' in app ? app.package : app.bundleId;
+};
 
 /**
  * `app.ios.keyboardDismiss` in the interaction module's vocabulary
