@@ -4,6 +4,11 @@ import { rectIntersection, type FocusedWindow, type KeyboardWitness, type Rect, 
 /**
  * The window manager's and the input method's dumps (`dumpsys window …`, `dumpsys input_method`) as the adapter reads
  * them: each read's shell line and its parser, with no device call here (android.ts sends the lines).
+ *
+ * A second display is answered three ways, each read's own: every display must agree (parseImeInsets, parseStatusBand,
+ * parseNavigationBand), the first found (parseFocusedWindow: its read prints no display headers) and display 0's block
+ * (defaultDisplayFocus). They were not made one (A27): every captured dump holds one display, where the three read
+ * alike, so none can say which is right for two — tests/adapters/android-wm.test.ts pins the census and where they differ.
  */
 
 /**
