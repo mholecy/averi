@@ -745,12 +745,13 @@ reads the stack and HOME with `frontOf`, `homeOf` and `isChooser` in `live-choos
 **Consequences.** A stale lab is now a named failure with its remedy, not a quiet SKIP. Not done here: nothing clears
 the state (no reinstall, no key, no setting — the owner's hand lines do that), and no recurring run includes the group
 yet (backlog T20b, a standing lab batch, and T20c, its schedule; since built, the T20b amendment below). Not run on a
-device: the emulator was down when this was built, so the premise's lines are pinned on batch-10's API 33 reads and T7b's recorded launcher reads, through a
-fake adb (tests/truth/chooser-premise.test.ts). What the tests pin is `readPremiseInto` (read, record, echo) and
-`summarizeRecord` (the record's labels into the summary, shared with `--rejudge`); live.ts's own two call lines are
-not pinned — its `readPremiseInto` call and the record it hands `summarizeRecord` (live.ts:264 and :288). Pinning them
-would take a test that runs live.ts in its run mode. T16's device reads are in the same place: ADR 0044's T16
-amendment pins device-state.ts's read over a fake exec, not live.ts's calls of it.
+device: the emulator was down when this was built, so the premise's lines are pinned on batch-10's API 33 reads and
+T7b's recorded launcher reads, through a fake adb (tests/truth/chooser-premise.test.ts). What the tests pin is
+`readPremiseInto` (read, record, echo) and `summarizeRecord` (the record's labels into the summary, shared with
+`--rejudge`); live.ts's own two call lines are not pinned — its `readPremiseInto` call and the record it hands
+`summarizeRecord` (live.ts:264 and :288). Pinning them would take a test that runs live.ts in its run mode. T16's device
+reads are in the same place: ADR 0044's T16 amendment pins device-state.ts's read over a fake exec, not live.ts's calls
+of it.
 
 ## Amendment: the standing lab batch (2026-11-11, T20b)
 
@@ -761,34 +762,46 @@ dirty window and its cleanup.
 
 **Decision.** The composition has an in-repo home: `scripts/truth/batch/lab-run.ts`, run by
 `npm run truth:lab -- --out <dir> --serial <lab emulator>`. It is built from the lab plumbing's blocks only and does
-nothing to a device that the numbered batches did not do. Its run, through `runBatch`:
+nothing to a device that the numbered batches did not do. Its blocks, through `runBatch`:
 
-- the `lab` block (`labBlock` in lab-build.ts): this checkout's lab APK built, installed with `-r`, and proven to
-  hold main's catalog;
+- the `lab` block (`labBlock` in lab-build.ts) over the android need and, with the chooser block wanted, the handler
+  counts. The android need runs the lab guard first, then asks for this checkout's build, installs it with `-r` and
+  proves it holds main's catalog, so a wrong serial costs no build. A build that fails is the lab check's WARN, and the
+  APK already installed is used;
 - the `chooser` block. Its needs are the android need and the handler counts it rests on (`handlersNeed`: shared 2,
   cell 1). Its run: `--check` before (`readCheck` in lab-emu.ts, read only), then `live.ts --groups chooser` inside the
-  chooser's dirty window, then the window's cleanup, which is `--check` after (`chooserStretch` in android-lab.ts,
-  `cleanUp` in lab-emu.ts);
-- the `forms` block: `live.ts --groups forms`.
+  chooser's dirty window (`chooserWindow` in lab-emu.ts), then the window's cleanup, which is `--check` after
+  (`cleanUp` in lab-emu.ts);
+- the `forms` block: `live.ts --groups forms`, outside the window, because no forms case opens a link.
 
-`--groups chooser|forms|chooser,forms` picks the live blocks; the default is both. A run with no serial is refused
-before anything is done (exit 2). A serial that is not the lab AVD is refused by the lab guard, as in every batch: each
-block is INCONCLUSIVE, nothing is done to the device, and the run exits 2. Everything the run writes is under `--out`.
+`--groups chooser|forms|chooser,forms` selects blocks the way ONLY= does; the default is both, and with ONLY= the run
+takes the blocks both name. Every block stays the batch's, so every block's state file is checked before a run starts.
+A run with no serial is refused before anything is done. A serial that is not the lab AVD is refused by the lab guard,
+as in every batch: each block is INCONCLUSIVE, nothing is built and nothing is done to the device. Everything the run
+writes is under `--out`, apart from the git-ignored Gradle build products in the checkout.
 
-- A `--check` before that does not prove the lab clean (a lab default, a chooser in front, a read that failed) leaves the
-  chooser group not run. Its line is a verdict, and its hand lines go to RESTORE, because the premise is not the batch's
-  to fix.
-- A default (`mAlways=true`) that `--check` after finds, where the `--check` before found none, is the run's own. It
-  fails the batch by name, `chooser left a default: FAIL`, beside the cleanup's own FAIL line. The cleanup clears it by
-  reinstalling the pulled APK (`clearLabEntry` in lab-emu.ts). That reinstall is why the batch is owner-run.
-- The chooser block has a state file (`state.json`, run-dir.ts's protocol): the window marks it dirty when it opens.
-  No probe keeps lab data here, so putting the state back is writing the file clean: at the run's end once the cleanup
-  proved the lab, after a proven reinstall, or in the abort's window restore (which writes it before its own
-  `--check`, as for a probe; a check that fails there still leaves RESTORE). A cleanup that does not prove the lab
-  leaves the file dirty, and the next run is refused naming it.
-- Each live block's verdict is main's rejudge exit code: 0 is PASS, 1 is FAIL. That covers an unknown MISMATCH, a stale
-  chooser premise (T20a) and a SKIP that proves nothing (`summarize` in live-cases.ts). The block is judged only once
-  its run is complete; an incomplete one gets the runner's backstop line.
+- **The `--check` before** speaks in its own words, since it presses nothing. A lab default (`mAlways=true`) is a FAIL
+  with its hand lines in RESTORE: the owner must clear it, and the next run is refused until then. A chooser in front
+  or a read that failed is an ERROR with no RESTORE: the run touched nothing, so there is nothing to put back. Either
+  way the chooser group is not run. A last-chosen entry is a WARN, and the group runs.
+- **A default that `--check` after finds**, where the `--check` before found none, is the run's own. The after line says
+  only that (`the chooser group's run left a lab default`), and `chooser left a default: FAIL` names it once more. The
+  cleanup clears it by reinstalling the pulled APK (`clearLabEntry` in lab-emu.ts). That reinstall is why the batch is
+  owner-run.
+- **The chooser block's state file** (`state.json`, run-dir.ts's protocol) is marked dirty when the window opens. No
+  probe keeps lab data here, so putting the state back is writing the file clean. That happens at the run's end once
+  the cleanup proved the lab, before the window is closed; after a proven reinstall; or in the window's restore at the
+  abort, which writes it before its own `--check`, as for a probe (a check that fails there still leaves RESTORE). A
+  cleanup that does not prove the lab leaves the file dirty, and the next run is refused naming it, its hand line
+  carrying the run's serial and the reinstall of that run's pulled APK.
+- **A live block's verdict** is main's rejudge exit code: 0 is PASS, 1 is FAIL. The FAIL names what the summary names:
+  a stale chooser premise (T20a) with its hand line, else each case not ok and not known, and the tallies that fail a
+  run (`summarize` in live-cases.ts). The run's outcome is kept in the block's folder (`<run>.outcome.json`, beside the
+  record and its rejudge summary), and the block's judge reads it from there only, once the run is complete.
+- **The exit code** is the standing net's, stricter than a numbered batch's: 0 only when every wanted block's verdict
+  is PASS and no line is INCONCLUSIVE or ERROR; 1 on a FAIL or a RESTORE written; 2 refused, or nothing ran; 3 unproven
+  (a block not PASS, an INCONCLUSIVE or ERROR line — a failed build, a live run past its bound, an unproven check);
+  130 interrupted. T20c schedules on it. runner.ts is unchanged: lab-run reads its own SUMMARY after the run.
 
 **Consequences.** The net has a stable home and one command. Not done: no schedule (backlog T20c: a launchd job on the
 owner's Mac, out of an agent's reach). It has not been run on a device: the emulator was down when it was built. Its

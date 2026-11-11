@@ -41,6 +41,8 @@ export const PREFERRED_WITH_DEFAULT = PREFERRED.replace(
     '',
   ].join('\n'),
 );
+/** API 33's focus read with the chooser in front (batch-10, T4's fixture). */
+export const FOCUS_CHOOSER = readFileSync(join(FIXTURES, '..', 'dumpsys-window-focus-api33-b10-chooser.txt'), 'utf8');
 export const DEVICE_APK = '/data/app/~~HASH==/dev.averi.lab-HASH==/base.apk';
 
 export interface Result {
@@ -104,6 +106,8 @@ export interface WorldOptions {
   companion?: 'none' | 'live' | 'stale';
   /** `idb disconnect` fails (exit 1) or passes its bound. */
   disconnectFails?: 'exit' | 'timeout';
+  /** What the focus read (CHOOSER_FOCUS_COMMAND) prints: API 33's launcher in front unless given. */
+  focus?: string;
   /** The preferred block `dumpsys package preferred` prints (API 33's fixture unless given); an uninstall puts it back. */
   preferred?: string;
   /** The builds: which step fails. */
@@ -133,6 +137,8 @@ export function labWorld(o: WorldOptions) {
     companion: o.companion ?? 'none',
     /** The preferred block now: a test may set it (a default left); `adb uninstall` of the lab clears it. */
     preferred: o.preferred ?? PREFERRED,
+    /** The focus read now: a test may set it (a chooser in front). */
+    focus: o.focus ?? fixture('dumpsys-window-focus-api33-b10-launcher-no-header.txt'),
   };
   const app = join(o.dir, 'container', 'AveriLab.app');
   rmSync(app, { recursive: true, force: true });
@@ -279,7 +285,7 @@ export function labWorld(o: WorldOptions) {
     if (words[0] === 'shell' && words[1] === 'cmd' && words[2] === 'package' && words[3] === 'query-activities') {
       return ok(fixture(said.includes('shared') ? 'query-activities-api33-b10-shared.txt' : 'query-activities-api33-b10-cell.txt'));
     }
-    if (said === `shell ${CHOOSER_FOCUS_COMMAND}`) return ok(fixture('dumpsys-window-focus-api33-b10-launcher-no-header.txt'));
+    if (said === `shell ${CHOOSER_FOCUS_COMMAND}`) return ok(st.focus);
     if (said === 'shell dumpsys package preferred') return ok(st.preferred);
     // An uninstall of the lab clears its defaults (lab-emu.ts#clearLabEntry's reinstall; API 33, batch-11 measured).
     if (said === `uninstall ${LAB_APP.native.package}`) return (st.installed = false), (st.preferred = PREFERRED), ok('Success');
