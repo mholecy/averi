@@ -13,6 +13,7 @@ import { parseDump } from '../helpers/android-dumps.js';
 import { FakeAdapter } from '../helpers/fake.js';
 import { formatSeconds } from '../../src/util/duration.js';
 import { Verifier } from '../../src/verify/assert.js';
+import { NO_EYES } from '../helpers/eyes.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on (tests/helpers/sleep-recorder.ts); a test that runs a
 // whole budget out fakes the Date too, so the recorded sleeps alone move its clock (T1).
@@ -393,7 +394,7 @@ describe('a miss on an unmarked uiautomator tree asks the window manager', () =>
     const { fake, asked } = device(lab('dialog-fullscreen'), word('dialog-fullscreen'));
     await resolveSettled(fake, 'id:"lab.dialog-fullscreen.S"', { ...FAST, timeoutMs: 500 });
     expect((await new Verifier(fake, { pollMs: 2, timeoutMs: 500 }).assert({ element: { id: 'lab.dialog-fullscreen.S' } })).pass).toBe(true);
-    await scrollUntilVisible(fake, 'id:"lab.dialog-fullscreen.S"', { settleMs: 1, timeoutMs: 2_000 });
+    await scrollUntilVisible(fake, 'id:"lab.dialog-fullscreen.S"', { eyes: NO_EYES, settleMs: 1, timeoutMs: 2_000 });
     expect(asked).toHaveLength(0);
   });
 
@@ -430,7 +431,7 @@ describe('a miss on an unmarked uiautomator tree asks the window manager', () =>
 
   it('scroll_until on dialog-fullscreen: stops before any swipe, the remedy said — no stroke on the dialog', async () => {
     const { fake, asked } = device(lab('dialog-fullscreen'), word('dialog-fullscreen'));
-    const error = await fails(scrollUntilVisible(fake, 'id:"lab.dialog-fullscreen.D"', { settleMs: 1, timeoutMs: 5_000 }));
+    const error = await fails(scrollUntilVisible(fake, 'id:"lab.dialog-fullscreen.D"', { eyes: NO_EYES, settleMs: 1, timeoutMs: 5_000 }));
     expect(fake.swipes).toEqual([]);
     expect(error).not.toBeInstanceOf(ElementNotFoundError);
     expect(error.message).toContain('stopped before any swipe — element is not in the tree');
@@ -440,7 +441,7 @@ describe('a miss on an unmarked uiautomator tree asks the window manager', () =>
 
   it('scroll_until on form-picker, whose sheet holds its own list: strokes that list, then — having searched it — says close it first, not scroll_until it in that list', async () => {
     const { fake, asked } = device(lab('form-picker'), word('form-picker'));
-    const error = await fails(scrollUntilVisible(fake, 'id:"lab.form-picker.name"', { settleMs: 1, timeoutMs: 5_000 }));
+    const error = await fails(scrollUntilVisible(fake, 'id:"lab.form-picker.name"', { eyes: NO_EYES, settleMs: 1, timeoutMs: 5_000 }));
     expect(fake.swipes.length).toBeGreaterThan(0);
     expect(error.message).toContain('element never appeared in the tree (a sheet or modal is presented over it, and the tree lists only that window — close it first)');
     expect(error.message).not.toContain("scroll_until it in that window's own list");
@@ -449,14 +450,14 @@ describe('a miss on an unmarked uiautomator tree asks the window manager', () =>
 
   it('scroll_until on dialog-fullscreen with no word: strokes as before, the hint said', async () => {
     const { fake } = device(lab('dialog-fullscreen'), { of: 'unknown' });
-    const error = await fails(scrollUntilVisible(fake, 'id:"lab.dialog-fullscreen.D"', { settleMs: 1, timeoutMs: 5_000 }));
+    const error = await fails(scrollUntilVisible(fake, 'id:"lab.dialog-fullscreen.D"', { eyes: NO_EYES, settleMs: 1, timeoutMs: 5_000 }));
     expect(fake.swipes.length).toBeGreaterThan(0);
     expect(error.message).toContain(`element never appeared in the tree (${ACTIVE_WINDOW_HINT})`);
   });
 
   it('scroll_until on open, the screen alone: strokes, the window asked once for the call, and no hint', async () => {
     const { fake, asked } = device(lab('open'), word('open'));
-    const error = await fails(scrollUntilVisible(fake, 'id:"nothing.here"', { settleMs: 1, timeoutMs: 5_000 }));
+    const error = await fails(scrollUntilVisible(fake, 'id:"nothing.here"', { eyes: NO_EYES, settleMs: 1, timeoutMs: 5_000 }));
     expect(fake.swipes.length).toBeGreaterThan(0);
     expect(error.message).toContain('element never appeared in the tree');
     expect(error.message).not.toContain(ACTIVE_WINDOW_HINT);

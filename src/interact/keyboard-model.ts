@@ -155,7 +155,8 @@ export interface GuardOptions extends SettleOptions {
   /**
    * The eyes' order question (ui-tree/eyes.ts#Eyes.order; verify/eyes.ts#eyesOn, wired at the composition root —
    * mcp/tools.ts, flow/engine.ts): asked once by the tap's judgement of a centre covered by a control the listing does
-   * not order (tap-judgement.ts#TapAsks). Absent: that order stays untold.
+   * not order (tap-judgement.ts#TapAsks). Absent: that order stays untold — reached only by the guard's own tests:
+   * the verbs above it require them (tap.ts#TapOptions, fill.ts#FillOptions; A30).
    */
   eyes?: OrderEyes;
 }

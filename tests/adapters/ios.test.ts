@@ -22,6 +22,7 @@ import { typeIntoFocused } from '../../src/interact/type-text.js';
 import { el, FAST, resetLayout, screen } from '../helpers/fake.js';
 import { execErrorLikeExec, typingExecError } from '../helpers/exec-error.js';
 import { appinfo } from '../helpers/simctl-appinfo.js';
+import { NO_EYES } from '../helpers/eyes.js';
 
 // The one sleep owner, recorded and not waited on: uiTree's settle re-read
 // waits IDB_EMPTY_RETRY_MS, pinned by value rather than spent in real time.
@@ -78,7 +79,7 @@ describe('IosAdapter interactions', () => {
     const wda: IosTreeSource = { ...WDA_NO_TREE, read: async () => parseWdaSource(capture) };
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda });
     const selector = 'id:swift_payment.form.continue_button';
-    const tapped = await tapElement(adapter, selector, { ambiguous: 'refuse' });
+    const tapped = await tapElement(adapter, selector, { eyes: NO_EYES, ambiguous: 'refuse' });
     expect(calls.at(-1)?.full).toBe('idb ui tap 201 802 --udid AAAA-1111');
     expect(tapText(selector, tapped)).toBe(`Tapped ${selector}\n⚠ The tree marks the target disabled, the tap may do nothing; read again before relying on it.`);
   });
@@ -86,7 +87,7 @@ describe('IosAdapter interactions', () => {
   it('end to end on the idb source: tapElement resolves against describe-all and taps the center through idb', async () => {
     const { fn, calls } = fakeExec({ 'idb ui describe-all': IDB_DESCRIBE_ALL });
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: new IdbTreeSource({ udid: 'AAAA-1111', exec: fn }) });
-    await tapElement(adapter, 'id:login_button', { ambiguous: 'refuse' });
+    await tapElement(adapter, 'id:login_button', { eyes: NO_EYES, ambiguous: 'refuse' });
     expect(calls.at(-1)?.full).toBe('idb ui tap 196 724 --udid AAAA-1111');
   });
 
@@ -119,7 +120,7 @@ describe('IosAdapter interactions', () => {
     it('idb: one 300 ms pause between the two describe-all reads', async () => {
       const { fn, calls } = fakeExec({ 'idb ui describe-all': IDB_DESCRIBE_ALL });
       const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: new IdbTreeSource({ udid: 'AAAA-1111', exec: fn }) });
-      await tapElement(adapter, 'id:login_button', { ambiguous: 'refuse' });
+      await tapElement(adapter, 'id:login_button', { eyes: NO_EYES, ambiguous: 'refuse' });
       expect(calls.filter((c) => c.full.startsWith('idb ui describe-all'))).toHaveLength(2);
       expect(sleeps).toEqual([300]);
     });
@@ -128,7 +129,7 @@ describe('IosAdapter interactions', () => {
       const { fn } = fakeExec({});
       const wda: IosTreeSource = { ...WDA_NO_TREE, read: async () => parseIdbDescribeAll(IDB_DESCRIBE_ALL) };
       const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda });
-      await tapElement(adapter, 'id:login_button', { ambiguous: 'refuse' });
+      await tapElement(adapter, 'id:login_button', { eyes: NO_EYES, ambiguous: 'refuse' });
       expect(sleeps).toEqual([500]);
     });
   });
@@ -399,7 +400,7 @@ describe('IosAdapter.uiTree and dispose — one delegation each to the tree sour
   it("taps resolve against the source's tree and still go through idb — only the tree read is the source's", async () => {
     const { fn, calls } = fakeExec({});
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: fakeSource().source });
-    await tapElement(adapter, 'id:home.header', { ambiguous: 'refuse' });
+    await tapElement(adapter, 'id:home.header', { eyes: NO_EYES, ambiguous: 'refuse' });
     // The source's rects are points, the units idb taps in — center of the host view.
     expect(calls.at(-1)?.full).toBe('idb ui tap 201 125 --udid AAAA-1111');
   });

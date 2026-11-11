@@ -6,6 +6,7 @@ import { OffScreenRefusal } from '../../src/interact/tap-judgement.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
 import { tapElement } from '../../src/interact/tap.js';
 import { drawnOverStrip } from '../helpers/android-dumps.js';
+import { NO_EYES } from '../helpers/eyes.js';
 
 /**
  * Android's status band END TO END through the real AndroidAdapter over a
@@ -68,7 +69,7 @@ const adapterOver = async (xml: string | ((offset: number) => string)) => {
   return { adapter: new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }), calls };
 };
 
-const OPTS = { ambiguous: 'refuse' as const, pollMs: 1, timeoutMs: 50 };
+const OPTS = { eyes: NO_EYES, ambiguous: 'refuse' as const, pollMs: 1, timeoutMs: 50 };
 
 describe('Android\'s status band through AndroidAdapter and adb', () => {
   it('tap text:"All contacts" at (256,3), under the status bar: REFUSED, nothing tapped (was `Tapped`, `input tap 256 3`)', async () => {
@@ -84,7 +85,7 @@ describe('Android\'s status band through AndroidAdapter and adb', () => {
 
   it('plain scroll_until text:"All contacts" is not "fully visible after 0 swipes" on the 6-px sliver: it swipes, and fails naming the status bar when nothing moves', async () => {
     const { adapter, calls } = await adapterOver(contacts(ROWS));
-    const failure = await scrollUntilVisible(adapter, 'text:"All contacts"', { maxSwipes: 2, settleMs: 0, timeoutMs: 5_000 }).catch((e: unknown) => e);
+    const failure = await scrollUntilVisible(adapter, 'text:"All contacts"', { eyes: NO_EYES, maxSwipes: 2, settleMs: 0, timeoutMs: 5_000 }).catch((e: unknown) => e);
     expect(failure).toBeInstanceOf(Error);
     expect((failure as Error).message).toMatch(/under the status bar at \(256,3\), in the top 66 of the screen \(tree units\),/);
     expect(calls.some((c) => c.includes('input swipe'))).toBe(true);
@@ -117,7 +118,7 @@ describe('Android\'s status band through AndroidAdapter and adb', () => {
 
   it('fully: true on the Contacts shape: one stroke drawing the content DOWN, and the stop wholly below the band', async () => {
     const { adapter, calls } = await adapterOver(moving);
-    const r = await scrollUntilVisible(adapter, 'text:"All contacts"', { fully: true, maxSwipes: 4, settleMs: 0, timeoutMs: 5_000 });
+    const r = await scrollUntilVisible(adapter, 'text:"All contacts"', { eyes: NO_EYES, fully: true, maxSwipes: 4, settleMs: 0, timeoutMs: 5_000 });
     const d = strokes(calls);
     expect(d).toHaveLength(1);
     expect(d[0]).toBeGreaterThan(0);
@@ -129,7 +130,7 @@ describe('Android\'s status band through AndroidAdapter and adb', () => {
 
   it('the far-edge turn, the band its reason: a plain scroll_until (direction down, strokes push content UP) turns its first stroke back, and stops once the centre is below the band', async () => {
     const { adapter, calls } = await adapterOver(moving);
-    const r = await scrollUntilVisible(adapter, 'text:"All contacts"', { maxSwipes: 4, settleMs: 0, timeoutMs: 5_000 });
+    const r = await scrollUntilVisible(adapter, 'text:"All contacts"', { eyes: NO_EYES, maxSwipes: 4, settleMs: 0, timeoutMs: 5_000 });
     const d = strokes(calls);
     expect(d.length).toBeGreaterThanOrEqual(1);
     expect(d[0]).toBeGreaterThan(0); // turned: content drawn down, not up past the top

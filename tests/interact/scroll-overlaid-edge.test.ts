@@ -4,6 +4,7 @@ import { describeScrollResult, scrollUntilVisible } from '../../src/interact/scr
 import { parseDump } from '../helpers/android-dumps.js';
 import { FakeAdapter } from '../helpers/fake.js';
 import { bothPinnedRemedyText } from '../../src/ui-tree/remedy-text.js';
+import { NO_EYES } from '../helpers/eyes.js';
 
 /**
  * `scroll_until` ON A NODE COMPOSE CUT AT AN OVERLAY (ui-tree/later-edges.ts#OverlaidEdge), over the lab's real captures
@@ -11,7 +12,7 @@ import { bothPinnedRemedyText } from '../../src/ui-tree/remedy-text.js';
  * role-less strip cut by the button is no stop; the plain stop on a row whose centre is clear still stops. docs/bugs/2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible.md
  */
 
-const FAST = { maxSwipes: 4, timeoutMs: 2_000, settleMs: 1 };
+const FAST = { eyes: NO_EYES, maxSwipes: 4, timeoutMs: 2_000, settleMs: 1 };
 const fakeOf = (cell: string): FakeAdapter => {
   const fake = new FakeAdapter({ s: parseDump(readFileSync(new URL(`../fixtures/truth/android-averi_lab-api33/${cell}.xml`, import.meta.url), 'utf8')) }, 's');
   fake.viewportSize = { width: 1080, height: 2220 };

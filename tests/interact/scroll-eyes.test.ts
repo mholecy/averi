@@ -7,6 +7,7 @@ import type { Eyes, EyesAnswer } from '../../src/ui-tree/eyes.js';
 import { eyesOn } from '../../src/verify/eyes.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { FakeAdapter, node } from '../helpers/fake.js';
+import { NO_EYES } from '../helpers/eyes.js';
 
 /**
  * THE EYES CONFIRM A FULLY CLAIM (ui-tree/eyes.ts), through scroll_until — the lab's real k7 stop (`form-keyboard`
@@ -16,7 +17,7 @@ import { FakeAdapter, node } from '../helpers/fake.js';
  */
 
 const IME: Rect = { x: 0, y: 1398, width: 1080, height: 822 };
-const FAST = { maxSwipes: 4, timeoutMs: 2_000, settleMs: 1 };
+const FAST = { eyes: NO_EYES, maxSwipes: 4, timeoutMs: 2_000, settleMs: 1 };
 const PHONE = 'id:"lab.form-keyboard.phone"';
 const fixture = (name: string): URL => new URL(`../fixtures/${name}`, import.meta.url);
 

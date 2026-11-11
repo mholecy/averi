@@ -10,7 +10,8 @@ import { NO_CONFIG, OPTIONAL_CONFIG, REQUIRED_CONFIG, REQUIRED_CONFIG_AND_ENV } 
  * this file is only the mapping, and it is here, beside the registrations,
  * because it is keyed by MCP tool names (review round 1: in flow/ it put the
  * MCP vocabulary below the layer that owns it). Every config-reading handler
- * in mcp/tools.ts starts with `loadForCall(TOOL_CONFIG.<tool>(…), cp)`.
+ * in mcp/tools.ts starts with one read under its entry — `serve(p, TOOL_CONFIG.<tool>(…), cp)`
+ * (config, device and eyes together, A30), or `loadForCall(TOOL_CONFIG.<tool>(…), cp)` where the device waits.
  *
  * ARCHITECTURE.md §5 ("Which tools read averi.yaml") carries the same table
  * in prose; tests/mcp/config-policy.test.ts pins each entry,

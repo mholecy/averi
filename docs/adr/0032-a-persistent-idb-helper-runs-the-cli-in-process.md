@@ -28,6 +28,8 @@ Amended 2026-11-03 (batch-9: D58 checked end to end through averi — the D58 am
 batch-8's).
 Amended 2026-11-06 (A10: the alert goes up as a fact, on both verbs, and its words move above the adapters — see the
 amendment below; replies byte for byte).
+Amended 2026-11-11 (A30: the D41 invariant is held by behaviour, every tool called in a wda project, not by a count of
+`registry.get(` in the source — see the amendment below; replies byte for byte).
 
 ## Context
 
@@ -844,3 +846,28 @@ Tests: `tests/truth/live-ios-wiring.test.ts`, through the side seam live.ts read
 none. One test pins the words of a line. This checkout's adapter is an `IosAdapter` that holds an `IdbHelper`. The
 factory hands iOS calls to `liveIos` with the call's kind (idb when none) and the WDA deps, hooks Android's strokes,
 and refuses a side with no live adapter.
+
+## Amendment: the composition root serves config, device and eyes in one call (2026-11-11, backlog A30)
+
+The architecture review of 2026-11-11 (card 12) found the D41 invariant spelled out in every handler: each one wrote
+`loadForCall`, `iosToolSettings` and `deviceFor` itself (about seventeen times), and only a regex test,
+`tests/mcp/registry-gets.test.ts`, guarded it, by counting `registry.get(` in `src/`. That test was a textual
+tripwire: an aliased registry, or a second resolver that called `deviceFor` with the wrong config, slipped past it.
+
+Decision: a handler makes ONE call, `mcp/tools.ts#serve(p, TOOL_CONFIG.<tool>(…), cp)`. It reads the config under the
+tool's policy, resolves the device through `deviceFor`, and returns the config, the iOS settings, the adapter and the
+eyes over it (`verify/eyes.ts#eyesOn`; ADR 0024's amendment A30) together. `deviceFor` now takes the loaded config
+rather than settings, and derives the kind from it, so no handler names a kind. Three handlers cannot get the device in
+the same breath, because they need it later. The engine tools (`ensure_state`, `run_flow`, `verify`) hand
+`deviceFor` to the run layer as their lazy form, and the run layer resolves it only after its pre-flight. `install_app`
+names its build before a device is bound, so a config without one binds nothing, as before.
+
+The regex test is gone. Its guarantee is now behavioural: `tests/mcp/tools.test.ts` calls EVERY tool of
+`mcp/config-policy.ts#TOOL_CONFIG` in one `treeSource: wda` project, with the calls keyed by the table so that a new
+tool fails to typecheck until it has a call. Each call must bind one wda adapter and nothing else. Any way a handler
+might reach another adapter shows up as an idb or a second binding: another kind, an alias of the registry, or a
+lazy resolver handed the wrong config. A type-level guarantee was weighed and rejected. A branded "loaded config" that
+only `loadForCall` can mint, and that the registry's `get` would require, would hold the kind to the call's own read.
+But it would put a flow/ type on the registry's interface and rewrite its 56 test calls. It would also guard less
+than the behavioural test: a brand cannot see a handler that never resolves a device at all.
+

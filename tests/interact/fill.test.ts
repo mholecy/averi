@@ -6,6 +6,7 @@ import { judgeFill } from '../../src/interact/fill-verdict.js';
 import { fillReply, wordingOf } from '../../src/interact/fill-text.js';
 import { el, FakeAdapter, idbFloatingLabelFake, node, PERMISSIVE, resetLayout, screen } from '../helpers/fake.js';
 import { WDA_TYPEABLE } from '../../src/adapters/ios-typing.js';
+import { NO_EYES } from '../helpers/eyes.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on: a cadence
 // is a sequence of delays, and asserting the sequence is exact where a wall
@@ -31,7 +32,7 @@ afterEach(() => {
 });
 
 /** Tests must not pay the real focus delay; the default is pinned once below. */
-const FAST = { ambiguous: 'first' as const, timeoutMs: 200, pollMs: 2 };
+const FAST = { eyes: NO_EYES, ambiguous: 'first' as const, timeoutMs: 200, pollMs: 2 };
 
 function formFake(amountValue: string | null = null) {
   resetLayout();
@@ -154,7 +155,7 @@ describe('fillField — focus, clear, type, verify', () => {
       fake.typed.push(text);
     };
     sleeps.length = 0;
-    await expect(fillField(fake, { id: 'amount_input' }, '12.34', { ambiguous: 'first' })).rejects.toThrow(/typed 5 characters/);
+    await expect(fillField(fake, { id: 'amount_input' }, '12.34', { eyes: NO_EYES, ambiguous: 'first' })).rejects.toThrow(/typed 5 characters/);
     expect(sleeps).toEqual([500, 350, 400, 400, 400, 400, 400]);
   });
 

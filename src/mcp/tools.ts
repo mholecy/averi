@@ -9,7 +9,7 @@ import { fillField } from '../interact/fill.js';
 import { fillReply } from '../interact/fill-text.js';
 import { typeIntoFocused } from '../interact/type-text.js';
 import { DEFAULT_SETTLE_TIMEOUT_MS } from '../interact/resolve.js';
-import type { GuardOptions } from '../interact/keyboard.js';
+import type { TapOptions } from '../interact/tap.js';
 import { DEFAULT_MAX_SWIPES, DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, HEDGE_WHATS, HEDGED_LEAD, scrollUntilVisible } from '../interact/scroll.js';
 import { eyesOn } from '../verify/eyes.js';
 import { SWIPE_REACH_FRACTION, swipeScreen } from '../interact/swipe.js';
@@ -17,7 +17,9 @@ import { tapElement } from '../interact/tap.js';
 import { deepLinkText, launchText, snapshotNote, swipeText, tapText, typedText } from './tool-text.js';
 import { EngineSession, launchApp } from '../flow/launch.js';
 import { appBuildPath } from '../flow/load.js';
-import { iosToolSettings, loadForCall, type IosToolSettings } from '../flow/tool-config.js';
+import { iosToolSettings, loadForCall, type ConfigPolicy, type IosToolSettings } from '../flow/tool-config.js';
+import type { AveriConfig } from '../flow/config.js';
+import type { Eyes } from '../ui-tree/eyes.js';
 import { TOOL_CONFIG } from './config-policy.js';
 import { ASSERT_TIMEOUT_MS, assertSpecSchema, PIXEL_ASSERT_TIMEOUT_MS } from '../verify/assert.js';
 import { DEFAULT_ENSURE_TIMEOUT_MS } from '../flow/engine.js';
@@ -83,9 +85,11 @@ import { PIXEL_OVERLAP_SLACK } from '../ui-tree/geometry.js';
  * and the config's; `assert` parses its specs, resolves the adapter and the
  * baseline dir, then calls runAsserts; `verify` is the widest — it loads the
  * config, parses the specs, then calls runVerification. Every handler that
- * reads averi.yaml starts with the same line, `loadForCall(TOOL_CONFIG.<tool>(…), cp)`
- * — the read stays here, above run/, so the policy has one caller shape
- * and nothing below reads the file again.
+ * reads averi.yaml starts with one call under its TOOL_CONFIG entry: `serve(p, TOOL_CONFIG.<tool>(…), cp)`, which
+ * hands back the config, the device and its eyes together (A30) — or, where the device waits on the config (the
+ * engine tools, which resolve it lazily through the run layer, and `install_app`, which names its build first),
+ * `loadForCall(TOOL_CONFIG.<tool>(…), cp)` and `deviceFor` later. The read stays here, above run/, so the policy has
+ * one caller shape and nothing below reads the file again.
  */
 
 const platform = z.enum(['android', 'ios']).describe('Target platform');
@@ -101,20 +105,33 @@ const environment = z
   .describe("Credential environment from averi.yaml `environments:`, for a build that points at another backend. Default $AVERI_ENV, then `defaultEnvironment:`");
 
 /**
+ * What one tool call is served with, by the composition root's ONE call per handler (`serve`, A30): the config the
+ * call read (flow/tool-config.ts#loadForCall under its TOOL_CONFIG entry), the iOS settings of that config, the
+ * project's adapter for the platform's device (D41), and the eyes over that adapter (verify/eyes.ts#eyesOn, ADR 0024)
+ * — handed together, so no handler assembles them. The engine tools resolve their adapter lazily, through the same
+ * `deviceFor`, once the run layer has checked the environment, and the engine makes their eyes (flow/engine.ts).
+ */
+interface Served {
+  cfg: AveriConfig | undefined;
+  settings: IosToolSettings;
+  adapter: DeviceAdapter;
+  eyes: Eyes;
+}
+
+/**
  * How the tools act on an element (tap and type_text with a selector): an
  * ambiguous selector is REFUSED — an agent exploring through the tools has
  * not seen the tree it would be guessing in (interact/resolve.ts, Ambiguity;
  * a flow step picks the first, flow/engine.ts#FLOW_AMBIGUITY) — and the
- * call's dismissals go to the keyboard guard, and the eyes' order question
- * (verify/eyes.ts#eyesOn: which of two controls listed in reading order is
- * drawn on top, ADR 0024) to the tap's judgement. Given once, as deviceFor is,
- * not spelled out per handler; a fill adds its
- * `clear`.
+ * call's dismissals go to the keyboard guard, and the served eyes' order
+ * question (which of two controls listed in reading order is drawn on top,
+ * ADR 0024) to the tap's judgement. Given once, not spelled out per handler;
+ * a fill adds its `clear`.
  */
-const guardOpts = (settings: IosToolSettings, adapter: DeviceAdapter): Pick<GuardOptions, 'ambiguous' | 'dismissals' | 'eyes'> => ({
+const acting = ({ settings, eyes }: Served): Pick<TapOptions, 'ambiguous' | 'dismissals' | 'eyes'> => ({
   ambiguous: 'refuse',
   dismissals: settings.dismissals,
-  eyes: eyesOn(adapter),
+  eyes,
 });
 
 const text = (value: unknown) => ({
@@ -233,13 +250,22 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
   /**
    * The ONE way a handler reaches a device (D41, 2026-11-01): the registry's adapter for the platform's bound device
    * and the project's iOS tree source — the `iosToolSettings` of the config the call loaded (android gets none; no
-   * config is the registry's default kind). tap and type_text pass the settings they also hand the keyboard guard. One adapter per simulator and configured source, so
-   * every tool of a project shares its idb helper, its launch memory and its screenshot source (ADR 0032, amendment
-   * D41). Until D41 eight handlers asked without the kind and, in a wda project, got a second, idb-kind adapter;
-   * tests/mcp/registry-gets.test.ts pins that no handler asks the registry itself.
+   * config is the registry's default kind). One adapter per simulator and configured source, so every tool of a
+   * project shares its idb helper, its launch memory and its screenshot source (ADR 0032, amendment D41). Until D41
+   * eight handlers asked without the kind and, in a wda project, got a second, idb-kind adapter. The engine tools hand
+   * it to the run layer as their lazy form; every other handler reaches it through `serve`. tests/mcp/tools.test.ts
+   * calls every tool of the policy table in a wda project and pins that one wda adapter alone is bound (ADR 0032,
+   * amendment A30).
    */
-  const deviceFor = (p: Platform, settings: IosToolSettings): Promise<DeviceAdapter> =>
-    registry.get(p, { treeSource: settings.treeSource });
+  const deviceFor = (p: Platform, cfg: AveriConfig | undefined): Promise<DeviceAdapter> =>
+    registry.get(p, { treeSource: iosToolSettings(cfg, p).treeSource });
+
+  /** The handler's one call (A30): read the config under the tool's policy, then the device and its eyes (`Served`). */
+  const serve = async (p: Platform, policy: ConfigPolicy, cp: string | undefined): Promise<Served> => {
+    const { cfg } = await loadForCall(policy, cp);
+    const adapter = await deviceFor(p, cfg);
+    return { cfg, settings: iosToolSettings(cfg, p), adapter, eyes: eyesOn(adapter) };
+  };
 
   registerTool(
     'list_devices',
@@ -286,10 +312,11 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       },
     },
     async ({ platform: p, path, configPath: cp }) => {
-      // Without a path the entry is `required`, so the config is there to name the build.
+      // Without a path the entry is `required`, so the config is there to name the build — named before a device is
+      // bound, so a config without one binds nothing: the device through `deviceFor` once the path is known.
       const { cfg } = await loadForCall(TOOL_CONFIG.install_app({ platform: p, path }), cp);
       const appPath = path ?? appBuildPath(cfg, p);
-      await (await deviceFor(p, iosToolSettings(cfg, p))).install(appPath);
+      await (await deviceFor(p, cfg)).install(appPath);
       return text(`Installed ${appPath} on ${p}`);
     },
   );
@@ -318,8 +345,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     },
     async ({ platform: p, appId, clearState, activity: named, intent, configPath: cp }) => {
       const entry = { platform: p, appId, activity: named, intent };
-      const { cfg } = await loadForCall(TOOL_CONFIG.launch_app(entry), cp);
-      return text(launchText(p, await launchApp(await deviceFor(p, iosToolSettings(cfg, p)), cfg, session, { appId, activity: named, intent, clearState })));
+      const { cfg, adapter } = await serve(p, TOOL_CONFIG.launch_app(entry), cp);
+      return text(launchText(p, await launchApp(adapter, cfg, session, { appId, activity: named, intent, clearState })));
     },
   );
 
@@ -330,8 +357,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       inputSchema: { platform, appId: z.string(), configPath },
     },
     async ({ platform: p, appId, configPath: cp }) => {
-      const { cfg } = await loadForCall(TOOL_CONFIG.terminate_app(p), cp);
-      await (await deviceFor(p, iosToolSettings(cfg, p))).terminate(appId);
+      const { adapter } = await serve(p, TOOL_CONFIG.terminate_app(p), cp);
+      await adapter.terminate(appId);
       return text(`Terminated ${appId} on ${p}`);
     },
   );
@@ -345,10 +372,10 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       inputSchema: { platform, url: z.string(), configPath },
     },
     async ({ platform: p, url, configPath: cp }) => {
-      const { cfg } = await loadForCall(TOOL_CONFIG.open_deep_link(p), cp);
+      const { cfg, adapter } = await serve(p, TOOL_CONFIG.open_deep_link(p), cp);
       // The project's iOS app (D49a): a link to its own scheme waits until it is in front (adapters/ios.ts). On
       // android the policy reads no config, so none is handed over (and android.ts ignores it).
-      const answer = await (await deviceFor(p, iosToolSettings(cfg, p))).openDeepLink(url, { appId: cfg?.app.ios?.bundleId });
+      const answer = await adapter.openDeepLink(url, { appId: cfg?.app.ios?.bundleId });
       return text(deepLinkText(p, url, answer));
     },
   );
@@ -361,8 +388,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       inputSchema: { platform, configPath },
     },
     async ({ platform: p, configPath: cp }) => {
-      const { cfg } = await loadForCall(TOOL_CONFIG.screenshot(p), cp);
-      const frame = await captureFrame(await deviceFor(p, iosToolSettings(cfg, p)));
+      const { adapter } = await serve(p, TOOL_CONFIG.screenshot(p), cp);
+      const frame = await captureFrame(adapter);
       const unsettled = unsettledNote(frame);
       const shot = image(await frame.shot.png());
       return { content: unsettled === undefined ? [shot] : [...text(unsettled).content, shot] };
@@ -390,8 +417,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       },
     },
     async ({ platform: p, filter, configPath: cp }) => {
-      const { cfg } = await loadForCall(TOOL_CONFIG.ui_snapshot(p), cp);
-      const tree = await (await deviceFor(p, iosToolSettings(cfg, p))).uiTree({ settle: true });
+      const { adapter } = await serve(p, TOOL_CONFIG.ui_snapshot(p), cp);
+      const tree = await adapter.uiTree({ settle: true });
       // An empty filter string is no filter, as `filter ? … : tree` always read it.
       const selector = filter || undefined;
       const matched = selector === undefined ? undefined : findAll(tree, selector).map(stripChildren);
@@ -428,10 +455,10 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       },
     },
     async ({ platform: p, selector, x, y, configPath: cp }) => {
-      const settings = iosToolSettings((await loadForCall(TOOL_CONFIG.tap(p), cp)).cfg, p);
-      const adapter = await deviceFor(p, settings);
+      const served = await serve(p, TOOL_CONFIG.tap(p), cp);
+      const { adapter } = served;
       if (selector !== undefined) {
-        return text(tapText(selector, await tapElement(adapter, selector, guardOpts(settings, adapter))));
+        return text(tapText(selector, await tapElement(adapter, selector, acting(served))));
       }
       if (x === undefined || y === undefined) {
         throw new Error('Provide either selector or both x and y');
@@ -467,8 +494,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         if (given > 0) throw new Error('Provide either direction or fromX/fromY/toX/toY, not both');
         // The tree it reads is the one tap and scroll_until read: the iOS
         // tree source averi.yaml names, when there is one.
-        const { cfg } = await loadForCall(TOOL_CONFIG.swipe(p), cp);
-        const adapter = await deviceFor(p, iosToolSettings(cfg, p));
+        const { adapter } = await serve(p, TOOL_CONFIG.swipe(p), cp);
         return text(swipeText({ direction, ...(await swipeScreen(adapter, { direction, meaning: 'finger', durationMs })) }));
       }
       if (fromX === undefined || fromY === undefined || toX === undefined || toY === undefined) {
@@ -479,9 +505,9 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         );
       }
       // Read no tree, but stroke through the same adapter as a direction (D41).
-      const { cfg } = await loadForCall(TOOL_CONFIG.swipe(p), cp);
+      const { adapter } = await serve(p, TOOL_CONFIG.swipe(p), cp);
       const stroke = { from: { x: fromX, y: fromY }, to: { x: toX, y: toY } };
-      await (await deviceFor(p, iosToolSettings(cfg, p))).swipe(stroke.from, stroke.to, durationMs);
+      await adapter.swipe(stroke.from, stroke.to, durationMs);
       return text(swipeText(stroke));
     },
   );
@@ -506,14 +532,14 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       },
     },
     async ({ platform: p, text: value, selector, clear, configPath: cp }) => {
-      const settings = iosToolSettings((await loadForCall(TOOL_CONFIG.type_text(p), cp)).cfg, p);
-      const adapter = await deviceFor(p, settings);
+      const served = await serve(p, TOOL_CONFIG.type_text(p), cp);
+      const { adapter } = served;
       if (selector === undefined) {
         if (clear) throw new Error('clear requires a selector (the field whose content to measure)');
         await typeIntoFocused(adapter, value);
         return text(typedText(value.length));
       }
-      const fill = await fillField(adapter, selector, value, { ...guardOpts(settings, adapter), clear });
+      const fill = await fillField(adapter, selector, value, { ...acting(served), clear });
       return text(fillReply(fill, selector));
     },
   );
@@ -551,10 +577,9 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       },
     },
     async ({ platform: p, selector, direction, maxSwipes, fully, timeoutMs, within, configPath: cp }) => {
-      const { cfg } = await loadForCall(TOOL_CONFIG.scroll_until(p), cp);
-      const adapter = await deviceFor(p, iosToolSettings(cfg, p));
-      // The eyes a `fully visible` claim is confirmed with (ui-tree/eyes.ts), wired here: interact/ may not import verify/.
-      const result = await scrollUntilVisible(adapter, selector, { direction, maxSwipes, fully, timeoutMs, within, eyes: eyesOn(adapter) });
+      const { adapter, eyes } = await serve(p, TOOL_CONFIG.scroll_until(p), cp);
+      // The eyes a `fully visible` claim is confirmed with (ui-tree/eyes.ts), served here: interact/ may not import verify/.
+      const result = await scrollUntilVisible(adapter, selector, { direction, maxSwipes, fully, timeoutMs, within, eyes });
       return text(`Element ${selector} ${describeScrollResult(result)}`);
     },
   );
@@ -566,8 +591,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       inputSchema: { platform, key: z.enum(['back', 'home', 'enter']), configPath },
     },
     async ({ platform: p, key, configPath: cp }) => {
-      const { cfg } = await loadForCall(TOOL_CONFIG.press_key(p), cp);
-      await (await deviceFor(p, iosToolSettings(cfg, p))).pressKey(key);
+      const { adapter } = await serve(p, TOOL_CONFIG.press_key(p), cp);
+      await adapter.pressKey(key);
       return text(`Pressed ${key}`);
     },
   );
@@ -590,7 +615,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       const project = await loadForCall(TOOL_CONFIG.ensure_state(), cp);
       const { text: report, shot } = await runEnsureState(
         { state, project, environment: envName, session },
-        (cfg) => deviceFor(p, iosToolSettings(cfg, p)),
+        (cfg) => deviceFor(p, cfg),
       );
       // No image when the final capture failed — the report's ⚠ screenshot: line says why.
       return { content: [...text(report).content, ...(shot === undefined ? [] : [image(shot)])] };
@@ -612,7 +637,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     async ({ platform: p, flow, configPath: cp, environment: envName }) => {
       const project = await loadForCall(TOOL_CONFIG.run_flow(), cp);
       return text(
-        await runNamedFlow({ flow, project, environment: envName, session }, (cfg) => deviceFor(p, iosToolSettings(cfg, p))),
+        await runNamedFlow({ flow, project, environment: envName, session }, (cfg) => deviceFor(p, cfg)),
       );
     },
   );
@@ -639,8 +664,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       // line — under the `optional` policy on both platforms: assert works
       // configless, but a broken averi.yaml fails it rather than silently
       // costing the health line (android) or the tree source (ios).
-      const { cfg } = await loadForCall(TOOL_CONFIG.assert(), cp);
-      const adapter = await deviceFor(p, iosToolSettings(cfg, p));
+      const { cfg, adapter } = await serve(p, TOOL_CONFIG.assert(), cp);
       return text(await runAsserts({ adapter, specs, baselineDir: baselineDirFor(cp), cfg }));
     },
   );
@@ -698,7 +722,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
           session,
           baselineDir: baselineDirFor(cp),
         },
-        (p) => deviceFor(p, iosToolSettings(project.cfg, p)),
+        (p) => deviceFor(p, project.cfg),
       );
       return { content: [...text(sections.join('\n\n')).content, ...screenshots.map(image)] };
     },
@@ -729,8 +753,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       },
     },
     async ({ platform: p, sinceSeconds, grep, maxLines, configPath: cp }) => {
-      const { cfg } = await loadForCall(TOOL_CONFIG.get_logs(p), cp);
-      const all = await (await deviceFor(p, iosToolSettings(cfg, p))).logs(Date.now() - sinceSeconds * 1000);
+      const { adapter } = await serve(p, TOOL_CONFIG.get_logs(p), cp);
+      const all = await adapter.logs(Date.now() - sinceSeconds * 1000);
       return text(formatLogExcerpt(all, grep, maxLines));
     },
   );

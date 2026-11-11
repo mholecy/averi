@@ -9,6 +9,7 @@ import {
 } from '../adapters/types.js';
 import { readTreeOrMiss, screenIdentity } from '../ui-tree/read-tree.js';
 import { soleIdOf } from '../ui-tree/selectors.js';
+import type { OrderEyes } from '../ui-tree/eyes.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { resolveClearOfKeyboard, type GuardOptions } from './keyboard.js';
@@ -34,8 +35,12 @@ export const DEFAULT_FOCUS_DELAY_MS = 350;
  */
 export const DEFAULT_VALUE_POLL_MS = 400;
 
-/** The guard's options (the focus tap goes through resolveClearOfKeyboard, dismissals included) plus the fill's own. */
+/**
+ * The guard's options (the focus tap goes through resolveClearOfKeyboard, dismissals included) plus the fill's own —
+ * the eyes REQUIRED, as a tap's (tap.ts#TapOptions, A30): the focus tap asks the order question as a tap does.
+ */
 export interface FillOptions extends GuardOptions {
+  eyes: OrderEyes;
   /** Delete the field's current content before typing — typing otherwise APPENDS. */
   clear?: boolean;
   /**

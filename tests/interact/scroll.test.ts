@@ -11,6 +11,7 @@ import { parseDump } from '../helpers/android-dumps.js';
 import { remedyThenEscape } from '../helpers/escape-order.js';
 import { boundReads } from '../helpers/terminal-read.js';
 import { parseIdbDescribeAll as parseIdbDescribeAllOf } from '../../src/adapters/ios-tree-source.js';
+import { NO_EYES } from '../helpers/eyes.js';
 
 /** The driver's settle pause, observed (passed through to the real sleep): a test sets `onSleep` to see each pause in order with the device's calls. */
 const pauses = vi.hoisted(() => ({ onSleep: undefined as ((ms: number) => void) | undefined }));
@@ -35,7 +36,7 @@ vi.mock('../../src/util/sleep.js', async (importOriginal) => {
  * 2026-10-09 (the scroll-rounds deepening).
  */
 
-const FAST = { maxSwipes: 4, timeoutMs: 2_000, settleMs: 1 };
+const FAST = { eyes: NO_EYES, maxSwipes: 4, timeoutMs: 2_000, settleMs: 1 };
 
 /** Fake whose target starts below the fold and moves up per swipe (viewport 1000x2000). */
 function scrollingFake(startY: number, perSwipe = 600, height = 40) {
@@ -96,7 +97,7 @@ describe('scrollUntilVisible — the result says what the scroll achieved', () =
     fake.uiTree = async () => {
       throw new Error('uiautomator dump returned no XML');
     };
-    const error = await scrollUntilVisible(fake, 'id:below_fold', { maxSwipes: 2, timeoutMs: 100, settleMs: 1 }).catch((e: unknown) => e);
+    const error = await scrollUntilVisible(fake, 'id:below_fold', { eyes: NO_EYES, maxSwipes: 2, timeoutMs: 100, settleMs: 1 }).catch((e: unknown) => e);
     expect((error as Error).message).toMatch(/last UI tree read failed: uiautomator dump returned no XML/);
     expect(error).not.toBeInstanceOf(ElementNotFoundError);
     // No read read, so nothing was swiped: a swipe drawn blind could land on a sheet over the screen.
@@ -117,7 +118,7 @@ describe('scrollUntilVisible — a read error no wait cures ends the scroll at o
       reads++;
       throw wedged;
     });
-    await expect(scrollUntilVisible(fake, 'id:submit_button', { maxSwipes: 4, timeoutMs: 60_000, settleMs: 1 })).rejects.toBe(wedged);
+    await expect(scrollUntilVisible(fake, 'id:submit_button', { eyes: NO_EYES, maxSwipes: 4, timeoutMs: 60_000, settleMs: 1 })).rejects.toBe(wedged);
     expect(reads).toBe(1);
     expect(fake.swipes).toHaveLength(0);
   });
@@ -432,7 +433,7 @@ describe('scrollUntilVisible — after the device check', () => {
     ['681/−729 down, 650 up', 729 / 344, 650 / 283, 2],
   ])('convergence (review round 2), %s: the turned stroke is halved, so the distance left shrinks whatever the app flings', async (_name, down, up, swipes) => {
     const fake = wdaForm(681, flinging(down, up));
-    const result = await scrollUntilVisible(fake, 'id:row', { fully: true, settleMs: 1, maxSwipes: 6 });
+    const result = await scrollUntilVisible(fake, 'id:row', { eyes: NO_EYES, fully: true, settleMs: 1, maxSwipes: 6 });
     expect(result).toEqual({ swipes, visible: 1, clipped: [] });
   });
 
@@ -440,7 +441,7 @@ describe('scrollUntilVisible — after the device check', () => {
     // Down 2.12× (681 → -48); up 4.5×: the half stroke (142 pt) throws it back under the pad (591); the next turn, a quarter
     // (86 pt), lands it at 409.
     const fake = wdaForm(681, flinging(729 / 344, 4.5));
-    expect(await scrollUntilVisible(fake, 'id:row', { fully: true, settleMs: 1, maxSwipes: 6 })).toEqual({ swipes: 3, visible: 1, clipped: [] });
+    expect(await scrollUntilVisible(fake, 'id:row', { eyes: NO_EYES, fully: true, settleMs: 1, maxSwipes: 6 })).toEqual({ swipes: 3, visible: 1, clipped: [] });
     expect(fake.swipes.map((s) => Math.abs(s.to.y - s.from.y))).toEqual([344, 142, 86]);
     expect(fake.swipes.map((s) => s.from.y)).toEqual([458, 175, 458]); // touch-downs where swipeVectorAbove put them
   });
@@ -470,7 +471,7 @@ describe('scrollUntilVisible — after the device check', () => {
   it('a stop reached at the deadline is reported unconfirmed — no confirming read past it', async () => {
     const fake = wdaForm(681, () => [300, 300]);
     fake.onSwipe = () => new Promise((r) => setTimeout(r, 60)); // the deadline passes during the stroke
-    const result = await scrollUntilVisible(fake, 'id:row', { fully: true, settleMs: 1, timeoutMs: 30 });
+    const result = await scrollUntilVisible(fake, 'id:row', { eyes: NO_EYES, fully: true, settleMs: 1, timeoutMs: 30 });
     expect(result).toEqual({ swipes: 1, visible: 1, clipped: [], settled: false });
     expect(fake.reads).toBe(2);
   });
@@ -541,14 +542,14 @@ describe('scrollUntilVisible — a list\'s end that rebounds (docs/bugs/2026-10-
 
   it('a platform that flings (no drag speed): the read after each stroke caught inside the bounce is read again settled — "content exhausted" after 2 swipes, not the whole budget', async () => {
     const fake = bouncing();
-    const error = await scrollUntilVisible(fake, 'text:"No Such Row"', { settleMs: 0 }).catch((e: unknown) => e);
+    const error = await scrollUntilVisible(fake, 'text:"No Such Row"', { eyes: NO_EYES, settleMs: 0 }).catch((e: unknown) => e);
     expect((error as Error).message).toMatch(/failed after 2 swipes \(the last 2, swiping down, did not change the screen: content exhausted/);
     expect(fake.swipes).toHaveLength(2);
   });
 
   it('a platform whose strokes drag (Android\'s drag speed): no settled read, the strokes run to maxSwipes as before', async () => {
     const fake = bouncing(0.45);
-    const error = await scrollUntilVisible(fake, 'text:"No Such Row"', { settleMs: 0 }).catch((e: unknown) => e);
+    const error = await scrollUntilVisible(fake, 'text:"No Such Row"', { eyes: NO_EYES, settleMs: 0 }).catch((e: unknown) => e);
     expect((error as Error).message).toContain('failed after 6 swipes (maxSwipes)');
   });
 });
@@ -573,7 +574,7 @@ describe('scrollUntilVisible — the round bound (code review of round 2, 2026-1
       }
     }
     const fake = new Restless({ s }, 's');
-    const error = await scrollUntilVisible(fake, 'id:t', { settleMs: 0 }).catch((e: unknown) => e);
+    const error = await scrollUntilVisible(fake, 'id:t', { eyes: NO_EYES, settleMs: 0 }).catch((e: unknown) => e);
     expect((error as Error).message).toContain('failed after 6 swipes (maxSwipes)');
     expect(fake.swipes).toHaveLength(6);
     expect(reads).toBe(25);
@@ -649,7 +650,7 @@ describe('scrollUntilVisible — strokes that drag, not fling, over the scroll c
 
   it('measured: Settings\' Display, two rows below the fold — reached; every stroke drawn over the list at the drag speed (850 px in 851 ms) moves it about its own length, not 1.6×', async () => {
     const fake = new LazyList(settingsLabels, 198, SETTINGS, { carry: flingCarry, dragSpeed: 0.45 });
-    const result = await scrollUntilVisible(fake, 'text:"Display"', { fully: true, maxSwipes: 6, timeoutMs: 5_000, settleMs: 1 });
+    const result = await scrollUntilVisible(fake, 'text:"Display"', { eyes: NO_EYES, fully: true, maxSwipes: 6, timeoutMs: 5_000, settleMs: 1 });
     expect(result.clipped).toEqual([]);
     expect(fake.rowRect('Display').height).toBe(198);
     for (const stroke of fake.swipes) {
@@ -666,7 +667,7 @@ describe('scrollUntilVisible — strokes that drag, not fling, over the scroll c
   it('measured: row_40 of a list that ends at row_36 — fails after the two strokes that no longer change the screen, not at the timeout; ElementNotFoundError, it never appeared', async () => {
     const rows = Array.from({ length: 37 }, (_, i) => `row_${i}`);
     const fake = new LazyList(rows, 198, SETTINGS, { carry: flingCarry, dragSpeed: 0.45, offset: 5_500 });
-    const error = await scrollUntilVisible(fake, 'text:"row_40"', { fully: true, maxSwipes: 6, timeoutMs: 15_000, settleMs: 1 }).catch((e: unknown) => e);
+    const error = await scrollUntilVisible(fake, 'text:"row_40"', { eyes: NO_EYES, fully: true, maxSwipes: 6, timeoutMs: 15_000, settleMs: 1 }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ElementNotFoundError);
     expect((error as Error).message).toBe(
       'scroll_until text:"row_40" failed after 3 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree — if it lies above, try direction: "up"',
@@ -675,7 +676,7 @@ describe('scrollUntilVisible — strokes that drag, not fling, over the scroll c
 
   it('an adapter with no drag speed (iOS) strokes at its own default duration, as before — none is passed', async () => {
     const fake = new LazyList(settingsLabels, 198, SETTINGS);
-    await scrollUntilVisible(fake, 'text:"Display"', { maxSwipes: 6, timeoutMs: 5_000, settleMs: 1 });
+    await scrollUntilVisible(fake, 'text:"Display"', { eyes: NO_EYES, maxSwipes: 6, timeoutMs: 5_000, settleMs: 1 });
     expect(fake.swipes.length).toBeGreaterThan(0);
     expect(fake.swipes.every((st) => st.durationMs === undefined)).toBe(true);
   });
@@ -731,7 +732,7 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
     expect(await scrollUntilVisible(fake, 'id:details_toggle', FAST)).toEqual({ swipes: 1, visible: 1, clipped: [] });
     expect(fake.swipes).toEqual([{ from: { x: 540, y: 1631 }, to: { x: 540, y: 589 } }]);
     // …where the tap then goes, at its centre, refused nothing.
-    await tapElement(fake, 'id:details_toggle', { ambiguous: 'refuse', timeoutMs: 60, pollMs: 2 });
+    await tapElement(fake, 'id:details_toggle', { eyes: NO_EYES, ambiguous: 'refuse', timeoutMs: 60, pollMs: 2 });
     expect(fake.tapPoints).toEqual([{ x: 540, y: 990 }]);
   });
 
@@ -741,7 +742,7 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
       fake.tapPoints.push({ x, y });
     };
     expect(await scrollUntilVisible(fake, 'label:"Payment details"', FAST)).toEqual({ swipes: 1, visible: 1, clipped: [] });
-    await tapElement(fake, 'label:"Payment details"', { ambiguous: 'refuse', timeoutMs: 60, pollMs: 2 });
+    await tapElement(fake, 'label:"Payment details"', { eyes: NO_EYES, ambiguous: 'refuse', timeoutMs: 60, pollMs: 2 });
     expect(fake.tapPoints).toEqual([{ x: 540, y: 990 }]);
   });
 
@@ -772,7 +773,7 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
   it('at the bound, the quote of the tap is the tap\'s own refusal\'s remedy, word for word — the way past included', async () => {
     const fake = new SwiftForm(1000);
     const failed = await scrollUntilVisible(fake, 'id:details_toggle', { ...FAST, maxSwipes: 0 }).catch((e: Error) => e.message);
-    const refused = await tapElement(fake, 'id:details_toggle', { ambiguous: 'refuse', timeoutMs: 60, pollMs: 2 }).catch((e: Error) => e.message);
+    const refused = await tapElement(fake, 'id:details_toggle', { eyes: NO_EYES, ambiguous: 'refuse', timeoutMs: 60, pollMs: 2 }).catch((e: Error) => e.message);
     const tapRemedy = /under the 65 a tap needs — (.*); nothing was tapped$/.exec(String(refused))?.[1];
     expect(tapRemedy).toBe('scroll_until it first (if it is whole and only its own content runs to that edge, no scroll shows more: tap a child of it that lies clear of that edge, or tap by coordinates)');
     expect(failed).toMatch(/ — a tap refuses it so cut: (.*)$/);
@@ -901,7 +902,7 @@ describe('scrollUntilVisible — nested clipping containers and a loading list (
       const tree = await read();
       return { ...tree, children: [...tree.children, node({ role: 'progress', rect: { x: 500, y: 2100, width: 80, height: 80 } })] };
     };
-    const error = await scrollUntilVisible(fake, 'text:"row_40"', { maxSwipes: 4, timeoutMs: 5_000, settleMs: 1 }).catch((e: unknown) => e);
+    const error = await scrollUntilVisible(fake, 'text:"row_40"', { eyes: NO_EYES, maxSwipes: 4, timeoutMs: 5_000, settleMs: 1 }).catch((e: unknown) => e);
     expect((error as Error).message).toContain('failed after 4 swipes (maxSwipes)');
   });
 });
@@ -930,7 +931,7 @@ describe('scrollUntilVisible — the match the next tap acts on (code review P2)
       node({ role: 'button', identifier: 'prio', label: 'Priority', rect: { x: 24, y: 771, width: 354, height: 52 } }),
       BAR,
     ]);
-    await expect(scrollUntilVisible(fake, 'id:prio', { maxSwipes: 0, settleMs: 0 })).rejects.toThrow(
+    await expect(scrollUntilVisible(fake, 'id:prio', { eyes: NO_EYES, maxSwipes: 0, settleMs: 0 })).rejects.toThrow(
       'scroll_until id:prio failed after 0 swipes (maxSwipes) — element reached the viewport but stayed under button "Continue" (24,780 354x44, reaching 24,780 354x94) at its centre (201,797), drawn over it — 17% of it shows (last rect {"x":24,"y":771,"width":354,"height":52})',
     );
   });
@@ -942,7 +943,7 @@ describe('scrollUntilVisible — the match the next tap acts on (code review P2)
       node({ role: 'text', identifier: 'prio', label: 'Priority hint', rect: { x: 24, y: 771, width: 354, height: 52 } }),
       BAR,
     ]);
-    expect(await scrollUntilVisible(fake, 'id:prio', { maxSwipes: 0, settleMs: 0 })).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    expect(await scrollUntilVisible(fake, 'id:prio', { eyes: NO_EYES, maxSwipes: 0, settleMs: 0 })).toEqual({ swipes: 0, visible: 1, clipped: [] });
   });
 });
 
@@ -1435,7 +1436,7 @@ describe('scroll_until\'s feeler on idb, as the driver sends it', () => {
     fake.platform = 'ios';
     fake.keyboard = undefined; // as IosAdapter: no oracle
     fake.viewportSize = { width: 402, height: 874, statusBand: 62 };
-    await scrollUntilVisible(fake, 'id:lab.form-picker.country.GB', { maxSwipes: 6, timeoutMs: 5_000, settleMs: 1 }).catch(() => undefined);
+    await scrollUntilVisible(fake, 'id:lab.form-picker.country.GB', { eyes: NO_EYES, maxSwipes: 6, timeoutMs: 5_000, settleMs: 1 }).catch(() => undefined);
     expect(fake.swipes).toEqual([
       { from: { x: 201, y: 699 }, to: { x: 201, y: 175 }, durationMs: 1502 },
       { from: { x: 201, y: 699 }, to: { x: 201, y: 175 }, durationMs: 1502 },

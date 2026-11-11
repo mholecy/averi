@@ -22,8 +22,9 @@ import { CLASSIC_VIEWS, SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android
 import { bandNode, dropBand, el, FakeAdapter, iosLoginFake, node, recorded, resetLayout, screen } from '../helpers/fake.js';
 import { missNote } from '../../src/ui-tree/miss.js';
 import { bothPinnedRemedyText } from '../../src/ui-tree/remedy-text.js';
+import { NO_EYES } from '../helpers/eyes.js';
 
-const FAST = { ambiguous: 'first' as const, timeoutMs: 60, pollMs: 2 };
+const FAST = { eyes: NO_EYES, ambiguous: 'first' as const, timeoutMs: 60, pollMs: 2 };
 const FIRST = { ambiguous: 'first' as const };
 const REFUSE = { ambiguous: 'refuse' as const };
 
@@ -491,7 +492,7 @@ describe('tapElement', () => {
 
   it('a target that never appears fails with the settle wording — the same error a flow tap: throws', async () => {
     const fake = new FakeAdapter({ s: screen() }, 's');
-    await expect(tapElement(fake, 'id:nope', { ...REFUSE, timeoutMs: 10, pollMs: 2 })).rejects.toThrow(
+    await expect(tapElement(fake, 'id:nope', { eyes: NO_EYES, ...REFUSE, timeoutMs: 10, pollMs: 2 })).rejects.toThrow(
       /Timed out after 10ms waiting for element id:nope to appear/,
     );
     expect(fake.taps).toEqual([]);
@@ -503,7 +504,7 @@ describe('tapElement', () => {
       { s: screen(el({ role: 'textfield', identifier: 'username' }), el({ role: 'textfield', identifier: 'password' })) },
       's',
     );
-    await expect(tapElement(fake, 'role:textfield', { ...REFUSE, timeoutMs: 50, pollMs: 2 })).rejects.toThrow(
+    await expect(tapElement(fake, 'role:textfield', { eyes: NO_EYES, ...REFUSE, timeoutMs: 50, pollMs: 2 })).rejects.toThrow(
       /Selector matches 2 elements: role:textfield/,
     );
     expect(fake.taps).toEqual([]);
@@ -541,17 +542,17 @@ describe('a tap target off the screen (2026-10-08)', () => {
 
   it('the measured rects (y 885, y 1157 on a 402x874 screen): refused, nothing tapped', async () => {
     const fake = swiftForm();
-    const street = await tapElement(fake, 'text:"Payee’s street"', { ...REFUSE, timeoutMs: 60, pollMs: 2 }).catch((e: unknown) => e);
+    const street = await tapElement(fake, 'text:"Payee’s street"', { eyes: NO_EYES, ...REFUSE, timeoutMs: 60, pollMs: 2 }).catch((e: unknown) => e);
     expect(street).toBeInstanceOf(OffScreenRefusal);
     expect((street as Error).message).toBe(
       'text:"Payee’s street" is off screen at (94,895) on a 402x874 screen (rect 42,885 103x20) — scroll_until it first; nothing was tapped',
     );
-    await expect(tapElement(fake, 'text:"Payee’s bank city*"', { ...REFUSE, timeoutMs: 60, pollMs: 2 })).rejects.toThrow(
+    await expect(tapElement(fake, 'text:"Payee’s bank city*"', { eyes: NO_EYES, ...REFUSE, timeoutMs: 60, pollMs: 2 })).rejects.toThrow(
       'text:"Payee’s bank city*" is off screen at (110,1167) on a 402x874 screen (rect 42,1157 136x20)',
     );
     expect(fake.tapPoints).toEqual([]);
     // The on-screen field beside them taps as before.
-    await tapElement(fake, 'id:amount', { ...REFUSE, timeoutMs: 60, pollMs: 2 });
+    await tapElement(fake, 'id:amount', { eyes: NO_EYES, ...REFUSE, timeoutMs: 60, pollMs: 2 });
     expect(fake.taps).toEqual(['amount']);
   });
 
@@ -559,10 +560,10 @@ describe('a tap target off the screen (2026-10-08)', () => {
     const fake = swiftForm();
     const street = () => fake.live().children[1];
     street().rect = { x: 42, y: 860, width: 103, height: 20 }; // centre (94,870): on screen, 14 of 20 pt visible
-    await tapElement(fake, 'text:"Payee’s street"', { ...REFUSE, timeoutMs: 60, pollMs: 2 });
+    await tapElement(fake, 'text:"Payee’s street"', { eyes: NO_EYES, ...REFUSE, timeoutMs: 60, pollMs: 2 });
     expect(fake.tapPoints).toEqual([{ x: 94, y: 870 }]);
     street().rect = { x: 42, y: 866, width: 103, height: 20 }; // centre (94,876): off, 8 of 20 pt visible
-    await expect(tapElement(fake, 'text:"Payee’s street"', { ...REFUSE, timeoutMs: 60, pollMs: 2 })).rejects.toThrow(
+    await expect(tapElement(fake, 'text:"Payee’s street"', { eyes: NO_EYES, ...REFUSE, timeoutMs: 60, pollMs: 2 })).rejects.toThrow(
       'text:"Payee’s street" is off screen at (94,876) on a 402x874 screen — only 40% of it (rect 42,866 103x20) is on screen, and a tap goes to its centre — scroll_until it with fully: true first; nothing was tapped',
     );
     expect(fake.tapPoints).toEqual([{ x: 94, y: 870 }]);
@@ -574,14 +575,14 @@ describe('a tap target off the screen (2026-10-08)', () => {
     fake.viewport = async () => {
       throw new Error('idb describe: no screen_dimensions');
     };
-    await tapElement(fake, 'id:go', { ...REFUSE, timeoutMs: 60, pollMs: 2 });
+    await tapElement(fake, 'id:go', { eyes: NO_EYES, ...REFUSE, timeoutMs: 60, pollMs: 2 });
     expect(fake.taps).toEqual(['go']);
   });
 
   it('the fill\'s focus tap goes through the same check: refused before anything is tapped or typed', async () => {
     const fake = swiftForm();
     fake.live().children[1].role = 'textfield';
-    await expect(fillField(fake, 'text:"Payee’s street"', 'Main St 1', { ...REFUSE, timeoutMs: 60, pollMs: 2 })).rejects.toBeInstanceOf(OffScreenRefusal);
+    await expect(fillField(fake, 'text:"Payee’s street"', 'Main St 1', { eyes: NO_EYES, ...REFUSE, timeoutMs: 60, pollMs: 2 })).rejects.toBeInstanceOf(OffScreenRefusal);
     expect(fake.tapPoints).toEqual([]);
     expect(fake.typed).toEqual([]);
   });
@@ -595,7 +596,7 @@ describe('a tap target off the screen (2026-10-08)', () => {
       },
     });
     fake.viewportSize = { width: 402, height: 874 };
-    const error = await tapElement(fake, 'id:login_submit', { ...REFUSE, timeoutMs: 60, pollMs: 2, dismissals: [{ kind: 'tap', target: { id: 'login_title' } }] }).catch((e: unknown) => e);
+    const error = await tapElement(fake, 'id:login_submit', { eyes: NO_EYES, ...REFUSE, timeoutMs: 60, pollMs: 2, dismissals: [{ kind: 'tap', target: { id: 'login_title' } }] }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(OffScreenRefusal);
     expect((error as Error).message).toBe(
       'id:login_submit was not tapped: after id:"login_title" was tapped at (201,303) to hide the soft keyboard, it is off screen at (107,924) on a 402x874 screen (rect 36,900 141x48) — scroll_until it first',
@@ -639,7 +640,7 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     return fake;
   };
   const PRIORITY = 'id:swift_payment.form.priority_select';
-  const OPTS = { ...REFUSE, timeoutMs: 60, pollMs: 2 };
+  const OPTS = { eyes: NO_EYES, ...REFUSE, timeoutMs: 60, pollMs: 2 };
 
   it('the measured rest position (y 771): only the top 9 pt show — refused, naming the bar, nothing tapped', async () => {
     const fake = swiftForm();
@@ -749,7 +750,7 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     const fake = new FakeAdapter({ form: tree }, 'form');
     fake.keyboard = undefined;
     fake.viewportSize = { width: 402, height: 874 };
-    const scrolled = await scrollUntilVisible(fake, 'text:"SWIFT PAYMENT"', { maxSwipes: 0, settleMs: 0 });
+    const scrolled = await scrollUntilVisible(fake, 'text:"SWIFT PAYMENT"', { eyes: NO_EYES, maxSwipes: 0, settleMs: 0 });
     expect(scrolled).toEqual({ swipes: 0, visible: 1, clipped: [] });
     for (const selector of ['text:"BackButton"', 'text:"SWIFT PAYMENT"']) expect(await tapElement(fake, selector, OPTS)).toEqual({ note: undefined, keyboardHidden: undefined, moved: undefined });
     expect(fake.tapPoints).toEqual([{ x: 44, y: 84 }, { x: 201, y: 84 }]);
@@ -763,10 +764,10 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     fake.keyboard = undefined;
     fake.viewportSize = { width: 402, height: 874 };
     const banner = { role: 'container', label: '!, Open debugger to view warnings.', identifier: null, rect: { x: 10, y: 787, width: 382, height: 49 } };
-    expect(await scrollUntilVisible(fake, 'id:placeholder_screen', { maxSwipes: 0, settleMs: 0 })).toEqual({ swipes: 0, visible: 1, clipped: [], covered: { by: banner, shows: expect.closeTo(0.915, 3) } });
+    expect(await scrollUntilVisible(fake, 'id:placeholder_screen', { eyes: NO_EYES, maxSwipes: 0, settleMs: 0 })).toEqual({ swipes: 0, visible: 1, clipped: [], covered: { by: banner, shows: expect.closeTo(0.915, 3) } });
     // `fully` is kept off by the dev build's warning banner at the bottom — a real cover — never by the screen's own text.
     // Neither lies in a scroll view (the screen-sized placeholder, LogBox's banner beside it): stopped before any swipe (D87).
-    await expect(scrollUntilVisible(fake, 'id:placeholder_screen', { maxSwipes: 0, settleMs: 0, fully: true })).rejects.toThrow(
+    await expect(scrollUntilVisible(fake, 'id:placeholder_screen', { eyes: NO_EYES, maxSwipes: 0, settleMs: 0, fully: true })).rejects.toThrow(
       `element is in the viewport but under container "!, Open debugger to view warnings." (10,787 382x49), drawn over it — 91% of it shows; no swipe was sent — ${bothPinnedRemedyText('touch')}`,
     );
     expect(await tapElement(fake, 'id:placeholder_screen', OPTS)).toEqual({ note: undefined, keyboardHidden: undefined, moved: undefined });
@@ -871,7 +872,7 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
  * refused, `scroll_until` called the screen a layout defect, and `fully` never stopped.
  */
 describe('a Compose label under its own control (2026-10-09)', () => {
-  const OPTS = { ...REFUSE, timeoutMs: 60, pollMs: 2 };
+  const OPTS = { eyes: NO_EYES, ...REFUSE, timeoutMs: 60, pollMs: 2 };
   const compose = (xml: string) => {
     const fake = new FakeAdapter({ s: parseDump(xml) }, 's');
     fake.viewportSize = { width: 1080, height: 2220 };
@@ -890,7 +891,7 @@ describe('a Compose label under its own control (2026-10-09)', () => {
   it('Account Detail: `fully: true` stops on a row\'s label node with its avatar on it, no stroke spent; a row under the tab bar\'s host is still not tapped there', async () => {
     const fake = compose(COMPOSE.accountDetail);
     const label = 'label:"Loan repayment, 17.12.2025, +493.00 EUR"';
-    expect(await scrollUntilVisible(fake, label, { maxSwipes: 2, settleMs: 0, fully: true })).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    expect(await scrollUntilVisible(fake, label, { eyes: NO_EYES, maxSwipes: 2, settleMs: 0, fully: true })).toEqual({ swipes: 0, visible: 1, clipped: [] });
     expect(fake.swipes).toEqual([]);
     const under = await tapElement(fake, 'label:"Card payment, 15.12.2025, -12.00 EUR"', OPTS).catch((e: unknown) => e);
     expect(under).toBeInstanceOf(CoveredRefusal);
@@ -911,7 +912,7 @@ describe('a Compose label under its own control (2026-10-09)', () => {
 
   it('the real Account Detail snapshot (one integration case; the other snapshots are rows of tests/ui-tree/standing.test.ts): a row\'s label node clear of the tab bar is fully visible after 0 swipes; the row cut at the tab bar\'s top is tapped at its title\'s centre', async () => {
     const fake = await snapshot('accountDetail');
-    expect(await scrollUntilVisible(fake, 'label:"Loan repayment, 04.01.2026, +91.00 EUR"', { maxSwipes: 2, settleMs: 0, fully: true })).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    expect(await scrollUntilVisible(fake, 'label:"Loan repayment, 04.01.2026, +91.00 EUR"', { eyes: NO_EYES, maxSwipes: 2, settleMs: 0, fully: true })).toEqual({ swipes: 0, visible: 1, clipped: [] });
     expect(await tapElement(fake, 'text:"+493"', OPTS)).toEqual({ note: undefined, keyboardHidden: undefined, moved: undefined });
     expect([fake.tapPoints, fake.swipes]).toEqual([[{ x: 782, y: 1836 }], []]);
   });
@@ -921,7 +922,7 @@ describe('a Compose label under its own control (2026-10-09)', () => {
     await expect(tapElement(login, 'text:"Forgot password?"', OPTS)).rejects.toBeInstanceOf(CoveredRefusal);
     expect(login.tapPoints).toEqual([]);
     const terms = compose(CLASSIC_VIEWS.terms);
-    await expect(scrollUntilVisible(terms, 'text:"By continuing you accept the terms"', { maxSwipes: 2, settleMs: 0 })).rejects.toThrow(
+    await expect(scrollUntilVisible(terms, 'text:"By continuing you accept the terms"', { eyes: NO_EYES, maxSwipes: 2, settleMs: 0 })).rejects.toThrow(
       /^scroll_until .* stopped before any swipe — .*under button "CONTINUE" \(40,1960 1000x130\) at its centre \(540,2015\), drawn over it — 0% of it shows; no swipe was sent — no scroll moves it out from under that: neither lies in a scroll view — /,
     );
   });
@@ -929,7 +930,7 @@ describe('a Compose label under its own control (2026-10-09)', () => {
 
 describe('a tap target cut to a sliver at its scroll container\'s edge (2026-10-10)', () => {
   // docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md, owner decision: refuse.
-  const OPTS = { ...REFUSE, timeoutMs: 60, pollMs: 2 };
+  const OPTS = { eyes: NO_EYES, ...REFUSE, timeoutMs: 60, pollMs: 2 };
   const TOGGLE = 'id:swift_payment.form.details_toggle';
   /** mp-native's SWIFT form on the Pixel_3a as measured: the form's scroller `0,242 1080x1736` (bottom 1978), `inside` in it, the CONTINUE bar below it. */
   const swiftForm = (...inside: UiNode[]) => {
@@ -1101,7 +1102,7 @@ describe('a tap or fill by an id idb\'s read does not list: the timeout says idb
     return fake;
   };
   const R = 'id:"lab.sheet-long-list.R"';
-  const OPTS = { ...REFUSE, timeoutMs: 20, pollMs: 2 };
+  const OPTS = { eyes: NO_EYES, ...REFUSE, timeoutMs: 20, pollMs: 2 };
 
   it('tap, a read listing no identifier at all (sheet-long-list): ElementNotFoundError, the noIdListed note beneath, nothing tapped', async () => {
     const fake = await idbFake('sheet-long-list');
@@ -1143,7 +1144,7 @@ describe('a tap or fill by an id idb\'s read does not list: the timeout says idb
  */
 describe('a tap or fill that misses under idb with the soft keyboard read up: the timeout names the keyboard', () => {
   const IOS = new URL('../fixtures/truth/ios-iphone17-ios27/', import.meta.url);
-  const OPTS = { ...REFUSE, timeoutMs: 20, pollMs: 2 };
+  const OPTS = { eyes: NO_EYES, ...REFUSE, timeoutMs: 20, pollMs: 2 };
   /** The keyboard band's background in the capture (`other 0,590 402x284`), which makes the keys a band. */
   const isBand = (e: { frame: Rect; role: string }) => e.frame.x === 0 && e.frame.y === 590 && e.frame.width === 402 && e.frame.height === 284;
   const fakeOf = async (cell: string, { band = true, extra = [] as object[] } = {}) => {
@@ -1226,7 +1227,7 @@ describe('a tap or fill that misses under idb with the soft keyboard read up: th
 
 /** Review of the off-screen refusal (2026-10-08): the probes it measured the first cut against. */
 describe('the off-screen rule — review round 1 (2026-10-08)', () => {
-  const OPTS = { ...REFUSE, timeoutMs: 60, pollMs: 2 };
+  const OPTS = { eyes: NO_EYES, ...REFUSE, timeoutMs: 60, pollMs: 2 };
   /** An iOS fake whose device reports `device` and whose tree is `tree` (idb: a rectless root unless the test gives it a rect). */
   const ios = (tree: UiNode, device: { width: number; height: number }) => {
     const fake = new FakeAdapter({ s: tree }, 's');
@@ -1329,7 +1330,7 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
       const fake = ios(idbRoot(...cells, ...rows, node({ role: 'button', identifier: 'item', rect: { x: 425, y: 80, width: 50, height: 40 } })), PORTRAIT);
       expect((await usableScreen(fake, { tree: await fake.uiTree() }))?.boxes).toEqual([{ x: 0, y: 0, width: 402, height: 874 }]);
       await expect(tapElement(fake, 'id:item', OPTS)).rejects.toThrow('id:item is off screen at (450,100) on a 402x874 screen (rect');
-      await expect(scrollUntilVisible(fake, 'id:item', { maxSwipes: 1, settleMs: 0 })).rejects.toThrow('never intersected the 402x874 viewport (last rect');
+      await expect(scrollUntilVisible(fake, 'id:item', { eyes: NO_EYES, maxSwipes: 1, settleMs: 0 })).rejects.toThrow('never intersected the 402x874 viewport (last rect');
       expect(fake.swipes).toHaveLength(1);
     });
 
@@ -1344,7 +1345,7 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
       );
       const fake = ios(tree, PORTRAIT);
       expect((await usableScreen(fake, { tree: await fake.uiTree() }))?.boxes).toHaveLength(2);
-      const error = await scrollUntilVisible(fake, 'id:pay', { maxSwipes: 0 }).catch((e: unknown) => e);
+      const error = await scrollUntilVisible(fake, 'id:pay', { eyes: NO_EYES, maxSwipes: 0 }).catch((e: unknown) => e);
       expect((error as Error).message).toContain('never intersected the 402x250 screen above the soft keyboard over [0,250][874,402] (last rect');
     });
   });
@@ -1353,18 +1354,18 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
     const rows = [0, 400, 800, 1200, 1600, 2000, 2400, 2950].map((y) => node({ role: 'text', rect: { x: 0, y, width: 852, height: 50 } }));
     const fake = ios(idbRoot(...rows, node({ role: 'button', identifier: 'go', rect: { x: 50, y: 580, width: 200, height: 40 } })), { width: 393, height: 852 });
     expect((await usableScreen(fake, { tree: await fake.uiTree() }))?.oriented).toEqual({ x: 0, y: 0, width: 852, height: 393 });
-    expect(await scrollUntilVisible(fake, 'id:go', { maxSwipes: 0 })).toEqual({ swipes: 0, visible: 1, clipped: [] });
+    expect(await scrollUntilVisible(fake, 'id:go', { eyes: NO_EYES, maxSwipes: 0 })).toEqual({ swipes: 0, visible: 1, clipped: [] });
     await tapElement(fake, 'id:go', OPTS);
     expect(fake.tapPoints).toEqual([{ x: 150, y: 600 }]);
     // Outside both ways up: still never intersected, and said so.
     fake.live().children[8].rect = { x: 50, y: 900, width: 200, height: 40 };
-    await expect(scrollUntilVisible(fake, 'id:go', { maxSwipes: 0 })).rejects.toThrow('element in tree but never intersected the 852x393 viewport either way up');
+    await expect(scrollUntilVisible(fake, 'id:go', { eyes: NO_EYES, maxSwipes: 0 })).rejects.toThrow('element in tree but never intersected the 852x393 viewport either way up');
   });
 
   it('M2 — probe I: scroll_until judges on the tap\'s screen, turned in landscape (WDA root 874x402 on a 402x874 panel): y 500 is NOT visible', async () => {
     const tree = node({ role: 'container', rect: { x: 0, y: 0, width: 874, height: 402 }, children: [node({ role: 'button', identifier: 'pay', rect: { x: 50, y: 500, width: 100, height: 40 } })] });
     const fake = ios(tree, PORTRAIT);
-    await expect(scrollUntilVisible(fake, 'id:pay', { maxSwipes: 0 })).rejects.toThrow('element in tree but never intersected the 874x402 viewport');
+    await expect(scrollUntilVisible(fake, 'id:pay', { eyes: NO_EYES, maxSwipes: 0 })).rejects.toThrow('element in tree but never intersected the 874x402 viewport');
     await expect(tapElement(fake, 'id:pay', OPTS)).rejects.toThrow('id:pay is off screen at (100,520) on a 874x402 screen');
   });
 
@@ -1377,7 +1378,7 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
       await swipe(from, to);
       fake.live().children[8].rect = { x: -30, y: 100, width: 450, height: 40 }; // left edge cut: beyond it on 852x393, across both edges on 393x852
     };
-    await scrollUntilVisible(fake, 'id:go', { direction: 'right', fully: true, maxSwipes: 2, settleMs: 0 }).catch(() => undefined);
+    await scrollUntilVisible(fake, 'id:go', { eyes: NO_EYES, direction: 'right', fully: true, maxSwipes: 2, settleMs: 0 }).catch(() => undefined);
     expect(fake.swipes).toHaveLength(2);
     for (const s of fake.swipes) expect(s.to.x).toBeLessThan(s.from.x); // content to the right both times: finger left, never turned
   });
@@ -1390,7 +1391,7 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
  * The band is the top safe-area inset (adapters/ios-status-band.ts#iosStatusBand): 62 pt on the measured 402x874.
  */
 describe('iOS\'s status band (2026-10-09)', () => {
-  const OPTS = { ...REFUSE, timeoutMs: 60, pollMs: 2 };
+  const OPTS = { eyes: NO_EYES, ...REFUSE, timeoutMs: 60, pollMs: 2 };
   /** The SWIFT form as idb lists it (tests/fixtures/idb-swift-form-continue.json), `priority_select` at `y`, on `platform`. */
   const swiftForm = async (y: number, platform: 'ios' | 'android' = 'ios') => {
     const tree = parseIdbDescribeAll(await readFile(new URL('../fixtures/idb-swift-form-continue.json', import.meta.url), 'utf8'));
@@ -1472,7 +1473,7 @@ describe('iOS\'s status band (2026-10-09)', () => {
  * Back, Home or Recents on three-button navigation. Refused whatever the navigation mode, in the bar's own words.
  */
 describe('Android\'s navigation band', () => {
-  const OPTS = { ...REFUSE, timeoutMs: 60, pollMs: 2 };
+  const OPTS = { eyes: NO_EYES, ...REFUSE, timeoutMs: 60, pollMs: 2 };
   const PIXEL = { width: 1080, height: 2220, statusBand: 66, navigationBand: 2154 };
   const accountDetailTop = async () => {
     const fake = new FakeAdapter({ s: { ...(JSON.parse(await readFile(new URL('../fixtures/android-ui-snapshot-compose.json', import.meta.url), 'utf8')).screens.accountDetailTop as UiNode), paddedTouchTargets: true } }, 's');

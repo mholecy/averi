@@ -5,6 +5,7 @@ import type { Rect } from '../../src/adapters/types.js';
 import { describeScrollResult, scrollUntilVisible } from '../../src/interact/scroll.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { FakeAdapter } from '../helpers/fake.js';
+import { NO_EYES } from '../helpers/eyes.js';
 
 /**
  * `scroll_until` on the strip between a FLOATING keyboard's panel and its band, over the lab's real capture
@@ -22,7 +23,7 @@ const IME = JSON.parse(readFileSync(new URL(`${CAPTURE}.ime.json`, import.meta.u
 const BAND: Rect = { x: 0, y: 2088, width: 1080, height: 132 };
 const SUBMIT = 'id:"lab.form-keyboard-floating.submit"';
 const SUBMIT_BOUNDS = 'bounds="[55,1928][1025,2060]"';
-const FAST = { maxSwipes: 4, timeoutMs: 2_000, settleMs: 1 };
+const FAST = { eyes: NO_EYES, maxSwipes: 4, timeoutMs: 2_000, settleMs: 1 };
 /** The straddling submit's failure as worded with no gap rule (the base commit's reply, verbatim): the gap judgement is dropped, never worded. */
 const STRADDLING =
   'scroll_until id:"lab.form-keyboard-floating.submit" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — ' +

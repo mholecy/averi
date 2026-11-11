@@ -8,6 +8,7 @@ import { AmbiguityRefusal } from '../../src/interact/resolve.js';
 import { tapElement, type TapAdapter } from '../../src/interact/tap.js';
 import { OffScreenRefusal } from '../../src/interact/tap-judgement.js';
 import { IDB_ALERT } from '../helpers/ios-lab.js';
+import { NO_EYES } from '../helpers/eyes.js';
 
 // D57 (ADR 0032's D57 amendment): the alert replies advise `tap text:"<label>"` first, so the real tapElement — the
 // MCP `tap` tool's selector path, with its `ambiguous` option `'refuse'` — is pinned over the captured "Open in
@@ -50,7 +51,7 @@ function alertDevice(read: () => UiNode) {
 }
 
 /** Its `ambiguous` option `'refuse'`, as the MCP tap passes it (mcp/tools.ts), with a short timeout and cadence. */
-const OPTS = { ambiguous: 'refuse', timeoutMs: 300, pollMs: 1 } as const;
+const OPTS = { eyes: NO_EYES, ambiguous: 'refuse', timeoutMs: 300, pollMs: 1 } as const;
 
 describe("tap text:\"<label>\" over iOS's system alert — the alert's own Button, at its centre (D57)", () => {
   for (const [source, read] of Object.entries(TREES)) {

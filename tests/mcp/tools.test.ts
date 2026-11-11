@@ -1217,6 +1217,42 @@ describe('every tool gets the project\'s adapter — one per simulator and confi
     expect(harness.bound()).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'wda' }]);
   });
 
+  /**
+   * EVERY tool that resolves a device — the policy table's tools, which tests below pin to be exactly the ones whose
+   * schema takes a `configPath` — keyed by the table, so a tool added to it fails to typecheck here until it has a
+   * call. Each is called in one wda project; the registry must have bound ONE adapter, of the project's kind, and
+   * nothing else. Since A30 this is the D41 invariant's guard, by behaviour: a handler that resolved its device
+   * another way — a second `registry.get` with another kind, an aliased registry, a lazy resolver handed the wrong
+   * config — binds a second adapter or an idb one here. (Until A30 a textual tripwire,
+   * tests/mcp/registry-gets.test.ts, counted `registry.get(` in src/; ADR 0032, amendment A30.)
+   */
+  const EVERY_DEVICE_CALL: Record<keyof typeof TOOL_CONFIG, Record<string, unknown>> = {
+    install_app: { platform: 'ios', path: '/builds/Bank.app' },
+    launch_app: { platform: 'ios', appId: 'md.bank.app' },
+    terminate_app: { platform: 'ios', appId: 'md.bank.app' },
+    open_deep_link: { platform: 'ios', url: 'bank://home' },
+    screenshot: { platform: 'ios' },
+    ui_snapshot: { platform: 'ios' },
+    tap: { platform: 'ios', selector: 'id:home_root' },
+    type_text: { platform: 'ios', text: 'a' },
+    scroll_until: { platform: 'ios', selector: 'id:home_root' },
+    swipe: { platform: 'ios', direction: 'up' },
+    press_key: { platform: 'ios', key: 'home' },
+    get_logs: { platform: 'ios' },
+    assert: { platform: 'ios', asserts: [{ element: { id: 'home_root' } }] },
+    ensure_state: { platform: 'ios', state: 'home' },
+    run_flow: { platform: 'ios', flow: 'touch_home' },
+    verify: { platforms: ['ios'], state: 'home' },
+  };
+
+  it.each(Object.entries(EVERY_DEVICE_CALL))('ios %s in a treeSource: wda project binds the wda adapter alone', async (tool, args) => {
+    const harness = await connect();
+    const configPath = await file('averi.yaml', VALID_CONFIG.replace('ios:     { bundleId: md.bank.app }', 'ios:     { bundleId: md.bank.app, treeSource: wda }'));
+    const result = await harness.call(tool, { configPath, ...args });
+    expect(result.isError, result.text).toBe(false);
+    expect(harness.bound()).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'wda' }]);
+  });
+
   it('ios without a project config: one idb adapter, shared by the tree tools and the rest', async () => {
     // `missing()` stands in for the default ./averi.yaml: the server's working directory is the repo, not a test's own.
     const harness = await connect();

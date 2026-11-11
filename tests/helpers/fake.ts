@@ -1,6 +1,7 @@
 import { KEYBOARD_ROLE, type AppHolder, type DeviceAdapter, type DeviceScreen, type FocusedWindow, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type DeepLinkOptions, type LaunchOptions, type Point, type Rect, type SoftKeyboard, type Stroke, type TypingDelivery, type UiNode } from '../../src/adapters/types.js';
 import type { RgbaImage } from '../../src/verify/capture.js';
 import { NOT_PRINTABLE_ASCII, type Typeable } from '../../src/adapters/typeable.js';
+import { NO_EYES } from './eyes.js';
 
 export const node = (partial: Partial<UiNode>): UiNode => ({
   role: 'other',
@@ -393,8 +394,8 @@ export class FakeKeyboard implements KeyboardOracle {
   }
 }
 
-/** The guard's settle options, fast: `first` on ambiguity, a 200 ms budget, a 2 ms poll — the two keyboard-*.test.ts files share it (fill.test.ts keeps an identical one of its own). */
-export const FAST = { ambiguous: 'first' as const, timeoutMs: 200, pollMs: 2 };
+/** The guard's settle options, fast: `first` on ambiguity, a 200 ms budget, a 2 ms poll, eyes that see nothing (NO_EYES: the verbs require them, A30) — the two keyboard-*.test.ts files share it (fill.test.ts keeps an identical one of its own). */
+export const FAST = { ambiguous: 'first' as const, timeoutMs: 200, pollMs: 2, eyes: NO_EYES };
 
 /** One ordered log of everything the keyboard guard and dismissal do to the device — and ask of its keyboard oracle, when it has one: `read`, `keyboard?`, `witness?`, `touchable?` (2026-10-08), `key:back`, `tap:x,y`. */
 export function recorded(fake: FakeAdapter): string[] {

@@ -9,6 +9,7 @@ import { CLIP_LINE, eyesQuestion } from '../../src/ui-tree/eyes.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
 import { eyesOn, judgeEyes } from '../../src/verify/eyes.js';
 import { FakeAdapter, node } from '../helpers/fake.js';
+import { NO_EYES } from '../helpers/eyes.js';
 
 /**
  * THE EYES LOOK FOR A CLIP LINE (ui-tree/eyes.ts#eyesQuestion, verify/eyes.ts#judgeEyes): a `fully: true` claim on a
@@ -121,7 +122,7 @@ describe('scroll_until under idb — a `fully: true` claim the eyes see cut', ()
 
   it('P, fully: true with no eyes handed in: "fully visible", as before the eyes — no clause on a clip line not looked for', async () => {
     const fake = await fakeOf();
-    expect(describeScrollResult(await scrollUntilVisible(fake, 'id:"lab.scroll-bounded.P"', { ...FAST, fully: true }))).toBe('fully visible after 0 swipes');
+    expect(describeScrollResult(await scrollUntilVisible(fake, 'id:"lab.scroll-bounded.P"', { eyes: NO_EYES, ...FAST, fully: true }))).toBe('fully visible after 0 swipes');
   });
 
   it('WDA P, fully: true: clipped by its scroll view, the tree tells it — no screenshot', async () => {

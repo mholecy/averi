@@ -6,7 +6,8 @@ exists). Implemented on `fix/r9-l4w`. Amends ADR 0015 (its 2026-10-19 amendment'
 narrowed) and extends ADR 0013 (the eyes get a second question). Amended 2026-10-22 (round 16, LE2's rest): a third
 trigger for the order question (below, "WHEN"). Amended 2026-10-23 (round 1023, ADR 0026): a second pair kind, below
 ("Amendment 2026-10-23"). Amended 2026-11-09 (D75, lab note LR4): the order question is asked on Android too — see "Amendment
-2026-11-09" below.
+2026-11-09" below. Amended 2026-11-11 (A30): the verbs that ask the eyes require them — see "Amendment 2026-11-11"
+below.
 
 ## Context
 
@@ -67,8 +68,9 @@ dismissal picker, `ui_snapshot`, a test) keeps today's untold order:
   (`ui-tree/read-tree.ts#treeFingerprint` and the question's pairs), so a covered element captures ONCE per distinct
   tree, not every round; an answer that unlocks is never kept — that round measures the very frame it was judged on,
   so keeping it saves nothing, and each round's unlock rests on its own frame.
-- Wired at the composition roots with `verify/eyes.ts#eyesOn` (`mcp/tools.ts#guardOpts`, `flow/engine.ts`'s
-  `acting`), as the first question is; interact/ imports no verify/.
+- Wired at the composition roots with `verify/eyes.ts#eyesOn` (`mcp/tools.ts#acting`, `guardOpts` until A30;
+  `flow/engine.ts`'s `acting`), as the first question is; interact/ imports no verify/. Required by the verbs since
+  A30 (the amendment below).
 
 A third trigger (2026-10-22, round 16, LE2's rest): the order is also untold for a control listed AFTER the target, past
 a reading-order break (ADR 0015), that overlaps it and holds its centre — idb lists no scroll view, so a row past its
@@ -238,3 +240,24 @@ screencap. One direction is unmeasured live (ADR 0015's D75 residual): a control
 centre, a `drawn` cover before the mark, is now an untold peer that a screenshot seeing the target on top lifts.
 Measured since (2026-11-11, D84 — ADR 0015's amendment "a sibling listed after the target, of any kind"): the
 lab's views-drawn-over, and a later-listed sibling of any kind is now such a peer; residual 2 widened to non-controls.
+
+## Amendment 2026-11-11: the verbs require the eyes (A30)
+
+The architecture review of 2026-11-11 (card 12) found the eyes optional at every verb that asks them (`eyes?`). Four
+production sites had to remember to call `eyesOn(adapter)`: `mcp/tools.ts`'s tap and type_text options and its
+`scroll_until`, and `flow/engine.ts`'s `acting` and its `scroll_until:` step. A site that forgot still typechecked,
+and it silently lost this ADR: the tap's order stayed untold, and every `fully visible` claim the eyes would have
+checked was said as the tree's ("… a screenshot could not tell (no screenshot was taken)").
+
+Decision: each verb's options REQUIRE the eyes. These are `interact/tap.ts#TapOptions` and
+`interact/fill.ts#FillOptions` (the order question, which a fill's focus tap asks as a tap does) and
+`interact/scroll.ts#ScrollOptions` (both questions). A caller that omits them no longer compiles.
+`tests/architecture/eyes-required.test.ts` pins the three types under `npm run lint`. The composition roots hand them
+in. In `mcp/tools.ts`, the handler's one call, `serve`, returns the eyes with the adapter (ADR 0032, amendment A30).
+`flow/engine.ts` makes them once per run over the adapter it acts through and hands the same eyes to `acting` and to
+`scroll_until:`. The keyboard guard below the verbs (`interact/keyboard-model.ts#GuardOptions`) keeps `eyes`
+optional: only the verbs are entry points, and the guard's own tests ask no order. `scroll_until`'s "no eyes" branch
+is gone, since nothing reaches it. Its wording lives on in the tests' `NO_EYES` (`tests/helpers/eyes.ts`), which a
+test that is not about the eyes hands in. That fake answers `fully` as an absent `eyes` did, and `order` with no pair
+seen. Replies are byte for byte unchanged: production always wired the eyes, and golden shows Changed 0.
+

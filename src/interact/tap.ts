@@ -1,6 +1,7 @@
 import { resolveClearOfKeyboard, type GuardOptions } from './keyboard.js';
 import type { KeyboardAdapter } from './keyboard-model.js';
 import type { Target } from './resolve.js';
+import type { OrderEyes } from '../ui-tree/eyes.js';
 
 /**
  * What a tap on a resolved node needs of the device: the keyboard guard's
@@ -9,6 +10,16 @@ import type { Target } from './resolve.js';
  * named for the caller that is not about the keyboard.
  */
 export type TapAdapter = KeyboardAdapter;
+
+/**
+ * The guard's options with the eyes REQUIRED (A30; ADR 0024, amendment A30): the order question a centre covered by a
+ * control the listing does not order asks (tap-judgement.ts#TapAsks). The composition root wires
+ * verify/eyes.ts#eyesOn (mcp/tools.ts, flow/engine.ts), a test a fake — no caller can forget them and typecheck. The
+ * guard below the verb keeps them optional (GuardOptions.eyes): its own tests ask no order.
+ */
+export interface TapOptions extends GuardOptions {
+  eyes: OrderEyes;
+}
 
 /**
  * The warning on a tap whose node the tree marks disabled (adapters/types.ts#UiNode.disabled) — warned, never refused:
@@ -73,7 +84,7 @@ export type TapMarks = Pick<Tapped, 'note' | 'moved' | 'disabled'>;
  * all the same, and the MCP reply and the flow's trace warn (DISABLED_TAP).
  * docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md
  */
-export async function tapElement(adapter: TapAdapter, target: Target, opts: GuardOptions): Promise<Tapped> {
+export async function tapElement(adapter: TapAdapter, target: Target, opts: TapOptions): Promise<Tapped> {
   const { note, keyboardHidden, point, moved, node } = await resolveClearOfKeyboard(adapter, target, opts);
   await adapter.tap(point.x, point.y);
   return { note, keyboardHidden, moved, disabled: node.disabled };
