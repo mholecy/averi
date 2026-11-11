@@ -1,0 +1,74 @@
+{
+  "cell": "carousel-in-list-cut",
+  "layer": "none",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [
+    {
+      "tag": "C",
+      "id": "lab.carousel-in-list-cut.C",
+      "color": "#D81B60",
+      "declared": "open",
+      "frame": {
+        "x": 44,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "518,497"
+        }
+      ],
+      "drawn": 0.977,
+      "seen": "#D81B60",
+      "geometry": "partly-centre-in",
+      "visible": {
+        "x": 66,
+        "y": 380,
+        "width": 926,
+        "height": 234
+      },
+      "piece": {
+        "x": 66,
+        "y": 380,
+        "width": 926,
+        "height": 234
+      },
+      "scrollView": "carousel",
+      "listed": {
+        "uiautomator": true
+      },
+      "reachedAtPiece": true
+    }
+  ],
+  "safeArea": {
+    "top": 66,
+    "left": 0,
+    "bottom": 66,
+    "right": 0
+  },
+  "scrollViews": {
+    "page": {
+      "x": 0,
+      "y": 0,
+      "width": 1080,
+      "height": 2220
+    },
+    "carousel": {
+      "x": 66,
+      "y": 380,
+      "width": 948,
+      "height": 234
+    }
+  },
+  "navigation": "gesture",
+  "windows": "carousel-in-list-cut.windows.txt",
+  "displays": "carousel-in-list-cut.displays.txt"
+}

@@ -81,6 +81,7 @@ export const edges: KnownFile = {
     [`${ANDROID}/scroll-top-edge.xml`]: 7,
     [`${ANDROID}/scroll-top-edge-end.xml`]: 7,
     [`${ANDROID}/carousel-in-list.xml`]: 9,
+    [`${ANDROID}/carousel-in-list-cut.xml`]: 2,
     [`${ANDROID}/scroll-collapsing.xml`]: 5,
     // T6's L7 carousels (Android only): B and U as carousel-in-list's (R-off's three each), and C — laid out nowhere at
     // launch (CellTruth.absent) — R-absent's R-stroke and R-fully (golden-spec/edges.ts#absentRows): all green, D59b's

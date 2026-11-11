@@ -1,0 +1,45 @@
+{
+  "cell": "carousel-in-list-cut",
+  "ready": true,
+  "screen": {
+    "x": 0,
+    "y": 0,
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "density": 2.75,
+  "frames": {
+    "C": {
+      "x": 44,
+      "y": 380,
+      "width": 948,
+      "height": 234
+    }
+  },
+  "events": [],
+  "safeArea": {
+    "top": 66,
+    "left": 0,
+    "bottom": 66,
+    "right": 0
+  },
+  "scrollViews": {
+    "page": {
+      "x": 0,
+      "y": 0,
+      "width": 1080,
+      "height": 2220
+    },
+    "carousel": {
+      "x": 66,
+      "y": 380,
+      "width": 948,
+      "height": 234
+    }
+  },
+  "offsets": {
+    "page": 825,
+    "carousel": 970
+  }
+}
