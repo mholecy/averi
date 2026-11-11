@@ -25,6 +25,7 @@ const IDB_COVER_UNSEEN = 'residual:ADR 0015 residual 4 — idb lists no bare Rea
 const BANNER_IDB = `${IOS_RN}/rn-banner.idb.json`;
 const BANNER_ANDROID = `${ANDROID_RN}/rn-banner.xml`;
 const ROLE_UNMARKED = 'residual:ADR 0015 residual 5 — a React Native container whose role dumps as android.view.View leaves its run unmarked, so LR4\'s lie survives';
+const ROLE_NOTE = 'a `toolbar`-role slot dumps as android.view.View, the run stays unmarked';
 const BANNER_ROLE = `${ANDROID_RN}/rn-banner-role.xml`;
 
 export const reactNative: KnownFile = {
@@ -35,8 +36,8 @@ export const reactNative: KnownFile = {
       [`${BANNER_IDB} ${t} colour`, { cls: 'passed on #263238', kind: 'PASS' as const, calls: [], note: 'idb: the cover is not listed, or read as the top bar', as: IDB_COVER_UNSEEN }] as const,
     ]),
     ...(['T', 'U', 'C'] as const).flatMap((t) => [
-      [`${BANNER_ROLE} ${t} tap`, { cls: 'Tapped', kind: 'Tapped' as const, calls: [`adb shell input tap 541 ${({ T: 391, U: 886, C: 1381 } as const)[t]}`], note: 'a `toolbar`-role slot dumps as android.view.View, the run stays unmarked — the cover read beneath the target', as: ROLE_UNMARKED }] as const,
-      [`${BANNER_ROLE} ${t} colour`, { cls: 'passed on #263238', kind: 'PASS' as const, calls: [], note: 'a `toolbar`-role slot dumps as android.view.View, the run stays unmarked — the cover measured as the target', as: ROLE_UNMARKED }] as const,
+      [`${BANNER_ROLE} ${t} tap`, { cls: 'Tapped', kind: 'Tapped' as const, calls: [`adb shell input tap 541 ${({ T: 391, U: 886, C: 1381 } as const)[t]}`], note: `${ROLE_NOTE} — the cover read beneath the target`, as: ROLE_UNMARKED }] as const,
+      [`${BANNER_ROLE} ${t} colour`, { cls: 'passed on #263238', kind: 'PASS' as const, calls: [], note: `${ROLE_NOTE} — the cover measured as the target`, as: ROLE_UNMARKED }] as const,
     ]),
   ]),
   counts: {

@@ -48,7 +48,8 @@ The row is `ui-tree/draw-order.ts`'s `flatListReadingOrder`, and only the `targe
    residual): a View whose accessibility role React Native dumps as `android.view.View` (`toolbar`, `alert`, `header`,
    `tablist`, …) reads as a node provider's host, so the uiautomator parser marks nothing under it, and a target with
    its later-drawn cover inside it keeps the location order as draw order — the lab's rn-banner-role (D77, captured
-   live 2026-11-11): every tap `Tapped` at the centre, on the cover, every colour assert passing on the cover.
+   live 2026-11-11): every tap `Tapped` at the centre, on the cover, every colour assert passing on the cover. A false
+   `Tapped`, the unsafe direction; no remedy (not narrowed).
 
 ## Amendment: covers listed before the target (2026-10-19, round 8)
 
@@ -443,6 +444,6 @@ residual, not the mark. Their predictions are pinned against synthetic dumps at 
 only at a generic geometry (draw-order-android-reading-order.test.ts, the review's repro: A `[40,1000][540,1200]`, B
 `[200,1050][900,1150]`), not the cell's. Predicted: views-banner's T, U and C refused, with the eyes or without;
 views-drawn-over's B and B2 refused, A and A2 `Tapped` where the eyes see them on top; rn-banner-role's T, U and C
-`Tapped` at the centre — LR4's lie, that amendment's React Native role residual, expected red. No src change. The
-capture is on the owner's list (backlog D77): until it lands, the generality of the mark still rests on AOSP's source
-and rn-banner.
+`Tapped` at the centre — LR4's lie, that amendment's React Native role residual (residual 5 above), expected red. No src change. Captured
+2026-11-11 (merge c2796759): views-banner and rn-banner-role as predicted; views-drawn-over's B and B2 refused as
+predicted, but A and A2 refused too, not `Tapped` (backlog D84).
