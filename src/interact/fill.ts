@@ -11,7 +11,8 @@ import { readTreeOrMiss, screenIdentity } from '../ui-tree/read-tree.js';
 import { soleIdOf } from '../ui-tree/selectors.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
-import { resolveClearOfKeyboard, type GuardOptions } from './keyboard.js';
+import { resolveClearOfKeyboard } from './keyboard.js';
+import type { TapOptions } from './tap.js';
 import { describeTarget, type Target } from './resolve.js';
 import { assertTypeable } from './type-text.js';
 import { fillFailureText, focusTapNote } from './fill-text.js';
@@ -34,8 +35,11 @@ export const DEFAULT_FOCUS_DELAY_MS = 350;
  */
 export const DEFAULT_VALUE_POLL_MS = 400;
 
-/** The guard's options (the focus tap goes through resolveClearOfKeyboard, dismissals included) plus the fill's own. */
-export interface FillOptions extends GuardOptions {
+/**
+ * A tap's options (the focus tap goes through resolveClearOfKeyboard, dismissals and eyes included) plus the fill's
+ * own: the focus tap asks the order question as a tap does.
+ */
+export interface FillOptions extends TapOptions {
   /** Delete the field's current content before typing — typing otherwise APPENDS. */
   clear?: boolean;
   /**

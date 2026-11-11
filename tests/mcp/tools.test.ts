@@ -1199,14 +1199,6 @@ describe('every tool gets the project\'s adapter — one per simulator and confi
     { tool: 'get_logs', label: 'get_logs', args: {} },
   ];
 
-  it.each(DEVICE_CALLS)('ios $label in a treeSource: wda project is served by the wda adapter', async ({ tool, args }) => {
-    const harness = await connect();
-    const configPath = await file('averi.yaml', WDA_PROJECT);
-    const result = await harness.call(tool, { platform: 'ios', configPath, ...args });
-    expect(result.isError).toBe(false);
-    expect(harness.bound()).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'wda' }]);
-  });
-
   it('ios: all eight and a tree tool in one wda project share ONE adapter, built once', async () => {
     const harness = await connect();
     const configPath = await file('averi.yaml', WDA_PROJECT);
@@ -1214,6 +1206,51 @@ describe('every tool gets the project\'s adapter — one per simulator and confi
       expect((await harness.call(tool, { platform: 'ios', configPath, ...args })).isError, label).toBe(false);
     }
     expect((await harness.call('ui_snapshot', { platform: 'ios', configPath })).isError).toBe(false);
+    expect(harness.bound()).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'wda' }]);
+  });
+
+  /**
+   * EVERY tool that resolves a device — the policy table's tools, which tests below pin to be exactly the ones whose
+   * schema takes a `configPath` — keyed by the table, so a tool added to it fails to typecheck here until it has a
+   * call. Each is called in one wda project; the registry must have bound ONE adapter, of the project's kind, and
+   * nothing else. Since A30 this is the D41 invariant's guard, by behaviour: a handler that resolves its device with
+   * the WRONG kind — a `registry.get` with another kind, an aliased registry, a lazy resolver handed the wrong config
+   * — binds an idb adapter here. A second get of the SAME kind is the registry's cached adapter and is not seen: it is
+   * also not a D41 violation. One call per tool takes one branch of it: `swipe` is called twice, by direction (it
+   * reads the tree) and by coordinates (D41's eighth tool); the other branches (tap and type_text with or without a
+   * selector, install_app without a path) resolve through the same call. (Until A30 a textual tripwire,
+   * tests/mcp/registry-gets.test.ts, counted `registry.get(` in src/; ADR 0032, amendment A30.) Folds in D41's
+   * per-tool test of its eight tools.
+   */
+  const EVERY_DEVICE_CALL: Record<keyof typeof TOOL_CONFIG, Record<string, unknown>> = {
+    install_app: { platform: 'ios', path: '/builds/Bank.app' },
+    launch_app: { platform: 'ios', appId: 'md.bank.app' },
+    terminate_app: { platform: 'ios', appId: 'md.bank.app' },
+    open_deep_link: { platform: 'ios', url: 'bank://home' },
+    screenshot: { platform: 'ios' },
+    ui_snapshot: { platform: 'ios' },
+    tap: { platform: 'ios', selector: 'id:home_root' },
+    type_text: { platform: 'ios', text: 'a' },
+    scroll_until: { platform: 'ios', selector: 'id:home_root' },
+    swipe: { platform: 'ios', direction: 'up' },
+    press_key: { platform: 'ios', key: 'home' },
+    get_logs: { platform: 'ios' },
+    assert: { platform: 'ios', asserts: [{ element: { id: 'home_root' } }] },
+    ensure_state: { platform: 'ios', state: 'home' },
+    run_flow: { platform: 'ios', flow: 'touch_home' },
+    verify: { platforms: ['ios'], state: 'home' },
+  };
+
+  const EVERY_CASE: [label: string, tool: string, args: Record<string, unknown>][] = [
+    ...Object.entries(EVERY_DEVICE_CALL).map(([tool, args]): [string, string, Record<string, unknown>] => [tool, tool, args]),
+    ['swipe (coordinates)', 'swipe', { platform: 'ios', fromX: 1, fromY: 2, toX: 3, toY: 4 }],
+  ];
+
+  it.each(EVERY_CASE)('ios %s in a treeSource: wda project binds the wda adapter alone', async (_label, tool, args) => {
+    const harness = await connect();
+    const configPath = await file('averi.yaml', VALID_CONFIG.replace('ios:     { bundleId: md.bank.app }', 'ios:     { bundleId: md.bank.app, treeSource: wda }'));
+    const result = await harness.call(tool, { configPath, ...args });
+    expect(result.isError, result.text).toBe(false);
     expect(harness.bound()).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'wda' }]);
   });
 

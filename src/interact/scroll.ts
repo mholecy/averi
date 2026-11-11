@@ -1,5 +1,5 @@
 import type { DeviceAdapter, Stroke } from '../adapters/types.js';
-import { pairsSeenBy, unseen, type Eyes } from '../ui-tree/eyes.js';
+import { pairsSeenBy, type Eyes } from '../ui-tree/eyes.js';
 import { readTreeOrMiss } from '../ui-tree/read-tree.js';
 import { CallWindow } from '../ui-tree/window-mark.js';
 import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
@@ -33,11 +33,13 @@ export interface ScrollOptions {
    */
   settleMs?: number;
   /**
-   * The eyes a `fully visible` claim is confirmed with (ui-tree/eyes.ts; verify/eyes.ts#eyesOn, which the composition
-   * root hands in — mcp/tools.ts, flow/engine.ts). Absent: a claim the eyes would be asked of is said as the tree's,
-   * unchecked ("fully visible by the tree … a screenshot could not tell (no screenshot was taken)").
+   * The eyes a `fully visible` claim is confirmed with, and the order question asked of two controls listed in reading
+   * order (ui-tree/eyes.ts; verify/eyes.ts#eyesOn, which the composition roots hand in — mcp/tools.ts,
+   * flow/engine.ts). REQUIRED (A30; ADR 0024, amendment A30): until then absent was allowed, and a caller that forgot
+   * them typechecked and said every such claim as the tree's, unchecked ("… a screenshot could not tell (no screenshot
+   * was taken)"). A test hands a fake (tests/helpers/eyes.ts).
    */
-  eyes?: Eyes;
+  eyes: Eyes;
   /**
    * The scroll view to stroke until the target is first read (D78; interact/within.ts): a selector of it or of an
    * element inside it — a selector string, or an element spec (a flow's, D81) — (the scroll view of its exact rect,
@@ -288,7 +290,7 @@ export type ScrollAdapter = Pick<
 export async function scrollUntilVisible(
   adapter: ScrollAdapter,
   target: Target,
-  opts: ScrollOptions = {},
+  opts: ScrollOptions,
 ): Promise<ScrollUntilResult> {
   // A `within` selector that does not parse is the caller's mistake, said before any device read (D78).
   if (opts.within !== undefined) checkWithin(opts.within);
@@ -383,7 +385,7 @@ export async function scrollUntilVisible(
     let next = round(state, { ...seen, elapsedMs: Date.now() - started });
     while (next.step.do === 'ask') {
       if (next.step.what === 'witness') seen.corroborated = reading !== undefined && (await reading.corroborated());
-      else if (next.step.what === 'eyes') seen.eyes = opts.eyes === undefined ? unseen(next.step.question, 'no screenshot was taken') : await opts.eyes.fully(next.step.question);
+      else if (next.step.what === 'eyes') seen.eyes = await opts.eyes.fully(next.step.question);
       else if (next.step.what === 'order') seen.order = await pairsSeenBy(opts.eyes, next.step.question);
       else seen.unlocated = reading !== undefined && (await reading.unlocated());
       next = round(state, { ...seen, elapsedMs: Date.now() - started });

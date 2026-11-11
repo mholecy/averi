@@ -4,6 +4,7 @@ import { parseTouchableRegion } from '../../src/adapters/android-wm.js';
 import { describeScrollResult, scrollUntilVisible } from '../../src/interact/scroll.js';
 import { GBOARD, GBOARD_PANEL, GBOARD_STRIP } from '../helpers/android-dumps.js';
 import { FakeAdapter, node, resetLayout } from '../helpers/fake.js';
+import { NO_EYES } from '../helpers/eyes.js';
 
 /**
  * `scroll_until` under a FLOATING Gboard (device check 2026-10-08,
@@ -17,7 +18,7 @@ import { FakeAdapter, node, resetLayout } from '../helpers/fake.js';
  * same shape as that block's `formFake`.
  */
 
-const FAST = { maxSwipes: 4, timeoutMs: 2_000, settleMs: 1 };
+const FAST = { eyes: NO_EYES, maxSwipes: 4, timeoutMs: 2_000, settleMs: 1 };
 const DOCKED: Rect = { x: 0, y: 1398, width: 1080, height: 822 };
 const touchableOf = (out: string): KeyboardTouchable => ({ witness: 'shown', region: parseTouchableRegion(out) });
 

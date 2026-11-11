@@ -13,6 +13,7 @@ import { scrollUntilVisible } from '../../src/interact/scroll.js';
 import { resolveSettled } from '../../src/interact/resolve.js';
 import { FakeAdapter } from '../helpers/fake.js';
 import { resetSleeps } from '../helpers/sleep-recorder.js';
+import { NO_EYES } from '../helpers/eyes.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on (tests/helpers/sleep-recorder.ts): the scroll and fill
 // plays below cost no wall clock (T1).
@@ -22,7 +23,7 @@ beforeEach(() => {
 });
 
 /** A fill's options in these tests: the settle's and the value poll's cadence short, the fill's own rules as they are. */
-const FILL = { ambiguous: 'first' as const, timeoutMs: 200, pollMs: 2 };
+const FILL = { ambiguous: 'first' as const, timeoutMs: 200, pollMs: 2, eyes: NO_EYES };
 
 /**
  * One Android field (`id:f`) behind fillField, every tree read a fresh parse of its dump (the parser is the seam: base
@@ -292,7 +293,7 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
 
   it('…and `scroll_until id:row_0 fully` turns at once (the label selector\'s measured stroke, content down) instead of "fully visible after 0 swipes"', async () => {
     const fake = new FakeAdapter({ list: tree }, 'list');
-    const outcome = await scrollUntilVisible(fake, 'id:transactions.list.row_0', { fully: true, maxSwipes: 1, timeoutMs: 2_000, settleMs: 1 }).catch((e: unknown) => e);
+    const outcome = await scrollUntilVisible(fake, 'id:transactions.list.row_0', { eyes: NO_EYES, fully: true, maxSwipes: 1, timeoutMs: 2_000, settleMs: 1 }).catch((e: unknown) => e);
     expect(outcome).toBeInstanceOf(Error);
     expect(fake.swipes).toHaveLength(1);
     expect(fake.swipes[0].to.y).toBeGreaterThan(fake.swipes[0].from.y);
@@ -300,12 +301,12 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
 
   it('a tap on the widened row aims at the part clear of the header (66 px), and is refused when what shows is under the minimum tap piece (a 30-px strip) — before, it tapped the strip that showed', async () => {
     const fake = new FakeAdapter({ list: tree }, 'list');
-    await tapElement(fake, 'id:transactions.list.row_0', { ambiguous: 'refuse', timeoutMs: 200, pollMs: 2 });
+    await tapElement(fake, 'id:transactions.list.row_0', { eyes: NO_EYES, ambiguous: 'refuse', timeoutMs: 200, pollMs: 2 });
     expect(fake.taps).toHaveLength(1);
     const thin = parseDump(ACCOUNT_DETAIL.replace('bounds="[66,480][1014,546]"', 'bounds="[66,516][1014,546]"').replace('[0,401][1080,480]', '[0,401][1080,516]'));
     expect(byIdIn(thin, 'transactions.list.row_0').rect).toEqual({ x: 66, y: 403, width: 948, height: 143 });
     const refused = new FakeAdapter({ list: thin }, 'list');
-    const error = await tapElement(refused, 'id:transactions.list.row_0', { ambiguous: 'refuse', timeoutMs: 200, pollMs: 2 }).catch((e: unknown) => e);
+    const error = await tapElement(refused, 'id:transactions.list.row_0', { eyes: NO_EYES, ambiguous: 'refuse', timeoutMs: 200, pollMs: 2 }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toContain('date_header_0');
     expect(refused.taps).toEqual([]);

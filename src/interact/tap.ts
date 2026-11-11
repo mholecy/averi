@@ -11,6 +11,14 @@ import type { Target } from './resolve.js';
 export type TapAdapter = KeyboardAdapter;
 
 /**
+ * What a tap takes: the keyboard guard's options (keyboard-model.ts#GuardOptions), eyes REQUIRED (A30; ADR 0024,
+ * amendment A30) — the order question a centre covered by a control the listing does not order asks
+ * (tap-judgement.ts#TapAsks). The composition roots wire verify/eyes.ts#eyesOn (mcp/tools.ts, flow/engine.ts), a test
+ * a fake: no caller can forget them and typecheck.
+ */
+export type TapOptions = GuardOptions;
+
+/**
  * The warning on a tap whose node the tree marks disabled (adapters/types.ts#UiNode.disabled) — warned, never refused:
  * the MCP reply's ⚠ line (mcp/tool-text.ts#tapText) and the flow's `⚠ tap` line (flow/engine.ts#tapSpec), in the same
  * words. docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md
@@ -73,7 +81,7 @@ export type TapMarks = Pick<Tapped, 'note' | 'moved' | 'disabled'>;
  * all the same, and the MCP reply and the flow's trace warn (DISABLED_TAP).
  * docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md
  */
-export async function tapElement(adapter: TapAdapter, target: Target, opts: GuardOptions): Promise<Tapped> {
+export async function tapElement(adapter: TapAdapter, target: Target, opts: TapOptions): Promise<Tapped> {
   const { note, keyboardHidden, point, moved, node } = await resolveClearOfKeyboard(adapter, target, opts);
   await adapter.tap(point.x, point.y);
   return { note, keyboardHidden, moved, disabled: node.disabled };

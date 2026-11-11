@@ -155,9 +155,10 @@ export interface GuardOptions extends SettleOptions {
   /**
    * The eyes' order question (ui-tree/eyes.ts#Eyes.order; verify/eyes.ts#eyesOn, wired at the composition root —
    * mcp/tools.ts, flow/engine.ts): asked once by the tap's judgement of a centre covered by a control the listing does
-   * not order (tap-judgement.ts#TapAsks). Absent: that order stays untold.
+   * not order (tap-judgement.ts#TapAsks). REQUIRED (A30; ADR 0024, amendment A30): a caller that forgot them would
+   * typecheck and leave that order untold. A test hands a fake (tests/helpers/eyes.ts#NO_EYES) or its own table.
    */
-  eyes?: OrderEyes;
+  eyes: OrderEyes;
 }
 
 /** What `dismissKeyboard` takes of the guard's options: the dismissals it may tap and the ambiguity policy they are judged under — no default policy is written here. The settle options are not among them: it resolves nothing. */

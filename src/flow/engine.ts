@@ -8,8 +8,8 @@ import { describeScrollResult, scrollUntilVisible, stopHedges } from '../interac
 import { WithinRefusedError } from '../interact/within.js';
 import { eyesOn } from '../verify/eyes.js';
 import { swipeScreen } from '../interact/swipe.js';
-import { dismissKeyboard, KeyboardGuardError, type DismissResult, type GuardOptions } from '../interact/keyboard.js';
-import { DISABLED_TAP, tapElement } from '../interact/tap.js';
+import { dismissKeyboard, KeyboardGuardError, type DismissResult } from '../interact/keyboard.js';
+import { DISABLED_TAP, tapElement, type TapOptions } from '../interact/tap.js';
 import { describeElementSpec, selectorOnly, type ElementSpec } from '../ui-tree/element-spec.js';
 import {
   pollOnVerdict,
@@ -20,6 +20,7 @@ import {
   type FirstSample,
 } from '../ui-tree/read-tree.js';
 import { ReadHandOff } from '../ui-tree/read-handoff.js';
+import type { Eyes } from '../ui-tree/eyes.js';
 import { markedForMiss } from '../ui-tree/window-mark.js';
 import { BARE_TREE_CONTENTS, treeShape } from '../ui-tree/bare-tree.js';
 import { missCarried, MissedError, missNote, missOf, withMissNote, type Miss } from '../ui-tree/miss.js';
@@ -314,7 +315,7 @@ type StepPayload<K extends string> = Extract<Step, Record<K, unknown>>[K];
  * are written against a known app by someone who can see its tree, and a
  * step that must not guess can say `role:` — whereas an agent exploring
  * through the MCP tools cannot, so those refuse (interact/resolve.ts,
- * Ambiguity — mcp/tools.ts#guardOpts). Stated once, in the engine's
+ * Ambiguity — mcp/tools.ts#acting). Stated once, in the engine's
  * `acting`, which every site that acts on an element is handed.
  */
 const FLOW_AMBIGUITY: Ambiguity = 'first';
@@ -515,11 +516,18 @@ export class FlowEngine {
    * `ambiguous` and `dismissals`. The engine never branches on the platform for the
    * dismissals: interact/ reads the list only where the adapter has no
    * keyboard oracle, so on Android it is carried and never read. And the
-   * eyes' order question (verify/eyes.ts#eyesOn, ADR 0024), which a tap's
+   * eyes' order question (`eyes`, ADR 0024), which a tap's
    * judgement asks only of a centre covered by a control the listing does
-   * not order — wired here: interact/ may not import verify/.
+   * not order.
    */
-  private readonly acting: Omit<GuardOptions, 'timeoutMs'>;
+  private readonly acting: Omit<TapOptions, 'timeoutMs'>;
+  /**
+   * The eyes (verify/eyes.ts#eyesOn over the adapter the run acts through), made once per run and handed to every
+   * verb that asks them — `acting`'s order question and a `scroll_until:` step's — wired here: interact/ may not
+   * import verify/. The verbs REQUIRE them (A30; ADR 0024, amendment A30), so a site that forgot them would not
+   * typecheck.
+   */
+  private readonly eyes: Eyes;
   /**
    * The run's hand-off of its last read (ui-tree/read-handoff.ts, ADR 0030). PRODUCERS here: the detect probe, a
    * `wait:` step, an `assert:` step (its Verifier shares this hand-off). TAKERS, each only as the hand-off's rules
@@ -556,13 +564,14 @@ export class FlowEngine {
     this.wipes = new WipesAhead(cfg);
     this.assertTimeoutMs = opts.assertTimeoutMs;
     this.pinKeyDelayMs = opts.pinKeyDelayMs ?? 300;
+    this.eyes = eyesOn(this.adapter);
     this.acting = {
       ambiguous: FLOW_AMBIGUITY,
       // Only a pinned pollMs (tests) is the settle's: otherwise a tap's and a fill's settle runs at the adapter's
       // measured cadence (interact/resolve.ts#settleCadence, ADR 0040), and the presence probe at its own 500.
       ...(opts.pollMs !== undefined && { pollMs: opts.pollMs }),
       dismissals: keyboardDismissals(cfg),
-      eyes: eyesOn(this.adapter),
+      eyes: this.eyes,
     };
     this.session = opts.session;
   }
@@ -1371,8 +1380,8 @@ export class FlowEngine {
       ...rest,
       // A flow names a scroll view by element spec, never by rect (D81): a failure's way into one asks for a spec.
       remedy: 'spec',
-      // The eyes a `fully visible` claim is confirmed with (ui-tree/eyes.ts), wired here: interact/ may not import verify/.
-      eyes: eyesOn(this.adapter),
+      // The eyes a `fully visible` claim is confirmed with (ui-tree/eyes.ts): the run's own.
+      eyes: this.eyes,
       timeoutMs: timeout === undefined ? undefined : parseDuration(timeout),
     });
     // ⚠ for a clipped stop, and (2026-10-08) for one the `unlocated`

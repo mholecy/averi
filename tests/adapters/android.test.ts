@@ -12,6 +12,7 @@ import { GBOARD, GBOARD_PANEL, GBOARD_STRIP, INPUT_SHOWN_LINE, UIAUTOMATOR_XML, 
 import { type DeviceAdapter } from '../../src/adapters/types.js';
 import { decodePng } from '../../src/verify/png.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
+import { NO_EYES } from '../helpers/eyes.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on (tests/helpers/sleep-recorder.ts): the adapter's
 // pacing, its settles and the null-root retry are pinned as the delay sequence, and cost no wall clock (T1).
@@ -250,7 +251,7 @@ describe('AndroidAdapter interactions', () => {
 
   it('tapElement resolves a selector and taps the rect center', async () => {
     const { fn, calls } = fakeExec({ 'adb -s emulator-5554 exec-out uiautomator': UIAUTOMATOR_XML });
-    await tapElement(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }), 'id:pin_key_2', { ambiguous: 'refuse' });
+    await tapElement(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }), 'id:pin_key_2', { eyes: NO_EYES, ambiguous: 'refuse' });
     expect(calls.at(-1)).toBe('adb -s emulator-5554 shell input tap 540 1350');
   });
 

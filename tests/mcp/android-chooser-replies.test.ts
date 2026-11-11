@@ -11,6 +11,7 @@ import { tapElement } from '../../src/interact/tap.js';
 import { drawnOverStrip } from '../helpers/android-dumps.js';
 import { resetSleeps } from '../helpers/sleep-recorder.js';
 import { execErrorLikeExec } from '../helpers/exec-error.js';
+import { NO_EYES } from '../helpers/eyes.js';
 
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 
@@ -311,14 +312,14 @@ describe("tap's reply on Android's chooser (D66): warned on a disabled button, n
     ['text:"Always"', 'input tap 936 2058'],
   ])('%s: tapped at its centre, and the ⚠ line follows the Tapped line', async (selector, sent) => {
     const { adapter, taps } = await chooserTree();
-    const tapped = await tapElement(adapter, selector, { ambiguous: 'refuse', timeoutMs: 200, pollMs: 2 });
+    const tapped = await tapElement(adapter, selector, { eyes: NO_EYES, ambiguous: 'refuse', timeoutMs: 200, pollMs: 2 });
     expect(taps).toEqual([sent]);
     expect(tapText(selector, tapped)).toBe(`Tapped ${selector}\n${WARN}`);
   });
 
   it('a row\'s app name (enabled): the reply is the one Tapped line, byte for byte as before D66', async () => {
     const { adapter, taps } = await chooserTree();
-    const tapped = await tapElement(adapter, 'text:"AveriLab twin"', { ambiguous: 'refuse', timeoutMs: 200, pollMs: 2 });
+    const tapped = await tapElement(adapter, 'text:"AveriLab twin"', { eyes: NO_EYES, ambiguous: 'refuse', timeoutMs: 200, pollMs: 2 });
     expect(taps).toHaveLength(1);
     expect(tapText('text:"AveriLab twin"', tapped)).toBe('Tapped text:"AveriLab twin"');
   });

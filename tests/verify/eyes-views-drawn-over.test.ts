@@ -12,6 +12,7 @@ import { byId, tagged } from '../helpers/covers.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { FakeAdapter } from '../helpers/fake.js';
 import { paint, usableOf, type Rgb } from '../helpers/pixels.js';
+import { NO_EYES } from '../helpers/eyes.js';
 
 /**
  * A nested run's sibling listed AFTER the target that draws over it is an untold peer of any kind
@@ -96,7 +97,7 @@ describe('D84: A and A2, drawn over the later-listed B and B2 — refused unseen
 
 describe('D84 through scroll_until on the capture: A stops where it stands', () => {
   const A = `id:"${cell('A')}"`;
-  const FAST = { maxSwipes: 4, timeoutMs: 2_000, settleMs: 1 };
+  const FAST = { eyes: NO_EYES, maxSwipes: 4, timeoutMs: 2_000, settleMs: 1 };
   const fake = async (): Promise<FakeAdapter> => {
     const f = new FakeAdapter({ s: await dump() }, 's');
     f.viewportSize = { width: 1080, height: 2220 };
