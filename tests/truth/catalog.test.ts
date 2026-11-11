@@ -245,13 +245,6 @@ describe('T6d: carousel-in-list-cut — carousel-in-list\'s C drawn cut by its c
     expect(captureRefusal(cut, 'ios', undefined)).toBe('built for android only');
     expect(captureRefusal(cut, 'android', 'gesture')).toBeUndefined();
   });
-
-  it('the Android lab app builds it: Edges.kt routes the id to carousel-in-list\'s page with the cut', async () => {
-    const kt = await readFile(new URL('../../fixtures/apps/android/src/main/java/dev/averi/lab/Edges.kt', import.meta.url), 'utf8');
-    expect(kt).toContain('cell.id == "carousel-in-list-cut"');
-    expect(kt).toContain('CarouselInList(cell, lab, maxWidth, maxHeight, cut = CarouselLayout.CUT)');
-    expect(kt).toContain('val CUT = 8.dp');
-  });
 });
 
 describe('captureRefusal: a cell captured only where it is built, and on Android under its navigation mode', () => {

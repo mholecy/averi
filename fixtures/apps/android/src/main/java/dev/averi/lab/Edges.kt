@@ -322,11 +322,12 @@ private object CarouselLayout {
     /** The cards in carousel order: a filler, C, a filler. */
     const val CARDS = 3
     /**
-     * carousel-in-list-cut's cut (backlog T6d): how far past C's start the carousel is scrolled on appear, so C is drawn
-     * cut this much at the clip's LEFT edge — on averi_lab 22 px: the carousel at 948 + 22 = 970 px, C at 44–992 px in
-     * the clip 66–1014 (tests/interact/scroll-carousel-unfit-cell.test.ts). Under 24 dp (66 px) on purpose, so both of
-     * C's sides lie on the screen (no side unknown: uiautomator cuts a node at the screen's edge, D17) and C, a
-     * clickable node, is listed whole (its bounds run on up to 24 dp past a clipping container: SPLIT_CELLS' note).
+     * carousel-in-list-cut's cut (backlog T6d): how far past C's start the carousel is scrolled on appear, so C is
+     * drawn cut this much at the clip's LEFT edge — on averi_lab 22 px: the carousel at 948 + 22 = 970 px, C at
+     * 44–992 px in the clip 66–1014 (tests/interact/scroll-carousel-unfit-cell.test.ts). At most 24 dp (66 px) on
+     * purpose, so both of C's sides lie on the screen (no side unknown: uiautomator cuts a node at the screen's edge,
+     * D17) and C, a clickable node, is listed whole (its bounds run on up to 24 dp past a clipping container:
+     * SPLIT_CELLS' note).
      */
     val CUT = 8.dp
 }

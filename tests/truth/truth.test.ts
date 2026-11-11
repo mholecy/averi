@@ -7,7 +7,6 @@ import type { RunManifest } from '../../scripts/differential/corpus.js';
 import { capture } from '../../scripts/truth/capture-run.js';
 import type { LabDevice, RawTree } from '../../scripts/truth/lab-device.js';
 import { SCROLL_TYPES } from '../../src/adapters/wda-source.js';
-import { AXIS_BY_CLASS } from '../../src/adapters/android.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, LabState, ProbeEvent, Rect, TargetTruth } from '../../scripts/truth/schema.js';
 import {
   axisOf,
@@ -27,7 +26,6 @@ import {
   readTargetProbe,
   scrollerListedIn,
   scrollAxisToldIn,
-  ANDROID_AXIS_BY_CLASS,
   selectorOf,
   WDA_SCROLLERS,
   situationOf,
@@ -136,9 +134,6 @@ describe('scrollAxisToldIn — the axis a raw tree tells of the scroller at a cl
     expect(scrollAxisToldIn(at('android.widget.HorizontalScrollView', 'true', '[66,380][1014,616]'), 'uiautomator', clip)).toBeUndefined();
     expect(scrollAxisToldIn(at('android.widget.HorizontalScrollView', 'true', '[67,381][1015,615]'), 'uiautomator', clip)).toBe('horizontal');
     expect(scrollAxisToldIn(JSON.stringify({ value: { type: 'Table', rect: clip } }), 'wda', clip)).toBeUndefined();
-  });
-  it("the classes are averi's own (src/adapters/android.ts#AXIS_BY_CLASS), copied: the two held equal", () => {
-    expect(ANDROID_AXIS_BY_CLASS).toEqual(AXIS_BY_CLASS);
   });
 });
 

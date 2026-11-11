@@ -7,11 +7,11 @@ import { parseDump } from '../helpers/android-dumps.js';
 import { failureOf, play, type Row } from '../helpers/rounds.js';
 
 /**
- * Backlog T6d: the PREDICTION for the lab cell `carousel-in-list-cut` (fixtures/apps/cells/edges.json, Edges.kt), pinned
- * before its capture (the owner's): carousel-in-list's page and told-axis carousel (a Compose `horizontalScroll`,
- * dumped `android.widget.HorizontalScrollView`), scrolled on appear one card and CUT_DP further, so C — as wide as the
- * carousel's clip — is drawn cut CUT_DP at the clip's LEFT edge, both its sides on the screen. D52's `unfit`
- * (ADR 0021): `fully: true` on C holds at one exact offset only, and the first read knows it.
+ * Backlog T6d: the PREDICTION for the lab cell `carousel-in-list-cut` (fixtures/apps/cells/edges.json, Edges.kt),
+ * pinned before its capture (the owner's): carousel-in-list's page and told-axis carousel (a Compose
+ * `horizontalScroll`, dumped `android.widget.HorizontalScrollView`), scrolled on appear one card and CUT_DP further,
+ * so C — as wide as the carousel's clip — is drawn cut CUT_DP at the clip's LEFT edge, both its sides on the screen.
+ * D52's `unfit` (ADR 0021): `fully: true` on C holds at one exact offset only, and the first read knows it.
  *
  * The geometry from the layout arithmetic on averi_lab (1080x2220, density 2.75), at carousel-in-list's measured clip
  * (tests/fixtures/truth/android-averi_lab-api33/carousel-in-list.state.json: `carousel` 66,380 948x234; C 948 wide):
@@ -22,6 +22,13 @@ import { failureOf, play, type Row } from '../helpers/rounds.js';
  * capture that disagrees is a finding, not a reason to edit these pins.
  */
 
+/** Edges.kt's CarouselLayout.CUT, in dp: the app's own number, so a change there turns the pins below red. */
+const CUT_DP = ((): number => {
+  const kt = readFileSync(new URL('../../fixtures/apps/android/src/main/java/dev/averi/lab/Edges.kt', import.meta.url), 'utf8');
+  const m = /\bval CUT = (\d+)\.dp\b/.exec(kt);
+  if (m === null) throw new Error('Edges.kt declares no `val CUT = <n>.dp`');
+  return Number(m[1]);
+})();
 const XML = readFileSync(new URL('../fixtures/truth/android-averi_lab-api33/carousel-in-list.xml', import.meta.url), 'utf8');
 const C_ID = 'lab.carousel-in-list-cut.C';
 const SCREEN: Rect = { x: 0, y: 0, width: 1080, height: 2220 };
@@ -49,10 +56,15 @@ const FULLY_LEFT: RoundRules & { screen: { width: number; height: number } } = {
 };
 
 describe('carousel-in-list-cut (T6d): C drawn cut at the carousel\'s left clip on appear', () => {
-  it('the layout arithmetic: 8 dp = 22 px; offset 970 px; C at 44–992 in the clip 66–1014', () => {
-    expect(Math.round(8 * 2.75)).toBe(22);
-    expect(CAROUSEL.x + CAROUSEL.width - (948 + 22)).toBe(C.x);
+  it("the layout arithmetic from Edges.kt's CUT: 8 dp = 22 px; offset 970 px; C at 44–992 in the clip 66–1014", () => {
+    expect(CUT_DP).toBe(8);
+    const cutPx = Math.round(CUT_DP * 2.75);
+    expect(cutPx).toBe(22);
+    expect(CAROUSEL.x + CAROUSEL.width - (948 + cutPx)).toBe(C.x);
     expect(C.x + C.width).toBe(992);
+    // At most 24 dp (66 px, the clip's inset and a clickable node's run past its clip): both sides on the screen,
+    // listed whole.
+    expect(cutPx).toBeLessThanOrEqual(CAROUSEL.x);
   });
 
   it('the truth will measure it partly-centre-in, 926 of its 948 px showing — cut by its scroll view, not the screen', () => {

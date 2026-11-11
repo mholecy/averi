@@ -1,9 +1,9 @@
 import type { Platform, SourceKind } from '../corpus.js';
 import type { AbsentTarget, CellTruth, TargetTruth } from '../../truth/schema.js';
-import { directionOf, scrollAxisToldIn, scrollerListedIn } from '../../truth/truth.js';
+import { directionOf, elementOf, nodeFramesIn, scrollAxisToldIn, scrollerListedIn } from '../../truth/truth.js';
 import { classed, type Expectation } from './judges.js';
 import { ABSENT_STOPS, askedUnlistedBy, unlistedBy, type TargetContract } from '../../truth/target-contract.js';
-import { absentFullyRow, colourFails, directionRow, fullyRow, scrollAxisOf, stopRow, strokeRow, tapRow, unfitRow, unfitSide } from './rows.js';
+import { absentFullyRow, colourFails, directionRow, fullyRow, stopRow, strokeRow, tapRow, unfitRow, unfitSide } from './rows.js';
 
 /**
  * The edge geometries' rows — a geometry group, named for the edges family (fixtures/apps/cells/edges.json, phase 3 B2)
@@ -71,15 +71,13 @@ export function edgeRows(platform: Platform, t: TargetTruth, cell: CellTruth, so
 }
 
 /**
- * The side R-unfit asks `fully: true` toward (rows.ts#unfitSide), where the replayed tree tells the target's scroll view's
- * axis as the one it is cut along (truth.ts#scrollAxisToldIn) — undefined otherwise, and with no tree: no cross-axis
- * `unfit`, and none of D59's inferred axis, which needs a stroke that moved the card, never seen in a replayed tree.
+ * The side R-unfit asks `fully: true` toward (rows.ts#unfitSide), read from the replayed tree `tree`: the axis it
+ * tells of each scroll view (truth.ts#scrollAxisToldIn) and where it lists the target (truth.ts#nodeFramesIn).
+ * Undefined with no tree.
  */
 function toldUnfitSide(t: TargetTruth, cell: CellTruth, source: SourceKind, tree: string | undefined) {
-  const side = unfitSide(t, cell);
-  const clip = t.scrollView === undefined ? undefined : cell.scrollViews?.[t.scrollView];
-  if (side === undefined || clip === undefined || tree === undefined) return undefined;
-  return scrollAxisToldIn(tree, source, clip) === scrollAxisOf(side) ? side : undefined;
+  if (tree === undefined) return undefined;
+  return unfitSide(t, cell, { told: (clip) => scrollAxisToldIn(tree, source, clip), listed: nodeFramesIn(tree, source, elementOf(t)) });
 }
 
 /**

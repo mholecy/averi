@@ -1,5 +1,5 @@
-import { parseInputShown, parseTouchableRegion } from '../../src/adapters/android.js';
-import { sameRect } from '../../src/adapters/types.js';
+import { AXIS_BY_CLASS, parseInputShown, parseTouchableRegion } from '../../src/adapters/android.js';
+import { sameRect, type ScrollAxis } from '../../src/adapters/types.js';
 import type { Platform, SourceKind } from '../differential/corpus.js';
 import { DRAWN, pct, type CatalogField, type CatalogForm, type CellTruth, type Direction, type ControlTruth, type Geometry, type Insets, type LabState, type NavigationMode, type ProbeEvent, type Rect, type Situation, type TargetTruth } from './schema.js';
 
@@ -182,36 +182,21 @@ export function scrollerListedIn(payload: string, source: SourceKind, clip: Rect
 }
 
 /**
- * The Android classes whose type fixes the one axis they scroll on. A deliberate copy of
- * src/adapters/android.ts#AXIS_BY_CLASS (the harness reads the raw tree without averi's code); tests/truth/truth.test.ts
- * holds the two equal.
- */
-export const ANDROID_AXIS_BY_CLASS: Readonly<Record<string, 'horizontal' | 'vertical'>> = {
-  ScrollView: 'vertical',
-  NestedScrollView: 'vertical',
-  ListView: 'vertical',
-  GridView: 'vertical',
-  HorizontalScrollView: 'horizontal',
-  ViewPager: 'horizontal',
-};
-
-/**
  * The axis a raw tree's payload TELLS of the scroller whose frame is `clip` (within a pixel, each edge), or undefined
- * when it tells none: a uiautomator node marked `scrollable="true"` whose class fixes its axis (ANDROID_AXIS_BY_CLASS:
- * a Compose `horizontalScroll` dumps as `android.widget.HorizontalScrollView`, a LazyRow or a RecyclerView tells
- * none). Uiautomator only: WDA's axis comes from a node's type or its content's extent (src/adapters/wda-source.ts),
- * which the harness does not read, and idb lists no scroller (ADR 0010 residual 5). golden-spec/rows.ts#unfitRow asks
- * D52's `unfit` only where the replayed tree tells the axis it is judged along: a replayed tree never moves, so D59's
- * axis inferred from a stroke that moved the card is never there to be had.
+ * when it tells none: a uiautomator node marked `scrollable="true"` whose class fixes its axis — averi's own table,
+ * src/adapters/android.ts#AXIS_BY_CLASS, so the row asks `unfit` exactly where averi reads a told axis (a Compose
+ * `horizontalScroll` dumps as `android.widget.HorizontalScrollView`; a LazyRow or a RecyclerView tells none).
+ * Uiautomator only: WDA's axis comes from a node's type or its content's extent (src/adapters/wda-source.ts), which
+ * the harness does not read, and idb lists no scroller (ADR 0010 residual 5). golden-spec/rows.ts#unfitSide asks it.
  */
-export function scrollAxisToldIn(payload: string, source: SourceKind, clip: Rect): 'horizontal' | 'vertical' | undefined {
+export function scrollAxisToldIn(payload: string, source: SourceKind, clip: Rect): ScrollAxis | undefined {
   if (source !== 'uiautomator') return undefined;
   const near = (a: number, b: number) => Math.abs(a - b) <= 1;
   for (const o of rawNodes(payload, source)) {
     if (o.scrollable !== 'true') continue;
     const r = rawFrame(o, source);
     if (r === undefined || !(near(r.x, clip.x) && near(r.y, clip.y) && near(r.x + r.width, clip.x + clip.width) && near(r.y + r.height, clip.y + clip.height))) continue;
-    const axis = ANDROID_AXIS_BY_CLASS[typeof o.class === 'string' ? (o.class.split('.').pop() ?? '') : ''];
+    const axis = AXIS_BY_CLASS[typeof o.class === 'string' ? (o.class.split('.').pop() ?? '') : ''];
     if (axis !== undefined) return axis;
   }
   return undefined;

@@ -734,36 +734,43 @@ fewer wasted swipes and no wrong advice):
 
 ## Amendment: a golden row for D52's `unfit` (2026-11-11, performance backlog T6d)
 
-**Context.** D52's `unfit` was proven by replayed reads written for the test (tests/interact/scroll-carousel-android.test.ts)
-and live (batch-6, T7a's carousel group), never by the golden: its `fully` rows judged only "never visible where it is
-cut" (`fullyRow` in scripts/differential/golden-spec/rows.ts). No captured tree draws a card as large as its scroll view CUT by that scroll view.
-At launch carousel-in-list's C lies right of the clip (outside-scroll-view), and the L7 carousels' C has no frame and
-no node (CellTruth.absent). A replayed tree never moves, so no stroke can bring it there. The L7 carousels could not
-give the row even drawn cut. A LazyRow's or a RecyclerView's node tells no axis, and D59's inference needs a stroke
-that moved the card. A RecyclerView's card is also View-cut flush, never `clipped`.
+**Context.** D52's `unfit` was proven by replayed reads written for the test
+(tests/interact/scroll-carousel-android.test.ts) and live (batch-6, T7a's carousel group), never by the golden: its
+`fully` rows judged only "never visible where it is cut" (`fullyRow` in scripts/differential/golden-spec/rows.ts). No
+captured tree draws a card as large as its scroll view CUT by that scroll view. At launch carousel-in-list's C lies
+right of the clip (outside-scroll-view), and the L7 carousels' C has no frame and no node (CellTruth.absent). A replayed
+tree never moves, so no stroke can bring it there. The L7 carousels could not give the row even drawn cut. A LazyRow's
+or a RecyclerView's node tells no axis, and D59's inference needs a stroke that moved the card. A RecyclerView's card is
+also View-cut flush, never `clipped`.
 
 **Decision.**
-1. *The cell* (`carousel-in-list-cut`, Android only, fixtures/apps/cells/edges.json, Edges.kt). It is carousel-in-list's page
-   and its told-axis carousel: a Compose `horizontalScroll`, dumped `android.widget.HorizontalScrollView`, free (no
+1. *The cell* (`carousel-in-list-cut`, Android only, fixtures/apps/cells/edges.json, Edges.kt). It is carousel-in-list's
+   page and its told-axis carousel: a Compose `horizontalScroll`, dumped `android.widget.HorizontalScrollView`, free (no
    snap). C is its only target. On appear the carousel is scrolled one card plus 8 dp (`CarouselLayout.CUT`), so C, as
-   wide as the clip, is drawn cut 8 dp at the clip's LEFT edge. On averi_lab (density 2.75) that is the carousel at
-   948 + 22 = 970 px and C at 44,380 948x234 in the clip 66,380 948x234 (partly-centre-in, 926 px showing). The cut is
-   not "mid-card" on purpose. A card as wide as the clip, cut deeper than the clip's 66-px inset, runs past the
-   screen's edge, where uiautomator cuts it (D17). Its side is then unknown, and it is never `unfit`. Under 24 dp, C (a
-   clickable Compose node) is also listed whole, as E2 read C at 45.
-2. *The row* (R-unfit, `unfitRow` in scripts/differential/golden-spec/rows.ts, in R-fully's place: the same key, verb `fully`). It is asked of a
-   cut target (partly-centre-in, centre-out, sliver) when four things hold along an axis (`unfitSide` in scripts/differential/golden-spec/rows.ts, vertical
-   first, as unfitAlong judges). The truth's frame is cut by its own scroll view's clip. It is at least that clip's
-   size less 1 (FIT_ROOM_PX). It and the clip lie inside the screen. And the replayed tree tells that clip's axis as
-   that one (`scrollAxisToldIn` in scripts/truth/truth.ts: a `scrollable` uiautomator node at the clip whose class fixes its axis, a
-   harness copy of android.ts#AXIS_BY_CLASS held equal by tests/truth/truth.test.ts). The row asks `fully: true`
-   toward the cut side and expects `unfit` (`carouselReply` in scripts/truth/replies.ts) with no inferred-axis clause. Any other reply is
-   red, its kind said.
-3. *The pins, before the capture.* tests/interact/scroll-carousel-unfit-cell.test.ts pins the layout arithmetic and the
-   truth's geometry. Over carousel-in-list's real dump with C moved to 44 and renamed, it also pins that `fully: true`
-   left ends `unfit` on the first read, with no swipe and the reply's exact words. tests/differential/golden-rows.test.ts
-   pins the row's choice and judge. A synthetic capture built the same way (scratch only, not committed) replays to
-   `ok C fully: R-unfit …` and `ok C tap: R-land`.
+   wide as the clip, is drawn cut 8 dp at the clip's LEFT edge. On averi_lab (density 2.75) that puts the carousel at
+   970 px (the card's 948 and the cut's 22) and C at 44,380 948x234 in the clip 66,380 948x234 (partly-centre-in, 926 px
+   showing). The cut is not "mid-card" on purpose. A card as wide as the clip, cut deeper than the clip's 66-px inset,
+   runs past the screen's edge, where uiautomator cuts it (D17). Its side is then unknown, and it is never `unfit`. At
+   most 24 dp, C (a clickable Compose node) is also listed whole, as E2 read C at 45.
+2. *The row* (R-unfit, `unfitRow` in scripts/differential/golden-spec/rows.ts, in R-fully's place: the same key, verb
+   `fully`). It is asked of a cut target (partly-centre-in, centre-out, sliver) where src's conditions
+   (scroll-read.ts#unfitAlong) hold over the truth and the replayed tree (`unfitSide` in the same file). The tree lists
+   the target whole, where the app reports its frame, within a pixel: a card listed cut flush to its clip is never
+   `clipped`. Its scroll views are its own clip and every other the truth reports overlapping the clip and not lying
+   inside it; the truth names no nesting, so such a scroll view stands in for an enclosing one. The drawn frame is where
+   they all and the screen overlap. Along an axis, vertical first, the frame runs past the drawn frame, with both its
+   sides on the screen. The room-giver is the smallest of its scroll views along that axis, and the tree tells its axis
+   as that one (`scrollAxisToldIn` in scripts/truth/truth.ts: a `scrollable` uiautomator node at that rect whose class
+   fixes its axis, by src's own android.ts#AXIS_BY_CLASS). The drawn frame and the frame are each at least that room
+   less 1 (FIT_ROOM_PX): an outer scroll view that cuts the room shorter keeps R-fully. The row asks `fully: true`
+   toward the cut side and expects `unfit` (`carouselReply` in scripts/truth/replies.ts) after no swipe, with no
+   inferred-axis clause. Any other reply is red, its kind said.
+3. *The pins, before the capture.* tests/interact/scroll-carousel-unfit-cell.test.ts reads `CUT` from Edges.kt and pins
+   the layout arithmetic and the truth's geometry from it. Over carousel-in-list's real dump with C moved to 44 and
+   renamed, it also pins that `fully: true` left ends `unfit` on the first read, with no swipe and the reply's exact
+   words. tests/differential/golden-rows.test.ts pins the row's choice, each condition by a fixture breaking it, and its
+   judge. A synthetic capture built the same way (scratch only, not committed) replays to `ok C fully: R-unfit …` and
+   `ok C tap: R-land`.
 
 **Consequences.** The golden against main's base: 0 of 1667 checks changed. No captured target meets the row's
 conditions, so nothing is asked differently until the capture. With it, golden is expected to show two NEW checks on
@@ -773,4 +780,5 @@ conditions, so nothing is asked differently until the capture. With it, golden i
 **Residual.** R-unfit is asked under uiautomator only. WDA's axis comes from a node's type or its content's extent
 (wda-source.ts), which the harness does not read, and idb lists no scroll view. No iOS twin is built: the L7 carousel
 cells are Android-only, and iOS has no clipping container that cuts a card's frame (a WDA card is listed where it lies,
-D52's WDA twin is unit-pinned). D59's inferred axis stays live-only: a replayed tree shows no stroke that moved the card.
+D52's WDA twin is unit-pinned). D59's inferred axis stays live-only: a replayed tree shows no stroke that moved the
+card.
