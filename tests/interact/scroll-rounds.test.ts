@@ -3428,7 +3428,7 @@ describe('round — `within`, the scroll view named for the strokes until the ta
     const played = play({ ...ANDROID, maxSwipes: 6, timeoutMs: 15_000, within }, [{ tree, cover: HIGH_IME }]);
     const outcome = played.outcome as Exclude<NonNullable<Played['outcome']>, { kind: 'visible' }>;
     expect(scrollFailure(outcome, 'id:lab.scroll-bounded.O', 'spec').message).toBe(
-      `scroll_until id:lab.scroll-bounded.O stopped before any swipe — within id:"lab.scroll-bounded.S" ${NO_ROOM_RECT} — swipe the screen so more of the scroll view shows, or hide the keyboard first (\`dismissKeyboard: true\` on the fill before this step), then scroll_until it again`,
+      `scroll_until id:lab.scroll-bounded.O stopped before any swipe — within id:"lab.scroll-bounded.S" ${NO_ROOM_RECT} — add a swipe: step before this one so more of the scroll view shows, or hide the keyboard first (\`dismissKeyboard: true\` on the fill before this step), then run the flow again`,
     );
   });
 
@@ -3450,7 +3450,11 @@ describe('round — `within`, the scroll view named for the strokes until the ta
       /the keyboard covers it from y 2200, leaving 40 of its height, under the 80 a swipe needs — swipe the screen so more of the scroll view shows, or hide the keyboard first \(tap a neutral element such as the screen title\), then scroll_until it again; this adapter cannot hide it on its own \(ADVICE\)$/,
     );
     expect(scrollFailure({ ...iosOutcome, within: { id: 'list' } }, 'id:x', 'spec').message).toMatch(
-      /or hide the keyboard first \(tap a neutral element such as the screen title — a tap: step before this one\), then scroll_until it again; this adapter cannot hide it on its own \(ADVICE\)$/,
+      /— add a swipe: step before this one so more of the scroll view shows, or hide the keyboard first \(tap a neutral element such as the screen title — a tap: step before this one\), then run the flow again; this adapter cannot hide it on its own \(ADVICE\)$/,
+    );
+    // Code review 2: the flow's whole way out is in steps, the no-keyboard case too — no `scroll_until it again`.
+    expect(scrollFailure({ kind: 'within', swipes: 0, within: { id: 'list' }, refused: { of: 'noRoom', rect: R, toward: 'down', room: 60 } }, 'id:x', 'spec').message).toBe(
+      'scroll_until id:x stopped before any swipe — within id:"list" names the scroll view 0,2160 1080x400, which has no room for a swipe down: 60 of its height lies on the screen, under the 80 a swipe needs — add a swipe: step before this one so more of the scroll view shows, then run the flow again',
     );
     expect(named(R, { toward: 'right', room: 60 })).toContain('which has no room for a swipe right: 60 of its width lies on the screen, under the 80 a swipe needs — swipe the screen');
   });

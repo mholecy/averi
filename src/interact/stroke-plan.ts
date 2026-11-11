@@ -328,15 +328,20 @@ export interface StrokePlan {
 }
 
 /**
- * What a named scroll view had of room when it had none (`StrokePlan.noRoom`): its `rect`, the stroke's `toward`, and
- * `room`, its length along the stroke on the gesture box — above the keyboard's top (`keyboardTop`, said only when
- * the keyboard cuts that part) for a vertical stroke; 0 when none of it lies there. Under MIN_STROKE_BOX, or at least
- * it and cut under it by what is drawn over the scroll view (`overlayTop`).
+ * What a named scroll view had of room when it had none — the facts the plan's `StrokePlan.noRoom` and the refusal it
+ * becomes (interact/within.ts#WithinRefusal's `noRoom`) share: its `rect`, the stroke's `toward`, and `room`, its
+ * length along the stroke on the gesture box — above the keyboard's top for a vertical stroke; 0 when none of it lies
+ * there. Under MIN_STROKE_BOX, or at least that and cut under it by what is drawn over the scroll view (the cut
+ * `overlayTop`, the function, computes).
  */
-export interface NamedNoRoom {
+export interface NoRoomFacts {
   readonly rect: Rect;
   readonly toward: Direction;
   readonly room: number;
+}
+
+/** `NoRoomFacts` as the plan knows them: with the keyboard's top (`keyboardTop`) only when the keyboard cuts that part. */
+export interface NamedNoRoom extends NoRoomFacts {
   readonly keyboardTop?: number;
 }
 

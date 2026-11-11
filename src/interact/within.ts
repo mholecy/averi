@@ -3,7 +3,7 @@ import { listsAncestry } from '../ui-tree/draw-order.js';
 import { quoted, type QuotedNode, type ScrollAxes } from '../ui-tree/geometry.js';
 import { findTarget, parseSelector, type Target } from '../ui-tree/selectors.js';
 import type { TreeFacts } from './scroll-read.js';
-import { targetScrollers } from './stroke-plan.js';
+import { targetScrollers, type NoRoomFacts } from './stroke-plan.js';
 import type { KeyboardUp } from './target-text.js';
 import { axisOf, type Direction } from './swipe.js';
 
@@ -71,13 +71,13 @@ export type WithinRefusal =
   /** The tree lists no scroll view (idb's flat list). */
   | { readonly of: 'untold' }
   /**
-   * D80: the named scroll view (`rect`), and every one nested in it, leaves no room for the round's stroke `toward` —
-   * the keyboard over it, too little of it on the screen, or what is drawn over it — before a read has found the
-   * target: judged by the stroke plan, every round (stroke-plan.ts#StrokePlan's `noRoom`: `room`, its length along
-   * the stroke), not here; never a stroke over the gesture box whole. `keyboard`, when the keyboard's top cuts it:
-   * that top and what the adapter hides it with (the round's applied cover's remedy), for the way out's words.
+   * D80: the named scroll view, and every one nested in it, leaves no room for the round's stroke — the keyboard over
+   * it, too little of it on the screen, or what is drawn over it — before a read has found the target: judged by the
+   * stroke plan, every round (stroke-plan.ts#NoRoomFacts, its facts), not here; never a stroke over the gesture box
+   * whole. `keyboard`, when the keyboard's top cuts it: that top and what the adapter hides it with (the round's
+   * applied cover's remedy), for the way out's words.
    */
-  | { readonly of: 'noRoom'; readonly rect: Rect; readonly toward: Direction; readonly room: number; readonly keyboard?: KeyboardUp };
+  | ({ readonly of: 'noRoom'; readonly keyboard?: KeyboardUp } & NoRoomFacts);
 
 /**
  * A `within` that names no scroll view to stroke (D78's stop before any swipe; interact/scroll-text.ts#scrollFailure),

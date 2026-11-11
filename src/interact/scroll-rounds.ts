@@ -1271,6 +1271,9 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   if (plan.noRoom !== undefined && s.rules.within !== undefined) {
     if (read === undefined && mayConfirm(s, seen.elapsedMs)) return confirm(s);
     const { keyboardTop, ...noRoom } = plan.noRoom;
+    // `lastCover` is set whenever `keyboardTop` is: a band-only line (no cover applied) is idb's alone
+    // (ui-tree/draw-order.ts), and idb's `within` is refused `untold` before any plan — a band on WDA or Android
+    // would break that.
     const keyboard = keyboardTop === undefined || s.lastCover === undefined ? undefined : { lineY: keyboardTop, remedy: s.lastCover.remedy };
     return stop(s, { kind: 'within', swipes: s.swipes, within: s.rules.within, refused: { of: 'noRoom', ...noRoom, ...(keyboard !== undefined && { keyboard }) } });
   }

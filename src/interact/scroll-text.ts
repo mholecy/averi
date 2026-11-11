@@ -859,6 +859,10 @@ export interface WithinRemedy {
   readonly ambiguous: string;
   /** D80: how the caller hides the keyboard that leaves a named scroll view no room, by the adapter's `dismissal`. */
   readonly hideKeyboard: (remedy: KeyboardRemedy) => string;
+  /** D80: how the caller brings more of a named scroll view on screen, before scrolling it again. */
+  readonly showMore: string;
+  /** D80: how the caller scrolls again once there is room, after `then `. */
+  readonly again: string;
 }
 
 /**
@@ -879,6 +883,8 @@ export const WITHIN_REMEDY = {
     absent: 'give a selector of the scroll view or of an element inside it, or its rect (ui_snapshot)',
     ambiguous: ", or give the scroll view's rect",
     hideKeyboard: hideKeyboardBriefly,
+    showMore: 'swipe the screen so more of the scroll view shows',
+    again: 'scroll_until it again',
   },
   spec: {
     listed: nodeText,
@@ -887,6 +893,8 @@ export const WITHIN_REMEDY = {
     absent: 'give an element spec of the scroll view or of an element inside it',
     ambiguous: '',
     hideKeyboard: hideKeyboardInFlow,
+    showMore: 'add a swipe: step before this one so more of the scroll view shows',
+    again: 'run the flow again',
   },
 } as const satisfies Record<string, WithinRemedy>;
 
@@ -935,25 +943,24 @@ function withinText(within: Within, refused: WithinRefusal, remedy: WithinRemedy
 /**
  * D80: why the named scroll view had no room for the round's stroke (within.ts#WithinRefusal's `noRoom`), after
  * `within <it> `: the keyboard over it, from its top (a vertical stroke's), and the length left of it — under
- * MIN_STROKE_BOX, or at least that and cut under it by what is drawn over it — then the way out: more of the scroll
- * view brought on screen, or, when the keyboard covers it, the keyboard hidden first — how, by what the adapter hides
- * it with (target-text.ts#hideClause over `remedy`'s form: the MCP tools' `press_key back` or a neutral tap, a flow's
- * step before this one), and where no key hides it the adapter's own advice after.
+ * MIN_STROKE_BOX, or at least that and cut under it by what is drawn over it — then the way out, in `remedy`'s form
+ * (the MCP tool's calls, a flow's steps): more of the scroll view brought on screen, or, when the keyboard covers it,
+ * the keyboard hidden first — how, by what the adapter hides it with (target-text.ts#hideClause: the MCP tools'
+ * `press_key back` or a neutral tap, a flow's step before this one), and where no key hides it the adapter's own
+ * advice after — then scrolled again.
  */
 function noRoomText({ rect, toward, room, keyboard }: Extract<WithinRefusal, { of: 'noRoom' }>, remedy: WithinRemedy): string {
   const side = axisOf(toward) === 'vertical' ? 'height' : 'width';
   const covers = keyboard === undefined ? '' : `the keyboard covers it from y ${keyboard.lineY}, `;
-  const short =
-    room < MIN_STROKE_BOX
-      ? `${covers === '' ? `${room} of its ${side} lies on the screen` : `${covers}leaving ${room} of its ${side}`}, under the ${MIN_STROKE_BOX} a swipe needs`
-      : covers === ''
-        ? `what is drawn over it leaves too little of the ${room} of its ${side} on the screen`
-        : `${covers}and what is drawn over it leaves too little of the ${room} of its ${side} left`;
-  const swipe = 'swipe the screen so more of the scroll view shows';
+  // Too short by itself (under MIN_STROKE_BOX), or long enough and cut under it by what is drawn over it — each said
+  // with the keyboard's cover first when it cuts the scroll view.
+  const tooShort = covers === '' ? `${room} of its ${side} lies on the screen` : `${covers}leaving ${room} of its ${side}`;
+  const cut = covers === '' ? `what is drawn over it leaves too little of the ${room} of its ${side} on the screen` : `${covers}and what is drawn over it leaves too little of the ${room} of its ${side} left`;
+  const short = room < MIN_STROKE_BOX ? `${tooShort}, under the ${MIN_STROKE_BOX} a swipe needs` : cut;
   const way =
     keyboard === undefined
-      ? `${swipe}, then scroll_until it again`
-      : hideClause(keyboard.remedy, `${swipe}, or hide the keyboard first (${remedy.hideKeyboard(keyboard.remedy)}), then scroll_until it again`);
+      ? `${remedy.showMore}, then ${remedy.again}`
+      : hideClause(keyboard.remedy, `${remedy.showMore}, or hide the keyboard first (${remedy.hideKeyboard(keyboard.remedy)}), then ${remedy.again}`);
   return `names the scroll view ${rectText(rect)}, which has no room for a swipe ${toward}: ${short} — ${way}`;
 }
 
