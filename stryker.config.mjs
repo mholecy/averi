@@ -26,6 +26,10 @@ export default {
     '!/scripts/mutation/',
     // T24: the release gate's pure modules (scripts/release/pack-files.ts, clean-log.ts) and their entry scripts.
     '!/scripts/release/',
+    // A33: the harnesses' in-process connection alone (its imports from side.ts are types), never the replay's corpus.
+    '!/scripts/differential/',
+    '/scripts/differential/*',
+    '!/scripts/differential/connection.ts',
     // catalog.ts's entry guard; run-case.ts's cases import catalog.ts.
     '!/scripts/is-main.ts',
     // The device batches' core (scripts/truth/batch/, backlog T2) and scripts/truth's own modules: run-case.ts (A11)

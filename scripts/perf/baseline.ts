@@ -4,13 +4,13 @@ import { cpus, loadavg, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import type { Platform } from '../../src/adapters/types.js';
 import { AdapterRegistry, defaultFactory, iosAdapterFor } from '../../src/mcp/registry.js';
 import { defaultDiscovery } from '../../src/adapters/discovery.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
+import { errorMessage } from '../../src/util/error-message.js';
+import { connectInProcess } from '../differential/connection.js';
 import { AndroidLab, IosLab, LAB_APP, LAB_WDA_DERIVED_DATA } from '../truth/lab-device.js';
 import { allPassed, callReply, claimsDone, claimsTap, claimsVisible, isError, OCR_FAILED_CLOSED } from '../truth/replies.js';
 import { labId, labSelector, parseLabApp, type LabApp } from '../truth/schema.js';
@@ -251,11 +251,7 @@ const registry = new AdapterRegistry({
   // The server's own discovery, its check's device.plist proof (D22) included, as `new AdapterRegistry()` has.
   discovery: defaultDiscovery,
 });
-const server = createAveriServer({ registry, version: 'perf-baseline' });
-const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
-await server.connect(serverSide);
-const client = new Client({ name: 'perf-baseline', version: '0' });
-await client.connect(clientSide);
+const { client, close } = await connectInProcess({ createAveriServer }, registry, 'perf-baseline');
 
 /** A tool call's reply as the judges read it (scripts/truth/replies.ts#callReply), the platform and config added. */
 const call = (tool: string, args: Record<string, unknown>) => callReply(client, tool, { platform, configPath, ...args });
@@ -295,8 +291,9 @@ async function runOnce(s: Scenario, r: number): Promise<Run> {
   return { repeat: r, status, ...measure(window, wallMs, (used.user + used.system) / 1000), reply: reply.slice(0, 2_000), window };
 }
 
-// Whatever ends the runs, the server is closed — the registry's shutdown stops a WebDriverAgent it started on the
-// lab's port — the temp config removed, and what was measured written.
+// Whatever ends the runs, what was measured is written first (D82: a close that hangs or throws on a device gone cannot
+// cost it), the temp config removed, then the connection closed — the registry's shutdown stops a WebDriverAgent it
+// started on the lab's port; a close that fails is one stderr line.
 try {
   const selected = await call('select_device', { device });
   if (isError(selected)) throw new Error(`select_device ${device}: ${selected}`);
@@ -317,11 +314,12 @@ try {
     console.error('no sleep recorded in any scenario: has src/util/sleep.ts moved? instrument.ts tells its timers by the stack');
   }
 } finally {
-  await client.close().catch(() => undefined);
-  await server.close().catch(() => undefined);
-  await registry.shutdown().catch((e: unknown) => console.error(`registry shutdown: ${(e as Error).message}`));
-  await rm(configDir, { recursive: true, force: true }).catch(() => undefined);
-  await report();
+  try {
+    await report();
+  } finally {
+    await rm(configDir, { recursive: true, force: true }).catch(() => undefined);
+    await close().catch((e: unknown) => console.error(`close: mcp (client, server, registry) failed — ${errorMessage(e)}`));
+  }
 }
 
 function firstLine(reply: string): string {

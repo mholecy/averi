@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
 import { installVirtualClock } from '../../scripts/differential/clock.js';
 import type { Recording } from '../../scripts/differential/corpus.js';
@@ -43,6 +43,26 @@ describe('compareRecording', { timeout: 30_000 }, () => {
       expect(Object.keys(result.perTool).sort()).toEqual(['assert', ...(r.platform === 'ios' ? ['launch_app'] : []), 'scroll_until', 'swipe', 'tap', 'ui_snapshot']);
       // Every command the tools sent on the sample is one the fake device models.
       expect(result.unmodelled).toEqual({});
+    }
+  });
+
+  it("A33: an old side whose registry's shutdown throws ends no replay — the close is one stderr line, every reply kept", async () => {
+    const dying: Side = {
+      ...side,
+      registry: (deps) => {
+        const registry = side.registry(deps);
+        registry.shutdown = () => Promise.reject(new Error('adapter gone'));
+        return registry;
+      },
+    };
+    const said = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const result = await compareRecording(sample[2], dying, side, { cap: 3 });
+      expect(result.diffs).toEqual([]);
+      expect(result.calls).toBeGreaterThan(10);
+      expect(said.mock.calls.map((c) => String(c[0]))).toContain(`close: ${side.root} connection failed — adapter gone`);
+    } finally {
+      said.mockRestore();
     }
   });
 

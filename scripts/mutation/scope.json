@@ -365,6 +365,12 @@
     "floor": 98,
     "baseline": "100 % on 2026-11-11 (D82 code review: the message from src/util/error-message.ts#errorMessage, the local copy gone; `npm run mutate -- --group lab --force --mutate scripts/truth/live-finish.ts --tempDirName .stryker-tmp-d82b`, cold, 13 s): 20 mutants, 20 killed, 0 survived, 0 without coverage"
   },
+  "scripts/differential/connection.ts": {
+    "group": "lab",
+    "tests": ["tests/differential/connection.test.ts"],
+    "floor": 89,
+    "baseline": "91.30 % on 2026-11-12 (A33 after the code review: `driver`, the close steps `async () => server?.close()` and `async () => shutdown?.call(registry)`, the server built inside the open's try; `npm run mutate -- --group lab --force`, cold, temp dir reports/mutation/stryker-tmp-lab, 303 s at load 7 → 11): 23 mutants, 21 killed, 2 survived, 0 without coverage, both equivalent — the client's version `'0'` emptied (nothing reads the client's version; the server's, the driver, is pinned) and `server?.close()` as `server.close()` (the server is undefined only when it could not be built, and that close's failure is dropped: the open throws its own error); the floor falls 94 → 89, two under the score's whole number"
+  },
   "scripts/truth/run-case.ts": {
     "group": "lab",
     "tests": ["tests/truth/run-case.test.ts"],

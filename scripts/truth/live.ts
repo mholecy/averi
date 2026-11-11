@@ -2,11 +2,11 @@ import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import { listIosDevices } from '../../src/adapters/discovery.js';
 import { errorMessage } from '../../src/util/error-message.js';
+import { connectInProcess, type InProcess } from '../differential/connection.js';
 import type { Platform } from '../differential/corpus.js';
 import { liveIosLine, loadSide } from '../differential/side.js';
 import { readPremiseInto } from './chooser-premise.js';
@@ -53,14 +53,14 @@ import { parseLabApp, type LabApp } from './schema.js';
  * (k2 is iOS only).
  *
  * The server is built as tests/mcp/tools.test.ts builds one (createAveriServer over the SDK's in-memory transport and
- * a real Client), over a REAL AdapterRegistry whose factory builds the iOS adapter through registry.ts#iosAdapterFor
- * (the server's wiring, the idb helper included: A23) with WDA deps of its own: averi gives WDA port
- * 8100 to the first simulator a process asks for, and 8100/8101 may belong to another session's WebDriverAgent — here
- * the WDA source takes `--wda-port` (default 8120, capture.ts's) and builds into the lab's own derived data
- * (lab-device.ts#LAB_WDA_DERIVED_DATA), never device-check's `averi-wda`. Discovery lists the lab simulator only, so no
- * tool call can bind another booted device. Each case launches its cell in a fresh process (simctl, as the capture does
- * — not averi's launch_app, which is not under test here), runs its calls, waits for the app to write, and reads the
- * model.
+ * a real Client, opened and closed by scripts/differential/connection.ts), over a REAL AdapterRegistry whose factory
+ * builds the iOS adapter through registry.ts#iosAdapterFor (the server's wiring, the idb helper included: A23) with WDA
+ * deps of its own: averi gives WDA port 8100 to the first simulator a process asks for, and 8100/8101 may belong to
+ * another session's WebDriverAgent — here the WDA source takes `--wda-port` (default 8120, capture.ts's) and builds
+ * into the lab's own derived data (lab-device.ts#LAB_WDA_DERIVED_DATA), never device-check's `averi-wda`. Discovery
+ * lists the lab simulator only, so no tool call can bind another booted device. Each case launches its cell in a fresh
+ * process (simctl, as the capture does — not averi's launch_app, which is not under test here), runs its calls, waits
+ * for the app to write, and reads the model.
  *
  * Outcome per case:
  *  - ok: the model holds what the case asked for, and averi's reply does not contradict it;
@@ -203,7 +203,8 @@ if (averi !== undefined && platform === 'ios') console.error(`ios: ${liveIosLine
 /** The carousel group's hook on the Android adapter's strokes (live-carousel.ts#SwipeHook): armed around a case's calls. */
 const swipeHook = new SwipeHook();
 
-async function connect(): Promise<{ client: Client; close(): Promise<void> }> {
+/** The server and its client in this process (connection.ts#connectInProcess); its close, one closer for finishRun. */
+function connect(): Promise<InProcess> {
   const registry = averi!.registry({
     factory: liveFactory(averi!, { wda: { port, derivedDataPath: LAB_WDA_DERIVED_DATA }, swipeHook }),
     // The lab device alone. Android: listed without asking adb (its listing runs getprop on every attached device).
@@ -212,22 +213,7 @@ async function connect(): Promise<{ client: Client; close(): Promise<void> }> {
       : p === 'ios' ? (await listIosDevices()).filter((d) => d.id === device)
       : [{ id: device, platform: 'android', name: LAB_AVD, osVersion: 'lab', state: 'booted' }],
   });
-  const server = averi!.createAveriServer({ registry, version: 'live-golden' });
-  const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
-  await server.connect(serverSide);
-  const client = new Client({ name: 'live-golden', version: '0' });
-  await client.connect(clientSide);
-  return {
-    client,
-    // One closer for finishRun (D82), not three: InMemoryTransport's close only drops references and the registry's
-    // shutdown disposes each adapter quietly (src/mcp/registry.ts#shutdown), so a dead device cannot throw out of it
-    // and leave the server's processes alive.
-    async close() {
-      await client.close();
-      await server.close();
-      await registry.shutdown();
-    },
-  };
+  return connectInProcess(averi!, registry, 'live-golden');
 }
 
 const configDir = join(tmpdir(), `averi-live-${process.pid}`);

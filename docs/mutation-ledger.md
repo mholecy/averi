@@ -391,6 +391,10 @@ No earlier baseline: the latest, in scope.json, is its first.
 
 - 100 % on 2026-11-11 (D82, finishRun: the record written before the closes, each closer tried, a failed close and a failed write said on stderr; `npm run mutate -- --group lab --force --mutate scripts/truth/live-finish.ts --tempDirName .stryker-tmp-d82`, cold, 24 s): 21 mutants, 21 killed, 0 timeouts, 0 survived, 0 without coverage
 
+## scripts/differential/connection.ts
+
+- 96.00 % on 2026-11-12 (A33, joined; `npm run mutate -- --group lab --force --tempDirName reports/mutation/stryker-tmp-a33`, cold, 315 s at load 7 → 10): 25 mutants, 24 killed, 1 survived, 0 without coverage — the client's version `'0'` emptied, equivalent (nothing reads the client's version; the server's, `name`, is pinned)
+
 ## scripts/truth/run-case.ts
 
 - 100 % on 2026-11-10 (T10, no first state: the case's named LOUD `no-state`, no judge, no late or panel read, the focus, screenshot and teardown kept; cold): 225 mutants, 0 survived
