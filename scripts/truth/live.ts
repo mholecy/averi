@@ -13,6 +13,7 @@ import { readPremiseInto } from './chooser-premise.js';
 import { deviceLabelling, type DeviceReadMode } from './device-state.js';
 import { AndroidLab, IosLab, LAB_AVD, LAB_WDA_DERIVED_DATA } from './lab-device.js';
 import { hookSwipes, SwipeHook } from './live-carousel.js';
+import { finishRun } from './live-finish.js';
 import {
   type Call,
   type Case,
@@ -82,7 +83,8 @@ import { parseLabApp, type LabApp } from './schema.js';
  * paragraph). `--record <file>` writes every read (the launch state, the state between the calls, after them) as JSON;
  * `--rejudge <file>` judges such a record again with this checkout's judges, no device (live-cases.ts#rejudge, which
  * tests/truth/live-rejudge.test.ts calls in process). The cases, their judging and the summary live in live-cases.ts,
- * one case's device cycle in run-case.ts; this file is the CLI.
+ * one case's device cycle in run-case.ts, the finish (the record written before anything closes, D82) in
+ * live-finish.ts; this file is the CLI.
  *
  * `--app react-native` runs the cases of the React Native lab app's cells (fixtures/apps/rn, its own bundle and package:
  * lab-device.ts#LAB_APP; the visibility cases from its own truth runs, the manifests whose `app` is AveriLabRN) — the
@@ -276,10 +278,19 @@ if (rejudging !== undefined) {
     }
     await deviceReads?.read('after');
   } finally {
-    if (deviceReads !== undefined) record.deviceLabel = deviceReads.label();
-    await close();
-    await lab.close();
-    if (values.record !== undefined) await writeFile(values.record, JSON.stringify(record) + '\n');
+    // D82 (live-finish.ts#finishRun): the label, the record written, then each close tried whatever the other threw —
+    // a failed close one stderr line, never thrown past the record or the summary (T16's first smoke lost its record to
+    // a force-stop on an offline emulator). A write that fails still throws, after the closes.
+    await finishRun({
+      record,
+      recordPath: values.record,
+      ...(deviceReads !== undefined && { deviceLabel: () => deviceReads.label() }),
+      closers: [
+        { name: 'mcp (client, server, registry)', close },
+        { name: `lab (${platform === 'android' ? 'am force-stop' : 'WDA shutdown, simctl terminate'})`, close: () => lab.close() },
+      ],
+      note: (line) => console.error(line),
+    });
   }
   // The summary: every case, a known one marked with its note (live-known.ts); exit 1 on an unknown MISMATCH, on a
   // known case not intermittent that came out ok in a run of this checkout (fixed: strike it off), and on a case whose
