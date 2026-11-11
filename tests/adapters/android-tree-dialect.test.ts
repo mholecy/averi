@@ -1,10 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { landingOf, type Expectation } from '../../src/interact/fill-landing.js';
+import { fillField } from '../../src/interact/fill.js';
 import { fillReply } from '../../src/interact/fill-text.js';
-import { typeAndConfirm, type FieldIo } from '../../src/interact/fill-type.js';
-import { clearStep, startClear } from '../../src/interact/fill-clear.js';
 import { tapElement } from '../../src/interact/tap.js';
 import { parseUiautomatorXml } from '../../src/adapters/android-tree-dialect.js';
 import { parseDump, UIAUTOMATOR_XML } from '../helpers/android-dumps.js';
@@ -23,6 +21,36 @@ beforeEach(() => {
   resetSleeps();
 });
 
+/** A fill's options in these tests: the settle's and the value poll's cadence short, the fill's own rules as they are. */
+const FILL = { ambiguous: 'first' as const, timeoutMs: 200, pollMs: 2 };
+
+/**
+ * One Android field (`id:f`) behind fillField, every tree read a fresh parse of its dump (the parser is the seam: base
+ * trimmed `Jan ` to `Jan`): it holds `start`, shows `hint` named as its hint, keeps `keep(typed, nth)` of each typing
+ * and loses one character a delete; a focus tap makes it hold `onFocus` when given. Its typing may arrive late, as
+ * AndroidAdapter's does — no dropped tail is typed again, and a sole `id` skips the post-focus re-read (ADR 0028).
+ */
+function androidField(start: string, opts: { hint?: string; keep?: (typed: string, nth: number) => string; onFocus?: string } = {}) {
+  let held = start;
+  const hint = opts.hint === undefined ? '' : ` hint="${opts.hint}"`;
+  const dump = () =>
+    parseDump(`<hierarchy><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]"><node class="android.widget.EditText" resource-id="app:id/f" text="${held}"${hint} password="false" bounds="[0,100][1080,220]" /></node></hierarchy>`);
+  const fake = new FakeAdapter({ form: dump() }, 'form', () => {
+    if (opts.onFocus !== undefined) held = opts.onFocus;
+  });
+  fake.typingDelivery = 'may-arrive-late';
+  fake.uiTree = async () => dump();
+  let nth = 0;
+  fake.typeText = async (text) => {
+    fake.typed.push(text);
+    held += (opts.keep ?? ((t) => t))(text, nth++);
+  };
+  fake.clearText = async (count) => {
+    fake.deletes.push(count);
+    held = held.slice(0, Math.max(0, held.length - count));
+  };
+  return { fake, held: () => held };
+}
 
 describe('parseUiautomatorXml', () => {
   const tree = parseDump(UIAUTOMATOR_XML.slice(0, UIAUTOMATOR_XML.lastIndexOf('>') + 1));
@@ -64,33 +92,14 @@ describe('parseUiautomatorXml', () => {
       expect(tree.children[1]).toMatchObject({ label: '\nSend' });
     });
 
-    /** An Android field holding `held`, as its dump reads (the parser is the seam: base trimmed `Jan ` to `Jan`). */
-    const dumped = (held: string): UiNode =>
-      parseDump(`<hierarchy><node class="android.widget.EditText" resource-id="app:id/f" text="${held}" bounds="[0,0][100,20]" /></hierarchy>`);
-
-    it('typeAndConfirm with clear, `Jan ` of `Jan Novak` landed: the wipe deletes 4, not 3, and the retype lands', async () => {
-      let held = '';
-      const wipes: number[] = [];
-      let typings = 0;
-      const io: FieldIo = {
-        type: async (text) => {
-          held += typings++ === 0 ? text.slice(0, 4) : text;
-        },
-        wipe: async (count) => {
-          wipes.push(count);
-          held = held.slice(0, Math.max(0, held.length - count));
-        },
-        read: async () => dumped(held).value ?? '',
-        screen: () => dumped(held),
-        reportDroppedTail: () => undefined,
-      };
-      const out = await typeAndConfirm(io, {
-        value: 'Jan Novak', clear: true, isInput: true, resolvedValue: null, before: '', placeholder: undefined, held: 0, pollMs: 1,
-        field: dumped(''), delivery: 'may-arrive-late',
-      });
-      expect(wipes).toEqual([4]);
-      expect(out).toMatchObject({ kind: 'landed', observed: 'Jan Novak' });
-      expect(held).toBe('Jan Novak'); // base: `JJan Novak`
+    it('fillField with clear, `Jan ` of `Jan Novak` landed: the wipe deletes 4, not 3, and the retype lands', async () => {
+      const { fake, held } = androidField('', { keep: (text, nth) => (nth === 0 ? text.slice(0, 4) : text) });
+      const result = await fillField(fake, 'id:f', 'Jan Novak', { ...FILL, clear: true });
+      expect(fake.deletes).toEqual([4]);
+      expect(fake.typed).toEqual(['Jan Novak', 'Jan Novak']);
+      expect(result.readBack).toEqual({ kind: 'landed' });
+      expect(fillReply(result, 'id:f')).toBe('Filled id:f (9 characters)');
+      expect(held()).toBe('Jan Novak'); // base: `JJan Novak`
     });
 
     // Review round 1, MAJOR-1: matching through the LABEL is unchanged; the `value` path sees the field's real text, as
@@ -111,68 +120,68 @@ describe('parseUiautomatorXml', () => {
 
     // Review round 1, MINOR-1: a hint is the same kind of string as text, compared with a reading exactly — kept untrimmed,
     // so an empty field showing `Name ` reads empty, not as 5 characters to clear.
-    it('an empty input whose dump names `hint="Name "` and shows it as `text="Name "` reads empty', () => {
-      const field = parseDump('<hierarchy><node class="android.widget.EditText" text="Name " hint="Name " bounds="[0,0][100,100]" /></hierarchy>');
-      expect(field.placeholder).toBe('Name ');
-      const first = clearStep(startClear(field.placeholder), { value: field.value });
-      expect(first.step).toEqual({ do: 'done', facts: { cleared: 0, end: { kind: 'empty', placeholder: 'shown' } } });
+    it('an empty input whose dump names `hint="Name "` and shows it as `text="Name "` reads empty: a clear deletes nothing', async () => {
+      const { fake } = androidField('Name ', { hint: 'Name ' });
+      expect((await fake.uiTree()).children[0].placeholder).toBe('Name ');
+      const result = await fillField(fake, 'id:f', '', { ...FILL, clear: true });
+      expect(fake.deletes).toEqual([]);
+      expect(result).toMatchObject({ cleared: 0, clearPlaceholder: 'shown', readBack: { kind: 'nothing-typed' } });
     });
 
     // After D71 (ADR 0034's D71 amendment), with D72's readings: no clear, the field already holding `held`, `value` typed,
-    // the field keeping `keep` of it (its first keys dropped) — `before` and every reading through the dump's parser.
-    const typedOver = async (held: string, value: string, keep: (typed: string) => string) => {
-      let text = held;
-      const io: FieldIo = {
-        type: async (typed) => {
-          text += keep(typed);
-        },
-        wipe: async () => undefined,
-        read: async () => dumped(text).value ?? '',
-        screen: () => dumped(text),
-        reportDroppedTail: () => undefined,
-      };
-      return typeAndConfirm(io, {
-        value, clear: false, isInput: true, resolvedValue: null, before: dumped(held).value ?? '', placeholder: undefined, held: 0, pollMs: 1,
-        field: dumped(held), delivery: 'may-arrive-late',
-      });
+    // the field keeping `keep` of it (its first keys dropped) — every reading through the dump's parser, the fill as
+    // fillField drives it on Android (a sole `id`, a typing that may arrive late: the post-focus re-read skipped).
+    const typedOver = async (start: string, value: string, keep: (typed: string) => string) => {
+      const { fake, held } = androidField(start, { keep });
+      return { result: await fillField(fake, 'id:f', value, FILL), held };
     };
 
     it('D71: `1 ` typed after `1` without clear, the `1` dropped, reads `1 ` — refused with the select-all hedge, never Filled', async () => {
-      expect(await typedOver('1', '1 ', (t) => t.slice(1))).toEqual({ kind: 'missed', observed: '1 ', again: [], differs: { kind: 'length', wholeToo: true, equal: { why: 'value-itself', appendWouldShow: 3 } } });
+      await expect(typedOver('1', '1 ', (t) => t.slice(1)).then(({ result }) => result)).rejects.toThrow(
+        'fill: typed 2 characters but the field shows only the typed text, where an append would show 3 — the field may have replaced its text (select-all): fill with `clear: true` (content withheld from this error)',
+      );
     });
 
     it('`Jan ` appended to `Jan` without clear lands (`JanJan `)', async () => {
-      expect(await typedOver('Jan', 'Jan ', (t) => t)).toMatchObject({ kind: 'landed', observed: 'JanJan ' });
+      const { result, held } = await typedOver('Jan', 'Jan ', (t) => t);
+      expect(fillReply(result, 'id:f')).toBe('Filled id:f (4 characters)');
+      expect(held()).toBe('JanJan ');
     });
 
     it('`Jan ` typed after `Jan ` without clear, no key landing, still lands — ADR 0034 residual 7, the value already shown', async () => {
-      expect(await typedOver('Jan ', 'Jan ', () => '')).toMatchObject({ kind: 'landed', observed: 'Jan ' });
+      const { result, held } = await typedOver('Jan ', 'Jan ', () => '');
+      expect(fillReply(result, 'id:f')).toBe('Filled id:f (4 characters)');
+      expect(held()).toBe('Jan ');
     });
 
-    it('the clear of a field holding `Jan ` deletes 4', () => {
-      const first = clearStep(startClear(undefined), { value: dumped('Jan ').value });
-      expect(first.step).toEqual({ do: 'delete', count: 4 });
+    it('the clear of a field holding `Jan ` deletes 4', async () => {
+      const { fake, held } = androidField('Jan ');
+      await fillField(fake, 'id:f', '', { ...FILL, clear: true });
+      expect(fake.deletes).toEqual([4]);
+      expect(held()).toBe('');
     });
   });
 
   // D64b-3 (ADR 0028's amendment), re-pinned by D72: the parser no longer trims a value's outer spaces, so the ⚠ line
   // counts what the app holds (5, where it counted 4), and a typed `+421` over an inserted `+421 ` is no longer silent.
+  // The field is empty before the tap, the focus inserts `+421 `, the typing takes none of the keys; the post-focus
+  // re-read is skipped (a sole `id`, Android's late typing), so the reading is `+421 `.
   describe('a field holding `+421 `, the re-read skipped: the reading is `+421 `', () => {
-    const reading = parseDump('<hierarchy><node class="android.widget.EditText" text="+421 " password="false" bounds="[0,0][100,100]" /></hierarchy>').value ?? '';
-    const expecting = (value: string): Expectation => ({ value, clear: false, before: '', placeholder: undefined, isInput: true, resolvedValue: null, held: 'unread' });
+    const fillDial = async (value: string) => {
+      const { fake } = androidField('', { onFocus: '+421 ', keep: () => '' });
+      return fillField(fake, 'id:f', value, FILL);
+    };
 
-    it('`421` typed: the line says 5 characters, as the app holds', () => {
-      const landing = landingOf(reading, expecting('421'));
-      expect(landing).toEqual({ kind: 'landed', focusUnread: { shows: 5 } });
-      const focusUnread = landing?.kind === 'landed' ? landing.focusUnread : undefined;
-      expect(fillReply({ role: 'textfield', typed: 3, readBack: { kind: 'landed' }, focusUnread }, 'id:dial')).toContain('\n⚠ the field shows 5 characters for the 3 typed,');
+    it('`421` typed: the line says 5 characters, as the app holds', async () => {
+      const result = await fillDial('421');
+      expect(result.focusUnread).toEqual({ shows: 5 });
+      expect(fillReply(result, 'id:dial')).toContain('\n⚠ the field shows 5 characters for the 3 typed,');
     });
 
-    it('`+421` typed: the reading is not the value typed, so the ⚠ line, where it was silent (ADR 0028 residual 3, D72)', () => {
-      const landing = landingOf(reading, expecting('+421'));
-      expect(landing).toEqual({ kind: 'landed', focusUnread: { shows: 5 } });
-      const focusUnread = landing?.kind === 'landed' ? landing.focusUnread : undefined;
-      expect(fillReply({ role: 'textfield', typed: 4, readBack: { kind: 'landed' }, focusUnread }, 'id:dial')).toContain('\n⚠ the field shows 5 characters for the 4 typed,');
+    it('`+421` typed: the reading is not the value typed, so the ⚠ line, where it was silent (ADR 0028 residual 3, D72)', async () => {
+      const result = await fillDial('+421');
+      expect(result.focusUnread).toEqual({ shows: 5 });
+      expect(fillReply(result, 'id:dial')).toContain('\n⚠ the field shows 5 characters for the 4 typed,');
     });
   });
 

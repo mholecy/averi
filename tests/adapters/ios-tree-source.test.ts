@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createIosTreeSource, IdbEmptyTreeError, IdbNoFrontmostError, IdbTreeSource, parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { rebootSimulatorAdvice } from '../../src/adapters/simulator-reboot.js';
 import { recordedSpinner } from '../helpers/live-records.js';
@@ -10,8 +10,13 @@ import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec
 import { PersistentReadError } from '../../src/adapters/types.js';
 import type { IdbHelper } from '../../src/adapters/idb-helper.js';
 import type { UiNode } from '../../src/adapters/types.js';
-import { landingOf } from '../../src/interact/fill-landing.js';
-import { maskTemplate } from '../../src/interact/fill-reformat.js';
+import { fillField } from '../../src/interact/fill.js';
+import { fillReply } from '../../src/interact/fill-text.js';
+import { FakeAdapter } from '../helpers/fake.js';
+
+// The one sleep owner (util/sleep.ts) is recorded, not waited on (tests/helpers/sleep-recorder.ts): the fill below
+// costs no focus delay and no poll's wall clock.
+vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 
 /**
  * One element in the vocabulary both backends share, spelled the two ways
@@ -239,11 +244,24 @@ describe('parseIdbDescribeAll — batch-4\'s real form-format dump: an empty fie
     expect(field(tree, 'date')?.rect).toEqual({ x: 20, y: 382, width: 362, height: 34 });
   });
 
-  it('the parsed mask is a mask template (D51): the dotted landing over it lands, reformatted', async () => {
-    const before = field(parseIdbDescribeAll(await raw()), 'date')!.value!;
-    expect(maskTemplate(before)).toBe(true);
-    const reading = { value: '31122026', clear: false, before, placeholder: undefined, isInput: true, resolvedValue: before, held: 0 as const };
-    expect(landingOf('31.12.2026', reading)).toEqual({ kind: 'landed', reformatted: { added: 2, respaced: 0 } });
+  // Through fillField, every tree read a fresh parse of the capture: the date field shows its mask until typed into,
+  // then each typed digit takes the mask's next `_` — as the lab's field does.
+  it('the parsed mask is a mask template (D51): a fill of `31122026` over it lands, reformatted', async () => {
+    const elements = JSON.parse(await raw()) as Record<string, unknown>[];
+    let shown = '__.__.____';
+    const tree = () => parseIdbDescribeAll(JSON.stringify(elements.map((e) => (e.AXUniqueId === 'lab.form-format.date' ? { ...e, AXValue: shown } : e))));
+    const fake = new FakeAdapter({ form: tree() }, 'form');
+    fake.platform = 'ios';
+    fake.uiTree = async () => tree();
+    fake.typeText = async (text) => {
+      fake.typed.push(text);
+      for (const digit of text) shown = shown.replace('_', digit);
+    };
+    const result = await fillField(fake, 'id:lab.form-format.date', '31122026', { ambiguous: 'first', timeoutMs: 200, pollMs: 2 });
+    expect(shown).toBe('31.12.2026');
+    expect(result).toMatchObject({ readBack: { kind: 'landed' }, reformatted: { added: 2, respaced: 0 } });
+    expect(fake.typed).toEqual(['31122026']); // nothing wiped or typed again
+    expect(fillReply(result, 'id:lab.form-format.date')).toContain('the field shows them reformatted: 2 separators added');
   });
 });
 
