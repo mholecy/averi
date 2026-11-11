@@ -1699,15 +1699,17 @@ T24 made the lab runs a release gate (docs/release.md). Three of its modules hol
 `lab` group, each against its own direct tests:
 
 - scripts/truth/batch/lab-run-ios.ts, Gate C's iOS standing batch (ADR 0041's T24 amendment), against
-  tests/truth/batch/lab-run-ios.test.ts: 86.76 %, 137 mutants, 9 survived, 9 without coverage. Floor 84.
+  tests/truth/batch/lab-run-ios.test.ts: 87.07 %, 117 mutants, 8 survived, 7 without coverage, 1 runtime error. Floor
+  84.
 - scripts/release/pack-files.ts, the smoke's file list, import and tool checks, against
   tests/release/pack-files.test.ts: 98.06 %, 155 mutants, 2 survived, 1 without coverage. Floor 96.
 - scripts/release/clean-log.ts, the record's path scrubber, against tests/release/clean-log.test.ts: 79.66 %, 59
   mutants, 2 survived, 10 without coverage. Floor 77.
 
-lab-run.ts lends lab-run-ios.ts its selection words, its live run and its exit tail (`Standing`, `keptLiveRun`,
-`standingRun`), so tests/truth/batch/lab-run-ios.test.ts joins its tests. It scores 95.40 % (523 mutants, 15 survived,
-2 timeouts counted killed, 9 without coverage), at its floor 93.
+lab-run.ts lends lab-run-ios.ts its selection (`Standing`, `standingSelection`), live run and judge (`keptLiveRun`,
+`liveJudge`) and the run with its exit rule (`standingRun`), so tests/truth/batch/lab-run-ios.test.ts joins its tests.
+It scores 95.42 % (525 mutants, 15 survived, 2 timeouts counted killed, 9 without coverage, 1 runtime error), at its
+floor 93.
 
 What is not killed, split in the scope.json baselines:
 
@@ -1719,6 +1721,6 @@ What is not killed, split in the scope.json baselines:
 - pack-files.ts: a dynamic import's `\s*` around its quotes made `\s`, which a one-space `import( 'x' )` still matches.
 
 The sandbox gains one entry, `!/scripts/release/`, in stryker.config.mjs's allowlist; tests/mutation/mutate.test.ts's
-path rule admits scripts/release/. The figures above come from a narrowed cold run (`--mutate` over the four modules,
-`--tempDirName reports/mutation/stryker-tmp-t24`, whose exit 1 is the narrowed run's). The cold full lab group took
-about 300 s (the reviewer measured 299 s) and exits 0.
+path rule admits scripts/release/. The figures above come from narrowed cold runs (`--mutate` over the four modules,
+then over the two batches, `--tempDirName reports/mutation/stryker-tmp-t24`, whose exit 1 is a narrowed run's). The cold
+full lab group took about 300 s (the reviewer measured 299 s) and exits 0.

@@ -11,7 +11,7 @@ import { chooserWindow, cleanUp, readCheck, reinstallProgress, type Check, type 
 import { CATALOG_PATH } from './lab-lines.js';
 import { nodeProcess, type ProcessSeam } from './proc.js';
 import { STATE_FILE } from './run-dir.js';
-import { runBatch, type Block, type BlockCtx, type BlockFiles, type LastStep, type LiveOutcome, type NeedSpec, type RunIo } from './runner.js';
+import { runBatch, type Block, type BlockCtx, type BlockFiles, type LiveOutcome, type RunBatchOptions, type RunIo } from './runner.js';
 import { configOf, NO_SERIAL, type ConfigRead, type Env } from './runner-lines.js';
 import { knobs as readKnobs, selectBlocks, type KnobValues, type Selection } from './select.js';
 import { EXIT, parseVerdictLine, refusedLine, verdictLine, type Verdict } from './words.js';
@@ -95,7 +95,10 @@ export const LEFT_LABEL = 'chooser left a default';
 /** No last-chosen entry is accepted: one is a WARN (lab-chooser.ts#CHECK_OUTCOME's 6), never a reinstall. */
 const ACCEPTED: readonly AcceptedEntry[] = [];
 
-/** The knobs (select.ts): the live runs' bound, the build's, the window's restore. */
+/**
+ * The knobs (select.ts): the live runs' bound, the build's, the window's restore (the chooser's here, a WDA window's in
+ * lab-run-ios.ts: both standing batches read these).
+ */
 export const KNOBS = {
   counts: {
     B_LIVE: { default: 1800, min: 300, max: 7200, unit: 'seconds' },
@@ -127,7 +130,7 @@ const liveBlock = (group: LabRunGroup): Pick<Block<LabRunKnobs>, 'id' | 'label' 
  * `--groups <g[,g]>` taken out of argv: the groups named (none: not given), the rest for configOf, or the refusal's
  * lines (a group that is none, none named, given twice, no value).
  */
-export function groupsOf<G extends string = LabRunGroup>(argv: readonly string[], st: Standing<G> = LAB_RUN_STANDING as unknown as Standing<G>): { named?: G[]; rest: string[]; errors: string[] } {
+export function groupsOf<G extends string>(argv: readonly string[], st: Standing<G>): { named?: G[]; rest: string[]; errors: string[] } {
   const rest: string[] = [];
   const errors: string[] = [];
   let named: string[] | undefined;
@@ -159,10 +162,10 @@ export function groupsOf<G extends string = LabRunGroup>(argv: readonly string[]
  * ONLY= as runBatch is to read it with `--groups`: the lab block and the groups named, within ONLY's names when it
  * names any (a name that is no block kept, for the runner's WARN); or why no block is left.
  */
-export function onlyWith<G extends string = LabRunGroup>(
+export function onlyWith<G extends string>(
   named: readonly G[] | undefined,
   only: string | undefined,
-  st: Standing<G> = LAB_RUN_STANDING as unknown as Standing<G>,
+  st: Standing<G>,
 ): { only?: string } | { why: string } {
   if (named === undefined) return only === undefined ? {} : { only };
   const allowed: readonly string[] = ['lab', ...named.flatMap((g) => st.blocksOf(g))];
@@ -327,7 +330,7 @@ export function noLiveGroup<G extends string>(
   selected: Selection,
   only: string | undefined,
   named: readonly G[] | undefined,
-  st: Standing<G> = LAB_RUN_STANDING as unknown as Standing<G>,
+  st: Standing<G>,
 ): string[] {
   const live = st.groups.flatMap((g) => st.blocksOf(g));
   if (!selected.ok || selected.wanted.some((b) => live.includes(b))) return [];
@@ -355,6 +358,7 @@ export function labRunExit(runner: number, summary: readonly string[] | undefine
   return passed ? LAB_RUN_EXIT.ok : LAB_RUN_EXIT.unproven;
 }
 
+/** A standing batch's options: lab-run's and lab-run-ios.ts's (which ignores `jvms`). */
 export interface LabRunOptions {
   argv: readonly string[];
   env: Env;
@@ -367,19 +371,27 @@ export interface LabRunOptions {
   jvms?: readonly string[];
 }
 
-/** The run, start to end: its exit code (LAB_RUN_EXIT), the one the seam's exit is called with. */
-export async function labRun(o: LabRunOptions): Promise<number> {
-  const picked = groupsOf(o.argv);
-  const only = onlyWith(picked.named, o.env.ONLY);
+/**
+ * A standing batch's selection from its argv and env (lab-run's and lab-run-ios.ts's): `--groups` as ONLY= is, the
+ * blocks wanted, and the config — refused, with every reason, on a bad group, ONLY= and --groups leaving no block, a
+ * selection with no live group, or the config's own errors.
+ */
+export function standingSelection<G extends string>(o: Pick<LabRunOptions, 'argv' | 'env' | 'repo'>, st: Standing<G>): { wanted: readonly string[]; config: ConfigRead } {
+  const picked = groupsOf(o.argv, st);
+  const only = onlyWith(picked.named, o.env.ONLY, st);
   const onlyValue = 'only' in only ? only.only : undefined;
-  const selected = selectBlocks(BLOCK_IDS, onlyValue);
-  const wanted = selected.ok ? selected.wanted : [];
+  const selected = selectBlocks(st.blockIds, onlyValue);
   const read = configOf(picked.rest, { ...o.env, ONLY: onlyValue }, o.repo);
   const errors = [...picked.errors, ...('why' in only ? [only.why] : [])];
   // A group refused is said alone: what it would have selected is not asked.
-  if (errors.length === 0) errors.push(...noLiveGroup(selected, o.env.ONLY, picked.named));
-  const config: ConfigRead =
-    read.ok && errors.length === 0 ? read : { ok: false, errors: [...(read.ok ? [] : read.errors), ...errors] };
+  if (errors.length === 0) errors.push(...noLiveGroup(selected, o.env.ONLY, picked.named, st));
+  const config: ConfigRead = read.ok && errors.length === 0 ? read : { ok: false, errors: [...(read.ok ? [] : read.errors), ...errors] };
+  return { wanted: selected.ok ? selected.wanted : [], config };
+}
+
+/** The run, start to end: its exit code (LAB_RUN_EXIT), the one the seam's exit is called with. */
+export async function labRun(o: LabRunOptions): Promise<number> {
+  const { wanted, config } = standingSelection(o, LAB_RUN_STANDING);
   const serial = config.ok ? config.config.serial : undefined;
   // The build's bound is given before runBatch reads the knobs (the blocks read theirs from ctx.knobs); a bad knob
   // refuses there, with nothing built.
@@ -451,15 +463,7 @@ export async function labRun(o: LabRunOptions): Promise<number> {
  */
 export async function standingRun(
   o: Pick<LabRunOptions, 'io'>,
-  b: {
-    name: string;
-    blocks: readonly Block<LabRunKnobs>[];
-    wanted: readonly string[];
-    needs: Readonly<Record<string, NeedSpec>>;
-    lastly: readonly LastStep[];
-    batchReasons: readonly string[];
-    config: ConfigRead;
-  },
+  b: Omit<RunBatchOptions<typeof KNOBS>, 'knobs' | 'io'> & { wanted: readonly string[] },
 ): Promise<number> {
   // Each method delegates, not a spread: a seam may be a class instance (the tests'), whose methods a spread would not copy.
   const real: ProcessSeam = o.io?.seam ?? nodeProcess;
@@ -473,20 +477,12 @@ export async function standingRun(
   const fs = o.io?.fs ?? nodeFs;
   const meta = b.config.ok ? join(b.config.config.out, 'meta') : undefined;
   const runsBefore = new Set(meta === undefined ? [] : fs.list(meta));
-  const code = await runBatch({
-    name: b.name,
-    knobs: KNOBS,
-    blocks: b.blocks,
-    needs: b.needs,
-    lastly: b.lastly,
-    batchReasons: b.batchReasons,
-    config: b.config,
-    io: { ...o.io, seam },
-  });
+  const { wanted, ...batch } = b;
+  const code = await runBatch({ ...batch, knobs: KNOBS, io: { ...o.io, seam } });
   if (code === EXIT.interrupted) return code;
   const run = meta === undefined ? undefined : fs.list(meta).find((n) => n.startsWith('run-') && !runsBefore.has(n));
   const text = run === undefined ? undefined : fs.read(join(meta!, run, 'summary.txt'));
-  const labels = b.blocks.filter((x) => b.wanted.includes(x.id)).map((x) => x.label);
+  const labels = b.blocks.filter((x) => wanted.includes(x.id)).map((x) => x.label);
   const exit = labRunExit(code, text?.split('\n'), labels);
   real.exit(exit);
   return exit;

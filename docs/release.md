@@ -85,6 +85,11 @@ them in the background.
    tests/helpers/tool-names.ts, in order. Exit 0 and the last line `release smoke: PASS`. Exit 1 is a FAIL that names
    each problem. Exit 2 means dist is missing (run `npm run build`).
 
+   Its limit: the extracted package runs over the checkout's node_modules, devDependencies among them, so a
+   dependency missing from `dependencies` only shows through the import check. That check reads the static
+   `import`/`export … from` lines and string-literal `import('…')` calls of dist. An import whose name is built at
+   run time (`import(name)`, `createRequire`) of a devDependency would pass the smoke and fail for a user.
+
 ## Gate B: Android (agent)
 
 **The device rules.** Only `emulator-5554`, the `averi_lab` AVD (live.ts and lab-run.ts refuse any other device
@@ -119,7 +124,10 @@ or restart anything to bring it up.
    ```
 
    `perl … alarm` bounds the run at one hour (macOS has no `timeout`). An exit of 142 (SIGALRM) means the run went
-   past its bound: unproven. `--record` writes every read as JSON, and `--shots` keeps the screen of each case that is
+   past its bound: unproven. The alarm kills node alone: an `adb` it started may still run. After a run past its
+   bound, `pgrep -fl 'adb -s emulator-5554'` must list nothing (end a leftover by its pid, never the adb server), and
+   `adb -s emulator-5554 shell echo ok` must answer within a few seconds; if it does not, stop and tell the owner.
+   `--record` writes every read as JSON, and `--shots` keeps the screen of each case that is
    not ok. The `dismissal` group is iOS only: Gate C runs it. The carousel group reads the device's state before and
    after its cases (about 55 s each) into the summary's `Device:` line. That line is a label, not a gate: record it.
 
@@ -127,6 +135,13 @@ or restart anything to bring it up.
    golden: N cases, … M mismatches (0 not known), …`, so every mismatch is one live-known.ts lists (marked `[known:
    …]`). None of these lines appear: `FIXED, not intermittent — strike off live-known.ts`, `SKIPPED where a skip
    proves nothing`, `NO FIRST STATE`, `MISMATCH (hedged ceiling)`. A case marked `[NOT known: …]` fails the run.
+
+   **A `loud` count above 0 does not fail the gate.** A LOUD case is one where the app's model does not hold what the
+   case asked and averi said so (an error, or `NOT verified`): honest, not a pass of that case, and not counted
+   against the run by `summarize` in live-cases.ts. Two LOUD kinds do fail it there: a case whose app wrote no state
+   (class `no-state`, the `NO FIRST STATE` line) and the carousel's hedged ceiling when it is a MISMATCH. Its
+   unjudged form (`LOUD (hedged ceiling): … fewer than … judged`) is a LOUD, said in the record. The record lists
+   every LOUD case by id and class, Gate B's and Gate C's alike.
 
 ## Gate C: iOS (owner, outside the agent's sandbox)
 
@@ -146,10 +161,11 @@ settings backed up, the run, WebDriverAgent ended, the settings put back key by 
 read at the start and at the end, and a change fails the run. A signal puts an open window back and exits 130. Each
 live run is bounded (`B_LIVE`, 1800 s by default).
 
-It passes only on **exit 0**, the same codes as `truth:lab`. Exit 1 is a FAIL or a `RESTORE.txt`, exit 2 means
+It passes only on **exit 0**, the same codes as `truth:lab`; each live block's verdict is its run's rejudge exit
+code, so the live golden's rules above hold, LOUD cases included. Exit 1 is a FAIL or a `RESTORE.txt`, exit 2 means
 refused or nothing ran (no udid, the simulator not the lab's or not booting), 3 means unproven, 130 means interrupted.
-If no lab simulator is available, the owner decides: Gate C is not skipped silently. A release without it says so in
-the record and in the release commit's message.
+If no lab simulator is available, only the owner may waive Gate C, never the agent. Gate C is not skipped silently: a
+release without it says so, with the owner's waiver, in the record and in the release commit's message.
 
 The owner hands back the SUMMARY (`<out>/meta/run-<id>/summary.txt`) for the record, cleaned with clean-log.ts.
 

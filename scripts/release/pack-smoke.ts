@@ -1,13 +1,14 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { mkdtemp, readdir, readFile, realpath, rm, symlink } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { existsSync, realpathSync } from 'node:fs';
+import { mkdtemp, readdir, readFile, rm, symlink } from 'node:fs/promises';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { TOOL_NAMES } from '../../tests/helpers/tool-names.js';
 import { isMain } from '../is-main.js';
+import { hostPaths, scrub } from './clean-log.js';
 import { bareImports, packFileProblems, toolProblems, undeclaredImports, type PackageDeps, type PackageShape } from './pack-files.js';
 
 /**
@@ -110,9 +111,9 @@ export async function smoke(): Promise<{ lines: string[]; exitCode: 0 | 1 | 2 }>
         if (served.name !== pkg.name || served.version !== pkg.version) problems.push(`server says ${served.name}@${served.version}, package.json ${pkg.name}@${pkg.version}`);
         problems.push(...toolProblems(served.tools, TOOL_NAMES));
       } catch (e) {
-        // No host path in the output: the folder as made and as node resolved it (/var → /private/var on macOS).
+        // No host path in the output (clean-log.ts's): the smoke's folder as made and as node resolved it, then the rest.
         const said = e instanceof Error ? e.message : String(e);
-        problems.push(`not started: ${said.replaceAll(await realpath(tmp), '<tmp>').replaceAll(tmp, '<tmp>')}`);
+        problems.push(`not started: ${scrub(said, hostPaths({ repo: ROOT, tmp: tmpdir(), home: homedir(), real: realpathSync }, [[tmp, '<tmp>']]))}`);
       }
     }
   } finally {

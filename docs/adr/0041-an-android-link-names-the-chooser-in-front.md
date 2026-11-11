@@ -825,8 +825,9 @@ dexopt. When the emulator is not up, the agent stops and tells the owner. T20c i
 Gate C is the batch's iOS counterpart, `npm run truth:lab:ios` (lab-run-ios.ts), composed of the same runner and lab
 plumbing: the lab block (the guard, the reset, this checkout's app built and installed), every idb run of live.ts's
 iOS groups (forms, visibility, dismissal, ensure) after its health check, then every WebDriverAgent run in its own D43
-settings window. The two batches share their selection words, the live blocks' judge and the exit rule (lab-run.ts's
-`Standing`, `liveJudge`, `standingRun`). The owner runs it, outside the agent's sandbox.
+settings window. The two batches share lab-run.ts's selection (`Standing`, `standingSelection`), live run and judge
+(`keptLiveRun`, `liveJudge`) and the run with its exit rule (`standingRun`). The owner runs it, outside the agent's
+sandbox.
 
 **Consequences.** Every release runs the net, so a chooser regression cannot ship between scheduled runs. The cost is
 one batch per platform per release, not one per night. Between releases the net runs only when someone asks for it.

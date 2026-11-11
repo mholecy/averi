@@ -4,20 +4,18 @@ import { shellQuote } from './ios-defaults.js';
 import { iosCheck, iosLab, wdaWindow } from './ios-lab.js';
 import { labBlock, labBuild } from './lab-build.js';
 import {
-  groupsOf,
   KNOBS,
   keptLiveRun,
   liveJudge,
-  noLiveGroup,
-  onlyWith,
   standingRun,
+  standingSelection,
   type LabRunKnobs,
   type LabRunOptions,
   type Standing,
 } from './lab-run.js';
 import type { Block, BlockCtx } from './runner.js';
-import { configOf, NO_UDID, type ConfigRead } from './runner-lines.js';
-import { knobs as readKnobs, selectBlocks } from './select.js';
+import { NO_UDID } from './runner-lines.js';
+import { knobs as readKnobs } from './select.js';
 
 /**
  * The standing lab batch on the lab simulator (backlog T24: docs/release.md's Gate C), lab-run.ts's iOS counterpart
@@ -91,15 +89,7 @@ export function windowStateHand(udid: string | undefined, file: string): string 
 
 /** The run, start to end: its exit code (lab-run.ts#LAB_RUN_EXIT), the one the seam's exit is called with. */
 export async function labRunIos(o: LabRunOptions): Promise<number> {
-  const picked = groupsOf(o.argv, IOS_STANDING);
-  const only = onlyWith(picked.named, o.env.ONLY, IOS_STANDING);
-  const onlyValue = 'only' in only ? only.only : undefined;
-  const selected = selectBlocks(IOS_BLOCK_IDS, onlyValue);
-  const wanted = selected.ok ? selected.wanted : [];
-  const read = configOf(picked.rest, { ...o.env, ONLY: onlyValue }, o.repo);
-  const errors = [...picked.errors, ...('why' in only ? [only.why] : [])];
-  if (errors.length === 0) errors.push(...noLiveGroup(selected, o.env.ONLY, picked.named, IOS_STANDING));
-  const config: ConfigRead = read.ok && errors.length === 0 ? read : { ok: false, errors: [...(read.ok ? [] : read.errors), ...errors] };
+  const { wanted, config } = standingSelection(o, IOS_STANDING);
   const udid = config.ok ? config.config.udid : undefined;
   const pre = readKnobs(KNOBS, o.env);
   const build = labBuild({ ...(pre.ok ? { secs: pre.values.B_BUILD } : {}) });

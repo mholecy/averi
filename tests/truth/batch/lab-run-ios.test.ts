@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync, writeSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -15,9 +15,9 @@ import {
 } from '../../../scripts/truth/batch/lab-run-ios.js';
 import { groupsOf, LAB_RUN_EXIT, onlyWith } from '../../../scripts/truth/batch/lab-run.js';
 import type { LiveCases, LiveTable } from '../../../scripts/truth/batch/live-table.js';
-import type { Ended, Handlers, KillResult, ProcessSeam, StartOptions, Started } from '../../../scripts/truth/batch/proc.js';
+import type { StartOptions } from '../../../scripts/truth/batch/proc.js';
 import { LIVE_GOLDEN_HEADER } from '../../../scripts/truth/batch/steps.js';
-import { CATALOG, LAB_UDID, labWorld, type LabWorld, type WorldOptions } from './lab-fakes.js';
+import { CATALOG, FakeSeam, LAB_UDID, labWorld, until, type Answer, type LabWorld, type WorldOptions } from './lab-fakes.js';
 
 // The standing lab batch on the lab simulator (T24, scripts/truth/batch/lab-run-ios.ts) under runBatch, over the shared
 // fake lab (lab-fakes.ts) and a fake process seam that answers git and live.ts — its run and its `--rejudge` — with
@@ -41,53 +41,16 @@ interface LiveScript {
   during?: (w: LabWorld, seam: IosSeam) => void;
 }
 
-class IosSeam implements ProcessSeam {
-  readonly words: string[] = [];
-  readonly exits: number[] = [];
-  handlers: Handlers | undefined;
-  hang: string | undefined;
+class IosSeam extends FakeSeam {
   live: Record<string, LiveScript> = {};
   /** `simctl boot` fails from now on (a reset after this point cannot be made). */
   bootFails = false;
   /** `idb disconnect` drops the entry but answers exit 1 from now on: the reset's warning, the lab still fit. */
   disconnectSaysFailed = false;
-  private nextPid = 100;
-  private readonly ends = new Map<number, (e: Ended) => void>();
-  private readonly ended = new Set<number>();
-  constructor(public world: LabWorld) {}
-  start(cmd: string, args: readonly string[], options: StartOptions): Started {
-    const said = `${cmd === process.execPath ? 'node' : cmd} ${args.join(' ')}`;
-    this.words.push(said);
-    const a = this.answer(cmd, args, options);
-    if (a === undefined) throw new Error(`no answer for ${said}`);
-    if (options.logFd !== undefined) writeSync(options.logFd, `${a.out}${a.err}`);
-    const pid = this.nextPid++;
-    let end!: (e: Ended) => void;
-    const exited = new Promise<Ended>((r) => (end = r));
-    this.ends.set(pid, (e) => (this.ended.add(pid), end(e)));
-    if (this.hang === undefined || !said.includes(this.hang)) this.ends.get(pid)!({ code: a.code, signal: null });
-    else this.hang = undefined;
-    return { pid, exited, closed: exited.then(() => {}), out: () => (options.logFd === undefined ? a.out : ''), err: () => (options.logFd === undefined ? a.err : ''), release: () => {} };
+  constructor(world: LabWorld) {
+    super(world, HEAD);
   }
-  killGroup(pid: number, signal: NodeJS.Signals | 0): KillResult {
-    if (this.ended.has(pid)) return 'gone';
-    if (signal !== 0) this.ends.get(pid)?.({ code: null, signal });
-    return 'sent';
-  }
-  install(h: Handlers): void {
-    this.handlers = h;
-  }
-  exit(code: number): void {
-    this.exits.push(code);
-  }
-  stderr(): void {}
-  private answer(cmd: string, args: readonly string[], options: StartOptions): { code: number; out: string; err: string } | undefined {
-    if (cmd === 'git') {
-      const said = args.slice(2).join(' ');
-      if (said === 'rev-parse --show-toplevel') return { code: 0, out: `${nodeFs.real(args[1])}\n`, err: '' };
-      if (said.startsWith('rev-parse --verify')) return { code: 0, out: `${HEAD}\n`, err: '' };
-      return { code: 0, out: '', err: '' };
-    }
+  protected answer(cmd: string, args: readonly string[], options: StartOptions): Answer | undefined {
     if (cmd === process.execPath && args.some((a) => a.endsWith('live.ts'))) {
       const at = (flag: string) => args[args.indexOf(flag) + 1];
       if (args.includes('--rejudge')) {
@@ -164,11 +127,6 @@ const lastCallAt = (text: string, before = Infinity) => {
   seam.words.forEach((w, i) => void (i < before && w.includes(text) && (at = i)));
   return at;
 };
-const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
-async function until(ok: () => boolean, ms = 1500): Promise<void> {
-  for (const end = Date.now() + ms; Date.now() < end; await tick(2)) if (ok()) return;
-  throw new Error('the condition never held');
-}
 
 describe('lab-run-ios.ts: a clean run — the lab, every idb run, then every WebDriverAgent run in its own window', () => {
   it('every line in the blocks\' order, the finportal key unchanged, RESTORE none; exit 0', async () => {
