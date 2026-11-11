@@ -33,6 +33,8 @@ run — see the A21 amendment at the end).
 Amended 2026-11-11 (A27: Android's parsers, split from android.ts, and android-chooser.ts joined the run as a fourth
 group, `android` — see the A27 amendment at the end).
 Amended 2026-11-11 (A34: runner.ts, standing.ts and lab-run.ts changed — the A34 line at the end).
+Amended 2026-11-11 (A32: scope.json keeps each module's latest baseline only; the earlier ones moved to
+docs/mutation-ledger.md — see the A32 amendment at the end).
 
 ## Context
 
@@ -2020,3 +2022,21 @@ live run's header names its bound), standing.ts (`liveSecsOf`, and `keptLiveRun`
 (`LIVE_SECS`). bounded.ts was changed in a review round and changed back: it is as on main. A cold lab run on the
 branch, 548 s at load 53–57, was load-inflated and before the review's changes; the modules' cold scores are recorded at
 the merge, from a cold run of every group on main.
+
+## Amendment: scope.json keeps the latest baseline, the ledger the rest (2026-11-11, backlog A32)
+
+scope.json had grown to 98 KB, 69 KB of it baseline prose that no code reads: each `baseline` field held every run
+since the module joined, newest first, on one line. A floor change was a diff of one enormous line.
+
+- **`baseline` holds the latest run only**: its score, date, row, command and survivors, as before. The floor rule is
+  unchanged: raise a floor when its baseline rises; lower it only with a reason written in the new `baseline`.
+- **The earlier runs are in docs/mutation-ledger.md**, one section per module, newest first. When a run records a new
+  baseline in scope.json, the one it replaces moves to the top of that module's list in the ledger, unedited.
+- The move was mechanical: each field was split where a new entry starts (`; ` then `<score> % on <date>`, outside
+  brackets), the first entry kept and the rest moved in order. Every module's old field equals its new `baseline` and
+  its ledger entries joined with `; `, checked for all 65 modules. No floor, test list or group changed, so no Stryker
+  run was needed: the run reads the same scope.
+- The scope has 65 modules at A32, not the five this ADR began with; the merge rule in Consequences applies to every
+  one of them, its tests and what they import.
+- An older amendment that says a reason or survivor is in "its scope.json baseline" (or "scope.json's baseline") means
+  the baseline of that time: unless it is still the latest, it is now in docs/mutation-ledger.md, under the module.
