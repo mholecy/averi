@@ -1,10 +1,11 @@
 # 39. iOS liveness asks the host's process list; a no is launchctl's
 
 Status: accepted 2026-11-02 (backlog row D33, docs/plans/2026-10-30-performance-backlog.md). The `DeviceAdapter`
-contract, `run/verify.ts#appHealth` and every reply line are unchanged. One verdict changes on purpose: launchctl's
-match is now exact (below). Amended 2026-11-02 (batch-4's device check: the A/B shown, the agreement before a
-reinstall — the batch-4 amendment). Amended 2026-11-02 (batch-5: the agreement after a reinstall measured, PASS —
-the last section).
+contract, `appHealth` (in `run/verify.ts` then, `run/app-health.ts#appHealth` since A29) and every reply line are
+unchanged. One verdict changes on purpose: launchctl's match is now exact (below). Amended 2026-11-02 (batch-4's device
+check: the A/B shown, the agreement before a reinstall — the batch-4 amendment). Amended 2026-11-02 (batch-5: the
+agreement after a reinstall measured, PASS — the batch-5 amendment). Amended 2026-11-11 (A29: app health in one module,
+one failure policy — the last section).
 
 ## Context
 
@@ -109,3 +110,45 @@ install, as above.
 Batch-4's relaunch miss did not recur: the cell opened after the install was ready at the first attempt 7/7, in about
 2.5 s (2.3–2.8), with no settle pause (4 cycles, relaunched about 2 s after the install returned, batch-4's condition)
 or a 3 s one (3 cycles). It was a one-off, not a property of the reinstall. D33 / L4 is done.
+
+## Amendment: app health in one module, one failure policy (2026-11-11, A29)
+
+Backlog row A29 (docs/plans/2026-10-30-performance-backlog.md), card 11 of the 2026-11-11 architecture review. This
+ADR's liveness answer is read by one function, `appHealth`, and the review found the health line spread over three
+modules with three failure policies.
+
+**Context.** The crash signatures and their scan (`CRASH_PATTERNS`, `scanForCrashes`) sat in `verify/assert.ts`, which
+never read them. The line (`appHealth`) and `get_logs`' excerpt (`formatLogExcerpt`, `LOG_GREP_FLAGS`,
+`LOG_MAX_LINES`) sat in `run/verify.ts`, the `verify` tool's orchestration, beside the reply pieces the single-platform
+tools borrowed from it. A health check that threw was handled three ways: `assert` swallowed it and dropped the line
+(`run/commands.ts#runAsserts`'s catch), `ensure_state` and `run_flow` rejected, and a `verify` leg became `FAILED:`
+and lost its asserts. But `appHealth` already words both device failures itself — a question that cannot be asked
+is `appAlive: unknown`, a log read that rejects costs the excerpt — so the only throws left are an adapter breaking
+its contract: a `platform` that throws on read, or `logs` resolving to no array. Neither real adapter can: `platform`
+is a readonly field on `AndroidAdapter` and `IosAdapter`, and both `logs` return a `split`. The catch in `runAsserts`
+was dead for every real adapter, and the three policies differed only for a fake.
+
+**Decision.** One module, `src/run/app-health.ts`: the crash signatures and their scan (now private: the line is
+their one reader) and `appHealth`. The app's id is read through `flow/config.ts#appIdOf`, the one owner the flow's
+`launch:` step reads too. `get_logs`' excerpt is not health and is a leaf of its own, `src/run/log-excerpt.ts`. One
+policy, stated in the module's header in the same words: **`appHealth` words every device failure into the line,
+and catches nothing else.** A question the device cannot answer is `appAlive: unknown`; a log read that rejects, or
+throws before it returns its promise (the call is made inside one), costs the excerpt. Its four callers await it bare.
+A broken adapter's throw is a bug and fails each call as any other throw in it does: `ensure_state`, `run_flow` and
+`assert` reject, and a `verify` leg is its `FAILED:` section (the leg's containment of any throw, not a health
+policy). `runAsserts`' catch is deleted. That is the one change of behaviour, and it is reachable only by a fake
+(`tests/run/commands.test.ts` pins it with a `logs` that resolves to `null`, as the ensure_state and verify-leg tests
+already did; `tests/run/app-health.test.ts` pins the `platform` breach and run_flow's own test the same). No reply a real adapter can produce changed: the truth corpus' golden shows Changed 0.
+
+The place is run/, by A24's order (`mcp → run → flow → interact → verify → ui-tree → adapters`,
+`tests/architecture/layering.test.ts`). The line asks about averi.yaml's app (`app.<platform>`, `flow/config.ts`), so
+verify/ would import flow/ upward. It is not a device command, so not adapters/. Its readers are run/'s compositions;
+the log excerpt's is mcp/'s `get_logs`, above run/. The reply pieces the legs and the single-platform tools share
+(`finalFrame`, `screenshotFailedLine`, `formatAsserts`, `assertSummary`) moved to `src/run/run-reply.ts` beside it,
+and the `formatTrace` re-export is gone: `run/commands.ts` imports it from `flow/engine.ts`, its owner.
+
+**Rejected.** Making `appHealth` total, with a catch-all that turns any throw into a line. A contract breach would
+then read as a health verdict (which one: `unknown` would send the caller to `adb devices` for a bug in averi), and
+the four callers would still agree only by convention. Keeping `assert`'s catch as the "verdict stands" policy for
+all four: a `verify` leg cannot keep its asserts without a per-leg catch of its own, and it would hide the same bug.
+

@@ -166,11 +166,9 @@ describe('runEnsureState', () => {
     expect(shot).toEqual(frame('s'));
   });
 
-  // Beside the frame, the health check still decides the call as it did
-  // after it: one that throws fails ensure_state (it is not degraded to a
-  // missing line the way `assert` degrades it). appHealth guards the
-  // question and a rejected log read itself, so the throw is made where it
-  // does not guard — a log read that answers with something it cannot scan.
+  // Beside the frame, the health check still decides the call as it did after it: one that throws fails ensure_state,
+  // as it fails every caller (run/app-health.ts, its one policy). appHealth words every device failure into the line,
+  // so the throw is a broken adapter's — a log read that answers with something it cannot scan.
   it('a health check that throws still fails the call, frame or no frame', async () => {
     const fake = home();
     fake.appRunning = false;
@@ -227,6 +225,17 @@ describe('runNamedFlow', () => {
     expect(r.resolvedWith).toEqual([]);
   });
 
+  // The one failure policy (run/app-health.ts): a broken adapter's throw from the health check fails run_flow, as it
+  // fails ensure_state, assert and a verify leg.
+  it('a health check that throws fails the call', async () => {
+    const fake = home();
+    fake.appRunning = false;
+    fake.logs = async () => null as unknown as string[];
+    await expect(
+      runNamedFlow({ session: new EngineSession(), flow: 'open_menu', project: await validProject() }, resolver(fake).resolve),
+    ).rejects.toThrow(TypeError);
+  });
+
   it('the health line is the app\'s: a dead app is reported, not thrown', async () => {
     const fake = home();
     fake.appRunning = false;
@@ -258,25 +267,20 @@ describe('runAsserts', () => {
     expect(await run((await validProject()).cfg)).toBe(`${bare}\nappAlive: true`);
   });
 
-  // A throw outside appHealth's own guard costs the health line and nothing
-  // else — the narrow guard kept from the old catch-all (2026-10-08 code
-  // review: the verdict change the wide removal made was not taken).
-  it('a throw from the health check itself omits the health line; the verdict and the results stand', async () => {
-    const bare = await run(undefined);
+  // One failure policy for the health line (run/app-health.ts, A29): appHealth words every device failure into the
+  // line itself, and anything else it throws is a broken adapter, which fails the call — here as in ensure_state,
+  // run_flow and a verify leg. Until A29 this call alone swallowed it and dropped the health line; no real adapter
+  // reaches that (their `platform` is a field and their `logs` an array), so no reply changed. The throw is made where
+  // the other two callers' tests make it: a log read that answers with something it cannot scan.
+  it('a health check that throws fails the call, as it fails the other three callers', async () => {
     const fake = home();
-    // appHealth contains its own device errors, so the throw has to come from
-    // somewhere it does not guard: the first thing it reads off the adapter.
-    Object.defineProperty(fake, 'platform', {
-      get() {
-        throw new Error('adapter gone');
-      },
-    });
-    expect(await run((await validProject()).cfg, fake)).toBe(bare);
+    fake.appRunning = false;
+    fake.logs = async () => null as unknown as string[];
+    await expect(run((await validProject()).cfg, fake)).rejects.toThrow(TypeError);
   });
 
-  // The guard is the health check's ALONE: a throw from the asserts
-  // themselves is the call's failure, not a verdict to pass over.
-  it('a throw from the asserts themselves fails the call — the guard does not reach them', async () => {
+  // A throw from the asserts themselves is the call's failure, not a verdict to pass over.
+  it('a throw from the asserts themselves fails the call', async () => {
     const assertAll = vi.spyOn(Verifier.prototype, 'assertAll').mockRejectedValue(new Error('verifier broke'));
     try {
       await expect(run((await validProject()).cfg)).rejects.toThrow('verifier broke');
@@ -297,7 +301,7 @@ describe('baselineDirFor', () => {
 });
 
 /**
- * ensure_state whose final capture throws (2026-10-08, run/verify.ts#finalFrame):
+ * ensure_state whose final capture throws (2026-10-08, run/run-reply.ts#finalFrame):
  * the state WAS ensured — the trace and health line stand, one `⚠ screenshot:`
  * line says why there is no image, and no shot is returned.
  */

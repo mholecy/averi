@@ -3,10 +3,11 @@ import type { DeviceAdapter, Platform } from '../adapters/types.js';
 import type { AveriConfig } from '../flow/config.js';
 import { configDir, projectConfigPath, type ProjectConfig } from '../flow/load.js';
 import { refuseUnknownEnvironment } from './preflight.js';
-import { FlowEngine, type EngineContext, type RunRequest } from '../flow/engine.js';
+import { FlowEngine, formatTrace, type EngineContext, type RunRequest } from '../flow/engine.js';
 import { DEFAULT_BASELINE_DIR, Verifier, type AssertSpec } from '../verify/assert.js';
 import { unsettledNote } from '../verify/capture.js';
-import { appHealth, assertSummary, finalFrame, formatAsserts, formatTrace, screenshotFailedLine } from './verify.js';
+import { appHealth } from './app-health.js';
+import { assertSummary, finalFrame, formatAsserts, screenshotFailedLine } from './run-reply.js';
 
 /**
  * The single-platform tool compositions: what one `ensure_state`, `run_flow`
@@ -94,14 +95,14 @@ async function runOnEngine(
 /**
  * `ensure_state`: the trace and health line, and the frame the state was left
  * in — settled, as `screenshot` settles it. No `shot` when the capture itself
- * failed (2026-10-08, run/verify.ts#finalFrame): the state WAS ensured, so the
+ * failed (2026-10-08, run/run-reply.ts#finalFrame): the state WAS ensured, so the
  * trace stands, with one `⚠ screenshot:` line where an unsettled frame's note goes.
  *
  * The health check and the capture run together (D13, see runOnEngine); the
  * reply is laid out as before — trace, health line, then the frame's one
- * note line, if any. A health check that throws still fails the call, as it
- * did when it ran first: `Promise.all`, not a settle-all. (finalFrame
- * catches its own capture failure, so it cannot be the one to reject.)
+ * note line, if any. Neither rejects for the device: appHealth words its
+ * failures into the line (run/app-health.ts, the one policy) and finalFrame
+ * catches its own capture failure.
  */
 export async function runEnsureState(
   call: EngineCall & { state: string },
@@ -109,7 +110,7 @@ export async function runEnsureState(
 ): Promise<{ text: string; shot?: Buffer }> {
   const { adapter, trace } = await runOnEngine(call, resolveAdapter, { state: call.state });
   const { cfg } = call.project;
-  // On an appHealth throw the frame's reads finish unawaited — harmless: reads only, and finalFrame never rejects.
+  // A broken adapter's throw from appHealth fails the call; the frame's reads then finish unawaited — reads only.
   const [health, { frame, failed }] = await Promise.all([appHealth(adapter, cfg), finalFrame(adapter)]);
   const text = trace + health;
   if (frame === undefined) return { text: `${text}\n${screenshotFailedLine(failed)}` };
@@ -135,7 +136,7 @@ export interface AssertCall {
    * Read by the handler under `assert`'s `optional` policy: `undefined` when
    * there is no file (no app to health-check; the asserts stand on their
    * own), and never a broken one — that failed the call before a device was
-   * bound, so no config error can reach the guard below.
+   * bound, so no config error reaches the health check.
    */
   cfg: AveriConfig | undefined;
 }
@@ -145,32 +146,21 @@ export interface AssertCall {
  * averi.yaml says which app to ask about.
  *
  * Until 2026-10-08 this loaded averi.yaml itself (strictly, with .env.averi)
- * inside a catch-all, with a dated note naming the narrowing as a
- * user-visible follow-up. The catch-all dropped the health line for a
- * present-but-invalid file on android (ios never got here: its tree-source
- * lookup failed the call first) and for anything appHealth threw. The first
- * half is gone: the config is the handler's single read, under which a broken
- * file fails the call on BOTH platforms — an android `assert` that passed
- * beside a broken averi.yaml now fails, naming the file. The second half is
- * kept, narrowed to what it was for: the guard wraps the health check ALONE,
- * with the config already in hand, so it can no longer hide a config error.
- * appHealth degrades its own device errors into the line
- * (run/verify.ts#appHealth); a throw outside that guard still costs only the
- * health line, as it always did — whether it should fail the assert instead,
- * as it does ensure_state, run_flow and a verify leg, is a verdict change of
- * its own and was not taken with this one (code review, 2026-10-08).
+ * inside a catch-all, which dropped the health line for a present-but-invalid
+ * file on android and for anything appHealth threw. The config is now the
+ * handler's single read, under which a broken file fails the call on both
+ * platforms. The catch was narrowed that day to the health check alone, and
+ * removed by A29: appHealth words every device failure into the line itself
+ * (run/app-health.ts, one policy for its four callers), so the catch could only
+ * be reached by an adapter that breaks its contract — a `platform` that throws,
+ * or `logs` resolving to no array; both real adapters hold `platform` in a
+ * readonly field and return `logs` from a `split`. Such a throw now fails the
+ * call, as it fails ensure_state, run_flow and a verify leg.
  */
 export async function runAsserts({ adapter, specs, baselineDir, cfg }: AssertCall): Promise<string> {
   // persistentRead: 'fail' — the reply IS the assert results: a read no wait cures (D21) is each assert's FAIL line,
   // its message the detail, rather than an error result that drops the asserts and the health line (VerifierOptions).
   const results = await new Verifier(adapter, { baselineDir, persistentRead: 'fail' }).assertAll(specs);
-  let health = '';
-  if (cfg !== undefined) {
-    try {
-      health = await appHealth(adapter, cfg);
-    } catch {
-      // the health line is omitted, as before 2026-10-08; the verdict stands
-    }
-  }
+  const health = cfg === undefined ? '' : await appHealth(adapter, cfg);
   return `${assertSummary(results)}\n${formatAsserts(results)}${health}`;
 }
