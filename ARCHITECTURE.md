@@ -344,6 +344,7 @@ Leaves every layer may reach: `duration.ts` (`durationSchema`, the one parser of
 
 Vocabulary: **duration** — a timeout as written (`"15s"`) or as a number of ms, parsed by one schema;
 **count** — a number with its noun (`1 swipe`, `3 swipes`).
+
 ---
 
 ## 3. Device Adapter layer (raw adb + simctl/idb)
@@ -391,7 +392,8 @@ error and trace line says the same, host paths stripped; the error's fields keep
   navigation bands, touchable region, `mInputShown`, the focused window), `android-bounds.ts` (`[l,t][r,b]`),
   `android-accessibility-order.ts` (AOSP's accessibility order of a ViewGroup's children, ADR 0015).
 - What the device's shell receives has one owner, `adapters/adb-shell.ts`: every word quoted (`shellQuote`), `exec-out`
-  left to the adb client, a raw line only by name. Whether a start started anything: `adapters/android-start.ts#runStart`.
+  left to the adb client, a raw line only by name. Whether a start started anything:
+  `adapters/android-start.ts#runStart`.
   An "Open with" chooser in front: `android-chooser.ts` (ADR 0041).
 - Capture: raw RGBA gzipped on the device, PNG encoded on the host only where one leaves the process (ADR 0035);
   `screenshot-bytes.ts` judges any capture's bytes before anyone above sees them.
@@ -525,7 +527,8 @@ Design points (each rule's owner holds its cases):
   it holds; a rung that throws escalates like one that completes without reaching the state.
 - **…and it gets one pass backwards.** After a ladder fails, the non-destructive rungs before the last run once more
   per call (`↻ recovery`), because the last rung's aftermath can bring a screen an earlier rung exists to clear
-  (docs/bugs/2026-08-26-ensure-state-no-recovery-pass.md, docs/bugs/2026-08-26-recovery-pass-skips-throwing-last-rung.md).
+  (docs/bugs/2026-08-26-ensure-state-no-recovery-pass.md,
+  docs/bugs/2026-08-26-recovery-pass-skips-throwing-last-rung.md).
 - **…and it never wipes blind.** A destructive rung whose preceding probe never read a RENDERED tree is refused: a probe
   is `unknown` when every read failed and `bare` when every tree was bare (`ui-tree/bare-tree.ts#isBareTree`). A
   probe that may end early on a held "no" does so only with no wipe ahead (ADR 0033).

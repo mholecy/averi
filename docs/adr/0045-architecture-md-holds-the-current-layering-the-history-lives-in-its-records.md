@@ -73,7 +73,7 @@ named modules' doc comments, which the new ARCHITECTURE.md names in the layer's 
 | §3 discovery off the adapter, `unauthorized` devices, selector tapping off the adapter | §3 | code: adapters/discovery.ts, mcp/registry.ts; ADR 0031 |
 | §3 Android bullets (modules, capture, screenshot bytes, tree, input, launch, the shell) | §3 Android | ADR 0035, 0037, 0038 (A27), 0041; backlog A27, D19, D43a, D55, D73; code: adapters/android.ts, android-start.ts, adb-shell.ts, screenshot-bytes.ts, input-text.ts |
 | §3 iOS bullets (screenshot, launch and links, input, the idb helper, the tree sources) | §3 iOS | ADR 0019, 0031, 0032 (with its D26b, D44, D49a, D54, D74 amendments), 0036, 0037, 0039; backlog D7a, D7b, D20, D21, D24, D39, D42, D48, D57, A1, A20, A23; the bug notes it cited; code: adapters/ios.ts, ios-foreground.ts, ios-tree-source.ts, wda.ts, wda-source.ts; docs/plans/ios-wda-tree-source.md |
-| §3 the iOS exception to "adapters know no averi.yaml" | §3 iOS, with the decision not to translate the words above the seam | ADR 0032, the A32 note (the review's remedy owner above the seam, not taken) |
+| §3 the iOS exception to "adapters know no averi.yaml" | §3 iOS, with the decision not to translate the words above the seam | ADR 0032, the A32 note (docs/architecture-reviews/2026-10-07-after-ios-idb-keyboard-fixes.html, #3: a remedy owner above the seam, not taken) |
 | §3 shutdown contract | §3 iOS, shutdown | code: mcp/lifecycle.ts, adapters/wda.ts |
 | §3 normalized tree and selectors | §3 | ADR 0028 (`secure`); code: adapters/types.ts (`UiNode`), ui-tree/selectors.ts |
 | §4 example and its comments | §4, the example with its dated comments shortened | — |
@@ -86,7 +86,7 @@ named modules' doc comments, which the new ARCHITECTURE.md names in the layer's 
 | §9 roadmap (status as of 0.9.0) | §9, shipped and open | the backlog |
 | §10 risks | §10 | docs/plans/ios-wda-tree-source.md (decision 4) |
 
-Two reasons the long form gave in prose, kept here because no other record holds them:
+Reasons the long form gave in prose, kept here because no other record holds them:
 
 - §7: the skill teaches the workflow and only what the tool descriptions do not already say, because an eval on Opus
   5.5 (2026-10-08) found that most of the old single-file skill duplicated the descriptions, and that the value it
@@ -94,6 +94,8 @@ Two reasons the long form gave in prose, kept here because no other record holds
 - §8 (login edge cases, design intent, not implemented): an OTP would come from a `prompt_human` step or a test-backend
   hook (`otp: { source: … }`); wrong-PIN lockout protection would allow at most one automatic retry, then stop and
   report, never brute-forcing a real backend. Neither key exists in the strict schema, which refuses both.
+- §3: `setClipboard` is not on the adapter interface (it had no caller, and Android only threw for it). It returns as
+  an optional capability, like `keyboard?`, once it has a first caller, such as pasting an OTP.
 
 ## Consequences
 
