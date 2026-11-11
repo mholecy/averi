@@ -180,7 +180,7 @@ export async function fillField(
   //   change". The pass says so where the reading is not exactly the value (`focusUnread`: fill-landing.ts#Landing, from
   //   the `'unread'` below; ADR 0028's D64b-3 amendment and residual 3).
   const delivery = adapter.typingDelivery ?? 'may-arrive-late';
-  const focusRead = postFocusReadOf({ value, clear: clear === true, field: node, soleId: soleIdOf(target) !== undefined, retypesTail: retypesTail(delivery) });
+  const focus = postFocusReadOf({ value, clear: clear === true, field: node, soleId: soleIdOf(target) !== undefined, retypesTail: retypesTail(delivery) });
   // Every read of the field from here on, and why it was lost when it was (fill-refetch.ts). Skipped: the screen the
   // field was resolved on words a `lost` alone.
   const field = fieldRefetch({
@@ -188,7 +188,7 @@ export async function fillField(
     target,
     resolve: opts,
     chosen: node,
-    ...(focusRead === 'skipped' && { resolvedOn: screenIdentity(resolvedIn) }),
+    ...(focus.count === 'unread' && { resolvedOn: screenIdentity(resolvedIn) }),
     unreadable: (e) => failure({ code: 'reread-failed', target: describeTarget(target), cause: e.message }),
   });
   const startTyping = async (text: string): Promise<void> => {
@@ -204,16 +204,16 @@ export async function fillField(
   // same field.
   const placeholder = node.placeholder;
 
-  // The read after focus (fill-landing.ts#postFocusReadOf): `count` — the pre-tap read is stale for exactly the fields
-  // the length rule cares about (Android autofill POPULATES a password field on focus, and a re-entry screen CLEARS
-  // one: review 2026-09-18 measured both as false failures against a pre-tap count); `clear` — a clear ALONE has no
-  // read-back behind it, so what its loop counts must be what the field holds after focus (2026-10-07). A field lost
-  // on that read keeps its pre-tap node.
+  // The read after focus, when the table says so (fill-landing.ts#postFocusReadOf: for the masked count — the pre-tap
+  // read is stale for exactly the fields the length rule cares about, Android autofill POPULATING a password field on
+  // focus and a re-entry screen CLEARING one, review 2026-09-18; or for what a clear ALONE deletes, 2026-10-07). A
+  // field lost on that read keeps its pre-tap node.
   let current: UiNode | undefined = node;
-  if (focusRead === 'count' || focusRead === 'clear') current = (await field.read()).node ?? node;
-  // What the masked read-back adds the typed length to, and the masked-append warning (fill-landing.ts#heldCountOf):
-  // what the field HOLDS, not what it SHOWS (fill-facts.ts#heldText: a reading equal to the named placeholder is empty).
-  const { held, maskedAppend } = heldCountOf(focusRead, heldText(current.value, placeholder));
+  if (focus.reads) current = (await field.read()).node ?? node;
+  // What the field HOLDS by now, not what it SHOWS (fill-facts.ts#heldText: a reading equal to the named placeholder is
+  // empty) — what the masked count is taken of (fill-landing.ts#heldCountOf), before any clear.
+  const heldAfterFocus = heldText(current.value, placeholder);
+  let maskedAppend: FillResult['maskedAppend'];
   let cleared: FillResult['cleared'];
   let clearUnchanged: FillResult['clearUnchanged'];
   // How the clear ended (fill-clear.ts#ClearFacts) — undefined without one.
@@ -275,9 +275,13 @@ export async function fillField(
     }
     return { input: nearestInput(tree, node) };
   };
-  if (value === '') {
+  if (focus.count === undefined) {
+    // Nothing typed (the table gives no count): the focus tap and the clear alone.
     await startTyping(value);
   } else {
+    // What the masked read-back adds the typed length to, and the masked-append warning.
+    const counted = heldCountOf(focus.count, heldAfterFocus);
+    maskedAppend = counted.maskedAppend;
     // Typing, the read-back and what is sent again are interact/fill-type.ts's
     // (typeAndConfirm): a masked field compared by length, a non-input proven
     // only by changing to show the text, a dropped tail typed again, the
@@ -300,7 +304,7 @@ export async function fillField(
         resolvedValue: node.value,
         before: shownBeforeTyping,
         placeholder,
-        held,
+        held: counted.held,
         pollMs,
         field: current ?? node,
         delivery,

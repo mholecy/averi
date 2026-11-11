@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { heldText, type Difference } from '../../src/interact/fill-facts.js';
-import { heldCountOf, landingOf, needsHeldCount, postFocusReadOf, readingOf, withoutWholeToo, type Expectation, type FocusFacts, type PostFocusRead, type Reading } from '../../src/interact/fill-landing.js';
+import { heldCountOf, landingOf, needsHeldCount, postFocusReadOf, readingOf, withoutWholeToo, type Expectation, type FocusFacts, type HeldFrom, type PostFocusRead, type Reading } from '../../src/interact/fill-landing.js';
 import { SEPARATORS } from '../../src/interact/fill-reformat.js';
 import { fillFailureText } from '../../src/interact/fill-text.js';
 import { isMaskedValue } from '../../src/ui-tree/masked-value.js';
@@ -979,41 +979,40 @@ describe('postFocusReadOf — the read after the focus tap, and what it is for',
   const labelEmpty = { role: 'text', secure: undefined, value: null, placeholder: undefined };
   const rows: [string, FocusFacts, PostFocusRead][] = [
     // Nothing typed: a clear alone counts what the field holds after focus (an autofill on focus); a focus alone reads nothing.
-    ['a clear alone of an input: the field after focus', { value: '', clear: true, field: plainFull, soleId: true, retypesTail: false }, 'clear'],
-    ['a clear alone of an empty input: the field after focus', { value: '', clear: true, field: plainEmpty, soleId: false, retypesTail: true }, 'clear'],
-    ['a clear alone of a non-input: nothing (no delete is sent)', { value: '', clear: true, field: label, soleId: false, retypesTail: true }, 'none'],
-    ['a focus alone: nothing', { value: '', clear: false, field: secure, soleId: false, retypesTail: true }, 'none'],
-    ['a focus alone of an empty field said plain, by a sole id, no retype: nothing (not skipped: no typing)', { value: '', clear: false, field: plainEmpty, soleId: true, retypesTail: false }, 'none'],
+    ['a clear alone of an input: the field after focus', { value: '', clear: true, field: plainFull, soleId: true, retypesTail: false }, { reads: true }],
+    ['a clear alone of an empty input: the field after focus', { value: '', clear: true, field: plainEmpty, soleId: false, retypesTail: true }, { reads: true }],
+    ['a clear alone of a non-input: nothing (no delete is sent)', { value: '', clear: true, field: label, soleId: false, retypesTail: true }, { reads: false }],
+    ['a focus alone: nothing', { value: '', clear: false, field: secure, soleId: false, retypesTail: true }, { reads: false }],
+    ['a focus alone of an empty field said plain, by a sole id, no retype: nothing (not skipped: no typing)', { value: '', clear: false, field: plainEmpty, soleId: true, retypesTail: false }, { reads: false }],
     // A value with clear: the read-back compares the field to the value and wipes a mismatch.
-    ['a value with clear into an empty field: nothing', { value: 'x', clear: true, field: plainEmpty, soleId: false, retypesTail: true }, 'none'],
-    ['a value with clear into a masked field: nothing', { value: 'x', clear: true, field: bullets, soleId: false, retypesTail: true }, 'none'],
+    ['a value with clear into an empty field: nothing', { value: 'x', clear: true, field: plainEmpty, soleId: false, retypesTail: true }, { reads: false, count: 'before-tap' }],
+    ['a value with clear into a masked field: nothing', { value: 'x', clear: true, field: bullets, soleId: false, retypesTail: true }, { reads: false, count: 'before-tap' }],
     // A value without clear: ADR 0028's gate first.
-    ['an empty input said plain, a sole id, no retype: skipped', { value: 'x', clear: false, field: plainEmpty, soleId: true, retypesTail: false }, 'skipped'],
-    ['an input said plain showing its named placeholder, a sole id, no retype: skipped', { value: 'x', clear: false, field: plainHint, soleId: true, retypesTail: false }, 'skipped'],
-    ['an empty input said plain, a sole id, an adapter that retypes a tail: the count', { value: 'x', clear: false, field: plainEmpty, soleId: true, retypesTail: true }, 'count'],
-    ['an empty input said plain, not a sole id, no retype: the count', { value: 'x', clear: false, field: plainEmpty, soleId: false, retypesTail: false }, 'count'],
-    ['an empty input its source said nothing of, a sole id, no retype: the count', { value: 'x', clear: false, field: unsaid, soleId: true, retypesTail: false }, 'count'],
-    ['an empty secure input: the count', { value: 'x', clear: false, field: secure, soleId: true, retypesTail: false }, 'count'],
-    ['a field showing bullets: the count', { value: 'x', clear: false, field: bullets, soleId: true, retypesTail: false }, 'count'],
-    ['an empty non-input: the count', { value: 'x', clear: false, field: labelEmpty, soleId: true, retypesTail: false }, 'count'],
+    ['an empty input said plain, a sole id, no retype: skipped', { value: 'x', clear: false, field: plainEmpty, soleId: true, retypesTail: false }, { reads: false, count: 'unread' }],
+    ['an input said plain showing its named placeholder, a sole id, no retype: skipped', { value: 'x', clear: false, field: plainHint, soleId: true, retypesTail: false }, { reads: false, count: 'unread' }],
+    ['an empty input said plain, a sole id, an adapter that retypes a tail: the count', { value: 'x', clear: false, field: plainEmpty, soleId: true, retypesTail: true }, { reads: true, count: 'after-focus' }],
+    ['an empty input said plain, not a sole id, no retype: the count', { value: 'x', clear: false, field: plainEmpty, soleId: false, retypesTail: false }, { reads: true, count: 'after-focus' }],
+    ['an empty input its source said nothing of, a sole id, no retype: the count', { value: 'x', clear: false, field: unsaid, soleId: true, retypesTail: false }, { reads: true, count: 'after-focus' }],
+    ['an empty secure input: the count', { value: 'x', clear: false, field: secure, soleId: true, retypesTail: false }, { reads: true, count: 'after-focus' }],
+    ['a field showing bullets: the count', { value: 'x', clear: false, field: bullets, soleId: true, retypesTail: false }, { reads: true, count: 'after-focus' }],
+    ['an empty non-input: the count', { value: 'x', clear: false, field: labelEmpty, soleId: true, retypesTail: false }, { reads: true, count: 'after-focus' }],
     // Plain content: an append is judged by where the value lies in the reading, never by a count.
-    ['an input holding plain text: nothing', { value: 'x', clear: false, field: plainFull, soleId: false, retypesTail: true }, 'none'],
-    ['a non-input showing plain text: nothing', { value: 'x', clear: false, field: label, soleId: true, retypesTail: false }, 'none'],
+    ['an input holding plain text: nothing', { value: 'x', clear: false, field: plainFull, soleId: false, retypesTail: true }, { reads: false, count: 'before-tap' }],
+    ['a non-input showing plain text: nothing', { value: 'x', clear: false, field: label, soleId: true, retypesTail: false }, { reads: false, count: 'before-tap' }],
   ];
-  for (const [shape, facts, read] of rows) it(shape, () => expect(postFocusReadOf(facts)).toBe(read));
+  for (const [shape, facts, read] of rows) it(shape, () => expect(postFocusReadOf(facts)).toStrictEqual(read));
 });
 
 /** A28 FK2: what the masked rule counts from (Expectation.held), and the masked-append warning, of what the field held. */
 describe('heldCountOf — the bullets the typing counts from', () => {
-  const rows: [string, PostFocusRead, string, ReturnType<typeof heldCountOf>][] = [
-    ['read after focus, bullets: their count, and the masked append', 'count', '•••••', { held: 5, maskedAppend: { held: 5 } }],
-    ['read after focus, empty: 0', 'count', '', { held: 0 }],
-    ['read after focus, plain text (a hint dumped as text): 0 — only bullets are held', 'count', 'Password', { held: 0 }],
-    ['read after focus, partly masked: 0 — not all bullets', 'count', '•••t', { held: 0 }],
-    ['skipped: unread, whatever the field showed', 'skipped', '', { held: 'unread' }],
-    ['not read, bullets: their count, no masked append (not seen after focus)', 'none', '•••', { held: 3 }],
-    ['not read, plain: 0', 'none', '9.99', { held: 0 }],
-    ['a clear alone: no masked append', 'clear', '••', { held: 2 }],
+  const rows: [string, HeldFrom, string, ReturnType<typeof heldCountOf>][] = [
+    ['read after focus, bullets: their count, and the masked append', 'after-focus', '•••••', { held: 5, maskedAppend: { held: 5 } }],
+    ['read after focus, empty: 0', 'after-focus', '', { held: 0 }],
+    ['read after focus, plain text (a hint dumped as text): 0 — only bullets are held', 'after-focus', 'Password', { held: 0 }],
+    ['read after focus, partly masked: 0 — not all bullets', 'after-focus', '•••t', { held: 0 }],
+    ['skipped: unread, whatever the field showed', 'unread', '', { held: 'unread' }],
+    ['not read, bullets: their count, no masked append (not seen after focus)', 'before-tap', '•••', { held: 3 }],
+    ['not read, plain: 0', 'before-tap', '9.99', { held: 0 }],
   ];
-  for (const [shape, read, shown, out] of rows) it(shape, () => expect(heldCountOf(read, shown)).toEqual(out));
+  for (const [shape, from, held, out] of rows) it(shape, () => expect(heldCountOf(from, held)).toEqual(out));
 });

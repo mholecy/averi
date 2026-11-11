@@ -61,13 +61,20 @@ export function sameField(tree: UiNode, chosen: UiNode): UiNode | undefined {
 /** A fresh tree's answer: the selector's match (`bySelector`), else the chosen node's twin where the guard allows, else why it is lost. Pure. */
 export function findAgain(tree: UiNode, bySelector: UiNode | undefined, chosen: UiNode, guard: TwinGuard): FieldRead {
   if (bySelector !== undefined) return { node: bySelector };
-  const screenChanged = guard.phase === 'typing' && !sameScreen(screenIdentity(tree), guard.screen);
-  const twin = guard.phase === 'before-typing' || (guard.phase === 'typing' && !screenChanged) ? sameField(tree, chosen) : undefined;
-  if (twin !== undefined) return { node: twin };
-  // Without a pre-typing read, the screen the field was resolved on says whether the screen changed — for the wording
-  // only: the twin fallback above stays off.
-  const changedSinceResolved = guard.phase === 'typing-unread' && guard.resolvedOn !== undefined && !sameScreen(screenIdentity(tree), guard.resolvedOn);
-  return { lost: screenChanged || changedSinceResolved ? 'screen-changed' : 'unmatched' };
+  const twinOr = (): FieldRead => {
+    const twin = sameField(tree, chosen);
+    return twin === undefined ? { lost: 'unmatched' } : { node: twin };
+  };
+  switch (guard.phase) {
+    case 'before-typing':
+      return twinOr();
+    case 'typing':
+      // Another screen than the pre-typing read's: its twin is not asked.
+      return sameScreen(screenIdentity(tree), guard.screen) ? twinOr() : { lost: 'screen-changed' };
+    case 'typing-unread':
+      // No twin: nothing was read before typing. The screen the field was resolved on, when known, words the why.
+      return { lost: guard.resolvedOn !== undefined && !sameScreen(screenIdentity(tree), guard.resolvedOn) ? 'screen-changed' : 'unmatched' };
+  }
 }
 
 /** A fill's reads of its field (see the module doc). */

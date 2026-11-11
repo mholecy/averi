@@ -249,25 +249,33 @@ the re-read runs there.
 Architecture review 2026-11-11 (docs/architecture-reviews/2026-11-11-ten-agent-review.html, card 10; backlog A28). No
 behaviour, timing or wording changed: the same reads at the same moments, in the same number.
 
-- **The read after the focus tap is one pure table**, `interact/fill-landing.ts#postFocusReadOf` → `count | clear |
-  skipped | none` from the value, `clear`, the field as resolved, a sole `id` and `retypesTail`. Until A28 fill.ts
-  decided it in four places: this ADR's gate (`skipped`), the masked count's re-read, a clear alone's re-read (inside
-  the clear branch), and the `held` it handed the typing. The gate is the table's `skipped` row, its clauses unchanged
-  (`needsHeldCount`, the sole id, `retypesTail`, no `clear`, a value); the decision above stands as written, only the
-  place it is written moved. The table is pinned row by row in tests/interact/fill-landing.test.ts.
-- **The held count is fill-landing.ts's** (`heldCountOf`, beside `needsHeldCount`), which finishes A2: the bullets-only
-  count the masked rule starts from (`Expectation.held`, `'unread'` on the skipped row) and the masked-append warning
-  were derived in fill.ts, inputs of the landing rule outside the landing module. fill.ts now performs the read the
-  table names and passes the count on.
+- **The read after the focus tap is one pure table**, `interact/fill-landing.ts#postFocusReadOf`, from the value,
+  `clear`, the field as resolved, a sole `id` and `retypesTail`, answering what fill.ts needs: `reads` (the field is
+  read after the tap) and `count`, where the masked rule's count comes from (`HeldFrom`: `after-focus`, `before-tap`,
+  or `unread` — the skip; absent when nothing is typed). Until A28 fill.ts decided it in four places: this ADR's gate,
+  the masked count's re-read, a clear alone's re-read (inside the clear branch), and the `held` it handed the typing.
+  The gate is the table's `unread` row, its clauses unchanged (`needsHeldCount`, the sole id, `retypesTail`, no
+  `clear`, a value); the decision above stands as written, only the place it is written moved. fill.ts reads the
+  answer's fields and switches on no kind of its own. The table is pinned row by row in
+  tests/interact/fill-landing.test.ts.
+- **The held count is fill-landing.ts's** (`heldCountOf(from, held)`, beside `needsHeldCount`), which finishes A2: the
+  bullets-only count the masked rule starts from (`Expectation.held`, `'unread'` on the skipped row) and the
+  masked-append warning (bullets seen `after-focus`) were derived in fill.ts, inputs of the landing rule outside the
+  landing module. fill.ts performs the read the table names and passes the count on; a fill that types nothing gets no
+  count at all.
 - **The field's reads are one module**, `interact/fill-refetch.ts` (`fieldRefetch`: `read`, `typingStarts`,
   `lastTree`): the selector first, else `sameField`'s twin under the screen guard (`TwinGuard` — before typing freely;
   after it only on the pre-typing read's screen; never when typing began with no read), else why it was lost
-  (`findAgain`, pure; the screen the field was resolved on words a `lost` on the skipped row, as before). Each read
+  (`findAgain`, pure, one switch over the guard's phase; the screen the field was resolved on words a `lost` on the
+  skipped row, as before). Each read
   answers the node or the why (`fill-facts.ts#FieldRead`). `FieldIo.read` (fill-type.ts, ADR 0023) answers the same,
   so the typing's `unread` carries the last read's `lost`, and fill.ts's mutable `lostOnLastRead`, which the read-back
   read off the closure while the clear got `{ lost }` explicitly, is gone. What a node shows is
-  `fill-facts.ts#shownText` (an input's null is ""), one rule for fill.ts and the typing.
-- **The adapter tests fill through fillField** (tests/adapters/android.test.ts's D72/D71/D64b-3 cases,
+  `fill-facts.ts#shownText` (an input's null is ""), one rule for fill.ts and the typing; it takes the matched node's
+  input-ness as the boolean `Expectation.isInput` already is, so the typing's reading cannot follow a re-read node's
+  role.
+- **The adapter tests fill through fillField** (the Android parser's D72/D71/D64b-3 cases, in
+  tests/adapters/android-tree-dialect.test.ts since A27,
   ios-tree-source.test.ts's D51 mask): they no longer re-wire fill.ts's glue by hand (`FieldIo`, `clearStep`,
   `landingOf`'s `Expectation`), so a fault in the glue fails them. The Android dump says `password="false"` as
   uiautomator does, so a sole `id` skips the re-read there as on a device.
@@ -279,10 +287,14 @@ unread, said why (`lost`)" and "a non-input that withholds its text on two reads
 tests were added there: "A28: `lost` is the LAST read's" (lost then withheld is no `lost`; withheld then lost is) and
 "an input whose value is null reads empty, not withheld" (fill-facts.ts#shownText through the poll). New:
 tests/interact/fill-refetch.test.ts, and fill-landing.test.ts's `postFocusReadOf` and `heldCountOf` tables.
-fill-refetch.ts joins the mutation scope's core group (ADR 0038): 98.75 %, floor 96, its one survivor equivalent;
-the fill modules after A28, cold and narrowed to the five (the whole core group passed its 600 s bound at load 52–62):
-fill-landing 99.52 %, fill-type 93.88 %, fill-reformat 97.98 %, fill-verdict 99.35 %, every floor kept
-(scripts/mutation/scope.json). A forms A/B on a device, which the review card
+fill-refetch.ts joins the mutation scope's core group (ADR 0038).
+
+Mutation: the full cold core group run is recorded at merge, on main, in the `docs: A28 done` commit. This branch ran
+the fill modules narrowed and cold (other agents' runs overlapping, load 50–64): fill-refetch 100 % (floor 98),
+fill-landing 98.83 % alone (floor 95 → 96), fill-type 93.83 % (floor 91), fill-reformat 94.80 % alone (floor 92),
+fill-verdict 99.35 % (floor 97). A module's narrowed figure moves with the tests that share its run: fill-landing
+scored 99.52 % and fill-reformat 97.98 % with all five fill modules' tests in one run, figures their floors do not rest
+on (scripts/mutation/scope.json). A forms A/B on a device, which the review card
 recommends for FK2, is not run here.
 
 ## Residuals accepted

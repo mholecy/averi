@@ -144,12 +144,9 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
   const before = io.screen();
   const others = before === undefined ? undefined : inputsOf(before, inputKey(intent.field));
   await io.type(value);
-  // The field's text on a read, or why the field was lost.
-  const readText = async (): Promise<Shown> => {
-    const found = await io.read();
-    return found.node === undefined ? { lost: found.lost } : { observed: shownText(found.node, intent.isInput) };
-  };
-  let read = await pollValue(readText, landing, intent.pollMs);
+  // The text the field shows on a read (fill-facts.ts#shownText).
+  const textOf = (n: UiNode): string | undefined => shownText(n, intent.isInput);
+  let read = await pollValue(io.read, textOf, landing, intent.pollMs);
   const again: SentAgain[] = [];
   const tails = () => again.filter((a) => a.kind === 'tail').length;
   for (;;) {
@@ -213,7 +210,7 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
       return { kind: 'missed', observed, again, differs: answer.differs };
     }
     const prior = observed;
-    read = { ...(await pollValue(readText, landing, intent.pollMs)), prior };
+    read = { ...(await pollValue(io.read, textOf, landing, intent.pollMs)), prior };
   }
 }
 
@@ -275,8 +272,8 @@ function whereTyped(before: OtherInputs | undefined, now: UiNode | undefined, mi
  */
 interface PollEnd {
   observed: string | undefined;
-  /** Why the last read did not find the field; undefined when it did. */
-  lost?: LostWhy | undefined;
+  /** Why the last read did not find the field (FieldRead's `lost`); undefined when it did. */
+  lost?: FieldRead['lost'];
   steady: boolean;
   prior?: string;
   /** The last reading landed, and how (fill-landing.ts#Landing); absent when it did not. */
@@ -301,23 +298,25 @@ const READ_BACK_POLLS = 5;
  * cost of a transformed value is paid on a fill that fails anyway; the price
  * of stopping early would be paid by ones that pass.
  */
-async function pollValue(read: () => Promise<Shown>, ok: (observed: string) => Landing | undefined, pollMs: number): Promise<PollEnd> {
+async function pollValue(
+  read: () => Promise<FieldRead>,
+  textOf: (n: UiNode) => string | undefined,
+  ok: (observed: string) => Landing | undefined,
+  pollMs: number,
+): Promise<PollEnd> {
   let observed: string | undefined;
   let previous: string | undefined;
   for (let i = 0; i < READ_BACK_POLLS; i++) {
     previous = observed;
-    const shown = await read();
-    observed = shown.observed;
+    const found = await read();
+    observed = found.node === undefined ? undefined : textOf(found.node);
     const landed = observed === undefined ? undefined : ok(observed);
     if (landed !== undefined) return { observed, steady: false, landed };
     // No text (a non-input withholding it) or no field — stop waiting. An
     // empty input reads "" and keeps every round: its text may be late.
     // `lost` rides along as read (undefined: found); typeAndConfirm's `unread` arm keeps it only when set.
-    if (observed === undefined && i >= 1) return { observed, steady: false, lost: shown.lost };
+    if (observed === undefined && i >= 1) return { observed, steady: false, lost: found.lost };
     await sleep(pollMs);
   }
   return { observed, steady: observed !== undefined && observed === previous };
 }
-
-/** One read's text (`observed`; undefined: withheld), or why the field was not found (`lost`). */
-type Shown = { observed: string | undefined; lost?: undefined } | { observed?: undefined; lost: LostWhy };
