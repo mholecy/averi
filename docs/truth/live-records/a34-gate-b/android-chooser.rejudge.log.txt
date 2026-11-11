@@ -1,0 +1,13 @@
+<!-- averi: this checkout (rejudged from <out>/chooser/run-20261111-221408-16175/android-chooser.json) -->
+# Live golden: 5 cases, 5 ok, 0 loud, 0 mismatches (0 not known), 0 skipped
+
+## uiautomator
+- ok lc1 form-basic: launch_app with intent VIEW averilab://shared/x and no activity (am start -p): the chooser raised, named under Launched (D55b) — Launched, the chooser named (android/com.android.internal.app.ResolverActivity), and it is in front
+- ok lc2 form-basic: launch_app with intent VIEW averilab://cell/form-prefilled, one handler: Launched, no note, the cell open — Launched, no note; dev.averi.lab/.MainActivity in front, the app shows cell form-prefilled
+- ok lc3 form-basic: launch_app with activity .Twin and the two-handler intent (am start -n): no chooser on the stack, no note, the lab in front — Launched .Twin, no note, no chooser; dev.averi.lab/.MainActivity in front, the lab's records 1 → 1
+- ok lc4' form-basic: launch_app with no activity (monkey) from the launcher: Launched, the app mFocusedApp (D73) — Launched, no note; dev.averi.lab/.MainActivity in front, no chooser on the stack (the app's cell "")
+- ok lc4'' form-basic: open_deep_link averilab://shared/open from the launcher (its chooser), then launch_app with no activity: Launched, the app mFocusedApp, no ResolverActivity left (D73) — Launched, no note; dev.averi.lab/.MainActivity in front, no chooser on the stack (the app's cell "")
+
+Chooser premise: fresh — no lab default (mAlways=true) for dev.averi.lab; 2 handlers for averilab://shared/open; no chooser on the stack; HOME com.google.android.apps.nexuslauncher/.NexusLauncherActivity
+Chooser premise: WARN — 2 last-chosen lab entries (mAlways=false: no default; no reinstall clears it), first: b42959c dev.averi.lab/.MainActivity | mMatch=0x300000 mAlways=false | Action: "android.intent.action.VIEW" | Category: "android.intent.category.DEFAULT" | Scheme: "averilab" | Authority: "pair": -1
+

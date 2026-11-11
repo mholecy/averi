@@ -1,0 +1,21 @@
+
+> averi@0.9.0 truth:lab
+> node --import tsx scripts/truth/batch/lab-run.ts --out <out> --serial emulator-5554
+
+lab-run run 20261111-221408-16175: blocks lab,chooser,forms,visibility,ensure,carousel — writing <out>/meta/run-20261111-221408-16175/lab-run.out (also <out>/lab-run.out); tail -f it; the SUMMARY follows here at the end.
+======== SUMMARY
+OK checkout: main's HEAD 57ba80d8, clean
+LAB android: WARN — java_home -v 17 → nothing: exit 1 The operation couldn’t be completed. Unable to locate a Java Runtime. — the build used the one from JavaVirtualMachines: averi_lab emulator emulator-5554; this run's build installed under JDK 17: <jdk17> (from JavaVirtualMachines); the APK's assets/cells.json is main's (pulled: <out>/lab/run-20261111-221408-16175/installed.apk); handlers: averilab://shared/open 2, averilab://cell/open 1
+LAB handlers: OK — handlers as expected: averilab://shared/open 2, averilab://cell/open 1
+lab check: PASS — every lab need met: android, handlers (each one's LAB line above)
+chooser check before: WARN — a last-chosen entry (mAlways=false: no default; no reinstall clears it): chooser no; preferred read (1 user); lab entries 2 (defaults 0, last-chosen 2, accepted 0); first: b42959c dev.averi.lab/.MainActivity | mMatch=0x300000 mAlways=false | Action: "android.intent.action.VIEW" | Category: "android.intent.category.DEFAULT" | Scheme: "averilab" | Authority: "pair": -1
+chooser check after: WARN — a last-chosen entry not accepted (mAlways=false: no default; no reinstall clears it, so none is tried — no RESTORE): chooser no; preferred read (1 user); lab entries 2 (defaults 0, last-chosen 2, accepted 0); first: b42959c dev.averi.lab/.MainActivity | mMatch=0x300000 mAlways=false | Action: "android.intent.action.VIEW" | Category: "android.intent.category.DEFAULT" | Scheme: "averilab" | Authority: "pair": -1
+chooser verdict: PASS — android-chooser: main's rejudge exit 0 (# Live golden: 5 cases, 5 ok, 0 loud, 0 mismatches (0 not known), 0 skipped)
+forms verdict: PASS — android-forms: main's rejudge exit 0 (# Live golden: 58 cases, 55 ok, 2 loud, 1 mismatches (0 not known), 0 skipped)
+visibility verdict: PASS — android-visibility: main's rejudge exit 0 (# Live golden: 181 cases, 174 ok, 7 loud, 0 mismatches (0 not known), 0 skipped)
+ensure verdict: PASS — android-ensure: main's rejudge exit 0 (# Live golden: 3 cases, 3 ok, 0 loud, 0 mismatches (0 not known), 0 skipped)
+carousel verdict: PASS — android-carousel: main's rejudge exit 0 (# Live golden: 11 cases, 5 ok, 6 loud, 0 mismatches (0 not known), 0 skipped)
+RESTORE: none — everything dirty was put back and verified
+======== SUMMARY end (run 20261111-221408-16175)
+npm run truth:lab -- --out $O --serial emulator-5554  91.75s user 60.97s system 4% cpu 55:55.19 total
+EXIT=0
