@@ -18,6 +18,9 @@ import { describe, expect, it } from 'vitest';
  * adb's devices; screenshot-bytes.ts is a platform's too). Adding a neutral leaf takes a deliberate entry in a row's
  * `neutral`, with its reason beside it; a platform module one file needs takes an `exceptions` entry, named in
  * ARCHITECTURE.md too.
+ *
+ * The rule is a module's direct imports: a platform module reached through another layer's module (a re-export, or a
+ * module that imports it) is that layer's row to allow or refuse.
  */
 
 const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '../../src');
@@ -52,7 +55,10 @@ const LAYERS: readonly Layer[] = [
     exempt: new Map(),
     neutral: new Map([
       [adapter('types.ts'), TYPES],
-      [adapter('typeable.ts'), "DeviceAdapter.typeable's shape and refusalOf, its one reader (ADR 0037), a leaf importing nothing"],
+      [
+        adapter('typeable.ts'),
+        "DeviceAdapter.typeable's shape and refusalOf, its one reader (ADR 0037), a leaf importing nothing",
+      ],
     ]),
     exceptions: [
       {
@@ -72,7 +78,8 @@ const breaks = (layer: Layer, file: string, target: string): boolean =>
 
 /**
  * Every module specifier a file names, in either quote style: static imports and re-exports (one or many lines), bare
- * imports, `import()`.
+ * imports, `import()`. Not read: `require(…)`, `import x = require(…)`, a template-literal `import(`…`)`, or
+ * `createRequire`. A comment or string that quotes an import is read as one — fail closed.
  */
 function specifiers(source: string): string[] {
   const found: string[] = [];
@@ -104,7 +111,8 @@ const offending = (layer: Layer): string[] =>
         .map((target) => `${rel(m)} -> ${rel(target)}`),
     );
 
-describe('a layer above adapters/ imports only the adapters/ modules its row allows (ARCHITECTURE.md, A16, A18)', () => {
+const TITLE = 'a layer above adapters/ imports only the adapters/ modules its row allows (ARCHITECTURE.md, A16, A18)';
+describe(TITLE, () => {
   const [mcp, interact] = LAYERS as [Layer, Layer];
 
   it('the check sees what it guards: the composition root imports the platform adapters, each of them flagged', () => {
