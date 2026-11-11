@@ -391,6 +391,10 @@ No earlier baseline: the latest, in scope.json, is its first.
 
 - 100 % on 2026-11-11 (D82, finishRun: the record written before the closes, each closer tried, a failed close and a failed write said on stderr; `npm run mutate -- --group lab --force --mutate scripts/truth/live-finish.ts --tempDirName .stryker-tmp-d82`, cold, 24 s): 21 mutants, 21 killed, 0 timeouts, 0 survived, 0 without coverage
 
+## scripts/differential/connection.ts
+
+No earlier baseline: the latest, in scope.json, is its first.
+
 ## scripts/truth/run-case.ts
 
 - 100 % on 2026-11-10 (T10, no first state: the case's named LOUD `no-state`, no judge, no late or panel read, the focus, screenshot and teardown kept; cold): 225 mutants, 0 survived

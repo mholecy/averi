@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { errorMessage } from '../../src/util/error-message.js';
 import { escapeRegExp } from '../../src/util/regex.js';
 import { connectInProcess } from './connection.js';
 import type { Platform, Recording, Screen } from './corpus.js';
@@ -362,7 +363,7 @@ export async function connect(side: Side, recording: Recording, profile: DeviceP
     discovery: async (platform) =>
       platform === recording.platform ? [{ id: device, platform, name: 'differential', osVersion: '0', state: 'booted' }] : [],
   });
-  // Opened and closed by connection.ts (the registry's shutdown too); the reply encoded here, as the golden base has it.
+  // Opened and closed by connection.ts#connectInProcess; the reply encoded here, as the golden base has it.
   const { client, close } = await connectInProcess(side, registry, 'differential');
   return {
     async call(call, configPath) {
@@ -380,7 +381,8 @@ export async function connect(side: Side, recording: Recording, profile: DeviceP
       }
       return { reply, device: deviceCalls() };
     },
-    close,
+    // A close that fails (an old side's shutdown) is one stderr line, not the run's end: every reply is in by then.
+    close: () => close().catch((e: unknown) => console.error(`close: ${side.root} connection failed — ${errorMessage(e)}`)),
   };
 }
 

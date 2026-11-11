@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { connectInProcess } from '../../scripts/differential/connection.js';
+import { connectInProcess, type InProcess } from '../../scripts/differential/connection.js';
 import { AdapterRegistry } from '../../src/mcp/registry.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
 
@@ -47,6 +47,16 @@ function serverLogging(log: string[], opts: { connectFails?: string; closeFails?
   };
 }
 
+/** The connection's client with its close logged; `fails` throws there, after the client closed. */
+function clientLogging(c: InProcess, log: string[], fails?: string): void {
+  const close = c.client.close.bind(c.client);
+  c.client.close = async () => {
+    log.push('client');
+    await close();
+    if (fails !== undefined) throw new Error(fails);
+  };
+}
+
 describe('connectInProcess: one averi server and its client in this process', () => {
   it('opens: the client talks to the server, which reports the name as its version; the client is named so too', async () => {
     const log: string[] = [];
@@ -60,11 +70,7 @@ describe('connectInProcess: one averi server and its client in this process', ()
   it('closes the client, then the server, then the registry (its shutdown stops the adapters’ processes)', async () => {
     const log: string[] = [];
     const c = await connectInProcess(serverLogging(log), registryLogging(log), 'differential');
-    const close = c.client.close.bind(c.client);
-    c.client.close = async () => {
-      log.push('client');
-      await close();
-    };
+    clientLogging(c, log);
     await c.close();
     expect(log).toEqual(['server connect', 'client', 'server', 'registry']);
   });
@@ -72,12 +78,7 @@ describe('connectInProcess: one averi server and its client in this process', ()
   it('D82: a close that throws skips none after it — every one is tried, the first failure thrown after the last', async () => {
     const log: string[] = [];
     const c = await connectInProcess(serverLogging(log, { closeFails: 'server gone' }), registryLogging(log, 'adb: device offline'), 'perf-baseline');
-    const close = c.client.close.bind(c.client);
-    c.client.close = async () => {
-      log.push('client');
-      await close();
-      throw new Error('transport gone');
-    };
+    clientLogging(c, log, 'transport gone');
     await expect(c.close()).rejects.toThrow('transport gone');
     expect(log).toEqual(['server connect', 'client', 'server', 'registry']);
   });

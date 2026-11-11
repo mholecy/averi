@@ -20,30 +20,33 @@ import type { Side } from './side.js';
  *    dead device must not keep the server's processes alive); the first failure is thrown after the last. A side's
  *    registry from before its shutdown (f9b4a67f, 2026-09-18) has none to call.
  *
- * `name` is the client's name and the server's reported version: who drives it (`live-golden`, `differential`,
- * `perf-baseline`).
+ * `driver` names who drives it (`live-golden`, `differential`, `perf-baseline`): the client's name and the server's
+ * reported version both.
  */
 export interface InProcess {
   client: Client;
   close(): Promise<void>;
 }
 
-export async function connectInProcess(averi: Pick<Side, 'createAveriServer'>, registry: AdapterRegistry, name: string): Promise<InProcess> {
-  const client = new Client({ name, version: '0' });
+export async function connectInProcess(averi: Pick<Side, 'createAveriServer'>, registry: AdapterRegistry, driver: string): Promise<InProcess> {
+  const client = new Client({ name: driver, version: '0' });
   let server: ReturnType<Side['createAveriServer']> | undefined;
   // Typed as this checkout's registry; an older side's may lack shutdown.
-  const shutdown = (registry as { shutdown?: () => Promise<void> }).shutdown?.bind(registry);
+  const { shutdown } = registry as { shutdown?: () => Promise<void> };
   const close = async (): Promise<void> => {
     const failures: unknown[] = [];
-    for (const step of [() => client.close(), server === undefined ? undefined : () => server!.close(), shutdown]) {
-      if (step === undefined) continue;
-      await step().catch((e: unknown) => failures.push(e));
+    for (const step of [() => client.close(), async () => server?.close(), async () => shutdown?.call(registry)]) {
+      try {
+        await step();
+      } catch (e) {
+        failures.push(e);
+      }
     }
     if (failures.length > 0) throw failures[0];
   };
   try {
     // Inside the try: a server that cannot be built still leaves the registry shut down.
-    server = averi.createAveriServer({ registry, version: name });
+    server = averi.createAveriServer({ registry, version: driver });
     const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
     await server.connect(serverSide);
     await client.connect(clientSide);

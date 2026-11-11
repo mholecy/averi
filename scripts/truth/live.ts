@@ -203,12 +203,7 @@ if (averi !== undefined && platform === 'ios') console.error(`ios: ${liveIosLine
 /** The carousel group's hook on the Android adapter's strokes (live-carousel.ts#SwipeHook): armed around a case's calls. */
 const swipeHook = new SwipeHook();
 
-/**
- * The server and its client in this process (scripts/differential/connection.ts#connectInProcess): its one close — the
- * client, the server, the registry's shutdown, each tried — is one closer for finishRun (D82). The registry's shutdown
- * is what stops the adapters' child processes; a dead device cannot throw out of it (src/mcp/registry.ts#shutdown
- * disposes each adapter quietly).
- */
+/** The server and its client in this process (connection.ts#connectInProcess); its close, one closer for finishRun. */
 function connect(): Promise<InProcess> {
   const registry = averi!.registry({
     factory: liveFactory(averi!, { wda: { port, derivedDataPath: LAB_WDA_DERIVED_DATA }, swipeHook }),

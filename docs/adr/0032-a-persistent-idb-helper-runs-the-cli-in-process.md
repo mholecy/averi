@@ -30,7 +30,7 @@ Amended 2026-11-06 (A10: the alert goes up as a fact, on both verbs, and its wor
 amendment below; replies byte for byte).
 Amended 2026-11-11 (A30: the D41 invariant is held by behaviour, every tool called in a wda project, not by a count of
 `registry.get(` in the source — see the amendment below; replies byte for byte).
-Amended 2026-11-11 (A33: live.ts, differential.ts and perf/baseline.ts open and close their in-process server through
+Amended 2026-11-12 (A33: live.ts, differential.ts and perf/baseline.ts open and close their in-process server through
 one module — see the amendment at the end; golden Changed 0).
 
 ## Context
@@ -887,7 +887,7 @@ missing-package refusal names `treeSource: wda`), as Android's launch refusals n
 owner above the seam. It was not taken (recorded 2026-10-08): a typed error translated above would be one sentence with
 a translation site per caller. Until A32 this was written only in ARCHITECTURE.md §3.
 
-## Amendment: one in-process connection for the three harnesses (2026-11-11, backlog A33)
+## Amendment: one in-process connection for the three harnesses (2026-11-12, backlog A33)
 
 A23's amendment left review card 5's second step (TL6) open: live.ts, differential.ts and perf/baseline.ts each built
 registry, server and client, and each closed them in its own way. live.ts closed client, server and registry in turn and
@@ -896,14 +896,15 @@ and the server and never shut its registry down. baseline.ts tried all three and
 report after the closes.
 
 `connectInProcess` in scripts/differential/connection.ts now does this for all three. It takes the side's
-`createAveriServer` (this checkout's for the baseline), the registry the caller built, and a name: the client's name
-and the server's reported version. It returns the client and one `close`.
+`createAveriServer` (this checkout's for the baseline), the registry the caller built, and a `driver`: who drives it,
+the client's name and the server's reported version both. It returns the client and one `close`.
 
 - Open: the server connects before the client. An open that fails, a server that cannot be built included, closes
   what it opened, the registry included, and throws the open's own error.
 - Close: the client, then the server, then the registry's shutdown (what stops WebDriverAgent and the idb helper).
   Each is tried whatever the one before threw, and the first failure is thrown after the last (D82). A side's registry
-  from before f9b4a67f (2026-09-18) has no shutdown and is not asked.
+  from before f9b4a67f (2026-09-18) has no shutdown and is not asked. This supersedes live.ts's argument that no close
+  can throw: the structure holds whether one does or not.
 
 Each caller keeps its own registry and its own reply encoding. live.ts and baseline.ts read a reply through
 `callReply` in scripts/truth/replies.ts. The replay keeps its own encoding (image blocks hashed, temp paths blurred,
@@ -915,13 +916,16 @@ What moved:
   close no longer skips the registry's shutdown. Records and replies are unchanged.
 - differential.ts (and golden.ts through `connect`): the registry is now shut down at each variant's close, so a
   replayed adapter is disposed. That happens after the variant's last call, and the fake device's log is reset at
-  each call, so no outcome moves (golden: 1691 checks, Changed 0).
-- baseline.ts: the report is written before the connection closes, as D82 has live.ts write its record. A close that
-  hangs on a device gone cannot cost the measurements. A close that fails is one stderr line, `close: mcp (client,
-  server, registry) failed — <why>`, which replaces `registry shutdown: <why>`.
+  each call, so no outcome moves (golden: 1691 checks, Changed 0). A close that fails (an old side's shutdown that
+  throws) is one stderr line, `close: <side root> connection failed — <why>`, and the replay goes on: every reply is
+  in by then, as finishRun has live.ts's record in before its closes.
+- baseline.ts: the report is written before the connection closes, as D82 has live.ts write its record, and the temp
+  config is removed before the close too. A close that hangs on a device gone costs neither. A close that fails is
+  one stderr line, `close: mcp (client, server, registry) failed — <why>`, which replaces `registry shutdown: <why>`.
 
 Tests: tests/differential/connection.test.ts drives this checkout's server through the module. The client reaches the
-server under the given name. The close order is client, server, registry. Every close is tried when earlier ones
+server under the given driver. The close order is client, server, registry. Every close is tried when earlier ones
 throw, and the first failure is thrown. A later failure is thrown when the earlier closes held. A registry without
-shutdown still closes. A failed open closes the server and the registry and throws its own error. A server that cannot be built still
-leaves the registry shut down.
+shutdown still closes. A failed open closes the server and the registry and throws its own error. A server that
+cannot be built still leaves the registry shut down. tests/differential/differential.test.ts replays a recording with
+one side's shutdown throwing: no diff, every call made, the stderr line said.
