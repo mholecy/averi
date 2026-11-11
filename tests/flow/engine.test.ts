@@ -623,8 +623,8 @@ flows:
 
   // A19: until a duration was one schema, `timeout: 5 sec` loaded clean and parseDuration threw a plain Error when the
   // rung ran — not terminal (engine.ts#isTerminal), so the ladder escalated past the typo into the clearState login.
-  // Now the config never loads: no step runs, no rung escalates, nothing is wiped.
-  it('a rung with a bad duration cannot escalate into the wipe — the config is refused at load, before any step', async () => {
+  // Now the config never loads, so the ladder never meets it; the empty taps and launches are a sanity check.
+  it('a bad duration never reaches the ladder: the config is refused at load', async () => {
     const fake = new FakeAdapter(screens(), 'biometrics_prompt');
     const typo = cfgYaml.replace('- tap: { id: not_now }', '- tap: { id: not_now, timeout: 5 sec }');
     await expect(async () => FlowEngine.run(parseConfig(typo), fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' })).rejects.toThrow(

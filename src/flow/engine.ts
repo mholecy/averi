@@ -1540,8 +1540,9 @@ export class FlowEngine {
 
   private async runOptionalSteps(steps: StepPayload<'optional'>): Promise<void> {
     for (const s of steps) {
-      // A tap's `timeout:` cannot be malformed here: durationSchema refused
-      // it when averi.yaml loaded (A19), so the split cannot throw.
+      // Kept outside the try: the catch reads `tap`. Its `timeout:` cannot be
+      // malformed here — durationSchema refused that when averi.yaml loaded
+      // (A19) — so the split cannot throw.
       const tap = 'tap' in s ? splitTapSpec(s.tap) : undefined;
       // Set from interact's answer, not deduced: resolvePresent returned a
       // sighting. After it, an ElementNotFoundError from the committed tap

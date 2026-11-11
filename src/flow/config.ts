@@ -415,7 +415,7 @@ const configSchema = z
             apk: z.string().optional(),
             /**
              * Entry activity for launches that name neither an activity nor an
-             * intent (".MainActivity" or fully-qualified; see resolveLaunchActivity).
+             * intent (".MainActivity" or fully-qualified; see flow/launch.ts#resolveLaunchActivity).
              * Without it launch uses `monkey -c LAUNCHER`, which picks
              * arbitrarily among the package's launcher activities — debug
              * builds bundling LeakCanary have two, so set this to pin the app.
