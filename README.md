@@ -125,7 +125,7 @@ On a Linux/Windows box you get the full Android toolset — pass `platforms: ["a
 | [SETUP.md](SETUP.md) | your agent (and you) | Step-by-step setup with verification checks |
 | [skill/SKILL.md](skill/SKILL.md) | the agent, every session | Golden path, short rules, the `averi.yaml` reach ladder; [references/](skill/references/) hold the full yaml reference, the full behaviour of each tool whose description was shortened, and a troubleshooting guide by symptom |
 | [docs/verification.md](docs/verification.md) | reference | Assert semantics, forms, layout/color/text contracts |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | contributors | Design, adapters, tool surface, roadmap |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | contributors | Layers and their vocabulary, adapters, tool surface (not in the npm package) |
 
 ## Development
 

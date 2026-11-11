@@ -80,7 +80,7 @@ them in the background.
    next change to it moves a module out or adds a group (ADR 0038's threshold rule and its A21 amendment).
 7. **The package:** `npm pack --dry-run` lists what ships. Then `npm run release:smoke` (after the build in step 4;
    `pack-smoke.ts` in scripts/release) packs the real tarball into a temporary folder and checks it. Its file list
-   must hold the bin's target (`dist/mcp/server.js`), every `files` entry (dist, skill, SETUP.md, ARCHITECTURE.md),
+   must hold the bin's target (`dist/mcp/server.js`), every `files` entry (dist, skill, SETUP.md),
    README.md, LICENSE and package.json, and nothing from tests/, fixtures/, docs/, reports/, src/ or scripts/, and no
    compiled test. Every bare import in its dist must be a declared dependency. Its bin, started with node over stdio,
    must answer `initialize` with package.json's name and version and `tools/list` with exactly the 18 tools of
