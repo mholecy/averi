@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 /**
  * Timeouts are written the way a human would in averi.yaml ("15s") and the way
  * a caller would in a tool argument (a number of ms). One parser for both,
@@ -5,14 +7,45 @@
  * scroll_until — and none of them owns the notion of a duration.
  */
 
-/** "15s" | "500ms" | "2m" | number(ms) → ms */
-export function parseDuration(value: string | number): number {
-  if (typeof value === 'number') return value;
-  const m = value.match(/^(\d+(?:\.\d+)?)(ms|s|m)$/);
-  if (!m) throw new Error(`Invalid duration "${value}" — use e.g. 500ms, 15s, 2m`);
-  const n = Number(m[1]);
-  return m[2] === 'ms' ? n : m[2] === 's' ? n * 1000 : n * 60_000;
+const DURATION = /^(\d+(?:\.\d+)?)(ms|s|m)$/;
+
+/**
+ * The one reader of a duration: its ms, or why it is no duration — in the words parseDuration throws and
+ * durationSchema refuses with. A number is ms as it is; a negative or non-finite one is no duration (A19).
+ */
+function readDuration(value: string | number): { ms: number } | { issue: string } {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value >= 0 ? { ms: value } : { issue: `Invalid duration ${value} — use e.g. 500ms, 15s, 2m` };
+  }
+  const m = DURATION.exec(value);
+  return m ? { ms: Number(m[1]) * (m[2] === 'ms' ? 1 : m[2] === 's' ? 1000 : 60_000) } : { issue: `Invalid duration "${value}" — use e.g. 500ms, 15s, 2m` };
 }
+
+/**
+ * "15s" | "500ms" | "2m" | number(ms) → ms. Every value that reaches it from averi.yaml or a tool argument passed
+ * durationSchema, so there it cannot throw.
+ */
+export function parseDuration(value: string | number): number {
+  const read = readDuration(value);
+  if ('issue' in read) throw new Error(read.issue);
+  return read.ms;
+}
+
+/**
+ * The one schema of a duration field — every `timeout` of a flow step (tap, scroll_until, wait) and of an assert spec
+ * (the MCP `assert` tool's and an `assert:` step's) (A19). A value parseDuration would refuse is refused here, with its
+ * message, so averi.yaml fails at load naming the field (`flows.f.steps.0.wait.timeout: Invalid duration "5 sec" — …`)
+ * and a tool call fails before a device is bound — never a plain Error mid-flow, which a reach rung would escalate past
+ * and an `optional:` would log as skipped. The value is kept as written, not turned into ms: the spec types stay
+ * `string | number` for the code and tests that build specs directly, and each consumer converts with parseDuration,
+ * which a value that passed here cannot make throw — util/regex.ts#regexSource's shape.
+ */
+export const durationSchema: z.ZodEffects<z.ZodUnion<[z.ZodNumber, z.ZodString]>> = z
+  .union([z.number(), z.string()])
+  .superRefine((value, ctx) => {
+    const read = readDuration(value);
+    if ('issue' in read) ctx.addIssue({ code: z.ZodIssueCode.custom, message: read.issue });
+  });
 
 /**
  * ms → "N s", the way a tool description or a message quotes a budget

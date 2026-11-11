@@ -160,7 +160,7 @@ const assertsInput = z
     'Assert specs, e.g. [{"element":{"id":"form"}}, {"element":{"id":"error"},"absent":true}, {"element":{"id":"amount"},"text":"100.00"}, ' +
       '{"element":{"id":"title"},"match":"^Pay"}, {"element":{"id":"card"},"rect":{"x":24,"w":345,"h":129,"frameWidth":393}} (Figma-frame units), ' +
       '{"element":{"id":"card"},"color":{"expected":"#FDFDFD","deltaE":8,"sample":"dominant"}} (sample: "dominant" | "patches"), {"element":{"id":"cta"},"ocr":{"text":"CONTINUE","heightPct":2.96}}, ' +
-      '{"screenshot":{"baseline":"transfers","threshold":0.01}}]. Each element spec takes "timeout" (ms, or "10s").',
+      '{"screenshot":{"baseline":"transfers","threshold":0.01}}]. Each element spec takes "timeout" (non-negative ms, or "10s").',
   );
 
 const parseAsserts = (raw: unknown[]) => raw.map((a) => assertSpecSchema.parse(a));
@@ -541,7 +541,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
           .boolean()
           .optional()
           .describe('Require the element ENTIRELY inside the viewport and uncovered, not just its centre. Default false'),
-        timeoutMs: z.number().optional().describe(`Default ${DEFAULT_SCROLL_TIMEOUT_MS}`),
+        timeoutMs: z.number().nonnegative().finite().optional().describe(`Default ${DEFAULT_SCROLL_TIMEOUT_MS}`),
         within: z
           .union([z.string(), z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }).strict()])
           .optional()

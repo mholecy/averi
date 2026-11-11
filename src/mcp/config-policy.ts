@@ -1,5 +1,5 @@
 import type { Platform } from '../adapters/types.js';
-import { launchConsultsConfigActivity, type LaunchEntry } from '../flow/config.js';
+import { launchConsultsConfigActivity, type LaunchEntry } from '../flow/launch.js';
 import { NO_CONFIG, OPTIONAL_CONFIG, REQUIRED_CONFIG, REQUIRED_CONFIG_AND_ENV } from '../flow/tool-config.js';
 
 /**

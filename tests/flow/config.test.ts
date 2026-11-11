@@ -7,8 +7,6 @@ import {
   flowItselfIsDestructive,
   inertKeyboardDismissNote,
   keyboardDismissals,
-  resolveLaunchActivity,
-  launchConsultsConfigActivity,
   parseConfig,
   type ContainerKind,
   type Step,
@@ -121,6 +119,27 @@ flows:
       ['wait: { element: { id: 5 } }', '- wait: { element: { id: 5 } }', 'flows.f.steps.0.wait.element.id: Expected string, received number'],
     ])('a wrong type inside a step (%s) names the field and the type it takes', (_, stepYaml, line) => {
       expect(load(stepYaml)).toThrow(only(line));
+    });
+
+    // A19: a duration is one schema (util/duration.ts#durationSchema), checked at load. Until A19 `timeout` was any
+    // string — `"5 sec"` loaded clean and parseDuration threw a plain Error when the step ran, which a reach rung
+    // escalated past and an `optional:` logged as skipped. Every step kind that takes a timeout, one row each.
+    const BAD_DURATION = 'Invalid duration "5 sec" — use e.g. 500ms, 15s, 2m';
+    it.each([
+      ['tap', '- tap: { id: x, timeout: 5 sec }', 'flows.f.steps.0.tap.timeout'],
+      ['scroll_until', '- scroll_until: { element: { id: x }, timeout: 5 sec }', 'flows.f.steps.0.scroll_until.timeout'],
+      ['wait', '- wait: { element: { id: x }, timeout: 5 sec }', 'flows.f.steps.0.wait.timeout'],
+      ['assert', '- assert: [ { element: { id: x }, timeout: 5 sec } ]', 'flows.f.steps.0.assert.0.timeout'],
+      ['optional tap', '- optional: [ { tap: { id: x, timeout: 5 sec } } ]', 'flows.f.steps.0.optional.0.tap.timeout'],
+    ])('a %s step\'s bad timeout is refused at load, naming the field', (_, stepYaml, path) => {
+      expect(load(stepYaml)).toThrow(only(`${path}: ${BAD_DURATION}`));
+    });
+
+    it('a negative timeout is refused at load; 0 and the three units parse', () => {
+      expect(load('- wait: { element: { id: x }, timeout: -5 }')).toThrow(only('flows.f.steps.0.wait.timeout: Invalid duration -5 — use e.g. 500ms, 15s, 2m'));
+      const cfg = parseConfig('app: {}\nflows:\n  f:\n    steps:\n      - wait: { element: { id: x }, timeout: 0 }\n      - tap: { id: x, timeout: 500ms }\n      - tap: { id: x, timeout: 2m }\n      - tap: { id: x, timeout: 1.5s }\n');
+      // The written value is kept as written: the engine converts it, so a trace quotes nothing new.
+      expect(cfg.flows.f.steps).toEqual([{ wait: { element: { id: 'x' }, timeout: 0 } }, { tap: { id: 'x', timeout: '500ms' } }, { tap: { id: 'x', timeout: '2m' } }, { tap: { id: 'x', timeout: '1.5s' } }]);
     });
 
     it('a kind\'s own unknown key is said at the kind, not at the step', () => {
@@ -599,53 +618,6 @@ app:
 flows: {}
 `),
     ).toThrow(/app\.android\.package must be a package name/);
-  });
-});
-
-describe('resolveLaunchActivity — the one launch-activity fallback (flow launch step and launch_app)', () => {
-  const cfg = parseConfig(`
-app:
-  android: { package: md.bank.app, activity: .MainActivity }
-  ios:     { bundleId: md.bank.app }
-`);
-
-  it("android, the config's own package → its activity", () => {
-    expect(resolveLaunchActivity(cfg, { platform: 'android', appId: 'md.bank.app' })).toBe('.MainActivity');
-  });
-
-  it('another package → none: the config describes a different app', () => {
-    expect(resolveLaunchActivity(cfg, { platform: 'android', appId: 'com.other.app' })).toBeUndefined();
-  });
-
-  it('ios → none, even when the bundle id equals the android package', () => {
-    expect(resolveLaunchActivity(cfg, { platform: 'ios', appId: 'md.bank.app' })).toBeUndefined();
-  });
-
-  it('no config, no android section, or no activity configured → none', () => {
-    expect(resolveLaunchActivity(undefined, { platform: 'android', appId: 'md.bank.app' })).toBeUndefined();
-    expect(resolveLaunchActivity(parseConfig('app:\n  ios: { bundleId: md.bank.app }\n'), { platform: 'android', appId: 'md.bank.app' })).toBeUndefined();
-    expect(resolveLaunchActivity(parseConfig('app:\n  android: { package: md.bank.app }\n'), { platform: 'android', appId: 'md.bank.app' })).toBeUndefined();
-  });
-
-  // 2026-10-03: WHEN the fallback applies is this rule's too, for both callers.
-  const SEND = { action: 'android.intent.action.SEND' };
-  const entry = { platform: 'android' as const, appId: 'md.bank.app' };
-
-  it('a named activity is returned as given, with or without an intent, on either platform', () => {
-    expect(resolveLaunchActivity(cfg, { ...entry, activity: '.ShareActivity' })).toBe('.ShareActivity');
-    expect(resolveLaunchActivity(cfg, { ...entry, activity: '.ShareActivity', intent: SEND })).toBe('.ShareActivity');
-    expect(resolveLaunchActivity(cfg, { ...entry, platform: 'ios', activity: '.X' })).toBe('.X');
-  });
-
-  it('an intent and no activity → none: the config activity is not forced onto the intent', () => {
-    expect(resolveLaunchActivity(cfg, { ...entry, intent: SEND })).toBeUndefined();
-  });
-
-  it('launchConsultsConfigActivity: android with neither an activity nor an intent, and nothing else', () => {
-    expect(launchConsultsConfigActivity({ platform: 'android' })).toBe(true);
-    expect(launchConsultsConfigActivity({ platform: 'android', intent: SEND })).toBe(false);
-    expect(launchConsultsConfigActivity({ platform: 'android', activity: '.X' })).toBe(false);
-    expect(launchConsultsConfigActivity({ platform: 'ios' })).toBe(false);
   });
 });
 
