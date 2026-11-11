@@ -11,7 +11,7 @@ import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from
 import { revealText, SIDES } from '../ui-tree/sides.js';
 import { countOf } from '../util/count.js';
 import { CHECKED_AFTER_HOLDS } from './flush-check.js';
-import { absenceError, type WaitEvidence } from './resolve.js';
+import { absenceError, describeTarget, type WaitEvidence } from './resolve.js';
 import { fullyClaimed, shortOf, unfitRoom, type AppliedKeyboard, type Judged, type Unfit } from './scroll-read.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type FlushCut, type FlushPlace, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 import type { CarriedUnder, UnseenStrokes } from './motion-ledger.js';
@@ -826,8 +826,8 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
  */
 export const withinRect = ({ x, y, width, height }: Rect): string => JSON.stringify({ x, y, width, height });
 
-/** `within` as the caller gave it: a selector as spelled, a rect as `withinRect`. */
-const withinSaid = (within: Within): string => (isRect(within) ? withinRect(within) : within);
+/** `within` as the caller gave it: a selector as spelled, an element spec as a step's element is said (D81), a rect as `withinRect`. */
+const withinSaid = (within: Within): string => (isRect(within) ? withinRect(within) : describeTarget(within));
 
 /** The other axis' two directions, as a sentence offers them. */
 const DIRECTIONS_ON: Readonly<Record<ScrollAxis, string>> = { vertical: 'up or down', horizontal: 'left or right' };
@@ -842,15 +842,18 @@ const asWithin = (n: QuotedNode): string => `${nodeText(n)} as within: ${withinR
  * Why `within` names no scroll view to stroke (interact/within.ts#WithinRefusal, D78), after `stopped before any
  * swipe — `: what it matched or is the rect of, and the way out — a narrower selector, a rect the tree lists (each
  * scroll view told along the stroke given as `within` takes it, `withinRect`), another direction or another scroll
- * view, or, on idb, the tree source that lists scroll views.
+ * view, or, on idb, the tree source that lists scroll views. An element spec (a flow's `within`, D81) is offered no
+ * rect: a flow cannot name one (flow/config.ts refuses it as device-specific).
  */
 function withinText(within: Within, refused: WithinRefusal): string {
   const w = `within ${withinSaid(within)}`;
+  // An element spec: the one form not a string among those a match is refused for (a rect is never absent nor ambiguous).
+  const spec = typeof within !== 'string';
   switch (refused.of) {
     case 'absent':
-      return `${w} matches nothing in the tree, so it names no scroll view — give a selector of the scroll view or of an element inside it, or its rect (ui_snapshot)`;
+      return `${w} matches nothing in the tree, so it names no scroll view — ${spec ? 'give an element spec of the scroll view or of an element inside it' : 'give a selector of the scroll view or of an element inside it, or its rect (ui_snapshot)'}`;
     case 'ambiguous':
-      return `${w} matches ${refused.matches.length} elements: ${refused.matches.map(nodeText).join(', ')} — narrow it so exactly one matches, or give the scroll view's rect`;
+      return `${w} matches ${refused.matches.length} elements: ${refused.matches.map(nodeText).join(', ')} — narrow it so exactly one matches${spec ? '' : ", or give the scroll view's rect"}`;
     case 'unscrolled':
       return `${w} matches ${nodeText(refused.node)}, which is no scroll view and lies in none — name a scroll view or an element inside one`;
     case 'stale': {

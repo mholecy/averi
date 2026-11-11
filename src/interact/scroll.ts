@@ -40,7 +40,7 @@ export interface ScrollOptions {
   eyes?: Eyes;
   /**
    * The scroll view to stroke until the target is first read (D78; interact/within.ts): a selector of it or of an
-   * element inside it (the scroll view of its exact rect, else its nearest), or its rect. Resolved at the first read that reads; one
+   * element inside it — a selector string, or an element spec (a flow's, D81) — (the scroll view of its exact rect, else its nearest), or its rect. Resolved at the first read that reads; one
    * that names no scroll view stops the scroll there, before any swipe. Default: the screen's largest scroller.
    */
   within?: Within;

@@ -3221,6 +3221,7 @@ describe('round — `within`, the scroll view named for the strokes until the ta
   it.each([
     ['its rect', LOWER],
     ['a selector of a row inside it (S)', 'id:lab.scroll-bounded.S'],
+    ['an element spec of that row (a flow\'s `within`, D81)', { id: 'lab.scroll-bounded.S' }],
   ] as const)('named by %s: every stroke for O goes inside `lower`, and the stop names `upper` with its rect as the next `within`', (_, within) => {
     const tree = parseDump(BOUNDED);
     const played = play({ ...ANDROID, maxSwipes: 6, timeoutMs: 15_000, within }, [{ tree }, { tree }, { tree }]);
@@ -3249,6 +3250,24 @@ describe('round — `within`, the scroll view named for the strokes until the ta
       'within {"x":0,"y":1046,"width":1080,"height":496} is the rect of no scroll view in the tree; the tree shows 2 scroll views that may scroll vertically: scrollable (0,303 1080x605) as within: {"x":0,"y":303,"width":1080,"height":605}, scrollable (0,1046 1080x495) as within: {"x":0,"y":1046,"width":1080,"height":495}',
     ],
   ] as const)('refused before any swipe when %s — the first read, the target not judged', (_, within, refused, words) => {
+    const tree = parseDump(BOUNDED);
+    const played = play({ ...ANDROID, maxSwipes: 6, timeoutMs: 15_000, within }, [{ tree }]);
+    expect(played.outcome).toMatchObject({ kind: 'within', swipes: 0, refused });
+    expect(failureOf(played, 'id:lab.scroll-bounded.O').message).toBe(`scroll_until id:lab.scroll-bounded.O stopped before any swipe — ${words}`);
+  });
+
+  // D81: a flow's `within` is an element spec — said as a step's element is (`id:"nope"`), and never offered a rect,
+  // which a flow cannot give (flow/config.ts refuses one).
+  it.each([
+    ['nothing matches', { id: 'nope' }, { of: 'absent' }, 'within id:"nope" matches nothing in the tree, so it names no scroll view — give an element spec of the scroll view or of an element inside it'],
+    [
+      'several match',
+      { role: 'scrollable' },
+      { of: 'ambiguous' },
+      'within role:"scrollable" matches 2 elements: scrollable (0,303 1080x605), scrollable (0,1046 1080x495) — narrow it so exactly one matches',
+    ],
+    ['its match lies in no scroll view', { id: 'content' }, { of: 'unscrolled' }, 'within id:"content" matches container id:content (0,0 1080x2220), which is no scroll view and lies in none — name a scroll view or an element inside one'],
+  ] as const)('an element spec (a flow\'s, D81) refused before any swipe when %s — no rect offered', (_, within, refused, words) => {
     const tree = parseDump(BOUNDED);
     const played = play({ ...ANDROID, maxSwipes: 6, timeoutMs: 15_000, within }, [{ tree }]);
     expect(played.outcome).toMatchObject({ kind: 'within', swipes: 0, refused });

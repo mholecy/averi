@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Rect, UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
-import { checkWithin, resolveWithin } from '../../src/interact/within.js';
+import { checkWithin, isRect, resolveWithin } from '../../src/interact/within.js';
 import { lookAt } from '../../src/ui-tree/look.js';
 import { parseDump } from '../helpers/android-dumps.js';
 
@@ -54,6 +54,34 @@ describe('resolveWithin — a selector: the matched scroll view, or the nearest 
     expect(resolveWithin(factsOf(ANDROID), 'id:content', 'down', ANDROID_SCREEN)).toEqual({
       refused: { of: 'unscrolled', node: { role: 'container', label: null, identifier: 'content', rect: ANDROID_SCREEN } },
     });
+  });
+});
+
+describe('resolveWithin — an element spec (a flow\'s `within`, D81): resolved as the selector of the same fields is', () => {
+  it('a row of `lower` names `lower` (Android and WDA); a spec of `upper`\'s row names `upper`', () => {
+    expect(resolveWithin(factsOf(ANDROID), { id: 'lab.scroll-bounded.S' }, 'down', ANDROID_SCREEN)).toEqual({ rect: LOWER });
+    expect(resolveWithin(factsOf(WDA), { id: 'lab.scroll-bounded.S' }, 'down', PHONE)).toEqual({ rect: WDA_LOWER });
+    expect(resolveWithin(factsOf(WDA), { id: 'lab.scroll-bounded.W' }, 'down', PHONE)).toEqual({ rect: WDA_UPPER });
+  });
+
+  it('the same refusals: several matches, none, one in no scroll view, across the stroke, idb', () => {
+    expect(resolveWithin(factsOf(ANDROID), { role: 'scrollable' }, 'down', ANDROID_SCREEN)).toEqual({ refused: { of: 'ambiguous', matches: [list(UPPER), list(LOWER)] } });
+    expect(resolveWithin(factsOf(ANDROID), { id: 'nope' }, 'down', ANDROID_SCREEN)).toEqual({ refused: { of: 'absent' } });
+    expect(resolveWithin(factsOf(ANDROID), { id: 'content' }, 'down', ANDROID_SCREEN)).toEqual({
+      refused: { of: 'unscrolled', node: { role: 'container', label: null, identifier: 'content', rect: ANDROID_SCREEN } },
+    });
+    expect(resolveWithin(factsOf(WDA), { id: 'lab.scroll-bounded.O' }, 'right', PHONE)).toEqual({ refused: { of: 'across', rect: WDA_LOWER, axis: 'vertical', toward: 'right' } });
+    expect(resolveWithin(factsOf(IDB), { id: 'lab.scroll-bounded.S' }, 'down', PHONE)).toEqual({ refused: { of: 'untold' } });
+  });
+
+  it('every field exact, as the spec matches a step\'s element: a spec\'s `text` is no regex', () => {
+    expect(resolveWithin(factsOf(ANDROID), { id: 'lab.scroll-bounded.S', text: '.*' }, 'down', ANDROID_SCREEN)).toEqual({ refused: { of: 'absent' } });
+  });
+
+  it('a spec is no rect; a rect is', () => {
+    expect(isRect({ id: 'x' })).toBe(false);
+    expect(isRect('id:x')).toBe(false);
+    expect(isRect(LOWER)).toBe(true);
   });
 });
 
@@ -144,5 +172,7 @@ describe('checkWithin — a string `within` parsed before anything is read, its 
     expect(() => checkWithin('text:"("')).not.toThrow();
     expect(() => checkWithin('id:lab.scroll-bounded.S label~"Target.*"')).not.toThrow();
     expect(() => checkWithin({ x: 0, y: 0, width: 1, height: 1 })).not.toThrow();
+    // An element spec (a flow's, D81): its fields are exact values, nothing to parse.
+    expect(() => checkWithin({ text: '(' })).not.toThrow();
   });
 });

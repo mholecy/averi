@@ -122,6 +122,12 @@ export interface ScrollUntilSpec {
    */
   fully?: boolean;
   timeout?: string | number;
+  /**
+   * The scroll view the swipes go over until the element is first read (D81; interact/within.ts): an element spec of
+   * it or of an element inside it (the scroll view of its very rect, else its nearest). Resolved and refused as the
+   * MCP tool's `within` is. No rect — device-specific (`WITHIN_NO_RECT`). Default: the screen's largest scroller.
+   */
+  within?: ElementSpec;
 }
 
 export type Step =
@@ -202,6 +208,32 @@ const launchIntent: z.ZodType<LaunchIntent> = z
   })
   .strict();
 
+/** A rect's sides — the MCP `scroll_until`'s other form of `within`, which a flow's refuses (D81). */
+const RECT_SIDES = ['x', 'y', 'width', 'height'];
+
+/** Why a flow's `within` takes no rect, said where one is given: a rect is one device's layout, a flow runs on others. */
+const WITHIN_NO_RECT = 'within takes an element spec (id, text, role, label) of the scroll view or of an element inside it, not a rect: a rect is device-specific';
+
+/** Why a flow's `within` takes no selector string, the MCP tool's other form: a flow names an element by spec. */
+const WITHIN_NO_STRING = 'within takes an element spec ({ id: … }), as the step\'s element does, not a selector string';
+
+/**
+ * A flow's `scroll_until` `within` (D81): the step's own `element` vocabulary, an element spec. The MCP tool's two
+ * other forms are refused naming why — anything carrying a rect's side (`WITHIN_NO_RECT`), a selector string
+ * (`WITHIN_NO_STRING`) — as the issue alone: the pipe stops at it, so neither the spec's "Unrecognized key(s)" nor the
+ * step union's bare refusal of `scroll_until` is said instead. Anything else is the element spec schema's to judge.
+ */
+const withinSpec: z.ZodType<ElementSpec> = z
+  // `any`, not `unknown`: the step's input type is `Step`, so its `within` must read as a spec on the way in too.
+  .any()
+  .superRefine((v, ctx) => {
+    if (typeof v === 'string') ctx.addIssue({ code: z.ZodIssueCode.custom, message: WITHIN_NO_STRING });
+    else if (typeof v === 'object' && v !== null && RECT_SIDES.some((side) => Object.hasOwn(v, side))) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: WITHIN_NO_RECT });
+    }
+  })
+  .pipe(elementSpecSchema);
+
 /** The platform-override step's refinement message — named, because parseConfig drops it where it is noise (withoutMootOverrideIssues). */
 const OVERRIDE_NEEDS_PLATFORM = 'platform override needs android and/or ios';
 
@@ -265,6 +297,7 @@ const step: z.ZodType<Step> = z.lazy(() =>
             maxSwipes: z.number().int().min(1).optional(),
             fully: z.boolean().optional(),
             timeout: timeout.optional(),
+            within: withinSpec.optional(),
           })
           .strict(),
       })

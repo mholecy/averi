@@ -1739,6 +1739,23 @@ flows:
     });
   });
 
+  // D81: the step's `within` reaches the scroll (interact/within.ts) — a spec that names no scroll view stops it
+  // before any swipe, said as the MCP tool's refusal is, the spec said as the step's element is.
+  it('`within` reaches the scroll: one that matches nothing stops it before any swipe', async () => {
+    const withinCfg = parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  to_submit:
+    steps:
+      - scroll_until: { element: { id: submit_button }, within: { id: nope }, maxSwipes: 4, timeout: 2s }
+`);
+    const fake = scrollingFake(3100);
+    await expect(FlowEngine.run(withinCfg, fake, FAST, { flow: 'to_submit' })).rejects.toThrow(
+      'scroll_until id:"submit_button" stopped before any swipe — within id:"nope" matches nothing in the tree, so it names no scroll view — give an element spec of the scroll view or of an element inside it',
+    );
+    expect(fake.swipes).toHaveLength(0);
+  });
+
   it('passes with 0 swipes when the element is already visible (fast path)', async () => {
     const fake = scrollingFake(500);
     const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'to_submit' });
