@@ -1,0 +1,10 @@
+# Golden against $S/golden-base-main-v3.json: 10 checks (was 10), 0 mismatches (was 0), 0 broken targets (was 0), 0 skipped (was 0)
+
+## Changed: 0 checks
+
+## Strike from KNOWN: 0 rows
+
+## COUNTS: 0 captures
+
+## Re-pin: 0 rows
+
