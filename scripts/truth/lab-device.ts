@@ -96,9 +96,9 @@ export interface LabDevice {
    */
   ime?(): Promise<ImeCapture>;
   /**
-   * Android: averi's touchable query (src/adapters/android-wm.ts#TOUCHABLE_COMMAND) now, raw — the IME window's touchable region beside `mInputShown`,
-   * read at a kf case's launch and again once its calls are done (run-case.ts, withMeasuredPanel; LabState.imeTouchable,
-   * D69). Leaves the keyboard up. Absent on iOS.
+   * Android: averi's touchable query (src/adapters/android-wm.ts#TOUCHABLE_COMMAND) now, raw — the IME window's
+   * touchable region beside `mInputShown`, read at a kf case's launch and again once its calls are done (run-case.ts,
+   * withMeasuredPanel; LabState.imeTouchable, D69). Leaves the keyboard up. Absent on iOS.
    */
   imeTouchable?(): Promise<string>;
   /**
@@ -509,8 +509,8 @@ export class AndroidLab implements LabDevice {
   }
 
   /**
-   * averi's own queries, imported (src/adapters/android-wm.ts#INPUT_SHOWN_COMMAND, #TOUCHABLE_COMMAND): the capture asks
-   * the device what averi asks it, shown and again after a back hid the keyboard.
+   * averi's own queries, imported (src/adapters/android-wm.ts#INPUT_SHOWN_COMMAND, #TOUCHABLE_COMMAND): the capture
+   * asks the device what averi asks it, shown and again after a back hid the keyboard.
    */
   async ime(): Promise<ImeCapture> {
     await this.guard();

@@ -767,11 +767,12 @@ else, and knew no fact of its own.
 **Decision.**
 
 1. **A root mark of the source's dialect: `UiNode.activeWindowOnly`** — set by the uiautomator parser on every tree's
-   root (`android-tree-dialect.ts#parseUiautomatorXml`), in the dialect of `flatList` and `unclippedFrames`: the tree lists the window
-   that has focus, nothing beneath it. `presentation.ts#presentationOf` picks the uiautomator adapter by it;
-   `paddedTouchTargets` keeps its one meaning (Compose's padded touch targets, draw order's `ownControl` row).
-2. **The parser marks the window presented, as the WDA parser marks WDA's layers** (`android-tree-dialect.ts#presentedWindow`,
-   `UiNode.presentation` on the root), since it reads what ui-tree never sees — the scrim's `clickable`:
+   root (`android-tree-dialect.ts#parseUiautomatorXml`), in the dialect of `flatList` and `unclippedFrames`: the tree
+   lists the window that has focus, nothing beneath it. `presentation.ts#presentationOf` picks the uiautomator adapter
+   by it; `paddedTouchTargets` keeps its one meaning (Compose's padded touch targets, draw order's `ownControl` row).
+2. **The parser marks the window presented, as the WDA parser marks WDA's layers**
+   (`android-tree-dialect.ts#presentedWindow`, `UiNode.presentation` on the root), since it reads what ui-tree never
+   sees — the scrim's `clickable`:
    - `dialog` — a new `PresentationKind`, typed by the window's own shape (the window is its own cover, no element):
      a window of some area that FLOATS OFF THE SCREEN'S EDGES ON BOTH AXES (its left edge past x 0 and its top edge
      past y 0). An app's window lies against the screen's top or left edge — at 0,0 on a phone, and offset on one axis
@@ -888,10 +889,10 @@ where the scrim does) — and of some height. Read against the SCRIM's edges, no
 bars); by the entry, not the full id (the package is the app's; the ids are never localized). Not a relaxation of the
 labelled scrim to unlabelled leaves: an unlabelled full-width clickable leaf over a full-width sibling is common app
 content, and the label was that rule's guard — the ids are this one's. The parser now asks the window of an ordered
-list of named recognizers (`android-tree-dialect.ts#PRESENTED_WINDOWS`: `floatingDialog`, `composeSheetScrim`, `materialSheetDialog`),
-the one place that answers whether the window is presented and as what. Decisions 3 and 4 read the mark as any other:
-the tap's wait ends with the presented remedy ("a screen is presented over it (a modal or a sheet) — close it first"),
-`scroll_until` stops before any stroke — none on the scrim, so nothing is dismissed.
+list of named recognizers (`android-tree-dialect.ts#PRESENTED_WINDOWS`: `floatingDialog`, `composeSheetScrim`,
+`materialSheetDialog`), the one place that answers whether the window is presented and as what. Decisions 3 and 4 read
+the mark as any other: the tap's wait ends with the presented remedy ("a screen is presented over it (a modal or a
+sheet) — close it first"), `scroll_until` stops before any stroke — none on the scrim, so nothing is dismissed.
 
 **Measured.** Golden over truth/round-7's captures (41302012, `--side` arch/r23-sheet-dialog): 251 → 243 mismatches —
 the 8 rows of `bottom-sheet-dialog.xml` A–D `tap` and `scroll_until` green (LW1's), every other row byte-identical

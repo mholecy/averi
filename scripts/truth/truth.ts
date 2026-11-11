@@ -125,8 +125,8 @@ function rawNodes(payload: string, source: SourceKind): Record<string, unknown>[
  * target, labelled `text` (WDA's `label`, idb's `AXLabel`, uiautomator's `text` or `content-desc`) compared as
  * textListedIn compares a string: whitespace collapsed (spaced), so a string the app wraps onto lines is one node in
  * both readings; or, for a label target, its accessibility label exactly as averi reads it (WDA's `label`, idb's
- * `AXLabel`; uiautomator's `content-desc`, or its `text` where that is empty — src/adapters/android-tree-dialect.ts#normalizeNode's
- * `label: contentDesc ?? text`).
+ * `AXLabel`; uiautomator's `content-desc`, or its `text` where that is empty —
+ * src/adapters/android-tree-dialect.ts#normalizeNode's `label: contentDesc ?? text`).
  */
 function isTarget(o: Record<string, unknown>, source: SourceKind, by: AssertElement): boolean {
   if ('id' in by) return (source === 'uiautomator' ? [o['resource-id']] : source === 'idb' ? [o.AXUniqueId] : [o.rawIdentifier, o.name]).some((v) => v === by.id);
@@ -205,8 +205,8 @@ function atClip(o: Record<string, unknown>, source: SourceKind, clip: Rect): boo
 /**
  * The axis a raw tree's payload TELLS of the scroller whose frame is `clip` (within a pixel, each edge), or undefined
  * when it tells none: a uiautomator node marked `scrollable="true"` whose class fixes its axis — averi's own table,
- * src/adapters/android-tree-dialect.ts#AXIS_BY_CLASS, so the row asks `unfit` exactly where averi reads a told axis (a Compose
- * `horizontalScroll` dumps as `android.widget.HorizontalScrollView`; a LazyRow or a RecyclerView tells none).
+ * src/adapters/android-tree-dialect.ts#AXIS_BY_CLASS, so the row asks `unfit` exactly where averi reads a told axis (a
+ * Compose `horizontalScroll` dumps as `android.widget.HorizontalScrollView`; a LazyRow or a RecyclerView tells none).
  * Uiautomator only: WDA's axis comes from a node's type or its content's extent (src/adapters/wda-source.ts), which
  * the harness does not read, and idb lists no scroller (ADR 0010 residual 5). golden-spec/rows.ts#unfitSide asks it.
  */

@@ -794,12 +794,13 @@ export interface Clips {
    * that rect, as `DrawOrder.drawnOver` finds its container — for `scroll_until`'s stroke plan
    * (interact/stroke-plan.ts#strokeRoom): the axis it scrolls on, and every scroll view nested in it (its descendants
    * that scroll, at any depth; one of its own rect left out; a text input left out — a Compose text field dumps as a
-   * scrolling (Horizontal)ScrollView, role `textfield` (`INPUT_ROLE`), adapters/android-tree-dialect.ts — so a stroke the plan sends
-   * inside a nested scroll view never lands in a field, D59b; Android's case: WDA marks no node clipping, and a
-   * scrolling WDA text view is a scroll view of its own role) with theirs, each as scroll-containers.ts#scrollAxis says
-   * on this tree's dialect (`unclipped`), undefined where it cannot tell. Undefined when the tree holds no scroll
-   * view of that rect (the list moved). Found as draw order finds its container (scroll-containers.ts#isScrollViewOf).
-   * Cost: a walk of the tree to find it on each ask; its facts kept for the life of the `Clips`.
+   * scrolling (Horizontal)ScrollView, role `textfield` (`INPUT_ROLE`), adapters/android-tree-dialect.ts — so a stroke
+   * the plan sends inside a nested scroll view never lands in a field, D59b; Android's case: WDA marks no node
+   * clipping, and a scrolling WDA text view is a scroll view of its own role) with theirs, each as
+   * scroll-containers.ts#scrollAxis says on this tree's dialect (`unclipped`), undefined where it cannot tell.
+   * Undefined when the tree holds no scroll view of that rect (the list moved). Found as draw order finds its container
+   * (scroll-containers.ts#isScrollViewOf). Cost: a walk of the tree to find it on each ask; its facts kept for the life
+   * of the `Clips`.
    */
   axesOf(container: Rect): ScrollAxes | undefined;
   /**

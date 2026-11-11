@@ -8,7 +8,7 @@ import { rectIntersection, type FocusedWindow, type KeyboardWitness, type Rect, 
  * A second display is answered three ways, each read's own: every display must agree (parseImeInsets, parseStatusBand,
  * parseNavigationBand), the first found (parseFocusedWindow: its read prints no display headers) and display 0's block
  * (defaultDisplayFocus). They were not made one (A27): every captured dump holds one display, where the three read
- * alike, so none can say which is right for two — tests/adapters/android-wm.test.ts pins the census and where they differ.
+ * alike, so none can say which is right for two: tests/adapters/android-wm.test.ts pins the census and the difference.
  */
 
 /**
@@ -446,7 +446,7 @@ function defaultDisplayBlock(dump: string): string {
   return displays.find((block) => Number.parseInt(block, 10) === DEFAULT_DISPLAY) ?? displays[0] ?? whole;
 }
 
-/** The default display's focus as CHOOSER_FOCUS_COMMAND prints it: the focused activity's component and the focused window's. */
+/** The default display's focus as CHOOSER_FOCUS_COMMAND prints it: the focused activity's and window's components. */
 export interface DisplayFocus {
   /** `mFocusedApp`'s component, when its line names one. */
   app?: string;
@@ -456,7 +456,8 @@ export interface DisplayFocus {
 
 /**
  * The focused activity and window of the default display (defaultDisplayBlock), so both are one display's pair: another
- * display's focus is not a link's started on display 0. Which of the two decides is the reader's (android-chooser.ts#chooserInFocus).
+ * display's focus is not a link's started on display 0. android-chooser.ts#chooserInFocus decides which of the two
+ * counts.
  */
 export function defaultDisplayFocus(dump: string): DisplayFocus {
   const block = defaultDisplayBlock(dump);

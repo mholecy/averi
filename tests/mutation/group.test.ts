@@ -93,6 +93,12 @@ describe('scopeOf — what stryker.config.mjs and vitest.mutation.config.ts read
 });
 
 describe('isGroup and filesOf', () => {
+  it('group.d.mts declares GROUPS as group.mjs defines it: the hand-written tuple cannot drift', () => {
+    const types = readFileSync(new URL('../../scripts/mutation/group.d.mts', import.meta.url), 'utf8');
+    const declared = /export declare const GROUPS: readonly \[([^\]]*)\];/.exec(types)?.[1];
+    expect(declared?.split(',').map((g) => g.trim().replace(/^'|'$/g, ''))).toEqual([...GROUPS]);
+  });
+
   it('isGroup: core, android, scene and lab only', () => {
     expect(GROUPS.every(isGroup)).toBe(true);
     for (const name of ['Core', 'all', '', undefined, 1]) expect(isGroup(name)).toBe(false);

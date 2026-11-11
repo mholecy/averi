@@ -30,6 +30,8 @@ Amended 2026-11-11 (T24: lab-run-ios.ts, scripts/release/pack-files.ts and clean
 amendment at the end).
 Amended 2026-11-11 (A21: scripts/truth/batch/standing.ts, scripts/truth/rejudge-failures.ts and shell.ts joined the
 run — see the A21 amendment at the end).
+Amended 2026-11-11 (A27: Android's parsers, split from android.ts, and android-chooser.ts joined the run as a fourth
+group, `android` — see the A27 amendment at the end).
 
 ## Context
 
@@ -1920,10 +1922,12 @@ and memos (1 146 lines). Its parsers move to three pure modules beside it, with 
   regex and `parseFocusedWindow`'s are now one (ADR 0041's A27 amendment).
 - `android-bounds.ts`: the `[l,t][r,b]` notation both of the others read.
 
-The move kept every function body byte for byte. What changed beside the imports and exports: a header comment on each
-new module, and three comments in android.ts that said a parser was "below" now name it in its new module
-(`android-wm.ts#parseStatusBand`, `#parseNavigationBand`, `#parseImeInsets`). android.ts was never in the run,
-because its parsers could not be mutated apart from the adapter.
+The split's first commit kept every function body byte for byte. What changed beside the imports and exports: a
+header comment on each new module, and three comments in android.ts that said a parser was "below" now name it in its
+new module (`android-wm.ts#parseStatusBand`, `#parseNavigationBand`, `#parseImeInsets`). One body changed later, on
+purpose: the focus read's commit (59bb9eeb) made `android-chooser.ts#chooserInFocus` read `defaultDisplayFocus`'s
+`app ?? window` instead of its own two regexes, with the same answers (ADR 0041's A27 amendment). android.ts was never
+in the run, because its parsers could not be mutated apart from the adapter.
 
 **A fourth group, `android` (the A27 decision).** The three modules join the run as a group of their own, with
 android-chooser.ts and its test (review round 2), after `core` and before `scene` (scripts/mutation/group.mjs's GROUPS:
@@ -1979,6 +1983,20 @@ With android-chooser.ts moved in, the cold group (`--tempDirName reports/mutatio
 **34 s**, at load 10 to 20 with a lab run going elsewhere: android-wm.ts 96.33 % (572 mutants, 21 survived; floor back
 to 94), android-tree-dialect.ts 95.44 % (floor 93), android-bounds.ts 100 % (floor 98), android-chooser.ts 100 % (109
 mutants, floor 98).
+
+The code review found the dialect's own baseline naming real survivors as untested. They are now killed through
+`parseUiautomatorXml`:
+
+- `uncut`'s skip conditions (a descendant of another x, another width or no area, and a row of no area) and
+  `widenUnderCovers`' empty guard, with a port that records each strip it is asked of;
+- the Compose scrim's `s.x`, on sheet-medium with its scrim and sheet shifted off the window's left edge;
+- `idEntry`'s `at < 0`, on bottom-sheet-dialog with its ids stripped of `:id/` or starting with it;
+- `nodeBounds`' missing parent, on a root dumped inverted.
+
+Each new case was shown failing under its mutant. The cold group (`--tempDirName reports/mutation/stryker-tmp-a27d`)
+passed in 23 s at load 2 to 9. android-tree-dialect.ts now scores 98.02 % (8 survived, 2 without coverage) and its
+floor rises to 96; the other three are unchanged. What is left is equivalent, with the reason given in scope.json's
+baseline.
 
 **One multi-display rule was not taken.** The window manager's reads answer a second display in three ways:
 

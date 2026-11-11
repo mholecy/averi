@@ -2,11 +2,12 @@
 import { readFileSync } from 'node:fs';
 
 /**
- * The mutation run's groups: each scope.json entry names one (`core`, `android`, `scene` or `lab`), and one Stryker process
- * mutates one group, against that group's tests only, with an incremental file, reports and temp dir of its own. Plain
- * JS, so that stryker.config.mjs (loaded by node, no tsx) reads it as vitest.mutation.config.ts and mutate.ts do. Why
- * the groups and which module is in which: docs/adr/0038-a-mutation-run-guards-the-pure-leaves-tests.md, the T2b-2
- * part (`scene`: its A25 amendment; `android`: its A27 amendment).
+ * The mutation run's groups: each scope.json entry names one (`core`, `android`, `scene` or `lab`), and one Stryker
+ * process mutates one group, against that group's tests only, with an incremental file, reports and temp dir of its
+ * own. Plain JS, so that stryker.config.mjs (loaded by node, no tsx) reads it as vitest.mutation.config.ts and
+ * mutate.ts do. Why the groups and which module is in which:
+ * docs/adr/0038-a-mutation-run-guards-the-pure-leaves-tests.md, the T2b-2 part (`scene`: its A25 amendment; `android`:
+ * its A27 amendment).
  */
 
 /** The groups, in the order a run without `--group` runs them. */

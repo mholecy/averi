@@ -373,12 +373,12 @@ export function floatingAtLaunch(launched: LabState): LiveVerdict | undefined {
 
 /**
  * The floating panel, as the IME window's touchable region named it right after the launch (LabState.imeTouchable,
- * run-case.ts's first device read for the kf cases — averi's own query, src/adapters/android-wm.ts#TOUCHABLE_COMMAND), read by
- * averi's own readers (src/adapters/android-wm.ts#parseInputShown, #parseTouchableRegion) and admitted by averi's own
- * rules (src/ui-tree/keyboard-cover.ts#panelsBeyond, beside `strip`, the inset the app hears of) — no second parser,
- * no rule of the harness's. The panel lies wherever the hand dragged it: no list of placements. Anything but one
- * admitted panel is "no measured panel", saying why: no read (a record before D67), a failed read, the input method
- * not saying shown, a region that does not read, one that does not hold the strip, rects off the screen, no rect
+ * run-case.ts's first device read for the kf cases — averi's own query, src/adapters/android-wm.ts#TOUCHABLE_COMMAND),
+ * read by averi's own readers (src/adapters/android-wm.ts#parseInputShown, #parseTouchableRegion) and admitted by
+ * averi's own rules (src/ui-tree/keyboard-cover.ts#panelsBeyond, beside `strip`, the inset the app hears of) — no
+ * second parser, no rule of the harness's. The panel lies wherever the hand dragged it: no list of placements. Anything
+ * but one admitted panel is "no measured panel", saying why: no read (a record before D67), a failed read, the input
+ * method not saying shown, a region that does not read, one that does not hold the strip, rects off the screen, no rect
  * beyond the strip, or several panels. The read after the calls (D69, on the final state) is admitted by it too.
  */
 export function measuredPanel(launched: LabState, strip: Rect): { panel: Rect } | { why: string } {

@@ -879,3 +879,84 @@ describe('the uiautomator parser marks the one window presented when the dump sh
   });
 });
 
+
+// A27's code review: the dialect's rules its other cases left to draw order's tests, through parseUiautomatorXml with a
+// port that records what it is asked (the candidates `uncut` found, each with its gained strip), and the sheet
+// recognizers on synthetic variants of the lab's captures.
+describe('parseUiautomatorXml — a node cut short of its own descendants, as the port is asked of it', () => {
+  type Asked = { id: string | null; strip: Rect };
+  /** The tree parsed with a port that records every strip it is asked of, and answers `drawn`. */
+  const parsedAsking = (xml: string, drawn = true): { tree: UiNode; asked: Asked[]; ported: number } => {
+    const asked: Asked[] = [];
+    let ported = 0;
+    const tree = parseUiautomatorXml(xml, () => {
+      ported++;
+      return (node, strip) => {
+        asked.push({ id: node.identifier, strip });
+        return drawn;
+      };
+    });
+    return { tree, asked, ported };
+  };
+  /** A window with a scroll view (the clip) holding `row_0`, dumped `[0,100][1080,200]`, and `inner` in the row. */
+  const rowWith = (inner: string, row = '[0,100][1080,200]'): string =>
+    `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?><hierarchy rotation="0">` +
+    `<node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="p" content-desc="" bounds="[0,0][1080,2220]">` +
+    `<node index="0" text="" resource-id="" class="android.widget.ScrollView" package="p" content-desc="" scrollable="true" bounds="[0,0][1080,2220]">` +
+    `<node index="0" text="" resource-id="p:id/row_0" class="android.widget.LinearLayout" package="p" content-desc="" bounds="${row}">${inner}</node>` +
+    `</node></node></hierarchy>`;
+  const label = (bounds: string): string => `<node index="0" text="Row" resource-id="p:id/label" class="android.widget.TextView" package="p" content-desc="" bounds="${bounds}" />`;
+
+  it('a descendant of the row\'s exact x and width above it: the row is a candidate, its strip the part above, widened when drawn over', () => {
+    const { tree, asked } = parsedAsking(rowWith(label('[0,50][1080,200]')));
+    expect(asked).toEqual([{ id: 'row_0', strip: { x: 0, y: 50, width: 1080, height: 50 } }]);
+    const row = [...everyNode(tree)].find((n) => n.identifier === 'row_0');
+    expect(row).toMatchObject({ rect: { x: 0, y: 50, width: 1080, height: 150 }, cutBounds: { x: 0, y: 100, width: 1080, height: 100 } });
+  });
+
+  it('nothing cut: the port is never even asked for its judge', () => {
+    expect(parsedAsking(rowWith(label('[0,100][1080,200]'))).ported).toBe(0);
+  });
+
+  it('a descendant of another x, another width or no area grows nothing', () => {
+    expect(parsedAsking(rowWith(label('[10,50][1090,200]'))).asked).toEqual([]);
+    expect(parsedAsking(rowWith(label('[0,50][540,200]'))).asked).toEqual([]);
+    expect(parsedAsking(rowWith(label('[0,50][1080,50]'))).asked).toEqual([]);
+  });
+
+  it('a row of no area is no candidate, whatever its descendants', () => {
+    expect(parsedAsking(rowWith(label('[0,50][1080,100]'), '[0,100][1080,100]')).asked).toEqual([]);
+  });
+
+  it('the root dumped inverted (it has no parent to read the clip off) reads top, never thrown on', () => {
+    const tree = parseDump(XML_INVERTED_ROOT);
+    expect(tree).toMatchObject({ clippedOut: 'top', rect: { x: 0, y: 100, width: 1080, height: 0 } });
+    expect(parseDump(XML_INVERTED_ROOT.replace('[0,100][1080,50]', '[100,0][50,2220]'))).toMatchObject({ clippedOut: 'left' });
+  });
+});
+
+const XML_INVERTED_ROOT =
+  `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?><hierarchy rotation="0">` +
+  `<node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="p" content-desc="" bounds="[0,100][1080,50]" /></hierarchy>`;
+
+describe('the sheet recognizers on synthetic variants of the lab\'s captures', () => {
+  const lab = (cell: string): string => {
+    const xml = readFileSync(new URL(`../fixtures/uiautomator-lab-${cell}.xml`, import.meta.url), 'utf8');
+    return xml.slice(0, xml.lastIndexOf('>') + 1);
+  };
+
+  it('sheet-medium: the scrim and its sheet moved off the window\'s left edge, at the window\'s width, are no sheet', () => {
+    const xml = lab('sheet-medium');
+    expect(parseDump(xml).presentation).toBe('screen');
+    const shifted = xml.replace('bounds="[0,0][1080,1110]"', 'bounds="[10,0][1090,1110]"').replace('bounds="[0,1110][1080,2220]"', 'bounds="[10,1110][1090,2220]"');
+    expect(shifted).not.toBe(xml);
+    expect(parseDump(shifted)).not.toHaveProperty('presentation');
+  });
+
+  it('bottom-sheet-dialog: Material\'s ids are read by the entry after `:id/` — an id with no `:id/` names none, one that starts with it names its entry', () => {
+    const xml = lab('bottom-sheet-dialog');
+    expect(parseDump(xml).presentation).toBe('screen');
+    expect(parseDump(xml.replaceAll('dev.averi.lab:id/', 'abc'))).not.toHaveProperty('presentation');
+    expect(parseDump(xml.replaceAll('dev.averi.lab:id/', ':id/')).presentation).toBe('screen');
+  });
+});

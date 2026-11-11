@@ -74,9 +74,9 @@ them in the background.
    Inside the agent's sandbox the macOS Vision recognizer does not run, so the first line ends `, K skipped (no OCR on
    this host: …)`. That is expected there; say it in the record. On the owner's Mac nothing is skipped.
 
-6. **Mutation, cold:** `npm run mutate -- --force` (every group: core, android, scene, then lab, each bounded at 600 s), exit 0.
-   Each group's floors are met (`checkFloors` in mutate.ts). Keep the per-module score lines and the last lines, and
-   record each group's time (`npm run mutate: <group> passed in N s`); a group over ~480 s on a quiet host means the
+6. **Mutation, cold:** `npm run mutate -- --force` (every group: core, android, scene, then lab, each bounded at 600 s),
+   exit 0. Each group's floors are met (`checkFloors` in mutate.ts). Keep the per-module score lines and the last lines,
+   and record each group's time (`npm run mutate: <group> passed in N s`); a group over ~480 s on a quiet host means the
    next change to it moves a module out or adds a group (ADR 0038's threshold rule and its A21 amendment).
 7. **The package:** `npm pack --dry-run` lists what ships. Then `npm run release:smoke` (after the build in step 4;
    `pack-smoke.ts` in scripts/release) packs the real tarball into a temporary folder and checks it. Its file list
