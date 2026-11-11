@@ -1,0 +1,16 @@
+lab: emulator-5554, AVD averi_lab
+averi: <repo>
+uiautomator tap:views-drawn-over.A ok: Tapped id:"lab.views-drawn-over.A"
+uiautomator tap:views-drawn-over.B ok: refused, nothing fired: ERROR id:"lab.views-drawn-over.B" is under other id:lab.views-drawn-over.A (127,303 825x176) at its centre (595,392), drawn over it as a screenshot shows (the two are listed in reading order); only a 55x121 part of it shows, under the 65x65 a tap may be moved 
+uiautomator tap:views-drawn-over.A2 ok: Tapped id:"lab.views-drawn-over.A2"
+uiautomator tap:views-drawn-over.B2 ok: refused, nothing fired: ERROR id:"lab.views-drawn-over.B2" is under other id:lab.views-drawn-over.A2 (127,798 825x176) at its centre (595,887), drawn over it as a screenshot shows (the two are listed in reading order); only a 55x121 part of it shows, under the 65x65 a tap may be move
+<!-- averi: this checkout -->
+# Live golden: 4 cases, 4 ok, 0 loud, 0 mismatches (0 not known), 0 skipped
+
+## uiautomator
+- ok tap:views-drawn-over.A views-drawn-over: tap A (open): fires it alone — Tapped id:"lab.views-drawn-over.A"
+- ok tap:views-drawn-over.B views-drawn-over: tap B (covered): refused, nothing fires — or fires it alone — refused, nothing fired: ERROR id:"lab.views-drawn-over.B" is under other id:lab.views-drawn-over.A (127,303 825x176) at its centre (595,392), drawn over it as a screenshot shows (the two are listed in reading order); only a 55x121 part of it shows, under the 65x65 a tap may be moved 
+- ok tap:views-drawn-over.A2 views-drawn-over: tap A2 (open): fires it alone — Tapped id:"lab.views-drawn-over.A2"
+- ok tap:views-drawn-over.B2 views-drawn-over: tap B2 (covered): refused, nothing fires — or fires it alone — refused, nothing fired: ERROR id:"lab.views-drawn-over.B2" is under other id:lab.views-drawn-over.A2 (127,798 825x176) at its centre (595,887), drawn over it as a screenshot shows (the two are listed in reading order); only a 55x121 part of it shows, under the 65x65 a tap may be move
+
+exit=0
