@@ -3,7 +3,18 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
-import { cleanState, failuresIn, groupsOf, LAB_RUN_EXIT, labRun, labRunExit, liveJudge, liveVerdictLine, onlyWith } from '../../../scripts/truth/batch/lab-run.js';
+import {
+  cleanState,
+  failuresIn,
+  groupsOf,
+  LAB_RUN_EXIT,
+  labRun,
+  labRunExit,
+  leftLine,
+  liveJudge,
+  liveVerdictLine,
+  onlyWith,
+} from '../../../scripts/truth/batch/lab-run.js';
 import type { LiveCases, LiveTable } from '../../../scripts/truth/batch/live-table.js';
 import type { Ended, Handlers, KillResult, ProcessSeam, StartOptions, Started } from '../../../scripts/truth/batch/proc.js';
 import { LIVE_GOLDEN_HEADER } from '../../../scripts/truth/batch/steps.js';
@@ -156,7 +167,7 @@ const dirtyState = (): string => {
 /** The index of the first call holding `text` at or after `from`. */
 const callAt = (text: string, from = 0) => seam.words.findIndex((w, i) => i >= from && w.includes(text));
 
-describe('lab-run.ts: the standing lab batch (T20b) — the lab block, the chooser group between --check before and after, the forms group', () => {
+describe('lab-run.ts: a clean run, the blocks\' order and the lab block', () => {
   it('a clean run of both groups: every line in the blocks\' order, the checks around the chooser run, exit 0', async () => {
     expect(await go()).toBe(0);
     const s = summary();
@@ -193,9 +204,29 @@ describe('lab-run.ts: the standing lab batch (T20b) — the lab block, the choos
     expect(JSON.parse(readFileSync(join(dirOf('chooser'), 'state.json'), 'utf8'))).toEqual({ dirty: false });
     expect(seam.exits).toEqual([0]);
   });
+
+  it('this run\'s build failing: the lab check WARNs naming it; the live groups run on the APK already installed; unproven, exit 3', async () => {
+    fresh({ buildFails: 'gradlew' });
+    expect(await go(['--groups', 'forms'])).toBe(LAB_RUN_EXIT.unproven);
+    const s = summary();
+    expect(s.find((l) => l.startsWith('lab check:'))).toMatch(/^lab check: WARN — the lab devices checked, but this run's build failed \(android-build: the Android build failed/);
+    expect(s.find((l) => l.startsWith('forms verdict:'))).toMatch(/^forms verdict: PASS/);
+  });
+
+  it('the run\'s output is lab-run\'s: meta/lab-run.out', async () => {
+    expect(await go(['--groups', 'forms'])).toBe(0);
+    expect(existsSync(join(dirOf('meta'), 'lab-run.out'))).toBe(true);
+  });
+
+  it('a Gradle daemon its build could not stop: stopped by the run\'s last step, said so', async () => {
+    seam.stopFailsOnce = true;
+    expect(await go(['--groups', 'forms'])).toBe(0);
+    expect(seam.words.filter((w) => w.includes('gradlew') && w.includes('--stop'))).toHaveLength(2);
+    expect(outText()).toContain("lab android: the Gradle daemon stopped at the run's end (its --stop failed: exit 1)");
+  });
 });
 
-describe('--groups: the live blocks it picks (default both), each in the batch\'s order', () => {
+describe('--groups: a selection, as ONLY= is — every block stays the batch\'s', () => {
   it('--groups forms: no chooser block, no handlers need, no --check, no chooser run', async () => {
     expect(await go(['--groups', 'forms'])).toBe(0);
     const s = summary();
@@ -244,6 +275,49 @@ describe('--groups: the live blocks it picks (default both), each in the batch\'
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain('no out folder');
   });
+
+  it('--groups forms over a dirty chooser state file: refused naming it, exit 2, nothing done', async () => {
+    const file = dirtyState();
+    expect(await go(['--groups', 'forms'])).toBe(2);
+    expect(printed.join('')).toContain(`${file} is dirty (the chooser window not put back):`);
+    expect(seam.words).toEqual([]);
+  });
+
+  it('ONLY= and --groups together: the blocks both name; none left is refused', async () => {
+    expect(await go(['--groups', 'chooser,forms'], { ONLY: 'forms' })).toBe(0);
+    expect(liveGroups()).toEqual(['forms']);
+    printed.length = 0;
+    expect(await go(['--groups', 'chooser'], { ONLY: 'forms' })).toBe(2);
+    expect(printed.join('')).toContain('ONLY=forms and --groups chooser leave no block of lab-run to run');
+  });
+
+  it.each([
+    [[], { ONLY: 'lab' }, 'ONLY=lab'],
+    [['--groups', 'forms'], { ONLY: 'lab' }, 'ONLY=lab --groups forms'],
+    [['--groups', 'chooser,forms'], { ONLY: 'lab' }, 'ONLY=lab --groups chooser,forms'],
+  ])('%j with %j selects no live group: refused up front, named, exit 2, nothing done', async (argv, env, said) => {
+    expect(await go(argv, env)).toBe(LAB_RUN_EXIT.nothingDone);
+    expect(printed.join('')).toContain(`${said} selects no live group of lab-run (chooser, forms): a standing run that runs none proves nothing`);
+    expect(seam.words).toEqual([]);
+  });
+
+  describe('onlyWith and groupsOf: --groups as ONLY=', () => {
+    it('no --groups: ONLY as given', () => {
+      expect(onlyWith(undefined, undefined)).toStrictEqual({});
+      expect(onlyWith(undefined, 'forms')).toStrictEqual({ only: 'forms' });
+      expect(groupsOf(['--out', '/x'])).toStrictEqual({ rest: ['--out', '/x'], errors: [] });
+    });
+    it('--groups alone: the lab block and the groups', () => {
+      expect(onlyWith(['forms'], undefined)).toEqual({ only: 'lab,forms' });
+      expect(onlyWith(['chooser', 'forms'], '')).toEqual({ only: 'lab,chooser,forms' });
+    });
+    it('with ONLY: the names both allow, a name that is no block kept for the runner\'s WARN; none left refused', () => {
+      expect(onlyWith(['chooser', 'forms'], 'forms  lab,nope')).toEqual({ only: 'forms,lab,nope' });
+      expect(onlyWith(['forms'], 'chooser,forms')).toEqual({ only: 'forms' });
+      expect(onlyWith(['chooser'], 'forms,nope')).toEqual({ why: expect.stringContaining('ONLY=forms,nope and --groups chooser leave no block of lab-run to run') });
+      expect(onlyWith(['chooser', 'forms'], 'nope')).toEqual({ why: expect.stringContaining('ONLY=nope and --groups chooser,forms leave no block') });
+    });
+  });
 });
 
 describe('the refusals and the lab guard: nothing done to a device that is not the lab emulator', () => {
@@ -277,7 +351,52 @@ describe('the refusals and the lab guard: nothing done to a device that is not t
   });
 });
 
-describe('the --check before and after the chooser group (lab-chooser.ts#CHECK_OUTCOME)', () => {
+describe('the --check before: read only, in its own words; only a default goes to RESTORE', () => {
+  it('a default before the run: the chooser group not run, the before line FAIL with its hand line in RESTORE; forms still runs; exit 1', async () => {
+    fresh({ preferred: PREFERRED_WITH_DEFAULT });
+    expect(await go()).toBe(1);
+    const s = summary();
+    expect(s.find((l) => l.startsWith('chooser check before:'))).toMatch(/^chooser check before: FAIL — a lab default \(mAlways=true\) is set before the run — the chooser group not run: chooser no; /);
+    expect(s).toContain("chooser verdict: INCONCLUSIVE — the lab not proven clean before the chooser group (chooser check before's line) — not run");
+    expect(s.some((l) => l.startsWith('chooser check after') || l.startsWith('chooser left'))).toBe(false);
+    expect(s).toContain(`RESTORE: state not provably put back — ${join(out, 'RESTORE.txt')}:`);
+    expect(readFileSync(join(out, 'RESTORE.txt'), 'utf8')).toContain(
+      `adb -s ${LAB_SERIAL} uninstall dev.averi.lab && adb -s ${LAB_SERIAL} install ${join(dirOf('lab'), 'installed.apk')} (clears it; wipes the lab's data); then: adb -s ${LAB_SERIAL} shell dumpsys package preferred`,
+    );
+    expect(liveGroups()).toEqual(['forms']);
+    // Read only: no reinstall, no key pressed.
+    expect(world.calls.some((c) => / (uninstall|shell input) /.test(c))).toBe(false);
+    expect(existsSync(join(dirOf('chooser'), 'state.json'))).toBe(false);
+  });
+
+  it('a chooser in front before the run: ERROR in the before check\'s own words, nothing pressed, no RESTORE; unproven, exit 3', async () => {
+    fresh({ focus: FOCUS_CHOOSER });
+    expect(await go()).toBe(LAB_RUN_EXIT.unproven);
+    const s = summary();
+    expect(s.find((l) => l.startsWith('chooser check before:'))).toMatch(/^chooser check before: ERROR — a chooser is in front before the run \(read only: nothing pressed\) — the chooser group not run: chooser yes \(/);
+    expect(s).toContain('RESTORE: none — everything dirty was put back and verified');
+    expect(existsSync(join(out, 'RESTORE.txt'))).toBe(false);
+    expect(world.calls.some((c) => c.includes('keyevent'))).toBe(false);
+    expect(liveGroups()).toEqual(['forms']);
+  });
+
+  it('the preferred block unread before the run: ERROR, no RESTORE; exit 3', async () => {
+    fresh({ preferred: 'nothing here\n' });
+    expect(await go(['--groups', 'chooser'])).toBe(LAB_RUN_EXIT.unproven);
+    expect(summary().find((l) => l.startsWith('chooser check before:'))).toMatch(/^chooser check before: ERROR — the preferred activities or the focus not proven clean \(read only: nothing pressed\) — the chooser group not run: /);
+    expect(existsSync(join(out, 'RESTORE.txt'))).toBe(false);
+  });
+
+  it('a last-chosen entry before and after: WARN lines only, the chooser group run, exit 0', async () => {
+    fresh({ preferred: PREFERRED_WITH_DEFAULT.replace('mAlways=true', 'mAlways=false') });
+    expect(await go(['--groups', 'chooser'])).toBe(0);
+    const s = summary();
+    expect(s.find((l) => l.startsWith('chooser check before:'))).toMatch(/^chooser check before: WARN — a last-chosen entry \(mAlways=false: no default; no reinstall clears it\): chooser no; /);
+    expect(liveGroups()).toEqual(['chooser']);
+  });
+});
+
+describe('the --check after and the chooser block\'s state file', () => {
   it('a default the chooser group left: the after check FAILs, the reinstall clears it, the run FAILs by name, exit 1; the state file clean', async () => {
     seam.live.chooser = { during: (w) => void (w.st.preferred = PREFERRED_WITH_DEFAULT) };
     expect(await go()).toBe(1);
@@ -302,25 +421,49 @@ describe('the --check before and after the chooser group (lab-chooser.ts#CHECK_O
     expect(existsSync(join(out, 'RESTORE.txt'))).toBe(true);
   });
 
-  it('a default before the run: the chooser group not run, the before line FAIL with its hand line in RESTORE; forms still runs; exit 1', async () => {
-    fresh({ preferred: PREFERRED_WITH_DEFAULT });
-    expect(await go()).toBe(1);
+  it('the --check after not proving the lab: its ERROR and hand line in RESTORE, the state file left dirty; the next run refused naming it', async () => {
+    seam.live.chooser = { during: (w) => void (w.st.preferred = 'no preferred block here\n') };
+    expect(await go(['--groups', 'chooser'])).toBe(1);
     const s = summary();
-    expect(s.find((l) => l.startsWith('chooser check before:'))).toMatch(/^chooser check before: FAIL — a lab default \(mAlways=true\) is set before the run — the chooser group not run: chooser no; /);
-    expect(s).toContain("chooser verdict: INCONCLUSIVE — the lab not proven clean before the chooser group (chooser check before's line) — not run");
-    expect(s.some((l) => l.startsWith('chooser check after') || l.startsWith('chooser left'))).toBe(false);
-    expect(s).toContain(`RESTORE: state not provably put back — ${join(out, 'RESTORE.txt')}:`);
-    expect(readFileSync(join(out, 'RESTORE.txt'), 'utf8')).toContain(
-      `adb -s ${LAB_SERIAL} uninstall dev.averi.lab && adb -s ${LAB_SERIAL} install ${join(dirOf('lab'), 'installed.apk')} (clears it; wipes the lab's data); then: adb -s ${LAB_SERIAL} shell dumpsys package preferred`,
+    expect(s.find((l) => l.startsWith('chooser check after:'))).toMatch(/^chooser check after: ERROR — the preferred activities or the focus not proven clean/);
+    const state = join(dirOf('chooser'), 'state.json');
+    expect(JSON.parse(readFileSync(state, 'utf8'))).toMatchObject({ dirty: true });
+    expect(s).not.toContain('chooser left a default: FAIL');
+    rmSync(join(out, 'RESTORE.txt'));
+    printed.length = 0;
+    seam.words.length = 0;
+    expect(await labRun({ argv: ['--out', out, '--repo', repo, '--serial', LAB_SERIAL], env: {}, io: { ...io(), clock: () => new Date(2026, 10, 11, 11, 0, 0) } })).toBe(2);
+    const said = printed.join('');
+    expect(said).toContain(`${state} is dirty (the chooser window not put back):`);
+    const apk = join(dirOf('lab'), 'installed.apk');
+    expect(said).toContain(
+      `  → adb -s ${LAB_SERIAL} shell dumpsys package preferred: a lab entry with mAlways=true left, ` +
+        `adb -s ${LAB_SERIAL} uninstall dev.averi.lab && adb -s ${LAB_SERIAL} install ${apk}; ` +
+        `a chooser in front, adb -s ${LAB_SERIAL} shell input keyevent KEYCODE_BACK; ` +
+        `adb -s ${LAB_SERIAL} shell pm path dev.averi.lab (installed); then: printf '%s\\n' '{"dirty":false}' > ${state}`,
     );
-    expect(liveGroups()).toEqual(['forms']);
-    // Read only: no reinstall, no key pressed.
-    expect(world.calls.some((c) => / (uninstall|shell input) /.test(c))).toBe(false);
-    expect(existsSync(join(dirOf('chooser'), 'state.json'))).toBe(false);
+    expect(seam.words).toEqual([]);
+  });
+
+  it('leftLine: the cleanup\'s tail by search; a line holding none is kept whole, its label and verdict still the after check\'s', () => {
+    const check = { exit: 1 as const, focus: { state: 'read' as const, chooser: undefined }, preferred: { state: 'unread' as const, why: 'r' } };
+    const said = 'the chooser group\'s run left a lab default (mAlways=true) — chooser check before found none: chooser no; preferred unread (r)';
+    expect(leftLine({ line: 'chooser check after: FAIL — words; first: x; cleared: done', check })).toBe(`chooser check after: FAIL — ${said}; cleared: done`);
+    expect(leftLine({ line: 'chooser check after: FAIL — w; NOT cleared: no; cleared: inner', check })).toBe(`chooser check after: FAIL — ${said}; NOT cleared: no; cleared: inner`);
+    expect(leftLine({ line: 'chooser check after: FAIL — another wording', check })).toBe('chooser check after: FAIL — another wording');
+  });
+
+  it('cleanState: the file written `{"dirty":false}` whole, said so; its hand command writes the same', async () => {
+    const file = join(root, 'state.json');
+    writeFileSync(file, '{"dirty":true,"kept":1}');
+    const r = cleanState(nodeFs, file);
+    expect(await r.restore(async () => ({ code: 0, timedOut: false, signal: null, out: '', err: '' }))).toEqual({ ok: true, how: 'lab-run keeps no lab data: its state file written clean' });
+    expect(readFileSync(file, 'utf8')).toBe('{"dirty":false}\n');
+    expect(r.command).toBe(`printf '%s\\n' '{"dirty":false}' > ${file}`);
   });
 });
 
-describe('each live block\'s verdict: main\'s rejudge exit code (live-cases.ts#summarize)', () => {
+describe('each live block\'s verdict: main\'s rejudge exit code, judged from the block\'s folder', () => {
   it('a rejudge exit 1 on an unknown MISMATCH and a SKIP: the block FAILs naming them (a known MISMATCH not among them), exit 1', async () => {
     const out = [
       `${LIVE_GOLDEN_HEADER} 3 cases, 1 ok, 0 loud, 2 mismatches (1 not known), 1 skipped`,
@@ -364,131 +507,68 @@ describe('each live block\'s verdict: main\'s rejudge exit code (live-cases.ts#s
     expect(await go(['--groups', 'forms'])).toBe(LAB_RUN_EXIT.unproven);
     expect(summary().find((l) => l.startsWith('forms verdict:'))).toMatch(/^forms verdict: INCONCLUSIVE/);
   });
-});
 
-describe('the chooser block\'s state file (run-dir.ts#refusals): clean only once the lab is proven', () => {
-  it('the --check after not proving the lab: its ERROR and hand line in RESTORE, the state file left dirty; the next run refused naming it', async () => {
-    seam.live.chooser = { during: (w) => void (w.st.preferred = 'no preferred block here\n') };
-    expect(await go(['--groups', 'chooser'])).toBe(1);
-    const s = summary();
-    expect(s.find((l) => l.startsWith('chooser check after:'))).toMatch(/^chooser check after: ERROR — the preferred activities or the focus not proven clean/);
-    const state = join(dirOf('chooser'), 'state.json');
-    expect(JSON.parse(readFileSync(state, 'utf8'))).toMatchObject({ dirty: true });
-    expect(s).not.toContain('chooser left a default: FAIL');
-    rmSync(join(out, 'RESTORE.txt'));
-    printed.length = 0;
-    seam.words.length = 0;
-    expect(await labRun({ argv: ['--out', out, '--repo', repo, '--serial', LAB_SERIAL], env: {}, io: { ...io(), clock: () => new Date(2026, 10, 11, 11, 0, 0) } })).toBe(2);
-    const said = printed.join('');
-    expect(said).toContain(`${state} is dirty (the chooser window not put back):`);
-    const apk = join(dirOf('lab'), 'installed.apk');
-    expect(said).toContain(
-      `  → adb -s ${LAB_SERIAL} shell dumpsys package preferred: a lab entry with mAlways=true left, ` +
-        `adb -s ${LAB_SERIAL} uninstall dev.averi.lab && adb -s ${LAB_SERIAL} install ${apk}; ` +
-        `a chooser in front, adb -s ${LAB_SERIAL} shell input keyevent KEYCODE_BACK; ` +
-        `adb -s ${LAB_SERIAL} shell pm path dev.averi.lab (installed); then: printf '%s\\n' '{"dirty":false}' > ${state}`,
-    );
-    expect(seam.words).toEqual([]);
-  });
-
-  it('cleanState: the file written `{"dirty":false}` whole, said so; its hand command writes the same', async () => {
-    const file = join(root, 'state.json');
-    writeFileSync(file, '{"dirty":true,"kept":1}');
-    const r = cleanState(nodeFs, file);
-    expect(await r.restore(async () => ({ code: 0, timedOut: false, signal: null, out: '', err: '' }))).toEqual({ ok: true, how: 'lab-run keeps no lab data: its state file written clean' });
-    expect(readFileSync(file, 'utf8')).toBe('{"dirty":false}\n');
-    expect(r.command).toBe(`printf '%s\\n' '{"dirty":false}' > ${file}`);
-  });
-});
-
-describe('the lab block and the run\'s own files', () => {
-  it('this run\'s build failing: the lab check WARNs naming it; the live groups run on the APK already installed; unproven, exit 3', async () => {
-    fresh({ buildFails: 'gradlew' });
-    expect(await go(['--groups', 'forms'])).toBe(LAB_RUN_EXIT.unproven);
-    const s = summary();
-    expect(s.find((l) => l.startsWith('lab check:'))).toMatch(/^lab check: WARN — the lab devices checked, but this run's build failed \(android-build: the Android build failed/);
-    expect(s.find((l) => l.startsWith('forms verdict:'))).toMatch(/^forms verdict: PASS/);
+  describe('liveVerdictLine: a live block\'s verdict from its run and its summary', () => {
+    const ok = { word: 'OK' as const, why: 'exit 0' };
+    const header = '# Live golden: 2 cases, 2 ok';
+    it('never run: INCONCLUSIVE, said so', () => {
+      expect(liveVerdictLine('x verdict', 'r', undefined, undefined)).toBe('x verdict: INCONCLUSIVE — r: no rejudge of its record (live.ts: not run)');
+    });
+    it('run, no rejudge (no record): INCONCLUSIVE naming live.ts\'s why', () => {
+      expect(liveVerdictLine('x verdict', 'r', { live: { word: 'FAIL', why: 'timed out' } }, undefined)).toBe('x verdict: INCONCLUSIVE — r: no rejudge of its record (live.ts: timed out)');
+    });
+    it('the rejudge not judged: INCONCLUSIVE naming its why', () => {
+      expect(liveVerdictLine('x verdict', 'r', { live: ok, rejudge: { word: 'FAIL', why: 'exit 2' } }, header)).toBe("x verdict: INCONCLUSIVE — r: main's rejudge exit 2");
+    });
+    it('exit 0 PASS, exit 1 FAIL, the summary\'s header quoted when there is one', () => {
+      expect(liveVerdictLine('x verdict', 'r', { live: ok, rejudge: ok }, `<!-- averi -->\n${header}\n`)).toBe(`x verdict: PASS — r: main's rejudge exit 0 (${header})`);
+      expect(liveVerdictLine('x verdict', 'r', { live: ok, rejudge: ok }, 'no header\n')).toBe("x verdict: PASS — r: main's rejudge exit 0");
+      expect(liveVerdictLine('x verdict', 'r', { live: ok, rejudge: ok }, undefined)).toBe("x verdict: PASS — r: main's rejudge exit 0");
+      expect(liveVerdictLine('x verdict', 'r', { live: ok, rejudge: { word: 'DONE', why: 'judged' } }, header)).toBe(
+        `x verdict: FAIL — r: main's rejudge exit 1 — its summary names no case or premise: read r.rejudge.txt (${header})`,
+      );
+      const tallies = ['SKIPPED where a skip proves nothing — the run fails: uiautomator e1', 'NO FIRST STATE — the app wrote none, the run fails: uiautomator f2', 'FIXED, not intermittent — strike off live-known.ts: uiautomator f3'];
+      expect(liveVerdictLine('x verdict', 'r', { live: ok, rejudge: { word: 'DONE', why: 'judged' } }, ['- LOUD (x) f9 open: says — loud', ...tallies].join('\n'))).toBe(
+        `x verdict: FAIL — r: main's rejudge exit 1 — LOUD f9; ${tallies.join('; ')}`,
+      );
+    });
   });
 
-  it('the run\'s output is lab-run\'s: meta/lab-run.out', async () => {
-    expect(await go(['--groups', 'forms'])).toBe(0);
-    expect(existsSync(join(dirOf('meta'), 'lab-run.out'))).toBe(true);
+  describe('liveJudge: device-free, from the block\'s folder alone', () => {
+    it('nothing written: "not run"; the outcome written beside its summary: its verdict', async () => {
+      const dir = join(root, 'judged');
+      mkdirSync(dir);
+      const judge = liveJudge('x verdict', 'r');
+      expect(await judge({ dir, fs: nodeFs })).toEqual(['x verdict: INCONCLUSIVE — r: no rejudge of its record (live.ts: not run)']);
+      writeFileSync(join(dir, 'r.outcome.json'), JSON.stringify({ live: { word: 'OK', why: 'exit 0' }, rejudge: { word: 'OK', why: 'exit 0' } }));
+      writeFileSync(join(dir, 'r.rejudge.txt'), `${LIVE_GOLDEN_HEADER} 1 cases, 1 ok\n`);
+      expect(await judge({ dir, fs: nodeFs })).toEqual([`x verdict: PASS — r: main's rejudge exit 0 (${LIVE_GOLDEN_HEADER} 1 cases, 1 ok)`]);
+      writeFileSync(join(dir, 'r.outcome.json'), 'not json');
+      expect(await judge({ dir, fs: nodeFs })).toEqual(['x verdict: INCONCLUSIVE — r: its outcome file r.outcome.json is unreadable']);
+    });
+
+    it('a live run writes its outcome beside its record', async () => {
+      expect(await go(['--groups', 'forms'])).toBe(0);
+      expect(JSON.parse(readFileSync(join(dirOf('forms'), 'android-forms.outcome.json'), 'utf8'))).toEqual({ live: { word: 'OK', why: 'exit 0' }, rejudge: { word: 'OK', why: 'exit 0' } });
+    });
   });
 
-  it('a Gradle daemon its build could not stop: stopped by the run\'s last step, said so', async () => {
-    seam.stopFailsOnce = true;
-    expect(await go(['--groups', 'forms'])).toBe(0);
-    expect(seam.words.filter((w) => w.includes('gradlew') && w.includes('--stop'))).toHaveLength(2);
-    expect(outText()).toContain("lab android: the Gradle daemon stopped at the run's end (its --stop failed: exit 1)");
-  });
-});
-
-describe('liveVerdictLine: a live block\'s verdict from its run and its summary', () => {
-  const ok = { word: 'OK' as const, why: 'exit 0' };
-  const header = '# Live golden: 2 cases, 2 ok';
-  it('never run: INCONCLUSIVE, said so', () => {
-    expect(liveVerdictLine('x verdict', 'r', undefined, undefined)).toBe('x verdict: INCONCLUSIVE — r: no rejudge of its record (live.ts: not run)');
-  });
-  it('run, no rejudge (no record): INCONCLUSIVE naming live.ts\'s why', () => {
-    expect(liveVerdictLine('x verdict', 'r', { live: { word: 'FAIL', why: 'timed out' } }, undefined)).toBe('x verdict: INCONCLUSIVE — r: no rejudge of its record (live.ts: timed out)');
-  });
-  it('the rejudge not judged: INCONCLUSIVE naming its why', () => {
-    expect(liveVerdictLine('x verdict', 'r', { live: ok, rejudge: { word: 'FAIL', why: 'exit 2' } }, header)).toBe("x verdict: INCONCLUSIVE — r: main's rejudge exit 2");
-  });
-  it('exit 0 PASS, exit 1 FAIL, the summary\'s header quoted when there is one', () => {
-    expect(liveVerdictLine('x verdict', 'r', { live: ok, rejudge: ok }, `<!-- averi -->\n${header}\n`)).toBe(`x verdict: PASS — r: main's rejudge exit 0 (${header})`);
-    expect(liveVerdictLine('x verdict', 'r', { live: ok, rejudge: ok }, 'no header\n')).toBe("x verdict: PASS — r: main's rejudge exit 0");
-    expect(liveVerdictLine('x verdict', 'r', { live: ok, rejudge: ok }, undefined)).toBe("x verdict: PASS — r: main's rejudge exit 0");
-    expect(liveVerdictLine('x verdict', 'r', { live: ok, rejudge: { word: 'DONE', why: 'judged' } }, header)).toBe(
-      `x verdict: FAIL — r: main's rejudge exit 1 — its summary names no case or premise: read r.rejudge.txt (${header})`,
-    );
-    const tallies = ['SKIPPED where a skip proves nothing — the run fails: uiautomator e1', 'NO FIRST STATE — the app wrote none, the run fails: uiautomator f2', 'FIXED, not intermittent — strike off live-known.ts: uiautomator f3'];
-    expect(liveVerdictLine('x verdict', 'r', { live: ok, rejudge: { word: 'DONE', why: 'judged' } }, ['- LOUD (x) f9 open: says — loud', ...tallies].join('\n'))).toBe(
-      `x verdict: FAIL — r: main's rejudge exit 1 — LOUD f9; ${tallies.join('; ')}`,
-    );
+  describe('failuresIn: what a failed rejudge summary names', () => {
+    it('a premise first, its hand lines up to the next other line', () => {
+      const text = ['CHOOSER PREMISE: stale — a — the run fails', 'D55 (Android): one', 'D55 (Android): two', 'after', 'D55 (Android): not its'].join('\n');
+      expect(failuresIn(text)).toEqual(['CHOOSER PREMISE: stale — a — the run fails | D55 (Android): one | D55 (Android): two']);
+      expect(failuresIn('x\nCHOOSER PREMISE: stale — b — the run fails\nD55 (Android): h')).toEqual(['CHOOSER PREMISE: stale — b — the run fails | D55 (Android): h']);
+    });
+    it('only lines that start so: an indented reply or a quoted word is none', () => {
+      expect(failuresIn('    - MISMATCH lc1 open: x\n  SKIPPED where a skip proves nothing — the run fails: e\n- ok lc2 open: - MISMATCH lc9 \n')).toEqual([]);
+      expect(failuresIn('- LOUD f1 open: x\n- SKIP (c) s2 open: y')).toEqual(['LOUD f1', 'SKIP s2']);
+    });
   });
 });
 
-describe('--groups is the selection (as ONLY=): every block stays the batch\'s, so every state file is checked', () => {
-  it('--groups forms over a dirty chooser state file: refused naming it, exit 2, nothing done', async () => {
-    const file = dirtyState();
-    expect(await go(['--groups', 'forms'])).toBe(2);
-    expect(printed.join('')).toContain(`${file} is dirty (the chooser window not put back):`);
-    expect(seam.words).toEqual([]);
-  });
-
-  it('ONLY= and --groups together: the blocks both name; none left is refused', async () => {
-    expect(await go(['--groups', 'chooser,forms'], { ONLY: 'forms' })).toBe(0);
-    expect(liveGroups()).toEqual(['forms']);
-    printed.length = 0;
-    expect(await go(['--groups', 'chooser'], { ONLY: 'forms' })).toBe(2);
-    expect(printed.join('')).toContain('ONLY=forms and --groups chooser leave no block of lab-run to run');
-  });
-});
-
-describe('the --check before: read only, its own words; only a default goes to RESTORE (review round 1)', () => {
-  it('a chooser in front before the run: ERROR in the before check\'s own words, nothing pressed, no RESTORE; unproven, exit 3', async () => {
-    fresh({ focus: FOCUS_CHOOSER });
-    expect(await go()).toBe(LAB_RUN_EXIT.unproven);
-    const s = summary();
-    expect(s.find((l) => l.startsWith('chooser check before:'))).toMatch(/^chooser check before: ERROR — a chooser is in front before the run \(read only: nothing pressed\) — the chooser group not run: chooser yes \(/);
-    expect(s).toContain('RESTORE: none — everything dirty was put back and verified');
-    expect(existsSync(join(out, 'RESTORE.txt'))).toBe(false);
-    expect(world.calls.some((c) => c.includes('keyevent'))).toBe(false);
-    expect(liveGroups()).toEqual(['forms']);
-  });
-
-  it('the preferred block unread before the run: ERROR, no RESTORE; exit 3', async () => {
-    fresh({ preferred: 'nothing here\n' });
-    expect(await go(['--groups', 'chooser'])).toBe(LAB_RUN_EXIT.unproven);
-    expect(summary().find((l) => l.startsWith('chooser check before:'))).toMatch(/^chooser check before: ERROR — the preferred activities or the focus not proven clean \(read only: nothing pressed\) — the chooser group not run: /);
-    expect(existsSync(join(out, 'RESTORE.txt'))).toBe(false);
-  });
-});
-
-describe('the exit code: 0 only when every selected block PASSed (LAB_RUN_EXIT)', () => {
+describe('the exit code (LAB_RUN_EXIT): 0 only when every selected block PASSed', () => {
   it('the codes', () => {
-    expect(LAB_RUN_EXIT).toEqual({ passed: 0, failed: 1, refused: 2, unproven: 3, interrupted: 130 });
+    expect(LAB_RUN_EXIT).toEqual({ ok: 0, failed: 1, nothingDone: 2, interrupted: 130, unproven: 3 });
   });
 
   it('a SIGINT during the forms run: exit 130, the chooser block judged from its folder by the abort (PASS), forms INTERRUPTED', async () => {
@@ -502,28 +582,7 @@ describe('the exit code: 0 only when every selected block PASSed (LAB_RUN_EXIT)'
     expect(s.find((l) => l.startsWith('chooser verdict:'))).toMatch(/^chooser verdict: PASS — android-chooser: main's rejudge exit 0/);
     expect(s.find((l) => l.startsWith('forms:'))).toMatch(/^forms: INTERRUPTED — not judged/);
   });
-});
 
-describe('liveJudge: device-free, from the block\'s folder alone', () => {
-  it('nothing written: "not run"; the outcome written beside its summary: its verdict', async () => {
-    const dir = join(root, 'judged');
-    mkdirSync(dir);
-    const judge = liveJudge('x verdict', 'r');
-    expect(await judge({ dir, fs: nodeFs })).toEqual(['x verdict: INCONCLUSIVE — r: no rejudge of its record (live.ts: not run)']);
-    writeFileSync(join(dir, 'r.outcome.json'), JSON.stringify({ live: { word: 'OK', why: 'exit 0' }, rejudge: { word: 'OK', why: 'exit 0' } }));
-    writeFileSync(join(dir, 'r.rejudge.txt'), `${LIVE_GOLDEN_HEADER} 1 cases, 1 ok\n`);
-    expect(await judge({ dir, fs: nodeFs })).toEqual([`x verdict: PASS — r: main's rejudge exit 0 (${LIVE_GOLDEN_HEADER} 1 cases, 1 ok)`]);
-    writeFileSync(join(dir, 'r.outcome.json'), 'not json');
-    expect(await judge({ dir, fs: nodeFs })).toEqual(['x verdict: INCONCLUSIVE — r: its outcome file r.outcome.json is unreadable']);
-  });
-
-  it('a live run writes its outcome beside its record', async () => {
-    expect(await go(['--groups', 'forms'])).toBe(0);
-    expect(JSON.parse(readFileSync(join(dirOf('forms'), 'android-forms.outcome.json'), 'utf8'))).toEqual({ live: { word: 'OK', why: 'exit 0' }, rejudge: { word: 'OK', why: 'exit 0' } });
-  });
-});
-
-describe('the exit code read from this run\'s own SUMMARY', () => {
   it('an earlier run\'s clean SUMMARY beside it is never read: this run unproven, exit 3', async () => {
     expect(await go(['--groups', 'forms'])).toBe(0);
     seam.live.forms = { code: 142, noRecord: true };
@@ -539,67 +598,29 @@ describe('the exit code read from this run\'s own SUMMARY', () => {
     expect(summary().find((l) => l.startsWith('forms verdict:'))).toMatch(/^forms verdict: PASS/);
   });
 
-  it('a last-chosen entry before and after: WARN lines only, the chooser group run, exit 0', async () => {
-    fresh({ preferred: PREFERRED_WITH_DEFAULT.replace('mAlways=true', 'mAlways=false') });
-    expect(await go(['--groups', 'chooser'])).toBe(0);
-    const s = summary();
-    expect(s.find((l) => l.startsWith('chooser check before:'))).toMatch(/^chooser check before: WARN — a last-chosen entry \(mAlways=false: no default; no reinstall clears it\): chooser no; /);
-    expect(liveGroups()).toEqual(['chooser']);
-  });
-});
+  describe('labRunExit: 0 only when every wanted block PASSed and no line is INCONCLUSIVE or ERROR', () => {
+    const pass = ['lab check: PASS — met', 'forms verdict: PASS — ok', 'LAB android: OK — fine', 'RESTORE: none — everything dirty was put back and verified', 'x step: WARN — said'];
+    const labels = ['lab check', 'forms verdict'];
+    it('an ERROR step line (steps.log, timed) or a log\'s ERROR line beside every block PASS: unproven, 3', () => {
+      expect(labRunExit(0, [...pass, '10:15:00 ERROR forms live android-forms (exit 2) — see x.log'], labels)).toBe(3);
+      expect(labRunExit(0, [...pass, 'ERROR something in a log (×2, in forms/android-forms.log)'], labels)).toBe(3);
+      expect(labRunExit(0, [...pass, '[forms/x.log] ERROR boom'], labels)).toBe(3);
+      expect(labRunExit(0, [...pass, 'ERRORS seen: none', 'x ERROR y'], labels)).toBe(0);
+    });
 
-describe('labRunExit: 0 only when every wanted block PASSed and no line is INCONCLUSIVE or ERROR', () => {
-  const pass = ['lab check: PASS — met', 'forms verdict: PASS — ok', 'LAB android: OK — fine', 'RESTORE: none — everything dirty was put back and verified', 'x step: WARN — said'];
-  const labels = ['lab check', 'forms verdict'];
-  it('an ERROR step line (steps.log, timed) or a log\'s ERROR line beside every block PASS: unproven, 3', () => {
-    expect(labRunExit(0, [...pass, '10:15:00 ERROR forms live android-forms (exit 2) — see x.log'], labels)).toBe(3);
-    expect(labRunExit(0, [...pass, 'ERROR something in a log (×2, in forms/android-forms.log)'], labels)).toBe(3);
-    expect(labRunExit(0, [...pass, '[forms/x.log] ERROR boom'], labels)).toBe(3);
-    expect(labRunExit(0, [...pass, 'ERRORS seen: none', 'x ERROR y'], labels)).toBe(0);
-  });
-
-  it('the runner\'s 1, 2 and 130 stand', () => {
-    for (const c of [1, 2, 130]) expect(labRunExit(c, pass, labels)).toBe(c);
-  });
-  it('every wanted block PASS, OK and WARN lines beside: 0', () => {
-    expect(labRunExit(0, pass, labels)).toBe(0);
-  });
-  it('unproven (3): the SUMMARY unread; an INCONCLUSIVE line; an ERROR line; a wanted block not PASS or missing', () => {
-    expect(labRunExit(0, undefined, labels)).toBe(3);
-    expect(labRunExit(0, [...pass, 'chooser check before: INCONCLUSIVE — x'], labels)).toBe(3);
-    expect(labRunExit(0, [...pass, 'LAB handlers: ERROR — x'], labels)).toBe(3);
-    expect(labRunExit(0, ['lab check: WARN — build failed', 'forms verdict: PASS — ok'], labels)).toBe(3);
-    expect(labRunExit(0, ['forms verdict: PASS — ok'], labels)).toBe(3);
-    expect(labRunExit(0, ['lab check: PASS — x', 'forms verdict: SKIP — x'], labels)).toBe(3);
-  });
-});
-
-describe('onlyWith and groupsOf: --groups as ONLY=', () => {
-  it('no --groups: ONLY as given', () => {
-    expect(onlyWith(undefined, undefined)).toStrictEqual({});
-    expect(onlyWith(undefined, 'forms')).toStrictEqual({ only: 'forms' });
-    expect(groupsOf(['--out', '/x'])).toStrictEqual({ rest: ['--out', '/x'], errors: [] });
-  });
-  it('--groups alone: the lab block and the groups', () => {
-    expect(onlyWith(['forms'], undefined)).toEqual({ only: 'lab,forms' });
-    expect(onlyWith(['chooser', 'forms'], '')).toEqual({ only: 'lab,chooser,forms' });
-  });
-  it('with ONLY: the names both allow, a name that is no block kept for the runner\'s WARN; none left refused', () => {
-    expect(onlyWith(['chooser', 'forms'], 'forms  lab,nope')).toEqual({ only: 'forms,lab,nope' });
-    expect(onlyWith(['forms'], 'chooser,forms')).toEqual({ only: 'forms' });
-    expect(onlyWith(['chooser'], 'forms,nope')).toEqual({ why: expect.stringContaining('ONLY=forms,nope and --groups chooser leave no block of lab-run to run') });
-    expect(onlyWith(['chooser', 'forms'], 'nope')).toEqual({ why: expect.stringContaining('ONLY=nope and --groups chooser,forms leave no block') });
-  });
-});
-
-describe('failuresIn: what a failed rejudge summary names', () => {
-  it('a premise first, its hand lines up to the next other line', () => {
-    const text = ['CHOOSER PREMISE: stale — a — the run fails', 'D55 (Android): one', 'D55 (Android): two', 'after', 'D55 (Android): not its'].join('\n');
-    expect(failuresIn(text)).toEqual(['CHOOSER PREMISE: stale — a — the run fails | D55 (Android): one | D55 (Android): two']);
-    expect(failuresIn('x\nCHOOSER PREMISE: stale — b — the run fails\nD55 (Android): h')).toEqual(['CHOOSER PREMISE: stale — b — the run fails | D55 (Android): h']);
-  });
-  it('only lines that start so: an indented reply or a quoted word is none', () => {
-    expect(failuresIn('    - MISMATCH lc1 open: x\n  SKIPPED where a skip proves nothing — the run fails: e\n- ok lc2 open: - MISMATCH lc9 \n')).toEqual([]);
-    expect(failuresIn('- LOUD f1 open: x\n- SKIP (c) s2 open: y')).toEqual(['LOUD f1', 'SKIP s2']);
+    it('the runner\'s 1, 2 and 130 stand', () => {
+      for (const c of [1, 2, 130]) expect(labRunExit(c, pass, labels)).toBe(c);
+    });
+    it('every wanted block PASS, OK and WARN lines beside: 0', () => {
+      expect(labRunExit(0, pass, labels)).toBe(0);
+    });
+    it('unproven (3): the SUMMARY unread; an INCONCLUSIVE line; an ERROR line; a wanted block not PASS or missing', () => {
+      expect(labRunExit(0, undefined, labels)).toBe(3);
+      expect(labRunExit(0, [...pass, 'chooser check before: INCONCLUSIVE — x'], labels)).toBe(3);
+      expect(labRunExit(0, [...pass, 'LAB handlers: ERROR — x'], labels)).toBe(3);
+      expect(labRunExit(0, ['lab check: WARN — build failed', 'forms verdict: PASS — ok'], labels)).toBe(3);
+      expect(labRunExit(0, ['forms verdict: PASS — ok'], labels)).toBe(3);
+      expect(labRunExit(0, ['lab check: PASS — x', 'forms verdict: SKIP — x'], labels)).toBe(3);
+    });
   });
 });

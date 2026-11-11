@@ -1505,19 +1505,19 @@ hand mutants showed.
 scripts/truth/batch/lab-run.ts, the standing lab batch (ADR 0041's T20b amendment), is in the `lab` group against
 tests/truth/batch/lab-run.test.ts. It is mostly composition, but it holds logic worth scoring: `--groups` as a
 selection beside ONLY=, the before check's own words, the after line for a default the run left, the state file, a
-live block's verdict and what its FAIL names, and lab-run's own exit code. In the cold full lab group run (267 s, every
-module at or above its floor) it scored 95.25 %: 464 mutants, 14 survived, 8 without coverage, 1 runtime error; after
-review round 2, cold and narrowed to it, 95.39 % of 478 mutants with the same 23 not killed. Its floor is 93.
+live block's verdict and what its FAIL names, and lab-run's own exit code. In the cold full lab group run after the
+code review (279 s, every module at or above its floor) it scored 95.30 %: 512 mutants, 15 survived, 9 without
+coverage, 1 runtime error. Its floor is 93.
 
-The 23 not killed, split in its scope.json baseline:
+The 25 not killed, split in its scope.json baseline:
 
-- equivalent (8): `summary ?? ''` seeded, ACCEPTED seeded, the out folder's `meta` branches and `run-` filter (meta is
-  undefined only on a refused config), the selection's `[]` on a refusal;
+- equivalent (9): `summary ?? ''` seeded, ACCEPTED seeded, the out folder's `meta` branches and `run-` filter (meta is
+  undefined only on a refused config), the selection's `[]` on a refusal, leftLine's `at < 0` as `at <= 0`;
 - untested (6): the build's bound (`B_BUILD`; no test waits one out), the `io` fallbacks the command line alone takes,
   the held seam's `stderr`, the hand line's placeholder for a serial not given;
 - unreachable under the fakes only (2): `!opened.ok`, which a real emulator that goes away between the android need and
   the block can reach;
-- unreachable (3): `apk === undefined` (a met android need has pulled the APK);
+- unreachable (4): `apk === undefined` and its block (a met android need has pulled the APK);
 - the entry guard's line (4).
 
 The sandbox needs no new file: scripts/is-main.ts and scripts/truth/*.ts are already in it.

@@ -292,7 +292,7 @@ The exit code is stricter than a device batch's, so a schedule can act on it:
 | --- | --- |
 | 0 | every selected block PASSed, and no line is INCONCLUSIVE or ERROR |
 | 1 | a FAIL, or state left to put back by hand (`RESTORE.txt`) |
-| 2 | refused, or nothing ran |
+| 2 | refused (a selection with no live group too, such as `ONLY=lab`), or nothing ran |
 | 3 | unproven: a build that failed, a live run past its bound, a check that could not prove the lab clean |
 | 130 | interrupted |
 

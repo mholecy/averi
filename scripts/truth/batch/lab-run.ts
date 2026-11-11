@@ -11,9 +11,9 @@ import { chooserWindow, cleanUp, readCheck, reinstallProgress, type Check, type 
 import { CATALOG_PATH } from './lab-lines.js';
 import { nodeProcess, type ProcessSeam } from './proc.js';
 import { STATE_FILE } from './run-dir.js';
-import { runBatch, type Block, type BlockFiles, type LiveOutcome, type RunIo } from './runner.js';
+import { runBatch, type Block, type BlockCtx, type BlockFiles, type LiveOutcome, type RunIo } from './runner.js';
 import { configOf, NO_SERIAL, type ConfigRead, type Env } from './runner-lines.js';
-import { knobs as readKnobs, selectBlocks, type KnobValues } from './select.js';
+import { knobs as readKnobs, selectBlocks, type KnobValues, type Selection } from './select.js';
 import { EXIT, parseVerdictLine, refusedLine, verdictLine, type Verdict } from './words.js';
 
 /**
@@ -57,11 +57,8 @@ export type LabRunGroup = (typeof LAB_RUN_GROUPS)[number];
 /** The batch's blocks, in its order. */
 const BLOCK_IDS = ['lab', ...LAB_RUN_GROUPS] as const;
 
-/**
- * lab-run's exit codes: a numbered batch's (words.ts#EXIT), and `unproven` for a run that proved nothing wrong or
- * right.
- */
-export const LAB_RUN_EXIT = { passed: 0, failed: 1, refused: 2, unproven: 3, interrupted: 130 } as const;
+/** lab-run's exit codes: a numbered batch's (words.ts#EXIT), and `unproven` for a run that proved nothing. */
+export const LAB_RUN_EXIT = { ...EXIT, unproven: 3 } as const;
 
 /** The need on the handler counts the chooser group rests on (batch-11's D55: shared 2, cell 1). */
 export const HANDLERS_NEED = 'handlers';
@@ -84,10 +81,25 @@ export const KNOBS = {
     B_RESTORE: { default: 300, min: 60, max: 1800, unit: 'seconds' },
   },
 } as const;
-type K = KnobValues<typeof KNOBS>;
+type LabRunKnobs = KnobValues<typeof KNOBS>;
 
 /** A live block's run, asked: every case of its group on the lab emulator's lab app, under uiautomator. */
-export const askedOf = (group: LabRunGroup): Asked => ({ platform: 'android', app: 'native', sources: ['uiautomator'], cases: [], groups: [group] });
+export const askedOf = (group: LabRunGroup): Asked => ({
+  platform: 'android',
+  app: 'native',
+  sources: ['uiautomator'],
+  cases: [],
+  groups: [group],
+});
+
+/** A live block's run, by its group: its `.cases`, record, log, rejudge summary and outcome are named so. */
+const runName = (group: LabRunGroup): string => `android-${group}`;
+
+/** A live block's id, label and judge, from its group alone. */
+const liveBlock = (group: LabRunGroup): Pick<Block<LabRunKnobs>, 'id' | 'label' | 'judge'> => {
+  const label = `${group} verdict`;
+  return { id: group, label, judge: liveJudge(label, runName(group)) };
+};
 
 /**
  * `--groups <g[,g]>` taken out of argv: the groups named (none: not given), the rest for configOf, or the refusal's
@@ -114,7 +126,8 @@ export function groupsOf(argv: readonly string[]): { named?: LabRunGroup[]; rest
     }
     named = value.split(',');
     for (const g of named) {
-      if (!(LAB_RUN_GROUPS as readonly string[]).includes(g)) errors.push(refusedLine(`--groups names '${g}', which is no group of lab-run (${LAB_RUN_GROUPS.join(', ')})`));
+      if ((LAB_RUN_GROUPS as readonly string[]).includes(g)) continue;
+      errors.push(refusedLine(`--groups names '${g}', which is no group of lab-run (${LAB_RUN_GROUPS.join(', ')})`));
     }
   }
   return { ...(named !== undefined && { named: named as LabRunGroup[] }), rest, errors };
@@ -124,14 +137,17 @@ export function groupsOf(argv: readonly string[]): { named?: LabRunGroup[]; rest
  * ONLY= as runBatch is to read it with `--groups`: the lab block and the groups named, within ONLY's names when it
  * names any (a name that is no block kept, for the runner's WARN); or why no block is left.
  */
-export function onlyWith(named: readonly LabRunGroup[] | undefined, only: string | undefined): { only?: string } | { why: string } {
+export function onlyWith(
+  named: readonly LabRunGroup[] | undefined,
+  only: string | undefined,
+): { only?: string } | { why: string } {
   if (named === undefined) return only === undefined ? {} : { only };
   const allowed: readonly string[] = ['lab', ...named];
   if (only === undefined || only === '') return { only: allowed.join(',') };
   const names = only.split(/[\s,]/).filter((n) => n !== '');
   const kept = names.filter((n) => allowed.includes(n) || !(BLOCK_IDS as readonly string[]).includes(n));
-  if (!kept.some((n) => allowed.includes(n))) return { why: refusedLine(`ONLY=${only} and --groups ${named.join(',')} leave no block of lab-run to run`) };
-  return { only: kept.join(',') };
+  if (kept.some((n) => allowed.includes(n))) return { only: kept.join(',') };
+  return { why: refusedLine(`ONLY=${only} and --groups ${named.join(',')} leave no block of lab-run to run`) };
 }
 
 /** The state file written clean by hand, once the lab is proven put back. */
@@ -173,23 +189,44 @@ export function stateHand(serial: string | undefined, file: string): string {
  * a WARN, both letting the chooser group run; 1 a FAIL with its hand lines; 3 and 4 an ERROR with none — the run
  * touched nothing, so there is nothing to put back.
  */
-export function beforeLine(c: Pick<Check, 'exit' | 'focus' | 'preferred'>, base: HandBase): { line: string; hand: string[]; run: boolean } {
+export function beforeLine(
+  c: Pick<Check, 'exit' | 'focus' | 'preferred'>,
+  base: HandBase,
+): { line: string; hand: string[]; run: boolean } {
   const why = checkWhy(c.focus, c.preferred, ACCEPTED);
-  const notRun = (v: Verdict, what: string, hand: string[] = []) => ({ line: verdictLine(BEFORE_LABEL, v, `${what} — the chooser group not run: ${why}`), hand, run: false });
+  const notRun = (v: Verdict, what: string, hand: string[] = []) => ({
+    line: verdictLine(BEFORE_LABEL, v, `${what} — the chooser group not run: ${why}`),
+    hand,
+    run: false,
+  });
   const exit: CheckExit = c.exit;
-  if (exit === CHECK_EXIT.leak) return notRun('FAIL', 'a lab default (mAlways=true) is set before the run', CHECK_OUTCOME[exit].hand(base));
-  if (exit === CHECK_EXIT.chooser) return notRun('ERROR', 'a chooser is in front before the run (read only: nothing pressed)');
-  if (exit === CHECK_EXIT.unproven) return notRun('ERROR', 'the preferred activities or the focus not proven clean (read only: nothing pressed)');
-  if (exit === CHECK_EXIT.lastChosen) return { line: verdictLine(BEFORE_LABEL, 'WARN', `a last-chosen entry (mAlways=false: no default; no reinstall clears it): ${why}`), hand: [], run: true };
+  if (exit === CHECK_EXIT.leak) {
+    return notRun('FAIL', 'a lab default (mAlways=true) is set before the run', CHECK_OUTCOME[exit].hand(base));
+  }
+  if (exit === CHECK_EXIT.chooser) {
+    return notRun('ERROR', 'a chooser is in front before the run (read only: nothing pressed)');
+  }
+  if (exit === CHECK_EXIT.unproven) {
+    return notRun('ERROR', 'the preferred activities or the focus not proven clean (read only: nothing pressed)');
+  }
+  if (exit === CHECK_EXIT.lastChosen) {
+    const said = `a last-chosen entry (mAlways=false: no default; no reinstall clears it): ${why}`;
+    return { line: verdictLine(BEFORE_LABEL, 'WARN', said), hand: [], run: true };
+  }
   return { line: verdictLine(BEFORE_LABEL, 'OK', why), hand: [], run: true };
 }
 
-/** The cleanup's line when the run left the default: that alone, with what the cleanup did (cleared or not). */
-function leftLine(c: { line: string; check: Check }): string {
+/**
+ * The cleanup's line when the run left the default: that alone, with what the cleanup did — cleanUp's
+ * `; cleared: …` or `; NOT cleared: …` on, found by search. A line holding neither (cleanUp worded otherwise) is kept whole: it is
+ * the after check's line still, its FAIL beside LEFT_LABEL's.
+ */
+export function leftLine(c: { line: string; check: Pick<Check, 'focus' | 'preferred'> }): string {
+  const at = c.line.search(/; (?:NOT )?cleared: /);
+  if (at < 0) return c.line;
   const why = checkWhy(c.check.focus, c.check.preferred, ACCEPTED);
-  // What the cleanup did, as cleanUp says it on a default: from its `; cleared: …` or `; NOT cleared: …` on.
-  const tail = c.line.slice(c.line.search(/; (?:NOT )?cleared: /));
-  return verdictLine(AFTER_LABEL, 'FAIL', `the chooser group's run left a lab default (mAlways=true) — ${BEFORE_LABEL} found none: ${why}${tail}`);
+  const said = `the chooser group's run left a lab default (mAlways=true) — ${BEFORE_LABEL} found none: ${why}`;
+  return verdictLine(AFTER_LABEL, 'FAIL', `${said}${c.line.slice(at)}`);
 }
 
 /**
@@ -212,6 +249,9 @@ export function failuresIn(summary: string): string[] {
   return [...(premise.length > 0 ? [premise.join(' | ')] : []), ...cases, ...tallies];
 }
 
+/** stepOutcome's word for a rejudge that exit 1 with its golden header: judged, and failed (cases.ts#stepOutcome). */
+const REJUDGE_FAILED = 'DONE';
+
 /**
  * A live block's verdict from its run (LiveOutcome) and its summary: main's rejudge exit 0 PASS; exit 1 judged FAIL,
  * naming what the summary names; else (no rejudge, not judged, past its bound) INCONCLUSIVE naming why.
@@ -220,9 +260,11 @@ export function liveVerdictLine(label: string, name: string, o: LiveOutcome | un
   const header = (summary ?? '').split('\n').find((l) => l.startsWith('# Live golden:'));
   const said = header === undefined ? '' : ` (${header})`;
   const line = (v: Verdict, why: string) => verdictLine(label, v, `${name}: ${why}`);
-  if (o?.rejudge === undefined) return line('INCONCLUSIVE', `no rejudge of its record (live.ts: ${o === undefined ? 'not run' : o.live.why})`);
+  if (o?.rejudge === undefined) {
+    return line('INCONCLUSIVE', `no rejudge of its record (live.ts: ${o === undefined ? 'not run' : o.live.why})`);
+  }
   if (o.rejudge.word === 'OK') return line('PASS', `main's rejudge exit 0${said}`);
-  if (o.rejudge.word === 'DONE') {
+  if (o.rejudge.word === REJUDGE_FAILED) {
     const named = failuresIn(summary ?? '');
     const what = named.length > 0 ? named.join('; ') : `its summary names no case or premise: read ${name}.rejudge.txt`;
     return line('FAIL', `main's rejudge exit 1 — ${what}${said}`);
@@ -247,6 +289,21 @@ export function liveJudge(label: string, name: string): (j: BlockFiles) => Promi
   };
 }
 
+/**
+ * Why a selection is refused when it holds no live group (`ONLY=lab`, with or without `--groups`): a standing run
+ * that runs none proves nothing. None when the selection is itself refused (the runner says why).
+ */
+function noLiveGroup(
+  selected: Selection,
+  only: string | undefined,
+  named: readonly LabRunGroup[] | undefined,
+): string[] {
+  if (!selected.ok || selected.wanted.some((b) => (LAB_RUN_GROUPS as readonly string[]).includes(b))) return [];
+  const said = [`ONLY=${only}`, ...(named === undefined ? [] : [`--groups ${named.join(',')}`])].join(' ');
+  const groups = LAB_RUN_GROUPS.join(', ');
+  return [refusedLine(`${said} selects no live group of lab-run (${groups}): a standing run that runs none proves nothing`)];
+}
+
 /** An ERROR line of the SUMMARY's ERROR section: bare, timed (`HH:MM:SS `) or named by its log (`[<log>] `). */
 const ERROR_STEP = /^(?:\[[^\]]*\] |\d\d:\d\d:\d\d )?ERROR\b/;
 
@@ -263,7 +320,7 @@ export function labRunExit(runner: number, summary: readonly string[] | undefine
   // The SUMMARY's ERROR section: a step's (steps.log, timed) or a log's ERROR line (runner-lines.ts#logErrors).
   if (summary.some((l) => ERROR_STEP.test(l))) return LAB_RUN_EXIT.unproven;
   const passed = labels.every((l) => parsed.some((v) => v.label === l && v.verdict === 'PASS'));
-  return passed ? LAB_RUN_EXIT.passed : LAB_RUN_EXIT.unproven;
+  return passed ? LAB_RUN_EXIT.ok : LAB_RUN_EXIT.unproven;
 }
 
 export interface LabRunOptions {
@@ -280,28 +337,30 @@ export interface LabRunOptions {
 export async function labRun(o: LabRunOptions): Promise<number> {
   const picked = groupsOf(o.argv);
   const only = onlyWith(picked.named, o.env.ONLY);
-  const env: Env = { ...o.env, ONLY: 'only' in only ? only.only : undefined };
-  const read = configOf(picked.rest, env, o.repo);
+  const onlyValue = 'only' in only ? only.only : undefined;
+  const selected = selectBlocks(BLOCK_IDS, onlyValue);
+  const wanted = selected.ok ? selected.wanted : [];
+  const read = configOf(picked.rest, { ...o.env, ONLY: onlyValue }, o.repo);
   const errors = [...picked.errors, ...('why' in only ? [only.why] : [])];
-  const config: ConfigRead = read.ok && errors.length === 0 ? read : { ok: false, errors: [...(read.ok ? [] : read.errors), ...errors] };
+  // A group refused is said alone: what it would have selected is not asked.
+  if (errors.length === 0) errors.push(...noLiveGroup(selected, o.env.ONLY, picked.named));
+  const config: ConfigRead =
+    read.ok && errors.length === 0 ? read : { ok: false, errors: [...(read.ok ? [] : read.errors), ...errors] };
   const serial = config.ok ? config.config.serial : undefined;
   // The build's bound is given before runBatch reads the knobs (the blocks read theirs from ctx.knobs); a bad knob
   // refuses there, with nothing built.
   const pre = readKnobs(KNOBS, o.env);
   const build = labBuild(pre.ok ? { secs: pre.values.B_BUILD } : {});
   const android = androidLab({ build: build.android, settle: o.wait });
-  const selected = selectBlocks(BLOCK_IDS, 'only' in only ? only.only : undefined);
-  const wanted = selected.ok ? selected.wanted : [];
 
-  const liveRun = async (ctx: Parameters<Block<K>['run']>[0], group: LabRunGroup): Promise<void> => {
-    const name = `android-${group}`;
+  const liveRun = async (ctx: BlockCtx<LabRunKnobs>, group: LabRunGroup): Promise<void> => {
+    const name = runName(group);
     const outcome = await ctx.liveRun(name, askedOf(group), { secs: ctx.knobs.B_LIVE });
     ctx.fs.createExclusive(outcomeFile(ctx.dir, name), `${JSON.stringify(outcome)}\n`);
   };
 
-  const chooser: Block<K> = {
-    id: 'chooser',
-    label: 'chooser verdict',
+  const chooser: Block<LabRunKnobs> = {
+    ...liveBlock('chooser'),
     needs: ['android', HANDLERS_NEED],
     stateful: { what: 'the chooser window not put back', hand: (file) => [stateHand(serial, file)] },
     async run(ctx) {
@@ -309,40 +368,43 @@ export async function labRun(o: LabRunOptions): Promise<number> {
       if (!opened.ok) return ctx.verdict('INCONCLUSIVE', opened.why);
       const emu = opened.value;
       const apk = android.pulled();
-      if (apk === undefined) return ctx.verdict('INCONCLUSIVE', 'no APK was pulled at the lab check: no reinstall could be proven, so the chooser group is not run');
+      if (apk === undefined) {
+        return ctx.verdict('INCONCLUSIVE', 'no APK was pulled at the lab check: no reinstall could be proven, so the chooser group is not run');
+      }
       const base: HandBase = { serial: emu.serial, apk, then: adbLine(emu.serial, ['shell', ...PREFERRED_ARGV]) };
       const before = beforeLine(await readCheck(emu, ACCEPTED), base);
       ctx.verdictAndHand({ line: before.line, hand: before.hand });
-      if (!before.run) return ctx.verdict('INCONCLUSIVE', `the lab not proven clean before the chooser group (${BEFORE_LABEL}'s line) — not run`);
+      if (!before.run) {
+        return ctx.verdict('INCONCLUSIVE', `the lab not proven clean before the chooser group (${BEFORE_LABEL}'s line) — not run`);
+      }
       const stateFile = join(ctx.dir, STATE_FILE);
       const putBack = cleanState(ctx.fs, stateFile);
       await putBack.restore(ctx.bounded);
-      const opts = { apk, catalog: join(ctx.config.repo, CATALOG_PATH), dir: ctx.dir, accepted: ACCEPTED, progress: reinstallProgress(), stateFile, putBack };
-      ctx.open(CHOOSER_WINDOW, chooserWindow(emu, { ...opts, block: ctx.id, cleanup: AFTER_LABEL, secs: ctx.knobs.B_RESTORE }));
+      const catalog = join(ctx.config.repo, CATALOG_PATH);
+      const opts = { apk, catalog, dir: ctx.dir, accepted: ACCEPTED, progress: reinstallProgress(), stateFile, putBack };
+      const window = { ...opts, block: ctx.id, cleanup: AFTER_LABEL, secs: ctx.knobs.B_RESTORE };
+      ctx.open(CHOOSER_WINDOW, chooserWindow(emu, window));
       await liveRun(ctx, 'chooser');
       const after = await cleanUp(emu, { ...opts, label: AFTER_LABEL });
       const left = after.check.exit === CHECK_EXIT.leak;
       ctx.verdictAndHand({ line: left ? leftLine(after) : after.line, hand: after.hand });
-      if (left) ctx.verdict('FAIL', `the chooser group's run left a lab default (mAlways=true): ${BEFORE_LABEL} found none, ${AFTER_LABEL} found one`, LEFT_LABEL);
+      if (left) {
+        const why = `the chooser group's run left a lab default (mAlways=true): ${BEFORE_LABEL} found none, ${AFTER_LABEL} found one`;
+        ctx.verdict('FAIL', why, LEFT_LABEL);
+      }
       // Proven: the state written clean while the window is still open, so no await lies between them and its close.
       if (after.hand.length === 0) await putBack.restore(ctx.bounded);
       ctx.close(CHOOSER_WINDOW);
     },
-    judge: liveJudge('chooser verdict', 'android-chooser'),
   };
 
-  const forms: Block<K> = {
-    id: 'forms',
-    label: 'forms verdict',
-    needs: ['android'],
-    run: (ctx) => liveRun(ctx, 'forms'),
-    judge: liveJudge('forms verdict', 'android-forms'),
-  };
+  const forms: Block<LabRunKnobs> = { ...liveBlock('forms'), needs: ['android'], run: (ctx) => liveRun(ctx, 'forms') };
 
   // The guard first: the android need asks the build itself, after the lab guard (lab-build.ts#checkDevice).
   const lab = labBlock(['android', ...(wanted.includes('chooser') ? [HANDLERS_NEED] : [])], { build });
   const blocks = [lab, chooser, forms];
-  // The runner's exit is held: lab-run's own is called once the SUMMARY is read (the abort's 130 goes through).
+  // The runner's exit is held: lab-run's own is called once the SUMMARY is read (the abort's 130 goes through). Each
+  // method delegates, not a spread: a seam may be a class instance (the tests'), whose methods a spread would not copy.
   const real: ProcessSeam = o.io?.seam ?? nodeProcess;
   const seam: ProcessSeam = {
     start: (cmd, args, options) => real.start(cmd, args, options),

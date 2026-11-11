@@ -42,7 +42,7 @@ export const PREFERRED_WITH_DEFAULT = PREFERRED.replace(
   ].join('\n'),
 );
 /** API 33's focus read with the chooser in front (batch-10, T4's fixture). */
-export const FOCUS_CHOOSER = readFileSync(join(FIXTURES, '..', 'dumpsys-window-focus-api33-b10-chooser.txt'), 'utf8');
+export const FOCUS_CHOOSER = fixture('../dumpsys-window-focus-api33-b10-chooser.txt');
 export const DEVICE_APK = '/data/app/~~HASH==/dev.averi.lab-HASH==/base.apk';
 
 export interface Result {

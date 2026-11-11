@@ -776,6 +776,8 @@ nothing to a device that the numbered batches did not do. Its blocks, through `r
 
 `--groups chooser|forms|chooser,forms` selects blocks the way ONLY= does; the default is both, and with ONLY= the run
 takes the blocks both name. Every block stays the batch's, so every block's state file is checked before a run starts.
+A selection with no live group (`ONLY=lab`, with or without `--groups`) is refused: a standing run that runs none
+proves nothing.
 A run with no serial is refused before anything is done. A serial that is not the lab AVD is refused by the lab guard,
 as in every batch: each block is INCONCLUSIVE, nothing is built and nothing is done to the device. Everything the run
 writes is under `--out`, apart from the git-ignored Gradle build products in the checkout.
