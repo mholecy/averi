@@ -114,10 +114,18 @@ npm run truth:lab -- --out "$OUT/truth-lab" --serial emulator-5554
 It builds the lab app from this checkout under JDK 17 and installs it, runs the live golden's `chooser` group between
 a check of the chooser's lab defaults before and after, then live.ts's other Android groups, `forms`, `visibility`,
 `ensure` and `carousel`, each as its own block (backlog A22). The `dismissal` group is iOS only: Gate C runs it. It
-bounds itself (each live run 1800 s, the build 2400 s; standing.ts's KNOBS), each call in a process group of its own,
+bounds itself (each live run 1800 s, the visibility group's 3000 s, the build 2400 s; standing.ts's KNOBS and
+lab-run.ts's LIVE_SECS, backlog A34), each call in a process group of its own,
 which a run past its bound has killed whole (the `adb` it started among it), and its block is INCONCLUSIVE. After such
 an INCONCLUSIVE, `adb -s
 emulator-5554 shell echo ok` must answer before you report the run; if it does not, stop and tell the owner.
+
+**Its wall time.** About 52 min on an unloaded machine: the build and the chooser group a few minutes, `forms` about
+12 min, `visibility` about 31 min (181 cases), `ensure` under 2 min, `carousel` about 5 min (A22's first run on
+main, 2026-11-11, and A34's run of the visibility group). Other agents' mutation runs on the same machine stretch every
+group: at a load of 50–65 the visibility group ran about 28 s a case against about 10 s (about 85 min whole, past its own bound), and the
+emulator's framework restarted under it (A34). Run Gate B when the machine is not loaded, or set `B_LIVE` (seconds,
+up to 7200), which then bounds every live run alike.
 
 It passes only on **exit 0**: every block PASS, and no INCONCLUSIVE or ERROR line. Exit 1 is a FAIL or a `RESTORE.txt`
 to act on by hand, and it goes to the owner. Exit 2 means refused, and 3 means unproven. Neither is a pass. Any line in

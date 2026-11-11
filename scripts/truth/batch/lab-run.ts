@@ -10,6 +10,7 @@ import { chooserWindow, cleanUp, readCheck, reinstallProgress, type Check, type 
 import { CATALOG_PATH } from './lab-lines.js';
 import { STATE_FILE } from './run-dir.js';
 import type { Block, BlockCtx } from './runner.js';
+import type { Env } from './runner-lines.js';
 import { knobs as readKnobs } from './select.js';
 import {
   cleanStateCommand,
@@ -17,6 +18,7 @@ import {
   keptLiveRun,
   KNOBS,
   liveJudge,
+  liveSecsOf,
   standingRun,
   standingSelection,
   type Standing,
@@ -84,6 +86,18 @@ export const LAB_RUN_STANDING: Standing<LabRunGroup> = {
   blockIds: BLOCK_IDS,
   blocksOf: (g) => [g],
 };
+
+/**
+ * A live group's own bound, in seconds, where B_LIVE's default (1800 s) does not fit its run (A34): the visibility
+ * group, 181 cases over 32 cells, ran past 1800 s in A22's first Gate B on main (173 cases logged) and takes about
+ * 1880 s at a load under 17 (about 10.4 s a case; ADR 0041's A34 amendment) — its bound about 1.6 times that. Every
+ * other group keeps B_LIVE's default, so a hung forms, ensure or carousel run is still cut at 1800 s. B_LIVE given
+ * bounds every group alike (standing.ts#liveSecsOf).
+ */
+export const LIVE_SECS: Readonly<Partial<Record<LabRunGroup, number>>> = { visibility: 3000 };
+
+/** A live group's bound in a run: its own (LIVE_SECS) unless B_LIVE is given, else B_LIVE's default. */
+export const labLiveSecs = (group: LabRunGroup, env: Env, knobs: { B_LIVE: number }): number => liveSecsOf(env, knobs, LIVE_SECS[group]);
 
 /** The need on the handler counts the chooser group rests on (batch-11's D55: shared 2, cell 1). */
 export const HANDLERS_NEED = 'handlers';
@@ -202,7 +216,8 @@ export async function labRun(o: StandingOptions): Promise<StandingExit> {
   const build = labBuild({ ...(pre.ok ? { secs: pre.values.B_BUILD } : {}), jvms: o.jvms });
   const android = androidLab({ build: build.android, settle: o.wait });
 
-  const liveRun = (ctx: BlockCtx<StandingKnobs>, group: LabRunGroup): Promise<void> => keptLiveRun(ctx, runName(group), askedOf(group));
+  const liveRun = (ctx: BlockCtx<StandingKnobs>, group: LabRunGroup): Promise<void> =>
+    keptLiveRun(ctx, runName(group), askedOf(group), labLiveSecs(group, o.env, ctx.knobs));
 
   const chooser: Block<StandingKnobs> = {
     ...liveBlock('chooser'),

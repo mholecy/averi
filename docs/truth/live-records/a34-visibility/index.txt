@@ -1,0 +1,15 @@
+A34 (2026-11-11): the Android visibility group alone on emulator-5554, to time it whole (live.ts --serial
+emulator-5554 --groups visibility --record <scratch>, from the fix/a34-live-block-bounds worktree at main d8f78516).
+
+run-1  20:37:47 start; 36 of 181 cases logged; 17:03 wall; ended at dialog-fullscreen: the emulator's framework
+       restarted (`am force-stop` → "cmd: Can't find service: activity"; sys.system_server.start_count 1 → 2),
+       live.ts threw, exit 1, no record. Host load 39 → 65 (other agents' mutation runs; this agent's cold lab
+       mutation run from 20:50). The framework came back by itself at 20:59:10.
+run-2  21:00:30 start; 31 cases logged; 12:26 wall; about 9.5 s a case while the load stayed under 15 (21:02–21:05),
+       then slower at 50–64; ended at the same cell the same way ("the app did not report ready within 10 s",
+       then "Can't find service: activity"; start_count 2 → 3, back by 21:17), exit 1, no record.
+
+Neither run finished, so the group's duration is sized from A22's first Gate B (../a22-gate-b/): 173 of 181 cases
+logged in its 1800 s at load 6–17, about 10.4 s a case; the 8 left are plain taps, so about 1880 s whole.
+Nothing was started, restarted or wiped on the emulator; every read after the crashes was `service check activity`,
+`getprop` and `echo ok`.

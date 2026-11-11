@@ -17,6 +17,8 @@ Amended 2026-11-06 (D73: monkey's `** SYS_KEYS` line is why it stopped, not a wa
 This corrects D55b; implemented on `fix/d73-monkey-syskeys`).
 Amended 2026-11-11 (A27: the focus read moves to `adapters/android-wm.ts`, one `mCurrentFocus` reader; the judgement
 stays here, byte for byte; implemented on `refactor/a27-android-split`).
+Amended 2026-11-11 (A34: each live block of the standing lab batch a bound that fits it, the visibility group's own
+3000 s; implemented on `fix/a34-live-block-bounds`).
 
 ## Context
 
@@ -878,3 +880,28 @@ user token and a block whose first focus line is a title). Since A22 the lab's `
 `chooserInFocus` (its own reader, above), so the move touches no lab judgement. The chooser's replies are byte for byte,
 and its display rule, display 0's block, is unchanged: A27 did not merge it with the window manager's other two (ADR
 0038's A27 amendment says why).
+
+## Amendment: each live block a bound that fits it (2026-11-11, A34)
+
+**Context.** A22's first truth:lab on main (docs/truth/live-records/a22-gate-b/) exited 3: the visibility block was cut
+at `B_LIVE`'s 1800 s with 173 of its 181 cases logged, about 10.4 s a case; every other block passed (chooser 22 s,
+forms about 12 min, ensure 81 s, carousel about 5 min: the run's steps, lab-run.out.log.txt). That run's load was not
+recorded. A34 sized the group from it: the 8 cases left are plain taps like the ones before them, so the group takes
+about 1880 s (31 min) at that pace. Two runs of the group alone on emulator-5554 to time it whole
+(docs/truth/live-records/a34-visibility/, the load sampled each minute) did not finish: each kept about 10 s a case
+while the load stayed under 15, then about 28 s a case at 50–65 (other agents' mutation runs), and each ended at the
+same cell, dialog-fullscreen, its live.ts thrown out by the emulator's framework restarting (`cmd: Can't find service:
+activity`; `sys.system_server.start_count` rising) — the load's doing, not a bound's.
+
+**Decision.** One bound sized for the longest group would let a hung forms, ensure or carousel run hold the device as
+long, so the bound is per group: `LIVE_SECS` (lab-run.ts) gives the visibility group its own, 3000 s, about 1.6 times
+its run; every other group keeps `B_LIVE`'s default, 1800 s. `B_LIVE` stays the override and keeps its rule (300 to 7200
+s): given, it bounds every live block alike, the visibility group's too — `B_LIVE=1800` replaces its 3000 s
+(`liveSecsOf` in standing.ts, given as select.ts's `knobGiven` reads it: unset or empty is not given). Each live run's
+header names the bound it got (`== visibility live android-visibility (bound 3000 s; log: …) ==`), so a block past its
+bound says which bound it passed. lab-run-ios.ts keeps `B_LIVE` for every iOS block (backlog A36).
+
+**Consequences.** Gate B's wall time is about 52 min on an unloaded machine (docs/release.md). On a loaded one the
+visibility group can pass even its own bound, and the emulator's framework may not hold: Gate B is run when the machine
+is not loaded. The lab mutation baseline A34 recorded, 548 s at load 53–57 (scripts/mutation/scope.json), is
+load-inflated, as A22's first 562 s at load 45–38 was; the coordinator reruns the lab group cold on main.

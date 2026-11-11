@@ -99,6 +99,12 @@ function checkSpec(spec: KnobSpec): void {
 }
 
 /**
+ * Whether `env` sets the knob `name`: any value but the empty one (zsh's `${K:-d}` reads empty as unset), as knobs()
+ * reads it — unset, the knob takes its default.
+ */
+export const knobGiven = (env: Readonly<Record<string, string | undefined>>, name: string): boolean => env[name] !== undefined && env[name] !== '';
+
+/**
  * Every knob from `env`, each checked: a count must be a whole number (digits only: no sign, fraction, exponent or
  * space) within its rule; a text empty or matching its pattern. An unset or empty variable takes the default (zsh's
  * `${K:-d}`). Then the cross checks, each only when both sides passed. Every error at once, in the spec's order.
@@ -108,7 +114,7 @@ export function knobs<S extends KnobSpec>(spec: S, env: Readonly<Record<string, 
   const values: Record<string, number | string> = {};
   const counted = new Map<string, number>();
   const errors: string[] = [];
-  const given = (name: string): string | undefined => (env[name] === '' ? undefined : env[name]);
+  const given = (name: string): string | undefined => (knobGiven(env, name) ? env[name] : undefined);
   for (const [name, k] of Object.entries(spec.counts ?? {})) {
     const raw = given(name);
     const v = raw === undefined ? k.default : WHOLE.test(raw) ? Number(raw) : Number.NaN;

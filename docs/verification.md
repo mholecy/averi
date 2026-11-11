@@ -279,7 +279,9 @@ npm run truth:lab -- --out <dir outside the checkout> --serial emulator-5554 [--
 checkout and installs it. It runs the live golden's `chooser` group (launch_app and open_deep_link around Android's
 "Open with" chooser) between a read-only `--check` of the lab's defaults before and a cleanup check after, then the
 live golden's other Android groups, `forms`, `visibility`, `ensure` and `carousel`, each its own block with its own
-verdict (backlog A22). Every group runs by default; `--groups` names some of them, comma-joined. It refuses to start
+verdict (backlog A22). Every group runs by default; `--groups` names some of them, comma-joined. Each live run is
+bounded: `B_LIVE`, 1800 s by default, and the visibility group by its own 3000 s (its 181 cases ran past 1800 s,
+backlog A34); `B_LIVE` given bounds every group alike. It refuses to start
 with no serial, and the lab guard refuses any emulator that is not the lab AVD before anything is built.
 
 The Android build runs under JDK 17, looked up in this order: JAVA_HOME, then `/usr/libexec/java_home -v 17`, then
