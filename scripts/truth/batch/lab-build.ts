@@ -237,6 +237,9 @@ export function labBuild(o: { secs?: number; jvms?: readonly string[] } = {}): L
    */
   const once = (need: string, build: (c: NeedCtx) => Promise<NeedResult>) => {
     let run: Promise<NeedResult> | undefined;
+    // Said once: the first asker's line carries the warning. If that asker's line then reports its own failure
+    // instead (a device need whose install fails), the warning is not repeated on a later line — the run is
+    // unproven then anyway (T23 review round 4, NIT-1).
     let said = false;
     return async (c: NeedCtx): Promise<NeedResult> => {
       const r = await (run ??= build(c).then((r) => {

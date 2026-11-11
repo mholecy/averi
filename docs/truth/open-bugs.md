@@ -186,7 +186,8 @@ node --import tsx scripts/truth/live.ts --rejudge docs/truth/live-records/<file>
 Lab app builds, device runs, OCR, calibrate and network installs all need the sandbox off.
 - Android: in `fixtures/apps/android`, run
   `export JAVA_HOME="${JAVA_HOME:-$(/usr/libexec/java_home -v 17 2>/dev/null)}"`, then `./gradlew assembleDebug`. A
-  JAVA_HOME already set is kept. If it is still empty (`java_home` finds no JDK inside the agent's sandbox), set it to
+  JAVA_HOME already set is kept — keep it only if it is a JDK 17; this line does not check it, the lab build's lookup
+  does. If it is still empty (`java_home` finds no JDK inside the agent's sandbox), set it to
   the JDK 17 under `/Library/Java/JavaVirtualMachines` or `~/Library/Java/JavaVirtualMachines`, for example
   `zulu-17.jdk/Contents/Home`. The standing lab run looks in that order on its own
   (`scripts/truth/batch/lab-lines.ts#jdk17Of`).
