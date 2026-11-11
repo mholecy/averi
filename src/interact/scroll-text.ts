@@ -18,7 +18,7 @@ import type { CarriedUnder, UnseenStrokes } from './motion-ledger.js';
 import { MIN_STROKE_BOX, type PresentedTouchDown, type StrokedAcross, type StrokedBeside, type TouchedOn } from './stroke-plan.js';
 import { axisOf, EDGE_TOWARD, OPPOSITE, type Direction } from './swipe.js';
 import { isRect, WithinRefusedError, type Within, type WithinRefusal } from './within.js';
-import { cutByRemedy, cutRemedy, cutSliverText, dismissKeyboardFirstText, hideClause, hideKeyboardBriefly, hideKeyboardHow, hideKeyboardInFlow, pastSideText, ridingKeyboard, underKeyboardText, untriedSideText, wholeThinWayPast, type KeyboardUp } from './target-text.js';
+import { cutByPinnedRemedy, cutByRemedy, cutRemedy, cutSliverText, dismissKeyboardFirstText, hideClause, hideKeyboardBriefly, hideKeyboardHow, hideKeyboardInFlow, pastSideText, ridingKeyboard, underKeyboardText, untriedSideText, wholeThinWayPast, type KeyboardUp } from './target-text.js';
 
 /**
  * Every sentence `scroll_until` says: the reply for a stop (`describeScrollResult`, over the result
@@ -223,8 +223,8 @@ const stoppedWhen = (swipes: number): string => (swipes === 0 ? 'before any swip
 /** The soft keyboard a match was judged under (`Judged.under`), as a cut-by remedy names it (target-text.ts#cutByRemedy). */
 const keyboardUp = ({ under }: Judged): KeyboardUp | undefined => (under === undefined ? undefined : { lineY: under.line.y, remedy: under.remedy });
 
-/** A plain stop's sliver (InFrameShort's `sliver`), in the tap's refusal's own words (target-text.ts#cutSliverText). */
-function sliverText({ judged, cut, minPiece }: Extract<Shortfall, { of: 'sliver' }>): string {
+/** A plain stop's sliver (InFrameShort's `sliver`, or the `overlapped` stop's cut), in the tap's refusal's own words (target-text.ts#cutSliverText). */
+function sliverText({ judged, cut, minPiece }: Pick<Extract<Shortfall, { of: 'sliver' }>, 'judged' | 'cut' | 'minPiece'>): string {
   return cutSliverText(cut, judged.node.rect, minPiece, judged.under?.line.y);
 }
 
@@ -784,12 +784,17 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
     case 'overlapped': {
       // Under a cover listed in reading order with it (ui-tree/standing.ts#Remedy's `unordered` or `seenOver`), or one where
       // neither lies in a scroll view (`bothPinned`): stopped without a swipe, as under a presented screen. A plain Error, as
-      // `stuck`: the element was there and seen.
+      // `stuck`: the element was there and seen. Or cut by a node drawn after it, neither in a scroll view (`bothPinned`,
+      // D88): the cut said as the tap says it, and its remedy (target-text.ts#cutByPinnedRemedy — the riding keyboard's first).
       const { judged, viewport, remedy } = o;
+      const [what, way] =
+        o.cut === undefined
+          ? [underText({ judged, cover: o.cover }), noScrollRemedyText(remedy, 'touch')]
+          : [sliverText({ judged, cut: o.cut, minPiece: o.minPiece }), cutByPinnedRemedy(o.cut.by, keyboardUp(judged), o.minPiece)];
       return {
         message:
-          `scroll_until ${describe} stopped ${stoppedWhen(o.swipes)} — element is in the viewport but ${underText({ judged, cover: o.cover })}; ` +
-            `${o.swipes === 0 ? 'no swipe' : 'no further swipe'} was sent — ${noScrollRemedyText(remedy, 'touch')}. ` +
+          `scroll_until ${describe} stopped ${stoppedWhen(o.swipes)} — element is in the viewport but ${what}; ` +
+            `${o.swipes === 0 ? 'no swipe' : 'no further swipe'} was sent — ${way}. ` +
             `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
       };
     }

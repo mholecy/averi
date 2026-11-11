@@ -1,5 +1,5 @@
 import { type DeviceScreen, type Point, type Rect, type Stroke, type UiNode } from '../adapters/types.js';
-import { belowStatusBand, clearOfSystemBands, quoted, toldFrame, type Edge, type ListedContent } from '../ui-tree/geometry.js';
+import { belowStatusBand, clearOfSystemBands, quoted, toldFrame, type Cut, type Edge, type ListedContent } from '../ui-tree/geometry.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
 import { screenChangedUnder, screenIdentity, type IdentifiedRead, type ScreenChange, type SheetDetent } from '../ui-tree/read-tree.js';
 import { drawOrderFound, type Cover } from '../ui-tree/cover.js';
@@ -220,6 +220,12 @@ export type RoundStep =
   /** The scroll is over. */
   | { do: 'stop'; outcome: ScrollOutcome };
 
+/** A cut by a node drawn after it (ui-tree/geometry.ts#Cut.by set): what the `overlapped` stop's cut arm carries. */
+export type CutByLater = Cut & { readonly by: UiNode };
+
+/** Whether `cut` is by a node drawn after it (`CutByLater`), not at a clipping container's edge. */
+const isCutByLater = (cut: Cut): cut is CutByLater => cut.by !== undefined;
+
 /**
  * Every way a scroll ends — one member per sentence the reader acts on
  * differently, each carrying exactly the facts its sentence quotes
@@ -299,11 +305,23 @@ export type ScrollOutcome = (
    * told — `remedy.untold` when a screenshot could not tell either —, or `seenOver`, a screenshot saw it drawn over the
    * target), or one where neither lies in a scroll view (`bothPinned`, D87: siblings of an unmarked run in none):
    * stopped without a swipe — no scroll tells which is drawn on top or moves the target out from under it, and a stroke
-   * beside an in-screen menu lands on its backdrop.
+   * beside an in-screen menu lands on its backdrop. Or (`cut`, D88) cut to a sliver by a node drawn after it where
+   * neither lies in a scroll view (`bothPinned`): the rest of it under that node, or it is only that thin — no scroll
+   * changes either.
    * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
    * docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
    */
-  | { kind: 'overlapped'; swipes: number; judged: Judged; viewport: Rect; cover: Cover; remedy: NoScrollRemedy }
+  | { kind: 'overlapped'; swipes: number; judged: Judged; viewport: Rect; cover: Cover; cut?: undefined; remedy: NoScrollRemedy }
+  | {
+      kind: 'overlapped';
+      swipes: number;
+      judged: Judged;
+      viewport: Rect;
+      cover?: undefined;
+      cut: CutByLater;
+      minPiece: number;
+      remedy: Extract<NoScrollRemedy, { readonly of: 'bothPinned' }>;
+    }
   /** D52: too large for its scroll view to show whole (scroll-read.ts#Unfit) — `fully: true` only. */
   | { kind: 'unfit'; swipes: number; judged: Judged; viewport: Rect; unfit: Unfit }
   /** D68: a proven cut another swipe would most likely not bring whole (flush-check.ts#FlushAim) — `fully: true` only. */
@@ -1066,8 +1084,13 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     if (remedy?.of === 'presented' && remedy.cover !== undefined) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: remedy.cover, viewport, ...(remedy.layer !== undefined && { layer: remedy.layer }) }, current === 'settle' && presentedBefore, seen.elapsedMs);
     // Under a cover listed in reading order with it — the order untold, or seen by a screenshot — or one where neither
     // lies in a scroll view (`bothPinned`, D87), no swipe tells which is on top or moves it out from under the other: stop.
-    if (best.standing.kind === 'covered' && noScrollHelps(best.standing.remedy)) {
-      return stop(s, { kind: 'overlapped', swipes: s.swipes, judged: best, viewport, cover: best.standing.cover, remedy: best.standing.remedy });
+    // So too under a cut by a node drawn after it where neither lies in a scroll view (`bothPinned`, D88).
+    const standing = best.standing;
+    if (standing.kind === 'covered' && noScrollHelps(standing.remedy)) {
+      return stop(s, { kind: 'overlapped', swipes: s.swipes, judged: best, viewport, cover: standing.cover, remedy: standing.remedy });
+    }
+    if (standing.kind === 'cut' && noScrollHelps(standing.remedy) && isCutByLater(standing.cut)) {
+      return stop(s, { kind: 'overlapped', swipes: s.swipes, judged: best, viewport, cut: standing.cut, minPiece: standing.minPiece, remedy: standing.remedy });
     }
     // `fully: true` on a match as wide or as tall as its scroll view, or more (scroll-read.ts#unfitAlong): fully shown at
     // one exact offset at most, which no stroke lands on — the strokes and turns would only swing it to and fro to the

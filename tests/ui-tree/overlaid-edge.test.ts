@@ -88,12 +88,12 @@ describe('OverlaidEdge — pinned-bar P: dumped 127,1846 825x110, ending where C
 });
 
 describe('OverlaidEdge — text-under-bar P: a role-less clickable dumped as the 22-px strip 127,1934 825x22 above Continue', () => {
-  it('the plain stop and the tap: cut to a sliver by Continue — the role-less node under an OVERLAY is read as the sliver it is', async () => {
+  it('the plain stop and the tap: cut to a sliver by Continue — the role-less node under an OVERLAY is read as the sliver it is; neither in a scroll view, `bothPinned` (D88)', async () => {
     const t = await lab('text-under-bar');
     const p = byId(t, 'lab.text-under-bar.P');
-    expect(said(standing(t, p, PLAIN))).toEqual({ kind: 'cut', edge: 'bottom', depth: 22, by: 'lab.text-under-bar.continue', remedy: 'scroll' });
-    expect(said(standing(t, p, TAP))).toEqual({ kind: 'cut', edge: 'bottom', depth: 22, by: 'lab.text-under-bar.continue', remedy: 'scroll' });
-    expect(said(standing(t, p, FULLY))).toEqual({ kind: 'cut', edge: 'bottom', depth: 22, by: 'lab.text-under-bar.continue', remedy: 'scroll' });
+    expect(said(standing(t, p, PLAIN))).toEqual({ kind: 'cut', edge: 'bottom', depth: 22, by: 'lab.text-under-bar.continue', remedy: 'bothPinned' });
+    expect(said(standing(t, p, TAP))).toEqual({ kind: 'cut', edge: 'bottom', depth: 22, by: 'lab.text-under-bar.continue', remedy: 'bothPinned' });
+    expect(said(standing(t, p, FULLY))).toEqual({ kind: 'cut', edge: 'bottom', depth: 22, by: 'lab.text-under-bar.continue', remedy: 'bothPinned' });
   });
   it('the colour assert: covered by Continue', async () => {
     const t = await lab('text-under-bar');

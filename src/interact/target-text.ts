@@ -3,6 +3,7 @@ import { cutAtLaterText } from '../ui-tree/cover.js';
 import { outsideScrollViewText, rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { clippedOutText, SIDES } from '../ui-tree/sides.js';
+import { noScrollRemedyText } from '../ui-tree/standing.js';
 
 /**
  * The phrases a target cut to a sliver, lying past a side, or lying under
@@ -193,15 +194,50 @@ export function ridingKeyboard(by: UiNode, keyboard: KeyboardUp | undefined, min
 }
 
 /**
- * The remedy for a node cut by a node drawn after it (`Cut.by`), as the tap's refusal and `scroll_until`'s bound
- * failure say it: with the soft keyboard up and that node riding on it (`ridingKeyboard`), dismiss it first, or scroll
- * the list (`dismissKeyboardFirstText`); else scroll the list — `scroll_until it out from under that container first`.
- * Not `cutRemedy`'s scroll toward the edge: the rest lies under the node, not past the edge of anything that scrolls.
+ * The remedy for a node cut by a node drawn after it (`Cut.by`) whose standing's remedy is `scroll`
+ * (ui-tree/standing.ts#Remedy), as the tap's refusal and `scroll_until`'s bound failure say it: with the soft keyboard
+ * up and that node riding on it (`ridingKeyboard`), dismiss it first, or scroll the list (`dismissKeyboardFirstText`);
+ * else scroll the list — `scroll_until it out from under that container first`. Not `cutRemedy`'s scroll toward the
+ * edge: the rest lies under the node, not past the edge of anything that scrolls.
  */
 export function cutByRemedy(by: UiNode, up: KeyboardUp | undefined, minPiece: number): string {
+  return ridingFirst(by, up, minPiece, 'or', `scroll_until it out from under that ${by.role} first (${wholeThinWayPast(by)})`);
+}
+
+/**
+ * `cutByRemedy`'s for a remedy `bothPinned` (D88: neither lies in a scroll view), as the tap's refusal and
+ * `scroll_until`'s stop before any swipe say it: no scroll — THE clause every verb quotes for it
+ * (ui-tree/standing.ts#noScrollRemedyText, with the cut's way past). With the soft keyboard up and that node riding on
+ * it, dismiss it first all the same: a bar riding on it goes down with it, scroll view or none. With the keyboard up and
+ * that node NOT read as riding but possibly stacked in a bar that does (`stackedOnKeyboard`: buttons stacked in a
+ * riding bar, the cut one on top), hiding it is named as a way that MAY move that node (`keyboardMayMoveText`): with no
+ * scroll to fall back on, saying nothing of the keyboard would mislead where it does — the safe direction, as
+ * `cutByRemedy`'s scroll is there. A node far above the line (a top bar) gets the clause alone.
+ */
+export function cutByPinnedRemedy(by: UiNode, up: KeyboardUp | undefined, minPiece: number): string {
+  const way = noScrollRemedyText({ of: 'bothPinned' }, 'touch', by);
+  if (ridingKeyboard(by, up, minPiece) === undefined && up !== undefined && stackedOnKeyboard(by, up)) return `${keyboardMayMoveText(up, by)} — else ${way}`;
+  return ridingFirst(by, up, minPiece, 'else', way);
+}
+
+/**
+ * Whether `by` MAY be stacked in a bar riding on the keyboard though not read as riding (`ridingKeyboard`): it ends at
+ * or above the keyboard's line, no further above it than its own height — room for one more such node beneath it (the
+ * lab's Continue is 132 tall, stacked on another, 66 above the line). Not the cut's edge: a riding bar cuts a field it
+ * has scrolled under at the field's TOP (the lab's phone, 1370..1412 under a bar ending at 1370), as a top bar does.
+ */
+function stackedOnKeyboard(by: UiNode, { lineY }: KeyboardUp): boolean {
+  const gap = lineY - (by.rect.y + by.rect.height);
+  return gap >= 0 && gap <= by.rect.height;
+}
+
+/** `the soft keyboard is up (its top edge at y 1398): hiding it may move that button (press_key back …)` — `cutByPinnedRemedy`'s for a node not read as riding on it. */
+const keyboardMayMoveText = ({ lineY, remedy }: KeyboardUp, by: UiNode): string => `${keyboardUpText(lineY)}: hiding it may move that ${by.role} (${hideClause(remedy)})`;
+
+/** `way`, after "dismiss it first" (`dismissKeyboardFirstText`) and `join` when that node rides on the keyboard (`ridingKeyboard`). */
+function ridingFirst(by: UiNode, up: KeyboardUp | undefined, minPiece: number, join: 'or' | 'else', way: string): string {
   const keyboard = ridingKeyboard(by, up, minPiece);
-  const scroll = `scroll_until it out from under that ${by.role} first (${wholeThinWayPast(by)})`;
-  return keyboard === undefined ? scroll : `${dismissKeyboardFirstText(keyboard)} — or ${scroll}`;
+  return keyboard === undefined ? way : `${dismissKeyboardFirstText(keyboard)} — ${join} ${way}`;
 }
 
 /**

@@ -10,6 +10,10 @@ Amended 2026-10-20 (round 14, LE3): a heading listed before a target it overlaps
 heading listed before" below. Amended 2026-10-22 (round 16, LE2's rest): the break no longer excuses a control that overlaps the
 target and holds its centre — see "Amendment: a control past the break that holds the centre" below. Amended 2026-11-09 (D75, lab note LR4):
 uiautomator's runs of classic Android Views are marked too — see "Amendment: Android Views list children by location" below.
+Amended 2026-11-11 (D87): a `covered` target whose cover's order is told, where neither lies in a scroll view, takes the
+remedy `bothPinned` — see "Amendment: a cover where neither lies in a scroll view" below. Amended 2026-11-11 (D88): so
+does a touch's cut by a node drawn after it — see "Amendment: a cut by a later node where neither lies in a scroll view"
+below.
 
 ## Context
 
@@ -600,6 +604,72 @@ scroll.test.ts mark their idb-shaped trees `flatList`.
   measured.
 - Two siblings inside one scroll view's content still swipe until exhausted (a Compose Column in a `verticalScroll`). The
   tree cannot tell them from a pinned section header and its rows (scroll-sticky.wda), so the scroll stays.
-- A `cut` whose `by` is a later sibling, neither in a scroll view (Android text-under-bar P, cut to 825x22 by
+- ~~A `cut` whose `by` is a later sibling, neither in a scroll view (Android text-under-bar P, cut to 825x22 by
   Continue), still swipes and the tap still advises `scroll_until`: `bothPinned` decides `covered` only. The pixel
-  assert, which judges that target `covered`, already says `bothPinned`, so the verbs disagree on it. Not extended here.
+  assert, which judges that target `covered`, already says `bothPinned`, so the verbs disagree on it. Not extended here.~~
+  Resolved by D88 (the amendment below).
+
+## Amendment: a cut by a later node where neither lies in a scroll view (2026-11-11, D88)
+
+### Context
+
+D87's review found one target the verbs still disagreed on. Android's text-under-bar P (Compose) is dumped as the strip
+127,1934 825x22, cut at its bottom by the later sibling Continue, and neither lies in a scroll view. The tap and both
+stops judge it `cut` (ui-tree/standing.ts#cutByLater), whose remedy was `scroll` unconditionally: the tap advised
+"scroll_until it out from under that container first", and `scroll_until` on P.id swiped twice before failing with "a
+layout defect (no clearance for a pinned bar?)". The pixel assert judges the same target `covered` by Continue (its
+overlaid edge) and, since D87, said `bothPinned`. That broke ui-tree/standing.ts#Remedy's "one precedence for every
+verb".
+
+### Decision
+
+`bothPinned` (5. of THE PRECEDENCE) now also decides a touch's `cut` whose `Cut.by` is set (a node drawn after it) when
+neither the target nor that node lies in a scroll view (geometry.ts#Clips.inScroller false for both). The test is
+ui-tree/standing.ts#bothPinned, which D87's `covered` case already asks, now given the other node directly. A cut at a
+clipping container's edge (`Cut.by` absent) keeps `scroll`. A container that clips also scrolls
+(ui-tree/scroll-containers.ts#scrolls), so such a node always lies in a scroll view, and the explicit `Cut.by` guard only
+restates that. Undefined ancestry keeps the old cases. idb's flat list never reads a cut by a later node anyway: that
+evidence is Compose's (ui-tree/later-edges.ts#laterEdgesIn).
+
+The cut stays ambiguous. The dump cannot tell the rest lying under that node from a whole control only that thin laid
+flush against it. No scroll changes either case, so stopping before any swipe is sound. The words keep the cut's own way
+past rather than the cover's "if a screenshot shows this element on top": a coordinate tap on a cut strip is the tap the
+refusal exists to prevent (ui-tree/standing.ts#bothPinnedRemedyText, `cutBy`). Every verb renders it with D87's clause:
+
+- the tap refuses with the cut sentence, then "no scroll moves it out from under that: neither lies in a scroll view — if
+  it is a menu or a popover, close it first; only if a screenshot shows it whole — a control that thin laid flush against
+  that container — tap it by coordinates";
+- `scroll_until`, plain and `fully`, stops before any swipe (interact/scroll-rounds.ts's `overlapped` stop, now carrying
+  the cut when there is no cover). Its words are "element is in the viewport but <the cut sentence>; no swipe was sent —"
+  and the same clause;
+- with the soft keyboard up and that node riding on it (interact/target-text.ts#ridingKeyboard), both name the keyboard
+  first: "the soft keyboard is up (…): dismiss it first (…) — a bar riding on it goes down with it — else" and the clause.
+  Hiding the keyboard moves a riding bar even where no scroll does (interact/target-text.ts#cutByPinnedRemedy);
+- with the keyboard up and that node not read as riding but possibly stacked in a bar that does (ADR 0013's stacked
+  buttons: it ends more than the tap minimum above the line, but no more than its own height),
+  both say "the soft keyboard is up (…): hiding it may move that <role> (…) — else" and the clause. ADR 0013 kept the
+  scroll alone there as the safe direction; with no scroll to fall back on, leaving the keyboard out would mislead
+  where hiding it does move that node. A node farther above the line (a top bar), or below it, gets the clause alone.
+  The test is the bar's distance from the line, not the cut's edge: a riding bar cuts a field it has scrolled under at
+  the field's top (the lab's phone), as a top bar does.
+
+Golden moved 1 check, the same verdict: android text-under-bar P.id `scroll_until` now stops with 0 swipes instead of 2,
+and its words change as above. Truth puts P under pinned chrome (`under-chrome:pinned`). The tap and the text-selector
+`scroll_until` on that cell never find P (its text is not in the dump), so they are unchanged. pinned-bar P (Android) is
+not cut (110 px tall), and its `fully` stop already said `bothPinned` as `covered`.
+
+### Residuals
+
+- The other node's half of the test (`inScroller` of `Cut.by`) is defence in depth here too, as far as measured. A cut's
+  flush later node is the first in draw order, the outermost. A synthetic dump with a scroll view listed after the
+  target, its row flush with the target, read the scroll view's own node, which lies in none, so the case took
+  `bothPinned`. That is right (scrolling moves the row, not the scroll view's frame over the target), but no tree reaches
+  the half where that node is itself scroll content. D87's first residual applies to it too: content a scroll moves
+  without an ancestor the tree marks as scrolling is read as still — a collapsing app bar a list's nested scroll folds,
+  any scroll view a source does not mark, and a later scroll container whose frame a CoordinatorLayout moves with the
+  scroll.
+- A cut whose `by` rides on the soft keyboard in no scroll view stops before any swipe and names the keyboard first; one
+  not read as riding names it as a way that may move that node. No measured cell has either shape: the lab's
+  form-keyboard field lies in its form's scroll view and keeps the scroll. The "may" is a hedge, not a promise: a
+  button that is not stacked in a riding bar but ends within its own height above the line is told it too, and hiding
+  the keyboard moves nothing there. Stacked buttons taller apart than one's own height get no keyboard words.

@@ -411,6 +411,11 @@ describe('tool descriptions on a screen presented over the target', () => {
       'or neither the target nor the cover lies in a scroll view (the tree lists none above either: a bar pinned over a screen that does not scroll) — then "no scroll moves it out from under that: neither lies in a scroll view", advising no scroll',
     );
     expect(full('scroll_until')).toContain('Under an element drawn over it where neither lies in a scroll view (as for tap — the tree lists none above either), it stops before any swipe');
+    // D88: the same for a strip cut by an element drawn after it.
+    expect(full('tap')).toContain(
+      'or scroll_until it out from under that element — unless neither the control nor that element lies in a scroll view (the tree lists none above either: a bar pinned over a screen that does not scroll), then "no scroll moves it out from under that: neither lies in a scroll view", advising no scroll',
+    );
+    expect(full('scroll_until')).toContain('Where neither the control nor that element lies in a scroll view (as for tap — the tree lists none above either), it stops before any swipe instead');
     // …or a cover whose order the tree does not tell (iOS's reading order): one screenshot tells it (ADR 0024); no scroll advised either.
     expect(full('tap')).toContain('averi then takes ONE screenshot and compares the two controls\' colours where they overlap and beside it: the target seen on top is tapped as usual; ');
     expect(full('tap')).toContain('"under …, drawn over it as a screenshot shows (the two are listed in reading order)" — close a menu or popover first, no scroll; ');
