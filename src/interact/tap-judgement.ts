@@ -342,7 +342,8 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
     case 'cut': {
       const cut = cutSliverText(standing.cut, told.node.rect, standing.minPiece, keyboard?.lineY);
       const by = standing.cut.by;
-      throw new ClippedRefusal(told.refusal(`${cut} — ${advice(standing.remedy, () => (by === undefined ? cutAdvice(standing.cut) : cutByRemedy(by, keyboard, standing.minPiece)))}`));
+      // Cut by a node drawn after it: a scroll, or (`bothPinned`, neither in a scroll view) none; at a container's edge, a scroll toward it.
+      throw new ClippedRefusal(told.refusal(`${cut} — ${advice(standing.remedy, (r) => (by === undefined ? cutAdvice(standing.cut) : cutByRemedy(by, keyboard, standing.minPiece, r)))}`));
     }
     case 'reachable': {
       if (standing.moved === undefined) return { point: standing.at };

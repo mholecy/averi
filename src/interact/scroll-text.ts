@@ -784,12 +784,15 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
     case 'overlapped': {
       // Under a cover listed in reading order with it (ui-tree/standing.ts#Remedy's `unordered` or `seenOver`), or one where
       // neither lies in a scroll view (`bothPinned`): stopped without a swipe, as under a presented screen. A plain Error, as
-      // `stuck`: the element was there and seen.
+      // `stuck`: the element was there and seen. Or cut by a node drawn after it, neither in a scroll view (`bothPinned`,
+      // D88): the cut said as the tap says it, and its remedy (target-text.ts#cutByRemedy — the riding keyboard's first).
       const { judged, viewport, remedy } = o;
+      const what = o.cut === undefined ? underText({ judged, cover: o.cover }) : sliverText({ of: 'sliver', judged, ...o.cut });
+      const way = o.cut === undefined ? noScrollRemedyText(remedy, 'touch') : cutByRemedy(o.cut.cut.by, keyboardUp(judged), o.cut.minPiece, o.remedy);
       return {
         message:
-          `scroll_until ${describe} stopped ${stoppedWhen(o.swipes)} — element is in the viewport but ${underText({ judged, cover: o.cover })}; ` +
-            `${o.swipes === 0 ? 'no swipe' : 'no further swipe'} was sent — ${noScrollRemedyText(remedy, 'touch')}. ` +
+          `scroll_until ${describe} stopped ${stoppedWhen(o.swipes)} — element is in the viewport but ${what}; ` +
+            `${o.swipes === 0 ? 'no swipe' : 'no further swipe'} was sent — ${way}. ` +
             `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
       };
     }
@@ -1273,7 +1276,7 @@ function shortText(short: Shortfall): string {
     }
     case 'sliver': {
       const { by } = short.cut;
-      const remedy = by === undefined ? cutRemedy(short.cut.edge) : cutByRemedy(by, keyboardUp(short.judged), short.minPiece);
+      const remedy = by === undefined ? cutRemedy(short.cut.edge) : cutByRemedy(by, keyboardUp(short.judged), short.minPiece, { of: 'scroll' });
       return `element reached the viewport but stayed ${sliverText(short)} (last rect ${JSON.stringify(short.judged.node.rect)}) — a tap refuses it so cut (${remedy})`;
     }
     case 'absent':

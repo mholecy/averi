@@ -627,13 +627,17 @@ describe('judgeTap(…).aim() — a sliver cut by a node drawn after it: Clipped
 });
 
 describe('judgeTap(…).aim() — a cut by a later node names the keyboard only when that node rides on it', () => {
-  /** A field `55,y 970x42` cut at its top by a bar laid after it, ending at `barBottom` — the keyboard's line at 1398. */
+  /**
+   * A field `55,y 970x42` in a form's scroll view, cut at its top by a bar laid after it outside that scroll view, ending
+   * at `barBottom` — the keyboard's line at 1398. In a scroll view, so its remedy is the scroll (in none, `bothPinned`,
+   * D88: tests/interact/remedy-agreement.test.ts).
+   */
   const cutAt = (barBottom: number) =>
     node({
       role: 'container',
       rect: { x: 0, y: 0, width: 1080, height: 2220 },
       children: [
-        node({ role: 'textfield', identifier: 'field', rect: { x: 55, y: barBottom, width: 970, height: 42 } }),
+        node({ role: 'scrollable', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [node({ role: 'textfield', identifier: 'field', rect: { x: 55, y: barBottom, width: 970, height: 42 } })] }),
         node({ role: 'button', identifier: 'bar', rect: { x: 0, y: barBottom - 132, width: 1080, height: 132 } }),
       ],
     });
@@ -658,5 +662,18 @@ describe('judgeTap(…).aim() — a cut by a later node names the keyboard only 
     const { outcome } = await judge(cutAt(300), 'field', { first: PIXEL }, { kb: reading(1398) });
     expect(said(outcome)).toContain('under the 65 a tap needs — scroll_until it out from under that button first (');
     expect(said(outcome)).not.toContain('soft keyboard');
+  });
+  /** `cutAt`'s field and bar with no scroll view: neither lies in one (`bothPinned`, D88). */
+  const pinnedAt = (barBottom: number) => {
+    const tree = cutAt(barBottom);
+    return { ...tree, children: [tree.children[0]!.children[0]!, tree.children[1]!] };
+  };
+  it('neither in a scroll view (D88): no scroll — the riding bar\'s keyboard first, else the one clause; a top bar, the clause alone', async () => {
+    const riding = said((await judge(pinnedAt(1370), 'field', { first: PIXEL }, { kb: reading(1398) })).outcome);
+    expect(riding).toContain(' — a bar riding on it goes down with it — else no scroll moves it out from under that: neither lies in a scroll view — ');
+    expect(riding).not.toContain('scroll_until');
+    const top = said((await judge(pinnedAt(300), 'field', { first: PIXEL }, { kb: reading(1398) })).outcome);
+    expect(top).toContain('under the 65 a tap needs — no scroll moves it out from under that: neither lies in a scroll view — ');
+    expect(top).not.toContain('soft keyboard');
   });
 });

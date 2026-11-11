@@ -16,7 +16,7 @@ import { overElement } from '../../src/verify/pixel-poll.js';
 import { colorSampleRect } from '../../src/verify/color-parity.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
-import { failureOf, play, type Row } from '../helpers/rounds.js';
+import { coverOver, failureOf, play, type Row } from '../helpers/rounds.js';
 import { stackedLayers } from '../helpers/stacked-layers.js';
 import { node } from '../helpers/fake.js';
 import { parseDump } from '../helpers/android-dumps.js';
@@ -935,5 +935,100 @@ describe('one remedy for a target under a drawn cover where neither lies in a sc
     expect(androidRemedies(scrolled, st).includes('bothPinned')).toBe(false);
     const row: Row = { tree: scrolled, found: [st], screen: ON_PIXEL.usable };
     expect(play(ANDROID_RULES, [row, row]).steps.filter((s) => s.do === 'stroke')).toHaveLength(1);
+  });
+});
+
+// D88: a target CUT to a sliver by a node drawn after it (geometry.ts#Cut.by), where neither lies in a scroll view as the
+// tree says — the lab's text-under-bar P on Android (Compose), cut to 825x22 by the later sibling Continue — takes
+// `bothPinned` too (ui-tree/standing.ts#Remedy, 5.): the pixel assert judges that target `covered` by the same node and
+// already said so (D87), so the tap, both stops and the pixel assert now agree, and scroll_until stops before any swipe
+// instead of stroking until exhausted. The cut stays ambiguous — the dump cannot tell it from a control only that thin
+// laid flush against that node — and the words keep that way past; neither case is one a scroll changes. A cut by its
+// clipping container, or the same pair inside a scroll view, keeps the scroll. (idb's flat list, whose ancestry is untold,
+// never reads a cut by a later node: that evidence is Compose's, later-edges.ts#cutsAtLater.)
+describe('one remedy for a target cut by a later node where neither lies in a scroll view (D88) — the tap, the stops and the pixel assert agree', () => {
+  const view = (id: string, bounds: string, kids = '', scrollable = false, cls = 'android.view.View') =>
+    `<node index="0" text="" resource-id="${id}" class="${cls}" package="dev.averi.lab" content-desc="" clickable="${id === '' ? 'false' : 'true'}" enabled="true" ${scrollable ? 'focusable="true" ' : ''}scrollable="${scrollable}" bounds="${bounds}">${kids}</node>`;
+  /**
+   * text-under-bar.xml's run: W, P cut to 825x22 at its bottom by `continue` (listed after it) — `scrolled`: in no
+   * scroll container, both in one (the run inside it), or P alone (W and P in it, `continue` pinned after it); `cls`,
+   * P's class: the dump's role-less View (a sliver on the overlay's evidence alone, never in a scroll view) or a Button
+   * (a sliver at any flush later node, in a scroll view too).
+   */
+  const textUnderBar = (scrolled: 'none' | 'both' | 'target', cls = 'android.view.View'): { tree: UiNode; t: UiNode } => {
+    const label = '<node index="0" text="Continue" resource-id="" class="android.widget.TextView" package="dev.averi.lab" content-desc="" clickable="false" enabled="true" scrollable="false" bounds="[447,2000][633,2066]" />';
+    const rows = view('lab.w', '[127,692][952,868]') + view('lab.t', '[127,1934][952,1956]', '', false, cls);
+    const bar = view('lab.continue', '[66,1956][1014,2110]', label);
+    const run = view('', '[0,0][1080,2220]', scrolled === 'target' ? view('', '[0,0][1080,2220]', rows, true) + bar : rows + bar);
+    const compose = `<node index="0" text="" resource-id="" class="androidx.compose.ui.platform.ComposeView" package="dev.averi.lab" content-desc="" clickable="false" enabled="true" scrollable="false" bounds="[0,0][1080,2220]">${scrolled === 'both' ? view('', '[0,0][1080,2220]', run, true) : run}</node>`;
+    const tree = parseDump(`<?xml version='1.0' encoding='UTF-8' standalone='yes' ?><hierarchy rotation="0"><node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="dev.averi.lab" content-desc="" clickable="false" enabled="true" scrollable="false" bounds="[0,0][1080,2220]">${compose}</node></hierarchy>`);
+    return { tree, t: [...everyNode(tree)].find((n) => n.identifier === 'lab.t')! };
+  };
+  const kinds = (tree: UiNode, t: UiNode, { usable }: On) => {
+    const scene = sceneOf(tree);
+    const of = (s: { kind: string; remedy?: { of: string } }) => (s.kind === 'reachable' ? 'reachable' : `${s.kind} ${s.remedy?.of}`);
+    return (['tap', 'stop', 'fully'] as const).map((p) => of(scene.standing(t, usable, { of: p }))).concat(of(scene.standing(t, usable, { of: 'pixel', reads: colorSampleRect, glyphs: false })));
+  };
+  const rules = ({ device }: On, fully = false) => ({ direction: 'down', fully, maxSwipes: 1, timeoutMs: 30_000, screen: device }) as const;
+  /** scroll_until over `reads` reads of the same tree (a replayed tree never moves). */
+  const strokes = (tree: UiNode, t: UiNode, on: On, fully = false, reads = 2) => {
+    const row: Row = { tree, found: [t], screen: on.usable };
+    return play(rules(on, fully), Array.from({ length: reads }, () => row));
+  };
+  const CUT =
+    'cut at its bottom edge by container id:lab.continue (66,1956 948x154), drawn after it — the dump (Compose\'s, on Android) leaves out of a node\'s bounds what a later node covers, so the rest of it may lie under that container';
+  const PINNED_CUT =
+    'no scroll moves it out from under that: neither lies in a scroll view — if it is a menu or a popover, close it first; only if a screenshot shows it whole — a control that thin laid flush against that container — tap it by coordinates';
+
+  it('Android text-under-bar P: `cut` by the later Continue for the tap and both stops, `bothPinned` for every purpose — as the pixel assert, which judges it `covered`', () => {
+    for (const cls of ['android.view.View', 'android.widget.Button']) {
+      const { tree, t } = textUnderBar('none', cls);
+      expect({ cls, kinds: kinds(tree, t, ON_PIXEL) }).toEqual({ cls, kinds: ['cut bothPinned', 'cut bothPinned', 'cut bothPinned', 'covered bothPinned'] });
+    }
+  });
+
+  it('word for word: the tap refuses with the one clause and the cut\'s way past; scroll_until (plain and fully) stops before any swipe', async () => {
+    const { tree, t } = textUnderBar('none');
+    expect(bothPinnedRemedyText("touch", [...everyNode(tree)].find((n) => n.identifier === "lab.continue"))).toBe(PINNED_CUT);
+    expect(await tapSaid(tree, t, ON_PIXEL)).toBe(`id:t is ${CUT}; only a 825x22 part of it shows, at 127,1934, 22 deep across that edge, under the 65 a tap needs — ${PINNED_CUT}; nothing was tapped`);
+    for (const fully of [false, true]) {
+      const played = strokes(tree, t, ON_PIXEL, fully, 1);
+      expect({ fully, strokes: played.steps.filter((s) => s.do === 'stroke').length }).toEqual({ fully, strokes: 0 });
+      expect(failureOf(played, 'id:t').message).toBe(
+        `scroll_until id:t stopped before any swipe — element is in the viewport but ${CUT}; only a 825x22 part of it shows, at 127,1934, 22 deep across that edge, under the 65 a tap needs; ` +
+          `no swipe was sent — ${PINNED_CUT}. Last rect {"x":127,"y":1934,"width":825,"height":22} in a 1080x2220 viewport`,
+      );
+    }
+  });
+
+  it('either in a scroll view — the pair in one, or P in one under the bar pinned after it — keeps the scroll: scroll_until strokes', async () => {
+    for (const scrolled of ['both', 'target'] as const) {
+      const { tree, t } = textUnderBar(scrolled, 'android.widget.Button');
+      expect({ scrolled, kinds: kinds(tree, t, ON_PIXEL).slice(0, 3) }).toEqual({ scrolled, kinds: ['cut scroll', 'cut scroll', 'cut scroll'] });
+      expect(await tapSaid(tree, t, ON_PIXEL)).toMatch(/ — scroll_until it out from under that container first \(/);
+      expect({ scrolled, strokes: strokes(tree, t, ON_PIXEL).steps.filter((s) => s.do === 'stroke').length }).toEqual({ scrolled, strokes: 1 });
+    }
+  });
+
+  it('a bar riding on the soft keyboard: scroll_until stops before any swipe, the keyboard named first — it moves that bar, though no scroll does', () => {
+    const field = node({ role: 'textfield', identifier: 't', rect: { x: 55, y: 1370, width: 970, height: 42 } });
+    const tree = node({ role: 'container', rect: { ...PIXEL_BOX }, children: [field, node({ role: 'button', identifier: 'bar', rect: { x: 0, y: 1238, width: 1080, height: 132 } })] });
+    const played = play(rules(ON_PIXEL), [{ tree, found: [field], screen: ON_PIXEL.usable, cover: coverOver({ x: 0, y: 1398, width: 1080, height: 822 }) }]);
+    expect(played.steps.filter((s) => s.do === 'stroke')).toEqual([]);
+    expect(failureOf(played, 'id:t').message).toContain(
+      '; no swipe was sent — the soft keyboard is up (its top edge at y 1398): dismiss it first (press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) — a bar riding on it goes down with it — else no scroll moves it out from under that: neither lies in a scroll view — ',
+    );
+  });
+
+  // A container that clips scrolls (scroll-containers.ts#scrolls): a node it cuts lies in a scroll view, so the explicit
+  // `Cut.by` guard in standing.ts#remedied only says what the ancestry already does.
+  it('a cut by its clipping container keeps the scroll — the rest lies past that edge, not under a node', () => {
+    const t = node({ role: 'button', identifier: 't', label: 'T', rect: { x: 0, y: 500, width: 402, height: 10 }, children: [node({ role: 'text', label: 'T', rect: { x: 0, y: 500, width: 402, height: 30 } })] });
+    const clip = node({ role: 'other', clipsDescendants: true, rect: { x: 0, y: 100, width: 402, height: 410 }, children: [t] });
+    const tree = node({ role: 'other', rect: { ...BOX }, children: [clip] });
+    const scene = sceneOf(tree);
+    const tap = scene.standing(t, USABLE, { of: 'tap' });
+    expect(tap.kind === 'cut' && tap.cut.by === undefined ? tap.remedy.of : tap.kind).toBe('scroll');
+    expect(scene.clips.inScroller(t)).toBe(true);
   });
 });
