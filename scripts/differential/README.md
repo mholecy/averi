@@ -164,8 +164,13 @@ target laid out nowhere (`CellTruth.absent`, T6: the L7 carousels' C at launch),
 every touch-down inside its scroll view where the replayed tree lists that a scroller (truth.ts#scrollerListedIn:
 uiautomator's `scrollable="true"`, WDA's ScrollView, Table or CollectionView, never idb) — D59b: a horizontal stroke
 over the page's vertical axis goes over the nested carousel of unknown axis, inside its band — every swipe along the
-direction's axis, and `fully: true` never "visible" (rows.ts#absentFullyRow; D52's `unfit` and D59's inferred axis need
-C drawn cut by the clip, which no launch tree shows: a capture of it is backlog T6d).
+direction's axis, and `fully: true` never "visible" (rows.ts#absentFullyRow; D52's `unfit` needs C drawn cut by the
+clip, which no launch tree shows; D59's inferred axis needs a stroke that moved it, live only). Where src's unfitAlong
+conditions hold over a framed target's truth and the replayed tree — listed whole where its frame lies, cut by its
+scroll views along an axis with both sides on the screen, as large as the smallest of them there less 1, whose axis the
+tree tells as that one (truth.ts#scrollAxisToldIn, uiautomator only) — `fully: true` is asked toward the cut and must
+end D52's `unfit` after no swipe (R-unfit in R-fully's place, rows.ts#unfitSide, #unfitRow; backlog T6d: the lab's
+carousel-in-list-cut).
 
 ```sh
 node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [--side <git ref | path>] [--worktrees <dir>] \

@@ -533,6 +533,15 @@
       ]
     },
     {
+      "id": "carousel-in-list-cut",
+      "family": "edges",
+      "layer": "none",
+      "platforms": ["android"],
+      "targets": [
+        { "tag": "C", "color": "#D81B60", "slot": 0, "declared": "open", "scrollView": "carousel" }
+      ]
+    },
+    {
       "id": "carousel-lazy",
       "family": "edges",
       "layer": "none",

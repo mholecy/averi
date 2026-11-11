@@ -1,9 +1,11 @@
+import type { ScrollAxis } from '../../../src/adapters/types.js';
+import { FIT_ROOM_PX } from '../../../src/interact/scroll-read.js';
 import type { Platform } from '../corpus.js';
 import type { Call, Outcome } from '../differential.js';
 import type { CellTruth, Rect, TargetTruth } from '../../truth/schema.js';
-import { axisOf, directionOf, otherAxis, navigationBandTakes, parseGeometry, rectInside, regionOverlap, sampleOf, selectorOf, type Direction } from '../../truth/truth.js';
+import { axisOf, directionOf, edgesWithinPixel, intersect, otherAxis, navigationBandTakes, parseGeometry, rectInside, regionOverlap, sampleOf, selectorOf, type Direction } from '../../truth/truth.js';
 import { bandNamed, isBand, judgedContext, type StopAsk, type TapAsk, type TargetContract } from '../../truth/target-contract.js';
-import { ASSERTS_FAILED, claimsTap, claimsVisible, dismissalCover, flushProbedSide, isError, namesUntried, notInTree, replyRect, scrollAdvice } from '../../truth/replies.js';
+import { ASSERTS_FAILED, carouselReply, claimsTap, claimsVisible, dismissalCover, flushProbedSide, inferredAxisSaid, isError, namesUntried, notInTree, replyRect, scrollAdvice } from '../../truth/replies.js';
 import { BUDGET_MS, first, landed, notTapped, passed, passes, pointsText, reachedWithNoSwipe, said, strokes, strokesOff, swipes, tapPoints, touchDowns, within, type Expectation } from './judges.js';
 
 /**
@@ -31,7 +33,8 @@ import { BUDGET_MS, first, landed, notTapped, passed, passes, pointsText, reache
  * | R-sliver | sliver | scroll_until | not reached where it is — the stop fails, whatever it swiped (the plain stop does not stop on a sliver; a replayed tree never moves) | ADR 0013 |
  * | R-land | partly-centre-in (reached) | tap | `Tapped`, every tap sent inside what shows (`visible`) | ADR 0005; docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md |
  * | R-land | centre-out, under-chrome | tap | refused, nothing sent — or `Tapped` inside its piece where the second probe fired (`reachedAtPiece`) | ADR 0005 (a covered target's tap moved to its piece, or refused) |
- * | R-fully (R-absent) | laid out nowhere (CellTruth.absent) | scroll_until `fully: true` toward it | never "visible" (it has no frame), its swipes as R-stroke's (absentFullyRow) | ADR 0021 (D52's `unfit` and D59's inferred axis are the live leg: they need it drawn cut by its clip, which no launch tree shows: backlog T6d); ADR 0010 D59b amendment |
+ * | R-fully (R-absent) | laid out nowhere (CellTruth.absent) | scroll_until `fully: true` toward it | never "visible" (it has no frame), its swipes as R-stroke's (absentFullyRow) | ADR 0021 (D52's `unfit` needs it drawn cut by its clip, which no launch tree shows: R-unfit asks it of carousel-in-list-cut's C, T6d; D59's inferred axis needs a stroke that moved it, live only); ADR 0010 D59b amendment |
+ * | R-unfit | partly-centre-in, centre-out, sliver, where src's unfitAlong conditions hold over the truth and the replayed tree (unfitSide: listed whole where its frame lies; cut by its scroll views' drawn frame along an axis, vertical first, both sides on the screen; the smallest of its scroll views along it told that axis by the tree, truth.ts#scrollAxisToldIn, uiautomator only; the drawn frame and the frame each at least that room less 1) — in R-fully's place (edges.ts) | scroll_until `fully: true` toward the cut side | `unfit` after no swipe (replies.ts#carouselReply), with no inferred-axis clause: the tree told the axis | ADR 0021 (D52's `unfit`; the T6d amendment): carousel-in-list-cut's C |
  * | R-fully | partly-centre-in, centre-out, sliver (and R-overlap's) | scroll_until `fully: true` | never "visible" where it is, whatever it swiped: it is cut — but a rect flush with its scroll container's edge, probed with a swipe toward it, may stop when the replayed probe moves nothing (the probe's answer is the device's: replies.ts#flushProbedSide) | ADR 0005 (the `fully` stop judges no sliver: a stop flush with a clipping container is the flush probe's to check, scroll-rounds.ts#PROBE_REACH), ADR 0009 (N-a, `fully`); docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md, docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md |
  * | R-band | status-band, nav-band (iOS's home-indicator band is no band: target-contract.ts#judgedContext) | tap | refused, nothing tapped — where its probe fired (iOS below the bar's touch area, Android's navigation band under gesture navigation): Tapped inside what shows of it, or refused with nothing sent | ADR 0009 (N-a), ADR 0008; docs/bugs/2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md |
  * | R-band | status-band, nav-band | colour | fails: a system band over what it reads (Android's navigation bar under three buttons: asked for the colour the screen shows there, the bar's, so a pass means it measured the bar — #23) — but in Android's navigation band under gesture navigation, where the band is the app's (truth.ts#navigationBandTakes, measured: bands N reached, seen in its own colour beneath the gesture handle), passes on its own colour or fails closed | ADR 0001; ADR 0020 (the measured truth outranks a hand-written expectation) |
@@ -347,6 +350,91 @@ export function fullyRow(platform: Platform, t: TargetTruth, cell: CellTruth, as
       const why = flushProbe(o, t, cell);
       if (why === undefined) return undefined;
       return said(o, `fully visible where it is ${t.geometry}, after ${swipes(o)} swipe(s) that move nothing${why === NOT_PROBED ? '' : ` (${why})`}`);
+    },
+  };
+}
+
+
+/** The edge a `fully: true` call toward `d` names: the side the target is cut on, its content lying past it. */
+const EDGE_OF: Readonly<Record<Direction, string>> = { up: 'top', down: 'bottom', left: 'left', right: 'right' };
+
+/** What unfitSide asks of the replayed tree: the axis it tells of a scroll view's rect, the target's listed frames. */
+export interface UnfitReading {
+  /** The axis the tree tells of the scroller at `clip` (truth.ts#scrollAxisToldIn), undefined where it tells none. */
+  told: (clip: Rect) => ScrollAxis | undefined;
+  /** The frames the tree lists the target at (truth.ts#nodeFramesIn). */
+  listed: readonly Rect[];
+}
+
+const UNFIT_SPANS = [
+  { axis: 'vertical', at: 'y', extent: 'height', sides: ['up', 'down'] },
+  { axis: 'horizontal', at: 'x', extent: 'width', sides: ['left', 'right'] },
+] as const;
+
+/**
+ * Where D52's `unfit` is the truth's answer to `fully: true` on a target (T6d): the direction of the side it is cut on
+ * (`up` its top), or undefined. The conditions are src's (scroll-read.ts#unfitAlong), read from the truth and the
+ * replayed tree (`reading`):
+ * - the tree lists the target whole, where the app reports its frame (each edge within a pixel,
+ *   truth.ts#edgesWithinPixel): src judges the listed rect, and a node listed cut flush to its clip (a non-clickable
+ *   Compose node, a View) is never `clipped`;
+ * - its scroll views are its own clip (cell.scrollViews[t.scrollView]) and every other the truth reports overlapping
+ *   that clip and not lying inside it (the truth names no nesting: one that holds or cuts the clip stands in for an
+ *   enclosing one, one inside it is one it holds); the drawn frame is where they all and the screen overlap — the
+ *   panel as built, bands and all, as src's `fully` stop judges in it (ui-tree/standing.ts#inStopFrame: the usable
+ *   screen's box, cut by the keyboard line only); the system bands are judged after, as a region, outside unfitAlong;
+ * - judged along each axis, vertical first, as unfitAlong: the frame runs past the drawn frame there, with both its
+ *   sides on the screen (uiautomator cuts a node at the screen's edge: D17);
+ * - the room-giver is the smallest of its scroll views along the axis (its own clip on a tie), and the tree tells
+ *   its axis as that one: no cross-axis `unfit`, and none of D59's inferred axis (a replayed tree never moves);
+ * - the drawn frame is at least that room less FIT_ROOM_PX there (no outer scroll view cuts it shorter: the card
+ *   would have more room once that one moves), and so is the frame.
+ * Cut on both sides (larger than its room), the deeper cut names the side (up, left on a tie).
+ * Not modelled: the soft keyboard's line, the one cut of src's judged frame left out — no edges cell shows a
+ * keyboard. Not seen: a scroller the replayed tree lists but the lab's state does not report (CellTruth.scrollViews),
+ * so an enclosing one of those that cuts the room is missed (the lab reports every scroll view its cells build).
+ */
+export function unfitSide(t: Pick<TargetTruth, 'frame' | 'scrollView'>, cell: Pick<CellTruth, 'screen' | 'scrollViews'>, reading: UnfitReading): Direction | undefined {
+  const own = t.scrollView === undefined ? undefined : cell.scrollViews?.[t.scrollView];
+  if (own === undefined || !reading.listed.some((r) => edgesWithinPixel(r, t.frame))) return undefined;
+  const holds = (r: Rect) => intersect(r, own) !== null && !(rectInside(r, own) && !edgesWithinPixel(r, own));
+  const others = Object.entries(cell.scrollViews ?? {}).flatMap(([name, r]) => (name !== t.scrollView && holds(r) ? [r] : []));
+  const views = [own, ...others];
+  const screen = { x: 0, y: 0, width: cell.screen.width, height: cell.screen.height };
+  const drawn = views.reduce<Rect | null>((d, r) => (d === null ? null : intersect(d, r)), screen);
+  if (drawn === null) return undefined;
+  const f = t.frame;
+  for (const { axis, at, extent, sides } of UNFIT_SPANS) {
+    const before = drawn[at] - f[at];
+    const after = f[at] + f[extent] - (drawn[at] + drawn[extent]);
+    if (before <= 0 && after <= 0) continue;
+    if (f[at] < 0 || f[at] + f[extent] > screen[extent]) continue;
+    const roomGiver = views.reduce((least, r) => (r[extent] < least[extent] ? r : least));
+    if (reading.told(roomGiver) !== axis) continue;
+    const room = roomGiver[extent];
+    if (drawn[extent] >= room - FIT_ROOM_PX && f[extent] >= room - FIT_ROOM_PX) return before >= after ? sides[0] : sides[1];
+  }
+  return undefined;
+}
+
+/**
+ * R-unfit (T6d): `fully: true` toward the side it is cut on ends D52's `unfit` — "as wide as its scroll view … drop
+ * fully: true" (replies.ts#carouselReply) — on the first read, with no swipe (a replayed tree never moves, so the
+ * first read is the one D52 judges), and says no inferred axis (the tree told it: edges.ts asks this row only then).
+ * Any other reply is red, its kind said. Asked in R-fully's place (the same key: verb `fully`), where unfitSide holds.
+ */
+export function unfitRow(platform: Platform, t: TargetTruth, ask: StopAsk, side: Direction): Expectation {
+  const wide = axisOf(side) === 'x' ? 'wide' : 'tall';
+  return {
+    asks: ask,
+    verb: 'fully',
+    says: `R-unfit: fully: true on a target as ${wide} as its scroll view ${t.scrollView ?? ''}, cut at its ${EDGE_OF[side]} edge, ends \`unfit\` (D52)`,
+    call: scrollCall(platform, t, side, true),
+    judge: (o) => {
+      const kind = carouselReply(o.reply);
+      if (kind !== 'unfit') return said(o, `not unfit (${kind}), after ${swipes(o)} swipe(s)`);
+      if (swipes(o) !== 0) return said(o, `unfit after ${swipes(o)} swipe(s), not on the first read`);
+      return inferredAxisSaid(o.reply) ? said(o, 'unfit by an inferred axis, though the tree tells it') : undefined;
     },
   };
 }

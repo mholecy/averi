@@ -55,6 +55,7 @@ describe('the cell catalog', () => {
       'edges/scroll-top-edge-end',
       'edges/carousel-in-list',
       'edges/scroll-collapsing',
+      'edges/carousel-in-list-cut',
       'edges/carousel-lazy',
       'edges/carousel-recycler',
       'edges/carousel-lazy-free',
@@ -231,6 +232,18 @@ describe('L7: carousel-lazy and carousel-recycler (D37\'s snapping pager) and th
   it('only those four carousels\' C may be absent: every other target must report a frame', async () => {
     const may = (await loadCatalog()).cells.flatMap((c) => c.targets.filter((t) => t.mayBeAbsent !== undefined).map((t) => `${c.id}.${t.tag}`));
     expect(may).toEqual(['carousel-lazy.C', 'carousel-recycler.C', 'carousel-lazy-free.C', 'carousel-recycler-free.C']);
+  });
+});
+
+describe('T6d: carousel-in-list-cut — carousel-in-list\'s C drawn cut by its clip on appear, Android only', () => {
+  it('C alone, carousel-in-list\'s C exactly (framed at launch: never mayBeAbsent), built on Android alone', async () => {
+    const cells = (await loadCatalog()).cells;
+    const of = (id: string) => cells.find((c) => c.id === id)!;
+    const cut = of('carousel-in-list-cut');
+    expect(cut).toMatchObject({ family: 'edges', layer: 'none', platforms: ['android'] });
+    expect(cut.targets).toEqual(of('carousel-in-list').targets.filter((t) => t.tag === 'C'));
+    expect(captureRefusal(cut, 'ios', undefined)).toBe('built for android only');
+    expect(captureRefusal(cut, 'android', 'gesture')).toBeUndefined();
   });
 });
 

@@ -594,3 +594,155 @@ describe('R-stroke of a FRAMED target its tree does not list: a touch-down besid
   });
 });
 
+describe('R-unfit: a target as wide as its scroll view, drawn cut by it, where the replayed tree tells that scroll view\'s axis — `fully: true` ends D52\'s `unfit` (T6d)', () => {
+  // carousel-in-list-cut on averi_lab, as tests/interact/scroll-carousel-unfit-cell.test.ts pins it: the carousel
+  // 66,380 948x234 (a HorizontalScrollView), C 948 wide at 44 — cut 22 px at the clip's left edge, both sides on the
+  // screen, listed whole. Each condition is src's (scroll-read.ts#unfitAlong); a fixture breaking one keeps R-fully.
+  const CAROUSEL = rect(66, 380, 948, 234);
+  const cell: CellTruth = {
+    cell: 'carousel-in-list-cut',
+    layer: 'none',
+    device: 'averi_lab emulator, Android 13 (API 33)',
+    screen: { width: 1080, height: 2220 },
+    scale: 1,
+    targets: [],
+    safeArea: { top: 66, left: 0, bottom: 66, right: 0 },
+    scrollViews: { page: rect(0, 0, 1080, 2220), carousel: CAROUSEL },
+    navigation: 'gesture',
+  };
+  const C_ID = 'lab.carousel-in-list-cut.C';
+  const C = (frame: Rect, over: Partial<TargetTruth> = {}): TargetTruth => ({
+    tag: 'C',
+    id: C_ID,
+    color: '#D81B60',
+    declared: 'open',
+    frame,
+    reached: true,
+    probe: [],
+    drawn: 1,
+    seen: '#D81B60',
+    geometry: 'partly-centre-in',
+    visible: rect(Math.max(frame.x, 66), 380, Math.min(frame.x + frame.width, 1014) - Math.max(frame.x, 66), 234),
+    scrollView: 'carousel',
+    ...over,
+  });
+  const bounds = (r: Rect) => `[${r.x},${r.y}][${r.x + r.width},${r.y + r.height}]`;
+  /** A replayed dump: the page, `scrollers` (class and rect), C listed at `listed` (none: not listed). */
+  const dump = (listed: Rect | undefined, scrollers: readonly [string, Rect][] = [['android.widget.HorizontalScrollView', CAROUSEL]]) =>
+    `<hierarchy><node scrollable="true" class="android.widget.ScrollView" bounds="[0,0][1080,2220]">${scrollers
+      .map(([cls, r]) => `<node scrollable="true" class="${cls}" bounds="${bounds(r)}" />`)
+      .join('')}${listed === undefined ? '' : `<node resource-id="${C_ID}" class="android.view.View" clickable="true" bounds="${bounds(listed)}" />`}</node></hierarchy>`;
+  const AT_44 = rect(44, 380, 948, 234);
+  /** The `fully` row of C at `frame`, listed there, over `tree` (null: none given). */
+  const fullyOf = (t: TargetTruth, tree: string | null = dump(t.frame), source: 'uiautomator' | 'wda' | 'idb' = 'uiautomator', c: CellTruth = cell) =>
+    expectations('android', t, c, source, tree ?? undefined).find((r) => r.verb === 'fully')!;
+  const UNFIT =
+    'ERROR scroll_until id:"lab.carousel-in-list-cut.C" failed after 0 swipes — element is in the viewport but CLIPPED at left: 98% of it is drawn, and it is 948 wide (tree units), as wide as its scroll view scrollable (66,380 948x234): fully: true holds at one exact scroll offset only, which no swipe can be aimed at — drop fully: true, or accept what it shows. Last rect {"x":44,"y":380,"width":948,"height":234} in a 1080x2220 viewport';
+
+  it('asks fully: true toward the cut side (left), by its identifier — the key\'s verb stays `fully`', () => {
+    const r = fullyOf(C(AT_44));
+    expect(r.says).toBe('R-unfit: fully: true on a target as wide as its scroll view carousel, cut at its left edge, ends `unfit` (D52)');
+    expect(r.call.args).toEqual({ platform: 'android', selector: 'id:"lab.carousel-in-list-cut.C"', direction: 'left', fully: true });
+    expect(r.asks).toEqual({ fully: true, holds: false });
+  });
+
+  it('cut at the right edge: asked right', () => {
+    expect(fullyOf(C(rect(88, 380, 948, 234))).call.args).toMatchObject({ direction: 'right', fully: true });
+  });
+
+  it('`unfit` on the first read (no swipe), with no inferred-axis clause: ok; anything else red, the reply\'s kind said', () => {
+    const r = fullyOf(C(AT_44));
+    expect(r.judge(out(UNFIT))).toBeUndefined();
+    expect(r.judge(out('ERROR scroll_until id:"lab.carousel-in-list-cut.C" failed after 6 swipes — stuck'))).toBe(
+      'not unfit (other), after 0 swipe(s): ERROR scroll_until id:"lab.carousel-in-list-cut.C" failed after 6 swipes — stuck',
+    );
+    const visible = 'Element id:"lab.carousel-in-list-cut.C" fully visible after 0 swipes';
+    expect(r.judge(out(visible))).toBe(`not unfit (fully-visible), after 0 swipe(s): ${visible}`);
+    const inferred = UNFIT.replace('scrollable (66,380 948x234)', 'scrollable (66,380 948x234) (the tree does not say which way it scrolls: the swipes over it did)');
+    expect(r.judge(out(inferred))).toMatch(/^unfit by an inferred axis, though the tree tells it: ERROR scroll_until /);
+  });
+
+  it('`unfit` after a swipe is red: a replayed tree never moves, so D52 holds on the first read', () => {
+    const after = UNFIT.replace('after 0 swipes', 'after 1 swipe');
+    expect(fullyOf(C(AT_44)).judge(out(after, ['adb shell input swipe 300 497 800 497 300']))).toMatch(/^unfit after 1 swipe\(s\), not on the first read: ERROR scroll_until /);
+  });
+
+  it('R-fully, not R-unfit, where the tree tells no axis (a LazyRow\'s android.view.View), lists no scroller there, gives no tree, or the source is not uiautomator', () => {
+    for (const r of [
+      fullyOf(C(AT_44), dump(AT_44, [['android.view.View', CAROUSEL]])),
+      fullyOf(C(AT_44), dump(AT_44, [])),
+      fullyOf(C(AT_44), null),
+      fullyOf(C(AT_44), JSON.stringify({ value: { type: 'ScrollView', rect: CAROUSEL } }), 'wda'),
+    ]) {
+      expect(r.says).toMatch(/^R-fully:/);
+    }
+  });
+
+  it('a vertical scroll view the tree tells does not make a horizontal cut unfit (no cross-axis unfit)', () => {
+    expect(fullyOf(C(AT_44), dump(AT_44, [['android.widget.ScrollView', CAROUSEL]])).says).toMatch(/^R-fully:/);
+  });
+
+  it('R-fully where the card has room (900 wide), runs past the screen (a side unknown, D17), or is not cut by its scroll view', () => {
+    expect(fullyOf(C(rect(44, 380, 900, 234))).says).toMatch(/^R-fully:/);
+    expect(fullyOf(C(rect(540, 380, 948, 234))).says).toMatch(/^R-fully:/);
+    expect(fullyOf(C(rect(-20, 380, 948, 234))).says).toMatch(/^R-fully:/);
+    expect(fullyOf(C(AT_44, { scrollView: 'page' })).says).toMatch(/^R-fully:/);
+  });
+
+  it('wider than its clip, cut on both sides: the deeper cut names the side, the left on a tie', () => {
+    expect(fullyOf(C(rect(56, 380, 968, 234))).call.args).toMatchObject({ direction: 'left', fully: true });
+    expect(fullyOf(C(rect(60, 380, 968, 234))).call.args).toMatchObject({ direction: 'right', fully: true });
+    expect(fullyOf(C(rect(50, 380, 968, 234))).call.args).toMatchObject({ direction: 'left', fully: true });
+  });
+
+  it('within FIT_ROOM_PX: a card 1 px narrower than its clip is still unfit; 2 px narrower is not', () => {
+    expect(fullyOf(C(rect(44, 380, 947, 234))).says).toMatch(/^R-unfit:/);
+    expect(fullyOf(C(rect(44, 380, 946, 234))).says).toMatch(/^R-fully:/);
+  });
+
+  it('(listed) the tree must list it whole, where its frame lies (within a pixel): listed cut flush to the clip, or not at all, keeps R-fully', () => {
+    expect(fullyOf(C(AT_44), dump(rect(45, 381, 947, 233))).says).toMatch(/^R-unfit:/);
+    expect(fullyOf(C(AT_44), dump(rect(66, 380, 926, 234))).says).toMatch(/^R-fully:/);
+    expect(fullyOf(C(AT_44), dump(undefined)).says).toMatch(/^R-fully:/);
+  });
+
+  it('(drawn) an outer scroll view cutting the clip along the axis leaves the card more room once it moves: R-fully', () => {
+    const outer = rect(200, 0, 1000, 2220);
+    const c = { ...cell, scrollViews: { ...cell.scrollViews, outer } };
+    expect(fullyOf(C(AT_44), dump(AT_44), 'uiautomator', c).says).toMatch(/^R-fully:/);
+    // One that holds the clip whole along x cuts nothing there.
+    const whole = { ...cell, scrollViews: { ...cell.scrollViews, outer: rect(0, 300, 1080, 400) } };
+    expect(fullyOf(C(AT_44), dump(AT_44), 'uiautomator', whole).says).toMatch(/^R-unfit:/);
+  });
+
+  it('(room-giver) the smallest of its scroll views along the axis gives the room, and its axis must be told: told only at a larger one, R-fully', () => {
+    // An enclosing scroll view scrolled so it cuts the carousel to 200–1000: 800 px of room, smaller than the clip's.
+    const outer = rect(200, 300, 800, 400);
+    const c = { ...cell, scrollViews: { ...cell.scrollViews, outer } };
+    expect(fullyOf(C(AT_44), dump(AT_44), 'uiautomator', c).says).toMatch(/^R-fully:/);
+    const told = dump(AT_44, [['android.widget.HorizontalScrollView', CAROUSEL], ['android.widget.HorizontalScrollView', outer]]);
+    expect(fullyOf(C(AT_44), told, 'uiautomator', c).says).toMatch(/^R-unfit:/);
+  });
+
+  it('(room-giver) a scroll view inside its clip (one it holds, not one holding it) is none of its scroll views', () => {
+    const inner = rect(66, 380, 500, 234);
+    const c = { ...cell, scrollViews: { ...cell.scrollViews, inner } };
+    expect(fullyOf(C(AT_44), dump(AT_44), 'uiautomator', c).call.args).toMatchObject({ direction: 'left', fully: true });
+  });
+
+  it('(bands) the system bands do not cut its drawn frame: src judges unfitAlong in the panel as built (bands and all, the keyboard line its only cut), the bands after, as a region', () => {
+    // A vertical list 1800–2220, under the 66-px navigation band (2154–2220); a row as tall as it, cut 10 at its top,
+    // both its sides on the screen: as tall as its list, unfit — asked up — though the band lies over its foot.
+    const list = rect(0, 1800, 1080, 420);
+    const c = { ...cell, scrollViews: { ...cell.scrollViews, list } };
+    const row = rect(0, 1790, 1080, 420);
+    const t = C(row, { scrollView: 'list', visible: rect(0, 1800, 1080, 420) });
+    expect(fullyOf(t, dump(row, [['android.widget.ScrollView', list]]), 'uiautomator', c).call.args).toMatchObject({ direction: 'up', fully: true });
+  });
+
+  it('vertical first, then horizontal, as unfitAlong: cut on both axes, the tree telling only the horizontal one — asked left', () => {
+    const both = rect(44, 370, 948, 234);
+    expect(fullyOf(C(both, { visible: rect(66, 380, 926, 224) })).call.args).toMatchObject({ direction: 'left', fully: true });
+    expect(fullyOf(C(both, { visible: rect(66, 380, 926, 224) }), dump(both, [['android.widget.ScrollView', CAROUSEL]])).call.args).toMatchObject({ direction: 'up', fully: true });
+  });
+});
