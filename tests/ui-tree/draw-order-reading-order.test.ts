@@ -100,7 +100,7 @@ describe('a control listed after a target, past a reading-order break, that hold
 describe('over every iOS tree of the committed fixtures: the untold covers listed after their target', () => {
   // Pinned: every target with a control listed after it whose order against it is not told, over the whole corpus — what the
   // eyes are asked of because of a control listed after (a screenshot per plain stop; per tap where no piece is left clear).
-  // The rule (`coversAfter`) added all but blur-menu's: before it the break excused their cover. blur-menu-stacked and
+  // The rule (`coversAfter`) added the idb ones but blur-menu's: before it the break excused their cover. blur-menu-stacked and
   // blur-menu-unhidden (round 16's probes of ADR 0018 residual 9) list W and C under idb as blur-menu-grouped does.
   it('are scroll-bounded-footer\'s O, the grouped blur menus\' W, mp-native\'s chooser row_swift and its lab rebuild\'s S — and the pair a listing already gave', async () => {
     const untold: string[] = [];
@@ -119,6 +119,11 @@ describe('over every iOS tree of the committed fixtures: the untold covers liste
     expect(judged).toBeGreaterThan(4000);
     expect(untold).toEqual([
       'idb-modal-listed-before-content.json#0: accounts.detail.payment_type_sheet.row_swift under transactions.list.row_0',
+      // D84 (ADR 0015's D84 amendment): a nested run's later-listed sibling drawn over the target is an untold peer of
+      // any kind, no longer `drawn` — here the screen-sized wrapper and its child, the form's container listed after
+      // them over their bottom (neither is a target anyone taps: the same tap point, only the order's kind moves)…
+      'wda-capture-lab-form-keyboard.json: null under null',
+      'wda-capture-lab-form-keyboard.json: null under null',
       'blur-menu-grouped.idb.json#0: lab.blur-menu-grouped.W under lab.blur-menu-grouped.C',
       'blur-menu-stacked.idb.json#0: lab.blur-menu-stacked.W under lab.blur-menu-stacked.C',
       'blur-menu-unhidden.idb.json#0: lab.blur-menu-unhidden.W under lab.blur-menu-unhidden.C',
@@ -126,7 +131,14 @@ describe('over every iOS tree of the committed fixtures: the untold covers liste
       'blur-menu.idb.json#0: lab.blur-menu.W under lab.blur-menu.C',
       'blur-menu.wda.json: lab.blur-menu.W under lab.blur-menu.C',
       'chooser-over-list.idb.json#0: lab.chooser-over-list.S under lab.chooser-over-list.R',
+      'form-keyboard.wda.json: null under null',
+      'form-keyboard.wda.json: null under null',
       'scroll-bounded-footer.idb.json#0: lab.scroll-bounded-footer.O under lab.scroll-bounded-footer.continue',
+      // …and rn-banner's bare RN Views: each cover asked as a target (T's and U's, listed before their targets by their
+      // tops), and C under its cover listed after it — the run cannot tell which is on top; the eyes do (the golden's C).
+      'rn-banner.wda.json: lab.rn-banner.T.cover under lab.rn-banner.T',
+      'rn-banner.wda.json: lab.rn-banner.U.cover under lab.rn-banner.U',
+      'rn-banner.wda.json: lab.rn-banner.C under lab.rn-banner.C.cover',
     ]);
   });
 });

@@ -742,13 +742,16 @@ describe('a refused tap on a target its moved tap keeps clear of a control liste
   const tree = node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 }, readingOrder: true, children: [w, c, banner] })] });
 
   it('the tap names the control the 300x10 part is clear of; scroll_until counts the 300x40 showing', async () => {
+    // The Banner, listed after C in the reading-order run, is a cover whose order is not told (D84: a later-listed
+    // sibling of any kind, ADR 0015's D84 amendment) — no scroll separates two siblings of one run, none advised.
     expect(await tapSaid(tree, c)).toBe(
-      'id:t is under image "Banner" (0,440 402x100) at its centre (201,460), drawn over it; ' +
-        'only a 300x10 part of it shows clear of button "W" (51,390 300x40), listed before it in reading order, under the 24x24 a tap may be moved to — scroll_until it first; nothing was tapped',
+      'id:t is overlapped by image "Banner" (0,440 402x100) at its centre (201,460), the two listed in reading order: which is drawn on top is not told; ' +
+        `only a 300x10 part of it shows clear of button "W" (51,390 300x40), listed before it in reading order, under the 24x24 a tap may be moved to — ${orderRemedyText({ of: 'unordered' }, 'touch')}; nothing was tapped`,
     );
     const row: Row = { tree, found: [c], screen: USABLE };
-    const failure = failureOf(play({ direction: 'down', fully: false, maxSwipes: 1, timeoutMs: 30_000, screen: IPHONE }, [row, row]), 'id:t').message;
-    expect(failure).toContain('33% of it shows');
+    // The order not told, scroll_until stops before any swipe (it swiped once before D84, the Banner then `drawn`).
+    const failure = failureOf(play({ direction: 'down', fully: false, maxSwipes: 1, timeoutMs: 30_000, screen: IPHONE }, [row]), 'id:t').message;
+    expect(failure).toMatch(/^scroll_until id:t stopped before any swipe — .* 33% of it shows; no swipe was sent — /);
   });
 });
 

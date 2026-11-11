@@ -35,28 +35,6 @@
     "PASS  element id:\"lab.scroll-sticky-cut.R\" fill within dE00 8 of #00897B — sampled #00897B (dominant, 100% of region) vs expected #00897B → dE00 0.00 ≤ 8; scale 1.000",
     "appAlive: true"
   ],
-  "android-averi_lab-api33/views-drawn-over.xml A colour": [
-    "1/1 asserts FAILED",
-    "FAIL  element id:\"lab.views-drawn-over.A\" fill within dE00 8 of #1E88E5 — other id:lab.views-drawn-over.B (182,331 825x121) is drawn over the element (element 127,303 825x176) — the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run — or, if no scroll moves it out from under that, assert something in it that lies clear of that; failing closed, color unchecked",
-    "appAlive: true"
-  ],
-  "android-averi_lab-api33/views-drawn-over.xml A scroll_until": [
-    "ERROR scroll_until id:\"lab.views-drawn-over.A\" failed after 3 swipes — element is in the viewport but under other id:lab.views-drawn-over.B (182,331 825x121) at its centre (540,391), drawn over it — 36% of it shows — and the content is exhausted: swiping down no longer moves it, nor does swiping up. The app draws that over it at the end of the content — a layout defect (no clearance for a pinned bar?), not a scroll that needs more swipes. Last rect {\"x\":127,\"y\":303,\"width\":825,\"height\":176} in a 1080x2220 viewport"
-  ],
-  "android-averi_lab-api33/views-drawn-over.xml A tap": [
-    "ERROR id:\"lab.views-drawn-over.A\" is under other id:lab.views-drawn-over.B (182,331 825x121) at its centre (540,391), drawn over it; only a 825x28 part of it shows, under the 65x65 a tap may be moved to — scroll_until it first; nothing was tapped"
-  ],
-  "android-averi_lab-api33/views-drawn-over.xml A2 colour": [
-    "1/1 asserts FAILED",
-    "FAIL  element id:\"lab.views-drawn-over.A2\" fill within dE00 8 of #00897B — other id:lab.views-drawn-over.B2 (182,826 825x121) is drawn over the element (element 127,798 825x176) — the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run — or, if no scroll moves it out from under that, assert something in it that lies clear of that; failing closed, color unchecked",
-    "appAlive: true"
-  ],
-  "android-averi_lab-api33/views-drawn-over.xml A2 scroll_until": [
-    "ERROR scroll_until id:\"lab.views-drawn-over.A2\" failed after 3 swipes — element is in the viewport but under other id:lab.views-drawn-over.B2 (182,826 825x121) at its centre (540,886), drawn over it — 36% of it shows — and the content is exhausted: swiping down no longer moves it, nor does swiping up. The app draws that over it at the end of the content — a layout defect (no clearance for a pinned bar?), not a scroll that needs more swipes. Last rect {\"x\":127,\"y\":798,\"width\":825,\"height\":176} in a 1080x2220 viewport"
-  ],
-  "android-averi_lab-api33/views-drawn-over.xml A2 tap": [
-    "ERROR id:\"lab.views-drawn-over.A2\" is under other id:lab.views-drawn-over.B2 (182,826 825x121) at its centre (540,886), drawn over it; only a 825x28 part of it shows, under the 65x65 a tap may be moved to — scroll_until it first; nothing was tapped"
-  ],
   "android-rn-averi_lab-api33/rn-banner-role.xml C colour": [
     "All 1 asserts passed",
     "PASS  element id:\"lab.rn-banner-role.C\" fill within dE00 8 of #263238 — sampled #263238 (dominant, 96% of region) vs expected #263238 → dE00 0.00 ≤ 8; scale 1.000",
