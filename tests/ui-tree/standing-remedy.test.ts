@@ -119,3 +119,20 @@ describe('THE REMEDY, per kind — the pixel assert, which judges a region', () 
     expect(said(sceneOf(t).standing(rootNode, iphone, COLOUR))).toEqual({ kind: 'covered', remedy: { of: 'fixed', what: 'root' } });
   });
 });
+
+describe('THE REMEDY — none on a reachable standing', () => {
+  it('a reachable node carries no remedy, for every purpose — a node beneath a presented screen too, laid clear of it (an undimmed partial sheet)', () => {
+    const full = (children: UiNode[]): UiNode => node({ role: 'container', rect: box(402, 874), children });
+    const row = el('row', { x: 24, y: 200, width: 354, height: 52 });
+    const sheet = node({ role: 'scrollable', rect: { x: 0, y: 500, width: 402, height: 374 }, children: [el('opt', { x: 20, y: 520, width: 362, height: 50 })] });
+    const t = full([full([full([node({ role: 'scrollable', rect: box(402, 874), children: [row] })]), full([sheet])])]);
+    const scene = sceneOf(t);
+    // The draw order judges a presented screen over it, of the node itself.
+    expect(scene.order.presentedOver(row)).toBeDefined();
+    const iphone = screen({ box: box(402, 874), boxes: [box(402, 874)], oriented: box(402, 874), statusBand: 62 });
+    for (const purpose of [TAP, STOP, FULLY, OCR()]) {
+      const s = scene.standing(row, iphone, purpose);
+      expect([purpose.of, s.kind, 'remedy' in s]).toEqual([purpose.of, 'reachable', false]);
+    }
+  });
+});

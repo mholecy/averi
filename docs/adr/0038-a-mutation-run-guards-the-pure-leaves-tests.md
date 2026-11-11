@@ -1735,12 +1735,14 @@ rule:
 
 | Module | Tests | Score | Floor |
 | --- | --- | --- | --- |
-| src/ui-tree/standing.ts | standing.test.ts, standing-remedy.test.ts, presented-remedy.test.ts, overlaid-edge.test.ts, heading-listed-before.test.ts, keyboard-position.test.ts, listed-content.test.ts, interact/remedy-agreement.test.ts, verify/eyes-views-drawn-over.test.ts, verify/assert.test.ts | 95.41 % (1 220 mutants, 50 survived, 6 without coverage; 84.92 % before A25's tests) | 93 |
+| src/ui-tree/standing.ts | standing.test.ts, standing-remedy.test.ts, presented-remedy.test.ts, overlaid-edge.test.ts, heading-listed-before.test.ts, keyboard-position.test.ts, listed-content.test.ts, interact/remedy-agreement.test.ts, verify/eyes-views-drawn-over.test.ts, verify/assert.test.ts | 95.90 % (1 220 mutants, 44 survived, 6 without coverage; 84.92 % before A25's tests) | 93 |
 | src/ui-tree/reading-order.ts | draw-order*.test.ts, heading-listed-before.test.ts | 88.11 % (185 mutants, 22 survived) | 86 |
 | src/ui-tree/later-edges.ts | later-edges.test.ts, overlaid-edge.test.ts | 97.35 % (151 mutants, 4 survived) | 95 |
 
-Scores from narrowed cold runs in core before the split; the cold `scene` run (below) confirms them: standing.ts
-96.23 % there, its 38 timeouts (counted killed) taken under load, reading-order.ts 88.11 %, later-edges.ts 97.35 %. The first run of standing.ts showed its remedies untested where they matter most: the tables of
+Scores from narrowed cold runs in core before the split; standing.ts's 95.90 % adds the six mutants review round 1's
+test kills (a reachable standing carries no remedy, for every purpose, a node beneath a presented screen too:
+standing-remedy.test.ts, shown red on `tap.kind === 'reachable'` emptied to false) to that run's 95.41 %. The cold
+`scene` run (below), before that test, confirms them: standing.ts 96.23 % there, its 38 timeouts (counted killed) taken under load, reading-order.ts 88.11 %, later-edges.ts 97.35 %. The first run of standing.ts showed its remedies untested where they matter most: the tables of
 standing.test.ts quote each standing's kind, never its remedy, so `keyboard`, `pinned`, `stuck` and `fixed` (and the
 `clipped` and `systemBar` cases of the switch) could each be emptied unnoticed. tests/ui-tree/standing-remedy.test.ts
 now pins the remedy per kind and purpose on the smallest trees; standing.test.ts gains the facts its readers quote
@@ -1750,8 +1752,7 @@ screen's side, `cutByLater`'s two thresholds, `marginSeen` of another pair); pre
 
 What is not killed, each equivalent or unreachable:
 
-- standing.ts (56): a reachable standing passed to `remedied` anyway (6: its switch's `default` returns it as it is);
-  the two `never` arms (4, no coverage); `bothPinned`'s `over` half (1: the draw order finds no cover in a scroll view
+- standing.ts (50): the two `never` arms (4, no coverage); `bothPinned`'s `over` half (1: the draw order finds no cover in a scroll view
   over a node in none, and a cut's flush later node is the outermost — the defence in depth ADR 0015's D87 amendment
   names); a container's cut with no `Cut.by` asked of `bothPinned` (1: `inScroller(undefined)` is undefined);
   `layer?.label` where a typed layer is defined (2); `outsideItsScrollView`'s kind (1: only `offScreen` carries
@@ -1786,4 +1787,8 @@ scoped test may import a module of a group below its own (tests/mutation/group.t
 on core's draw order and geometry, while a core test that imports standing.ts (the draw-order tests,
 eyes-views-drawn-over.test.ts, assert.test.ts) is in scene's tests too. Core is back to its pre-A25 modules and tests.
 The cold `npm run mutate -- --group scene --force`: passed in 205 s (load average 15 at its start, 45 at its end).
+The cold `npm run mutate -- --group core --force` after the split (33 modules, 7 427 mutants: core's pre-A25 set) still
+reached its 600 s bound: 7 135 of 7 427 mutants done, 236 timeouts, the load average 9 at its start (22 over five
+minutes) and 58 at its end, from other worktrees' Stryker runs. With standing.ts gone from core, that is the load's,
+not A25's; a cold core run on a quiet machine is left to the merge.
 

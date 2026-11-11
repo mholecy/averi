@@ -69,7 +69,7 @@
     "group": "scene",
     "tests": ["tests/ui-tree/standing.test.ts", "tests/ui-tree/standing-remedy.test.ts", "tests/ui-tree/presented-remedy.test.ts", "tests/ui-tree/overlaid-edge.test.ts", "tests/ui-tree/heading-listed-before.test.ts", "tests/ui-tree/keyboard-position.test.ts", "tests/ui-tree/listed-content.test.ts", "tests/interact/remedy-agreement.test.ts", "tests/verify/eyes-views-drawn-over.test.ts", "tests/verify/assert.test.ts"],
     "floor": 93,
-    "baseline": "95.41 % on 2026-11-11 (A25, joined, group scene since; `npm run mutate -- --group core --force --mutate src/ui-tree/standing.ts`, cold): 1220 mutants, 1156 killed, 8 timeouts, 50 survived, 6 without coverage (84.92 % before A25's tests), all equivalent or unreachable \u2014 ADR 0038's A25 amendment lists them"
+    "baseline": "95.90 % on 2026-11-11 (A25 review round 1: the 6 mutants of a reachable standing passed to `remedied` killed by standing-remedy.test.ts, added to the narrowed run's 95.41 %, `npm run mutate -- --group core --force --mutate src/ui-tree/standing.ts`, cold, before the scene group): 1220 mutants, 1156 + 6 killed, 8 timeouts, 44 survived, 6 without coverage (84.92 % before A25's tests), all equivalent or unreachable \u2014 ADR 0038's A25 amendment lists them; 96.23 % in the cold `--group scene --force` run (205 s, 38 timeouts under load)"
   },
   "src/ui-tree/reading-order.ts": {
     "group": "scene",
