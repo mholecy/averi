@@ -179,9 +179,10 @@ the outcome are the same with or without it. The second look's hold restarts on 
 Both wrappers are gone, and with them their two entries in tests/ui-tree/raw-tree-reads.test.ts's allowlist of raw
 `uiTree()` calls (ADR 0036): every tree read of both pollers now goes through the read seam.
 
-The one difference from the wrappers: a fake adapter whose `uiTree` throws synchronously is a failed read for the
-observer as for `readTreeOrMiss`, where the `.catch` wrapper never saw it. Real adapters are async, so no reply moves
-(golden: Changed 0 against v6). A single observer method, not timing on `PollRound` beside it, because both callers
+No behaviour moves (golden: Changed 0 against v6). The observer is told of exactly the reads the wrappers saw: the
+engine reads through ReadHandOff's watched proxy (ui-tree/read-handoff.ts), whose `async read` turns even a synchronous
+`uiTree` throw into a rejection, which the hold wrapper's `.catch` already saw; and the pixel wrapper set its start
+before calling `uiTree`, so a throw could not skip it. A single observer method, not timing on `PollRound` beside it, because both callers
 need the same fact — one fresh read as it ends — and the hold needs it for a round the predicate is never called on.
 Pinned in tests/ui-tree/read-tree.test.ts ("pollTree — the read observer"); the hold's restart by
 tests/flow/bare-tree-ladder.test.ts ("failed reads between two reads of the same screen restart the hold") and the
