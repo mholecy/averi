@@ -664,9 +664,8 @@ export const noScrollRemedyText = (remedy: NoScrollRemedy, purpose: 'touch' | 'p
  * 6. `pinned` — under a system bar or (the pixel assert) a cover, in no scroll view as the tree says
  *    (geometry.ts#Clips.inScroller false): no scroll moves it out. Under a cover it now arises only for a cover in a
  *    scroll view over a node in none, which the draw order excuses (draw-order.ts's `scrolledContent` row) save in a
- *    later screen, `presented` first — defence in depth: a hand-mutation / narrowed-run survivor of 5.'s cover half
- *    (and of the pixel assert's `pinned` words under a cover) is known (ADR 0015's D87 amendment; standing.ts is not in
- *    ADR 0038's mutation run).
+ *    later screen, `presented` first — defence in depth: 5.'s `over` half (`bothPinned`) survives the mutation run, an
+ *    equivalent mutant there (ADR 0015's D87 amendment; ADR 0038's A25 amendment, which lists this module's others).
  * 7. `stuck` — a scroll may not move it out: the tree cannot say whether it lies in a scroll view (idb's flat list,
  *    `inScroller` undefined), or — the pixel assert — it is laid from the screen's top edge under the status bar, or
  *    the cover's reach holds it whole.

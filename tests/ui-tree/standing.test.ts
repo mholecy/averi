@@ -1654,4 +1654,188 @@ describe('Scene.standing — a text in a control\'s touch margin, seen clear or 
       expect(fully.facts.marginSeen).toEqual([{ peer: byId(t, VS_TITLE), ...seen }]);
     }
   });
+
+  it('told the eyes saw another pair only: covered as by the tree alone, and nothing seen in the facts', async () => {
+    const t = await afterBack();
+    const phone = byId(t, PHONE);
+    const fully = sceneOf(t, seenOrderOf(phone, [{ peer: t, seen: 'clear', overlap: '#FFFFFF', beside: '#FFFFFF' }])).standing(phone, PIXEL, FULLY);
+    expect(said(fully)).toMatchObject({ kind: 'covered', cover: VS_TITLE });
+    expect('marginSeen' in fully.facts).toBe(false);
+  });
+});
+
+/**
+ * The facts and shapes a standing carries that its readers quote (the sentences, interact/course.ts, the far edge) —
+ * each on the smallest tree that makes it, on a 400x800 screen with no band read: which scroll view a sentence names
+ * where scroll views nest, a `fully` stop's clip by its scroll view (`ScrollViewCut`), the drawn frame, the cover
+ * judged above a keyboard line, a sliver at the screen's side.
+ */
+describe('Scene.standing — the facts its readers quote, on the smallest trees', () => {
+  const PLAIN_SCREEN = usable({ box: box(400, 800), boxes: [box(400, 800)] });
+  const root = (...children: UiNode[]): UiNode => node({ role: 'container', rect: box(400, 800), children });
+  const scroller = (identifier: string, rect: Rect, ...children: UiNode[]): UiNode => node({ role: 'container', identifier, clipsDescendants: true, rect, children });
+  const el = (identifier: string, rect: Rect, role = 'button'): UiNode => node({ role, identifier, rect });
+  const ocr: PixelPurpose = { of: 'pixel', reads: WHOLE, glyphs: true };
+
+  it('scroll views nested: the one named is the nearest whose frame leaves it — the list 100..500, not the carousel 400..600 inside it', () => {
+    const nested = (rect: Rect) => {
+      const a = el('a', rect);
+      return { t: root(scroller('list', { x: 0, y: 100, width: 400, height: 400 }, scroller('carousel', { x: 0, y: 400, width: 400, height: 200 }, a))), a };
+    };
+    const { t, a } = nested({ x: 50, y: 520, width: 100, height: 40 });
+    for (const purpose of [TAP, PLAIN] as const) expect(said(sceneOf(t).standing(a, PLAIN_SCREEN, purpose))).toEqual({ kind: 'offScreen', at: { x: 100, y: 540 }, visible: 0, scroller: 'list' });
+    expect(said(sceneOf(t).standing(a, PLAIN_SCREEN, ocr))).toEqual({ kind: 'offScreen', box: box(400, 800), scroller: 'list' });
+    // The pixel assert: what the list's edge leaves of it is a 2-px sliver, and the list is named.
+    const thin = nested({ x: 50, y: 498, width: 100, height: 50 });
+    expect(sceneOf(thin.t).standing(thin.a, PLAIN_SCREEN, ocr)).toMatchObject({ kind: 'offScreen', sliver: { x: 50, y: 498, width: 100, height: 2 }, scroller: { identifier: 'list' } });
+  });
+
+  it('scroll views that share no area: nothing of the node can be drawn — off the screen, its nearest leaving scroll view named', () => {
+    const a = el('a', { x: 50, y: 450, width: 100, height: 40 });
+    const t = root(scroller('list', { x: 0, y: 100, width: 400, height: 200 }, scroller('carousel', { x: 0, y: 400, width: 400, height: 200 }, a)));
+    expect(said(sceneOf(t).standing(a, PLAIN_SCREEN, TAP))).toEqual({ kind: 'offScreen', at: { x: 100, y: 470 }, visible: 0, scroller: 'list' });
+  });
+
+  it('a scroll view wholly below the screen: the tap judges nothing of the node drawn there — visible 0', () => {
+    const a = el('a', { x: 50, y: 950, width: 100, height: 40 });
+    expect(said(sceneOf(root(scroller('list', { x: 0, y: 900, width: 400, height: 400 }, a))).standing(a, PLAIN_SCREEN, TAP))).toEqual({ kind: 'offScreen', at: { x: 100, y: 970 }, visible: 0 });
+  });
+
+  it('two boxes (both orientations): off both, the most of it either shows; on the second, judged in that box', () => {
+    const two = usable({ box: box(400, 800), boxes: [box(400, 800), box(800, 400)] });
+    const off = el('a', { x: 0, y: 790, width: 100, height: 100 });
+    expect(said(sceneOf(root(off)).standing(off, two, TAP))).toEqual({ kind: 'offScreen', at: { x: 50, y: 840 }, visible: 0.1 });
+    const wide = el('a', { x: 600, y: 100, width: 100, height: 100 });
+    expect(sceneOf(root(wide)).standing(wide, two, TAP).facts.screen).toEqual(box(800, 400));
+  });
+
+  it('a centre exactly on idb\'s keyboard line is under it', () => {
+    const a = el('a', { x: 50, y: 580, width: 100, height: 40 });
+    expect(said(sceneOf(root(a)).standing(a, PLAIN_SCREEN, { of: 'tap', keyboardTop: idb(600) }))).toMatchObject({ kind: 'underKeyboard', top: 600 });
+  });
+
+  it('a `fully` stop clipped by its scroll view\'s edge (inside the screen): the edges, the scroll view, whether it is longer than the frame, and where its content stops short', () => {
+    const list = { x: 20, y: 100, width: 360, height: 400 };
+    const clip = (rect: Rect) => {
+      const a = el('a', rect);
+      const s = sceneOf(root(scroller('list', list, a))).standing(a, PLAIN_SCREEN, FULLY);
+      if (s.kind !== 'clipped') throw new Error(`not clipped: ${s.kind}`);
+      return s.byScrollView === undefined ? undefined : { ...s.byScrollView, scroller: s.byScrollView.scroller.identifier };
+    };
+    expect(clip({ x: 50, y: 450, width: 100, height: 100 })).toEqual({ edges: ['bottom'], scroller: 'list', stopsShort: 'after' });
+    expect(clip({ x: 50, y: 50, width: 100, height: 100 })).toEqual({ edges: ['top'], scroller: 'list', stopsShort: 'before' });
+    expect(clip({ x: 50, y: 50, width: 100, height: 500 })).toEqual({ edges: ['top', 'bottom'], scroller: 'list', longer: 'taller', stopsShort: 'both' });
+    expect(clip({ x: 350, y: 200, width: 100, height: 100 })).toEqual({ edges: ['right'], scroller: 'list', stopsShort: 'after' });
+    expect(clip({ x: 0, y: 200, width: 100, height: 100 })).toEqual({ edges: ['left'], scroller: 'list', stopsShort: 'before' });
+    expect(clip({ x: 0, y: 200, width: 400, height: 100 })).toEqual({ edges: ['left', 'right'], scroller: 'list', longer: 'wider', stopsShort: 'both' });
+    // Exactly as tall (400) or as wide (360) as the frame, clipped on one side: not longer.
+    expect(clip({ x: 50, y: 50, width: 100, height: 400 })).toEqual({ edges: ['top'], scroller: 'list', stopsShort: 'before' });
+    expect(clip({ x: 0, y: 200, width: 360, height: 100 })).toEqual({ edges: ['left'], scroller: 'list', stopsShort: 'before' });
+    // Clipped on both axes: longer on the axis it outruns — taller (clipped at a side too), wider (clipped at the top too).
+    expect(clip({ x: 300, y: 50, width: 150, height: 500 })).toEqual({ edges: ['top', 'bottom', 'right'], scroller: 'list', longer: 'taller', stopsShort: 'both' });
+    expect(clip({ x: 0, y: 50, width: 400, height: 100 })).toEqual({ edges: ['top', 'left', 'right'], scroller: 'list', longer: 'wider', stopsShort: 'both' });
+  });
+
+  it('a `fully` stop clipped where its scroll view ends at the screen\'s edge: the screen\'s cut, not the scroll view\'s — on each side', () => {
+    const clipIn = (list: Rect, rect: Rect) => {
+      const a = el('a', rect);
+      const s = sceneOf(root(scroller('list', list, a))).standing(a, PLAIN_SCREEN, FULLY);
+      return s.kind === 'clipped' ? { edges: s.edges, byScrollView: s.byScrollView?.edges } : s.kind;
+    };
+    expect(clipIn({ x: 20, y: 0, width: 360, height: 500 }, { x: 50, y: -50, width: 100, height: 100 })).toEqual({ edges: ['top'], byScrollView: undefined });
+    expect(clipIn({ x: 20, y: 100, width: 360, height: 700 }, { x: 50, y: 750, width: 100, height: 100 })).toEqual({ edges: ['bottom'], byScrollView: undefined });
+    expect(clipIn({ x: 0, y: 100, width: 380, height: 400 }, { x: -50, y: 200, width: 100, height: 100 })).toEqual({ edges: ['left'], byScrollView: undefined });
+    expect(clipIn({ x: 20, y: 100, width: 380, height: 400 }, { x: 350, y: 200, width: 100, height: 100 })).toEqual({ edges: ['right'], byScrollView: undefined });
+    // Its scroll view running past the screen's bottom: the same.
+    expect(clipIn({ x: 0, y: 100, width: 400, height: 900 }, { x: 50, y: 750, width: 100, height: 100 })).toEqual({ edges: ['bottom'], byScrollView: undefined });
+  });
+
+  it('a `fully` stop clipped at a side of its scroll view, which runs on under a keyboard line: the side is its scroll view\'s', () => {
+    const at = (rect: Rect) => {
+      const a = el('a', rect);
+      const s = sceneOf(root(scroller('list', { x: 20, y: 100, width: 380, height: 700 }, a))).standing(a, PLAIN_SCREEN, { of: 'fully', keyboardTop: wda(600) });
+      return s.kind === 'clipped' ? s.byScrollView?.edges : s.kind;
+    };
+    expect(at({ x: 0, y: 300, width: 100, height: 100 })).toEqual(['left']);
+  });
+
+  it('a `fully` stop clipped by the outer of two nested scroll views: the one whose frame does not hold it is named', () => {
+    const a = el('a', { x: 50, y: 450, width: 100, height: 100 });
+    const s = sceneOf(root(scroller('list', { x: 0, y: 100, width: 400, height: 400 }, scroller('carousel', { x: 0, y: 400, width: 400, height: 200 }, a)))).standing(a, PLAIN_SCREEN, FULLY);
+    expect(s.kind === 'clipped' && s.byScrollView?.scroller.identifier).toBe('list');
+  });
+
+  it('a stop\'s cover: judged above a keyboard line when one applies (`aboveKeyboard`), else not', () => {
+    const a = el('a', { x: 50, y: 300, width: 100, height: 100 }, 'text');
+    const t = root(a, el('b', { x: 60, y: 320, width: 80, height: 60 }));
+    const above = (s: Standing) => (s.kind === 'covered' ? s.aboveKeyboard : s.kind);
+    expect(above(sceneOf(t).standing(a, PLAIN_SCREEN, PLAIN))).toBe(false);
+    expect(above(sceneOf(t).standing(a, PLAIN_SCREEN, { of: 'stop', keyboardTop: wda(600) }))).toBe(true);
+  });
+
+  it('the drawn frame in the facts only for a node in a scroll view', () => {
+    const alone = el('a', { x: 50, y: 300, width: 100, height: 100 });
+    expect('drawn' in sceneOf(root(alone)).standing(alone, PLAIN_SCREEN, TAP).facts).toBe(false);
+    const inList = el('a', { x: 50, y: 300, width: 100, height: 100 });
+    expect(sceneOf(root(scroller('list', box(400, 800), inList))).standing(inList, PLAIN_SCREEN, TAP).facts.drawn).toEqual(box(400, 800));
+  });
+
+  it('a keyboard line at the box\'s top leaves no frame: under the keyboard, with facts of nothing shown', () => {
+    const a = el('a', { x: 50, y: 300, width: 100, height: 100 });
+    const s = sceneOf(root(a)).standing(a, PLAIN_SCREEN, { of: 'stop', keyboardTop: wda(0) });
+    expect(s).toMatchObject({ kind: 'underKeyboard' });
+    expect(s.facts).toEqual({ centre: { x: 100, y: 350 }, screen: { x: 0, y: 0, width: 400, height: 0 }, visible: 0, clipped: [], covers: [], centreExcused: [], shows: 0 });
+  });
+
+  it('a status band on a box laid lower than the screen\'s top: the band from the box\'s top to the band\'s bottom', () => {
+    const a = el('a', { x: 50, y: 50, width: 100, height: 30 }, 'text');
+    const lower = { x: 0, y: 30, width: 400, height: 770 };
+    expect(said(sceneOf(root(a)).standing(a, usable({ box: lower, boxes: [lower], statusBand: 70 }), ocr))).toMatchObject({ kind: 'systemBar', band: { x: 0, y: 30, width: 400, height: 40 } });
+  });
+
+  it('the pixel assert at the screen\'s side: 2 px left on it is a sliver, 3 px is measured; a whole element 2 px wide is measured', () => {
+    const at = (rect: Rect) => {
+      const a = el('a', rect, 'text');
+      return sceneOf(root(a)).standing(a, PLAIN_SCREEN, ocr);
+    };
+    expect(at({ x: 398, y: 300, width: 100, height: 50 })).toMatchObject({ kind: 'offScreen', sliver: { x: 398, y: 300, width: 2, height: 50 } });
+    expect(at({ x: 397, y: 300, width: 100, height: 50 }).kind).toBe('reachable');
+    expect(at({ x: 100, y: 300, width: 2, height: 50 }).kind).toBe('reachable');
+  });
+});
+
+/**
+ * The sliver cut by a node drawn after it (`cutByLater`) at its two thresholds, on a Compose-shaped dump: a strip ending
+ * where a later overlay begins (66..1014, reaching past it at both ends). The tap minimum here is 65 px.
+ */
+describe('Scene.standing — a strip under a later overlay: which node is a sliver', () => {
+  const strip = (cls: string, top: number) =>
+    parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+  <node class="${cls}" clickable="${cls.endsWith('TextView') ? 'false' : 'true'}" resource-id="strip" text="${cls.endsWith('TextView') ? 'Title' : ''}" bounds="[127,${top}][952,1956]" /><node class="android.view.View" clickable="true" resource-id="bar" bounds="[66,1956][1014,2110]"><node class="android.widget.TextView" text="Continue" bounds="[447,2000][633,2066]" /></node>
+</node></hierarchy>`);
+  const tapOn = (cls: string, top: number) => {
+    const t = strip(cls, top);
+    return sceneOf(t).standing(byId(t, 'strip'), PIXEL, TAP);
+  };
+
+  it('a role-less node 22 px tall is cut by the bar — its container the bar\'s rect; a control the same; a text is tapped as before', () => {
+    const bar = { x: 66, y: 1956, width: 948, height: 154 };
+    for (const cls of ['android.view.View', 'android.widget.Button']) {
+      const s = tapOn(cls, 1934);
+      expect([cls, s.kind === 'cut' && { depth: s.cut.depth, container: s.cut.container, by: s.cut.by?.identifier }]).toEqual([cls, { depth: 22, container: bar, by: 'bar' }]);
+    }
+    expect(tapOn('android.widget.TextView', 1934).kind).toBe('reachable');
+  });
+
+  it('a role-less node exactly the tap minimum tall (65 px) is no sliver', () => {
+    const s = tapOn('android.view.View', 1891);
+    expect(s.facts.minPiece).toBe(65);
+    expect(s.kind).toBe('reachable');
+  });
+
+  it('the colour assert on the role-less strip: covered by the overlay, never above a keyboard', () => {
+    const t = strip('android.view.View', 1934);
+    const s = sceneOf(t).standing(byId(t, 'strip'), PIXEL, COLOUR(byId(t, 'strip')));
+    expect(s.kind === 'covered' && { cover: s.cover.node.identifier, order: s.cover.order.kind, aboveKeyboard: s.aboveKeyboard }).toEqual({ cover: 'bar', order: 'overlaid', aboveKeyboard: false });
+  });
 });

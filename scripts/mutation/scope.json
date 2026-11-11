@@ -65,6 +65,24 @@
     "floor": 93,
     "baseline": "95.32 % on 2026-11-05 (D68 code review, OPPOSITE_EDGE; cold): the same survivors, none in OPPOSITE_EDGE; 95.30 % on 2026-11-03 (D55c review round 1, rectCentre moved to adapters/types.ts and re-exported here; cold): 1170 mutants, 55 survived, 0 without coverage — the same survivors, the 6 fewer mutants rectCentre's, now outside the mutated file; 95.32 % on 2026-11-03 (D59b review round 2, toldOn meets the usable screen and leaves out the keyboard's own; cold): 1175 mutants, 55 survived, 0 without coverage — the same survivors, none in toldOn; 95.29 % on 2026-11-03 (D59b review round 1, Clips.toldOn and INPUT_ROLE; cold): 1168 mutants, 55 survived, 0 without coverage — the same survivors, none in toldOn; 95.25 % on 2026-11-03 (D59b, axesOf's nested leaves out text inputs, its test in geometry-clips; cold): 1157 mutants, 55 survived, 0 without coverage — the same survivors, none in the new clause; 95.23 % on 2026-11-02 (D47, walkExtent tie under a root of no area; the root-area checks share one hasArea): 1152 mutants, 55 survived, 0 without coverage; 95.10 % on 2026-11-02 (D45): 1143 mutants, 56 survived, 0 without coverage; 49.52 % from tests/ui-tree/geometry.test.ts alone before D45. draw-order*.test.ts, in the same run, reach it too"
   },
+  "src/ui-tree/standing.ts": {
+    "group": "core",
+    "tests": ["tests/ui-tree/standing.test.ts", "tests/ui-tree/standing-remedy.test.ts", "tests/ui-tree/presented-remedy.test.ts", "tests/ui-tree/overlaid-edge.test.ts", "tests/ui-tree/heading-listed-before.test.ts", "tests/ui-tree/keyboard-position.test.ts", "tests/ui-tree/listed-content.test.ts", "tests/interact/remedy-agreement.test.ts"],
+    "floor": 93,
+    "baseline": "95.41 % on 2026-11-11 (A25, joined; `npm run mutate -- --group core --force --mutate src/ui-tree/standing.ts`, cold): 1220 mutants, 1156 killed, 8 timeouts, 50 survived, 6 without coverage (84.92 % before A25's tests), all equivalent or unreachable \u2014 ADR 0038's A25 amendment lists them"
+  },
+  "src/ui-tree/reading-order.ts": {
+    "group": "core",
+    "tests": ["tests/ui-tree/draw-order*.test.ts", "tests/ui-tree/heading-listed-before.test.ts"],
+    "floor": 86,
+    "baseline": "88.11 % on 2026-11-11 (A25, joined; `npm run mutate -- --group core --force --mutate src/ui-tree/reading-order.ts`, cold): 185 mutants, 151 killed, 12 timeouts, 22 survived, all equivalent \u2014 ADR 0038's A25 amendment lists them"
+  },
+  "src/ui-tree/later-edges.ts": {
+    "group": "core",
+    "tests": ["tests/ui-tree/later-edges.test.ts", "tests/ui-tree/overlaid-edge.test.ts"],
+    "floor": 95,
+    "baseline": "97.35 % on 2026-11-11 (A25, joined; `npm run mutate -- --group core --force --mutate src/ui-tree/later-edges.ts`, cold): 151 mutants, 144 killed, 3 timeouts, 4 survived, all equivalent \u2014 ADR 0038's A25 amendment lists them"
+  },
   "src/adapters/failure-text.ts": {
     "group": "core",
     "tests": ["tests/adapters/failure-text.test.ts"],

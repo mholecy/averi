@@ -1724,3 +1724,55 @@ The sandbox gains one entry, `!/scripts/release/`, in stryker.config.mjs's allow
 path rule admits scripts/release/. The figures above come from narrowed cold runs (`--mutate` over the four modules,
 then over the two batches, `--tempDirName reports/mutation/stryker-tmp-t24`, whose exit 1 is a narrowed run's). The cold
 full lab group took about 300 s (the reviewer measured 299 s) and exits 0.
+
+## Amendment: the Remedy precedence joins the run (2026-11-11, backlog A25)
+
+ui-tree/standing.ts decides THE REMEDY once for every verb (`remedied`): the tap, `scroll_until`'s stop and the pixel
+assert all quote it. Until now no floor held it, nor the two modules it leans on, ui-tree/reading-order.ts (which
+siblings a listing in reading order leaves untold) and ui-tree/later-edges.ts (the flush later node at each edge). All
+three join the `core` group, each with its own floor by the floor rule:
+
+| Module | Tests | Score | Floor |
+| --- | --- | --- | --- |
+| src/ui-tree/standing.ts | standing.test.ts, standing-remedy.test.ts, presented-remedy.test.ts, overlaid-edge.test.ts, heading-listed-before.test.ts, keyboard-position.test.ts, listed-content.test.ts, interact/remedy-agreement.test.ts | 95.41 % (1 220 mutants, 50 survived, 6 without coverage; 84.92 % before A25's tests) | 93 |
+| src/ui-tree/reading-order.ts | draw-order*.test.ts, heading-listed-before.test.ts | 88.11 % (185 mutants, 22 survived) | 86 |
+| src/ui-tree/later-edges.ts | later-edges.test.ts, overlaid-edge.test.ts | 97.35 % (151 mutants, 4 survived) | 95 |
+
+Scores from narrowed cold runs (`npm run mutate -- --group core --force --mutate <module>`, whose exit 1 is a narrowed
+run's). The first run of standing.ts showed its remedies untested where they matter most: the tables of
+standing.test.ts quote each standing's kind, never its remedy, so `keyboard`, `pinned`, `stuck` and `fixed` (and the
+`clipped` and `systemBar` cases of the switch) could each be emptied unnoticed. tests/ui-tree/standing-remedy.test.ts
+now pins the remedy per kind and purpose on the smallest trees; standing.test.ts gains the facts its readers quote
+(the scroll view named where scroll views nest, `ScrollViewCut`, the drawn frame, `aboveKeyboard`, the sliver at the
+screen's side, `cutByLater`'s two thresholds, `marginSeen` of another pair); presented-remedy.test.ts the words of
+`presentedLayerName` and `orderRemedyText`; draw-order-reading-order.test.ts idb's top bar against its content.
+
+What is not killed, each equivalent or unreachable:
+
+- standing.ts (56): a reachable standing passed to `remedied` anyway (6: its switch's `default` returns it as it is);
+  the two `never` arms (4, no coverage); `bothPinned`'s `over` half (1: the draw order finds no cover in a scroll view
+  over a node in none, and a cut's flush later node is the outermost — the defence in depth ADR 0015's D87 amendment
+  names); a container's cut with no `Cut.by` asked of `bothPinned` (1: `inScroller(undefined)` is undefined);
+  `layer?.label` where a typed layer is defined (2); `outsideItsScrollView`'s kind (1: only `offScreen` carries
+  `scroller`); keys spread as undefined — `cover`, `layer`, `band`, `scroller`, `longer`, `byScrollView`, `cutBy`,
+  `largest` — and a sentinel `off` word (`'wholly'`, `'outside'`) no reader tells apart (14); a drawn frame asked where none can be
+  (`drawn`/`frame` undefined in `regionPlace`, `inStopFrame`, `clippedByScrollView`: 7, the frame being then what the
+  node is judged in, or nothing of it shown, so another kind first); the whole box taken for a sliver in
+  `regionPlace` (1: a box is never as thin as the slack); `systemBands`' optional bands where a band
+  exists (2); `boxes` on a screen that fails open (2) and the pixel assert's one box (1, never read); `bandShows`'
+  covers compared where no cover changes the sum (5); the tap's piece judged again in the same frame, and its unmoved
+  arm under a cover (4); the pixel standing's own facts (3: its `sliver` and a read wholly in the status band — no
+  pixel reader reads a standing's facts); `sliverCut`'s `minPiece` (1: a sliver is only found against a minimum);
+  the stop's keyboard arm without a line (1: unreachable, the frame is then the box).
+- reading-order.ts (22): the `before` sort and the `NO_READING_ORDER` identity (6: draw-order.ts sorts `before` again
+  and never compares the object); `peerSeen`'s `untold`/`clear` arms (4: read only as `over` or `under`); the
+  peers seen under and listed before, and `coversAfter` of a peer listed before (8: draw-order.ts reads `seenUnder` and
+  `coversAfter` only of nodes listed after); `seenOver` over every overlapping peer (1: `unordered` is asked first);
+  `p.at` against `target.at` at equality and the target among its own peers (3: no sibling shares its index).
+- later-edges.ts (4): a node of no area classified (the draw order gives it no later node), and the overlay and the
+  pinned edge asked at the other two sides (no node flush across a side can reach past the node at both ends without
+  holding it), and a node in no scroll view's flush neighbours (none can be `outsideScrollView`).
+
+standing.ts's own doc no longer calls it outside this run (its `pinned` case, 6.). The cost: core's dry run takes the
+added tests (about 2 500 tests in 31 s); standing.ts's mutants run in 2.5 to 4.5 min of a narrowed run, the most of any
+core module, since every scene-building test covers them.
