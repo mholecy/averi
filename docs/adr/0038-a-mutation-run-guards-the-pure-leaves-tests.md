@@ -1531,12 +1531,12 @@ verdicts whole: outcome, rule, reply kind, and the words live.ts prints and a re
 (tests/fixtures/truth, already in the sandbox).
 
 The rest is code, each change proven identical by the rejudge. Every committed RunRecord under docs/ and tests/fixtures
-(699) was rejudged in process (live-cases.ts#rejudge) with `--groups forms` and with all six groups. Against a
+(699) was rejudged in process (`rejudge` in live-cases.ts) with `--groups forms` and with all six groups. Against a
 `git archive` of the base 4ffcf635 the output was byte-identical: 1 398 rejudges, the same sha1. The golden stays
 Changed 0.
 
 - **T17's gate** loses its two redundant conjuncts. `!holds` goes because a cut geometry never holds a `fully` stop
-  (stopHolds). `lead !== undefined` goes because replies.ts#hedgesCut, false without a lead, is now the type guard.
+  (stopHolds). `lead !== undefined` goes because `hedgesCut` in replies.ts, false without a lead, is now the type guard.
   `g !== undefined` stays for the narrowing, as an equivalent survivor.
 - **judgeCarry** reads the table's clip without a guard: it returns before that point when there is no region, and a
   region is only ever cut from the clip.
