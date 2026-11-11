@@ -81,8 +81,7 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
 
   it('a landed typing sends nothing again', async () => {
     const { io, intent, typed, dropped } = scripted();
-    // strict: an exact landing carries no `reformatted` or `focusUnread` key at all (Typed: absent when exact)
-    expect(await typeAndConfirm(io, intent)).toStrictEqual({ kind: 'landed', observed: 'Jan Novak', again: [] });
+    expect(await typeAndConfirm(io, intent)).toEqual({ kind: 'landed', observed: 'Jan Novak', again: [] });
     expect(typed).toEqual(['Jan Novak']);
     expect(dropped).toEqual([]);
   });
