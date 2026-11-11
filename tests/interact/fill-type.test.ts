@@ -637,6 +637,15 @@ describe('typeAndConfirm — an earlier text that holds the value is no landing 
  * field that holds nothing of ours, and what `whereTyped` takes for another input.
  */
 describe('typeAndConfirm — the reading withheld, a wipe of nothing, and which nodes are other inputs (T9)', () => {
+  /** `s`'s field with each screen it reads passed through `f` (none read stays none). */
+  const withScreen = (s: ReturnType<typeof scripted>, f: (tree: UiNode) => UiNode): FieldIo => ({
+    ...s.io,
+    screen: () => {
+      const tree = s.io.screen();
+      return tree === undefined ? undefined : f(tree);
+    },
+  });
+
   it('a field whose text is withheld (or not found) on two reads running is unread: two reads, nothing sent again', async () => {
     const s = scripted();
     let reads = 0;
@@ -685,15 +694,10 @@ describe('typeAndConfirm — the reading withheld, a wipe of nothing, and which 
 
   it('a non-input that echoes the typing (a live preview) is no other input: the dropped tail is still typed', async () => {
     const s = scripted({ keep: [3] });
-    const io: FieldIo = {
-      ...s.io,
-      screen: () => {
-        const tree = s.io.screen();
-        if (tree === undefined) return undefined;
-        const echo = node({ role: 'text', identifier: 'preview', rect: { x: 0, y: 80, width: 100, height: 20 }, value: tree.children[0].value });
-        return { ...tree, children: [...tree.children, echo] };
-      },
-    };
+    const io = withScreen(s, (tree) => {
+      const echo = node({ role: 'text', identifier: 'preview', rect: { x: 0, y: 80, width: 100, height: 20 }, value: tree.children[0].value });
+      return { ...tree, children: [...tree.children, echo] };
+    });
     expect(await typeAndConfirm(io, s.intent)).toEqual({ kind: 'landed', observed: 'Jan Novak', again: [{ kind: 'tail', length: 6 }] });
     expect(s.typed).toEqual(['Jan Novak', ' Novak']);
   });
@@ -701,14 +705,7 @@ describe('typeAndConfirm — the reading withheld, a wipe of nothing, and which 
   it('an input laid over the field\'s own rect is told from it by its identifier: its gain of the missing part is proof', async () => {
     const s = scripted({ keep: [3], elsewhere: (t) => t.slice(3) });
     const fieldRect = { x: 0, y: 0, width: 100, height: 20 };
-    const io: FieldIo = {
-      ...s.io,
-      screen: () => {
-        const tree = s.io.screen();
-        if (tree === undefined) return undefined;
-        return { ...tree, children: tree.children.map((c) => (c.identifier === 'o' ? { ...c, rect: fieldRect } : c)) };
-      },
-    };
+    const io = withScreen(s, (tree) => ({ ...tree, children: tree.children.map((c) => (c.identifier === 'o' ? { ...c, rect: fieldRect } : c)) }));
     expect(await typeAndConfirm(io, s.intent)).toEqual({
       kind: 'missed',
       observed: 'Jan',

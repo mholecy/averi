@@ -1577,15 +1577,15 @@ tests/interact/fill-type.test.ts. It joins the `core` group against that one tes
 
 Its floor is 91, two points under the whole number.
 
-The narrowed command exits 1 by design in a checkout with no earlier core run. checkFloors then fails on every other core
-module ("has a floor, but Stryker did not mutate it", 31 lines). It exits 0 only when the group's incremental file still
-holds those modules' last results. Read the narrowed module's own line, not the exit code.
+The narrowed command exits 1 by design in a checkout with no earlier core run. checkFloors then fails on every other
+core module ("has a floor, but Stryker did not mutate it", 31 lines). It exits 0 only when the group's incremental file
+still holds those modules' last results. Read the narrowed module's own line, not the exit code.
 
-**The poll's sleeps cost the run nothing.** `pollValue` sleeps `pollMs` between its reads through src/util/sleep.ts,
-up to five reads a poll. fill-type.test.ts mocks that module (`vi.mock`), as read-tree.test.ts and the verify tests do,
-and Stryker's vitest runner keeps the mock. The file's 55 tests take 10 ms. With the real sleep at their `pollMs: 1`
-they take 443 ms, which would be paid again by each of the 234 mutants' runs. The narrowed run takes 15 s in all, with no
-src change: the module needs no sleeper seam of its own.
+**The poll's sleeps cost the run nothing.** `pollValue` sleeps `pollMs` between its reads through src/util/sleep.ts, up
+to five reads a poll. fill-type.test.ts mocks that module (`vi.mock`), as read-tree.test.ts and the verify tests do, and
+Stryker's vitest runner keeps the mock. The file's 55 tests take 10 ms. With the real sleep at their `pollMs: 1` they
+take 443 ms, which would be paid again by each of the 234 mutants' runs. The narrowed run takes 15 s in all, with no src
+change: the module needs no sleeper seam of its own.
 
 T9 adds seven tests (one describe block). Each was checked red under its hand mutant. They pin:
 
@@ -1600,9 +1600,9 @@ T9 adds seven tests (one describe block). Each was checked red under its hand mu
 
 The 16 not killed are argued in its scope.json baseline:
 
-- untested by design (2): the landed arm's `reformatted` and `focusUnread` guards emptied to true, which add an undefined
-  key. The tests pin behaviour, not object shape (Consequences above). fill.ts, the one caller, tests both values only
-  with `!== undefined`, so it cannot tell an undefined key from an absent one.
+- untested by design (2): the landed arm's `reformatted` and `focusUnread` guards emptied to true, which add an
+  undefined key. The tests pin behaviour, not object shape (Consequences above). fill.ts, the one caller, tests both
+  values only with `!== undefined`, so it cannot tell an undefined key from an absent one.
 - equivalent (12):
   - `whereTyped`'s `unproven` emptied (4): a Whereabouts is read only as `field` or `elsewhere`.
   - `pollValue`'s `steady` on a landing or on an undefined reading (4): `steady` is never read there.
@@ -1621,7 +1621,7 @@ commit, which also held an exact-landing assertion strict (fill-type 94.02 % the
 `toEqual`, which changes only fill-type's own two key mutants.
 
 Part of the 58 s added is load, not fill-type. Its own mutants take 15 s narrowed. The timeouts outside fill-type rose
-from 17 to 34, all of the extra ones in fill-landing.ts (1 to 11) and fill-reformat.ts (1 to 9). Their mutants now also run against
-fill-type.test.ts, which reaches them through `landingOf` and `readingOf`, so their tests did change. But a second cold
-run of the same commit, in review, did not reproduce the extra timeouts: 1 in fill-landing.ts and 1 in fill-reformat.ts,
-21 in all (16 outside fill-type), in 371 s. Both runs are under T13's ~480 s line.
+from 17 to 34, all of the extra ones in fill-landing.ts (1 to 11) and fill-reformat.ts (1 to 9). Their mutants now also
+run against fill-type.test.ts, which reaches them through `landingOf` and `readingOf`, so their tests did change. But a
+second cold run of the same commit, in review, did not reproduce the extra timeouts: 1 in fill-landing.ts and 1 in
+fill-reformat.ts, 21 in all (16 outside fill-type), in 371 s. Both runs are under T13's ~480 s line.
