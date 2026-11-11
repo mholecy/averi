@@ -237,6 +237,14 @@ const withinSpec: z.ZodType<ElementSpec> = z
   })
   .pipe(elementSpecSchema);
 
+/**
+ * The platform override's keys, the source of PlatformKey (and through it of ContainerKind): a step of one or both of
+ * them is the override, `{ android?: Step; ios?: Step }`. A tuple the type is read from, so the two cannot differ.
+ */
+const PLATFORM_KEYS = ['android', 'ios'] as const;
+type PlatformKey = (typeof PLATFORM_KEYS)[number];
+const isPlatformKey = (k: string): k is PlatformKey => (PLATFORM_KEYS as readonly string[]).includes(k);
+
 /** A step nested in a container — `branch`'s arms, `optional`, a platform override — judged as any step is. */
 const nestedStep: z.ZodType<Step> = z.lazy(() => step);
 
@@ -313,10 +321,6 @@ const STEP_KINDS = {
   [K in Exclude<StepKind, PlatformKey>]: z.ZodType<Extract<Step, Record<K, unknown>>[K], z.ZodTypeDef, unknown>;
 };
 
-/** The platform override's keys: a step of one or both of them is the override, `{ android?: Step; ios?: Step }`. */
-type PlatformKey = Exclude<ContainerKind, 'branch' | 'optional'>;
-/** Every platform key, `tsc`-checked complete: the record has each PlatformKey as a key, and as that key's value. */
-const PLATFORM_KEYS: readonly string[] = Object.values({ android: 'android', ios: 'ios' } satisfies { [K in PlatformKey]: K });
 const platformOverride: z.ZodType<{ android?: Step; ios?: Step }, z.ZodTypeDef, unknown> = z
   .object({ android: nestedStep.optional(), ios: nestedStep.optional() })
   .strict();
@@ -324,66 +328,81 @@ const platformOverride: z.ZodType<{ android?: Step; ios?: Step }, z.ZodTypeDef, 
 /** What a step may be, said wherever one is not. */
 const STEP_ONE_OF = `one of: ${Object.keys(STEP_KINDS).join(', ')}, or a platform override (android and/or ios)`;
 
-/** Which schema judges a step: the platform override, one kind's (under its key), or none, and why. */
+/**
+ * How a step is judged: the schema, what it parses (the step itself, or the value under its key), where its issues sit
+ * under the step (`[]`, or `[key]`), and how its result becomes the step again — or why no schema judges it.
+ */
 type StepRoute =
-  | { kind: 'override' }
-  | { kind: 'step'; key: string; schema: z.ZodTypeAny }
-  | { kind: 'refused'; message: string };
+  | { schema: z.ZodTypeAny; input: unknown; path: string[]; wrap: (data: unknown) => Step }
+  | { refused: string };
+
+/** The platform override's route: the step parsed whole, its issues at the step, its result the step. */
+const overrideRoute = (v: unknown): StepRoute => ({
+  schema: platformOverride,
+  input: v,
+  path: [],
+  wrap: (data) => data as Step,
+});
 
 /**
  * Which schema judges this step, picked by its one key — or why none does. A step is a mapping of exactly one key
  * that names its kind, or of `android` and/or `ios` (the platform override).
  */
 function routeStep(v: unknown): StepRoute {
-  const refused = (message: string): StepRoute => ({ kind: 'refused', message });
   if (typeof v !== 'object' || v === null || Array.isArray(v)) {
-    return refused(`a step is a mapping of one key, ${STEP_ONE_OF} — received ${z.getParsedType(v)}`);
+    return { refused: `a step is a mapping of one key, ${STEP_ONE_OF} — received ${z.getParsedType(v)}` };
   }
   const keys = Object.keys(v);
-  const others = keys.filter((k) => !PLATFORM_KEYS.includes(k));
-  if (keys.length > 0 && others.length === 0) return { kind: 'override' };
-  // Beside a platform key, the one other key that is no kind either is a misspelt platform (`iOS`), not a step.
+  const others = keys.filter((k) => !isPlatformKey(k));
+  if (keys.length > 0 && others.length === 0) return overrideRoute(v);
+  // Beside a platform key, the one other key that is no kind either: a misspelt platform (`iOS`) or a misspelt step.
   if (others.length === 1 && keys.length > 1 && !Object.hasOwn(STEP_KINDS, others[0])) {
-    return refused(`unknown platform '${others[0]}': a platform override takes android and/or ios`);
+    const odd = others[0];
+    return { refused: `unknown key '${odd}' beside a platform override: a platform override takes android and/or ios` };
   }
   if (keys.length !== 1) {
     const has = keys.length === 0 ? 'none' : `${keys.length}: ${keys.join(', ')}`;
-    return refused(`a step has exactly one key, ${STEP_ONE_OF}; this one has ${has}`);
+    return { refused: `a step has exactly one key, ${STEP_ONE_OF}; this one has ${has}` };
   }
   const [key] = keys;
-  if (!Object.hasOwn(STEP_KINDS, key)) return refused(`unknown step '${key}': a step is ${STEP_ONE_OF}`);
-  return { kind: 'step', key, schema: STEP_KINDS[key as keyof typeof STEP_KINDS] };
+  if (!Object.hasOwn(STEP_KINDS, key)) return { refused: `unknown step '${key}': a step is ${STEP_ONE_OF}` };
+  return {
+    schema: STEP_KINDS[key as keyof typeof STEP_KINDS],
+    input: (v as Record<string, unknown>)[key],
+    path: [key],
+    wrap: (data) => ({ [key]: data }) as Step,
+  };
 }
 
 /**
  * A step, judged by its one key (D86): the kind it names parses the value under that key, and the kind's own issues
  * are said with their path — `steps.3.scroll_until.within.id: Expected string, received number`. Until D86 the step
  * was a `z.union` of every kind, and a wrong type inside a step's object collapsed to the union's bare
- * "Unrecognized key(s) in object: 'scroll_until'" at the step: when every member fails, zod reports one member's
- * issues, and the member it picked was not the one the step's key named. A discriminated union needs a literal field
- * to pick by, which a one-key step lacks — so the key is found here, and the step's shape (no key, several, an
+ * "Unrecognized key(s) in object: 'scroll_until'" at the step: when every member fails, zod's union reports the first
+ * member that failed only softly, and that was the platform override, the last member — its fields all optional, it
+ * failed on the unknown key alone — never the member the step's key named. A discriminated union needs a literal
+ * field to pick by, which a one-key step lacks — so the key is found here, and the step's shape (no key, several, an
  * unknown one, no mapping at all) is refused in words of its own.
  *
  * A check over a whole step belongs in validateReferences, never as a refine over this schema or a container of it: a
  * refused step's value here is z.NEVER, and a refine further up would still be handed it.
  */
-const step: z.ZodType<Step> = z.any().transform((v: unknown, ctx): Step => {
-  const route = routeStep(v);
-  if (route.kind === 'refused') {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: route.message });
-    return z.NEVER;
-  }
-  const parsed =
-    route.kind === 'override'
-      ? platformOverride.safeParse(v)
-      : route.schema.safeParse((v as Record<string, unknown>)[route.key]);
-  if (!parsed.success) {
-    const under = route.kind === 'step' ? [route.key] : [];
-    for (const issue of parsed.error.issues) ctx.addIssue({ ...issue, path: [...under, ...issue.path] });
-    return z.NEVER;
-  }
-  return route.kind === 'override' ? (parsed.data as Step) : ({ [route.key]: parsed.data } as Step);
-});
+const step: z.ZodType<Step> = z
+  // `any`, not `unknown`: a container's schema (`optional`, `branch`'s `do`) must read as Step[] on the way in too.
+  .any()
+  .transform((v: unknown, ctx): Step => {
+    const route = routeStep(v);
+    if ('refused' in route) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: route.refused });
+      return z.NEVER;
+    }
+    const parsed = route.schema.safeParse(route.input);
+    if (!parsed.success) {
+      for (const issue of parsed.error.issues) ctx.addIssue({ ...issue, path: [...route.path, ...issue.path] });
+      return z.NEVER;
+    }
+    return route.wrap(parsed.data);
+  });
 
 const configSchema = z
   .object({
@@ -774,9 +793,11 @@ type StepKind = Step extends infer S ? (S extends unknown ? keyof S : never) : n
  * `repeat:` as safe to re-run — the fail-unsafe answer to a check that exists
  * to make the decision explicit. tests/flow/config.test.ts pins that every
  * kind named here is one `childSteps` descends into, so the two lists cannot
- * drift apart.
+ * drift apart. Its schema goes in `STEP_KINDS` (the step's key routes to it);
+ * the platform keys come from `PLATFORM_KEYS`, so a new container is never a
+ * platform by accident.
  */
-export type ContainerKind = 'branch' | 'optional' | 'android' | 'ios';
+export type ContainerKind = 'branch' | 'optional' | PlatformKey;
 /** Every leaf kind a flow may repeat without consequence; `launch` decides for itself. Containers never belong here (see ContainerKind). */
 const SAFE_LEAVES = {
   tap: true,

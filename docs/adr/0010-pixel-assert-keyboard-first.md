@@ -693,11 +693,11 @@ up-front refusal is needed or possible. The engine passes the step's `within` th
 
 (c) Load-time refusals (`src/flow/config.ts`, `withinSpec`), each said as the one issue at `….scroll_until.within`,
 not the step union's bare `Unrecognized key(s) in object: 'scroll_until'` (since D86 the step is judged by its key,
-`src/flow/config.ts#routeStep`; the union and its bare message are gone): anything carrying a rect's side (`x`,
-`y`, `width`, `height` — the whole rect or one side beside a spec field) — `within takes an element spec (id, text,
-role, label) of the scroll view or of an element inside it, not a rect: a rect is device-specific`; a selector
-string, the MCP tool's other form — `within takes an element spec ({ id: … }), as the step's element does, not a
-selector string`; otherwise the element spec schema's own (`element spec needs at least one of: …`, an unknown key).
+`src/flow/config.ts#routeStep`; the union and its bare message are gone — the D86 amendment below): anything carrying
+a rect's side (`x`, `y`, `width`, `height` — the whole rect or one side beside a spec field) — `within takes an element
+spec (id, text, role, label) of the scroll view or of an element inside it, not a rect: a rect is device-specific`; a
+selector string, the MCP tool's other form — `within takes an element spec ({ id: … }), as the step's element does,
+not a selector string`; otherwise the element spec schema's own (`element spec needs at least one of: …`, an unknown key).
 
 (d) The refusal's words (`src/interact/scroll-text.ts`, `withinText`): a spec is said as a step's element is
 (`describeTarget`: `within id:"nope"`), and its absent and ambiguous refusals offer no rect, which a flow cannot give:
@@ -864,6 +864,38 @@ idb's `within` is refused `untold` before any plan (a comment at the conjunct sa
 stroke-plan.ts, scroll-rounds.ts, scroll-text.ts, target-text.ts and engine.ts are not in scripts/mutation/scope.json,
 hence the hand mutants. Mutation (core): `src/interact/within.ts` 100 % (106 mutants, narrowed cold run), floor 98 — its
 change a type and comments.
+
+## Amendment: D86 — a flow step is judged by its one key, its issues said with their path (2026-11-11)
+
+**Context.** D81's review (NIT-3): a flow step was a `z.union` of every kind, and a wrong TYPE inside a step's object
+(`within: { id: 5 }`, `within: ~`, `element: { id: 5 }`, `fully: 3`, `wait: { element: { id: 5 } }`) loaded as the
+bare `Unrecognized key(s) in object: 'scroll_until'` at the step. When every member fails, zod's union reports the
+first member that failed only softly: the platform override, the last member, whose fields are all optional, failed on
+the unknown key alone. The member the step's key named was never the one said. A discriminated union needs a literal
+field to pick by, which a one-key step lacks.
+
+**Decision.** (a) `src/flow/config.ts#routeStep` finds the step's one key and routes it: the kind's schema
+(`src/flow/config.ts#STEP_KINDS`) parses the value under that key, `android` and/or `ios` alone parse as the platform
+override, and the issues are said under the step with their path — `flows.f.steps.0.scroll_until.within.id: Expected
+string, received number`. `tsc` holds `STEP_KINDS` to Step: a key per kind, each schema yielding its member's value.
+D81 (c)'s `within` refusals stay the one issue at `….scroll_until.within`.
+
+(b) A step no schema judges is refused in words of its own, each naming what a step may be (`one of: launch, tap, …,
+or a platform override (android and/or ios)`): no mapping — `a step is a mapping of one key, … — received null`; no key
+or several — `a step has exactly one key, …; this one has none` / `… has 2: tap, timeout`; an unknown one — `unknown
+step 'tapp': a step is …` (no nearest-name guess: the repo has no such helper). The coordinator's decision, beyond the
+spec: beside a platform key, the one other key that is no kind is named — `unknown key 'iOS' beside a platform
+override: a platform override takes android and/or ios` (a misspelt platform or a misspelt step alike). The override's
+`needs android and/or ios` refinement and its noise filter went with the union: no step reaches them.
+
+(c) Valid configs parse to the same value: each member was a strict object of one required key (the override, of two
+optional ones), so a step the union accepted is exactly one member's, the very member its key now routes to, and that
+member's schema is unchanged. Measured: the 291 distinct configs the suite parsed on main replayed through the new
+schema — 253 valid ones deep-equal, 35 refusals word for word, 3 changed as intended (`tapp`, `frobnicate`, `{}`);
+`tests/flow/config.test.ts` holds every whole flow example in the docs to the steps it was written as.
+
+(d) A routed step that fails yields `z.NEVER`, and a refine over a step schema or a container of it would still be
+handed that value: a check over a whole step belongs in `validateReferences`, after the parse, not on the schema.
 
 ## Bug note
 

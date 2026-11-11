@@ -106,7 +106,8 @@ flows:
 
   // D86: a step is judged by its one key — the kind it names — and that kind's own issues are said with their path.
   // Under the union of every kind, a wrong TYPE inside a step's object collapsed to "Unrecognized key(s) in object:
-  // 'scroll_until'" at the step: zod's union reported the last member's key error.
+  // 'scroll_until'" at the step: zod's union reported the first member that failed only softly — the platform override,
+  // the last member, its fields all optional — never the member the step's key named.
   describe('a step is judged by its one key, and its own issues are said with their path (D86)', () => {
     const load = (stepYaml: string) => () => parseConfig(`app: {}\nflows:\n  f:\n    steps:\n      ${stepYaml}\n`);
     const only = (line: string) => new RegExp(`^Invalid averi\\.yaml:\\n {2}${line.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
@@ -135,7 +136,11 @@ flows:
     });
 
     it('a platform override takes android, ios or both; any other key beside them makes the step one of several keys', () => {
-      const cfg = parseConfig('app: {}\nflows:\n  f:\n    steps:\n      - { android: { tap: { id: a } }, ios: { tap: { id: i } } }\n      - ios: { swipe: { direction: up } }\n');
+      const cfg = parseConfig(
+        'app: {}\nflows:\n  f:\n    steps:\n' +
+          '      - { android: { tap: { id: a } }, ios: { tap: { id: i } } }\n' +
+          '      - ios: { swipe: { direction: up } }\n',
+      );
       expect(cfg.flows.f.steps).toEqual([{ android: { tap: { id: 'a' } }, ios: { tap: { id: 'i' } } }, { ios: { swipe: { direction: 'up' } } }]);
       expect(load('- { android: { tap: { id: x } }, tap: { id: y } }')).toThrow(only(`flows.f.steps.0: a step has exactly one key, ${ONE_OF}; this one has 2: android, tap`));
     });
@@ -149,13 +154,14 @@ flows:
       expect(load(`- { "${key}": { id: x } }`)).toThrow(only(`flows.f.steps.0: unknown step '${key}': a step is ${ONE_OF}`));
     });
 
-    it('beside a platform key, one other key that is no kind is a misspelt platform, named', () => {
-      expect(load('- { android: { tap: { id: a } }, iOS: { tap: { id: i } } }')).toThrow(
-        only("flows.f.steps.0: unknown platform 'iOS': a platform override takes android and/or ios"),
+    // A misspelt platform (`iOS`) or a misspelt step (`tapp`) beside the override: the key is named, not guessed at.
+    it.each(['iOS', 'andriod', 'tapp'])('beside a platform key, one other key that is no kind (%s) is named', (key) => {
+      expect(load(`- { ios: { tap: { id: i } }, ${key}: { tap: { id: a } } }`)).toThrow(
+        only(`flows.f.steps.0: unknown key '${key}' beside a platform override: a platform override takes android and/or ios`),
       );
-      expect(load('- { ios: { tap: { id: i } }, andriod: { tap: { id: a } } }')).toThrow(
-        only("flows.f.steps.0: unknown platform 'andriod': a platform override takes android and/or ios"),
-      );
+    });
+
+    it('beside a platform key, two unknown keys or a kind make a step of several keys', () => {
       // Two unknown keys beside it, or a kind beside it, is a step of several keys.
       expect(load('- { android: { tap: { id: a } }, iOS: { tap: { id: i } }, web: { tap: { id: w } } }')).toThrow(
         only(`flows.f.steps.0: a step has exactly one key, ${ONE_OF}; this one has 3: android, iOS, web`),
@@ -181,14 +187,22 @@ flows:
     // The repo keeps no averi.yaml of its own; its machine-readable flows are the docs' yaml examples. Every one that
     // holds whole flows (references/averi-yaml.md's are fragments, `steps: [ … ]`) parses — given an empty `app:` where
     // the example leaves it out — to the very steps it was written as.
+    type FlowExample = { app?: unknown; flows: Record<string, { steps: unknown[] }> };
+    /** A yaml example of whole flows: each flow's steps a list of mappings, not a fragment (`steps: [ … ]`). */
+    const isWholeFlowsExample = (raw: unknown): raw is FlowExample =>
+      typeof raw === 'object' &&
+      raw !== null &&
+      'flows' in raw &&
+      Object.values((raw as { flows: Record<string, { steps: unknown }> }).flows).every(
+        (f) => Array.isArray(f.steps) && f.steps.every((st) => typeof st === 'object'),
+      );
     it.each(['README.md', 'SETUP.md', 'ARCHITECTURE.md', 'skill/SKILL.md'])(
       'every flow example in %s parses to the steps it was written as',
       (doc) => {
         const md = readFileSync(new URL(`../../${doc}`, import.meta.url), 'utf8');
         const examples = [...md.matchAll(/```ya?ml\n([\s\S]*?)```/g)]
           .map((m) => { try { return parseYaml(m[1]) as unknown; } catch { return undefined; } })
-          .filter((raw): raw is { app?: unknown; flows: Record<string, { steps: unknown }> } =>
-            typeof raw === 'object' && raw !== null && 'flows' in raw && Object.values((raw as { flows: Record<string, { steps: unknown }> }).flows).every((f) => Array.isArray(f.steps) && f.steps.every((st) => typeof st === 'object')));
+          .filter(isWholeFlowsExample);
         expect(examples.length).toBeGreaterThan(0);
         for (const raw of examples) {
           const cfg = parseConfig(JSON.stringify({ app: {}, ...raw }), doc);
@@ -226,7 +240,12 @@ flows:
     });
 
     it('a valid step parses to the very value it was written as', () => {
-      const cfg = parseConfig('app: {}\nflows:\n  f:\n    steps:\n      - optional: [ { tap: { id: x, timeout: 2s } } ]\n      - android: { branch: [ { when: { element: { id: y } }, do: [ { fill: { id: z, value: v, clear: true } } ] } ] }\n');
+      const cfg = parseConfig(
+        'app: {}\nflows:\n  f:\n    steps:\n' +
+          '      - optional: [ { tap: { id: x, timeout: 2s } } ]\n' +
+          '      - android:\n' +
+          '          branch: [ { when: { element: { id: y } }, do: [ { fill: { id: z, value: v, clear: true } } ] } ]\n',
+      );
       expect(cfg.flows.f.steps).toEqual([
         { optional: [{ tap: { id: 'x', timeout: '2s' } }] },
         { android: { branch: [{ when: { element: { id: 'y' } }, do: [{ fill: { id: 'z', value: 'v', clear: true } }] }] } },
