@@ -542,7 +542,7 @@ export class Verifier {
    *
    * The loop itself is `pollTree` (ui-tree/read-tree.ts), written once
    * rather than copied per assert. What stays here
-   * is the verifier's vocabulary: a PollVerdict in, a verdict out, and
+   * is the verifier's vocabulary: an evaluator's verdict in, the poll's PollVerdict out, and
    * the per-assert timeout wording. A read no wait cures propagates from here
    * as from the pixel poll: `decided` alone applies the policy (A20).
    *
@@ -615,7 +615,8 @@ export class Verifier {
     const description = `element ${describeElementSpec(element)} is absent`;
     const run = async (): Promise<PollVerdict> => {
       // Read before polling: a viewport that cannot be read is an error, not a
-      // failed assert — absence is meaningless without a reference frame.
+      // failed assert — absence is meaningless without a reference frame. A
+      // PersistentReadError from it meets the policy in `decided`, as any read's does.
       // (Memoized by the adapter — adapters/types.ts — so this is one device
       // read per adapter, not per assert.)
       const viewport = await this.adapter.viewport();

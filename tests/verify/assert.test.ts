@@ -113,10 +113,17 @@ describe('asserts on a tree read no wait cures', () => {
     ['ocr', { element: { id: 'balance' }, ocr: { text: '1,250.00' } }],
   ] as const;
 
+  const screenshotSpec = { screenshot: { baseline: 'never-there' } } as const;
+
   it('every kind the schema has is looped here', () => {
-    // The kinds above plus `screenshot`, each a valid spec: a new kind fails here until it is added to the loop.
-    for (const [, spec] of treeKinds) expect(assertSpecSchema.safeParse(spec).success).toBe(true);
-    expect(assertSpecSchema.options).toHaveLength(5); // rect, color, ocr, element (present/text/match/error/absent), screenshot
+    // Each top-level schema option is matched by at least one spec of the loop or the screenshot test, and each spec
+    // is valid: a new kind fails here until it is added to the loop.
+    const specs = [...treeKinds.map(([, spec]) => spec), screenshotSpec];
+    for (const spec of specs) expect(assertSpecSchema.safeParse(spec).success).toBe(true);
+    const uncovered = assertSpecSchema.options
+      .map((option, i) => ({ i, covered: specs.some((spec) => option.safeParse(spec).success) }))
+      .filter(({ covered }) => !covered);
+    expect(uncovered).toEqual([]);
   });
 
   it.each(treeKinds)('%s, under persistentRead: \'fail\': fails after one read, the detail the error\'s message, and the next assert still runs', async (_kind, spec) => {
@@ -143,7 +150,7 @@ describe('asserts on a tree read no wait cures', () => {
 
   it.each([undefined, 'throw', 'fail'] as const)('screenshot, under persistentRead: %s: reads no tree, its refused capture fails it closed', async (persistentRead) => {
     const { fake, reads } = wedgedFake(0);
-    const results = await verifier(fake, persistentRead).assertAll([{ screenshot: { baseline: 'never-there' } }]);
+    const results = await verifier(fake, persistentRead).assertAll([screenshotSpec]);
     expect(results).toEqual([
       {
         description: expect.stringContaining('never-there'),
