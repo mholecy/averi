@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { everyNode, type UiNode } from '../../src/adapters/types.js';
+import type { UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
 import { seenOrderOf } from '../../src/ui-tree/seen-order.js';
-import { tagged } from '../helpers/covers.js';
+import { byId, tagged } from '../helpers/covers.js';
 import { parseDump } from '../helpers/android-dumps.js';
 
 /**
@@ -50,7 +50,6 @@ const interop = (inner: string) =>
         </node>
       </node>`);
 
-const byId = (t: UiNode, id: string): UiNode => [...everyNode(t)].find((n) => n.identifier === id)!;
 /** The eyes' answer for `tag` against `peer`, from the target's side. */
 const eyes = (target: UiNode, peer: UiNode, seen: 'over' | 'under') => seenOrderOf(target, [{ peer, seen, overlap: '#263238', own: '#43A047', other: '#263238' }]);
 /**
@@ -146,8 +145,8 @@ describe('P3 rn-banner-role: the slot container dumps as android.view.View — u
  * views-drawn-over (sub-case a), B's side: A listed BEFORE B by location (left 127 before 182, one stripe) but drawn
  * over it — by child order (A the later child) or by translationZ (A2) — each holding the other's centre. B's peer A,
  * listed before it, is untold: with no screenshot B is refused, and the eyes seeing B under A keep it refused. A's side
- * (B an untold peer, lifted when the eyes see A on top: A `Tapped`) is pinned in
- * draw-order-android-reading-order.test.ts ("a later-listed control over the target's centre in a classic run").
+ * (B an untold peer, lifted when the eyes see A on top: A `Tapped`) is pinned at the cell's geometry on the captured
+ * frame in tests/verify/eyes-views-drawn-over.test.ts (backlog D84: B, no control, became a peer when listed after A).
  */
 describe('P4 views-drawn-over, B\'s side: A listed before and drawn over it — B refused, with and without the eyes', () => {
   const cell = 'views-drawn-over';

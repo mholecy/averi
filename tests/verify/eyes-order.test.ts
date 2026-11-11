@@ -12,6 +12,8 @@ import { eyesOn, judgeOrder } from '../../src/verify/eyes.js';
 import { FakeAdapter, node } from '../helpers/fake.js';
 import { Verifier } from '../../src/verify/assert.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
+import { byId } from '../helpers/covers.js';
+import { paint as paintPng, usableOf, type Rgb } from '../helpers/pixels.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on (tests/helpers/sleep-recorder.ts), and the colour
 // assert's polls below fake the Date: only the recorded sleeps move the clock, so a budget holds the same rounds however
@@ -30,8 +32,7 @@ const file = async (name: string): Promise<Buffer> => readFile(new URL(`${IOS}/$
 const png = async (name: string) => PNG.sync.read(await file(name));
 /** A strip around a control (ui-tree/eyes.ts#AroundStrip): its rect and the edge of it against the control. */
 const strip = (x: number, y: number, width: number, height: number, against: Edge): AroundStrip => ({ rect: { x, y, width, height }, against });
-const byId = (tree: UiNode, id: string): UiNode => [...everyNode(tree)].find((n) => n.identifier === id)!;
-const USABLE = { box: { x: 0, y: 0, width: 402, height: 874 }, boxes: [{ x: 0, y: 0, width: 402, height: 874 }], oriented: { x: 0, y: 0, width: 402, height: 874 }, from: 'device' as const };
+const USABLE = usableOf({ x: 0, y: 0, width: 402, height: 874 });
 
 /** The pairs of an order question (ui-tree/eyes.ts#OrderPair) — none of a clear question's. */
 const orderPairs = (q: PairQuestion | undefined): readonly OrderPair[] => (q?.asks === 'order' ? q.pairs : []);
@@ -166,26 +167,11 @@ describe('the judge over the lab captures — W is drawn over C', () => {
 });
 
 // Synthetic: a 402x874 png at scale 1, the screen grey, W over C as on the lab's menu — then each untold shape.
-const SCREEN = [190, 190, 190] as const;
+const SCREEN: Rgb = [190, 190, 190];
 const TEAL = [0, 137, 123] as const;
 const GREEN = [52, 121, 55] as const;
-type Rgb = readonly [number, number, number];
-function paint(fills: readonly [Rect, Rgb][]): PNG {
-  const img = new PNG({ width: 402, height: 874 });
-  const put = (r: Rect, [red, g, b]: Rgb) => {
-    for (let y = r.y; y < r.y + r.height; y++)
-      for (let x = r.x; x < r.x + r.width; x++) {
-        const o = (y * 402 + x) * 4;
-        img.data[o] = red;
-        img.data[o + 1] = g;
-        img.data[o + 2] = b;
-        img.data[o + 3] = 255;
-      }
-  };
-  put({ x: 0, y: 0, width: 402, height: 874 }, SCREEN);
-  for (const [r, c] of fills) put(r, c);
-  return img;
-}
+/** A 402x874 png at scale 1, the screen grey, `fills` painted over it in order. */
+const paint = (fills: readonly (readonly [Rect, Rgb])[]): PNG => paintPng({ width: 402, height: 874 }, SCREEN, fills);
 const W = { x: 51, y: 448, width: 300, height: 64 };
 const C = { x: 51, y: 470, width: 300, height: 64 };
 const peer = node({ role: 'button', label: 'C', rect: C });

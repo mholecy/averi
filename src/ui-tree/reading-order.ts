@@ -10,18 +10,19 @@ import type { SeenOrder } from './seen-order.js';
  * (`UiNode.readingOrder`: idb's flat list, a WDA run sorted by top) — and AOSP lists a classic Android ViewGroup's
  * children by location (a uiautomator run so ordered, lab note LR4) — so a node drawn on top may be listed BEFORE the
  * node it is drawn over, and the draw order's rule "listed later = drawn later" (draw-order.ts#DrawOrder's doc) does
- * not hold there. This module is the one owner of "listed before, but drawn over" in such a listing: which siblings
- * listed before a target cover it — a heading (`headingsOver`: drawn over it, SwiftUI's pinned section header), a
- * control whose order against it the listing does not tell (`peersOf`), or, in a nested run (`listsNestedReadingOrder`:
- * WDA's), any sibling that draws there, whose order is not told either (React Native's covers, lab note LR3) — which
- * covers' order is not told, which
- * siblings a moved tap must keep clear of, and which controls listed AFTER it stay covers past the draw order's
- * reading-order break (`coversAfter`). draw-order.ts#drawOrder's `asTarget` asks it once for every question of a target
- * (`SeenFor.readingOrder`): `exposure` joins its covers to the draw order's own, the break's row
- * (`NOT_DRAWN.flatListReadingOrder`) reads `coversAfter`; it knows nothing of rows, presented layers or reaches.
+ * not hold there. This module is the one owner of "listed before or after, but drawn over or under" in such a
+ * listing: which siblings cover a target — a heading listed before it (`headingsOver`: drawn over it, SwiftUI's
+ * pinned section header), a control whose order against it the listing does not tell (`peersOf`), or, in a nested run
+ * (`listsNestedReadingOrder`: WDA's, uiautomator's classic run), any sibling listed before or after it that draws
+ * there, whose order is not told either (React Native's covers, lab note LR3; a sibling listed after, D84) — which
+ * covers' order is not told, which siblings a moved tap must keep clear of, and which controls listed AFTER it stay
+ * covers past the draw order's reading-order break (`coversAfter`). draw-order.ts#drawOrder's `asTarget` asks it once
+ * for every question of a target (`SeenFor.readingOrder`): `exposure` joins its covers to the draw order's own, the
+ * break's row (`NOT_DRAWN.flatListReadingOrder`) reads `coversAfter`; it knows nothing of rows, presented layers or
+ * reaches.
  * docs/adr/0015-flat-list-reading-order-break.md (its amendments, "covers listed before the target", "a heading
- * listed before", "a control past the break that holds the centre" and "React Native's covers listed before the
- * target")
+ * listed before", "a control past the break that holds the centre", "React Native's covers listed before the
+ * target" and "D84 — a sibling listed after the target, of any kind")
  * docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
  */
 
@@ -37,9 +38,10 @@ export interface ReadingOrderAbout {
   readonly contentFrom: number;
   readonly bottomChrome: ReadonlySet<Placed>;
   /**
-   * Whether a sibling listed before the target draws over it — the draw order's `target` column (draw-order.ts#NOT_DRAWN),
-   * the field's own floating label excused (ADR 0014's relation, draw-order.ts#ownLabelOf) — asked of the siblings
-   * `peersOf` takes past the controls, in a nested run in reading order only.
+   * Whether a sibling, listed before or after the target, draws over it — the draw order's `target` column
+   * (draw-order.ts#NOT_DRAWN) but its own-content row, the field's own floating label excused (ADR 0014's relation,
+   * draw-order.ts#ownLabelOf) — asked of the siblings `peersOf` takes past the controls, in a nested run in reading
+   * order only.
    */
   readonly drawn: (p: Placed) => boolean;
 }
@@ -143,9 +145,10 @@ function headingsOver(order: readonly Placed[], target: Placed): Placed[] {
 
 /**
  * The siblings whose ORDER against a target a listing given in reading order does not tell — two controls, as below;
- * and, in a nested run (`listsNestedReadingOrder`), any sibling listed BEFORE a target of any kind that draws there
- * (`ReadingOrderAbout.drawn`: the draw order's rows but its own-content one, a field's own floating label excused),
- * which then follows the same `before` / `unordered` / `listedBefore` rules (lab note LR3). The rest of this doc is the
+ * and, in a nested run (`listsNestedReadingOrder`), any sibling listed before OR AFTER a target of any kind that draws
+ * there (`ReadingOrderAbout.drawn`: the draw order's rows but its own-content one, a field's own floating label
+ * excused), which then follows the same `before` / `unordered` / `seenOver` / `listedBefore` rules (lab note LR3;
+ * listed after, backlog D84: the lab's views-drawn-over, ADR 0015's D84 amendment). The rest of this doc is the
  * controls'. The controls whose ORDER against a control target a listing given in reading order does not tell
  * (`listsInReadingOrder` of the target's parent, `about.target`): its siblings that are interactive and overlap it past
  * geometry.ts#PIXEL_OVERLAP_SLACK, neither holding the other whole nor of its frame (a control's own wrapper, its own
@@ -183,7 +186,8 @@ function headingsOver(order: readonly Placed[], target: Placed): Placed[] {
  *
  * …and THE ORDER SEEN (`seen`, ui-tree/seen-order.ts): a peer a screenshot saw drawn UNDER the target is no peer — not
  * in `before`, `unordered` or `listedBefore`, and, listed after it, no cover by the draw order either (`seenUnder`: the
- * screenshot overrides the listing for exactly that pair): the lab's W, seen over C. A peer seen OVER it stays the
+ * screenshot overrides the listing for exactly that pair; only a peer in play as a cover — one listed after it that
+ * holds no part of its centre stays the draw order's, D84): the lab's W, seen over C. A peer seen OVER it stays the
  * cover the listing made it, named `seenOver` instead of `unordered`: C, under W. An untold pair is as with no
  * screenshot.
  */
@@ -198,15 +202,19 @@ function peersOf(
   const t = target.node;
   if (flatList && (target.at < contentFrom || bottomChrome.has(target))) return NO_READING_ORDER;
   // A control's peers are controls, either side of it. In a NESTED run in reading order (`listsNestedReadingOrder`:
-  // WDA's run sorted by top, SwiftUI's, UIKit's and React Native's alike — not idb's flat list) a sibling listed BEFORE
-  // the target that draws over it (`drawn`: the draw order's `target` column, a field's own floating label excused) is a
-  // peer too, control or not, and of any target: React Native's covers (lab note LR3) — WDA lists RN's views by their
-  // tops, so a later sibling drawn over the target (a toast, a banner) whose top lies above the target's is listed
-  // before it (measured on the lab's rn-banner). Listed after it, the draw order already makes such a sibling a cover.
+  // WDA's run sorted by top, SwiftUI's, UIKit's and React Native's alike, uiautomator's classic run in location order —
+  // not idb's flat list) a sibling that draws over the target (`drawn`: the draw order's `target` column but its
+  // own-content row, a field's own floating label excused) is a peer too, control or not, of any target, LISTED EITHER
+  // SIDE of it: such a run lists by place, not by drawing. Listed before: React Native's covers (lab note LR3: WDA
+  // lists a later sibling drawn over the target by its top, above the target's). Listed after (D84): it may lie UNDER
+  // the target (the lab's views-drawn-over). Either way untold: held to `after`'s centre gate below, refused with no
+  // screenshot, lifted only where the eyes see the target on top (verify/eyes.ts#judgeOrder). Its own-content excuse
+  // still holds in the draw order's covers (draw-order.ts#NOT_DRAWN's `onTarget`). The capture, the guards and the
+  // residual (a non-drawing touch layer lifted: ADR 0024's residual 2 widened): ADR 0015's D84 amendment.
   // Not idb's flat list: there a modal is listed before the screen beneath it and its frame (mp-native's value date
   // picker `Value date 56,291 298x375`) over form rows measured clear (tests/verify/assert.test.ts).
   const nested = target.parent !== undefined && listsNestedReadingOrder(target.parent);
-  const peerOf = (p: Placed): boolean => (isInteractive(t) && isInteractive(p.node)) || (nested && p.at < target.at && drawn(p));
+  const peerOf = (p: Placed): boolean => (isInteractive(t) && isInteractive(p.node)) || (nested && drawn(p));
   const peers = order.filter(
     (p) =>
       p !== target &&
@@ -230,11 +238,17 @@ function peersOf(
   const before = listedBefore.some(holdsCentre) ? listedBefore : [];
   const after = kept.filter((p) => p.at > target.at && holdsCentre(p));
   const overlapping = [...before, ...after];
+  // Dropped by what was seen: only a peer in play as a cover — listed before when one listed before holds the centre,
+  // listed after when it holds it itself (D84's review: a peer clear of the centre stays the draw order's to judge,
+  // whatever a seen order says of it; no question of the target asks about it).
+  const listedBeforeAll = peers.filter((p) => p.at < target.at);
+  const beforeInPlay = listedBeforeAll.some(holdsCentre) ? listedBeforeAll : [];
+  const inPlay = [...beforeInPlay, ...peers.filter((p) => p.at > target.at && holdsCentre(p))];
   return {
     before,
     unordered: new Set(overlapping.filter((p) => !overIt(p))),
     seenOver: new Set(overlapping.filter(overIt)),
-    seenUnder: new Set(peers.filter((p) => peerSeen(p) === 'under')),
+    seenUnder: new Set(inPlay.filter((p) => peerSeen(p) === 'under')),
     listedBefore,
     coversAfter: new Set(after),
   };

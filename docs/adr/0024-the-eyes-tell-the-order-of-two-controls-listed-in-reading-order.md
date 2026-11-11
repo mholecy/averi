@@ -173,7 +173,9 @@ screenshot": "no scroll tells which is on top: a screenshot could not tell eithe
    strips and the screen beside are then pixel for pixel what an opaque control of that colour would show — the class
    of residual 7: no rule of one frame can tell it, and it reads `over`, a `Tapped` that may hit the button. Pinned as
    told (`RESIDUAL`, tests/verify/eyes-order.test.ts: the frame, and the frame and a pixel). Not measured by a lab cell
-   (a cell `presented/plain-button-over-row` would measure the common shape).
+   (a cell `presented/plain-button-over-row` would measure the common shape). Widened to non-controls since D84 (ADR
+   0015's amendment "a sibling listed after the target, of any kind"): in a nested run any sibling that draws over the
+   target is such a peer, so a touch layer that draws nothing, over a surface of that shape, reads the same way.
 3. **One unsettled capture** for the tap and `scroll_until` (the pixel assert's is settled): a frame mid-transition
    reads a blend — untold; a frame of another screen than the tree's (read before a navigation, shot after) could in
    principle mis-tell, the gap being one screenshot's latency — ADR 0013's residual for the first question.
@@ -234,3 +236,5 @@ Android (a cover listed before its target, a later JSX sibling) is refused "draw
 screenshot per tap, live and in golden. Nothing in ui-tree or verify knows Android; the frame is the device's
 screencap. One direction is unmeasured live (ADR 0015's D75 residual): a control listed AFTER the target over its
 centre, a `drawn` cover before the mark, is now an untold peer that a screenshot seeing the target on top lifts.
+Measured since (2026-11-11, D84 — ADR 0015's amendment "a sibling listed after the target, of any kind"): the
+lab's views-drawn-over, and a later-listed sibling of any kind is now such a peer; residual 2 widened to non-controls.

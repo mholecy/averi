@@ -442,4 +442,93 @@ only at a generic geometry (draw-order-android-reading-order.test.ts, the review
 views-drawn-over's B and B2 refused, A and A2 `Tapped` where the eyes see them on top; rn-banner-role's T, U and C
 `Tapped` at the centre — LR4's lie, residual 5 above, expected red. No src change. Captured 2026-11-11 (merge
 c2796759): views-banner and rn-banner-role as predicted; views-drawn-over's B and B2 refused as predicted, but A and A2
-refused too, not `Tapped` (backlog D84).
+refused too, not `Tapped` (backlog D84) (fixed: the D84 amendment below).
+
+## Amendment: a sibling listed after the target, of any kind (2026-11-11, D84)
+
+### Context
+
+The D77 capture of `views-drawn-over` (averi_lab, API 33, merge c2796759;
+tests/fixtures/truth/android-averi_lab-api33/views-drawn-over.*) measured the direction the amendment "Android Views
+list children by location" left open in its residual "A later-listed control over the target's centre … lifted when the
+eyes see the target on top" — on the cautious side. A `127,303 825x176` and A2 are drawn OVER the later-listed B
+`182,331 825x121` and B2 (child order; translationZ 8 dp), the frame showing A's own #1E88E5 (A2's #00897B) over the
+whole overlap — truth `drawn: 1`, the pixel histogram of each overlap 100 % the target's colour. Yet A and A2 were
+refused as under B / B2 "drawn over it", with no "as a screenshot shows": B, a clickable FrameLayout with no text, is no
+control (role `other`: `clickable` does not reach the tree), and `peersOf` took a non-control sibling as an untold peer
+only when listed BEFORE the target. Listed after, B stayed the draw order's `drawn` cover, which the eyes are never
+asked about. From B's side A, listed before, was the untold peer the eyes saw on top: averi called each the other's
+cover. A's `scroll_until` swiped three times and then blamed "a layout defect".
+
+### Decision
+
+In a nested run in reading order (`listsNestedReadingOrder`: WDA's run sorted by top, SwiftUI's, UIKit's and React
+Native's, uiautomator's classic run in location order), a sibling that draws over the target (`ReadingOrderAbout.drawn`:
+the draw order's `target` column but its own-content row, a field's own floating label excused) is an untold peer of a
+target of any kind, LISTED EITHER SIDE of it (reading-order.ts#peersOf: the guard `p.at < target.at` dropped). Such a
+run lists by place, not by drawing, so neither side tells which is on top. Everything else stands:
+
+- listed after, it is held to `after`'s gate: it must hold the target's centre;
+- with no screenshot it still covers, its order `untold` instead of `drawn` (still refused);
+- the eyes (ADR 0024, verify/eyes.ts#judgeOrder) decide with every guard they had: the one-colour bands
+  (`FLANK_MIN_PX`), the opacity guard, sides apart by more than ΔE00 8, and an overlap within `EYES_APART_DE` of exactly
+  one side. A sibling seen under the target is dropped (A `Tapped` at (540,391)); seen over, it is `seenOver`.
+
+The draw order's own-content excuse (draw-order.ts#NOT_DRAWN's `onTarget`) still judges a sibling listed after, in the
+covers. The idb flat list is untouched.
+A seen order drops (`seenUnder`) only a peer in play as a cover — listed before when one listed before holds the
+centre, listed after when it holds it — so a later-listed sibling clear of the centre stays the draw order's `drawn`
+cover whatever a seen order says of it (code review: defence in depth; no question of the target asks about it).
+
+This closes the later-listed half of the D75 residual above for non-controls. The direction is now measured, and averi
+reads A over B the way the frame shows it.
+
+Pinned at the cell's geometry on the committed capture (tests/verify/eyes-views-drawn-over.test.ts):
+
+- the A side with no eyes: B untold, refused, no tap point;
+- the eyes' question (overlap `182,331 770x121`);
+- the committed png: A and A2 seen over, tapped at their centres;
+- eyes answering `untold` or `under`: still refused;
+- the negatives, painted at the cell's geometry: B drawing nothing or translucent (the screen's colour around it past
+  A), B of A's own colour, and a blended overlap all stay untold;
+- a later-listed sibling that draws nothing (a touch layer `400,340 640x160`, holding A's centre) stays an untold cover
+  with no eyes. On the captured shape it leaves both pairs untold: each band meets the other cover, so it is refused.
+
+Golden (against main's base): 132 → 126 mismatches. views-drawn-over's A and A2 tap, colour and `scroll_until` go green,
+and the six rows of views.known.ts are struck. Two replies change wording with the same verdict. Both are
+rn-banner.wda's C (the bare `C.cover` View, listed after C, now untold, and the eyes see it over C — truth `seen`
+#263238, the cover's colour, `drawn` 0.188):
+
+- the tap: "drawn over it as a screenshot shows (the two are listed in reading order) … if it is a menu or a popover,
+  close it first; no scroll moves it out from under it" instead of "drawn over it … scroll_until it first";
+- the colour assert: "if it is a menu or a popover, close it first; else assert something in the element that lies clear
+  of it" instead of "scroll_until the element with `fully: true` first".
+
+Both are TRUE for that capture and the old remedy was not. The cover is C's sibling in the same run, and the tree lists
+no scroll view at all (rn-banner.wda.json: the seven Others under one screen-sized `Other`), so no scroll separates the
+two. C's tap now costs one screenshot. The same rule moves
+remedy-agreement.test.ts's synthetic Banner (an image listed after C in a reading-order run, no screenshot) from
+"under … drawn over it … scroll_until it first" to "overlapped by … which is drawn on top is not told … no scroll tells
+which is on top". Its `scroll_until` stops before any swipe instead of spending one, which is true for two siblings of
+one run. The corpus inventory (draw-order-reading-order.test.ts) gains seven untold-after pairs:
+
+- rn-banner.wda's three covers-as-targets (T.cover under T, U.cover under U, C under C.cover);
+- the screen-sized wrapper and its child of form-keyboard.wda and wda-capture-lab-form-keyboard, under the form's
+  container listed after them: the same tap point, only the order's kind moves.
+
+None gains a tap point.
+
+### Residuals of the amendment
+
+- **A later-listed sibling that draws nothing but takes touches** (an invisible touch layer, a transparent Pressable,
+  a non-control `clickable` overlay) can now be lifted. With no screenshot it covers as before. With one, the opacity
+  guard reads its bands past the target's edges and calls it untold where they show the colour around it. But where
+  what lies under those bands is a surface ending within a pixel of the layer's own edges, in a colour neither the
+  strips around it nor the screen beside show, it reads as the target on top, and the result is a false `Tapped` that
+  was a refusal. This is ADR 0024's residual 2 widened from
+  controls to non-controls. Not measured by a lab cell.
+- Every nested run pays one more screenshot per target with a later-listed non-control sibling over its centre (the
+  pairs above): a tap or a plain stop asks the eyes where the draw order answered alone before.
+- A later-listed sibling the draw order excuses as the target's own content (`onTarget`: narrower than the target, its
+  centre on it, ending above its bottom) stays excused, as before D84. A touch layer of that shape is still read as
+  content, a `Tapped` (draw-order.ts's stated residual).

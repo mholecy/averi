@@ -597,11 +597,12 @@ const ownField = (placed: Placed, { target, labelOverhang: overhang }: SeenFor):
 /**
  * `label` is the floating label of `field`, the target — ADR 0014's relation (`ownField`) seen from the field: a text
  * spanning the height of the text input the target is (`inputOf`: it, or the one it is nothing but), each edge within
- * the label overhang (`spansHeight`). Asked of a sibling listed BEFORE a field in a nested run in reading order
- * (`asTarget`'s `drawn`, reading-order.ts#peersOf): React Native lays a field after its label and draws it over it,
- * transparent — rn-field's M label `69,491 175x23` before its field's wrapper `69,492 264x20`. A text a field merely
- * lies over (a header title under a search field) spans no field's height, and a toast over a row is no text over a
- * text input: both stay covers.
+ * the label overhang (`spansHeight`). Asked of a sibling listed either side of a field in a nested run in reading
+ * order (`asTarget`'s `drawn`, reading-order.ts#peersOf; listed after since D84, ADR 0015's D84 amendment): React
+ * Native lays a field after its label and draws it over it, transparent — rn-field's M label `69,491 175x23` before
+ * its field's wrapper `69,492 264x20`. A label listed after its field is the same relation, excused as a peer too (it
+ * is then judged a cover, or not, by the draw order's own rows). A text a field merely lies over (a header title under
+ * a search field) spans no field's height, and a toast over a row is no text over a text input: both stay covers.
  */
 const ownLabelOf = (label: Placed, field: Placed, overhang: number): boolean => {
   const input = inputOf(field.node);
@@ -1335,11 +1336,13 @@ const NOT_DRAWN = {
 const ROWS: readonly Row[] = Object.values(NOT_DRAWN);
 
 /**
- * The rows a sibling listed BEFORE the target is judged by as a peer (reading-order.ts#peersOf, `asTarget`'s `drawn`):
- * every row but `onTarget`, whose own-content rule reads a narrower sibling with its centre on the target as drawn on
- * it — true of what the target carries, listed after it; a peer listed before it overlaps it apart
- * (reading-order.ts#overlapsApart: never held whole), so it is none of the target's content — a toast narrower than
- * the row it lies over stays a cover (tests/ui-tree/draw-order-rn-covers.test.ts, rn-banner edited).
+ * The rows a sibling listed either side of the target is judged by as a peer (reading-order.ts#peersOf, `asTarget`'s
+ * `drawn`; listed after since D84): every row but `onTarget`, whose own-content rule reads a narrower sibling with its
+ * centre on the target as drawn on it — true of what the target carries, listed after it; a peer listed before it
+ * overlaps it apart (reading-order.ts#overlapsApart: never held whole), so it is none of the target's content — a
+ * toast narrower than the row it lies over stays a cover (tests/ui-tree/draw-order-rn-covers.test.ts, rn-banner
+ * edited). A peer listed after it is judged by every row, `onTarget` included, when `exposure` takes the covers
+ * (`drawsOverTarget`): what the target carries stays excused there.
  */
 const PEER_ROWS: readonly Row[] = ROWS.filter((row) => row !== NOT_DRAWN.onTarget);
 
@@ -1754,10 +1757,10 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
       labelOverhang: overhang,
       orderSeen,
     };
-    // Whether a sibling listed before the target draws over it, for the listing's untold peers (reading-order.ts#peersOf):
-    // the `target` column's rows but `onTarget` (`PEER_ROWS`), judged with no reading order of its own — the order is
-    // what is being asked — and the target field's own floating label excused (`ownLabelOf`, ADR 0014's relation the
-    // other way round).
+    // Whether a sibling listed either side of the target draws over it, for the listing's untold peers
+    // (reading-order.ts#peersOf; listed after since D84): the `target` column's rows but `onTarget` (`PEER_ROWS`),
+    // judged with no reading order of its own — the order is what is being asked — and the target field's own floating
+    // label excused (`ownLabelOf`, ADR 0014's relation the other way round).
     const unordered: SeenFor = { ...base, readingOrder: NO_READING_ORDER };
     const drawn = (p: Placed): boolean => !ownLabelOf(p, target, overhang) && drawsAsPeer(p, unordered);
     return {

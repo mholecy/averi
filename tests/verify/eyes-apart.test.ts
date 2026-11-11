@@ -9,6 +9,8 @@ import { apartOfFrame } from '../../src/verify/eyes.js';
 import { Verifier } from '../../src/verify/assert.js';
 import { FakeAdapter } from '../helpers/fake.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
+import { byId } from '../helpers/covers.js';
+import { paint } from '../helpers/pixels.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on (tests/helpers/sleep-recorder.ts), and the colour
 // assert's polls below fake the Date: only the recorded sleeps move the clock, so a budget holds the same rounds however
@@ -29,7 +31,6 @@ const idbTree = async (cell: string): Promise<UiNode> => parseIdbDescribeAll(awa
 const pngOf = async (cell: string) => PNG.sync.read(await readFile(new URL(`${cell}.png`, IOS)));
 /** The simulator's screen, as the capture witnesses it (verify/capture.ts#witnessScreen): idb's tree surfaces no window rect. */
 const SCREEN = { width: 402, height: 874 };
-const byId = (tree: UiNode, id: string): UiNode => [...everyNode(tree)].find((n) => n.identifier === id)!;
 /** The question as the colour assert asks it: THE region its sampler reads (ui-tree/standing.ts#Scene.pixelRegion), on the capture. */
 const seenOf = async (cell: string, target: string) => {
   const tree = await idbTree(cell);
@@ -82,9 +83,7 @@ describe('apartOfFrame — the region against the screen beside it, on one frame
 describe('apartOfFrame — a small mark of its own on a large element is its own', () => {
   const tree = async () => idbTree('sheet-long-list');
   const white = (): PNG => {
-    const png = new PNG({ width: 1206, height: 2622 });
-    png.data.fill(255);
-    return png;
+    return paint({ width: 1206, height: 2622 }, [255, 255, 255], []);
   };
   const mark = (png: PNG, x0: number, y0: number, w: number, h: number): PNG => {
     for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) png.data.fill(0, (y * png.width + x) * 4, (y * png.width + x) * 4 + 3);
