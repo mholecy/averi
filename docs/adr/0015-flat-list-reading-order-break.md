@@ -640,7 +640,7 @@ refusal exists to prevent (ui-tree/standing.ts#bothPinnedRemedyText, `cutBy`). E
   and the same clause;
 - with the soft keyboard up and that node riding on it (interact/target-text.ts#ridingKeyboard), both name the keyboard
   first: "the soft keyboard is up (…): dismiss it first (…) — a bar riding on it goes down with it — else" and the clause.
-  Hiding the keyboard moves a riding bar even where no scroll does (interact/target-text.ts#cutByRemedy).
+  Hiding the keyboard moves a riding bar even where no scroll does (interact/target-text.ts#cutByPinnedRemedy).
 
 Golden moved 1 check, the same verdict: android text-under-bar P.id `scroll_until` now stops with 0 swipes instead of 2,
 and its words change as above. Truth puts P under pinned chrome (`under-chrome:pinned`). The tap and the text-selector

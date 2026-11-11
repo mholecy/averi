@@ -12,7 +12,7 @@ import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-s
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { describeTarget, type RefusedOnPresentElement, type Target } from './resolve.js';
 import type { SeenLook } from './keyboard-model.js';
-import { cutByRemedy, cutRemedy, cutSliverText, hideClause, hideKeyboardHow, underKeyboardText, type KeyboardUp } from './target-text.js';
+import { cutByPinnedRemedy, cutByRemedy, cutRemedy, cutSliverText, hideClause, hideKeyboardHow, underKeyboardText, type KeyboardUp } from './target-text.js';
 
 /**
  * THE tap judgement of a resolved node — the rule every tap on one shares,
@@ -343,7 +343,8 @@ function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => Judge
       const cut = cutSliverText(standing.cut, told.node.rect, standing.minPiece, keyboard?.lineY);
       const by = standing.cut.by;
       // Cut by a node drawn after it: a scroll, or (`bothPinned`, neither in a scroll view) none; at a container's edge, a scroll toward it.
-      throw new ClippedRefusal(told.refusal(`${cut} — ${advice(standing.remedy, (r) => (by === undefined ? cutAdvice(standing.cut) : cutByRemedy(by, keyboard, standing.minPiece, r)))}`));
+      const remedy = advice(standing.remedy, (r) => (by === undefined ? cutAdvice(standing.cut) : (noScrollHelps(r) ? cutByPinnedRemedy : cutByRemedy)(by, keyboard, standing.minPiece)));
+      throw new ClippedRefusal(told.refusal(`${cut} — ${remedy}`));
     }
     case 'reachable': {
       if (standing.moved === undefined) return { point: standing.at };

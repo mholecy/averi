@@ -3,7 +3,7 @@ import { cutAtLaterText } from '../ui-tree/cover.js';
 import { outsideScrollViewText, rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { clippedOutText, SIDES } from '../ui-tree/sides.js';
-import { noScrollRemedyText, type Remedy } from '../ui-tree/standing.js';
+import { noScrollRemedyText } from '../ui-tree/standing.js';
 
 /**
  * The phrases a target cut to a sliver, lying past a side, or lying under
@@ -194,18 +194,30 @@ export function ridingKeyboard(by: UiNode, keyboard: KeyboardUp | undefined, min
 }
 
 /**
- * The remedy for a node cut by a node drawn after it (`Cut.by`), as the tap's refusal and `scroll_until`'s stop and
- * bound failure say it, of its standing's `remedy` (ui-tree/standing.ts#Remedy): `scroll` — scroll the list,
- * `scroll_until it out from under that container first`; `bothPinned` (D88: neither lies in a scroll view) — no scroll,
- * THE clause every verb quotes for it (ui-tree/standing.ts#noScrollRemedyText, with the cut's way past). Either way,
- * with the soft keyboard up and that node riding on it (`ridingKeyboard`), dismiss it first
- * (`dismissKeyboardFirstText`) — a bar riding on it goes down with it, scroll view or none. Not `cutRemedy`'s scroll
- * toward the edge: the rest lies under the node, not past the edge of anything that scrolls.
+ * The remedy for a node cut by a node drawn after it (`Cut.by`) whose standing's remedy is `scroll`
+ * (ui-tree/standing.ts#Remedy), as the tap's refusal and `scroll_until`'s bound failure say it: with the soft keyboard
+ * up and that node riding on it (`ridingKeyboard`), dismiss it first, or scroll the list (`dismissKeyboardFirstText`);
+ * else scroll the list — `scroll_until it out from under that container first`. Not `cutRemedy`'s scroll toward the
+ * edge: the rest lies under the node, not past the edge of anything that scrolls.
  */
-export function cutByRemedy(by: UiNode, up: KeyboardUp | undefined, minPiece: number, remedy: Extract<Remedy, { readonly of: 'bothPinned' | 'scroll' }>): string {
+export function cutByRemedy(by: UiNode, up: KeyboardUp | undefined, minPiece: number): string {
+  return ridingFirst(by, up, minPiece, 'or', `scroll_until it out from under that ${by.role} first (${wholeThinWayPast(by)})`);
+}
+
+/**
+ * `cutByRemedy`'s for a remedy `bothPinned` (D88: neither lies in a scroll view), as the tap's refusal and
+ * `scroll_until`'s stop before any swipe say it: no scroll — THE clause every verb quotes for it
+ * (ui-tree/standing.ts#noScrollRemedyText, with the cut's way past). With the soft keyboard up and that node riding on
+ * it, dismiss it first all the same: a bar riding on it goes down with it, scroll view or none.
+ */
+export function cutByPinnedRemedy(by: UiNode, up: KeyboardUp | undefined, minPiece: number): string {
+  return ridingFirst(by, up, minPiece, 'else', noScrollRemedyText({ of: 'bothPinned' }, 'touch', by));
+}
+
+/** `way`, after "dismiss it first" (`dismissKeyboardFirstText`) and `join` when that node rides on the keyboard (`ridingKeyboard`). */
+function ridingFirst(by: UiNode, up: KeyboardUp | undefined, minPiece: number, join: 'or' | 'else', way: string): string {
   const keyboard = ridingKeyboard(by, up, minPiece);
-  const way = remedy.of === 'bothPinned' ? noScrollRemedyText(remedy, 'touch', by) : `scroll_until it out from under that ${by.role} first (${wholeThinWayPast(by)})`;
-  return keyboard === undefined ? way : `${dismissKeyboardFirstText(keyboard)} — ${remedy.of === 'bothPinned' ? 'else' : 'or'} ${way}`;
+  return keyboard === undefined ? way : `${dismissKeyboardFirstText(keyboard)} — ${join} ${way}`;
 }
 
 /**
