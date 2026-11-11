@@ -23,15 +23,15 @@ import { describe, expect, it } from 'vitest';
  *   adapters/input-text.ts, Android's `input text` control-character vocabulary, to word its refusal before any device
  *   call (input-text.ts is a leaf so interact/ does not import the Android adapter for a sentence).
  * - flow/, verify/, ui-tree/, run/ (A24): the interface module, plus ARCHITECTURE.md's named exceptions — the config
- *   (flow/config.ts, flow/tool-config.ts) takes the iOS tree-source kinds from adapters/ios-node.ts, pure, where the
- *   registry keys on them; verify/ocr.ts runs the host's OCR recognizer through adapters/exec.ts (a host process, not
+ *   (flow/config.ts, flow/tool-config.ts) reads the iOS tree source's kinds from adapters/ios-node.ts (pure; the
+ *   config chooses by platform); verify/ocr.ts runs the host's OCR recognizer through adapters/exec.ts (a host process, not
  *   a device command); verify/shot.ts encodes a raw capture through adapters/png-encode.ts (the codec split backlog A5
  *   tracks).
  *
  * Fail closed: any other adapters/ module counts as platform code, whatever its name (discovery.ts lists simctl's and
  * adb's devices; screenshot-bytes.ts is a platform's too). Adding a neutral leaf takes a deliberate entry in a row's
  * `neutral`, with its reason beside it; a platform module one file needs takes an `exceptions` entry, named in
- * ARCHITECTURE.md too.
+ * ARCHITECTURE.md too. Every layer the ORDER places above adapters/ has a row (fail closed).
  *
  * The rule is a module's direct imports: a platform module reached through another layer's module (a re-export, or a
  * module that imports it) is that layer's row to allow or refuse.
@@ -41,6 +41,13 @@ const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '../../src');
 const ADAPTERS = join(SRC, 'adapters');
 const adapter = (name: string): string => join(ADAPTERS, name);
 
+/** One importer and what it imports, with the reason the rule names it. */
+interface Edge {
+  readonly from: string;
+  readonly to: string;
+  readonly why: string;
+}
+
 interface Layer {
   /** The layer's directory under src/. */
   readonly dir: string;
@@ -49,7 +56,7 @@ interface Layer {
   /** The adapters/ modules any of its modules may import, each with its reason. */
   readonly neutral: ReadonlyMap<string, string>;
   /** One importer reading one platform module, each named in ARCHITECTURE.md with its reason. */
-  readonly exceptions: readonly { readonly from: string; readonly to: string; readonly why: string }[];
+  readonly exceptions: readonly Edge[];
 }
 
 const MCP = join(SRC, 'mcp');
@@ -67,6 +74,14 @@ const MCP_LAYER: Layer = {
   neutral: new Map([[adapter('types.ts'), TYPES]]),
   exceptions: [],
 };
+
+/** A row that allows the interface module only, plus its named `exceptions`. */
+const typesOnly = (dir: string, exceptions: readonly Edge[] = []): Layer => ({
+  dir,
+  exempt: new Map(),
+  neutral: new Map([[adapter('types.ts'), TYPES]]),
+  exceptions,
+});
 
 const INTERACT_LAYER: Layer = {
   dir: INTERACT,
@@ -87,60 +102,45 @@ const INTERACT_LAYER: Layer = {
   ],
 };
 
-const IOS_TREE_SOURCE_KINDS =
-  "the configured iOS tree source's kinds and default (`app.ios.treeSource`), pure, spelled once where the registry " +
-  'keys on them';
+const CONFIG_CHOOSES = 'pure; the config chooses by platform';
 
-const FLOW_LAYER: Layer = {
-  dir: FLOW,
-  exempt: new Map(),
-  neutral: new Map([[adapter('types.ts'), TYPES]]),
-  exceptions: [
-    { from: join(FLOW, 'config.ts'), to: adapter('ios-node.ts'), why: IOS_TREE_SOURCE_KINDS },
-    { from: join(FLOW, 'tool-config.ts'), to: adapter('ios-node.ts'), why: IOS_TREE_SOURCE_KINDS },
-  ],
-};
+const FLOW_LAYER = typesOnly(FLOW, [
+  {
+    from: join(FLOW, 'config.ts'),
+    to: adapter('ios-node.ts'),
+    why: `the iOS tree source's kinds and default, \`app.ios.treeSource\`'s enum (${CONFIG_CHOOSES})`,
+  },
+  {
+    from: join(FLOW, 'tool-config.ts'),
+    to: adapter('ios-node.ts'),
+    why: `the iOS tree source's kind, the type a tool's config answers (${CONFIG_CHOOSES})`,
+  },
+]);
 
-const VERIFY_LAYER: Layer = {
-  dir: VERIFY,
-  exempt: new Map(),
-  neutral: new Map([[adapter('types.ts'), TYPES]]),
-  exceptions: [
-    {
-      from: join(VERIFY, 'ocr.ts'),
-      to: adapter('exec.ts'),
-      why: "the host's OCR recognizer runs as a host process, not a device command",
-    },
-    {
-      from: join(VERIFY, 'shot.ts'),
-      to: adapter('png-encode.ts'),
-      why: 'a raw capture encoded on the host where a PNG leaves the process (the codec split, backlog A5)',
-    },
-  ],
-};
+const VERIFY_LAYER = typesOnly(VERIFY, [
+  {
+    from: join(VERIFY, 'ocr.ts'),
+    to: adapter('exec.ts'),
+    why: "the host's OCR recognizer runs as a host process, not a device command",
+  },
+  {
+    from: join(VERIFY, 'shot.ts'),
+    to: adapter('png-encode.ts'),
+    why: 'a raw capture encoded on the host where a PNG leaves the process (the codec split, backlog A5)',
+  },
+]);
 
-const UI_TREE_LAYER: Layer = {
-  dir: UI_TREE,
-  exempt: new Map(),
-  neutral: new Map([[adapter('types.ts'), TYPES]]),
-  exceptions: [],
-};
-
-const RUN_LAYER: Layer = {
-  dir: RUN,
-  exempt: new Map(),
-  neutral: new Map([[adapter('types.ts'), TYPES]]),
-  exceptions: [],
-};
+const UI_TREE_LAYER = typesOnly(UI_TREE);
+const RUN_LAYER = typesOnly(RUN);
 
 const LAYERS: readonly Layer[] = [MCP_LAYER, RUN_LAYER, FLOW_LAYER, INTERACT_LAYER, VERIFY_LAYER, UI_TREE_LAYER];
 
 /** ARCHITECTURE.md §2's order, top first: a module may import its own layer's and those after it. */
-const ORDER = ['mcp', 'run', 'flow', 'interact', 'verify', 'ui-tree', 'adapters'] as const;
+const ORDER: readonly string[] = ['mcp', 'run', 'flow', 'interact', 'verify', 'ui-tree', 'adapters'];
 /** The leaf every layer may import; it imports no other layer. */
 const LEAF = 'util';
 /** A layer below that a layer still may not import, each with its reason. */
-const SKIPS: readonly { readonly from: string; readonly to: string; readonly why: string }[] = [
+const SKIPS: readonly Edge[] = [
   {
     from: 'interact',
     to: 'verify',
@@ -155,13 +155,13 @@ const layerOf = (file: string): string => relative(SRC, file).split(sep)[0]!;
  * Whether `file` importing `target` breaks the order: a target in a layer above the importer's, in a layer the
  * importer skips, out of util/ into a layer, or in or out of a layer the order does not name (fail closed).
  */
-function upward(file: string, target: string): boolean {
+function againstOrder(file: string, target: string): boolean {
   const from = layerOf(file);
   const to = layerOf(target);
   if (from === to || to === LEAF) return false;
   if (from === LEAF) return true;
-  const rankFrom = ORDER.indexOf(from as (typeof ORDER)[number]);
-  const rankTo = ORDER.indexOf(to as (typeof ORDER)[number]);
+  const rankFrom = ORDER.indexOf(from);
+  const rankTo = ORDER.indexOf(to);
   if (rankFrom < 0 || rankTo < 0) return true;
   return rankTo < rankFrom || SKIPS.some((s) => s.from === from && s.to === to);
 }
@@ -200,23 +200,24 @@ const modulesOf = (dir: string): string[] =>
     .filter((f) => f.endsWith('.ts'))
     .map((f) => join(dir, f));
 
-/** Every import in `layer` that breaks it, as `importer -> target`. */
-const offending = (layer: Layer): string[] =>
-  modulesOf(layer.dir)
-    .filter((m) => !layer.exempt.has(m))
-    .flatMap((m) =>
-      importsOf(m)
-        .filter((target) => breaks(layer, m, target))
-        .map((target) => `${rel(m)} -> ${rel(target)}`),
-    );
-
-/** Every src/ import that breaks the order, as `importer -> target`. */
-const againstTheOrder = (): string[] =>
-  modulesOf(SRC).flatMap((m) =>
+/** Every import of `modules` that `breaksRule` refuses, as `importer -> target`. */
+const edgesWhere = (modules: readonly string[], breaksRule: (file: string, target: string) => boolean): string[] =>
+  modules.flatMap((m) =>
     importsOf(m)
-      .filter((target) => target.startsWith(SRC + sep) && upward(m, target))
+      .filter((target) => breaksRule(m, target))
       .map((target) => `${rel(m)} -> ${rel(target)}`),
   );
+
+/** Every import in `layer` that breaks its adapters/ row. */
+const offending = (layer: Layer): string[] =>
+  edgesWhere(
+    modulesOf(layer.dir).filter((m) => !layer.exempt.has(m)),
+    (m, target) => breaks(layer, m, target),
+  );
+
+/** Every src/ import that breaks the order. */
+const againstTheOrder = (): string[] =>
+  edgesWhere(modulesOf(SRC), (m, target) => target.startsWith(SRC + sep) && againstOrder(m, target));
 
 const ORDER_TITLE = `dependencies point one way only: ${ORDER.join(' → ')}, ${LEAF}/ a leaf (ARCHITECTURE.md §2, A24)`;
 describe(ORDER_TITLE, () => {
@@ -231,23 +232,24 @@ describe(ORDER_TITLE, () => {
         .map((d) => `src/${d} is not in ARCHITECTURE.md §2's order — place it in ORDER (and the doc) or move its modules`)
         .join('; '),
     ).toEqual([]);
+    // Overlaps the two above on purpose: they name what is wrong; this one also catches a placed layer gone missing.
     expect(entries.map((e) => e.name).sort()).toEqual([...placed].sort());
   });
 
   it('the check sees what it guards: down and into util/ pass; up, a skip, out of util/ or an unplaced layer fail', () => {
-    expect(upward(join(MCP, 'tools.ts'), join(RUN, 'verify.ts'))).toBe(false);
-    expect(upward(join(FLOW, 'engine.ts'), join(VERIFY, 'capture.ts'))).toBe(false);
-    expect(upward(join(UI_TREE, 'geometry.ts'), adapter('types.ts'))).toBe(false);
-    expect(upward(adapter('ios.ts'), join(SRC, 'util', 'sleep.ts'))).toBe(false);
-    expect(upward(join(VERIFY, 'shot.ts'), join(VERIFY, 'png.ts'))).toBe(false);
+    expect(againstOrder(join(MCP, 'tools.ts'), join(RUN, 'verify.ts'))).toBe(false);
+    expect(againstOrder(join(FLOW, 'engine.ts'), join(VERIFY, 'capture.ts'))).toBe(false);
+    expect(againstOrder(join(UI_TREE, 'geometry.ts'), adapter('types.ts'))).toBe(false);
+    expect(againstOrder(adapter('ios.ts'), join(SRC, 'util', 'sleep.ts'))).toBe(false);
+    expect(againstOrder(join(VERIFY, 'shot.ts'), join(VERIFY, 'png.ts'))).toBe(false);
 
-    expect(upward(adapter('ios.ts'), join(UI_TREE, 'geometry.ts'))).toBe(true);
-    expect(upward(join(VERIFY, 'eyes.ts'), join(INTERACT, 'resolve.ts'))).toBe(true);
-    expect(upward(join(RUN, 'verify.ts'), join(MCP, 'tools.ts'))).toBe(true);
-    expect(upward(join(INTERACT, 'resolve.ts'), join(VERIFY, 'eyes.ts'))).toBe(true);
-    expect(upward(join(SRC, 'util', 'sleep.ts'), adapter('types.ts'))).toBe(true);
-    expect(upward(join(SRC, 'cli', 'main.ts'), adapter('types.ts'))).toBe(true);
-    expect(upward(join(VERIFY, 'eyes.ts'), join(SRC, 'cli', 'main.ts'))).toBe(true);
+    expect(againstOrder(adapter('ios.ts'), join(UI_TREE, 'geometry.ts'))).toBe(true);
+    expect(againstOrder(join(VERIFY, 'eyes.ts'), join(INTERACT, 'resolve.ts'))).toBe(true);
+    expect(againstOrder(join(RUN, 'verify.ts'), join(MCP, 'tools.ts'))).toBe(true);
+    expect(againstOrder(join(INTERACT, 'resolve.ts'), join(VERIFY, 'eyes.ts'))).toBe(true);
+    expect(againstOrder(join(SRC, 'util', 'sleep.ts'), adapter('types.ts'))).toBe(true);
+    expect(againstOrder(join(SRC, 'cli', 'main.ts'), adapter('types.ts'))).toBe(true);
+    expect(againstOrder(join(VERIFY, 'eyes.ts'), join(SRC, 'cli', 'main.ts'))).toBe(true);
   });
 
   it('a planted source is read end to end: its upward imports, in any form, are the ones flagged', () => {
@@ -262,7 +264,7 @@ describe(ORDER_TITLE, () => {
       `import '../mcp/tools.js';`,
     ].join('\n');
     const flagged = importsIn(file, source)
-      .filter((target) => upward(file, target))
+      .filter((target) => againstOrder(file, target))
       .map(rel);
     expect(flagged).toEqual(['interact/resolve.ts', 'flow/engine.ts', 'mcp/tools.ts']);
   });
@@ -281,6 +283,13 @@ describe(ORDER_TITLE, () => {
 
 const TITLE = 'a layer above adapters/ imports only the adapters/ modules its row allows (ARCHITECTURE.md, A16, A18, A24)';
 describe(TITLE, () => {
+  it('every layer the order places above adapters/ has a row', () => {
+    const rows = LAYERS.map((layer) => layerOf(layer.dir));
+    const missing = ORDER.filter((name) => name !== 'adapters' && !rows.includes(name));
+    expect(missing, `${missing.join(', ')}: no adapters/ row in this test's LAYERS — add one`).toEqual([]);
+    expect([...rows].sort()).toEqual(ORDER.filter((name) => name !== 'adapters').sort());
+  });
+
   it('the check sees what it guards: the composition root imports the platform adapters, each of them flagged', () => {
     expect(modulesOf(MCP)).toContain(COMPOSITION_ROOT);
     const platform = importsOf(COMPOSITION_ROOT)
