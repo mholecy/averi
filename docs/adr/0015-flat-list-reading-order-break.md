@@ -46,10 +46,10 @@ The row is `ui-tree/draw-order.ts`'s `flatListReadingOrder`, and only the `targe
 5. **React Native's role-carrying container leaves LR4's lie on Android** (D75 round 1, not narrowed by the owner;
    numbered 2026-11-11, D85; the amendment "Android Views list children by location" below, its React Native role
    residual): a View whose accessibility role React Native dumps as `android.view.View` (`toolbar`, `alert`, `header`,
-   `tablist`, …) reads as a node provider's host, so the uiautomator parser marks nothing under it, and a target with
-   its later-drawn cover inside it keeps the location order as draw order — the lab's rn-banner-role (D77, captured
-   live 2026-11-11): every tap `Tapped` at the centre, on the cover, every colour assert passing on the cover. A false
-   `Tapped`, the unsafe direction; no remedy (not narrowed).
+   `tablist`, …) reads as a node provider's host (android.ts#providesNodes), so the uiautomator parser marks nothing
+   under it, and a target with its later-drawn cover inside it keeps the location order as draw order — the lab's
+   rn-banner-role (D77, captured live 2026-11-11): every tap `Tapped` at the centre, on the cover, every colour assert
+   passing on the cover. A false `Tapped`, the unsafe direction; no remedy (not narrowed).
 
 ## Amendment: covers listed before the target (2026-10-19, round 8)
 
@@ -414,15 +414,11 @@ is AOSP's, every classic ViewGroup's).
   (tests/ui-tree/draw-order-android-reading-order.test.ts, the review's repro). Where AOSP's listing is location order
   that is right (the listing says nothing of Z); where the eyes misjudge, it is a false `Tapped` that was a refusal.
   Backlog D77 asks for a classic cell whose target is truly drawn over a later-listed control.
-- **React Native maps some accessibility roles to the className `android.view.View`** (verified in the lab app's
+- **React Native's roles that dump as `android.view.View`: residual 5 above.** The roles (verified in the lab app's
   react-native 0.88.0, ReactAndroid/…/uimanager/ReactAccessibilityDelegate.kt, `AccessibilityRole.getValue`, set by
   `setRole` only when a role is given): `none` (given explicitly), `link`, `summary`, `header`, `alert`, `combobox`,
   `menu`, `menubar`, `menuitem`, `progressbar`, `radiogroup`, `scrollbar`, `tab`, `tabbar`, `tablist`, `timer`,
-  `toolbar`. Such a view dumps like a node provider's host (android.ts#providesNodes), so its own children and
-  everything under it stay unmarked: an RN container with one of those roles holding a target and its cover keeps
-  LR4's lie (a `Tapped` on the cover). A view with such a role as a CHILD (a toast with `role="alert"`) does not unmark
-  its parent's run. Not narrowed (the owner's decision, D75 round 1); backlog D77 asks for an RN banner cell whose
-  container carries such a role. Measured live 2026-11-11 (rn-banner-role) and numbered residual 5 above (D85).
+  `toolbar`. A view with such a role as a CHILD (a toast with `role="alert"`) does not unmark its parent's run.
 - Every marked run pays what WDA's does (this ADR's second residual and the LR3 amendment's third): two overlapping
   siblings that are really drawn in list order — a badge over an avatar, a label laid over its field — ask the eyes,
   and are refused where a screenshot cannot tell them apart. The lab's classic-Views twin of rn-banner is not built
@@ -444,6 +440,6 @@ residual, not the mark. Their predictions are pinned against synthetic dumps at 
 only at a generic geometry (draw-order-android-reading-order.test.ts, the review's repro: A `[40,1000][540,1200]`, B
 `[200,1050][900,1150]`), not the cell's. Predicted: views-banner's T, U and C refused, with the eyes or without;
 views-drawn-over's B and B2 refused, A and A2 `Tapped` where the eyes see them on top; rn-banner-role's T, U and C
-`Tapped` at the centre — LR4's lie, that amendment's React Native role residual (residual 5 above), expected red. No src change. Captured
-2026-11-11 (merge c2796759): views-banner and rn-banner-role as predicted; views-drawn-over's B and B2 refused as
-predicted, but A and A2 refused too, not `Tapped` (backlog D84).
+`Tapped` at the centre — LR4's lie, residual 5 above, expected red. No src change. Captured 2026-11-11 (merge
+c2796759): views-banner and rn-banner-role as predicted; views-drawn-over's B and B2 refused as predicted, but A and A2
+refused too, not `Tapped` (backlog D84).
