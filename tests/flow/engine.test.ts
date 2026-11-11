@@ -1799,6 +1799,20 @@ flows:
       expect(fake.swipes).toHaveLength(0);
       expect(fake.taps).toHaveLength(0);
     });
+
+    // D80: the named list IS on this screen, but the keyboard (its top at 1100) leaves it 54 of its height — no room for
+    // a swipe. Not an absent interstitial: skipping it would run on as if the list had been scrolled. An earlier step
+    // hides the keyboard, so the flow fails naming that — said as its own reason, not "no screen cures".
+    it('noRoom (the keyboard over the named list): fails the flow, not skipped — no swipe sent, nothing after it run, the way out a step that hides the keyboard', async () => {
+      const fake = new FakeAdapter({ s: withAfter(BOUNDED) }, 's');
+      fake.attachKeyboard({ state: 'shown', frame: { x: 0, y: 1100, width: 1080, height: 1120 } }, 'shown');
+      const run = FlowEngine.run(optionalScroll('{ element: { id: lab.scroll-bounded.O }, within: { id: lab.scroll-bounded.S } }'), fake, FAST, { flow: 'f' });
+      await expect(run).rejects.toThrow(
+        'optional step not skipped: its within names a scroll view on this screen with no room to swipe it, which an earlier step must make — scroll_until id:"lab.scroll-bounded.O" stopped before any swipe — within id:"lab.scroll-bounded.S" names the scroll view 0,1046 1080x495, which has no room for a swipe down: the keyboard covers it from y 1100, leaving 54 of its height, under the 80 a swipe needs — hide the keyboard in an earlier step (a fill with dismissKeyboard: true, or a tap on a neutral element), or swipe the screen so more of the scroll view shows, then scroll_until it again',
+      );
+      expect(fake.swipes).toHaveLength(0);
+      expect(fake.taps).toHaveLength(0);
+    });
   });
 
   // D81 review round 1, MINOR-2: a flow names elements by spec — the exhausted reply's way into a list it never swiped

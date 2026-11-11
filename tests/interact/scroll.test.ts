@@ -1470,3 +1470,21 @@ describe('scrollUntilVisible — the remedy form of a failure naming the list be
     await expect(failure).rejects.not.toThrow('"x":');
   });
 });
+
+/**
+ * D80: a `within` whose scroll view the keyboard leaves no room in, through the driver with the keyboard oracle as the
+ * Android adapter reads it (the IME's frame, its top at 1100, over all of `lower` but 54 of its height): stopped before
+ * any swipe — before D80 the stroke fell back to the screen whole, touching down at (540,880), on `upper`.
+ */
+describe('scrollUntilVisible — a named scroll view with no room under the keyboard (D80)', () => {
+  it('the MCP tool\'s rect: no swipe sent, a WithinRefusedError `noRoom`, the way out a tap that hides the keyboard', async () => {
+    const fake = new FakeAdapter({ s: parseDump(await readFile(new URL('../fixtures/truth/android-averi_lab-api33/scroll-bounded.xml', import.meta.url), 'utf8')) }, 's');
+    fake.attachKeyboard({ state: 'shown', frame: { x: 0, y: 1100, width: 1080, height: 1120 } }, 'shown');
+    const failure = scrollUntilVisible(fake, 'id:lab.scroll-bounded.O', { ...FAST, maxSwipes: 4, within: { x: 0, y: 1046, width: 1080, height: 495 } });
+    await expect(failure).rejects.toThrow(
+      'scroll_until id:lab.scroll-bounded.O stopped before any swipe — within {"x":0,"y":1046,"width":1080,"height":495} names the scroll view 0,1046 1080x495, which has no room for a swipe down: the keyboard covers it from y 1100, leaving 54 of its height, under the 80 a swipe needs — hide the keyboard (tap a neutral element such as the screen title), or swipe the screen so more of the scroll view shows, then scroll_until it again',
+    );
+    await expect(failure).rejects.toMatchObject({ name: 'WithinRefusedError', refused: 'noRoom' });
+    expect(fake.swipes).toHaveLength(0);
+  });
+});

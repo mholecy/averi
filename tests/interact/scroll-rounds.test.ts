@@ -4,7 +4,7 @@ import { everyNode, type Rect, type Stroke, type UiNode } from '../../src/adapte
 import { ElementNotFoundError, describeTarget } from '../../src/interact/resolve.js';
 import { round, SETTLE_CONFIRM_READS, startRounds, type RoundRead, type RoundRules } from '../../src/interact/scroll-rounds.js';
 import { boundText, describeScrollResult, scrollFailure, WITHIN_REMEDY } from '../../src/interact/scroll-text.js';
-import { WithinRefusedError } from '../../src/interact/within.js';
+import { WithinRefusedError, type WithinRefusal } from '../../src/interact/within.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { node } from '../helpers/fake.js';
@@ -3353,5 +3353,68 @@ describe('round — `within`, the scroll view named for the strokes until the ta
     const played = play({ ...ANDROID, within: 'id:nope' }, [{ error: 'dump failed' }, { tree }]);
     expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stop']);
     expect(played.outcome).toMatchObject({ kind: 'within', swipes: 0 });
+  });
+
+  /**
+   * D80 (ADR 0010's D78 residual 1): a named scroll view the keyboard leaves no room in for a stroke — a keyboard whose
+   * top lies at 1100 over `lower` (1046–1541), 54 of its height left, under the 80 a stroke needs — stops `within`,
+   * `noRoom`, rather than stroke the gesture box whole, whose touch-down lies on `upper` (540,788) or anything else.
+   */
+  const HIGH_IME = coverOver({ x: 0, y: 1100, width: 1080, height: 1120 });
+  const NO_ROOM_RECT =
+    'names the scroll view 0,1046 1080x495, which has no room for a swipe down: the keyboard covers it from y 1100, leaving 54 of its height, under the 80 a swipe needs';
+
+  it.each([
+    ['its rect', LOWER, 'within {"x":0,"y":1046,"width":1080,"height":495}'],
+    ['a selector of a row inside it', 'id:lab.scroll-bounded.S', 'within id:lab.scroll-bounded.S'],
+  ] as const)('named by %s, with the keyboard over all but 54 of it: stopped before any swipe, `noRoom` — no stroke over the gesture box whole', (_, within, said) => {
+    const tree = parseDump(BOUNDED);
+    const played = play({ ...ANDROID, maxSwipes: 6, timeoutMs: 15_000, within }, [{ tree, cover: HIGH_IME }]);
+    expect(strokesOf(played)).toEqual([]);
+    expect(played.outcome).toEqual({ kind: 'within', swipes: 0, within, refused: { of: 'noRoom', rect: LOWER, toward: 'down', room: 54, keyboardTop: 1100 } });
+    const error = failureOf(played, 'id:lab.scroll-bounded.O');
+    expect(error).toBeInstanceOf(WithinRefusedError);
+    expect((error as WithinRefusedError).refused).toBe('noRoom');
+    expect(error.message).toBe(
+      `scroll_until id:lab.scroll-bounded.O stopped before any swipe — ${said} ${NO_ROOM_RECT} — hide the keyboard (tap a neutral element such as the screen title), or swipe the screen so more of the scroll view shows, then scroll_until it again`,
+    );
+  });
+
+  it('…the same keyboard with no `within`: the largest scroller (`upper`, clear of it) is stroked as before — nothing stops', () => {
+    const tree = parseDump(BOUNDED);
+    const played = play({ ...ANDROID, maxSwipes: 1, timeoutMs: 15_000 }, [{ tree, cover: HIGH_IME }, { tree, cover: HIGH_IME }]);
+    expect(strokesOf(played).map((st) => st.box)).toEqual([UPPER]);
+    expect(played.outcome).toMatchObject({ kind: 'bound' });
+  });
+
+  it('…the keyboard up after a swipe inside it: the next round stops, after that swipe — judged every round, where the plan judges room', () => {
+    const tree = parseDump(BOUNDED);
+    const played = play({ ...ANDROID, maxSwipes: 6, timeoutMs: 15_000, within: LOWER }, [{ tree }, { tree, cover: HIGH_IME }]);
+    expect(strokesOf(played).map((st) => st.box)).toEqual([LOWER]);
+    expect(played.outcome).toMatchObject({ kind: 'within', swipes: 1, refused: { of: 'noRoom', room: 54, keyboardTop: 1100 } });
+    expect(failureOf(played, 'id:lab.scroll-bounded.O').message).toMatch(/^scroll_until id:lab\.scroll-bounded\.O stopped after 1 swipe, without swiping further — within \{"x":0,"y":1046,"width":1080,"height":495\} names the scroll view 0,1046 1080x495, which has no room/);
+  });
+
+  it('…a flow\'s (the spec form, D81): its way out names a step that hides the keyboard, and no rect', () => {
+    const tree = parseDump(BOUNDED);
+    const within = { id: 'lab.scroll-bounded.S' };
+    const played = play({ ...ANDROID, maxSwipes: 6, timeoutMs: 15_000, within }, [{ tree, cover: HIGH_IME }]);
+    const outcome = played.outcome as Exclude<NonNullable<Played['outcome']>, { kind: 'visible' }>;
+    expect(scrollFailure(outcome, 'id:lab.scroll-bounded.O', 'spec').message).toBe(
+      `scroll_until id:lab.scroll-bounded.O stopped before any swipe — within id:"lab.scroll-bounded.S" ${NO_ROOM_RECT} — hide the keyboard in an earlier step (a fill with dismissKeyboard: true, or a tap on a neutral element), or swipe the screen so more of the scroll view shows, then scroll_until it again`,
+    );
+  });
+
+  it('…no keyboard, too little of it on screen: said as the length on screen; cut by what is drawn over it: said as such; sideways: its width', () => {
+    const named = (rect: Rect, refused: Partial<Extract<WithinRefusal, { of: 'noRoom' }>>): string =>
+      failureOf({ steps: [], outcome: { kind: 'within', swipes: 0, within: rect, refused: { of: 'noRoom', rect, toward: 'down', room: 0, ...refused } } } as unknown as Played, 'id:x').message;
+    const R: Rect = { x: 0, y: 2160, width: 1080, height: 400 };
+    expect(named(R, { room: 60 })).toBe(
+      'scroll_until id:x stopped before any swipe — within {"x":0,"y":2160,"width":1080,"height":400} names the scroll view 0,2160 1080x400, which has no room for a swipe down: 60 of its height lies on the screen, under the 80 a swipe needs — swipe the screen so more of the scroll view shows, then scroll_until it again',
+    );
+    expect(named(R, { room: 80 })).toContain('which has no room for a swipe down: what is drawn over it leaves too little of the 80 of its height on the screen — swipe');
+    expect(named(R, { room: 120 })).toContain('which has no room for a swipe down: what is drawn over it leaves too little of the 120 of its height on the screen — swipe the screen');
+    expect(named(R, { room: 300, keyboardTop: 2400 })).toContain('which has no room for a swipe down: the keyboard covers it from y 2400, and what is drawn over it leaves too little of the 300 of its height left — hide the keyboard');
+    expect(named(R, { toward: 'right', room: 60 })).toContain('which has no room for a swipe right: 60 of its width lies on the screen, under the 80 a swipe needs — swipe the screen');
   });
 });

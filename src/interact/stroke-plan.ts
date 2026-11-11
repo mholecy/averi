@@ -317,6 +317,26 @@ export interface StrokePlan {
   readonly presented: PresentedTouchDown | undefined;
   /** The memory to keep whatever becomes of the stroke — held for a confirming read, held back at a bound, or sent (then through `strokeSent`). */
   readonly memory: StrokeMemory;
+  /**
+   * D80: the scroll view the caller named (`within`) — and every one nested in it — leaves no room for this stroke,
+   * before a read has found the target: the stroke is NOT to be sent (scroll-rounds.ts stops `within`, its refusal
+   * `noRoom`), since its fallback, the gesture box whole, may touch down on another scroll view than the one named.
+   * Undefined otherwise — none named, the target found, a stroke over the screen box (`StrokeAsk.screenBox`), no gesture box.
+   */
+  readonly noRoom: NamedNoRoom | undefined;
+}
+
+/**
+ * What a named scroll view had of room when it had none (`StrokePlan.noRoom`): its `rect`, the stroke's `toward`, and
+ * `room`, its length along the stroke on the gesture box — above the keyboard's top (`keyboardTop`, said only when the
+ * keyboard cuts that part) for a vertical stroke; 0 when none of it lies there. Under MIN_STROKE_BOX, or at least it
+ * and cut under it by what is drawn over the scroll view (`overlayTop`).
+ */
+export interface NamedNoRoom {
+  readonly rect: Rect;
+  readonly toward: Direction;
+  readonly room: number;
+  readonly keyboardTop?: number;
 }
 
 /**
@@ -370,7 +390,20 @@ export function planStroke(memory: StrokeMemory, { toward, reach: turnsReach, ge
     ...(m.target === undefined && m.named !== undefined && read !== undefined && { named: candidates[0] }),
   };
   const chosenAt = points === undefined ? undefined : { ...points.from };
-  return { stroke, presented, memory: close({ ...planned, chosen: room === undefined ? undefined : { ...room.scrollView }, chosenAt, roomless: room?.roomless ?? [] }) };
+  // D80: no room in the named scroll view nor any nested in it — the gesture box whole is no stroke of the one named.
+  const noRoom = room === undefined && gesture !== undefined && screenBox !== true && m.target === undefined && m.named !== undefined ? roomOfNamed(m.named.rect, gesture, toward, kept) : undefined;
+  return { stroke, presented, memory: close({ ...planned, chosen: room === undefined ? undefined : { ...room.scrollView }, chosenAt, roomless: room?.roomless ?? [] }), noRoom };
+}
+
+/** `StrokePlan.noRoom` of the named scroll view `rect`: its length along a stroke `toward` on `gesture`, above a keyboard whose top is `keyboardTop` (vertical strokes only, as `roomIn` judges). */
+function roomOfNamed(rect: Rect, gesture: Rect, toward: Direction, keyboardTop: number | undefined): NamedNoRoom {
+  const said = { rect: { ...rect }, toward };
+  const met = rectIntersection(gesture, rect);
+  if (met === undefined) return { ...said, room: 0 };
+  if (axisOf(toward) !== 'vertical') return { ...said, room: met.width };
+  const bottom = met.y + met.height;
+  if (keyboardTop === undefined || keyboardTop >= bottom) return { ...said, room: met.height };
+  return { ...said, room: Math.max(0, keyboardTop - met.y), keyboardTop };
 }
 
 /**

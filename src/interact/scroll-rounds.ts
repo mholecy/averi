@@ -261,7 +261,9 @@ export type RoundStep =
  *   scroll container than a stroke of this call no longer than the next reveal carried it (flush-check.ts#FlushAim, D68):
  *   another swipe would most likely push that side out past the container, so none is sent.
  * - `within`: the caller's `within` (D78) names no scroll view to stroke on the scroll's first read that read
- *   (interact/within.ts#WithinRefusal) — no swipe sent, whatever that read held of the target.
+ *   (interact/within.ts#WithinRefusal) — no swipe sent, whatever that read held of the target; or (D80) the scroll
+ *   view it names has no room for the round's stroke while no read has found the target (`noRoom`, the stroke plan's)
+ *   — that stroke not sent.
  * - `changed`: the screen changed under the strokes (ui-tree/read-tree.ts#ScreenChange) — the
  *   first read after them is another screen than the read before them; no
  *   stop is judged on it and no further stroke sent, whether the target is
@@ -320,8 +322,12 @@ export type ScrollOutcome = (
       presented?: PresentedTouchDown;
     }
   | { kind: 'changed'; swipes: number; change: ScreenChange; found: boolean }
-  /** D78: the caller's `within` names no scroll view to stroke (interact/within.ts#WithinRefusal) — stopped at the first read that read, before any swipe. */
-  | { kind: 'within'; swipes: 0; within: Within; refused: WithinRefusal }
+  /**
+   * D78: the caller's `within` names no scroll view to stroke (interact/within.ts#WithinRefusal) — stopped at the first
+   * read that read, before any swipe; or, D80, the one it names has no room for the next stroke (`noRoom`), at any
+   * round before a read finds the target — after the swipes sent so far.
+   */
+  | { kind: 'within'; swipes: number; within: Within; refused: WithinRefusal }
 ) & { detent?: DetentMove; endTurn?: EndTurn };
 
 /**
@@ -1252,6 +1258,12 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // view of that layer's own (a search inside a sheet's list) is sent. A screen presented by shape alone is still
   // stroked over for a target not in the tree: it has nothing to ask on behalf of. One question of the scene, at the
   // touch-down of the points as sent (the plan's `presented`, ui-tree/standing.ts#Scene.presentedAt).
+  // THE NAMED SCROLL VIEW WITHOUT ROOM (D80): the plan found no room for this stroke in the scroll view `within` names
+  // nor in any nested in it (the keyboard over it, too little of it on screen) — its fallback, the gesture box whole,
+  // may touch down on another scroll view, and the reply would read as the named one's. Stopped, the stroke not sent;
+  // judged every round where the plan judges room, so a keyboard up after a swipe stops the next. A bound above wins:
+  // no stroke would be sent then either.
+  if (plan.noRoom !== undefined && s.rules.within !== undefined) return stop(s, { kind: 'within', swipes: s.swipes, within: s.rules.within, refused: { of: 'noRoom', ...plan.noRoom } });
   if (plan.presented !== undefined) {
     return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, viewport, next: plan.presented }, current === 'settle' && presentedBefore, seen.elapsedMs);
   }
