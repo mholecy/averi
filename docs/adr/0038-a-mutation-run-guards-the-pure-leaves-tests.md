@@ -1629,8 +1629,10 @@ fill-reformat.ts, 21 in all (16 outside fill-type), in 371 s. Both runs are unde
 ## Amendment: judgeCarry's view filter is equivalent after all (2026-11-11, backlog D83)
 
 D83 gives judgeCarry's carry past its window a move: a stroke counts only when it moved the table down by more than the
-slack (`MOVE_SLACK` in live-visibility.ts), beside the window test. Without it, a row taller than its region and over
-both its edges read as carried past by a stroke that moved nothing. That takes back what T21's amendment said of the
+slack (`MOVE_SLACK` in live-visibility.ts), beside the window test. Without it L, the carry row (`CARRY.tag` in
+live-visibility.ts), when taller than its region and over both its edges, read as carried past by a stroke that moved
+nothing. The window test alone implies a move of more than the region's height less L's, so the conjunct matters only
+when L is as tall as its region give or take the slack; the lab's 64-pt row never is. That takes back what T21's amendment said of the
 view filter. Its counterexample, another view's still stroke read as a carry past a narrow window, moves nothing, so the
 move test rules it out too. Another view's stroke that moves more than the slack is judgeScroll's R-direction before
 the carry is read, a LOUD stop too, and one back by no more than the slack is no turn. The filter's two mutants are
@@ -1640,6 +1642,13 @@ now argued equivalent in the scope.json baseline. The counterexample's test stay
 | --- | --- | --- | --- |
 | scripts/truth/live-visibility.ts | 98.37 % (1 470 mutants, 23 survived, 1 without coverage) | 98.24 % (1 476 mutants, 25 survived, 1 without coverage) | 96 |
 
-The move conjunct's 6 new mutants are all killed. Every committed RunRecord (698 under docs/truth/live-records, 3 under
-tests/fixtures) rejudges byte-identically against a `git archive` of fa817c29, with `--groups forms` and with all six
-groups.
+The move conjunct's 6 new mutants are all killed. The cold lab group ran in 270 s, every module at or above its floor.
+
+Every committed RunRecord rejudges byte-identically against a `git archive` of fa817c29, with `--groups forms` and with
+all six groups: 1 402 rejudges. The runner counted as a record each JSON file with a `results` array: 698 under
+docs/truth/live-records (10 JSON files there are not records) and 3 under tests/fixtures
+(live-android-carousel-d68-d59-synthetic.json, live-android-forms-b11-kf-floated.json and
+live-android-forms-b10-kf-docked.json), 701 in all. T21 counted 699 with 696 under docs/truth/live-records. No record was
+added or removed since T21's base 4ffcf635 (only D74's scripts), so the two extra are a counting rule: two files have
+no `platform` (android-hint-everywhere-e726c77-asserts.json and android-hint-everywhere-9fa59ae-asserts.json), most
+likely left out by T21's count. They rejudge identically here too.

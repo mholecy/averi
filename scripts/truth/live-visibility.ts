@@ -918,10 +918,13 @@ export function judgeCarry(reply: string, state: LabState, start: LabState): Liv
   if (verdict.outcome === 'MISMATCH' || f0 === undefined || region === undefined) return verdict;
   const o0 = start.offsets?.[CARRY.view] ?? 0;
   const top = (o: number) => f0.y - (o - o0);
+  // The view filter is kept for intent: equivalent since D83 (another view's stroke that moves is judgeScroll's first).
   const strokes = strokesSince(state, start).filter((s) => s.view === CARRY.view);
   const turned = strokes.filter((s) => s.to < s.from - MOVE_SLACK);
-  // A move as well as the window test: L taller than its region and over both its edges is below its bottom and above
-  // its top at once, where a stroke that moved nothing carried nothing (D83).
+  // A move as well as the window test (D83). The window test alone implies a move of more than region.height −
+  // f0.height, so the move conjunct matters only when L is as tall as its region give or take the slack (f0.height >
+  // region.height − MOVE_SLACK): over both its edges it is below its bottom and above its top at once, and a stroke
+  // that moved nothing would read as a carry past. On every shorter row (the lab's) it changes nothing.
   const past = strokes.filter((s) => s.to - s.from > MOVE_SLACK && top(s.from) + f0.height > region.y + region.height && top(s.to) < region.y);
   // The table's clip is there: a region (showRegion) is only ever cut from it.
   const touched = touchTurns(state, start, start.scrollViews![CARRY.view]!);
