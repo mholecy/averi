@@ -870,11 +870,11 @@ default display's block move there, as `defaultDisplayFocus`, which answers the 
 window components. `android-chooser.ts#chooserInFocus` keeps the judgement this ADR decided: the activity's line
 decides when it names one, the window's only when it does not, and only the platform's chooser is named.
 
-The focus line had two regexes, the focused window's hash for `parseFocusedWindow` and its component here. They are
-one, `CURRENT_FOCUS_RE`. The two did not read every line alike: the hash reader took any `Window{<hash> ` record, the
+The focus line had two regexes, the focused window's hash for `parseFocusedWindow` and its component here. They are one,
+`CURRENT_FOCUS_RE`. The two did not read every line alike: the hash reader took any `Window{<hash> ` record, the
 component reader only `Window{<hash> u<user> <pkg>/<class>}`. Every captured line has the user token, so no fixture
 decides between them, and the one reader keeps both answers (tests/adapters/android-wm.test.ts pins the record with no
-user token and a block whose first focus line is a title). Since A22 the lab's `--check` no longer reads src's `chooserInFocus` (its own reader, above), so the move touches
-no lab judgement. The chooser's replies are byte for byte, and its display
-rule, display 0's block, is unchanged: A27 did not merge it with the window manager's other two (ADR 0038's A27
-amendment says why).
+user token and a block whose first focus line is a title). Since A22 the lab's `--check` no longer reads src's
+`chooserInFocus` (its own reader, above), so the move touches no lab judgement. The chooser's replies are byte for byte,
+and its display rule, display 0's block, is unchanged: A27 did not merge it with the window manager's other two (ADR
+0038's A27 amendment says why).
