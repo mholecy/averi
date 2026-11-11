@@ -225,7 +225,7 @@
     "group": "lab",
     "tests": ["tests/truth/batch/lab-lines.test.ts", "tests/truth/batch/ios-lab.test.ts"],
     "floor": 98,
-    "baseline": "100 % on 2026-11-05 (T2 batch-13 fixes: disconnectArgv, disconnectWarning, idbFailText; cold): 283 mutants, 0 survived; 100 % on 2026-11-05 (T2 S6b code review: the one hand-line builder, freshIn moved to io.ts; cold, final): 272 mutants, 0 survived; superseded: 100 % on 2026-11-05 (T2 S6b review round 1, cold): 283 mutants, 1 timeout (counted killed), 0 survived"
+    "baseline": "100 % on 2026-11-11 (T23 jdk17Of: JAVA_HOME, java_home, the JVM folder; narrowed --mutate lab-lines.ts,lab-build.ts): 326 mutants, 0 survived; 100 % on 2026-11-05 (T2 batch-13 fixes: disconnectArgv, disconnectWarning, idbFailText; cold): 283 mutants, 0 survived; 100 % on 2026-11-05 (T2 S6b code review: the one hand-line builder, freshIn moved to io.ts; cold, final): 272 mutants, 0 survived; superseded: 100 % on 2026-11-05 (T2 S6b review round 1, cold): 283 mutants, 1 timeout (counted killed), 0 survived"
   },
   "scripts/truth/batch/ios-lab.ts": {
     "group": "lab",
@@ -243,7 +243,7 @@
     "group": "lab",
     "tests": ["tests/truth/batch/lab-build.test.ts", "tests/truth/batch/lab-batch.test.ts"],
     "floor": 98,
-    "baseline": "100 % on 2026-11-05 (T2 batch-13 fixes: checkDevice joins the readying's warning and the build's; cold): 273 mutants, 0 survived; 100 % on 2026-11-05 (T2 S6b code review: checkDevice, GradleCall, the stop's reason; cold, final): 266 mutants, 0 survived; superseded: 100 % on 2026-11-05 (T2 S6b review round 2, cold): 241 mutants, 0 survived"
+    "baseline": "100 % on 2026-11-11 (T23 the JDK lookup wired, its line; narrowed --mutate lab-lines.ts,lab-build.ts): 276 mutants, 0 survived; 100 % on 2026-11-05 (T2 batch-13 fixes: checkDevice joins the readying's warning and the build's; cold): 273 mutants, 0 survived; 100 % on 2026-11-05 (T2 S6b code review: checkDevice, GradleCall, the stop's reason; cold, final): 266 mutants, 0 survived; superseded: 100 % on 2026-11-05 (T2 S6b review round 2, cold): 241 mutants, 0 survived"
   },
   "scripts/truth/batch/lab-run.ts": {
     "group": "lab",

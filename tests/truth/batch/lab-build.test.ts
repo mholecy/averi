@@ -113,7 +113,7 @@ describe('the Android build (batch-11.sh:298, 308–314): JDK 17, gradlew assemb
     const run = runOf(world);
     const r = await need(b, ANDROID_BUILD_NEED).check(needCtx(run, LAB_UDID, { PATH: '/bin', ANDROID_HOME: '/sdk' }));
     const apk = join(repo, APK_PATH);
-    expect(r).toEqual({ ok: true, how: `built from the checkout under test (${apk}); its assets/cells.json main's; the Gradle daemon stopped` });
+    expect(r).toEqual({ ok: true, how: `built from the checkout under test (${apk}) under JDK 17: ${join(dir, 'jdk17')} (from java_home); its assets/cells.json main's; the Gradle daemon stopped` });
     const cwd = join(repo, 'fixtures/apps/android');
     const log = join(dir, 'lab', 'android-build.log');
     const env = { PATH: '/bin', ANDROID_HOME: '/sdk', JAVA_HOME: join(dir, 'jdk17') };
@@ -140,6 +140,27 @@ describe('the Android build (batch-11.sh:298, 308–314): JDK 17, gradlew assemb
     expect(bare.seen.find((s) => s.words.endsWith('assembleDebug'))?.env).toEqual({ JAVA_HOME: join(dir, 'jdk17') });
   });
 
+  it('T23: JAVA_HOME when it is a JDK 17 (java_home never asked); else java_home; else the JVM folder\'s first *.jdk saying 17 — the line names which', async () => {
+    const own = join(dir, 'own17');
+    mkdirSync(own);
+    writeFileSync(join(own, 'release'), 'JAVA_VERSION="17.0.19"\n');
+    const run = runOf(world);
+    const r = await need(labBuild(), ANDROID_BUILD_NEED).check(needCtx(run, LAB_UDID, { JAVA_HOME: own }));
+    expect(r).toMatchObject({ ok: true, how: expect.stringContaining(`under JDK 17: ${own} (from JAVA_HOME);`) });
+    expect(run.seen.some((s) => s.words.startsWith(JAVA_HOME))).toBe(false);
+    expect(run.seen.find((s) => s.words.endsWith('assembleDebug'))?.env).toEqual({ JAVA_HOME: own });
+    // The agent's sandbox: java_home finds none, the JDK is installed in the JVM folder (zulu-17.jdk on the owner's host).
+    fresh({ buildFails: 'java' });
+    const jvms = join(dir, 'jvms');
+    const zulu = join(jvms, 'zulu-17.jdk', 'Contents', 'Home');
+    mkdirSync(zulu, { recursive: true });
+    writeFileSync(join(zulu, 'release'), 'JAVA_VERSION="17.0.12"\n');
+    const sandboxed = runOf(world);
+    const s = await need(labBuild({ jvms }), ANDROID_BUILD_NEED).check(needCtx(sandboxed, LAB_UDID, { JAVA_HOME: '' }));
+    expect(s).toMatchObject({ ok: true, how: expect.stringContaining(`under JDK 17: ${zulu} (from JavaVirtualMachines);`) });
+    expect(sandboxed.seen.find((c) => c.words.endsWith('assembleDebug'))?.env).toEqual({ JAVA_HOME: zulu });
+  });
+
   it('a build that fails: --stop still called after it, then not met naming its log', async () => {
     fresh({ buildFails: 'gradlew' });
     const run = runOf(world);
@@ -154,10 +175,14 @@ describe('the Android build (batch-11.sh:298, 308–314): JDK 17, gradlew assemb
     expect(r).toMatchObject({ ok: true });
     expect(steps).toEqual(['WARN lab android: gradlew --stop: exit 1 no daemon — the Gradle daemon may still be running']);
     fresh({ buildFails: 'java' });
-    expect(await need(labBuild(), ANDROID_BUILD_NEED).check(needCtx())).toEqual({ ok: false, why: 'no JDK 17 (java_home -v 17 → nothing: exit 1 Unable to find any JVMs matching version "17")' });
+    const jvms = join(dir, 'jvms');
+    expect(await need(labBuild({ jvms }), ANDROID_BUILD_NEED).check(needCtx())).toEqual({
+      ok: false,
+      why: `no JDK 17 (JAVA_HOME unset; java_home -v 17 → nothing: exit 1 Unable to find any JVMs matching version "17"; ${jvms}: no *.jdk)`,
+    });
     fresh();
     writeFileSync(join(dir, 'jdk17', 'release'), 'JAVA_VERSION="21"\n');
-    expect(await need(labBuild(), ANDROID_BUILD_NEED).check(needCtx())).toMatchObject({ ok: false, why: expect.stringContaining('its release says no 17') });
+    expect(await need(labBuild({ jvms }), ANDROID_BUILD_NEED).check(needCtx())).toMatchObject({ ok: false, why: expect.stringContaining('its release says no 17') });
     fresh();
     rmSync(join(repo, APK_PATH), { force: true });
     const noApk = await need(labBuild(), ANDROID_BUILD_NEED).check(needCtx(async (cmd, args, call) => (args.includes('assembleDebug') ? { code: 0, timedOut: false, signal: null, out: '', err: '' } : runOf(world)(cmd, args, call))));

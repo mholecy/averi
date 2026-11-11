@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { APK_PATH, isDeviceCheckSimulator } from '../lab-device.js';
 import type { CallResult, Run } from './bounded.js';
 import { CELLS_ENTRY, UNZIP_SECS } from './lab-emu.js';
-import { CATALOG_PATH, cellsWhy, javaHomeOf, NOT_REBUILT, REBUILT, RERUN_HINT, type Opened } from './lab-lines.js';
+import { CATALOG_PATH, cellsWhy, jdk17Of, jdkLine, JVM_DIR, NOT_REBUILT, REBUILT, RERUN_HINT, type Opened } from './lab-lines.js';
 import type { Block, LastStep, Need, NeedCtx, NeedSpec } from './runner.js';
 import { NO_UDID, type NeedResult } from './runner-lines.js';
 import { exitText, failedCall, nameInLine } from './words.js';
@@ -12,7 +12,7 @@ import { exitText, failedCall, nameInLine } from './words.js';
  * block names — `ios-build`, `android-build` — so a build that fails makes every block needing it INCONCLUSIVE naming
  * why (the runner's need rule), and a block that does not need it runs on the app already installed: main's catalog
  * `--check`ed first, once for both (S3's not-ported row: a stale cells.json builds nothing); the iOS build (xcodegen,
- * xcodebuild) and the Android build (`gradlew assembleDebug` under JDK 17), each a bounded step logged in the lab
+ * xcodebuild) and the Android build (`gradlew assembleDebug` under JDK 17: lab-lines.ts#jdk17Of, T23), each a bounded step logged in the lab
  * folder, its product's cells.json main's; then `gradlew --stop`, after every Android build: the Gradle daemon leaves
  * the call's group by design, so S2's group kill cannot reach it. xcodebuild needs no pkill: its group ends with it
  * (S2). The devices' needs (ios-lab.ts, android-lab.ts) install this run's build (`built`) before their cells check;
@@ -127,10 +127,12 @@ const failedText = (what: string, r: CallResult, log: string): string => `${what
 
 /**
  * The lab builds. Each need checks main's catalog first (one `catalog.ts --check` for the run, from the checkout under
- * test), then builds; met, its product's cells.json is main's. `alive`: the product still there.
+ * test), then builds; met, its product's cells.json is main's. `alive`: the product still there. `jvms`: the folder the
+ * JDK lookup tries last (JVM_DIR; a test's own).
  */
-export function labBuild(o: { secs?: number } = {}): LabBuild {
+export function labBuild(o: { secs?: number; jvms?: string } = {}): LabBuild {
   const secs = o.secs ?? BUILD_SECS;
+  const jvms = o.jvms ?? JVM_DIR;
   let catalog: Promise<string | undefined> | undefined;
   const built: { ios?: string; android?: string } = {};
   const failed = new Map<string, string>();
@@ -167,7 +169,14 @@ export function labBuild(o: { secs?: number } = {}): LabBuild {
   const android = async (c: NeedCtx): Promise<NeedResult> => {
     const stale = await catalogFresh(c);
     if (stale !== undefined) return { ok: false, why: `${stale} — nothing built` };
-    const checked = javaHomeOf(await c.bounded(JAVA_HOME, ['-v', '17'], { secs: JAVA_HOME_SECS }), (home) => c.fs.read(join(home, 'release')));
+    // JAVA_HOME, else java_home, else the JVM folder (T23: java_home finds none inside the agent's sandbox).
+    const checked = await jdk17Of({
+      javaHomeEnv: c.config.env.JAVA_HOME,
+      javaHome: () => c.bounded(JAVA_HOME, ['-v', '17'], { secs: JAVA_HOME_SECS }),
+      jvms,
+      list: (d) => c.fs.list(d),
+      release: (home) => c.fs.read(join(home, 'release')),
+    });
     if ('why' in checked) return { ok: false, why: checked.why };
     const cwd = join(c.config.repo, 'fixtures/apps/android');
     const log = join(c.labDir, 'android-build.log');
@@ -190,7 +199,7 @@ export function labBuild(o: { secs?: number } = {}): LabBuild {
     const why = cellsWhy(failedCall(cells) ? undefined : cells.out, catalogText(c), 'the built APK');
     if (why !== undefined) return { ok: false, why };
     built.android = apk;
-    return { ok: true, how: `built from the checkout under test (${nameInLine(apk)}); its ${CELLS_ENTRY} main's; the Gradle daemon stopped` };
+    return { ok: true, how: `built from the checkout under test (${nameInLine(apk)}) under ${jdkLine(checked)}; its ${CELLS_ENTRY} main's; the Gradle daemon stopped` };
   };
 
   const stillThere = (product: () => string | undefined) => async (c: NeedCtx): Promise<NeedResult> => {

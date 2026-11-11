@@ -1,8 +1,9 @@
+import { join } from 'node:path';
 import type { Point } from '../../../src/adapters/types.js';
 import { isDeviceCheckSimulator } from '../lab-device.js';
 import type { CallResult } from './bounded.js';
 import { HAND_PREFIX, LAB_WDA_PORT, RESTORE_LABEL, shellQuote } from './ios-defaults.js';
-import { exitText, failedCall, firstLineOf, verdictLine } from './words.js';
+import { exitText, failedCall, firstLineOf, nameInLine, verdictLine } from './words.js';
 
 /**
  * The lab plumbing's pure half (T2 S6b; ios-lab.ts, android-lab.ts and lab-build.ts hold the calls and the files):
@@ -184,15 +185,68 @@ export function cellsWhy(installed: string | undefined, catalog: string | undefi
 
 // -------------------------------------------------------------------------------------------- the builds
 
-/**
- * `java_home -v 17` and the home's release file (read through `release`, only once there is a home): the JDK 17's
- * home, or why there is none (batch-11.sh:309–310).
- */
-export function javaHomeOf(r: CallResult, release: (home: string) => string | undefined): { home: string } | { why: string } {
-  const home = failedCall(r) ? '' : r.out.trim();
-  if (home === '') return { why: `no JDK 17 (java_home -v 17 → nothing${failedCall(r) ? `: ${exitText(r)}` : ''})` };
-  const said = release(home);
-  if (said === undefined) return { why: `no JDK 17 (java_home -v 17 → '${home}', its release file not read)` };
-  if (!/^JAVA_VERSION="17/m.test(said)) return { why: `no JDK 17 (java_home -v 17 → '${home}', its release says no 17)` };
-  return { home };
+/** Where a JDK 17 is looked for last (T23): macOS's folder of installed JDKs, each `<name>.jdk/Contents/Home`. */
+export const JVM_DIR = '/Library/Java/JavaVirtualMachines';
+
+/** Where the JDK 17 was found: JAVA_HOME, `java_home -v 17`, or the JVM folder. */
+export type JdkFrom = 'JAVA_HOME' | 'java_home' | 'JavaVirtualMachines';
+
+/** What the JDK lookup asks (T23), each answer injected: lab-build.ts gives the config's env, the call, the batch fs. */
+export interface JdkProbes {
+  /** JAVA_HOME as the env says it (empty: unset). */
+  javaHomeEnv: string | undefined;
+  /** `java_home -v 17`, asked only when JAVA_HOME is no JDK 17. */
+  javaHome(): Promise<CallResult>;
+  /** The JVM folder (JVM_DIR; a test's own). */
+  jvms: string;
+  /** A folder's entries ([] when unreadable). */
+  list(dir: string): string[];
+  /** A home's release file, or undefined when it cannot be read. */
+  release(home: string): string | undefined;
 }
+
+/** A JDK's release file says it is 17: `JAVA_VERSION="17"` or `"17.…"`, on a line of its own. */
+export const says17 = (release: string): boolean => /^JAVA_VERSION="17[."]/m.test(release);
+
+/** One candidate home: undefined when its release says 17, else why not. */
+const not17 = (home: string, release: (home: string) => string | undefined): string | undefined => {
+  const said = release(home);
+  if (said === undefined) return 'its release file not read';
+  return says17(said) ? undefined : 'its release says no 17';
+};
+
+/**
+ * The JDK 17 for the Android build (batch-11.sh:309–310; T23): JAVA_HOME when its release says 17; else
+ * `java_home -v 17`'s home, its release checked; else the first `*.jdk` in the JVM folder, sorted, whose
+ * `Contents/Home/release` says 17 — `java_home` finds nothing inside the agent's sandbox although the JDK is installed.
+ * Each source asked only when the one before it failed. The home and its source, or why none — each source tried and
+ * what it said.
+ */
+export async function jdk17Of(p: JdkProbes): Promise<{ home: string; from: JdkFrom } | { why: string }> {
+  const tried: string[] = [];
+  const env = p.javaHomeEnv ?? '';
+  if (env === '') tried.push('JAVA_HOME unset');
+  else {
+    const why = not17(env, p.release);
+    if (why === undefined) return { home: env, from: 'JAVA_HOME' };
+    tried.push(`JAVA_HOME '${env}': ${why}`);
+  }
+  const r = await p.javaHome();
+  const home = failedCall(r) ? '' : r.out.trim();
+  if (home === '') tried.push(`java_home -v 17 → nothing${failedCall(r) ? `: ${exitText(r)}` : ''}`);
+  else {
+    const why = not17(home, p.release);
+    if (why === undefined) return { home, from: 'java_home' };
+    tried.push(`java_home -v 17 → '${home}': ${why}`);
+  }
+  const jdks = p.list(p.jvms).filter((e) => e.endsWith('.jdk')).sort();
+  for (const jdk of jdks) {
+    const jdkHome = join(p.jvms, jdk, 'Contents', 'Home');
+    if (not17(jdkHome, p.release) === undefined) return { home: jdkHome, from: 'JavaVirtualMachines' };
+  }
+  tried.push(jdks.length === 0 ? `${p.jvms}: no *.jdk` : `${p.jvms}: no *.jdk whose release says 17 (${jdks.join(', ')})`);
+  return { why: `no JDK 17 (${tried.join('; ')})` };
+}
+
+/** The JDK the build ran under, for its line: `JDK 17: <home> (from <source>)`. */
+export const jdkLine = (jdk: { home: string; from: JdkFrom }): string => `JDK 17: ${nameInLine(jdk.home)} (from ${jdk.from})`;

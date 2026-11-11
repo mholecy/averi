@@ -184,7 +184,10 @@ node --import tsx scripts/truth/live.ts --rejudge docs/truth/live-records/<file>
 ```
 
 Lab app builds, device runs, OCR, calibrate and network installs all need the sandbox off.
-- Android: in `fixtures/apps/android`, run `JAVA_HOME=~/Library/Java/JavaVirtualMachines/azul-17.0.19/Contents/Home ./gradlew assembleDebug`.
+- Android: in `fixtures/apps/android`, run `JAVA_HOME=$(/usr/libexec/java_home -v 17) ./gradlew assembleDebug`. Where
+  `java_home` finds no JDK (inside the agent's sandbox), set JAVA_HOME to the JDK 17 under
+  `/Library/Java/JavaVirtualMachines`, for example `zulu-17.jdk/Contents/Home`. The standing lab run looks the same way
+  (`scripts/truth/batch/lab-lines.ts#jdk17Of`).
 - iOS: in `fixtures/apps/ios`, run `xcodegen generate`, then `xcodebuild`.
 - The React Native app (`fixtures/apps/rn`) needs a real `npm ci` in its folder. A symlinked `node_modules` breaks Metro.
 
