@@ -106,16 +106,18 @@ describe('over every iOS tree of the committed fixtures: the untold covers liste
   it('are scroll-bounded-footer\'s O, the grouped blur menus\' W, mp-native\'s chooser row_swift and its lab rebuild\'s S — and the pair a listing already gave', async () => {
     const untold: string[] = [];
     let judged = 0;
-    // A node by its identifier or label, else by its role and rect (a bare wrapper).
-    const named = (n: UiNode): string => n.identifier ?? n.label ?? `${n.role} ${n.rect.x},${n.rect.y} ${n.rect.width}x${n.rect.height}`;
+
     for (const [file, tree] of await iosTrees()) {
       const nodes = [...everyNode(tree)];
+      // A node by its identifier or label, else by its role, rect and place in the walk (a bare wrapper).
+      const describeNode = (n: UiNode): string =>
+        n.identifier ?? n.label ?? `${n.role} ${n.rect.x},${n.rect.y} ${n.rect.width}x${n.rect.height} #${nodes.indexOf(n)}`;
       const screen = screenOf(tree);
       const seen = drawOrder(tree);
       nodes.forEach((n, i) => {
         judged++;
         for (const c of seen.exposure(n, screen).covers) {
-          if (c.order.kind === 'untold' && nodes.indexOf(c.node) > i) untold.push(`${file}: ${named(n)} under ${named(c.node)}`);
+          if (c.order.kind === 'untold' && nodes.indexOf(c.node) > i) untold.push(`${file}: ${describeNode(n)} under ${describeNode(c.node)}`);
         }
       });
     }
@@ -125,8 +127,8 @@ describe('over every iOS tree of the committed fixtures: the untold covers liste
       // D84 (ADR 0015's D84 amendment): a nested run's later-listed sibling drawn over the target is an untold peer of
       // any kind, no longer `drawn` — here the screen-sized wrapper and its child, the form's container listed after
       // them over their bottom (neither is a target anyone taps: the same tap point, only the order's kind moves)…
-      'wda-capture-lab-form-keyboard.json: container 0,0 402x874 under container 0,116 402x764',
-      'wda-capture-lab-form-keyboard.json: container 0,0 402x874 under container 0,116 402x764',
+      'wda-capture-lab-form-keyboard.json: container 0,0 402x874 #14 under container 0,116 402x764 #17',
+      'wda-capture-lab-form-keyboard.json: container 0,0 402x874 #16 under container 0,116 402x764 #17',
       'blur-menu-grouped.idb.json#0: lab.blur-menu-grouped.W under lab.blur-menu-grouped.C',
       'blur-menu-stacked.idb.json#0: lab.blur-menu-stacked.W under lab.blur-menu-stacked.C',
       'blur-menu-unhidden.idb.json#0: lab.blur-menu-unhidden.W under lab.blur-menu-unhidden.C',
@@ -134,8 +136,8 @@ describe('over every iOS tree of the committed fixtures: the untold covers liste
       'blur-menu.idb.json#0: lab.blur-menu.W under lab.blur-menu.C',
       'blur-menu.wda.json: lab.blur-menu.W under lab.blur-menu.C',
       'chooser-over-list.idb.json#0: lab.chooser-over-list.S under lab.chooser-over-list.R',
-      'form-keyboard.wda.json: container 0,0 402x874 under container 0,116 402x764',
-      'form-keyboard.wda.json: container 0,0 402x874 under container 0,116 402x764',
+      'form-keyboard.wda.json: container 0,0 402x874 #14 under container 0,116 402x764 #17',
+      'form-keyboard.wda.json: container 0,0 402x874 #16 under container 0,116 402x764 #17',
       'scroll-bounded-footer.idb.json#0: lab.scroll-bounded-footer.O under lab.scroll-bounded-footer.continue',
       // …and rn-banner's bare RN Views: each cover asked as a target (T's and U's, listed before their targets by their
       // tops), and C under its cover listed after it — the run cannot tell which is on top; the eyes do (the

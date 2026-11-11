@@ -10,16 +10,16 @@ import type { SeenOrder } from './seen-order.js';
  * (`UiNode.readingOrder`: idb's flat list, a WDA run sorted by top) — and AOSP lists a classic Android ViewGroup's
  * children by location (a uiautomator run so ordered, lab note LR4) — so a node drawn on top may be listed BEFORE the
  * node it is drawn over, and the draw order's rule "listed later = drawn later" (draw-order.ts#DrawOrder's doc) does
- * not hold there. This module is the one owner of "listed before, but drawn over" in such a listing: which siblings
- * listed before a target cover it — a heading (`headingsOver`: drawn over it, SwiftUI's pinned section header), a
- * control whose order against it the listing does not tell (`peersOf`), or, in a nested run (`listsNestedReadingOrder`:
- * WDA's, uiautomator's classic run), any sibling that draws there, listed before or after it, whose order is not told
- * either (React Native's covers, lab note LR3; the views-drawn-over cell, D84) — which
- * covers' order is not told, which
- * siblings a moved tap must keep clear of, and which controls listed AFTER it stay covers past the draw order's
- * reading-order break (`coversAfter`). draw-order.ts#drawOrder's `asTarget` asks it once for every question of a target
- * (`SeenFor.readingOrder`): `exposure` joins its covers to the draw order's own, the break's row
- * (`NOT_DRAWN.flatListReadingOrder`) reads `coversAfter`; it knows nothing of rows, presented layers or reaches.
+ * not hold there. This module is the one owner of "listed before or after, but drawn over or under" in such a
+ * listing: which siblings cover a target — a heading listed before it (`headingsOver`: drawn over it, SwiftUI's
+ * pinned section header), a control whose order against it the listing does not tell (`peersOf`), or, in a nested run
+ * (`listsNestedReadingOrder`: WDA's, uiautomator's classic run), any sibling listed before or after it that draws
+ * there, whose order is not told either (React Native's covers, lab note LR3; a sibling listed after, D84) — which
+ * covers' order is not told, which siblings a moved tap must keep clear of, and which controls listed AFTER it stay
+ * covers past the draw order's reading-order break (`coversAfter`). draw-order.ts#drawOrder's `asTarget` asks it once
+ * for every question of a target (`SeenFor.readingOrder`): `exposure` joins its covers to the draw order's own, the
+ * break's row (`NOT_DRAWN.flatListReadingOrder`) reads `coversAfter`; it knows nothing of rows, presented layers or
+ * reaches.
  * docs/adr/0015-flat-list-reading-order-break.md (its amendments, "covers listed before the target", "a heading
  * listed before", "a control past the break that holds the centre", "React Native's covers listed before the
  * target" and "D84 — a sibling listed after the target, of any kind")
@@ -203,20 +203,13 @@ function peersOf(
   // A control's peers are controls, either side of it. In a NESTED run in reading order (`listsNestedReadingOrder`:
   // WDA's run sorted by top, SwiftUI's, UIKit's and React Native's alike, uiautomator's classic run in location order —
   // not idb's flat list) a sibling that draws over the target (`drawn`: the draw order's `target` column but its
-  // own-content row, a field's own floating label excused) is a peer too, control or not, of any target, and LISTED
-  // EITHER SIDE of it: such a run lists by place, not by drawing, so neither side tells which is on top. Listed BEFORE:
-  // React Native's covers (lab note LR3) — WDA lists RN's views by their tops, so a later sibling drawn over the target
-  // (a toast, a banner) whose top lies above the target's is listed before it (the lab's rn-banner). Listed AFTER
-  // (D84): a sibling the run lists later may lie UNDER the target — the lab's views-drawn-over, A `127,303 825x176`
-  // drawn over the later-listed B `182,331 825x121` (child order; A2 over B2 by translationZ), the frame A's own
-  // #1E88E5 over the whole overlap: read as the draw order's `drawn` cover, which the eyes are never asked about, A was
-  // refused while from B's side A was the untold peer the eyes saw on top — each the other's cover. Untold, it is held
-  // to `after`'s gate below (it holds the target's centre), refused with no screenshot, and lifted only where the eyes
-  // see the target on top (`seen`, verify/eyes.ts#judgeOrder's guards: a translucent or drawing-nothing sibling, one of
-  // the target's colour, a blended overlap stay untold). Its own-content excuse still holds in the draw order's covers
-  // (draw-order.ts#NOT_DRAWN's `onTarget`, judged there of whatever is listed after). Residual (ADR 0015's D84
-  // amendment): a later-listed sibling that draws nothing but takes touches, lifted where the opacity guard cannot see
-  // past its edges — a false `Tapped`, ADR 0024's residual 2 widened to non-controls.
+  // own-content row, a field's own floating label excused) is a peer too, control or not, of any target, LISTED EITHER
+  // SIDE of it: such a run lists by place, not by drawing. Listed before: React Native's covers (lab note LR3: WDA
+  // lists a later sibling drawn over the target by its top, above the target's). Listed after (D84): it may lie UNDER
+  // the target (the lab's views-drawn-over). Either way untold: held to `after`'s centre gate below, refused with no
+  // screenshot, lifted only where the eyes see the target on top (verify/eyes.ts#judgeOrder). Its own-content excuse
+  // still holds in the draw order's covers (draw-order.ts#NOT_DRAWN's `onTarget`). The capture, the guards and the
+  // residual (a non-drawing touch layer lifted: ADR 0024's residual 2 widened): ADR 0015's D84 amendment.
   // Not idb's flat list: there a modal is listed before the screen beneath it and its frame (mp-native's value date
   // picker `Value date 56,291 298x375`) over form rows measured clear (tests/verify/assert.test.ts).
   const nested = target.parent !== undefined && listsNestedReadingOrder(target.parent);
