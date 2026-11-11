@@ -7,7 +7,7 @@ import { askedOf, eyesQuestion, pairQuestion, reachesPoint, sameQuestion, type E
 import { seenOrderOf, type OrderSeen, type PairSeen } from '../ui-tree/seen-order.js';
 import { hasArea, tapPoint } from '../ui-tree/selectors.js';
 import { missOf, saysTopLayerOnly, topLayerOnlySource, type Miss, type TopLayerOnlySource } from '../ui-tree/miss.js';
-import { outsideItsScrollView, type Remedy } from '../ui-tree/standing.js';
+import { noScrollHelps, outsideItsScrollView, type NoScrollRemedy } from '../ui-tree/standing.js';
 import { SIDES } from '../ui-tree/sides.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { Target, WaitEvidence } from './resolve.js';
@@ -303,7 +303,7 @@ export type ScrollOutcome = (
    * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
    * docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
    */
-  | { kind: 'overlapped'; swipes: number; judged: Judged; viewport: Rect; cover: Cover; remedy: Extract<Remedy, { of: 'unordered' | 'seenOver' | 'bothPinned' }> }
+  | { kind: 'overlapped'; swipes: number; judged: Judged; viewport: Rect; cover: Cover; remedy: NoScrollRemedy }
   /** D52: too large for its scroll view to show whole (scroll-read.ts#Unfit) — `fully: true` only. */
   | { kind: 'unfit'; swipes: number; judged: Judged; viewport: Rect; unfit: Unfit }
   /** D68: a proven cut another swipe would most likely not bring whole (flush-check.ts#FlushAim) — `fully: true` only. */
@@ -1066,7 +1066,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     if (remedy?.of === 'presented' && remedy.cover !== undefined) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: remedy.cover, viewport, ...(remedy.layer !== undefined && { layer: remedy.layer }) }, current === 'settle' && presentedBefore, seen.elapsedMs);
     // Under a cover listed in reading order with it — the order untold, or seen by a screenshot — or one where neither
     // lies in a scroll view (`bothPinned`, D87), no swipe tells which is on top or moves it out from under the other: stop.
-    if (best.standing.kind === 'covered' && (best.standing.remedy.of === 'unordered' || best.standing.remedy.of === 'seenOver' || best.standing.remedy.of === 'bothPinned')) {
+    if (best.standing.kind === 'covered' && noScrollHelps(best.standing.remedy)) {
       return stop(s, { kind: 'overlapped', swipes: s.swipes, judged: best, viewport, cover: best.standing.cover, remedy: best.standing.remedy });
     }
     // `fully: true` on a match as wide or as tall as its scroll view, or more (scroll-read.ts#unfitAlong): fully shown at

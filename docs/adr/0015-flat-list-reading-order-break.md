@@ -555,11 +555,15 @@ header as pinned, and an Android ScrollView's single child looks the same.
 A new remedy case, `bothPinned`, sits 5th in THE PRECEDENCE: after `fixed` and before `pinned`, `stuck` and `scroll`. It
 is the remedy of a `covered` target whose cover's order the tree tells (`drawn` or `overlaid`; `untold` and `seenOver`
 take 2.) when NEITHER the target NOR its cover lies in a scroll view as the tree says (geometry.ts#Clips.inScroller false
-for both). With no scroll view above either, no scroll moves either. The cover's own side is asked too, because a cover
+for both). With no scroll view above either, no scroll moves either. This is the backlog's candidate narrowed on
+ancestry and widened on kind and relation: it fires for `drawn` and `overlaid` covers alike, and for any cover outside
+every scroll view, not only a sibling of the target's run (a bar laid in another branch, a scroll container listed after
+the target — whence the CoordinatorLayout residual below). The cover's own side is asked too, because a cover
 in a scroll view could be stroked away. The draw order already excuses scroll content over a node outside its scroll
 view (draw-order.ts's `scrolledContent` row) unless that content lies in a later screen, which takes `presented` first.
 So the cover's half is defence in depth, and so is `pinned` under a cover in the pixel assert, which now arises only
-for such a cover: their Stryker survivors (standing.ts's cover half, pixel-poll.ts's words) are known. Undefined
+for such a cover: their hand-mutation / narrowed-run survivors (standing.ts's cover half, pixel-poll.ts's words) are
+known — standing.ts and pixel-poll.ts are not in ADR 0038's mutation run. Undefined
 ancestry (idb's flat list) keeps the old cases. Since D84 views-drawn-over's A no longer reaches this case (its cover B
 is an untold peer, 2.); the targets that do are pinned-bar P and text-under-bar P under Continue (WDA, Compose) and
 rn-banner's "Saved".
@@ -567,8 +571,8 @@ rn-banner's "Saved".
 Every verb renders `bothPinned` with one clause (ui-tree/standing.ts#bothPinnedRemedyText):
 
 - the tap refuses with "no scroll moves it out from under that: neither lies in a scroll view — if it is a menu or a
-  popover, close it first; if a screenshot shows this element on top, tap it by coordinates; else a layout defect (no
-  clearance for a pinned bar?)";
+  popover, close it first; if a screenshot shows this element on top, tap it by coordinates" — no "layout defect", which
+  no stroke proved;
 - `scroll_until` stops before any swipe (interact/scroll-rounds.ts's `overlapped` stop) with "no swipe was sent —" and
   the same clause;
 - the pixel assert misses with "the capture would show it, not the element; no scroll moves the element out from under

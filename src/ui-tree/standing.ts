@@ -580,13 +580,27 @@ export const orderRemedyText = (remedy: RemedyCase<'unordered' | 'seenOver'>, pu
  * touch (the tap, `scroll_until`) or the pixel assert — the one wording every verb quotes: no scroll moves either, so
  * none is advised; a menu or popover drawn over it is closed first; the way out where the tree's order is not the
  * frame's (a sibling raised by elevation or `zIndex`, which the listing does not tell): a tap by coordinates when a
- * screenshot shows the target on top — the pixel assert, something of the element clear of the cover; else (the
- * touch) the app lays the cover over it, the stuck stop's "layout defect" said without the strokes that proved it.
+ * screenshot shows the target on top — the pixel assert, something of the element clear of the cover. No "layout
+ * defect": with no stroke sent, nothing proved one.
  */
 export const bothPinnedRemedyText = (purpose: 'touch' | 'pixel'): string =>
   purpose === 'touch'
-    ? 'no scroll moves it out from under that: neither lies in a scroll view — if it is a menu or a popover, close it first; if a screenshot shows this element on top, tap it by coordinates; else a layout defect (no clearance for a pinned bar?)'
+    ? 'no scroll moves it out from under that: neither lies in a scroll view — if it is a menu or a popover, close it first; if a screenshot shows this element on top, tap it by coordinates'
     : 'no scroll moves the element out from under that: neither lies in a scroll view — if it is a menu or a popover, close it first; else assert something in the element that lies clear of it';
+
+/**
+ * The remedies under which NO SCROLL HELPS a `covered` node (`Remedy`'s `unordered`, `seenOver`, `bothPinned`): the
+ * tap advises none, `scroll_until` stops before any swipe (interact/scroll-rounds.ts's `overlapped`), the pixel assert
+ * names none. One set, asked by `noScrollHelps` and said by `noScrollRemedyText`.
+ */
+export type NoScrollRemedy = RemedyCase<'unordered' | 'seenOver' | 'bothPinned'>;
+
+/** Whether `remedy` is one under which no scroll helps (`NoScrollRemedy`). */
+export const noScrollHelps = (remedy: Remedy): remedy is NoScrollRemedy => remedy.of === 'unordered' || remedy.of === 'seenOver' || remedy.of === 'bothPinned';
+
+/** THE words for a `NoScrollRemedy`, for a touch or the pixel assert: `orderRemedyText`'s, or `bothPinnedRemedyText`'s. */
+export const noScrollRemedyText = (remedy: NoScrollRemedy, purpose: 'touch' | 'pixel'): string =>
+  remedy.of === 'bothPinned' ? bothPinnedRemedyText(purpose) : orderRemedyText(remedy, purpose);
 
 /**
  * THE REMEDY for a node that does not stand `reachable`: what would bring it within reach, as one closed set of cases
@@ -637,8 +651,9 @@ export const bothPinnedRemedyText = (purpose: 'touch' | 'pixel'): string =>
  * 6. `pinned` — under a system bar or (the pixel assert) a cover, in no scroll view as the tree says
  *    (geometry.ts#Clips.inScroller false): no scroll moves it out. Under a cover it now arises only for a cover in a
  *    scroll view over a node in none, which the draw order excuses (draw-order.ts's `scrolledContent` row) save in a
- *    later screen, `presented` first — defence in depth: a mutant of 5.'s cover half (and of the pixel assert's
- *    `pinned` words under a cover) survives, as known (ADR 0015's D87 amendment).
+ *    later screen, `presented` first — defence in depth: a hand-mutation / narrowed-run survivor of 5.'s cover half
+ *    (and of the pixel assert's `pinned` words under a cover) is known (ADR 0015's D87 amendment; standing.ts is not in
+ *    ADR 0038's mutation run).
  * 7. `stuck` — a scroll may not move it out: the tree cannot say whether it lies in a scroll view (idb's flat list,
  *    `inScroller` undefined), or — the pixel assert — it is laid from the screen's top edge under the status bar, or
  *    the cover's reach holds it whole.

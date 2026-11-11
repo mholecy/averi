@@ -916,13 +916,13 @@ describe('a Compose label under its own control (2026-10-09)', () => {
     expect([fake.tapPoints, fake.swipes]).toEqual([[{ x: 782, y: 1836 }], []]);
   });
 
-  it('a classic View\'s pinned CTA over a text in the same layout (review of fix/r6) stays a cover: tap text:"Forgot password?" is refused, never pressing LOG IN; scroll_until to the terms under CONTINUE keeps the layout-defect diagnosis — before any swipe, neither in a scroll view (D87)', async () => {
+  it('a classic View\'s pinned CTA over a text in the same layout (review of fix/r6) stays a cover: tap text:"Forgot password?" is refused, never pressing LOG IN; scroll_until to the terms under CONTINUE stops before any swipe, no scroll advised — neither lies in a scroll view (D87)', async () => {
     const login = compose(CLASSIC_VIEWS.loginImeUp);
     await expect(tapElement(login, 'text:"Forgot password?"', OPTS)).rejects.toBeInstanceOf(CoveredRefusal);
     expect(login.tapPoints).toEqual([]);
     const terms = compose(CLASSIC_VIEWS.terms);
     await expect(scrollUntilVisible(terms, 'text:"By continuing you accept the terms"', { maxSwipes: 2, settleMs: 0 })).rejects.toThrow(
-      /^scroll_until .* stopped before any swipe — .*under button "CONTINUE" \(40,1960 1000x130\) at its centre \(540,2015\), drawn over it — 0% of it shows; no swipe was sent — no scroll moves it out from under that: neither lies in a scroll view .* a layout defect/,
+      /^scroll_until .* stopped before any swipe — .*under button "CONTINUE" \(40,1960 1000x130\) at its centre \(540,2015\), drawn over it — 0% of it shows; no swipe was sent — no scroll moves it out from under that: neither lies in a scroll view — /,
     );
   });
 });

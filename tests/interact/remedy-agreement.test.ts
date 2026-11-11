@@ -19,6 +19,7 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { failureOf, play, type Row } from '../helpers/rounds.js';
 import { stackedLayers } from '../helpers/stacked-layers.js';
 import { node } from '../helpers/fake.js';
+import { parseDump } from '../helpers/android-dumps.js';
 
 // ONE remedy for a target that is not reachable itself (ui-tree/standing.ts#Remedy), decided once by the standing with
 // one precedence — a screen presented over the target first (docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md),
@@ -883,7 +884,7 @@ describe('one remedy for a target under a drawn cover where neither lies in a sc
     expect(failureOf(played, 'id:t').message).toBe(
       `scroll_until id:t stopped before any swipe — element is in the viewport but ${UNDER} — 0% of it shows; no swipe was sent — ` +
         'no scroll moves it out from under that: neither lies in a scroll view — if it is a menu or a popover, close it first; ' +
-        'if a screenshot shows this element on top, tap it by coordinates; else a layout defect (no clearance for a pinned bar?). ' +
+        'if a screenshot shows this element on top, tap it by coordinates. ' +
         'Last rect {"x":0,"y":400,"width":402,"height":100} in a 402x874 viewport',
     );
   });
@@ -902,5 +903,37 @@ describe('one remedy for a target under a drawn cover where neither lies in a sc
       const played = play(RULES, [row, row]);
       expect({ name, strokes: played.steps.filter((s) => s.do === 'stroke').length }).toEqual({ name, strokes: 1 });
     }
+  });
+
+  // The spec's own shape (D87), uiautomator's: an unmarked Compose run, T and the card listed after it (drawn over its
+  // centre) siblings in one View, no scroll container above either — every verb `bothPinned`, scroll_until no stroke.
+  // Its twin, the same run inside a scroll container (`scrollable="true"`, a LazyColumn), keeps the scroll.
+  const dumpNode = (id: string, bounds: string, kids = '', extra = '') =>
+    `<node index="0" text="" resource-id="${id}" class="android.view.View" package="dev.averi.lab" content-desc="" clickable="${id === '' ? 'false' : 'true'}" enabled="true" ${extra}scrollable="${extra === '' ? 'false' : 'true'}" bounds="${bounds}">${kids}</node>`;
+  const composeRun = (scrolled: boolean): UiNode => {
+    const banner = '<node index="0" text="Banner" resource-id="" class="android.widget.TextView" package="dev.averi.lab" content-desc="" clickable="false" enabled="true" scrollable="false" bounds="[400,940][680,1010]" />';
+    const run = dumpNode('', '[0,0][1080,2220]', dumpNode('lab.t', '[127,800][952,1000]') + dumpNode('lab.card', '[66,850][1014,1100]', banner));
+    const compose = `<node index="0" text="" resource-id="" class="androidx.compose.ui.platform.ComposeView" package="dev.averi.lab" content-desc="" clickable="false" enabled="true" scrollable="false" bounds="[0,0][1080,2220]">${scrolled ? dumpNode('', '[0,0][1080,2220]', run, 'focusable="true" ') : run}</node>`;
+    return parseDump(`<?xml version='1.0' encoding='UTF-8' standalone='yes' ?><hierarchy rotation="0"><node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="dev.averi.lab" content-desc="" clickable="false" enabled="true" scrollable="false" bounds="[0,0][1080,2220]">${compose}</node></hierarchy>`);
+  };
+  const ANDROID_RULES = { direction: 'down', fully: false, maxSwipes: 1, timeoutMs: 30_000, screen: ON_PIXEL.device } as const;
+  const androidRemedies = (tree: UiNode, t: UiNode) => {
+    const scene = sceneOf(tree);
+    const of = (s: { kind: string; remedy?: { of: string } }) => (s.kind === 'reachable' ? 'reachable' : s.remedy?.of);
+    return (['tap', 'stop', 'fully'] as const).map((p) => of(scene.standing(t, ON_PIXEL.usable, { of: p }))).concat(of(scene.standing(t, ON_PIXEL.usable, { of: 'pixel', reads: colorSampleRect, glyphs: false })));
+  };
+
+  it('Compose, uiautomator-shaped: a drawn later sibling in an unmarked run, neither in a scroll container — `bothPinned`, scroll_until stops with no stroke; in a scroll container, it strokes', () => {
+    const run = composeRun(false);
+    const t = [...everyNode(run)].find((n) => n.identifier === 'lab.t')!;
+    expect(androidRemedies(run, t)).toEqual(['bothPinned', 'bothPinned', 'bothPinned', 'bothPinned']);
+    const played = play(ANDROID_RULES, [{ tree: run, found: [t], screen: ON_PIXEL.usable }]);
+    expect(played.steps.filter((s) => s.do === 'stroke')).toEqual([]);
+    expect(failureOf(played, 'id:t').message).toMatch(/^scroll_until id:t stopped before any swipe — element is in the viewport but under container id:lab\.card .*; no swipe was sent — no scroll moves it out from under that: neither lies in a scroll view — /);
+    const scrolled = composeRun(true);
+    const st = [...everyNode(scrolled)].find((n) => n.identifier === 'lab.t')!;
+    expect(androidRemedies(scrolled, st).includes('bothPinned')).toBe(false);
+    const row: Row = { tree: scrolled, found: [st], screen: ON_PIXEL.usable };
+    expect(play(ANDROID_RULES, [row, row]).steps.filter((s) => s.do === 'stroke')).toHaveLength(1);
   });
 });

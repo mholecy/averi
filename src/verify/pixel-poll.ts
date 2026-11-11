@@ -10,7 +10,7 @@ import { markedForMiss } from '../ui-tree/window-mark.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { coverClause } from '../ui-tree/cover.js';
-import { orderRemedyText, outsideItsScrollView, presentedRemedy, bothPinnedRemedyText, type PixelRegionOf, type PixelStanding, type Remedy } from '../ui-tree/standing.js';
+import { noScrollRemedyText, outsideItsScrollView, presentedRemedy, type PixelRegionOf, type PixelStanding, type Remedy } from '../ui-tree/standing.js';
 import { systemBarName } from '../ui-tree/system-bar.js';
 import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame, type TreeRequestedFrame } from './capture.js';
@@ -675,11 +675,10 @@ const coverRemedy = (remedy: CoverRemedy): string => {
     case 'scroll':
       return scroll;
     case 'unordered':
-      return `the capture may show it, not the element; ${orderRemedyText(remedy, 'pixel')}`;
     case 'seenOver':
-      return `the capture would show it, not the element; ${orderRemedyText(remedy, 'pixel')}`;
     case 'bothPinned':
-      return `the capture would show it, not the element; ${bothPinnedRemedyText('pixel')}`;
+      // The order untold, the capture MAY show it; seen over, or no scroll moving either, it WOULD.
+      return `the capture ${remedy.of === 'unordered' ? 'may' : 'would'} show it, not the element; ${noScrollRemedyText(remedy, 'pixel')}`;
   }
 };
 
