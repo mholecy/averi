@@ -1,0 +1,107 @@
+{
+  "cell": "views-drawn-over",
+  "layer": "none",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [
+    {
+      "tag": "A",
+      "id": "lab.views-drawn-over.A",
+      "color": "#1E88E5",
+      "declared": "open",
+      "frame": {
+        "x": 127,
+        "y": 303,
+        "width": 825,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,391"
+        }
+      ],
+      "drawn": 1,
+      "seen": "#1E88E5"
+    },
+    {
+      "tag": "B",
+      "id": "lab.views-drawn-over.B",
+      "color": "#E53935",
+      "declared": "covered",
+      "frame": {
+        "x": 182,
+        "y": 331,
+        "width": 825,
+        "height": 121
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "595,392"
+        },
+        {
+          "kind": "tap",
+          "tag": "A"
+        }
+      ],
+      "drawn": 0.067,
+      "seen": "#1E88E5"
+    },
+    {
+      "tag": "A2",
+      "id": "lab.views-drawn-over.A2",
+      "color": "#00897B",
+      "declared": "open",
+      "frame": {
+        "x": 127,
+        "y": 798,
+        "width": 825,
+        "height": 176
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "540,886"
+        }
+      ],
+      "drawn": 1,
+      "seen": "#00897B"
+    },
+    {
+      "tag": "B2",
+      "id": "lab.views-drawn-over.B2",
+      "color": "#FDD835",
+      "declared": "covered",
+      "frame": {
+        "x": 182,
+        "y": 826,
+        "width": 825,
+        "height": 121
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "595,887"
+        },
+        {
+          "kind": "tap",
+          "tag": "A2"
+        }
+      ],
+      "drawn": 0.067,
+      "seen": "#00897B"
+    }
+  ],
+  "navigation": "gesture",
+  "windows": "views-drawn-over.windows.txt",
+  "displays": "views-drawn-over.displays.txt"
+}

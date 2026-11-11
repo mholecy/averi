@@ -47,6 +47,17 @@
       },
       "screenshot": "rn-format-eager.png",
       "truth": "rn-format-eager.truth.json"
+    },
+    {
+      "file": "rn-banner-role.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "rn-banner-role.png",
+      "truth": "rn-banner-role.truth.json"
     }
   ]
 }
