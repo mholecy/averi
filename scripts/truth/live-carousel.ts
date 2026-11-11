@@ -301,8 +301,9 @@ export function judgeFully(expect: FullyExpect): CarouselJudge {
     }
     if (expect.inBand === true) {
       const swipes = log?.swipes;
-      const clip = launched.scrollViews?.carousel;
-      if (swipes === undefined || clip === undefined) return { ...base, outcome: 'SKIP', why: swipes === undefined ? 'no stroke log: the band unjudged' : 'no carousel clip at launch: the band unjudged' };
+      // The launch's clip is there: a band case without it SKIPped above (NO_CLIP), before any premise.
+      const clip = launched.scrollViews!.carousel!;
+      if (swipes === undefined) return { ...base, outcome: 'SKIP', why: 'no stroke log: the band unjudged' };
       const inside = (p: Point) => p.y >= clip.y && p.y <= clip.y + clip.height;
       const off = swipes.filter((s) => !(inside(s.from) && inside(s.to)));
       if (off.length > 0) return { ...base, outcome: 'LOUD', cls: 'off-band', why: `${off.length} of ${swipes.length} stroke(s) drawn outside the carousel's band y ${clip.y}–${clip.y + clip.height} (e.g. (${off[0].from.x},${off[0].from.y})→(${off[0].to.x},${off[0].to.y})): ${short(reply)}` };

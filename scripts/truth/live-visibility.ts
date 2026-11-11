@@ -162,7 +162,7 @@ const touchesText = (state: Pick<LabState, 'events'>, launched: Pick<LabState, '
   return ts.length === 0 ? 'none' : touchPointsText(ts);
 };
 const eventsText = (es: readonly ProbeEvent[]) => (es.length === 0 ? 'nothing' : es.map((e) => `${e.kind} ${e.tag}`).join(', '));
-const rectText = (r: Rect | undefined | null) => (r === undefined || r === null ? 'none' : `${round(r.x)},${round(r.y)} ${round(r.width)}x${round(r.height)}`);
+const rectText = (r: Rect | undefined) => (r === undefined ? 'none' : `${round(r.x)},${round(r.y)} ${round(r.width)}x${round(r.height)}`);
 const round = (n: number) => Math.round(n * 10) / 10;
 export const short = (reply: string) => reply.split('\n')[0].slice(0, 260);
 
@@ -379,9 +379,10 @@ export function judgeScroll(
   // T11, T17: a stop whose lead says it may be cut claims nothing whole — every flush hedge alike, a cut a swipe proved or
   // one no probe checked: honest where the app shows it cut, and not a pass. Off the screen or outside its scroll view
   // the lead's "visible" is false whatever the hedge, and an UNCOVERED-only hedge says nothing of a cut: the claim's
-  // MISMATCH below (ADR 0013's T17 amendment).
+  // MISMATCH below (ADR 0013's T17 amendment). A cut geometry never holds a `fully` stop (stopHolds), so the gate needs no
+  // `!holds`; hedgesCut is false without a lead (T21).
   const lead = hedgedLead(scroll);
-  if (visible && !holds && c.fully && g !== undefined && CUT_GEOMETRIES.includes(g) && tapped?.outcome !== 'MISMATCH' && lead !== undefined && hedgesCut(lead)) {
+  if (visible && c.fully && g !== undefined && CUT_GEOMETRIES.includes(g) && tapped?.outcome !== 'MISMATCH' && hedgesCut(lead)) {
     const old = lead.preT17;
     const opening = old ? 'hedged in its body, but its opening claimed "fully visible" (before T17), and' : `hedged (${HEDGED_LEAD} ${lead.what}), and`;
     return { outcome: 'LOUD', cls: HEDGED_CUT[old ? 'preT17' : 'lead'], kind, why: `${opening} the app lays it out ${g}: ${short(scroll)}`, app };
@@ -920,8 +921,8 @@ export function judgeCarry(reply: string, state: LabState, start: LabState): Liv
   const strokes = strokesSince(state, start).filter((s) => s.view === CARRY.view);
   const turned = strokes.filter((s) => s.to < s.from - MOVE_SLACK);
   const past = strokes.filter((s) => top(s.from) + f0.height > region.y + region.height && top(s.to) < region.y);
-  const clip = start.scrollViews?.[CARRY.view];
-  const touched = clip === undefined ? 0 : touchTurns(state, start, clip);
+  // The table's clip is there: a region (showRegion) is only ever cut from it.
+  const touched = touchTurns(state, start, start.scrollViews![CARRY.view]!);
   const said = turnsSaid(reply);
   const breaks = [
     ...turned.map((s) => `a stroke back up (${round(s.from)}→${round(s.to)}): averi turned`),
