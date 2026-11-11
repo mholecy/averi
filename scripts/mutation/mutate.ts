@@ -9,12 +9,12 @@ import {
 } from './group.mjs';
 
 /**
- * `npm run mutate`: Stryker over the modules scope.json names, one group at a time (core, then lab: one Stryker
- * process each, bounded at GROUP_BOUND_MS), then each module's score held to its own floor there. Fails if either
+ * `npm run mutate`: Stryker over the modules scope.json names, one group at a time (core, scene, then lab: one Stryker
+ * process each, bounded at GROUP_BOUND_MS), then each module's score held to its own floor there. Fails if any
  * group fails. Why, when, the groups and the floor rule: docs/adr/0038-a-mutation-run-guards-the-pure-leaves-tests.md.
  *
- *   node --import tsx scripts/mutation/mutate.ts [--group core|lab] [<stryker run argument> …]
- *   (npm run mutate -- --force: both groups, cold; npm run mutate -- --group lab --force: lab alone, cold)
+ *   node --import tsx scripts/mutation/mutate.ts [--group core|scene|lab] [<stryker run argument> …]
+ *   (npm run mutate -- --force: every group, cold; npm run mutate -- --group lab --force: lab alone, cold)
  */
 
 export type { Scope };
@@ -116,7 +116,7 @@ export function planRuns(
     const { slot, needs } = OPTIONS[name];
     const value = inline ?? (args[i + 1]?.startsWith('-') === false ? args[++i] : undefined);
     if (value === undefined || value === '') return refuse(`${name === '-m' ? '--mutate' : name} needs ${needs}`);
-    if (slot === 'group' && given.group !== undefined) return refuse('--group given twice: give one, or none for both');
+    if (slot === 'group' && given.group !== undefined) return refuse('--group given twice: give one, or none for all');
     given[slot] = value;
   }
   const { group, tempDir, mutate } = given;

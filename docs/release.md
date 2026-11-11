@@ -74,7 +74,7 @@ them in the background.
    Inside the agent's sandbox the macOS Vision recognizer does not run, so the first line ends `, K skipped (no OCR on
    this host: …)`. That is expected there; say it in the record. On the owner's Mac nothing is skipped.
 
-6. **Mutation, cold:** `npm run mutate -- --force` (both groups, core then lab, each bounded at 600 s), exit 0. Each
+6. **Mutation, cold:** `npm run mutate -- --force` (every group: core, scene, then lab, each bounded at 600 s), exit 0. Each
    group's floors are met (`checkFloors` in mutate.ts). Keep the per-module score lines and the last lines.
 7. **The package:** `npm pack --dry-run` lists what ships. Then `npm run release:smoke` (after the build in step 4;
    `pack-smoke.ts` in scripts/release) packs the real tarball into a temporary folder and checks it. Its file list
@@ -216,7 +216,7 @@ Only after A, B and C passed, on the commit they tested:
 | A build | exit 0 | vX.Y.Z/build.log.txt |
 | A golden | N checks, M mismatches (M known, 0 new), 0 broken; K skipped (no OCR) | vX.Y.Z/golden.log.txt |
 | A golden diff | Strike 0, COUNTS 0, Re-pin 0 | vX.Y.Z/golden-against.log.txt |
-| A mutation | core PASS, lab PASS (cold) | vX.Y.Z/mutate.log.txt |
+| A mutation | core PASS, scene PASS, lab PASS (cold) | vX.Y.Z/mutate.log.txt |
 | A package | release smoke: PASS (N files, 18 tools) | vX.Y.Z/release-smoke.log.txt |
 | B truth:lab | exit 0: lab, chooser, forms PASS | vX.Y.Z/android-truth-lab.log.txt |
 | B live | exit 0: N cases, M mismatches (0 not known); Device: <label> | vX.Y.Z/android-live.log.txt |

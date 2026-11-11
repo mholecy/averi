@@ -1730,16 +1730,17 @@ full lab group took about 300 s (the reviewer measured 299 s) and exits 0.
 ui-tree/standing.ts decides THE REMEDY once for every verb (`remedied`): the tap, `scroll_until`'s stop and the pixel
 assert all quote it. Until now no floor held it, nor the two modules it leans on, ui-tree/reading-order.ts (which
 siblings a listing in reading order leaves untold) and ui-tree/later-edges.ts (the flush later node at each edge). All
-three join the `core` group, each with its own floor by the floor rule:
+three join the run in a third group, `scene` (the scene every verb judges on), each with its own floor by the floor
+rule:
 
 | Module | Tests | Score | Floor |
 | --- | --- | --- | --- |
-| src/ui-tree/standing.ts | standing.test.ts, standing-remedy.test.ts, presented-remedy.test.ts, overlaid-edge.test.ts, heading-listed-before.test.ts, keyboard-position.test.ts, listed-content.test.ts, interact/remedy-agreement.test.ts | 95.41 % (1 220 mutants, 50 survived, 6 without coverage; 84.92 % before A25's tests) | 93 |
+| src/ui-tree/standing.ts | standing.test.ts, standing-remedy.test.ts, presented-remedy.test.ts, overlaid-edge.test.ts, heading-listed-before.test.ts, keyboard-position.test.ts, listed-content.test.ts, interact/remedy-agreement.test.ts, verify/eyes-views-drawn-over.test.ts, verify/assert.test.ts | 95.41 % (1 220 mutants, 50 survived, 6 without coverage; 84.92 % before A25's tests) | 93 |
 | src/ui-tree/reading-order.ts | draw-order*.test.ts, heading-listed-before.test.ts | 88.11 % (185 mutants, 22 survived) | 86 |
 | src/ui-tree/later-edges.ts | later-edges.test.ts, overlaid-edge.test.ts | 97.35 % (151 mutants, 4 survived) | 95 |
 
-Scores from narrowed cold runs (`npm run mutate -- --group core --force --mutate <module>`, whose exit 1 is a narrowed
-run's). The first run of standing.ts showed its remedies untested where they matter most: the tables of
+Scores from narrowed cold runs in core before the split; the cold `scene` run (below) confirms them: standing.ts
+96.23 % there, its 38 timeouts (counted killed) taken under load, reading-order.ts 88.11 %, later-edges.ts 97.35 %. The first run of standing.ts showed its remedies untested where they matter most: the tables of
 standing.test.ts quote each standing's kind, never its remedy, so `keyboard`, `pinned`, `stuck` and `fixed` (and the
 `clipped` and `systemBar` cases of the switch) could each be emptied unnoticed. tests/ui-tree/standing-remedy.test.ts
 now pins the remedy per kind and purpose on the smallest trees; standing.test.ts gains the facts its readers quote
@@ -1776,3 +1777,13 @@ What is not killed, each equivalent or unreachable:
 standing.ts's own doc no longer calls it outside this run (its `pinned` case, 6.). The cost: core's dry run takes the
 added tests (about 2 500 tests in 31 s); standing.ts's mutants run in 2.5 to 4.5 min of a narrowed run, the most of any
 core module, since every scene-building test covers them.
+
+**A third group, `scene` (the A25 decision).** In `core`, standing.ts pushed the cold core run past its 600 s bound
+twice (5 802 and 6 209 of 8 983 mutants at 600 s, load average 25 to 42 from other worktrees' runs). The three
+modules now form a group of their own, after `core` and before `lab` (scripts/mutation/group.mjs's GROUPS; mutate.ts,
+`npm run mutate -- --force` and docs/release.md's Gate A run every group). Groups are layered core, scene, lab: a
+scoped test may import a module of a group below its own (tests/mutation/group.test.ts), so scene's tests build scenes
+on core's draw order and geometry, while a core test that imports standing.ts (the draw-order tests,
+eyes-views-drawn-over.test.ts, assert.test.ts) is in scene's tests too. Core is back to its pre-A25 modules and tests.
+The cold `npm run mutate -- --group scene --force`: passed in 205 s (load average 15 at its start, 45 at its end).
+

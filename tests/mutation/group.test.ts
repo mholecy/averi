@@ -8,28 +8,28 @@ import { filesOf, GROUPS, GROUP_ENV, groupScope, isGroup, readScopeFile, scopeEr
 // stryker.config.mjs, vitest.mutation.config.ts and mutate.ts alike.
 
 const entry = (group: unknown, tests = ['tests/a.test.ts']) => ({ tests, floor: 90, baseline: '', group });
-const scope = { 'src/a.ts': entry('core'), 'scripts/truth/batch/lab-x.ts': entry('lab', ['tests/x.test.ts']) };
+const scope = { 'src/a.ts': entry('core'), 'src/ui-tree/s.ts': entry('scene', ['tests/s.test.ts']), 'scripts/truth/batch/lab-x.ts': entry('lab', ['tests/x.test.ts']) };
 
 describe('scopeErrors — every scope.json entry names exactly one known group (T2b-2)', () => {
-  it('a scope where every entry names core or lab has no error', () => {
-    expect(GROUPS).toEqual(['core', 'lab']);
+  it('a scope where every entry names core, scene or lab has no error', () => {
+    expect(GROUPS).toEqual(['core', 'scene', 'lab']);
     expect(scopeErrors(scope)).toEqual([]);
   });
 
   it('a missing group, an unknown one or a list of groups is an error naming the entry', () => {
-    const bad = { 'src/a.ts': entry(undefined), 'src/b.ts': entry('Core'), 'src/c.ts': entry(['core', 'lab']), 'src/d.ts': entry('lab'), 'src/e.ts': entry('core') };
+    const bad = { 'src/a.ts': entry(undefined), 'src/b.ts': entry('Core'), 'src/c.ts': entry(['core', 'lab']), 'src/d.ts': entry('lab'), 'src/e.ts': entry('core'), 'src/f.ts': entry('scene') };
     expect(scopeErrors(bad)).toEqual([
-      'src/a.ts: has no group in scripts/mutation/scope.json (core or lab)',
-      'src/b.ts: group "Core" in scripts/mutation/scope.json is not core or lab',
-      'src/c.ts: group ["core","lab"] in scripts/mutation/scope.json is not core or lab',
+      'src/a.ts: has no group in scripts/mutation/scope.json (core, scene or lab)',
+      'src/b.ts: group "Core" in scripts/mutation/scope.json is not core, scene or lab',
+      'src/c.ts: group ["core","lab"] in scripts/mutation/scope.json is not core, scene or lab',
     ]);
   });
 
   it('a group no entry names is an error: its run would mutate nothing', () => {
-    expect(scopeErrors({ 'src/a.ts': entry('core') })).toEqual(['group lab: no module in scripts/mutation/scope.json']);
+    expect(scopeErrors({ 'src/a.ts': entry('core') })).toEqual(['group scene: no module in scripts/mutation/scope.json', 'group lab: no module in scripts/mutation/scope.json']);
   });
 
-  it('scope.json itself: every entry in a known group, and both groups used', () => {
+  it('scope.json itself: every entry in a known group, and every group used', () => {
     expect(scopeErrors(readScopeFile())).toEqual([]);
   });
 });
@@ -37,6 +37,7 @@ describe('scopeErrors — every scope.json entry names exactly one known group (
 describe('groupScope — a group\'s own entries', () => {
   it('keeps only the entries of the group asked', () => {
     expect(Object.keys(groupScope(scope, 'core'))).toEqual(['src/a.ts']);
+    expect(Object.keys(groupScope(scope, 'scene'))).toEqual(['src/ui-tree/s.ts']);
     expect(Object.keys(groupScope(scope, 'lab'))).toEqual(['scripts/truth/batch/lab-x.ts']);
   });
 });
@@ -59,7 +60,7 @@ describe('scopeOf — what stryker.config.mjs and vitest.mutation.config.ts read
     const of = scopeOf({}, scope);
     expect(of.group).toBeUndefined();
     expect(Object.keys(of.scope)).toEqual(Object.keys(scope));
-    expect(of.tests).toEqual(['tests/a.test.ts', 'tests/x.test.ts']);
+    expect(of.tests).toEqual(['tests/a.test.ts', 'tests/s.test.ts', 'tests/x.test.ts']);
     expect(of.files).toEqual({
       incremental: 'reports/mutation/stryker-incremental.json',
       json: 'reports/mutation/mutation.json',
@@ -69,15 +70,15 @@ describe('scopeOf — what stryker.config.mjs and vitest.mutation.config.ts read
   });
 
   it('a test two entries of one group list is included once', () => {
-    const shared = { 'src/a.ts': entry('core', ['tests/s.test.ts']), 'src/b.ts': entry('core', ['tests/s.test.ts', 'tests/b.test.ts']), 'src/c.ts': entry('lab') };
+    const shared = { 'src/a.ts': entry('core', ['tests/s.test.ts']), 'src/b.ts': entry('core', ['tests/s.test.ts', 'tests/b.test.ts']), 'src/c.ts': entry('lab'), 'src/d.ts': entry('scene') };
     expect(scopeOf({ [GROUP_ENV]: 'core' }, shared).tests).toEqual(['tests/s.test.ts', 'tests/b.test.ts']);
   });
 
   it('an unknown group in the env, or a scope with an error, throws: no Stryker run over the wrong modules', () => {
-    expect(() => scopeOf({ [GROUP_ENV]: 'all' }, scope)).toThrow(`${GROUP_ENV}=all: not a mutation group (core or lab)`);
-    expect(() => scopeOf({ [GROUP_ENV]: '' }, scope)).toThrow(`${GROUP_ENV}=: not a mutation group (core or lab)`);
+    expect(() => scopeOf({ [GROUP_ENV]: 'all' }, scope)).toThrow(`${GROUP_ENV}=all: not a mutation group (core, scene or lab)`);
+    expect(() => scopeOf({ [GROUP_ENV]: '' }, scope)).toThrow(`${GROUP_ENV}=: not a mutation group (core, scene or lab)`);
     expect(() => scopeOf({ [GROUP_ENV]: 'core' }, { 'src/a.ts': entry('x'), 'src/b.ts': entry('lab') })).toThrow(
-      'scripts/mutation/scope.json: src/a.ts: group "x" in scripts/mutation/scope.json is not core or lab',
+      'scripts/mutation/scope.json: src/a.ts: group "x" in scripts/mutation/scope.json is not core, scene or lab',
     );
   });
 
@@ -87,7 +88,7 @@ describe('scopeOf — what stryker.config.mjs and vitest.mutation.config.ts read
 });
 
 describe('isGroup and filesOf', () => {
-  it('isGroup: core and lab only', () => {
+  it('isGroup: core, scene and lab only', () => {
     expect(GROUPS.every(isGroup)).toBe(true);
     for (const name of ['Core', 'all', '', undefined, 1]) expect(isGroup(name)).toBe(false);
   });
@@ -125,12 +126,14 @@ describe('a group\'s tests: every scoped test that imports a module of a group i
     .filter((f) => f.endsWith('.test.ts'))
     .map((f) => `tests/${f.split('\\').join('/')}`);
 
-  it('a scoped test importing a module of another group is lab\'s, importing core: the lab builds on core', () => {
+  it('a scoped test importing a module of another group is in a group above it: core, then scene, then lab', () => {
     // Narrowing a group's include can only lower a score (fewer tests to kill a mutant): a loud floor failure, never a
-    // false pass. So a scoped test that imports a module of a group runs in that group. The one known exception: lab's
-    // tests import core's modules, what the lab is built on (runner, bounded, io …), and may kill core mutants too (in
-    // main's single run lab-batch.test.ts was the first killer of some); core's own tests must suffice for core's
-    // floors, and T2b-2's per-mutant compare with the single run found every status unchanged (ADR 0038, T2b-2).
+    // false pass. So a scoped test that imports a module of a group runs in that group — unless the test's group builds
+    // on the module's (GROUPS' order: core, scene, lab). Lab's tests import core's modules, what the lab is built on
+    // (runner, bounded, io …), and may kill core mutants too (in main's single run lab-batch.test.ts was the first
+    // killer of some); core's own tests must suffice for core's floors, and T2b-2's per-mutant compare with the single
+    // run found every status unchanged (ADR 0038, T2b-2). The same for scene's (A25): its tests build scenes on core's
+    // draw order and geometry, and core's own tests hold core's floors.
     const misplaced: string[] = [];
     for (const test of testFiles.filter((t) => inGroup(t))) {
       const source = readFileSync(join(root, test), 'utf8');
@@ -140,7 +143,7 @@ describe('a group\'s tests: every scoped test that imports a module of a group i
         const module = relative(root, join(root, dirname(test), spec)).split('\\').join('/').replace(/\.js$/, '.ts');
         const group = scope[module]?.group;
         if (group === undefined || inGroup(test, group)) continue;
-        if (group === 'core' && inGroup(test, 'lab')) continue;
+        if (GROUPS.some((above) => GROUPS.indexOf(above) > GROUPS.indexOf(group) && inGroup(test, above))) continue;
         misplaced.push(`${test} imports ${module} (${group}) but is not in ${group}'s tests`);
       }
     }
