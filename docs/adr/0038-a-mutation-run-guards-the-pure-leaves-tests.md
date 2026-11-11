@@ -1949,8 +1949,24 @@ reports/mutation/stryker-tmp-a27`, about 6 minutes each on a loaded machine) sco
 96.50 % with A27's new cases (floor 94), android-tree-dialect.ts 86.34 % and then 95.45 % (floor 93), and
 android-bounds.ts 66.67 % and then 100 % (floor 98). The new cases kill the real survivors through the modules'
 exports. scope.json's baselines list what is left: equivalent mutants, anchors that no captured dump tests, and
-`uncut`'s skip conditions, which are pinned through draw order rather than here. The cold `android` group's own time
-and scores, with the lean lists above, are recorded here once it has run on a quiet machine.
+`uncut`'s skip conditions, which are pinned through draw order rather than here.
+
+The cold group, `npm run mutate -- --group android --force --tempDirName reports/mutation/stryker-tmp-a27b`, passed in
+**23 s** (load average 11 at its start, 17 at its end; main's cold groups measured core 461 s, scene 144 s and lab
+315 s that day, at load 4 to 25). android-wm.ts scores 95.45 % (572 mutants, 26 survived; floor 93),
+android-tree-dialect.ts 95.44 % (505 mutants, 21 survived, 2 without coverage; floor 93) and android-bounds.ts 100 %
+(9 mutants; floor 98). Leaving android.test.ts and android-presented-window.test.ts out cost two kinds of kill, now
+restored through the modules' own tests:
+
+- INPUT_SHOWN_COMMAND's and TOUCHABLE_COMMAND's strings, which only the adapter's calls in android.test.ts pinned.
+  android-wm.test.ts now pins them as sent.
+- The dialect's node-provider rule (`providesNodes`, `inProvider`, the `provided` set and the one window's copy of
+  it), which only android-presented-window.test.ts's plays killed. tests/adapters/android-accessibility-order.test.ts,
+  core's reading-order cases over parsed dumps, joins the dialect's tests and kills them.
+
+Six regex anchors the earlier core runs had counted as timeouts now survive (the window header's `^` and `$`,
+`Frames:`'s `^`, InsetsSource's `$`, DisplayFrames' `r=(\d)` and its tail). No captured dump tests them, and the
+baselines name them.
 
 **One multi-display rule was not taken.** The window manager's reads answer a second display in three ways:
 

@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { defaultDisplayFocus, parseFocusedWindow, parseImeInsets, parseInputShown, parseNavigationBand, parseStatusBand, parseTouchableRegion } from '../../src/adapters/android-wm.js';
+import { INPUT_SHOWN_COMMAND, TOUCHABLE_COMMAND, defaultDisplayFocus, parseFocusedWindow, parseImeInsets, parseInputShown, parseNavigationBand, parseStatusBand, parseTouchableRegion } from '../../src/adapters/android-wm.js';
 import { chooserInFocus } from '../../src/adapters/android-chooser.js';
 import { GBOARD, GBOARD_PANEL, GBOARD_STRIP, INPUT_SHOWN_LINE } from '../helpers/android-dumps.js';
 
@@ -543,5 +543,15 @@ describe('parseTouchableRegion — the IME window\'s touchable region (the parse
     ['a readable line beside one that is not (no line is dropped to make the rest agree)', GBOARD.floating.touchable + '  touchable region=SkRegion((359,1269\n'],
   ])('cannot read → undefined (no panel, the band alone): %s', (_name, out) => {
     expect(parseTouchableRegion(out)).toBeUndefined();
+  });
+});
+
+describe('the keyboard reads\' shell lines, as sent (until A27 pinned only through the adapter\'s calls, android.test.ts)', () => {
+  it('the witness: the input method\'s first `mInputShown` word, filtered on the device', () => {
+    expect(INPUT_SHOWN_COMMAND).toBe('dumpsys input_method | grep -m1 -w mInputShown');
+  });
+
+  it('the touchable region: the witness\'s line, every `touchable region=` line of the IME window, then `true`', () => {
+    expect(TOUCHABLE_COMMAND).toBe("dumpsys input_method | grep -m1 -w mInputShown; dumpsys window InputMethod | grep -F 'touchable region='; true");
   });
 });
