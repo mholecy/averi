@@ -20,6 +20,9 @@ export const liveResult = (id: string, source: Source, verdict: LiveVerdict = { 
 export const hedgedLegs = (source: Source): LiveResult[] =>
   UNAIMABLE_LEGS.map((id) => liveResult(id, source, { outcome: 'ok', why: 'hedged', accepted: { id: D68_SPREAD.id, residual: D68_SPREAD.residual } }, 'carousel'));
 
-/** live-cases.ts#summarize over these results, a run of this checkout (a rejudge's when `rejudgedFrom` names its record). */
+/**
+ * live-cases.ts#summarize over these results, a run of this checkout (a rejudge's when `rejudgedFrom` names its
+ * record).
+ */
 export const liveSummary = (platform: 'android' | 'ios', results: readonly LiveResult[], o: { rejudgedFrom?: string; premise?: ChooserPremise } = {}) =>
   summarize({ platform, sources: [...new Set(results.map((r) => r.source))], results, side: THIS_CHECKOUT, ...o });

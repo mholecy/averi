@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { failuresOf } from '../rejudge-failures.js';
 import { runFiles, type Asked } from './cases.js';
+import { nodeProcess } from './proc.js';
 import { runBatch, type Block, type BlockCtx, type BlockFiles, type LiveOutcome, type RunBatchOptions, type RunIo } from './runner.js';
 import { configOf, NO_SERIAL, NO_UDID, SERIAL_FLAGS, UDID_FLAGS, type ConfigRead, type Env } from './runner-lines.js';
 import { selectBlocks, type KnobValues, type Selection } from './select.js';
@@ -24,7 +25,10 @@ import { EXIT, exitCodeOf, parseVerdictLine, refusedLine, verdictLine, type Summ
  *   or how to give it (deviceInHand).
  */
 
-/** The lab device a standing batch runs on, by the config's id for it: the emulator's serial, or the simulator's udid. */
+/**
+ * The lab device a standing batch runs on, by the config's id for it: the emulator's serial, or the simulator's
+ * udid.
+ */
 export const LAB_DEVICES = {
   serial: { what: 'the lab emulator', missing: NO_SERIAL, flags: SERIAL_FLAGS },
   udid: { what: 'the lab simulator', missing: NO_UDID, flags: UDID_FLAGS },
@@ -223,7 +227,10 @@ export async function keptLiveRun(ctx: BlockCtx<{ B_LIVE: number }>, name: strin
   ctx.fs.createExclusive(outcomeFile(ctx.dir, name), `${JSON.stringify(outcome)}\n`);
 }
 
-/** A live block's judge, device-free: its outcome file, its rejudge summary and failure reasons, from its folder alone. */
+/**
+ * A live block's judge, device-free: its outcome file, its rejudge summary and failure reasons, from its folder
+ * alone.
+ */
 export function liveJudge(label: string, name: string): (j: BlockFiles) => Promise<string[]> {
   return async ({ dir, fs }) => {
     const text = fs.read(outcomeFile(dir, name));
@@ -240,8 +247,9 @@ export function liveJudge(label: string, name: string): (j: BlockFiles) => Promi
 
 /**
  * A standing batch run through runBatch, its exit its own: runBatch's result as it returns it — refused or interrupted,
- * its exit; ended, the standing rule over its SUMMARY and the wanted blocks' labels (standingExitOf). A run
- * whose device was not given is refused (noDeviceReason). The process's exit is the CLI entry's.
+ * its exit; ended, the standing rule over its SUMMARY and the wanted blocks' labels (standingExitOf), set as the
+ * seam's exit code too, over the runner's backstop (an unproven run's 3, not the runner's 0). A run whose device was
+ * not given is refused (noDeviceReason). The process's exit is the CLI entry's.
  */
 export async function standingRun<G extends string>(
   o: Pick<StandingOptions, 'io'>,
@@ -252,5 +260,8 @@ export async function standingRun<G extends string>(
   const batchReasons = b.config.ok && !given ? [noDeviceReason(st)] : [];
   const r = await runBatch({ name: st.batch, blocks: b.blocks, needs: b.needs, lastly: b.lastly, config: b.config, batchReasons, knobs: KNOBS, io: o.io });
   if (!('summary' in r)) return r.exit;
-  return standingExitOf(r.summary, b.blocks.filter((x) => b.wanted.includes(x.id)).map((x) => x.label));
+  const exit = standingExitOf(r.summary, b.blocks.filter((x) => b.wanted.includes(x.id)).map((x) => x.label));
+  // The backstop carries the standing code, never the runner's 0 for a run that proved nothing (fail closed).
+  (o.io?.seam ?? nodeProcess).setExitCode(exit);
+  return exit;
 }

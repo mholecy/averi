@@ -267,7 +267,7 @@
     "group": "lab",
     "tests": ["tests/truth/batch/standing.test.ts", "tests/truth/batch/lab-run.test.ts", "tests/truth/batch/lab-run-ios.test.ts"],
     "floor": 97,
-    "baseline": "99.31 % on 2026-11-11 (A21; cold full lab group, 367 s at load 30–10): 289 mutants, 1 survived (`summary ?? ''`, equivalent), 1 without coverage"
+    "baseline": "98.97 % on 2026-11-11 (A21: standingRun sets its own exit code over the runner's; cold, `--group lab --force --mutate`): 291 mutants, 2 survived (`summary ?? ''`, equivalent; `o.io?.seam` as `o.io.seam`, only the command line passes no io), 1 without coverage; 99.31 % on 2026-11-11 (A21; cold full lab group, 367 s at load 30–10): 289 mutants, 1 survived (`summary ?? ''`, equivalent), 1 without coverage"
   },
   "scripts/release/pack-files.ts": {
     "group": "lab",

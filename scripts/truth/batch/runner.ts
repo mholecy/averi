@@ -106,7 +106,8 @@ import { canonicalJson, EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parse
  *     const r = await runBatch({ name: 'batch-13', knobs, blocks: [labBlock(['android', 'ios'], { build }), kf, D43],
  *       needs: { ...build.needs, android: android.need, ios: ios.need }, lastly: [ios.lastly, build.lastly],
  *       config: configOf(process.argv.slice(2), process.env, repo) });
- *     process.exit(r.exit);                                           // at once: runBatch leaves the exit to its caller
+ *     process.exit(r.exit);                                           // at once: runBatch leaves the exit to its
+ *                                                                     // caller
  *
  * The rejudge is asked for its failure reasons (`--failures`, A21): a batch pointed at a checkout from before A21,
  * whose live.ts knows no such flag, sees every rejudge refused, so every live block INCONCLUSIVE — fail closed.

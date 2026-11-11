@@ -515,6 +515,8 @@ describe('the exit code (standing.ts#STANDING_EXIT, over the SUMMARY runBatch re
   it('an ERROR line in a live run\'s log, every block PASS: the SUMMARY\'s ERROR section makes it unproven, exit 3', async () => {
     seam.live.forms = { logLine: 'ERROR the lab app crashed once' };
     expect(await go(['--groups', 'forms'])).toBe(LAB_RUN_EXIT.unproven);
+    // The backstop carries the standing code, not the runner's 0: the last exit code set is 3 (fail closed).
+    expect(seam.exitCodes).toEqual([0, LAB_RUN_EXIT.unproven]);
     expect(summary()).toContain('ERROR the lab app crashed once');
     expect(summary().find((l) => l.startsWith('forms verdict:'))).toMatch(/^forms verdict: PASS/);
   });

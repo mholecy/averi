@@ -65,7 +65,10 @@ export const iosLabel = (source: IosSource, group: IosRunGroup): string => `ios 
 /** The batch's blocks, in its order: the lab block, every idb run, then every WebDriverAgent run. */
 export const IOS_BLOCK_IDS: readonly string[] = ['lab', ...IOS_SOURCES.flatMap((s) => IOS_RUN_GROUPS.map((g) => iosBlockId(s, g)))];
 
-/** The iOS batch's selection words (standing.ts#Standing): a group selects its idb block and its WebDriverAgent block. */
+/**
+ * The iOS batch's selection words (standing.ts#Standing): a group selects its idb block and its WebDriverAgent
+ * block.
+ */
 export const IOS_STANDING: Standing<IosRunGroup> = {
   batch: 'lab-run-ios',
   device: 'udid',
