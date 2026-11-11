@@ -606,7 +606,7 @@ function presentedScreen(window: WdaElement, appWindow: boolean): WdaElement | u
  * What the flags cannot tell (ADR 0018, the amendment's residual): a hidden screen-sized leaf that PASSES touches
  * (`.allowsHitTesting(false)`, RN `pointerEvents="none"`, accessibility-hidden) listed after the screen's content
  * reads as a backdrop, and taps beneath it are refused — unmeasured in any app; so the mark is its own kind, whose
- * remedy names this evidence and the way out when a screenshot shows no menu (ui-tree/standing.ts#presentedRemedy).
+ * remedy names this evidence and the way out when a screenshot shows no menu (ui-tree/remedy-text.ts#presentedRemedy).
  * docs/bugs/2026-10-14-ios-swiftui-blur-overlay-has-no-node-tap-beneath-reported-done.md
  */
 function inWindowBackdrops(window: WdaElement): readonly WdaElement[] {

@@ -6,7 +6,7 @@ import { scrollUntilVisible } from '../../src/interact/scroll.js';
 import { walkOf } from '../../src/ui-tree/placed.js';
 import { presentationOf } from '../../src/ui-tree/presentation.js';
 import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
-import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
+import { presentedRemedy, presentedStop } from '../../src/ui-tree/remedy-text.js';
 import { ElementNotFoundError, resolvePresent, resolveSettled } from '../../src/interact/resolve.js';
 import { coverOver, failureOf, play, type Row } from '../helpers/rounds.js';
 import { parseDump } from '../helpers/android-dumps.js';

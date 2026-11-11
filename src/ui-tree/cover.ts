@@ -117,7 +117,7 @@ export const MARGIN_BESIDE_MIN = 4;
  * - `touch` — the target the subject, the clause what it lies under: the tap's refusal and move
  *   (interact/tap-judgement.ts) and `scroll_until`'s covered sentences (interact/scroll-text.ts); `centre` given, the
  *   cover is said to lie over the target's centre there (the point a tap presses).
- * - `pixel` — the cover the subject (`<cover> <clause>`), the pixel assert's covered miss (verify/pixel-poll.ts): `at`
+ * - `pixel` — the cover the subject (`<cover> <clause>`), the pixel assert's covered miss (verify/pixel-text.ts): `at`
  *   the element's parenthetical as that sentence quotes it (`(element 51,470 300x64)`).
  */
 export type CoverGrammar = { readonly of: 'touch'; readonly centre?: Point } | { readonly of: 'pixel'; readonly at: string };

@@ -191,7 +191,7 @@ export interface DrawOrder {
    * draw order asks beside its rows. The verbs' one view of the tree source's mark is its `press`: a surface
    * `presentedAt`, `presentedOver` or `markedAt` named, as a sentence quotes it — where it presses (the reach
    * `presentedAt` holds its point against: the whole screen for a marked presented layer's cover, else its rect,
-   * geometry.ts#coverText quotes it) and that marked layer, which the remedy names (ui-tree/standing.ts#presentedRemedy).
+   * geometry.ts#coverText quotes it) and that marked layer, which the remedy names (ui-tree/remedy-text.ts#presentedRemedy).
    */
   readonly presentation: Presentation;
   /**
@@ -350,7 +350,7 @@ export interface Exposure {
    *   later screen-sized layer stacked over its own; or a marked presented layer's cover, reaching the whole screen,
    *   or a node of a marked `screen` layer) — never a control, a bar the layer carries or any other labelled node,
    *   which cover anyway (Safari's capsule bar). A target under one lies under a presented screen no scroll moves it
-   *   out from under — close it first (ui-tree/standing.ts#presentedRemedy;
+   *   out from under — close it first (ui-tree/remedy-text.ts#presentedRemedy;
    *   docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md).
    */
   readonly covers: readonly Cover[];

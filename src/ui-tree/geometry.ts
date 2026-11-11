@@ -1419,7 +1419,7 @@ export const quoted = ({ role, label, identifier, rect }: QuotedNode): QuotedNod
  * 402x780)` — or past one edge of (`where`: `below its scroll view …`, interact/target-text.ts#pastSideText), when
  * nothing of the node, or not its centre, is drawn there (ui-tree/standing.ts, the drawn frame, `Clips.drawnIn`). One
  * spelling for the tap's refusal, `scroll_until`'s sentences and the dismissal picker's skip line; the pixel assert's
- * miss heads (verify/pixel-poll.ts#OUTSIDE_ITS_SCROLL_VIEW, #TOO_THIN_IN_ITS_SCROLL_VIEW), quoted whole by the tool
+ * miss heads (verify/pixel-text.ts#OUTSIDE_ITS_SCROLL_VIEW, #TOO_THIN_IN_ITS_SCROLL_VIEW), quoted whole by the tool
  * description, end with the same words.
  */
 export const outsideScrollViewText = (scroller: QuotedNode, where = 'outside'): string =>

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { noScrollHelps, noScrollRemedyText, orderRemedyText, presentedLayerName, presentedRemedy, presentedStop, type Remedy } from '../../src/ui-tree/standing.js';
+import { node } from '../helpers/fake.js';
+import { noScrollHelps, type Remedy } from '../../src/ui-tree/standing.js';
+import { noScrollRemedyText, orderRemedyText, presentedLayerName, presentedRemedy, presentedStop } from '../../src/ui-tree/remedy-text.js';
 
-// The presented clause, per kind of marked layer (ui-tree/standing.ts#presentedRemedy, #presentedStop): a layer the
+// The presented clause, per kind of marked layer (ui-tree/remedy-text.ts#presentedRemedy, #presentedStop): a layer the
 // source types is named by its kind and label; a `screen` layer, or none marked, gets the presented screen's words.
 
 describe('presentedRemedy / presentedStop / presentedLayerName — the words per kind of presented layer', () => {
@@ -64,8 +66,8 @@ describe('orderRemedyText / noScrollRemedyText — the words of a cover listed i
 
   it('noScrollRemedyText words each no-scroll remedy as its own text does; noScrollHelps holds exactly those three', () => {
     expect(noScrollRemedyText({ of: 'seenOver' }, 'touch')).toBe(orderRemedyText({ of: 'seenOver' }, 'touch'));
-    expect(noScrollRemedyText({ of: 'bothPinned' }, 'pixel')).toMatch(/^no scroll moves the element out from under that: neither lies in a scroll view/);
-    const every: readonly Remedy[] = [{ of: 'unordered' }, { of: 'seenOver' }, { of: 'bothPinned' }, { of: 'presented' }, { of: 'keyboard' }, { of: 'fixed', what: 'screen' }, { of: 'pinned' }, { of: 'stuck' }, { of: 'scroll' }];
+    expect(noScrollRemedyText({ of: 'bothPinned', under: node({ role: 'button' }) }, 'pixel')).toMatch(/^no scroll moves the element out from under that: neither lies in a scroll view/);
+    const every: readonly Remedy[] = [{ of: 'unordered' }, { of: 'seenOver' }, { of: 'bothPinned', under: node({ role: 'button' }) }, { of: 'presented' }, { of: 'keyboard' }, { of: 'fixed', what: 'screen' }, { of: 'pinned' }, { of: 'stuck' }, { of: 'scroll' }];
     expect(every.filter(noScrollHelps).map((r) => r.of)).toEqual(['unordered', 'seenOver', 'bothPinned']);
   });
 });

@@ -294,7 +294,7 @@ export const SCREEN_SIZED_FRACTION = 0.9;
  * show over the screen beneath it (adapters/wda-source.ts#inWindowBackdrops: a SwiftUI menu's dimmed tap-catcher in
  * the screen's own container) — judged as a `screen` layer is, but on weaker evidence: one empty element WDA lists
  * over the whole screen, which a hidden overlay that lets touches through matches too, so its remedy names that
- * evidence and the way out (ui-tree/standing.ts#presentedRemedy).
+ * evidence and the way out (ui-tree/remedy-text.ts#presentedRemedy).
  */
 export type PresentationKind = 'alert' | 'actionSheet' | 'popover' | 'dialog' | 'screen' | 'backdrop';
 
@@ -706,7 +706,7 @@ export interface UiNode {
    *   its own nodes stay covers, each a presented surface (presentation.ts#PresentedOver, which draw order reads for
    *   each cover's `presented` flag, cover.ts#Cover, `presentedAt`, `presentedOver`, `markedAt`); the module hands the mark on as `MarkedLayer`
    *   (its kind and label, presentation.ts#Presentation.press) — to the standing's remedy
-   *   (ui-tree/standing.ts#presentedRemedy: "an alert is presented over it ("Exit confirmation")") and to
+   *   (ui-tree/remedy-text.ts#presentedRemedy: "an alert is presented over it ("Exit confirmation")") and to
    *   `scroll_until`'s stroke (interact/scroll-rounds.ts), never the node itself.
    * - `ui_snapshot`, which prints it with the tree's JSON (mcp/tools.ts), so later device trees carry it.
    * Absent everywhere else — on an idb tree but on a presented layer's root, on an Android tree but on a presented

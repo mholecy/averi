@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { everyNode, type PresentationKind, type Rect, type UiNode } from '../../src/adapters/types.js';
 import type { MarkedLayer } from '../../src/ui-tree/presentation.js';
 import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, KEYBOARD_UNLISTED, missNote, withMissNote } from '../../src/ui-tree/miss.js';
-import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
+import { presentedRemedy, presentedStop } from '../../src/ui-tree/remedy-text.js';
 import { boundText, describeScrollResult, flushText, UNTRIED_END, UNTRIED_LEAD } from '../../src/interact/scroll-text.js';
 import {
   CAROUSEL_REPLY_WORDS, carouselReply, fullyHedged, hedgedLead, hedgeWhy, replyKind, VISIBLE_STOP, MAX_SWIPES, flushProbedSide,
@@ -39,7 +39,7 @@ const src = (file: string) =>
     .replace(/^\s*\/\/.*$/gm, '');
 
 // The two "close it first" the harness reads apart (scripts/truth/replies.ts): the presented remedy, driven here by
-// src's own builders (ui-tree/standing.ts#presentedRemedy, #presentedStop) over every layer they word, and the
+// src's own builders (ui-tree/remedy-text.ts#presentedRemedy, #presentedStop) over every layer they word, and the
 // active-window hint (#ACTIVE_WINDOW_HINT), which is no presented remedy.
 
 /** Every presentation kind — the type check below fails when src adds one this list lacks. */
@@ -341,7 +341,7 @@ describe('LIVE_REPLY_WORDS: the words the live forms and turn judges key on, eac
   const WRITTEN_IN: Record<(typeof LIVE_REPLY_WORDS)[number], string> = {
     'Refused before anything was sent': 'src/adapters/typeable.ts',
     'did not change': 'src/interact/fill-text.ts',
-    'scroll_until it out from under': 'src/interact/target-text.ts',
+    'scroll_until it out from under': 'src/interact/touch-remedy.ts',
     'dismiss it first': 'src/interact/target-text.ts',
     'PARTLY UNDER a surface': 'src/interact/scroll-text.ts',
     'direction: "': 'src/ui-tree/sides.ts',

@@ -21,7 +21,7 @@ import { probePoint, within } from './truth.js';
  * stay here: refusedLadder's `last.includes(phrase)` (the phrase its caller passes, replies.ts#UNCHANGED_SAID),
  * judgeMissUnderSheet's `ASSERTS_FAILED.test` (replies.ts's own), and the quotes of the measured panel — kf3's
  * `over ${frameText(panel)}` (scroll_until's: src/interact/scroll-text.ts, `the soft keyboard over ${frameText(…)}`)
- * and kf1/kf2's `keyboard ${rectText(panel)}` (the pixel poll's: src/verify/pixel-poll.ts#keyboardCovers). Each is
+ * and kf1/kf2's `keyboard ${rectText(panel)}` (the pixel poll's: src/verify/pixel-text.ts#keyboardCovers). Each is
  * one src word around src's own geometry builder, left unpinned as A14 decided. KEYBOARD_QUOTE and OVER_QUOTE read
  * the same words, for a MISMATCH's why-text only.
  */
@@ -440,7 +440,7 @@ type AfterCalls = 'unread' | 'agreed';
 const quoted = (reply: string, pattern: RegExp): string => [...new Set([...reply.matchAll(pattern)].map((m) => m[0]))].join(', ') || 'no panel';
 /** The MISMATCH's measured side: the one panel both reads admitted. */
 const MEASURED_TWICE = 'the panel measured at launch and again after the calls is';
-/** The pixel poll's panel quote, `keyboard x,y wxh` (src/verify/pixel-poll.ts#keyboardCovers: `keyboard ${rectText(keyboard)}`). */
+/** The pixel poll's panel quote, `keyboard x,y wxh` (src/verify/pixel-text.ts#keyboardCovers: `keyboard ${rectText(keyboard)}`). */
 const KEYBOARD_QUOTE = /keyboard \d+,\d+ \d+x\d+/g;
 /** scroll_until's panel quote, `over [l,t][r,b]` (src/interact/scroll-text.ts: `the soft keyboard over ${frameText(…)}`). */
 const OVER_QUOTE = /over \[\d+,\d+\]\[\d+,\d+\]/g;

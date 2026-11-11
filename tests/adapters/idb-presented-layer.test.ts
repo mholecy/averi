@@ -5,7 +5,7 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { walkOf } from '../../src/ui-tree/placed.js';
 import { presentationOf } from '../../src/ui-tree/presentation.js';
 import { missNote, missOf } from '../../src/ui-tree/miss.js';
-import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
+import { presentedRemedy, presentedStop } from '../../src/ui-tree/remedy-text.js';
 import { ElementNotFoundError, resolveSettled } from '../../src/interact/resolve.js';
 import { failureOf, play, resultOf, type Row } from '../helpers/rounds.js';
 

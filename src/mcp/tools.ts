@@ -4,7 +4,7 @@ import type { AdapterRegistry } from './registry.js';
 import { BARE_TREE_CONTENTS } from '../ui-tree/bare-tree.js';
 import { findAll } from '../ui-tree/selectors.js';
 import { ACTIVE_WINDOW_HINT } from '../ui-tree/miss.js';
-import { presentedRemedy, presentedStop } from '../ui-tree/standing.js';
+import { presentedRemedy, presentedStop } from '../ui-tree/remedy-text.js';
 import { fillField } from '../interact/fill.js';
 import { fillReply } from '../interact/fill-text.js';
 import { typeIntoFocused } from '../interact/type-text.js';

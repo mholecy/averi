@@ -4,7 +4,7 @@ import { presentationOf, type MarkedLayer } from './presentation.js';
 import { clips } from './scroll-containers.js';
 import { findTarget, hasArea, soleIdOf, type Target } from './selectors.js';
 import { clippedOutText, revealText } from './sides.js';
-import { presentedLayerName, presentedRemedy } from './standing.js';
+import { presentedLayerName, presentedRemedy } from './remedy-text.js';
 import { isBareTreeMemo } from './verdict.js';
 
 /**

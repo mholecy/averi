@@ -5,7 +5,8 @@ import { isUnnamedWrapper } from '../ui-tree/placed.js';
 import { scrollAxis, scrolls } from '../ui-tree/scroll-containers.js';
 import { isInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { accessoryDismissButton } from '../ui-tree/soft-keyboard.js';
-import { outsideItsScrollView, presentedRemedy, type TapStanding } from '../ui-tree/standing.js';
+import { presentedRemedy } from '../ui-tree/remedy-text.js';
+import { outsideItsScrollView, type TapStanding } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { KeyboardDismissal } from './keyboard-model.js';
 import { describeTarget, findTarget, type Ambiguity } from './resolve.js';
@@ -223,7 +224,7 @@ function configuredStrategy(d: KeyboardDismissal): DismissalStrategy {
  * that node, the last such (drawn on top): the tap would press it, and on the post-fill `dismiss()` path a pressed
  * control would be reported as the dismissal. A silently pressed control is worse than a skipped title (ADR 0016). A
  * candidate beneath a presented layer the tree marks (an alert) is skipped in the tap's words for it
- * (ui-tree/standing.ts#presentedRemedy: the alert named, close it first), whatever else keeps it from a tap.
+ * (ui-tree/remedy-text.ts#presentedRemedy: the alert named, close it first), whatever else keeps it from a tap.
  */
 function whyNotTapped(standing: TapStanding, node: UiNode): string | undefined {
   // Beneath a presented layer the tree marks (an alert), whatever the kind: the alert's words, as the tap refuses it.

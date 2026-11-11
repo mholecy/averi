@@ -21,7 +21,7 @@ import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { CLASSIC_VIEWS, SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';
 import { bandNode, dropBand, el, FakeAdapter, iosLoginFake, node, recorded, resetLayout, screen } from '../helpers/fake.js';
 import { missNote } from '../../src/ui-tree/miss.js';
-import { bothPinnedRemedyText } from '../../src/ui-tree/standing.js';
+import { bothPinnedRemedyText } from '../../src/ui-tree/remedy-text.js';
 
 const FAST = { ambiguous: 'first' as const, timeoutMs: 60, pollMs: 2 };
 const FIRST = { ambiguous: 'first' as const };
