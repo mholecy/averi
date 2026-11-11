@@ -53,9 +53,10 @@ them in the background.
 5. **Golden** (the replayed truth corpus, judged against this checkout's KNOWN tables, not against the last tag):
 
    ```
-   node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth > "$OUT/golden.txt"            # exit 0
-   node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth --json > "$OUT/golden.json"    # exit 0
-   node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth --against "$OUT/golden.json"   # exit 0
+   G='node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth'
+   $G > "$OUT/golden.txt"                           # exit 0
+   $G --json > "$OUT/golden.json"                   # exit 0
+   $G --against "$OUT/golden.json"                  # exit 0
    ```
 
    The pass criterion (`goldenReport` and `diffReport` in golden.ts and golden-diff.ts; the exit code is `exitCode`
@@ -113,14 +114,14 @@ or restart anything to bring it up.
 
    ```
    perl -e 'alarm shift; exec @ARGV' 3600 \
-     node --import tsx scripts/truth/live.ts --serial emulator-5554 --groups visibility,dismissal,ensure,carousel \
+     node --import tsx scripts/truth/live.ts --serial emulator-5554 --groups visibility,ensure,carousel \
        --record "$OUT/android-live.json" --shots "$OUT/android-live-shots" > "$OUT/android-live.txt" 2>&1
    ```
 
-   `perl … alarm` bounds the run at one hour (macOS has no `timeout`). An exit of 142 (SIGALRM) means the run went past
-   its bound: unproven. `--record` writes every read as JSON, and `--shots` keeps the screen of each case that is not
-   ok. `dismissal` is iOS only and selects no case here. The carousel group reads the device's state before and after
-   its cases (about 55 s each) into the summary's `Device:` line. That line is a label, not a gate: record it.
+   `perl … alarm` bounds the run at one hour (macOS has no `timeout`). An exit of 142 (SIGALRM) means the run went
+   past its bound: unproven. `--record` writes every read as JSON, and `--shots` keeps the screen of each case that is
+   not ok. The `dismissal` group is iOS only: Gate C runs it. The carousel group reads the device's state before and
+   after its cases (about 55 s each) into the summary's `Device:` line. That line is a label, not a gate: record it.
 
    It passes only on **exit 0** (the summary's rules: `summarize` in live-cases.ts). The header line reads `# Live
    golden: N cases, … M mismatches (0 not known), …`, so every mismatch is one live-known.ts lists (marked `[known:
@@ -130,21 +131,27 @@ or restart anything to bring it up.
 ## Gate C: iOS (owner, outside the agent's sandbox)
 
 The agent's sandbox cannot drive simctl, idb, xcodebuild or WebDriverAgent. The agent asks the owner to run, from the
-checkout at the commit Gate A tested:
+checkout at the commit Gate A tested (`xcrun simctl list devices | grep 'averi-lab '` names the lab simulator):
 
 ```
-scripts/truth/batch/ios-release.sh <out dir> [--udid <lab simulator>] [--limit <seconds per run>]
+npm run truth:lab:ios -- --out <dir outside the checkout> --udid <lab simulator> [--groups forms|visibility|…]
 ```
 
-It finds the lab simulator by its name (`averi-lab …`), builds the lab app from the checkout and installs it, then
-checks that the installed `cells.json` is the checkout's. It runs live.ts once for each tree source (idb, wda) and each
-iOS group (forms, visibility, dismissal, ensure), resetting the simulator before every run and bounding each run (1800
-s by default). It writes `ios-<source>-<group>.log.txt` per run and `ios-release.log.txt` (one PASS, FAIL or UNPROVEN
-line per run), all cleaned. It **passes on exit 0**. Exit 1 means a run failed (live.ts exit 1). Exit 2 means refused.
-Exit 3 means unproven. If no lab simulator is available, the owner decides: Gate C is not skipped silently. A release
-without it says so in the record and in the release commit's message.
+This is lab-run-ios.ts in scripts/truth/batch, lab-run's iOS counterpart through the same runner. Its `lab` block
+guards the simulator (device-check's and any simulator not named `averi-lab …` are refused before any call), resets
+it, builds the lab app from the checkout and installs it, and checks that the installed `cells.json` is the
+checkout's. Then it runs live.ts once per iOS group (forms, visibility, dismissal, ensure) under idb, each after a
+health check. Then it runs each group under WebDriverAgent, each inside its own D43 settings window: the simulator's
+settings backed up, the run, WebDriverAgent ended, the settings put back key by key and compared. The finportal key is
+read at the start and at the end, and a change fails the run. A signal puts an open window back and exits 130. Each
+live run is bounded (`B_LIVE`, 1800 s by default).
 
-The owner hands the out dir's `.log.txt` files back to the agent for the record.
+It passes only on **exit 0**, the same codes as `truth:lab`. Exit 1 is a FAIL or a `RESTORE.txt`, exit 2 means
+refused or nothing ran (no udid, the simulator not the lab's or not booting), 3 means unproven, 130 means interrupted.
+If no lab simulator is available, the owner decides: Gate C is not skipped silently. A release without it says so in
+the record and in the release commit's message.
+
+The owner hands back the SUMMARY (`<out>/meta/run-<id>/summary.txt`) for the record, cleaned with clean-log.ts.
 
 ## Gate D: the release (agent prepares, owner publishes)
 
@@ -159,7 +166,8 @@ Only after A, B and C passed, on the commit they tested:
      that now refuses, warns or takes longer). The house style counts the latter as minor even while 0.x;
    - **patch**: fixes only, with no new surface and no change a consumer sees except the bug gone.
 2. **The bump:** `npm version X.Y.Z --no-git-tag-version` (it writes package.json and package-lock.json). Then `npm
-   run build && npm run release:smoke` again: the server must report the new version.
+   run build && npm run release:smoke` again. The smoke only proves that the bin reads the package.json shipped
+   beside it, so check by eye that its `server:` line shows the new version.
 3. **The record:** `docs/releases/vX.Y.Z.md` (the template below) and its logs under `docs/releases/vX.Y.Z/`, each a
    cleaned `.log.txt`. Then `npx vitest run tests/docs`: the path-hygiene test holds docs/ to no host path.
 4. **The commit:** one commit, `chore(release): X.Y.Z`, holding package.json, package-lock.json and the record. The
@@ -190,13 +198,13 @@ Only after A, B and C passed, on the commit they tested:
 | A lint | exit 0 | vX.Y.Z/lint.log.txt |
 | A tests | N files, M tests passed | vX.Y.Z/test.log.txt |
 | A build | exit 0 | vX.Y.Z/build.log.txt |
-| A golden | N checks, M mismatches (M known, 0 new), 0 broken; K skipped (no OCR in the sandbox) | vX.Y.Z/golden.log.txt |
+| A golden | N checks, M mismatches (M known, 0 new), 0 broken; K skipped (no OCR) | vX.Y.Z/golden.log.txt |
 | A golden diff | Strike 0, COUNTS 0, Re-pin 0 | vX.Y.Z/golden-against.log.txt |
 | A mutation | core PASS, lab PASS (cold) | vX.Y.Z/mutate.log.txt |
 | A package | release smoke: PASS (N files, 18 tools) | vX.Y.Z/release-smoke.log.txt |
 | B truth:lab | exit 0: lab, chooser, forms PASS | vX.Y.Z/android-truth-lab.log.txt |
 | B live | exit 0: N cases, M mismatches (0 not known); Device: <label> | vX.Y.Z/android-live.log.txt |
-| C iOS | exit 0: 8 runs PASS (or: not run, and why) | vX.Y.Z/ios-release.log.txt, vX.Y.Z/ios-*.log.txt |
+| C iOS | exit 0: lab, 4 idb and 4 wda blocks PASS (or: not run, and why) | vX.Y.Z/ios-truth-lab.log.txt |
 
 Not proven: <anything skipped or unproven, or "nothing">.
 ```

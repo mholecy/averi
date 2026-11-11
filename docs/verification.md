@@ -292,9 +292,13 @@ build's reason, which lists every source and what it gave, and the run ends unpr
 
 It runs as Gate B of every release ([docs/release.md](release.md)), on `emulator-5554`, by the agent preparing the
 release (the owner's decision, backlog T24) or by the owner. A chooser run that leaves a lab default behind fails the
-run by name, and the cleanup clears that default by uninstalling and reinstalling the lab app. Everything it writes goes under `--out`, apart from the
-git-ignored Gradle build products in the checkout: a `<block>/run-<id>` folder per block, holding the live records,
-logs and rejudge summaries, and `meta/run-<id>/summary.txt`, the SUMMARY.
+run by name, and the cleanup clears that default by uninstalling and reinstalling the lab app. Everything it writes
+goes under `--out`, apart from the git-ignored Gradle build products in the checkout: a `<block>/run-<id>` folder per
+block, holding the live records, logs and rejudge summaries, and `meta/run-<id>/summary.txt`, the SUMMARY.
+
+Its iOS counterpart, `npm run truth:lab:ios -- --out <dir> --udid <lab simulator>` (lab-run-ios.ts, Gate C, the
+owner's), runs live.ts's iOS groups on the lab simulator: every idb run first, then every WebDriverAgent run in its own
+D43 settings window, with the same exit codes.
 
 The exit code is stricter than a device batch's, so a release can gate on it (only 0 passes):
 

@@ -20,7 +20,7 @@ const FORBIDDEN_TREES = ['tests', 'fixtures', 'docs', 'reports', 'src', 'scripts
 /** A compiled test (a `*.test.*` or `*.spec.*` anywhere): never shipped. */
 const TEST_FILE = /\.(test|spec)\.[cm]?[jt]s$/;
 
-const strip = (path: string) => path.replace(/^\.\//, '');
+const strip = (path: string) => (path.startsWith('./') ? path.slice(2) : path);
 const under = (path: string, tree: string) => path.startsWith(`${tree}/`);
 
 /** The problems of a packed file list (`npm pack --json`'s `files[].path`), each a line; none when it is fit to ship. */

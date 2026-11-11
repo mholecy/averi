@@ -816,11 +816,17 @@ starts it, because its cleanup may uninstall and reinstall the lab app.
 The net is needed when a new averi version goes out, not on a clock.
 
 **Decision.** `npm run truth:lab` is Gate B of every release (docs/release.md), together with live.ts's visibility,
-dismissal, ensure and carousel groups on the same emulator. It passes only on exit 0. A FAIL, a RESTORE, a refusal and
-an unproven run (exit 3) each stop the release. The agent that prepares a release runs it on `emulator-5554`. This
+ensure and carousel groups on the same emulator. It passes only on exit 0. A FAIL, a RESTORE, a refusal and an
+unproven run (exit 3) each stop the release. The agent that prepares a release runs it on `emulator-5554`. This
 replaces the T20b amendment's "an agent never starts it": the cleanup's uninstall and reinstall of the lab APK is a lab
 APK install, and the release's device rules allow it. They do not allow an AVD start or restart, `pm clear` or a
 dexopt. When the emulator is not up, the agent stops and tells the owner. T20c is superseded and nothing is scheduled.
 
+Gate C is the batch's iOS counterpart, `npm run truth:lab:ios` (lab-run-ios.ts), composed of the same runner and lab
+plumbing: the lab block (the guard, the reset, this checkout's app built and installed), every idb run of live.ts's
+iOS groups (forms, visibility, dismissal, ensure) after its health check, then every WebDriverAgent run in its own D43
+settings window. The two batches share their selection words, the live blocks' judge and the exit rule (lab-run.ts's
+`Standing`, `liveJudge`, `standingRun`). The owner runs it, outside the agent's sandbox.
+
 **Consequences.** Every release runs the net, so a chooser regression cannot ship between scheduled runs. The cost is
-one batch per release, not one per night. Between releases the net runs only when someone asks for it.
+one batch per platform per release, not one per night. Between releases the net runs only when someone asks for it.

@@ -22,11 +22,13 @@ import { bareImports, packFileProblems, toolProblems, undeclaredImports, type Pa
  *    borrows the checkout's node_modules, devDependencies too: a dev-only import is caught here, not there);
  * 3. the extracted bin spawned with node over stdio, the checkout's node_modules linked beside it, and an MCP client
  *    asks it `initialize` and `tools/list`: the server's name and version must be package.json's, its tools exactly
- *    tests/helpers/tool-names.ts's, in order (pack-files.ts#toolProblems).
+ *    tests/helpers/tool-names.ts's, in order (pack-files.ts#toolProblems). The version check proves only that the bin
+ *    reads the package.json shipped beside it (src/util/version.ts): the server reports whatever that file says, so a
+ *    version left unbumped passes here — the bump is Gate D's to check by eye.
  *
  * Not part of `npm test`: it needs `npm run build` first (dist is the package's), and packs and spawns. No device, no
  * network. Prints no absolute path (its output goes into the release record), removes its temporary folder, and exits
- * 0 on PASS, 1 on FAIL, 2 when dist is missing.
+ * 0 on PASS, 1 on FAIL (package.json's bin not built among them), 2 when dist/ is missing.
  */
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
@@ -75,9 +77,10 @@ async function listTools(packageDir: string, bin: string): Promise<{ name?: stri
 export async function smoke(): Promise<{ lines: string[]; exitCode: 0 | 1 | 2 }> {
   const pkg = JSON.parse(await readFile(join(ROOT, 'package.json'), 'utf8')) as Pkg;
   const bin = binOf(pkg).replace(/^\.\//, '');
-  if (!existsSync(join(ROOT, bin))) return { lines: [`release smoke: REFUSED — ${bin} is not built; run \`npm run build\` first`], exitCode: 2 };
+  if (!existsSync(join(ROOT, 'dist'))) return { lines: ['release smoke: REFUSED — dist/ is missing; run `npm run build` first'], exitCode: 2 };
   const lines: string[] = [`release smoke: ${pkg.name}@${pkg.version}, bin ${bin}`];
   const problems: string[] = [];
+  // Built, but nothing where package.json's bin points: the file check below FAILs naming it (`missing: … (bin …)`).
   const tmp = await mkdtemp(join(tmpdir(), 'averi-release-smoke-'));
   try {
     // 1. the tarball and its file list
@@ -98,7 +101,7 @@ export async function smoke(): Promise<{ lines: string[]; exitCode: 0 | 1 | 2 }>
     problems.push(...importProblems);
 
     // 3. the bin, started as a client starts it
-    if (!existsSync(join(packageDir, bin))) problems.push(`not started: ${bin} is not in the tarball`);
+    if (!existsSync(join(packageDir, bin))) problems.push(`not started: package.json's bin ${bin} is not in the tarball`);
     else {
       await symlink(join(ROOT, 'node_modules'), join(packageDir, 'node_modules'), 'dir');
       try {

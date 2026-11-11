@@ -49,8 +49,14 @@ describe('packFileProblems: the packed file list against what the package needs'
     ]);
   });
 
-  it('a test file compiled into dist is not for the package either', () => {
-    expect(packFileProblems([...GOOD, 'dist/mcp/tools.test.js'], PKG)).toEqual(['not for the package: dist/mcp/tools.test.js']);
+  it('a test file compiled into dist is not for the package either, in any module flavour; a name merely holding .test. is', () => {
+    const tests = ['dist/mcp/tools.test.js', 'dist/a.spec.mjs', 'dist/b.test.cjs'];
+    expect(packFileProblems([...GOOD, ...tests, 'dist/fixtures.test.json', 'dist/x.test.jsx'], PKG)).toEqual(['not for the package: dist/mcp/tools.test.js', 'not for the package: dist/a.spec.mjs', 'not for the package: dist/b.test.cjs']);
+  });
+
+  it('only a leading ./ is dropped: a ./ inside a name is kept', () => {
+    expect(packFileProblems([...GOOD.filter((f) => f !== 'dist/mcp/server.js'), 'dist/v./mcp/server.js'], { ...PKG, bin: { averi: 'dist/v./mcp/server.js' } })).toEqual([]);
+    expect(packFileProblems(GOOD, { ...PKG, bin: { averi: 'dist/./mcp/server.js' } })).toEqual(['missing: dist/./mcp/server.js (bin averi)']);
   });
 
   it('a name that only starts like a forbidden tree passes (testsuite.md is no tests/)', () => {
@@ -83,14 +89,18 @@ describe('bareImports: the package specifiers a compiled module imports', () => 
       "} from '@modelcontextprotocol/sdk/server/mcp.js';",
       "export { x } from './x.js';",
       "export * from \"yaml\";",
-      "const m = await import('pixelmatch');",
+      "const m = await import( 'pixelmatch' );",
+      "  import { q } from 'indented';",
+      "  import 'indented-side';",
+      'export * from"tight";',
+      'import"tight-side";',
       "import { y } from '../y.js';",
     ].join('\n');
-    expect(bareImports(source)).toEqual(['pngjs', 'zod', '@modelcontextprotocol/sdk/server/mcp.js', 'yaml', 'pixelmatch']);
+    expect(bareImports(source)).toEqual(['pngjs', 'zod', '@modelcontextprotocol/sdk/server/mcp.js', 'yaml', 'pixelmatch', 'indented', 'indented-side', 'tight', 'tight-side']);
   });
 
   it('a string in prose that merely follows the word import is no import', () => {
-    expect(bareImports("const why = `the import failed`; say('import this read failed');\nlog(\"from 'nowhere'\");\nconst s = \"we import it from 'nowhere'\";")).toEqual([]);
+    expect(bareImports("const why = `the import failed`; say('import this read failed');\nlog(\"from 'nowhere'\");\nconst s = \"we import it from 'nowhere'\";\nsay(\"import 'nowhere'\");")).toEqual([]);
   });
 });
 

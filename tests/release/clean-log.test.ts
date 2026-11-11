@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hostPaths, scrub } from '../../scripts/release/clean-log.js';
+import { hostPaths, scrub, subsOf } from '../../scripts/release/clean-log.js';
 
 /** The release record's logs hold no host path (docs/release.md; path-hygiene.test.ts holds docs/ to it): clean-log.ts. */
 describe('scrub: host paths replaced by labels, longest first', () => {
@@ -28,11 +28,26 @@ describe("hostPaths: the checkout, the temporary folder and home, each as given 
     ]);
   });
 
-  it('strips a trailing slash (a TMPDIR ends in one)', () => {
-    expect(hostPaths({ repo: '/w/repo/', tmp: '/t/', home: '/h/me', real: (p) => p }, [])).toEqual([
+  it('strips trailing slashes (a TMPDIR ends in one), but never the root\'s own', () => {
+    expect(hostPaths({ repo: '/w/repo//', tmp: '/t/', home: '/', real: (p) => p }, [['/', '<root>']])).toEqual([
       ['/w/repo', '<repo>'],
       ['/t', '<tmp>'],
-      ['/h/me', '~'],
+      ['/', '~'],
+      ['/', '<root>'],
     ]);
+  });
+});
+
+describe("subsOf: the caller's <path>=<label> arguments", () => {
+  it('splits each at its last =, so a path may hold one', () => {
+    expect(subsOf(['/w/out=<out>', '/w/a=b=<x>'])).toEqual([
+      ['/w/out', '<out>'],
+      ['/w/a=b', '<x>'],
+    ]);
+  });
+
+  it('refuses one with no = or no path before it', () => {
+    expect(() => subsOf(['/w/out'])).toThrow('clean-log: <path>=<label>, not "/w/out"');
+    expect(() => subsOf(['=<out>'])).toThrow('not "=<out>"');
   });
 });

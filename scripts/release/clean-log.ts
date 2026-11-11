@@ -34,6 +34,15 @@ export function hostPaths(host: { repo: string; tmp: string; home: string; real:
   return [...both(host.repo, '<repo>'), ...both(host.tmp, '<tmp>'), ...both(host.home, '~'), ...extra.flatMap(([p, label]) => both(p, label))];
 }
 
+/** The caller's `<path>=<label>` arguments, split at the last `=`; one with no path before it throws. */
+export function subsOf(argv: readonly string[]): Sub[] {
+  return argv.map((a): Sub => {
+    const at = a.lastIndexOf('=');
+    if (at <= 0) throw new Error(`clean-log: <path>=<label>, not "${a}"`);
+    return [a.slice(0, at), a.slice(at + 1)];
+  });
+}
+
 if (isMain(import.meta.url)) {
   const real = (p: string) => {
     try {
@@ -42,13 +51,8 @@ if (isMain(import.meta.url)) {
       return p;
     }
   };
-  const extra = process.argv.slice(2).map((a): Sub => {
-    const at = a.lastIndexOf('=');
-    if (at <= 0) throw new Error(`clean-log: <path>=<label>, not "${a}"`);
-    return [a.slice(0, at), a.slice(at + 1)];
-  });
   const chunks: Buffer[] = [];
   for await (const c of process.stdin) chunks.push(c as Buffer);
-  const subs = hostPaths({ repo: fileURLToPath(new URL('../..', import.meta.url)), tmp: tmpdir(), home: homedir(), real }, extra);
+  const subs = hostPaths({ repo: fileURLToPath(new URL('../..', import.meta.url)), tmp: tmpdir(), home: homedir(), real }, subsOf(process.argv.slice(2)));
   process.stdout.write(scrub(Buffer.concat(chunks).toString('utf8'), subs));
 }
