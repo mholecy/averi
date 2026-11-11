@@ -509,6 +509,71 @@ describe('pollTree — the one deadline loop', () => {
   });
 });
 
+// A31 (ADR 0033 amendment, reopening A7 slice B): what a caller learns of each read beside the predicate — its timing,
+// and a failed one, which the predicate never sees — without wrapping the adapter.
+describe('pollTree — the read observer', () => {
+  it('is told of every fresh read before its predicate runs: when it started and ended, and the error of one that failed', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    resetSleeps();
+    try {
+      const t0 = Date.now();
+      const log: string[] = [];
+      let reads = 0;
+      const outcome = await pollTree(
+        {
+          uiTree: async () => {
+            vi.setSystemTime(Date.now() + 30); // each read takes 30 ms
+            if (reads++ === 1) throw new Error('null root node');
+            return tree;
+          },
+        },
+        () => (log.push(`predicate @${Date.now() - t0}`), reads === 3 ? 'done' : undefined),
+        {
+          timeoutMs: 10_000,
+          pollMs: 500,
+          observer: {
+            read: ({ startedAt, endedAt, error }) => log.push(`read ${startedAt - t0}–${endedAt - t0}${error === undefined ? '' : ` ${error.message}`}`),
+          },
+        },
+      );
+      expect(outcome).toEqual({ timedOut: false, value: 'done' });
+      expect(log).toEqual(['read 0–30', 'predicate @30', 'read 500–530 null root node', 'read 1000–1030', 'predicate @1030']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('is never told of a handed-on read — only of the reads this poll took', async () => {
+    const told: number[] = [];
+    const now = Date.now();
+    const outcome = await pollTree({ uiTree: async () => tree }, (_t, round) => (round.handedOn ? undefined : 'fresh'), {
+      timeoutMs: 0,
+      pollMs: 5,
+      first: { take: () => ({ tree, startedAt: now - 100, endedAt: now - 50 }) },
+      observer: { read: ({ startedAt }) => told.push(startedAt) },
+    });
+    expect(outcome).toEqual({ timedOut: false, value: 'fresh' });
+    expect(told).toHaveLength(1);
+    expect(told[0]).toBeGreaterThanOrEqual(now);
+  });
+
+  it('is not told of a read no wait cures: it leaves the poll as it came', async () => {
+    const wedged = new PersistentReadError('wedged until a reboot');
+    const told: unknown[] = [];
+    const poll = pollTree(
+      {
+        uiTree: async () => {
+          throw wedged;
+        },
+      },
+      () => 'never',
+      { timeoutMs: 60_000, pollMs: 2, observer: { read: (r) => told.push(r) } },
+    );
+    await expect(poll).rejects.toBe(wedged);
+    expect(told).toEqual([]);
+  });
+});
+
 describe('pollTree — a handed-on first sample (ADR 0030)', () => {
   const marked = (id: string): UiNode => ({ ...tree, identifier: id });
   const handing = (read: HandedRead | undefined) => {

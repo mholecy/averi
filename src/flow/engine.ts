@@ -1111,8 +1111,8 @@ export class FlowEngine {
    * `no` without polling to its deadline. A spinner's or a bare tree's other
    * counting is unchanged (a spinner tree still counts as rendered). A
    * handed-on read is never shown to it (it may only answer `yes`); a failed
-   * read is, through `reading` below (pollTree shows the predicate trees
-   * only): the same tree on both sides of reads that saw nothing did not
+   * read is, through pollTree's observer below (pollTree shows the predicate
+   * trees only): the same tree on both sides of reads that saw nothing did not
    * provably hold (code review, 2026-10-31). Without
    * `holdMs` a `no` still waits for the deadline. A held `no` carries
    * `heldMs`, how long its tree held, for the ladder's trace line.
@@ -1137,24 +1137,12 @@ export class FlowEngine {
     let rendered = 0;
     let lastBareTree: UiNode | undefined;
     const hold = holdMs === undefined ? undefined : holdTracker(holdMs);
-    // A failed read restarts the hold (HoldTracker.observe, code review 2026-10-31): pollTree shows the predicate only
-    // the reads that returned a tree, so with a hold the reads go through this, which tells the tracker of the others.
-    const reading: Pick<DeviceAdapter, 'uiTree'> =
-      hold === undefined ?
-        this.adapter
-      : {
-          uiTree: (opts) =>
-            this.adapter.uiTree(opts).catch((e: unknown) => {
-              hold.observe(undefined, Date.now());
-              throw e;
-            }),
-        };
     // A handed-on round (`first`, ADR 0030) may only answer `yes`: it never counts as rendered or bare, so the
     // probe's `no`, `bare` and `unknown` — the answers the ladder escalates and refuses a wipe on — rest on fresh
     // reads alone. And the probe produces: its reads may be handed to the next step.
     const outcome = await this.handOff.producing(() =>
       pollTree(
-        reading,
+        this.adapter,
         async (tree, { handedOn }) => {
           if ((await this.evaluate(cond, tree)) === 'yes') return 'yes' as const;
           if (handedOn) return undefined;
@@ -1163,7 +1151,20 @@ export class FlowEngine {
           const heldMs = hold?.observe(tree, Date.now());
           return heldMs === undefined ? undefined : { heldMs };
         },
-        { timeoutMs: windowMs, pollMs: this.pollMs, ...(first !== undefined && { first }) },
+        {
+          timeoutMs: windowMs,
+          pollMs: this.pollMs,
+          ...(first !== undefined && { first }),
+          // A failed read restarts the hold (HoldTracker.observe, code review 2026-10-31): pollTree shows the predicate
+          // only the reads that returned a tree, and tells its observer of the others (A31, ui-tree/read-tree.ts#PollObserver).
+          ...(hold !== undefined && {
+            observer: {
+              read: ({ endedAt, error }) => {
+                if (error !== undefined) hold.observe(undefined, endedAt);
+              },
+            },
+          }),
+        },
       ),
     );
     // `yes`, or — with `holdMs` — `no` on a rendered tree that held still (above), with how long it held.

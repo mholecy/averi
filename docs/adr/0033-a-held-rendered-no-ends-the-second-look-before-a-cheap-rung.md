@@ -7,7 +7,8 @@ D11 analysed"; the orchestrator's decision, variant A). Implemented on `perf/d2-
 8a4efe1b, 021fade0 and 8999f3ff, merged e26fa898). Amended 2026-11-01 (A7): both checks now live in one module — the
 last section. Amended 2026-11-02 (D50: through idb an unlabelled `GenericElement` with the `UpdatesFrequently` trait →
 `progress`, so SwiftUI's ProgressView stops a hold there too — the D50 sub-bullet below; commits 9559a7f9, d0f69f85,
-merge f0bf0d70).
+merge f0bf0d70). Amended 2026-11-11 (A31, A7's slice B): the hold learns of a failed read from `pollTree`'s observer,
+not through a wrapper of the adapter — the section "A poll observer".
 
 ## Context
 
@@ -160,3 +161,34 @@ wipe lies ahead (above).
 The two checks of "No wipe ahead" above — `wipeAhead === 0`, the engine counter, and `state.reach.slice(i)` under
 `flowIsDestructive` — now live in `flow/wipes-ahead.ts#WipesAhead`: `noneAheadOf(rungs, i)` asks both,
 `running(rungs, i, fn)` raises and lowers the count around a rung. The decision is unchanged.
+
+## Amendment: a poll observer (2026-11-11, backlog A31 — A7's slice B)
+
+A7 left slice B, a poll observer, undone: one consumer (the hold's failed-read wrapper above) made it a hypothetical
+seam, to be revisited "if a second poll observer appears". The 2026-11-11 architecture review (card 13) found the
+second: the pixel poll (`verify/pixel-poll.ts#pollPixels`) wrapped the adapter's `uiTree` too, only to note when each
+read started, so the timeout can quote the slowest round from the start of its read. Two callers each handed `pollTree`
+a fake adapter to see what `pollTree` already knew.
+
+`pollTree` now takes an optional observer (`PollOptions.observer`, `ui-tree/read-tree.ts#PollObserver`). Its one method,
+`read({ startedAt, endedAt, error? })`, is called once per fresh read, as soon as the read ends and before the predicate
+runs on its tree: a failed read (a miss) included, which the predicate never sees; a handed-on read (ADR 0030) and a
+read no wait cures (ADR 0036, thrown out of the poll) never. It observes and decides nothing — the loop, the cadence and
+the outcome are the same with or without it. The second look's hold restarts on a reported `error`
+(`hold.observe(undefined, endedAt)`); the pixel poll keeps the `startedAt` of the read its predicate is about to see.
+Both wrappers are gone, and with them their two entries in tests/ui-tree/raw-tree-reads.test.ts's allowlist of raw
+`uiTree()` calls (ADR 0036): every tree read of both pollers now goes through the read seam.
+
+No behaviour moves (golden: Changed 0 against v6). The observer is told of exactly the reads the wrappers saw: the
+engine reads through ReadHandOff's watched proxy (ui-tree/read-handoff.ts), whose `async read` turns even a synchronous
+`uiTree` throw into a rejection, which the hold wrapper's `.catch` already saw; and the pixel wrapper set its start
+before calling `uiTree`, so a throw could not skip it.
+
+Deviation from the review card: card 13 proposed that each round handed to the predicate carry its read's timing (on
+`PollRound`) and that `pollTree` report a failed read separately. Instead one observer method carries both, because both
+callers need the same fact — one fresh read as it ends — and the hold needs it for a round the predicate is never called
+on; timing on `PollRound` as well would be a second channel for the same read.
+
+Pinned in tests/ui-tree/read-tree.test.ts ("pollTree — the read observer"); the hold's restart by
+tests/flow/bare-tree-ladder.test.ts ("failed reads between two reads of the same screen restart the hold") and the round
+timing by tests/verify/assert.test.ts ("the timeout sentence quotes the SLOWEST round, not the last one").

@@ -184,14 +184,35 @@ export interface PollOptions {
    * decide is `pollTree`'s rule: only a value ends the poll on it.
    */
   first?: FirstSample;
+  /** Told of each fresh read, beside what the predicate sees (`PollObserver`). */
+  observer?: PollObserver;
 }
 
-/** A tree read handed on to a later poll, with when its read started and ended (`Date.now()`). */
-export interface HandedRead {
-  tree: UiNode;
+/** When a tree read started and ended, on `Date.now()` — the clock of a poll's deadline and cadence. */
+export interface ReadSpan {
   startedAt: number;
   endedAt: number;
 }
+
+/**
+ * One fresh read of a poll, as its observer is told it: its span, and `error` when it failed — a miss,
+ * `readTreeOrMiss`'s error, which the predicate never sees.
+ */
+export type ObservedRead = ReadSpan & { error?: Error };
+
+/**
+ * What a caller learns of a poll's reads that the predicate is not told (A31, docs/adr/0033-a-held-rendered-no-ends-
+ * the-second-look-before-a-cheap-rung.md, amendment "A poll observer"): `read` is called once per fresh read, as soon
+ * as it ends and before the predicate sees its tree — a failed read included, a handed-on read (`first`) and a read no
+ * wait cures (thrown, ending the poll) never. It observes and decides nothing: the poll's loop, cadence and outcome are
+ * the same with or without it.
+ */
+export interface PollObserver {
+  read(read: ObservedRead): void;
+}
+
+/** A tree read handed on to a later poll, with its span. */
+export type HandedRead = ReadSpan & { tree: UiNode };
 
 /** Where a poll asks for a handed-on read: once, and an answer of `undefined` means read fresh. */
 export interface FirstSample {
@@ -404,6 +425,10 @@ export interface PollRound {
  *   `pauseAfterRead` gives after the handed read, counted from when it ended.
  *   So a handed read is a positive verdict or a first sample, never an absence
  *   and never the sole evidence of a timeout.
+ * - An observer (`opts.observer`, A31: `PollObserver`) is told of each fresh
+ *   read — its start, its end and, for a failed one, its error — before the
+ *   predicate runs on it. A caller that needs a read's timing or its failure
+ *   asks here rather than wrapping the adapter; the loop is the same without it.
  *
  * Returns an outcome rather than throwing on timeout because the callers
  * disagree about what a timeout IS: a flow wait throws, an assert returns a
@@ -443,8 +468,10 @@ export async function pollTree<T>(
   for (;;) {
     const readStart = Date.now();
     const read = await readTreeOrMiss(adapter);
-    const readMs = Date.now() - readStart;
+    const readEnd = Date.now();
+    const readMs = readEnd - readStart;
     readError = read.error;
+    opts.observer?.read({ startedAt: readStart, endedAt: readEnd, ...(read.error !== undefined && { error: read.error }) });
     if (read.tree !== undefined) {
       treesRead++;
       lastTree = read.tree;

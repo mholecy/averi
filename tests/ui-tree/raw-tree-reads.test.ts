@@ -9,10 +9,8 @@ import { describe, expect, it } from 'vitest';
 // routed through the seam or added below with the reason it may read raw.
 // A textual tripwire (it counts `.uiTree(` in the source text), not a proof: an aliased or destructured read slips by.
 const ALLOWED_RAW_READS: Record<string, { calls: number; why: string }> = {
-  'src/flow/engine.ts': { calls: 1, why: 'a hold-observing wrapper handed to pollTree: it rethrows every failure' },
   'src/interact/keyboard-in-tree.ts': { calls: 1, why: "dismiss's first look: nothing moved yet, any failure throws as it came" },
   'src/mcp/tools.ts': { calls: 1, why: 'the one-shot ui_tree tool: any failure is the answer' },
-  'src/verify/pixel-poll.ts': { calls: 1, why: 'a read-timing wrapper handed to pollTree: it rethrows every failure' },
 };
 
 const SRC = join(import.meta.dirname, '../../src');
