@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { assertSpecSchema, scanForCrashes, Verifier } from '../../src/verify/assert.js';
+import { assertSpecSchema, Verifier } from '../../src/verify/assert.js';
 import { elementAssertSchema } from '../../src/verify/element-assert.js';
 import type { z } from 'zod';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
@@ -2013,25 +2013,6 @@ describe('assertSpecSchema', () => {
     expect(() =>
       assertSpecSchema.parse({ element: { id: 'x' }, color: { expected: '#FDFDFD', sample: 'average' } }),
     ).toThrow();
-  });
-});
-
-describe('scanForCrashes', () => {
-  it('extracts Android fatal exceptions with trailing stack context', () => {
-    const lines = [
-      '07-08 11:00:00.000  1234  1234 I ActivityManager: ok line',
-      '07-08 11:00:01.000  5678  5678 E AndroidRuntime: FATAL EXCEPTION: main',
-      '07-08 11:00:01.001  5678  5678 E AndroidRuntime: java.lang.NullPointerException',
-      '07-08 11:00:01.002  5678  5678 E AndroidRuntime:   at md.bank.app.MainActivity.onCreate',
-    ];
-    const excerpt = scanForCrashes(lines, 'android');
-    expect(excerpt[0]).toContain('FATAL EXCEPTION');
-    expect(excerpt).toHaveLength(3);
-  });
-
-  it('detects iOS uncaught exceptions and returns nothing for clean logs', () => {
-    expect(scanForCrashes(['Terminating app due to uncaught exception NSRangeException'], 'ios')).toHaveLength(1);
-    expect(scanForCrashes(['all quiet', 'nothing to see'], 'ios')).toHaveLength(0);
   });
 });
 

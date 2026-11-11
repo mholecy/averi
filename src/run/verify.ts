@@ -1,14 +1,16 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import type { DeviceAdapter, Platform, UiNode } from '../adapters/types.js';
+import type { DeviceAdapter, Platform } from '../adapters/types.js';
 import type { AveriConfig } from '../flow/config.js';
 import type { EnvValues } from '../flow/credentials.js';
 import { refuseUnknownEnvironment } from './preflight.js';
 import { formatTrace, FlowEngine, runRequestOf, type EngineContext, type TraceEntry } from '../flow/engine.js';
-import { scanForCrashes, Verifier, type AssertResult, type AssertSpec } from '../verify/assert.js';
+import { Verifier, type AssertResult, type AssertSpec } from '../verify/assert.js';
+import { appHealth } from './app-health.js';
+import { assertSummary, finalFrame, formatAsserts, screenshotFailedLine, type FinalFrame } from './leg-reply.js';
 import { ReadHandOff } from '../ui-tree/read-handoff.js';
 import { errorMessage } from '../util/error-message.js';
-import { captureFrame, captureRefusal, unsettledNote, type Frame, type MeasuredFrame, type TreeFrame } from '../verify/capture.js';
+import { unsettledNote, type MeasuredFrame, type TreeFrame } from '../verify/capture.js';
 import {
   compareColorParity,
   contractHasColorAnchors,
@@ -99,143 +101,17 @@ export interface VerificationOutput {
 }
 
 /**
- * The final capture of a run that has already done its work — a `verify`
- * leg, `ensure_state` — or the one line saying why there is none
- * (2026-10-08). Since the adapters refuse a capture that is not a PNG as a
- * transport error (adapters/screenshot-bytes.ts), `captureFrame` can throw
- * for a device that died AFTER the run, and a throw here would discard the
- * trace, the assert results, the health line and the ⚠ lines of a run that
- * took minutes — the same loss the leg's comment below forbids for a tree or
- * screen read. So it is caught here, for this one capture, and the run
- * returns no image and says so. Only `captureFrame` is inside: its own doc
- * says nothing past the screenshot itself throws.
- */
-export type FinalFrame = { frame: Frame; failed?: undefined } | { frame?: undefined; failed: string };
-
-export async function finalFrame(
-  adapter: Pick<DeviceAdapter, 'screenshot' | 'uiTree' | 'viewport'>,
-  opts: { readTree?: boolean } = {},
-): Promise<FinalFrame> {
-  try {
-    return { frame: await captureFrame(adapter, { readTree: opts.readTree === true }) };
-  } catch (e) {
-    return { failed: captureRefusal(e) };
-  }
-}
-
-/** The line a run prints when its final capture failed — where the `⚠ frame:` note of an unsettled one goes. */
-export const screenshotFailedLine = (failed: string): string => `⚠ screenshot: ${failed} — no image is returned`;
-
-/**
  * What one platform's leg produced. `frame` is the settled frame the leg
  * ended on — the png returned to the caller and, with a contract, the tree
  * and the one scale the parity tables measure against; absent parts carry
  * their reason (verify/capture.ts). Absent altogether, with `failed`, when
- * the capture itself threw (`finalFrame`).
+ * the capture itself threw (run/leg-reply.ts#finalFrame).
  */
 type VerificationLeg = {
   trace: TraceEntry[];
   results: AssertResult[];
   health: string;
 } & FinalFrame;
-
-/**
- * appAlive check (ARCHITECTURE.md §8): is the app-under-test still running?
- * When it died, include a crash excerpt from recent logs so a run that ended
- * on a blank screen says why. Which results carry it is the callers' call
- * (run/commands.ts, the verify legs below).
- */
-export async function appHealth(adapter: DeviceAdapter, cfg: AveriConfig): Promise<string> {
-  const app = cfg.app[adapter.platform];
-  if (!app) return '';
-  const appId = 'package' in app ? app.package : app.bundleId;
-  let running: boolean;
-  try {
-    running = await adapter.isAppRunning(appId);
-  } catch (e) {
-    // The question could not be ASKED — a device under load or unreachable is
-    // not a dead app, and saying `false` here sends the caller after a crash
-    // that never happened (measured 2026-09-17, finportal b4).
-    const why = errorMessage(e).split('\n')[0];
-    const check = adapter.platform === 'android'
-      ? 'check `adb devices` and host load'
-      : 'check `xcrun simctl list devices booted` and host load (reboot the simulator if it does not answer)';
-    return (
-      `\nappAlive: unknown — could not ask the device whether ${appId} runs (${why}); ` +
-      `the device is unreachable or under load. NOT evidence that the app died — ${check}, then retry.`
-    );
-  }
-  if (running) return '\nappAlive: true';
-  const lines = await adapter.logs(Date.now() - 60_000).catch(() => [] as string[]);
-  const crashes = scanForCrashes(lines, adapter.platform).slice(0, 24);
-  return (
-    `\nappAlive: false — ${appId} is not running!` +
-    (crashes.length > 0 ? `\nCrash excerpt:\n${crashes.join('\n')}` : '\n(no crash signature in the last 60s of logs)')
-  );
-}
-
-// Re-exported, not defined: a failing flow now renders its own trace into the
-// error message, so the formatter moved to the engine (flow/engine.ts) to stay
-// importable from there. This name is the one the MCP layer and the tests use.
-export { formatTrace };
-
-export const formatAsserts = (results: AssertResult[]): string =>
-  results
-    .map((r) => `${r.pass ? 'PASS' : 'FAIL'}  ${r.description}${r.detail ? ` — ${r.detail}` : ''}`)
-    .join('\n');
-
-/**
- * The one-line verdict over a set of asserts. It lives beside formatAsserts
- * for the reason describeElementSpec has one owner: this is user-facing
- * wording that appears in BOTH the single-platform `assert` tool and every leg
- * of a `verify` report, and two tools describing the same failure differently
- * is the drift this prevents.
- */
-export const assertSummary = (results: AssertResult[]): string => {
-  const failed = results.filter((r) => !r.pass).length;
-  return failed === 0
-    ? `All ${results.length} asserts passed`
-    : `${failed}/${results.length} asserts FAILED`;
-};
-
-/**
- * The flags a log grep compiles with — case-insensitive, nothing else. Named
- * so get_logs' schema validates the pattern under the same flags
- * (util/regex.ts) rather than a copy of them. Never `g` or `y`:
- * formatLogExcerpt compiles the pattern once and calls `.test` on every line,
- * and a global or sticky regex carries `lastIndex` from one line into the
- * next, silently dropping matches.
- */
-export const LOG_GREP_FLAGS = 'i';
-
-/**
- * How many matching lines a log excerpt keeps when the caller names no
- * budget — the tail, where the failure is. Owned here, where the limit is
- * applied; the MCP get_logs tool's schema default and description quote it.
- * (Until 2026-10-08 this function defaulted to 2000 while the tool's schema
- * said 400, two defaults for one limit.)
- */
-export const LOG_MAX_LINES = 400;
-
-/**
- * Device-log excerpt: filter to a regex, keep the tail, and say what that did.
- * Pure — it takes the lines rather than the device — because the COUNTING is
- * the part that misleads when it is wrong: a grep that silently matched
- * nothing reads exactly like a quiet device, and a truncated pull that does
- * not admit it reads like the whole story. Worth a test; untestable inside a
- * tool handler.
- */
-export function formatLogExcerpt(all: string[], grep: string | undefined, maxLines = LOG_MAX_LINES): string {
-  const re = grep === undefined ? undefined : new RegExp(grep, LOG_GREP_FLAGS);
-  const lines = re === undefined ? all : all.filter((l) => re.test(l));
-  const tail = lines.slice(-maxLines);
-  const header: string[] = [];
-  if (grep !== undefined) header.push(`[grep /${grep}/${LOG_GREP_FLAGS} matched ${lines.length} of ${all.length} lines]`);
-  if (lines.length > tail.length) {
-    header.push(`[truncated: showing last ${maxLines} of ${lines.length} lines]`);
-  }
-  return [...header, ...tail].join('\n');
-}
 
 /**
  * Every parity dimension opens the same way — no tree, no contribution — and

@@ -835,7 +835,7 @@ async function stableScreenshot(
  * (adapters/screenshot-bytes.ts). `captureFrame` throws for nothing else (its
  * doc), so a caller that catches it quotes this — the pixel and baseline
  * asserts as a fail-closed reason (2026-10-08), a run's final capture as its
- * `⚠ screenshot:` line (run/verify.ts#finalFrame).
+ * `⚠ screenshot:` line (run/leg-reply.ts#finalFrame).
  */
 export const captureRefusal = (e: unknown): string => errorMessage(e).split('\n')[0];
 

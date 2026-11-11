@@ -6,15 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PersistentReadError, type DeviceAdapter, type Platform, type UiNode } from '../../src/adapters/types.js';
 import { parseConfig } from '../../src/flow/config.js';
 import { EngineSession } from '../../src/flow/launch.js';
-import {
-  appHealth,
-  assertSummary,
-  contractProblems,
-  formatLogExcerpt,
-  LOG_MAX_LINES,
-  paritySection,
-  runVerification,
-} from '../../src/run/verify.js';
+import { contractProblems, paritySection, runVerification } from '../../src/run/verify.js';
 import { Verifier } from '../../src/verify/assert.js';
 import type { LayoutContract } from '../../src/verify/layout-contract.js';
 import { ocrEngineFor, ocrUnavailableReason, type OcrEngine } from '../../src/verify/ocr.js';
@@ -191,9 +183,9 @@ describe('runVerification legs', () => {
     expect(out.screenshots).toHaveLength(1);
   });
 
-  // A health check that throws fails its leg, and only its leg. appHealth
-  // guards the question and a rejected log read, so the throw is made where
-  // it does not guard: a log read that answers with something it cannot scan.
+  // A health check that throws fails its leg, and only its leg: appHealth words every device failure into the line
+  // (run/app-health.ts, its one policy), so the throw is a broken adapter's — a log read that answers with something
+  // it cannot scan — and the leg contains it as it contains any throw.
   it('a health check that throws still fails its leg, and only its leg', async () => {
     const android = fake('android');
     android.appRunning = false;
@@ -1096,50 +1088,6 @@ describe('one OCR choice per run — the text table and every leg\'s ocr asserts
   });
 });
 
-describe('appHealth', () => {
-  it('reports a live app', async () => {
-    expect(await appHealth(fake('android'), CFG)).toBe('\nappAlive: true');
-  });
-
-  // Measured 2026-09-17 (finportal, host load avg 28): a timed-out `adb shell pidof`
-  // read as `appAlive: false` for an app that was alive on the expected screen.
-  it('reports UNKNOWN, never dead, when the device cannot be asked', async () => {
-    const loaded = fake('android');
-    loaded.isAppRunning = async () => {
-      throw new Error('Command timed out: adb -s emulator-5554 shell pidof com.example.app');
-    };
-    const health = await appHealth(loaded, CFG);
-    expect(health).toContain('appAlive: unknown');
-    expect(health).toContain('Command timed out');
-    expect(health).toContain('NOT evidence that the app died');
-    expect(health).not.toContain('appAlive: false');
-  });
-
-  it('reports a dead app with a crash excerpt from the logs', async () => {
-    const dead = fake('android');
-    dead.appRunning = false;
-    dead.logLines = ['FATAL EXCEPTION: main', 'at com.example.app.Main.onCreate(Main.kt:42)'];
-
-    const health = await appHealth(dead, CFG);
-    expect(health).toContain('appAlive: false — com.example.app is not running!');
-    expect(health).toContain('Crash excerpt:');
-    expect(health).toContain('Main.kt:42');
-  });
-
-  it('says so plainly when the app died without a crash signature', async () => {
-    const dead = fake('android');
-    dead.appRunning = false;
-    dead.logLines = ['nothing interesting here'];
-
-    expect(await appHealth(dead, CFG)).toContain('(no crash signature in the last 60s of logs)');
-  });
-
-  it('is silent for a platform the config does not declare', async () => {
-    const cfg = parseConfig('app:\n  android: { package: com.example.app }\n');
-    expect(await appHealth(fake('ios'), cfg)).toBe('');
-  });
-});
-
 /**
  * The mutation survivors from the step-6 review. Each of these killed no
  * mutant before it existed: the flow-engine half of the composition, the
@@ -1284,21 +1232,6 @@ describe('assert verdict line', () => {
   });
 });
 
-describe('crash scanning is platform-specific', () => {
-  it('an iOS leg matches iOS signatures, not Android ones', async () => {
-    const dead = fake('ios');
-    dead.appRunning = false;
-    dead.logLines = ['Terminating app due to uncaught exception NSRangeException'];
-    expect(await appHealth(dead, CFG)).toContain('Crash excerpt:');
-
-    // An Android-only signature must NOT be picked up on an iOS leg.
-    const other = fake('ios');
-    other.appRunning = false;
-    other.logLines = ['FATAL EXCEPTION: main'];
-    expect(await appHealth(other, CFG)).toContain('(no crash signature in the last 60s of logs)');
-  });
-});
-
 describe('tree read is gated and ordered', () => {
   function tracked(): { adapter: FakeAdapter; ops: string[] } {
     const adapter = fake('android');
@@ -1363,20 +1296,6 @@ describe('baselineDir reaches the Verifier', () => {
   });
 });
 
-describe('appHealth degrades rather than failing', () => {
-  it('still reports the death when the log read itself throws', async () => {
-    const dead = fake('android');
-    dead.appRunning = false;
-    dead.logs = async () => {
-      throw new Error('adb: device offline');
-    };
-    // Losing the logs costs the crash excerpt, not the appAlive verdict.
-    const health = await appHealth(dead, CFG);
-    expect(health).toContain('appAlive: false');
-    expect(health).toContain('(no crash signature in the last 60s of logs)');
-  });
-});
-
 describe('color parity per-leg notes', () => {
   it('names the leg whose UI tree could not be read', async () => {
     const ok = fake('android');
@@ -1397,62 +1316,11 @@ describe('color parity per-leg notes', () => {
   });
 });
 
-describe('assertSummary', () => {
-  it('reads the same for the assert tool and a verify leg', () => {
-    const pass = { description: 'a', pass: true };
-    const fail = { description: 'b', pass: false };
-    expect(assertSummary([pass, pass])).toBe('All 2 asserts passed');
-    expect(assertSummary([pass, fail])).toBe('1/2 asserts FAILED');
-    // Vacuously true, and the callers decide whether to print it at all.
-    expect(assertSummary([])).toBe('All 0 asserts passed');
-  });
-});
-
-describe('formatLogExcerpt', () => {
-  const lines = (n: number, prefix = 'line'): string[] =>
-    Array.from({ length: n }, (_, i) => `${prefix} ${i}`);
-
-  it('passes short unfiltered output through with no header', () => {
-    expect(formatLogExcerpt(['a', 'b'], undefined)).toBe('a\nb');
-  });
-
-  // The counting is the point: a grep that matched nothing must SAY so, or it
-  // reads exactly like a quiet device.
-  it('reports what the grep matched, including nothing', () => {
-    const out = formatLogExcerpt(['ERROR boom', 'info ok'], 'error');
-    expect(out).toBe('[grep /error/i matched 1 of 2 lines]\nERROR boom');
-    expect(formatLogExcerpt(['info ok'], 'crash')).toBe('[grep /crash/i matched 0 of 1 lines]');
-  });
-
-  // One limit, one owner: the get_logs tool's schema default is this same
-  // constant (tests/mcp/tool-descriptions.test.ts); until 2026-10-08 the
-  // function alone defaulted to 2000.
-  it('keeps LOG_MAX_LINES lines when the caller names no budget', () => {
-    const out = formatLogExcerpt(lines(LOG_MAX_LINES + 1), undefined).split('\n');
-    expect(out[0]).toBe(`[truncated: showing last ${LOG_MAX_LINES} of ${LOG_MAX_LINES + 1} lines]`);
-    expect(out).toHaveLength(LOG_MAX_LINES + 1);
-  });
-
-  it('keeps the TAIL when truncating and admits it', () => {
-    const out = formatLogExcerpt(lines(5), undefined, 2).split('\n');
-    expect(out[0]).toBe('[truncated: showing last 2 of 5 lines]');
-    expect(out.slice(1)).toEqual(['line 3', 'line 4']);
-  });
-
-  it('counts against the filtered set, not the raw one', () => {
-    const out = formatLogExcerpt([...lines(3, 'keep'), ...lines(50, 'drop')], 'keep', 2);
-    expect(out).toContain('[grep /keep/i matched 3 of 53 lines]');
-    expect(out).toContain('[truncated: showing last 2 of 3 lines]');
-    expect(out).toContain('keep 2');
-    expect(out).not.toContain('drop');
-  });
-});
-
 /**
  * A leg whose final capture THROWS (2026-10-08: the adapter refuses an empty
  * or non-PNG capture, adapters/screenshot-bytes.ts) keeps everything the leg
  * already did — trace, asserts, health — with one `⚠ screenshot:` line and no
- * image (run/verify.ts#finalFrame). Until then the throw rejected the leg and
+ * image (run/leg-reply.ts#finalFrame). Until then the throw rejected the leg and
  * the section read only "FAILED: …".
  */
 describe('a leg whose final screenshot is refused', () => {

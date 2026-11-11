@@ -800,28 +800,3 @@ function baselineRefusal(frame: BaselineFrame): string {
   }
 }
 
-/** Crash signatures per platform, scanned over recent device logs. */
-const CRASH_PATTERNS: Record<'android' | 'ios', RegExp[]> = {
-  android: [/FATAL EXCEPTION/, /ANR in /, /Force finishing activity/, /native crash/i, /SIGSEGV|SIGABRT/],
-  ios: [
-    /Terminating app due to uncaught exception/,
-    /NSInvalidArgumentException|NSRangeException/,
-    /EXC_BAD_ACCESS|EXC_CRASH/,
-    /abort\(\) called/,
-    /Fatal error:/,
-  ],
-};
-
-/** Returns crash-related log lines (with a little trailing context for stack traces). */
-export function scanForCrashes(lines: string[], platform: 'android' | 'ios'): string[] {
-  const patterns = CRASH_PATTERNS[platform];
-  const excerpt: string[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    if (patterns.some((p) => p.test(lines[i]))) {
-      excerpt.push(...lines.slice(i, i + 8));
-      i += 7;
-    }
-  }
-  return excerpt;
-}
-

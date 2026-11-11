@@ -51,8 +51,8 @@ vi.mock('../../src/verify/text-parity.js', async (orig) => ({
   ...(await orig<typeof import('../../src/verify/text-parity.js')>()),
   DEFAULT_SIZE_TOLERANCE_PCT: 10.25,
 }));
-vi.mock('../../src/run/verify.js', async (orig) => ({
-  ...(await orig<typeof import('../../src/run/verify.js')>()),
+vi.mock('../../src/run/app-health.js', async (orig) => ({
+  ...(await orig<typeof import('../../src/run/app-health.js')>()),
   LOG_MAX_LINES: 425,
 }));
 vi.mock('../../src/flow/engine.js', async (orig) => ({
@@ -256,7 +256,7 @@ describe('tool descriptions quote each operation default from its owner', () => 
     expect(description('swipe')).not.toMatch(/(?<![\d.])30%/);
   });
 
-  it('get_logs: the line budget, schema default and description alike (run/verify.ts LOG_MAX_LINES)', () => {
+  it('get_logs: the line budget, schema default and description alike (run/app-health.ts LOG_MAX_LINES)', () => {
     const maxLines = property('get_logs', 'maxLines');
     expect(maxLines.default).toBe(425);
     expect(maxLines.description).toContain('(default 425)');
@@ -641,7 +641,7 @@ describe('the full reference quotes each operation default as shipped', () => {
     const { SWIPE_REACH_FRACTION } = await actual<typeof import('../../src/interact/swipe.js')>('../../src/interact/swipe.js');
     const { DEFAULT_MAX_SWIPES, DEFAULT_SCROLL_TIMEOUT_MS } = await actual<typeof import('../../src/interact/scroll.js')>('../../src/interact/scroll.js');
     const { DEFAULT_ENSURE_TIMEOUT_MS } = await actual<typeof import('../../src/flow/engine.js')>('../../src/flow/engine.js');
-    const { LOG_MAX_LINES } = await actual<typeof import('../../src/run/verify.js')>('../../src/run/verify.js');
+    const { LOG_MAX_LINES } = await actual<typeof import('../../src/run/app-health.js')>('../../src/run/app-health.js');
     const { DEFAULT_TOLERANCE_DE, CONTRACT_TOL_FACTOR } = await actual<typeof import('../../src/verify/color-parity.js')>('../../src/verify/color-parity.js');
     const { DEFAULT_SIZE_TOLERANCE_PCT } = await actual<typeof import('../../src/verify/text-parity.js')>('../../src/verify/text-parity.js');
 

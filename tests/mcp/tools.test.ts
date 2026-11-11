@@ -1825,7 +1825,7 @@ describe('screenshot: an empty capture is an error, not an image', () => {
   });
 });
 
-/** ensure_state and verify after a refused final capture: the report stands, no image block (run/verify.ts#finalFrame). */
+/** ensure_state and verify after a refused final capture: the report stands, no image block (run/leg-reply.ts#finalFrame). */
 describe('ensure_state and verify: a refused final screenshot is a ⚠ line, not an image or an error', () => {
   const refusing = () => {
     const fake = home();
