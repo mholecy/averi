@@ -117,8 +117,8 @@ import { parseLabApp, type LabApp } from './schema.js';
  * `chooser` (T7b, Android, not in the default groups): launch_app and open_deep_link around Android's "Open with"
  * chooser (live-chooser.ts) — lc1 the `-p` start that raises it, named; lc2 a one-handler link, no note; lc3 `.Twin`
  * named, no chooser; lc4' monkey from the launcher and lc4'' monkey over a link's chooser (D73's net: on demand, or in
- * the standing lab batch, `npm run truth:lab`, scripts/truth/batch/lab-run.ts, T20b — owner-run; its schedule is
- * backlog T20c). The oracle is the device's focus and activity stack (AndroidLab.focus, the record's `focus`), read
+ * the standing lab batch, `npm run truth:lab`, scripts/truth/batch/lab-run.ts, T20b — a release gate, docs/release.md,
+ * T24). The oracle is the device's focus and activity stack (AndroidLab.focus, the record's `focus`), read
  * before, between and after the calls; a chooser left in front is dropped with one BACK. A SKIP fails the run. Before
  * the cases (T20a, ADR 0041's T20a amendment), the group's premise is read once, read only
  * (chooser-premise.ts#readPremiseInto): no lab default (`mAlways=true`, `dumpsys package preferred`), two handlers for

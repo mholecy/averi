@@ -290,12 +290,13 @@ a WARN that starts with what each passed-over source said and `— the build use
 still passes and the exit code is unchanged. When no JDK 17 is found, nothing is built: the lab check WARNs with the
 build's reason, which lists every source and what it gave, and the run ends unproven (exit 3).
 
-Only the owner runs it. A chooser run that leaves a lab default behind fails the run by name, and the cleanup clears
-that default by uninstalling and reinstalling the lab app. Everything it writes goes under `--out`, apart from the
+It runs as Gate B of every release ([docs/release.md](release.md)), on `emulator-5554`, by the agent preparing the
+release (the owner's decision, backlog T24) or by the owner. A chooser run that leaves a lab default behind fails the
+run by name, and the cleanup clears that default by uninstalling and reinstalling the lab app. Everything it writes goes under `--out`, apart from the
 git-ignored Gradle build products in the checkout: a `<block>/run-<id>` folder per block, holding the live records,
 logs and rejudge summaries, and `meta/run-<id>/summary.txt`, the SUMMARY.
 
-The exit code is stricter than a device batch's, so a schedule can act on it:
+The exit code is stricter than a device batch's, so a release can gate on it (only 0 passes):
 
 | Code | Meaning |
 | --- | --- |
@@ -305,4 +306,5 @@ The exit code is stricter than a device batch's, so a schedule can act on it:
 | 3 | unproven: a build that failed, a live run past its bound, a check that could not prove the lab clean |
 | 130 | interrupted |
 
-Scheduling it is backlog T20c. ADR 0041's T20b amendment has the details.
+It is not scheduled: it is a release gate (docs/release.md, backlog T24, which replaced the schedule T20c). ADR 0041's
+T20b and T24 amendments have the details.
