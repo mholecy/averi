@@ -624,17 +624,11 @@ export async function pollPixels(
     if (verdict.final) throw new FinalMiss(verdict.detail);
     return verdict;
   };
-  // Each round is timed from the start of its read, for the timeout wording;
-  // pollTree's loop and what it reads are unchanged.
+  // Each round is timed from the start of its read, for the timeout wording: pollTree's observer tells when the read
+  // the predicate is about to see started.
   let readStarted = Date.now();
-  const timedReads: Pick<DeviceAdapter, 'uiTree'> = {
-    uiTree: () => {
-      readStarted = Date.now();
-      return adapter.uiTree();
-    },
-  };
   const outcome = await pollTree(
-    timedReads,
+    adapter,
     async (tree, { deadline }) => {
       try {
         return verdictToPoll(await round(tree, deadline));
@@ -642,7 +636,15 @@ export async function pollPixels(
         memory.roundTook(Date.now() - readStarted);
       }
     },
-    { timeoutMs, pollMs },
+    {
+      timeoutMs,
+      pollMs,
+      observer: {
+        read: ({ startedAt }) => {
+          readStarted = startedAt;
+        },
+      },
+    },
   ).catch((e: unknown) => {
     // pollTree propagates the predicate's own errors; only a final miss — a
     // refused capture, or a verdict `measure` marked final — is ours to turn into the verdict.

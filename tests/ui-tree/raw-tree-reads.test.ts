@@ -7,12 +7,12 @@ import { describe, expect, it } from 'vitest';
 // raw `adapter.uiTree()` decides it again wherever it stands, and inside a catch-all it would swallow that failure as
 // a miss. So the raw calls outside the adapters and the seam are pinned here: a new one fails this test, and is either
 // routed through the seam or added below with the reason it may read raw.
+// Since A31 the read-timing and hold-observing wrappers (verify/pixel-poll.ts, flow/engine.ts) are gone: pollTree's
+// observer (ui-tree/read-tree.ts#PollObserver) tells a caller what they wrapped the adapter to see.
 // A textual tripwire (it counts `.uiTree(` in the source text), not a proof: an aliased or destructured read slips by.
 const ALLOWED_RAW_READS: Record<string, { calls: number; why: string }> = {
-  'src/flow/engine.ts': { calls: 1, why: 'a hold-observing wrapper handed to pollTree: it rethrows every failure' },
   'src/interact/keyboard-in-tree.ts': { calls: 1, why: "dismiss's first look: nothing moved yet, any failure throws as it came" },
   'src/mcp/tools.ts': { calls: 1, why: 'the one-shot ui_tree tool: any failure is the answer' },
-  'src/verify/pixel-poll.ts': { calls: 1, why: 'a read-timing wrapper handed to pollTree: it rethrows every failure' },
 };
 
 const SRC = join(import.meta.dirname, '../../src');
