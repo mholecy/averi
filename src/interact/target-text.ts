@@ -209,15 +209,26 @@ export function cutByRemedy(by: UiNode, up: KeyboardUp | undefined, minPiece: nu
  * `scroll_until`'s stop before any swipe say it: no scroll — THE clause every verb quotes for it
  * (ui-tree/standing.ts#noScrollRemedyText, with the cut's way past). With the soft keyboard up and that node riding on
  * it, dismiss it first all the same: a bar riding on it goes down with it, scroll view or none. With the keyboard up and
- * that node NOT read as riding (`ridingKeyboard`: it ends more than the tap minimum above the line — buttons stacked
- * in a riding bar, the cut one on top — or below it), hiding it is named as a way that MAY move that node
- * (`keyboardMayMoveText`): with no scroll to fall back on, saying nothing of the keyboard would mislead where it does —
- * the safe direction, as `cutByRemedy`'s scroll is there.
+ * that node NOT read as riding but possibly stacked in a bar that does (`stackedOnKeyboard`: buttons stacked in a
+ * riding bar, the cut one on top), hiding it is named as a way that MAY move that node (`keyboardMayMoveText`): with no
+ * scroll to fall back on, saying nothing of the keyboard would mislead where it does — the safe direction, as
+ * `cutByRemedy`'s scroll is there. A node far above the line (a top bar) gets the clause alone.
  */
 export function cutByPinnedRemedy(by: UiNode, up: KeyboardUp | undefined, minPiece: number): string {
   const way = noScrollRemedyText({ of: 'bothPinned' }, 'touch', by);
-  if (up !== undefined && ridingKeyboard(by, up, minPiece) === undefined) return `${keyboardMayMoveText(up, by)} — else ${way}`;
+  if (ridingKeyboard(by, up, minPiece) === undefined && up !== undefined && stackedOnKeyboard(by, up)) return `${keyboardMayMoveText(up, by)} — else ${way}`;
   return ridingFirst(by, up, minPiece, 'else', way);
+}
+
+/**
+ * Whether `by` MAY be stacked in a bar riding on the keyboard though not read as riding (`ridingKeyboard`): it ends at
+ * or above the keyboard's line, no further above it than its own height — room for one more such node beneath it (the
+ * lab's Continue is 132 tall, stacked on another, 66 above the line). Not the cut's edge: a riding bar cuts a field it
+ * has scrolled under at the field's TOP (the lab's phone, 1370..1412 under a bar ending at 1370), as a top bar does.
+ */
+function stackedOnKeyboard(by: UiNode, { lineY }: KeyboardUp): boolean {
+  const gap = lineY - (by.rect.y + by.rect.height);
+  return gap >= 0 && gap <= by.rect.height;
 }
 
 /** `the soft keyboard is up (its top edge at y 1398): hiding it may move that button (press_key back …)` — `cutByPinnedRemedy`'s for a node not read as riding on it. */

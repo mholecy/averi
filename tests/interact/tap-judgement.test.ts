@@ -678,12 +678,21 @@ describe('judgeTap(…).aim() — a cut by a later node names the keyboard only 
   });
   // ADR 0013's stacked-button residual under D88: a bar 66 px above the line is not read as riding, and with no scroll
   // to fall back on, hiding the keyboard is named as a way that MAY move it — not dismissed, not left out.
-  it('neither in a scroll view, the keyboard up, the bar not read as riding (D88): hiding it may move that bar — else the one clause', async () => {
-    for (const barBottom of [1332, 300]) {
+  // Only a bar that may be stacked in a riding one — ending at or above the line, within its own height of it (132 here):
+  // 66 above (1332) and 132 above (1266) say "may move"; 133 above (1265), a top bar (300) and one the keyboard is drawn
+  // over (line 1360, the bar ending 10 px below it) get the clause alone.
+  it('neither in a scroll view, the keyboard up, the bar not read as riding (D88): hiding it may move that bar — else the one clause; far above or below the line, the clause alone', async () => {
+    const MAY = 'the soft keyboard is up (its top edge at y 1398): hiding it may move that button (press_key back';
+    for (const barBottom of [1332, 1266]) {
       const reply = said((await judge(pinnedAt(barBottom), 'field', { first: PIXEL }, { kb: reading(1398) })).outcome);
-      expect({ barBottom, may: reply.includes('the soft keyboard is up (its top edge at y 1398): hiding it may move that button (press_key back') }).toEqual({ barBottom, may: true });
+      expect({ barBottom, may: reply.includes(MAY) }).toEqual({ barBottom, may: true });
       expect(reply).toContain(') — else no scroll moves it out from under that: neither lies in a scroll view — ');
       expect(reply).not.toContain('dismiss it first');
+    }
+    for (const [barBottom, line] of [[1265, 1398], [300, 1398], [1370, 1360]]) {
+      const reply = said((await judge(pinnedAt(barBottom), 'field', { first: PIXEL }, { kb: reading(line) })).outcome);
+      expect({ barBottom, line, may: reply.includes('hiding it may move') }).toEqual({ barBottom, line, may: false });
+      expect(reply).toContain(' — no scroll moves it out from under that: neither lies in a scroll view — ');
     }
   });
 });

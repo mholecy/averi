@@ -787,8 +787,10 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       // `stuck`: the element was there and seen. Or cut by a node drawn after it, neither in a scroll view (`bothPinned`,
       // D88): the cut said as the tap says it, and its remedy (target-text.ts#cutByPinnedRemedy — the riding keyboard's first).
       const { judged, viewport, remedy } = o;
-      const what = o.cut === undefined ? underText({ judged, cover: o.cover }) : sliverText({ judged, ...o.cut });
-      const way = o.cut === undefined ? noScrollRemedyText(remedy, 'touch') : cutByPinnedRemedy(o.cut.cut.by, keyboardUp(judged), o.cut.minPiece);
+      const [what, way] =
+        o.cut === undefined
+          ? [underText({ judged, cover: o.cover }), noScrollRemedyText(remedy, 'touch')]
+          : [sliverText({ judged, cut: o.cut, minPiece: o.minPiece }), cutByPinnedRemedy(o.cut.by, keyboardUp(judged), o.minPiece)];
       return {
         message:
           `scroll_until ${describe} stopped ${stoppedWhen(o.swipes)} — element is in the viewport but ${what}; ` +

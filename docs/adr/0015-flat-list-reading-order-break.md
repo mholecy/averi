@@ -10,6 +10,10 @@ Amended 2026-10-20 (round 14, LE3): a heading listed before a target it overlaps
 heading listed before" below. Amended 2026-10-22 (round 16, LE2's rest): the break no longer excuses a control that overlaps the
 target and holds its centre — see "Amendment: a control past the break that holds the centre" below. Amended 2026-11-09 (D75, lab note LR4):
 uiautomator's runs of classic Android Views are marked too — see "Amendment: Android Views list children by location" below.
+Amended 2026-11-11 (D87): a `covered` target whose cover's order is told, where neither lies in a scroll view, takes the
+remedy `bothPinned` — see "Amendment: a cover where neither lies in a scroll view" below. Amended 2026-11-11 (D88): so
+does a touch's cut by a node drawn after it — see "Amendment: a cut by a later node where neither lies in a scroll view"
+below.
 
 ## Context
 
@@ -641,10 +645,13 @@ refusal exists to prevent (ui-tree/standing.ts#bothPinnedRemedyText, `cutBy`). E
 - with the soft keyboard up and that node riding on it (interact/target-text.ts#ridingKeyboard), both name the keyboard
   first: "the soft keyboard is up (…): dismiss it first (…) — a bar riding on it goes down with it — else" and the clause.
   Hiding the keyboard moves a riding bar even where no scroll does (interact/target-text.ts#cutByPinnedRemedy);
-- with the keyboard up and that node not read as riding (ADR 0013's stacked buttons: it ends more than the tap minimum
-  above the line), both say "the soft keyboard is up (…): hiding it may move that <role> (…) — else" and the clause.
-  ADR 0013 kept the scroll alone there as the safe direction; with no scroll to fall back on, leaving the keyboard out
-  would mislead where hiding it does move that node.
+- with the keyboard up and that node not read as riding but possibly stacked in a bar that does (ADR 0013's stacked
+  buttons: it ends more than the tap minimum above the line, but no more than its own height),
+  both say "the soft keyboard is up (…): hiding it may move that <role> (…) — else" and the clause. ADR 0013 kept the
+  scroll alone there as the safe direction; with no scroll to fall back on, leaving the keyboard out would mislead
+  where hiding it does move that node. A node farther above the line (a top bar), or below it, gets the clause alone.
+  The test is the bar's distance from the line, not the cut's edge: a riding bar cuts a field it has scrolled under at
+  the field's top (the lab's phone), as a top bar does.
 
 Golden moved 1 check, the same verdict: android text-under-bar P.id `scroll_until` now stops with 0 swipes instead of 2,
 and its words change as above. Truth puts P under pinned chrome (`under-chrome:pinned`). The tap and the text-selector
@@ -663,5 +670,6 @@ not cut (110 px tall), and its `fully` stop already said `bothPinned` as `covere
   scroll.
 - A cut whose `by` rides on the soft keyboard in no scroll view stops before any swipe and names the keyboard first; one
   not read as riding names it as a way that may move that node. No measured cell has either shape: the lab's
-  form-keyboard field lies in its form's scroll view and keeps the scroll. The "may" is said of any such node with the
-  keyboard up, a top bar too, where hiding the keyboard moves nothing: a hedge that may not help, not a promise.
+  form-keyboard field lies in its form's scroll view and keeps the scroll. The "may" is a hedge, not a promise: a
+  button that is not stacked in a riding bar but ends within its own height above the line is told it too, and hiding
+  the keyboard moves nothing there. Stacked buttons taller apart than one's own height get no keyboard words.

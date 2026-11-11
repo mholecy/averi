@@ -9,6 +9,9 @@ Amended 2026-11-05 (D68: a reveal this call's own strokes say would most likely 
 amendment below).
 Amended 2026-11-06 (T11: a held reveal on a proven cut is doubted once, however far the proving stroke carried the match, and
 a second ends in a hedge, never `checked`; D62's carry line is gone — see the amendment below).
+Amended 2026-11-11 (D88: a cut by a later node where neither lies in a scroll view takes no scroll; a bar not read as
+riding but stacked on the keyboard names hiding it as a way that may move it — see the stacked-button paragraph, and
+docs/adr/0015-flat-list-reading-order-break.md's D88 amendment).
 
 ## Context
 
@@ -62,8 +65,10 @@ A bar riding on the keyboard whose cutting node (`interact/target-text.ts#riding
 minimum above the keyboard's line (buttons stacked in it, the cut one on top) is not read as riding: its remedy is the
 scroll alone, without "dismiss the keyboard first" — the safe direction, a remedy that may not suffice rather than one
 that misleads. Since D88 (ADR 0015's D88 amendment), where neither the field nor that node lies in a scroll view there is
-no scroll to name: with the keyboard up, the remedy says hiding it may move that node, then that no scroll moves it out
-(`interact/target-text.ts#cutByPinnedRemedy`) — the same safe direction.
+no scroll to name: with the keyboard up and that node ending within its own height above the line (room for the riding
+button beneath it), the remedy says hiding it may move that node, then that no scroll moves it out
+(`interact/target-text.ts#cutByPinnedRemedy`) — the same safe direction. A node farther above (a top bar) gets the
+no-scroll words alone.
 
 Bug note: docs/bugs/2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md
 

@@ -220,6 +220,12 @@ export type RoundStep =
   /** The scroll is over. */
   | { do: 'stop'; outcome: ScrollOutcome };
 
+/** A cut by a node drawn after it (ui-tree/geometry.ts#Cut.by set): what the `overlapped` stop's cut arm carries. */
+export type CutByLater = Cut & { readonly by: UiNode };
+
+/** Whether `cut` is by a node drawn after it (`CutByLater`), not at a clipping container's edge. */
+const isCutByLater = (cut: Cut): cut is CutByLater => cut.by !== undefined;
+
 /**
  * Every way a scroll ends — one member per sentence the reader acts on
  * differently, each carrying exactly the facts its sentence quotes
@@ -306,7 +312,16 @@ export type ScrollOutcome = (
    * docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
    */
   | { kind: 'overlapped'; swipes: number; judged: Judged; viewport: Rect; cover: Cover; cut?: undefined; remedy: NoScrollRemedy }
-  | { kind: 'overlapped'; swipes: number; judged: Judged; viewport: Rect; cover?: undefined; cut: { readonly cut: Cut & { readonly by: UiNode }; readonly minPiece: number }; remedy: Extract<NoScrollRemedy, { readonly of: 'bothPinned' }> }
+  | {
+      kind: 'overlapped';
+      swipes: number;
+      judged: Judged;
+      viewport: Rect;
+      cover?: undefined;
+      cut: CutByLater;
+      minPiece: number;
+      remedy: Extract<NoScrollRemedy, { readonly of: 'bothPinned' }>;
+    }
   /** D52: too large for its scroll view to show whole (scroll-read.ts#Unfit) — `fully: true` only. */
   | { kind: 'unfit'; swipes: number; judged: Judged; viewport: Rect; unfit: Unfit }
   /** D68: a proven cut another swipe would most likely not bring whole (flush-check.ts#FlushAim) — `fully: true` only. */
@@ -1069,13 +1084,13 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     if (remedy?.of === 'presented' && remedy.cover !== undefined) return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, cover: remedy.cover, viewport, ...(remedy.layer !== undefined && { layer: remedy.layer }) }, current === 'settle' && presentedBefore, seen.elapsedMs);
     // Under a cover listed in reading order with it — the order untold, or seen by a screenshot — or one where neither
     // lies in a scroll view (`bothPinned`, D87), no swipe tells which is on top or moves it out from under the other: stop.
-    // So for a cut by a node drawn after it where neither lies in a scroll view (`bothPinned`, D88).
+    // So too under a cut by a node drawn after it where neither lies in a scroll view (`bothPinned`, D88).
     const standing = best.standing;
     if (standing.kind === 'covered' && noScrollHelps(standing.remedy)) {
       return stop(s, { kind: 'overlapped', swipes: s.swipes, judged: best, viewport, cover: standing.cover, remedy: standing.remedy });
     }
-    if (standing.kind === 'cut' && noScrollHelps(standing.remedy) && standing.cut.by !== undefined) {
-      return stop(s, { kind: 'overlapped', swipes: s.swipes, judged: best, viewport, cut: { cut: { ...standing.cut, by: standing.cut.by }, minPiece: standing.minPiece }, remedy: standing.remedy });
+    if (standing.kind === 'cut' && noScrollHelps(standing.remedy) && isCutByLater(standing.cut)) {
+      return stop(s, { kind: 'overlapped', swipes: s.swipes, judged: best, viewport, cut: standing.cut, minPiece: standing.minPiece, remedy: standing.remedy });
     }
     // `fully: true` on a match as wide or as tall as its scroll view, or more (scroll-read.ts#unfitAlong): fully shown at
     // one exact offset at most, which no stroke lands on — the strokes and turns would only swing it to and fro to the

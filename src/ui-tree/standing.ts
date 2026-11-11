@@ -1307,8 +1307,10 @@ const aboveLine = (box: Rect, line: KeyboardLine | undefined): Rect =>
  * minimum above the keyboard's line (buttons stacked in it, the cut one on top) is not read as riding: its remedy is
  * the scroll alone, without "dismiss the keyboard first" — the safe direction, a remedy that may not suffice rather
  * than one that misleads. Where neither lies in a scroll view (`Remedy`'s `bothPinned`, D88) there is no scroll to fall
- * back on: with the keyboard up, hiding it is named as a way that MAY move that node, before the no-scroll clause
- * (interact/target-text.ts#cutByPinnedRemedy) — the same safe direction.
+ * back on: with the keyboard up and that node ending within its own height above the line (room for the riding button
+ * beneath it), hiding it is named as a way that MAY move that node, before the no-scroll clause
+ * (interact/target-text.ts#cutByPinnedRemedy) — the same safe direction; a node farther above (a top bar) gets the
+ * clause alone.
  * docs/bugs/2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible.md
  */
 function cutByLater({ node, later }: Judged, minPiece: number): Cut | undefined {
