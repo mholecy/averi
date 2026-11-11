@@ -233,6 +233,12 @@
     "floor": 98,
     "baseline": "100 % on 2026-11-05 (T2 batch-13 fixes: checkDevice joins the readying's warning and the build's; cold): 273 mutants, 0 survived; 100 % on 2026-11-05 (T2 S6b code review: checkDevice, GradleCall, the stop's reason; cold, final): 266 mutants, 0 survived; superseded: 100 % on 2026-11-05 (T2 S6b review round 2, cold): 241 mutants, 0 survived"
   },
+  "scripts/truth/batch/lab-run.ts": {
+    "group": "lab",
+    "tests": ["tests/truth/batch/lab-run.test.ts"],
+    "floor": 93,
+    "baseline": "95.30 % on 2026-11-11 (T20b code review: a selection with no live group refused, leftLine's tail guarded, liveBlock, LAB_RUN_EXIT from words.ts#EXIT; the cold full lab group run, `npm run mutate -- --group lab --force`, 279 s, every lab module at or above its floor): 512 mutants, 485 killed, 2 timeouts, 15 survived, 9 without coverage, 1 runtime error. Equivalent (9): `summary ?? ''` seeded twice (no `# Live golden:` header, no failure line either way); ACCEPTED seeded with a string (it matches no entry); `meta === undefined`'s two branches and the `run-` filter, twice each (meta is undefined only on a refused config, whose exit 2 stands, and meta holds only `run-` folders); `wanted`'s `[]` on a refused selection (the run is refused); leftLine's `at < 0` as `at <= 0` (the cleanup's tail is never at the line's start, which is its label). Untested (6): labBuild's `{ secs }` emptied (B_BUILD's default is BUILD_SECS, and no test waits out a build's bound); `o.io?.seam`, `o.io?.fs` and its `??` (the tests always pass io; only the command line runs without); the held seam's `stderr` (no test makes the runner write there); the stateful hand line's placeholder for a serial not given (that refusal is the serial's own). Unreachable under the fakes only (2): `!opened.ok` and its why — the android need's guard ran just before, but a real emulator can go away between the need and the block. Unreachable (4): `apk === undefined`, its block and its two words — a met android need has pulled the APK. The entry guard's line (4): `isMain` is never true under the tests. Superseded: 95.39 % on 2026-11-11 (T20b review round 2, narrowed, 478 mutants); 95.25 % (round 1, the cold group run, 464 mutants); 94.12 % (the first cut, 205 mutants)"
+  },
   "scripts/truth/chooser-readers.ts": {
     "group": "lab",
     "tests": ["tests/truth/chooser-premise.test.ts", "tests/truth/batch/lab-chooser.test.ts", "tests/truth/batch/lab-emu.test.ts"],

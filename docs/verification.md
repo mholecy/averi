@@ -266,3 +266,34 @@ or the text sits at a contrast the recognizer cannot resolve, which would be a r
 output says the cause is undetermined), and an anchor whose source yields no string at all. Both
 still fail the run. Single-element form:
 `{"element":{"id":"cta"},"ocr":{"text":"CONTINUE","heightPct":2.96}}`.
+
+## Standing lab run
+
+The harness's own net on the Android lab emulator, in one command:
+
+```
+npm run truth:lab -- --out <dir outside the checkout> --serial emulator-5554 [--groups chooser|forms|chooser,forms]
+```
+
+`scripts/truth/batch/lab-run.ts` checks that the emulator is the `averi_lab` AVD, then builds the lab app from the
+checkout and installs it. It runs the live golden's `chooser` group (launch_app and open_deep_link around Android's
+"Open with" chooser) between a read-only `--check` of the lab's defaults before and a cleanup check after, then the
+`forms` group. Both groups run by default. It refuses to start with no serial, and the lab guard refuses any emulator
+that is not the lab AVD before anything is built.
+
+Only the owner runs it. A chooser run that leaves a lab default behind fails the run by name, and the cleanup clears
+that default by uninstalling and reinstalling the lab app. Everything it writes goes under `--out`, apart from the
+git-ignored Gradle build products in the checkout: a `<block>/run-<id>` folder per block, holding the live records,
+logs and rejudge summaries, and `meta/run-<id>/summary.txt`, the SUMMARY.
+
+The exit code is stricter than a device batch's, so a schedule can act on it:
+
+| Code | Meaning |
+| --- | --- |
+| 0 | every selected block PASSed, and no line is INCONCLUSIVE or ERROR |
+| 1 | a FAIL, or state left to put back by hand (`RESTORE.txt`) |
+| 2 | refused (a selection with no live group too, such as `ONLY=lab`), or nothing ran |
+| 3 | unproven: a build that failed, a live run past its bound, a check that could not prove the lab clean |
+| 130 | interrupted |
+
+Scheduling it is backlog T20c. ADR 0041's T20b amendment has the details.

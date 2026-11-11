@@ -41,7 +41,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit && tsc -p tsconfig.test.json",
-    "mutate": "node --import tsx scripts/mutation/mutate.ts"
+    "mutate": "node --import tsx scripts/mutation/mutate.ts",
+    "truth:lab": "node --import tsx scripts/truth/batch/lab-run.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",

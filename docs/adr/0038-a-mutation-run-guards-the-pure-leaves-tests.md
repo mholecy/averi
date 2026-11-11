@@ -22,6 +22,7 @@ T2 amendment's T2c part below).
 Amended 2026-11-06 (A11: scripts/truth/run-case.ts joined the run — see the amendment at the end).
 Amended 2026-11-10 (T13: flush-check.ts, replies.ts, live-carousel.ts and live-visibility.ts joined the run — see the T13
 amendment at the end).
+Amended 2026-11-11 (T20b: scripts/truth/batch/lab-run.ts joined the run — see the T20b amendment at the end).
 
 ## Context
 
@@ -1498,3 +1499,25 @@ hand mutants showed.
   the live cases are built from (fixtures/apps/cells.json, read by catalogOf in scripts/truth/live-cases.ts).
 - **The cost**, measured cold on this branch (`npm run mutate -- --force`): core 266 s, lab 127 s, 393 s in all (core
   200 s and lab 62 s at T2b-2). The lab's three modules add about 65 s; flush-check about 15 s.
+
+## Amendment: the standing lab batch joins the run (2026-11-11, backlog T20b)
+
+scripts/truth/batch/lab-run.ts, the standing lab batch (ADR 0041's T20b amendment), is in the `lab` group against
+tests/truth/batch/lab-run.test.ts. It is mostly composition, but it holds logic worth scoring: `--groups` as a
+selection beside ONLY=, the before check's own words, the after line for a default the run left, the state file, a
+live block's verdict and what its FAIL names, and lab-run's own exit code. In the cold full lab group run after the
+code review (279 s, every module at or above its floor) it scored 95.30 %: 512 mutants, 15 survived, 9 without
+coverage, 1 runtime error. Its floor is 93.
+
+The 25 not killed, split in its scope.json baseline:
+
+- equivalent (9): `summary ?? ''` seeded, ACCEPTED seeded, the out folder's `meta` branches and `run-` filter (meta is
+  undefined only on a refused config), the selection's `[]` on a refusal, leftLine's `at < 0` as `at <= 0`;
+- untested (6): the build's bound (`B_BUILD`; no test waits one out), the `io` fallbacks the command line alone takes,
+  the held seam's `stderr`, the hand line's placeholder for a serial not given;
+- unreachable under the fakes only (2): `!opened.ok`, which a real emulator that goes away between the android need and
+  the block can reach;
+- unreachable (4): `apk === undefined` and its block (a met android need has pulled the APK);
+- the entry guard's line (4).
+
+The sandbox needs no new file: scripts/is-main.ts and scripts/truth/*.ts are already in it.
