@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { readFileSync, rmSync } from 'node:fs';
 import * as nodePath from 'node:path';
-import { join } from 'node:path';
+import { extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isMain } from '../is-main.js';
 import {
@@ -15,6 +15,9 @@ import {
  *
  *   node --import tsx scripts/mutation/mutate.ts [--group core|android|scene|lab] [<stryker run argument> …]
  *   (npm run mutate -- --force: every group, cold; npm run mutate -- --group lab --force: lab alone, cold)
+ *
+ * --force removes each group's incremental file first, and a plain run removes one it cannot read or that names a
+ * module outside the group, saying so: Stryker carries that file's modules into the report (ADR 0038, A37).
  */
 
 export type { Scope };
@@ -68,16 +71,21 @@ export function checkFloors(report: MutationReport, scope: Scope): string[] {
   return failures;
 }
 
-/** One Stryker process: its group and the arguments after `stryker run`. */
+/** One Stryker process: its group, the arguments after `stryker run`, its incremental file and whether it is cold. */
 export interface GroupRun {
   group: Group;
   args: string[];
+  /** The incremental file Stryker will use: `--incrementalFile`'s, per group, or the group's default. */
+  incremental: string;
+  /** `--force` (or `--force=true`): the run reads no incremental file. */
+  force: boolean;
 }
 
 /** The options planRuns reads (the rest go to Stryker as given): each its slot, and what its missing value is. */
 const OPTIONS = {
   '--group': { slot: 'group', needs: `a group (${GROUP_WORDS})` },
   '--tempDirName': { slot: 'tempDir', needs: 'a name' },
+  '--incrementalFile': { slot: 'incremental', needs: 'a file' },
   '--mutate': { slot: 'mutate', needs: 'a file' },
   '-m': { slot: 'mutate', needs: 'a file' },
 } as const;
@@ -90,14 +98,21 @@ const nodeGlob = (nodePath as { matchesGlob?: GlobMatch }).matchesGlob;
 /** What makes a `--mutate` pattern a glob rather than a path. */
 const GLOB_CHARS = /[*?[\]{}!]/;
 
+/** `file` with `text` before its extension: `inc.json`, `-core`: `inc-core.json`. Pure. */
+const beforeExtension = (file: string, text: string): string => {
+  const ext = extname(file);
+  return `${file.slice(0, file.length - ext.length)}${text}${ext}`;
+};
+
 /**
  * The groups a run starts, in order, each with its Stryker arguments; or a refusal. `--group <name>` picks one group
  * (none: all, in GROUPS' order) and is not passed on. `--tempDirName <name>` becomes `<name>-<group>`, each group its
- * own sandbox. Without `--group`, each `--mutate` pattern (a path or a glob, a Stryker range after a path kept) is
- * matched against scope.json's modules, and each group gets the modules it matched there (a glob as their paths); only
- * the groups matched run, and a pattern matching none is a refusal. A path is looked up as a scope.json key first; a
- * pattern with glob characters needs `glob` (node's path.matchesGlob, 20.17 and later), refused without it (null). With
- * `--group`, `--mutate` is passed on as given. Pure.
+ * own sandbox; `--incrementalFile <file>` likewise, the group before its extension (`inc.json`: `inc-<group>.json`).
+ * Without `--group`, each `--mutate` pattern (a path or a glob, a Stryker range after a path kept) is matched against
+ * scope.json's modules, and each group gets the modules it matched there (a glob as their paths); only the groups
+ * matched run, and a pattern matching none is a refusal. A path is looked up as a scope.json key first; a pattern with
+ * glob characters needs `glob` (node's path.matchesGlob, 20.17 and later), refused without it (null). With `--group`,
+ * `--mutate` is passed on as given. Each run also carries its incremental file and whether it is cold (--force). Pure.
  */
 export function planRuns(
   args: readonly string[],
@@ -105,7 +120,7 @@ export function planRuns(
   glob: GlobMatch | null = nodeGlob ?? null,
 ): { runs: GroupRun[] } | { refusal: string } {
   const refuse = (why: string) => ({ refusal: `npm run mutate: ${why}` });
-  const given: { group?: string; tempDir?: string; mutate?: string } = {};
+  const given: { group?: string; tempDir?: string; incremental?: string; mutate?: string } = {};
   const rest: string[] = [];
   for (let i = 0; i < args.length; i++) {
     const [name, inline] = args[i].includes('=') ? args[i].split(/=(.*)/s, 2) : [args[i], undefined];
@@ -119,15 +134,21 @@ export function planRuns(
     if (slot === 'group' && given.group !== undefined) return refuse('--group given twice: give one, or none for all');
     given[slot] = value;
   }
-  const { group, tempDir, mutate } = given;
+  const { group, tempDir, incremental, mutate } = given;
   if (group !== undefined && !isGroup(group)) return refuse(`--group ${group}: not a group (${GROUP_WORDS})`);
-  const argsOf = (g: Group, files: string | undefined): string[] => [
-    ...(files === undefined ? [] : ['--mutate', files]),
-    ...rest,
-    ...(tempDir === undefined ? [] : ['--tempDirName', `${tempDir}-${g}`]),
-  ];
-  if (group !== undefined) return { runs: [{ group, args: argsOf(group, mutate) }] };
-  if (mutate === undefined) return { runs: GROUPS.map((g) => ({ group: g, args: argsOf(g, undefined) })) };
+  const force = rest.some((arg) => arg === '--force' || arg === '--force=true');
+  const runOf = (g: Group, files: string | undefined): GroupRun => {
+    const ownIncremental = incremental === undefined ? undefined : beforeExtension(incremental, `-${g}`);
+    const args = [
+      ...(files === undefined ? [] : ['--mutate', files]),
+      ...rest,
+      ...(tempDir === undefined ? [] : ['--tempDirName', `${tempDir}-${g}`]),
+      ...(ownIncremental === undefined ? [] : ['--incrementalFile', ownIncremental]),
+    ];
+    return { group: g, args, incremental: ownIncremental ?? filesOf(g).incremental, force };
+  };
+  if (group !== undefined) return { runs: [runOf(group, mutate)] };
+  if (mutate === undefined) return { runs: GROUPS.map((g) => runOf(g, undefined)) };
   const byGroup = new Map<Group, string[]>();
   for (const pattern of mutate.split(',')) {
     const path = pattern.replace(/:\d.*$/s, '');
@@ -141,7 +162,7 @@ export function planRuns(
     // group it would mutate modules whose tests that group does not run).
     for (const [file, m] of matched) byGroup.set(m.group, [...(byGroup.get(m.group) ?? []), file === path ? pattern : file]);
   }
-  return { runs: GROUPS.filter((g) => byGroup.has(g)).map((g) => ({ group: g, args: argsOf(g, byGroup.get(g)?.join(',')) })) };
+  return { runs: GROUPS.filter((g) => byGroup.has(g)).map((g) => runOf(g, byGroup.get(g)?.join(','))) };
 }
 
 /** How one Stryker process ended: its code or signal, and whether its bound or an interrupt of ours stopped it. */
@@ -211,8 +232,9 @@ export function spawnBounded(command: string, cwd: string, signals: SignalSource
 export interface MutateDeps {
   readScope(): Scope;
   spawn: Spawner;
-  readReport(path: string): MutationReport | undefined;
-  removeReport(path: string): void;
+  /** A report or incremental file; undefined when there is none. Throws on one it cannot parse. */
+  readJson(path: string): MutationReport | undefined;
+  removeFile(path: string): void;
   now(): number;
   log(line: string): void;
   error(line: string): void;
@@ -221,30 +243,47 @@ export interface MutateDeps {
 const realDeps: MutateDeps = {
   readScope,
   spawn: spawnBounded(STRYKER, ROOT),
-  readReport: (path) => {
+  readJson: (path) => {
     try {
-      return JSON.parse(readFileSync(join(ROOT, path), 'utf8')) as MutationReport;
+      return JSON.parse(readFileSync(resolve(ROOT, path), 'utf8')) as MutationReport;
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
       throw e;
     }
   },
-  removeReport: (path) => rmSync(join(ROOT, path), { force: true }),
+  removeFile: (path) => rmSync(resolve(ROOT, path), { force: true }),
   now: () => Date.now(),
   log: (line) => console.log(line),
   error: (line) => console.error(line),
 };
 
+/** Why a plain run cannot use its incremental file: unreadable, or naming a module outside the group; none: it can. */
+function staleIncremental(incremental: string, own: Scope, deps: MutateDeps): string | undefined {
+  let read: MutationReport | undefined;
+  try {
+    read = deps.readJson(incremental);
+  } catch (e) {
+    return `is unreadable (${e instanceof Error ? e.message : String(e)})`;
+  }
+  const outside = Object.keys(read?.files ?? {}).filter((file) => !(file in own));
+  return outside.length === 0 ? undefined : `names ${outside.join(', ')}, not in the group`;
+}
+
 /** One group's Stryker and its floors: its exit code, and whether an interrupt stopped it. */
 async function runGroup(run: GroupRun, scope: Scope, deps: MutateDeps): Promise<{ code: number; interrupted: boolean }> {
-  const { group } = run;
+  const { group, incremental } = run;
   const fail = (why: string, code = 1) => {
     deps.error(`npm run mutate: ${group}: ${why}`);
     return code;
   };
   const report = filesOf(group).json;
+  const own = groupScope(scope, group);
   // A report left by an earlier run must not be read as this one's.
-  deps.removeReport(report);
+  deps.removeFile(report);
+  // Stryker carries the incremental file's other modules into the report, --force or not (ADR 0038, A37).
+  const stale = run.force ? undefined : staleIncremental(incremental, own, deps);
+  if (run.force || stale !== undefined) deps.removeFile(incremental);
+  if (stale !== undefined) deps.log(`npm run mutate: ${group}: ${incremental} ${stale}: removed, the run is cold`);
   const stryker = await deps.spawn(['run', ...run.args], { [GROUP_ENV]: group }, GROUP_BOUND_MS);
   const { interrupted } = stryker;
   if (stryker.timedOut) return { code: fail(`Stryker passed its ${GROUP_BOUND_MS / 1000} s bound and was stopped`), interrupted };
@@ -253,9 +292,8 @@ async function runGroup(run: GroupRun, scope: Scope, deps: MutateDeps): Promise<
     return { code: fail(`Stryker did not run to an end: ${why}`, interrupted ? 130 : 1), interrupted };
   }
   if (stryker.status !== 0) return { code: stryker.status, interrupted };
-  const read = deps.readReport(report);
+  const read = deps.readJson(report);
   if (read === undefined) return { code: fail(`Stryker wrote no report at ${report}: did it crash?`), interrupted };
-  const own = groupScope(scope, group);
   for (const file of Object.keys(read.files).sort()) deps.log(scoreLine(file, read, own));
   const failures = checkFloors(read, own);
   if (failures.length === 0) return { code: 0, interrupted };

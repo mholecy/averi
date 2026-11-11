@@ -57,7 +57,7 @@ describe('scopeOf — what stryker.config.mjs and vitest.mutation.config.ts read
       incremental: 'reports/mutation/stryker-incremental-lab.json',
       json: 'reports/mutation/mutation-lab.json',
       html: 'reports/mutation/mutation-lab.html',
-      tempDir: 'node_modules/.stryker-tmp-lab',
+      tempDir: 'reports/mutation/stryker-tmp-lab',
     });
   });
 
@@ -70,7 +70,7 @@ describe('scopeOf — what stryker.config.mjs and vitest.mutation.config.ts read
       incremental: 'reports/mutation/stryker-incremental.json',
       json: 'reports/mutation/mutation.json',
       html: 'reports/mutation/mutation.html',
-      tempDir: 'node_modules/.stryker-tmp',
+      tempDir: 'reports/mutation/stryker-tmp',
     });
   });
 
@@ -107,6 +107,26 @@ describe('isGroup and filesOf', () => {
   it('filesOf: a group\'s files suffixed, none: the unsuffixed names', () => {
     expect(filesOf('core').json).toBe('reports/mutation/mutation-core.json');
     expect(filesOf(undefined).json).toBe('reports/mutation/mutation.json');
+  });
+
+  it('A37: every temp dir is in the checkout\'s own reports/mutation/, never in node_modules (worktrees share it)', () => {
+    const own = /^reports\/mutation\/stryker-tmp(-[a-z]+)?$/;
+    for (const group of [...GROUPS, undefined]) expect(filesOf(group).tempDir).toMatch(own);
+  });
+});
+
+describe('vitest.config.ts — `npx vitest run` collects no test a mutation sandbox copied (A37)', () => {
+  it('its exclude covers a leftover sandbox under each temp dir, and keeps vitest\'s defaults', async () => {
+    const { configDefaults } = await import('vitest/config');
+    // Should group.mjs ever join scope.json, this import breaks in Stryker's sandbox: vitest.config.ts is not in its
+    // allowlist.
+    const exclude = (await import('../../vitest.config.js')).default.test?.exclude ?? [];
+    expect(exclude).toEqual(expect.arrayContaining(configDefaults.exclude));
+    for (const group of [...GROUPS, undefined]) {
+      const copied = `${filesOf(group).tempDir}/sandbox-AbC123/tests/mutation/group.test.ts`;
+      expect(exclude.some((glob) => matchesGlob(copied, glob))).toBe(true);
+    }
+    expect(exclude.some((glob) => matchesGlob('tests/mutation/group.test.ts', glob))).toBe(false);
   });
 });
 

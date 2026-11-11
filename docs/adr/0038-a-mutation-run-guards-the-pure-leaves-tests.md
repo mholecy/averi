@@ -2040,3 +2040,50 @@ since the module joined, newest first, on one line. A floor change was a diff of
   one of them, its tests and what they import.
 - An older amendment that says a reason or survivor is in "its scope.json baseline" (or "scope.json's baseline") means
   the baseline of that time: unless it is still the latest, it is now in docs/mutation-ledger.md, under the module.
+
+## Amendment: a cold run is cold, and its temp dir is the checkout's own (2026-11-11, backlog A37)
+
+The merge-time `npm run mutate -- --force` on main failed core with `src/adapters/android-chooser.ts: mutated, but has
+no floor`. The module had moved to the `android` group (A27), but reports/mutation/stryker-incremental-core.json, left
+by an earlier core run, still named it. `--force` does not make Stryker ignore that file. Its IncrementalDiffer reruns
+every mutant it produces, but it also keeps every mutant of the old file that this run did not produce. So the old
+module's results came back in core's report, and `checkFloors` read them as a mutated module without a floor. Any
+module that leaves a group does this once in every checkout holding that group's incremental file, cold or not.
+
+- **`--force` removes the group's incremental file before its Stryker starts** (mutate.ts, `runGroup`, next to the
+  removal of the old report). A cold run then depends on nothing a run before it left. A narrowed cold run
+  (`--mutate`) loses the incremental data of the group's other modules too. That costs one slower plain run later.
+- **A plain run removes an incremental file that names a module outside the group**, and logs one line naming the
+  modules (`npm run mutate: core: reports/mutation/stryker-incremental-core.json names src/adapters/android-chooser.ts,
+  not in the group: removed, the run is cold`). A file that names only the group's own modules is kept, so a plain run
+  stays incremental. Refusing such a module instead would leave the user to delete the file by hand, and only the
+  runner knows which file that is. A file the runner cannot parse (a run killed while Stryker wrote it) is removed the
+  same way, its line saying why (`… is unreadable (Unexpected end of JSON input): removed, the run is cold`), rather
+  than crashing the runner.
+- **Both act on the file Stryker will use.** `--force=true` counts as `--force`. `--incrementalFile <file>` is read by
+  planRuns as `--tempDirName` is, and each group gets its own copy, the group before the extension (`inc.json` becomes
+  `inc-core.json`, …). The removal and the check then read that file, not the default. planRuns resolves both once:
+  each `GroupRun` carries its `incremental` file and `force`, and runGroup reads those, never the arguments again. The
+  runner's file ports are `readJson` and `removeFile` (were `readReport` and `removeReport`), as they now serve the
+  incremental file too.
+- **Each group's temp dir is `reports/mutation/stryker-tmp-<group>`** (group.mjs, `filesOf`; no group:
+  `reports/mutation/stryker-tmp`). It was `node_modules/.stryker-tmp-<group>`. A worktree's node_modules is a symlink
+  to main's, so every worktree's run of a group used, and `cleanTempDir: 'always'` deleted, the same directory. That is
+  why the loop's command passed `--tempDirName reports/mutation/stryker-tmp-<n>` by hand (the T2b-2 part's
+  `npm run mutate -- --force --tempDirName .stryker-tmp-<n>`). The default now does that. An explicit `--tempDirName
+  <name>` still wins, as `<name>-<group>`. reports/mutation/ is git-ignored and outside Stryker's sandbox allowlist.
+- **`npx vitest run` excludes reports/** (a new vitest.config.ts: vitest's default excludes plus `reports/**`). The old
+  temp dir relied on vitest's default `**/node_modules/**` exclude to keep the tests that a killed run's leftover
+  sandbox had copied out of the suite. The new one needs its own exclude.
+
+Not changed: vitest.mutation.config.ts's `cacheDir` (`node_modules/.vite-mutation`) is still shared through the
+symlink. It holds vitest's result cache, which only orders test files, so sharing it does not change a score.
+
+Tests: tests/mutation/mutate.test.ts reproduces the failure without Stryker. Its fake Stryker writes the report as
+IncrementalDiffer does, with the group's own module plus every module the incremental file still names. A stale core
+file naming android-chooser.ts failed `--group core --force` with exit 1 before the fix and passes after it. The tests
+also cover `--force` (and `--force=true`) removing even a current file unread, a plain run removing a stale or an
+unreadable file (with its line) but keeping a current one, and both acting on a given `--incrementalFile`, suffixed per
+group by planRuns. tests/mutation/group.test.ts pins every group's temp dir under reports/mutation/, and checks that
+vitest.config.ts's exclude covers a sandbox copy under each one while keeping vitest's defaults. Each test was shown
+failing under its mutant of the fix. No module in scope.json changed, so no floor moved.

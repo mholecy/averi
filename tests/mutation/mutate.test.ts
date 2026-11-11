@@ -67,29 +67,35 @@ const groups: Scope = {
   'scripts/truth/batch/lab-x.ts': { tests: ['tests/x.test.ts'], floor: 90, baseline: '', group: 'lab' },
 };
 
+/** planRuns, each run its group and Stryker arguments only: its incremental file and force have their own test. */
+function plan(...a: Parameters<typeof planRuns>) {
+  const planned = planRuns(...a);
+  return 'refusal' in planned ? planned : { runs: planned.runs.map(({ group, args }) => ({ group, args })) };
+}
+
 describe('planRuns — which groups run, each with its Stryker arguments (T2b-2)', () => {
   it('no --group: core, android, scene then lab, each given the same arguments', () => {
-    expect(planRuns([], groups)).toEqual({ runs: [{ group: 'core', args: [] }, { group: 'android', args: [] }, { group: 'scene', args: [] }, { group: 'lab', args: [] }] });
-    expect(planRuns(['--force'], groups)).toEqual({
+    expect(plan([], groups)).toEqual({ runs: [{ group: 'core', args: [] }, { group: 'android', args: [] }, { group: 'scene', args: [] }, { group: 'lab', args: [] }] });
+    expect(plan(['--force'], groups)).toEqual({
       runs: [{ group: 'core', args: ['--force'] }, { group: 'android', args: ['--force'] }, { group: 'scene', args: ['--force'] }, { group: 'lab', args: ['--force'] }],
     });
   });
 
   it('--group <name> or --group=<name>: that group alone, the option not passed on to Stryker', () => {
-    expect(planRuns(['--group', 'lab', '--force'], groups)).toEqual({ runs: [{ group: 'lab', args: ['--force'] }] });
-    expect(planRuns(['--force', '--group=core'], groups)).toEqual({ runs: [{ group: 'core', args: ['--force'] }] });
+    expect(plan(['--group', 'lab', '--force'], groups)).toEqual({ runs: [{ group: 'lab', args: ['--force'] }] });
+    expect(plan(['--force', '--group=core'], groups)).toEqual({ runs: [{ group: 'core', args: ['--force'] }] });
   });
 
   it('an unknown group, a --group without its name, or two of them: a refusal naming it', () => {
-    expect(planRuns(['--group', 'all'], groups)).toEqual({ refusal: 'npm run mutate: --group all: not a group (core, android, scene or lab)' });
-    expect(planRuns(['--group=Core'], groups)).toEqual({ refusal: 'npm run mutate: --group Core: not a group (core, android, scene or lab)' });
-    expect(planRuns(['--group'], groups)).toEqual({ refusal: 'npm run mutate: --group needs a group (core, android, scene or lab)' });
-    expect(planRuns(['--group', '--force'], groups)).toEqual({ refusal: 'npm run mutate: --group needs a group (core, android, scene or lab)' });
-    expect(planRuns(['--group', 'core', '--group', 'lab'], groups)).toEqual({ refusal: 'npm run mutate: --group given twice: give one, or none for all' });
+    expect(plan(['--group', 'all'], groups)).toEqual({ refusal: 'npm run mutate: --group all: not a group (core, android, scene or lab)' });
+    expect(plan(['--group=Core'], groups)).toEqual({ refusal: 'npm run mutate: --group Core: not a group (core, android, scene or lab)' });
+    expect(plan(['--group'], groups)).toEqual({ refusal: 'npm run mutate: --group needs a group (core, android, scene or lab)' });
+    expect(plan(['--group', '--force'], groups)).toEqual({ refusal: 'npm run mutate: --group needs a group (core, android, scene or lab)' });
+    expect(plan(['--group', 'core', '--group', 'lab'], groups)).toEqual({ refusal: 'npm run mutate: --group given twice: give one, or none for all' });
   });
 
   it('--tempDirName <name>: each group its own, the name suffixed with the group', () => {
-    expect(planRuns(['--force', '--tempDirName', '.stryker-tmp-7'], groups)).toEqual({
+    expect(plan(['--force', '--tempDirName', '.stryker-tmp-7'], groups)).toEqual({
       runs: [
         { group: 'core', args: ['--force', '--tempDirName', '.stryker-tmp-7-core'] },
         { group: 'android', args: ['--force', '--tempDirName', '.stryker-tmp-7-android'] },
@@ -97,31 +103,44 @@ describe('planRuns — which groups run, each with its Stryker arguments (T2b-2)
         { group: 'lab', args: ['--force', '--tempDirName', '.stryker-tmp-7-lab'] },
       ],
     });
-    expect(planRuns(['--tempDirName=t', '--group', 'lab'], groups)).toEqual({ runs: [{ group: 'lab', args: ['--tempDirName', 't-lab'] }] });
-    expect(planRuns(['--tempDirName'], groups)).toEqual({ refusal: 'npm run mutate: --tempDirName needs a name' });
+    expect(plan(['--tempDirName=t', '--group', 'lab'], groups)).toEqual({ runs: [{ group: 'lab', args: ['--tempDirName', 't-lab'] }] });
+    expect(plan(['--tempDirName'], groups)).toEqual({ refusal: 'npm run mutate: --tempDirName needs a name' });
+  });
+
+  it('--incrementalFile <file>: each group its own, the group before the extension (A37)', () => {
+    expect(plan(['--incrementalFile', 'reports/inc.json'], groups)).toEqual({
+      runs: [
+        { group: 'core', args: ['--incrementalFile', 'reports/inc-core.json'] },
+        { group: 'android', args: ['--incrementalFile', 'reports/inc-android.json'] },
+        { group: 'scene', args: ['--incrementalFile', 'reports/inc-scene.json'] },
+        { group: 'lab', args: ['--incrementalFile', 'reports/inc-lab.json'] },
+      ],
+    });
+    expect(plan(['--incrementalFile=inc', '--group', 'lab'], groups)).toEqual({ runs: [{ group: 'lab', args: ['--incrementalFile', 'inc-lab'] }] });
+    expect(plan(['--incrementalFile'], groups)).toEqual({ refusal: 'npm run mutate: --incrementalFile needs a file' });
   });
 
   it('--mutate without --group: each file to its own group, a group none names not run', () => {
-    expect(planRuns(['--mutate', 'src/a.ts,scripts/truth/batch/lab-x.ts:3-9'], groups)).toEqual({
+    expect(plan(['--mutate', 'src/a.ts,scripts/truth/batch/lab-x.ts:3-9'], groups)).toEqual({
       runs: [
         { group: 'core', args: ['--mutate', 'src/a.ts'] },
         { group: 'lab', args: ['--mutate', 'scripts/truth/batch/lab-x.ts:3-9'] },
       ],
     });
-    expect(planRuns(['-m', 'scripts/truth/batch/lab-x.ts', '--force'], groups)).toEqual({
+    expect(plan(['-m', 'scripts/truth/batch/lab-x.ts', '--force'], groups)).toEqual({
       runs: [{ group: 'lab', args: ['--mutate', 'scripts/truth/batch/lab-x.ts', '--force'] }],
     });
-    expect(planRuns(['-m=src/a.ts'], groups)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/a.ts'] }] });
-    expect(planRuns(['--mutate=src/a.ts:1:2-3:4'], groups)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/a.ts:1:2-3:4'] }] });
+    expect(plan(['-m=src/a.ts'], groups)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/a.ts'] }] });
+    expect(plan(['--mutate=src/a.ts:1:2-3:4'], groups)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/a.ts:1:2-3:4'] }] });
   });
 
   it('--mutate without --group: a glob gives each group the modules it matches there, never the glob itself', () => {
-    expect(planRuns(['--mutate', 'src/*.ts', '--force'], groups)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/a.ts', '--force'] }] });
-    expect(planRuns(['--mutate', 'scripts/truth/batch/lab-*.ts'], groups)).toEqual({
+    expect(plan(['--mutate', 'src/*.ts', '--force'], groups)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/a.ts', '--force'] }] });
+    expect(plan(['--mutate', 'scripts/truth/batch/lab-*.ts'], groups)).toEqual({
       runs: [{ group: 'lab', args: ['--mutate', 'scripts/truth/batch/lab-x.ts'] }],
     });
     const more: Scope = { ...groups, 'src/b.ts': { tests: ['tests/b.test.ts'], floor: 90, baseline: '', group: 'core' } };
-    expect(planRuns(['--mutate', '**/*.ts,src/a.ts:2-5'], more)).toEqual({
+    expect(plan(['--mutate', '**/*.ts,src/a.ts:2-5'], more)).toEqual({
       runs: [
         { group: 'core', args: ['--mutate', 'src/a.ts,src/b.ts,src/a.ts:2-5'] },
         { group: 'android', args: ['--mutate', 'src/adapters/android-w.ts'] },
@@ -132,64 +151,113 @@ describe('planRuns — which groups run, each with its Stryker arguments (T2b-2)
   });
 
   it('--mutate without --group on a node without path.matchesGlob (before 20.17): exact paths work, a glob is refused', () => {
-    expect(planRuns(['--mutate', 'src/a.ts,scripts/truth/batch/lab-x.ts:3-9'], groups, null)).toEqual({
+    expect(plan(['--mutate', 'src/a.ts,scripts/truth/batch/lab-x.ts:3-9'], groups, null)).toEqual({
       runs: [
         { group: 'core', args: ['--mutate', 'src/a.ts'] },
         { group: 'lab', args: ['--mutate', 'scripts/truth/batch/lab-x.ts:3-9'] },
       ],
     });
     for (const glob of ['src/*.ts', 'src/a.t?', 'src/[ab].ts', 'src/**']) {
-      expect(planRuns(['--mutate', glob], groups, null)).toEqual({
+      expect(plan(['--mutate', glob], groups, null)).toEqual({
         refusal: `npm run mutate: --mutate ${glob}: a glob needs Node 20.17 or later (path.matchesGlob); give scripts/mutation/scope.json paths, or --group`,
       });
     }
     // A scope.json key is looked up as itself first, glob characters and all (one a glob would not match).
     const bracketed: Scope = { ...groups, 'src/[id].ts': { tests: ['tests/id.test.ts'], floor: 90, baseline: '', group: 'core' } };
     for (const glob of [null, undefined]) {
-      expect(planRuns(['--mutate', 'src/[id].ts'], bracketed, glob)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/[id].ts'] }] });
+      expect(plan(['--mutate', 'src/[id].ts'], bracketed, glob)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/[id].ts'] }] });
     }
-    expect(planRuns(['--mutate', 'src/zz.ts'], groups, null)).toEqual({
+    expect(plan(['--mutate', 'src/zz.ts'], groups, null)).toEqual({
       refusal: 'npm run mutate: --mutate src/zz.ts: matches no scripts/mutation/scope.json module (give --group to mutate it)',
     });
   });
 
   it('--mutate without --group: a pattern matching no scope entry, or no file, is a refusal', () => {
-    expect(planRuns(['--mutate', 'src/a.ts,src/zz/*.ts'], groups)).toEqual({
+    expect(plan(['--mutate', 'src/a.ts,src/zz/*.ts'], groups)).toEqual({
       refusal: 'npm run mutate: --mutate src/zz/*.ts: matches no scripts/mutation/scope.json module (give --group to mutate it)',
     });
-    expect(planRuns(['--mutate', 'src/a'], groups)).toEqual({
+    expect(plan(['--mutate', 'src/a'], groups)).toEqual({
       refusal: 'npm run mutate: --mutate src/a: matches no scripts/mutation/scope.json module (give --group to mutate it)',
     });
-    expect(planRuns(['--mutate'], groups)).toEqual({ refusal: 'npm run mutate: --mutate needs a file' });
-    expect(planRuns(['-m', ''], groups)).toEqual({ refusal: 'npm run mutate: --mutate needs a file' });
+    expect(plan(['--mutate'], groups)).toEqual({ refusal: 'npm run mutate: --mutate needs a file' });
+    expect(plan(['-m', ''], groups)).toEqual({ refusal: 'npm run mutate: --mutate needs a file' });
+  });
+
+  it('each run\'s incremental file (--incrementalFile per group, or the default) and whether it is cold (A37)', () => {
+    const fields = (args: string[]) => {
+      const planned = planRuns(args, groups);
+      return 'refusal' in planned ? planned : planned.runs.map(({ group, incremental, force }) => [group, incremental, force]);
+    };
+    const core = 'reports/mutation/stryker-incremental-core.json';
+    expect(fields(['--group', 'core'])).toEqual([['core', core, false]]);
+    expect(fields(['--group', 'lab', '--force'])).toEqual([['lab', 'reports/mutation/stryker-incremental-lab.json', true]]);
+    expect(fields(['--force=true', '--incrementalFile', 'inc.json', '--mutate', 'src/a.ts'])).toEqual([['core', 'inc-core.json', true]]);
+    expect(fields(['--force=false', '--group', 'core'])).toEqual([['core', core, false]]);
   });
 
   it('--mutate with --group: passed on as given, globs too', () => {
-    expect(planRuns(['--group', 'core', '--mutate', 'src/*.ts'], groups)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/*.ts'] }] });
+    expect(plan(['--group', 'core', '--mutate', 'src/*.ts'], groups)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/*.ts'] }] });
   });
 });
 
-/** A fake run: each group's Stryker result and report, and what main did, in order. */
-function fakeDeps(o: { spawned?: Partial<Record<string, Partial<Spawned>>>; reports?: Record<string, MutationReport | undefined>; scope?: Scope } = {}) {
+/** Each group's module in `groups`. */
+const moduleOf: Record<string, string> = {
+  core: 'src/a.ts', android: 'src/adapters/android-w.ts', scene: 'src/ui-tree/s.ts', lab: 'scripts/truth/batch/lab-x.ts',
+};
+
+/** A file on the fake disk: a report, or what JSON.parse throws on it (a truncated file). */
+type OnDisk = MutationReport | Error;
+
+/**
+ * A fake run: each group's Stryker result and report, and what main did, in order. With `disk` (A37), the files are
+ * there, and Stryker writes the group's report as its IncrementalDiffer does: the group's own module plus every module
+ * its incremental file still names; the incremental file then holds that report.
+ */
+function fakeDeps(o: {
+  spawned?: Partial<Record<string, Partial<Spawned>>>;
+  reports?: Record<string, MutationReport | undefined>;
+  scope?: Scope;
+  disk?: Map<string, OnDisk>;
+} = {}) {
   const events: string[] = [];
   const out: string[] = [];
   let clock = 0;
+  const reportOf = (group: string): MutationReport => ({
+    files: { [moduleOf[group]]: { mutants: mutants({ Killed: 9, Survived: 1 }) } },
+  });
   const deps: MutateDeps = {
     readScope: () => o.scope ?? groups,
     spawn: (args, env, boundMs) => {
-      const group = env[GROUP_ENV];
+      const group = env[GROUP_ENV] ?? '';
       events.push(`spawn ${group} ${args.join(' ')} ${boundMs}`);
       clock += group === 'core' ? 212_400 : group === 'android' ? 180_300 : group === 'scene' ? 150_200 : 98_600;
+      if (o.disk !== undefined) {
+        const at = args.indexOf('--incrementalFile');
+        const incremental = at === -1 ? `reports/mutation/stryker-incremental-${group}.json` : args[at + 1];
+        const left = o.disk.get(incremental);
+        const report = { files: { ...(left instanceof Error ? {} : left?.files), ...reportOf(group).files } };
+        o.disk.set(`reports/mutation/mutation-${group}.json`, report);
+        o.disk.set(incremental, report);
+      }
       return Promise.resolve({ status: 0, signal: null, timedOut: false, interrupted: false, ...o.spawned?.[group] });
     },
-    readReport: (path) => {
+    readJson: (path) => {
       events.push(`read ${path}`);
+      if (o.disk !== undefined) {
+        const file = o.disk.get(path);
+        if (file instanceof Error) throw file;
+        return file;
+      }
+      // No incremental file left from an earlier run.
+      if (path.includes('stryker-incremental')) return undefined;
       const group = /mutation-(\w+)\.json$/.exec(path)?.[1] ?? '';
       if (o.reports !== undefined && group in o.reports) return o.reports[group];
-      const file = group === 'core' ? 'src/a.ts' : group === 'android' ? 'src/adapters/android-w.ts' : group === 'scene' ? 'src/ui-tree/s.ts' : 'scripts/truth/batch/lab-x.ts';
-      return { files: { [file]: { mutants: mutants({ Killed: 9, Survived: 1 }) } } };
+      return reportOf(group);
     },
-    removeReport: (path) => events.push(`remove ${path}`),
+    removeFile: (path) => {
+      events.push(`remove ${path}`);
+      o.disk?.delete(path);
+    },
     now: () => clock,
     log: (line) => out.push(line),
     error: (line) => out.push(`E ${line}`),
@@ -198,21 +266,25 @@ function fakeDeps(o: { spawned?: Partial<Record<string, Partial<Spawned>>>; repo
 }
 
 describe('main — the groups one after the other, the run failing if any fails (T2b-2)', () => {
-  it('no --group: core, android, scene then lab, each its report removed first, its own env and 600 s bound; all pass: 0', async () => {
+  it('no --group: core, android, scene then lab, each its files removed first, its own env and 600 s bound; all pass: 0', async () => {
     const { deps, events, out } = fakeDeps();
     expect(GROUP_BOUND_MS).toBe(600_000);
     expect(await main(['--force'], deps)).toBe(0);
     expect(events).toEqual([
       'remove reports/mutation/mutation-core.json',
+      'remove reports/mutation/stryker-incremental-core.json',
       'spawn core run --force 600000',
       'read reports/mutation/mutation-core.json',
       'remove reports/mutation/mutation-android.json',
+      'remove reports/mutation/stryker-incremental-android.json',
       'spawn android run --force 600000',
       'read reports/mutation/mutation-android.json',
       'remove reports/mutation/mutation-scene.json',
+      'remove reports/mutation/stryker-incremental-scene.json',
       'spawn scene run --force 600000',
       'read reports/mutation/mutation-scene.json',
       'remove reports/mutation/mutation-lab.json',
+      'remove reports/mutation/stryker-incremental-lab.json',
       'spawn lab run --force 600000',
       'read reports/mutation/mutation-lab.json',
     ]);
@@ -301,6 +373,79 @@ describe('main — the groups one after the other, the run failing if any fails 
     expect(await main([], bad.deps)).toBe(2);
     expect(bad.events).toEqual([]);
     expect(bad.out).toEqual(['E npm run mutate: src/b.ts: group "x" in scripts/mutation/scope.json is not core, android, scene or lab']);
+  });
+});
+
+// A37: a cold run is cold. Stryker (its IncrementalDiffer) keeps every mutant of its incremental file that this run
+// did not produce, --force or not: a module the file names but the group no longer mutates comes back in the report.
+
+describe('main — a leftover incremental file cannot fail a run (A37)', () => {
+  const moved = 'src/adapters/android-chooser.ts';
+  const inc = 'reports/mutation/stryker-incremental-core.json';
+  // An incremental file from before the module moved to android (A27): it names a module core no longer has.
+  const stale = (): MutationReport => ({
+    files: { 'src/a.ts': { mutants: mutants({ Killed: 10 }) }, [moved]: { mutants: mutants({ Killed: 3 }) } },
+  });
+  const current = (): MutationReport => ({ files: { 'src/a.ts': { mutants: mutants({ Killed: 10 }) } } });
+  const mutatedIn = (disk: Map<string, OnDisk>) =>
+    Object.keys((disk.get('reports/mutation/mutation-core.json') as MutationReport).files);
+
+  it('--force: the group\'s incremental file is removed before Stryker starts, so the run is cold', async () => {
+    const disk = new Map<string, OnDisk>([[inc, stale()]]);
+    const { deps, events, out } = fakeDeps({ disk });
+    expect(await main(['--group', 'core', '--force'], deps)).toBe(0);
+    expect(out.filter((line) => line.includes('no floor'))).toEqual([]);
+    expect(mutatedIn(disk)).toEqual(['src/a.ts']);
+    expect(events.slice(0, 3)).toEqual([
+      'remove reports/mutation/mutation-core.json',
+      `remove ${inc}`,
+      'spawn core run --force 600000',
+    ]);
+  });
+
+  it('--force or --force=true: even an incremental file of the group\'s own modules goes, unread', async () => {
+    for (const force of ['--force', '--force=true']) {
+      const disk = new Map<string, OnDisk>([[inc, current()]]);
+      const { deps, events } = fakeDeps({ disk });
+      expect(await main(['--group', 'core', force], deps)).toBe(0);
+      expect(events).toContain(`remove ${inc}`);
+      expect(events).not.toContain(`read ${inc}`);
+    }
+  });
+
+  it('no --force: an incremental file naming a module outside the group is removed, saying so', async () => {
+    const disk = new Map<string, OnDisk>([[inc, stale()]]);
+    const { deps, out } = fakeDeps({ disk });
+    expect(await main(['--group', 'core'], deps)).toBe(0);
+    expect(out).toContain(`npm run mutate: core: ${inc} names ${moved}, not in the group: removed, the run is cold`);
+    expect(mutatedIn(disk)).toEqual(['src/a.ts']);
+  });
+
+  it('no --force: an unreadable incremental file (a run killed while writing it) is removed, saying why', async () => {
+    const disk = new Map<string, OnDisk>([[inc, new SyntaxError('Unexpected end of JSON input')]]);
+    const { deps, out } = fakeDeps({ disk });
+    expect(await main(['--group', 'core'], deps)).toBe(0);
+    const why = 'is unreadable (Unexpected end of JSON input)';
+    expect(out).toContain(`npm run mutate: core: ${inc} ${why}: removed, the run is cold`);
+  });
+
+  it('no --force: an incremental file of the group\'s own modules is kept: a plain run stays incremental', async () => {
+    const disk = new Map<string, OnDisk>([[inc, current()]]);
+    const { deps, events, out } = fakeDeps({ disk });
+    expect(await main(['--group', 'core'], deps)).toBe(0);
+    expect(events.filter((e) => e.startsWith('remove'))).toEqual(['remove reports/mutation/mutation-core.json']);
+    expect(out.filter((line) => line.includes('incremental'))).toEqual([]);
+  });
+
+  it('--incrementalFile: --force removes, and a plain run checks, the file Stryker will use', async () => {
+    const given = 'reports/inc-core.json';
+    const cold = new Map<string, OnDisk>([[given, stale()], [inc, stale()]]);
+    const forced = fakeDeps({ disk: cold }).deps;
+    expect(await main(['--group', 'core', '--force', '--incrementalFile', 'reports/inc.json'], forced)).toBe(0);
+    expect(mutatedIn(cold)).toEqual(['src/a.ts']);
+    const { deps, out } = fakeDeps({ disk: new Map<string, OnDisk>([[given, stale()]]) });
+    expect(await main(['--group', 'core', '--incrementalFile', 'reports/inc.json'], deps)).toBe(0);
+    expect(out).toContain(`npm run mutate: core: ${given} names ${moved}, not in the group: removed, the run is cold`);
   });
 });
 
