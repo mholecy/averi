@@ -57,7 +57,10 @@ export type LabRunGroup = (typeof LAB_RUN_GROUPS)[number];
 /** The batch's blocks, in its order. */
 const BLOCK_IDS = ['lab', ...LAB_RUN_GROUPS] as const;
 
-/** lab-run's exit codes: a numbered batch's (words.ts#EXIT), and `unproven` for a run that proved nothing wrong or right. */
+/**
+ * lab-run's exit codes: a numbered batch's (words.ts#EXIT), and `unproven` for a run that proved nothing wrong or
+ * right.
+ */
 export const LAB_RUN_EXIT = { passed: 0, failed: 1, refused: 2, unproven: 3, interrupted: 130 } as const;
 
 /** The need on the handler counts the chooser group rests on (batch-11's D55: shared 2, cell 1). */
@@ -184,7 +187,8 @@ export function beforeLine(c: Pick<Check, 'exit' | 'focus' | 'preferred'>, base:
 /** The cleanup's line when the run left the default: that alone, with what the cleanup did (cleared or not). */
 function leftLine(c: { line: string; check: Check }): string {
   const why = checkWhy(c.check.focus, c.check.preferred, ACCEPTED);
-  const tail = c.line.slice(verdictLine(AFTER_LABEL, 'FAIL', CHECK_OUTCOME[CHECK_EXIT.leak].words(why)).length);
+  // What the cleanup did, as cleanUp says it on a default: from its `; cleared: …` or `; NOT cleared: …` on.
+  const tail = c.line.slice(c.line.search(/; (?:NOT )?cleared: /));
   return verdictLine(AFTER_LABEL, 'FAIL', `the chooser group's run left a lab default (mAlways=true) — ${BEFORE_LABEL} found none: ${why}${tail}`);
 }
 
@@ -243,15 +247,21 @@ export function liveJudge(label: string, name: string): (j: BlockFiles) => Promi
   };
 }
 
+/** An ERROR line of the SUMMARY's ERROR section: bare, timed (`HH:MM:SS `) or named by its log (`[<log>] `). */
+const ERROR_STEP = /^(?:\[[^\]]*\] |\d\d:\d\d:\d\d )?ERROR\b/;
+
 /**
  * lab-run's exit from the runner's and the SUMMARY's lines: the runner's 1, 2 and 130 stand; its 0 is 0 only when
- * every wanted block's line is PASS and no line is INCONCLUSIVE or ERROR — else unproven (3), the SUMMARY unread too.
+ * every wanted block's line is PASS, no verdict line is INCONCLUSIVE or ERROR and the ERROR section is empty — else
+ * unproven (3), the SUMMARY unread too.
  */
 export function labRunExit(runner: number, summary: readonly string[] | undefined, labels: readonly string[]): number {
   if (runner !== EXIT.ok) return runner;
   if (summary === undefined) return LAB_RUN_EXIT.unproven;
   const parsed = summary.map(parseVerdictLine).filter((v) => v !== undefined);
   if (parsed.some((v) => v.verdict === 'INCONCLUSIVE' || v.verdict === 'ERROR')) return LAB_RUN_EXIT.unproven;
+  // The SUMMARY's ERROR section: a step's (steps.log, timed) or a log's ERROR line (runner-lines.ts#logErrors).
+  if (summary.some((l) => ERROR_STEP.test(l))) return LAB_RUN_EXIT.unproven;
   const passed = labels.every((l) => parsed.some((v) => v.label === l && v.verdict === 'PASS'));
   return passed ? LAB_RUN_EXIT.passed : LAB_RUN_EXIT.unproven;
 }

@@ -29,6 +29,8 @@ interface LiveScript {
   rejudgeCode?: number;
   /** live.ts wrote no record and never judged (cut at its bound). */
   noRecord?: boolean;
+  /** A line live.ts prints into its log before its summary. */
+  logLine?: string;
   /** What its rejudge prints (the cases' summary unless given). */
   rejudgeOut?: string;
   during?: (w: LabWorld) => void;
@@ -91,7 +93,7 @@ class RunSeam implements ProcessSeam {
       script.during?.(this.world);
       if (script.noRecord === true) return { code: script.code ?? 0, out: '', err: '' };
       writeFileSync(at('--record'), '{"results":[]}');
-      return { code: script.code ?? 0, out: summaryOf(GROUP_CASES[group]), err: '' };
+      return { code: script.code ?? 0, out: `${script.logLine === undefined ? '' : `${script.logLine}\n`}${summaryOf(GROUP_CASES[group])}`, err: '' };
     }
     if (cmd.endsWith('gradlew') && args.includes('--stop') && this.stopFailsOnce) {
       this.stopFailsOnce = false;
@@ -289,6 +291,15 @@ describe('the --check before and after the chooser group (lab-chooser.ts#CHECK_O
     expect(s.find((l) => l.startsWith('forms verdict:'))).toMatch(/^forms verdict: PASS/);
     expect(world.st.preferred).not.toContain('mAlways=true\n          Selected from:\n            dev.averi.lab');
     expect(JSON.parse(readFileSync(join(dirOf('chooser'), 'state.json'), 'utf8'))).toEqual({ dirty: false });
+  });
+
+  it('a default the chooser group left that the reinstall does not clear: the after line says so, NOT cleared, its hand line in RESTORE; exit 1', async () => {
+    seam.live.chooser = { during: (w) => void ((w.st.preferred = PREFERRED_WITH_DEFAULT), (w.st.apkCells = '{"cells":[]}\n')) };
+    expect(await go(['--groups', 'chooser'])).toBe(1);
+    const afterLine = summary().find((l) => l.startsWith('chooser check after:'))!;
+    expect(afterLine).toMatch(/^chooser check after: FAIL — the chooser group's run left a lab default \(mAlways=true\) — chooser check before found none: chooser no; [^]*; NOT cleared: the reinstall not proven: /);
+    expect(afterLine.match(/cleared: /g)).toHaveLength(1);
+    expect(existsSync(join(out, 'RESTORE.txt'))).toBe(true);
   });
 
   it('a default before the run: the chooser group not run, the before line FAIL with its hand line in RESTORE; forms still runs; exit 1', async () => {
@@ -521,6 +532,13 @@ describe('the exit code read from this run\'s own SUMMARY', () => {
     expect(seam.exits).toEqual([0, 3]);
   });
 
+  it('an ERROR line in a live run\'s log, every block PASS: the SUMMARY\'s ERROR section makes it unproven, exit 3', async () => {
+    seam.live.forms = { logLine: 'ERROR the lab app crashed once' };
+    expect(await go(['--groups', 'forms'])).toBe(LAB_RUN_EXIT.unproven);
+    expect(summary()).toContain('ERROR the lab app crashed once');
+    expect(summary().find((l) => l.startsWith('forms verdict:'))).toMatch(/^forms verdict: PASS/);
+  });
+
   it('a last-chosen entry before and after: WARN lines only, the chooser group run, exit 0', async () => {
     fresh({ preferred: PREFERRED_WITH_DEFAULT.replace('mAlways=true', 'mAlways=false') });
     expect(await go(['--groups', 'chooser'])).toBe(0);
@@ -533,6 +551,13 @@ describe('the exit code read from this run\'s own SUMMARY', () => {
 describe('labRunExit: 0 only when every wanted block PASSed and no line is INCONCLUSIVE or ERROR', () => {
   const pass = ['lab check: PASS — met', 'forms verdict: PASS — ok', 'LAB android: OK — fine', 'RESTORE: none — everything dirty was put back and verified', 'x step: WARN — said'];
   const labels = ['lab check', 'forms verdict'];
+  it('an ERROR step line (steps.log, timed) or a log\'s ERROR line beside every block PASS: unproven, 3', () => {
+    expect(labRunExit(0, [...pass, '10:15:00 ERROR forms live android-forms (exit 2) — see x.log'], labels)).toBe(3);
+    expect(labRunExit(0, [...pass, 'ERROR something in a log (×2, in forms/android-forms.log)'], labels)).toBe(3);
+    expect(labRunExit(0, [...pass, '[forms/x.log] ERROR boom'], labels)).toBe(3);
+    expect(labRunExit(0, [...pass, 'ERRORS seen: none', 'x ERROR y'], labels)).toBe(0);
+  });
+
   it('the runner\'s 1, 2 and 130 stand', () => {
     for (const c of [1, 2, 130]) expect(labRunExit(c, pass, labels)).toBe(c);
   });

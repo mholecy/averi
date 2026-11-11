@@ -1506,8 +1506,8 @@ scripts/truth/batch/lab-run.ts, the standing lab batch (ADR 0041's T20b amendmen
 tests/truth/batch/lab-run.test.ts. It is mostly composition, but it holds logic worth scoring: `--groups` as a
 selection beside ONLY=, the before check's own words, the after line for a default the run left, the state file, a
 live block's verdict and what its FAIL names, and lab-run's own exit code. In the cold full lab group run (267 s, every
-module at or above its floor) it scored 95.25 %: 464 mutants, 14 survived, 8 without coverage, 1 runtime error. Its
-floor is 93.
+module at or above its floor) it scored 95.25 %: 464 mutants, 14 survived, 8 without coverage, 1 runtime error; after
+review round 2, cold and narrowed to it, 95.39 % of 478 mutants with the same 23 not killed. Its floor is 93.
 
 The 23 not killed, split in its scope.json baseline:
 
