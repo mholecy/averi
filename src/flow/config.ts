@@ -242,7 +242,8 @@ const nestedStep: z.ZodType<Step> = z.lazy(() => step);
 
 /**
  * Every step kind but the platform override, by its one key: the schema of the value under that key. `tsc` holds it
- * to Step's kinds (the `satisfies`), so a kind added to Step is a kind a flow can write.
+ * to Step (the `satisfies`): a key for every kind, and each schema yields what its Step member holds under that key,
+ * so a kind added to Step, or one whose schema drifts from its type, fails to compile.
  */
 const STEP_KINDS = {
   launch: z
@@ -308,32 +309,50 @@ const STEP_KINDS = {
     }),
   branch: z.array(z.object({ when: condition, do: z.array(nestedStep) }).strict()).min(1),
   optional: z.array(nestedStep).min(1),
-} satisfies Record<Exclude<StepKind, PlatformKey>, z.ZodTypeAny>;
+} satisfies {
+  [K in Exclude<StepKind, PlatformKey>]: z.ZodType<Extract<Step, Record<K, unknown>>[K], z.ZodTypeDef, unknown>;
+};
 
 /** The platform override's keys: a step of one or both of them is the override, `{ android?: Step; ios?: Step }`. */
-type PlatformKey = 'android' | 'ios';
-const PLATFORM_KEYS: readonly string[] = ['android', 'ios'] satisfies PlatformKey[];
-const platformOverride = z.object({ android: nestedStep.optional(), ios: nestedStep.optional() }).strict();
+type PlatformKey = Exclude<ContainerKind, 'branch' | 'optional'>;
+/** Every platform key, `tsc`-checked complete: the record has each PlatformKey as a key, and as that key's value. */
+const PLATFORM_KEYS: readonly string[] = Object.values({ android: 'android', ios: 'ios' } satisfies { [K in PlatformKey]: K });
+const platformOverride: z.ZodType<{ android?: Step; ios?: Step }, z.ZodTypeDef, unknown> = z
+  .object({ android: nestedStep.optional(), ios: nestedStep.optional() })
+  .strict();
 
 /** What a step may be, said wherever one is not. */
 const STEP_ONE_OF = `one of: ${Object.keys(STEP_KINDS).join(', ')}, or a platform override (android and/or ios)`;
+
+/** Which schema judges a step: the platform override, one kind's (under its key), or none, and why. */
+type StepRoute =
+  | { kind: 'override' }
+  | { kind: 'step'; key: string; schema: z.ZodTypeAny }
+  | { kind: 'refused'; message: string };
 
 /**
  * Which schema judges this step, picked by its one key — or why none does. A step is a mapping of exactly one key
  * that names its kind, or of `android` and/or `ios` (the platform override).
  */
-function stepSchemaFor(v: unknown): { key?: string; schema: z.ZodTypeAny } | string {
+function routeStep(v: unknown): StepRoute {
+  const refused = (message: string): StepRoute => ({ kind: 'refused', message });
   if (typeof v !== 'object' || v === null || Array.isArray(v)) {
-    return `a step is a mapping of one key, ${STEP_ONE_OF} — received ${z.getParsedType(v)}`;
+    return refused(`a step is a mapping of one key, ${STEP_ONE_OF} — received ${z.getParsedType(v)}`);
   }
   const keys = Object.keys(v);
-  if (keys.length > 0 && keys.every((k) => PLATFORM_KEYS.includes(k))) return { schema: platformOverride };
+  const others = keys.filter((k) => !PLATFORM_KEYS.includes(k));
+  if (keys.length > 0 && others.length === 0) return { kind: 'override' };
+  // Beside a platform key, the one other key that is no kind either is a misspelt platform (`iOS`), not a step.
+  if (others.length === 1 && keys.length > 1 && !Object.hasOwn(STEP_KINDS, others[0])) {
+    return refused(`unknown platform '${others[0]}': a platform override takes android and/or ios`);
+  }
   if (keys.length !== 1) {
-    return `a step has exactly one key, ${STEP_ONE_OF}; this one has ${keys.length === 0 ? 'none' : `${keys.length}: ${keys.join(', ')}`}`;
+    const has = keys.length === 0 ? 'none' : `${keys.length}: ${keys.join(', ')}`;
+    return refused(`a step has exactly one key, ${STEP_ONE_OF}; this one has ${has}`);
   }
   const [key] = keys;
-  if (!Object.hasOwn(STEP_KINDS, key)) return `unknown step '${key}': a step is ${STEP_ONE_OF}`;
-  return { key, schema: STEP_KINDS[key as keyof typeof STEP_KINDS] };
+  if (!Object.hasOwn(STEP_KINDS, key)) return refused(`unknown step '${key}': a step is ${STEP_ONE_OF}`);
+  return { kind: 'step', key, schema: STEP_KINDS[key as keyof typeof STEP_KINDS] };
 }
 
 /**
@@ -344,20 +363,26 @@ function stepSchemaFor(v: unknown): { key?: string; schema: z.ZodTypeAny } | str
  * issues, and the member it picked was not the one the step's key named. A discriminated union needs a literal field
  * to pick by, which a one-key step lacks — so the key is found here, and the step's shape (no key, several, an
  * unknown one, no mapping at all) is refused in words of its own.
+ *
+ * A check over a whole step belongs in validateReferences, never as a refine over this schema or a container of it: a
+ * refused step's value here is z.NEVER, and a refine further up would still be handed it.
  */
 const step: z.ZodType<Step> = z.any().transform((v: unknown, ctx): Step => {
-  const picked = stepSchemaFor(v);
-  if (typeof picked === 'string') {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: picked });
+  const route = routeStep(v);
+  if (route.kind === 'refused') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: route.message });
     return z.NEVER;
   }
-  const { key, schema } = picked;
-  const parsed = schema.safeParse(key === undefined ? v : (v as Record<string, unknown>)[key]);
+  const parsed =
+    route.kind === 'override'
+      ? platformOverride.safeParse(v)
+      : route.schema.safeParse((v as Record<string, unknown>)[route.key]);
   if (!parsed.success) {
-    for (const issue of parsed.error.issues) ctx.addIssue({ ...issue, path: key === undefined ? issue.path : [key, ...issue.path] });
+    const under = route.kind === 'step' ? [route.key] : [];
+    for (const issue of parsed.error.issues) ctx.addIssue({ ...issue, path: [...under, ...issue.path] });
     return z.NEVER;
   }
-  return (key === undefined ? parsed.data : { [key]: parsed.data }) as Step;
+  return route.kind === 'override' ? (parsed.data as Step) : ({ [route.key]: parsed.data } as Step);
 });
 
 const configSchema = z

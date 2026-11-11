@@ -692,7 +692,8 @@ up-front refusal is needed or possible. The engine passes the step's `within` th
 (`src/flow/engine.ts`, `runScrollUntil`'s spread), as it passes `direction`, `maxSwipes` and `fully`.
 
 (c) Load-time refusals (`src/flow/config.ts`, `withinSpec`), each said as the one issue at `….scroll_until.within`,
-not the step union's bare `Unrecognized key(s) in object: 'scroll_until'`: anything carrying a rect's side (`x`,
+not the step union's bare `Unrecognized key(s) in object: 'scroll_until'` (since D86 the step is judged by its key,
+`src/flow/config.ts#routeStep`; the union and its bare message are gone): anything carrying a rect's side (`x`,
 `y`, `width`, `height` — the whole rect or one side beside a spec field) — `within takes an element spec (id, text,
 role, label) of the scroll view or of an element inside it, not a rect: a rect is device-specific`; a selector
 string, the MCP tool's other form — `within takes an element spec ({ id: … }), as the step's element does, not a

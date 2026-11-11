@@ -144,6 +144,24 @@ flows:
       expect(load('- tapp: { id: x }')).toThrow(only(`flows.f.steps.0: unknown step 'tapp': a step is ${ONE_OF}`));
     });
 
+    // A kind is the table's OWN key: an inherited name (`toString`, `constructor`) or `__proto__` is no kind.
+    it.each(['toString', 'constructor', '__proto__'])('a key the kind table merely inherits (%s) is an unknown step', (key) => {
+      expect(load(`- { "${key}": { id: x } }`)).toThrow(only(`flows.f.steps.0: unknown step '${key}': a step is ${ONE_OF}`));
+    });
+
+    it('beside a platform key, one other key that is no kind is a misspelt platform, named', () => {
+      expect(load('- { android: { tap: { id: a } }, iOS: { tap: { id: i } } }')).toThrow(
+        only("flows.f.steps.0: unknown platform 'iOS': a platform override takes android and/or ios"),
+      );
+      expect(load('- { ios: { tap: { id: i } }, andriod: { tap: { id: a } } }')).toThrow(
+        only("flows.f.steps.0: unknown platform 'andriod': a platform override takes android and/or ios"),
+      );
+      // Two unknown keys beside it, or a kind beside it, is a step of several keys.
+      expect(load('- { android: { tap: { id: a } }, iOS: { tap: { id: i } }, web: { tap: { id: w } } }')).toThrow(
+        only(`flows.f.steps.0: a step has exactly one key, ${ONE_OF}; this one has 3: android, iOS, web`),
+      );
+    });
+
     it('a step with no key, or with several, says a step has exactly one', () => {
       expect(load('- {}')).toThrow(only(`flows.f.steps.0: a step has exactly one key, ${ONE_OF}; this one has none`));
       expect(load('- { tap: { id: x }, swipe: { direction: up } }')).toThrow(only(`flows.f.steps.0: a step has exactly one key, ${ONE_OF}; this one has 2: tap, swipe`));
