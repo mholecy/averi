@@ -633,3 +633,120 @@ describe('parseUiautomatorXml — a text input\'s hint (2026-10-09)', () => {
     expect(blankHint).not.toHaveProperty('placeholder');
   });
 });
+
+// A27's mutation run (ADR 0038's A27 amendment): the dialect's rules its other tests left unpinned, through
+// parseUiautomatorXml.
+describe('parseUiautomatorXml — the dialect\'s rules, one by one', () => {
+  const XML = (body: string): string => `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?><hierarchy rotation="0">${body}</hierarchy>`;
+  const node = (attrs: string, children = ''): string => `<node index="0" text="" resource-id="" package="p" content-desc="" ${attrs}${children === '' ? ' />' : `>${children}</node>`}`;
+  /** One window [0,0][1080,2220] holding `child`, parsed; its one child back. */
+  const only = (child: string): UiNode => parseDump(XML(node('class="android.widget.FrameLayout" bounds="[0,0][1080,2220]"', child))).children[0];
+
+  it('the role map: ImageButton a button, EditText and AutoCompleteTextView text fields', () => {
+    expect(only(node('class="android.widget.ImageButton" bounds="[0,0][10,10]"')).role).toBe('button');
+    expect(only(node('class="android.widget.EditText" bounds="[0,0][10,10]"')).role).toBe('textfield');
+    expect(only(node('class="android.widget.AutoCompleteTextView" bounds="[0,0][10,10]"')).role).toBe('textfield');
+  });
+
+  it('a class ENDING in EditText is a text input (AppCompatEditText), with no role of its own in the map', () => {
+    expect(only(node('class="androidx.appcompat.widget.AppCompatEditText" bounds="[0,0][10,10]"')).role).toBe('textfield');
+    expect(only(node('class="android.widget.EditTextLike" bounds="[0,0][10,10]"')).role).toBe('other');
+  });
+
+  it('a node with no class: a container with children, else other — never thrown on', () => {
+    expect(only(node('bounds="[0,0][10,10]"')).role).toBe('other');
+    expect(only(node('bounds="[0,0][10,10]"', node('class="android.widget.TextView" text="x" bounds="[0,0][10,10]"'))).role).toBe('container');
+  });
+
+  it('a scroll view\'s axis by its class: HorizontalScrollView horizontal, ScrollView vertical — a text input none', () => {
+    expect(only(node('class="android.widget.HorizontalScrollView" bounds="[0,0][10,10]"')).scrollAxis).toBe('horizontal');
+    expect(only(node('class="android.widget.ScrollView" bounds="[0,0][10,10]"')).scrollAxis).toBe('vertical');
+    expect(only(node('class="android.widget.EditText" bounds="[0,0][10,10]"'))).not.toHaveProperty('scrollAxis');
+    expect(only(node('class="android.widget.TextView" bounds="[0,0][10,10]"'))).not.toHaveProperty('scrollAxis');
+  });
+
+  it('a Compose text input is a (Horizontal)ScrollView both focusable AND long-clickable; either alone is a scroll view', () => {
+    for (const cls of ['ScrollView', 'HorizontalScrollView']) {
+      const field = only(node(`class="android.widget.${cls}" focusable="true" long-clickable="true" text="Jan" bounds="[0,0][10,10]"`));
+      expect(field, cls).toMatchObject({ role: 'textfield', value: 'Jan' });
+      expect(field).not.toHaveProperty('scrollAxis');
+      expect(only(node(`class="android.widget.${cls}" focusable="true" long-clickable="false" bounds="[0,0][10,10]"`)).role, cls).toBe('scrollable');
+      expect(only(node(`class="android.widget.${cls}" focusable="false" long-clickable="true" bounds="[0,0][10,10]"`)).role, cls).toBe('scrollable');
+    }
+    expect(only(node('class="android.view.View" focusable="true" long-clickable="true" bounds="[0,0][10,10]"')).role).toBe('other');
+  });
+
+  it('masked or not, on a text input only: password "true" secure, "false" not, absent or other unknown', () => {
+    expect(only(node('class="android.widget.EditText" password="true" bounds="[0,0][10,10]"')).secure).toBe(true);
+    expect(only(node('class="android.widget.EditText" password="false" bounds="[0,0][10,10]"')).secure).toBe(false);
+    expect(only(node('class="android.widget.EditText" bounds="[0,0][10,10]"'))).not.toHaveProperty('secure');
+    expect(only(node('class="android.widget.EditText" password="yes" bounds="[0,0][10,10]"'))).not.toHaveProperty('secure');
+    expect(only(node('class="android.widget.TextView" password="true" bounds="[0,0][10,10]"'))).not.toHaveProperty('secure');
+  });
+
+  it('every attribute but text and hint loses ALL its outer spaces', () => {
+    expect(only(node('class="android.widget.Button" content-desc="  Pay  " bounds="[0,0][10,10]"')).label).toBe('Pay');
+  });
+
+  it('no nodes, or no hierarchy at all: the dump is refused', () => {
+    expect(() => parseDump(XML(''))).toThrow('uiautomator dump contained no nodes');
+    expect(() => parseDump('<?xml version="1.0"?><other />')).toThrow('uiautomator dump contained no nodes');
+  });
+
+  it('several windows: one synthetic container over them, of no area, marked as its source — no presentation of any', () => {
+    const floating = (b: string): string => node(`class="android.widget.FrameLayout" bounds="${b}"`, node(`class="android.widget.TextView" text="t" bounds="${b}"`));
+    const tree = parseDump(XML(floating('[100,100][500,500]') + floating('[100,600][500,900]')));
+    expect({ ...tree, children: tree.children.length }).toStrictEqual({
+      role: 'container', label: null, identifier: null, value: null, rect: { x: 0, y: 0, width: 0, height: 0 }, children: 2,
+      paddedTouchTargets: true, activeWindowOnly: true, boundsCutAtScreen: true,
+    });
+    expect(parseDump(XML(floating('[100,100][500,500]'))).presentation).toBe('dialog');
+  });
+
+  it('bounds of no height or no width are no inversion: no clippedOut, and no key for it', () => {
+    expect(only(node('class="android.widget.TextView" text="a" bounds="[0,10][100,10]"'))).not.toHaveProperty('clippedOut');
+    expect(only(node('class="android.widget.TextView" text="a" bounds="[10,0][10,100]"'))).not.toHaveProperty('clippedOut');
+    expect(only(node('class="android.widget.TextView" text="a" bounds="[0,0][100,100]"'))).not.toHaveProperty('clippedOut');
+  });
+
+  it('no bounds attribute: a node of no area at 0,0, never thrown on', () => {
+    expect(only(node('class="android.widget.TextView" text="a"')).rect).toEqual({ x: 0, y: 0, width: 0, height: 0 });
+  });
+
+  it('an inverted node equally far from both of its parent\'s edges reads `top` (a tie reads top or left)', () => {
+    const parent = (child: string): string => node('class="android.widget.FrameLayout" bounds="[0,100][1080,300]"', child);
+    // t 250 is 150 below the parent's top 100, b 150 is 150 above its bottom 300
+    const tie = parseDump(XML(node('class="android.widget.FrameLayout" bounds="[0,0][1080,2220]"', parent(node('class="android.widget.TextView" text="a" bounds="[0,250][100,150]"')))));
+    expect(tie.children[0].children[0].clippedOut).toBe('top');
+    const sideTie = parseDump(XML(node('class="android.widget.FrameLayout" bounds="[0,0][1080,2220]"', node('class="android.widget.FrameLayout" bounds="[100,0][300,500]"', node('class="android.widget.TextView" text="a" bounds="[250,0][150,100]"')))));
+    expect(sideTie.children[0].children[0].clippedOut).toBe('left');
+  });
+
+  it('a sheet scrim whose sibling has no bounds is no sheet, and no read of it throws', () => {
+    const window = node('class="android.widget.FrameLayout" bounds="[0,0][1080,2220]"',
+      node('class="android.view.View" bounds="[0,0][1080,2220]"',
+        node('class="android.view.View" clickable="true" content-desc="Close sheet" bounds="[0,0][1080,1110]"') + node('class="android.view.View" clickable="false"')));
+    expect(parseDump(XML(window))).not.toHaveProperty('presentation');
+  });
+
+  it('a Compose sheet\'s scrim spans the window\'s width, and the sheet starts below the scrim\'s top', () => {
+    const sheet = (scrim: string, below: string): UiNode =>
+      parseDump(XML(node('class="android.widget.FrameLayout" bounds="[0,0][1080,2220]"',
+        node('class="android.view.View" bounds="[0,0][1080,2220]"',
+          node(`class="android.view.View" clickable="true" content-desc="Close sheet" bounds="${scrim}"`) + node(`class="android.view.View" bounds="${below}"`, node('class="android.widget.TextView" text="x" bounds="[0,1500][100,1600]"'))))));
+    expect(sheet('[0,0][1080,1110]', '[0,1110][1080,2220]').presentation).toBe('screen');
+    expect(sheet('[0,0][1000,1110]', '[0,1110][1000,2220]')).not.toHaveProperty('presentation');
+    expect(sheet('[0,0][1080,1110]', '[0,0][1080,2220]')).not.toHaveProperty('presentation');
+  });
+
+  it('every class of the role map, and every class of the axis map, as the dump names them', () => {
+    const roles: Record<string, string> = {
+      Button: 'button', ImageButton: 'button', TextView: 'text', EditText: 'textfield', AutoCompleteTextView: 'textfield', ImageView: 'image',
+      CheckBox: 'checkbox', Switch: 'switch', ToggleButton: 'switch', RadioButton: 'radiobutton', SeekBar: 'slider', ProgressBar: 'progress',
+      WebView: 'webview', RecyclerView: 'scrollable', ListView: 'scrollable', ScrollView: 'scrollable', HorizontalScrollView: 'scrollable', ViewPager: 'scrollable',
+    };
+    for (const [cls, role] of Object.entries(roles)) expect(only(node(`class="android.widget.${cls}" bounds="[0,0][10,10]"`)).role, cls).toBe(role);
+    const axes: Record<string, string> = { ScrollView: 'vertical', NestedScrollView: 'vertical', ListView: 'vertical', GridView: 'vertical', HorizontalScrollView: 'horizontal', ViewPager: 'horizontal' };
+    for (const [cls, axis] of Object.entries(axes)) expect(only(node(`class="androidx.core.widget.${cls}" bounds="[0,0][10,10]"`)).scrollAxis, cls).toBe(axis);
+  });
+});

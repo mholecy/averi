@@ -1906,3 +1906,48 @@ counted killed) and reading-order.ts 97.30 % (44 timeouts counted killed). The l
 A25 records; the quiet run's 95.26 % and 88.11 % are the figures to compare. A26 changes only comments in core's geometry.ts, draw-order.ts and cover.ts, and an import in assert.test.ts.
 After it, the cold `npm run mutate -- --group core --force` passed in 408 s (load average 27 at its start, 18 at its
 end), every module at or above its floor (draw-order.ts 89.87 %, geometry.ts 95.34 %).
+
+## Amendment: Android's parsers join the run (2026-11-11, backlog A27)
+
+A27 split `src/adapters/android.ts` (2 003 lines) along what it reads. The adapter keeps the adb calls, their bounds
+and memos (1 146 lines). Its parsers move to three pure modules beside it, with no device call:
+
+- `android-tree-dialect.ts` (463 lines): the uiautomator dialect. It holds the XML as a normalized tree, the role and
+  axis maps, the marks on the root and the presented-window recognizers.
+- `android-wm.ts` (466 lines): the window manager's and the input method's dumps. Each read has its shell line and its parser:
+  the IME's insets, the status and navigation bands, the touchable region, `mInputShown` and the focused window. The
+  chooser's focus read joins them from `android-chooser.ts` as `defaultDisplayFocus`. Its `mCurrentFocus` regex and
+  `parseFocusedWindow`'s are now one (ADR 0041's A27 amendment).
+- `android-bounds.ts`: the `[l,t][r,b]` notation both of the others read.
+
+The move kept every body byte for byte; only imports and exports changed. android.ts was never in the run, because
+its parsers could not be mutated apart from the adapter. All three modules now join the `core` group against their
+direct tests:
+
+- android-wm.ts: tests/adapters/android-wm.test.ts (new), android.test.ts (the keyboard, band and witness parsers'
+  cases), android-focused-window.test.ts and android-chooser.test.ts. 96.50 %, floor 94.
+- android-tree-dialect.ts: tests/adapters/android-tree-dialect.test.ts (moved from android.test.ts),
+  android-presented-window.test.ts, android-resolver-tree.test.ts and secure-field.test.ts. 95.45 %, floor 93.
+- android-bounds.ts: the dialect's and the window manager's tests, and android-presented-window.test.ts. 100 %,
+  floor 98.
+
+The first cold run scored 88.81 %, 86.34 % and 66.67 %. The new cases kill the real survivors through the modules'
+exports, and scope.json's baselines list what is left. That is equivalent mutants, anchors that no captured dump
+tests, and `uncut`'s skip conditions, which are pinned through draw order rather than here. android-chooser.ts
+stays at 100 % (109 mutants, down from 143, with the focus read gone).
+
+**One multi-display rule was not taken.** The window manager's reads answer a second display in three ways:
+
+- every display must agree (the insets reads);
+- the first one found (the focused window, whose read prints no display headers);
+- display 0's block (the chooser).
+
+Every captured dump holds one display: 35 `dumpsys window displays` dumps and 29 focused-window reads. On each of
+them, display 0's block reads the same as the whole dump, so no fixture can say which rule is right for two displays.
+tests/adapters/android-wm.test.ts pins that census, and synthetic two-display dumps pin where the rules differ today.
+Merging them needs a dump from a device with two displays.
+
+The figures come from cold runs narrowed with `--mutate` over the four modules and `--tempDirName
+reports/mutation/stryker-tmp-a27`. Each took about 6 minutes on a loaded machine, and each exits 1 as any narrowed
+run does. One run under load counted 42 of the dialect's mutants as timeouts. The floors are set on the quieter run's
+figures.

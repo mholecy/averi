@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { defaultDisplayFocus, parseFocusedWindow, parseImeInsets, parseNavigationBand, parseStatusBand } from '../../src/adapters/android-wm.js';
+import { defaultDisplayFocus, parseFocusedWindow, parseImeInsets, parseNavigationBand, parseStatusBand, parseTouchableRegion } from '../../src/adapters/android-wm.js';
 import { chooserInFocus } from '../../src/adapters/android-chooser.js';
 
 // A27: ONE `mCurrentFocus` reader for both of its readers — parseFocusedWindow, which wants the focused window's hash
@@ -26,33 +26,33 @@ const focusRecordAs = (tail: string): string => {
 describe('the focus line, read once: the window\'s hash for parseFocusedWindow, its component for the chooser', () => {
   it('a recorded line (`Window{<hash> u0 <pkg>/<class>}`): both read it', () => {
     expect(parseFocusedWindow(dumpOf('dialog-fullscreen'))).toEqual(STACKED);
-    expect(defaultDisplayFocus('  mCurrentFocus=Window{56b9ca0 u0 android/com.android.internal.app.ResolverActivity}\n')).toEqual({
+    expect(defaultDisplayFocus('  mCurrentFocus=Window{56b9ca0 u0 android/com.android.internal.app.ResolverActivity}\n')).toStrictEqual({
       window: 'android/com.android.internal.app.ResolverActivity',
     });
   });
 
   it('a window named by a title, not a component (`Window{<hash> u0 Some Title}`): its hash is read, no component', () => {
     expect(parseFocusedWindow(focusRecordAs('u0 Dialog Title'))).toEqual(STACKED);
-    expect(defaultDisplayFocus('  mCurrentFocus=Window{56b9ca0 u0 Dialog Title}\n')).toEqual({});
+    expect(defaultDisplayFocus('  mCurrentFocus=Window{56b9ca0 u0 Dialog Title}\n')).toStrictEqual({});
   });
 
   it('a record with no user token (`Window{<hash> <pkg>/<class>}`, never captured): its hash is read, no component — the two old regexes\' difference, kept', () => {
     expect(parseFocusedWindow(focusRecordAs('dev.averi.lab/dev.averi.lab.MainActivity'))).toEqual(STACKED);
-    expect(defaultDisplayFocus('  mCurrentFocus=Window{56b9ca0 android/com.android.internal.app.ResolverActivity}\n')).toEqual({});
+    expect(defaultDisplayFocus('  mCurrentFocus=Window{56b9ca0 android/com.android.internal.app.ResolverActivity}\n')).toStrictEqual({});
     expect(chooserInFocus('  mCurrentFocus=Window{56b9ca0 android/com.android.internal.app.ResolverActivity}\n')).toBeUndefined();
   });
 
   it('two focus lines in one block, the first a title (never captured): the hash is the first line\'s, the component the first one named', () => {
     const lines = '  mCurrentFocus=Window{1111111 u0 Dialog Title}\n  mCurrentFocus=Window{56b9ca0 u0 android/com.android.internal.app.ResolverActivity}\n';
-    expect(defaultDisplayFocus(lines)).toEqual({ window: 'android/com.android.internal.app.ResolverActivity' });
+    expect(defaultDisplayFocus(lines)).toStrictEqual({ window: 'android/com.android.internal.app.ResolverActivity' });
     const dump = focusRecordAs('u0 Dialog Title');
     expect(parseFocusedWindow(dump.replace('mCurrentFocus=', 'mCurrentFocus=Window{2222222 u0 dev.averi.lab/dev.averi.lab.Other}\n  mCurrentFocus='))).toEqual({ of: 'unknown' });
   });
 
   it('the focused activity beside the window: `mFocusedApp`\'s component, in either API\'s shape', () => {
     const app = 'dev.averi.lab/.MainActivity';
-    expect(defaultDisplayFocus(`  mCurrentFocus=null\n  mFocusedApp=ActivityRecord{6909a9c u0 ${app}} t2590}\n`)).toEqual({ app });
-    expect(defaultDisplayFocus(`  mFocusedApp=ActivityRecord{6909a9c u0 ${app} t2590}\n`)).toEqual({ app });
+    expect(defaultDisplayFocus(`  mCurrentFocus=null\n  mFocusedApp=ActivityRecord{6909a9c u0 ${app}} t2590}\n`)).toStrictEqual({ app });
+    expect(defaultDisplayFocus(`  mFocusedApp=ActivityRecord{6909a9c u0 ${app} t2590}\n`)).toStrictEqual({ app });
   });
 });
 
@@ -145,5 +145,114 @@ describe('where the three rules differ today: two displays (synthetic — no dev
     // another display's focus listed first: its window is none of the windows dump's → unknown; listed after: unread
     expect(parseFocusedWindow(dump.replace('  mCurrentFocus=', `${other}  mCurrentFocus=`))).toEqual({ of: 'unknown' });
     expect(parseFocusedWindow(dump.replace(/(mCurrentFocus=[^\n]*\n)/, `$1${other}`))).toEqual(STACKED);
+  });
+});
+
+// A27's mutation run (ADR 0038's A27 amendment): what the moved parsers' own tests left unpinned, through the module's
+// exports. Each case is one rule of the parser's doc comment.
+describe('parseFocusedWindow: the window types of an app, by number, and a window the dump gives no frame', () => {
+  const dump = dumpOf('dialog-fullscreen');
+  const hash = FOCUS_LINE.exec(dump)?.[1] ?? '';
+  /** The dump with `edit` applied to the focused window's block alone. */
+  const inFocused = (edit: (block: string) => string): string => {
+    const at = dump.indexOf(`Window{${hash} `, dump.indexOf('WINDOW MANAGER WINDOWS'));
+    const end = dump.indexOf('\n  Window #', at);
+    expect(at).toBeGreaterThan(0);
+    return dump.slice(0, at) + edit(dump.slice(at, end === -1 ? undefined : end)) + (end === -1 ? '' : dump.slice(end));
+  };
+  const typed = (ty: string): string => inFocused((block) => block.replace(/ty=APPLICATION /, `ty=${ty} `));
+
+  it('a type printed as a number: 2–99 and 1000–1999 are an app\'s (stacked), 100–999 and 2000 on are not', () => {
+    expect(typed('APPLICATION')).toBe(dump);
+    for (const ty of ['2', '99', '1000', '1999']) expect(parseFocusedWindow(typed(ty)), ty).toEqual(STACKED);
+    for (const ty of ['100', '999', '2000', '2040']) expect(parseFocusedWindow(typed(ty)), ty).toEqual({ of: 'unknown' });
+  });
+
+  it('another app window visible beside the activity\'s is read by its own `isVisible=true` line alone', () => {
+    const open = dumpOf('open');
+    const launcher = open.indexOf('com.google.android.apps.nexuslauncher/');
+    const shownAs = (line: string): string => open.slice(0, launcher) + open.slice(launcher).replace('    isVisible=false', line);
+    expect(parseFocusedWindow(shownAs('    isVisible=true'))).toEqual({ of: 'unknown' });
+    expect(parseFocusedWindow(shownAs('      isVisible=true'))).toMatchObject({ of: 'screenAlone' });
+    expect(parseFocusedWindow(shownAs('    isVisible=trueish'))).toMatchObject({ of: 'screenAlone' });
+  });
+
+  it('a type name the table does not hold is no app\'s: unknown', () => {
+    expect(parseFocusedWindow(typed('STATUS_BAR'))).toEqual({ of: 'unknown' });
+  });
+
+  it('the focused window\'s block with no `Frames:` line, or a frame wholly off the display: unknown', () => {
+    expect(parseFocusedWindow(inFocused((block) => block.replace(/^ +Frames: [^\n]*\n/m, '')))).toEqual({ of: 'unknown' });
+    expect(parseFocusedWindow(inFocused((block) => block.replace(/ frame=\[[^\]]*\]\[[^\]]*\]/, ' frame=[2000,66][2100,2153]')))).toEqual({ of: 'unknown' });
+  });
+});
+
+describe('parseTouchableRegion: a rect of no width or height is kept, an inverted one is none', () => {
+  it('a line rect (right = left, or bottom = top) is a rect of no area', () => {
+    expect(parseTouchableRegion('touchable region=SkRegion((5,5,5,10))')).toEqual([{ x: 5, y: 5, width: 0, height: 5 }]);
+    expect(parseTouchableRegion('touchable region=SkRegion((5,5,10,5))')).toEqual([{ x: 5, y: 5, width: 5, height: 0 }]);
+  });
+
+  it('right left of left, or bottom above top: undefined', () => {
+    expect(parseTouchableRegion('touchable region=SkRegion((10,5,5,10))')).toBeUndefined();
+    expect(parseTouchableRegion('touchable region=SkRegion((5,10,10,5))')).toBeUndefined();
+  });
+});
+
+describe('the InsetsState readers: an entry with a token missing, a frame of no area, the line\'s own edges', () => {
+  const entry = (body: string): string => `        InsetsSource ${body}\n`;
+  const STATUS = entry('type=ITYPE_STATUS_BAR frame=[0,0][1080,66] visible=true insetsRoundedCornerFrame=false');
+  const FRAMES = '  DisplayFrames w=1080 h=2220 r=0\n';
+  const NAV = (frame: string): string => entry(`type=ITYPE_NAVIGATION_BAR frame=${frame} visible=true`);
+
+  it('an entry with no `type=` is read past by all three, never thrown on', () => {
+    const untyped = entry('frame=[0,0][1080,66] visible=true');
+    expect(parseImeInsets(untyped + STATUS + '    mIsImeShowing=false\n')).toEqual({ state: 'hidden' });
+    expect(parseStatusBand(untyped + STATUS)).toBe(66);
+    expect(parseNavigationBand(FRAMES + untyped + NAV('[0,2154][1080,2220]'))).toBe(2154);
+  });
+
+  it('parseImeInsets: no entry that reads fully (type, frame, visible) is a format it does not know — unknown, even beside mIsImeShowing=false', () => {
+    expect(parseImeInsets(entry('type=ITYPE_STATUS_BAR visible=true') + '    mIsImeShowing=false\n')).toEqual({ state: 'unknown' });
+    expect(parseImeInsets(STATUS + '    mIsImeShowing=false\n')).toEqual({ state: 'hidden' });
+    expect(parseImeInsets(entry('frame=[0,0][1080,66] visible=true') + '    mIsImeShowing=false\n')).toEqual({ state: 'unknown' });
+  });
+
+  it('parseImeInsets: a visible IME frame of no width, or of no height, is unknown', () => {
+    expect(parseImeInsets(STATUS + entry('type=ITYPE_IME frame=[0,1398][0,2220] visible=true'))).toEqual({ state: 'unknown' });
+    expect(parseImeInsets(STATUS + entry('type=ITYPE_IME frame=[0,1398][1080,1398] visible=true'))).toEqual({ state: 'unknown' });
+    expect(parseImeInsets(STATUS + entry('type=ITYPE_IME frame=[0,1398][1080,2220] visible=true'))).toEqual({ state: 'shown', frame: { x: 0, y: 1398, width: 1080, height: 822 } });
+    expect(parseImeInsets(STATUS + entry('type=ITYPE_IME frame=[359,1269][1040,1912] visible=true'))).toEqual({ state: 'shown', frame: { x: 359, y: 1269, width: 681, height: 643 } });
+  });
+
+  it('parseImeInsets: `mIsImeShowing` with blanks after it on its line is still its line', () => {
+    expect(parseImeInsets(STATUS + entry('type=ITYPE_IME frame=[0,0][0,0] visible=false') + '    mIsImeShowing=true \n')).toEqual({ state: 'unknown' });
+  });
+
+  it('parseStatusBand: an entry with no frame, a frame of no width or no height — no band', () => {
+    expect(parseStatusBand(entry('type=ITYPE_STATUS_BAR visible=true'))).toBeUndefined();
+    expect(parseStatusBand(entry('type=ITYPE_STATUS_BAR frame=[0,0][0,66] visible=true'))).toBeUndefined();
+    expect(parseStatusBand(entry('type=ITYPE_STATUS_BAR frame=[0,0][1080,0] visible=true'))).toBeUndefined();
+  });
+
+  it('parseStatusBand: `visible=true` ending the entry, or starting it, reads', () => {
+    expect(parseStatusBand(entry('type=statusBars frame=[0,0][1080,66] visible=true'))).toBe(66);
+    expect(parseStatusBand(entry('visible=true type=statusBars frame=[0,0][1080,66]'))).toBe(66);
+  });
+
+  it('parseNavigationBand: a square display is upright; a landscape one at r=0, or a turned one, has no band', () => {
+    expect(parseNavigationBand('  DisplayFrames w=1080 h=1080 r=0\n' + NAV('[0,1014][1080,1080]'))).toBe(1014);
+    expect(parseNavigationBand('  DisplayFrames w=2560 h=1600 r=0\n' + NAV('[0,1534][2560,1600]'))).toBeUndefined();
+    expect(parseNavigationBand('  DisplayFrames w=1080 h=2220 r=1\n' + NAV('[0,2154][1080,2220]'))).toBeUndefined();
+  });
+
+  it('parseNavigationBand: a bar as tall as it is wide is no band', () => {
+    expect(parseNavigationBand(FRAMES + NAV('[0,1140][1080,2220]'))).toBeUndefined();
+  });
+
+  it('parseNavigationBand: DisplayFrames lines alike but for their indent are one size; a line with more after r= is none', () => {
+    expect(parseNavigationBand(FRAMES + '    DisplayFrames w=1080 h=2220 r=0\n' + NAV('[0,2154][1080,2220]'))).toBe(2154);
+    expect(parseNavigationBand('  DisplayFrames w=1080 h=2220 r=0 x\n' + NAV('[0,2154][1080,2220]'))).toBeUndefined();
+    expect(parseNavigationBand('  mLast DisplayFrames w=1080 h=2220 r=0\n' + NAV('[0,2154][1080,2220]'))).toBeUndefined();
   });
 });
