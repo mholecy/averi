@@ -41,8 +41,15 @@ npm install                       # node_modules here, not the repo root's
 xcrun simctl install 3AB1E82E-47C1-4BEF-9F89-1FF62DBBC348 \
   ios/build/dd/Build/Products/Release-iphonesimulator/AveriLabRN.app
 
-# Android: the release variant (the JS bundled in), debuggable so run-as reads the state file; arm64-v8a only
-(cd android && JAVA_HOME=~/Library/Java/JavaVirtualMachines/azul-17.0.19/Contents/Home ./gradlew assembleRelease)
+# Android: the release variant (the JS bundled in), debuggable so run-as reads the state file; arm64-v8a only.
+# JDK 17: the lab build's lookup (scripts/truth/batch/lab-lines.ts#jdk17Of) — JAVA_HOME if it is a JDK 17,
+# else `/usr/libexec/java_home -v 17`, else the first *.jdk in /Library/Java/JavaVirtualMachines, then in
+# ~/Library/Java/JavaVirtualMachines, whose release says 17 and that has bin/javac (e.g. zulu-17.jdk/Contents/Home;
+# java_home finds none inside the agent's sandbox). The line below keeps a JAVA_HOME already set — keep it only if it
+# is a JDK 17 (unlike the lab build's lookup, this line does not check it); if it is still
+# empty, set it to the folder JDK by hand, e.g. export JAVA_HOME=/Library/Java/JavaVirtualMachines/zulu-17.jdk/Contents/Home
+export JAVA_HOME="${JAVA_HOME:-$(/usr/libexec/java_home -v 17 2>/dev/null)}"
+(cd android && ./gradlew assembleRelease)
 adb -s emulator-5554 install -r android/app/build/outputs/apk/release/app-release.apk
 ```
 
