@@ -281,7 +281,7 @@ checkout and installs it. It runs the live golden's `chooser` group (launch_app 
 live golden's other Android groups, `forms`, `visibility`, `ensure` and `carousel`, each its own block with its own
 verdict (backlog A22). Every group runs by default; `--groups` names some of them, comma-joined. Each live run is
 bounded: `B_LIVE`, 1800 s by default, and the visibility group by its own 3000 s (its 181 cases ran past 1800 s,
-backlog A34); `B_LIVE` given bounds every group alike. It refuses to start
+backlog A34); `B_LIVE` given, 1800 too, bounds every group alike. It refuses to start
 with no serial, and the lab guard refuses any emulator that is not the lab AVD before anything is built.
 
 The Android build runs under JDK 17, looked up in this order: JAVA_HOME, then `/usr/libexec/java_home -v 17`, then

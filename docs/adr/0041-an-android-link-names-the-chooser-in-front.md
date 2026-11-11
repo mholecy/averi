@@ -899,9 +899,12 @@ its run; every other group keeps `B_LIVE`'s default, 1800 s. `B_LIVE` stays the 
 s): given, it bounds every live block alike, the visibility group's too — `B_LIVE=1800` replaces its 3000 s
 (`liveSecsOf` in standing.ts, given as select.ts's `knobGiven` reads it: unset or empty is not given). Each live run's
 header names the bound it got (`== visibility live android-visibility (bound 3000 s; log: …) ==`), so a block past its
-bound says which bound it passed. lab-run-ios.ts keeps `B_LIVE` for every iOS block (backlog A36).
+bound says which bound it passed, and bounded.ts tells the process seam each call's bound (`StartOptions.secs`, which
+the real seam ignores) so the batch's tests pin the bound every live.ts run was given. lab-run-ios.ts keeps `B_LIVE` for
+every iOS block (backlog A36).
 
-**Consequences.** Gate B's wall time is about 52 min on an unloaded machine (docs/release.md). On a loaded one the
-visibility group can pass even its own bound, and the emulator's framework may not hold: Gate B is run when the machine
-is not loaded. The lab mutation baseline A34 recorded, 548 s at load 53–57 (scripts/mutation/scope.json), is
-load-inflated, as A22's first 562 s at load 45–38 was; the coordinator reruns the lab group cold on main.
+**Consequences.** Gate B's wall time is about 52 min at the pace of A22's first run on main (docs/release.md). On a
+loaded machine the visibility group can pass even its own bound, and the emulator's framework may not hold: Gate B is run
+when the machine is not loaded. The lab mutation baseline A34 recorded, 548 s at load 53–57
+(scripts/mutation/scope.json), is load-inflated, as A22's first 562 s at load 45–38 was; the coordinator reruns the lab
+group cold on main.

@@ -10,6 +10,6 @@ run-2  21:00:30 start; 31 cases logged; 12:26 wall; about 9.5 s a case while the
        then "Can't find service: activity"; start_count 2 → 3, back by 21:17), exit 1, no record.
 
 Neither run finished, so the group's duration is sized from A22's first Gate B (../a22-gate-b/): 173 of 181 cases
-logged in its 1800 s at load 6–17, about 10.4 s a case; the 8 left are plain taps, so about 1880 s whole.
+logged in its 1800 s (its load not recorded), about 10.4 s a case; the 8 left are plain taps, so about 1880 s whole.
 Nothing was started, restarted or wiped on the emulator; every read after the crashes was `service check activity`,
 `getprop` and `echo ok`.
