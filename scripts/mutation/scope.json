@@ -69,19 +69,19 @@
     "group": "scene",
     "tests": ["tests/ui-tree/standing.test.ts", "tests/ui-tree/standing-remedy.test.ts", "tests/ui-tree/presented-remedy.test.ts", "tests/ui-tree/overlaid-edge.test.ts", "tests/ui-tree/heading-listed-before.test.ts", "tests/ui-tree/keyboard-position.test.ts", "tests/ui-tree/listed-content.test.ts", "tests/interact/remedy-agreement.test.ts", "tests/verify/eyes-views-drawn-over.test.ts", "tests/verify/assert.test.ts"],
     "floor": 93,
-    "baseline": "95.90 % on 2026-11-11 (A25 review round 1: the 6 mutants of a reachable standing passed to `remedied` killed by standing-remedy.test.ts, added to the narrowed run's 95.41 %, `npm run mutate -- --group core --force --mutate src/ui-tree/standing.ts`, cold, before the scene group): 1220 mutants, 1156 + 6 killed, 8 timeouts, 44 survived, 6 without coverage (84.92 % before A25's tests), all equivalent or unreachable \u2014 ADR 0038's A25 amendment lists them; 96.23 % in the cold `--group scene --force` run (205 s, 38 timeouts under load)"
+    "baseline": "96.23 % on 2026-11-11 (A25, joined; `npm run mutate -- --group scene --force --mutate src/ui-tree/standing.ts`, cold): 1220 mutants, 40 survived, 6 without coverage — ADR 0038's A25 amendment lists them"
   },
   "src/ui-tree/reading-order.ts": {
     "group": "scene",
     "tests": ["tests/ui-tree/draw-order*.test.ts", "tests/ui-tree/heading-listed-before.test.ts"],
     "floor": 86,
-    "baseline": "88.11 % on 2026-11-11 (A25, joined, group scene since; `npm run mutate -- --group core --force --mutate src/ui-tree/reading-order.ts`, cold): 185 mutants, 151 killed, 12 timeouts, 22 survived, all equivalent \u2014 ADR 0038's A25 amendment lists them"
+    "baseline": "88.11 % on 2026-11-11 (A25, joined; `npm run mutate -- --group scene --force`, cold): 185 mutants, 22 survived — ADR 0038's A25 amendment lists them"
   },
   "src/ui-tree/later-edges.ts": {
     "group": "scene",
     "tests": ["tests/ui-tree/later-edges.test.ts", "tests/ui-tree/overlaid-edge.test.ts"],
     "floor": 95,
-    "baseline": "97.35 % on 2026-11-11 (A25, joined, group scene since; `npm run mutate -- --group core --force --mutate src/ui-tree/later-edges.ts`, cold): 151 mutants, 144 killed, 3 timeouts, 4 survived, all equivalent \u2014 ADR 0038's A25 amendment lists them"
+    "baseline": "97.35 % on 2026-11-11 (A25, joined; `npm run mutate -- --group scene --force`, cold): 151 mutants, 4 survived — ADR 0038's A25 amendment lists them"
   },
   "src/adapters/failure-text.ts": {
     "group": "core",

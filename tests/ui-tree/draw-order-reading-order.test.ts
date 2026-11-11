@@ -11,6 +11,7 @@ import { coverNodes, tagged } from '../helpers/covers.js';
 import { iosTrees } from '../helpers/ios-trees.js';
 import { screenOf } from '../../src/ui-tree/geometry.js';
 import { node } from '../helpers/fake.js';
+import { IPHONE_17 } from '../helpers/pixels.js';
 
 /**
  * A row past its scroll view's clip, in idb's flat list (which lists no scroll view): `scroll-bounded`'s O `51,620 300x64`, a
@@ -339,10 +340,9 @@ describe('the order a screenshot saw, handed to the draw order', () => {
  * the bar's band).
  */
 describe('idb\'s top bar and its content: no reading-order peers of each other', () => {
-  const iphone = { box: { x: 0, y: 0, width: 402, height: 874 }, boxes: [{ x: 0, y: 0, width: 402, height: 874 }], oriented: { x: 0, y: 0, width: 402, height: 874 }, from: 'device', statusBand: 62 } as const;
   const el = (identifier: string, rect: UiNode['rect'], role = 'button'): UiNode => node({ role, identifier, rect });
-  const flat = (...children: UiNode[]): UiNode => node({ role: 'application', rect: iphone.box, flatList: true, readingOrder: true, children });
-  const covers = (t: UiNode, target: UiNode) => sceneOf(t).standing(target, iphone, { of: 'tap' }).facts.covers.map((c) => [c.node.identifier, c.order.kind]);
+  const flat = (...children: UiNode[]): UiNode => node({ role: 'application', rect: IPHONE_17.box, flatList: true, readingOrder: true, children });
+  const covers = (t: UiNode, target: UiNode) => sceneOf(t).standing(target, IPHONE_17, { of: 'tap' }).facts.covers.map((c) => [c.node.identifier, c.order.kind]);
 
   it('a content row scrolled under the bar\'s Back, which holds its centre: Back is no cover of it', () => {
     const row = el('row', { x: 0, y: 70, width: 200, height: 60 });

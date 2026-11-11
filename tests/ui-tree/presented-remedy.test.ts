@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { noScrollHelps, noScrollRemedyText, orderRemedyText, presentedLayerName, presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
+import { noScrollHelps, noScrollRemedyText, orderRemedyText, presentedLayerName, presentedRemedy, presentedStop, type Remedy } from '../../src/ui-tree/standing.js';
 
 // The presented clause, per kind of marked layer (ui-tree/standing.ts#presentedRemedy, #presentedStop): a layer the
 // source types is named by its kind and label; a `screen` layer, or none marked, gets the presented screen's words.
 
-describe('presentedRemedy / presentedStop — the words per kind of presented layer', () => {
+describe('presentedRemedy / presentedStop / presentedLayerName — the words per kind of presented layer', () => {
   it('an alert, an action sheet and a popover are named by kind and label, and a swipe would land on it', () => {
     expect(presentedRemedy('it', { kind: 'alert', label: 'Exit confirmation' })).toBe('an alert is presented over it ("Exit confirmation") — close it first');
     expect(presentedRemedy('the element', { kind: 'actionSheet', label: 'Discard?' })).toBe('an action sheet is presented over the element ("Discard?") — close it first');
@@ -32,10 +32,8 @@ describe('presentedRemedy / presentedStop — the words per kind of presented la
     expect(presentedStop({ kind: 'backdrop' })).toBe(`${evidence} (${noMenu} swipe, then tap the target, by coordinates); no scroll moves it out from under that backdrop, and a swipe on it may close the menu`);
     expect(presentedLayerName({ kind: 'backdrop' })).toBe("a menu's backdrop");
   });
-});
 
-describe('presentedLayerName — a presented layer in one phrase, for a sentence already in a parenthesis', () => {
-  it('a typed layer by its article, kind and label; a `screen` layer or none, a sheet or modal', () => {
+  it('presentedLayerName, the layer in one phrase for a sentence already in a parenthesis: a typed layer by its article, kind and label; a `screen` layer or none, a sheet or modal', () => {
     expect(presentedLayerName({ kind: 'dialog', label: 'Rename' })).toBe('a dialog "Rename"');
     expect(presentedLayerName({ kind: 'dialog' })).toBe('a dialog');
     expect(presentedLayerName({ kind: 'alert', label: 'Delete?' })).toBe('an alert "Delete?"');
@@ -67,6 +65,7 @@ describe('orderRemedyText / noScrollRemedyText — the words of a cover listed i
   it('noScrollRemedyText words each no-scroll remedy as its own text does; noScrollHelps holds exactly those three', () => {
     expect(noScrollRemedyText({ of: 'seenOver' }, 'touch')).toBe(orderRemedyText({ of: 'seenOver' }, 'touch'));
     expect(noScrollRemedyText({ of: 'bothPinned' }, 'pixel')).toMatch(/^no scroll moves the element out from under that: neither lies in a scroll view/);
-    expect(['unordered', 'seenOver', 'bothPinned', 'presented', 'keyboard', 'pinned', 'stuck', 'scroll'].filter((of) => noScrollHelps({ of } as never))).toEqual(['unordered', 'seenOver', 'bothPinned']);
+    const every: readonly Remedy[] = [{ of: 'unordered' }, { of: 'seenOver' }, { of: 'bothPinned' }, { of: 'presented' }, { of: 'keyboard' }, { of: 'fixed', what: 'screen' }, { of: 'pinned' }, { of: 'stuck' }, { of: 'scroll' }];
+    expect(every.filter(noScrollHelps).map((r) => r.of)).toEqual(['unordered', 'seenOver', 'bothPinned']);
   });
 });

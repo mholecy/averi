@@ -79,7 +79,7 @@ describe('planRuns — which groups run, each with its Stryker arguments (T2b-2)
     expect(planRuns(['--force', '--group=core'], three)).toEqual({ runs: [{ group: 'core', args: ['--force'] }] });
   });
 
-  it('an unknown group, a --group without its name, or three of them: a refusal naming it', () => {
+  it('an unknown group, a --group without its name, or two of them: a refusal naming it', () => {
     expect(planRuns(['--group', 'all'], three)).toEqual({ refusal: 'npm run mutate: --group all: not a group (core, scene or lab)' });
     expect(planRuns(['--group=Core'], three)).toEqual({ refusal: 'npm run mutate: --group Core: not a group (core, scene or lab)' });
     expect(planRuns(['--group'], three)).toEqual({ refusal: 'npm run mutate: --group needs a group (core, scene or lab)' });

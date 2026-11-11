@@ -25,3 +25,6 @@ export function paint(size: { readonly width: number; readonly height: number },
 
 /** The whole `screen` usable, as the device reports it — what a test of a phone with nothing cut from it hands a standing. */
 export const usableOf = (screen: Rect): UsableScreen => ({ box: { ...screen }, boxes: [{ ...screen }], oriented: { ...screen }, from: 'device' });
+
+/** The iPhone 17 (402x874 pt) as the device reports it, its status band to 62 pt: the usable screen the iOS standing tests judge on. */
+export const IPHONE_17: UsableScreen = { ...usableOf({ x: 0, y: 0, width: 402, height: 874 }), statusBand: 62 };

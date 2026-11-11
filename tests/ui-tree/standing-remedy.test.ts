@@ -7,6 +7,7 @@ import { sceneOf, type PixelPurpose, type PixelStanding, type Purpose, type Stan
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { colorSampleRect } from '../../src/verify/color-parity.js';
 import { node } from '../helpers/fake.js';
+import { IPHONE_17, usableOf } from '../helpers/pixels.js';
 
 /**
  * THE REMEDY (ui-tree/standing.ts#Remedy, its PRECEDENCE, decided once by `remedied`) per kind and purpose, on the
@@ -17,15 +18,14 @@ import { node } from '../helpers/fake.js';
  */
 
 const box = (width: number, height: number, y = 0): Rect => ({ x: 0, y, width, height });
-const screen = (s: Partial<UsableScreen> = {}): UsableScreen => ({ box: box(400, 800), boxes: [box(400, 800)], oriented: box(400, 800), from: 'device', ...s });
 /** A 400x800 screen with no system band read, and one with a status band to 40 and a navigation band from 760. */
-const PLAIN_SCREEN = screen();
-const BANDS = screen({ statusBand: 40, navigationBand: 760 });
+const PLAIN_SCREEN = usableOf(box(400, 800));
+const BANDS: UsableScreen = { ...PLAIN_SCREEN, statusBand: 40, navigationBand: 760 };
 const idb = (y: number): KeyboardLine => ({ y, witnessed: false });
 const TAP = { of: 'tap' } as const;
-const STOP = { of: 'stop' } as const;
+const PLAIN = { of: 'stop' } as const;
 const FULLY = { of: 'fully' } as const;
-const OCR = (keyboardTop?: KeyboardLine): PixelPurpose => ({ of: 'pixel', reads: (r) => r, glyphs: true, ...(keyboardTop !== undefined && { keyboardTop }) });
+const OCR = (_n?: UiNode, keyboardTop?: KeyboardLine): PixelPurpose => ({ of: 'pixel', reads: (r) => r, glyphs: true, ...(keyboardTop !== undefined && { keyboardTop }) });
 const COLOUR: PixelPurpose = { of: 'pixel', reads: colorSampleRect, glyphs: false };
 
 /** A nested tree (draw-order.ts#listsAncestry): `inScroller` is told for every node. */
@@ -35,27 +35,27 @@ const list = (rect: Rect, ...children: UiNode[]): UiNode => node({ role: 'contai
 const el = (identifier: string, rect: Rect, role = 'button'): UiNode => node({ role, identifier, rect });
 
 /** A standing's kind and its remedy, as one plain value. */
-const said = (s: Standing | PixelStanding): unknown => (s.kind === 'reachable' ? { kind: s.kind } : { kind: s.kind, remedy: s.remedy });
-const standing = (tree: UiNode, target: UiNode, at: UsableScreen, purpose: Purpose) => said(sceneOf(tree).standing(target, at, purpose));
+const kindAndRemedy = (s: Standing | PixelStanding): unknown => (s.kind === 'reachable' ? { kind: s.kind } : { kind: s.kind, remedy: s.remedy });
+const standing = (tree: UiNode, target: UiNode, at: UsableScreen, purpose: Purpose) => kindAndRemedy(sceneOf(tree).standing(target, at, purpose));
 
 describe('THE REMEDY, per kind — the touch purposes (the tap, the plain stop, the `fully` stop)', () => {
-  it('3. under a keyboard line no guard acts on (idb\'s band): hide the keyboard — the tap, the plain stop and the pixel assert alike', () => {
+  it('under a keyboard line no guard acts on (idb\'s band): hide the keyboard — the tap, the plain stop and the pixel assert alike', () => {
     const a = el('a', { x: 50, y: 650, width: 100, height: 40 });
     const t = root(a);
-    for (const purpose of [{ of: 'tap', keyboardTop: idb(600) }, { of: 'stop', keyboardTop: idb(600) }, OCR(idb(600))] as const) {
+    for (const purpose of [{ of: 'tap', keyboardTop: idb(600) }, { of: 'stop', keyboardTop: idb(600) }, OCR(undefined, idb(600))] as const) {
       expect(standing(t, a, PLAIN_SCREEN, purpose)).toEqual({ kind: 'underKeyboard', remedy: { of: 'keyboard' } });
     }
   });
 
   it('a system bar over a node in a scroll view: a scroll moves it out; in none, `pinned` — no scroll does', () => {
     const inList = el('a', { x: 50, y: 0, width: 100, height: 30 });
-    expect(standing(root(list(box(400, 800), inList)), inList, BANDS, STOP)).toEqual({ kind: 'systemBar', remedy: { of: 'scroll' } });
+    expect(standing(root(list(box(400, 800), inList)), inList, BANDS, PLAIN)).toEqual({ kind: 'systemBar', remedy: { of: 'scroll' } });
     const alone = el('a', { x: 50, y: 0, width: 100, height: 30 });
-    expect(standing(root(alone), alone, BANDS, STOP)).toEqual({ kind: 'systemBar', remedy: { of: 'pinned' } });
+    expect(standing(root(alone), alone, BANDS, PLAIN)).toEqual({ kind: 'systemBar', remedy: { of: 'pinned' } });
     expect(standing(root(alone), alone, BANDS, TAP)).toEqual({ kind: 'systemBar', remedy: { of: 'pinned' } });
   });
 
-  it('8. clipped (a `fully` stop): a scroll, whatever lies around it — in no scroll view too, clipped at the screen\'s edge', () => {
+  it('clipped (a `fully` stop): a scroll, whatever lies around it — in no scroll view too, clipped at the screen\'s edge', () => {
     const a = el('a', { x: 50, y: 750, width: 100, height: 100 });
     expect(standing(root(a), a, PLAIN_SCREEN, FULLY)).toEqual({ kind: 'clipped', remedy: { of: 'scroll' } });
     const b = el('b', { x: 50, y: 450, width: 100, height: 100 });
@@ -72,7 +72,7 @@ describe('THE REMEDY, per kind — the pixel assert, which judges a region', () 
     expect(inList({ x: 50, y: 0, width: 100, height: 30 }, BANDS)).toEqual({ kind: 'systemBar', remedy: { of: 'stuck' } });
     expect(inList({ x: 50, y: 10, width: 100, height: 30 }, BANDS)).toEqual({ kind: 'systemBar', remedy: { of: 'scroll' } });
     // Under the navigation bar alone, laid from the box's top edge: the status bar's rule only — a scroll.
-    expect(inList({ x: 50, y: 0, width: 100, height: 800 }, screen({ navigationBand: 760 }))).toEqual({ kind: 'systemBar', remedy: { of: 'scroll' } });
+    expect(inList({ x: 50, y: 0, width: 100, height: 800 }, { ...PLAIN_SCREEN, navigationBand: 760 })).toEqual({ kind: 'systemBar', remedy: { of: 'scroll' } });
   });
 
   it('under a system bar in no scroll view: `pinned`, or `fixed` for content no scroll lifts out of a band — the screen itself, a full-bleed header, a full-bleed footer', () => {
@@ -115,8 +115,7 @@ describe('THE REMEDY, per kind — the pixel assert, which judges a region', () 
   it('covered: idb\'s flat-list root under the content listed on it is `fixed` as the root', async () => {
     const t = parseIdbDescribeAll(JSON.stringify(JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')).elements));
     const rootNode = [...everyNode(t)].find((n) => n.label === 'Skeleton Internal')!;
-    const iphone = screen({ box: box(402, 874), boxes: [box(402, 874)], oriented: box(402, 874), statusBand: 62 });
-    expect(said(sceneOf(t).standing(rootNode, iphone, COLOUR))).toEqual({ kind: 'covered', remedy: { of: 'fixed', what: 'root' } });
+    expect(kindAndRemedy(sceneOf(t).standing(rootNode, IPHONE_17, COLOUR))).toEqual({ kind: 'covered', remedy: { of: 'fixed', what: 'root' } });
   });
 });
 
@@ -129,9 +128,8 @@ describe('THE REMEDY — none on a reachable standing', () => {
     const scene = sceneOf(t);
     // The draw order judges a presented screen over it, of the node itself.
     expect(scene.order.presentedOver(row)).toBeDefined();
-    const iphone = screen({ box: box(402, 874), boxes: [box(402, 874)], oriented: box(402, 874), statusBand: 62 });
-    for (const purpose of [TAP, STOP, FULLY, OCR()]) {
-      const s = scene.standing(row, iphone, purpose);
+    for (const purpose of [TAP, PLAIN, FULLY, OCR()]) {
+      const s = scene.standing(row, IPHONE_17, purpose);
       expect([purpose.of, s.kind, 'remedy' in s]).toEqual([purpose.of, 'reachable', false]);
     }
   });

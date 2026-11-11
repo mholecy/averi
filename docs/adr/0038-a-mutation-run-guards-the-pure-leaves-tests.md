@@ -1730,65 +1730,70 @@ full lab group took about 300 s (the reviewer measured 299 s) and exits 0.
 ui-tree/standing.ts decides THE REMEDY once for every verb (`remedied`): the tap, `scroll_until`'s stop and the pixel
 assert all quote it. Until now no floor held it, nor the two modules it leans on, ui-tree/reading-order.ts (which
 siblings a listing in reading order leaves untold) and ui-tree/later-edges.ts (the flush later node at each edge). All
-three join the run in a third group, `scene` (the scene every verb judges on), each with its own floor by the floor
-rule:
+three join the run in a third group, `scene` (the scene every verb judges on, below), each with its own floor by the
+floor rule:
 
-| Module | Tests | Score | Floor |
-| --- | --- | --- | --- |
-| src/ui-tree/standing.ts | standing.test.ts, standing-remedy.test.ts, presented-remedy.test.ts, overlaid-edge.test.ts, heading-listed-before.test.ts, keyboard-position.test.ts, listed-content.test.ts, interact/remedy-agreement.test.ts, verify/eyes-views-drawn-over.test.ts, verify/assert.test.ts | 95.90 % (1 220 mutants, 44 survived, 6 without coverage; 84.92 % before A25's tests) | 93 |
-| src/ui-tree/reading-order.ts | draw-order*.test.ts, heading-listed-before.test.ts | 88.11 % (185 mutants, 22 survived) | 86 |
-| src/ui-tree/later-edges.ts | later-edges.test.ts, overlaid-edge.test.ts | 97.35 % (151 mutants, 4 survived) | 95 |
+| Module | Group | Tests | Score | Floor |
+| --- | --- | --- | --- | --- |
+| src/ui-tree/standing.ts | scene | standing.test.ts, standing-remedy.test.ts, presented-remedy.test.ts, overlaid-edge.test.ts, heading-listed-before.test.ts, keyboard-position.test.ts, listed-content.test.ts, interact/remedy-agreement.test.ts, verify/eyes-views-drawn-over.test.ts, verify/assert.test.ts | 96.23 % (1 220 mutants, 1 172 killed, 2 timeouts, 40 survived, 6 without coverage, load average 44 to 66; 84.92 % before A25's tests) | 93 |
+| src/ui-tree/reading-order.ts | scene | draw-order*.test.ts, heading-listed-before.test.ts | 88.11 % (185 mutants, 22 survived) | 86 |
+| src/ui-tree/later-edges.ts | scene | later-edges.test.ts, overlaid-edge.test.ts | 97.35 % (151 mutants, 4 survived) | 95 |
 
-Scores from narrowed cold runs in core before the split; standing.ts's 95.90 % adds the six mutants review round 1's
-test kills (a reachable standing carries no remedy, for every purpose, a node beneath a presented screen too:
-standing-remedy.test.ts, shown red on `tap.kind === 'reachable'` emptied to false) to that run's 95.41 %. The cold
-`scene` run (below), before that test, confirms them: standing.ts 96.23 % there, its 38 timeouts (counted killed) taken under load, reading-order.ts 88.11 %, later-edges.ts 97.35 %. The first run of standing.ts showed its remedies untested where they matter most: the tables of
+reading-order.ts's and later-edges.ts's scores are the cold `npm run mutate -- --group scene --force` run's (below);
+standing.ts's is a narrowed cold run at the branch's head (`npm run mutate -- --group scene --force --mutate
+src/ui-tree/standing.ts`), after review round 1's test — a reachable standing carries no remedy, for every purpose, a
+node beneath a presented screen too (standing-remedy.test.ts) — which kills all six mutants of a reachable standing
+passed to `remedied` (shown red on `tap.kind === 'reachable'` emptied to false); the measured run confirms it.
+
+The first run of standing.ts (84.92 %) showed its remedies untested where they matter most: the tables of
 standing.test.ts quote each standing's kind, never its remedy, so `keyboard`, `pinned`, `stuck` and `fixed` (and the
 `clipped` and `systemBar` cases of the switch) could each be emptied unnoticed. tests/ui-tree/standing-remedy.test.ts
-now pins the remedy per kind and purpose on the smallest trees; standing.test.ts gains the facts its readers quote
-(the scroll view named where scroll views nest, `ScrollViewCut`, the drawn frame, `aboveKeyboard`, the sliver at the
-screen's side, `cutByLater`'s two thresholds, `marginSeen` of another pair); presented-remedy.test.ts the words of
+now pins the remedy per kind and purpose on the smallest trees; standing.test.ts gains the facts its readers quote (the
+scroll view named where scroll views nest, `ScrollViewCut`, the drawn frame, `aboveKeyboard`, the sliver at the screen's
+side, `cutByLater`'s two thresholds, `marginSeen` of another pair); presented-remedy.test.ts the words of
 `presentedLayerName` and `orderRemedyText`; draw-order-reading-order.test.ts idb's top bar against its content.
 
 What is not killed, each equivalent or unreachable:
 
-- standing.ts (50): the two `never` arms (4, no coverage); `bothPinned`'s `over` half (1: the draw order finds no cover in a scroll view
-  over a node in none, and a cut's flush later node is the outermost — the defence in depth ADR 0015's D87 amendment
-  names); a container's cut with no `Cut.by` asked of `bothPinned` (1: `inScroller(undefined)` is undefined);
-  `layer?.label` where a typed layer is defined (2); `outsideItsScrollView`'s kind (1: only `offScreen` carries
-  `scroller`); keys spread as undefined — `cover`, `layer`, `band`, `scroller`, `longer`, `byScrollView`, `cutBy`,
-  `largest` — and a sentinel `off` word (`'wholly'`, `'outside'`) no reader tells apart (14); a drawn frame asked where none can be
-  (`drawn`/`frame` undefined in `regionPlace`, `inStopFrame`, `clippedByScrollView`: 7, the frame being then what the
-  node is judged in, or nothing of it shown, so another kind first); the whole box taken for a sliver in
-  `regionPlace` (1: a box is never as thin as the slack); `systemBands`' optional bands where a band
-  exists (2); `boxes` on a screen that fails open (2) and the pixel assert's one box (1, never read); `bandShows`'
-  covers compared where no cover changes the sum (5); the tap's piece judged again in the same frame, and its unmoved
-  arm under a cover (4); the pixel standing's own facts (3: its `sliver` and a read wholly in the status band — no
-  pixel reader reads a standing's facts); `sliverCut`'s `minPiece` (1: a sliver is only found against a minimum);
-  the stop's keyboard arm without a line (1: unreachable, the frame is then the box).
-- reading-order.ts (22): the `before` sort and the `NO_READING_ORDER` identity (6: draw-order.ts sorts `before` again
-  and never compares the object); `peerSeen`'s `untold`/`clear` arms (4: read only as `over` or `under`); the
-  peers seen under and listed before, and `coversAfter` of a peer listed before (8: draw-order.ts reads `seenUnder` and
-  `coversAfter` only of nodes listed after); `seenOver` over every overlapping peer (1: `unordered` is asked first);
-  `p.at` against `target.at` at equality and the target among its own peers (3: no sibling shares its index).
-- later-edges.ts (4): a node of no area classified (the draw order gives it no later node), and the overlay and the
-  pinned edge asked at the other two sides (no node flush across a side can reach past the node at both ends without
-  holding it), and a node in no scroll view's flush neighbours (none can be `outsideScrollView`).
+- standing.ts (46, the measured run's): the two `never` arms (4, no coverage); `bothPinned`'s `over` half (1: the draw
+  order finds no cover in a scroll view over a node in none, and a cut's flush later node is the outermost — the defence
+  in depth ADR 0015's D87 amendment names); a container's cut with no `Cut.by` asked of `bothPinned` (1:
+  `inScroller(undefined)` is undefined); `layer?.label` where a typed layer is defined (2); `outsideItsScrollView`'s
+  kind (1: only `offScreen` carries `scroller`); keys spread as undefined — `cover`, `layer`, `band`, `cutBy`, `longer`,
+  `byScrollView`, `largest`, `centreCover`, `sliver` — and a sentinel `off` word (`'wholly'`, `'outside'`) no reader
+  tells apart (11); a drawn frame asked where none can be (`drawn`/`frame` undefined in `regionPlace`, `factsIn`,
+  `inStopFrame`, `clippedByScrollView`: 8, the frame being then what the node is judged in, or nothing of it shown, so
+  another kind first); the whole box taken for a sliver in `regionPlace` (1: a box is never as thin as the slack);
+  `systemBands`' status band of no height and its optional bands where a band exists (4); `boxes` on a screen that fails
+  open (2); `bandShows`' covers compared where the lengths already tell (3); the tap's piece judged again in the same
+  frame, and its unmoved arm under a cover (3); the pixel standing's own facts (3: its `sliver` and a read wholly in the
+  status band — no pixel reader reads a standing's facts); `sliverCut`'s `minPiece` (1: a sliver is only found against a
+  minimum); the stop's keyboard arm without a line (1: unreachable, the frame is then the box). Under load the set moves
+  by a few: a test timing out at 5 s (remedy-agreement.test.ts's every-target sweep) counts as a kill, so a run on a
+  busy machine reads higher.
+- reading-order.ts (22): the `before` sort and the `NO_READING_ORDER` identity (5: draw-order.ts sorts `before` again
+  and never compares the object); `peersOf`'s `target.parent !== undefined` guard (1, survivor 216: dead behind
+  `readingOrderOf`'s own at :116); `p.at` against `target.at` at equality and the target among its own peers (5: no
+  sibling shares its index); `peerSeen`'s `untold`/`clear` arms (4: read only as `over` or `under`); the peers seen
+  under and listed before, and `coversAfter` of a peer listed before (6: draw-order.ts reads `seenUnder` and
+  `coversAfter` only of nodes listed after); `seenOver` over every overlapping peer (1: `unordered` is asked first).
+- later-edges.ts (4): a node of no area classified (the draw order gives it no later node), the overlay and the pinned
+  edge asked at the other two sides (no node flush across a side can reach past the node at both ends without holding
+  it), and a node in no scroll view's flush neighbours (none can be `outsideScrollView`).
 
-standing.ts's own doc no longer calls it outside this run (its `pinned` case, 6.). The cost: core's dry run takes the
-added tests (about 2 500 tests in 31 s); standing.ts's mutants run in 2.5 to 4.5 min of a narrowed run, the most of any
-core module, since every scene-building test covers them.
+standing.ts's own doc no longer calls it outside this run (its `pinned` case, 6.). Its mutants are the costliest of any
+scoped module: every scene-building test covers them (2.5 to 4.5 min in a narrowed run).
 
 **A third group, `scene` (the A25 decision).** In `core`, standing.ts pushed the cold core run past its 600 s bound
-twice (5 802 and 6 209 of 8 983 mutants at 600 s, load average 25 to 42 from other worktrees' runs). The three
-modules now form a group of their own, after `core` and before `lab` (scripts/mutation/group.mjs's GROUPS; mutate.ts,
-`npm run mutate -- --force` and docs/release.md's Gate A run every group). Groups are layered core, scene, lab: a
-scoped test may import a module of a group below its own (tests/mutation/group.test.ts), so scene's tests build scenes
-on core's draw order and geometry, while a core test that imports standing.ts (the draw-order tests,
-eyes-views-drawn-over.test.ts, assert.test.ts) is in scene's tests too. Core is back to its pre-A25 modules and tests.
-The cold `npm run mutate -- --group scene --force`: passed in 205 s (load average 15 at its start, 45 at its end).
-The cold `npm run mutate -- --group core --force` after the split (33 modules, 7 427 mutants: core's pre-A25 set) still
-reached its 600 s bound: 7 135 of 7 427 mutants done, 236 timeouts, the load average 9 at its start (22 over five
-minutes) and 58 at its end, from other worktrees' Stryker runs. With standing.ts gone from core, that is the load's,
-not A25's; a cold core run on a quiet machine is left to the merge.
+twice (5 802 and 6 209 of 8 983 mutants at 600 s, load average 25 to 42 from other worktrees' runs). The three modules
+now form a group of their own, after `core` and before `lab` (scripts/mutation/group.mjs's GROUPS; mutate.ts, `npm run
+mutate -- --force` and docs/release.md's Gate A run every group). Groups are layered core, scene, lab: a scoped test may
+import a module of a group below its own (tests/mutation/group.test.ts), so scene's tests build scenes on core's draw
+order and geometry, while a core test that imports standing.ts (the draw-order tests, eyes-views-drawn-over.test.ts,
+assert.test.ts) is in scene's tests too. The cold `npm run mutate -- --group scene --force` passed in 205 s (load
+average 15 at its start, 45 at its end).
 
+Core's scope is unchanged by A25: its 33 modules and their tests as before (7 427 mutants). A cold core run on this
+branch, under load (9 at its start, 58 at its end, from other worktrees' Stryker runs), reached its 600 s bound at 7 135
+of 7 427 mutants; it proves nothing either way. Its post-split cold time is recorded at merge, in the "docs: A25 done"
+commit and here.
