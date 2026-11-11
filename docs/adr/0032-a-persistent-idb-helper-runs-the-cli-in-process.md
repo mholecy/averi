@@ -916,9 +916,9 @@ What moved:
   close no longer skips the registry's shutdown. Records and replies are unchanged.
 - differential.ts (and golden.ts through `connect`): the registry is now shut down at each variant's close, so a
   replayed adapter is disposed. That happens after the variant's last call, and the fake device's log is reset at
-  each call, so no outcome moves (golden: 1691 checks, Changed 0). A close that fails (an old side's shutdown that
-  throws) is one stderr line, `close: <side root> connection failed — <why>`, and the replay goes on: every reply is
-  in by then, as finishRun has live.ts's record in before its closes.
+  each call, so no outcome moves (golden: 1691 checks, Changed 0). A close that fails (a shutdown that throws) is
+  one stderr line, `close: <side root> connection failed — <why>`, and the replay goes on: every reply is in by
+  then, as finishRun has live.ts's record in before its closes.
 - baseline.ts: the report is written before the connection closes, as D82 has live.ts write its record, and the temp
   config is removed before the close too. A close that hangs on a device gone costs neither. A close that fails is
   one stderr line, `close: mcp (client, server, registry) failed — <why>`, which replaces `registry shutdown: <why>`.

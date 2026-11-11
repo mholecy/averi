@@ -393,7 +393,7 @@ No earlier baseline: the latest, in scope.json, is its first.
 
 ## scripts/differential/connection.ts
 
-No earlier baseline: the latest, in scope.json, is its first.
+- 96.00 % on 2026-11-12 (A33, joined; `npm run mutate -- --group lab --force --tempDirName reports/mutation/stryker-tmp-a33`, cold, 315 s at load 7 → 10): 25 mutants, 24 killed, 1 survived, 0 without coverage — the client's version `'0'` emptied, equivalent (nothing reads the client's version; the server's, `name`, is pinned)
 
 ## scripts/truth/run-case.ts
 

@@ -381,7 +381,7 @@ export async function connect(side: Side, recording: Recording, profile: DeviceP
       }
       return { reply, device: deviceCalls() };
     },
-    // A close that fails (an old side's shutdown) is one stderr line, not the run's end: every reply is in by then.
+    // A close that fails (a shutdown that throws) is one stderr line, not the run's end: every reply is in by then.
     close: () => close().catch((e: unknown) => console.error(`close: ${side.root} connection failed — ${errorMessage(e)}`)),
   };
 }

@@ -2094,7 +2094,9 @@ failing under its mutant of the fix. No module in scope.json changed, so no floo
 differential.ts and perf/baseline.ts open and close: every close tried, the first failure thrown after the last, D82;
 ADR 0032's A33 amendment) joins the `lab` group against tests/differential/connection.test.ts, as live-finish.ts joined
 it for D82. The sandbox's allowlist (stryker.config.mjs) takes that one file of scripts/differential/, never the
-replay's corpus. Cold lab group run (`npm run mutate -- --group lab --force --tempDirName
-reports/mutation/stryker-tmp-a33`, 315 s): 96.00 % (25 mutants, 1 survived, 0 without coverage), floor 94. The
-survivor is the client's version `'0'` emptied: nothing reads the client's version, so it is equivalent. Every other
-lab module stayed at or above its floor.
+replay's corpus. Cold lab group run after the code review (`npm run mutate -- --group lab --force`, A37's temp dir
+reports/mutation/stryker-tmp-lab, 303 s): 91.30 % (23 mutants, 2 survived, 0 without coverage), floor 89. Both
+survivors are equivalent. One is the client's version `'0'` emptied: nothing reads the client's version. The other is
+`server?.close()` as `server.close()`: the server is undefined only when it could not be built, and that close's
+failure is dropped, since the open throws its own error. The first run, before the review, scored 96.00 % (25 mutants,
+1 survived; docs/mutation-ledger.md). Every other lab module stayed at or above its floor.
