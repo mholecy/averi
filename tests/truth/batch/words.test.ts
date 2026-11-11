@@ -15,6 +15,8 @@ import {
   timeOf,
   parseVerdictLine,
   stepLine,
+  standingExitOf,
+  STANDING_EXIT,
   SUMMARY_MARKER,
   summaryLines,
   VERDICTS,
@@ -246,6 +248,46 @@ describe('exitCodeOf — 0, 1 on a FAIL or a RESTORE, 130 when interrupted (batc
     const interrupted = { ...base, interrupted: { at: '10:12:00' } };
     expect(exitCodeOf(interrupted)).toBe(130);
     expect(exitCodeOf({ ...interrupted, restore: { file: 'R', written: ['x'] }, blocks: [{ block: 'E5', lines: ['E5 verdict: FAIL'] }] })).toBe(130);
+  });
+});
+
+describe('standingExitOf — a standing batch\'s exit over the same SUMMARY (A21: lab-run\'s, lab-run-ios\'s; 0 only when proven)', () => {
+  const wanted = ['kf live verdict', 'E5 verdict'];
+  const blocks = (lines: string[]) => [...base.blocks, { block: 'x', lines }];
+
+  it('the codes: a batch\'s and unproven (3)', () => {
+    expect(STANDING_EXIT).toEqual({ ok: 0, failed: 1, nothingDone: 2, interrupted: 130, unproven: 3 });
+  });
+
+  it('every wanted label PASS, OK and WARN lines beside, the ERROR section empty: 0', () => {
+    expect(standingExitOf({ ...base, blocks: blocks([verdictLine('x check', 'WARN', 'said')]) }, wanted)).toBe(0);
+    expect(standingExitOf(base, [])).toBe(0);
+  });
+
+  it('exitCodeOf\'s 1, 2 and 130 stand, whatever else the SUMMARY holds', () => {
+    expect(standingExitOf({ ...base, blocks: blocks([verdictLine('x', 'FAIL'), verdictLine('y', 'INCONCLUSIVE')]) }, wanted)).toBe(1);
+    expect(standingExitOf({ ...base, noneRan: true, errors: ['ERROR x'] }, wanted)).toBe(2);
+    expect(standingExitOf({ ...base, interrupted: { at: '10:12:00' } }, wanted)).toBe(130);
+  });
+
+  it('unproven (3): an INCONCLUSIVE or ERROR among the blocks\', the labs\' or the protected keys\' lines', () => {
+    expect(standingExitOf({ ...base, blocks: blocks([verdictLine('x check', 'INCONCLUSIVE', 'r')]) }, wanted)).toBe(3);
+    expect(standingExitOf({ ...base, blocks: blocks([verdictLine('x check', 'ERROR', 'r')]) }, wanted)).toBe(3);
+    expect(standingExitOf({ ...base, labs: [verdictLine('LAB handlers', 'ERROR', 'r')] }, wanted)).toBe(3);
+    expect(standingExitOf({ ...base, labs: [verdictLine('LAB handlers', 'INCONCLUSIVE', 'r')] }, wanted)).toBe(3);
+    expect(standingExitOf({ ...base, protectedLines: [verdictLine('key', 'ERROR', 'unread')] }, wanted)).toBe(3);
+  });
+
+  it('unproven (3): any line in the ERROR section — an ERROR, or a log not read (what it held is not known)', () => {
+    expect(standingExitOf({ ...base, errors: ['10:15:00 ERROR forms live android-forms (exit 2)'] }, wanted)).toBe(3);
+    expect(standingExitOf({ ...base, errors: ['NOTE forms/x.log not read: unreadable'] }, wanted)).toBe(3);
+  });
+
+  it('unproven (3): a wanted label with no PASS line — another verdict, or no line of it', () => {
+    const kfSkip = [{ block: 'kf', lines: [verdictLine('kf live verdict', 'SKIP', 'x')] }, base.blocks[1]];
+    expect(standingExitOf({ ...base, blocks: kfSkip }, wanted)).toBe(3);
+    expect(standingExitOf({ ...base, blocks: [base.blocks[1]] }, wanted)).toBe(3);
+    expect(standingExitOf(base, [...wanted, 'forms verdict'])).toBe(3);
   });
 });
 

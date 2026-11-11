@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
+import { failuresJson, failuresOf } from '../../scripts/truth/batch/cases.js';
 import { type Case, judged, rejudge as rejudgeRecord, ROOT, type RunRecord } from '../../scripts/truth/live-cases.js';
 import type { LiveVerdict } from '../../scripts/truth/live-visibility.js';
 import { hedgedLead } from '../../scripts/truth/replies.js';
@@ -37,9 +38,13 @@ async function rejudgeInProcess(record: string, groups: string): Promise<{ code:
 }
 
 /** The CLI itself, spawned: `node --import tsx scripts/truth/live.ts --rejudge <record> --groups <groups>`. */
-async function rejudgeCli(record: string, groups: string): Promise<{ code: number; out: string }> {
+const rejudgeCli = (record: string, groups: string) => rejudgeCliWith(record, groups, []);
+/** The same, with more flags after it. */
+const rejudgeCliWith = (record: string, groups: string, more: readonly string[]) => rejudgeCliArgs(['--rejudge', pathOf(record), '--groups', groups, ...more]);
+/** live.ts spawned with these flags: its exit code, and what it printed (stdout, then stderr when it failed). */
+async function rejudgeCliArgs(args: readonly string[]): Promise<{ code: number; out: string }> {
   try {
-    const { stdout } = await run(process.execPath, ['--import', 'tsx', 'scripts/truth/live.ts', '--rejudge', pathOf(record), '--groups', groups], { cwd: ROOT, maxBuffer: 16 * 1024 * 1024 });
+    const { stdout } = await run(process.execPath, ['--import', 'tsx', 'scripts/truth/live.ts', ...args], { cwd: ROOT, maxBuffer: 16 * 1024 * 1024 });
     return { code: 0, out: stdout };
   } catch (e) {
     const err = e as { code?: number; stdout?: string; stderr?: string };
@@ -61,6 +66,31 @@ describe('live.ts --rejudge, the CLI: argv in, the summary on stdout, the exit c
 });
 
 // live-cases.ts#judged: a forms case not ok is read again 3 s later (`late`) — a model that catches up was the app's lag.
+describe('live.ts --rejudge --failures <file>: the summary\'s failure reasons as data beside it (A21, batch/cases.ts#failuresJson)', () => {
+  it.each([
+    ['ios-wda-long-list-parked-2.json', 'visibility'],
+    ['ios-forms-r8-l2-before.json', 'forms'],
+  ] as const)('%s (--groups %s): the reasons rejudge() returns, written as JSON; one a reason exactly when the exit is 1', { timeout: 60_000 }, async (record, groups) => {
+    const dir = await mkdtemp(join(tmpdir(), 'live-failures-'));
+    try {
+      const file = join(dir, 'r.rejudge.json');
+      const cli = await rejudgeCliWith(record, groups, ['--failures', file]);
+      const recorded = JSON.parse(readFileSync(resolve(ROOT, pathOf(record)), 'utf8')) as RunRecord;
+      const own = await rejudgeRecord(recorded, pathOf(record), { groups: groups.split(',') });
+      expect(readFileSync(file, 'utf8')).toBe(failuresJson(own.failures));
+      expect(failuresOf(readFileSync(file, 'utf8'))!.length > 0).toBe(cli.code === 1);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('refused without --rejudge: only a rejudge writes its reasons', { timeout: 60_000 }, async () => {
+    const cli = await rejudgeCliArgs(['--serial', 'x', '--failures', '/nonexistent/f.json']);
+    expect(cli.code).not.toBe(0);
+    expect(cli.out).toContain('--failures: only a rejudge writes its failure reasons; pass --rejudge <record>');
+  });
+});
+
 describe('judged — the first read, and the late one 3 s after it', () => {
   const read = (focus: string): LabState => ({ cell: 'form-basic', ready: true, screen: { x: 0, y: 0, width: 402, height: 874 }, scale: 3, frames: {}, events: [], focus });
   /** A case whose verdict is read off the focus each read holds — each its own outcome, rule and kind of reply. */
@@ -1311,6 +1341,11 @@ describe("T20a: the chooser group's premise, printed from the record", () => {
     const stale = await rejudgeRecord({ ...recorded(), chooserPremise: { state: 'stale', facts, lines } }, RECORD, { groups: ['chooser'] });
     expect(stale.lines).toEqual([...plain.lines, ...lines, '']);
     expect(stale.exitCode).toBe(1);
+    // A21: the premise's line and its hand line, one failure reason; a last-chosen WARN beside them is not part of it.
+    expect(stale.failures).toEqual([lines.join(' | ')]);
+    const warn = 'Chooser premise: WARN — 1 last-chosen lab entry (mAlways=false: no default; no reinstall clears it), first: 9d3a2b9 dev.averi.lab/.Twin';
+    const warned = await rejudgeRecord({ ...recorded(), chooserPremise: { state: 'stale', facts, lines: [...lines, warn] } }, RECORD, { groups: ['chooser'] });
+    expect(warned.failures).toEqual([lines.join(' | ')]);
     const unread = await rejudgeRecord({ ...recorded(), chooserPremise: { state: 'unread', facts, lines: ['Chooser premise: unread — x'] } }, RECORD, { groups: ['chooser'] });
     expect(unread.exitCode).toBe(0);
   });

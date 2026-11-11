@@ -186,7 +186,7 @@ function go(b: ReturnType<typeof batch>, env: Record<string, string> = {}): Prom
     lastly: b.lastly,
     config: { ok: true, config: { out, repo, udid: LAB_UDID, serial: LAB_SERIAL, env } },
     io: { fs: nodeFs, seam, terminal: () => {}, clock, pid: 4242, table, graceMs: 5 },
-  });
+  }).then((r) => r.exit);
 }
 
 const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));

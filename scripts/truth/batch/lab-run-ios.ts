@@ -1,21 +1,22 @@
 import { isMain } from '../../is-main.js';
 import type { Asked } from './cases.js';
-import { shellQuote } from './ios-defaults.js';
 import { iosCheck, iosLab, wdaWindow } from './ios-lab.js';
 import { labBlock, labBuild } from './lab-build.js';
+import type { Block, BlockCtx } from './runner.js';
+import { knobs as readKnobs } from './select.js';
+import { shellQuote } from './shell.js';
 import {
+  cleanStateCommand,
+  deviceInHand,
   KNOBS,
   keptLiveRun,
   liveJudge,
   standingRun,
   standingSelection,
-  type LabRunKnobs,
-  type LabRunOptions,
   type Standing,
-} from './lab-run.js';
-import type { Block, BlockCtx } from './runner.js';
-import { NO_UDID } from './runner-lines.js';
-import { knobs as readKnobs } from './select.js';
+  type StandingKnobs,
+  type StandingOptions,
+} from './standing.js';
 
 /**
  * The standing lab batch on the lab simulator (backlog T24: docs/release.md's Gate C), lab-run.ts's iOS counterpart
@@ -39,8 +40,9 @@ import { knobs as readKnobs } from './select.js';
  *
  *     npm run truth:lab:ios -- --out <dir outside the checkout> --udid <lab simulator> [--groups forms|…]
  *
- * The owner's, outside the agent's sandbox (simctl, idb, xcodebuild and WebDriverAgent do not run inside it). The exit
- * code is lab-run's (labRunExit): 0 only when every wanted block PASSed and no line is INCONCLUSIVE or ERROR; 1 a FAIL
+ * The owner's, outside the agent's sandbox (simctl, idb, xcodebuild and WebDriverAgent do not run inside it). Its
+ * selection, knobs, live runs, judge and run are standing.ts's, shared with lab-run.ts and imported from neither batch.
+ * The exit code is the standing one (words.ts#standingExitOf): 0 only when every wanted block PASSed and no line is INCONCLUSIVE or ERROR; 1 a FAIL
  * or a RESTORE; 2 refused (no udid, a group that is none, an earlier window's state file dirty) or nothing ran; 3
  * unproven; 130 interrupted.
  */
@@ -62,9 +64,10 @@ export const iosLabel = (source: IosSource, group: IosRunGroup): string => `ios 
 /** The batch's blocks, in its order: the lab block, every idb run, then every WebDriverAgent run. */
 export const IOS_BLOCK_IDS: readonly string[] = ['lab', ...IOS_SOURCES.flatMap((s) => IOS_RUN_GROUPS.map((g) => iosBlockId(s, g)))];
 
-/** The iOS batch's selection words (lab-run.ts#Standing): a group selects its idb block and its WebDriverAgent block. */
+/** The iOS batch's selection words (standing.ts#Standing): a group selects its idb block and its WebDriverAgent block. */
 export const IOS_STANDING: Standing<IosRunGroup> = {
   batch: 'lab-run-ios',
+  device: 'udid',
   groups: IOS_RUN_GROUPS,
   hint: `${IOS_RUN_GROUPS.join(', ')}, or several joined by commas`,
   blockIds: IOS_BLOCK_IDS,
@@ -79,16 +82,16 @@ export const iosAskedOf = (source: IosSource, group: IosRunGroup): Asked => ({ p
  * the compare by hand, then the file written clean.
  */
 export function windowStateHand(udid: string | undefined, file: string): string {
-  const u = udid ?? '<the lab simulator: --udid or AVERI_LAB_UDID>';
+  const u = deviceInHand('udid', udid);
   return (
     `  → the WDA window's settings not put back: for each domain in ${shellQuote(file)}, ` +
     `xcrun simctl spawn ${u} defaults import <domain> <its backup beside the file>; compare them by hand; ` +
-    `then: printf '%s\\n' '{"dirty":false}' > ${shellQuote(file)}`
+    `then: ${cleanStateCommand(file)}`
   );
 }
 
-/** The run, start to end: its exit code (lab-run.ts#LAB_RUN_EXIT), the one the seam's exit is called with. */
-export async function labRunIos(o: LabRunOptions): Promise<number> {
+/** The run, start to end: its exit code (words.ts#STANDING_EXIT), for the CLI entry to exit with. */
+export async function labRunIos(o: StandingOptions): Promise<number> {
   const { wanted, config } = standingSelection(o, IOS_STANDING);
   const udid = config.ok ? config.config.udid : undefined;
   const pre = readKnobs(KNOBS, o.env);
@@ -96,7 +99,7 @@ export async function labRunIos(o: LabRunOptions): Promise<number> {
   const ios = iosLab({ build: build.ios, wait: o.wait });
 
   /** An idb run: the health check, then the run; not fit, INCONCLUSIVE naming why, nothing run. */
-  const idbBlock = (group: IosRunGroup): Block<LabRunKnobs> => {
+  const idbBlock = (group: IosRunGroup): Block<StandingKnobs> => {
     const [label, name] = [iosLabel('idb', group), iosRunName('idb', group)];
     return {
       id: iosBlockId('idb', group),
@@ -115,7 +118,7 @@ export async function labRunIos(o: LabRunOptions): Promise<number> {
   };
 
   /** A WebDriverAgent run in its own D43 window, after the work's own health check (runner.ts's header's D43). */
-  const wdaBlock = (group: IosRunGroup): Block<LabRunKnobs> => {
+  const wdaBlock = (group: IosRunGroup): Block<StandingKnobs> => {
     const [label, name, asked] = [iosLabel('wda', group), iosRunName('wda', group), iosAskedOf('wda', group)];
     return {
       id: iosBlockId('wda', group),
@@ -123,7 +126,7 @@ export async function labRunIos(o: LabRunOptions): Promise<number> {
       needs: ['ios'],
       stateful: { what: 'the WDA window not put back', hand: (file) => [windowStateHand(udid, file)] },
       judge: liveJudge(label, name),
-      async run(ctx: BlockCtx<LabRunKnobs>) {
+      async run(ctx: BlockCtx<StandingKnobs>) {
         const sim = await ios.open(ctx);
         if (!sim.ok) return ctx.verdict('INCONCLUSIVE', sim.why);
         const said: string[] = [];
@@ -144,15 +147,14 @@ export async function labRunIos(o: LabRunOptions): Promise<number> {
   };
 
   const blocks = [labBlock(['ios'], { build }), ...IOS_RUN_GROUPS.map(idbBlock), ...IOS_RUN_GROUPS.map(wdaBlock)];
-  return standingRun(o, {
-    name: 'lab-run-ios',
+  return standingRun(o, IOS_STANDING, {
     blocks,
     wanted,
     needs: { ...build.needs, ios: ios.need },
     lastly: [ios.lastly, build.lastly],
-    batchReasons: config.ok && udid === undefined ? [`${NO_UDID}: lab-run-ios runs on the lab simulator only`] : [],
     config,
   });
 }
 
-if (isMain(import.meta.url)) await labRunIos({ argv: process.argv.slice(2), env: process.env });
+// The exit at once, as runBatch leaves it to its caller (runner.ts#runBatch).
+if (isMain(import.meta.url)) process.exit(await labRunIos({ argv: process.argv.slice(2), env: process.env }));

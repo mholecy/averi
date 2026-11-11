@@ -110,7 +110,7 @@ or restart anything to bring it up.
    npm run truth:lab -- --out "$OUT/truth-lab" --serial emulator-5554
    ```
 
-   It bounds itself (each live run 1800 s, the build 2400 s; lab-run.ts's KNOBS). It passes only on **exit 0**: every
+   It bounds itself (each live run 1800 s, the build 2400 s; standing.ts's KNOBS). It passes only on **exit 0**: every
    block PASS, and no INCONCLUSIVE or ERROR line. Exit 1 is a FAIL or a `RESTORE.txt` to act on by hand, and it goes
    to the owner. Exit 2 means refused, and 3 means unproven. Neither is a pass. The record keeps the SUMMARY
    (`$OUT/truth-lab/meta/run-<id>/summary.txt`), cleaned.

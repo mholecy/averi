@@ -22,7 +22,7 @@ const git = (...args: string[]) => execFileSync('git', args, { timeout: 10_000, 
 git('-c', 'init.defaultBranch=main', 'init', '-q', repo);
 git('-C', repo, '-c', 'user.name=batch-test', '-c', 'user.email=batch-test@example.invalid', 'commit', '-q', '--allow-empty', '-m', 'init');
 
-await runBatch({
+const result = await runBatch({
   name: 'batch-r',
   needs: {},
   blocks: [
@@ -50,3 +50,5 @@ await runBatch({
   ],
   config: configOf(['--out', at('out'), '--repo', repo], {}),
 });
+// runBatch leaves the exit to its caller (A21): at once, as a batch's CLI entry does.
+process.exit(result.exit);

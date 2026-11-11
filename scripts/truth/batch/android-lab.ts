@@ -2,7 +2,7 @@ import { basename, join } from 'node:path';
 import { LAB_AVD, pause } from '../lab-device.js';
 import type { Run } from './bounded.js';
 import { freshIn, type BatchFs } from './io.js';
-import { shellQuote } from './ios-defaults.js';
+import { shellQuote } from './shell.js';
 import { CLEANUP_LABEL, compareReads, comparedLine, sanitizeFixture, type ShellRead } from './lab-chooser.js';
 import { CELLS_ENTRY, chooserWindow, cleanUp, handlers, LabEmu, labInstalled, readClipboard, readRoleHolders, UNZIP_SECS, type Cleanup, type ReinstallOptions, type StateRestore } from './lab-emu.js';
 import { CATALOG_PATH, cellsWhy, type Opened } from './lab-lines.js';

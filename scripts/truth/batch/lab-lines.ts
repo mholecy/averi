@@ -2,7 +2,8 @@ import { join } from 'node:path';
 import type { Point } from '../../../src/adapters/types.js';
 import { isDeviceCheckSimulator } from '../lab-device.js';
 import type { CallResult } from './bounded.js';
-import { HAND_PREFIX, LAB_WDA_PORT, RESTORE_LABEL, shellQuote } from './ios-defaults.js';
+import { HAND_PREFIX, LAB_WDA_PORT, RESTORE_LABEL } from './ios-defaults.js';
+import { shellQuote } from './shell.js';
 import { exitText, failedCall, firstLineOf, nameInLine, verdictLine } from './words.js';
 
 /**

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { NOT_STARTED, TIMED_OUT } from '../../../scripts/truth/batch/bounded.js';
-import { completeness, incompleteLine, runFiles, runsIn, selectorOf, stepOutcome, writeCases, type Asked, type Selector } from '../../../scripts/truth/batch/cases.js';
+import { completeness, failuresJson, failuresOf, incompleteLine, runFiles, runsIn, selectorOf, stepOutcome, writeCases, type Asked, type Selector } from '../../../scripts/truth/batch/cases.js';
 import { DEFAULT_GROUPS, liveTableOf, type LiveCases, type LiveTable } from '../../../scripts/truth/batch/live-table.js';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
 import { LIVE_GOLDEN_HEADER } from '../../../scripts/truth/batch/steps.js';
@@ -95,9 +95,15 @@ describe('writeCases — what a run was asked, written before anything of it run
   });
 });
 
-describe('runFiles and runsIn — a run\'s four files, and the runs a block folder asked', () => {
-  it('runFiles: <name>.cases, .json (live.ts --record), .log, .rejudge.txt', () => {
-    expect(runFiles('d', 'x')).toEqual({ cases: join('d', 'x.cases'), record: join('d', 'x.json'), log: join('d', 'x.log'), summary: join('d', 'x.rejudge.txt') });
+describe('runFiles and runsIn — a run\'s five files, and the runs a block folder asked', () => {
+  it('runFiles: <name>.cases, .json (live.ts --record), .log, .rejudge.txt, .rejudge.json (A21)', () => {
+    expect(runFiles('d', 'x')).toEqual({
+      cases: join('d', 'x.cases'),
+      record: join('d', 'x.json'),
+      log: join('d', 'x.log'),
+      summary: join('d', 'x.rejudge.txt'),
+      failures: join('d', 'x.rejudge.json'),
+    });
   });
 
   it('runsIn: every .cases\'s name, sorted; a record without one (ime.json, d62.json) is no run; a missing folder has none', () => {
@@ -107,6 +113,20 @@ describe('runFiles and runsIn — a run\'s four files, and the runs a block fold
     writeFileSync(join(dir, 'x.cases.bak'), '{}');
     expect(runsIn(nodeFs, dir)).toEqual(['android-kf-1', 'android-kf-2']);
     expect(runsIn(nodeFs, join(dir, 'nope'))).toEqual([]);
+  });
+});
+
+describe('failuresJson and failuresOf — a rejudge\'s failure reasons as data beside its summary (A21)', () => {
+  it('written as one JSON object; read back whole', () => {
+    expect(failuresJson(['MISMATCH lc1', 'a — b'])).toBe('{"failures":["MISMATCH lc1","a — b"]}\n');
+    expect(failuresOf(failuresJson(['MISMATCH lc1', 'a — b']))).toEqual(['MISMATCH lc1', 'a — b']);
+    expect(failuresOf(failuresJson([]))).toEqual([]);
+  });
+
+  it('fail closed: no text, no JSON, or not its shape is undefined — never "no failure"', () => {
+    for (const text of [undefined, '', 'not json', 'null', '5', '"x"', '[]', '{}', '{"failures":"x"}', '{"failures":[1]}', '{"failures":["a",null]}']) {
+      expect(failuresOf(text), String(text)).toBeUndefined();
+    }
   });
 });
 

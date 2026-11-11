@@ -197,6 +197,26 @@ export function exitCodeOf(s: Summary): 0 | 1 | 2 | 130 {
   return s.noneRan === true ? EXIT.nothingDone : EXIT.ok;
 }
 
+/** A standing batch's exit codes (standing.ts: lab-run's, lab-run-ios's): a batch's, and `unproven` for a run that proved nothing. */
+export const STANDING_EXIT = { ...EXIT, unproven: 3 } as const;
+
+/**
+ * A standing batch's exit code, read from the same SUMMARY as exitCodeOf and stricter: exitCodeOf's 1, 2 and 130
+ * stand; its 0 is 0 only when no judged line (the checkout's, the labs', the blocks', the protected keys') says
+ * INCONCLUSIVE or ERROR, the ERROR section is empty (an unread log's NOTE in it too: what it held is not known) and
+ * every label in `wanted` has a PASS line — else unproven (3).
+ */
+export function standingExitOf(s: Summary, wanted: readonly string[]): number {
+  const code = exitCodeOf(s);
+  if (code !== EXIT.ok) return code;
+  const judged = [s.checkout, ...s.labs, ...s.blocks.flatMap((b) => b.lines), ...s.protectedLines].map(parseVerdictLine).filter((v) => v !== undefined);
+  const proven =
+    s.errors.length === 0 &&
+    !judged.some((v) => v.verdict === 'INCONCLUSIVE' || v.verdict === 'ERROR') &&
+    wanted.every((l) => judged.some((v) => v.label === l && v.verdict === 'PASS'));
+  return proven ? STANDING_EXIT.ok : STANDING_EXIT.unproven;
+}
+
 /**
  * A JSON value as one key (T2 S6b review round 1, NIT 8: a run's identity, asked and done; here since T2b-1's code
  * review, so the pure halves need no io): every object's fields sorted, at every depth, so two equal values built in

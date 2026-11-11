@@ -28,6 +28,8 @@ Amended 2026-11-11 (T22: src/util/regex.ts joined the run — see the T22 amendm
 Amended 2026-11-11 (T23: the Android build's JDK 17 lookup — see the T23 amendment at the end).
 Amended 2026-11-11 (T24: lab-run-ios.ts, scripts/release/pack-files.ts and clean-log.ts joined the run — see the T24
 amendment at the end).
+Amended 2026-11-11 (A21: scripts/truth/batch/standing.ts and shell.ts joined the run — see the A21 amendment at the
+end).
 
 ## Context
 
@@ -1724,3 +1726,30 @@ The sandbox gains one entry, `!/scripts/release/`, in stryker.config.mjs's allow
 path rule admits scripts/release/. The figures above come from narrowed cold runs (`--mutate` over the four modules,
 then over the two batches, `--tempDirName reports/mutation/stryker-tmp-t24`, whose exit 1 is a narrowed run's). The cold
 full lab group took about 300 s (the reviewer measured 299 s) and exits 0.
+
+## Amendment: the standing kit and the one shell quoter join the run (2026-11-11, backlog A21)
+
+A21 (the 2026-11-11 architecture review's card 3) gives the standing batches runBatch's result as data and a module of
+their own. runBatch now returns its BatchResult (refused, interrupted, or ended with its exit, run id and SUMMARY) and
+leaves the process's exit to its caller; only the abort still exits by itself. The T24 list above changes so:
+
+- scripts/truth/batch/standing.ts, the standing kit lab-run.ts lent lab-run-ios.ts until now (`Standing`,
+  `standingSelection`, `KNOBS`, `keptLiveRun`, `liveJudge`, `liveVerdictLine`, `standingRun`, the clean-state command
+  and the device words), joins the `lab` group against tests/truth/batch/standing.test.ts, lab-run.test.ts and
+  lab-run-ios.test.ts: 99.19 %, 247 mutants, 1 survived (equivalent), 1 without coverage. Floor 97.
+- lab-run.ts is held against its own lab-run.test.ts alone (lab-run-ios.ts imports nothing from it any more): 93.14 %,
+  at its floor 93 — the kit's well-killed code left it, so the classes the T24 amendment names weigh more.
+- lab-run-ios.ts: 85.98 % (floor 84), the same classes.
+- scripts/truth/batch/shell.ts, the batches' one host-shell quoter (the review's TL8: ios-defaults.ts's shellQuote and
+  run-dir.ts's private copy), joins the `core` group against tests/truth/batch/shell.test.ts: 100 %, 10 mutants.
+  Floor 98.
+
+The exit rule over the SUMMARY (`standingExitOf` in scripts/truth/batch/words.ts, beside `exitCodeOf`) is scored with
+words.ts (100 %), and the rejudge's failure-reasons file (`failuresJson` and `failuresOf` in
+scripts/truth/batch/cases.ts) with cases.ts (98.97 %, two equivalents in failuresOf). The cold full core group passed in
+559 s. The cold full lab group passed mutate.ts's 600 s bound twice, at 89 % and 95 % done, on a host whose load average
+stood at 20–37 (other worktrees' runs); the lab figures above come from narrowed cold runs (`--mutate` over the batch
+modules A21 touched: standing.ts, lab-run.ts, lab-run-ios.ts, ios-defaults.ts, ios-domains.ts, lab-lines.ts and
+android-lab.ts, each at or above its floor). Every lab-run and lab-run-ios test now goes through `summarize` in
+scripts/truth/live-cases.ts (tests/truth/batch/standing-fakes.ts), which the lab group's live-carousel.ts and
+live-visibility.ts mutants then also run; a quiet host's cold lab run is the check that it still fits the bound.

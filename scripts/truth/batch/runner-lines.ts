@@ -334,9 +334,12 @@ export interface LiveRunSpec {
   record: string;
 }
 
+/** Where a lab device's id is given: its flag, or its env. */
+export const UDID_FLAGS = '--udid or AVERI_LAB_UDID';
+export const SERIAL_FLAGS = '--serial or AVERI_LAB_SERIAL';
 /** A device id not given (`--udid`, `--serial`, or their env): no run, and no lab need, on that platform. */
-export const NO_UDID = 'no lab simulator udid given (--udid or AVERI_LAB_UDID)';
-export const NO_SERIAL = 'no lab emulator serial given (--serial or AVERI_LAB_SERIAL)';
+export const NO_UDID = `no lab simulator udid given (${UDID_FLAGS})`;
+export const NO_SERIAL = `no lab emulator serial given (${SERIAL_FLAGS})`;
 
 /** The device flags for a live run, or why there are none: the device id not given. */
 export function deviceArgs(asked: Asked, ids: DeviceIds): { args: string[] } | { why: string } {
@@ -373,8 +376,19 @@ export const liveCalls = ({ repo, secs, rejudgeSecs, files }: LiveBounds & { rep
   rejudge: { secs: rejudgeSecs ?? REJUDGE_SECS, cwd: repo, log: files.summary },
 });
 
-/** live.ts's rejudge of a record: main's judges, the same groups (batch-11.sh:479). */
-export const rejudgeArgs = ({ repo, asked, record }: LiveRunSpec): string[] => [...liveTs(repo), '--rejudge', record, '--groups', groupsOf(asked)];
+/**
+ * live.ts's rejudge of a record: main's judges, the same groups (batch-11.sh:479); its failure reasons written to
+ * `failures` (cases.ts#failuresJson, A21).
+ */
+export const rejudgeArgs = ({ repo, asked, record, failures }: LiveRunSpec & { failures: string }): string[] => [
+  ...liveTs(repo),
+  '--rejudge',
+  record,
+  '--groups',
+  groupsOf(asked),
+  '--failures',
+  failures,
+];
 
 /** A live step's text: OK bare; else its why and the log to read (batch-11.sh:234–237). */
 export const liveStepText = (what: string, outcome: { word: 'OK' | 'DONE' | 'FAIL'; why: string }, log: string): string => (outcome.word === 'OK' ? what : `${what} (${outcome.why}) — see ${log}`);

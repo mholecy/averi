@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { Platform } from '../differential/corpus.js';
 import { familyOf } from './catalog.js';
 import type { ChooserPremise } from './chooser-premise.js';
+import { HAND_PREFIX } from './chooser-readers.js';
 import { type DeviceLabel, deviceLine } from './device-state.js';
 import { LAB_APP } from './lab-device.js';
 import { CAROUSEL_CASES, hedgedCeiling, type PreDragged, type Shorten, type SwipeEntry } from './live-carousel.js';
@@ -788,9 +789,19 @@ export async function rejudgedResults(record: RunRecord, selection: RejudgeSelec
 // a known case not intermittent that came out ok in a run of this checkout (fixed: strike it off), on a SKIP of a case
 // marked skipFails, on a case with no first state (T10), and on a stale chooser premise (T20a) ---
 
-/** What a run (or a rejudged record) reports: the summary's lines, as live.ts prints them, and its exit code. */
+/**
+ * What a run (or a rejudged record) reports: the summary's lines, as live.ts prints them; its failure reasons, as data
+ * (A21: what a standing batch names — written beside the rejudge's summary, batch/cases.ts#failuresJson); and its exit
+ * code, 1 exactly when there is a failure reason.
+ */
 export interface Summary {
   lines: string[];
+  /**
+   * Each reason the run fails, in the summary's own words, in its order: the stale chooser premise (its line and hand
+   * lines, ` | `-joined), each unknown MISMATCH (`MISMATCH <id>`), then the FIXED, the failing-SKIP and the NO FIRST
+   * STATE tallies and the hedged ceiling's MISMATCH line, whole. A LOUD, a SKIP or a known MISMATCH is none.
+   */
+  failures: string[];
   exitCode: 0 | 1;
 }
 
@@ -866,9 +877,13 @@ export function summarize({
     lines.push('');
   }
   if (cleared.length > 0) lines.push(`Known but ok this run: ${cleared.map((r) => `${r.source} ${r.c.id}`).join(', ')}`, '');
-  if (fixed.length > 0) lines.push(`FIXED, not intermittent — strike off live-known.ts: ${fixed.map((r) => `${r.source} ${r.c.id}`).join(', ')}`, '');
-  if (failingSkips.length > 0) lines.push(`SKIPPED where a skip proves nothing — the run fails: ${failingSkips.map((r) => `${r.source} ${r.c.id}`).join(', ')}`, '');
-  if (stateless.length > 0) lines.push(`NO FIRST STATE — the app wrote none, the run fails: ${stateless.map((r) => `${r.source} ${r.c.id}`).join(', ')}`, '');
+  /** The tallies that fail the run, each its line when it counts any: said in the summary and named as a failure. */
+  const tallies = [
+    fixed.length > 0 ? `FIXED, not intermittent — strike off live-known.ts: ${fixed.map((r) => `${r.source} ${r.c.id}`).join(', ')}` : undefined,
+    failingSkips.length > 0 ? `SKIPPED where a skip proves nothing — the run fails: ${failingSkips.map((r) => `${r.source} ${r.c.id}`).join(', ')}` : undefined,
+    stateless.length > 0 ? `NO FIRST STATE — the app wrote none, the run fails: ${stateless.map((r) => `${r.source} ${r.c.id}`).join(', ')}` : undefined,
+  ].filter((l) => l !== undefined);
+  for (const l of tallies) lines.push(l, '');
   // An ok on a reply accepted under a residual (LiveVerdict.accepted): counted, per residual, against the runs of the
   // cases that accept it.
   const residuals = new Map(results.flatMap((r) => (r.verdict.accepted === undefined ? [] : [[r.verdict.accepted.id, r.verdict.accepted.residual] as const])));
@@ -889,10 +904,10 @@ export function summarize({
   // run. Only where a chooser case is among the results: a rejudge of another group judges nothing it rests on.
   const shown = results.some((r) => r.c.group === 'chooser') ? premise : undefined;
   if (shown !== undefined) lines.push(...shown.lines, '');
-  const stalePremise = shown?.state === 'stale';
-  const counted = unknown.length > 0 || fixed.length > 0 || failingSkips.length > 0 || stateless.length > 0;
-  const fails = counted || ceiling.fails || stalePremise;
-  return { lines, exitCode: fails ? 1 : 0 };
+  // A stale premise names its line and its hand lines (each `D55 (Android): …`), not its last-chosen WARN.
+  const staleLines = shown?.state === 'stale' ? [shown.lines.filter((l, i) => i === 0 || l.startsWith(HAND_PREFIX)).join(' | ')] : [];
+  const failures = [...staleLines, ...unknown.map((r) => `MISMATCH ${r.c.id}`), ...tallies, ...(ceiling.fails ? ceiling.lines : [])];
+  return { lines, failures, exitCode: failures.length > 0 ? 1 : 0 };
 }
 
 /**
