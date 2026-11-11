@@ -9,37 +9,15 @@ import {
 import { selectCases } from '../../scripts/truth/live-cases.js';
 import { describeScrollResult } from '../../src/interact/scroll-text.js';
 import type { CellTruth, LabState, Stroke, TargetTruth } from '../../scripts/truth/schema.js';
+import { at, c, reached, SCREEN, state, stroke } from './live-visibility-fixtures.js';
 
 // T21: the live visibility judges' verdicts pinned whole — outcome, rule, reply kind and the words live.ts prints and a
 // record keeps — with their boundaries, by judge; and the cases the live run asks of the committed static truth
 // (tests/fixtures/truth). The judges' rules are live-visibility.test.ts's; this file holds what each says, and where
 // its edges lie. iOS units as there: the iPhone 17's 402x874 pt, its status band 62 pt; Android px: 1080x2220.
 
-const SCREEN = { x: 0, y: 0, width: 402, height: 874 };
-const at = 1;
-
-/** An edges-like cell's state: T in `page` (the whole screen), its frame `y`, the page at `offset` (as live-visibility.test.ts's). */
-function state(over: Partial<LabState> = {}): LabState {
-  return {
-    cell: 'c',
-    ready: true,
-    screen: SCREEN,
-    scale: 3,
-    frames: { T: { x: 51, y: -2, width: 300, height: 64 } },
-    events: [],
-    safeArea: { top: 62, left: 0, bottom: 34, right: 0 },
-    scrollViews: { page: SCREEN },
-    offsets: { page: 382 },
-    strokes: [],
-    ...over,
-  };
-}
-const stroke = (from: number, to: number, view = 'page'): Stroke => ({ view, from, to, at });
 const tap = (tag: string) => ({ kind: 'tap' as const, tag, at });
 const touch = (tag: string) => ({ kind: 'touch' as const, tag, at });
-/** T whole at y 300, the page at 80 after one stroke closer, the tap fired T: judgeScroll's ok stop (live-visibility.test.ts's `reached`). */
-const reached = state({ frames: { T: { x: 51, y: 300, width: 300, height: 64 } }, offsets: { page: 80 }, strokes: [stroke(382, 80)], events: [tap('T')] });
-const c = { tag: 'T', view: 'page', fully: false, platform: 'ios' as const };
 const STOP = 'Element id:"x" visible after 1 swipe';
 
 describe('what a verdict prints of the app (appText): the target, its scroll view, the strokes, what fired, the touches', () => {

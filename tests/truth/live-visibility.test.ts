@@ -6,31 +6,11 @@ import { turnsSaid } from '../../scripts/truth/replies.js';
 import type { CellTruth, LabState, Stroke, TargetTruth } from '../../scripts/truth/schema.js';
 import type { Rect } from '../../src/adapters/types.js';
 import { knownLive, LIVE_KNOWN } from '../../scripts/truth/live-known.js';
+import { at, c, reached, SCREEN, state, stroke } from './live-visibility-fixtures.js';
 
 // The live golden's visibility judges (scripts/truth/live-visibility.ts): pure over the lab app's state — its tap log,
 // its scroll offsets and strokes, its frames — so they are pinned here without a device. iOS units: the iPhone 17's
 // 402x874 pt, its status band 62 pt.
-
-const SCREEN = { x: 0, y: 0, width: 402, height: 874 };
-const at = 1;
-
-/** A state of an edges-like cell: T in `page` (the whole screen), its frame `y`, the page at `offset`. */
-function state(over: Partial<LabState> = {}): LabState {
-  return {
-    cell: 'c',
-    ready: true,
-    screen: SCREEN,
-    scale: 3,
-    frames: { T: { x: 51, y: -2, width: 300, height: 64 } },
-    events: [],
-    safeArea: { top: 62, left: 0, bottom: 34, right: 0 },
-    scrollViews: { page: SCREEN },
-    offsets: { page: 382 },
-    strokes: [],
-    ...over,
-  };
-}
-const stroke = (from: number, to: number, view = 'page'): Stroke => ({ view, from, to, at });
 
 describe('judgeTap: the app\'s tap log is the oracle', () => {
   const launched = state();
@@ -109,9 +89,7 @@ describe('directionBreaks', () => {
 });
 
 describe('judgeScroll', () => {
-  const c = { tag: 'T', view: 'page', fully: false, platform: 'ios' as const };
   const launched = state();
-  const reached = state({ frames: { T: { x: 51, y: 300, width: 300, height: 64 } }, offsets: { page: 80 }, strokes: [stroke(382, 80)], events: [{ kind: 'tap', tag: 'T', at }] });
   it('a stop the app bears out, one stroke closer, the tap firing it: ok', () => {
     expect(judgeScroll(c, ['Element id:"x" visible after 1 swipe', 'Tapped id:"x"'], reached, launched).outcome).toBe('ok');
   });

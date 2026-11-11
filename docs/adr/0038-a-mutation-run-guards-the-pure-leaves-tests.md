@@ -1551,7 +1551,7 @@ confirmed by a differential fuzz in the review. The golden stays Changed 0.
 | Module | Before (cold) | After (cold) | Floor |
 | --- | --- | --- | --- |
 | scripts/truth/live-visibility.ts | 75.42 % (1 485 mutants, 345 survived, 20 without coverage) | 98.37 % (1 470 mutants, 23 survived, 1 without coverage) | 72 → 96 |
-| scripts/truth/live-carousel.ts | 98.87 % (798 mutants, 8 survived, 1 without coverage) | 99.36 % (789 mutants, 5 survived, 0 without coverage) | 96 |
+| scripts/truth/live-carousel.ts | 98.87 % (798 mutants, 8 survived, 1 without coverage) | 99.36 % (789 mutants, 5 survived, 0 without coverage) | 96 → 97 |
 
 live-visibility.ts's 24 not killed are all equivalent, each argued in its scope.json baseline: the status trim and
 three chrome boundaries of showRegion, judgeScroll's `g !== undefined` twice and its tap/tapped pair,
