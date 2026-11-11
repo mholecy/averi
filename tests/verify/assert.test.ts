@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { PNG } from 'pngjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { assertSpecSchema, scanForCrashes, Verifier } from '../../src/verify/assert.js';
+import { elementAssertSchema } from '../../src/verify/element-assert.js';
+import type { z } from 'zod';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 import { KEYBOARD_ROLE, PersistentReadError, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { findBySpec } from '../../src/ui-tree/selectors.js';
@@ -102,7 +104,7 @@ describe('asserts on a tree read no wait cures', () => {
       ...(persistentRead !== undefined && { persistentRead }),
     });
 
-  const treeKinds = [
+  const wedgeableKinds = [
     ['present', { element: { id: 'balance' } }],
     ['text', { element: { id: 'balance' }, text: '1,250.00' }],
     ['match', { element: { id: 'balance' }, match: '^1' }],
@@ -115,18 +117,48 @@ describe('asserts on a tree read no wait cures', () => {
 
   const screenshotSpec = { screenshot: { baseline: 'never-there' } } as const;
 
-  it('every kind the schema has is looped here', () => {
-    // Each top-level schema option is matched by at least one spec of the loop or the screenshot test, and each spec
-    // is valid: a new kind fails here until it is added to the loop.
-    const specs = [...treeKinds.map(([, spec]) => spec), screenshotSpec];
+  it('every kind the schema has is looped here: each top-level option, and each element-assert flag', () => {
+    // Each spec is valid, and each top-level schema option accepts at least one spec of the loop or the screenshot
+    // test: a new top-level kind fails here until it is added.
+    const specs = [...wedgeableKinds.map(([, spec]) => spec), screenshotSpec];
     for (const spec of specs) expect(assertSpecSchema.safeParse(spec).success).toBe(true);
     const uncovered = assertSpecSchema.options
       .map((option, i) => ({ i, covered: specs.some((spec) => option.safeParse(spec).success) }))
       .filter(({ covered }) => !covered);
     expect(uncovered).toEqual([]);
+    // The element assert's variants share one schema arm: each flag of its shape (all but the element and the
+    // timeout) is a kind of its own, and the bare `present` the one with none — a new flag fails here until looped.
+    const flags = Object.keys((elementAssertSchema as unknown as z.ZodEffects<z.AnyZodObject>).innerType().shape).filter(
+      (key) => key !== 'element' && key !== 'timeout',
+    );
+    expect(flags.length).toBeGreaterThan(0);
+    const looped = new Set(wedgeableKinds.flatMap(([, spec]) => Object.keys(spec)));
+    expect(flags.filter((flag) => !looped.has(flag))).toEqual([]);
+    expect(wedgeableKinds.some(([, spec]) => Object.keys(spec).length === 1 && 'element' in spec)).toBe(true);
   });
 
-  it.each(treeKinds)('%s, under persistentRead: \'fail\': fails after one read, the detail the error\'s message, and the next assert still runs', async (_kind, spec) => {
+  // The one read before polling that meets the policy (A20): the absent assert's viewport, its reference frame. The
+  // rect assert's witness read swallows every error (capture.ts#witnessScreen), so it has no such path.
+  it.each([
+    ['fail', { pass: false, detail: WEDGED }],
+    ['throw', 'rejects'],
+    [undefined, 'rejects'],
+  ] as const)('absent, a PersistentReadError from its viewport read under persistentRead: %s', async (persistentRead, expected) => {
+    const { fake, reads } = wedgedFake(0);
+    fake.viewport = async () => {
+      throw new PersistentReadError(WEDGED);
+    };
+    const spec = { element: { id: 'balance' }, absent: true } as const;
+    const outcome = await verifier(fake, persistentRead).assert(spec).catch((e: unknown) => e);
+    if (expected === 'rejects') {
+      expect(outcome).toBeInstanceOf(PersistentReadError);
+    } else {
+      expect(outcome).toEqual({ description: expect.stringMatching(/balance.*absent/), ...expected });
+    }
+    expect(reads()).toBe(0);
+  });
+
+  it.each(wedgeableKinds)('%s, under persistentRead: \'fail\': fails after one read, the detail the error\'s message, and the next assert still runs', async (_kind, spec) => {
     const { fake, reads } = wedgedFake(2);
     const results = await verifier(fake, 'fail').assertAll([spec, spec]);
     expect(results.map((r) => ({ pass: r.pass, detail: r.detail }))).toEqual([
@@ -137,7 +169,7 @@ describe('asserts on a tree read no wait cures', () => {
     expect(reads()).toBe(2);
   });
 
-  it.each(treeKinds.flatMap(([kind, spec]) => [[kind, 'unset (the default)', spec, undefined], [kind, 'throw', spec, 'throw']] as const))(
+  it.each(wedgeableKinds.flatMap(([kind, spec]) => [[kind, 'unset (the default)', spec, undefined], [kind, 'throw', spec, 'throw']] as const))(
     '%s, under persistentRead: %s: thrown as it came after one read',
     async (_kind, _setting, spec, persistentRead) => {
       const { fake, reads } = wedgedFake(1);

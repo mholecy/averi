@@ -250,7 +250,7 @@ export type PersistentReadMode = 'throw' | 'fail';
  */
 interface PlannedAssert {
   description: string;
-  run: () => Promise<{ pass: boolean; detail?: string }>;
+  run: () => Promise<PollVerdict>;
 }
 
 interface PollSpec {
@@ -447,7 +447,10 @@ export class Verifier {
     // most once for the whole assert, before a wider-than-screen refusal
     // (capture.ts#ScreenWitness). A failed read is not a failed assert: the
     // width is then the tree's alone, and windowWidth says so in the detail —
-    // the degradation captureFrame applies to the table.
+    // the degradation captureFrame applies to the table. So no read of the
+    // witness ever reaches `decided`: witnessScreen and `judge`'s re-read
+    // swallow every error, a PersistentReadError included — only the tree
+    // poll's reads meet the persistentRead policy here.
     const run = async (): Promise<PollVerdict> => {
       const witness = await ScreenWitness.read(this.adapter);
       return this.treePoll(
@@ -577,12 +580,11 @@ export class Verifier {
     evaluate: (tree: UiNode) => PollVerdict | typeof Undecided | undefined | Promise<PollVerdict | typeof Undecided | undefined>,
     spec: PollSpec,
   ): Promise<PollVerdict> {
-    const { timeoutMs } = spec;
     const outcome = await pollTree(this.adapter, async (tree) => {
       const verdict = await evaluate(tree);
       return verdict === Undecided ? Undecided : verdictToPoll(verdict);
     }, {
-      timeoutMs,
+      timeoutMs: spec.timeoutMs,
       pollMs: this.pollMs,
       ...(spec.first !== undefined && { first: spec.first }),
     });
