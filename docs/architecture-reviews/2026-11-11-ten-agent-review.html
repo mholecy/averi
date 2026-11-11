@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>averi — architektonická revízia 2026-11-11</title>
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<style>
+  body { background:#f8fafc; }
+  .box { border:1.5px solid #94a3b8; border-radius:6px; padding:4px 8px; font-size:12px; background:#fff; font-family: ui-monospace, monospace; }
+  .box.hot { border-color:#dc2626; background:#fef2f2; }
+  .box.deep { border-color:#16a34a; background:#f0fdf4; border-width:2.5px; }
+  .box.leak { border-style:dashed; border-color:#ea580c; background:#fff7ed; }
+  .arrow { color:#64748b; font-size:12px; text-align:center; }
+  .badge-strong { background:#16a34a; color:#fff; }
+  .badge-worth { background:#ca8a04; color:#fff; }
+  .badge-spec { background:#64748b; color:#fff; }
+  .badge-bug { background:#dc2626; color:#fff; }
+  code { background:#f1f5f9; padding:0 3px; border-radius:3px; font-size:0.85em; }
+</style>
+</head>
+<body class="text-slate-800">
+<div class="max-w-6xl mx-auto px-4 py-8">
+
+<header class="mb-8">
+  <h1 class="text-3xl font-bold">averi: architektonická revízia</h1>
+  <p class="text-slate-600 mt-1">2026-11-11 · main <code>d3604410</code> · 10 Opus agentov (high-level prierez, zmeny od revízie 2026-11-01, iOS adaptér, Android a spoločné adaptéry, fill/klávesnica, scroll/tap, ui-tree, verify, flow+mcp+run, nástroje a testy) · ~70 surových nálezov zlúčených do 14 kariet + zvyšok v tabuľke</p>
+  <div class="mt-4 p-4 bg-white border rounded">
+    <h2 class="font-semibold mb-2">Zhrnutie</h2>
+    <ul class="list-disc pl-5 text-sm space-y-1">
+      <li><b>Prehĺbenia z minulej revízie vydržali.</b> A1 (read seam: žiadne nové raw <code>.uiTree(</code>), A2/A9 (fill landing), A3, A7, A16 a A18 nikto nenarušil. Vrstvenie platí: whole-repo import walk nenašiel ani jeden import smerom hore.</li>
+      <li><b>Dva reálne defekty</b>, ktoré som overil v kóde: (1) zlý <code>timeout: "5 sec"</code> prejde načítaním configu a neskôr eskaluje reach rebrík; (2) live golden pre iOS (a teda Gate C) beží <i>bez</i> idb helpera, takže release gate netestuje transport, ktorý dostanú používatelia.</li>
+      <li><b>Najhorúcejšie miesto</b> je preklad Remedy do viet. Rozhodnutie žije v jednom module (<code>standing.ts</code>), ale vety a jeho opätovné vetvenie sú v 4–5 súboroch; D87 a D88 sa museli dotknúť všetkých. Súlad dnes drží len 1 077-riadkový agreement test a golden.</li>
+      <li><b>Release gate nástroje</b> (T20b/T24) čítajú späť vlastnú prózu regexmi a už sa rozišli (hedged ceiling). Keďže CLAUDE.md robí z gate záväzné pravidlo, ide o integritu gate, nie o kozmetiku.</li>
+    </ul>
+  </div>
+</header>
+
+<section class="mb-10">
+  <h2 class="text-2xl font-bold mb-3">Poradie opráv</h2>
+  <p class="text-sm mb-2"><b>Backlog:</b> karty 1–14 = riadky A19–A32 v docs/plans/2026-10-30-performance-backlog.md.</p>
+  <p class="text-sm text-slate-600 mb-3">Zoradené podľa: najprv správnosť a integrita release gate, potom záchranná sieť pred refaktorom, potom prehĺbenia v najčastejšie menenom kóde, nakoniec presuny kvôli locality.</p>
+  <div class="overflow-x-auto bg-white border rounded">
+  <table class="text-sm w-full">
+    <thead class="bg-slate-100 text-left"><tr><th class="p-2">#</th><th class="p-2">Karta</th><th class="p-2">Zdroj (agenti)</th><th class="p-2">Cena / riziko</th><th class="p-2">Device?</th><th class="p-2">Prečo teraz</th></tr></thead>
+    <tbody class="divide-y">
+      <tr><td class="p-2 font-bold">1</td><td class="p-2"><a class="underline" href="#c1">Trvanie validované pri načítaní</a></td><td class="p-2">FM1</td><td class="p-2">S / low</td><td class="p-2">nie</td><td class="p-2">reálny bug: môže spustiť <code>clearState</code> login rung</td></tr>
+      <tr><td class="p-2 font-bold">2</td><td class="p-2"><a class="underline" href="#c2">Verifier: persistent-read policy na jednom mieste</a></td><td class="p-2">VR3</td><td class="p-2">XS / low</td><td class="p-2">nie</td><td class="p-2">latentný bug pri ďalšom pixel asserte</td></tr>
+      <tr><td class="p-2 font-bold">3</td><td class="p-2"><a class="underline" href="#c3">Standing batch dostane Summary ako dáta</a></td><td class="p-2">CH1 = TL4, TL3, CH3</td><td class="p-2">S / low</td><td class="p-2">nie</td><td class="p-2">exit release gate z prózy; už sa rozišiel</td></tr>
+      <tr><td class="p-2 font-bold">4</td><td class="p-2"><a class="underline" href="#c4">Gate B jedným príkazom</a></td><td class="p-2">TL2</td><td class="p-2">S / low</td><td class="p-2">1 beh truth:lab</td><td class="p-2">závisí od #3; odstráni ručný perl/pgrep</td></tr>
+      <tr><td class="p-2 font-bold">5</td><td class="p-2"><a class="underline" href="#c5">Live harness skladá iOS adaptér cez registry</a></td><td class="p-2">TL1, TL6</td><td class="p-2">S / med</td><td class="p-2">Gate C (owner)</td><td class="p-2">gate má testovať to, čo sa shipuje; pred ďalším release</td></tr>
+      <tr><td class="p-2 font-bold">6</td><td class="p-2"><a class="underline" href="#c6">Layering guard pre celé poradie vrstiev</a></td><td class="p-2">HL1 (+HL5 menovite)</td><td class="p-2">XS / low</td><td class="p-2">nie</td><td class="p-2">lacná poistka pred refaktormi nižšie</td></tr>
+      <tr><td class="p-2 font-bold">7</td><td class="p-2"><a class="underline" href="#c7">standing.ts (+reading-order, later-edges) do mutation scope</a></td><td class="p-2">UT6</td><td class="p-2">S / low</td><td class="p-2">nie</td><td class="p-2">záchranná sieť pred #8</td></tr>
+      <tr><td class="p-2 font-bold">8</td><td class="p-2"><a class="underline" href="#c8">Jedna vetu tvoriaca funkcia pre touch Remedy</a></td><td class="p-2">ST1, CH2, UT1, VR1, (ST2, ST3)</td><td class="p-2">S–M / med</td><td class="p-2">nie (golden wording)</td><td class="p-2">hotspot: každá nová Remedy = 5 súborov</td></tr>
+      <tr><td class="p-2 font-bold">9</td><td class="p-2"><a class="underline" href="#c9">android.ts rozdeliť: uiautomator dialekt + WM dump modul</a></td><td class="p-2">AND-2, AND-1, CH4</td><td class="p-2">S–M / low→med</td><td class="p-2">presun nie; zmena display pravidla áno</td><td class="p-2">2 003 riadkov, 3 moduly; parsery mimo mutácie</td></tr>
+      <tr><td class="p-2 font-bold">10</td><td class="p-2"><a class="underline" href="#c10">Fill: testy cez fillField, potom post-focus read a identita poľa</a></td><td class="p-2">FK3 → FK2 → FK1</td><td class="p-2">S / low</td><td class="p-2">FK2: odporúčaný forms A/B</td><td class="p-2">dokončí A2</td></tr>
+      <tr><td class="p-2 font-bold">11</td><td class="p-2"><a class="underline" href="#c11">App health a reply diely run/ v jednom module</a></td><td class="p-2">HL3, FM5, VR4</td><td class="p-2">S / low</td><td class="p-2">nie</td><td class="p-2">3 volajúci, 3 politiky zlyhania</td></tr>
+      <tr><td class="p-2 font-bold">12</td><td class="p-2"><a class="underline" href="#c12">Composition root rozdáva device+config+eyes</a></td><td class="p-2">FM2, HL4</td><td class="p-2">S / low</td><td class="p-2">nie</td><td class="p-2">zabudnuté <code>eyes</code> potichu vypne ADR 0024</td></tr>
+      <tr><td class="p-2 font-bold">13</td><td class="p-2"><a class="underline" href="#c13">pollTree hlási časovanie a zlyhanie čítania</a></td><td class="p-2">HL2</td><td class="p-2">S / low</td><td class="p-2">nie</td><td class="p-2">splnená podmienka A7 slice B</td></tr>
+      <tr><td class="p-2 font-bold">14</td><td class="p-2"><a class="underline" href="#c14">ARCHITECTURE.md §2 a dátovaná história</a></td><td class="p-2">HL6, FM3, TL7</td><td class="p-2">M / low (docs)</td><td class="p-2">nie</td><td class="p-2">293 KB, shipuje sa v npm; kedykoľvek, paralelne</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="text-sm text-slate-600 mt-2">Body 1–7 nemenia správanie (okrem #1, ktorý pridáva zámerné odmietnutie) a sú malé. Body 1, 2 a 6 sú nezávislé a dajú sa robiť paralelne v worktree. #3 → #4 → #5 idú v poradí. #7 musí predchádzať #8.</p>
+</section>
+
+<div class="mb-10">
+<pre class="mermaid">
+flowchart LR
+  subgraph A[Správnosť a gate]
+    c1[1 durations]:::bug
+    c2[2 persistent read]:::bug
+    c3[3 Summary as data] --> c4[4 Gate B one cmd] --> c5[5 live via registry]
+  end
+  subgraph B[Záchranná sieť]
+    c6[6 layering guard]
+    c7[7 standing in mutation] --> c8[8 Remedy sentence]
+  end
+  subgraph C[Prehĺbenia / locality]
+    c9[9 android split]
+    c10[10 fill]
+    c11[11 app health]
+    c12[12 composition root]
+    c13[13 pollTree observer]
+  end
+  c14[14 docs diet]
+  c8 -.-> ST3[ST3 stop table]
+  classDef bug fill:#fee2e2,stroke:#dc2626;
+</pre>
+</div>
+
+<!-- ============ CARDS ============ -->
+<section class="space-y-8">
+
+<!-- C1 -->
+<article id="c1" class="bg-white border rounded p-5">
+  <div class="flex items-center gap-2 flex-wrap"><h3 class="text-xl font-bold">1. Trvanie (duration) ako jedna schéma, validovaná pri načítaní</h3><span class="px-2 py-0.5 rounded text-xs badge-bug">BUG (overené)</span><span class="px-2 py-0.5 rounded text-xs badge-strong">Strong</span></div>
+  <p class="text-sm mt-2"><b>Files:</b> <code>src/flow/config.ts:171</code> (<code>timeout = z.union([z.number(), z.string()])</code>), <code>src/util/duration.ts</code>, <code>src/flow/engine.ts:886, 1375, 1464, 1543, 1906</code>, <code>src/verify/assert.ts:83,113,152</code>, <code>src/verify/element-assert.ts:35</code></p>
+  <p class="text-sm mt-2"><b>Problém:</b> <code>timeout: "5 sec"</code> prejde cez <code>parseConfig</code>. <code>parseDuration</code> potom za behu hodí obyčajný <code>Error</code>, ktorý nie je <code>isTerminal</code>, a reach rebrík v takom prípade <i>eskaluje na ďalší rung</i>, prípadne až na <code>clearState</code> login, čomu má <code>SetupError</code> práve zabrániť (config.ts:642). Pod <code>optional:</code> sa takáto chyba zaloguje ako „skipped“. Pravidlo „toto je duration“ je napísané 5× ako voľný union.</p>
+  <p class="text-sm mt-2"><b>Riešenie:</b> jednu duration schému vlastní <code>util/duration.ts</code> a odmietne zlý reťazec už pri parse. D86 routing potom pomenuje pole (<code>steps.0.wait.timeout: …</code>). Parse v engine už nemôže zlyhať a špeciálne ošetrenie tapu na :1543 odpadne.</p>
+  <p class="text-sm mt-2"><b>Prínos:</b> locality (jedno pravidlo namiesto 5 kópií), uzavretá wipe-eskalácia, jeden load test pokryje všetky druhy krokov.</p>
+  <div class="grid md:grid-cols-2 gap-4 mt-3">
+    <div><div class="text-xs font-semibold mb-1">Before</div>
+      <div class="box">config.ts: timeout = number | string <span class="text-red-600">(akýkoľvek)</span></div><div class="arrow">↓ load OK</div>
+      <div class="box hot">engine step → parseDuration → Error</div><div class="arrow">↓ nie terminal</div>
+      <div class="box hot">ladder: „escalating to …“ → clearState</div></div>
+    <div><div class="text-xs font-semibold mb-1">After</div>
+      <div class="box deep">util/duration.ts: Duration schema (jediný vlastník)</div><div class="arrow">↓ použité všetkými <code>timeout</code></div>
+      <div class="box">parseConfig: „steps.0.wait.timeout: Invalid duration“</div><div class="arrow">↓</div>
+      <div class="box">engine: parse nemôže zlyhať</div></div>
+  </div>
+  <p class="text-xs text-slate-500 mt-2">Cena S · Riziko low (dnes rozbitý config sa odmietne pri load, čo je zámer) · golden nedotknutý · ADR: žiadny konflikt</p>
+</article>
+
+<!-- C2 -->
+<article id="c2" class="bg-white border rounded p-5">
+  <div class="flex items-center gap-2 flex-wrap"><h3 class="text-xl font-bold">2. Verifier: „persistent read → AssertResult“ na jednom mieste</h3><span class="px-2 py-0.5 rounded text-xs badge-bug">latentný bug</span><span class="px-2 py-0.5 rounded text-xs badge-worth">Worth exploring</span></div>
+  <p class="text-sm mt-2"><b>Files:</b> <code>src/verify/assert.ts:481, 511, 520, 566-593</code>, <code>src/verify/pixel-poll.ts:839-868</code></p>
+  <p class="text-sm mt-2"><b>Problém:</b> stromové asserty dostanú policy <code>persistentRead</code> vnútri <code>Verifier.poll</code>. Pixel asserty (OCR, color) si ju musia pridať ručným <code>.catch(failedOnPersistentRead)</code> na každom mieste volania. Ak ju tretí pixel assert zabudne, pod <code>'fail'</code> PersistentReadError zhodí celú verify nohu ako <code>FAILED</code> a stratí sa trace, frame aj health, presne to, čomu mal zabrániť D21 round 2. Testy pinujú present, absent a color, ale nie ocr a rect.</p>
+  <p class="text-sm mt-2"><b>Riešenie:</b> jeden privátny krok Verifiera: spusti poll (tree alebo pixel), prelož ho na AssertResult a aplikuj policy raz. Test potom ide v slučke cez všetky druhy assertov.</p>
+  <div class="grid md:grid-cols-2 gap-4 mt-3">
+    <div><div class="text-xs font-semibold mb-1">Before</div><div class="flex gap-2 flex-wrap"><div class="box">poll(tree) + policy</div><div class="box leak">assertOcr + .catch</div><div class="box leak">assertColor + .catch</div><div class="box hot">nový assert: ?</div></div></div>
+    <div><div class="text-xs font-semibold mb-1">After</div><div class="box deep">Verifier.settle(poll) → AssertResult + policy</div><div class="arrow">↑ tree · ocr · color · rect · …</div></div>
+  </div>
+  <p class="text-xs text-slate-500 mt-2">Cena XS–S · Riziko low · bez zmeny wording · ADR 0036: v súlade (assert.ts zostáva policy site, len ako jedno miesto)</p>
+</article>
+
+<!-- C3 -->
+<article id="c3" class="bg-white border rounded p-5">
+  <div class="flex items-center gap-2 flex-wrap"><h3 class="text-xl font-bold">3. Standing batch dostane Summary ako dáta, nie ako prózu</h3><span class="px-2 py-0.5 rounded text-xs badge-strong">Strong</span></div>
+  <p class="text-sm mt-2"><b>Files:</b> <code>scripts/truth/batch/runner.ts:320, 846-875</code>, <code>scripts/truth/batch/lab-run.ts:262-276 (failuresIn), 343-360 (labRunExit, ERROR_STEP), 458-491 (standingRun)</code>, <code>scripts/truth/live-cases.ts:843-891</code>, <code>scripts/truth/live-carousel.ts:561</code>, <code>lab-run-ios.ts:1-17, 81-88</code></p>
+  <p class="text-sm mt-2"><b>Problém:</b> <code>runBatch</code> drží štruktúrovaný <code>Summary</code>, ale vracia len číslo a proces ukončí sám. <code>standingRun</code> preto zabalí exit seam, nový <code>run-*</code> priečinok nájde diffom výpisu <code>meta/</code>, prečíta späť <code>summary.txt</code> a regexmi z textu znova odvodí exit 3. <code>failuresIn</code> grepuje doslovné vety z <code>summarize</code> a už sa rozišiel: nezachytí <code>MISMATCH (hedged ceiling)</code> (overené: regex <code>^- (MISMATCH|LOUD|SKIP)</code>) a uvádza LOUD, hoci LOUD beh nezhodí. Dnes to skrýva len to, že carousel nie je v lab-run (pozri #4). Pri zmenenom layoute ERROR riadkov a samých PASS by vyšiel exit 0. Navyše iOS batch importuje celú kostru zo súboru Android batchu (CH3).</p>
+  <p class="text-sm mt-2"><b>Riešenie:</b> <code>runBatch</code> vráti {exit, runId, verdikty} a exit nechá na volajúcom. <code>summarize</code> vráti dôvody zlyhania ako dáta, ktoré rejudge zapíše ako JSON vedľa <code>.rejudge.txt</code>. Spoločná „standing“ súprava sa presunie do vlastného modulu, ktorý importujú oba batche.</p>
+  <div class="mt-3"><pre class="mermaid">
+flowchart LR
+  subgraph Before
+    R1[runBatch: Summary v pamäti] -->|exit seam zhltne| X1[number]
+    R1 --> F1[summary.txt]
+    S1[standingRun] -->|diff meta/| F1
+    F1 -->|regex ERROR_STEP, failuresIn| E1[exit 0/1/3]
+  end
+  subgraph After
+    R2[runBatch] -->|"{exit, runId, verdicts, failures}"| S2[standing kit] --> E2[exit 0/1/3]
+  end
+  </pre></div>
+  <p class="text-xs text-slate-500 mt-2">Cena S · Riziko low (scripts, bez device) · rebaseline lab mutation floors · nie A14 (to bolo o pure/io pároch)</p>
+</article>
+
+<!-- C4 -->
+<article id="c4" class="bg-white border rounded p-5">
+  <div class="flex items-center gap-2 flex-wrap"><h3 class="text-xl font-bold">4. Gate B jedným príkazom: visibility, ensure, carousel ako live bloky lab-run</h3><span class="px-2 py-0.5 rounded text-xs badge-strong">Strong</span></div>
+  <p class="text-sm mt-2"><b>Files:</b> <code>docs/release.md:118-143</code> (perl <code>alarm 3600</code> okolo live.ts, ručný <code>pgrep adb</code>, čítanie súhrnu okom), <code>scripts/truth/batch/lab-run.ts:56</code> (<code>LAB_RUN_GROUPS = ['chooser','forms']</code>), <code>lab-run-ios.ts:49</code></p>
+  <p class="text-sm mt-2"><b>Problém:</b> runBatch už má bounded kroky, process-group kill, rejudge a exit 3. Tri Android skupiny ho obchádzajú, takže agent musí bound, upratovanie aj súdenie robiť ručne podľa prózy. Keď bound vyprší, ostanú viseť <code>adb</code> deti. iOS tie isté skupiny púšťa ako bloky.</p>
+  <p class="text-sm mt-2"><b>Riešenie:</b> pridať ich do <code>LAB_RUN_GROUPS</code>. Gate B = jeden príkaz, jeden exit. Pravidlo release je potom v kóde, nie v próze.</p>
+  <div class="grid md:grid-cols-2 gap-4 mt-3">
+    <div><div class="text-xs font-semibold mb-1">Before</div><div class="box">npm run truth:lab (chooser, forms)</div><div class="box hot mt-1">perl alarm + live.ts visibility,ensure,carousel + pgrep + oko</div></div>
+    <div><div class="text-xs font-semibold mb-1">After</div><div class="box deep">npm run truth:lab (chooser, forms, visibility, ensure, carousel) → 0/1/2/3</div></div>
+  </div>
+  <p class="text-xs text-slate-500 mt-2">Cena S · Riziko low · potrebuje #3 (inak hedged ceiling prekĺzne) · jeden beh na emulator-5554 · mení príkaz v ADR 0041 T24 amendment a docs/release.md, nie ich zámer</p>
+</article>
+
+<!-- C5 -->
+<article id="c5" class="bg-white border rounded p-5">
+  <div class="flex items-center gap-2 flex-wrap"><h3 class="text-xl font-bold">5. Live harness skladá iOS adaptér cez composition root</h3><span class="px-2 py-0.5 rounded text-xs badge-strong">Strong</span><span class="px-2 py-0.5 rounded text-xs badge-bug">gate netestuje produkciu (overené)</span></div>
+  <p class="text-sm mt-2"><b>Files:</b> <code>scripts/truth/live.ts:191-195</code> (<code>new side.IosAdapter({udid, treeSource: create(...)})</code> bez <code>idbHelper</code>), <code>src/mcp/registry.ts:70-73</code> (<code>iosAdapterFor</code> pridáva <code>IdbHelper</code>), <code>scripts/perf/baseline.ts:245-250</code> (používa <code>iosAdapterFor</code>), <code>src/adapters/ios.ts:246</code>; TL6: <code>live.ts:200-226</code>, <code>differential.ts:357-389</code>, <code>baseline.ts:242-258</code></p>
+  <p class="text-sm mt-2"><b>Problém:</b> každý idb prípad v live golden a v <code>truth:lab:ios</code> (Gate C) ide cez CLI cestu, ktorá v produkcii beží len s <code>AVERI_IDB_HELPER=off</code>. Release gate teda nikdy neoverí transport, ktorý používatelia dostanú (ADR 0032, D7a). Okrem toho sa spojenie registry + server + client a poradie zatvárania (D82) píše 3×, s dvomi kódovaniami reply (<code>THROW</code> vs <code>ERROR (thrown)</code>).</p>
+  <p class="text-sm mt-2"><b>Riešenie:</b> live.ts zoberie <code>iosAdapterFor</code> zo side (s fallbackom pre staré <code>--side</code> checkouty). V druhom kroku jeden modul pre in-process spojenie vedľa side.ts; differential si ponechá vlastné kódovanie ako explicitnú voľbu, aby sa golden base nepohol.</p>
+  <div class="grid md:grid-cols-2 gap-4 mt-3">
+    <div><div class="text-xs font-semibold mb-1">Before</div><div class="flex gap-2 flex-wrap"><div class="box">registry: IosAdapter + IdbHelper</div><div class="box">perf: iosAdapterFor ✓</div><div class="box hot">live.ts: IosAdapter (CLI)</div></div></div>
+    <div><div class="text-xs font-semibold mb-1">After</div><div class="box deep">registry.iosAdapterFor (jediné zapojenie)</div><div class="arrow">↑ server · perf · live.ts · Gate C</div></div>
+  </div>
+  <p class="text-xs text-slate-500 mt-2">Cena S · Riziko med: iOS verdikty sa môžu pohnúť, takže treba beh Gate C (owner) · ADR: žiadny konflikt</p>
+</article>
+
+<!-- C6 -->
+<article id="c6" class="bg-white border rounded p-5">
+  <div class="flex items-center gap-2 flex-wrap"><h3 class="text-xl font-bold">6. Layering guard pre celé poradie vrstiev</h3><span class="px-2 py-0.5 rounded text-xs badge-strong">Strong</span></div>
+  <p class="text-sm mt-2"><b>Files:</b> <code>ARCHITECTURE.md:77-81</code> (pravidlo plus ručný grep), <code>tests/architecture/layering.test.ts:48-75</code> (len MCP_LAYER, INTERACT_LAYER; len importy do adapters/)</p>
+  <p class="text-sm mt-2"><b>Problém:</b> <code>mcp → run → flow → interact → verify → ui-tree → adapters</code> nazýva ARCHITECTURE.md „the rule that keeps this honest“, ale žiadny test ho nevynucuje. Dnes platí (overené walkom a SCC), no import interact→verify alebo ui-tree→interact by prešiel CI. Nepomenované hrany do adapters/: <code>flow/config.ts:4</code> a <code>flow/tool-config.ts:2 → ios-node.ts</code>, <code>verify/ocr.ts:6 → exec.ts</code>, <code>verify/shot.ts:1 → png-encode.ts</code>. Súvisí s tým aj HL5: <code>adapters/types.ts</code> (1 414 riadkov) je pre guard celý „neutral“, takže čokoľvek sa do neho presunie, prejde.</p>
+  <p class="text-sm mt-2"><b>Riešenie:</b> zoradená tabuľka vrstiev v tom istom teste, fail-closed, s riadkami pre flow/, verify/, ui-tree/ a run/ a so štyrmi hranami pomenovanými ako výnimky. Rozdelenie types.ts nechať na neskôr (Speculative).</p>
+  <p class="text-xs text-slate-500 mt-2">Cena XS · Riziko low (len test) · nadväzuje na A16/A18</p>
+</article>
+
+<!-- C7 -->
+<article id="c7" class="bg-white border rounded p-5">
+  <div class="flex items-center gap-2 flex-wrap"><h3 class="text-xl font-bold">7. Precedencia Remedy do mutation run</h3><span class="px-2 py-0.5 rounded text-xs badge-worth">Worth exploring → robiť pred #8</span></div>
+  <p class="text-sm mt-2"><b>Files:</b> <code>src/ui-tree/standing.ts:663-667</code> (sám priznáva survivor), <code>:889-967</code> (<code>remedied</code>), <code>scripts/mutation/scope.json</code></p>
+  <p class="text-sm mt-2"><b>Problém:</b> <code>remedied</code> je precedencia, ktorú citujú tap, scroll_until aj pixel assert, teda modul s najväčším leverage v ui-tree. Napriek tomu nie je v ADR 0038 mutation scope (draw-order a geometry áno). Vstupná podmienka ADR 0038 je splnená: priame testy majú 1 657 riadkov.</p>
+  <p class="text-sm mt-2"><b>Riešenie:</b> pridať <code>standing.ts</code>, <code>reading-order.ts</code> a <code>later-edges.ts</code> s baseline a floor. Až potom refaktorovať vety (#8).</p>
+  <p class="text-xs text-slate-500 mt-2">Cena S (cold runy) · Riziko low · ADR 0038 to výslovne dovoľuje</p>
+</article>
+
+<!-- C8 -->
+<article id="c8" class="bg-white border rounded p-5 ring-2 ring-green-600">
+  <div class="flex items-center gap-2 flex-wrap"><h3 class="text-xl font-bold">8. Jedna vetu tvoriaca funkcia pre touch Remedy: Standing → veta</h3><span class="px-2 py-0.5 rounded text-xs badge-strong">Strong</span><span class="text-xs text-slate-500">nezávisle od seba ho našli 5 agenti</span></div>
+  <p class="text-sm mt-2"><b>Files:</b> <code>src/ui-tree/standing.ts:474-611</code> (vety v module rozhodnutia), <code>src/interact/tap-judgement.ts:341-347, 369, 388, 457, 496</code>, <code>src/interact/scroll-rounds.ts:221-227, 1085-1094</code>, <code>src/interact/scroll-text.ts:627-643, 784-800, 1279-1282</code>, <code>src/interact/target-text.ts:190-232</code>, <code>src/verify/pixel-poll.ts:444-697</code>, <code>tests/interact/remedy-agreement.test.ts</code> (1 077 riadkov)</p>
+  <p class="text-sm mt-2"><b>Problém:</b> rozhodnutie je deep (<code>remedied</code>, uzavreté unióny, <code>noScrollHelps</code>), ale cesta od (kind, remedy, cut.by, keyboard) k vete je napísaná 3–4×:</p>
+  <ul class="list-disc pl-6 text-sm">
+    <li>tap si vyberá medzi <code>cutAdvice</code>, <code>cutByRemedy</code> a <code>cutByPinnedRemedy</code>;</li>
+    <li>scroll-rounds znova testuje <code>kind==='cut' && noScrollHelps && isCutByLater</code> a kvôli tomu zavádza typ <code>CutByLater</code>;</li>
+    <li>scroll-text citovanú vetu tapu („a tap refuses it so cut (…)“) skladá nanovo, takže pri container cut už dnes cituje <i>inú</i> vetu, než tap naozaj povie (chýba way-past klauzula);</li>
+    <li><code>cutByPinnedRemedy</code> si sám zostavuje <code>{of:'bothPinned'}</code>;</li>
+    <li>„rides the keyboard“ je geometrický úsudok, ktorý žije vo wording module a dostáva od tapu a od scroll_until <i>dve rôzne</i> čiary klávesnice (ST2);</li>
+    <li><code>advice()</code> je 2× (tap-judgement:457, pixel-poll:645);</li>
+    <li>pixel-poll má 869 riadkov, z toho ~250 sú vety.</li>
+  </ul>
+  <p class="text-sm mt-1">D87 aj D88 sa museli dotknúť standing, tap-judgement, scroll-rounds a scroll-text (D87 aj pixel-poll) a ich review kolá opakovane opravovali to isté. Tri no-scroll Remedy prišli za ~2 týždne.</p>
+  <p class="text-sm mt-2"><b>Riešenie:</b> (a) touch Remedy veta ako jedna funkcia v target-text, ktorú volajú tap aj všetky vetvy scroll-text; citát tapu sa potom <i>nemôže</i> rozísť. (b) No-scroll standing nesie „pod čím je pripnutý“ bez ohľadu na kind, takže scroll-rounds položí jednu otázku. (c) Presun: zdieľané vety zo standing.ts do ui-tree words modulu (UT1) a vety pixel verbu do <code>verify/pixel-text</code> (VR1). (d) Neskôr: fakt „rides keyboard“ do standing, posúdený na jednej čiare (ST2), a precedencia stopov v <code>round()</code> ako tabuľka (ST3). Pravidlo „rozhodnuté raz, každý verb vlastní svoje vety“ zostáva; mení sa len to, že touch verby zdieľajú jednu vetu tvoriacu funkciu.</p>
+  <div class="grid md:grid-cols-2 gap-4 mt-3">
+    <div><div class="text-xs font-semibold mb-1">Before</div>
+      <div class="box deep">standing.ts: remedied() + 140 riadkov viet</div>
+      <div class="arrow">↓ ↓ ↓ ↓ (každý znova vetví kind/cut.by/noScroll)</div>
+      <div class="flex gap-2 flex-wrap"><div class="box leak">tap-judgement</div><div class="box leak">scroll-rounds</div><div class="box leak">scroll-text (rebuild citátu)</div><div class="box leak">target-text (+keyboard úsudok)</div><div class="box leak">pixel-poll (+advice kópia)</div></div>
+      <div class="arrow">↑ drží pokope: remedy-agreement.test.ts 1 077 r. + golden</div></div>
+    <div><div class="text-xs font-semibold mb-1">After</div>
+      <div class="box deep">standing.ts: remedied() + „pinned under“ fakt</div>
+      <div class="arrow">↓</div>
+      <div class="flex gap-2 flex-wrap"><div class="box deep">target-text: touchRemedySentence(standing)</div><div class="box">pixel-text (pixel verb)</div></div>
+      <div class="arrow">↓ volajú bez vetvenia</div>
+      <div class="flex gap-2 flex-wrap"><div class="box">tap</div><div class="box">scroll_until stops</div><div class="box">pixel assert</div></div>
+      <div class="arrow">ďalšia Remedy = standing.ts + jeden switch viet</div></div>
+  </div>
+  <p class="text-xs text-slate-500 mt-2">Cena S–M · Riziko med: golden wording sa pohne (citát container cut dostane way-past klauzulu; je to oprava) · bez device; ST2 môže chcieť lab check na Android IME barách · ADR 0015 amendments fixujú správanie, nie umiestnenie</p>
+</article>
+
+<!-- C9 -->
+<article id="c9" class="bg-white border rounded p-5">
+  <div class="flex items-center gap-2 flex-wrap"><h3 class="text-xl font-bold">9. android.ts: uiautomator dialekt a window-manager dump ako vlastné moduly</h3><span class="px-2 py-0.5 rounded text-xs badge-strong">Strong</span></div>
+  <p class="text-sm mt-2"><b>Files:</b> <code>src/adapters/android.ts</code> (2 003 r.: adaptér :216-1190, WM parsery :1191-1610, uiautomator parser :1610-2003), <code>src/adapters/android-chooser.ts:44-84</code>, importéri parsera: <code>scripts/truth/batch/lab-chooser.ts</code>, <code>scripts/truth/truth.ts</code>, <code>tests/helpers/android-dumps.ts</code></p>
+  <p class="text-sm mt-2"><b>Problém:</b> <code>dumpsys window</code> číta 6 parserov v 2 moduloch s <b>tromi</b> rôznymi pravidlami pre multi-display: „všetky displeje súhlasia“ (IME a bandy), „prvý nájdený“ (focused window) a „blok displeja 0“ (chooser). Komentár IME parsera hovorí, že scoping na displej sa nedá overiť; chooser modul ho neskôr overil na API 36 fixture. Regex <code>mCurrentFocus</code> existuje 2×. Uiautomator parser je čistý tree source, no scripts a testy kvôli nemu načítajú celý adaptér. android.ts nie je v mutation scope, android-chooser.ts áno (100 %).</p>
+  <p class="text-sm mt-2"><b>Riešenie:</b> krok 1 (byte-identický presun): uiautomator dialekt vedľa <code>android-accessibility-order.ts</code>, WM parsery do jedného modulu s príkazmi a regexmi. Krok 2 (osobitne): jedno multi-display pravidlo, s fixture alebo device dôkazom. Parsery potom môžu ísť do mutation scope. android.ts klesne na ~1 000 riadkov, porovnateľne s ios.ts.</p>
+  <div class="grid md:grid-cols-2 gap-4 mt-3">
+    <div><div class="text-xs font-semibold mb-1">Before</div><div class="box hot" style="height:110px">android.ts 2 003 r.<br>· AndroidAdapter<br>· 6 WM parserov (3 display pravidlá)<br>· uiautomator XML + recognizers</div></div>
+    <div><div class="text-xs font-semibold mb-1">After</div><div class="flex gap-2 flex-wrap"><div class="box">android.ts ~1 000 r. (transport, memo)</div><div class="box deep">android-wm.ts (1 display pravidlo)</div><div class="box deep">android-tree-dialect.ts</div></div></div>
+  </div>
+  <p class="text-xs text-slate-500 mt-2">Cena S–M · Riziko low pre presun (golden replay parsera byte-identický), med pre zmenu pravidla · ADR 0041: sémantika choosera zachovaná</p>
+</article>
+
+<!-- C10 -->
+<article id="c10" class="bg-white border rounded p-5">
+  <div class="flex items-center gap-2 flex-wrap"><h3 class="text-xl font-bold">10. Fill: testy cez fillField, potom post-focus read a identita poľa</h3><span class="px-2 py-0.5 rounded text-xs badge-strong">Strong (FK3)</span><span class="px-2 py-0.5 rounded text-xs badge-worth">Worth exploring (FK2, FK1)</span></div>
+  <p class="text-sm mt-2"><b>Files:</b> <code>tests/adapters/android.test.ts:107-212</code>, <code>tests/adapters/ios-tree-source.test.ts:13-14</code>, <code>src/interact/fill.ts:184-255, 219-328, 402, 425-437</code>, <code>src/interact/fill-type.ts:77, 119, 149</code>, <code>src/interact/fill-landing.ts</code></p>
+  <p class="text-sm mt-2"><b>Problém:</b> adapter testy ručne kopírujú glue z fill.ts (Typed → FillResult, <code>focusUnread</code>). Chyba v glue by ich nezhodila, a zároveň viažu testy parsera na internú FieldIo/TypingIntent. FK2: otázku „číta fill po focuse a aký <code>held</code> nesie“ rozhodujú 4 miesta vo fill.ts; bullets-only počítanie (:303) je vstupom landing pravidla, ale A2 ho nechal mimo fill-landing. FK1: „pole nenájdené“ vs „uzol zadržiava text“ sa rozlišuje cez mutovateľnú premennú <code>lostOnLastRead</code> v closure, kým clear dostáva explicitné <code>{lost}</code>.</p>
+  <p class="text-sm mt-2"><b>Riešenie:</b> FK3 (iba testy) → FK2 (čisté rozhodnutie post-focus readu ako tabuľka; held-count k <code>needsHeldCount</code>, čím sa A2 dokončí) → FK1 (malý stavový modul „nájdi pole znova“, ktorý odpovedá uzlom alebo dôvodom straty).</p>
+  <p class="text-xs text-slate-500 mt-2">Cena S každý · Riziko low; FK2 musí zachovať presný počet a časovanie readov, odporúčaný forms A/B na zariadení · ADR 0028 gate sa nemení, len miesto, kde je napísaný</p>
+</article>
+
+<!-- C11 -->
+<article id="c11" class="bg-white border rounded p-5">
+  <div class="flex items-center gap-2 flex-wrap"><h3 class="text-xl font-bold">11. App health a reply diely run/ vo vlastnom module</h3><span class="px-2 py-0.5 rounded text-xs badge-worth">Worth exploring</span></div>
+  <p class="text-sm mt-2"><b>Files:</b> <code>src/verify/assert.ts:786-810</code> (<code>CRASH_PATTERNS</code>, používa ho len run/), <code>src/run/verify.ts:101-238</code> (finalFrame, appHealth, formatAsserts, assertSummary, re-export formatTrace, formatLogExcerpt), <code>src/run/commands.ts:166-174</code></p>
+  <p class="text-sm mt-2"><b>Problém:</b> „žije appka, a ak nie, prečo“ žije vo verify/, run/ aj adapters/. Traja volajúci majú tri politiky zlyhania: runAsserts zhltne, runEnsureState propaguje, verify leg zmení na FAILED a stratí asserty. appHealth dnes chytá sám, takže catch v commands.ts je mŕtvy a rozdiel je zatiaľ len latentný. run/verify.ts (728 r.) je zároveň orchestrácia, súprava reply dielov pre iné tooly a get_logs formátovač.</p>
+  <p class="text-sm mt-2"><b>Riešenie:</b> jeden app-health modul (alive check, crash scan, log excerpt) s jednou stanovenou politikou; leg reply diely do vlastného run/ modulu; re-export zrušiť.</p>
+  <p class="text-xs text-slate-500 mt-2">Cena S · Riziko low (reply text nemenný) · A12 sa netýka</p>
+</article>
+
+<!-- C12 -->
+<article id="c12" class="bg-white border rounded p-5">
+  <div class="flex items-center gap-2 flex-wrap"><h3 class="text-xl font-bold">12. Composition root rozdáva config, device aj eyes naraz</h3><span class="px-2 py-0.5 rounded text-xs badge-worth">Worth exploring</span></div>
+  <p class="text-sm mt-2"><b>Files:</b> <code>src/mcp/tools.ts</code> (18× <code>loadForCall</code>, 17× <code>iosToolSettings</code>, :113-117 guardOpts, :556), <code>src/flow/engine.ts:558-565, 1374</code>, <code>src/interact/scroll.ts:36-40, 386</code>, <code>src/interact/keyboard.ts:153</code></p>
+  <p class="text-sm mt-2"><b>Problém:</b> D41 invariant („jeden adaptér projektu, vybraný z configu, ktorý toto volanie prečítalo“) sa v každom handleri skladá z troch volaní a stráži ho iba regex test. <code>eyes?</code> je voliteľné a ak chýba, tap nechá poradie „untold“ a scroll_until povie „no screenshot was taken“. Všetky 4 produkčné miesta si ho musia pamätať; nový verb, ktorý ho zabudne, prejde typmi a potichu stratí ADR 0024.</p>
+  <p class="text-sm mt-2"><b>Riešenie:</b> jedno volanie na handler vráti {config, settings, adapter, eyes} (s lazy formou pre 3 engine tooly). Produkčné vstupy eyes vyžadujú a vynechať ich môžu len testy.</p>
+  <p class="text-xs text-slate-500 mt-2">Cena S · Riziko low (replies byte-identické) · posilňuje ADR 0032 D41 amendment</p>
+</article>
+
+<!-- C13 -->
+<article id="c13" class="bg-white border rounded p-5">
+  <div class="flex items-center gap-2 flex-wrap"><h3 class="text-xl font-bold">13. pollTree hlási časovanie a zlyhanie čítania (A7 slice B)</h3><span class="px-2 py-0.5 rounded text-xs badge-worth">Worth exploring</span><span class="px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-900">otvára A7 slice B, splnená jeho vlastná podmienka</span></div>
+  <p class="text-sm mt-2"><b>Files:</b> <code>src/verify/pixel-poll.ts:838-844</code> (timedReads), <code>src/flow/engine.ts:1132-1141</code> (hold wrapper), <code>src/ui-tree/read-tree.ts:444-446</code></p>
+  <p class="text-sm mt-2"><b>Problém:</b> A7 odložil poll observer ako hypotetický seam: „revisit if a second poll observer appears“. Dvaja už existujú a oba podstrkujú falošný adaptér, aby videli to, čo <code>pollTree</code> už vie (readStart, readMs, zlyhanie).</p>
+  <p class="text-sm mt-2"><b>Riešenie:</b> každé kolo, ktoré pollTree odovzdá predikátu, nesie časovanie svojho readu a pollTree hlási zlyhaný read. Oba wrappery sa zmažú.</p>
+  <p class="text-xs text-slate-500 mt-2">Cena S · Riziko low · golden sa nemá pohnúť</p>
+</article>
+
+<!-- C14 -->
+<article id="c14" class="bg-white border rounded p-5">
+  <div class="flex items-center gap-2 flex-wrap"><h3 class="text-xl font-bold">14. ARCHITECTURE.md §2, dátovaná história a scope.json</h3><span class="px-2 py-0.5 rounded text-xs badge-strong">Strong (doc)</span><span class="px-2 py-0.5 rounded text-xs badge-worth">Worth exploring (komentáre)</span></div>
+  <p class="text-sm mt-2"><b>Files:</b> <code>ARCHITECTURE.md</code> (293 KB; riadok 64 má 44 KB, riadok 72 má 36 KB; 191 dátových „since/until/round“ značiek; v <code>package.json "files"</code> sa shipuje), <code>src/**</code> (~55 % riadkov sú komentáre, 109 dátových poznámok), <code>src/flow/engine.ts:806-861</code>, <code>scripts/mutation/scope.json</code> (78 KB, z toho 69 KB baseline prózy, ktorú kód nečíta)</p>
+  <p class="text-sm mt-2"><b>Problém:</b> §2 má podať vrstvenie a slovník (GLOSSARY.md neexistuje), no vrstvenie sa z neho už vyčítať nedá. História je trikrát (ADR, backlog, kód/doc) a rozchádza sa. Zmena floor v scope.json je nečitateľný diff jedného obrovského riadku.</p>
+  <p class="text-sm mt-2"><b>Riešenie:</b> §2 skrátiť na odsek na vrstvu + slovník (prípadne vytvoriť GLOSSARY.md); dátovanú históriu nechať v ADR a backlogu; v kóde držať <i>why</i>, nie <i>when</i>, priebežne pri dotyku súboru, nie veľkým commitom; v scope.json nechať floor a poslednú baseline, históriu presunúť do ledgera v docs/. Rýchla výhra navyše: vyradiť ARCHITECTURE.md z npm <code>files</code>.</p>
+  <p class="text-xs text-slate-500 mt-2">Cena M (docs) · Riziko low · <code>tests/docs/references.test.ts</code> drží odkazy</p>
+</article>
+
+</section>
+
+<!-- ============ REST ============ -->
+<section class="mt-12">
+  <h2 class="text-2xl font-bold mb-3">Ďalšie kandidáty (nižšia priorita)</h2>
+  <div class="overflow-x-auto bg-white border rounded">
+  <table class="text-sm w-full">
+    <thead class="bg-slate-100 text-left"><tr><th class="p-2">ID</th><th class="p-2">Návrh</th><th class="p-2">Cena</th><th class="p-2">Sila</th><th class="p-2">Verdikt</th></tr></thead>
+    <tbody class="divide-y">
+      <tr><td class="p-2">IOS2 + IOS3</td><td class="p-2">Settle re-read prázdneho idb stromu presunúť z IosAdapter do IdbTreeSource (hint <code>settle</code>); idb adaptér do vlastného súboru vedľa wda-tree-source</td><td class="p-2">S</td><td class="p-2"><span class="badge-worth px-1 rounded text-xs">Worth</span></td><td class="p-2">urobiť spolu, keď sa ide do ios-tree-source</td></tr>
+      <tr><td class="p-2">UT4</td><td class="p-2">Jeden tree-dialect modul ako jediný čitateľ root marks (flatList, unclippedFrames…); odpadne ručne udržiavaný zoznam čitateľov</td><td class="p-2">XS</td><td class="p-2"><span class="badge-worth px-1 rounded text-xs">Worth</span></td><td class="p-2">lacné, spojiť s #9 (Android dialekt)</td></tr>
+      <tr><td class="p-2">UT5</td><td class="p-2">idb keyboard band vráti celý pás aj s tiling pravidlom ADR 0007 (dnes indexy, ktoré prerezáva draw-order)</td><td class="p-2">XS</td><td class="p-2"><span class="badge-worth px-1 rounded text-xs">Worth</span></td><td class="p-2">áno, pri ďalšom dotyku klávesnice</td></tr>
+      <tr><td class="p-2">UT2</td><td class="p-2">Clips, drawn frame a Cut z geometry.ts do modulu vedľa scroll-containers</td><td class="p-2">S</td><td class="p-2"><span class="badge-worth px-1 rounded text-xs">Worth</span></td><td class="p-2">až po #7 a #8 (scope.json split)</td></tr>
+      <tr><td class="p-2">VR2</td><td class="p-2">ocr-fold odpovie celú otázku „pattern vs reading modulo fold“; 4 primitíva sa stanú privátnymi</td><td class="p-2">S</td><td class="p-2"><span class="badge-worth px-1 rounded text-xs">Worth</span></td><td class="p-2">áno, keď sa otvorí OCR</td></tr>
+      <tr><td class="p-2">ST3</td><td class="p-2">Precedencia no-stroke stopov v <code>round()</code> (432 r.) ako čistá zoradená tabuľka</td><td class="p-2">M</td><td class="p-2"><span class="badge-worth px-1 rounded text-xs">Worth</span></td><td class="p-2">po #8, prirodzene naň nadväzuje</td></tr>
+      <tr><td class="p-2">AND-3</td><td class="p-2">Discovery vracia dôvod a nápravu nepoužiteľného zariadenia pre obe platformy; registry stratí platform branch</td><td class="p-2">S</td><td class="p-2"><span class="badge-worth px-1 rounded text-xs">Worth</span></td><td class="p-2">dokončenie A3, nízka priorita</td></tr>
+      <tr><td class="p-2">TL5</td><td class="p-2">lab-chooser <code>--check</code> používa nezávislý reader live-chooser, nie parser, ktorý testuje</td><td class="p-2">S</td><td class="p-2"><span class="badge-worth px-1 rounded text-xs">Worth</span></td><td class="p-2">áno (ADR 0020 nezávislosť oraklu); spojiť s #3/#4</td></tr>
+      <tr><td class="p-2">FM6</td><td class="p-2">Launch-activity pravidlo z config.ts do launch.ts</td><td class="p-2">XS</td><td class="p-2"><span class="badge-worth px-1 rounded text-xs">Worth</span></td><td class="p-2">pribaliť k #1</td></tr>
+      <tr><td class="p-2">IOS1</td><td class="p-2">Liveness policy a jej stav z IosAdapter do ios-liveness.ts</td><td class="p-2">S</td><td class="p-2"><span class="badge-worth px-1 rounded text-xs">Worth</span></td><td class="p-2">hraničí s A15 (won't-do), len ak to owner odlíši</td></tr>
+      <tr><td class="p-2">HL5</td><td class="p-2">Rozdeliť adapters/types.ts (UiNode a rect math vs DeviceAdapter)</td><td class="p-2">S–M</td><td class="p-2"><span class="badge-spec px-1 rounded text-xs">Spec</span></td><td class="p-2">odložiť; #6 ho zatiaľ pomenuje</td></tr>
+      <tr><td class="p-2">FM4</td><td class="p-2">Detect probe ako vlastný modul z engine.ts</td><td class="p-2">M</td><td class="p-2"><span class="badge-spec px-1 rounded text-xs">Spec</span></td><td class="p-2">nie teraz (blízko odmietnutého A7B observera)</td></tr>
+      <tr><td class="p-2">UT3</td><td class="p-2">Screen identity z read-tree.ts von</td><td class="p-2">XS–S</td><td class="p-2"><span class="badge-spec px-1 rounded text-xs">Spec</span></td><td class="p-2">nestojí za to, žiadny bug</td></tr>
+      <tr><td class="p-2">AND-4</td><td class="p-2">Zrušiť re-export rect primitív z geometry.ts</td><td class="p-2">XS</td><td class="p-2"><span class="badge-spec px-1 rounded text-xs">Spec</span></td><td class="p-2">pribaliť k #6, ak vôbec</td></tr>
+      <tr><td class="p-2">TL8</td><td class="p-2">Tri shell quotery v scripts</td><td class="p-2">XS</td><td class="p-2"><span class="badge-spec px-1 rounded text-xs">Spec</span></td><td class="p-2">pribaliť k #3 (shellQuote z iOS modulu)</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section class="mt-10">
+  <h2 class="text-2xl font-bold mb-3">Neoplatí sa opravovať (zhoda agentov)</h2>
+  <ul class="list-disc pl-5 text-sm space-y-1 bg-white border rounded p-4">
+    <li><b>8 fill-* modulov</b>: každý prejde deletion testom; fill-facts láme reálny cyklus, fill-clear je čistý stavový automat.</li>
+    <li><b>engine.ts ako celok</b>: rebrík a interpreter krokov sú vzájomne rekurzívne a zdieľajú stav behu, takže split by stav len presunul. Trápia ho komentáre (#14), nie tvar.</li>
+    <li><b>DeviceAdapter</b>: reálny seam (2 adaptéry + 1 FakeAdapter, ktorý <code>implements</code> interface). ~10 voliteľných členov sú fakty platformy, nie flagy.</li>
+    <li><b>idb vs WDA</b>: duplicita je nízka, normalizáciu zdieľa ios-node.ts. WdaServer (884 r.) je súdržný.</li>
+    <li><b>Parity moduly</b> (text, color, rect): zámerne rovnaký tvar, metriky sa líšia, „no reporting framework“ (ARCHITECTURE:74).</li>
+    <li><b>Keyboard split</b> interact/ vs ui-tree/: koherentný, vynútený vrstvením (pixel-poll nesmie importovať interact).</li>
+    <li><b>draw-order.ts</b> (1 955 r.): jedna práca, jedna tabuľka precedencie NOT_DRAWN; delenie by ju rozsypalo.</li>
+    <li><b>Eyes seam</b> ui-tree/eyes vs verify/eyes: skutočný port s adaptérom.</li>
+    <li><b>Step typ vs STEP_KINDS</b> po D86: <code>satisfies</code> to drží za kompilácie.</li>
+    <li><b>config-policy vs tool-config</b>: dve polovice jedného rozhodnutia; split drží MCP mená mimo flow/.</li>
+    <li><b>util/</b>, aim-floor, unfit-axis, margin-memo, motion-shown, hold-tracker, wipes-ahead: malé, ale každý vlastní pomenované pravidlo a má testy.</li>
+    <li><b>Systémové lišty</b>: rozdielne vety tapu a scroll_until sú zámerné, scroll_until vie, ktorými smermi ťahal.</li>
+    <li><b>A4, A5, A6, A8, A12, A14, A15</b>: nikto ich neotvoril. A5 a A4 ostávajú viazané na svoj spúšťač (fakes, D20 re-tune).</li>
+  </ul>
+</section>
+
+<section class="mt-10 mb-16">
+  <h2 class="text-2xl font-bold mb-3">Top odporúčanie</h2>
+  <div class="bg-green-50 border border-green-600 rounded p-5 text-sm space-y-2">
+    <p><b>Najprv #1 a #2 a hneď potom #3 → #4.</b> Sú malé, nemenia golden a opravujú veci, ktoré dnes reálne môžu dať zlú odpoveď: wipe-eskaláciu z preklepu v configu a release gate, ktorý číta vlastnú prózu a už ju číta zle. Keďže CLAUDE.md robí z gate záväzný postup pre každý release, gate musí byť dôveryhodný skôr, než sa ide ďalej. #5 (idb helper v Gate C) treba mať pred najbližším release, ale potrebuje beh u ownera.</p>
+    <p><b>Najväčšia architektonická výhra je #8</b> (Remedy veta), s #7 (mutation sieť) pred ním. Je to jediné miesto, kde posledné dva bugfixy (D87, D88) museli meniť 5 súborov a review kolá opravovali súlad viet. Nezávisle ho našlo 5 z 10 agentov a každá ďalšia Remedy ho zdraží.</p>
+  </div>
+</section>
+
+</div>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral' });</script>
+</body>
+</html>
