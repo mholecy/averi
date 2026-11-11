@@ -279,7 +279,10 @@ unread, said why (`lost`)" and "a non-input that withholds its text on two reads
 tests were added there: "A28: `lost` is the LAST read's" (lost then withheld is no `lost`; withheld then lost is) and
 "an input whose value is null reads empty, not withheld" (fill-facts.ts#shownText through the poll). New:
 tests/interact/fill-refetch.test.ts, and fill-landing.test.ts's `postFocusReadOf` and `heldCountOf` tables.
-fill-refetch.ts joins the mutation scope's core group (ADR 0038). A forms A/B on a device, which the review card
+fill-refetch.ts joins the mutation scope's core group (ADR 0038): 98.75 %, floor 96, its one survivor equivalent;
+the fill modules after A28, cold and narrowed to the five (the whole core group passed its 600 s bound at load 52–62):
+fill-landing 99.52 %, fill-type 93.88 %, fill-reformat 97.98 %, fill-verdict 99.35 %, every floor kept
+(scripts/mutation/scope.json). A forms A/B on a device, which the review card
 recommends for FK2, is not run here.
 
 ## Residuals accepted

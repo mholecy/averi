@@ -275,8 +275,8 @@ function whereTyped(before: OtherInputs | undefined, now: UiNode | undefined, mi
  */
 interface PollEnd {
   observed: string | undefined;
-  /** Why the last read did not find the field; absent when it did. */
-  lost?: LostWhy;
+  /** Why the last read did not find the field; undefined when it did. */
+  lost?: LostWhy | undefined;
   steady: boolean;
   prior?: string;
   /** The last reading landed, and how (fill-landing.ts#Landing); absent when it did not. */
@@ -312,7 +312,8 @@ async function pollValue(read: () => Promise<Shown>, ok: (observed: string) => L
     if (landed !== undefined) return { observed, steady: false, landed };
     // No text (a non-input withholding it) or no field — stop waiting. An
     // empty input reads "" and keeps every round: its text may be late.
-    if (observed === undefined && i >= 1) return shown.lost === undefined ? { observed, steady: false } : { observed, steady: false, lost: shown.lost };
+    // `lost` rides along as read (undefined: found); typeAndConfirm's `unread` arm keeps it only when set.
+    if (observed === undefined && i >= 1) return { observed, steady: false, lost: shown.lost };
     await sleep(pollMs);
   }
   return { observed, steady: observed !== undefined && observed === previous };
