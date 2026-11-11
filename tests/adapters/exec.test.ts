@@ -56,11 +56,22 @@ describe('ExecError: its message is commandFailureText, its fields every byte (D
     expect(err?.stack).toContain('ExecError');
   });
 
-  it('a typed text is in the command field, never in the message or the stack', () => {
-    const err = new ExecError('idb ui text hunter2 --udid U', 1, 'Command failed: idb ui text hunter2 --udid U\n');
-    expect(err.message).toBe('Command failed (exit 1): idb ui text <typed text> --udid U\nCommand failed: idb ui text <typed text> --udid U');
-    expect(err.stack).not.toContain('hunter2');
-    expect(err.command).toBe('idb ui text hunter2 --udid U');
+  it('a word declared typed (ExecOptions.typed) is <typed text> in command, message and stack, and in node\'s own line for a silent child (A17)', async () => {
+    const err = await exec('sh', ['-c', 'exit 3', 'hunter2'], { typed: [2] }).then(() => undefined, (e: unknown) => e as ExecError);
+    expect(err?.command).toBe('sh -c exit 3 <typed text>');
+    expect(err?.message).toBe('Command failed (exit 3): sh -c exit 3 <typed text>\nCommand failed: sh -c exit 3 <typed text>');
+    expect(err?.stderr).toBe('Command failed: sh -c exit 3 <typed text>\n');
+    expect(err?.stack).not.toContain('hunter2');
+  });
+
+  it('a typed word stays out of a timeout too; what the child prints is not exec\'s to mask', async () => {
+    const late = await exec('sh', ['-c', 'sleep 5', 'hunter2'], { typed: [2], timeoutMs: 100 }).then(() => undefined, (e: unknown) => e as ExecError);
+    expect(late?.timedOut).toBe(true);
+    expect(late?.command).toBe('sh -c sleep 5 <typed text>');
+    expect(`${late?.message}${late?.stack}${late?.stderr}`).not.toContain('hunter2');
+    const said = await exec('sh', ['-c', 'echo "$0" >&2; exit 1', 'hunter2'], { typed: [2] }).then(() => undefined, (e: unknown) => e as ExecError);
+    expect(said?.command).toBe('sh -c echo "$0" >&2; exit 1 <typed text>');
+    expect(said?.stderr).toBe('hunter2\n');
   });
 
   it('a note and a cause still go through it', () => {

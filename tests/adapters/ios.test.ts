@@ -20,7 +20,7 @@ import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { fillField } from '../../src/interact/fill.js';
 import { typeIntoFocused } from '../../src/interact/type-text.js';
 import { el, FAST, resetLayout, screen } from '../helpers/fake.js';
-import { execErrorLikeExec } from '../helpers/exec-error.js';
+import { execErrorLikeExec, typingExecError } from '../helpers/exec-error.js';
 import { appinfo } from '../helpers/simctl-appinfo.js';
 
 // The one sleep owner, recorded and not waited on: uiTree's settle re-read
@@ -207,7 +207,15 @@ describe('IosAdapter interactions', () => {
   it('typeText hands the text to idb ui text', async () => {
     const { fn, calls } = fakeExec({});
     await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE }).typeText('alice');
-    expect(calls.at(-1)?.full).toBe('idb ui text alice --udid AAAA-1111');
+    expect(calls.at(-1)?.full).toBe('idb ui text --udid AAAA-1111 -- alice');
+  });
+
+  // D74: a text after `--` is argparse's positional whatever it starts with — `-h` is typed, not answered with help (exit
+  // 0, nothing typed), `-hunter2` and `--log=s3cret` are no options. The --udid stands before the `--`.
+  it.each(['-h', '-abc', '-hunter2', '--log=s3cret', '--', '--udid'])('typeText sends %s after `--`, the --udid before it (D74)', async (text) => {
+    const { fn, calls } = fakeExec({});
+    await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE }).typeText(text);
+    expect(calls.at(-1)?.full).toBe(`idb ui text --udid AAAA-1111 -- ${text}`);
   });
 
   // docs/bugs/2026-10-07-ios-fill-empty-value-fails-in-idb.md: `idb ui text ''`
@@ -759,7 +767,7 @@ describe('IosAdapter.typeText — the first key alone, on an app seen dropping a
     resetSleeps();
     adapter.noteDroppedTail();
     await adapter.typeText('Jan Novak');
-    expect(log()).toEqual(['idb ui text J --udid AAAA-1111', 50, 'idb ui text an Novak --udid AAAA-1111']);
+    expect(log()).toEqual(['idb ui text --udid AAAA-1111 -- J', 50, 'idb ui text --udid AAAA-1111 -- an Novak']);
     expect(FIRST_KEY_ALONE_MS).toBe(50);
   });
 
@@ -771,11 +779,11 @@ describe('IosAdapter.typeText — the first key alone, on an app seen dropping a
     await adapter.launch('com.lab.native');
     resetSleeps();
     await adapter.typeText('Jan');
-    expect(log()).toEqual(['idb ui text Jan --udid AAAA-1111']);
+    expect(log()).toEqual(['idb ui text --udid AAAA-1111 -- Jan']);
     await adapter.launch('com.lab.rn');
     resetSleeps();
     await adapter.typeText('Jan');
-    expect(log()).toEqual(['idb ui text J --udid AAAA-1111', 50, 'idb ui text an --udid AAAA-1111']);
+    expect(log()).toEqual(['idb ui text --udid AAAA-1111 -- J', 50, 'idb ui text --udid AAAA-1111 -- an']);
   });
 
   it('terminating the launched app forgets which app is in front: no split, and nothing learned, until the next launch', async () => {
@@ -787,15 +795,15 @@ describe('IosAdapter.typeText — the first key alone, on an app seen dropping a
     await adapter.terminate('com.lab.other'); // another bundle: the key stays
     resetSleeps();
     await adapter.typeText('Jan');
-    expect(log()).toEqual(['idb ui text J --udid AAAA-1111', 50, 'idb ui text an --udid AAAA-1111']);
+    expect(log()).toEqual(['idb ui text --udid AAAA-1111 -- J', 50, 'idb ui text --udid AAAA-1111 -- an']);
     await adapter.terminate('com.lab.rn');
     adapter.noteDroppedTail(); // not known what is in front: nothing to learn
     await adapter.typeText('Jan');
-    expect(log()).toEqual(['idb ui text Jan --udid AAAA-1111']);
+    expect(log()).toEqual(['idb ui text --udid AAAA-1111 -- Jan']);
     await adapter.launch('com.lab.rn');
     resetSleeps();
     await adapter.typeText('Jan');
-    expect(log()).toEqual(['idb ui text J --udid AAAA-1111', 50, 'idb ui text an --udid AAAA-1111']);
+    expect(log()).toEqual(['idb ui text --udid AAAA-1111 -- J', 50, 'idb ui text --udid AAAA-1111 -- an']);
   });
 
   it('an app never seen dropping a tail types in one burst, with no wait — native apps never pay', async () => {
@@ -804,7 +812,7 @@ describe('IosAdapter.typeText — the first key alone, on an app seen dropping a
     await adapter.launch('com.lab.rn');
     resetSleeps();
     await adapter.typeText('Jan Novak');
-    expect(log()).toEqual(['idb ui text Jan Novak --udid AAAA-1111']);
+    expect(log()).toEqual(['idb ui text --udid AAAA-1111 -- Jan Novak']);
   });
 
   it('a one-character text has no rest: one call, no wait, even in an app that dropped', async () => {
@@ -815,7 +823,7 @@ describe('IosAdapter.typeText — the first key alone, on an app seen dropping a
     resetSleeps();
     await adapter.typeText('J');
     await adapter.typeText('👍');
-    expect(log()).toEqual(['idb ui text J --udid AAAA-1111', 'idb ui text 👍 --udid AAAA-1111']);
+    expect(log()).toEqual(['idb ui text --udid AAAA-1111 -- J', 'idb ui text --udid AAAA-1111 -- 👍']);
   });
 
   it('the first key is a whole character: a surrogate pair is never cut between the two calls', async () => {
@@ -823,7 +831,7 @@ describe('IosAdapter.typeText — the first key alone, on an app seen dropping a
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
     adapter.noteDroppedTail(); // before any launch: the app in front, whichever it is
     await adapter.typeText('👍ok');
-    expect(log()).toEqual(['idb ui text 👍 --udid AAAA-1111', 50, 'idb ui text ok --udid AAAA-1111']);
+    expect(log()).toEqual(['idb ui text --udid AAAA-1111 -- 👍', 50, 'idb ui text --udid AAAA-1111 -- ok']);
   });
 });
 
@@ -858,7 +866,7 @@ describe('IosAdapter.typeText — routed per call: idb for what idb types, the s
   it('an ASCII text goes to idb ui text and never to the source\'s typer', async () => {
     const { adapter, log } = routed();
     await adapter.typeText('Jan Novak');
-    expect(log()).toEqual(['idb ui text Jan Novak --udid AAAA-1111']);
+    expect(log()).toEqual(['idb ui text --udid AAAA-1111 -- Jan Novak']);
   });
 
   it('a text idb cannot type goes to the source\'s typer once, whole, and no idb ui text is sent', async () => {
@@ -885,7 +893,7 @@ describe('IosAdapter.typeText — routed per call: idb for what idb types, the s
     adapter.noteDroppedTail();
     resetSleeps();
     await adapter.typeText('Jan Novak');
-    expect(log()).toEqual(['idb ui text J --udid AAAA-1111', FIRST_KEY_ALONE_MS, 'idb ui text an Novak --udid AAAA-1111']);
+    expect(log()).toEqual(['idb ui text --udid AAAA-1111 -- J', FIRST_KEY_ALONE_MS, 'idb ui text --udid AAAA-1111 -- an Novak']);
     await adapter.typeText('Jan Šťastný');
     expect(log()).toEqual(['wda Jan Šťastný']);
   });
@@ -893,7 +901,7 @@ describe('IosAdapter.typeText — routed per call: idb for what idb types, the s
   it('over a source without a typer (idb\'s, the recorded one), a non-ASCII text still goes to idb — as before D43', async () => {
     const { fn, calls } = fakeExec({});
     await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: WDA_NO_TREE }).typeText('Šťastný');
-    expect(calls.at(-1)?.full).toBe('idb ui text Šťastný --udid AAAA-1111');
+    expect(calls.at(-1)?.full).toBe('idb ui text --udid AAAA-1111 -- Šťastný');
   });
 
   it('a failure of the source\'s typer is the typing\'s failure, as WDA said it', async () => {
@@ -922,7 +930,7 @@ describe('IosAdapter + fillField — a dropped tail on one fill makes the next f
     const fn: ExecFn = async (cmd, args) => {
       const full = [cmd, ...args].join(' ');
       if (full.startsWith('idb ui text ')) {
-        const text = args[args.indexOf('text') + 1]!;
+        const text = args.at(-1)!; // `ui text --udid U -- <text>` (D74)
         texts.push(...sleeps.splice(0).filter((ms) => ms === FIRST_KEY_ALONE_MS), text);
         field.value = (field.value ?? '') + text.slice(0, keeps.shift() ?? text.length);
       }
@@ -1242,36 +1250,24 @@ describe('openDeepLink when simctl answers (D65)', () => {
   });
 });
 
-describe('a failed typing keeps its text out of the message (D70, ADR 0043)', () => {
+describe('a failed typing keeps its text out of the error (D70, A17, ADR 0043)', () => {
   const secret = 'hunter2secret';
-  const failingText: ExecFn = async (cmd, args) => {
-    if (args[1] === 'text') throw new ExecError([cmd, ...args].join(' '), 1, 'companion gone\n');
+  /** An exec that fails `ui text` as exec does: its command shown with the typed words the call declared (ExecOptions.typed). */
+  const failingText = (stderr: string): ExecFn => async (cmd, args, opts) => {
+    if (args[1] === 'text') throw typingExecError(cmd, args, opts?.typed, 1, stderr);
     return { stdout: Buffer.alloc(0), stderr: '' };
   };
 
-  it('the whole text on idb: the command field keeps it, the message never holds it', async () => {
-    const typing = new IosAdapter({ udid: 'AAAA-1111', exec: failingText, treeSource: NO_TREE }).typeText(secret);
-    await expect(typing).rejects.toThrow(/^Command failed \(exit 1\): idb ui text <typed text> --udid AAAA-1111\ncompanion gone$/);
-    await expect(typing).rejects.toMatchObject({ command: `idb ui text ${secret} --udid AAAA-1111` });
-  });
-
-  it('idb\'s own argparse line, which quotes a text taken for an option, is left out; the argv the adapter really sends is recognised', async () => {
-    const exec: ExecFn = async (cmd, args) => {
-      if (args[1] === 'text') throw new ExecError([cmd, ...args].join(' '), 2, "usage: idb ui text [-h] text\nidb ui text: error: argument -h/--help: ignored explicit argument 'unter2'\n");
-      return { stdout: Buffer.alloc(0), stderr: '' };
-    };
-    await expect(new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: NO_TREE }).typeText('-hunter2')).rejects.toThrow(
-      /^Command failed \(exit 2\): idb ui text <typed text> --udid AAAA-1111\nusage: idb ui text \[-h\] text\nidb rejected its arguments \(its error line, which can quote the typed text, is left out\)$/,
-    );
+  it('the whole text on idb: neither the command field nor the message holds it', async () => {
+    const typing = new IosAdapter({ udid: 'AAAA-1111', exec: failingText('companion gone\n'), treeSource: NO_TREE }).typeText(secret);
+    await expect(typing).rejects.toThrow(/^Command failed \(exit 1\): idb ui text --udid AAAA-1111 -- <typed text>\ncompanion gone$/);
+    await expect(typing).rejects.toMatchObject({ command: 'idb ui text --udid AAAA-1111 -- <typed text>' });
   });
 
   it("a reader's `.message` of a crash during a typing shows neither the text nor the trace", async () => {
-    const exec: ExecFn = async (cmd, args) => {
-      if (args[1] === 'text') throw new ExecError([cmd, ...args].join(' '), 1, 'Traceback (most recent call last):\n  File "/Users/me/x.py", line 1, in m\nException: gone\n');
-      return { stdout: Buffer.alloc(0), stderr: '' };
-    };
+    const exec = failingText('Traceback (most recent call last):\n  File "/Users/me/x.py", line 1, in m\nException: gone\n');
     await expect(new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: NO_TREE }).typeText(secret)).rejects.toThrow(
-      /^Command failed \(exit 1\): idb ui text <typed text> --udid AAAA-1111\nidb crashed: Exception: gone \(Python traceback left out: run the command by hand, with the real text and paths, to see it\)$/,
+      /^Command failed \(exit 1\): idb ui text --udid AAAA-1111 -- <typed text>\nidb crashed: Exception: gone \(Python traceback left out: run the command by hand, with the real text and paths, to see it\)$/,
     );
   });
 });

@@ -235,7 +235,7 @@ describe('recordHelperCalls — a call the idb helper serves is no process, and 
       const udid = 'D8DACDE6-6352-437C-AA22-86FB06275C3F';
       rec.begin();
       for (const args of [['ui', 'tap', '1', '2'], ['ui', 'tap', '1', '2', '--duration', '0.8'], ['ui', 'swipe', '1', '2', '3', '4', '--duration', '0.3'],
-        ['ui', 'text', 'Jan Novak'], ['ui', 'key', '40'], ['ui', 'key-sequence', '42', '42'], ['ui', 'button', 'HOME']]) {
+        ['ui', 'text', '--', 'Jan Novak'], ['ui', 'key', '40'], ['ui', 'key-sequence', '42', '42'], ['ui', 'button', 'HOME']]) {
         await runIdb(exec, udid, args, { helper });
       }
       const died = { run: () => Promise.resolve({ kind: 'died' }) } as unknown as IdbHelper;

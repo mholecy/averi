@@ -326,7 +326,11 @@ function answer(cmd: string, args: string[], stdin: string | undefined): Answer 
     return unmodelled(`simctl ${verb} ${rest.join(' ')}`);
   }
   if (cmd === 'idb') {
-    const argv = args.slice(0, args.indexOf('--udid') === -1 ? undefined : args.indexOf('--udid'));
+    // runIdb's `--udid U` out, and the `--` a typing's text follows (D74, `ui text --udid U -- <text>`): the call is
+    // recorded as before D74, `idb ui text <text>`, so a replay's calls read alike.
+    const at = args.indexOf('--udid');
+    const rest = at === -1 ? [] : args.slice(at + 2);
+    const argv = at === -1 ? args : [...args.slice(0, at), ...(rest[0] === '--' ? rest.slice(1) : rest)];
     const line = argv.join(' ');
     if (line === 'describe --json') {
       device.calls.push(`idb ${line}`);

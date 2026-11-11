@@ -541,7 +541,7 @@ describe('IosAdapter.openDeepLink — which app the typing goes into', () => {
     };
     const exec: ExecFn = async (cmd, args) => {
       const full = [cmd, ...args].join(' ');
-      if (full.startsWith('idb ui text')) typed.push(args[2]);
+      if (full.startsWith('idb ui text')) typed.push(args.at(-1)!); // `ui text --udid U -- <text>` (D74)
       if (full.startsWith('xcrun simctl appinfo')) return { stdout: Buffer.from(LAB_INFO), stderr: '' };
       if (full.startsWith('plutil ')) return { stdout: Buffer.from(LAB_TYPES), stderr: '' };
       return { stdout: Buffer.alloc(0), stderr: '' };

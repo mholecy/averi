@@ -1,4 +1,4 @@
-import { ExecError } from '../../src/adapters/exec.js';
+import { typingExecError } from '../helpers/exec-error.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PersistentReadError, type UiNode } from '../../src/adapters/types.js';
 import { parseConfig, type AveriConfig, type Step } from '../../src/flow/config.js';
@@ -1579,10 +1579,11 @@ describe('secrets', () => {
   it('a typing that fails on part of a secret (D24\'s split, a retyped tail, Android\'s one character) leaves no part of it: redaction matches only the whole', async () => {
     const fake = new FakeAdapter(buildScreens(), 'fresh_login');
     fake.typeText = async () => {
-      throw new ExecError('idb ui text 2secret --udid U', 1, 'Command failed: idb ui text 2secret --udid U\n');
+      // As the adapter's exec throws it (A17): the call declared the text typed, so its command shows <typed text>.
+      throw typingExecError('idb', ['ui', 'text', '--udid', 'U', '--', '2secret'], [5], 1, '');
     };
     const failed = await FlowEngine.run(CONFIG, fake, FAST, { state: 'logged_in' }).then(() => undefined, (e: unknown) => e as Error);
-    expect(failed?.message).toContain('idb ui text <typed text> --udid U');
+    expect(failed?.message).toContain('idb ui text --udid U -- <typed text>');
     expect(failed?.message).not.toContain('2secret');
   });
 

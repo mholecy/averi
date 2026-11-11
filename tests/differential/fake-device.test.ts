@@ -47,6 +47,14 @@ describe('the fake device serving a captured screenshot', () => {
     expect(deviceCalls()).toEqual(['idb screenshot']);
   });
 
+  it('iOS: a typing is recorded with its text, the --udid and the `--` before it out (D74\'s `ui text --udid U -- <text>`)', async () => {
+    useDevice({ platform: 'ios', screen: { width: 10, height: 20 }, frame: { width: 30, height: 60 } });
+    await execFile('idb', ['ui', 'text', '--udid', 'AAAA-1111', '--', '-hunter2']);
+    await execFile('idb', ['ui', 'text', '--udid', 'AAAA-1111', '--', '--']);
+    await execFile('idb', ['ui', 'tap', '1', '2', '--udid', 'AAAA-1111']);
+    expect(deviceCalls()).toEqual(['idb ui text -hunter2', 'idb ui text --', 'idb ui tap 1 2']);
+  });
+
   it('Android: screencap answers the captured PNG, byte for byte', async () => {
     const shot = png(20, 40);
     useDevice({ platform: 'android', screen: { width: 20, height: 40 }, frame: { width: 20, height: 40 }, screenshot: shot });

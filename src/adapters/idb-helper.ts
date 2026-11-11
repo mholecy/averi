@@ -5,6 +5,7 @@ import { delimiter, isAbsolute, join, basename } from 'node:path';
 import { createInterface } from 'node:readline';
 import type { Readable, Writable } from 'node:stream';
 import { IDB_HELPER_SCRIPT } from './idb-helper-script.js';
+import { shownCommand } from './failure-text.js';
 
 /**
  * What the helper answered for one argv: the CLI's exit code and its two streams, as the `idb` process would have
@@ -18,10 +19,14 @@ import { IDB_HELPER_SCRIPT } from './idb-helper-script.js';
  */
 export type IdbHelperReply = { kind: 'answer'; code: number; stdout: Buffer; stderr: string } | { kind: 'died' } | { kind: 'unsent' };
 
-/** The caller's timeout ran out with the request in the helper: the helper was killed, and nothing is retried. */
+/**
+ * The caller's timeout ran out with the request in the helper: the helper was killed, and nothing is retried. Its
+ * message names the argv as shown (shownCommand, A17): a typed word is `<typed text>` in it. Defence in depth: runIdb
+ * never lets this error out, it throws its own ExecError, masked alike, in its place.
+ */
 export class IdbHelperTimeout extends Error {
-  constructor(argv: readonly string[]) {
-    super(`idb helper timed out: idb ${argv.join(' ')}`);
+  constructor(argv: readonly string[], typed?: readonly number[]) {
+    super(`idb helper timed out: ${shownCommand('idb', argv, typed)}`);
     this.name = 'IdbHelperTimeout';
   }
 }
@@ -242,9 +247,14 @@ export class IdbHelper {
 
   /**
    * Run one idb argv (the `--udid` included) in the helper, or undefined: run it on the CLI. `env` is what exec merges
-   * over process.env (the Xcode env); the helper is started with it, so its idb sees what the CLI's would.
+   * over process.env (the Xcode env); the helper is started with it, so its idb sees what the CLI's would. `typed`, the
+   * indexes of `argv` that hold typed text (ExecOptions.typed), keeps it out of a timeout's message. The text itself
+   * goes to the helper on its stdin, which nothing prints.
    */
-  run(argv: readonly string[], opts: { env?: Record<string, string>; timeoutMs: number }): Promise<IdbHelperReply> | undefined {
+  run(
+    argv: readonly string[],
+    opts: { env?: Record<string, string>; timeoutMs: number; typed?: readonly number[] },
+  ): Promise<IdbHelperReply> | undefined {
     if (idbHelperDisabled()) return undefined;
     if (this.state === 'idle') {
       void this.start(opts.env);
@@ -262,7 +272,7 @@ export class IdbHelper {
         this.timeoutsInARow++;
         this.killed = child;
         this.kill(child);
-        reject(new IdbHelperTimeout(argv));
+        reject(new IdbHelperTimeout(argv, opts.typed));
       }, opts.timeoutMs);
       this.pending = { id, taken: false, resolve, reject, timer };
       // A failed write never reached the helper: `unsent` (D7b — an input then runs on the CLI). The helper is killed,
