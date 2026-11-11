@@ -138,8 +138,9 @@ describe('a group\'s tests: every scoped test that imports a module of a group i
     // (runner, bounded, io …), and may kill core mutants too (in main's single run lab-batch.test.ts was the first
     // killer of some); core's own tests must suffice for core's floors, and T2b-2's per-mutant compare with the single
     // run found every status unchanged (ADR 0038, T2b-2). The same for scene's (A25): its tests build scenes on core's
-    // draw order and geometry, and core's own tests hold core's floors. The same for android's (A27): its parsers build
-    // on core's accessibility order and are read by core's chooser.
+    // draw order and geometry, and core's own tests hold core's floors. Android's (A27) sits below scene and lab because
+    // their tests read its parsers: scene's tests/ui-tree/keyboard-position.test.ts imports android-wm.ts, lab's
+    // tests/truth/batch/lab-emu.test.ts too; android's own tests import core's modules only.
     const misplaced: string[] = [];
     for (const test of testFiles.filter((t) => inGroup(t))) {
       const source = readFileSync(join(root, test), 'utf8');

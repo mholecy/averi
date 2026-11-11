@@ -179,6 +179,25 @@ describe('parseFocusedWindow: the window types of an app, by number, and a windo
     expect(parseFocusedWindow(shownAs('    isVisible=trueish'))).toMatchObject({ of: 'screenAlone' });
   });
 
+  /** The dump with `line` inserted just before the focused window's header (inside the block before it). */
+  const beforeFocused = (line: string): string => {
+    const header = dump.lastIndexOf('\n  Window #', dump.indexOf(`Window{${hash} `, dump.indexOf('WINDOW MANAGER WINDOWS')));
+    expect(header).toBeGreaterThan(0);
+    return `${dump.slice(0, header)}\n${line}${dump.slice(header)}`;
+  };
+
+  it('a window block opens on its own header line alone: two spaces, `Window #`, and the line ending at its `:`', () => {
+    // a deeper line naming the focused window's hash, and a header-like line with more after its `:`, open no block
+    expect(parseFocusedWindow(beforeFocused(`    Window #99 Window{${hash} u0 Nested}:`))).toEqual(STACKED);
+    expect(parseFocusedWindow(beforeFocused(`  Window #99 Window{${hash} u0 Other}: and more`))).toEqual(STACKED);
+    expect(parseFocusedWindow(beforeFocused(`  Window #99 Window{${hash} u0 Other}:`))).toEqual({ of: 'unknown' }); // a real header: a block with no type
+  });
+
+  it('a window\'s frame is its own `Frames:` line, which starts the line after the indent', () => {
+    expect(parseFocusedWindow(inFocused((block) => block.replace(/^( +Frames: )/m, '    mLast Frames: parent=[0,0][1,1] frame=[0,0][10,10]\n$1')))).toEqual(STACKED);
+    expect(parseFocusedWindow(inFocused((block) => block.replace(/^( +Frames: )/m, '    Frames: parent=[0,0][1,1] frame=[0,0][10,10]\n$1')))).toEqual({ of: 'stacked', frame: { x: 0, y: 0, width: 10, height: 10 }, screen: SCREEN });
+  });
+
   it('a type name the table does not hold is no app\'s: unknown', () => {
     expect(parseFocusedWindow(typed('STATUS_BAR'))).toEqual({ of: 'unknown' });
   });
@@ -250,6 +269,12 @@ describe('the InsetsState readers: an entry with a token missing, a frame of no 
 
   it('parseNavigationBand: a bar as tall as it is wide is no band', () => {
     expect(parseNavigationBand(FRAMES + NAV('[0,1140][1080,2220]'))).toBeUndefined();
+  });
+
+  it('parseNavigationBand: a DisplayFrames line\'s rotation is all its digits, and blanks may end the line', () => {
+    expect(parseNavigationBand('  DisplayFrames w=1080 h=2220 r=0 \t\n' + NAV('[0,2154][1080,2220]'))).toBe(2154);
+    // a second display at r=10 (no Android rotation; synthetic): read as a second size, so no band
+    expect(parseNavigationBand(FRAMES + '  DisplayFrames w=1080 h=2220 r=10\n' + NAV('[0,2154][1080,2220]'))).toBeUndefined();
   });
 
   it('parseNavigationBand: DisplayFrames lines alike but for their indent are one size; a line with more after r= is none', () => {
