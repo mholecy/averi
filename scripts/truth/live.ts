@@ -53,7 +53,8 @@ import { parseLabApp, type LabApp } from './schema.js';
  * (k2 is iOS only).
  *
  * The server is built as tests/mcp/tools.test.ts builds one (createAveriServer over the SDK's in-memory transport and
- * a real Client), over a REAL AdapterRegistry whose factory constructs the iOS adapter itself: averi gives WDA port
+ * a real Client), over a REAL AdapterRegistry whose factory builds the iOS adapter through registry.ts#iosAdapterFor
+ * (the server's wiring, the idb helper included: A23) with WDA deps of its own: averi gives WDA port
  * 8100 to the first simulator a process asks for, and 8100/8101 may belong to another session's WebDriverAgent — here
  * the WDA source takes `--wda-port` (default 8120, capture.ts's) and builds into the lab's own derived data
  * (lab-device.ts#LAB_WDA_DERIVED_DATA), never device-check's `averi-wda`. Discovery lists the lab simulator only, so no
@@ -95,7 +96,8 @@ import { parseLabApp, type LabApp } from './schema.js';
  * native app's (`native`, the default) otherwise: one app per run, its cases only (schema.ts#appOf).
  *
  * `--side <checkout>` runs another averi's src (a calibration checkout, calibrate.ts's `differential-cal-<sha>`): its
- * tools, registry, iOS adapter and tree source, loaded as scripts/differential/side.ts loads a side — the live
+ * tools, registry and iOS adapter (side.ts#Side.liveIos: its registry.ts#iosAdapterFor, or before D7a its IosAdapter
+ * over its tree source, no idb helper), loaded as scripts/differential/side.ts loads a side — the live
  * calibration of a note (calibration.json `live`) runs its cases at the note's before and after commits. The record
  * names it by a portable label (live-cases.ts#sideLabel), never the host's path.
  *
@@ -188,16 +190,18 @@ if (rejudging === undefined) console.error(`lab: ${ios !== undefined ? await ios
 // --- the server: a real registry, the lab simulator only, WDA on a port of its own ---
 
 /**
- * The averi under test: this checkout's src, or `--side`'s (a checkout of another commit) — its tools, registry, iOS
- * adapter and tree source, loaded by scripts/differential/side.ts#loadSide (the export guard, the old registry's shim).
+ * The averi under test: this checkout's src, or `--side`'s (a checkout of another commit) — its tools, registry and
+ * live iOS adapter, loaded by scripts/differential/side.ts#loadSide (the export guard, the old registry's shim). The iOS
+ * adapter is the side's registry.ts#iosAdapterFor, the server's own wiring with its idb helper (A23, ADR 0032), or, for
+ * a side older than it, IosAdapter over its createIosTreeSource with no helper — the `ios:` line says which.
  */
 const averi = rejudging === undefined ? await loadSide(values.side ?? ROOT) : undefined;
 if (averi !== undefined) console.error(`averi: ${averi.root}`);
+if (averi !== undefined && platform === 'ios') console.error(`ios: ${averi.liveIos?.wiring ?? 'none — the side has no iOS tree-source seam'}`);
 function iosAdapter(udid: string, source: IosTreeSourceKind): DeviceAdapter {
-  const create = averi!.createIosTreeSource;
-  if (create === undefined) throw new Error(`side ${averi!.root}: no src/adapters/ios-tree-source.ts#createIosTreeSource — the live golden cannot build its tree source`);
-  const side = averi!;
-  return new side.IosAdapter({ udid, treeSource: create(source, udid, { port, derivedDataPath: LAB_WDA_DERIVED_DATA }) as ConstructorParameters<typeof side.IosAdapter>[0]['treeSource'] });
+  const live = averi!.liveIos;
+  if (live === undefined) throw new Error(`side ${averi!.root}: no src/adapters/ios-tree-source.ts#createIosTreeSource — the live golden cannot build its tree source`);
+  return live.adapter(udid, source, { port, derivedDataPath: LAB_WDA_DERIVED_DATA });
 }
 
 /** The carousel group's hook on the Android adapter's strokes (live-carousel.ts#SwipeHook): armed around a case's calls. */

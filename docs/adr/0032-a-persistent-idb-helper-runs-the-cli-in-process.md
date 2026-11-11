@@ -796,3 +796,40 @@ verbs on real adapters, MCP and flow): identical.
 Changed 0 (it replays tree reads, no launch or link seam).
 
 Residual: the amended text above names `alertNote` and `alertText`, which no longer exist, as they were at their date.
+
+## Amendment: the live golden drives the helper too (2026-11-11, backlog A23)
+
+The architecture review of 2026-11-11 (card 5) found that the release gate never ran the helper. `scripts/truth/live.ts`
+built its iOS adapter by hand, `IosAdapter` over the side's `createIosTreeSource`, with no `IdbHelper`. Every idb case
+of the live golden and of Gate C (`truth:lab:ios`, which runs live.ts per group) therefore went through the CLI path,
+which the server takes only with `AVERI_IDB_HELPER=off`. `mcp/registry.ts#iosAdapterFor` (this ADR's Node side) and
+`scripts/perf/baseline.ts` already added the helper.
+
+Decision: live.ts takes its iOS adapter from the side's composition root. `loadSide` in `scripts/differential/side.ts`
+gives each side a `liveIos`: the side's own `registry.ts#iosAdapterFor`, handed the lab's WebDriverAgent port and derived
+data as `deps`, as perf/baseline.ts hands them. One wiring then serves the server, the perf baseline and the live
+golden, and Gate C runs the transport users get. A `--side` checkout older than D7a (no `iosAdapterFor`, before
+2026-10-31) keeps the construction live.ts had, `IosAdapter` over its `createIosTreeSource` with no helper. A side
+with neither gets no live iOS adapter, and live.ts refuses as before. Which wiring a run uses is said once on stderr,
+on the line after `averi:`. With `iosAdapterFor` the line reads
+`ios: registry.ts#iosAdapterFor — the server's iOS wiring, its idb helper on (ADR 0032)`. The fallback line reads
+`ios: no registry.ts#iosAdapterFor in this side — … no idb helper: every idb call the CLI (the live golden before A23)`.
+The kill switch is unchanged. With `AVERI_IDB_HELPER=off` in the environment, a live run drives the CLI as the server
+would. The replay (golden, differential) is untouched: its fake device still sets the switch, since it answers
+execFile only.
+
+Consequences:
+
+- iOS verdicts of the live golden may move, because the helper is a different transport: its timing, the D7b input
+  path, and screenshots through the helper (D26b). The first Gate C after A23 is the owner's check that they did not
+  move, or that a move is the helper's and a note explains it. No replayed check moves (golden Changed 0).
+- A live calibration (`calibration.json` `live`) whose before commit predates D7a runs that side on the CLI and the
+  after side on the helper. The `ios:` line in each run's log says so, and a difference between them may be the
+  transport's.
+- Not done here (review card 5's second step, TL6): one in-process connection module for live.ts, differential.ts and
+  perf/baseline.ts. Each still builds registry, server and client and closes them in its own order (D82).
+
+Tests: `tests/truth/live-ios-wiring.test.ts` covers this through the side seam live.ts reads. A side with
+`iosAdapterFor` gets that function, with the udid, kind and deps passed through. A side without it gets its
+`IosAdapter` over its `createIosTreeSource`, with no helper, and the fallback line. A side with neither gets none.
+This checkout's adapter is an `IosAdapter` that holds an `IdbHelper`.

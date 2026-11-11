@@ -17,7 +17,8 @@ import { RecordedTreeSource } from './recorded-source.js';
  *
  *   src/mcp/tools.ts            createAveriServer (the tool handlers)
  *   src/mcp/registry.ts         AdapterRegistry, defaultFactory (the live wiring) — the registry built through
- *                               `registry` below, which also takes the constructor an older side had
+ *                               `registry` below, which also takes the constructor an older side had; iosAdapterFor,
+ *                               when the side has it (since D7a, 2026-10-31) — the live golden's iOS adapter (`liveIos`)
  *   src/adapters/discovery.ts   discoveryOver, when the side has it (since A3) — its discovery over the harness's listing
  *   src/adapters/ios.ts         IosAdapter (takes any IosTreeSource)
  *   src/adapters/wda-source.ts  parseWdaSourceValue (WdaTreeSource's parser)
@@ -47,10 +48,42 @@ export interface Side {
    */
   registry(deps: { factory: AdapterFactory; discovery: Listing }): AdapterRegistry;
   /**
-   * The side's iOS tree-source seam (src/adapters/ios-tree-source.ts#createIosTreeSource), when it has one — what the
-   * live golden (scripts/truth/live.ts `--side`) builds a real WDA or idb source with; the replay does not use it.
+   * The side's iOS adapter for a real simulator — what the live golden (scripts/truth/live.ts, `--side` or not) drives
+   * the lab simulator with; the replay does not use it. A side with src/mcp/registry.ts#iosAdapterFor (D7a, 2026-10-31)
+   * gets the server's own wiring, its idb helper included (ADR 0032, A23), so Gate C runs the transport users get. An
+   * older side gets the construction the live golden had before A23: its IosAdapter over its
+   * src/adapters/ios-tree-source.ts#createIosTreeSource, no helper (every idb call the CLI). `wiring` names which, for
+   * the run's log. A side with neither has none.
    */
-  createIosTreeSource?: (kind: 'idb' | 'wda', udid: string, deps: { port?: number; derivedDataPath?: string }) => unknown;
+  liveIos?: LiveIos;
+}
+
+/** A side's live iOS adapter (`Side.liveIos`): the adapter for one simulator and tree-source kind, and which wiring built it. */
+export interface LiveIos {
+  adapter(udid: string, kind: 'idb' | 'wda', deps: LiveIosDeps): DeviceAdapter;
+  wiring: string;
+}
+
+/** What the live golden hands the tree source: its own WebDriverAgent port and derived data (lab-device.ts). */
+export interface LiveIosDeps {
+  port?: number;
+  derivedDataPath?: string;
+}
+
+/** `Side.liveIos` from the side's registry and tree-source modules (see there). */
+function liveIosOf(registry: Record<string, unknown>, treeSource: Record<string, unknown>, Ios: Side['IosAdapter']): LiveIos | undefined {
+  if (typeof registry.iosAdapterFor === 'function') {
+    return {
+      adapter: registry.iosAdapterFor as LiveIos['adapter'],
+      wiring: "registry.ts#iosAdapterFor — the server's iOS wiring, its idb helper on (ADR 0032)",
+    };
+  }
+  if (typeof treeSource.createIosTreeSource !== 'function') return undefined;
+  const create = treeSource.createIosTreeSource as (kind: 'idb' | 'wda', udid: string, deps: LiveIosDeps) => ConstructorParameters<Side['IosAdapter']>[0]['treeSource'];
+  return {
+    adapter: (udid, kind, deps) => new Ios({ udid, treeSource: create(kind, udid, deps) }),
+    wiring: 'no registry.ts#iosAdapterFor in this side — IosAdapter over its createIosTreeSource, no idb helper: every idb call the CLI (the live golden before A23)',
+  };
 }
 
 /** Which devices a platform has — what the harness fakes (adapters/discovery.ts#DeviceDiscovery's `list`). */
@@ -101,6 +134,7 @@ export async function loadSide(root: string): Promise<Side> {
   const over = typeof discovery.discoveryOver === 'function' ? (discovery.discoveryOver as DiscoveryOver) : undefined;
   const Registry = registry.AdapterRegistry as new (deps: { factory: AdapterFactory; discovery: DeviceDiscovery }) => AdapterRegistry;
   const discoverySeam = await takesDeps(Registry);
+  const liveIos = liveIosOf(registry, treeSource, ios.IosAdapter as Side['IosAdapter']);
   return {
     root: resolve(root),
     createAveriServer: tools.createAveriServer as Side['createAveriServer'],
@@ -108,7 +142,7 @@ export async function loadSide(root: string): Promise<Side> {
     IosAdapter: ios.IosAdapter as Side['IosAdapter'],
     parseWdaSourceValue: wda.parseWdaSourceValue as Side['parseWdaSourceValue'],
     asksWdaBundle: typeof (wdaServer.WdaServer as { prototype?: Record<string, unknown> } | undefined)?.prototype?.activeAppInfo === 'function',
-    ...(typeof treeSource.createIosTreeSource === 'function' && { createIosTreeSource: treeSource.createIosTreeSource as NonNullable<Side['createIosTreeSource']> }),
+    ...(liveIos !== undefined && { liveIos }),
     registry: (deps) => {
       if (discoverySeam) return new Registry({ factory: deps.factory, discovery: discoveryFor(deps.discovery, over) });
       const legacy = Registry as unknown as new (factory: AdapterFactory) => AdapterRegistry;
