@@ -42,9 +42,10 @@ xcrun simctl install 3AB1E82E-47C1-4BEF-9F89-1FF62DBBC348 \
   ios/build/dd/Build/Products/Release-iphonesimulator/AveriLabRN.app
 
 # Android: the release variant (the JS bundled in), debuggable so run-as reads the state file; arm64-v8a only.
-# JDK 17: the lab build's lookup (scripts/truth/batch/lab-lines.ts#jdk17Of) — JAVA_HOME if it is a 17, else
-# `/usr/libexec/java_home -v 17`, else the first /Library/Java/JavaVirtualMachines/*.jdk whose release says 17
-# (e.g. zulu-17.jdk/Contents/Home, where java_home finds none inside the agent's sandbox)
+# JDK 17: the lab build's lookup (`jdk17Of` in scripts/truth/batch/lab-lines.ts) — JAVA_HOME if it is a JDK 17,
+# else `/usr/libexec/java_home -v 17`, else the first *.jdk in /Library/Java/JavaVirtualMachines, then in
+# ~/Library/Java/JavaVirtualMachines, whose release says 17 and that has bin/javac (e.g. zulu-17.jdk/Contents/Home;
+# java_home finds none inside the agent's sandbox)
 (cd android && JAVA_HOME=$(/usr/libexec/java_home -v 17) ./gradlew assembleRelease)
 adb -s emulator-5554 install -r android/app/build/outputs/apk/release/app-release.apk
 ```

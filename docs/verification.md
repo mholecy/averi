@@ -281,10 +281,11 @@ checkout and installs it. It runs the live golden's `chooser` group (launch_app 
 `forms` group. Both groups run by default. It refuses to start with no serial, and the lab guard refuses any emulator
 that is not the lab AVD before anything is built.
 
-The Android build runs under JDK 17, looked up in this order: JAVA_HOME if its `release` file says 17, then
-`/usr/libexec/java_home -v 17`, then the first `/Library/Java/JavaVirtualMachines/*.jdk` whose `Contents/Home/release`
-says 17. The build's LAB line names the JDK and where it came from. When none is found, the line says what each of the
-three gave.
+The Android build runs under JDK 17, looked up in this order: JAVA_HOME, then `/usr/libexec/java_home -v 17`, then
+the first `*.jdk` in `/Library/Java/JavaVirtualMachines` and then in `~/Library/Java/JavaVirtualMachines`. A home
+counts when its `release` file says 17 and it has `bin/javac`. The build's LAB line names the JDK and where it came
+from, and is a WARN naming what an earlier source said when one was passed over. When none is found, the line says what
+each source gave.
 
 Only the owner runs it. A chooser run that leaves a lab default behind fails the run by name, and the cleanup clears
 that default by uninstalling and reinstalling the lab app. Everything it writes goes under `--out`, apart from the

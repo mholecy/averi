@@ -1,8 +1,9 @@
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { APK_PATH, isDeviceCheckSimulator } from '../lab-device.js';
 import type { CallResult, Run } from './bounded.js';
 import { CELLS_ENTRY, UNZIP_SECS } from './lab-emu.js';
-import { CATALOG_PATH, cellsWhy, jdk17Of, jdkLine, JVM_DIR, NOT_REBUILT, REBUILT, RERUN_HINT, type Opened } from './lab-lines.js';
+import { CATALOG_PATH, cellsWhy, jdk17Of, jdkLine, jvmDirs, NOT_REBUILT, REBUILT, RERUN_HINT, type Opened } from './lab-lines.js';
 import type { Block, LastStep, Need, NeedCtx, NeedSpec } from './runner.js';
 import { NO_UDID, type NeedResult } from './runner-lines.js';
 import { exitText, failedCall, nameInLine } from './words.js';
@@ -12,11 +13,12 @@ import { exitText, failedCall, nameInLine } from './words.js';
  * block names — `ios-build`, `android-build` — so a build that fails makes every block needing it INCONCLUSIVE naming
  * why (the runner's need rule), and a block that does not need it runs on the app already installed: main's catalog
  * `--check`ed first, once for both (S3's not-ported row: a stale cells.json builds nothing); the iOS build (xcodegen,
- * xcodebuild) and the Android build (`gradlew assembleDebug` under JDK 17: lab-lines.ts#jdk17Of, T23), each a bounded step logged in the lab
- * folder, its product's cells.json main's; then `gradlew --stop`, after every Android build: the Gradle daemon leaves
- * the call's group by design, so S2's group kill cannot reach it. xcodebuild needs no pkill: its group ends with it
- * (S2). The devices' needs (ios-lab.ts, android-lab.ts) install this run's build (`built`) before their cells check;
- * and `labBlock` is batch-11's and batch-12's `lab` block — `ONLY=lab` runs just its needs.
+ * xcodebuild) and the Android build (`gradlew assembleDebug` under JDK 17: `jdk17Of` in lab-lines.ts, T23), each a
+ * bounded step logged in the lab folder, its product's cells.json main's; then `gradlew --stop`, after every Android
+ * build: the Gradle daemon leaves the call's group by design, so S2's group kill cannot reach it. xcodebuild needs no
+ * pkill: its group ends with it (S2). The devices' needs (ios-lab.ts, android-lab.ts) install this run's build
+ * (`built`) before their cells check; and `labBlock` is batch-11's and batch-12's `lab` block — `ONLY=lab` runs just
+ * its needs.
  */
 
 /** A build's bound when the batch names none (batch-11's B_BUILD). */
@@ -127,12 +129,12 @@ const failedText = (what: string, r: CallResult, log: string): string => `${what
 
 /**
  * The lab builds. Each need checks main's catalog first (one `catalog.ts --check` for the run, from the checkout under
- * test), then builds; met, its product's cells.json is main's. `alive`: the product still there. `jvms`: the folder the
- * JDK lookup tries last (JVM_DIR; a test's own).
+ * test), then builds; met, its product's cells.json is main's. `alive`: the product still there. `jvms`: the folders
+ * the JDK lookup tries last (jvmDirs: the system's, then the user's; a test's own).
  */
-export function labBuild(o: { secs?: number; jvms?: string } = {}): LabBuild {
+export function labBuild(o: { secs?: number; jvms?: readonly string[] } = {}): LabBuild {
   const secs = o.secs ?? BUILD_SECS;
-  const jvms = o.jvms ?? JVM_DIR;
+  const jvms = o.jvms ?? jvmDirs(homedir());
   let catalog: Promise<string | undefined> | undefined;
   const built: { ios?: string; android?: string } = {};
   const failed = new Map<string, string>();
@@ -176,6 +178,7 @@ export function labBuild(o: { secs?: number; jvms?: string } = {}): LabBuild {
       jvms,
       list: (d) => c.fs.list(d),
       release: (home) => c.fs.read(join(home, 'release')),
+      javac: (home) => c.fs.exists(join(home, 'bin', 'javac')),
     });
     if ('why' in checked) return { ok: false, why: checked.why };
     const cwd = join(c.config.repo, 'fixtures/apps/android');
@@ -199,7 +202,9 @@ export function labBuild(o: { secs?: number; jvms?: string } = {}): LabBuild {
     const why = cellsWhy(failedCall(cells) ? undefined : cells.out, catalogText(c), 'the built APK');
     if (why !== undefined) return { ok: false, why };
     built.android = apk;
-    return { ok: true, how: `built from the checkout under test (${nameInLine(apk)}) under ${jdkLine(checked)}; its ${CELLS_ENTRY} main's; the Gradle daemon stopped` };
+    const how = `built from the checkout under test (${nameInLine(apk)}) under ${jdkLine(checked)}; its ${CELLS_ENTRY} main's; the Gradle daemon stopped`;
+    // A source passed over (JAVA_HOME not a JDK 17, java_home failing) is said: the build ran, but not where asked.
+    return checked.warning === undefined ? { ok: true, how } : { ok: true, how, warning: checked.warning };
   };
 
   const stillThere = (product: () => string | undefined) => async (c: NeedCtx): Promise<NeedResult> => {

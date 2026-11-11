@@ -22,6 +22,7 @@ import {
   jdkLine,
   JVM_DIR,
   says17,
+  jvmDirs,
   type JdkProbes,
   STALE_COMPANION_WHY,
 } from '../../../scripts/truth/batch/lab-lines.js';
@@ -181,53 +182,88 @@ describe('an installed cells.json against main\'s catalog, byte for byte (batch-
   });
 });
 
-describe('the JDK for the Android build (batch-11.sh:309–310; T23: JAVA_HOME, else `java_home -v 17`, else /Library/Java/JavaVirtualMachines)', () => {
-  /** The probes: JAVA_HOME as given, `java_home -v 17`'s answer, the JVM folder's entries, each home's release file. */
-  const probes = (o: { env?: string; javaHome?: CallResult; entries?: string[]; releases?: Record<string, string> }) => {
+describe('the JDK for the Android build (batch-11.sh:309–310; T23: JAVA_HOME, else `java_home -v 17`, else the JVM folders)', () => {
+  /** The probes: JAVA_HOME as given, java_home's answer, the JVM folders' entries, each home's release, javac. */
+  const probes = (o: { env?: string; javaHome?: CallResult; entries?: Record<string, string[]>; releases?: Record<string, string>; jre?: string[] }) => {
     const asked: string[] = [];
     const p: JdkProbes = {
       javaHomeEnv: o.env,
       javaHome: async () => (asked.push('java_home'), o.javaHome ?? exit(1, 'Unable to locate a Java Runtime.\n')),
-      jvms: '/J',
-      list: (dir) => (asked.push(`list ${dir}`), o.entries ?? []),
+      jvms: ['/J', '/U'],
+      list: (dir) => (asked.push(`list ${dir}`), o.entries?.[dir] ?? []),
       release: (home) => (asked.push(`release ${home}`), o.releases?.[home]),
+      javac: (home) => !(o.jre ?? []).includes(home),
     };
     return { p, asked };
   };
   const R17 = 'IMPLEMENTOR="x"\nJAVA_VERSION="17.0.12"\n';
+  const NO_JRE = 'Unable to locate a Java Runtime.';
 
-  it('JAVA_HOME first, when its release says JAVA_VERSION="17…: java_home never asked, the folder never listed', async () => {
+  it('JAVA_HOME first, when it is a JDK 17: java_home never asked, no folder listed, nothing passed over', async () => {
     const { p, asked } = probes({ env: '/jdk17', javaHome: ok('/other\n'), releases: { '/jdk17': R17, '/other': R17 } });
     expect(await jdk17Of(p)).toEqual({ home: '/jdk17', from: 'JAVA_HOME' });
     expect(asked).toEqual(['release /jdk17']);
   });
 
-  it('JAVA_HOME not 17 (unset, empty, its release unread or another version): `java_home -v 17` next, its home\'s release checked', async () => {
-    for (const env of [undefined, '', '/jdk21', '/gone']) {
-      const { p, asked } = probes({ env, javaHome: ok('/jdk17\n'), releases: { '/jdk21': 'JAVA_VERSION="21.0.1"\n', '/jdk17': R17 } });
+  it('JAVA_HOME unset or empty: `java_home -v 17` next, its home checked; no warning (nothing passed over)', async () => {
+    for (const env of [undefined, '']) {
+      const { p, asked } = probes({ env, javaHome: ok('/jdk17\n'), releases: { '/jdk17': R17 } });
       expect(await jdk17Of(p)).toEqual({ home: '/jdk17', from: 'java_home' });
-      expect(asked).toEqual([...(env === undefined || env === '' ? [] : [`release ${env}`]), 'java_home', 'release /jdk17']);
+      expect(asked).toEqual(['java_home', 'release /jdk17']);
     }
   });
 
-  it('then the first *.jdk in the JVM folder, sorted, whose Contents/Home/release says 17 (the sandbox: java_home finds none)', async () => {
-    const releases = { '/J/0-jre17/Contents/Home': R17, '/J/a-21.jdk/Contents/Home': 'JAVA_VERSION="21"\n', '/J/b.jdk/Contents/Home': R17, '/J/c-17.jdk/Contents/Home': R17 };
-    const { p, asked } = probes({ entries: ['c-17.jdk', 'notes.txt', 'b.jdk', '0-jre17', 'a-21.jdk'], releases });
-    expect(await jdk17Of(p)).toEqual({ home: '/J/b.jdk/Contents/Home', from: 'JavaVirtualMachines' });
-    expect(asked).toEqual(['java_home', 'list /J', 'release /J/a-21.jdk/Contents/Home', 'release /J/b.jdk/Contents/Home']);
+  it('JAVA_HOME set but no JDK 17 (release unread, another version, a JRE): java_home used, the warning says why', async () => {
+    const releases = { '/jdk21': 'JAVA_VERSION="21.0.1"\n', '/jre17': R17, '/jdk17': R17 };
+    const cases: [string, string][] = [
+      ['/jdk21', "JAVA_HOME '/jdk21': its release says no 17"],
+      ['/gone', "JAVA_HOME '/gone': its release file not read"],
+      ['/jre17', "JAVA_HOME '/jre17': no bin/javac (a JRE)"],
+    ];
+    for (const [env, said] of cases) {
+      const { p, asked } = probes({ env, javaHome: ok('/jdk17\n'), releases, jre: ['/jre17'] });
+      expect(await jdk17Of(p)).toEqual({ home: '/jdk17', from: 'java_home', warning: `${said} — the build used the one from java_home` });
+      expect(asked).toEqual([`release ${env}`, 'java_home', 'release /jdk17']);
+    }
   });
 
-  it('none: why names the three tried, each with what it said', async () => {
-    const { p } = probes({ env: '/jdk21', entries: ['a.jdk', 'b.jdk'], releases: { '/jdk21': 'JAVA_VERSION="21"\n', '/J/a.jdk/Contents/Home': 'IMPLEMENTOR_JAVA_VERSION="17"\n' } });
-    expect(await jdk17Of(p)).toEqual({
-      why: "no JDK 17 (JAVA_HOME '/jdk21': its release says no 17; java_home -v 17 → nothing: exit 1 Unable to locate a Java Runtime.; /J: no *.jdk whose release says 17 (a.jdk, b.jdk))",
+  it('then the first *.jdk in the JVM folders, each sorted, in order — a JDK 17 home (the sandbox: java_home finds none)', async () => {
+    const releases = {
+      '/J/0-jre17/Contents/Home': R17,
+      '/J/a-21.jdk/Contents/Home': 'JAVA_VERSION="21"\n',
+      '/J/b-jre.jdk/Contents/Home': R17,
+      '/J/c.jdk/Contents/Home': R17,
+      '/J/d-17.jdk/Contents/Home': R17,
+    };
+    const { p, asked } = probes({ entries: { '/J': ['d-17.jdk', 'notes.txt', 'c.jdk', '0-jre17', 'b-jre.jdk', 'a-21.jdk'] }, releases, jre: ['/J/b-jre.jdk/Contents/Home'] });
+    expect(await jdk17Of(p)).toEqual({ home: '/J/c.jdk/Contents/Home', from: 'JavaVirtualMachines', warning: `java_home -v 17 → nothing: exit 1 ${NO_JRE} — the build used the one from JavaVirtualMachines` });
+    expect(asked).toEqual(['java_home', 'list /J', 'release /J/a-21.jdk/Contents/Home', 'release /J/b-jre.jdk/Contents/Home', 'release /J/c.jdk/Contents/Home']);
+    // The user's folder (~/Library/Java/JavaVirtualMachines) after the system one; the system one's misses passed over.
+    const user = probes({ entries: { '/J': ['a.jdk'], '/U': ['azul-17.0.19.jdk'] }, releases: { '/U/azul-17.0.19.jdk/Contents/Home': R17 } });
+    expect(await jdk17Of(user.p)).toEqual({
+      home: '/U/azul-17.0.19.jdk/Contents/Home',
+      from: 'JavaVirtualMachines',
+      warning: `java_home -v 17 → nothing: exit 1 ${NO_JRE}; /J: no JDK 17 among a.jdk (its release file not read) — the build used the one from JavaVirtualMachines`,
     });
-    expect(await jdk17Of(probes({ javaHome: ok(' \n') }).p)).toEqual({ why: 'no JDK 17 (JAVA_HOME unset; java_home -v 17 → nothing; /J: no *.jdk)' });
+    expect(user.asked).toEqual(['java_home', 'list /J', 'release /J/a.jdk/Contents/Home', 'list /U', 'release /U/azul-17.0.19.jdk/Contents/Home']);
+  });
+
+  it('none: why names every source tried, each with what it said', async () => {
+    const entries = { '/J': ['a.jdk', 'b.jdk', 'c.jdk'] };
+    const releases = { '/jdk21': 'JAVA_VERSION="21"\n', '/J/a.jdk/Contents/Home': 'IMPLEMENTOR_JAVA_VERSION="17"\n', '/J/c.jdk/Contents/Home': R17 };
+    const { p } = probes({ env: '/jdk21', entries, releases, jre: ['/J/c.jdk/Contents/Home'] });
+    expect(await jdk17Of(p)).toEqual({
+      why:
+        "no JDK 17 (JAVA_HOME '/jdk21': its release says no 17; java_home -v 17 → nothing: exit 1 Unable to locate a Java Runtime.; " +
+        '/J: no JDK 17 among a.jdk (its release says no 17), b.jdk (its release file not read), c.jdk (no bin/javac (a JRE)); /U: no *.jdk (or unreadable))',
+    });
+    expect(await jdk17Of(probes({ javaHome: ok(' \n') }).p)).toEqual({ why: 'no JDK 17 (JAVA_HOME unset; java_home -v 17 → nothing; /J: no *.jdk (or unreadable); /U: no *.jdk (or unreadable))' });
     const unread = probes({ env: '/gone', javaHome: ok('/jdk\n'), releases: { '/jdk': 'JAVA_VERSION="170"\n' } }).p;
-    expect(await jdk17Of(unread)).toEqual({ why: "no JDK 17 (JAVA_HOME '/gone': its release file not read; java_home -v 17 → '/jdk': its release says no 17; /J: no *.jdk)" });
+    expect(await jdk17Of(unread)).toMatchObject({ why: expect.stringMatching(/^no JDK 17 \(JAVA_HOME '\/gone': its release file not read; java_home -v 17 → '\/jdk': its release says no 17; \/J: /) });
     const noRelease = probes({ javaHome: exit(1, '', '/jdk\n'), releases: {} }).p;
-    expect(await jdk17Of(noRelease)).toEqual({ why: 'no JDK 17 (JAVA_HOME unset; java_home -v 17 → nothing: exit 1 /jdk; /J: no *.jdk)' });
-    expect(await jdk17Of(probes({ javaHome: ok('/x\n') }).p)).toEqual({ why: "no JDK 17 (JAVA_HOME unset; java_home -v 17 → '/x': its release file not read; /J: no *.jdk)" });
+    expect(await jdk17Of(noRelease)).toMatchObject({ why: expect.stringMatching(/^no JDK 17 \(JAVA_HOME unset; java_home -v 17 → nothing: exit 1 \/jdk; \/J: /) });
+    expect(await jdk17Of(probes({ javaHome: ok('/x\n') }).p)).toMatchObject({ why: expect.stringContaining("java_home -v 17 → '/x': its release file not read; ") });
+    expect(await jdk17Of(probes({ javaHome: ok('/x\n'), releases: { '/x': R17 }, jre: ['/x'] }).p)).toMatchObject({ why: expect.stringContaining("java_home -v 17 → '/x': no bin/javac (a JRE); ") });
   });
 
   it('the version check: JAVA_VERSION="17" or "17.…" on a line of its own; not 170, not another key ending in it', () => {
@@ -235,10 +271,11 @@ describe('the JDK for the Android build (batch-11.sh:309–310; T23: JAVA_HOME, 
     expect(['JAVA_VERSION="170"', 'IMPLEMENTOR_JAVA_VERSION="17"', 'JAVA_VERSION="21.0.1"', 'JAVA_VERSION=17', ''].map(says17)).toEqual([false, false, false, false, false]);
   });
 
-  it('the line naming the winner: `JDK 17: <home> (from <source>)`', () => {
+  it('the line naming the winner: `JDK 17: <home> (from <source>)`; the folders: the system one, the user\'s', () => {
     expect(jdkLine({ home: '/J/zulu-17.jdk/Contents/Home', from: 'JavaVirtualMachines' })).toBe('JDK 17: /J/zulu-17.jdk/Contents/Home (from JavaVirtualMachines)');
     expect(jdkLine({ home: '/a\nb', from: 'JAVA_HOME' })).toBe('JDK 17: "/a\\nb" (from JAVA_HOME)');
     expect(JVM_DIR).toBe('/Library/Java/JavaVirtualMachines');
+    expect(jvmDirs('/Users/me')).toEqual([JVM_DIR, '/Users/me/Library/Java/JavaVirtualMachines']);
   });
 });
 
