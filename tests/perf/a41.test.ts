@@ -270,9 +270,9 @@ describe('summaryLines — the short summary', () => {
     );
     // (a): 7000 − 600 = 6400 against max(0, 6000 − 1200) + 500 = 5300.
     expect(lines).toContain('first tap after launch_app (a, at once; information, not judged): first − warm 7000 − 600 = 6400 ms; WDA cold start 6000 ms against launch_app 1200 ms; first tap ok 5/5');
-    expect(lines).toContain('first tap after launch_app (b, ≥ 3.5 s after it started) ≤ the same tap warm + 500 ms: yes (1000 vs 600 + 500); first tap ok 4/5');
+    expect(lines).toContain('first tap after launch_app (b, ≥ 3.5 s after it replied) ≤ the same tap warm + 500 ms: yes (1000 vs 600 + 500); first tap ok 4/5');
     expect(lines).toContain('foreground after launch ok 5/5 (1 clearState; n ≥ 5 with one: yes)');
-    expect(lines).toContain('auto, the same first tap 4010 ms (n 5, 4009–4011) after launch_app started (no read before it): 1000 ms (n 5, 999–1001)');
+    expect(lines).toContain('auto, the same first tap 4010 ms (n 5, 4009–4011) after launch_app replied (no read before it): 1000 ms (n 5, 999–1001)');
     expect(lines).toContain('A41b acceptance');
     expect(lines).toContain(
       'at 300 ms: 0 wrong in 35 moving, uncensored settles over 60 trials — of 84 settles (M1a 4, M1b 50, M2 30), 40 of moving ids, 5 censored (< 500 ms of reads after), 0 wrong in all',
@@ -314,7 +314,7 @@ describe('summaryLines — the short summary', () => {
     // A gap under 3.5 s did not give WDA's start its time: unproven, whatever the tap took.
     const gapped = (min: number) =>
       summaryLines({ ...full, autoTap: { ...full.autoTap!, waitedGap: { n: 5, median: 4000, min, max: 4100 } } }).find((l) => l.includes('(b, '));
-    expect(gapped(3499)).toMatch(/: unproven \(a tap 3499 ms after launch_app started, under 3500\); first tap ok 4\/5$/);
+    expect(gapped(3499)).toMatch(/: unproven \(a tap 3499 ms after launch_app replied, under 3500\); first tap ok 4\/5$/);
     expect(gapped(3500)).toMatch(/: yes \(1000 vs 600 \+ 500\)/);
     const front = (f: NonNullable<A41Report['autoTap']>['foreground']) =>
       summaryLines({ ...full, autoTap: { ...full.autoTap!, foreground: f } }).find((l) => l.startsWith('foreground after launch'));
@@ -458,7 +458,7 @@ describe('the foreground leg (A41b review r1): which app the first read after a 
     expect(foregroundOk({ clearState: false, expected, label: 'Contacts', bundle: 'dev.averi.lab' })).toBe(false);
     expect(foregroundOk({ clearState: false, expected, label: 'AveriLab', bundle: 'dev.averi.lab', error: 'x' })).toBe(false);
   });
-  it('the waited leg starts its tap at least 3.5 s after launch_app started, the least gap it is judged on', () => {
+  it('the waited leg starts its tap at least 3.5 s after launch_app replied, the least gap it is judged on', () => {
     expect(WAITED_GAP_MIN_MS).toBe(3500);
     expect(WAITED_GAP_MS).toBeGreaterThanOrEqual(WAITED_GAP_MIN_MS);
   });

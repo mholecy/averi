@@ -459,11 +459,11 @@ export interface ColdRun {
 }
 
 /**
- * How long after launch_app started (the session's first device call: it builds the adapter, and its launch pre-warms
- * WDA) the waited leg's first tap starts — WDA's cold start (3.1–3.6 s on the lab) and a margin.
+ * How long after launch_app's reply the waited leg's first tap starts — WDA's cold start (3.1–3.6 s on the lab) and a
+ * margin. From the reply, not the call: the launch pre-warms WDA only once `simctl launch` returned, before the reply.
  */
 export const WAITED_GAP_MS = 4000;
-/** The least gap leg (b) is judged on: a tap that started earlier did not give WDA's start its time — unproven. */
+/** The least gap after launch_app's reply leg (b) is judged on: a tap that started earlier is unproven. */
 export const WAITED_GAP_MIN_MS = 3500;
 
 /**
@@ -504,8 +504,8 @@ export function snapshotRootLabel(reply: string): string | undefined {
  * An `auto` session: launch_app (WDA stopped), the first tap (the catalog's `open`), the open cell waited for
  * (`openSettled`: listed in time — else the warm taps paid the push), two warm taps on its A; launch_app again and the
  * same first tap with WDA up; launch_app a third time, the catalog waited for (`catalogSettled`), and the same tap warm.
- * Then two more fresh sessions (A41b review r1): the waited leg — launch_app, an untimed wait until WAITED_GAP_MS after
- * it started (no tree read), the same first tap (`firstWaited`; `waitedGapMs`, the time from launch_app's start to the
+ * Then two more fresh sessions (A41b review r1): the waited leg — launch_app, an untimed wait of WAITED_GAP_MS after
+ * it replied (no tree read), the same first tap (`firstWaited`; `waitedGapMs`, the time from launch_app's reply to the
  * tap's) — and `foreground` (ForegroundRun).
  */
 export interface AutoRun {
@@ -608,7 +608,7 @@ function autoLines(a: NonNullable<A41Report['autoTap']>): string[] {
     `auto, the catalog's open tap — first after launch_app (WDA stopped): ${orDash(a.firstCold)}; first after a relaunch, WDA up: ${orDash(a.firstWdaUp)}; warm: ${orDash(a.warmCatalog)}`,
     `auto, warm tap on open.A (another target, for information): ${orDash(a.warm)}`,
     `auto, WDA's bring-up in the first tap (first − first with WDA up): ${bringUp}`,
-    `auto, the same first tap ${orDash(a.waitedGap)} after launch_app started (no read before it): ${orDash(a.firstWaited)}`,
+    `auto, the same first tap ${orDash(a.waitedGap)} after launch_app replied (no read before it): ${orDash(a.firstWaited)}`,
     ...(left.length > 0 || a.failed > 0 ? [`auto, left out: ${[...left, ...(a.failed > 0 ? [`${a.failed} sessions with a failed step`] : [])].join('; ')}`] : []),
   ];
 }
@@ -619,7 +619,7 @@ const okOf = (c: { ok: number; n: number }): string => `${c.ok}/${c.n}`;
  * The first tap after launch_app in two legs (A41b reviews), each with how many first taps found the app in front:
  * (a) as the session runs — launch_app, then the tap at once — information only: first − warm, and WDA's cold start
  * against launch_app (no verdict: the probe cannot time the foreground wait, the only part of the launch the pre-warm
- * overlaps); (b) the acceptance — the tap WAITED_GAP_MS after launch_app started: `first ≤ warm + 500`, unproven when
+ * overlaps); (b) the acceptance — the tap WAITED_GAP_MS after launch_app replied: `first ≤ warm + 500`, unproven when
  * a gap was under WAITED_GAP_MIN_MS or a step fell back to idb (not WDA's taps). Then whether every first read after
  * a launch was the lab app.
  */
@@ -637,13 +637,13 @@ function firstTapLines(r: A41Report): string[] {
     (waited === undefined || warm === undefined || gap === undefined
       ? 'not measured'
       : gap.min < WAITED_GAP_MIN_MS
-        ? `unproven (a tap ${Math.round(gap.min)} ms after launch_app started, under ${WAITED_GAP_MIN_MS})`
+        ? `unproven (a tap ${Math.round(gap.min)} ms after launch_app replied, under ${WAITED_GAP_MIN_MS})`
         : `${waited.median <= warm.median + 500 ? 'yes' : 'no'} (${Math.round(waited.median)} vs ${Math.round(warm.median)} + 500)`);
   const f = a.foreground;
   const front = f.n === 0 ? 'not measured' : `${f.ok === f.n && f.n >= 5 && f.clearState >= 1 ? 'yes' : 'no'}`;
   return [
     `first tap after launch_app (a, at once; information, not judged): ${legA}; first tap ok ${okOf(a.firstTaps)}`,
-    `first tap after launch_app (b, ≥ ${WAITED_GAP_MIN_MS / 1000} s after it started) ≤ the same tap warm + 500 ms: ${legB}; first tap ok ${okOf(a.waitedTaps)}`,
+    `first tap after launch_app (b, ≥ ${WAITED_GAP_MIN_MS / 1000} s after it replied) ≤ the same tap warm + 500 ms: ${legB}; first tap ok ${okOf(a.waitedTaps)}`,
     `foreground after launch ok ${okOf(f)} (${f.clearState} clearState; n ≥ 5 with one: ${front})${f.seen.length > 0 ? ` — read instead: ${f.seen.join('; ')}` : ''}`,
   ];
 }

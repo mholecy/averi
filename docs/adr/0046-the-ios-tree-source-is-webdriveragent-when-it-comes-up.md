@@ -146,7 +146,7 @@ start, and returns at once. It never throws and never rejects. Nothing awaits it
   3. Under `wda` a failed background build is dropped and the first read builds again: two builds where there was one.
   4. The "first WDA build … takes minutes" line would reach stderr during an unrelated tool call.
 - The rule (cached build, run in the background, never reject, nothing once released) is one function,
-  `wda-tree-source.ts#startInBackgroundIfBuilt`, which both sources call.
+  `adapters/prewarm.ts#startInBackgroundIfBuilt`, which both sources call.
 
 **Behaviour that moves.**
 - Under `auto`, a launch may see the choice made during its foreground wait. The wait asks idb's label until then and
@@ -162,11 +162,12 @@ start, and returns at once. It never throws and never rejects. Nothing awaits it
     summary prints first − warm and WDA's cold start against launch_app, with no verdict. The pre-warm overlaps only
     the launch's foreground wait, which the probe cannot time apart from the rest of launch_app, so any allowance
     would be a guess (review 2, the orchestrator's decision). The original "first ≤ warm + 500" is not reachable in
-    this order, whatever the code does.
+    this order while WDA's cold start exceeds the launch's foreground wait.
   - *(b) the acceptance:* a fresh session whose tap starts `WAITED_GAP_MS` (4 s: WDA's cold start, 3.1–3.6 s, and a
-    margin) after `launch_app` started, with no read before it: first ≤ warm + 500 ms, judged only when every gap was
-    at least 3.5 s and no step fell back to idb (else unproven). Plausible: WDA is up by then, and the tap with WDA up
-    measured 1 202 against 1 157 warm.
+    margin) after `launch_app` replied, with no read before it: first ≤ warm + 500 ms, judged only when every gap from
+    the reply was at least 3.5 s and no step fell back to idb (else unproven). The gap is counted from the reply, not
+    the call: the pre-warm starts once `simctl launch` returned, before the reply, so WDA gets at least its whole
+    measured cold start. Plausible: WDA is up by then, and the tap with WDA up measured 1 202 against 1 157 warm.
 - *Foreground after launch ok n/n:* 5 fresh sessions, the first a `clearState` launch, each reading at once after
   `launch_app`: the read's root label is the lab app's (AveriLab) and WDA's active bundle is `dev.averi.lab`. It
   measures what is left of the overlap: WDA's start beside the launch's foreground wait.

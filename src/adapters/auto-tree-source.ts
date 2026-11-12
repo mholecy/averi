@@ -2,7 +2,7 @@ import { errorMessage } from '../util/error-message.js';
 import { withNoteLine } from '../util/note-line.js';
 import type { IosTreeSourceKind } from './ios-node.js';
 import { idbTypingRefusal } from './ios-typing.js';
-import { startInBackgroundIfBuilt } from './wda-tree-source.js';
+import { startInBackgroundIfBuilt } from './prewarm.js';
 import type { ApplicationLabel, IosTreeSource } from './ios-tree-source.js';
 import type { SystemAlert, UiNode } from './types.js';
 
@@ -115,7 +115,7 @@ export class AutoTreeSource implements IosTreeSource {
   }
 
   /**
-   * Starts the choice in the background and returns at once (A41b; wda-tree-source.ts#startInBackgroundIfBuilt), once:
+   * Starts the choice in the background and returns at once (A41b; prewarm.ts#startInBackgroundIfBuilt), once:
    * nothing after a choice started. A WDA that does not come up is the fallback the first read meets (choose); a
    * release mid-choice is that read's error.
    */
