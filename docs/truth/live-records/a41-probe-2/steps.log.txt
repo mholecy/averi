@@ -1,0 +1,25 @@
+21:02:41 ---- lab-a41-ios run 20261112-210241-23296, blocks lab,a41-idb,a41-wda,a41-report
+21:02:41 OK checkout: main's HEAD 6f80d529, clean
+21:02:41 NOTE ios-reset: D8DACDE6-6352-437C-AA22-86FB06275C3F, its idb companion and the lab's WebDriverAgent
+21:02:58 OK   ios-reset
+21:02:58 NOTE com.apple.launchservices.schemeapproval's finportal key at the iOS stretch's start: sk.finportal.myport (read only: no batch writes it)
+21:03:06 LAB ios: OK — averi-lab iPhone 17 simulator, iOS 27.0, reset; this run's build installed; the installed cells.json is main's
+21:03:36 OK   a41-idb golden (exit 0)
+21:03:39 OK   ios-health before a41 baseline-idb
+21:07:28 OK   a41-idb baseline-idb
+21:07:30 OK   ios-health before a41 hit-test
+21:08:07 OK   a41-idb hit-test
+21:08:10 OK   ios-health before the WDA window
+21:08:11 OK   D43 backup: com.apple.keyboard.preferences exported, com.apple.Preferences exported, com.apple.Accessibility exported; state <out>/a41-wda/run-20261112-210241-23296/state.json (dirty until the restore verifies)
+21:08:14 OK   ios-health before a41 baseline-wda
+21:12:23 OK   a41-wda baseline-wda
+21:12:25 OK   ios-health before a41 wda-cold
+21:13:00 OK   a41-wda wda-cold
+21:13:02 OK   ios-health before a41 auto-tap
+21:15:42 OK   a41-wda auto-tap
+21:15:45 OK   ios-health before a41 cadence
+21:26:59 OK   a41-wda cadence
+21:27:08 OK   ios-health before iOS end
+21:27:10 OK   a41-report report
+21:27:10 A41 summary: <out>/a41-report/run-20261112-210241-23296/summary.txt
+21:27:10 NOTE the lab's WebDriverAgent (port 8120 free) and idb_companion of D8DACDE6-6352-437C-AA22-86FB06275C3F ended

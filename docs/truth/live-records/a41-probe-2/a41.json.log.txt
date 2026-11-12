@@ -1,0 +1,958 @@
+{
+ "meta": {
+  "commit": "6f80d529437298a6c05546dfd911481e91524705",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "generated": "2026-11-12T20:27:10.133Z"
+ },
+ "missing": [],
+ "wdaBuilt": false,
+ "table": [
+  {
+   "scenario": "tree",
+   "idb": {
+    "first": 196.8268750000002,
+    "warm": {
+     "n": 7,
+     "median": 107.64574999999604,
+     "min": 78.4008329999997,
+     "max": 115.31020799999533
+    },
+    "failed": 0
+   },
+   "wda": {
+    "first": 4153.132917,
+    "warm": {
+     "n": 7,
+     "median": 103.21783300000243,
+     "min": 101.84775000001537,
+     "max": 105.94720899999811
+    },
+    "failed": 0
+   }
+  },
+  {
+   "scenario": "tap",
+   "idb": {
+    "first": 541.7340000000004,
+    "warm": {
+     "n": 7,
+     "median": 469.52404200000456,
+     "min": 452.04899999999907,
+     "max": 479.6075419999979
+    },
+    "failed": 0
+   },
+   "wda": {
+    "first": 686.4498750000002,
+    "warm": {
+     "n": 7,
+     "median": 490.28516699999454,
+     "min": 486.81795799999963,
+     "max": 491.0818330000038
+    },
+    "failed": 0
+   }
+  },
+  {
+   "scenario": "fill",
+   "idb": {
+    "first": 1167.3125419999997,
+    "warm": {
+     "n": 7,
+     "median": 1046.4242499999964,
+     "min": 1025.328665999994,
+     "max": 1055.780625000014
+    },
+    "failed": 0
+   },
+   "wda": {
+    "first": 1638.9307499999995,
+    "warm": {
+     "n": 7,
+     "median": 1626.212542000023,
+     "min": 1616.0667910000193,
+     "max": 1662.859666999997
+    },
+    "failed": 0
+   }
+  },
+  {
+   "scenario": "scroll",
+   "idb": {
+    "first": 7782.960332999999,
+    "warm": {
+     "n": 7,
+     "median": 8025.92074999999,
+     "min": 7923.380208000002,
+     "max": 8071.0043749999895
+    },
+    "failed": 0
+   },
+   "wda": {
+    "first": 6626.084292,
+    "warm": {
+     "n": 7,
+     "median": 6589.07016599999,
+     "min": 6516.489792000008,
+     "max": 6686.361416999978
+    },
+    "failed": 0
+   }
+  },
+  {
+   "scenario": "ensure-cold",
+   "idb": {
+    "first": 3418.597334000002,
+    "warm": {
+     "n": 7,
+     "median": 2968.8357080000133,
+     "min": 2921.6169579999987,
+     "max": 2987.4599159999925
+    },
+    "failed": 0
+   },
+   "wda": {
+    "first": 5938.33525,
+    "warm": {
+     "n": 7,
+     "median": 5894.607375000021,
+     "min": 5868.558667000005,
+     "max": 5916.766250000015
+    },
+    "failed": 0
+   }
+  },
+  {
+   "scenario": "ensure-warm",
+   "idb": {
+    "first": 458.44587500000125,
+    "warm": {
+     "n": 7,
+     "median": 475.08679099999426,
+     "min": 448.5757500000036,
+     "max": 481.33995799999684
+    },
+    "failed": 0
+   },
+   "wda": {
+    "first": 488.95300000000134,
+    "warm": {
+     "n": 7,
+     "median": 491.5583329999936,
+     "min": 484.74379199999385,
+     "max": 499.2251669999969
+    },
+    "failed": 0
+   }
+  }
+ ],
+ "wdaCold": {
+  "coldRead": {
+   "n": 5,
+   "median": 3101.415417,
+   "min": 3095.589874999998,
+   "max": 3154.482208
+  },
+  "warmRead": {
+   "n": 5,
+   "median": 30.123583000000508,
+   "min": 29.190291999999317,
+   "max": 34.18479100000059
+  },
+  "failed": 0
+ },
+ "autoTap": {
+  "launch": {
+   "n": 5,
+   "median": 1992.5728329999984,
+   "min": 1989.405749999998,
+   "max": 2009.305375
+  },
+  "relaunch": {
+   "n": 5,
+   "median": 1948.9687919999997,
+   "min": 1922.5964579999854,
+   "max": 1967.9723749999994
+  },
+  "firstCold": {
+   "n": 5,
+   "median": 5180.302249999993,
+   "min": 5165.304291000008,
+   "max": 5230.6431250000005
+  },
+  "firstWdaUp": {
+   "n": 5,
+   "median": 1201.9935830000031,
+   "min": 1182.7317499999917,
+   "max": 1206.1830830000108
+  },
+  "warmCatalog": {
+   "n": 5,
+   "median": 1157.5620839999901,
+   "min": 1141.605750000017,
+   "max": 1164.387125000001
+  },
+  "warm": {
+   "n": 10,
+   "median": 480.07897899999807,
+   "min": 464.15354199998546,
+   "max": 492.46158399999695
+  },
+  "firstWaited": {
+   "n": 5,
+   "median": 1307.7927909999999,
+   "min": 1286.613584000006,
+   "max": 1338.3950840000034
+  },
+  "waitedGap": {
+   "n": 5,
+   "median": 4002.0725410000014,
+   "min": 4000.750291000004,
+   "max": 4002.9690840000003
+  },
+  "firstTaps": {
+   "ok": 5,
+   "n": 5
+  },
+  "waitedTaps": {
+   "ok": 5,
+   "n": 5
+  },
+  "foreground": {
+   "ok": 5,
+   "n": 5,
+   "clearState": 1,
+   "seen": []
+  },
+  "fellBack": 0,
+  "paidPush": 0,
+  "catalogUnsettled": 0,
+  "failed": 0
+ },
+ "cadence": {
+  "trials": 0,
+  "moving": {},
+  "passes": [
+   {
+    "pollMs": 300,
+    "settles": {},
+    "wrong": [],
+    "moving": 0,
+    "censored": 0,
+    "judged": 0,
+    "wrongJudged": 0
+   },
+   {
+    "pollMs": 500,
+    "settles": {},
+    "wrong": [],
+    "moving": 0,
+    "censored": 0,
+    "judged": 0,
+    "wrongJudged": 0
+   }
+  ],
+  "judgement": {
+   "verdict": "unproven",
+   "why": "no trial recorded"
+  }
+ },
+ "hitTest": {
+  "rows": [
+   {
+    "kind": "false-tapped",
+    "id": "lab.blur-menu-grouped.A",
+    "point": {
+     "x": 201,
+     "y": 142
+    },
+    "verdict": "unsound",
+    "named": [
+     "cli lab.blur-menu-grouped.A",
+     "cli lab.blur-menu-grouped.A",
+     "cli lab.blur-menu-grouped.A",
+     "helper lab.blur-menu-grouped.A",
+     "helper lab.blur-menu-grouped.A",
+     "helper lab.blur-menu-grouped.A"
+    ],
+    "rules": [
+     "target",
+     "target",
+     "target",
+     "target",
+     "target",
+     "target"
+    ],
+    "cliMs": 92.48416700000053,
+    "helperMs": 16.38025000000016
+   },
+   {
+    "kind": "false-tapped",
+    "id": "lab.blur-menu-grouped.B",
+    "point": {
+     "x": 201,
+     "y": 322
+    },
+    "verdict": "unsound",
+    "named": [
+     "cli lab.blur-menu-grouped.B",
+     "cli lab.blur-menu-grouped.B",
+     "cli lab.blur-menu-grouped.B",
+     "helper lab.blur-menu-grouped.B",
+     "helper lab.blur-menu-grouped.B",
+     "helper lab.blur-menu-grouped.B"
+    ],
+    "rules": [
+     "target",
+     "target",
+     "target",
+     "target",
+     "target",
+     "target"
+    ],
+    "cliMs": 92.79083300000002,
+    "helperMs": 16.388500000000022
+   },
+   {
+    "kind": "false-tapped",
+    "id": "lab.blur-menu-grouped.D",
+    "point": {
+     "x": 201,
+     "y": 682
+    },
+    "verdict": "unsound",
+    "named": [
+     "cli lab.blur-menu-grouped.D",
+     "cli lab.blur-menu-grouped.D",
+     "cli lab.blur-menu-grouped.D",
+     "helper lab.blur-menu-grouped.D",
+     "helper lab.blur-menu-grouped.D",
+     "helper lab.blur-menu-grouped.D"
+    ],
+    "rules": [
+     "target",
+     "target",
+     "target",
+     "target",
+     "target",
+     "target"
+    ],
+    "cliMs": 93.09675000000061,
+    "helperMs": 16.152666999999383
+   },
+   {
+    "kind": "control",
+    "id": "lab.blur-menu-grouped.K",
+    "point": {
+     "x": 201,
+     "y": 412
+    },
+    "verdict": "open",
+    "named": [
+     "cli lab.blur-menu-grouped.K",
+     "cli lab.blur-menu-grouped.K",
+     "cli lab.blur-menu-grouped.K",
+     "helper lab.blur-menu-grouped.K",
+     "helper lab.blur-menu-grouped.K",
+     "helper lab.blur-menu-grouped.K"
+    ],
+    "rules": [
+     "target",
+     "target",
+     "target",
+     "target",
+     "target",
+     "target"
+    ],
+    "cliMs": 93.40679199999977,
+    "helperMs": 15.789083000000574
+   },
+   {
+    "kind": "control",
+    "id": "lab.blur-menu-grouped.W",
+    "point": {
+     "x": 201,
+     "y": 480
+    },
+    "verdict": "open",
+    "named": [
+     "cli lab.blur-menu-grouped.W",
+     "cli lab.blur-menu-grouped.W",
+     "cli lab.blur-menu-grouped.W",
+     "helper lab.blur-menu-grouped.W",
+     "helper lab.blur-menu-grouped.W",
+     "helper lab.blur-menu-grouped.W"
+    ],
+    "rules": [
+     "target",
+     "target",
+     "target",
+     "target",
+     "target",
+     "target"
+    ],
+    "cliMs": 92.35270799999944,
+    "helperMs": 15.909834000000046
+   },
+   {
+    "kind": "false-tapped",
+    "id": "lab.blur-menu-stacked.A",
+    "point": {
+     "x": 201,
+     "y": 142
+    },
+    "verdict": "unsound",
+    "named": [
+     "cli lab.blur-menu-stacked.A",
+     "cli lab.blur-menu-stacked.A",
+     "cli lab.blur-menu-stacked.A",
+     "helper lab.blur-menu-stacked.A",
+     "helper lab.blur-menu-stacked.A",
+     "helper lab.blur-menu-stacked.A"
+    ],
+    "rules": [
+     "target",
+     "target",
+     "target",
+     "target",
+     "target",
+     "target"
+    ],
+    "cliMs": 91.80779199999961,
+    "helperMs": 15.97004200000083
+   },
+   {
+    "kind": "false-tapped",
+    "id": "lab.blur-menu-stacked.B",
+    "point": {
+     "x": 201,
+     "y": 322
+    },
+    "verdict": "unsound",
+    "named": [
+     "cli lab.blur-menu-stacked.B",
+     "cli lab.blur-menu-stacked.B",
+     "cli lab.blur-menu-stacked.B",
+     "helper lab.blur-menu-stacked.B",
+     "helper lab.blur-menu-stacked.B",
+     "helper lab.blur-menu-stacked.B"
+    ],
+    "rules": [
+     "target",
+     "target",
+     "target",
+     "target",
+     "target",
+     "target"
+    ],
+    "cliMs": 92.261708,
+    "helperMs": 16.31891700000051
+   },
+   {
+    "kind": "false-tapped",
+    "id": "lab.blur-menu-stacked.D",
+    "point": {
+     "x": 201,
+     "y": 682
+    },
+    "verdict": "unsound",
+    "named": [
+     "cli lab.blur-menu-stacked.D",
+     "cli lab.blur-menu-stacked.D",
+     "cli lab.blur-menu-stacked.D",
+     "helper lab.blur-menu-stacked.D",
+     "helper lab.blur-menu-stacked.D",
+     "helper lab.blur-menu-stacked.D"
+    ],
+    "rules": [
+     "target",
+     "target",
+     "target",
+     "target",
+     "target",
+     "target"
+    ],
+    "cliMs": 94.52554100000089,
+    "helperMs": 14.34154099999978
+   },
+   {
+    "kind": "control",
+    "id": "lab.blur-menu-stacked.K",
+    "point": {
+     "x": 201,
+     "y": 412
+    },
+    "verdict": "open",
+    "named": [
+     "cli lab.blur-menu-stacked.K",
+     "cli lab.blur-menu-stacked.K",
+     "cli lab.blur-menu-stacked.K",
+     "helper lab.blur-menu-stacked.K",
+     "helper lab.blur-menu-stacked.K",
+     "helper lab.blur-menu-stacked.K"
+    ],
+    "rules": [
+     "target",
+     "target",
+     "target",
+     "target",
+     "target",
+     "target"
+    ],
+    "cliMs": 92.68795800000044,
+    "helperMs": 16.395542000000205
+   },
+   {
+    "kind": "control",
+    "id": "lab.blur-menu-stacked.W",
+    "point": {
+     "x": 201,
+     "y": 480
+    },
+    "verdict": "open",
+    "named": [
+     "cli lab.blur-menu-stacked.W",
+     "cli lab.blur-menu-stacked.W",
+     "cli lab.blur-menu-stacked.W",
+     "helper lab.blur-menu-stacked.W",
+     "helper lab.blur-menu-stacked.W",
+     "helper lab.blur-menu-stacked.W"
+    ],
+    "rules": [
+     "target",
+     "target",
+     "target",
+     "target",
+     "target",
+     "target"
+    ],
+    "cliMs": 92.56424999999945,
+    "helperMs": 15.977582999999868
+   },
+   {
+    "kind": "false-tapped",
+    "id": "lab.blur-menu.A",
+    "point": {
+     "x": 201,
+     "y": 142
+    },
+    "verdict": "unsound",
+    "named": [
+     "cli lab.blur-menu.A",
+     "cli lab.blur-menu.A",
+     "cli lab.blur-menu.A",
+     "helper lab.blur-menu.A",
+     "helper lab.blur-menu.A",
+     "helper lab.blur-menu.A"
+    ],
+    "rules": [
+     "target",
+     "target",
+     "target",
+     "target",
+     "target",
+     "target"
+    ],
+    "cliMs": 91.55612499999916,
+    "helperMs": 15.96887500000048
+   },
+   {
+    "kind": "false-tapped",
+    "id": "lab.blur-menu.B",
+    "point": {
+     "x": 201,
+     "y": 322
+    },
+    "verdict": "unsound",
+    "named": [
+     "cli lab.blur-menu.B",
+     "cli lab.blur-menu.B",
+     "cli lab.blur-menu.B",
+     "helper lab.blur-menu.B",
+     "helper lab.blur-menu.B",
+     "helper lab.blur-menu.B"
+    ],
+    "rules": [
+     "target",
+     "target",
+     "target",
+     "target",
+     "target",
+     "target"
+    ],
+    "cliMs": 91.42662500000006,
+    "helperMs": 15.833125000001019
+   },
+   {
+    "kind": "false-tapped",
+    "id": "lab.blur-menu.D",
+    "point": {
+     "x": 201,
+     "y": 682
+    },
+    "verdict": "unsound",
+    "named": [
+     "cli lab.blur-menu.D",
+     "cli lab.blur-menu.D",
+     "cli lab.blur-menu.D",
+     "helper lab.blur-menu.D",
+     "helper lab.blur-menu.D",
+     "helper lab.blur-menu.D"
+    ],
+    "rules": [
+     "target",
+     "target",
+     "target",
+     "target",
+     "target",
+     "target"
+    ],
+    "cliMs": 91.5102079999997,
+    "helperMs": 14.488916999998764
+   },
+   {
+    "kind": "control",
+    "id": "lab.blur-menu.K",
+    "point": {
+     "x": 201,
+     "y": 412
+    },
+    "verdict": "open",
+    "named": [
+     "cli lab.blur-menu.K",
+     "cli lab.blur-menu.K",
+     "cli lab.blur-menu.K",
+     "helper lab.blur-menu.K",
+     "helper lab.blur-menu.K",
+     "helper lab.blur-menu.K"
+    ],
+    "rules": [
+     "target",
+     "target",
+     "target",
+     "target",
+     "target",
+     "target"
+    ],
+    "cliMs": 92.19229199999972,
+    "helperMs": 16.134667000002082
+   },
+   {
+    "kind": "control",
+    "id": "lab.blur-menu.W",
+    "point": {
+     "x": 201,
+     "y": 480
+    },
+    "verdict": "open",
+    "named": [
+     "cli lab.blur-menu.W",
+     "cli lab.blur-menu.W",
+     "cli lab.blur-menu.W",
+     "helper lab.blur-menu.W",
+     "helper lab.blur-menu.W",
+     "helper lab.blur-menu.W"
+    ],
+    "rules": [
+     "target",
+     "target",
+     "target",
+     "target",
+     "target",
+     "target"
+    ],
+    "cliMs": 90.71012500000143,
+    "helperMs": 15.074166999998852
+   },
+   {
+    "kind": "false-tapped",
+    "id": "lab.scroll-bounded-footer.O",
+    "point": {
+     "x": 201,
+     "y": 670
+    },
+    "verdict": "unproven",
+    "named": [
+     "cli error: Command failed (exit 1): idb ui describe-point 201 670 --json --udid D8DACDE6-6352-437C-AA22-86FB06275C3F",
+     "cli error: Command failed (exit 1): idb ui describe-point 201 670 --json --udid D8DACDE6-6352-437C-AA22-86FB06275C3F",
+     "cli error: Command failed (exit 1): idb ui describe-point 201 670 --json --udid D8DACDE6-6352-437C-AA22-86FB06275C3F",
+     "helper error: idb describe-point exit 1: No accessibility element at (201.0, 670.0): the point may be off-screen or covered by a fullscreen dialog",
+     "helper error: idb describe-point exit 1: No accessibility element at (201.0, 670.0): the point may be off-screen or covered by a fullscreen dialog",
+     "helper error: idb describe-point exit 1: No accessibility element at (201.0, 670.0): the point may be off-screen or covered by a fullscreen dialog"
+    ],
+    "rules": [
+     "error",
+     "error",
+     "error",
+     "error",
+     "error",
+     "error"
+    ]
+   },
+   {
+    "kind": "false-tapped",
+    "id": "lab.scroll-bounded.S",
+    "point": {
+     "x": 201,
+     "y": 584
+    },
+    "verdict": "unproven",
+    "named": [
+     "cli error: Command failed (exit 1): idb ui describe-point 201 584 --json --udid D8DACDE6-6352-437C-AA22-86FB06275C3F",
+     "cli error: Command failed (exit 1): idb ui describe-point 201 584 --json --udid D8DACDE6-6352-437C-AA22-86FB06275C3F",
+     "cli error: Command failed (exit 1): idb ui describe-point 201 584 --json --udid D8DACDE6-6352-437C-AA22-86FB06275C3F",
+     "helper error: idb describe-point exit 1: No accessibility element at (201.0, 584.0): the point may be off-screen or covered by a fullscreen dialog",
+     "helper error: idb describe-point exit 1: No accessibility element at (201.0, 584.0): the point may be off-screen or covered by a fullscreen dialog",
+     "helper error: idb describe-point exit 1: No accessibility element at (201.0, 584.0): the point may be off-screen or covered by a fullscreen dialog"
+    ],
+    "rules": [
+     "error",
+     "error",
+     "error",
+     "error",
+     "error",
+     "error"
+    ]
+   },
+   {
+    "kind": "false-tapped",
+    "id": "lab.scroll-bounded.O",
+    "point": {
+     "x": 201,
+     "y": 652
+    },
+    "verdict": "unproven",
+    "named": [
+     "cli error: Command failed (exit 1): idb ui describe-point 201 652 --json --udid D8DACDE6-6352-437C-AA22-86FB06275C3F",
+     "cli error: Command failed (exit 1): idb ui describe-point 201 652 --json --udid D8DACDE6-6352-437C-AA22-86FB06275C3F",
+     "cli error: Command failed (exit 1): idb ui describe-point 201 652 --json --udid D8DACDE6-6352-437C-AA22-86FB06275C3F",
+     "helper error: idb describe-point exit 1: No accessibility element at (201.0, 652.0): the point may be off-screen or covered by a fullscreen dialog",
+     "helper error: idb describe-point exit 1: No accessibility element at (201.0, 652.0): the point may be off-screen or covered by a fullscreen dialog",
+     "helper error: idb describe-point exit 1: No accessibility element at (201.0, 652.0): the point may be off-screen or covered by a fullscreen dialog"
+    ],
+    "rules": [
+     "error",
+     "error",
+     "error",
+     "error",
+     "error",
+     "error"
+    ]
+   },
+   {
+    "kind": "control",
+    "id": "lab.scroll-bounded.W",
+    "point": {
+     "x": 201,
+     "y": 152
+    },
+    "verdict": "open",
+    "named": [
+     "cli lab.scroll-bounded.W",
+     "cli lab.scroll-bounded.W",
+     "cli lab.scroll-bounded.W",
+     "helper lab.scroll-bounded.W",
+     "helper lab.scroll-bounded.W",
+     "helper lab.scroll-bounded.W"
+    ],
+    "rules": [
+     "target",
+     "target",
+     "target",
+     "target",
+     "target",
+     "target"
+    ],
+    "cliMs": 92.91362499999741,
+    "helperMs": 15.433874999998807
+   },
+   {
+    "kind": "control",
+    "id": "lab.scroll-bounded.P",
+    "point": {
+     "x": 201,
+     "y": 322
+    },
+    "verdict": "open",
+    "named": [
+     "cli lab.scroll-bounded.P",
+     "cli lab.scroll-bounded.P",
+     "cli lab.scroll-bounded.P",
+     "helper lab.scroll-bounded.P",
+     "helper lab.scroll-bounded.P",
+     "helper lab.scroll-bounded.P"
+    ],
+    "rules": [
+     "target",
+     "target",
+     "target",
+     "target",
+     "target",
+     "target"
+    ],
+    "cliMs": 92.37883399999919,
+    "helperMs": 14.376667000000452
+   },
+   {
+    "kind": "false-tapped",
+    "id": "lab.rn-banner.T",
+    "point": {
+     "x": 201,
+     "y": 142
+    },
+    "verdict": "sound",
+    "named": [
+     "cli lab.rn-banner.T.cover",
+     "cli lab.rn-banner.T.cover",
+     "cli lab.rn-banner.T.cover",
+     "helper lab.rn-banner.T.cover",
+     "helper lab.rn-banner.T.cover",
+     "helper lab.rn-banner.T.cover"
+    ],
+    "rules": [
+     "other",
+     "other",
+     "other",
+     "other",
+     "other",
+     "other"
+    ],
+    "cliMs": 92.8216250000005,
+    "helperMs": 14.186582999998791
+   },
+   {
+    "kind": "false-tapped",
+    "id": "lab.rn-banner.U",
+    "point": {
+     "x": 201,
+     "y": 322
+    },
+    "verdict": "unsound",
+    "named": [
+     "cli lab.rn-banner.U",
+     "cli lab.rn-banner.U",
+     "cli lab.rn-banner.U",
+     "helper lab.rn-banner.U",
+     "helper lab.rn-banner.U",
+     "helper lab.rn-banner.U"
+    ],
+    "rules": [
+     "target",
+     "target",
+     "target",
+     "target",
+     "target",
+     "target"
+    ],
+    "cliMs": 92.49941600000238,
+    "helperMs": 14.473458000000392
+   },
+   {
+    "kind": "false-tapped",
+    "id": "lab.rn-banner.C",
+    "point": {
+     "x": 201,
+     "y": 502
+    },
+    "verdict": "unsound",
+    "named": [
+     "cli lab.rn-banner.C",
+     "cli lab.rn-banner.C",
+     "cli lab.rn-banner.C",
+     "helper lab.rn-banner.C",
+     "helper lab.rn-banner.C",
+     "helper lab.rn-banner.C"
+    ],
+    "rules": [
+     "target",
+     "target",
+     "target",
+     "target",
+     "target",
+     "target"
+    ],
+    "cliMs": 91.78549999999814,
+    "helperMs": 15.211750000002212
+   },
+   {
+    "kind": "control",
+    "id": "lab.blur-menu-unhidden.K",
+    "point": {
+     "x": 201,
+     "y": 412
+    },
+    "verdict": "open",
+    "named": [
+     "cli lab.blur-menu-unhidden.K",
+     "cli lab.blur-menu-unhidden.K",
+     "cli lab.blur-menu-unhidden.K",
+     "helper lab.blur-menu-unhidden.K",
+     "helper lab.blur-menu-unhidden.K",
+     "helper lab.blur-menu-unhidden.K"
+    ],
+    "rules": [
+     "target",
+     "target",
+     "target",
+     "target",
+     "target",
+     "target"
+    ],
+    "cliMs": 92.7120419999992,
+    "helperMs": 16.09649999999965
+   },
+   {
+    "kind": "control",
+    "id": "lab.blur-menu-unhidden.W",
+    "point": {
+     "x": 201,
+     "y": 480
+    },
+    "verdict": "open",
+    "named": [
+     "cli lab.blur-menu-unhidden.W",
+     "cli lab.blur-menu-unhidden.W",
+     "cli lab.blur-menu-unhidden.W",
+     "helper lab.blur-menu-unhidden.W",
+     "helper lab.blur-menu-unhidden.W",
+     "helper lab.blur-menu-unhidden.W"
+    ],
+    "rules": [
+     "target",
+     "target",
+     "target",
+     "target",
+     "target",
+     "target"
+    ],
+    "cliMs": 92.11795800000255,
+    "helperMs": 15.567167000001064
+   }
+  ],
+  "counts": {
+   "falseTapped": 15,
+   "sound": 1,
+   "unsound": 11,
+   "unprovenFalse": 3,
+   "controls": 10,
+   "open": 10,
+   "falseRefusal": 0,
+   "unprovenControls": 0
+  },
+  "cli": {
+   "n": 66,
+   "median": 92.36577099999931,
+   "min": 89.82537500000035,
+   "max": 95.26804099999936
+  },
+  "helper": {
+   "n": 66,
+   "median": 15.839583500000572,
+   "min": 13.936499999999796,
+   "max": 23.60041700000147
+  }
+ },
+ "cadenceTrace": [
+
+ ]
+}
