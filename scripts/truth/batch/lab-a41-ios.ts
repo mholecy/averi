@@ -74,7 +74,18 @@ export const CADENCE_PER_MOTION = 20;
  */
 export const A41_SECS = { golden: 300, 'baseline-idb': 900, 'hit-test': 600, 'baseline-wda': 1800, 'wda-cold': 900, 'auto-tap': 900, cadence: 1500, report: 120 } as const;
 export type A41Child = keyof typeof A41_SECS;
-/** What each child is expected to take on the lab, in seconds (the run's ~22 min, with the lab block and the checks). */
+/**
+ * What each child is expected to take on the lab, in seconds: 21 min of children. EXPECTED_OVERHEAD_SECS adds the rest
+ * of a run that goes well — the lab block (reset, a cached build, install: 26 s in Gate C 2026-11-12), the 7 health
+ * checks (~3 s each), the window's backup, restore and end check (~15 s) — about 23 min in all. A WebDriverAgent build
+ * not cached adds its minutes to baseline-wda.
+ *
+ * The worst case is the bounds: the children's A41_SECS (7 020 s, 117 min), the lab block's build (B_BUILD, 2 400 s by
+ * default) and installs, and any reset a health check makes (simctl shutdown, boot and bootstatus, each up to 300 s:
+ * ~16 min a reset; a reset that fails ends the WDA block, M3) — well over two hours, reached only when every call
+ * hangs to its bound.
+ */
+export const EXPECTED_OVERHEAD_SECS = 26 + 7 * 3 + 15;
 export const EXPECTED_SECS: Readonly<Record<A41Child, number>> = {
   golden: 20,
   'baseline-idb': 200,
@@ -181,14 +192,14 @@ export async function labA41Ios(o: StandingOptions): Promise<StandingExit> {
         ctx.step('FAIL', `${ctx.id} ${whys[0]}`);
       }
       const unfit = await fit(ctx, lab, 'a41 baseline-idb', warnings);
-      if (unfit !== undefined) return ctx.verdict('INCONCLUSIVE', unfit);
+      if (unfit !== undefined) return ctx.verdict('INCONCLUSIVE', `${unfit}; not run: baseline-idb, hit-test`);
       const base = join(ctx.dir, 'baseline-idb.json');
       const b = await child(ctx, 'baseline-idb', baselineArgs(repo, lab.udid, 'idb', base), base);
       if (b !== undefined) whys.push(b);
       if (ctx.fs.read(golden) !== undefined) {
         const unfitHit = await fit(ctx, lab, 'a41 hit-test', warnings);
         const hit = join(ctx.dir, 'hit-test.json');
-        const h = unfitHit ?? (await child(ctx, 'hit-test', probeArgs(repo, lab.udid, 'hit-test', hit, ['--golden', golden]), hit));
+        const h = unfitHit === undefined ? await child(ctx, 'hit-test', probeArgs(repo, lab.udid, 'hit-test', hit, ['--golden', golden]), hit) : `${unfitHit}; not run: hit-test`;
         if (h !== undefined) whys.push(h);
       }
       if (warnings.length > 0) ctx.step('WARN', `${ctx.id}: ${warnings.join('; ')}`);
@@ -218,9 +229,17 @@ export async function labA41Ios(o: StandingOptions): Promise<StandingExit> {
       const w = await wdaWindow(ctx, sim.value, {
         secs: ctx.knobs.B_RESTORE,
         work: async () => {
-          for (const c of wdaChildren(ctx.config.repo, sim.value, ctx.dir)) {
+          const children = wdaChildren(ctx.config.repo, sim.value, ctx.dir);
+          for (const [i, c] of children.entries()) {
             const unfit = await fit(ctx, sim.value, `a41 ${c.name}`, said);
-            const why = unfit ?? (await child(ctx, c.name, c.args(c.file), c.file));
+            if (unfit !== undefined) {
+              // A reset that failed: no more checks or resets on the shared simulator (lab-run-ios.ts's way) — what is
+              // left is said not run.
+              whys.push(unfit, `not run: ${children.slice(i + 1).map((x) => x.name).join(', ') || 'none left'}`);
+              ctx.step('ERROR', `${ctx.id}: ${unfit}`);
+              break;
+            }
+            const why = await child(ctx, c.name, c.args(c.file), c.file);
             if (why !== undefined) whys.push(why);
           }
         },

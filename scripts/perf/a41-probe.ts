@@ -18,7 +18,7 @@ import { isMain } from '../is-main.js';
 import { connectInProcess } from '../differential/connection.js';
 import { IosLab, LAB_APP, LAB_WDA_DERIVED_DATA } from '../truth/lab-device.js';
 import { callReply, claimsTap, isError } from '../truth/replies.js';
-import { labSelector } from '../truth/schema.js';
+import { labId, labSelector } from '../truth/schema.js';
 import {
   encodeRects,
   hitTargetsOf,
@@ -57,8 +57,9 @@ import {
  *   (the first read: WDA's start) and ui_snapshot again (warm), then the server closed (its shutdown stops the WDA it
  *   started and waits for the port). A WDA this server did not start is refused by WdaServer, never measured as cold.
  * - `auto-tap` (A41b, under `treeSource: auto`): `--repeat` fresh servers — launch_app (the catalog), the first tap
- *   after it (`text:"open"`, WDA's bring-up inside it), two warm taps on the open cell's A, then launch_app again and
- *   the same first tap with WDA up. A reply that fell back to idb is counted.
+ *   after it (`text:"open"`, WDA's bring-up inside it), then — untimed — ui_snapshot until the open cell is listed and
+ *   a second's quiet (the push over), two warm taps on the open cell's A, then launch_app again and the same first tap
+ *   with WDA up. A reply that fell back to idb is marked; a41.ts leaves it out of WDA's numbers.
  * - `cadence` (A41b, ADR 0040, under WDA): MOTIONS × `--repeat` trials (20: D35's count) — the cell launched, one read
  *   before the trigger (WDA attached), the trigger (an idb swipe, as averi strokes), then WDA reads back to back for
  *   WINDOW_MS after it; each trial kept in the d35 fixture's shape (a41.ts#encodeRects). The settle is replayed offline
@@ -196,6 +197,20 @@ interface AutoRun {
   error?: string;
 }
 
+/** How long the open cell is waited for after the catalog tap, before the warm taps (untimed). */
+const OPEN_WAIT_MS = 10_000;
+/** The quiet after the open cell is first listed: the push transition's end. */
+const OPEN_QUIET_MS = 1000;
+
+/** Untimed: ui_snapshot until it lists the open cell's A (at most OPEN_WAIT_MS), then OPEN_QUIET_MS still. */
+async function settledOnOpen(s: Session): Promise<void> {
+  const id = labId('open', 'A');
+  for (const end = performance.now() + OPEN_WAIT_MS; performance.now() < end; await sleep(250)) {
+    if ((await s.call('ui_snapshot', {})).includes(id)) break;
+  }
+  await sleep(OPEN_QUIET_MS);
+}
+
 async function autoTap(lab: IosLab, device: string, repeat: number): Promise<AutoRun[]> {
   const bundle = LAB_APP.native.bundle;
   const ok = (x: string) => !isError(x);
@@ -210,6 +225,8 @@ async function autoTap(lab: IosLab, device: string, repeat: number): Promise<Aut
       await stop();
       run.launch = await step(s, 'launch_app', { appId: bundle }, ok);
       run.firstCold = await step(s, 'tap', { selector: 'text:"open"' }, claimsTap);
+      // Untimed: the open cell in front and still, so the warm taps do not pay the push from the catalog.
+      await settledOnOpen(s);
       for (let k = 0; k < 2; k++) run.warm.push(await step(s, 'tap', { selector: labSelector('open', 'A') }, claimsTap));
       await stop();
       run.relaunch = await step(s, 'launch_app', { appId: bundle }, ok);
@@ -307,10 +324,15 @@ async function hitTest(device: string, golden: { results: GoldenResultLike[] }):
         for (const target of mine) results.push({ target, cli: [], helper: [], skipped: why });
         continue;
       }
-      const all = JSON.parse((await exec('idb', withUdid(['ui', 'describe-all', '--json'], device).argv, { env, timeoutMs: HIT_TIMEOUT_MS })).stdout.toString('utf8')) as {
-        AXUniqueId?: string | null;
-        frame?: Rect;
-      }[];
+      let all: { AXUniqueId?: string | null; frame?: Rect }[];
+      try {
+        all = JSON.parse((await exec('idb', withUdid(['ui', 'describe-all', '--json'], device).argv, { env, timeoutMs: HIT_TIMEOUT_MS })).stdout.toString('utf8')) as typeof all;
+      } catch (e) {
+        // One cell's read lost, not the hit test: its targets skipped, said.
+        const why = `describe-all on ${c.cell} failed: ${firstLine(errorMessage(e))}`;
+        for (const target of mine) results.push({ target, cli: [], helper: [], skipped: why });
+        continue;
+      }
       for (const target of mine) {
         const frame = all.filter((e) => e.AXUniqueId === target.id).at(-1)?.frame;
         const argv = withUdid(['ui', 'describe-point', String(Math.round(target.point.x)), String(Math.round(target.point.y)), '--json'], device).argv;
@@ -336,6 +358,8 @@ async function hitTest(device: string, golden: { results: GoldenResultLike[] }):
     }
   } finally {
     await helper.dispose();
+    // Both lab apps terminated (lab-device.ts#close: only one the guard cleared, and launched or not, a no-op at worst).
+    for (const l of Object.values(labs)) await l.close().catch((e: unknown) => console.error(`close: ${errorMessage(e)}`));
   }
   return { helperReady, results };
 }

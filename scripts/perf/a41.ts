@@ -286,7 +286,7 @@ export function classesOf(t: Pick<Trial, 'reads' | 'rects'>): Record<string, num
 /** A trial moved: some id held two rects in its window. */
 export const movedTrial = (t: Pick<Trial, 'reads' | 'rects'>): boolean => {
   const classes = classesOf(t);
-  return Object.keys(t.rects).some((id) => new Set(classes.map((c) => c[id]).filter((c) => c !== undefined)).size > 1);
+  return Object.keys(t.rects).some((id) => movedId(classes, id));
 };
 
 /** ADR 0040's wrong settle: id settled at read k, and a later read has it present at another rect. */
@@ -303,7 +303,21 @@ export interface CadencePass {
   pollMs: number;
   settles: Record<string, number>;
   wrong: string[];
+  /** Of the settles: those of an id that moved in its trial (a static id settles trivially and proves nothing). */
+  moving: number;
+  /** Of the settles: those with under CENSOR_MS of reads after the settled read — a later move could not be seen. */
+  censored: number;
 }
+
+/** A settle followed by less recorded time than this is censored: its wrongness is not observable. */
+export const CENSOR_MS = 500;
+
+/** An id that held two rects in its trial's window. */
+export const movedId = (classes: readonly Record<string, number>[], id: string): boolean =>
+  new Set(classes.map((c) => c[id]).filter((c) => c !== undefined)).size > 1;
+
+/** Censored: the trial's last read ends under CENSOR_MS after read k ends. */
+export const censoredAt = (reads: readonly [number, number][], k: number): boolean => reads[reads.length - 1][1] - reads[k][1] < CENSOR_MS;
 
 export interface CadenceJudgement {
   verdict: 'shorten' | 'keep' | 'unproven';
@@ -324,8 +338,9 @@ export function cadenceJudgement(o: { trials: readonly { motion: string; moved: 
   if (Object.values(moving).some((n) => n < MOVING_PER_MOTION)) return { verdict: 'unproven', why: `a motion seen moving fewer than ${MOVING_PER_MOTION} times: ${said}` };
   const settles = sumOf(o.at300.settles);
   if (settles === 0) return { verdict: 'unproven', why: `no settle at 300 ms in the window; moving trials ${said}` };
+  if (o.at300.moving === 0) return { verdict: 'unproven', why: `no settle of an id that moved, at 300 ms (${settles} of static ids only); moving trials ${said}` };
   if (o.at300.wrong.length > 0) return { verdict: 'keep', why: `${o.at300.wrong.length} wrong settles in ${settles} at 300 ms (${o.at300.wrong.join('; ')})` };
-  return { verdict: 'shorten', why: `0 wrong settles in ${settles} at 300 ms; moving trials ${said}` };
+  return { verdict: 'shorten', why: `0 wrong settles in ${settles} at 300 ms (${o.at300.moving} of moving ids, ${o.at300.censored} censored); moving trials ${said}` };
 }
 
 // ----------------------------------------------------------------------------------------------- the report
@@ -338,6 +353,8 @@ export interface HitRow {
   verdict: HitVerdict;
   /** What each probe named (CLI then helper): the element's id, or its type and label. */
   named: string[];
+  /** Which rule decided each probe, in the same order (namedBy's word; `error` for a probe that failed). */
+  rules: (Named | 'error')[];
   cliMs?: number;
   helperMs?: number;
   skipped?: string;
@@ -390,24 +407,35 @@ export function summaryLines(r: A41Report): string[] {
   else {
     const a = r.autoTap;
     const s = (x: Spread | undefined) => (x === undefined ? '—' : spreadText(x));
-    lines.push(`auto, first tap after launch_app (WDA stopped): ${s(a.firstCold)}; after a relaunch, WDA up: ${s(a.firstWdaUp)}; warm tap: ${s(a.warm)}${a.fellBack > 0 ? `; ${a.fellBack} fell back to idb` : ''}${a.failed > 0 ? `; ${a.failed} failed` : ''}`);
+    const bringUp = a.firstCold === undefined || a.firstWdaUp === undefined ? '—' : signed(a.firstCold.median - a.firstWdaUp.median);
+    lines.push(`auto, first tap after launch_app (WDA stopped): ${s(a.firstCold)}; after a relaunch, WDA up: ${s(a.firstWdaUp)}; warm tap: ${s(a.warm)}${a.fellBack > 0 ? `; ${a.fellBack} fell back to idb (left out of these)` : ''}${a.failed > 0 ? `; ${a.failed} failed` : ''}`);
+    lines.push(`auto, WDA's bring-up in the first tap (first − first with WDA up): ${bringUp}`);
   }
   lines.push('', 'A41b acceptance (current main: the numbers before any pre-warm)');
   const tapRow = r.table.find((x) => x.scenario === 'tap');
   const tapDelta = tapRow === undefined ? undefined : deltaOf(tapRow);
-  lines.push(`WDA tap median within 100 ms of idb: ${tapDelta === undefined ? 'not measured' : `${Math.abs(tapDelta) <= 100 ? 'yes' : 'no'} (${signed(tapDelta)})`}`);
+  lines.push(`WDA tap median no more than 100 ms slower than idb's: ${tapDelta === undefined ? 'not measured' : `${tapDelta <= 100 ? 'yes' : 'no'} (wda−idb ${signed(tapDelta)})`}`);
   const first = r.autoTap?.firstCold;
   const warm = r.autoTap?.warm;
+  const fell = r.autoTap?.fellBack ?? 0;
   lines.push(
     `first tap after launch_app ≤ warm tap + 500 ms: ${
-      first === undefined || warm === undefined ? 'not measured' : `${first.median <= warm.median + 500 ? 'yes' : 'no'} (${Math.round(first.median)} vs ${Math.round(warm.median)} + 500)`
+      fell > 0
+        ? `unproven (${fell} auto steps fell back to idb: not WDA's taps)`
+        : first === undefined || warm === undefined
+          ? 'not measured'
+          : `${first.median <= warm.median + 500 ? 'yes' : 'no'} (${Math.round(first.median)} vs ${Math.round(warm.median)} + 500)`
     }`,
   );
   lines.push('', "A41b cadence — WDA's settle replayed at 300 ms against its 500 (ADR 0040)");
   if (r.cadence === undefined) lines.push('cadence: not measured');
   else {
     lines.push(`trials: ${r.cadence.trials}; seen moving: ${perMotionText(r.cadence.moving)}`);
-    for (const p of r.cadence.passes) lines.push(`wrong settles at ${p.pollMs} ms: ${p.wrong.length} in ${sumOf(p.settles)} settles (${perMotionText(p.settles)})${p.wrong.length > 0 ? ` — ${p.wrong.join('; ')}` : ''}`);
+    for (const p of r.cadence.passes) {
+      lines.push(
+        `wrong settles at ${p.pollMs} ms: ${p.wrong.length} in ${sumOf(p.settles)} settles (${perMotionText(p.settles)}); of moving ids ${p.moving}, censored (< ${CENSOR_MS} ms of reads after) ${p.censored}${p.wrong.length > 0 ? ` — ${p.wrong.join('; ')}` : ''}`,
+      );
+    }
     lines.push(`cadence: ${r.cadence.judgement.verdict} — ${r.cadence.judgement.why}`);
   }
   lines.push('', 'A41c — idb ui describe-point at the stroke point');
@@ -419,7 +447,7 @@ export function summaryLines(r: A41Report): string[] {
     const lat = (x: Spread | undefined) => (x === undefined ? '—' : `${ms(x.median)} (n ${x.n})`);
     lines.push(`describe-point latency: CLI ${lat(r.hitTest.cli)}, helper ${lat(r.hitTest.helper)}`);
     for (const row of r.hitTest.rows) {
-      lines.push(`  ${row.verdict.padEnd(13)} ${row.kind.padEnd(12)} ${row.id} at ${row.point.x},${row.point.y}: ${row.skipped ?? row.named.join(' | ')}`);
+      lines.push(`  ${row.verdict.padEnd(13)} ${row.kind.padEnd(12)} ${row.id} at ${row.point.x},${row.point.y}: ${row.skipped ?? row.named.map((n, i) => `${n} [${row.rules[i]}]`).join(' | ')}`);
     }
   }
   return lines;
@@ -458,6 +486,8 @@ export interface A41Parts {
 }
 
 const okMs = (steps: readonly (StepLike | undefined)[]): Spread | undefined => spreadOf(steps.filter((s): s is StepLike => s?.ok === true).map((s) => s.ms));
+/** WDA's own taps: ok, and not read through idb (an `auto` step that fell back is idb's, never WDA's). */
+const wdaMs = (steps: readonly (StepLike | undefined)[]): Spread | undefined => okMs(steps.filter((s) => s?.fellBack !== true));
 
 const probeName = (path: string, p: HitProbe): string =>
   p.error !== undefined ? `${path} error: ${p.error}` : `${path} ${p.hit?.id ?? `${p.hit?.type ?? '?'} "${p.hit?.label ?? ''}"`}`;
@@ -471,6 +501,8 @@ function hitRow(r: HitResult): HitRow {
     point: r.target.point,
     verdict: hitVerdict(r),
     named: [...r.cli.map((p) => probeName('cli', p)), ...r.helper.map((p) => probeName('helper', p))],
+    // probeOnce gives a probe `named` or `error`, never both.
+    rules: [...r.cli, ...r.helper].map((p) => p.named ?? 'error'),
     ...(cliMs !== undefined && { cliMs }),
     ...(helperMs !== undefined && { helperMs }),
     ...(r.skipped !== undefined && { skipped: r.skipped }),
@@ -499,9 +531,9 @@ export function reportOf(p: A41Parts, missing: readonly string[], generated: str
     const runs = p.autoTap.runs;
     const steps = (r: (typeof runs)[number]) => [r.launch, r.firstCold, ...r.warm, r.relaunch, r.firstWdaUp];
     report.autoTap = {
-      ...spreadField('firstCold', okMs(runs.map((r) => r.firstCold))),
-      ...spreadField('firstWdaUp', okMs(runs.map((r) => r.firstWdaUp))),
-      ...spreadField('warm', okMs(runs.flatMap((r) => r.warm))),
+      ...spreadField('firstCold', wdaMs(runs.map((r) => r.firstCold))),
+      ...spreadField('firstWdaUp', wdaMs(runs.map((r) => r.firstWdaUp))),
+      ...spreadField('warm', wdaMs(runs.flatMap((r) => r.warm))),
       fellBack: runs.flatMap(steps).filter((s) => s?.fellBack === true).length,
       failed: runs.filter((r) => r.error !== undefined || steps(r).some((s) => s !== undefined && !s.ok)).length,
     };
@@ -510,7 +542,7 @@ export function reportOf(p: A41Parts, missing: readonly string[], generated: str
     const moving: Record<string, number> = {};
     const trials = p.cadence.trials.map((t) => ({ motion: t.motion, moved: movedTrial(t) }));
     for (const t of trials) moving[t.motion] = (moving[t.motion] ?? 0) + (t.moved ? 1 : 0);
-    const at300 = p.cadence.passes.find((x) => x.pollMs === 300) ?? { pollMs: 300, settles: {}, wrong: [] };
+    const at300 = p.cadence.passes.find((x) => x.pollMs === 300) ?? { pollMs: 300, settles: {}, wrong: [], moving: 0, censored: 0 };
     report.cadence = { trials: trials.length, moving, passes: p.cadence.passes, judgement: cadenceJudgement({ trials, at300 }) };
   }
   if (p.hitTest !== undefined) {

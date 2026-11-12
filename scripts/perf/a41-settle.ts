@@ -1,7 +1,7 @@
 import { PersistentReadError, type DeviceAdapter, type UiNode } from '../../src/adapters/types.js';
 import { resolveSettled } from '../../src/interact/resolve.js';
 import { SLEEP_OWNER } from '../differential/clock.js';
-import { classesOf, wrongSettle, type CadencePass, type Trial } from './a41.js';
+import { censoredAt, classesOf, movedId, wrongSettle, type CadencePass, type Trial } from './a41.js';
 
 /**
  * A settle trace replayed through the production settle (A41b's cadence question, ADR 0040): resolveSettled →
@@ -66,7 +66,7 @@ function tracedAdapter(t: Trial, trees: readonly UiNode[], clock: ReplayClock): 
 
 /** Every (trial, id) settle of the trace at `pollMs`: the settles per motion and the wrong ones. */
 export async function replaySettles(trials: readonly Trial[], o: { pollMs: number }, clock: ReplayClock): Promise<CadencePass> {
-  const pass: CadencePass = { pollMs: o.pollMs, settles: Object.fromEntries(trials.map((t) => [t.motion, 0])), wrong: [] };
+  const pass: CadencePass = { pollMs: o.pollMs, settles: Object.fromEntries(trials.map((t) => [t.motion, 0])), wrong: [], moving: 0, censored: 0 };
   for (const t of trials) {
     const classes = classesOf(t);
     const trees = classes.map(
@@ -87,6 +87,8 @@ export async function replaySettles(trials: readonly Trial[], o: { pollMs: numbe
         const k = readOf.get(settled.tree);
         if (k === undefined) throw new Error('the settle returned a tree the trace never served');
         pass.settles[t.motion]++;
+        if (movedId(classes, id)) pass.moving++;
+        if (censoredAt(t.reads, k)) pass.censored++;
         if (wrongSettle(classes, id, k)) pass.wrong.push(`${t.motion}#${t.trial} ${id} @${k}`);
       } catch (e) {
         if (!(e instanceof WindowEnded)) throw e;

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
-import { A41_BLOCK_IDS, A41_SECS, EXPECTED_SECS, labA41Ios, siblingDir } from '../../../scripts/truth/batch/lab-a41-ios.js';
+import { A41_BLOCK_IDS, A41_SECS, EXPECTED_OVERHEAD_SECS, EXPECTED_SECS, labA41Ios, siblingDir } from '../../../scripts/truth/batch/lab-a41-ios.js';
 import type { LiveCases, LiveTable } from '../../../scripts/truth/batch/live-table.js';
 import type { StartOptions } from '../../../scripts/truth/batch/proc.js';
 import { A41_FILES } from '../../../scripts/perf/a41-report.js';
@@ -144,11 +144,13 @@ describe('lab-a41-ios.ts: a clean run — the lab, the idb probes, the WDA probe
     expect(readFileSync(join(dirOf('a41-wda'), 'cadence.log'), 'utf8')).toBe('cadence ran\n');
   });
 
-  it('the bounds: each child bounded; the expected total under 30 minutes', async () => {
+  it('the bounds: each child bounded; the expected total — children, lab block, health checks, window — under 30 minutes', async () => {
     expect(await go()).toBe(0);
     expect(Object.keys(A41_SECS).sort()).toEqual(Object.keys(EXPECTED_SECS).sort());
     for (const [k, v] of Object.entries(EXPECTED_SECS)) expect(A41_SECS[k as keyof typeof A41_SECS], k).toBeGreaterThanOrEqual(2 * v);
-    expect(Object.values(EXPECTED_SECS).reduce((a, b) => a + b, 0)).toBeLessThan(25 * 60);
+    // The overhead counts each health check this run made (one before each device child).
+    expect(seam.words.filter((w) => w.startsWith('idb ui swipe 200 600 200 400')).length).toBeLessThanOrEqual(7 + 2);
+    expect(Object.values(EXPECTED_SECS).reduce((a, b) => a + b, 0) + EXPECTED_OVERHEAD_SECS).toBeLessThan(25 * 60);
   });
 });
 
@@ -175,6 +177,24 @@ describe('a probe that is not whole: INCONCLUSIVE naming it, the window still pu
     expect(await go()).toBe(3);
     expect(children()).toEqual(['golden', 'baseline-idb', 'hit-test', 'a41-report']);
     expect(verdicts().filter((l) => l.startsWith('a41 wda'))).toEqual([expect.stringMatching(/^a41 wda probe verdict: INCONCLUSIVE — the WDA window did not run: /)]);
+  });
+
+  it('a health check whose reset fails inside the window: the WDA block stops there, naming what did not run', async () => {
+    let n = 0;
+    // The wda-cold child leaves the lab sick (its describe-all fails from then on) and boot fails: the check before
+    // auto-tap cannot reset it.
+    const answer = seam.world.answer;
+    seam.world.answer = (cmd, args, o) => {
+      if (cmd === 'idb' && args[0] === 'ui' && args[1] === 'describe-all' && args[2] !== '--json' && seam.words.some((w) => w.includes('--mode wda-cold'))) return { code: 1, out: '', err: 'sick' };
+      if (cmd === 'xcrun' && args[1] === 'boot' && seam.words.some((w) => w.includes('--mode wda-cold'))) return (n++, { code: 149, out: '', err: 'Unable to boot device' });
+      return answer(cmd, args, o);
+    };
+    expect(await go()).toBe(3);
+    expect(children()).toEqual(['golden', 'baseline-idb', 'hit-test', 'baseline-wda', 'wda-cold', 'a41-report']);
+    // Two boots: the failed reset before auto-tap, and the window's own end check (ios-lab.ts#wdaWindow, as Gate C) — none
+    // before cadence.
+    expect(n).toBe(2);
+    expect(verdicts().find((l) => l.startsWith('a41 wda probe verdict: INCONCLUSIVE'))).toMatch(/the iOS reset before a41 auto-tap failed: .* — no a41 auto-tap; not run: cadence$/);
   });
 
   it('the golden prints no JSON: no hit test, the idb block INCONCLUSIVE', async () => {
