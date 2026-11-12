@@ -1,4 +1,6 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
+import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import type { UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
 import { node } from '../helpers/fake.js';
@@ -134,14 +136,12 @@ describe('a `screen` layer: the whole screen, its own nodes named where they dra
   });
 });
 
-// A38a: idb's flat list marks the unhidden blur menu's backdrop (adapters/ios-tree-source.ts#backdropOf), listed between
-// the card (K, W) and the screen beneath (A–D). Listed BEFORE the targets it covers, it is still counted as drawn over
-// them (presentation.ts#PresentedOver.listedAhead), after everything listed after them.
+// A38a: idb's flat list marks the unhidden blur menu's backdrop (adapters/ios-tree-source.ts#backdropOf), listed
+// between the card (K, W) and the screen beneath (A–D). Listed BEFORE the targets it covers, it is still counted as
+// drawn over them (presentation.ts#PresentedOver.coversAhead), after everything listed after them.
 describe('a flat list\'s backdrop covers what is listed after it, through the whole screen', () => {
   const BACKDROP = 'other 0,0 402x874';
   const blurMenu = async () => {
-    const { readFile } = await import('node:fs/promises');
-    const { parseIdbDescribeAll } = await import('../../src/adapters/ios-tree-source.js');
     const tree = parseIdbDescribeAll(await readFile(new URL('../fixtures/truth/ios-iphone17-ios27/blur-menu-unhidden.idb.json', import.meta.url), 'utf8'));
     return { tree, byTag: (tag: string): UiNode => tree.children.find((n) => n.identifier === `lab.blur-menu-unhidden.${tag}`)! };
   };

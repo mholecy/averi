@@ -47,6 +47,9 @@ export default {
     '!/docs/truth/live-records/',
     '/docs/truth/live-records/*',
     '!/docs/truth/live-records/android-k7-eyes-1.json',
+    // A38a: the two idb describe-all records the backdrop sweep reads (tests/adapters/idb-presented-layer.test.ts).
+    '!/docs/truth/live-records/ios-idb-held-no-spinner-describe-all-d30-1.json',
+    '!/docs/truth/live-records/ios-idb-held-no-spinner-describe-all-nested-d30-1.json',
     // T15: the pre-T17 hedged reply replies.test.ts's hedgeWhy reads (t11's final A/B, scroll-sticky-cut.R.fully).
     '!/docs/truth/live-records/t11-carousel-visible/',
     '/docs/truth/live-records/t11-carousel-visible/*',

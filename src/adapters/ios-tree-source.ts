@@ -279,8 +279,8 @@ const DISMISS_REGION = 'PopoverDismissRegion';
  * docs/truth/live-ios-2026-10-18-visibility.md (iOS point 4); ADR 0018 residual 6.
  */
 function listsPresentedLayer(elements: readonly IdbElement[]): boolean {
-  const app = elements.find((el) => el.type === 'Application')?.frame;
-  if (app === undefined || rectArea(app) === 0) return false;
+  const app = appFrame(elements);
+  if (app === undefined) return false;
   return elements.some((el) => el.AXUniqueId === DISMISS_REGION && el.frame !== undefined && coversWhole(el.frame, app));
 }
 
@@ -300,13 +300,19 @@ function listsPresentedLayer(elements: readonly IdbElement[]): boolean {
  * the reply; a hidden backdrop idb does not list (blur-menu, -grouped, -stacked) stays unseen (ADR 0018 residual 9).
  */
 function backdropOf(elements: readonly IdbElement[]): number | undefined {
-  const app = elements.find((el) => el.type === 'Application')?.frame;
-  if (app === undefined || rectArea(app) === 0) return undefined;
+  const app = appFrame(elements);
+  if (app === undefined) return undefined;
   const i = elements.findIndex(
     (el, at) => at > 0 && el.type === 'GenericElement' && !el.AXLabel && !el.AXUniqueId && !el.AXValue && el.frame !== undefined && coversWhole(el.frame, app),
   );
   return i < 0 ? undefined : i;
 }
+
+/** The `Application` element's frame, the whole screen the list is judged against; undefined when none has area. */
+const appFrame = (elements: readonly IdbElement[]): Rect | undefined => {
+  const app = elements.find((el) => el.type === 'Application')?.frame;
+  return app === undefined || rectArea(app) === 0 ? undefined : app;
+};
 
 /** `frame` covers `whole` entirely. */
 const coversWhole = (frame: Rect, whole: Rect): boolean => {

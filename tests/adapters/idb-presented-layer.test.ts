@@ -24,7 +24,10 @@ const capture = (cell: string): UiNode => parseIdbDescribeAll(raw(cell));
 const IPHONE: DeviceScreen = { width: 402, height: 874, statusBand: 62 };
 const RULES = { direction: 'down', fully: false, maxSwipes: 5, timeoutMs: 30_000, screen: IPHONE } as const;
 
-/** Every raw idb element list a committed fixture holds: the lab's captures, and the device dumps under tests/fixtures (an array of elements at any depth of their JSON). */
+/**
+ * Every raw idb element list committed (an array of elements at any depth of their JSON): the lab's captures, the
+ * device dumps under tests/fixtures, and the describe-all records under docs/truth/live-records.
+ */
 function everyIdbList(): { file: string; elements: unknown[] }[] {
   const lists: { file: string; elements: unknown[] }[] = [];
   const isList = (v: unknown): v is unknown[] => Array.isArray(v) && v.length > 0 && v.every((e) => typeof e === 'object' && e !== null && 'type' in e && 'frame' in e);
@@ -36,6 +39,10 @@ function everyIdbList(): { file: string; elements: unknown[] }[] {
   for (const f of readdirSync(TRUTH).filter((f) => f.endsWith('.idb.json'))) walk(f, JSON.parse(readFileSync(new URL(f, TRUTH), 'utf8')));
   const fixtures = new URL('../fixtures/', import.meta.url);
   for (const f of readdirSync(fixtures).filter((f) => f.startsWith('idb-') && f.endsWith('.json'))) walk(f, JSON.parse(readFileSync(new URL(f, fixtures), 'utf8')));
+  const records = new URL('../../docs/truth/live-records/', import.meta.url);
+  for (const f of readdirSync(records).filter((f) => f.startsWith('ios-idb-') && f.includes('describe-all') && f.endsWith('.json'))) {
+    walk(f, JSON.parse(readFileSync(new URL(f, records), 'utf8')));
+  }
   return lists;
 }
 
@@ -164,7 +171,7 @@ describe('the idb parser marks an unlabelled, id-less element over the whole scr
 
   it('specific: no other committed idb list holds one — the lab\'s other captures and the device dumps under tests/fixtures', () => {
     const lists = everyIdbList();
-    expect(lists.length).toBe(51);
+    expect(lists.length).toBe(53);
     expect(lists.filter(({ elements: list }) => backdrops(list).length > 0).map(({ file }) => file)).toEqual(['blur-menu-unhidden.idb.json']);
   });
 
@@ -203,7 +210,7 @@ describe('the presentation module: a flat list\'s backdrop covers what is listed
     const presentation = presentationOf(tree, order);
     for (const tag of ['A', 'B', 'C', 'D']) {
       const over = presentation.over(byTag(tag));
-      expect(over.listedAhead).toEqual([backdrop]);
+      expect(over.coversAhead).toEqual([backdrop]);
       expect(over.wholeScreen(backdrop)).toBe(true);
       expect(over.surface(backdrop)).toBe('fact');
     }
@@ -213,7 +220,7 @@ describe('the presentation module: a flat list\'s backdrop covers what is listed
     const presentation = presentationOf(tree, order);
     for (const tag of ['K', 'W']) {
       const over = presentation.over(byTag(tag));
-      expect(over.listedAhead).toEqual([]);
+      expect(over.coversAhead).toEqual([]);
       expect(order.filter((p) => over.wholeScreen(p) || over.surface(p) !== undefined || !over.drawn(p))).toEqual([]);
     }
   });
@@ -231,8 +238,19 @@ describe('the presentation module: a flat list\'s backdrop covers what is listed
     const presentation = presentationOf(nested, placed);
     expect(presentation.over(byTag('K')).wholeScreen(placed[4]!)).toBe(true);
     expect(presentation.over(byTag('A')).wholeScreen(placed[4]!)).toBe(false);
-    expect(presentation.over(byTag('A')).listedAhead).toEqual([]);
+    expect(presentation.over(byTag('A')).coversAhead).toEqual([]);
     expect(presentation.press(placed[4]!.node).layer).toEqual({ kind: 'backdrop' });
+  });
+});
+
+describe('scroll_until for a target not in the tree on blur-menu-unhidden (idb): stops on the backdrop before any swipe', () => {
+  it('no stroke is sent — the touch-down would land on the backdrop — and the stop names it', () => {
+    const row: Row = { tree: capture('blur-menu-unhidden'), found: [] };
+    const played = play(RULES, [row, row]);
+    expect(played.steps.some((s) => s.do === 'stroke')).toBe(false);
+    const failure = failureOf(played, 'id:"lab.blur-menu-unhidden.Z"');
+    expect(failure).not.toBeInstanceOf(ElementNotFoundError);
+    expect(failure.message).toContain(`${presentedStop({ kind: 'backdrop', listedAhead: true })}, so none was sent.`);
   });
 });
 

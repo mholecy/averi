@@ -159,7 +159,7 @@ question:
   draw order, never a dependency).
 - **Presentation** — `presentation.ts` (`presentationOf`): which layer is presented over a target or a point, and on
   what evidence — the source's marks where it judged them (`byMarks`; on idb's flat list a marked backdrop covers what
-  is listed after it, `PresentedOver.listedAhead`), else the shape fallback (`byShape`), ADR 0018;
+  is listed after it, `PresentedOver.coversAhead`), else the shape fallback (`byShape`), ADR 0018;
   `window-mark.ts` (what Android's window manager says of an unmarked root, asked on a miss only).
 - **Standing** — `standing.ts`: the one answer to "can this target be used where it stands?", shared by the tap,
   `scroll_until`'s stop and the pixel assert, over a tree's scene (`sceneOf`: draw order and clip facts, derived once).

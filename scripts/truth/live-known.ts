@@ -212,8 +212,8 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
     // blur-menu-stacked's and blur-menu-unhidden's (the round-16 probes, first run under idb at the merge 4f48c642: each
     // tap Tapped, the menu dismissed, in two runs of two: ios-vis-r16-merge-1.json, -2.json; golden-known alike).
     // blur-menu-unhidden's under idb struck off by A38a (ADR 0018, the amendment "idb's backdrop"): idb lists its
-    // backdrop as an unlabelled, id-less element over the whole screen before A–D, now a presented `backdrop` — each tap
-    // refused "close it first" on the replay (golden); the next Gate C proves it on the device.
+    // backdrop as an unlabelled, id-less element over the whole screen before A–D, now a presented `backdrop` — each
+    // tap refused "close it first" on the replay (golden); the next Gate C proves it on the device.
     ...each(`ios ${src}`, ['tap:blur-menu.A', 'tap:blur-menu.B', 'tap:blur-menu.D', ...(src === 'idb' ? ['grouped', 'stacked'].flatMap((cell) => ['A', 'B', 'D'].map((t) => `tap:blur-menu-${cell}.${t}`)) : [])], BLUR, 'tap-claim', 'Tapped'),
     // blur-menu's W struck off by round 9's L4 fix (1ef11b9c, ADR 0024): the eyes see it drawn over C — Tapped, it alone
     // fired, under idb and WDA (ios-vis-r9-l4w-1.json, -2.json); refused under C, the order not told, before.

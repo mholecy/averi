@@ -1341,13 +1341,16 @@ unlabelled full-screen web or map view is never read as a menu's backdrop — it
 element's frame whole, not the first element listed (that is the `Application` itself); the first such element only. On
 a flat list (`UiNode.flatList`) a marked non-root layer covers what is listed AFTER it — idb lists the card, then the
 backdrop, then the screen beneath — and never what is listed before it: it is LISTED AHEAD of what it covers
-(ui-tree/presentation.ts#byMarks, `listedAhead`; `MarkedLayer.listedAhead`). Draw order counts it among what is drawn
-over such a target, after everything listed after the target (`PresentedOver.listedAhead`, draw-order.ts#laterFor), so
+(ui-tree/presentation.ts#byMarks, `isListedAhead`; `MarkedLayer.listedAhead`). Draw order counts it among what is drawn
+over such a target, after everything listed after the target (`PresentedOver.coversAhead`, draw-order.ts#laterFor), so
 the tap, `scroll_until`'s stop and the pixel assert read it as they read WDA's backdrop: a presented surface reaching
 the whole screen, the remedy `presented` first. Its words name idb's evidence (ui-tree/remedy-text.ts#backdropEvidence):
 "a menu's backdrop is presented over it (an empty element idb lists over the whole screen, before the screen's content)
 — close it first (if a screenshot shows no menu up, …)", the way out as WDA's. It only ever adds refusals: a target
-listed after the backdrop is refused "close it first", one listed before it (the card's rows) reads as before.
+listed after the backdrop is refused "close it first", one listed before it (the card's rows) reads as before. And
+`scroll_until` for a target NOT in the tree now stops on this screen before any swipe: with no target, the touch-down
+lands on the topmost marked layer (presentation.ts#Presentation.topmostAt, draw-order.ts#DrawOrder.markedAt), here the
+backdrop — as on WDA's — another refusal, never a claim.
 
 The sweep: of the 53 idb lists committed (the 51 of the lab's captures and tests/fixtures/idb-*, which
 tests/adapters/idb-presented-layer.test.ts sweeps, and the two describe-all records under docs/truth/live-records/) only

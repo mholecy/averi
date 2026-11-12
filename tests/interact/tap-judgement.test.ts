@@ -364,9 +364,9 @@ describe('judgeTap(…).aim() — a later stacked screen layer over the target (
     );
   });
 
-  // A38a (ADR 0018, the amendment "idb's backdrop"): idb lists the unhidden blur menu's backdrop as an unlabelled, id-less
-  // `GenericElement 0,0 402x874` BETWEEN the card (K, W) and the screen beneath (A–D). Read as an excused structural
-  // leaf, A answered Tapped while the backdrop took the touch.
+  // A38a (ADR 0018, the amendment "idb's backdrop"): idb lists the unhidden blur menu's backdrop as an unlabelled,
+  // id-less `GenericElement 0,0 402x874` BETWEEN the card (K, W) and the screen beneath (A–D). Read as an excused
+  // structural leaf, A answered Tapped while the backdrop took the touch.
   it('the lab\'s unhidden blur menu (idb): a row of the screen listed after the backdrop is refused naming idb\'s evidence; the card\'s row listed before it is tapped', async () => {
     const tree = parseIdbDescribeAll(await readFile(new URL('../fixtures/truth/ios-iphone17-ios27/blur-menu-unhidden.idb.json', import.meta.url), 'utf8'));
     expect(said((await judge(tree, 'lab.blur-menu-unhidden.A', { first: IPHONE })).outcome)).toBe(

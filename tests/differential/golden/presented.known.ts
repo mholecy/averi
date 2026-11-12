@@ -27,9 +27,8 @@ const CHOOSER = 'residual:ADR 0024 residual 1 — alike looks (two white rows): 
 const SLOT_TAP: Record<string, string> = { A: 'idb ui tap 201 142', B: 'idb ui tap 201 322', C: 'idb ui tap 201 502', D: 'idb ui tap 201 682' };
 const BLURRED: Record<string, string> = { A: '#AC2B28', B: '#1766AC', C: '#00897B', D: '#BC6900' };
 /**
- * What a tree says of the blur menu's backdrop: nothing that shows it over the target (idb lists no trace of the hidden
- * one; WDA's ungrouped run lists it first by its top, its order untold). The unhidden one under idb, an unlabelled
- * screen-sized element, is a presented `backdrop` since A38a: its rows are green.
+ * What a tree says of the blur menu's backdrop: nothing that shows it over the target — idb lists no trace of the
+ * hidden one (blur-menu, -grouped, -stacked), and WDA's ungrouped run lists it first by its top, its order untold.
  */
 const NO_NODE = 'nothing in the tree shows the blur backdrop over it';
 /** A, B, D beneath the blur menu's backdrop, which the tree does not show over them: Tapped, a colour PASS on the blur, fully visible (#31). */
@@ -113,11 +112,11 @@ export const presented: KnownFile = {
     // order, overlapping it, is a cover whose order is not told, ADR 0015's amendment) and, since ADR 0024, seen drawn
     // over it on the screenshot. The grouped WDA trees (blur-menu-grouped, -stacked, -unhidden) went green in round 16
     // (adapters/wda-source.ts#inWindowBackdrops: the backdrop listed after the screen beneath at its origin is a
-    // presented screen) — their 12, 12 and 12 rows struck off / never listed. blur-menu-unhidden.idb's 12 went green with
-    // A38a (src/adapters/ios-tree-source.ts#backdropOf: idb lists the unhidden backdrop as an unlabelled, id-less element
-    // over the whole screen between the card and the screen beneath, now a presented `backdrop` covering what is listed
-    // after it): A, B, D refused "close it first", their colour failing closed, scroll_until stopping before any swipe;
-    // C gains "close it first" — struck off.
+    // presented screen) — their 12, 12 and 12 rows struck off / never listed. blur-menu-unhidden.idb's 12 went green
+    // with A38a (src/adapters/ios-tree-source.ts#backdropOf: idb lists the unhidden backdrop as an unlabelled, id-less
+    // element over the whole screen between the card and the screen beneath, now a presented `backdrop` covering what
+    // is listed after it): A, B, D refused "close it first", their colour failing closed, scroll_until stopping before
+    // any swipe; C gains "close it first" — struck off.
     ...beneathTheBlur(`${IOS}/blur-menu.idb.json`, ['A', 'B', 'D']),
     ...beneathTheBlur(`${IOS}/blur-menu.wda.json`, ['A', 'B', 'D']),
     ...beneathTheBlur(`${IOS}/blur-menu-grouped.idb.json`, ['A', 'B', 'D']),
