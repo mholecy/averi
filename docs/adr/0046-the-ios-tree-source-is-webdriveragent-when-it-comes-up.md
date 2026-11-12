@@ -4,7 +4,8 @@ Status: accepted 2026-11-12 (performance backlog rows A41, decided by the owner,
 docs/plans/2026-10-30-performance-backlog.md). Golden unchanged: every recording pins its source. The next Gate C
 checks the default block (see Acceptance).
 Amended 2026-11-12 (A41b: a launch pre-warms WebDriverAgent just after `simctl launch`, never awaited, and only with
-its build cached) — see the amendment below.
+its build cached) — see the amendment below. Amended 2026-11-12 (A44: the probe's cadence before auto-tap, its
+`clearState` launch last; an unproven required part makes the report INCONCLUSIVE) — the last section.
 
 ## Context
 
@@ -168,7 +169,7 @@ start, and returns at once. It never throws and never rejects. Nothing awaits it
     the reply was at least 3.5 s and no step fell back to idb (else unproven). The gap is counted from the reply, not
     the call: the pre-warm starts once `simctl launch` returned, before the reply, so WDA gets at least its whole
     measured cold start. Plausible: WDA is up by then, and the tap with WDA up measured 1 202 against 1 157 warm.
-- *Foreground after launch ok n/n:* 5 fresh sessions, the first a `clearState` launch, each reading at once after
+- *Foreground after launch ok n/n:* 5 fresh sessions, the last a `clearState` launch, each reading at once after
   `launch_app`: the read's root label is the lab app's (AveriLab) and WDA's active bundle is `dev.averi.lab`. It
   measures what is left of the overlap: WDA's start beside the launch's foreground wait.
 - The `auto-tap` child grows by two short sessions a repeat (~20 s), about 86 → ~200 s, its expected length already;
@@ -189,3 +190,30 @@ start, and returns at once. It never throws and never rejects. Nothing awaits it
 **Residual 2, now.** A warm-built machine's first read after a launch pays only what is left of WDA's cold start after
 `simctl launch`. A first read with no launch before it pays the whole start, and a fresh machine still pays the whole
 first build at the first read.
+
+## Amendment 2026-11-12 (A44): the probe cannot pass an unproven part, and its wipe comes last
+
+Probe-2 (6f80d529) recorded no cadence trial. The foreground leg's `clearState` launch, on `auto-tap`'s first repeat,
+removed the lab app's Documents/ (ADR 0047). The `cadence` child ran after it, and the lab app could not write its
+state file. Yet the cadence child exited 0, and the report block said PASS, because it judged only missing files. The
+300 ms cadence rests on probe-1's replay (0 wrong in 60).
+
+- **Order.** The WDA block's children are baseline-wda, wda-cold, cadence, auto-tap (`A41_CHILDREN` in
+  scripts/perf/a41.ts). The foreground leg wipes on auto-tap's last repeat (`clearsStateOn`). So the wipe is the
+  block's last launch, and no later session runs on a wiped app. auto-tap is marked `wipes`, and a test fails if any
+  child follows a child that wipes.
+- **No trial is no measurement.** `a41-probe.ts --mode cadence` still writes its file with its errors. It exits
+  `PROBE_UNPROVEN_EXIT` (3, the standing exit for unproven) when no trial was recorded (`cadenceExit`). The WDA block
+  then says INCONCLUSIVE, naming it. A run with some trials and some errors exits 0. The report catches it instead:
+  too few trials leave `cadenceJudgement` unproven, so the cadence part is unproven and the report block INCONCLUSIVE.
+- **An unproven required part is INCONCLUSIVE.** The report now carries `unproven` (`unprovenOf`), each with its why:
+  the cadence judgement `unproven`; leg (b) of the first tap unproven or not measured; the foreground leg on under 5
+  launches or none with `clearState`. The summary prints `UNPROVEN: …` beside `MISSING: …`. lab-a41-ios.ts's report
+  block is PASS only when nothing is missing and nothing is unproven. A measured no, such as a `keep` cadence, a leg
+  (b) `no` or a launch not in front, is still a measurement.
+
+Tests: tests/perf/a41.test.ts (the order and the `wipes` rule, the wiping repeat, `cadenceExit` and its code equal to
+the standing one, `unprovenOf` over every leg-(b), foreground and cadence outcome, the UNPROVEN line, reportOf's
+`unproven`); tests/perf/a41-report.test.ts (a trace with a few trials and errors, and one with none, read from files:
+both unproven); tests/truth/batch/lab-a41-ios.test.ts (the new order, a cadence exit 3, the report block on unproven
+alone and with missing). Hand mutants, each killed.

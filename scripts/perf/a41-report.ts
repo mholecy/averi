@@ -11,8 +11,9 @@ import { installReplayClock, replaySettles } from './a41-settle.js';
  * through the production settle at each of a41.ts#CADENCES (a41-settle.ts, on virtual time) — and whether a
  * WebDriverAgent build ran (a41.ts#WDA_BUILD_LINE in a WDA child's log), into `a41.json` (the report, a41.ts#A41Report,
  * with the trace beside it as evidence) and `summary.txt` (a41.ts#summaryLines), both in `--out`, the summary on stdout
- * too. A file missing or unreadable is named in the report's `missing` and its part said MISSING, never a number. Exit
- * 0 once both are written; 1 when the report itself could not be.
+ * too. A file missing or unreadable is named in the report's `missing` and its part said MISSING, never a number; a
+ * required part read but not proven, in its `unproven` (a41.ts#unprovenOf), said UNPROVEN. Exit 0 once both are
+ * written — the batch's report block judges `missing` and `unproven`; 1 when the report itself could not be.
  *
  *   node --import tsx scripts/perf/a41-report.ts --idb <a41-idb run folder> --wda <a41-wda run folder> --out <dir>
  */

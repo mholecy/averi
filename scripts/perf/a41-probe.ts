@@ -17,6 +17,8 @@ import { claimsTap, firstLine, isError } from '../truth/replies.js';
 import { labId, labSelector, type LabState } from '../truth/schema.js';
 import {
   A41_CHILDREN,
+  cadenceExit,
+  clearsStateOn,
   COVER_NOT_UP,
   coverIdsOf,
   coverUp,
@@ -74,13 +76,15 @@ import { averiServer, commitOf } from './session.js';
  *   time, untimed the catalog waited for (`catalogSettled`), and the same catalog tap warm — the tap the first one is
  *   judged against. Then two more fresh servers each (A41b review r1): launch_app, no read until WAITED_GAP_MS after it
  *   replied, and the same first tap (the pre-warm given the time WDA's start takes); and launch_app (a `clearState`
- *   one on the first repeat) with the first read at once — its root's label and WDA's active bundle, the app in
+ *   one on the last repeat, a41.ts#clearsStateOn: auto-tap is the WDA block's last child, so no later session runs on
+ *   the wiped app — A44) with the first read at once — its root's label and WDA's active bundle, the app in
  *   front while WDA came up beside the launch's foreground wait. A reply that fell back to idb is marked; a41.ts leaves
  *   it out of WDA's numbers.
  * - `cadence` (A41b, ADR 0040, under WDA): MOTIONS × `--repeat` trials (20: D35's count) — the cell launched, one read
  *   before the trigger (WDA attached), the trigger (an idb swipe, as averi strokes), then WDA reads back to back for
  *   WINDOW_MS after it; each trial kept in the d35 fixture's shape (a41.ts#encodeRects). The settle is replayed offline
- *   (a41-report.ts → a41-settle.ts), never on the device.
+ *   (a41-report.ts → a41-settle.ts), never on the device. No trial recorded: the file still written (its errors), the
+ *   exit a41.ts#PROBE_UNPROVEN_EXIT (A44).
  */
 
 /** The trace's window after the trigger (d35's 3 s). */
@@ -269,7 +273,7 @@ async function autoTap(lab: IosLab, device: string, repeat: number): Promise<Aut
       await s?.close();
     }
     await waitedTap(stop, device, run, catalogTap);
-    run.foreground = await foreground(stop, device, r === 1);
+    run.foreground = await foreground(stop, device, clearsStateOn(r, repeat));
     const t = (x: Step | undefined) => (x === undefined ? '—' : `${x.ms.toFixed(0)}${x.ok ? '' : ' (not ok)'}`);
     const f = run.foreground;
     console.error(
@@ -457,6 +461,7 @@ export async function main(argv: readonly string[]): Promise<number> {
     await writeFile(values.out!, `${JSON.stringify({ meta: meta(), ...body }, null, 1)}\n`);
   };
   console.error(`a41-probe ${mode}: ${described}`);
+  let exit = 0;
   try {
     if (mode === 'hit-test') {
       const golden = JSON.parse(await readFile(values.golden!, 'utf8')) as { results: GoldenResultLike[] };
@@ -466,12 +471,14 @@ export async function main(argv: readonly string[]): Promise<number> {
     else {
       const { trials, errors } = await cadence(lab, device, repeat);
       await write({ windowMs: WINDOW_MS, motions: MOTIONS.map((m) => ({ ...m, labels: m.labels?.source })), errors, trials });
+      // No trial is no measurement (A44): the file kept with its errors, the run unproven, never 0.
+      exit = cadenceExit(trials.length);
     }
   } finally {
     // The lab app terminated, as live.ts closes its lab (lab-device.ts#close).
     await lab.close().catch((e: unknown) => console.error(`close: ${errorMessage(e)}`));
   }
-  return 0;
+  return exit;
 }
 
 if (isMain(import.meta.url)) process.exit(await main(process.argv.slice(2)));

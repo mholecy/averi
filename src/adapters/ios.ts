@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { exec as defaultExec, ExecError, hostHome, type ExecFn } from './exec.js';
@@ -17,6 +17,7 @@ import { isSystemScheme, isWebScheme, linkScheme, PLUTIL_NO_SUCH_KEY, SCHEME_APP
 import { hostProcessPattern, pgrepReason, pgrepVerdict } from './ios-liveness.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { iosStatusBand } from './ios-status-band.js';
+import { isAppDataContainer, resetDataContainer } from './ios-data-container.js';
 import { sleep } from '../util/sleep.js';
 import type { Typeable } from './typeable.js';
 import { withNoteLine } from '../util/note-line.js';
@@ -987,15 +988,16 @@ export class IosAdapter implements DeviceAdapter {
     return stdout.toString('utf8').split('\n').filter((l) => l.trim() !== '');
   }
 
-  /** Wipe the app's data container in place (simctl has no `pm clear` equivalent). */
+  /**
+   * Wipe the app's data container in place (simctl has no `pm clear` equivalent), leaving a fresh install's folders
+   * (ios-data-container.ts, ADR 0047).
+   */
   private async clearAppData(bundleId: string): Promise<void> {
     await this.terminate(bundleId);
     const { stdout } = await this.simctl(['get_app_container', this.udid, bundleId, 'data']);
     const container = stdout.toString('utf8').trim();
-    if (!container.startsWith('/')) throw new Error(`Unexpected app container path: ${container}`);
-    for (const entry of await readdir(container)) {
-      await rm(join(container, entry), { recursive: true, force: true });
-    }
+    if (!isAppDataContainer(container, this.udid)) throw new Error(`Unexpected app container path: ${container}`);
+    await resetDataContainer(container);
   }
 }
 

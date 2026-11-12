@@ -233,7 +233,10 @@ final class Lab: ObservableObject {
     static weak var current: Lab?
 
     init() {
-        file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("lab-state.json")
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        // Documents/ may be gone (an older averi's clearState removed it, A44): made again, or every write fails silently.
+        try? FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
+        file = documents.appendingPathComponent("lab-state.json")
         let screen = UIScreen.main
         state = LabState(cell: "", ready: false, screen: Frame(screen.bounds), scale: Double(screen.scale), frames: [:], events: [])
         Lab.current = self

@@ -125,6 +125,12 @@
     "floor": 98,
     "baseline": "100 % on 2026-11-06 (D70 review round 1, pgrepReason's line through withoutHostPaths; cold): 73 mutants, 0 survived"
   },
+  "src/adapters/ios-data-container.ts": {
+    "group": "core",
+    "tests": ["tests/adapters/ios-data-container.test.ts"],
+    "floor": 98,
+    "baseline": "100 % on 2026-11-12 (A44 review round 1: isAppDataContainer, rm's `force` back; `npm run mutate -- --group core --force`, cold, 409 s): 18 mutants, 0 survived"
+  },
   "src/adapters/android-accessibility-order.ts": {
     "group": "core",
     "tests": ["tests/adapters/android-accessibility-order.test.ts", "tests/ui-tree/draw-order-android-reading-order.test.ts", "tests/ui-tree/draw-order-android-views-twin.test.ts", "tests/ui-tree/draw-order-rn-covers.test.ts"],
