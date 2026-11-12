@@ -1,0 +1,14 @@
+lab: emulator-5554, AVD averi_lab
+averi: <repo>
+uiautomator tap:rn-banner-role.T ok: refused, nothing fired: ERROR id:"lab.rn-banner-role.T" is under container "Saved" (73,275 935x143) at its centre (541,391), drawn over it as a screenshot shows (the two are listed in reading order); only a 825x61 part of it shows, under the 65x65 a tap may be moved to — if it is a m
+uiautomator tap:rn-banner-role.U ok: refused, nothing fired: ERROR id:"lab.rn-banner-role.U" is under other id:lab.rn-banner-role.U.cover (73,770 935x143) at its centre (541,886), drawn over it as a screenshot shows (the two are listed in reading order); only a 825x61 part of it shows, under the 65x65 a tap may be moved
+uiautomator tap:rn-banner-role.C ok: refused, nothing fired: ERROR id:"lab.rn-banner-role.C" is under other id:lab.rn-banner-role.C.cover (73,1320 935x143) at its centre (541,1381), drawn over it as a screenshot shows (the two are listed in reading order); only a 825x27 part of it shows, under the 65x65 a tap may be mov
+<!-- averi: this checkout -->
+# Live golden: 3 cases, 3 ok, 0 loud, 0 mismatches (0 not known), 0 skipped
+
+## uiautomator
+- ok tap:rn-banner-role.T rn-banner-role: tap T (covered): refused, nothing fires — or fires it alone — refused, nothing fired: ERROR id:"lab.rn-banner-role.T" is under container "Saved" (73,275 935x143) at its centre (541,391), drawn over it as a screenshot shows (the two are listed in reading order); only a 825x61 part of it shows, under the 65x65 a tap may be moved to — if it is a m
+- ok tap:rn-banner-role.U rn-banner-role: tap U (covered): refused, nothing fires — or fires it alone — refused, nothing fired: ERROR id:"lab.rn-banner-role.U" is under other id:lab.rn-banner-role.U.cover (73,770 935x143) at its centre (541,886), drawn over it as a screenshot shows (the two are listed in reading order); only a 825x61 part of it shows, under the 65x65 a tap may be moved
+- ok tap:rn-banner-role.C rn-banner-role: tap C (covered): refused, nothing fires — or fires it alone — refused, nothing fired: ERROR id:"lab.rn-banner-role.C" is under other id:lab.rn-banner-role.C.cover (73,1320 935x143) at its centre (541,1381), drawn over it as a screenshot shows (the two are listed in reading order); only a 825x27 part of it shows, under the 65x65 a tap may be mov
+
+exit 0
