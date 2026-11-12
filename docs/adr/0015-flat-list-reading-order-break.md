@@ -13,7 +13,8 @@ uiautomator's runs of classic Android Views are marked too — see "Amendment: A
 Amended 2026-11-11 (D87): a `covered` target whose cover's order is told, where neither lies in a scroll view, takes the
 remedy `bothPinned` — see "Amendment: a cover where neither lies in a scroll view" below. Amended 2026-11-11 (D88): so
 does a touch's cut by a node drawn after it — see "Amendment: a cut by a later node where neither lies in a scroll view"
-below.
+below. Amended 2026-11-12 (backlog A42a): residual 5 narrowed — a plain View with a direct ViewGroup child hosts no node
+provider; see "Amendment: a View with a ViewGroup child hosts no provider" below.
 
 ## Context
 
@@ -47,13 +48,18 @@ The row is `ui-tree/draw-order.ts`'s `flatListReadingOrder`, and only the `targe
    applying to every WDA run in reading order, SwiftUI's and UIKit's too; the amendment "React Native's covers listed before
    the target" below): idb lists no bare View, and reads a cover above its flat list's top-bar line as the bar — the lab's
    rn-banner under idb: every tap `Tapped`, every colour assert passing on the cover. Remedy: `treeSource: wda`.
-5. **React Native's role-carrying container leaves LR4's lie on Android** (D75 round 1, not narrowed by the owner;
+5. **React Native's role-carrying container whose children all carry roles leaves LR4's lie on Android** (D75 round 1;
    numbered 2026-11-11, D85; the amendment "Android Views list children by location" below, its React Native role
-   residual): a View whose accessibility role React Native dumps as `android.view.View` (`toolbar`, `alert`, `header`,
-   `tablist`, …) reads as a node provider's host (android-tree-dialect.ts#providesNodes), so the uiautomator parser
-   marks nothing under it, and a target with its later-drawn cover inside it keeps the location order as draw order —
-   the lab's rn-banner-role (D77, captured live 2026-11-11): every tap `Tapped` at the centre, on the cover, every
-   colour assert passing on the cover. A false `Tapped`, the unsafe direction; no remedy (not narrowed).
+   residual; NARROWED 2026-11-12 by A42a, the amendment "A View with a ViewGroup child hosts no provider" below): a View
+   whose accessibility role React Native dumps as `android.view.View` (`toolbar`, `alert`, `header`, `tablist`, …)
+   reads as a node provider's host (android-tree-dialect.ts#providesNodes) only when none of its direct children dumps
+   as `android.view.ViewGroup` — when every child carries a class of its own: a role (`button` → `android.widget.Button`,
+   another such role → `android.view.View`), a Text (`android.widget.TextView`), an Image, a TextInput. Then the
+   uiautomator parser marks nothing under it, and a target with its later-drawn cover inside it keeps the location
+   order as draw order: a tap `Tapped` at the centre, on the cover, a colour assert passing on the cover. A false
+   `Tapped`, the unsafe direction; no remedy. A role container holding a plain React Native View (a ViewGroup) is
+   marked since A42a — the lab's rn-banner-role (D77, captured live 2026-11-11 with every tap `Tapped` on the cover):
+   every tap refused, every colour assert failing closed. No lab cell has the residual's shape.
 
 ## Amendment: covers listed before the target (2026-10-19, round 8)
 
@@ -354,9 +360,11 @@ drawn over it.
   WDA's: a run of classic Views passes it; a run listed so by chance passes it too.
 - LEFT-TO-RIGHT is assumed: the dump names no layout direction, so a right-to-left run (sorted by right edges) reads
   out of order and is not marked — it keeps its order as draw order, as before.
-- NOT a node a node provider lists: any node of the class `android.view.View` hosts virtual nodes (a plain View holds no
-  child views, so any children it lists are virtual) — Compose's AndroidComposeView, under a `ComposeView` on a screen and under a bare
-  ViewGroup in a Compose dialog's window — and nothing under it is marked (android-tree-dialect.ts#providesNodes).
+- NOT a node a node provider lists: a node of the class `android.view.View` with no direct `android.view.ViewGroup`
+  child hosts virtual nodes (a plain View holds no child views, so any children it lists are virtual) — Compose's
+  AndroidComposeView, under a `ComposeView` on a screen and under a bare ViewGroup in a Compose dialog's window — and
+  nothing under it is marked (android-tree-dialect.ts#providesNodes). One with a direct ViewGroup child is a renamed
+  ViewGroup, no provider's host (since A42a: "Amendment: a View with a ViewGroup child hosts no provider" below).
   Compose's order is composition order: form-shared-id lists each outlined field (left 55) before its label drawn over
   its outline (left 77) — location order by chance; marked, the five labels would gain their fields as untold covers.
 - From there LR3's rules apply unchanged, through `listsNestedReadingOrder` (any nested run marked so):
@@ -753,3 +761,61 @@ beneath a presented screen, so changes 1 and 3 move no row. Every other reply is
   it two different keyboard lines. Making it a standing fact judged on one line is its own change, and it may need a lab
   check on Android IME bars.
 - ST3: the order of the no-stroke stops in scroll-rounds.ts#round (presented, overlapped, unfit, …) as one ordered table.
+
+## Amendment: a View with a ViewGroup child hosts no provider (2026-11-12, backlog A42a)
+
+### Context
+
+Residual 5 above, as A42 analysed it (backlog A42, on b3aa6daf): of the golden's 28 non-idb mismatches only
+rn-banner-role's six (Android RN; T, U and C, `tap` and the colour assert) had a sound fail-closed rule. Each slot of
+rn-banner-role is a React Native View with `accessibilityRole="toolbar"`, which ReactAccessibilityDelegate.kt dumps as
+`android.view.View` — the class android-tree-dialect.ts#providesNodes took for a node provider's host (the D75
+amendment, "NOT a node a node provider lists"). The dump (tests/fixtures/truth/android-rn-averi_lab-api33/rn-banner-role.xml)
+lists each slot's cover and target as `android.view.ViewGroup`: React Native's ReactViewGroups, real child views AOSP
+sorts by location, not virtual nodes. Read as a provider's, the slot's run was never marked, each cover listed first
+read as drawn beneath its target: every tap `Tapped` at the centre, on the cover; every colour assert passing on it.
+
+### Decision
+
+- **A plain `android.view.View` with a direct child of the class `android.view.ViewGroup` is no node provider's
+  host** (android-tree-dialect.ts#providesNodes). A plain View holds no child views, so a ViewGroup child says the
+  class is a delegate's name for a real ViewGroup — React Native's role container — whose children AOSP sorts by
+  location (`addChildrenForAccessibility`); its run is checked and marked as any classic run. One such child is enough.
+- **A provider's host stays one all the way down**: a node under a provider (`inProvider`) is the provider's whatever
+  its own children's classes; the rule asks only a node not already under one. Compose's AndroidComposeView lists its
+  semantics nodes as `android.view.View` or a role's widget class: no Compose capture of the lab lists an
+  `android.view.ViewGroup` directly under its host (the sweep below). AndroidView interop is measured: the real truth
+  captures scroll-sticky-view, carousel-recycler (and carousel-recycler-free) and scroll-collapsing
+  (tests/fixtures/truth/android-averi_lab-api33/) each list `androidx.compose.ui.viewinterop.ViewFactoryHolder` by its
+  own class, beneath Compose's virtual nodes under the host, and none of their golden rows moved; the synthetic P2
+  (tests/ui-tree/draw-order-android-views-twin.test.ts) pins the same shape, still unmarked. A holder dumped as
+  `android.view.ViewGroup` directly under the host is the second residual below.
+- Nothing else changes: the mark, the stripe check, LR3's rules and the eyes judge the run as they judge views-banner's
+  (P1).
+
+Measured: over the 70 uiautomator dumps of tests/fixtures, exactly three nodes match the rule — rn-banner-role's T, U
+and C slots. Golden over the truth corpus against the branch base 3e2df45b (1691 checks): exactly rn-banner-role's six rows change,
+MISMATCH → ok (T, U and C refused, "drawn over it as a screenshot shows (the two are listed in reading order)"; the
+colour asserts fail closed naming the cover); mismatches 113 → 107; the six rows struck from react-native.known.ts and
+their pins from pins.json. tests/ui-tree/draw-order-android-views-twin.test.ts P3 flipped: each slot marked, each cover
+an untold peer, refused with the eyes or without. tests/adapters/android-accessibility-order.test.ts pins the rule
+(rn-banner-role's slots marked; one ViewGroup child among View children enough; a ViewGroup below a provider's virtual
+node unmarks nothing). Unmeasured live: the next Gate B confirms rn-banner-role's three taps refused, nothing fired.
+
+Rejected: a React-Native-only rule (the package name, the role) — the dump names no role, and the sort is AOSP's for
+any ViewGroup a delegate renames; reading every `android.view.View` with children as a ViewGroup — Compose's host has
+children too, listed in composition order (scroll-sticky, form-shared-id).
+
+### Residuals
+
+- **A role container whose children all carry roles** (or are Text, Image, TextInput — any class but
+  `android.view.ViewGroup`) still reads as a provider's host: residual 5 above, narrowed to that shape. A toolbar of
+  Pressables with `role="button"` (`android.widget.Button`) and a toast drawn over them stays on LR4's lie. Nothing in
+  the dump tells such a container from Compose's host.
+- **A provider's host listing a ViewGroup as its direct child** loses its provider reading: its children's run is
+  checked for location order and marked where it is in it (by chance, for a provider), and its overlaps then ask the
+  eyes — a screenshot per tap, a refusal when the eyes cannot tell. A Compose AndroidView placed directly at the root
+  of its composition, if its holder were listed under the host with the holder's ViewGroup class, would have that
+  shape. No dump has it (the sweep above); unmeasured. Its cost is bounded: a wrongly un-provided host can at most
+  bring its overlaps under the eyes-gated judgement (an untold cover lifted only when the eyes see the target on top,
+  `seenUnder`, ADR 0024) — never a `Tapped` from the listing alone.

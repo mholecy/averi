@@ -52,12 +52,8 @@ const interop = (inner: string) =>
 
 /** The eyes' answer for `tag` against `peer`, from the target's side. */
 const eyes = (target: UiNode, peer: UiNode, seen: 'over' | 'under') => seenOrderOf(target, [{ peer, seen, overlap: '#263238', own: '#43A047', other: '#263238' }]);
-/**
- * Each target's centre, as averi taps it when nothing covers it: the views twin's (127 + 952) / 2 = 539.5, rounded to
- * 540; React Native's (P3) (128 + 953) / 2 = 540.5, to 541.
- */
+/** Each target's centre, as averi taps it when nothing covers it: the views twin's (127 + 952) / 2 = 539.5, rounded to 540. */
 const CENTRE = { T: { x: 540, y: 391 }, U: { x: 540, y: 886 }, C: { x: 540, y: 1381 } } as const;
-const RN_CENTRE = { T: { x: 541, y: 391 }, U: { x: 541, y: 886 }, C: { x: 541, y: 1381 } } as const;
 
 describe('P1 views-banner hosted by setContentView: the run is marked, each cover an untold peer — refused with and without the eyes', () => {
   const cell = 'views-banner';
@@ -109,11 +105,13 @@ describe('P2 the same run in Compose AndroidView interop: unmarked, tapped at th
  * a container of [cover, target] — location order, the cover's left 20 dp further left. The container ENCLOSES its
  * cover (the slot widened 20 dp left and right, 10 dp up and down), so no bound is clipped: a slot as small as its
  * target would clip the cover's dumped bounds to it (View#getBoundsOnScreen clips to each parent) and fail the location
- * check on its own — the cell would not tell the role rule from the clip. Here only the provider rule
- * (android-tree-dialect.ts#providesNodes) leaves the run unmarked: LR4's lie is the EXPECTED prediction (ADR 0015's residual 5,
- * not narrowed), filed in react-native.known.ts as that residual since the capture (2026-11-11).
+ * check on its own — the cell would not tell the role rule from the clip. Until A42a the provider rule
+ * (android-tree-dialect.ts#providesNodes) left the run unmarked and each target `Tapped` at the centre, on its cover (LR4's
+ * lie, ADR 0015's residual 5, captured so 2026-11-11). The slot's direct children are React Native's ViewGroups, which no
+ * node provider lists: since A42a it is no provider's host, its run is marked, and the slot reads as views-banner's run
+ * does (P1) — each cover an untold peer, refused with the eyes or without (ADR 0015's residual 5, narrowed).
  */
-describe('P3 rn-banner-role: the slot container dumps as android.view.View — unmarked, tapped at the centre (LR4 survives)', () => {
+describe('P3 rn-banner-role: the slot container dumps as android.view.View with ViewGroup children — marked, each cover an untold peer, refused', () => {
   const cell = 'rn-banner-role';
   // The slot at (slot left - 20, slot top - 10) dp: left 72.5 rounded up to 73, top 275 / 770 / 1265, 935x231 px; the
   // target 20,10 dp inside it (55, 27.5 rounded up to 28: 128,303 as rn-banner's); the cover at its left, at its top
@@ -130,14 +128,22 @@ describe('P3 rn-banner-role: the slot container dumps as android.view.View — u
     </node>`),
   );
 
-  it.each(['T', 'U', 'C'])('%s\'s slot container is not marked', (tag) => {
-    expect(byId(t, `lab.${cell}.${tag}.slot`).readingOrder).toBeUndefined();
+  it.each(['T', 'U', 'C'])('%s\'s slot container is marked readingOrder', (tag) => {
+    expect(byId(t, `lab.${cell}.${tag}.slot`).readingOrder).toBe(true);
   });
 
-  it.each(['T', 'U', 'C'] as const)('%s: no cover, tapped at its centre — on the cover', (tag) => {
+  it.each(['T', 'U', 'C'])('%s carries its cover, untold; no screenshot: no tap point — refused', (tag) => {
     const e = drawOrder(t).exposure(byId(t, `lab.${cell}.${tag}`), PHONE);
-    expect(e.covers).toEqual([]);
-    expect(e.tapAt).toEqual({ point: RN_CENTRE[tag], moved: false });
+    expect(tagged(e.covers)).toEqual([{ node: byId(t, `lab.${cell}.${tag}.cover`), order: 'untold', presented: false }]);
+    expect(e.tapAt).toBeUndefined();
+  });
+
+  it.each(['T', 'U', 'C'])('%s: the eyes seeing the cover drawn over it — still refused, no tap point', (tag) => {
+    const target = byId(t, `lab.${cell}.${tag}`);
+    const cover = byId(t, `lab.${cell}.${tag}.cover`);
+    const e = drawOrder(t, eyes(target, cover, 'under')).exposure(target, PHONE);
+    expect(tagged(e.covers)).toEqual([{ node: cover, order: 'seenOver', presented: false }]);
+    expect(e.tapAt).toBeUndefined();
   });
 });
 

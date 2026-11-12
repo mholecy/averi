@@ -259,15 +259,19 @@ interface Around {
 
 /**
  * Whether `raw` hosts a NODE PROVIDER — its children are virtual nodes the provider lists in its own order, not the
- * views AOSP sorts by location (android-accessibility-order.ts): a node of the class `android.view.View`. A plain View
- * holds no child views, so any children it lists are virtual: Compose's (AndroidComposeView dumps as
- * `android.view.View`, under a ComposeView on a screen and under a bare ViewGroup in a dialog's window — measured on
- * every Compose capture of the lab, API 33), or an ExploreByTouchHelper's. Everything under it is the provider's too.
- * The class is the accessibility className, which a delegate may set: React Native gives `android.view.View` to a view
- * with some accessibility roles (`toolbar`, `alert`, `header`, `tablist`, … — ReactAccessibilityDelegate.kt), so such a
- * container's subtree is read as a provider's, unmarked (ADR 0015's D75 residual; not narrowed).
+ * views AOSP sorts by location (android-accessibility-order.ts): a node of the class `android.view.View` none of whose
+ * direct children is of the class `android.view.ViewGroup`. A plain View holds no child views, so any children it lists
+ * are virtual: Compose's (AndroidComposeView dumps as `android.view.View`, under a ComposeView on a screen and under a
+ * bare ViewGroup in a dialog's window — measured on every Compose capture of the lab, API 33), or an
+ * ExploreByTouchHelper's. Everything under it is the provider's too. The class is the accessibility className, which a
+ * delegate may set: React Native gives `android.view.View` to a view with some accessibility roles (`toolbar`, `alert`,
+ * `header`, `tablist`, … — ReactAccessibilityDelegate.kt), and such a container's children are its real child views,
+ * React Native's ViewGroups — a direct `android.view.ViewGroup` child tells it from a provider's host (ADR 0015's
+ * residual 5, narrowed by A42a: rn-banner-role). A role container whose children all carry classes other than
+ * `android.view.ViewGroup` (each a role, a Text, an Image) still reads as a provider's host, unmarked.
  */
-const providesNodes = (raw: RawNode): boolean => raw.class === 'android.view.View';
+const providesNodes = (raw: RawNode, children: readonly RawNode[]): boolean =>
+  raw.class === 'android.view.View' && !children.some((child) => child.class === 'android.view.ViewGroup');
 
 function normalizeNode(raw: RawNode, around: Around): UiNode {
   const className = raw.class?.split('.').pop() ?? '';
@@ -275,7 +279,7 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
   const rawText = emptyToNull(raw.text);
   const text = emptyToNull(raw.text === undefined ? undefined : trimOuter(String(raw.text)));
   const contentDesc = emptyToNull(raw['content-desc']);
-  const rawChildren = raw.node === undefined ? [] : Array.isArray(raw.node) ? raw.node : [raw.node];
+  const rawChildren = childrenOf(raw);
   // Compose text inputs don't always dump as EditText: a BasicTextField with
   // scroll semantics surfaces as (Horizontal)ScrollView carrying the content
   // in `text` (measured on the login username field — value came back
@@ -288,7 +292,7 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
   const isTextInput = className.endsWith('EditText') || composeTextInput;
   const { rect, clippedOut } = nodeBounds(raw.bounds, around.parent);
   const clips = raw.scrollable === 'true';
-  const inProvider = around.inProvider || providesNodes(raw);
+  const inProvider = around.inProvider || providesNodes(raw, rawChildren);
   const children = rawChildren.map((child) => normalizeNode(child, { ...around, parent: rect, clip: clips ? rect : around.clip, inProvider }));
   const whole = around.clip === undefined ? undefined : uncut(rect, children, around.clip);
   const node: UiNode = {

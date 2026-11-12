@@ -41,13 +41,13 @@ import type { Cell, Lab, Target } from './lab';
 //
 // `rn-banner-role` (Android only, backlog D77 sub-case b): rn-banner with each target and its cover inside a slot View
 // carrying `accessibilityRole="toolbar"`, kept un-flattened (`collapsable={false}`) — React Native gives that role the
-// accessibility className `android.view.View` (ReactAccessibilityDelegate.kt, AccessibilityRole.getValue), the shape of
-// a node provider's host, whose subtree averi's reading-order mark never reaches (docs/adr/0015-flat-list-reading-
-// order-break.md, the D75 residual; not narrowed). The slot ENCLOSES its cover (`ROLE_SLOT`: widened 20 pt left and
+// accessibility className `android.view.View` (ReactAccessibilityDelegate.kt, AccessibilityRole.getValue), the class of
+// a node provider's host; its children are React Native's ViewGroups, which tell it from one (docs/adr/0015-flat-list-
+// reading-order-break.md, ADR 0015 residual 5). The slot ENCLOSES its cover (`ROLE_SLOT`: widened 20 pt left and
 // right, 10 pt up and down, the target and the cover where rn-banner lays them on the screen): a slot as small as its
 // target would clip the cover's dumped bounds to it (View#getBoundsOnScreen clips to each parent), which fails the
-// location check alone, and the cell would not tell the role from the clip. Predicted LR4's lie (a `Tapped` on the
-// cover): tests/ui-tree/draw-order-android-views-twin.test.ts, P3.
+// location check alone, and the cell would not tell the role from the clip. Predicted: each target refused under its
+// cover (ADR 0015 residual 5): tests/ui-tree/draw-order-android-views-twin.test.ts, P3.
 
 export const SLOT = { width: 300, height: 64 };
 const slotTop = (slot: number) => 142 + 180 * slot - SLOT.height / 2;
