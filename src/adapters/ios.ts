@@ -18,8 +18,9 @@ import { hostProcessPattern, pgrepReason, pgrepVerdict } from './ios-liveness.js
 import { ViewportMemo } from './viewport-memo.js';
 import { iosStatusBand } from './ios-status-band.js';
 import { sleep } from '../util/sleep.js';
-import { refusalOf, type Typeable } from './typeable.js';
-import { IDB_TYPEABLE, typingPathOf, WDA_TYPEABLE } from './ios-typing.js';
+import type { Typeable } from './typeable.js';
+import { withNoteLine } from '../util/note-line.js';
+import { IDB_TYPEABLE, idbTypingRefusal, typingPathOf, WDA_TYPEABLE } from './ios-typing.js';
 
 /**
  * How long uiTree({ settle: true }) waits before its one re-read of an idb
@@ -183,9 +184,14 @@ export class IosAdapter implements DeviceAdapter {
     return this.treeSource.typeText !== undefined ? WDA_TYPEABLE : IDB_TYPEABLE;
   }
 
-  /** The source's line for every claiming reply (DeviceAdapter.claimNote): `auto`'s, once it fell back to idb (A41a). */
+  /** The source's line for every claiming reply (DeviceAdapter.claimNote): `auto`'s, once it fell back (A41a). */
   get claimNote(): string | undefined {
     return this.treeSource.claimNote;
+  }
+
+  /** Whether the source fell back (DeviceAdapter.fellBack, IosTreeSource.fellBack): `auto` read through idb (A41a). */
+  get fellBack(): boolean {
+    return this.treeSource.fellBack === true;
   }
   private readonly exec: ExecFn;
   private readonly udid: string;
@@ -766,11 +772,11 @@ export class IosAdapter implements DeviceAdapter {
       return;
     }
     // A backstop, not a path (A41a review M2): a source that fell back (IosTreeSource.fellBack — `auto` whose
-    // WebDriverAgent did not come up) lost its typer after a caller checked `typeable`. A text only WDA types gets ADR
-    // 0037's refusal, nothing sent, instead of idb's trace. Over idb and the recorded source (never fallen back) nothing
-    // changes.
-    if (this.treeSource.fellBack === true && typingPathOf(text) === 'wda') {
-      throw new Error(refusalOf(text, IDB_TYPEABLE) ?? `cannot type it: ${IDB_TYPEABLE.says}`);
+    // WebDriverAgent did not come up) lost its typer after a caller checked `typeable`. A text only WDA types gets
+    // ADR 0037's refusal, nothing sent, instead of idb's trace. Over idb and the recorded source (never fallen back)
+    // nothing changes.
+    if (this.fellBack && typingPathOf(text) === 'wda') {
+      throw new Error(withNoteLine(idbTypingRefusal(text), this.treeSource.claimNote));
     }
     // Every typing here goes through idbText: `ui text --udid U -- <text>`, so a leading dash is typed (D74), and its
     // text declared typed (A17), so no failure shows it.

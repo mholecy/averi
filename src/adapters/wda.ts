@@ -727,7 +727,7 @@ export class WdaServer {
     return stats[0].path;
   }
 
-  /** `project`: wdaProjectPath()'s, preflighted by the caller — its failure is a missing-package error, not a build failure. */
+  /** `project`: wdaProjectPath()'s, preflighted by the caller — a missing package is no failed build. */
   private async build(project: string): Promise<void> {
     const env = await detectXcodeEnv(this.exec);
     try {

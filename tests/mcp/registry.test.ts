@@ -331,10 +331,10 @@ describe('AdapterRegistry', () => {
     expect(bound).toEqual(['b+auto', 'b+wda']);
   });
 
-  it('select() of the device already bound drops only an adapter that fell back (claimNote, A41a): the next get builds a fresh one', async () => {
+  it('select() of the device already bound drops only an adapter that fell back (fellBack, A41a): the next get builds a fresh one', async () => {
     const { registry, created } = makeRegistry([device('sim', 'booted', 'ios')]);
     await registry.select('ios', 'sim');
-    const fallen = Object.assign((await registry.get('ios', {})) as FakeAdapter, { claimNote: 'read through idb: …' });
+    const fallen = Object.assign((await registry.get('ios', {})) as FakeAdapter, { fellBack: true });
     const wda = (await registry.get('ios', { treeSource: 'wda' })) as FakeAdapter;
     await registry.select('ios', 'sim');
     expect(fallen.disposed).toBe(1);

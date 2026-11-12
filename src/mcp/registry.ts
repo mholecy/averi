@@ -23,8 +23,8 @@ function unusableNamed(device: Device | undefined): string | undefined {
 /**
  * Per-call adapter options — today only the iOS tree-source kind (averi.yaml `app.ios.treeSource`). Required by
  * `get` (D41, 2026-11-01): a caller states the project's kind, or that it has none (`treeSource` undefined — the
- * default, `auto`), and cannot forget it — the eight tools that once asked without it were served, in a `treeSource: wda`
- * project, by a second adapter of the default kind.
+ * default, `auto`), and cannot forget it — the eight tools that once asked without it were served, in a
+ * `treeSource: wda` project, by a second adapter of the default kind.
  */
 export interface AdapterOpts {
   treeSource?: IosTreeSourceSetting;
@@ -67,7 +67,11 @@ export const defaultFactory: AdapterFactory = (platform, deviceId, opts) => {
  * drive it from one server (ADR 0032, amendment D41). `deps` reach the tree source: the
  * server passes none; scripts/perf/baseline.ts passes its lab WebDriverAgent's port and derived data.
  */
-export function iosAdapterFor(udid: string, kind: IosTreeSourceSetting, deps: Omit<IosTreeSourceDeps, 'idbHelper'> = {}): IosAdapter {
+export function iosAdapterFor(
+  udid: string,
+  kind: IosTreeSourceSetting,
+  deps: Omit<IosTreeSourceDeps, 'idbHelper'> = {},
+): IosAdapter {
   const idbHelper = new IdbHelper();
   return new IosAdapter({ udid, treeSource: createIosTreeSource(kind, udid, { ...deps, idbHelper }), idbHelper });
 }
@@ -155,7 +159,7 @@ export class AdapterRegistry {
 
   /**
    * Pin the platform's tools to one booted device (id from listAll). Selecting the device already bound keeps its
-   * adapters, except one that fell back (DeviceAdapter.claimNote: an iOS `treeSource: auto` adapter whose WebDriverAgent
+   * adapters, except one that fell back (DeviceAdapter.fellBack: an iOS `treeSource: auto` adapter whose WebDriverAgent
    * did not come up, A41a): that one is dropped, so the next call builds a fresh adapter that tries WebDriverAgent
    * again — the retry its note names.
    */
@@ -174,7 +178,7 @@ export class AdapterRegistry {
     this.assertOpen(); // before the write, as in get(): a shutdown during the probe must not leave a binding behind
     const previous = this.bindings.get(platform);
     if (previous && previous.deviceId !== deviceId) this.evict(platform, previous.deviceId);
-    else this.evict(platform, deviceId, (adapter) => adapter.claimNote !== undefined);
+    else this.evict(platform, deviceId, (adapter) => adapter.fellBack === true);
     this.bindings.set(platform, { deviceId, pinned: true });
     return device;
   }

@@ -8,6 +8,8 @@ Amended 2026-11-02 (D43a device run: the refusal holds on iOS idb, iOS wda and A
 Amended 2026-11-03 (D43: a project with the WDA tree source types what idb cannot through WebDriverAgent's `/wda/keys`;
 every refusal names the remedy true for its adapter — see the D43 amendment below).
 Amended 2026-11-03 (batch-11: D43 proven live — the last paragraph of the D43 amendment).
+Amended 2026-11-12 (A41a: `IosAdapter.typeable` is asked of the tree source per call — under `auto` WDA's set until a
+fallback to idb, idb's after it, and a fill checks the value again after its first read; ADR 0046).
 
 ## Context
 

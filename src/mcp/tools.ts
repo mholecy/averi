@@ -30,6 +30,7 @@ import { DEFAULT_SIZE_TOLERANCE_PCT } from '../verify/text-parity.js';
 import { baselineDirFor, runAsserts, runEnsureState, runNamedFlow } from '../run/commands.js';
 import { formatLogExcerpt, LOG_GREP_FLAGS, LOG_MAX_LINES } from '../run/log-excerpt.js';
 import { runVerification } from '../run/verify.js';
+import { claimed } from '../run/claims.js';
 import { normalizePlatforms } from './platforms.js';
 import { regexSource } from '../util/regex.js';
 import { FOREGROUND_WAIT_MS, type DeviceAdapter, type Platform, type UiNode } from '../adapters/types.js';
@@ -139,19 +140,6 @@ const text = (value: unknown) => ({
     { type: 'text' as const, text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) },
   ],
 });
-
-/**
- * A reply that claims what it read through the tree, with the claim note of the adapter(s) that served it
- * (DeviceAdapter.claimNote — an iOS `treeSource: auto` adapter whose WebDriverAgent did not come up, A41a) on a line of
- * its own: `⚠ <note>`. Asked after the call, whose first read made the choice. Not on a refusal (a throw), which claims
- * nothing, nor on replies that claim no read (a coordinate tap, a swipe, a snapshot).
- */
-const noted = (adapters: readonly DeviceAdapter[], reply: string): string => {
-  const note = claimNoteOf(adapters);
-  return note === undefined ? reply : `${reply}\n⚠ ${note}`;
-};
-
-const claimNoteOf = (adapters: readonly DeviceAdapter[]): string | undefined => adapters.find((a) => a.claimNote !== undefined)?.claimNote;
 
 /** A PNG as MCP image content — the one spelling of it for screenshot, ensure_state and verify. */
 const image = (shot: Buffer) => ({
@@ -272,35 +260,6 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
    */
   const deviceFor = (p: Platform, cfg: AveriConfig | undefined): Promise<DeviceAdapter> =>
     registry.get(p, { treeSource: iosToolSettings(cfg, p).treeSource });
-
-  /**
-   * `deviceFor` for an engine tool, which resolves its device lazily through the run layer, keeping the adapters it
-   * handed out (`used`) for the reply's claim note (noted). `claims` runs the engine and, when it throws, throws a new
-   * error of the same message with the note on a line of its own, the caught one as its cause (A41a review M1): a failed
-   * flow's error (flow/engine.ts#FlowError) lists the ✓ lines of the steps that ran — taps and fills claimed — before
-   * the one that failed. run_flow and ensure_state throw so; verify reports a failed flow as a section of its reply,
-   * which `noted` covers.
-   */
-  const engineDevices = () => {
-    const used: DeviceAdapter[] = [];
-    return {
-      used,
-      deviceFor: async (p: Platform, cfg: AveriConfig | undefined): Promise<DeviceAdapter> => {
-        const adapter = await deviceFor(p, cfg);
-        used.push(adapter);
-        return adapter;
-      },
-      claims: async <T>(work: () => Promise<T>): Promise<T> => {
-        try {
-          return await work();
-        } catch (e) {
-          const note = claimNoteOf(used);
-          if (note === undefined || !(e instanceof Error)) throw e;
-          throw new Error(`${e.message}\n⚠ ${note}`, { cause: e });
-        }
-      },
-    };
-  };
 
   /**
    * The handler's one call (A30): read the config under the tool's policy, then the device through `deviceFor` and
@@ -503,7 +462,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     async ({ platform: p, selector, x, y, configPath: cp }) => {
       const served = await serve(p, TOOL_CONFIG.tap(p), cp);
       if (selector !== undefined) {
-        return text(noted([served.adapter], tapText(selector, await tapElement(served.adapter, selector, acting(served)))));
+        const tapped = await tapElement(served.adapter, selector, acting(served));
+        return text(claimed(served.adapter, tapText(selector, tapped)));
       }
       if (x === undefined || y === undefined) {
         throw new Error('Provide either selector or both x and y');
@@ -584,7 +544,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         return text(typedText(value.length));
       }
       const fill = await fillField(served.adapter, selector, value, { ...acting(served), clear });
-      return text(noted([served.adapter], fillReply(fill, selector)));
+      return text(claimed(served.adapter, fillReply(fill, selector)));
     },
   );
 
@@ -624,7 +584,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       const { adapter, eyes } = await serve(p, TOOL_CONFIG.scroll_until(p), cp);
       // The eyes a `fully visible` claim is confirmed with (ui-tree/eyes.ts), served here: interact/ may not import verify/.
       const result = await scrollUntilVisible(adapter, selector, { direction, maxSwipes, fully, timeoutMs, within, eyes });
-      return text(noted([adapter], `Element ${selector} ${describeScrollResult(result)}`));
+      return text(claimed(adapter, `Element ${selector} ${describeScrollResult(result)}`));
     },
   );
 
@@ -657,12 +617,12 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     },
     async ({ platform: p, state, configPath: cp, environment: envName }) => {
       const project = await loadForCall(TOOL_CONFIG.ensure_state(), cp);
-      const run = engineDevices();
-      const { text: report, shot } = await run.claims(() =>
-        runEnsureState({ state, project, environment: envName, session }, (cfg) => run.deviceFor(p, cfg)),
+      const { text: report, shot } = await runEnsureState(
+        { state, project, environment: envName, session },
+        (cfg) => deviceFor(p, cfg),
       );
       // No image when the final capture failed — the report's ⚠ screenshot: line says why.
-      return { content: [...text(noted(run.used, report)).content, ...(shot === undefined ? [] : [image(shot)])] };
+      return { content: [...text(report).content, ...(shot === undefined ? [] : [image(shot)])] };
     },
   );
 
@@ -680,9 +640,9 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     },
     async ({ platform: p, flow, configPath: cp, environment: envName }) => {
       const project = await loadForCall(TOOL_CONFIG.run_flow(), cp);
-      const run = engineDevices();
-      const report = await run.claims(() => runNamedFlow({ flow, project, environment: envName, session }, (cfg) => run.deviceFor(p, cfg)));
-      return text(noted(run.used, report));
+      return text(
+        await runNamedFlow({ flow, project, environment: envName, session }, (cfg) => deviceFor(p, cfg)),
+      );
     },
   );
 
@@ -709,7 +669,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       // configless, but a broken averi.yaml fails it rather than silently
       // costing the health line (android) or the tree source (ios).
       const { cfg, adapter } = await serve(p, TOOL_CONFIG.assert(), cp);
-      return text(noted([adapter], await runAsserts({ adapter, specs, baselineDir: baselineDirFor(cp), cfg })));
+      return text(await runAsserts({ adapter, specs, baselineDir: baselineDirFor(cp), cfg }));
     },
   );
 
@@ -746,7 +706,6 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     },
     async ({ platforms: requested, state, flow, asserts, contract: contractPath, configPath: cp, environment: envName }) => {
       const project = await loadForCall(TOOL_CONFIG.verify(), cp);
-      const run = engineDevices();
       // Parsed before the contract is read: a malformed assert spec is the
       // caller's most likely mistake, and it stays the error they see when both
       // are wrong.
@@ -767,9 +726,9 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
           session,
           baselineDir: baselineDirFor(cp),
         },
-        (p) => run.deviceFor(p, project.cfg),
+        (p) => deviceFor(p, project.cfg),
       );
-      return { content: [...text(noted(run.used, sections.join('\n\n'))).content, ...screenshots.map(image)] };
+      return { content: [...text(sections.join('\n\n')).content, ...screenshots.map(image)] };
     },
   );
 

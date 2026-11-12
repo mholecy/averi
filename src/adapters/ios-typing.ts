@@ -1,4 +1,4 @@
-import { PRINTABLE_ASCII, type Typeable } from './typeable.js';
+import { PRINTABLE_ASCII, refusalOf, type Typeable } from './typeable.js';
 
 /**
  * What iOS types, and through which path (D43, docs/adr/0037-a-value-the-adapter-cannot-type-is-refused-before-any-
@@ -65,6 +65,14 @@ export const IDB_TYPEABLE: Typeable = {
     blockedBy: (char) => `averi has no typing path on iOS for this value (WebDriverAgent's \`/wda/keys\` is not measured for ${char}; ADR 0037): ${BY_HAND}`,
   },
 };
+
+/**
+ * idb's refusal of `text` (IDB_TYPEABLE, refusalOf) — for a text only WebDriverAgent types that reached a typer after
+ * `treeSource: auto` fell back to idb (A41a: adapters/auto-tree-source.ts, IosAdapter.typeText's backstop). Built here
+ * once; the fallback wording is for a text idb types, which no caller sends.
+ */
+export const idbTypingRefusal = (text: string): string =>
+  refusalOf(text, IDB_TYPEABLE) ?? `cannot type it: ${IDB_TYPEABLE.says}`;
 
 /** What an IosAdapter over a source that types (IosTreeSource.typeText: WDA's) types — the module doc. */
 export const WDA_TYPEABLE: Typeable = {

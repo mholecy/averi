@@ -47,6 +47,8 @@ describe('a fill under treeSource auto whose first read falls back to idb (A41a 
     expect(err).toBeInstanceOf(FillValueFailure);
     expect((err as FillValueFailure).fillValue).toBe('refused');
     expect((err as Error).message).toMatch(/^cannot type U\+0160 .*Refused before anything was sent — nothing tapped, cleared or typed/s);
+    // The refusal says why idb's set applies: the claim note's line, grep-able as `read through idb` (review point 7).
+    expect((err as Error).message).toMatch(/\n⚠ read through idb: WebDriverAgent did not come up \(WebDriverAgent requires the appium-webdriveragent package; select_device again to retry\)/);
     expect(calls).toContain(DESCRIBE_ALL);
     // Reads only (the tree, the screen's description) — no tap, no key, no text.
     expect(calls.filter((c) => /^idb ui (tap|text|key|swipe)/.test(c))).toEqual([]);
@@ -58,8 +60,8 @@ describe('a fill under treeSource auto whose first read falls back to idb (A41a 
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const { adapter, calls } = fallenBack();
     await adapter.uiTree(); // the choice: idb
-    await expect(adapter.typeText('Šťastný')).rejects.toThrow(/^cannot type U\+0160 .*Refused before anything was sent/s);
-    await expect(typeIntoFocused(adapter, 'Šťastný')).rejects.toThrow(/^cannot type U\+0160/);
+    await expect(adapter.typeText('Šťastný')).rejects.toThrow(/^cannot type U\+0160 .*Refused before anything was sent.*\n⚠ read through idb: /s);
+    await expect(typeIntoFocused(adapter, 'Šťastný')).rejects.toThrow(/^cannot type U\+0160 .*\n⚠ read through idb: /s);
     expect(calls.filter((c) => c.startsWith('idb ui text'))).toEqual([]);
     errors.mockRestore();
   });

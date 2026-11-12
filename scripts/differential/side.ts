@@ -112,7 +112,9 @@ function liveIosOf(
     };
   }
   if (typeof treeSource.createIosTreeSource !== 'function') return undefined;
-  const create = treeSource.createIosTreeSource as (kind: IosTreeSourceSetting, udid: string, deps: LiveIosDeps) => ConstructorParameters<Side['IosAdapter']>[0]['treeSource'];
+  type Source = ConstructorParameters<Side['IosAdapter']>[0]['treeSource'];
+  type Create = (kind: IosTreeSourceSetting, udid: string, deps: LiveIosDeps) => Source;
+  const create = treeSource.createIosTreeSource as Create;
   return { adapter: (udid, kind, deps) => new Ios({ udid, treeSource: create(kind, udid, deps) }), wiring: 'fallback' };
 }
 

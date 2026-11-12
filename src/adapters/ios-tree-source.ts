@@ -149,14 +149,22 @@ export type IosTreeSourceDeps = Omit<WdaServerOptions, 'udid'> & {
  * error here — not a runtime default somewhere above (moved out of
  * mcp/registry.ts on review 2026-10-03). `auto` (A41a) is both sources, of which its first read keeps one.
  */
+const idbSource = (udid: string, deps: IosTreeSourceDeps): IdbTreeSource =>
+  new IdbTreeSource({ udid, exec: deps.exec, helper: deps.idbHelper });
+const wdaSource = (udid: string, { idbHelper: _idb, ...deps }: IosTreeSourceDeps): WdaTreeSource =>
+  new WdaTreeSource({ ...deps, udid });
+
 const constructors: Record<IosTreeSourceSetting, (udid: string, deps: IosTreeSourceDeps) => IosTreeSource> = {
-  idb: (udid, deps) => new IdbTreeSource({ udid, exec: deps.exec, helper: deps.idbHelper }),
-  wda: (udid, { idbHelper: _idb, ...deps }) => new WdaTreeSource({ ...deps, udid }),
-  auto: (udid, { idbHelper, ...deps }) =>
-    new AutoTreeSource({ wda: new WdaTreeSource({ ...deps, udid }), idb: new IdbTreeSource({ udid, exec: deps.exec, helper: idbHelper }) }),
+  idb: idbSource,
+  wda: wdaSource,
+  auto: (udid, deps) => new AutoTreeSource({ wda: wdaSource(udid, deps), idb: idbSource(udid, deps) }),
 };
 
-export function createIosTreeSource(setting: IosTreeSourceSetting, udid: string, deps: IosTreeSourceDeps = {}): IosTreeSource {
+export function createIosTreeSource(
+  setting: IosTreeSourceSetting,
+  udid: string,
+  deps: IosTreeSourceDeps = {},
+): IosTreeSource {
   return constructors[setting](udid, deps);
 }
 

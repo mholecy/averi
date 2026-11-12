@@ -1301,7 +1301,7 @@ describe('every tool gets the project\'s adapter — one per simulator and confi
     expect(result.text.split('read through idb: the note'), result.text).toHaveLength(2);
   });
 
-  it('ios verify: a flow that fails is a section of the reply, not a throw — the reply carries the note once (noted)', async () => {
+  it('ios verify: a flow that fails is a section of the reply, not a throw — the reply carries the note once (run/claims.ts#claimed)', async () => {
     const ios = Object.assign(home(), { claimNote: 'read through idb: the note' });
     const harness = await connect({ android: home(), ios });
     const result = await harness.call('verify', { platforms: ['ios'], flow: 'tap_then_miss', configPath: await file('averi.yaml', TAP_THEN_MISS) });

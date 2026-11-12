@@ -1,6 +1,8 @@
 import { CONTROL_CHAR_RE, controlCharRemedy, inputTextControlFate } from '../adapters/input-text.js';
 import { codePoint, refusalOf, type Typeable } from '../adapters/typeable.js';
 import type { DeviceAdapter } from '../adapters/types.js';
+import { errorMessage } from '../util/error-message.js';
+import { withNoteLine } from '../util/note-line.js';
 
 /**
  * Which text averi types, stated ONCE, where text is accepted — and checked
@@ -78,8 +80,23 @@ export function assertTypeable(value: string, typeable: Typeable): void {
   );
 }
 
-/** Type into whatever is focused, after `assertTypeable` — the one path for a caller that has no field to fill. */
+/**
+ * `assertTypeable` against the adapter's set, its refusal carrying the adapter's claim note line (DeviceAdapter.
+ * claimNote, util/note-line.ts) when it has one: after iOS `treeSource: auto` fell back to idb, a value only
+ * WebDriverAgent types is refused by idb's set, and the line says why that set applies (A41a). Without a note, the
+ * refusal as it was.
+ */
+export function assertTypeableOn(adapter: DeviceAdapter, value: string): void {
+  try {
+    assertTypeable(value, adapter.typeable);
+  } catch (e) {
+    if (adapter.claimNote === undefined) throw e;
+    throw new Error(withNoteLine(errorMessage(e), adapter.claimNote), { cause: e });
+  }
+}
+
+/** Type into whatever is focused, after `assertTypeableOn` — the one path for a caller that has no field to fill. */
 export async function typeIntoFocused(adapter: DeviceAdapter, value: string): Promise<void> {
-  assertTypeable(value, adapter.typeable);
+  assertTypeableOn(adapter, value);
   await adapter.typeText(value);
 }

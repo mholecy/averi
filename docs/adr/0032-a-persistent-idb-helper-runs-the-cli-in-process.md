@@ -32,6 +32,8 @@ Amended 2026-11-11 (A30: the D41 invariant is held by behaviour, every tool call
 `registry.get(` in the source — see the amendment below; replies byte for byte).
 Amended 2026-11-12 (A33: live.ts, differential.ts and perf/baseline.ts open and close their in-process server through
 one module — see the amendment at the end; golden Changed 0).
+Amended 2026-11-12 (A41a: the default tree source is `auto`, chosen lazily per adapter at its first tree read — still
+ONE source per adapter, never two trees; ADR 0046).
 
 ## Context
 
@@ -881,11 +883,12 @@ than the behavioural test: a brand cannot see a handler that never resolves a de
 
 The iOS stack is shaped by a config key, `app.ios.treeSource`, but never reads averi.yaml: the kind arrives as a
 value. What crosses the seam is words: a refusal may name the config key that is the reader's next move
-(`IosAdapter.keyboardAdvice` names `app.ios.keyboardDismiss`, `IdbEmptyTreeError` names `treeSource: wda`, `WdaServer`'s
-missing-package refusal names `treeSource: wda`), as Android's launch refusals name theirs. The review of 2026-10-07
-(docs/architecture-reviews/2026-10-07-after-ios-idb-keyboard-fixes.html, #3) called this a config leak and proposed one remedy
-owner above the seam. It was not taken (recorded 2026-10-08): a typed error translated above would be one sentence with
-a translation site per caller. Until A32 this was written only in ARCHITECTURE.md §3.
+(`IosAdapter.keyboardAdvice` names `app.ios.keyboardDismiss`, `IdbEmptyTreeError` names `treeSource: wda`; `WdaServer`'s
+missing-package refusal named `treeSource: wda` until A41a, and names the package since, ADR 0046), as Android's launch
+refusals name theirs. The review of 2026-10-07 (docs/architecture-reviews/2026-10-07-after-ios-idb-keyboard-fixes.html,
+#3) called this a config leak and proposed one remedy owner above the seam. It was not taken (recorded 2026-10-08): a
+typed error translated above would be one sentence with a translation site per caller. Until A32 this was written only
+in ARCHITECTURE.md §3.
 
 ## Amendment: one in-process connection for the three harnesses (2026-11-12, backlog A33)
 

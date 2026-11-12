@@ -38,12 +38,16 @@ read is idb's for the adapter's life, and every reply that claims what it read c
   clause of WDA's error, at most 80 characters (`fallbackReason`): `WebDriverAgent requires the appium-webdriveragent
   package`, `A WebDriverAgent answers /status on port 8100`, `WDA build failed`. The agent cannot read averi's stderr,
   so the reason travels in the reply. The claiming replies are `tap` with a selector, `type_text` with a selector (a
-  fill), `scroll_until`, `assert`, `run_flow`, `ensure_state` and `verify` (`mcp/tools.ts#noted`). The engine tools
-  also put it on the error they throw: a failed flow's error lists the ✓ lines of the taps and fills before the step
-  that failed. Any other refusal claims nothing and gets no note. Nothing is refused for the fallback.
-- The retry is `select_device` of the same simulator. `registry.ts#select` drops a cached adapter whose `claimNote` is
-  set, so the next call builds a fresh `auto` adapter that asks WDA again. A re-select keeps every other adapter, as
-  before.
+  fill), `scroll_until`, `assert`, `run_flow`, `ensure_state` and `verify`. The line is added in the run layer
+  (`run/claims.ts#claimed`, `claimedError`): by the compositions for `assert`, `ensure_state`, `run_flow` and
+  `verify`, and around the interaction's reply for `tap`, the fill and `scroll_until`. A failed engine run's error
+  (`run_flow`, `ensure_state`) carries it too, as a new error with the caught one as its cause: it lists the ✓ lines
+  of the taps and fills before the step that failed. A failed flow inside `verify` is a section of its reply, which
+  the line closes. The refusal of a value only WDA types after a fallback carries the line as well (Typing, below).
+  Any other refusal claims nothing and gets no note. Nothing is refused for the fallback itself.
+- The retry is `select_device` of the same simulator. `registry.ts#select` drops a cached adapter that fell back
+  (`DeviceAdapter.fellBack`, the one signal: `claimNote` is its words), so the next call builds a fresh `auto` adapter
+  that asks WDA again. A re-select keeps every other adapter, as before.
 - With the package missing, `WdaServer` now says so before the "first WDA build … takes minutes" line, not after it,
   and its refusal opens `WebDriverAgent requires the appium-webdriveragent package` (it opened `treeSource: wda
   requires`, which named a setting the `auto` user never wrote).
@@ -55,14 +59,22 @@ read is idb's for the adapter's life, and every reply that claims what it read c
   until a fallback, and IDB_TYPEABLE after one, so a later value idb cannot type is refused before anything is sent.
   - A fill checks the value twice: before resolving the field, as always, and again after the resolution's read,
     before the focus tap (`interact/fill.ts#fillField`). If that read was the one that fell back, a value only WDA
-    types is refused there with ADR 0037's refusal: nothing tapped, cleared or typed.
+    types is refused there with ADR 0037's refusal. There is no focus tap, no clear and no typing. The resolution
+    before it may have run the keyboard guard, but a fallback reads idb's tree, which marks no keyboard, so that
+    guard dismisses nothing there. ADR 0037's own sentence ("nothing tapped, cleared or typed") is the refusal's,
+    unchanged.
   - A text that needs WDA, typed before any read (`type_text` without a selector, a flow's `type:`), makes the choice
-    itself. If WDA does not come up, it is refused as idb refuses it, with WDA's reason after it. Nothing is typed.
+    itself. If WDA does not come up, it is refused as idb refuses it. Nothing is typed.
   - `IosAdapter.typeText` is the backstop: a text only WDA types, reaching it over a source that fell back
     (`IosTreeSource.fellBack`), gets the same refusal instead of idb's trace. idb and the recorded source never fall
     back, so `treeSource: idb` is unchanged.
-- `treeSource: idb` and `treeSource: wda` behave as before, byte for byte. The registry caches per setting, so
-  `auto`, `idb` and `wda` are three adapters.
+  - Each of these refusals, and any `typeable` refusal on an adapter that fell back
+    (`interact/type-text.ts#assertTypeableOn`), ends with the claim note's line, so it is grep-able as `read through
+    idb` and names the reason and the retry. One wording for idb's refusal: `adapters/ios-typing.ts#idbTypingRefusal`.
+- `treeSource: idb` behaves as before, byte for byte. So does `treeSource: wda`, with one exception: a missing
+  `appium-webdriveragent` package is now said before the first-build line, and its refusal opens `WebDriverAgent
+  requires …` instead of `treeSource: wda requires …` (above). The registry caches per setting, so `auto`, `idb` and
+  `wda` are three adapters.
 - `app.ios.keyboardDismiss`'s load-time note (`flow/config.ts#inertKeyboardDismissNote`) is printed only for a
   project that pins `idb`. Under `auto` the list applies whenever WDA comes up.
 
@@ -78,7 +90,8 @@ read is idb's for the adapter's life, and every reply that claims what it read c
    choice. The claim note does not name the keyboard.
 4. After a fallback, a value only WDA types is refused before anything is sent: by the fill's second check, or by
    `type_text`'s own check. That refusal is ADR 0037's idb wording, and its remedy names `treeSource: wda`, which fails
-   on this machine for the reason the note gives. The remedy is to fix that reason, then `select_device` again.
+   on this machine for the reason the note line after it gives. The way out is to fix that reason, then
+   `select_device` again.
 5. Two adapters of one simulator, `auto` and `wda` (two projects, one server), each own a WdaServer on the same
    per-UDID port. That is the D41 situation of ADR 0032, unchanged.
 

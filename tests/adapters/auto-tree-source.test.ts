@@ -154,7 +154,7 @@ describe('AutoTreeSource — WebDriverAgent when it comes up, idb when it does n
     const gone = fakeWda(down);
     const fallen = new AutoTreeSource({ wda: gone, idb: fakeIdb() });
     await expect(fallen.typeText?.('Šťastný')).rejects.toThrow(
-      /^cannot type U\+0160 .*Refused before anything was sent.* \(WebDriverAgent did not come up: WebDriverAgent requires the appium-webdriveragent package\)$/s,
+      /^cannot type U\+0160 .*Refused before anything was sent.*\n⚠ read through idb: WebDriverAgent did not come up \(WebDriverAgent requires the appium-webdriveragent package; select_device again to retry\) and idb lists/s,
     );
     expect(gone.typed).toEqual([]);
     expect(fallen.typeText).toBeUndefined();
