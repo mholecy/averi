@@ -17,7 +17,7 @@ import { isSystemScheme, isWebScheme, linkScheme, PLUTIL_NO_SUCH_KEY, SCHEME_APP
 import { hostProcessPattern, pgrepReason, pgrepVerdict } from './ios-liveness.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { iosStatusBand } from './ios-status-band.js';
-import { resetDataContainer } from './ios-data-container.js';
+import { isAppDataContainer, resetDataContainer } from './ios-data-container.js';
 import { sleep } from '../util/sleep.js';
 import type { Typeable } from './typeable.js';
 import { withNoteLine } from '../util/note-line.js';
@@ -996,7 +996,7 @@ export class IosAdapter implements DeviceAdapter {
     await this.terminate(bundleId);
     const { stdout } = await this.simctl(['get_app_container', this.udid, bundleId, 'data']);
     const container = stdout.toString('utf8').trim();
-    if (!container.startsWith('/')) throw new Error(`Unexpected app container path: ${container}`);
+    if (!isAppDataContainer(container, this.udid)) throw new Error(`Unexpected app container path: ${container}`);
     await resetDataContainer(container);
   }
 }

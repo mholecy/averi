@@ -119,6 +119,12 @@ No earlier baseline: the latest, in scope.json, is its first.
 
 - 100 % on 2026-11-02 (D33 after review, pgrepReason and the case-free UDID added): 70 mutants, 0 survived, 0 without coverage — after a test killed the first run's one survivor (the ExecError check) and covered one string
 
+## src/adapters/ios-data-container.ts
+
+- 90.00 % on 2026-11-12 (A44 review round 1, the first cold core run with isAppDataContainer; `npm run mutate -- --group core --force`, 402 s): 20 mutants, 2 survived, both equivalent — the dot-segment check's `^` and `$` alternatives emptied: a dot segment at either end is refused by the container pattern's own anchors; the alternatives were dropped, not kept equivalent
+- 100 % on 2026-11-12 (A44, `force` removed from rm; `npm run mutate -- --force --mutate src/adapters/ios-data-container.ts --tempDirName reports/mutation/stryker-tmp-a44`, cold, alone, 24 s): 10 mutants, 0 survived
+- 90.91 % on 2026-11-12 (A44, new; `npm run mutate -- --group core --force`, 397 s): 11 mutants, 1 survived, equivalent — rm's `force: true` made false (each entry was just listed); review round 1 put `force` back and killed it with an entry that vanishes between the listing and its removal
+
 ## src/adapters/android-accessibility-order.ts
 
 No earlier baseline: the latest, in scope.json, is its first.

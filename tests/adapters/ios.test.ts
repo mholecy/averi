@@ -495,9 +495,10 @@ describe('IosAdapter re-enables accessibility automation before every launch and
   });
 
   it('a clearState launch: terminate and wipe first, the writes right before the launch', async () => {
-    const container = await mkdtemp(join(tmpdir(), 'averi-test-container-'));
+    const devices = await mkdtemp(join(tmpdir(), 'averi-test-devices-'));
+    const container = join(devices, 'AAAA-1111', 'data', 'Containers', 'Data', 'Application', '95E78B94-6D6B-4B15-8D47-45D88DDC2ABD');
     try {
-      await mkdir(join(container, 'Documents'));
+      await mkdir(join(container, 'Documents'), { recursive: true });
       await writeFile(join(container, 'Documents', 'x'), '');
       const { fn, calls } = fakeExec({ 'xcrun simctl get_app_container AAAA-1111 com.app data': `${container}\n` });
       await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE }).launch('com.app', { clearState: true });
@@ -511,7 +512,22 @@ describe('IosAdapter re-enables accessibility automation before every launch and
       expect((await readdir(container)).sort()).toEqual(['Documents', 'Library', 'SystemData', 'tmp']);
       expect(await readdir(join(container, 'Documents'))).toEqual([]);
     } finally {
-      await rm(container, { recursive: true, force: true });
+      await rm(devices, { recursive: true, force: true });
+    }
+  });
+
+  it('a clearState launch whose container is not an app data container of this simulator: refused, nothing deleted, no launch', async () => {
+    const elsewhere = await mkdtemp(join(tmpdir(), 'averi-test-odd-container-'));
+    try {
+      await writeFile(join(elsewhere, 'precious'), 'keep');
+      const { fn, calls } = fakeExec({ 'xcrun simctl get_app_container AAAA-1111 com.app data': `${elsewhere}\n` });
+      await expect(new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE }).launch('com.app', { clearState: true })).rejects.toThrow(
+        `Unexpected app container path: ${elsewhere}`,
+      );
+      expect(await readdir(elsewhere)).toEqual(['precious']);
+      expect(simctlCalls(calls)).not.toContain('xcrun simctl launch AAAA-1111 com.app');
+    } finally {
+      await rm(elsewhere, { recursive: true, force: true });
     }
   });
 

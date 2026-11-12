@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { STANDING_EXIT } from '../../scripts/truth/batch/standing.js';
 import {
   A41_CHILD_NAMES,
   A41_CHILDREN,
@@ -241,6 +242,13 @@ describe('A41_CHILDREN — one table for the probe, the batch and the report', (
     expect(CADENCES[0]).toBe(300);
   });
 
+  it('no child runs after the one that wipes (A44): one wiping child, auto-tap, last in the run and in its block', () => {
+    const wipes = A41_CHILD_NAMES.filter((n) => (A41_CHILDREN[n] as ChildSpec).wipes === true);
+    expect(wipes).toEqual(['auto-tap']);
+    // Every child after the first that wipes would run on a wiped app: there must be none, in any block.
+    expect(A41_CHILD_NAMES.slice(A41_CHILD_NAMES.indexOf(wipes[0]) + 1)).toEqual([]);
+  });
+
   it('auto-tap wipes on its last repeat only (A44): no later session of the probe runs on a wiped app', () => {
     expect([1, 2, 3, 4, 5].map((r) => clearsStateOn(r, 5))).toEqual([false, false, false, false, true]);
     expect(clearsStateOn(1, 1)).toBe(true);
@@ -248,6 +256,7 @@ describe('A41_CHILDREN — one table for the probe, the batch and the report', (
 
   it('a cadence run with no trial exits PROBE_UNPROVEN_EXIT (3, the standing exit for unproven), never 0 (A44)', () => {
     expect(PROBE_UNPROVEN_EXIT).toBe(3);
+    expect(PROBE_UNPROVEN_EXIT).toBe(STANDING_EXIT.unproven);
     expect(cadenceExit(0)).toBe(3);
     expect(cadenceExit(1)).toBe(0);
     expect(cadenceExit(60)).toBe(0);
@@ -486,6 +495,12 @@ describe('reportOf — the probe\'s files summed', () => {
       'first tap (b) (unproven (a tap 3000 ms after launch_app replied, under 3500))',
     ]);
     expect(unprovenOf({})).toEqual([]);
+    // The foreground leg: n ≥ 5 with one clearState, else unproven with its counts; a launch not in front is a measured no.
+    const fg = (f: NonNullable<A41Report['autoTap']>['foreground']) => unprovenOf({ autoTap: { ...auto, foreground: f } });
+    expect(fg({ ok: 4, n: 5, clearState: 1, seen: ['x'] })).toEqual([]);
+    expect(fg({ ok: 4, n: 4, clearState: 1, seen: [] })).toEqual(['foreground (4 launches, 1 clearState: n ≥ 5 with one needed)']);
+    expect(fg({ ok: 5, n: 5, clearState: 0, seen: [] })).toEqual(['foreground (5 launches, 0 clearState: n ≥ 5 with one needed)']);
+    expect(fg({ ok: 0, n: 0, clearState: 0, seen: [] })).toEqual(['foreground (0 launches, 0 clearState: n ≥ 5 with one needed)']);
     const keep: CadenceJudgement = { verdict: 'keep', why: 'k' };
     const shorten: CadenceJudgement = { verdict: 'shorten', why: 's' };
     const c = (judgement: CadenceJudgement) => ({ trials: 60, moving: {}, passes: [], judgement });

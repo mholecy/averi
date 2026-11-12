@@ -1,8 +1,15 @@
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { CONTAINER_METADATA, FRESH_CONTAINER_DIRS, resetDataContainer } from '../../src/adapters/ios-data-container.js';
+import * as fsp from 'node:fs/promises';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CONTAINER_METADATA, FRESH_CONTAINER_DIRS, isAppDataContainer, resetDataContainer } from '../../src/adapters/ios-data-container.js';
+
+// readdir passed through, so a test can list an entry that is gone by the time it is removed.
+vi.mock('node:fs/promises', async (actual) => {
+  const m = await actual<typeof import('node:fs/promises')>();
+  return { ...m, readdir: vi.fn(m.readdir) };
+});
 
 /** Every path under `dir`, relative, directories with a trailing `/`, sorted. */
 async function tree(dir: string, prefix = ''): Promise<string[]> {
@@ -68,8 +75,45 @@ describe('resetDataContainer — clearState leaves the data container as a fresh
     expect(await tree(container)).toEqual(FRESH);
   });
 
+  it('an entry gone between the listing and its removal (the system writing beside the wipe) is no failure', async () => {
+    await writeFile(join(container, 'stray'), 's');
+    vi.mocked(fsp.readdir).mockResolvedValueOnce(['vanished', 'stray'] as never);
+    await expect(resetDataContainer(container)).resolves.toBeUndefined();
+    expect(await tree(container)).toEqual(FRESH);
+  });
+
   it('an empty container gets the fresh layout', async () => {
     await resetDataContainer(container);
     expect(await tree(container)).toEqual(FRESH);
+  });
+});
+
+describe('isAppDataContainer — clearState deletes only under this simulator\'s app data containers (A44 review)', () => {
+  const U = 'D8DACDE6-1111-2222-3333-444455556666';
+  const G = '95E78B94-6D6B-4B15-8D47-45D88DDC2ABD';
+  const root = `/Users/me/Library/Developer/CoreSimulator/Devices/${U}/data/Containers/Data/Application`;
+
+  it('a container of this simulator, its UDID in either case, a trailing slash or none', () => {
+    expect(isAppDataContainer(`${root}/${G}`, U)).toBe(true);
+    expect(isAppDataContainer(`${root}/${G}/`, U)).toBe(true);
+    expect(isAppDataContainer(`${root}/${G}`, U.toLowerCase())).toBe(true);
+  });
+
+  it('refused: another simulator, another kind of container, the folder above, a deeper one, dot segments, a relative path', () => {
+    expect(isAppDataContainer(root.replace(U, '37956039-94EA-4F51-93E5-94F7723A4578') + `/${G}`, U)).toBe(false);
+    expect(isAppDataContainer(root.replace('/Data/Application', '/Bundle/Application') + `/${G}`, U)).toBe(false);
+    expect(isAppDataContainer(root, U)).toBe(false);
+    expect(isAppDataContainer(`${root}/${G}/Documents`, U)).toBe(false);
+    expect(isAppDataContainer(`${root}/..`, U)).toBe(false);
+    expect(isAppDataContainer(`${root}/${G}/../..`, U)).toBe(false);
+    expect(isAppDataContainer(`/Users/me/../../tmp/x/${U}/data/Containers/Data/Application/${G}`, U)).toBe(false);
+    expect(isAppDataContainer(`/Users/me/./${U}/data/Containers/Data/Application/${G}`, U)).toBe(false);
+    expect(isAppDataContainer(`Devices/${U}/data/Containers/Data/Application/${G}`, U)).toBe(false);
+    expect(isAppDataContainer('/', U)).toBe(false);
+    expect(isAppDataContainer('', U)).toBe(false);
+  });
+
+  it('the UDID is matched literally, never as a pattern', () => {
+    expect(isAppDataContainer(`${root}/${G}`.replace(U, 'D8DACDE6X1111-2222-3333-444455556666'), 'D8DACDE6.1111-2222-3333-444455556666')).toBe(false);
   });
 });

@@ -129,7 +129,7 @@
     "group": "core",
     "tests": ["tests/adapters/ios-data-container.test.ts"],
     "floor": 98,
-    "baseline": "100 % on 2026-11-12 (A44, new; `npm run mutate -- --force --mutate src/adapters/ios-data-container.ts --tempDirName reports/mutation/stryker-tmp-a44`, cold, alone, 24 s): 10 mutants, 0 survived. The cold full core group run before it (`npm run mutate -- --group core --force`, 397 s, every module at or above its floor) read 90.91 % (11 mutants): its one survivor, rm's `force: true` made false, was equivalent (each entry was just listed), and `force` is gone since"
+    "baseline": "100 % on 2026-11-12 (A44 review round 1: isAppDataContainer, rm's `force` back; `npm run mutate -- --group core --force`, cold, 409 s): 18 mutants, 0 survived"
   },
   "src/adapters/android-accessibility-order.ts": {
     "group": "core",

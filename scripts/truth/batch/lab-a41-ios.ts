@@ -1,6 +1,6 @@
 import { basename, dirname, join } from 'node:path';
 import { isMain } from '../../is-main.js';
-import { A41_CHILD_NAMES, A41_CHILDREN, A41B_SCENARIOS, type A41ChildName, type ChildSpec } from '../../perf/a41.js';
+import { A41_CHILD_NAMES, A41_CHILDREN, A41B_SCENARIOS, type A41ChildName, type A41Report, type ChildSpec } from '../../perf/a41.js';
 import { iosCheck, iosLab, wdaWindow, type IosSim } from './ios-lab.js';
 import { labBlock, labBuild } from './lab-build.js';
 import type { Block, BlockCtx } from './runner.js';
@@ -31,7 +31,7 @@ import { exitText, failedCall } from './words.js';
  * (`<name>.log` beside its JSON). A block's verdict is PASS when every child exited 0 and wrote its file, else
  * INCONCLUSIVE naming which — a probe measures, its verdict says only whether the measurement is whole. The report
  * block is PASS only with no file missing and no required part unproven (a41.ts#unprovenOf: the cadence, leg (b) of
- * the first tap — A44). The ios need's end reads the finportal key again; the run's last step ends the lab's
+ * the first tap, the foreground leg — A44). The ios need's end reads the finportal key again; the run's last step ends the lab's
  * WebDriverAgent and idb_companion. A signal puts an open window back and exits 130. What it leaves on the simulator
  * is what Gate C leaves: the WDA window's domains put back and compared; the lab app (and, if installed, the React
  * Native lab app) launched on cells through lab-device.ts, as live.ts launches them.
@@ -198,6 +198,9 @@ async function children(
   return whys;
 }
 
+/** What the report block reads of a41.json (a41.ts#A41Report): the files missing, the required parts unproven. */
+type ReportRead = Partial<Pick<A41Report, 'missing' | 'unproven'>>;
+
 /** A probe block's verdict: PASS with every child whole, else INCONCLUSIVE naming what is not. */
 function verdictOf(ctx: BlockCtx<StandingKnobs>, whys: readonly string[], whole: string): void {
   if (whys.length === 0) ctx.verdict('PASS', whole);
@@ -263,16 +266,17 @@ export async function labA41Ios(o: StandingOptions): Promise<StandingExit> {
       const out = join(ctx.dir, 'a41.json');
       const why = await child(ctx, 'report', reportArgs(ctx.config.repo, siblingDir(ctx.dir, a41BlockId('idb')), siblingDir(ctx.dir, a41BlockId('wda')), ctx.dir), out);
       if (why !== undefined) return ctx.verdict('INCONCLUSIVE', why);
-      let read: { missing?: string[]; unproven?: string[] };
+      let read: ReportRead;
       try {
-        read = JSON.parse(ctx.fs.read(out) ?? '{}') as typeof read;
+        read = JSON.parse(ctx.fs.read(out) ?? '{}') as ReportRead;
       } catch {
         return ctx.verdict('INCONCLUSIVE', `a41.json unreadable (${out})`);
       }
       ctx.note(`A41 summary: ${join(ctx.dir, 'summary.txt')}`);
       // A44: a required part read but unproven (a41.ts#unprovenOf) is no more a measurement than a missing file.
-      const [missing, unproven] = [read.missing ?? [], read.unproven ?? []];
-      const whys = [...(missing.length > 0 ? [`${missing.join(', ')} missing`] : []), ...(unproven.length > 0 ? [`unproven: ${unproven.join('; ')}`] : [])];
+      const whys: string[] = [];
+      if (read.missing !== undefined && read.missing.length > 0) whys.push(`${read.missing.join(', ')} missing`);
+      if (read.unproven !== undefined && read.unproven.length > 0) whys.push(`unproven: ${read.unproven.join('; ')}`);
       if (whys.length === 0) ctx.verdict('PASS', `every part measured: ${out}`);
       else ctx.verdict('INCONCLUSIVE', `${whys.join('; ')}: ${out}`);
     },

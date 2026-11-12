@@ -28,7 +28,7 @@ import { median, type Spread } from './stats.js';
  *   report.
  * - The summary (summaryLines): the A41b table and acceptance numbers, the cadence, the A41c counts; a part not measured
  *   is said MISSING, never a number; a required part read but not proven (unprovenOf: the cadence, leg (b) of the
- *   first tap) is said UNPROVEN (A44).
+ *   first tap, the foreground leg) is said UNPROVEN (A44).
  */
 
 export interface Rect {
@@ -416,6 +416,8 @@ export interface ChildSpec {
   repeat: number;
   /** Its key in A41Parts. */
   part: keyof A41Parts;
+  /** Its last repeat launches with `clearState` (clearsStateOn): no child may run after it (tests/perf/a41.test.ts). */
+  wipes?: true;
 }
 export const PROBE_MODES = ['hit-test', 'wda-cold', 'auto-tap', 'cadence'] as const;
 export type ProbeMode = (typeof PROBE_MODES)[number];
@@ -433,7 +435,7 @@ export const A41_CHILDREN = {
   'baseline-wda': { block: 'wda', file: 'baseline-wda.json', repeat: 8, part: 'baselineWda' },
   'wda-cold': { block: 'wda', file: 'wda-cold.json', mode: 'wda-cold', repeat: 5, part: 'wdaCold' },
   cadence: { block: 'wda', file: 'cadence-trace.json', mode: 'cadence', repeat: 20, part: 'cadence' },
-  'auto-tap': { block: 'wda', file: 'auto-tap.json', mode: 'auto-tap', repeat: 5, part: 'autoTap' },
+  'auto-tap': { block: 'wda', file: 'auto-tap.json', mode: 'auto-tap', repeat: 5, part: 'autoTap', wipes: true },
 } as const satisfies Record<string, ChildSpec>;
 export type A41ChildName = keyof typeof A41_CHILDREN;
 export const A41_CHILD_NAMES = Object.keys(A41_CHILDREN) as A41ChildName[];
@@ -441,7 +443,11 @@ export const A41_CHILD_NAMES = Object.keys(A41_CHILDREN) as A41ChildName[];
 /** auto-tap's foreground leg wipes (`clearState`) on its last repeat only, so no session after it runs on a wiped app. */
 export const clearsStateOn = (r: number, repeat: number): boolean => r === repeat;
 
-/** A probe run whose measurement is unproven exits so: scripts/truth/batch/standing.ts#STANDING_EXIT's `unproven`. */
+/**
+ * A probe run whose measurement is unproven exits so: scripts/truth/batch/standing.ts#STANDING_EXIT's `unproven`, the
+ * same 3 (a test holds them equal). Not imported: standing.ts brings the batch runner and its processes into this
+ * device-free leaf, whose only import is stats.ts.
+ */
 export const PROBE_UNPROVEN_EXIT = 3;
 /** The cadence run's exit: unproven with no trial recorded (its file is still written, with its errors), else 0. */
 export const cadenceExit = (trials: number): number => (trials === 0 ? PROBE_UNPROVEN_EXIT : 0);
@@ -559,8 +565,8 @@ export interface A41Report {
   /** The parts not found or not readable (their files), each said in the summary. */
   missing: string[];
   /**
-   * The required parts read but not proven (unprovenOf, A44): the cadence judgement and leg (b) of the first tap. The
-   * batch's report block is INCONCLUSIVE on any, as on a missing file.
+   * The required parts read but not proven (unprovenOf, A44): the cadence judgement, leg (b) of the first tap and the
+   * foreground leg. The batch's report block is INCONCLUSIVE on any, as on a missing file.
    */
   unproven: string[];
   /** Whether a WebDriverAgent build ran (WDA_BUILD_LINE in a WDA child's log); undefined: no log read. */
@@ -646,9 +652,9 @@ function firstTapLines(r: A41Report): string[] {
   const msOr = (x: CountedSpread | undefined): string => (x === undefined ? '—' : `${Math.round(x.median)}`);
   const over = first === undefined || warm === undefined ? '—' : `${Math.round(first.median - warm.median)}`;
   const legA = `first − warm ${msOr(first)} − ${msOr(warm)} = ${over} ms; WDA cold start ${msOr(cold)} ms against launch_app ${msOr(launch)} ms`;
-  const legB = legBOf(a).text;
+  const legB = waitedTapAnswer(a).words;
   const f = a.foreground;
-  const front = f.n === 0 ? 'not measured' : `${f.ok === f.n && f.n >= 5 && f.clearState >= 1 ? 'yes' : 'no'}`;
+  const front = f.n === 0 ? 'not measured' : `${f.ok === f.n && foregroundJudged(f) ? 'yes' : 'no'}`;
   return [
     `first tap after launch_app (a, at once; information, not judged): ${legA}; first tap ok ${okOf(a.firstTaps)}`,
     `first tap after launch_app (b, ≥ ${WAITED_GAP_MIN_MS / 1000} s after it replied) ≤ the same tap warm + 500 ms: ${legB}; first tap ok ${okOf(a.waitedTaps)}`,
@@ -656,28 +662,44 @@ function firstTapLines(r: A41Report): string[] {
   ];
 }
 
-/**
- * Leg (b)'s answer (firstTapLines): `unproven` when a step fell back to idb or a gap was under WAITED_GAP_MIN_MS, `not
- * measured` without the waited tap, its warm tap or its gap; else yes or no, and the line's words.
- */
-function legBOf(a: NonNullable<A41Report['autoTap']>): { proven: boolean; text: string } {
-  const [waited, warm, gap] = [a.firstWaited, a.warmCatalog, a.waitedGap];
-  if (a.fellBack > 0) return { proven: false, text: `unproven (${a.fellBack} auto steps fell back to idb: not WDA's taps)` };
-  if (waited === undefined || warm === undefined || gap === undefined) return { proven: false, text: 'not measured' };
-  if (gap.min < WAITED_GAP_MIN_MS) return { proven: false, text: `unproven (a tap ${Math.round(gap.min)} ms after launch_app replied, under ${WAITED_GAP_MIN_MS})` };
-  return { proven: true, text: `${waited.median <= warm.median + 500 ? 'yes' : 'no'} (${Math.round(waited.median)} vs ${Math.round(warm.median)} + 500)` };
+/** Leg (b)'s answer: yes or no measured; unproven or not measured, neither a measurement. */
+interface WaitedTapAnswer {
+  state: 'yes' | 'no' | 'unproven' | 'not-measured';
+  /** The acceptance line's words after its colon (firstTapLines). */
+  words: string;
 }
 
 /**
- * The required parts read but not proven (A44): the cadence's judgement `unproven`, and leg (b) of the first tap
- * unproven or not measured — each with its why. A measured no (`keep`, leg (b)'s `no`) is proven. A part whose file
- * is absent is `missing`'s, not this.
+ * Leg (b), the waited first tap against the same tap warm + 500 ms: `unproven` when a step fell back to idb or a gap
+ * was under WAITED_GAP_MIN_MS, `not-measured` without the waited tap, its warm tap or its gap; else yes or no.
+ */
+function waitedTapAnswer(a: NonNullable<A41Report['autoTap']>): WaitedTapAnswer {
+  const [waited, warm, gap] = [a.firstWaited, a.warmCatalog, a.waitedGap];
+  if (a.fellBack > 0) return { state: 'unproven', words: `unproven (${a.fellBack} auto steps fell back to idb: not WDA's taps)` };
+  if (waited === undefined || warm === undefined || gap === undefined) return { state: 'not-measured', words: 'not measured' };
+  if (gap.min < WAITED_GAP_MIN_MS) {
+    return { state: 'unproven', words: `unproven (a tap ${Math.round(gap.min)} ms after launch_app replied, under ${WAITED_GAP_MIN_MS})` };
+  }
+  const state = waited.median <= warm.median + 500 ? 'yes' : 'no';
+  return { state, words: `${state} (${Math.round(waited.median)} vs ${Math.round(warm.median)} + 500)` };
+}
+
+/** The foreground leg is judged on at least 5 launches, one of them `clearState` (ADR 0046's acceptance). */
+const foregroundJudged = (f: NonNullable<A41Report['autoTap']>['foreground']): boolean => f.n >= 5 && f.clearState >= 1;
+
+/**
+ * The required parts read but not proven (A44): the cadence's judgement `unproven`; leg (b) of the first tap unproven
+ * or not measured; the foreground leg on under 5 launches or none with `clearState` — each with its why. A measured no
+ * (`keep`, leg (b)'s `no`, a launch not in front) is proven. A part whose file is absent is `missing`'s, not this.
  */
 export function unprovenOf(r: Pick<A41Report, 'cadence' | 'autoTap'>): string[] {
   const out: string[] = [];
   if (r.cadence?.judgement.verdict === 'unproven') out.push(`cadence (${r.cadence.judgement.why})`);
-  const b = r.autoTap === undefined ? undefined : legBOf(r.autoTap);
-  if (b !== undefined && !b.proven) out.push(`first tap (b) (${b.text})`);
+  if (r.autoTap === undefined) return out;
+  const b = waitedTapAnswer(r.autoTap);
+  if (b.state === 'unproven' || b.state === 'not-measured') out.push(`first tap (b) (${b.words})`);
+  const f = r.autoTap.foreground;
+  if (!foregroundJudged(f)) out.push(`foreground (${f.n} launches, ${f.clearState} clearState: n ≥ 5 with one needed)`);
   return out;
 }
 
