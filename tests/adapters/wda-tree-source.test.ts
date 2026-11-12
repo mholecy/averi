@@ -210,7 +210,21 @@ describe('WdaTreeSource.prewarm — WebDriverAgent started in the background, ne
       process.off('unhandledRejection', hear);
     }
     expect(unhandled).toEqual([]);
+    const probes = () => fetcher.urls.filter((u) => u.endsWith('/status')).length;
+    const before = probes();
     await expect(source.read()).rejects.toThrow(/but this session did not start it/);
+    expect(probes()).toBeGreaterThan(before); // the read started again — the failed start was not kept
+  });
+
+  it('WebDriverAgent already up: nothing is asked — no /status probe at every launch', async () => {
+    const { source, fetcher } = await setup();
+    await source.read();
+    const asked = fetcher.urls.length;
+    source.prewarm();
+    await drain();
+    await drain();
+    expect(fetcher.urls.length).toBe(asked);
+    await source.dispose();
   });
 
   it('released: starts nothing', async () => {

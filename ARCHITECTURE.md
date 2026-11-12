@@ -424,7 +424,7 @@ error and trace line says the same, host paths stripped; the error's fields keep
     WDA's reason in a few words. Two trees are never reconciled. Before the choice the launch's label is idb's. A
     `select_device` of the simulator drops a fallen-back adapter (`registry.ts#select`), and the next call tries WDA
     again. The choice may start earlier, in the background (`prewarm`, A41b): the registry asks it when it builds the
-    adapter, and a launch again; the first read joins that one attempt. Only with WDA's build cached: an uncached
+    adapter, and a launch again after `simctl launch`; the first read joins that one attempt. Only with WDA's build cached: an uncached
     build waits for the first read, as before (ADR 0046's A41b amendment). `treeSource: wda` pre-warms the same way;
     idb has nothing to start.
   - **idb** (`IdbTreeSource`, `treeSource: idb`, and `auto`'s fallback): `idb ui describe-all`, a FLAT list under a

@@ -99,14 +99,15 @@ export class WdaTreeSource implements IosTreeSource {
 
   /**
    * Starts WebDriverAgent in the background and returns at once — never awaited, never rejecting (A41b): what the
-   * registry asks when it builds the adapter and a launch asks again (IosAdapter.prewarm), so the first read finds WDA
+   * registry asks when it builds the adapter and a launch asks again after `simctl launch` (IosAdapter.prewarm), so the first read finds WDA
    * up or joins its start (WdaServer.ensureRunning is single-flight). Only when the build is cached (buildCached): an
    * uncached first build is up to 10 minutes of xcodebuild, which a pre-warm would run beside the agent's own work,
    * unasked — the first read builds then, as before (ADR 0046's A41b amendment). A start that fails is dropped here:
-   * the next read starts again and fails in its own words. Released → nothing.
+   * the next read starts again and fails in its own words. Released, or WDA already up (WdaServer.upGeneration: no
+   * `/status` probe at every launch) → nothing.
    */
   prewarm(): void {
-    if (this.disposed) return;
+    if (this.disposed || this.server.upGeneration() !== undefined) return;
     void this.startIfBuilt().catch(() => undefined);
   }
 

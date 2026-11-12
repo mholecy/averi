@@ -1377,7 +1377,8 @@ export interface DeviceAdapter {
    * Starts, in the background, what the adapter's first tree read would otherwise start, and returns at once — never
    * awaited, never throwing, never rejecting (A41b): an iOS adapter under `treeSource: auto` or `wda` begins bringing
    * WebDriverAgent up (adapters/ios.ts#prewarm; ADR 0046's A41b amendment), so the first read finds it up or joins its
-   * start. Asked by mcp/registry.ts when it builds the adapter, and by an iOS launch. Changes nothing the device shows.
+   * start. Asked by mcp/registry.ts when it builds the adapter, and by an iOS launch after `simctl launch`. Changes
+   * nothing the device shows.
    * Absent (Android, idb's tree): nothing to start.
    */
   prewarm?(): void;

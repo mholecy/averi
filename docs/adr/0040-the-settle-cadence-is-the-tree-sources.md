@@ -161,7 +161,9 @@ through `resolveSettled` with the product's `pauseAfterRead` at 300 and at 500 m
 | 300 ms | 160 (M1a 0, M1b 100, M2 60) | 60 | 0 | **0** |
 | 500 ms | 160 (M1a 0, M1b 100, M2 60) | 60 | 0 | 0 |
 
-The rule set before the run: shorten only at 0 wrong in at least 60 moving, uncensored settles. It held.
+The rule set before the run: shorten only at 0 wrong in at least 60 moving, uncensored settles. It held. M1a gave 0
+settles at either cadence: its sheet fling decelerates through the whole window, as on idb (T5). So the 300 ms
+evidence rests on M1b (100 settles) and M2 (60). M1a shows only that the fling is never taken as settled.
 
 **The decision.** `WdaTreeSource.settleCadenceMs = WDA_SETTLE_CADENCE_MS` = 300 (`adapters/wda-tree-source.ts`). Under
 `treeSource: auto` the adapter's cadence is still undefined (500) until the first read chose, then the chosen source's:

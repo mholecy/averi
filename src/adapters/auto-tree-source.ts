@@ -54,7 +54,7 @@ export type WdaSide = IosTreeSource & { bringUp(): Promise<void>; buildCached():
  * the choice (typeText).
  *
  * The choice may start before the first read (prewarm, A41b): the registry asks it when it builds the adapter, and a
- * launch asks again, so WDA's start runs beside the agent's work, when its build is cached. It is the same choice — one
+ * launch asks again after `simctl launch`, so WDA's start runs beside the agent's work, when its build is cached. It is the same choice — one
  * attempt, which the first read joins, and whose outcome is the one that read would have met.
  */
 export class AutoTreeSource implements IosTreeSource {

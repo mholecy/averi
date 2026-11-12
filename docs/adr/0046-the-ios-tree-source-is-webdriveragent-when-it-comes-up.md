@@ -113,8 +113,10 @@ cold start alone, first read, was 3 151 ms (n 5), the read after it 30 ms.
 first tree read would otherwise start, and return at once. They never throw and never reject. Nothing awaits them.
 
 - **Where.** `mcp/registry.ts#adapterFor` asks it of each adapter it builds, once. That is the first moment averi knows
-  both the device and the project's tree source. `IosAdapter.launch` asks it again, first thing, so a launch on an
-  adapter whose WDA is not up starts it beside the launch. A flow's `launch:` goes through the same method.
+  both the device and the project's tree source. `IosAdapter.launch` asks it again just after `simctl launch` returns,
+  before the foreground wait, never before the launch (review r1: a start racing the app's own launch is unmeasured).
+  A launch on an adapter whose WDA is not up starts it there, beside the wait. A flow's `launch:` goes through the
+  same method.
 - **`auto`.** `AutoTreeSource.prewarm` starts the choice itself (`source()`), the same single attempt the first read
   would start. The first read finds it made or joins it in flight. One bring-up, chosen once, and the outcome is the one
   that read would have met: WDA if it came up, else idb with the stderr line and the claim note (Decision, above). A
@@ -122,7 +124,8 @@ first tree read would otherwise start, and return at once. They never throw and 
   during the choice is still the read's released error (`AutoTreeSource.choose`). Nothing is asked once a choice was
   started, made, or the source released.
 - **`wda`.** `WdaTreeSource.prewarm` calls `WdaServer.ensureRunning`, which is single-flight, so a read joins the start
-  in flight. A failed pre-warm is dropped. The next read starts WDA again and fails in its own words, as every read on
+  in flight. With WDA already up (`WdaServer.upGeneration`) it asks nothing, so a launch sends no `/status` probe. A
+  failed pre-warm is dropped. The next read starts WDA again and fails in its own words, as every read on
   `wda` did before.
 - **`idb`**, and the differential harness's recorded source, have none: nothing is started.
 - **Only with WDA's build cached** (`WdaTreeSource.buildCached`, `WdaServer.isBuilt`: an xctestrun under DerivedData's
@@ -145,19 +148,35 @@ first tree read would otherwise start, and return at once. They never throw and 
 - Under `auto`, a launch may see the choice made during its foreground wait. The wait asks idb's label until then and
   WDA's active app after it (both are answers the wait already handles). Its `source`, which words a deadline note's
   lag, is read when the wait starts, so it says idb's.
-- WDA's start now overlaps `simctl launch` when the adapter is built by `launch_app`. The probe measured WDA starting
-  after a launch, not during one. The owner's re-run checks that the first tap still finds the app in front.
 
-**Acceptance (the owner re-runs `npm run truth:lab:ios:a41`).**
+**Acceptance, restated (review r1, the orchestrator's decision; the owner re-runs `npm run truth:lab:ios:a41`).**
 - *WDA tap no more than 100 ms slower than idb's*: plausible. The 300 ms cadence (ADR 0040's A41b amendment) takes
   about 200 ms off a WDA tap's settle, from 687 to about 490 ms against idb's 476.
-- *First tap after `launch_app` ≤ the same tap warm + 500 ms*: not plausible in the probe as written. Its session runs
-  `select_device`, `simctl terminate`, then `launch_app`, so the adapter is built by `launch_app`, and the pre-warm
-  starts about 1.9 s (launch_app's median, 1 924 ms) before the timed tap. WDA's cold start is about 3.1 s, so the tap
-  should still pay about 1.2 s of it, more if the two compete for the CPU. That puts it near 2.2 s against a warm tap
-  of about 0.96 s (after the cadence) + 0.5. The criterion holds once about 3 s pass between the adapter's creation and
-  the first read: an `install_app` first, a screenshot, or an agent's own time between calls. The probe's tap is timed
-  from `launch_app`'s reply, and nothing in the probe waits there.
+- The first tap is judged in two legs (scripts/perf/a41.ts, its summary), each with "first tap ok n/n" (the catalog's
+  tap claimed: the app in front):
+  - *(a) as the probe ran:* `select_device`, `simctl terminate`, `launch_app`, the tap at once. The adapter is built by
+    `launch_app`, so the pre-warm gets launch_app's ~1.9 s before a cold start of ~3.1 s. The criterion is that the
+    start overlaps the launch: first − warm ≤ max(0, WDA cold start − launch_app) + 500 ms (≈ 1.2 s + 0.5 on the A41
+    numbers). The original "first ≤ warm + 500" is not reachable in this order, whatever the code does.
+  - *(b) the waited leg:* a fresh session whose tap starts `WAITED_GAP_MS` (4 s, WDA's cold start 3.1–3.6 s and a
+    margin) after `launch_app` started, with no read before it: first ≤ warm + 500 ms. Plausible: WDA is up by then,
+    and the tap with WDA up measured 1 202 against 1 157 warm.
+- *Foreground after launch ok n/n:* 5 fresh sessions, the first a `clearState` launch, each reading at once after
+  `launch_app`: the read's root label is the lab app's (AveriLab) and WDA's active bundle is `dev.averi.lab`.
+- The `auto-tap` child grows by two short sessions a repeat (~20 s), about 86 → ~200 s, its expected length already;
+  the probe stays about 25 minutes, under 30.
+
+**Residuals of the pre-warm.**
+- **The race with the launch is unmeasured.** The registry's pre-warm runs when `launch_app` builds the adapter, so
+  on a session's first launch WDA's start (xcodebuild test-without-building, the runner's install and start) runs
+  beside `simctl launch`. The A41 probe saw WDA start only after a launch, never during one. Moving the launch's own
+  pre-warm after `simctl launch` narrows it to that first launch. Whether the app stays in front is proven only by the
+  owner's re-run: the foreground leg (n ≥ 5, one `clearState`) and "first tap ok n/n" in both legs. Until then it is a
+  claim.
+- **The D21 analog.** D21 found that an AX query too soon after a simulator boot wedges the simulator until a reboot.
+  A pre-warm at `install_app`, or at any adapter's creation, can start XCTest automation (WebDriverAgent's runner)
+  seconds after a boot, earlier than a first read would have. Whether that wedges AX the same way is unmeasured. Gate
+  C boots and resets the lab simulator, so it would show there first.
 
 **Residual 2, now.** A warm-built machine's first read pays only what is left of WDA's cold start after the time since
 the adapter was built. A fresh machine still pays the whole first build at the first read.

@@ -448,20 +448,20 @@ describe('IosAdapter re-enables accessibility automation before every launch and
     expect(simctlCalls(calls)).toEqual([...WRITES, 'xcrun simctl launch AAAA-1111 com.app']);
   });
 
-  // A41b: the launch asks its source to pre-warm (WebDriverAgent's start in the background) before anything else, and
-  // never waits for it — the source's bring-up below never settles.
-  it('a launch pre-warms its tree source first and does not wait for it', async () => {
+  // A41b: the launch asks its source to pre-warm (WebDriverAgent's start in the background) right after `simctl launch`
+  // — never before it (review r1: a start racing the app's launch is unmeasured) — and never waits for it.
+  it('a launch pre-warms its tree source after simctl launch, before the foreground wait, and does not wait for it', async () => {
     const { fn, calls } = fakeExec({});
     const order: string[] = [];
     const wda: IosTreeSource = {
       kind: 'wda',
       read: () => new Promise(() => undefined),
       applicationLabel: async () => ({ kind: 'declined' }),
-      prewarm: () => void order.push(`prewarm after ${calls.length} calls`),
+      prewarm: () => void order.push(`prewarm after ${calls.at(-1)?.full ?? 'nothing'}`),
       dispose: () => Promise.resolve(),
     };
     await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda }).launch('com.app');
-    expect(order).toEqual(['prewarm after 0 calls']);
+    expect(order).toEqual(['prewarm after xcrun simctl launch AAAA-1111 com.app']);
     expect(simctlCalls(calls)).toEqual([...WRITES, 'xcrun simctl launch AAAA-1111 com.app']);
   });
 
