@@ -146,7 +146,7 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   ...each('ios idb', ['A', 'B', 'C', 'D'].flatMap((t) => [`scroll:sheet-background.${t}`, `scroll:alert-dim.${t}`, `scroll:dim-cover.${t}`]), NOT_YET_IN_TREE, 'presented-stroke', 'not found'),
   // idb lists no carousel (LE2 across): carousel-in-list's C was stroked across the screen's middle, none moving the
   // carousel, "content exhausted … a layout defect" (ADR 0010's residual 5) — struck off by A38b
-  // (interact/stroke-plan.ts#bandOf: the sideways stroke goes over C's own row, inside the carousel's band; the replay
+  // (interact/stroke-plan.ts#rowOf: the sideways stroke goes over C's own row, inside the carousel; the replay
   // green), for the next Gate C to prove.
   // blur-menu-grouped's C under idb: refused after three strokes on the blur at L4's 37bf5a15 (ios-vis-r8-l4-1.json,
   // -2.json; no dismissal), struck off at its final src (94fc318b): stopped before any swipe, nothing stroked, in two

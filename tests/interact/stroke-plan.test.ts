@@ -884,21 +884,21 @@ describe('the presented touch-down — asked of the scene at the points as sent'
 
 // A38b: idb lists no scroll view, so before its motion is seen a sideways stroke for a target it lists went over the
 // screen box — on the lab's carousel-in-list, C (378,138 354x85, past the carousel's right clip) was stroked at y 437,
-// 256 pt below the carousel, and nothing moved. Any horizontal scroller holding C spans C's band: the stroke goes there.
-describe('the band — on a tree that tells no scroll view, a sideways stroke for a listed target goes over its own row', () => {
+// 256 pt below the carousel, and nothing moved. Any horizontal scroller holding C spans C's row: the stroke goes there.
+describe('the target\'s row — on a tree that tells no scroll view, a sideways stroke for a listed target goes over its own row', () => {
   const idb = (): UiNode => parseIdbDescribeAll(readFileSync(new URL('../fixtures/truth/ios-iphone17-ios27/carousel-in-list.idb.json', import.meta.url), 'utf8'));
   const byId = (tree: UiNode, id: string): UiNode => {
     const found = [...everyNode(tree)].find((n) => n.identifier === id);
     if (found === undefined) throw new Error(`no ${id}`);
     return found;
   };
-  const BAND: Rect = { x: 0, y: 138, width: 402, height: 85 };
+  const ROW: Rect = { x: 0, y: 138, width: 402, height: 85 };
 
-  it('carousel-in-list under idb, C stroked `right`: over the screen box cut to C\'s band — 322,181 → 80,181, not 322,437', () => {
+  it('carousel-in-list under idb, C stroked `right`: over the screen box cut to C\'s row — 322,181 → 80,181, not 322,437', () => {
     const tree = idb();
     const plan = planOn(tree, 'right', { target: byId(tree, 'lab.carousel-in-list.C'), gesture: PHONE });
-    expect(plan.stroke).toMatchObject({ box: BAND, points: { from: { x: 322, y: 181 }, to: { x: 80, y: 181 } } });
-    expect(planOn(tree, 'left', { target: byId(tree, 'lab.carousel-in-list.C'), gesture: PHONE }).stroke).toMatchObject({ box: BAND, points: swipeVector(BAND, 'left', 'content') });
+    expect(plan.stroke).toMatchObject({ box: ROW, points: { from: { x: 322, y: 181 }, to: { x: 80, y: 181 } } });
+    expect(planOn(tree, 'left', { target: byId(tree, 'lab.carousel-in-list.C'), gesture: PHONE }).stroke).toMatchObject({ box: ROW, points: swipeVector(ROW, 'left', 'content') });
   });
 
   it('only sideways, only with the target read, only on the screen: a vertical stroke, no target, or a target off the screen keeps the screen box', () => {
@@ -909,43 +909,49 @@ describe('the band — on a tree that tells no scroll view, a sideways stroke fo
     expect(planOn(tree, 'right', { target: byId(tree, 'lab.carousel-in-list.U'), gesture: PHONE }).stroke).toMatchObject({ box: PHONE, points: swipeVector(PHONE, 'right', 'content') });
   });
 
-  it('the keyboard line (review round 1): a band at or below it is no band — the screen box above the keyboard, as before; one it cuts is stroked above it; one it leaves under TOUCH_SLOP is none', () => {
+  it('the keyboard line: a row at or below it is no row — the screen box above the keyboard; one it cuts is stroked above it; one it leaves under TOUCH_SLOP is none', () => {
     const tree = idb();
     const c = byId(tree, 'lab.carousel-in-list.C');
     const right = (keyboardTop: number) => planOn(tree, 'right', { target: c, gesture: PHONE, keyboardTop }).stroke;
-    // Above the band (138): the old screen box's stroke, above the keys — never on them (y 130 before the fix).
+    // Above the row (138): the old screen box's stroke, above the keys — never on them (y 130 before the fix).
     expect(right(100)).toMatchObject({ box: PHONE, points: swipeVectorAbove(PHONE, 100, 'right', 'content') });
     expect(right(138)).toMatchObject({ box: PHONE, points: swipeVectorAbove(PHONE, 138, 'right', 'content') });
-    // Inside it: the band cut at the line, 138..180, its stroke at 159, above the keys.
-    expect(right(180)).toMatchObject({ box: { ...BAND, height: 42 }, points: { from: { x: 322, y: 159 }, to: { x: 80, y: 159 } } });
+    // Inside it: the row cut at the line, 138..180, its stroke at 159, above the keys.
+    expect(right(180)).toMatchObject({ box: { ...ROW, height: 42 }, points: { from: { x: 322, y: 159 }, to: { x: 80, y: 159 } } });
     // Inside it, 12 pt left (under TOUCH_SLOP 24): too thin for the stroke's line — the screen box above the keys.
     expect(right(150)).toMatchObject({ box: PHONE, points: swipeVectorAbove(PHONE, 150, 'right', 'content') });
-    // Below it: the band whole, as with no keyboard.
-    expect(right(400)).toMatchObject({ box: BAND, points: { from: { x: 322, y: 181 }, to: { x: 80, y: 181 } } });
+    // Below it: the row whole, as with no keyboard.
+    expect(right(400)).toMatchObject({ box: ROW, points: { from: { x: 322, y: 181 }, to: { x: 80, y: 181 } } });
   });
 
-  it('the floor is the keyboard\'s alone (review round 2): a thin target with no keyboard up, or one no keyboard cuts, gets its band whole — its centre line lies inside its scroller', () => {
+  it('the floor is the keyboard\'s alone: a thin target with no keyboard up, or one no keyboard cuts, gets its row whole — its centre line lies inside its scroller', () => {
     const thin = node({ role: 'button', identifier: 'thin', rect: { x: 378, y: 300, width: 354, height: 20 } });
     const flat = node({ role: 'container', flatList: true, readingOrder: true, rect: { x: 0, y: 0, width: 0, height: 0 }, children: [node({ role: 'other', rect: { ...PHONE } }), thin] });
-    const band: Rect = { x: 0, y: 300, width: 402, height: 20 };
-    expect(planOn(flat, 'right', { target: thin, gesture: PHONE }).stroke).toMatchObject({ box: band, points: swipeVector(band, 'right', 'content') });
-    expect(planOn(flat, 'right', { target: thin, gesture: PHONE, keyboardTop: 500 }).stroke.box).toEqual(band);
+    const row: Rect = { x: 0, y: 300, width: 402, height: 20 };
+    expect(planOn(flat, 'right', { target: thin, gesture: PHONE }).stroke).toMatchObject({ box: row, points: swipeVector(row, 'right', 'content') });
+    expect(planOn(flat, 'right', { target: thin, gesture: PHONE, keyboardTop: 500 }).stroke.box).toEqual(row);
   });
 
-  it('a later read that does not find the target keeps the band, as it keeps the target\'s scroll views', () => {
+  it('a row whose bottom touches the keyboard top is cut there: 1 pt left, under TOUCH_SLOP — the screen box above the keys', () => {
+    const thin = node({ role: 'button', identifier: 'thin', rect: { x: 378, y: 300, width: 354, height: 1 } });
+    const flat = node({ role: 'container', flatList: true, readingOrder: true, rect: { x: 0, y: 0, width: 0, height: 0 }, children: [node({ role: 'other', rect: { ...PHONE } }), thin] });
+    expect(planOn(flat, 'right', { target: thin, gesture: PHONE, keyboardTop: 301 }).stroke).toMatchObject({ box: PHONE, points: swipeVectorAbove(PHONE, 301, 'right', 'content') });
+  });
+
+  it('a later read that does not find the target keeps the row, as it keeps the target\'s scroll views', () => {
     const tree = idb();
     const memory = seeRead(after(tree, { target: byId(tree, 'lab.carousel-in-list.C') }), { facts: factsOf(tree), line: undefined, target: undefined });
-    expect(planStroke(memory, { kind: 'full', toward: 'right', reach: 1, gesture: PHONE, read: undefined }).stroke.box).toEqual(BAND);
+    expect(planStroke(memory, { kind: 'full', toward: 'right', reach: 1, gesture: PHONE, read: undefined }).stroke.box).toEqual(ROW);
   });
 
-  it('once the motion shows a region: a stroke carrying content back goes over the region; one the region does not take (`screenBox`) over the band, not the screen box', () => {
+  it('once the motion shows a region: a stroke carrying content back goes over the region; one the region does not take (`screenBox`) over the row, not the screen box', () => {
     const tree = idb();
     const c = byId(tree, 'lab.carousel-in-list.C');
     const region: Rect = { x: 24, y: 140, width: 354, height: 80 };
     const memory = seeRead(startStrokes(), { facts: factsOf(tree), line: undefined, target: c, region: { rect: region, axis: 'horizontal' } });
     const ask = { kind: 'full', toward: 'left', reach: 1, gesture: PHONE, read: { facts: factsOf(tree), target: c } } as const;
     expect(planStroke(memory, ask).stroke.box).toEqual(region);
-    expect(planStroke(memory, { ...ask, toward: 'right', screenBox: true }).stroke.box).toEqual(BAND);
+    expect(planStroke(memory, { ...ask, toward: 'right', screenBox: true }).stroke.box).toEqual(ROW);
   });
 
   it('a tree that tells the target\'s scroll view is untouched: WDA\'s carousel-in-list strokes inside the carousel, as before', async () => {

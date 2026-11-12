@@ -222,10 +222,8 @@ the MCP tools. Its modules, by verb:
 - **Scroll** — `scroll.ts` drives `scroll_until`; its rules are pure: `scroll-read.ts` (what ONE read means),
   `scroll-rounds.ts` (`round(state, seen) → { state, step }`: what a read means ACROSS reads, the one owner of every
   rule that compares reads), `course.ts` (which way and how far the next stroke goes, ADR 0021), `stroke-plan.ts`
-  (which scroll view, which box, which points; on idb's flat list, before the motion shows a region, a sideways stroke
-  goes over the target's own row, ADR 0010's A38b amendment), `motion-ledger.ts` (every "did it move"),
-  `motion-shown.ts` (the scroll view the motion shows on idb's flat list), `flush-check.ts` (the `fully: true` stop's
-  flush probe, ADR 0013),
+  (which scroll view, which box, which points), `motion-ledger.ts` (every "did it move"), `motion-shown.ts` (the scroll
+  view the motion shows on idb's flat list), `flush-check.ts` (the `fully: true` stop's flush probe, ADR 0013),
   `margin-memo.ts` (ADR 0026), `aim-floor.ts` and `unfit-axis.ts` (proofs from the call's own evidence, D68, D59),
   `within.ts` (the scroll view the caller names, D78), `scroll-text.ts` (every sentence: `describeScrollResult`,
   `scrollFailure`). `swipe.ts`: a direction over the device box, `swipe.ts#screenBox`. Its orientation read is the

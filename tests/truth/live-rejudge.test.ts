@@ -24,10 +24,10 @@ import { readLiveRecord, type LiveRecord, type RecordedCase, withFieldValue } fr
 
 const run = promisify(execFile);
 /**
- * carousel-in-list's C under idb as it read before A38b's band stroke (interact/stroke-plan.ts#bandOf): its sideways
- * strokes over the screen's middle (y 437, below the carousel), none moving it, "content exhausted … a layout defect" —
- * R-direction on `refused`, known as ADR 0010's residual 5 until A38b struck it off (stroked inside the carousel's band
- * since, the replay green; the next Gate C proves it live): a record before it reads not known.
+ * carousel-in-list's C under idb as it read before A38b's row stroke (interact/stroke-plan.ts#rowOf): its sideways
+ * strokes over the screen's middle (y 437, below the carousel), none moving it, "content exhausted … a layout
+ * defect" — R-direction on `refused`, known as ADR 0010's residual 5 until A38b struck it off (stroked inside the
+ * carousel since, the replay green; the next Gate C proves it live): a record before it reads not known.
  */
 const A38B_IDB = ['scroll:carousel-in-list.C'];
 
@@ -275,7 +275,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // Round 14's fix of LE1 (bugs/r14-le1, the drawn frame on Android): its six cases ok — S's and C's taps refused
     // outside their scroll view, P and S stroked inside upper/lower, C stroked sideways inside the carousel (824,497).
     ['android-vis-r14-le1.json', 'visibility', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
-    // (round 14's LE2 fix, ios-idb-vis-r14-le2-1.json and -2.json: below, before A38b's band stroke)
+    // (round 14's LE2 fix, ios-idb-vis-r14-le2-1.json and -2.json: below, before A38b's row stroke)
     // Round 16's LE2 rest (bugs/r16-le2: a control past the reading-order break that holds the target's centre is an untold cover):
     // scroll-bounded-footer's O under idb — the tap moved clear of Continue to (201,670), nothing fired (at the base it
     // fired button footer.continue), the plain stop refused before any swipe; the tap case and the scroll case's own tap
@@ -339,7 +339,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // dim-cover and the content-up cells (scroll-top-edge, tabbar-dense, tabbar-floating, carousel-in-list), twice —
     // sheet-background's A and B two feelers from (201,175), nothing dismissed, the unmoved stop with "idb lists only
     // what a presented sheet, alert or cover leaves" (presented-stroke, residual 6, known); every other case as before.
-    // (ios-vis-r16-r6-1.json and -2.json: below, before A38b's band stroke)
+    // (ios-vis-r16-r6-1.json and -2.json: below, before A38b's row stroke)
     // …and sheet-background's A and B alone, three runs, the feeler's measurement at the values chosen (160 pt, 600 ms)
     ['ios-idb-sheet-r16-r6-1.json', 'visibility', { cases: 2, ok: 0, loud: 0, mismatches: 2 }],
     ['ios-idb-sheet-r16-r6-2.json', 'visibility', { cases: 2, ok: 0, loud: 0, mismatches: 2 }],
@@ -582,7 +582,7 @@ describe('live.ts --rejudge over the committed iOS records of the src before the
     ['ios-idb-sheet-a5-1.json', 'visibility', { cases: 18, ok: 14, loud: 2, mismatches: 2 }, []],
     ['ios-idb-sheet-a5-2.json', 'visibility', { cases: 18, ok: 14, loud: 2, mismatches: 2 }, []],
     ['ios-vis-r9-final-sanity.json', 'visibility', { cases: 78, ok: 66, loud: 2, mismatches: 10 }, []],
-    // …and carousel-in-list's C under idb, from before A38b's band stroke (A38B_IDB): not known, exit 1
+    // …and carousel-in-list's C under idb, from before A38b's row stroke (A38B_IDB): not known, exit 1
     ['ios-vis-r14-lv3.json', 'visibility', { cases: 149, ok: 113, loud: 5, mismatches: 31 }, A38B_IDB],
   ] as const)('%s (--groups %s): sheet-background\'s A and B LOUD, marked not known; everything else as HEAD knows it', { timeout: 60_000 }, async (record, groups, want, unknownIds) => {
     const { code, out } = await rejudgeInProcess(record, groups);
@@ -879,7 +879,7 @@ const L4_WDA = ['tap:blur-menu.C', 'scroll:blur-menu.C'];
 
 // L4's fix (37bf5a15), round 8 — and LE2's (11daf08), round 14: idb's two `fully` cases of scroll-bounded (LE2_IDB);
 // and LE3's (40b4856), round 14: scroll-sticky's R with `fully: true` (LE3_IDB, LE3_WDA); and LV3's (02aabfa6), round
-// 14: idb's tabbar-floating R (LV3_IDB); and A38b's band stroke: idb's carousel-in-list C (A38B_IDB).
+// 14: idb's tabbar-floating R (LV3_IDB); and A38b's row stroke: idb's carousel-in-list C (A38B_IDB).
 describe('live.ts --rejudge over the committed iOS records of the src before L4\'s reading-order covers', () => {
   // C's cases beneath the blur menus, as above: in these records, each an older src's, they read as recorded — a tap
   // that fired W, a stop claimed at once — not known: a calibration of that src now, not HEAD's KNOWN: exit 1, as
@@ -936,11 +936,11 @@ describe('live.ts --rejudge over the committed iOS records of the src before idb
   });
 });
 
-// A38b's band stroke (interact/stroke-plan.ts#bandOf).
-describe('live.ts --rejudge over the committed iOS records of the src before A38b\'s band stroke', () => {
+// A38b's row stroke (interact/stroke-plan.ts#rowOf).
+describe('live.ts --rejudge over the committed iOS records of the src before A38b\'s row stroke', () => {
   // idb's carousel-in-list C as above (A38B_IDB): in these records, each an older src's, its strokes went over the
-  // screen's middle and moved nothing — not known: a calibration of that src now, not HEAD's KNOWN: exit 1, as recorded.
-  // Everything else as HEAD knows it.
+  // screen's middle and moved nothing — not known: a calibration of that src now, not HEAD's KNOWN: exit 1, as
+  // recorded. Everything else as HEAD knows it.
   it.each([
     // Round 14's LE2 fix (bugs/r14-le2), idb's visibility cells it touched, twice
     ['ios-idb-vis-r14-le2-1.json', { cases: 18, ok: 9, loud: 0, mismatches: 9 }],
@@ -1133,7 +1133,7 @@ describe('live.ts --rejudge over the committed iOS record of a --side run of b71
   // since round 7's A1 struck their entries off, WDA's turn of F (LV4) and carousel C's stop claimed on a read still
   // moving, as recorded at that src; since A5's, idb's presented-layer cases (A5_IDB, above); since L4's, C's cases
   // beneath the blur menus (L4_IDB, L4_WDA); since LE2's and LE3's (round 14), LE2_IDB and scroll-sticky's R fully
-  // (LE3_IDB, LE3_WDA); since LV3's (round 14), idb's tabbar-floating R (LV3_IDB); since A38b's band stroke, idb's
+  // (LE3_IDB, LE3_WDA); since LV3's (round 14), idb's tabbar-floating R (LV3_IDB); since A38b's row stroke, idb's
   // carousel-in-list C (A38B_IDB: hence scroll:carousel-in-list.C twice, WDA's and idb's).
   // The visibility cases A1 and A5 fixed since.
   it('ios-vis-b71cbbb.json: forms b4 and p2 not known, and the visibility cases the one-stroke stop and idb\'s presented layer fixed since', { timeout: 60_000 }, async () => {
