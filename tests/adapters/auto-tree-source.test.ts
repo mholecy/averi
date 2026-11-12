@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AutoTreeSource, IDB_FALLBACK_NOTE, type WdaSide } from '../../src/adapters/auto-tree-source.js';
+import { AutoTreeSource, fallbackReason, idbFallbackNote, type WdaSide } from '../../src/adapters/auto-tree-source.js';
 import { createIosTreeSource, IdbTreeSource, type ApplicationLabel, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
 import { WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
 import { IOS_TREE_SOURCE_SETTINGS, DEFAULT_IOS_TREE_SOURCE } from '../../src/adapters/ios-node.js';
@@ -69,7 +69,7 @@ function fakeIdb(): IosTreeSource & { reads: number; labels: number } {
   return idb;
 }
 
-const down = () => Promise.reject(new Error('treeSource: wda requires the appium-webdriveragent package'));
+const down = () => Promise.reject(new Error('WebDriverAgent requires the appium-webdriveragent package, an optional dependency of averi that is not installed — reinstall averi'));
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -103,10 +103,13 @@ describe('AutoTreeSource — WebDriverAgent when it comes up, idb when it does n
     expect(wda.disposed).toBe(1);
     expect(idb.reads).toBe(2);
     expect(said.mock.calls).toEqual([
-      ['averi: treeSource auto — WebDriverAgent did not come up, so this simulator\'s tree is read through idb: treeSource: wda requires the appium-webdriveragent package'],
+      ['averi: treeSource auto — WebDriverAgent did not come up, so this simulator\'s tree is read through idb: WebDriverAgent requires the appium-webdriveragent package, an optional dependency of averi that is not installed — reinstall averi'],
     ]);
     expect(auto.kind).toBe('idb');
-    expect(auto.claimNote).toBe(IDB_FALLBACK_NOTE);
+    expect(auto.claimNote).toBe(
+      'read through idb: WebDriverAgent did not come up (WebDriverAgent requires the appium-webdriveragent package; select_device again to retry) ' +
+        'and idb lists no presented layer or scroll clip — a layer over the target or a clip cutting it was not judged',
+    );
     expect(auto.settleCadenceMs).toBe(300);
     expect(auto.typeText).toBeUndefined();
   });
@@ -149,7 +152,7 @@ describe('AutoTreeSource — WebDriverAgent when it comes up, idb when it does n
     const gone = fakeWda(down);
     const fallen = new AutoTreeSource({ wda: gone, idb: fakeIdb() });
     await expect(fallen.typeText?.('Šťastný')).rejects.toThrow(
-      "nothing typed: WebDriverAgent did not come up (treeSource auto; the reason is on averi's stderr), and idb types only printable ASCII — use a value without the other characters, or enter it by hand",
+      /^cannot type U\+0160 .*Refused before anything was sent.* \(WebDriverAgent did not come up: WebDriverAgent requires the appium-webdriveragent package\)$/s,
     );
     expect(gone.typed).toEqual([]);
     expect(fallen.typeText).toBeUndefined();
@@ -177,6 +180,30 @@ describe('AutoTreeSource — WebDriverAgent when it comes up, idb when it does n
     await auto.read();
     await auto.dispose();
     expect(wda.disposed).toBe(1);
+  });
+});
+
+describe('fallbackReason — WDA\'s error in a few words for the note', () => {
+  it.each([
+    ['WebDriverAgent requires the appium-webdriveragent package, an optional dependency of averi …', 'WebDriverAgent requires the appium-webdriveragent package'],
+    ['A WebDriverAgent answers /status on port 8100, but this session did not start it (udid U). …', 'A WebDriverAgent answers /status on port 8100'],
+    ['WDA did not answer /status on port 8100 within 60 s — xcodebuild log: /tmp/x.log. First install …', 'WDA did not answer /status on port 8100 within 60 s'],
+    ['WDA build failed (xcodebuild build-for-testing, timed out after 10 min) — output: /tmp/x.log', 'WDA build failed'],
+    ['spawn xcodebuild ENOENT: no such file', 'spawn xcodebuild ENOENT'],
+    ['WdaServer for U was stopped during startup. Then\nmore', 'WdaServer for U was stopped during startup'],
+  ])('%s → %s', (message, reason) => {
+    expect(fallbackReason(new Error(message))).toBe(reason);
+  });
+
+  it('a long clause is cut at 80 characters with an ellipsis; an empty one says so', () => {
+    const cut = fallbackReason(new Error('x'.repeat(200)));
+    expect(cut).toBe(`${'x'.repeat(79)}…`);
+    expect(fallbackReason(new Error(''))).toBe('no reason given');
+    expect(fallbackReason('plain string, not an Error')).toBe('plain string');
+  });
+
+  it('the note carries it', () => {
+    expect(idbFallbackNote('WDA build failed')).toContain('(WDA build failed; select_device again to retry)');
   });
 });
 

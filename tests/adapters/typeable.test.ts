@@ -3,7 +3,7 @@ import { AndroidAdapter } from '../../src/adapters/android.js';
 import type { ExecFn } from '../../src/adapters/exec.js';
 import { IosAdapter } from '../../src/adapters/ios.js';
 import { parseIdbDescribeAll, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
-import { AutoTreeSource, IDB_FALLBACK_NOTE } from '../../src/adapters/auto-tree-source.js';
+import { AutoTreeSource, idbFallbackNote } from '../../src/adapters/auto-tree-source.js';
 import { IDB_TYPEABLE, WDA_TYPEABLE } from '../../src/adapters/ios-typing.js';
 import { refusalOf, type Typeable } from '../../src/adapters/typeable.js';
 import type { DeviceAdapter } from '../../src/adapters/types.js';
@@ -81,7 +81,7 @@ describe('IosAdapter.typeable comes from the tree source', () => {
     expect(adapter.claimNote).toBeUndefined();
     await adapter.uiTree();
     expect(adapter.typeable).toBe(IDB_TYPEABLE);
-    expect(adapter.claimNote).toBe(IDB_FALLBACK_NOTE);
+    expect(adapter.claimNote).toBe(idbFallbackNote('no WebDriverAgent'));
     errors.mockRestore();
   });
 

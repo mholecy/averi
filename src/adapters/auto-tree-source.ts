@@ -1,16 +1,33 @@
 import { errorMessage } from '../util/error-message.js';
 import type { IosTreeSourceKind } from './ios-node.js';
+import { IDB_TYPEABLE } from './ios-typing.js';
+import { refusalOf } from './typeable.js';
 import type { ApplicationLabel, IosTreeSource } from './ios-tree-source.js';
 import type { SystemAlert, UiNode } from './types.js';
 
 /**
  * The line every claiming reply carries once `auto` fell back to idb (IosTreeSource.claimNote; the tools print it as
  * `⚠ <line>`). Says the one fact that changes the claim — idb lists no presented layer and no scroll clip, so neither
- * was judged — and where the reason WebDriverAgent did not come up was said.
+ * was judged — why WebDriverAgent did not come up, in a few words (`reason`, fallbackReason), and the way to try again
+ * (a select_device of the simulator drops a fallen-back adapter: mcp/registry.ts#select). The whole error is on stderr.
  */
-export const IDB_FALLBACK_NOTE =
-  'read through idb: WebDriverAgent did not come up (treeSource auto; the reason is on averi\'s stderr) and idb lists ' +
-  'no presented layer or scroll clip — a layer over the target or a clip cutting it was not judged';
+export const idbFallbackNote = (reason: string): string =>
+  `read through idb: WebDriverAgent did not come up (${reason}; select_device again to retry) and idb lists no ` +
+  'presented layer or scroll clip — a layer over the target or a clip cutting it was not judged';
+
+/** The most a fallback's reason may run to in the note — WDA's errors run to hundreds of characters, with log paths. */
+const REASON_MAX = 80;
+
+/**
+ * WDA's error in a few words for the note: its first clause — up to the first ` — `, `. `, `, `, ` (` or `: ` — cut at
+ * REASON_MAX with an ellipsis. `WebDriverAgent requires the appium-webdriveragent package`, `A WebDriverAgent answers
+ * /status on port 8100`, `WDA did not answer /status on port 8100 within 60 s`, `WDA build failed`.
+ */
+export function fallbackReason(err: unknown): string {
+  const clause = errorMessage(err).split(/ — |\. |, | \(|: |\n/)[0].trim();
+  if (clause === '') return 'no reason given';
+  return clause.length <= REASON_MAX ? clause : `${clause.slice(0, REASON_MAX - 1)}…`;
+}
 
 /** WebDriverAgent's source as `auto` uses it: a tree source that can be asked to come up without reading a tree. */
 export type WdaSide = IosTreeSource & { bringUp(): Promise<void> };
@@ -24,7 +41,7 @@ export type WdaSide = IosTreeSource & { bringUp(): Promise<void> };
  * - WDA came up → every call is WDA's, exactly as under `treeSource: wda` — a later WDA failure is WDA's error, never a
  *   switch to idb.
  * - It did not → the reason is said once on stderr, WDA is shut down, every read is idb's, and `claimNote` is set: the
- *   tools add it to each reply that claims what it read (IDB_FALLBACK_NOTE). Nothing is refused for it.
+ *   tools add it to each reply that claims what it read (idbFallbackNote). Nothing is refused for it.
  *
  * Before the choice, what is asked without a tree read is idb's: a launch's application label (WDA's would be
  * `declined` — it is not up), `kind` (the label's wording) and no settle cadence (the default 500). Typing waits for
@@ -37,6 +54,8 @@ export class AutoTreeSource implements IosTreeSource {
   private chosen: IosTreeSource | undefined;
   /** The choice in flight, shared by every read that starts before it is made. */
   private choosing: Promise<IosTreeSource> | undefined;
+  /** Why WDA did not come up (fallbackReason), set with a fallback to idb. */
+  private reason: string | undefined;
   /** WDA's shutdown after a fallback, awaited by dispose(). */
   private wdaReleased: Promise<void> | undefined;
   private disposed = false;
@@ -55,13 +74,14 @@ export class AutoTreeSource implements IosTreeSource {
   }
 
   get claimNote(): string | undefined {
-    return this.chosen === this.idb ? IDB_FALLBACK_NOTE : undefined;
+    return this.chosen === this.idb ? idbFallbackNote(this.reason ?? 'no reason given') : undefined;
   }
 
   /**
    * WDA's typer while WDA is or may be chosen; none once idb was — what IosAdapter's `typeable` and its typing route
    * read per call, so a fallback refuses what idb cannot type before anything is sent (ADR 0037). Before the choice it
-   * makes it: a text sent here is one idb cannot type, and if WDA does not come up nothing is typed.
+   * makes it: a text sent here is one idb cannot type, and if WDA does not come up it is refused as idb refuses it,
+   * with WDA's reason — nothing typed.
    */
   get typeText(): ((text: string) => Promise<void>) | undefined {
     return this.chosen === this.idb ? undefined : this.typeThroughWda;
@@ -69,10 +89,7 @@ export class AutoTreeSource implements IosTreeSource {
 
   private readonly typeThroughWda = async (text: string): Promise<void> => {
     if ((await this.source()) !== this.wda || this.wda.typeText === undefined) {
-      throw new Error(
-        "nothing typed: WebDriverAgent did not come up (treeSource auto; the reason is on averi's stderr), and idb types " +
-          'only printable ASCII — use a value without the other characters, or enter it by hand',
-      );
+      throw new Error(`${refusalOf(text, IDB_TYPEABLE) ?? 'nothing typed'} (WebDriverAgent did not come up: ${this.reason ?? 'no reason given'})`);
     }
     return this.wda.typeText(text);
   };
@@ -103,6 +120,7 @@ export class AutoTreeSource implements IosTreeSource {
       // Released mid-choice: the release is the answer, not a fallback (WdaTreeSource words it).
       if (this.disposed) throw err;
       console.error(`averi: treeSource auto — WebDriverAgent did not come up, so this simulator's tree is read through idb: ${errorMessage(err)}`);
+      this.reason = fallbackReason(err);
       this.wdaReleased = this.wda.dispose().catch(() => undefined);
       this.chosen = this.idb;
     }

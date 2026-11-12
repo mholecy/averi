@@ -1284,6 +1284,30 @@ describe('every tool gets the project\'s adapter — one per simulator and confi
     },
   );
 
+  it.each([
+    ['run_flow', { platform: 'ios', flow: 'tap_then_miss' }],
+    ['verify', { platforms: ['ios'], flow: 'tap_then_miss' }],
+  ] as const)('ios %s: a flow that throws after a claimed tap carries the claim note on its error too (A41a review M1)', async (tool, args) => {
+    const ios = Object.assign(home(), { claimNote: 'read through idb: the note' });
+    const harness = await connect({ android: home(), ios });
+    const configPath = await file('averi.yaml', `${VALID_CONFIG}  tap_then_miss:\n    steps:\n      - tap: { id: home_root }\n      - wait: { element: { id: nowhere }, timeout: 20ms }\n`);
+    const result = await harness.call(tool, { configPath, ...args });
+    expect(result.text).toContain('home_root');
+    expect(result.text.split('read through idb: the note'), result.text).toHaveLength(2);
+    if (tool === 'run_flow') {
+      expect(result.isError).toBe(true);
+      expect(result.text.endsWith('\n⚠ read through idb: the note'), result.text).toBe(true);
+    }
+  });
+
+  it('ios run_flow: a flow that throws on an adapter with no claim note is the error as it was', async () => {
+    const harness = await connect();
+    const configPath = await file('averi.yaml', `${VALID_CONFIG}  tap_then_miss:\n    steps:\n      - tap: { id: home_root }\n      - wait: { element: { id: nowhere }, timeout: 20ms }\n`);
+    const result = await harness.call('run_flow', { platform: 'ios', flow: 'tap_then_miss', configPath });
+    expect(result.isError).toBe(true);
+    expect(result.text).not.toContain('read through idb');
+  });
+
   it('ios: an adapter with no claim note adds nothing to a claiming reply', async () => {
     const harness = await connect();
     const result = await harness.call('tap', { platform: 'ios', selector: 'id:home_root', configPath: missing() });

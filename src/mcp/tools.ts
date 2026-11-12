@@ -147,9 +147,11 @@ const text = (value: unknown) => ({
  * nothing, nor on replies that claim no read (a coordinate tap, a swipe, a snapshot).
  */
 const noted = (adapters: readonly DeviceAdapter[], reply: string): string => {
-  const note = adapters.find((a) => a.claimNote !== undefined)?.claimNote;
+  const note = claimNoteOf(adapters);
   return note === undefined ? reply : `${reply}\n⚠ ${note}`;
 };
+
+const claimNoteOf = (adapters: readonly DeviceAdapter[]): string | undefined => adapters.find((a) => a.claimNote !== undefined)?.claimNote;
 
 /** A PNG as MCP image content — the one spelling of it for screenshot, ensure_state and verify. */
 const image = (shot: Buffer) => ({
@@ -222,7 +224,7 @@ export const serverInstructions = (version: string): string => [
     'Double-quote a value with spaces: text:"Sign in" (text:Sign in fails at "in"). Prefer stable id:s.',
   'Coordinates and rects are in tree units: pixels on Android, points on iOS.',
   'configPath: averi.yaml is read only when a call uses a value from it; an invalid file fails the call, naming it; a missing one fails only the tools that cannot work without it (ensure_state, run_flow, verify, install_app without a path).',
-  'iOS tree source (app.ios.treeSource in averi.yaml): auto — WebDriverAgent, or idb if it cannot start (a ⚠ line says so; no scroll views, container ids, keyboard or presented layers); wda/idb pin one.',
+  'iOS tree source (app.ios.treeSource): auto — WebDriverAgent, or idb if it cannot start (a ⚠ line says so; no scroll views, container ids, keyboard or presented layers); wda/idb pin one.',
   'A refusal taps, types or swipes nothing on its target (a keyboard dismissal it tried is named in it) and names its cause and remedy (scroll_until it first, close the presented screen first, hide the keyboard): follow it rather than retrying unchanged. Under a screen presented over the target (an alert, a sheet, a modal, an Android dialog) no scroll helps: close it first. ' +
     'An empty or bare tree is not absence: compare with screenshot.',
   `Full behaviour of each tool: the averi skill's references/tools.md (without the skill: ${toolsReferenceUrl(version)}); error lines by symptom: references/troubleshooting.md.`,
@@ -273,7 +275,9 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
 
   /**
    * `deviceFor` for an engine tool, which resolves its device lazily through the run layer, keeping the adapters it
-   * handed out (`used`) for the reply's claim note (noted).
+   * handed out (`used`) for the reply's claim note (noted). `claims` runs the engine and, when it throws, rethrows the
+   * same error with the note on a line of its own (A41a review M1): a failed flow's error (flow/engine.ts#FlowError)
+   * lists the ✓ lines of the steps that ran — taps and fills claimed — before the one that failed.
    */
   const engineDevices = () => {
     const used: DeviceAdapter[] = [];
@@ -283,6 +287,15 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         const adapter = await deviceFor(p, cfg);
         used.push(adapter);
         return adapter;
+      },
+      claims: async <T>(work: () => Promise<T>): Promise<T> => {
+        try {
+          return await work();
+        } catch (e) {
+          const note = claimNoteOf(used);
+          if (note !== undefined && e instanceof Error) e.message = `${e.message}\n⚠ ${note}`;
+          throw e;
+        }
       },
     };
   };
@@ -434,7 +447,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'Normalized accessibility tree as JSON — cheap text-based verification. filter (a selector) returns only the matching nodes, without their children. Rects are in tree units (px on Android, pt on iOS). ' +
         `A filter that matches nothing returns [] plus a second text block: the tree's size and roles, or a ⚠ that the tree is bare (${BARE_TREE_CONTENTS}) — still loading, or stuck on a rendered screen: compare with screenshot, and never read the element as absent from a bare tree. ` +
         `iOS idb's stuck tree (a 0×0 Application) fails the call instead. Does not wait, but for one re-read of an unreadable first read; to wait for an element, assert polls (${ASSERT_BUDGET} by default; set "timeout" in the spec). ` +
-        'iOS: an id: that finds nothing on screen is often the default idb tree source (React Native static text and containers, SwiftUI .contain containers, some UIKit ids) — set app.ios.treeSource: wda in averi.yaml and retry, or ask by text:/label:. ' +
+        'iOS: an id: that finds nothing on screen is often idb (pinned, or auto without WDA), which drops React Native static text and containers, SwiftUI .contain containers, some UIKit ids — set app.ios.treeSource: wda and retry, or ask by text:/label:. ' +
         'An EMPTY textfield\'s "value" is often its placeholder; a node whose "placeholder" equals its value is an empty field. ' +
         'Marks: "presentation" ("alert", "actionSheet", "popover", "screen", "backdrop"; on an Android root "dialog"/"screen") — a layer presented over the screen, covering everything beneath it: targets there are refused until it is closed; ' +
         '"hidden": true (iOS wda) — listed but not shown (a tab bar a pushed screen hides), no cover; role "keyboard" (iOS wda) — the band where a tap is refused, while "ofKeyboard": true nodes are the keyboard\'s own, tappable UI; ' +
@@ -551,7 +564,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'typed — APPENDING to pre-filled content unless clear: true deletes it first — then read back. "Filled …" only when the field shows the text (a dropped clear-fill is retried once); otherwise "Typed … — NOT verified" (or "Cleared …"/"Focused … — NOT verified") with the reason; a match that is not a textfield gets a ⚠ naming the nearest input. ' +
         'A text the app transforms (auto-capitalisation, autocorrect, a mask) FAILS the read-back, saying whether only letter case differs — never the text. If the tree cannot be re-read after typing, the call FAILS. ' +
         'A placeholder the tree reports as the value is not content. The keyboard is NOT dismissed afterwards (a flow\'s fill: has dismissKeyboard). ' +
-        'Types printable ASCII, and under `ios.treeSource: wda` also Latin, Greek, Cyrillic and Han letters, punctuation and symbols; anything else is refused before anything is sent (ADR 0037). ' +
+        'Types printable ASCII, and under WDA (`wda`, or `auto` once up) also Latin, Greek, Cyrillic and Han letters, punctuation and symbols; anything else is refused before anything is sent (ADR 0037). ' +
         'Every case in full: references/tools.md#type_text.',
       inputSchema: {
         platform,
@@ -643,9 +656,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     async ({ platform: p, state, configPath: cp, environment: envName }) => {
       const project = await loadForCall(TOOL_CONFIG.ensure_state(), cp);
       const run = engineDevices();
-      const { text: report, shot } = await runEnsureState(
-        { state, project, environment: envName, session },
-        (cfg) => run.deviceFor(p, cfg),
+      const { text: report, shot } = await run.claims(() =>
+        runEnsureState({ state, project, environment: envName, session }, (cfg) => run.deviceFor(p, cfg)),
       );
       // No image when the final capture failed — the report's ⚠ screenshot: line says why.
       return { content: [...text(noted(run.used, report)).content, ...(shot === undefined ? [] : [image(shot)])] };
@@ -667,7 +679,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     async ({ platform: p, flow, configPath: cp, environment: envName }) => {
       const project = await loadForCall(TOOL_CONFIG.run_flow(), cp);
       const run = engineDevices();
-      const report = await runNamedFlow({ flow, project, environment: envName, session }, (cfg) => run.deviceFor(p, cfg));
+      const report = await run.claims(() => runNamedFlow({ flow, project, environment: envName, session }, (cfg) => run.deviceFor(p, cfg)));
       return text(noted(run.used, report));
     },
   );
@@ -740,7 +752,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       // The contract goes down as the PATH: run/verify.ts reads, parses and
       // validates it before it resolves any adapter, so a typo'd path or a bad
       // field value never costs a device run — and the pre-flight has one owner.
-      const { sections, screenshots } = await runVerification(
+      const { sections, screenshots } = await run.claims(() => runVerification(
         {
           platforms: normalizePlatforms(requested),
           cfg: project.cfg,
@@ -754,7 +766,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
           baselineDir: baselineDirFor(cp),
         },
         (p) => run.deviceFor(p, project.cfg),
-      );
+      ));
       return { content: [...text(noted(run.used, sections.join('\n\n'))).content, ...screenshots.map(image)] };
     },
   );

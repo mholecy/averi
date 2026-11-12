@@ -55,9 +55,9 @@ WDA comes from `appium-webdriveragent`, an optional dependency of averi. If an i
 
 Alternatively, detect on an id idb does list, or by `text:`/`label:`.
 
-## iOS: `⚠ read through idb: WebDriverAgent did not come up …`
+## iOS: `⚠ read through idb: WebDriverAgent did not come up (<reason>; select_device again to retry) …`
 
-Under the default `treeSource: auto` averi reads the tree through WebDriverAgent, and through idb when WebDriverAgent cannot be brought up at the simulator's first tree read (its package missing, a failed build, a WebDriverAgent averi did not start on its port). The choice holds for the simulator for the rest of the server session. Each reply that claims what it read (tap, a fill, scroll_until, assert, flows, ensure_state, verify) then ends with this line: idb lists no presented layer and no scroll clip, so a target under a menu or sheet, or past its scroll view's edge, may be claimed while the app saw nothing. Check such a claim with a `screenshot`. The reason is on averi's stderr. `app.ios.treeSource: wda` makes the same failure an error that names it; fix it and restart the server.
+Under the default `treeSource: auto` averi reads the tree through WebDriverAgent. When WebDriverAgent cannot be brought up at the simulator's first tree read, it reads through idb instead. Typical reasons: the `appium-webdriveragent` package is missing, the build failed, or a WebDriverAgent averi did not start holds the port. The parenthesis names the reason in a few words, and averi's stderr has the whole error. The choice holds for that simulator until `select_device` names it again. Every reply that claims what it read then ends with this line: tap, a fill, scroll_until, assert, run_flow, ensure_state and verify, and a failed flow's error too. idb lists no presented layer and no scroll clip. So a target under a menu or sheet, or past its scroll view's edge, may be claimed while the app saw nothing. Check such a claim with a `screenshot`. Fix the reason, then `select_device` the simulator to try WebDriverAgent again. `app.ios.treeSource: idb` makes idb the choice without the note.
 
 ## A tap target off screen
 

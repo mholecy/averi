@@ -433,7 +433,7 @@ describe('windowWidth — the rect denominator, one trust policy with the scale'
     const got = windowWidth(letterbox, { width: 1080, height: 1800 });
     expect(got.error).toMatch(/^screen width 945 is a CONTENT width/);
     expect(got.error).toMatch(/On Android an inset start is usually the app's own window, letterboxed or freeform/);
-    expect(got.error).toMatch(/On iOS the default idb source/);
+    expect(got.error).toMatch(/On iOS the idb source often/);
   });
 
   it('says so when nothing witnessed it: no screen, or one that cannot be divided by', () => {

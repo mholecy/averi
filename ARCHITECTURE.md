@@ -418,8 +418,9 @@ error and trace line says the same, host paths stripped; the error's fields keep
   and `auto` over both:
   - **auto** (`AutoTreeSource`, `auto-tree-source.ts`, the default; ADR 0046): the first tree read asks WDA to come up
     (`WdaTreeSource.bringUp`) and keeps ONE source for the adapter's life — WDA when it came up, else idb, said once on
-    stderr and on every claiming reply (`claimNote`, printed `⚠ …` by `mcp/tools.ts#noted`). Two trees are never
-    reconciled. Before the choice the launch's label is idb's.
+    stderr and on every claiming reply and failed flow (`claimNote`, printed `⚠ …` by `mcp/tools.ts#noted`), with
+    WDA's reason in a few words. Two trees are never reconciled. Before the choice the launch's label is idb's. A
+    `select_device` of the simulator drops a fallen-back adapter (`registry.ts#select`), and the next call tries WDA again.
   - **idb** (`IdbTreeSource`, `treeSource: idb`, and `auto`'s fallback): `idb ui describe-all`, a FLAT list under a synthetic root. An empty or
     area-less list is a read error (`IdbEmptyTreeError`), never a tree that reads "absent"; a wedged service is
     `PersistentReadError` (ADR 0036). Settle cadence 300 ms (`IDB_SETTLE_CADENCE_MS`, ADR 0040). Its presented

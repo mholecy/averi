@@ -697,7 +697,7 @@ describe('every description keeps the rules an agent must not break', () => {
     ['type_text', 'FAILS the read-back, saying whether only letter case differs — never the text'],
     ['type_text', 'The keyboard is NOT dismissed afterwards'],
     // D43 (ADR 0037's D43 amendment): what each path types, not "on both platforms" (the code points: tools.md).
-    ['type_text', 'Types printable ASCII, and under `ios.treeSource: wda` also Latin, Greek, Cyrillic and Han letters, punctuation and symbols'],
+    ['type_text', 'Types printable ASCII, and under WDA (`wda`, or `auto` once up) also Latin, Greek, Cyrillic and Han letters, punctuation and symbols'],
     ['type_text', 'anything else is refused before anything is sent (ADR 0037)'],
     ['scroll_until', 'Pass fully: true when the next step MEASURES the element'],
     ['scroll_until', 'It never swipes on a screen presented over the target'],

@@ -504,7 +504,7 @@ export const DESCRIBE_ALL_TIMEOUT_MS = 15_000;
 export const IDB_SETTLE_CADENCE_MS = 300;
 
 /**
- * The default tree source: one `idb ui describe-all --json` per read, nothing
+ * The idb tree source (`treeSource: idb`, and `auto`'s fallback): one `idb ui describe-all --json` per read, nothing
  * to start and nothing to dispose. `exec` defaults to the real one — the same
  * function IosAdapter defaults to, so in production the two share the
  * memoized Xcode probe without anyone passing anything. A test passes its

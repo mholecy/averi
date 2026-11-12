@@ -128,7 +128,7 @@ function untrustedTreeWidth(size: { width: number; reliable: boolean }): string 
     return (
       `screen width ${size.width} is a CONTENT width, not the window width — the widest rect ` +
       'starts inset (filtered tree?), or the tree\'s own screen-shaped rects contradict it, and ' +
-      'nothing in the tree can say which reading is the screen. On iOS the default idb source often ' +
+      'nothing in the tree can say which reading is the screen. On iOS the idb source often ' +
       'surfaces no window rect — app.ios.treeSource: wda in averi.yaml gives one. On Android an inset ' +
       'start is usually the app\'s own window, letterboxed or freeform (a fixed-orientation or ' +
       'non-resizable app on a large screen): it starts inset by design, and its canvas cannot be told ' +

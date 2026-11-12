@@ -153,7 +153,12 @@ export class AdapterRegistry {
     return this.bindings.get(platform)?.deviceId;
   }
 
-  /** Pin the platform's tools to one booted device (id from listAll). */
+  /**
+   * Pin the platform's tools to one booted device (id from listAll). Selecting the device already bound keeps its
+   * adapters, except one that fell back (DeviceAdapter.claimNote: an iOS `treeSource: auto` adapter whose WebDriverAgent
+   * did not come up, A41a): that one is dropped, so the next call builds a fresh adapter that tries WebDriverAgent
+   * again — the retry its note names.
+   */
   async select(platform: Platform, deviceId: string): Promise<Device> {
     this.assertOpen();
     const devices = await this.probe(platform);
@@ -169,6 +174,7 @@ export class AdapterRegistry {
     this.assertOpen(); // before the write, as in get(): a shutdown during the probe must not leave a binding behind
     const previous = this.bindings.get(platform);
     if (previous && previous.deviceId !== deviceId) this.evict(platform, previous.deviceId);
+    else this.evict(platform, deviceId, (adapter) => adapter.claimNote !== undefined);
     this.bindings.set(platform, { deviceId, pinned: true });
     return device;
   }
@@ -243,10 +249,10 @@ export class AdapterRegistry {
     return entry.adapter;
   }
 
-  /** Drop and dispose every cached adapter (every kind) bound to one device. */
-  private evict(platform: Platform, deviceId: string): void {
+  /** Drop and dispose every cached adapter (every kind) bound to one device — or, with `only`, those it holds to. */
+  private evict(platform: Platform, deviceId: string, only: (adapter: DeviceAdapter) => boolean = () => true): void {
     for (const [key, entry] of this.adapters) {
-      if (entry.platform === platform && entry.deviceId === deviceId) {
+      if (entry.platform === platform && entry.deviceId === deviceId && only(entry.adapter)) {
         this.adapters.delete(key);
         void disposeQuietly(entry.adapter);
       }
