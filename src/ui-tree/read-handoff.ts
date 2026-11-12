@@ -164,6 +164,7 @@ export const ADAPTER_SURFACE: Record<keyof DeviceAdapter, 'tree' | 'reads' | 'ac
   settleCadenceMs: 'fact',
   typingDelivery: 'fact',
   typeable: 'fact',
+  claimNote: 'fact',
   noteDroppedTail: 'reads',
   focusedWindow: 'reads',
   logs: 'reads',

@@ -130,6 +130,32 @@ describe('WdaTreeSource — the WebDriverAgent adapter at the seam', () => {
   });
 });
 
+describe('WdaTreeSource.bringUp — WebDriverAgent up without a tree read (treeSource auto, A41a)', () => {
+  it('starts ONE WebDriverAgent and reads no tree; the read after it reuses it', async () => {
+    const { source, spawner, fetcher } = await setup();
+    await source.bringUp();
+    expect(spawner.spawns).toHaveLength(1);
+    expect(fetcher.urls.filter((u) => u.includes('/source'))).toEqual([]);
+    await source.read();
+    expect(spawner.spawns).toHaveLength(1);
+  });
+
+  it('a WebDriverAgent that cannot come up fails it in WdaServer\'s words', async () => {
+    const { dd } = await tempDerivedData(true);
+    const fetcher = fakeFetch(() => ({ status: 200, body: WDA_STATUS })); // answering before we spawned: not ours
+    const source = new WdaTreeSource({ udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fetcher.fn, spawnFn: fakeSpawn().fn, derivedDataPath: dd, pollIntervalMs: 5 });
+    await expect(source.bringUp()).rejects.toThrow(/but this session did not start it/);
+  });
+
+  it('after dispose: the released error, nothing started', async () => {
+    const { source, spawner, fetcher } = await setup();
+    await source.dispose();
+    await expect(source.bringUp()).rejects.toThrow(/select the device again/);
+    expect(spawner.spawns).toEqual([]);
+    expect(fetcher.urls).toEqual([]);
+  });
+});
+
 describe('WdaTreeSource.applicationLabel — which app WebDriverAgent reads, asked only of a WDA that is up (D48)', () => {
   const asked = (urls: string[]) => urls.filter((u) => u.endsWith('/wda/activeAppInfo'));
 

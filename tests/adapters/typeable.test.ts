@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { AndroidAdapter } from '../../src/adapters/android.js';
 import type { ExecFn } from '../../src/adapters/exec.js';
 import { IosAdapter } from '../../src/adapters/ios.js';
-import type { IosTreeSource } from '../../src/adapters/ios-tree-source.js';
+import { parseIdbDescribeAll, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
+import { AutoTreeSource, IDB_FALLBACK_NOTE } from '../../src/adapters/auto-tree-source.js';
 import { IDB_TYPEABLE, WDA_TYPEABLE } from '../../src/adapters/ios-typing.js';
 import { refusalOf, type Typeable } from '../../src/adapters/typeable.js';
 import type { DeviceAdapter } from '../../src/adapters/types.js';
@@ -70,6 +71,18 @@ const adapters: [string, () => DeviceAdapter][] = [
 describe('IosAdapter.typeable comes from the tree source', () => {
   it('a source that types (WDA\'s): WDA_TYPEABLE', () => {
     expect(ios('wda', true).typeable).toBe(WDA_TYPEABLE);
+  });
+
+  it('auto (A41a): WDA_TYPEABLE until its first read chose idb, IDB_TYPEABLE from then on; its claim note forwarded', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const wda = { ...treeSource('wda', true), bringUp: () => Promise.reject(new Error('no WebDriverAgent')) };
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: recordingExec().fn, treeSource: new AutoTreeSource({ wda, idb: { ...treeSource('idb'), read: async () => parseIdbDescribeAll('[]') } }) });
+    expect(adapter.typeable).toBe(WDA_TYPEABLE);
+    expect(adapter.claimNote).toBeUndefined();
+    await adapter.uiTree();
+    expect(adapter.typeable).toBe(IDB_TYPEABLE);
+    expect(adapter.claimNote).toBe(IDB_FALLBACK_NOTE);
+    errors.mockRestore();
   });
 
   it.each([['idb'], ['wda']] as const)('a source of kind %s without a typer: IDB_TYPEABLE', (kind) => {

@@ -1,6 +1,6 @@
 import { AndroidAdapter } from '../adapters/android.js';
 import { IosAdapter } from '../adapters/ios.js';
-import { DEFAULT_IOS_TREE_SOURCE, type IosTreeSourceKind } from '../adapters/ios-node.js';
+import { DEFAULT_IOS_TREE_SOURCE, type IosTreeSourceSetting } from '../adapters/ios-node.js';
 import { createIosTreeSource, type IosTreeSourceDeps } from '../adapters/ios-tree-source.js';
 import { IdbHelper } from '../adapters/idb-helper.js';
 import { androidUnusable, defaultDiscovery, type DeviceDiscovery, type ListOpts } from '../adapters/discovery.js';
@@ -23,11 +23,11 @@ function unusableNamed(device: Device | undefined): string | undefined {
 /**
  * Per-call adapter options — today only the iOS tree-source kind (averi.yaml `app.ios.treeSource`). Required by
  * `get` (D41, 2026-11-01): a caller states the project's kind, or that it has none (`treeSource` undefined — the
- * default), and cannot forget it — the eight tools that once asked without it were served, in a `treeSource: wda`
+ * default, `auto`), and cannot forget it — the eight tools that once asked without it were served, in a `treeSource: wda`
  * project, by a second adapter of the default kind.
  */
 export interface AdapterOpts {
-  treeSource?: IosTreeSourceKind;
+  treeSource?: IosTreeSourceSetting;
 }
 
 /**
@@ -67,7 +67,7 @@ export const defaultFactory: AdapterFactory = (platform, deviceId, opts) => {
  * drive it from one server (ADR 0032, amendment D41). `deps` reach the tree source: the
  * server passes none; scripts/perf/baseline.ts passes its lab WebDriverAgent's port and derived data.
  */
-export function iosAdapterFor(udid: string, kind: IosTreeSourceKind, deps: Omit<IosTreeSourceDeps, 'idbHelper'> = {}): IosAdapter {
+export function iosAdapterFor(udid: string, kind: IosTreeSourceSetting, deps: Omit<IosTreeSourceDeps, 'idbHelper'> = {}): IosAdapter {
   const idbHelper = new IdbHelper();
   return new IosAdapter({ udid, treeSource: createIosTreeSource(kind, udid, { ...deps, idbHelper }), idbHelper });
 }
@@ -80,7 +80,7 @@ export function iosAdapterFor(udid: string, kind: IosTreeSourceKind, deps: Omit<
  * the default-kind instance. Resolving the default HERE is what makes the
  * cache key and the factory call agree: the factory is handed the resolved kind.
  */
-function kindFor(platform: Platform, opts: AdapterOpts): IosTreeSourceKind | undefined {
+function kindFor(platform: Platform, opts: AdapterOpts): IosTreeSourceSetting | undefined {
   return platform === 'ios' ? opts.treeSource ?? DEFAULT_IOS_TREE_SOURCE : undefined;
 }
 

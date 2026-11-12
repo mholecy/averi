@@ -15,7 +15,7 @@ app:
   ios:
     bundleId: com.example.dev
     app: path/to.app
-    treeSource: wda             # optional, default idb; see troubleshooting.md
+    treeSource: wda             # optional: auto (default — WebDriverAgent, idb if it cannot start), wda or idb; see troubleshooting.md
     keyboardDismiss:            # optional, ordered; acts only with treeSource: wda
       - tap: { id: screen_title }   # a NON-interactive element whose tap does not submit
       - accessory: true             # the Done button on a number pad's accessory toolbar
@@ -42,7 +42,7 @@ states:
 ```
 
 - `detect` takes `element`, `state`, `any` and `all`. An element condition can carry `absent: true`, so "row visible AND card face gone" is expressible.
-- A bare tree (a cold launch's decor or splash; on iOS also SpringBoard's status bar and the launching app's icon) decides no condition. An `absent:` check there is not satisfied, `ensure_state` looks again for up to ~20 s, and `wait:`/`branch:` keep polling. On iOS a `launch_app` or `launch:` also waits (up to 3 s) until the tree is the launched app's, not the app it covered — on the default idb tree source by the tree's Application label, with `treeSource: wda` by WebDriverAgent's active app once WDA is running (a wda project's first tree read starts it, which outlasts the switch). It is therefore safe to call `ensure_state` right after `launch_app`. A ⚠ line in the reply means the wait never saw the app: read again before you trust an absence.
+- A bare tree (a cold launch's decor or splash; on iOS also SpringBoard's status bar and the launching app's icon) decides no condition. An `absent:` check there is not satisfied, `ensure_state` looks again for up to ~20 s, and `wait:`/`branch:` keep polling. On iOS a `launch_app` or `launch:` also waits (up to 3 s) until the tree is the launched app's, not the app it covered — on the idb tree source (and under the default `auto` before its first tree read) by the tree's Application label, under WebDriverAgent by its active app once WDA is running (the first tree read starts it, which outlasts the switch). It is therefore safe to call `ensure_state` right after `launch_app`. A ⚠ line in the reply means the wait never saw the app: read again before you trust an absence.
 - A state with no `reach:` can only be detected. `ensure_state` on it fails if it is not already on screen.
 
 ## Flows

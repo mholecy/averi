@@ -140,6 +140,17 @@ const text = (value: unknown) => ({
   ],
 });
 
+/**
+ * A reply that claims what it read through the tree, with the claim note of the adapter(s) that served it
+ * (DeviceAdapter.claimNote — an iOS `treeSource: auto` adapter whose WebDriverAgent did not come up, A41a) on a line of
+ * its own: `⚠ <note>`. Asked after the call, whose first read made the choice. Not on a refusal (a throw), which claims
+ * nothing, nor on replies that claim no read (a coordinate tap, a swipe, a snapshot).
+ */
+const noted = (adapters: readonly DeviceAdapter[], reply: string): string => {
+  const note = adapters.find((a) => a.claimNote !== undefined)?.claimNote;
+  return note === undefined ? reply : `${reply}\n⚠ ${note}`;
+};
+
 /** A PNG as MCP image content — the one spelling of it for screenshot, ensure_state and verify. */
 const image = (shot: Buffer) => ({
   type: 'image' as const,
@@ -211,7 +222,7 @@ export const serverInstructions = (version: string): string => [
     'Double-quote a value with spaces: text:"Sign in" (text:Sign in fails at "in"). Prefer stable id:s.',
   'Coordinates and rects are in tree units: pixels on Android, points on iOS.',
   'configPath: averi.yaml is read only when a call uses a value from it; an invalid file fails the call, naming it; a missing one fails only the tools that cannot work without it (ensure_state, run_flow, verify, install_app without a path).',
-  'iOS tree source (app.ios.treeSource in averi.yaml): idb by default — no scroll views, no container ids, nothing beneath the keyboard or a presented layer; wda (WebDriverAgent) sees those, ~2x slower.',
+  'iOS tree source (app.ios.treeSource in averi.yaml): auto — WebDriverAgent, or idb if it cannot start (a ⚠ line says so; no scroll views, container ids, keyboard or presented layers); wda/idb pin one.',
   'A refusal taps, types or swipes nothing on its target (a keyboard dismissal it tried is named in it) and names its cause and remedy (scroll_until it first, close the presented screen first, hide the keyboard): follow it rather than retrying unchanged. Under a screen presented over the target (an alert, a sheet, a modal, an Android dialog) no scroll helps: close it first. ' +
     'An empty or bare tree is not absence: compare with screenshot.',
   `Full behaviour of each tool: the averi skill's references/tools.md (without the skill: ${toolsReferenceUrl(version)}); error lines by symptom: references/troubleshooting.md.`,
@@ -259,6 +270,22 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
    */
   const deviceFor = (p: Platform, cfg: AveriConfig | undefined): Promise<DeviceAdapter> =>
     registry.get(p, { treeSource: iosToolSettings(cfg, p).treeSource });
+
+  /**
+   * `deviceFor` for an engine tool, which resolves its device lazily through the run layer, keeping the adapters it
+   * handed out (`used`) for the reply's claim note (noted).
+   */
+  const engineDevices = () => {
+    const used: DeviceAdapter[] = [];
+    return {
+      used,
+      deviceFor: async (p: Platform, cfg: AveriConfig | undefined): Promise<DeviceAdapter> => {
+        const adapter = await deviceFor(p, cfg);
+        used.push(adapter);
+        return adapter;
+      },
+    };
+  };
 
   /**
    * The handler's one call (A30): read the config under the tool's policy, then the device through `deviceFor` and
@@ -461,7 +488,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     async ({ platform: p, selector, x, y, configPath: cp }) => {
       const served = await serve(p, TOOL_CONFIG.tap(p), cp);
       if (selector !== undefined) {
-        return text(tapText(selector, await tapElement(served.adapter, selector, acting(served))));
+        return text(noted([served.adapter], tapText(selector, await tapElement(served.adapter, selector, acting(served)))));
       }
       if (x === undefined || y === undefined) {
         throw new Error('Provide either selector or both x and y');
@@ -542,7 +569,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         return text(typedText(value.length));
       }
       const fill = await fillField(served.adapter, selector, value, { ...acting(served), clear });
-      return text(fillReply(fill, selector));
+      return text(noted([served.adapter], fillReply(fill, selector)));
     },
   );
 
@@ -582,7 +609,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       const { adapter, eyes } = await serve(p, TOOL_CONFIG.scroll_until(p), cp);
       // The eyes a `fully visible` claim is confirmed with (ui-tree/eyes.ts), served here: interact/ may not import verify/.
       const result = await scrollUntilVisible(adapter, selector, { direction, maxSwipes, fully, timeoutMs, within, eyes });
-      return text(`Element ${selector} ${describeScrollResult(result)}`);
+      return text(noted([adapter], `Element ${selector} ${describeScrollResult(result)}`));
     },
   );
 
@@ -615,12 +642,13 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     },
     async ({ platform: p, state, configPath: cp, environment: envName }) => {
       const project = await loadForCall(TOOL_CONFIG.ensure_state(), cp);
+      const run = engineDevices();
       const { text: report, shot } = await runEnsureState(
         { state, project, environment: envName, session },
-        (cfg) => deviceFor(p, cfg),
+        (cfg) => run.deviceFor(p, cfg),
       );
       // No image when the final capture failed — the report's ⚠ screenshot: line says why.
-      return { content: [...text(report).content, ...(shot === undefined ? [] : [image(shot)])] };
+      return { content: [...text(noted(run.used, report)).content, ...(shot === undefined ? [] : [image(shot)])] };
     },
   );
 
@@ -638,9 +666,9 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     },
     async ({ platform: p, flow, configPath: cp, environment: envName }) => {
       const project = await loadForCall(TOOL_CONFIG.run_flow(), cp);
-      return text(
-        await runNamedFlow({ flow, project, environment: envName, session }, (cfg) => deviceFor(p, cfg)),
-      );
+      const run = engineDevices();
+      const report = await runNamedFlow({ flow, project, environment: envName, session }, (cfg) => run.deviceFor(p, cfg));
+      return text(noted(run.used, report));
     },
   );
 
@@ -667,7 +695,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       // configless, but a broken averi.yaml fails it rather than silently
       // costing the health line (android) or the tree source (ios).
       const { cfg, adapter } = await serve(p, TOOL_CONFIG.assert(), cp);
-      return text(await runAsserts({ adapter, specs, baselineDir: baselineDirFor(cp), cfg }));
+      return text(noted([adapter], await runAsserts({ adapter, specs, baselineDir: baselineDirFor(cp), cfg })));
     },
   );
 
@@ -704,6 +732,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     },
     async ({ platforms: requested, state, flow, asserts, contract: contractPath, configPath: cp, environment: envName }) => {
       const project = await loadForCall(TOOL_CONFIG.verify(), cp);
+      const run = engineDevices();
       // Parsed before the contract is read: a malformed assert spec is the
       // caller's most likely mistake, and it stays the error they see when both
       // are wrong.
@@ -724,9 +753,9 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
           session,
           baselineDir: baselineDirFor(cp),
         },
-        (p) => deviceFor(p, project.cfg),
+        (p) => run.deviceFor(p, project.cfg),
       );
-      return { content: [...text(sections.join('\n\n')).content, ...screenshots.map(image)] };
+      return { content: [...text(noted(run.used, sections.join('\n\n'))).content, ...screenshots.map(image)] };
     },
   );
 

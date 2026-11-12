@@ -1133,7 +1133,7 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
     const harness = await connect();
     const result = await harness.call(tool, { platform: 'ios', configPath: missing(), ...TREE_CALLS[tool] });
     expect(result.isError).toBe(false);
-    expect(harness.bound()).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'idb' }]);
+    expect(harness.bound()).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'auto' }]);
   });
 
   it.each(['ui_snapshot', 'tap', 'type_text', 'scroll_until', 'swipe'])('android %s: an INVALID averi.yaml is not read at all, and the call works', async (tool) => {
@@ -1145,10 +1145,10 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
     expect(configReads(configPath)).toBe(0);
   });
 
-  it('ios: a missing averi.yaml means the default tree source (idb)', async () => {
+  it('ios: a missing averi.yaml means the default tree source (auto, A41a)', async () => {
     const { result, bound } = await snapshot('ios', missing());
     expect(result.isError).toBe(false);
-    expect(bound).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'idb' }]);
+    expect(bound).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'auto' }]);
   });
 
   it('ios: a valid averi.yaml naming treeSource: wda reaches the registry — the config IS consulted', async () => {
@@ -1254,14 +1254,40 @@ describe('every tool gets the project\'s adapter — one per simulator and confi
     expect(harness.bound()).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'wda' }]);
   });
 
-  it('ios without a project config: one idb adapter, shared by the tree tools and the rest', async () => {
+  it('ios without a project config: one auto adapter, shared by the tree tools and the rest', async () => {
     // `missing()` stands in for the default ./averi.yaml: the server's working directory is the repo, not a test's own.
     const harness = await connect();
     for (const { tool, label, args } of DEVICE_CALLS) {
       expect((await harness.call(tool, { platform: 'ios', configPath: missing(), ...args })).isError, label).toBe(false);
     }
     expect((await harness.call('ui_snapshot', { platform: 'ios', configPath: missing() })).isError).toBe(false);
-    expect(harness.bound()).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'idb' }]);
+    expect(harness.bound()).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'auto' }]);
+  });
+
+  /**
+   * A41a: an adapter under `treeSource: auto` whose WebDriverAgent did not come up says so (DeviceAdapter.claimNote) on
+   * every reply that claims what it read — a tap or fill on a selector, a scroll_until, an assert, a flow, an ensure, a
+   * verify — as one `⚠` line after it, and on no other reply.
+   */
+  const CLAIMING = new Set(['tap', 'scroll_until', 'assert', 'ensure_state', 'run_flow', 'verify']);
+  it.each([...EVERY_CASE, ['type_text (fill)', 'type_text', { platform: 'ios', text: 'a', selector: 'id:home_root' }] as [string, string, Record<string, unknown>]])(
+    'ios %s: the claim note of an auto adapter fallen back to idb is the reply\'s last line exactly when the reply claims a read',
+    async (label, tool, args) => {
+      const ios = Object.assign(home(), { claimNote: 'read through idb: the note' });
+      const harness = await connect({ android: home(), ios });
+      const configPath = await file('averi.yaml', VALID_CONFIG);
+      const result = await harness.call(tool, { configPath, ...args });
+      expect(result.isError, result.text).toBe(false);
+      const claims = CLAIMING.has(tool) || label === 'type_text (fill)';
+      expect(result.text.endsWith('\n⚠ read through idb: the note'), result.text).toBe(claims);
+      expect(result.text.split('read through idb: the note')).toHaveLength(claims ? 2 : 1);
+    },
+  );
+
+  it('ios: an adapter with no claim note adds nothing to a claiming reply', async () => {
+    const harness = await connect();
+    const result = await harness.call('tap', { platform: 'ios', selector: 'id:home_root', configPath: missing() });
+    expect(result.text).not.toContain('⚠');
   });
 
   it.each(DEVICE_CALLS)('ios $label: an INVALID averi.yaml fails the call naming the file, before a device is bound', async ({ tool, args }) => {

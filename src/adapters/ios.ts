@@ -176,14 +176,17 @@ export class IosAdapter implements DeviceAdapter {
   /**
    * What this adapter types (ios-typing.ts, ADR 0037's D43 amendment): WDA_TYPEABLE over a tree source that types
    * (IosTreeSource.typeText — WDA's), else IDB_TYPEABLE. Decided by the source's typer, not its kind: the differential
-   * harness's recorded source is of kind `wda` and types nothing. Fixed for the adapter's life.
+   * harness's recorded source is of kind `wda` and types nothing. Asked of the source per call: fixed for idb and wda,
+   * and under `auto` (A41a) WDA's until its first read chose idb, IDB_TYPEABLE from then on.
    */
-  readonly typeable: Typeable;
-  /**
-   * The source's typer (IosTreeSource.typeText, WDA's), bound once here: what `typeable` and typeText's route both come
-   * from — undefined over a source that types nothing, where every text goes to idb.
-   */
-  private readonly sourceTyper: ((text: string) => Promise<void>) | undefined;
+  get typeable(): Typeable {
+    return this.treeSource.typeText !== undefined ? WDA_TYPEABLE : IDB_TYPEABLE;
+  }
+
+  /** The source's line for every claiming reply (DeviceAdapter.claimNote): `auto`'s, once it fell back to idb (A41a). */
+  get claimNote(): string | undefined {
+    return this.treeSource.claimNote;
+  }
   private readonly exec: ExecFn;
   private readonly udid: string;
   private readonly treeSource: IosTreeSource;
@@ -229,8 +232,6 @@ export class IosAdapter implements DeviceAdapter {
     this.udid = opts.udid;
     this.exec = opts.exec ?? defaultExec;
     this.treeSource = opts.treeSource;
-    this.sourceTyper = opts.treeSource.typeText?.bind(opts.treeSource);
-    this.typeable = this.sourceTyper !== undefined ? WDA_TYPEABLE : IDB_TYPEABLE;
     this.idbHelper = opts.idbHelper;
     this.screenshotVia = iosScreenshotViaSimctl() ? 'simctl' : 'idb';
   }
@@ -760,8 +761,8 @@ export class IosAdapter implements DeviceAdapter {
     // on return (batch-10's G1: 20/20), so `typingDelivery` holds for it too. No D24 split there: batch-10's G5 typed
     // 10/10 into the RN field with no tail dropped, and the fill's retype stays the net. Every text idb can type stays
     // on idb, byte for byte; over a source without a typer every text does, as before D43.
-    if (this.sourceTyper !== undefined && typingPathOf(text) === 'wda') {
-      await this.sourceTyper(text);
+    if (this.treeSource.typeText !== undefined && typingPathOf(text) === 'wda') {
+      await this.treeSource.typeText(text);
       return;
     }
     // Every typing here goes through idbText: `ui text --udid U -- <text>`, so a leading dash is typed (D74), and its

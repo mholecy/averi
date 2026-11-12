@@ -29,7 +29,7 @@ Prefer to do it by hand, or setting up for a whole team (committed `.mcp.json`)?
 ```mermaid
 flowchart LR
     A(["AI agent"]) -- MCP --> S["averi server"]
-    S -- "adb / simctl + idb (opt-in WDA)" --> D["emulator / simulator"]
+    S -- "adb / simctl + idb + WDA" --> D["emulator / simulator"]
     subgraph R["your app repo"]
         Y["averi.yaml<br/>states, flows, selectors"]
         E[".env.averi — gitignored<br/>credential values"]
@@ -114,7 +114,7 @@ averi can only select what the accessibility tree exposes. Give new screens test
 
 ## Requirements
 
-Node 20+. **Android**: `adb` + a running emulator (macOS/Linux/Windows). **iOS**: macOS with Xcode, a booted simulator, and `idb` — Apple ships simulators only with Xcode. The opt-in `app.ios.treeSource: wda` reads the tree through WebDriverAgent, which averi builds with `xcodebuild` from the `appium-webdriveragent` package — an optional dependency installed with averi (`npx` included); if that optional install was skipped or failed (e.g. `--omit=optional`), `treeSource: wda` fails with a message naming the package. Exact install commands and checks: [SETUP.md, step 0](SETUP.md#step-0--prerequisites).
+Node 20+. **Android**: `adb` + a running emulator (macOS/Linux/Windows). **iOS**: macOS with Xcode, a booted simulator, and `idb` — Apple ships simulators only with Xcode. By default (`app.ios.treeSource: auto`) averi reads the tree through WebDriverAgent, which it builds with `xcodebuild` from the `appium-webdriveragent` package — an optional dependency installed with averi (`npx` included). The first read brings it up (seconds; minutes for the first build per Xcode). If it cannot come up (the optional install was skipped or failed, e.g. `--omit=optional`, or no Xcode build), averi reads through idb for that simulator, says why on its stderr, and adds a ⚠ line to every reply that claims what it read: idb lists no presented layers or scroll clips. `treeSource: wda` pins WebDriverAgent (and fails with a message naming the package when it is missing); `treeSource: idb` pins idb. Exact install commands and checks: [SETUP.md, step 0](SETUP.md#step-0--prerequisites).
 
 On a Linux/Windows box you get the full Android toolset — pass `platforms: ["android"]` to `verify` (its default runs both platforms; iOS tools error only when called). OCR-backed checks use the macOS Vision framework: elsewhere `ocr` asserts fail closed and the text/type-size parity tables compare from the accessibility tree instead. Windows is untested — reports welcome.
 
@@ -139,7 +139,7 @@ npm run release:smoke  # pack the package, start its bin, list its tools (after 
 npm run dev        # run the MCP server over stdio from source
 ```
 
-Layout (each layer imports only those after it): `src/mcp/` (tool surface, no logic) · `src/run/` (tool commands, verify runs) · `src/flow/` (yaml schema, credentials, engine) · `src/interact/` (tap/type/fill/scroll/swipe, keyboard guard) · `src/verify/` (asserts, baselines, pixel poll, parity tables, crash scan) · `src/ui-tree/` (selectors, geometry, tree verdicts) · `src/adapters/` (adb, simctl/idb, opt-in WDA tree source, one normalized tree) · `src/util/` · `skill/` · `docs/plans/`.
+Layout (each layer imports only those after it): `src/mcp/` (tool surface, no logic) · `src/run/` (tool commands, verify runs) · `src/flow/` (yaml schema, credentials, engine) · `src/interact/` (tap/type/fill/scroll/swipe, keyboard guard) · `src/verify/` (asserts, baselines, pixel poll, parity tables, crash scan) · `src/ui-tree/` (selectors, geometry, tree verdicts) · `src/adapters/` (adb, simctl/idb, the WDA tree source, one normalized tree) · `src/util/` · `skill/` · `docs/plans/`.
 
 ## Releasing
 

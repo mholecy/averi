@@ -1360,6 +1360,14 @@ export interface DeviceAdapter {
    */
   readonly typeable: Typeable;
   /**
+   * One line that every reply claiming what it read through this adapter's tree carries (the tools print it as
+   * `⚠ <line>`, mcp/tools.ts#noted) — or undefined, the common case. Set only by an iOS adapter under
+   * `treeSource: auto` whose WebDriverAgent did not come up, so its tree is idb's, which lists no presented layer or
+   * scroll clip (A41a, docs/adr/0046-the-ios-tree-source-is-webdriveragent-when-it-comes-up.md). Read after the call,
+   * whose first read made the choice.
+   */
+  readonly claimNote?: string;
+  /**
    * What a fill tells the adapter after a REPAIRED drop (interact/fill-type.ts, docs/adr/0023-fill-types-a-dropped-
    * tail-again.md, its D24 amendment): the field kept a strict prefix of a typing whose delivery is `on-return`, the
    * tail was typed again, and the typing then LANDED whole — the app in front drops the end of a burst. Never for a
