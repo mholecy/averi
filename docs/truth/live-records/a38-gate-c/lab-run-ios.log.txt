@@ -1,0 +1,18 @@
+14:39:12 ---- lab-run-ios run 20261112-143912-38612, blocks lab,idb-visibility,wda-visibility
+14:39:12 OK checkout: main's HEAD ad3be918, clean
+14:39:12 NOTE ios-reset: D8DACDE6-6352-437C-AA22-86FB06275C3F, its idb companion and the lab's WebDriverAgent
+14:39:29 OK   ios-reset
+14:39:29 NOTE com.apple.launchservices.schemeapproval's finportal key at the iOS stretch's start: sk.finportal.myport (read only: no batch writes it)
+14:39:36 LAB ios: OK — averi-lab iPhone 17 simulator, iOS 27.0, reset; this run's build installed; the installed cells.json is main's
+14:39:39 OK   ios-health before ios-idb-visibility
+15:01:37 OK   idb-visibility live ios-idb-visibility
+15:01:38 OK   idb-visibility rejudge ios-idb-visibility
+15:01:40 OK   ios-health before the WDA window
+15:01:41 OK   D43 backup: com.apple.keyboard.preferences exported, com.apple.Preferences exported, com.apple.Accessibility exported; state <out>/wda-visibility/run-20261112-143912-38612/state.json (dirty until the restore verifies)
+15:01:44 OK   ios-health before ios-wda-visibility
+15:22:12 OK   wda-visibility live ios-wda-visibility
+15:22:13 OK   wda-visibility rejudge ios-wda-visibility
+15:22:23 OK   ios-health before iOS end
+15:22:26 NOTE the lab's WebDriverAgent (port 8120 free) and idb_companion of D8DACDE6-6352-437C-AA22-86FB06275C3F ended
+15:22:26 OK   idb-visibility analyze
+15:22:26 OK   wda-visibility analyze

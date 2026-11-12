@@ -1,0 +1,11 @@
+======== SUMMARY
+OK checkout: main's HEAD ad3be918, clean
+LAB ios: OK — averi-lab iPhone 17 simulator, iOS 27.0, reset; this run's build installed; the installed cells.json is main's
+lab check: PASS — every lab need met: ios (each one's LAB line above)
+ios idb visibility verdict: PASS — ios-idb-visibility: main's rejudge exit 0 (# Live golden: 184 cases, 140 ok, 4 loud, 40 mismatches (0 not known), 0 skipped)
+D43 WDA-window restore: OK — com.apple.keyboard.preferences put back (imported the whole backup into com.apple.keyboard.preferences (exit 0)), com.apple.Preferences equal, com.apple.Accessibility put back (wrote back AccessibilityEnabled, ApplicationAccessibilityEnabled, AutomationEnabled in com.apple.Accessibility); port 8120 free
+D43 WDA-window compare: OK — every domain still equals its backup after the end check
+ios wda visibility verdict: PASS — ios-wda-visibility: main's rejudge exit 0 (# Live golden: 185 cases, 179 ok, 0 loud, 6 mismatches (0 not known), 0 skipped)
+OK   com.apple.launchservices.schemeapproval's -->sk.finportal.myport unchanged (sk.finportal.myport; read only)
+RESTORE: none — everything dirty was put back and verified
+======== SUMMARY end (run 20261112-143912-38612)
