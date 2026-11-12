@@ -783,9 +783,12 @@ read as drawn beneath its target: every tap `Tapped` at the centre, on the cover
 - **A provider's host stays one all the way down**: a node under a provider (`inProvider`) is the provider's whatever
   its own children's classes; the rule asks only a node not already under one. Compose's AndroidComposeView lists its
   semantics nodes as `android.view.View` or a role's widget class: no Compose capture of the lab lists an
-  `android.view.ViewGroup` directly under its host (the sweep below). AndroidView interop is pinned only on a synthetic
-  dump that names the holder by its own class (tests/ui-tree/draw-order-android-views-twin.test.ts, P2, still
-  unmarked); a holder dumped as `android.view.ViewGroup` directly under the host is the second residual below.
+  `android.view.ViewGroup` directly under its host (the sweep below). AndroidView interop is measured: the real truth
+  captures scroll-sticky-view, carousel-recycler (and carousel-recycler-free) and scroll-collapsing
+  (tests/fixtures/truth/android-averi_lab-api33/) each list `androidx.compose.ui.viewinterop.ViewFactoryHolder` by its
+  own class, beneath Compose's virtual nodes under the host, and none of their golden rows moved; the synthetic P2
+  (tests/ui-tree/draw-order-android-views-twin.test.ts) pins the same shape, still unmarked. A holder dumped as
+  `android.view.ViewGroup` directly under the host is the second residual below.
 - Nothing else changes: the mark, the stripe check, LR3's rules and the eyes judge the run as they judge views-banner's
   (P1).
 
@@ -812,4 +815,6 @@ children too, listed in composition order (scroll-sticky, form-shared-id).
   checked for location order and marked where it is in it (by chance, for a provider), and its overlaps then ask the
   eyes — a screenshot per tap, a refusal when the eyes cannot tell. A Compose AndroidView placed directly at the root
   of its composition, if its holder were listed under the host with the holder's ViewGroup class, would have that
-  shape. No dump has it (the sweep above); unmeasured.
+  shape. No dump has it (the sweep above); unmeasured. Its cost is bounded: a wrongly un-provided host can at most
+  bring its overlaps under the eyes-gated judgement (an untold cover lifted only when the eyes see the target on top,
+  `seenUnder`, ADR 0024) — never a `Tapped` from the listing alone.
