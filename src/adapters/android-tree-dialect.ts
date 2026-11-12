@@ -259,15 +259,19 @@ interface Around {
 
 /**
  * Whether `raw` hosts a NODE PROVIDER — its children are virtual nodes the provider lists in its own order, not the
- * views AOSP sorts by location (android-accessibility-order.ts): a node of the class `android.view.View`. A plain View
- * holds no child views, so any children it lists are virtual: Compose's (AndroidComposeView dumps as
- * `android.view.View`, under a ComposeView on a screen and under a bare ViewGroup in a dialog's window — measured on
- * every Compose capture of the lab, API 33), or an ExploreByTouchHelper's. Everything under it is the provider's too.
- * The class is the accessibility className, which a delegate may set: React Native gives `android.view.View` to a view
- * with some accessibility roles (`toolbar`, `alert`, `header`, `tablist`, … — ReactAccessibilityDelegate.kt), so such a
- * container's subtree is read as a provider's, unmarked (ADR 0015's D75 residual; not narrowed).
+ * views AOSP sorts by location (android-accessibility-order.ts): a node of the class `android.view.View` none of whose
+ * direct children is of the class `android.view.ViewGroup`. A plain View holds no child views, so any children it lists
+ * are virtual: Compose's (AndroidComposeView dumps as `android.view.View`, under a ComposeView on a screen and under a
+ * bare ViewGroup in a dialog's window — measured on every Compose capture of the lab, API 33), or an
+ * ExploreByTouchHelper's. Everything under it is the provider's too. The class is the accessibility className, which a
+ * delegate may set: React Native gives `android.view.View` to a view with some accessibility roles (`toolbar`, `alert`,
+ * `header`, `tablist`, … — ReactAccessibilityDelegate.kt), and such a container's children are its real child views,
+ * React Native's ViewGroups — a direct `android.view.ViewGroup` child tells it from a provider's host (ADR 0015's
+ * residual 5, narrowed by A42a: rn-banner-role). A role container whose children all carry classes other than
+ * `android.view.ViewGroup` (each a role, a Text, an Image) still reads as a provider's host, unmarked.
  */
-const providesNodes = (raw: RawNode): boolean => raw.class === 'android.view.View';
+const providesNodes = (raw: RawNode): boolean =>
+  raw.class === 'android.view.View' && !childrenOf(raw).some((child) => child.class === 'android.view.ViewGroup');
 
 function normalizeNode(raw: RawNode, around: Around): UiNode {
   const className = raw.class?.split('.').pop() ?? '';

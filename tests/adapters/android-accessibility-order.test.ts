@@ -119,6 +119,38 @@ describe('parseUiautomatorXml marks a parent whose children are listed in locati
     expect([...everyNode(t)].filter((n) => n.readingOrder)).toEqual([]);
   });
 
+  it('rn-banner-role: a plain android.view.View with a direct android.view.ViewGroup child (React Native\'s role container) hosts no provider — its run is marked (A42a)', async () => {
+    const t = await dump('android-rn-averi_lab-api33', 'rn-banner-role.xml');
+    for (const tag of ['T', 'U', 'C']) expect(parentOfId(t, `lab.rn-banner-role.${tag}`).readingOrder).toBe(true);
+  });
+
+  it('one ViewGroup child among View children is enough: the View is no provider\'s host, its run is marked', () => {
+    const t = parseDump(`<hierarchy rotation="0">
+  <node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+    <node class="android.view.View" resource-id="app:id/slot" bounds="[73,276][1008,479]">
+      <node class="android.view.View" resource-id="app:id/cover" bounds="[73,276][1008,419]"/>
+      <node class="android.view.ViewGroup" resource-id="app:id/target" bounds="[128,303][953,479]"/>
+    </node>
+  </node>
+</hierarchy>`);
+    expect(parentOfId(t, 'cover').readingOrder).toBe(true);
+  });
+
+  it('a ViewGroup only BELOW a provider\'s virtual node does not unmark the provider: Compose\'s host with View children stays a provider, all the way down', () => {
+    const t = parseDump(`<hierarchy rotation="0">
+  <node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+    <node class="android.view.View" resource-id="app:id/host" bounds="[0,0][1080,2220]">
+      <node class="android.view.View" resource-id="app:id/cover" bounds="[73,276][1008,419]"/>
+      <node class="android.view.View" resource-id="app:id/target" bounds="[128,303][953,479]">
+        <node class="android.view.ViewGroup" resource-id="app:id/a" bounds="[128,303][500,350]"/>
+        <node class="android.view.ViewGroup" resource-id="app:id/b" bounds="[128,360][500,400]"/>
+      </node>
+    </node>
+  </node>
+</hierarchy>`);
+    expect([...everyNode(t)].filter((n) => n.readingOrder)).toEqual([]);
+  });
+
   it('a one-window dump whose window root is itself a plain android.view.View (a provider\'s host): the root the parser copies from it stays unmarked', () => {
     const t = parseDump(`<hierarchy rotation="0">
   <node class="android.view.View" bounds="[0,0][1080,2220]">
