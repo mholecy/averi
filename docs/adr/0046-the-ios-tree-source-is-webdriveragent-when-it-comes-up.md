@@ -58,9 +58,9 @@ read is idb's for the adapter's life, and every reply that claims what it read c
     types is refused there with ADR 0037's refusal: nothing tapped, cleared or typed.
   - A text that needs WDA, typed before any read (`type_text` without a selector, a flow's `type:`), makes the choice
     itself. If WDA does not come up, it is refused as idb refuses it, with WDA's reason after it. Nothing is typed.
-  - `IosAdapter.typeText` is the backstop: a text only WDA types, reaching it over a source with no typer, gets the
-    same refusal instead of idb's trace. Every caller checks `typeable` first, so under `treeSource: idb` this cannot
-    be reached, and that setting is unchanged.
+  - `IosAdapter.typeText` is the backstop: a text only WDA types, reaching it over a source that fell back
+    (`IosTreeSource.fellBack`), gets the same refusal instead of idb's trace. idb and the recorded source never fall
+    back, so `treeSource: idb` is unchanged.
 - `treeSource: idb` and `treeSource: wda` behave as before, byte for byte. The registry caches per setting, so
   `auto`, `idb` and `wda` are three adapters.
 - `app.ios.keyboardDismiss`'s load-time note (`flow/config.ts#inertKeyboardDismissNote`) is printed only for a

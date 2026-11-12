@@ -86,6 +86,7 @@ describe('AutoTreeSource — WebDriverAgent when it comes up, idb when it does n
     expect(wda.bringUps).toBe(1);
     expect(idb.reads).toBe(0);
     expect(auto.kind).toBe('wda');
+    expect(auto.fellBack).toBe(false);
     expect(auto.claimNote).toBeUndefined();
     expect(auto.settleCadenceMs).toBeUndefined();
     expect(auto.typeText).toBeDefined();
@@ -106,6 +107,7 @@ describe('AutoTreeSource — WebDriverAgent when it comes up, idb when it does n
       ['averi: treeSource auto — WebDriverAgent did not come up, so this simulator\'s tree is read through idb: WebDriverAgent requires the appium-webdriveragent package, an optional dependency of averi that is not installed — reinstall averi'],
     ]);
     expect(auto.kind).toBe('idb');
+    expect(auto.fellBack).toBe(true);
     expect(auto.claimNote).toBe(
       'read through idb: WebDriverAgent did not come up (WebDriverAgent requires the appium-webdriveragent package; select_device again to retry) ' +
         'and idb lists no presented layer or scroll clip — a layer over the target or a clip cutting it was not judged',

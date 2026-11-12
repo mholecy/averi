@@ -58,6 +58,12 @@ export interface IosTreeSource {
    */
   readonly claimNote?: string;
   /**
+   * Whether this source fell back from the backend it was asked for — `auto` whose WebDriverAgent did not come up, so
+   * its typer is gone (AutoTreeSource, A41a). What IosAdapter.typeText's backstop decides by; absent (not fallen back)
+   * on idb and wda.
+   */
+  readonly fellBack?: boolean;
+  /**
    * The cadence at which two of this source's reads may prove an element holds still (types.ts#DeviceAdapter.
    * settleCadenceMs, which IosAdapter forwards; docs/adr/0040-the-settle-cadence-is-the-tree-sources.md). The SOURCE's
    * fact, not the kind's: it is where inside a read the snapshot falls. Set only from a measurement of this source

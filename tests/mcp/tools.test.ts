@@ -1284,20 +1284,31 @@ describe('every tool gets the project\'s adapter — one per simulator and confi
     },
   );
 
+  const TAP_THEN_MISS = `${VALID_CONFIG.replace('states:\n', 'states:\n  missed:\n    detect: { element: { id: nowhere } }\n    reach: [tap_then_miss]\n')}  tap_then_miss:\n    steps:\n      - tap: { id: home_root }\n      - wait: { element: { id: nowhere }, timeout: 20ms }\n`;
+
   it.each([
     ['run_flow', { platform: 'ios', flow: 'tap_then_miss' }],
-    ['verify', { platforms: ['ios'], flow: 'tap_then_miss' }],
-  ] as const)('ios %s: a flow that throws after a claimed tap carries the claim note on its error too (A41a review M1)', async (tool, args) => {
+    ['ensure_state', { platform: 'ios', state: 'missed' }],
+  ] as const)('ios %s: an engine run that throws after a claimed tap carries the claim note on its error, once (A41a review M1)', async (tool, args) => {
+    // Rendered, not bare (a labelled control): the ensure's ladder judges the screen at once, with no second look.
+    const rendered = new FakeAdapter({ home: screen(el({ role: 'container', identifier: 'home_root' }), el({ role: 'button', label: 'Settings' })) }, 'home');
+    const ios = Object.assign(rendered, { claimNote: 'read through idb: the note' });
+    const harness = await connect({ android: home(), ios });
+    const result = await harness.call(tool, { configPath: await file('averi.yaml', TAP_THEN_MISS), ...args });
+    expect(result.isError, result.text).toBe(true);
+    expect(result.text).toContain('home_root');
+    expect(result.text.endsWith('\n⚠ read through idb: the note'), result.text).toBe(true);
+    expect(result.text.split('read through idb: the note'), result.text).toHaveLength(2);
+  });
+
+  it('ios verify: a flow that fails is a section of the reply, not a throw — the reply carries the note once (noted)', async () => {
     const ios = Object.assign(home(), { claimNote: 'read through idb: the note' });
     const harness = await connect({ android: home(), ios });
-    const configPath = await file('averi.yaml', `${VALID_CONFIG}  tap_then_miss:\n    steps:\n      - tap: { id: home_root }\n      - wait: { element: { id: nowhere }, timeout: 20ms }\n`);
-    const result = await harness.call(tool, { configPath, ...args });
+    const result = await harness.call('verify', { platforms: ['ios'], flow: 'tap_then_miss', configPath: await file('averi.yaml', TAP_THEN_MISS) });
+    expect(result.isError, result.text).toBe(false);
     expect(result.text).toContain('home_root');
+    expect(result.text.endsWith('\n⚠ read through idb: the note'), result.text).toBe(true);
     expect(result.text.split('read through idb: the note'), result.text).toHaveLength(2);
-    if (tool === 'run_flow') {
-      expect(result.isError).toBe(true);
-      expect(result.text.endsWith('\n⚠ read through idb: the note'), result.text).toBe(true);
-    }
   });
 
   it('ios run_flow: a flow that throws on an adapter with no claim note is the error as it was', async () => {

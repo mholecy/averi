@@ -73,8 +73,13 @@ export class AutoTreeSource implements IosTreeSource {
     return this.chosen?.settleCadenceMs;
   }
 
+  /** The first read chose idb: WebDriverAgent did not come up. */
+  get fellBack(): boolean {
+    return this.chosen === this.idb;
+  }
+
   get claimNote(): string | undefined {
-    return this.chosen === this.idb ? idbFallbackNote(this.reason ?? 'no reason given') : undefined;
+    return this.fellBack ? idbFallbackNote(this.reason ?? 'no reason given') : undefined;
   }
 
   /**

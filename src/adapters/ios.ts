@@ -765,10 +765,11 @@ export class IosAdapter implements DeviceAdapter {
       await this.treeSource.typeText(text);
       return;
     }
-    // A backstop, not a path (A41a review M2): a source that fell back (claimNote — `auto` whose WebDriverAgent did not
-    // come up) lost its typer after a caller checked `typeable`. A text only WDA types gets ADR 0037's refusal, nothing
-    // sent, instead of idb's trace. Over idb and the recorded source (no claim note) nothing changes.
-    if (this.treeSource.claimNote !== undefined && typingPathOf(text) === 'wda') {
+    // A backstop, not a path (A41a review M2): a source that fell back (IosTreeSource.fellBack — `auto` whose
+    // WebDriverAgent did not come up) lost its typer after a caller checked `typeable`. A text only WDA types gets ADR
+    // 0037's refusal, nothing sent, instead of idb's trace. Over idb and the recorded source (never fallen back) nothing
+    // changes.
+    if (this.treeSource.fellBack === true && typingPathOf(text) === 'wda') {
       throw new Error(refusalOf(text, IDB_TYPEABLE) ?? `cannot type it: ${IDB_TYPEABLE.says}`);
     }
     // Every typing here goes through idbText: `ui text --udid U -- <text>`, so a leading dash is typed (D74), and its

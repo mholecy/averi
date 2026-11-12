@@ -275,9 +275,11 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
 
   /**
    * `deviceFor` for an engine tool, which resolves its device lazily through the run layer, keeping the adapters it
-   * handed out (`used`) for the reply's claim note (noted). `claims` runs the engine and, when it throws, rethrows the
-   * same error with the note on a line of its own (A41a review M1): a failed flow's error (flow/engine.ts#FlowError)
-   * lists the ✓ lines of the steps that ran — taps and fills claimed — before the one that failed.
+   * handed out (`used`) for the reply's claim note (noted). `claims` runs the engine and, when it throws, throws a new
+   * error of the same message with the note on a line of its own, the caught one as its cause (A41a review M1): a failed
+   * flow's error (flow/engine.ts#FlowError) lists the ✓ lines of the steps that ran — taps and fills claimed — before
+   * the one that failed. run_flow and ensure_state throw so; verify reports a failed flow as a section of its reply,
+   * which `noted` covers.
    */
   const engineDevices = () => {
     const used: DeviceAdapter[] = [];
@@ -293,8 +295,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
           return await work();
         } catch (e) {
           const note = claimNoteOf(used);
-          if (note !== undefined && e instanceof Error) e.message = `${e.message}\n⚠ ${note}`;
-          throw e;
+          if (note === undefined || !(e instanceof Error)) throw e;
+          throw new Error(`${e.message}\n⚠ ${note}`, { cause: e });
         }
       },
     };
@@ -752,7 +754,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       // The contract goes down as the PATH: run/verify.ts reads, parses and
       // validates it before it resolves any adapter, so a typo'd path or a bad
       // field value never costs a device run — and the pre-flight has one owner.
-      const { sections, screenshots } = await run.claims(() => runVerification(
+      const { sections, screenshots } = await runVerification(
         {
           platforms: normalizePlatforms(requested),
           cfg: project.cfg,
@@ -766,7 +768,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
           baselineDir: baselineDirFor(cp),
         },
         (p) => run.deviceFor(p, project.cfg),
-      ));
+      );
       return { content: [...text(noted(run.used, sections.join('\n\n'))).content, ...screenshots.map(image)] };
     },
   );
