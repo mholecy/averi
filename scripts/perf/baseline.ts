@@ -1,20 +1,15 @@
-import { execFileSync } from 'node:child_process';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { cpus, loadavg, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import type { Platform } from '../../src/adapters/types.js';
-import { AdapterRegistry, defaultFactory, iosAdapterFor } from '../../src/mcp/registry.js';
-import { defaultDiscovery } from '../../src/adapters/discovery.js';
-import { createAveriServer } from '../../src/mcp/tools.js';
 import { errorMessage } from '../../src/util/error-message.js';
-import { connectInProcess } from '../differential/connection.js';
-import { AndroidLab, IosLab, LAB_APP, LAB_WDA_DERIVED_DATA } from '../truth/lab-device.js';
-import { allPassed, callReply, claimsDone, claimsTap, claimsVisible, isError, OCR_FAILED_CLOSED } from '../truth/replies.js';
+import { AndroidLab, IosLab, LAB_APP, LAB_WDA_PORT } from '../truth/lab-device.js';
+import { allPassed, claimsDone, claimsTap, claimsVisible, firstLine, isError, OCR_FAILED_CLOSED } from '../truth/replies.js';
 import { labId, labSelector, parseLabApp, type LabApp } from '../truth/schema.js';
 import { installRecorder, Recorder } from './instrument.js';
+import { averiServer, commitOf } from './session.js';
 import { fmtMs, reportTable } from './report.js';
 import {
   breakdown,
@@ -84,8 +79,6 @@ import {
  * Not a vitest test: it needs the device. Its arithmetic and wrappers are tested in tests/perf/.
  */
 
-const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-
 const { values } = parseArgs({
   options: {
     platform: { type: 'string' },
@@ -109,7 +102,7 @@ const repeat = Number(values.repeat ?? 5);
 if (!Number.isInteger(repeat) || repeat < 1) throw new Error(`--repeat ${values.repeat}: a whole number ≥ 1`);
 const treeSource: IosTreeSourceKind = (values['tree-source'] as IosTreeSourceKind | undefined) ?? (app === 'react-native' ? 'wda' : 'idb');
 if (treeSource !== 'idb' && treeSource !== 'wda') throw new Error(`--tree-source ${treeSource as string}: idb or wda`);
-const wdaPort = Number(values['wda-port'] ?? 8120);
+const wdaPort = Number(values['wda-port'] ?? LAB_WDA_PORT);
 if (!Number.isInteger(wdaPort) || wdaPort < 1024 || wdaPort > 65535) throw new Error(`--wda-port ${values['wda-port']}: a whole port number, 1024–65535`);
 
 // --- the scenarios ---
@@ -225,36 +218,21 @@ async function setUp(setup: Setup): Promise<void> {
   else await lab.simctl('terminate', device, LAB_APP[app].bundle).catch(() => undefined);
 }
 
-const commit = (() => {
-  const git = (...a: string[]) => execFileSync('git', ['-C', ROOT, ...a], { encoding: 'utf8' }).trim();
-  try {
-    return { head: git('rev-parse', 'HEAD'), subject: git('log', '-1', '--format=%s'), dirty: git('status', '--porcelain', '--untracked-files=no') !== '' };
-  } catch {
-    return undefined;
-  }
-})();
+const commit = commitOf();
 
 // --- the server, and the recorder in the process boundary ---
 
 const recorder = new Recorder();
 installRecorder(recorder);
 
-const registry = new AdapterRegistry({
-  // Android: the registry's own adapter. iOS: the registry's own wiring, with WDA (when asked) on the lab's port and
-  // derived data rather than 8100, which another session's WebDriverAgent may hold.
-  // The idb helper (D7a) comes with the registry's iOS wiring (iosAdapterFor); its calls reach the recorder through
-  // instrument.ts#recordHelperCalls, and `AVERI_IDB_HELPER=off` measures the CLI.
-  factory: (p, deviceId, opts) =>
-    p === 'android'
-      ? defaultFactory(p, deviceId, opts)
-      : iosAdapterFor(deviceId, opts?.treeSource ?? treeSource, { port: wdaPort, derivedDataPath: LAB_WDA_DERIVED_DATA }),
-  // The server's own discovery, its check's device.plist proof (D22) included, as `new AdapterRegistry()` has.
-  discovery: defaultDiscovery,
-});
-const { client, close } = await connectInProcess({ createAveriServer }, registry, 'perf-baseline');
+// The server (session.ts#averiServer): Android's own adapter; iOS's registry wiring, WDA (when asked) on the lab's port
+// and derived data. The idb helper (D7a) comes with the registry's iOS wiring; its calls reach the recorder through
+// instrument.ts#recordHelperCalls, and `AVERI_IDB_HELPER=off` measures the CLI.
+const server = await averiServer({ treeSource, driver: 'perf-baseline', wdaPort });
+const close = server.close;
 
 /** A tool call's reply as the judges read it (scripts/truth/replies.ts#callReply), the platform and config added. */
-const call = (tool: string, args: Record<string, unknown>) => callReply(client, tool, { platform, configPath, ...args });
+const call = (tool: string, args: Record<string, unknown>) => server.call(tool, { platform, configPath, ...args });
 
 // --- the runs ---
 
@@ -322,9 +300,6 @@ try {
   }
 }
 
-function firstLine(reply: string): string {
-  return reply.split('\n')[0].slice(0, 160);
-}
 
 // --- the report ---
 

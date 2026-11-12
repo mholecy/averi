@@ -4,10 +4,7 @@ import { iosCheck, iosLab, wdaWindow } from './ios-lab.js';
 import { labBlock, labBuild } from './lab-build.js';
 import type { Block, BlockCtx } from './runner.js';
 import { knobs as readKnobs } from './select.js';
-import { shellQuote } from './shell.js';
 import {
-  cleanStateCommand,
-  deviceInHand,
   KNOBS,
   keptLiveRun,
   liveJudge,
@@ -17,6 +14,7 @@ import {
   type StandingExit,
   type StandingKnobs,
   type StandingOptions,
+  windowStateHand,
 } from './standing.js';
 
 /**
@@ -80,19 +78,6 @@ export const IOS_STANDING: Standing<IosRunGroup> = {
 
 /** A run, asked: every case of its group on the lab simulator's native lab app, under its one source. */
 export const iosAskedOf = (source: IosSource, group: IosRunGroup): Asked => ({ platform: 'ios', app: 'native', sources: [source], cases: [], groups: [group] });
-
-/**
- * The hand line for a WebDriverAgent block's state file left dirty: the domains imported from the backups beside it,
- * the compare by hand, then the file written clean.
- */
-export function windowStateHand(udid: string | undefined, file: string): string {
-  const u = deviceInHand('udid', udid);
-  return (
-    `  → the WDA window's settings not put back: for each domain in ${shellQuote(file)}, ` +
-    `xcrun simctl spawn ${u} defaults import <domain> <its backup beside the file>; compare them by hand; ` +
-    `then: ${cleanStateCommand(file)}`
-  );
-}
 
 /** The run, start to end: its exit code (standing.ts#STANDING_EXIT), for the CLI entry to exit with. */
 export async function labRunIos(o: StandingOptions): Promise<StandingExit> {

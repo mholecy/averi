@@ -43,6 +43,7 @@
     "mutate": "node --import tsx scripts/mutation/mutate.ts",
     "truth:lab": "node --import tsx scripts/truth/batch/lab-run.ts",
     "truth:lab:ios": "node --import tsx scripts/truth/batch/lab-run-ios.ts",
+    "truth:lab:ios:a41": "node --import tsx scripts/truth/batch/lab-a41-ios.ts",
     "release:smoke": "node --import tsx scripts/release/pack-smoke.ts"
   },
   "dependencies": {

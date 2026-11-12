@@ -102,6 +102,19 @@ export const cleanStateCommand = (file: string): string => `printf '%s\\n' '{"di
 /** A lab device's id as a hand line names it: the one given, or where to give it. */
 export const deviceInHand = (device: LabDeviceId, id: string | undefined): string => id ?? `<${LAB_DEVICES[device].what}: ${LAB_DEVICES[device].flags}>`;
 
+/**
+ * The hand line for a WebDriverAgent block's state file left dirty (lab-run-ios.ts's and lab-a41-ios.ts's D43
+ * window): the domains imported from the backups beside it, the compare by hand, then the file written clean.
+ */
+export function windowStateHand(udid: string | undefined, file: string): string {
+  const u = deviceInHand('udid', udid);
+  return (
+    `  → the WDA window's settings not put back: for each domain in ${shellQuote(file)}, ` +
+    `xcrun simctl spawn ${u} defaults import <domain> <its backup beside the file>; compare them by hand; ` +
+    `then: ${cleanStateCommand(file)}`
+  );
+}
+
 /** The refusal of a standing run whose device was not given. */
 export const noDeviceReason = (st: Pick<Standing, 'batch' | 'device'>): string => `${LAB_DEVICES[st.device].missing}: ${st.batch} runs on ${LAB_DEVICES[st.device].what} only`;
 
