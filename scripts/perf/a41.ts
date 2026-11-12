@@ -459,10 +459,12 @@ export interface ColdRun {
 }
 
 /**
- * How long after the adapter is built (launch_app's start: the session's first device call builds it, and the registry
- * pre-warms it there) the waited leg's first tap starts — WDA's cold start (3.1–3.6 s on the lab) and a margin.
+ * How long after launch_app started (the session's first device call: it builds the adapter, and its launch pre-warms
+ * WDA) the waited leg's first tap starts — WDA's cold start (3.1–3.6 s on the lab) and a margin.
  */
 export const WAITED_GAP_MS = 4000;
+/** The least gap leg (b) is judged on: a tap that started earlier did not give WDA's start its time — unproven. */
+export const WAITED_GAP_MIN_MS = 3500;
 
 /**
  * A fresh `auto` session (A41b review r1): launch_app (WDA stopped; a `clearState` one on the first repeat), then the
@@ -617,7 +619,7 @@ const okOf = (c: { ok: number; n: number }): string => `${c.ok}/${c.n}`;
  * The first-tap acceptance in its two legs (A41b review r1), each with how many first taps found the app in front:
  * (a) as the session runs — launch_app, then the tap at once: what is left of WDA's cold start after the launch is
  * allowed, `first − warm ≤ max(0, cold start − launch_app) + 500`: proof the start overlaps the launch; (b) the tap
- * WAITED_GAP_MS after the adapter was built: `first ≤ warm + 500`. Then whether every first read after a launch was the
+ * WAITED_GAP_MS after launch_app started: `first ≤ warm + 500`, unproven when a gap was under WAITED_GAP_MIN_MS. Then whether every first read after a launch was the
  * lab app. A step that fell back to idb makes the legs unproven: not WDA's taps.
  */
 function firstTapLines(r: A41Report): string[] {
@@ -634,17 +636,19 @@ function firstTapLines(r: A41Report): string[] {
           const over = first.median - warm.median;
           return `${over <= allowed ? 'yes' : 'no'} (${Math.round(first.median)} − ${Math.round(warm.median)} = ${Math.round(over)} vs max(0, ${Math.round(cold.median)} − ${Math.round(launch.median)}) + 500 = ${Math.round(allowed)})`;
         })());
-  const waited = a.firstWaited;
+  const [waited, gap] = [a.firstWaited, a.waitedGap];
   const legB =
     unproven ??
-    (waited === undefined || warm === undefined
+    (waited === undefined || warm === undefined || gap === undefined
       ? 'not measured'
-      : `${waited.median <= warm.median + 500 ? 'yes' : 'no'} (${Math.round(waited.median)} vs ${Math.round(warm.median)} + 500)`);
+      : gap.min < WAITED_GAP_MIN_MS
+        ? `unproven (a tap ${Math.round(gap.min)} ms after launch_app started, under ${WAITED_GAP_MIN_MS})`
+        : `${waited.median <= warm.median + 500 ? 'yes' : 'no'} (${Math.round(waited.median)} vs ${Math.round(warm.median)} + 500)`);
   const f = a.foreground;
   const front = f.n === 0 ? 'not measured' : `${f.ok === f.n && f.n >= 5 && f.clearState >= 1 ? 'yes' : 'no'}`;
   return [
     `first tap after launch_app (a, at once): first − warm ≤ max(0, WDA cold start − launch_app) + 500 ms: ${legA}; first tap ok ${okOf(a.firstTaps)}`,
-    `first tap after launch_app (b, ≥ ${WAITED_GAP_MS / 1000} s after the adapter was built) ≤ the same tap warm + 500 ms: ${legB}; first tap ok ${okOf(a.waitedTaps)}`,
+    `first tap after launch_app (b, ≥ ${WAITED_GAP_MIN_MS / 1000} s after it started) ≤ the same tap warm + 500 ms: ${legB}; first tap ok ${okOf(a.waitedTaps)}`,
     `foreground after launch ok ${okOf(f)} (${f.clearState} clearState; n ≥ 5 with one: ${front})${f.seen.length > 0 ? ` — read instead: ${f.seen.join('; ')}` : ''}`,
   ];
 }

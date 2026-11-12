@@ -193,14 +193,6 @@ export class IosAdapter implements DeviceAdapter {
   get fellBack(): boolean {
     return this.treeSource.fellBack === true;
   }
-
-  /**
-   * DeviceAdapter.prewarm: the source's (IosTreeSource.prewarm — WebDriverAgent's start under `auto` and `wda`, A41b),
-   * forwarded as it stands; idb has none and starts nothing. Returns at once.
-   */
-  prewarm(): void {
-    this.treeSource.prewarm?.();
-  }
   private readonly exec: ExecFn;
   private readonly udid: string;
   private readonly treeSource: IosTreeSource;
@@ -357,9 +349,10 @@ export class IosAdapter implements DeviceAdapter {
     await this.prepareForOpen(`launching ${bundleId}`);
     await this.simctl(['launch', this.udid, bundleId]);
     this.front = { kind: 'launched', bundleId };
-    // A41b: WebDriverAgent's start, if it is not up, runs beside the foreground wait — never awaited (prewarm). After
-    // `simctl launch`, never before it: a start racing the app's own launch is unmeasured (ADR 0046's A41b amendment).
-    this.prewarm();
+    // A41b: WebDriverAgent's start, if it is not up, runs beside the foreground wait — never awaited
+    // (IosTreeSource.prewarm; idb has none). After `simctl launch`, never before it: a start racing the app's own
+    // launch is unmeasured (ADR 0046's A41b amendment).
+    this.treeSource.prewarm?.();
     // `simctl launch` returns before the app is in front: for ~1–2 s idb (and
     // WDA's /source, D48) can still hand out the previous app's (or
     // SpringBoard's) tree, complete and labelled, which no reader doubts. Wait

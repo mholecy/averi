@@ -299,21 +299,6 @@ describe('AdapterRegistry', () => {
     expect(bound).toEqual(['first', 'second']);
   });
 
-  // A41b: averi knows the device and the project's tree source when it builds the adapter — the bring-up of a
-  // WebDriverAgent starts there, in the background (IosAdapter.prewarm), once per adapter, never awaited.
-  it('pre-warms each adapter it builds, once — a cached one is not asked again; get() does not wait for it', async () => {
-    const prewarmed: string[] = [];
-    const factory = (platform: Platform, deviceId: string, opts?: AdapterOpts): DeviceAdapter =>
-      Object.assign(new FakeAdapter({}, 'none'), { prewarm: () => void prewarmed.push(`${deviceId}+${opts?.treeSource ?? '-'}`) });
-    const { listing } = recordingListing([device('sim', 'booted', 'ios'), device('phone')]);
-    const registry = new AdapterRegistry({ factory, discovery: discoveryOver(listing) });
-    await registry.get('ios', {});
-    await registry.get('ios', {});
-    await registry.get('ios', { treeSource: 'wda' });
-    await registry.get('android', {});
-    expect(prewarmed).toEqual(['sim+auto', 'sim+wda', 'phone+-']);
-  });
-
   it('caches per tree-source setting: same setting shares an instance, wda and idb get their own', async () => {
     const { registry, bound } = makeRegistry([device('sim', 'booted', 'ios')]);
     // `{}` is a project that configures no setting: the default's instance.

@@ -74,8 +74,9 @@ import { averiServer, commitOf } from './session.js';
  *   time, untimed the catalog waited for (`catalogSettled`), and the same catalog tap warm — the tap the first one is
  *   judged against. Then two more fresh servers each (A41b review r1): launch_app, no read until WAITED_GAP_MS after it
  *   started, and the same first tap (the pre-warm given the time WDA's start takes); and launch_app (a `clearState`
- *   one on the first repeat) with the first read at once — its root's label and WDA's active bundle, the app in front
- *   while WDA came up beside the launch. A reply that fell back to idb is marked; a41.ts leaves it out of WDA's numbers.
+ *   one on the first repeat) with the first read at once — its root's label and WDA's active bundle, the app in
+ *   front while WDA came up beside the launch's foreground wait. A reply that fell back to idb is marked; a41.ts leaves
+ *   it out of WDA's numbers.
  * - `cadence` (A41b, ADR 0040, under WDA): MOTIONS × `--repeat` trials (20: D35's count) — the cell launched, one read
  *   before the trigger (WDA attached), the trigger (an idb swipe, as averi strokes), then WDA reads back to back for
  *   WINDOW_MS after it; each trial kept in the d35 fixture's shape (a41.ts#encodeRects). The settle is replayed offline
@@ -186,7 +187,7 @@ async function settledOn(s: Session, listed: RegExp): Promise<boolean> {
   return seen;
 }
 
-/** The bundle WebDriverAgent's active app is (GET /wda/activeAppInfo on the lab's port); undefined when it cannot say. */
+/** WebDriverAgent's active app's bundle (GET /wda/activeAppInfo on the lab's port); undefined when it cannot say. */
 async function activeBundle(): Promise<string | undefined> {
   try {
     const res = await fetch(`http://127.0.0.1:${LAB_WDA_PORT}/wda/activeAppInfo`, { signal: AbortSignal.timeout(5000) });

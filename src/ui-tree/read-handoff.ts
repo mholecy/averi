@@ -142,8 +142,7 @@ export const HANDOFF_MAX_AGE_MS = 1_000;
  *   `treeSource: auto` (A41a) `typeable`, `settleCadenceMs`, `claimNote` and `fellBack` follow the source that read
  *   chose. Reading one asks the device nothing either way, which is all this record classifies.
  * `noteDroppedTail` is classed `reads`: it asks nothing of the device and changes nothing it shows (it tells the
- * adapter how to type from then on), so the kept read stands across it. So is `prewarm` (A41b): WebDriverAgent's start
- * in the background changes nothing the device shows.
+ * adapter how to type from then on), so the kept read stands across it.
  */
 export const ADAPTER_SURFACE: Record<keyof DeviceAdapter, 'tree' | 'reads' | 'acts' | 'fact'> = {
   platform: 'fact',
@@ -171,7 +170,6 @@ export const ADAPTER_SURFACE: Record<keyof DeviceAdapter, 'tree' | 'reads' | 'ac
   claimNote: 'fact',
   fellBack: 'fact',
   noteDroppedTail: 'reads',
-  prewarm: 'reads',
   focusedWindow: 'reads',
   logs: 'reads',
   isAppRunning: 'reads',

@@ -12,6 +12,7 @@ import {
   encodeRects,
   foregroundOk,
   snapshotRootLabel,
+  WAITED_GAP_MIN_MS,
   WAITED_GAP_MS,
   hitTargetsOf,
   hitVerdict,
@@ -269,7 +270,7 @@ describe('summaryLines — the short summary', () => {
     );
     // (a): 7000 − 600 = 6400 against max(0, 6000 − 1200) + 500 = 5300.
     expect(lines).toContain('first tap after launch_app (a, at once): first − warm ≤ max(0, WDA cold start − launch_app) + 500 ms: no (7000 − 600 = 6400 vs max(0, 6000 − 1200) + 500 = 5300); first tap ok 5/5');
-    expect(lines).toContain('first tap after launch_app (b, ≥ 4 s after the adapter was built) ≤ the same tap warm + 500 ms: yes (1000 vs 600 + 500); first tap ok 4/5');
+    expect(lines).toContain('first tap after launch_app (b, ≥ 3.5 s after it started) ≤ the same tap warm + 500 ms: yes (1000 vs 600 + 500); first tap ok 4/5');
     expect(lines).toContain('foreground after launch ok 5/5 (1 clearState; n ≥ 5 with one: yes)');
     expect(lines).toContain('auto, the same first tap 4010 ms (n 5, 4009–4011) after launch_app started (no read before it): 1000 ms (n 5, 999–1001)');
     expect(lines).toContain('A41b acceptance');
@@ -309,6 +310,12 @@ describe('summaryLines — the short summary', () => {
     expect(b(1100)).toMatch(/: yes \(1100 vs 600 \+ 500\)/);
     expect(b(1101)).toMatch(/: no \(1101 vs 600 \+ 500\)/);
     expect(summaryLines({ ...full, autoTap: { ...full.autoTap!, firstWaited: undefined } }).find((l) => l.includes('(b, '))).toMatch(/: not measured; first tap ok 4\/5$/);
+    expect(summaryLines({ ...full, autoTap: { ...full.autoTap!, waitedGap: undefined } }).find((l) => l.includes('(b, '))).toMatch(/: not measured;/);
+    // A gap under 3.5 s did not give WDA's start its time: unproven, whatever the tap took.
+    const gapped = (min: number) =>
+      summaryLines({ ...full, autoTap: { ...full.autoTap!, waitedGap: { n: 5, median: 4000, min, max: 4100 } } }).find((l) => l.includes('(b, '));
+    expect(gapped(3499)).toMatch(/: unproven \(a tap 3499 ms after launch_app started, under 3500\); first tap ok 4\/5$/);
+    expect(gapped(3500)).toMatch(/: yes \(1000 vs 600 \+ 500\)/);
     const front = (f: NonNullable<A41Report['autoTap']>['foreground']) =>
       summaryLines({ ...full, autoTap: { ...full.autoTap!, foreground: f } }).find((l) => l.startsWith('foreground after launch'));
     expect(front({ ok: 4, n: 5, clearState: 1, seen: ['Contacts / com.apple.MobileAddressBook'] })).toBe(
@@ -451,8 +458,9 @@ describe('the foreground leg (A41b review r1): which app the first read after a 
     expect(foregroundOk({ clearState: false, expected, label: 'Contacts', bundle: 'dev.averi.lab' })).toBe(false);
     expect(foregroundOk({ clearState: false, expected, label: 'AveriLab', bundle: 'dev.averi.lab', error: 'x' })).toBe(false);
   });
-  it('the waited leg starts its tap at least 3.5 s after the adapter was built', () => {
-    expect(WAITED_GAP_MS).toBeGreaterThanOrEqual(3500);
+  it('the waited leg starts its tap at least 3.5 s after launch_app started, the least gap it is judged on', () => {
+    expect(WAITED_GAP_MIN_MS).toBe(3500);
+    expect(WAITED_GAP_MS).toBeGreaterThanOrEqual(WAITED_GAP_MIN_MS);
   });
 });
 

@@ -12,6 +12,24 @@ import type { SystemAlert, UiNode } from './types.js';
 export const WDA_SETTLE_CADENCE_MS = 300;
 
 /**
+ * A pre-warm's one rule (A41b; ADR 0046's A41b amendment), for WdaTreeSource.prewarm and AutoTreeSource.prewarm:
+ * run `start` in the background and return at once — never awaited, never rejecting, nothing once `released()`.
+ * Only when WebDriverAgent's build is cached (`wda.buildCached`): an uncached first build is up to 10 minutes of
+ * xcodebuild beside the agent's own work, unasked, and the first read builds it instead.
+ */
+export function startInBackgroundIfBuilt(
+  wda: { buildCached(): Promise<boolean> },
+  released: () => boolean,
+  start: () => Promise<unknown>,
+): void {
+  if (released()) return;
+  const run = async (): Promise<void> => {
+    if ((await wda.buildCached()) && !released()) await start();
+  };
+  void run().catch(() => undefined);
+}
+
+/**
  * The WebDriverAgent adapter at the iOS tree-source seam (ios-tree-source.ts):
  * owns ONE WdaServer for its simulator and turns `/source` into the
  * normalized tree. This is the only module that joins wda.ts (the server's
@@ -98,24 +116,17 @@ export class WdaTreeSource implements IosTreeSource {
   }
 
   /**
-   * Starts WebDriverAgent in the background and returns at once — never awaited, never rejecting (A41b): what the
-   * registry asks when it builds the adapter and a launch asks again after `simctl launch` (IosAdapter.prewarm), so the first read finds WDA
-   * up or joins its start (WdaServer.ensureRunning is single-flight). Only when the build is cached (buildCached): an
-   * uncached first build is up to 10 minutes of xcodebuild, which a pre-warm would run beside the agent's own work,
-   * unasked — the first read builds then, as before (ADR 0046's A41b amendment). A start that fails is dropped here:
-   * the next read starts again and fails in its own words. Released, or WDA already up (WdaServer.upGeneration: no
-   * `/status` probe at every launch) → nothing.
+   * Starts WebDriverAgent in the background and returns at once (A41b; startInBackgroundIfBuilt): what a launch
+   * asks after `simctl launch` (IosAdapter.launch), so the first read finds WDA up or joins its start
+   * (WdaServer.ensureRunning is single-flight). A start that fails is dropped here: the next read starts again and
+   * fails in its own words. WDA already up (WdaServer.upGeneration) → nothing, so a launch sends no `/status` probe.
    */
   prewarm(): void {
-    if (this.disposed || this.server.upGeneration() !== undefined) return;
-    void this.startIfBuilt().catch(() => undefined);
+    if (this.server.upGeneration() !== undefined) return;
+    startInBackgroundIfBuilt(this, () => this.disposed, () => this.server.ensureRunning());
   }
 
-  private async startIfBuilt(): Promise<void> {
-    if ((await this.buildCached()) && !this.disposed) await this.server.ensureRunning();
-  }
-
-  /** Whether WebDriverAgent's build is cached, so a start runs no `xcodebuild build-for-testing` (WdaServer.isBuilt). */
+  /** Whether WDA's build is cached, so a start runs no `xcodebuild build-for-testing` (WdaServer.isBuilt). */
   buildCached(): Promise<boolean> {
     return this.server.isBuilt();
   }

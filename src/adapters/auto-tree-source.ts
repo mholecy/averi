@@ -2,6 +2,7 @@ import { errorMessage } from '../util/error-message.js';
 import { withNoteLine } from '../util/note-line.js';
 import type { IosTreeSourceKind } from './ios-node.js';
 import { idbTypingRefusal } from './ios-typing.js';
+import { startInBackgroundIfBuilt } from './wda-tree-source.js';
 import type { ApplicationLabel, IosTreeSource } from './ios-tree-source.js';
 import type { SystemAlert, UiNode } from './types.js';
 
@@ -53,9 +54,9 @@ export type WdaSide = IosTreeSource & { bringUp(): Promise<void>; buildCached():
  * `declined` — it is not up), `kind` (the label's wording) and no settle cadence (the default 500). Typing waits for
  * the choice (typeText).
  *
- * The choice may start before the first read (prewarm, A41b): the registry asks it when it builds the adapter, and a
- * launch asks again after `simctl launch`, so WDA's start runs beside the agent's work, when its build is cached. It is the same choice — one
- * attempt, which the first read joins, and whose outcome is the one that read would have met.
+ * The choice may start before the first read (prewarm, A41b): a launch asks it after `simctl launch`, so WDA's start
+ * runs beside the launch's foreground wait, when its build is cached. It is the same choice — one attempt, which the
+ * first read joins, and whose outcome is the one that read would have met.
  */
 export class AutoTreeSource implements IosTreeSource {
   private readonly wda: WdaSide;
@@ -114,19 +115,18 @@ export class AutoTreeSource implements IosTreeSource {
   }
 
   /**
-   * Starts the choice in the background and returns at once (A41b) — only while none is made or in flight, and only
-   * when WDA's build is cached: an uncached first build is up to 10 minutes of xcodebuild beside the agent's own work,
-   * which the first read then runs, as before (ADR 0046's A41b amendment). Never rejects: a WDA that does not come up
-   * is the fallback the first read meets (choose); a release mid-choice is that read's error.
+   * Starts the choice in the background and returns at once (A41b; wda-tree-source.ts#startInBackgroundIfBuilt), once:
+   * nothing after a choice started. A WDA that does not come up is the fallback the first read meets (choose); a
+   * release mid-choice is that read's error.
    */
   prewarm(): void {
-    // `choosing` is set once a choice started, and stays: made, in flight, or never asked.
-    if (this.choosing !== undefined || this.disposed) return;
-    void this.chooseIfBuilt().catch(() => undefined);
+    if (this.choiceStarted) return;
+    startInBackgroundIfBuilt(this.wda, () => this.disposed, () => this.source());
   }
 
-  private async chooseIfBuilt(): Promise<void> {
-    if ((await this.wda.buildCached()) && !this.disposed) await this.source();
+  /** A choice was started: made, or in flight — `choosing` is set at its start and kept. */
+  private get choiceStarted(): boolean {
+    return this.choosing !== undefined;
   }
 
   applicationLabel(): Promise<ApplicationLabel> {

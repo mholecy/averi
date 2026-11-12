@@ -249,9 +249,6 @@ export class AdapterRegistry {
       const adapter = this.factory(platform, deviceId, kind === undefined ? undefined : { treeSource: kind });
       entry = { platform, deviceId, adapter };
       this.adapters.set(key, entry);
-      // A41b: the device and the project's tree source are known now — an iOS adapter under `auto` or `wda` starts
-      // bringing WebDriverAgent up in the background, never awaited (DeviceAdapter.prewarm). Once per adapter.
-      adapter.prewarm?.();
     }
     return entry.adapter;
   }

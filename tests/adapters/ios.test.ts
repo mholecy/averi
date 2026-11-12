@@ -485,15 +485,13 @@ describe('IosAdapter re-enables accessibility automation before every launch and
     expect(bringUps).toBe(1);
   });
 
-  it('prewarm is the source\'s: forwarded as it stands; idb has none, so it asks nothing', () => {
-    const { fn, calls } = fakeExec({});
-    const asked: string[] = [];
-    new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: { ...WDA_NO_TREE, prewarm: () => void asked.push('wda') } }).prewarm();
-    expect(asked).toEqual(['wda']);
+  it('idb has no pre-warm: a launch over it starts nothing beyond the launch', async () => {
+    const { fn, calls } = fakeExec({ 'idb ui describe-all': IDB_DESCRIBE_ALL });
     const idb = new IdbTreeSource({ udid: 'AAAA-1111', exec: fn });
     expect((idb as IosTreeSource).prewarm).toBeUndefined();
-    new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: idb }).prewarm();
-    expect(calls).toEqual([]);
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: { ...NO_TREE, applicationLabel: async () => ({ kind: 'declined' }) } });
+    await adapter.launch('com.app');
+    expect(simctlCalls(calls)).toEqual([...WRITES, 'xcrun simctl launch AAAA-1111 com.app']);
   });
 
   it('a clearState launch: terminate and wipe first, the writes right before the launch', async () => {
