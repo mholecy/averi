@@ -29,6 +29,8 @@ class A41Seam extends FakeSeam {
   goldenOut = '{"side":"x","results":[]}';
   /** Children that exit 0 and write no file. */
   noFile = new Set<string>();
+  /** The required parts the report says unproven (a41.ts#unprovenOf), in its a41.json. */
+  unproven: string[] = [];
   constructor(world: LabWorld) {
     super(world, HEAD);
   }
@@ -41,7 +43,7 @@ class A41Seam extends FakeSeam {
       const [idb, wda, out] = [at(args, '--idb'), at(args, '--wda'), at(args, '--out')];
       const dirs = { idb, wda };
       const missing = A41_CHILD_NAMES.map((n) => A41_CHILDREN[n]).filter((c) => !existsSync(join(dirs[c.block], c.file))).map((c) => c.file);
-      writeFileSync(join(out, 'a41.json'), JSON.stringify({ missing }));
+      writeFileSync(join(out, 'a41.json'), JSON.stringify({ missing, unproven: this.unproven }));
       writeFileSync(join(out, 'summary.txt'), 'A41 probe\n');
       return { code: 0, out: 'A41 probe\n', err: '' };
     }
@@ -97,10 +99,10 @@ const verdicts = () => summary().filter((l) => / verdict: /.test(l));
 describe('lab-a41-ios.ts: a clean run — the lab, the idb probes, the WDA probes in one window, the report', () => {
   it('every child in order, each probe after its health check, the WDA ones inside the window; exit 0', async () => {
     expect(await go()).toBe(0);
-    expect(children()).toEqual(['golden', 'baseline-idb', 'hit-test', 'baseline-wda', 'wda-cold', 'auto-tap', 'cadence', 'a41-report']);
+    expect(children()).toEqual(['golden', 'baseline-idb', 'hit-test', 'baseline-wda', 'wda-cold', 'cadence', 'auto-tap', 'a41-report']);
     expect(verdicts()).toEqual([
       'a41 idb probe verdict: PASS — baseline-idb and hit-test measured',
-      'a41 wda probe verdict: PASS — baseline-wda, wda-cold, auto-tap and cadence measured',
+      'a41 wda probe verdict: PASS — baseline-wda, wda-cold, cadence and auto-tap measured',
       `a41 report verdict: PASS — every part measured: ${join(dirOf('a41-report'), 'a41.json')}`,
     ]);
     expect(summary()).toContain('lab check: PASS — every lab need met: ios (each one\'s LAB line above)');
@@ -109,13 +111,13 @@ describe('lab-a41-ios.ts: a clean run — the lab, the idb probes, the WDA probe
     const backup = callAt('defaults export');
     const restored = seam.words.findIndex((w, i) => i > backup && / defaults (write|import) /.test(w));
     expect(callAt('--mode hit-test')).toBeLessThan(backup);
-    for (const c of ['--tree-source wda', '--mode wda-cold', '--mode auto-tap', '--mode cadence']) {
+    for (const c of ['--tree-source wda', '--mode wda-cold', '--mode cadence', '--mode auto-tap']) {
       expect(callAt(c)).toBeGreaterThan(backup);
       expect(callAt(c)).toBeLessThan(restored);
     }
     expect(callAt('a41-report.ts')).toBeGreaterThan(restored);
     // Each device child right after its own health check (the lab's WebDriverAgent ended, then describe-all and a swipe).
-    for (const c of ['--tree-source idb', '--mode hit-test', '--tree-source wda', '--mode wda-cold', '--mode auto-tap', '--mode cadence']) {
+    for (const c of ['--tree-source idb', '--mode hit-test', '--tree-source wda', '--mode wda-cold', '--mode cadence', '--mode auto-tap']) {
       const i = callAt(c);
       expect(seam.words[i - 1], c).toBe(`idb ui swipe 200 600 200 400 --udid ${LAB_UDID}`);
     }
@@ -163,8 +165,27 @@ describe('a probe that is not whole: INCONCLUSIVE naming it, the window still pu
     expect(v[0]).toBe('a41 idb probe verdict: PASS — baseline-idb and hit-test measured');
     expect(v[1]).toMatch(/^a41 wda probe verdict: INCONCLUSIVE — baseline-wda: exit 1 — see .*baseline-wda\.log$/);
     expect(v[2]).toBe(`a41 report verdict: INCONCLUSIVE — baseline-wda.json missing: ${join(dirOf('a41-report'), 'a41.json')}`);
-    expect(children()).toEqual(['golden', 'baseline-idb', 'hit-test', 'baseline-wda', 'wda-cold', 'auto-tap', 'cadence', 'a41-report']);
+    expect(children()).toEqual(['golden', 'baseline-idb', 'hit-test', 'baseline-wda', 'wda-cold', 'cadence', 'auto-tap', 'a41-report']);
     expect(summary()).toContain('RESTORE: none — everything dirty was put back and verified');
+  });
+
+  it('A44: cadence exits 3 with its file written (no trial): the WDA block INCONCLUSIVE naming it', async () => {
+    seam.codes.cadence = 3;
+    expect(await go()).toBe(3);
+    expect(verdicts()[1]).toMatch(/^a41 wda probe verdict: INCONCLUSIVE — cadence: exit 3 — see .*cadence\.log$/);
+  });
+
+  it('A44: every file there but a required part unproven: the report block INCONCLUSIVE naming it, never PASS', async () => {
+    seam.unproven = ['cadence (no trial recorded)', 'first tap (b) (not measured)'];
+    expect(await go()).toBe(3);
+    expect(verdicts()[2]).toBe(`a41 report verdict: INCONCLUSIVE — unproven: cadence (no trial recorded); first tap (b) (not measured): ${join(dirOf('a41-report'), 'a41.json')}`);
+  });
+
+  it('A44: missing and unproven both: both named', async () => {
+    seam.codes['baseline-wda'] = 1;
+    seam.unproven = ['cadence (no trial recorded)'];
+    expect(await go()).toBe(3);
+    expect(verdicts()[2]).toBe(`a41 report verdict: INCONCLUSIVE — baseline-wda.json missing; unproven: cadence (no trial recorded): ${join(dirOf('a41-report'), 'a41.json')}`);
   });
 
   it('a child exits 0 but writes no file: not whole either', async () => {
@@ -183,7 +204,7 @@ describe('a probe that is not whole: INCONCLUSIVE naming it, the window still pu
   it('a health check whose reset fails inside the window: the WDA block stops there, naming what did not run', async () => {
     let n = 0;
     // The wda-cold child leaves the lab sick (its describe-all fails from then on) and boot fails: the check before
-    // auto-tap cannot reset it.
+    // cadence cannot reset it.
     const answer = seam.world.answer;
     seam.world.answer = (cmd, args, o) => {
       if (cmd === 'idb' && args[0] === 'ui' && args[1] === 'describe-all' && args[2] !== '--json' && seam.words.some((w) => w.includes('--mode wda-cold'))) return { code: 1, out: '', err: 'sick' };
@@ -192,10 +213,10 @@ describe('a probe that is not whole: INCONCLUSIVE naming it, the window still pu
     };
     expect(await go()).toBe(3);
     expect(children()).toEqual(['golden', 'baseline-idb', 'hit-test', 'baseline-wda', 'wda-cold', 'a41-report']);
-    // Two boots: the failed reset before auto-tap, and the window's own end check (ios-lab.ts#wdaWindow, as Gate C) — none
-    // before cadence.
+    // Two boots: the failed reset before cadence, and the window's own end check (ios-lab.ts#wdaWindow, as Gate C) — none
+    // before auto-tap.
     expect(n).toBe(2);
-    expect(verdicts().find((l) => l.startsWith('a41 wda probe verdict: INCONCLUSIVE'))).toMatch(/the iOS reset before a41 auto-tap failed: .* — no a41 auto-tap; not run: auto-tap, cadence$/);
+    expect(verdicts().find((l) => l.startsWith('a41 wda probe verdict: INCONCLUSIVE'))).toMatch(/the iOS reset before a41 cadence failed: .* — no a41 cadence; not run: cadence, auto-tap$/);
   });
 
   it('the golden prints no JSON: no hit test, the idb block INCONCLUSIVE', async () => {
@@ -212,7 +233,7 @@ describe('the selection', () => {
     expect(await go(['--groups', 'idb'])).toBe(3);
     expect(children()).toEqual(['golden', 'baseline-idb', 'hit-test', 'a41-report']);
     expect(seam.words.some((w) => w.includes('defaults export'))).toBe(false);
-    expect(verdicts()[1]).toMatch(/^a41 report verdict: INCONCLUSIVE — baseline-wda\.json, wda-cold\.json, auto-tap\.json, cadence-trace\.json missing/);
+    expect(verdicts()[1]).toMatch(/^a41 report verdict: INCONCLUSIVE — baseline-wda\.json, wda-cold\.json, cadence-trace\.json, auto-tap\.json missing/);
   });
 
   it('no udid: refused before anything is done, exit 2', async () => {

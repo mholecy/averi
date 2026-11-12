@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -497,7 +497,8 @@ describe('IosAdapter re-enables accessibility automation before every launch and
   it('a clearState launch: terminate and wipe first, the writes right before the launch', async () => {
     const container = await mkdtemp(join(tmpdir(), 'averi-test-container-'));
     try {
-      await writeFile(join(container, 'Library'), '');
+      await mkdir(join(container, 'Documents'));
+      await writeFile(join(container, 'Documents', 'x'), '');
       const { fn, calls } = fakeExec({ 'xcrun simctl get_app_container AAAA-1111 com.app data': `${container}\n` });
       await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE }).launch('com.app', { clearState: true });
       expect(simctlCalls(calls)).toEqual([
@@ -506,7 +507,9 @@ describe('IosAdapter re-enables accessibility automation before every launch and
         ...WRITES,
         'xcrun simctl launch AAAA-1111 com.app',
       ]);
-      expect(await readdir(container)).toEqual([]); // the wipe still happened
+      // The wipe happened, and left a fresh install's folders (A44, ADR 0047): Documents/ present and empty.
+      expect((await readdir(container)).sort()).toEqual(['Documents', 'Library', 'SystemData', 'tmp']);
+      expect(await readdir(join(container, 'Documents'))).toEqual([]);
     } finally {
       await rm(container, { recursive: true, force: true });
     }

@@ -26,7 +26,12 @@ import {
   traceIds,
   tenths,
   wrongSettle,
+  cadenceExit,
+  clearsStateOn,
+  PROBE_UNPROVEN_EXIT,
+  unprovenOf,
   type A41Report,
+  type CadenceJudgement,
   type CadencePass,
   type ChildSpec,
   type GoldenResultLike,
@@ -228,10 +233,24 @@ describe('coverIdsOf / coverUp — a hit-test cell is probed only with its cover
 
 describe('A41_CHILDREN — one table for the probe, the batch and the report', () => {
   it('each child once, its file, its part; the probe modes each a child', () => {
-    expect(A41_CHILD_NAMES).toEqual(['baseline-idb', 'hit-test', 'baseline-wda', 'wda-cold', 'auto-tap', 'cadence']);
+    // A44: cadence before auto-tap, whose clearState launch (its last repeat) is the WDA block's last: a wipe that
+    // cannot reach a later leg.
+    expect(A41_CHILD_NAMES).toEqual(['baseline-idb', 'hit-test', 'baseline-wda', 'wda-cold', 'cadence', 'auto-tap']);
     expect(new Set(A41_CHILD_NAMES.map((n) => A41_CHILDREN[n].file)).size).toBe(6);
-    expect(A41_CHILD_NAMES.map((n) => (A41_CHILDREN[n] as ChildSpec).mode).filter((m) => m !== undefined)).toEqual(['hit-test', 'wda-cold', 'auto-tap', 'cadence']);
+    expect(A41_CHILD_NAMES.map((n) => (A41_CHILDREN[n] as ChildSpec).mode).filter((m) => m !== undefined)).toEqual(['hit-test', 'wda-cold', 'cadence', 'auto-tap']);
     expect(CADENCES[0]).toBe(300);
+  });
+
+  it('auto-tap wipes on its last repeat only (A44): no later session of the probe runs on a wiped app', () => {
+    expect([1, 2, 3, 4, 5].map((r) => clearsStateOn(r, 5))).toEqual([false, false, false, false, true]);
+    expect(clearsStateOn(1, 1)).toBe(true);
+  });
+
+  it('a cadence run with no trial exits PROBE_UNPROVEN_EXIT (3, the standing exit for unproven), never 0 (A44)', () => {
+    expect(PROBE_UNPROVEN_EXIT).toBe(3);
+    expect(cadenceExit(0)).toBe(3);
+    expect(cadenceExit(1)).toBe(0);
+    expect(cadenceExit(60)).toBe(0);
   });
 });
 
@@ -241,6 +260,7 @@ describe('summaryLines — the short summary', () => {
   const full: A41Report = {
     meta: { commit: 'abcdef1234', device: 'averi-lab iPhone 17 simulator, iOS 27.0', generated: '2026-11-12T10:00:00.000Z' },
     missing: [],
+    unproven: [],
     table: [
       { scenario: 'tap', idb: { warm: sp(474), first: 900, failed: 0 }, wda: { warm: sp(520), first: 9000, failed: 0 } },
       { scenario: 'fill', idb: { failed: 2 }, wda: { warm: sp(1700), failed: 0 } },
@@ -324,6 +344,10 @@ describe('summaryLines — the short summary', () => {
     expect(front({ ok: 5, n: 5, clearState: 0, seen: [] })).toMatch(/\(0 clearState; n ≥ 5 with one: no\)$/);
     expect(front({ ok: 4, n: 4, clearState: 1, seen: [] })).toMatch(/: no\)$/);
     expect(front({ ok: 0, n: 0, clearState: 0, seen: [] })).toMatch(/: not measured\)$/);
+  });
+  it('an unproven required part is said beside MISSING (A44); none, no line', () => {
+    expect(summaryLines({ ...full, unproven: ['cadence (no trial recorded)'] })).toContain('UNPROVEN: cadence (no trial recorded)');
+    expect(summaryLines(full).some((l) => l.startsWith('UNPROVEN'))).toBe(false);
   });
   it('a run that built WDA says so', () => {
     expect(summaryLines({ ...full, wdaBuilt: true })).toContain("WDA was built in this run: baseline-wda's first repeat and the run's length include the build");
@@ -438,6 +462,39 @@ describe('reportOf — the probe\'s files summed', () => {
     const why = '0 wrong in 1 moving, uncensored settles over 16 trials at 300 ms: under 60 judged; moving trials M1 15';
     expect(r.cadence).toEqual({ trials: 16, moving: { M1: 15 }, passes, judgement: { verdict: 'unproven', why } });
     expect('wdaBuilt' in r).toBe(false);
+    expect(r.unproven).toEqual([`cadence (${why})`]);
+  });
+
+  it('A44: a cadence file with no trial is an unproven part, never a pass — the report block reads `unproven`', () => {
+    const r = reportOf({ cadence: { trials: [], passes: [] } }, [], 'g');
+    expect(r.cadence!.judgement.verdict).toBe('unproven');
+    expect(r.unproven).toEqual(['cadence (no trial recorded)']);
+  });
+
+  it('A44: leg (b) of the first tap unproven or not measured is an unproven part; yes or no is proven; no file, missing only', () => {
+    const sp = (median: number, n = 5) => ({ n, median, min: median - 1, max: median + 1 });
+    const auto: NonNullable<A41Report['autoTap']> = {
+      warmCatalog: sp(600), firstWaited: sp(1000), waitedGap: sp(4010),
+      firstTaps: { ok: 5, n: 5 }, waitedTaps: { ok: 5, n: 5 }, foreground: { ok: 5, n: 5, clearState: 1, seen: [] },
+      fellBack: 0, paidPush: 0, catalogUnsettled: 0, failed: 0,
+    };
+    expect(unprovenOf({ autoTap: auto })).toEqual([]);
+    expect(unprovenOf({ autoTap: { ...auto, firstWaited: sp(5000) } })).toEqual([]); // a measured no
+    expect(unprovenOf({ autoTap: { ...auto, firstWaited: undefined } })).toEqual(['first tap (b) (not measured)']);
+    expect(unprovenOf({ autoTap: { ...auto, fellBack: 1 } })).toEqual(["first tap (b) (unproven (1 auto steps fell back to idb: not WDA's taps))"]);
+    expect(unprovenOf({ autoTap: { ...auto, waitedGap: { n: 5, median: 4000, min: 3000, max: 4100 } } })).toEqual([
+      'first tap (b) (unproven (a tap 3000 ms after launch_app replied, under 3500))',
+    ]);
+    expect(unprovenOf({})).toEqual([]);
+    const keep: CadenceJudgement = { verdict: 'keep', why: 'k' };
+    const shorten: CadenceJudgement = { verdict: 'shorten', why: 's' };
+    const c = (judgement: CadenceJudgement) => ({ trials: 60, moving: {}, passes: [], judgement });
+    expect(unprovenOf({ cadence: c(keep) })).toEqual([]);
+    expect(unprovenOf({ cadence: c(shorten) })).toEqual([]);
+    expect(unprovenOf({ cadence: c({ verdict: 'unproven', why: 'u' }), autoTap: { ...auto, firstWaited: undefined } })).toEqual([
+      'cadence (u)',
+      'first tap (b) (not measured)',
+    ]);
   });
 });
 

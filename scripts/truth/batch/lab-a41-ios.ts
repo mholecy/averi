@@ -23,17 +23,18 @@ import { exitText, failedCall } from './words.js';
  *   lab's WebDriverAgent ended, port 8120 proven free, the domains put back key by key, the end check, the compare),
  *   its work — each child after its own health check, which ends the lab's WebDriverAgent, so each starts from a
  *   stopped one — baseline.ts `--tree-source wda` (the WDA column; its build, if any, paid here), then a41-probe.ts
- *   `--mode wda-cold`, `--mode auto-tap` and `--mode cadence`;
+ *   `--mode wda-cold`, `--mode cadence` and `--mode auto-tap` (last: its `clearState` launch wipes the lab app — A44);
  * - `a41-report`, device-free: scripts/perf/a41-report.ts over the two blocks' folders of this run — `a41.json` and
  *   `summary.txt` in its own folder (the files to commit, after scripts/release/clean-log.ts).
  *
  * Every child is bounded (A41_SECS, each its own process group: a child past its bound goes whole) and logged
  * (`<name>.log` beside its JSON). A block's verdict is PASS when every child exited 0 and wrote its file, else
- * INCONCLUSIVE naming which — a probe measures, its verdict says only whether the measurement is whole. The ios
- * need's end reads the finportal key again; the run's last step ends the lab's WebDriverAgent and idb_companion. A
- * signal puts an open window back and exits 130. What it leaves on the simulator is what Gate C leaves: the WDA
- * window's domains put back and compared; the lab app (and, if installed, the React Native lab app) launched on cells
- * through lab-device.ts, as live.ts launches them.
+ * INCONCLUSIVE naming which — a probe measures, its verdict says only whether the measurement is whole. The report
+ * block is PASS only with no file missing and no required part unproven (a41.ts#unprovenOf: the cadence, leg (b) of
+ * the first tap — A44). The ios need's end reads the finportal key again; the run's last step ends the lab's
+ * WebDriverAgent and idb_companion. A signal puts an open window back and exits 130. What it leaves on the simulator
+ * is what Gate C leaves: the WDA window's domains put back and compared; the lab app (and, if installed, the React
+ * Native lab app) launched on cells through lab-device.ts, as live.ts launches them.
  *
  *     npm run truth:lab:ios:a41 -- --out <dir outside the checkout> --udid <lab simulator> [--groups idb|wda]
  *
@@ -262,15 +263,18 @@ export async function labA41Ios(o: StandingOptions): Promise<StandingExit> {
       const out = join(ctx.dir, 'a41.json');
       const why = await child(ctx, 'report', reportArgs(ctx.config.repo, siblingDir(ctx.dir, a41BlockId('idb')), siblingDir(ctx.dir, a41BlockId('wda')), ctx.dir), out);
       if (why !== undefined) return ctx.verdict('INCONCLUSIVE', why);
-      let missing: string[] = [];
+      let read: { missing?: string[]; unproven?: string[] };
       try {
-        missing = (JSON.parse(ctx.fs.read(out) ?? '{}') as { missing?: string[] }).missing ?? [];
+        read = JSON.parse(ctx.fs.read(out) ?? '{}') as typeof read;
       } catch {
         return ctx.verdict('INCONCLUSIVE', `a41.json unreadable (${out})`);
       }
       ctx.note(`A41 summary: ${join(ctx.dir, 'summary.txt')}`);
-      if (missing.length === 0) ctx.verdict('PASS', `every part measured: ${out}`);
-      else ctx.verdict('INCONCLUSIVE', `${missing.join(', ')} missing: ${out}`);
+      // A44: a required part read but unproven (a41.ts#unprovenOf) is no more a measurement than a missing file.
+      const [missing, unproven] = [read.missing ?? [], read.unproven ?? []];
+      const whys = [...(missing.length > 0 ? [`${missing.join(', ')} missing`] : []), ...(unproven.length > 0 ? [`unproven: ${unproven.join('; ')}`] : [])];
+      if (whys.length === 0) ctx.verdict('PASS', `every part measured: ${out}`);
+      else ctx.verdict('INCONCLUSIVE', `${whys.join('; ')}: ${out}`);
     },
   };
 

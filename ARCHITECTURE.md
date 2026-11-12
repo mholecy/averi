@@ -411,7 +411,8 @@ error and trace line says the same, host paths stripped; the error's fields keep
   accessibility (docs/bugs/2026-10-07-one-wda-session-makes-idb-stick-until-reboot.md). After a launch it waits until
   the tree is the launched app's (`ios-foreground.ts`); an "Open in …?" alert in front is `ios-system-alert.ts`'s; a
   link's scheme is `ios-url-schemes.ts`'s; liveness is the host's process list (`ios-liveness.ts`, ADR 0039); the
-  status band is `ios-status-band.ts`'s.
+  status band is `ios-status-band.ts`'s. A `clearState` launch empties the app's data container to a fresh install's
+  folders (`ios-data-container.ts`, ADR 0047).
 - idb calls all go through `adapters/idb.ts#runIdb`; a persistent helper per adapter (`idb-helper.ts`) runs the CLI
   in-process (ADR 0032). What iOS types, and through which path, is `ios-typing.ts`'s (ADR 0037).
 - **Tree sources** — `adapters/ios-tree-source.ts#IosTreeSource` (`read()`, `applicationLabel()`, `dispose()`), chosen
@@ -574,7 +575,7 @@ Small and high-level — agents do better with fewer, smarter tools. Each tool's
 |---|---|
 | `list_devices()` / `select_device(platform, device)` | Devices with boot state; pin the platform's target. A pinned device going offline is an error, never a silent fallback |
 | `install_app(platform, path?)` | Install, `averi.yaml`'s build by default |
-| `launch_app(platform, appId, clearState?, activity?, intent?)` | Launch; `clearState` wipes first and counts in the session's wipe count. `activity`/`intent` Android only |
+| `launch_app(platform, appId, clearState?, activity?, intent?)` | Launch; `clearState` wipes first (iOS: to a fresh install's empty folders, ADR 0047) and counts in the session's wipe count. `activity`/`intent` Android only |
 | `terminate_app(platform, appId)` / `open_deep_link(platform, url)` | Force-stop; open a link, saying what holds the app when it is not in front (`AppHolder`) |
 | `ensure_state(state, platform, environment?)` | The killer tool: detect → reach ladder → confirm. Trace and final screenshot |
 | `run_flow(flow, platform, environment?)` | A named flow, honouring its `requires:`. Trace |
