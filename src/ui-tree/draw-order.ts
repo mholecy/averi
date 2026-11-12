@@ -1809,9 +1809,11 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
   /**
    * What is drawn after the node at `places` (`laterThan`) as a TARGET meets it: what the presentation over it
    * (`SeenFor.over`) leaves drawn — a typed presented layer is its element alone, what else it holds drawn on it, no
-   * cover of its own. A node not in the walk (no `places`) has nothing after it.
+   * cover of its own — and, last, the covers of marked layers listed AHEAD of it that lie over it (presentation.ts
+   * #PresentedOver.coversAhead: a flat list's backdrop, drawn over what is listed after it). A node not in the
+   * walk (no `places`) has nothing after it.
    */
-  const laterFor = (places: readonly Placed[], about: SeenFor): readonly Placed[] => laterThan(places, about.over.drawn);
+  const laterFor = (places: readonly Placed[], about: SeenFor): readonly Placed[] => [...laterThan(places, about.over.drawn), ...about.over.coversAhead];
 
   /**
    * The last node drawn after `node` whose reach `where` keeps (a presented layer's cover reaches the whole screen,

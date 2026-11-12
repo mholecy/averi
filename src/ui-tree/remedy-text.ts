@@ -77,14 +77,24 @@ export const presentedLayerName = (layer: MarkedLayer | undefined): string => {
  */
 const BACKDROP = "a menu's backdrop";
 /**
+ * The evidence a `backdrop` rests on, as its source lists it: WDA's in-window backdrop is listed AFTER the screen's
+ * content (adapters/wda-source.ts#inWindowBackdrops); idb's, in its flat list, BEFORE it, after the menu's card
+ * (`MarkedLayer.listedAhead`, adapters/ios-tree-source.ts#backdropOf). The flag names idb because only idb's tree is a
+ * flat list (`UiNode.flatList`, set by adapters/ios-tree-source.ts#markIdbDialect alone), so a backdrop listed ahead
+ * is idb's.
+ */
+const backdropEvidence = (layer: MarkedLayer): string =>
+  layer.listedAhead === true ? "an empty element idb lists over the whole screen, before the screen's content" : "an empty element WDA lists over the whole screen, after the screen's content";
+
+/**
  * The `backdrop` remedy over the node (`purpose`'s pronoun), its way out (`wayOut`: what to do by coordinates or on the screenshot) in a
  * parenthesis right after "close it first" — so what a caller appends ("; nothing was tapped", ", so none was sent")
  * follows the refusal's own clause, never the way out.
  */
-const backdropRemedy = (purpose: RemedyPurpose, wayOut: string): string => {
+const backdropRemedy = (purpose: RemedyPurpose, wayOut: string, layer: MarkedLayer): string => {
   const what = pronoun(purpose);
   return (
-    `${BACKDROP} is presented over ${what} (an empty element WDA lists over the whole screen, after the screen's content) — close it first ` +
+    `${BACKDROP} is presented over ${what} (${backdropEvidence(layer)}) — close it first ` +
   `(if a screenshot shows no menu up, the backdrop is an overlay that lets touches through: ${wayOut}); no scroll moves ${what} out from under that backdrop`
   );
 };
@@ -101,7 +111,7 @@ const backdropRemedy = (purpose: RemedyPurpose, wayOut: string): string => {
  */
 export const presentedRemedy = (purpose: RemedyPurpose, layer?: MarkedLayer): string => {
   // A touch's sentence (tap, scroll_until) and the pixel assert's: each its own way out.
-  if (layer?.kind === 'backdrop') return backdropRemedy(purpose, purpose === 'touch' ? 'tap the target by its coordinates (its centre from ui_snapshot)' : 'judge the element on that screenshot');
+  if (layer?.kind === 'backdrop') return backdropRemedy(purpose, purpose === 'touch' ? 'tap the target by its coordinates (its centre from ui_snapshot)' : 'judge the element on that screenshot', layer);
   const what = pronoun(purpose);
   const typed = typedWords(layer);
   return typed !== undefined
@@ -116,7 +126,7 @@ export const presentedRemedy = (purpose: RemedyPurpose, layer?: MarkedLayer): st
  * `scroll_until` description quotes (mcp/tools.ts).
  */
 export const presentedStop = (layer?: MarkedLayer): string => {
-  if (layer?.kind === 'backdrop') return `${backdropRemedy('touch', 'swipe, then tap the target, by coordinates')}, and a swipe on it may close the menu`;
+  if (layer?.kind === 'backdrop') return `${backdropRemedy('touch', 'swipe, then tap the target, by coordinates', layer)}, and a swipe on it may close the menu`;
   const typed = typedWords(layer);
   return `${presentedRemedy('touch', layer)}, ${typed === undefined ? 'and a swipe on it may dismiss it' : `and a swipe would land on the ${typed.noun}`}`;
 };

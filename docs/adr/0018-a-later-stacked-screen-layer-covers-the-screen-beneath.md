@@ -61,7 +61,10 @@ changed-screen stop no longer fires on a list that only scrolled; the scroll's t
 tap's wait beneath a layer idb shows no sign of, which the amendments "idb's presented layer" and "an idb read that
 lists no identifier" left unnumbered; no behaviour changes). Amended again 2026-11-02 (D32: on idb the tap's and fill's
 not-found names the soft keyboard where its keys are read up by shape — see the amendment "the soft keyboard on idb's
-tap and fill miss" below; residual 20 narrowed for those waits).
+tap and fill miss" below; residual 20 narrowed for those waits). Amended again 2026-11-12 (backlog A38a, from Gate C
+on main 8e60cb2b): idb's flat list marks an unlabelled, id-less element over the whole screen, not listed first, a
+`backdrop` that covers what the list lists AFTER it — residual 9 closed on idb for the unhidden backdrop (see
+"Amendment: idb's backdrop" below).
 
 ## Context
 
@@ -1322,6 +1325,53 @@ form-keyboard and the three toolbar-dismiss cells under idb, judged unlisted as 
 a "not found" naming idb's reasons and the soft keyboard idb lists nothing beneath (the golden reader
 `keyboardUnlistedSaid`, in scripts/truth/replies.ts) — are green and struck off.
 
+## Amendment: idb's backdrop (2026-11-12, A38a)
+
+Gate C on main 8e60cb2b (docs/truth/live-records/a36-gate-c/) found idb far behind WDA on the blur menus; on
+`blur-menu-unhidden` idb answered Tapped for A, B and D while the menu's backdrop took the touch. What idb lists there
+(tests/fixtures/truth/ios-iphone17-ios27/blur-menu-unhidden.idb.json): `Application 0,0 402x874`, the card's `K 380`
+and `W 448`, then `GenericElement 0,0 402x874` (no label, no id, traits `[Scrollable]`), then the screen beneath, `A
+110, B 290, C 470, D 650`. WDA reads the same screen with that backdrop (`Other 0,0 402x874`) shown and A–D wholly
+`isVisible="0"` (the amendment "an in-window backdrop"). averi read the GenericElement as an unlabelled structural leaf,
+excused — no cover — and on a flat list a later-listed node as the one drawn over, so nothing covered A, B or D.
+
+**Decision.** The idb parser marks such an element a presented `backdrop` (adapters/ios-tree-source.ts#backdropOf,
+beside `listsPresentedLayer`): a `GenericElement` with no label, no id and no value — the measured shape only, so an
+unlabelled full-screen web or map view is never read as a menu's backdrop — its frame covering the `Application`
+element's frame whole, not the first element listed (that is the `Application` itself); the first such element only. On
+a flat list (`UiNode.flatList`) a marked non-root layer covers what is listed AFTER it — idb lists the card, then the
+backdrop, then the screen beneath — and never what is listed before it: it is LISTED AHEAD of what it covers
+(ui-tree/presentation.ts#byMarks, `isListedAhead`; `MarkedLayer.listedAhead`). Draw order counts it among what is drawn
+over such a target, after everything listed after the target (`PresentedOver.coversAhead`, draw-order.ts#laterFor), so
+the tap, `scroll_until`'s stop and the pixel assert read it as they read WDA's backdrop: a presented surface reaching
+the whole screen, the remedy `presented` first. Its words name idb's evidence (ui-tree/remedy-text.ts#backdropEvidence):
+"a menu's backdrop is presented over it (an empty element idb lists over the whole screen, before the screen's content)
+— close it first (if a screenshot shows no menu up, …)", the way out as WDA's. It only ever adds refusals: a target
+listed after the backdrop is refused "close it first", one listed before it (the card's rows) reads as before. And
+`scroll_until` for a target NOT in the tree now stops on this screen before any swipe: with no target, the touch-down
+lands on the topmost marked layer (presentation.ts#Presentation.topmostAt, draw-order.ts#DrawOrder.markedAt), here the
+backdrop — as on WDA's — another refusal, never a claim.
+
+The sweep: of the 53 idb lists committed (the 51 of the lab's captures and tests/fixtures/idb-*, which
+tests/adapters/idb-presented-layer.test.ts sweeps, and the two describe-all records under docs/truth/live-records/) only
+blur-menu-unhidden holds such an element — UIKit's dismiss region has an id and a label (`PopoverDismissRegion`,
+`dismiss popup`), the keyboard's unlabelled `Spacer` is 402x284.
+Golden against main b71b5dba: 12 checks move, all blur-menu-unhidden.idb's — A, B and D (tap, colour,
+`scroll_until`) refused "close it first", the colour failing closed, the stop before any swipe; C, under the card's W
+at its centre, gains "close it first" (its centre cover is now named the backdrop, drawn over it too). Nothing else
+moves. live-known: idb's `tap:` and `scroll:blur-menu-unhidden.{A,B,D}` struck; the next Gate C proves it on the device.
+
+Residuals of the amendment:
+
+- **One lab cell.** The shape is measured on one SwiftUI cell (an accessibility element as the backdrop); no app is
+  measured. An app's unlabelled screen-wide overlay that lets touches through (a decorative tint idb lists) refuses
+  what is listed after it: a false refusal, the safe direction, with the way out in the reply.
+- **The hidden backdrop stays unseen under idb** (blur-menu, -grouped, -stacked: idb lists no trace of it) — residual
+  9 stands there; and a reading-break rule that would infer it refuses open targets on fab and tabbar-floating (A38's
+  analysis), so none is added. Way out: `treeSource: wda`.
+- **C's centre cover is named the backdrop under idb, W under WDA.** Both are drawn over C's centre; the presented
+  remedy, first in precedence, is the same.
+
 ## Residuals accepted
 
 (Numbered as before; 8 replaced by the sheet's bare dim after the full-screen leaf condition removed the Android background case.)
@@ -1458,12 +1508,12 @@ a "not found" naming idb's reasons and the soft keyboard idb lists nothing benea
    **Closed for WDA where the backdrop is listed after the screen beneath at its origin** — the card and the screen
    beneath each an accessibility container (the lab's `blur-menu-grouped`, `-stacked`, `-unhidden`): see "Amendment:
    an in-window backdrop". **Stands**:
-   - under idb, which lists no trace of a hidden backdrop (an unhidden one only as an unlabelled screen-sized frame, an
-     excused structural leaf). Indirect signs (idb dropping the host's tab bar) are no evidence of a backdrop. A
-     screenshot per tap gives none either: a dimmed, blurred backdrop reads as the screen beneath it, only darker and
-     softer, and nothing in its pixels tells "covered" from an app's own dim or blur, so a judgement from them would
-     refuse taps on screens nothing covers. The cost is the lesser reason: an estimated +20–40 % of a tap's wall time
-     under the default tree source (not measured);
+   - under idb, which lists no trace of a hidden backdrop. (An unhidden one, listed as an unlabelled, id-less element
+     over the whole screen, is a presented `backdrop` since 2026-11-12: see "Amendment: idb's backdrop".) Indirect
+     signs (idb dropping the host's tab bar) are no evidence of a backdrop. A screenshot per tap gives none either: a
+     dimmed, blurred backdrop reads as the screen beneath it, only darker and softer, and nothing in its pixels tells
+     "covered" from an app's own dim or blur, so a judgement from them would refuse taps on screens nothing covers. The
+     cost is the lesser reason: an estimated +20–40 % of a tap's wall time under the default tree source (not measured);
    - under WDA in a reading-order run (the ungrouped `blur-menu`: the backdrop and the targets siblings), where the
      backdrop is listed first by its top and its order against the targets is untold;
    - for mp-native's own menu, until a raw `/source` with it up shows which shape it is (only a normalized snapshot,

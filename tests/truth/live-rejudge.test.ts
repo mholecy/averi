@@ -321,13 +321,8 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // scroll_until stopped before any swipe, nothing stroked or dismissed; K and W Tapped, each alone fired.
     ['ios-vis-r16-blur-1.json', 'visibility', { cases: 30, ok: 30, loud: 0, mismatches: 0 }],
     ['ios-vis-r16-blur-2.json', 'visibility', { cases: 30, ok: 30, loud: 0, mismatches: 0 }],
-    // Round 16's merge (bugs/round-16 4f48c642: LE2's rest beside the in-window backdrop): chooser-over-list,
-    // scroll-bounded-footer and the three grouped blur menus under idb and WDA, twice — under WDA chooser-over-list's R
-    // refused under S, "close it first", its scroll_until stopped before any swipe, nothing stroked or dismissed (LE2's
-    // branch alone stroked the dim three times); the blur menus as bugs/r16-blur's records; under idb the menus' A, B, D
-    // Tapped, the menu dismissed (residual 9, known), S refused (LOUD), footer O as LE2's records.
-    ['ios-vis-r16-merge-1.json', 'visibility', { cases: 72, ok: 51, loud: 1, mismatches: 20 }],
-    ['ios-vis-r16-merge-2.json', 'visibility', { cases: 72, ok: 51, loud: 1, mismatches: 20 }],
+    // Round 16's merge (ios-vis-r16-merge-1.json, -2.json): pinned below A38a's fix, which struck blur-menu-unhidden's
+    // idb entries.
     // Round 16's feeler (bugs/r16-r6, ADR 0018 "idb's presented layer" Decision 3), idb: sheet-background, alert-dim,
     // dim-cover and the content-up cells (scroll-top-edge, tabbar-dense, tabbar-floating, carousel-in-list), twice —
     // sheet-background's A and B two feelers from (201,175), nothing dismissed, the unmoved stop with "idb lists only
@@ -643,6 +638,27 @@ describe('live.ts --rejudge over the committed iOS records of LE2\'s chooser bef
     expect(unknown).toEqual(['scroll:chooser-over-list.R']);
     expect(code).toBe(1);
   });
+});
+
+// A38a's fix: the src before it, live (round 16's merge, bugs/round-16 4f48c642).
+describe('live.ts --rejudge over the committed iOS records of the src before A38a\'s fix', () => {
+  // chooser-over-list, scroll-bounded-footer and the three grouped blur menus under idb and WDA, twice — under WDA
+  // chooser-over-list's R refused under S, "close it first", its scroll_until stopped before any swipe, nothing stroked
+  // or dismissed (LE2's branch alone stroked the dim three times); the blur menus as bugs/r16-blur's records; under idb
+  // the menus' A, B, D Tapped, the menu dismissed (residual 9), S refused (LOUD), footer O as LE2's records.
+  // A38a (ADR 0018, the amendment "idb's backdrop") reads blur-menu-unhidden's backdrop in idb's list and struck its
+  // `ios idb` tap and scroll entries for A, B, D: the recorded replies read as they were, those six not known — exit 1,
+  // as recorded. blur-menu-grouped's and -stacked's stay known (idb lists no trace of their backdrop).
+  it.each([['ios-vis-r16-merge-1.json'], ['ios-vis-r16-merge-2.json']] as const)(
+    '%s: blur-menu-unhidden\'s idb A, B, D not known, everything else as HEAD knows it',
+    { timeout: 60_000 },
+    async (record) => {
+      const { code, out } = await rejudgeInProcess(record, 'visibility');
+      expect(out).toMatch(/^# Live golden: 72 cases, 51 ok, 1 loud, 20 mismatches \(6 not known\), 0 skipped$/m);
+      expect(notKnown(out).sort()).toEqual(['A', 'B', 'D'].flatMap((t) => [`scroll:blur-menu-unhidden.${t}`, `tap:blur-menu-unhidden.${t}`]).sort());
+      expect(code).toBe(1);
+    },
+  );
 });
 
 // D50's fix: the src before it, live (batch-3's block G at 6b4a44df, D30).

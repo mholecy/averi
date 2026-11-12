@@ -364,6 +364,19 @@ describe('judgeTap(…).aim() — a later stacked screen layer over the target (
     );
   });
 
+  // A38a (ADR 0018, the amendment "idb's backdrop"): idb lists the unhidden blur menu's backdrop as an unlabelled,
+  // id-less `GenericElement 0,0 402x874` BETWEEN the card (K, W) and the screen beneath (A–D). Read as an excused
+  // structural leaf, A answered Tapped while the backdrop took the touch.
+  it('the lab\'s unhidden blur menu (idb): a row of the screen listed after the backdrop is refused naming idb\'s evidence; the card\'s row listed before it is tapped', async () => {
+    const tree = parseIdbDescribeAll(await readFile(new URL('../fixtures/truth/ios-iphone17-ios27/blur-menu-unhidden.idb.json', import.meta.url), 'utf8'));
+    expect(said((await judge(tree, 'lab.blur-menu-unhidden.A', { first: IPHONE })).outcome)).toBe(
+      'CoveredRefusal: lab.blur-menu-unhidden.A is under other (0,0 402x874) at its centre (201,142), drawn over it; nothing of it shows — ' +
+        "a menu's backdrop is presented over it (an empty element idb lists over the whole screen, before the screen's content) — close it first " +
+        '(if a screenshot shows no menu up, the backdrop is an overlay that lets touches through: tap the target by its coordinates (its centre from ui_snapshot)); no scroll moves it out from under that backdrop; nothing was tapped',
+    );
+    expect(said((await judge(tree, 'lab.blur-menu-unhidden.K', { first: IPHONE })).outcome)).toBe('{"point":{"x":201,"y":412}}');
+  });
+
   it('Contacts\' discard popover over the New Contact sheet: a row of the sheet under the popover\'s labelled `PopoverDismissRegion` is refused as under a presented screen — close it first', async () => {
     const { outcome } = await judge((await screens()).contactsDiscardPopover, 'Insert add instant message', { first: IPHONE });
     expect(said(outcome)).toBe(
