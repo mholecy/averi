@@ -195,7 +195,8 @@ export function markIdbDialect<T extends UiNode>(tree: T): T {
 }
 
 function idbTree(elements: IdbElement[]): UiNode {
-  const children: UiNode[] = elements.map((el) => {
+  const backdrop = backdropOf(elements);
+  const children: UiNode[] = elements.map((el, i) => {
     const node = normalizeIosElement(
       { type: el.type, label: el.AXLabel, identifier: el.AXUniqueId, value: el.AXValue, rect: el.frame },
       IOS_ROLE_MAP,
@@ -207,6 +208,7 @@ function idbTree(elements: IdbElement[]): UiNode {
     if (el.enabled === false) node.disabled = true;
     const secure = idbSecure(el);
     if (secure !== undefined) node.secure = secure;
+    if (i === backdrop) node.presentation = 'backdrop';
     return node;
   });
   attachFieldErrors(children);
@@ -279,12 +281,37 @@ const DISMISS_REGION = 'PopoverDismissRegion';
 function listsPresentedLayer(elements: readonly IdbElement[]): boolean {
   const app = elements.find((el) => el.type === 'Application')?.frame;
   if (app === undefined || rectArea(app) === 0) return false;
-  return elements.some((el) => {
-    if (el.AXUniqueId !== DISMISS_REGION || el.frame === undefined) return false;
-    const on = rectIntersection(el.frame, app);
-    return on !== undefined && rectArea(on) === rectArea(app);
-  });
+  return elements.some((el) => el.AXUniqueId === DISMISS_REGION && el.frame !== undefined && coversWhole(el.frame, app));
 }
+
+/**
+ * THE BACKDROP idb lists (types.ts#UiNode.presentation `backdrop`; ADR 0018, the amendment "idb's backdrop"): the
+ * index of the first element that is unlabelled and id-less, whose frame covers the `Application` element's frame
+ * whole, and that is not the first element listed — undefined when none. idb lists a SwiftUI menu's unhidden dimmed
+ * backdrop so, BETWEEN the menu's card and the screen beneath it: on the lab's blur-menu-unhidden `K 380, W 448,
+ * GenericElement 0,0 402x874 (no label, no id, traits [Scrollable]), A 110, B 290, C 470, D 650`, where WDA reads the
+ * same backdrop shown and A–D wholly `isVisible="0"` (tests/fixtures/truth/ios-iphone17-ios27/blur-menu-unhidden.
+ * {idb,wda}.json). Read as an excused structural leaf it covered nothing, and a tap on A answered Tapped while the
+ * backdrop took the touch. Marked, it covers what the flat list lists AFTER it (ui-tree/presentation.ts#byMarks) —
+ * only ever a refusal more. Not the first listed: that is the `Application` element itself (labelled anyway). The
+ * sweep of the 53 idb lists in the repo (tests/adapters/idb-presented-layer.test.ts pins 51 of them) finds no other such element: UIKit's dismiss region has an id and a label
+ * (`listsPresentedLayer`), the keyboard's unlabelled `Spacer` is 402x284. Residuals, stated: a screen-wide unlabelled
+ * overlay that lets touches through (a decorative tint) refuses what idb lists after it — the safe direction, with the
+ * backdrop's way out in the reply; a hidden backdrop idb does not list (blur-menu, -grouped, -stacked) stays unseen
+ * (ADR 0018 residual 9).
+ */
+function backdropOf(elements: readonly IdbElement[]): number | undefined {
+  const app = elements.find((el) => el.type === 'Application')?.frame;
+  if (app === undefined || rectArea(app) === 0) return undefined;
+  const i = elements.findIndex((el, at) => at > 0 && !el.AXLabel && !el.AXUniqueId && el.frame !== undefined && coversWhole(el.frame, app));
+  return i < 0 ? undefined : i;
+}
+
+/** `frame` covers `whole` entirely. */
+const coversWhole = (frame: Rect, whole: Rect): boolean => {
+  const on = rectIntersection(frame, whole);
+  return on !== undefined && rectArea(on) === rectArea(whole);
+};
 
 /**
  * idb answered, but with no tree: an empty list, or elements none of which

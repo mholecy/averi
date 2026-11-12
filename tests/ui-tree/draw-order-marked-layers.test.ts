@@ -133,3 +133,32 @@ describe('a `screen` layer: the whole screen, its own nodes named where they dra
     expect(exposed(tree, field)).toMatchObject({ covers: [surface(SHEET_PROMPT)], centreCover: SHEET_PROMPT, shows: 0 });
   });
 });
+
+// A38a: idb's flat list marks the unhidden blur menu's backdrop (adapters/ios-tree-source.ts#backdropOf), listed between
+// the card (K, W) and the screen beneath (A–D). Listed BEFORE the targets it covers, it is still counted as drawn over
+// them (presentation.ts#PresentedOver.coversListedBefore), after everything listed after them.
+describe('a flat list\'s backdrop covers what is listed after it, through the whole screen', () => {
+  const BACKDROP = 'other 0,0 402x874';
+  const blurMenu = async () => {
+    const { readFile } = await import('node:fs/promises');
+    const { parseIdbDescribeAll } = await import('../../src/adapters/ios-tree-source.js');
+    const tree = parseIdbDescribeAll(await readFile(new URL('../fixtures/truth/ios-iphone17-ios27/blur-menu-unhidden.idb.json', import.meta.url), 'utf8'));
+    return { tree, byTag: (tag: string): UiNode => tree.children.find((n) => n.identifier === `lab.blur-menu-unhidden.${tag}`)! };
+  };
+
+  it('A beneath it: the backdrop is its one cover, a presented surface over its centre; nothing of it shows, no tap', async () => {
+    const { tree, byTag } = await blurMenu();
+    expect(exposed(tree, byTag('A'))).toEqual({ covers: [surface(BACKDROP)], centreCover: BACKDROP, shows: 0 });
+    const order = drawOrder(tree);
+    expect(desc(order.presentedOver(byTag('A')))).toBe(BACKDROP);
+    expect(desc(order.presentedAt(byTag('D'), { x: 201, y: 682 }))).toBe(BACKDROP);
+    expect(order.coversOf(byTag('B'), { x: 0, y: 0, width: 10, height: 10 }).map(desc)).toEqual([BACKDROP]);
+  });
+
+  it('K and W, the card listed before it: drawn over it, never covered by it (W\'s untold peer C is the eyes\' to tell, ADR 0024)', async () => {
+    const { tree, byTag } = await blurMenu();
+    expect(exposed(tree, byTag('K')).covers).toEqual([]);
+    expect(exposed(tree, byTag('W')).covers).toEqual([{ node: 'button lab.blur-menu-unhidden.C 51,470 300x64', order: 'untold', presented: false }]);
+    for (const tag of ['K', 'W']) expect(drawOrder(tree).presentedOver(byTag(tag))).toBeUndefined();
+  });
+});

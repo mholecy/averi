@@ -16,7 +16,8 @@ import { scrolls } from './scroll-containers.js';
  *   presentedLayers, by element type and by WDA's own visibility flags), the uiautomator parser's (adapters/
  *   android-tree-dialect.ts#presentedWindow: the one window it dumps, on its root, a `dialog` or a `screen`) and idb's
  *   (adapters/ios-tree-source.ts#listsPresentedLayer: its flat list, on its root, a `screen` when UIKit's dismiss
- *   region lies over the whole screen); read on every tree, since a flagless WDA payload still types an alert. A
+ *   region lies over the whole screen; and `backdropOf`: a `backdrop` on the unlabelled, id-less element over the whole
+ *   screen it lists between a menu's card and the screen beneath); read on every tree, since a flagless WDA payload still types an alert. A
  *   ROOT the source marks is a presented layer listed ALONE — the screen beneath it is not in the tree, so a target
  *   missing from it may lie there, unlisted (`alone`; lab note L1, iOS point 4).
  * - BY SHAPE (`byShape`): the FALLBACK for a tree whose source did not judge presented layers (no
@@ -84,6 +85,11 @@ export interface Presentation {
 export interface MarkedLayer {
   readonly kind: PresentationKind;
   readonly label?: string;
+  /**
+   * The layer covers what its flat list lists AFTER it, not what is listed before it (`byMarks`: idb's backdrop, listed
+   * between the menu's card and the screen beneath) — so its words name where it is listed. Absent on every other layer.
+   */
+  readonly coversListedAfter?: true;
 }
 
 /**
@@ -133,6 +139,12 @@ export interface PresentedOver {
   surface(p: Placed): SurfaceBy | undefined;
   /** `row`'s frame excuse of `p` (placed.ts#FRAME_EXCUSES) gives way: `p` lies on a screen presented over the target's, by shape. */
   givesWay(row: FrameRow, p: Placed): boolean;
+  /**
+   * The covers of marked layers listed BEFORE the target that lie over it, in the walk's order: a flat list's backdrop
+   * (`byMarks`), which covers what is listed after it. Each is a cover `wholeScreen` answers true of; draw order counts
+   * them as drawn over the target, after everything listed after it. Empty on every other tree.
+   */
+  readonly coversListedBefore: readonly Placed[];
 }
 
 /**
@@ -157,7 +169,7 @@ interface PresentationAdapter {
 }
 
 /** Nothing presented over a target: every node drawn, none a layer's cover or a presented surface, no excuse given way. */
-const NOTHING_OVER: PresentedOver = { drawn: () => true, wholeScreen: () => false, surface: () => undefined, givesWay: () => false };
+const NOTHING_OVER: PresentedOver = { drawn: () => true, wholeScreen: () => false, surface: () => undefined, givesWay: () => false, coversListedBefore: [] };
 
 /**
  * The presentation of `tree`, over its walk (`order`, placed.ts#walkOf — draw order hands its own, so the tree is
@@ -186,6 +198,7 @@ export function presentationOf(tree: UiNode, order: readonly Placed[] = walkOf(t
           return by.includes('inferred') ? 'inferred' : by.includes('fact') ? 'fact' : undefined;
         },
         givesWay: (row, p) => overs.some((o) => o.givesWay(row, p)),
+        coversListedBefore: overs.flatMap((o) => o.coversListedBefore),
       };
     },
     topmostAt: (point) => adapters.reduce<PresentedTop | undefined>((found, a) => found ?? a.topmostAt(point), undefined),
@@ -224,8 +237,17 @@ const markOf = (layer: Placed, order: readonly Placed[]): PresentedLayer | undef
   if (kind === undefined) return undefined;
   const element = isTyped(kind) ? order.slice(layer.at, layer.end).find((p) => p.node.presentationElement === true) : undefined;
   const cover = element ?? layer;
-  return { layer, kind, ...(element !== undefined && { element }), cover, named: { kind, ...(cover.node.label ? { label: cover.node.label } : {}) } };
+  const named: MarkedLayer = { kind, ...(cover.node.label ? { label: cover.node.label } : {}), ...(coversListedAfter(layer, order) && { coversListedAfter: true as const }) };
+  return { layer, kind, ...(element !== undefined && { element }), cover, named };
 };
+
+/**
+ * A marked `layer` covers what is listed AFTER it, not before it: a non-root layer of a FLAT LIST (`UiNode.flatList` on
+ * the root, idb's). idb lists the unhidden blur menu's backdrop between the menu's card and the screen beneath it (K,
+ * W, the backdrop, A–D: adapters/ios-tree-source.ts#backdropOf) — so the card, listed before it, is drawn over it, and
+ * the screen, listed after it, beneath it. A marked ROOT is the whole list (`alone`) and covers nothing of it.
+ */
+const coversListedAfter = (layer: Placed, order: readonly Placed[]): boolean => layer.parent !== undefined && order[0]?.node.flatList === true;
 
 /**
  * THE MARKS ADAPTER: the layers the tree source marks presented (`markOf`), read on every tree. A LAYER it marks covers
@@ -234,7 +256,10 @@ const markOf = (layer: Placed, order: readonly Placed[]): PresentedLayer | undef
  * reaching the whole screen with its own nodes covering where they draw — each that screen's surface; a `backdrop`
  * (WDA's in-window backdrop, a childless node inside a layer) judged as a `screen` layer, its own cover with no nodes
  * of its own, whatever is listed after it outside it (its menu card) not beneath it — only its words differ
- * (remedy-text.ts#presentedRemedy). No stacked-screens, window or bare-frame condition: those are the shape fallback's
+ * (remedy-text.ts#presentedRemedy). On a FLAT LIST (idb's) the order runs the other way for a marked non-root layer
+ * (`coversListedAfter`): idb lists its backdrop after the menu's card and before the screen beneath, so it covers what
+ * is listed AFTER it and never what is listed before it — draw order counts it over such a target through
+ * `PresentedOver.coversListedBefore` (ADR 0018, the amendment "idb's backdrop"). No stacked-screens, window or bare-frame condition: those are the shape fallback's
  * inferences (`byShape`), which the mark makes moot. A marked ROOT is a layer listed ALONE (`alone`): uiautomator's
  * one window, idb's flat list — nothing of the tree lies outside it, so it covers no target, and for no target its
  * cover takes every touch-down (`topmostAt`).
@@ -260,7 +285,8 @@ function byMarks(order: readonly Placed[], screen: Rect): PresentationAdapter {
   return {
     ...(alone !== undefined && { alone }),
     /**
-     * The marked layers over the target at `places`: each drawn after it and OUTSIDE it — never one holding it (a
+     * The marked layers over the target at `places`: each drawn after it and OUTSIDE it (on a flat list, a non-root one
+     * listed BEFORE it: `coversListedAfter`) — never one holding it (a
      * layer's own nodes are not beneath it: the popover's `dismiss popup` is the way to close it), nor one in its
      * subtree; never over the keyboard's own nodes (`Placed.inKeyboard`): the keyboard is drawn over the app's windows,
      * wherever WDA lists its Window. A typed layer's element is its cover and what else it holds is drawn on it; a
@@ -268,7 +294,11 @@ function byMarks(order: readonly Placed[], screen: Rect): PresentationAdapter {
      * at a point is what of the layer is on top there, the layer itself only where nothing of it draws.
      */
     over(places) {
-      const layers = places[0].inKeyboard ? [] : marked.filter(({ layer }) => layer.at >= places[0].end && !places.some((place) => within(layer, place) || within(place, layer)));
+      const over = ({ layer, named }: PresentedLayer): boolean =>
+        named.coversListedAfter === true
+          ? places.every((place) => layer.end <= place.at)
+          : layer.at >= places[0].end && !places.some((place) => within(layer, place) || within(place, layer));
+      const layers = places[0].inKeyboard ? [] : marked.filter(over);
       if (layers.length === 0) return NOTHING_OVER;
       const covers = new Set(layers.map(({ cover }) => cover));
       const typed = layers.filter(({ kind }) => isTyped(kind));
@@ -278,6 +308,7 @@ function byMarks(order: readonly Placed[], screen: Rect): PresentationAdapter {
         wholeScreen: (p) => covers.has(p),
         surface: (p) => (screens.some(({ layer }) => within(p, layer)) ? 'fact' : undefined),
         givesWay: () => false,
+        coversListedBefore: layers.filter(({ layer }) => layer.at < places[0].at).map(({ cover }) => cover),
       };
     },
     topmostAt(point) {
@@ -414,7 +445,13 @@ function byShape(screenArea: number): PresentationAdapter {
     (Object.keys(OVER_PRESENTED) as FrameRow[]).some((row) => OVER_PRESENTED[row].surfaceCandidate(placed.node, () => FRAME_EXCUSES[row](placed, target, screenArea)) && givesWay(row, placed, target));
   return {
     over([target]) {
-      return { drawn: () => true, wholeScreen: () => false, surface: (p) => (presentedSurface(p, target) ? 'inferred' : undefined), givesWay: (row, p) => givesWay(row, p, target) };
+      return {
+        drawn: () => true,
+        wholeScreen: () => false,
+        surface: (p) => (presentedSurface(p, target) ? 'inferred' : undefined),
+        givesWay: (row, p) => givesWay(row, p, target),
+        coversListedBefore: [],
+      };
     },
     topmostAt: () => undefined,
     layerOf: () => undefined,

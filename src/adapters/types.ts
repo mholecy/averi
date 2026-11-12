@@ -292,9 +292,10 @@ export const SCREEN_SIZED_FRACTION = 0.9;
  * opened from (adapters/android-tree-dialect.ts#presentedWindow); `screen`, a presented screen WDA shows by its
  * visibility flags, or the uiautomator window whose scrim lies above its sheet; and `backdrop`, an IN-WINDOW BACKDROP
  * WDA's flags show over the screen beneath it (adapters/wda-source.ts#inWindowBackdrops: a SwiftUI menu's dimmed
- * tap-catcher in the screen's own container) — judged as a `screen` layer is, but on weaker evidence: one empty element
- * WDA lists over the whole screen, which a hidden overlay that lets touches through matches too, so its remedy names
- * that evidence and the way out (ui-tree/remedy-text.ts#presentedRemedy).
+ * tap-catcher in the screen's own container), or the unlabelled, id-less element over the whole screen idb lists
+ * between a menu's card and the screen beneath (adapters/ios-tree-source.ts#backdropOf) — judged as a `screen` layer
+ * is, but on weaker evidence: one empty element listed over the whole screen, which an overlay that lets touches
+ * through matches too, so its remedy names that evidence and the way out (ui-tree/remedy-text.ts#presentedRemedy).
  */
 export type PresentationKind = 'alert' | 'actionSheet' | 'popover' | 'dialog' | 'screen' | 'backdrop';
 
@@ -675,7 +676,9 @@ export interface UiNode {
    * the screen's top and left edges both, and `screen` for one whose clickable, labelled scrim lies screen-wide above
    * its sheet; the root also carries `activeWindowOnly`), and by the idb parser on the root of its flat list
    * (adapters/ios-tree-source.ts#listsPresentedLayer: `screen`, the list holding UIKit's dismiss region over the whole
-   * screen — the list is then the presented layer alone). One writer works after the read: on a miss only, the root of
+   * screen — the list is then the presented layer alone) and on one element of it (adapters/ios-tree-source.ts
+   * #backdropOf: `backdrop`, an unlabelled, id-less element over the whole screen, not listed first — it covers what
+   * the flat list lists AFTER it, ADR 0018's amendment "idb's backdrop"). One writer works after the read: on a miss only, the root of
    * a uiautomator tree its parser left unmarked is marked by the window manager's word on the focused window
    * (ui-tree/window-mark.ts#markByWindow, from `DeviceAdapter.focusedWindow`: a Dialog's or a panel's window at the
    * root's bounds, `screen` when it spans the screen's width, else `dialog`).
@@ -710,8 +713,8 @@ export interface UiNode {
    *   (ui-tree/remedy-text.ts#presentedRemedy: "an alert is presented over it ("Exit confirmation")") and to
    *   `scroll_until`'s stroke (interact/scroll-rounds.ts), never the node itself.
    * - `ui_snapshot`, which prints it with the tree's JSON (mcp/tools.ts), so later device trees carry it.
-   * Absent everywhere else — on an idb tree but on a presented layer's root, on an Android tree but on a presented
-   * window's root.
+   * Absent everywhere else — on an idb tree but on a presented layer's root and its backdrop, on an Android tree but on
+   * a presented window's root.
    */
   presentation?: PresentationKind;
   /**

@@ -175,50 +175,6 @@
   "ios-iphone17-ios27/blur-menu-stacked.idb.json D tap": [
     "Tapped id:\"lab.blur-menu-stacked.D\""
   ],
-  "ios-iphone17-ios27/blur-menu-unhidden.idb.json A colour": [
-    "All 1 asserts passed",
-    "PASS  element id:\"lab.blur-menu-unhidden.A\" fill within dE00 8 of #AC2B28 — sampled #AC2B28 (dominant, 86% of region) vs expected #AC2B28 → dE00 0.00 ≤ 8; scale 3.000",
-    "appAlive: true"
-  ],
-  "ios-iphone17-ios27/blur-menu-unhidden.idb.json A scroll_until": [
-    "Element id:\"lab.blur-menu-unhidden.A\" fully visible after 0 swipes"
-  ],
-  "ios-iphone17-ios27/blur-menu-unhidden.idb.json A tap": [
-    "Tapped id:\"lab.blur-menu-unhidden.A\""
-  ],
-  "ios-iphone17-ios27/blur-menu-unhidden.idb.json B colour": [
-    "All 1 asserts passed",
-    "PASS  element id:\"lab.blur-menu-unhidden.B\" fill within dE00 8 of #1766AC — sampled #1866AC (dominant, 92% of region) vs expected #1766AC → dE00 0.07 ≤ 8; scale 3.000",
-    "appAlive: true"
-  ],
-  "ios-iphone17-ios27/blur-menu-unhidden.idb.json B scroll_until": [
-    "Element id:\"lab.blur-menu-unhidden.B\" fully visible after 0 swipes"
-  ],
-  "ios-iphone17-ios27/blur-menu-unhidden.idb.json B tap": [
-    "Tapped id:\"lab.blur-menu-unhidden.B\""
-  ],
-  "ios-iphone17-ios27/blur-menu-unhidden.idb.json C colour": [
-    "1/1 asserts FAILED",
-    "FAIL  element id:\"lab.blur-menu-unhidden.C\" fill within dE00 8 of #00897B — button \"Target W\" (51,448 300x64) is drawn over the element (element 51,470 300x64) as a screenshot shows (the two are listed in reading order) — the capture would show it, not the element; if it is a menu or a popover, close it first; else assert something in the element that lies clear of it; failing closed, color unchecked",
-    "appAlive: true"
-  ],
-  "ios-iphone17-ios27/blur-menu-unhidden.idb.json C scroll_until": [
-    "ERROR scroll_until id:\"lab.blur-menu-unhidden.C\" stopped before any swipe — element is in the viewport but under button \"Target W\" (51,448 300x64) at its centre (201,502), drawn over it as a screenshot shows (the two are listed in reading order) — 34% of it shows; no swipe was sent — if it is a menu or a popover, close it first; no scroll moves it out from under it. Last rect {\"x\":51,\"y\":470,\"width\":300,\"height\":64} in a 402x874 viewport"
-  ],
-  "ios-iphone17-ios27/blur-menu-unhidden.idb.json C tap": [
-    "ERROR id:\"lab.blur-menu-unhidden.C\" is under button \"Target W\" (51,448 300x64) at its centre (201,502), drawn over it as a screenshot shows (the two are listed in reading order); only a 300x22 part of it shows, under the 24x24 a tap may be moved to — if it is a menu or a popover, close it first; no scroll moves it out from under it; nothing was tapped"
-  ],
-  "ios-iphone17-ios27/blur-menu-unhidden.idb.json D colour": [
-    "All 1 asserts passed",
-    "PASS  element id:\"lab.blur-menu-unhidden.D\" fill within dE00 8 of #BC6900 — sampled #BC6A02 (dominant, 96% of region) vs expected #BC6900 → dE00 0.34 ≤ 8; scale 3.000",
-    "appAlive: true"
-  ],
-  "ios-iphone17-ios27/blur-menu-unhidden.idb.json D scroll_until": [
-    "Element id:\"lab.blur-menu-unhidden.D\" fully visible after 0 swipes"
-  ],
-  "ios-iphone17-ios27/blur-menu-unhidden.idb.json D tap": [
-    "Tapped id:\"lab.blur-menu-unhidden.D\""
-  ],
   "ios-iphone17-ios27/blur-menu.idb.json A colour": [
     "All 1 asserts passed",
     "PASS  element id:\"lab.blur-menu.A\" fill within dE00 8 of #AC2B28 — sampled #AC2B28 (dominant, 86% of region) vs expected #AC2B28 → dE00 0.00 ≤ 8; scale 3.000",

@@ -158,7 +158,8 @@ question:
   in reading order says of a target's order, ADR 0015), `seen-order.ts` (the order the eyes saw, an input of the pure
   draw order, never a dependency).
 - **Presentation** — `presentation.ts` (`presentationOf`): which layer is presented over a target or a point, and on
-  what evidence — the source's marks where it judged them (`byMarks`), else the shape fallback (`byShape`), ADR 0018;
+  what evidence — the source's marks where it judged them (`byMarks`; on idb's flat list a marked backdrop covers what
+  is listed after it, `PresentedOver.coversListedBefore`), else the shape fallback (`byShape`), ADR 0018;
   `window-mark.ts` (what Android's window manager says of an unmarked root, asked on a miss only).
 - **Standing** — `standing.ts`: the one answer to "can this target be used where it stands?", shared by the tap,
   `scroll_until`'s stop and the pixel assert, over a tree's scene (`sceneOf`: draw order and clip facts, derived once).
@@ -416,7 +417,9 @@ error and trace line says the same, host paths stripped; the error's fields keep
   (`normalizeIosElement`; the default kind, `DEFAULT_IOS_TREE_SOURCE`). Two adapters:
   - **idb** (`IdbTreeSource`, the default): `idb ui describe-all`, a FLAT list under a synthetic root. An empty or
     area-less list is a read error (`IdbEmptyTreeError`), never a tree that reads "absent"; a wedged service is
-    `PersistentReadError` (ADR 0036). Settle cadence 300 ms (`IDB_SETTLE_CADENCE_MS`, ADR 0040).
+    `PersistentReadError` (ADR 0036). Settle cadence 300 ms (`IDB_SETTLE_CADENCE_MS`, ADR 0040). Its presented
+    marks: the root when the list holds UIKit's dismiss region (`listsPresentedLayer`), and a menu's `backdrop`, the
+    unlabelled, id-less element over the whole screen not listed first (`backdropOf`, ADR 0018).
   - **WebDriverAgent** (`WdaTreeSource`, opt-in `treeSource: wda`): the NESTED XCUIElement tree, for the React Native
     and SwiftUI container ids idb drops. `wda.ts` owns the server's lifecycle (build once per Xcode, from the pinned
     `appium-webdriveragent` optional dependency), `wda-source.ts` parses `/source` and marks the keyboard band, hidden
