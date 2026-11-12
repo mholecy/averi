@@ -9,10 +9,12 @@ import { withNoteLine } from '../util/note-line.js';
  * in `claimed`; the compositions here wrap assert, ensure_state, run_flow (commands.ts) and verify (verify.ts).
  */
 
-/** `reply` with the note of the first of `adapters` that has one, on its own last line; `reply` alone otherwise. */
-export function claimed(adapters: DeviceAdapter | readonly DeviceAdapter[], reply: string): string {
-  const all: readonly DeviceAdapter[] = Array.isArray(adapters) ? adapters : [adapters as DeviceAdapter];
-  return withNoteLine(reply, all.find((a) => a.claimNote !== undefined)?.claimNote);
+/**
+ * `reply` with the note of the first of `adapters` that has one, on its own last line — unless the reply already
+ * carries it (withNoteLine); `reply` alone otherwise.
+ */
+export function claimed(adapters: readonly DeviceAdapter[], reply: string): string {
+  return withNoteLine(reply, adapters.find((a) => a.claimNote !== undefined)?.claimNote);
 }
 
 /**

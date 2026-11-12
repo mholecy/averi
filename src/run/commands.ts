@@ -121,10 +121,10 @@ export async function runEnsureState(
   const [health, { frame, failed }] = await Promise.all([appHealth(adapter, cfg), finalFrame(adapter)]);
   const text = trace + health;
   // The claim note (claims.ts) closes the reply, after the frame's line.
-  if (frame === undefined) return { text: claimed(adapter, `${text}\n${screenshotFailedLine(failed)}`) };
+  if (frame === undefined) return { text: claimed([adapter], `${text}\n${screenshotFailedLine(failed)}`) };
   const unsettled = unsettledNote(frame);
   const reply = unsettled === undefined ? text : `${text}\n${unsettled}`;
-  return { text: claimed(adapter, reply), shot: await frame.shot.png() };
+  return { text: claimed([adapter], reply), shot: await frame.shot.png() };
 }
 
 /** `run_flow`: the trace and health line. */
@@ -133,7 +133,7 @@ export async function runNamedFlow(
   resolveAdapter: ResolveAdapterFor,
 ): Promise<string> {
   const { adapter, trace } = await runOnEngine(call, resolveAdapter, { flow: call.flow });
-  return claimed(adapter, trace + (await appHealth(adapter, call.project.cfg)));
+  return claimed([adapter], trace + (await appHealth(adapter, call.project.cfg)));
 }
 
 export interface AssertCall {
@@ -171,5 +171,5 @@ export async function runAsserts({ adapter, specs, baselineDir, cfg }: AssertCal
   // its message the detail, rather than an error result that drops the asserts and the health line (VerifierOptions).
   const results = await new Verifier(adapter, { baselineDir, persistentRead: 'fail' }).assertAll(specs);
   const health = cfg === undefined ? '' : await appHealth(adapter, cfg);
-  return claimed(adapter, `${assertSummary(results)}\n${formatAsserts(results)}${health}`);
+  return claimed([adapter], `${assertSummary(results)}\n${formatAsserts(results)}${health}`);
 }

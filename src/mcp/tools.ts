@@ -463,7 +463,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       const served = await serve(p, TOOL_CONFIG.tap(p), cp);
       if (selector !== undefined) {
         const tapped = await tapElement(served.adapter, selector, acting(served));
-        return text(claimed(served.adapter, tapText(selector, tapped)));
+        return text(claimed([served.adapter], tapText(selector, tapped)));
       }
       if (x === undefined || y === undefined) {
         throw new Error('Provide either selector or both x and y');
@@ -544,7 +544,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         return text(typedText(value.length));
       }
       const fill = await fillField(served.adapter, selector, value, { ...acting(served), clear });
-      return text(claimed(served.adapter, fillReply(fill, selector)));
+      return text(claimed([served.adapter], fillReply(fill, selector)));
     },
   );
 
@@ -584,7 +584,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       const { adapter, eyes } = await serve(p, TOOL_CONFIG.scroll_until(p), cp);
       // The eyes a `fully visible` claim is confirmed with (ui-tree/eyes.ts), served here: interact/ may not import verify/.
       const result = await scrollUntilVisible(adapter, selector, { direction, maxSwipes, fully, timeoutMs, within, eyes });
-      return text(claimed(adapter, `Element ${selector} ${describeScrollResult(result)}`));
+      const reply = `Element ${selector} ${describeScrollResult(result)}`;
+      return text(claimed([adapter], reply));
     },
   );
 
