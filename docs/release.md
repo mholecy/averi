@@ -154,8 +154,11 @@ Gate C's alike.
 
 ## Gate C: iOS (owner, outside the agent's sandbox)
 
-The agent's sandbox cannot drive simctl, idb, xcodebuild or WebDriverAgent. The agent asks the owner to run, from the
-checkout at the commit Gate A tested (`xcrun simctl list devices | grep 'averi-lab '` names the lab simulator):
+The agent's sandbox cannot drive simctl, idb, xcodebuild or WebDriverAgent (idb's target list needs the
+`/var/run/usbmuxd` socket, and the liveness check needs `pgrep`; both are refused there). The agent asks the owner to
+run, from the checkout at the commit Gate A tested (`xcrun simctl list devices | grep 'averi-lab '` names the lab
+simulator), with `--out` in a folder the shell's user can write and the agent can read (2026-11-12:
+`/Volumes/Workspaces/tmp/<run>`, which an ACL opens to the agent's user):
 
 ```
 npm run truth:lab:ios -- --out <dir outside the checkout> --udid <lab simulator> [--groups forms|visibility|…]
