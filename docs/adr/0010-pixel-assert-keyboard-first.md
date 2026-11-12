@@ -180,7 +180,8 @@ Bug note: docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-co
    flat list pins over it says so (a bar's reach to the screen's bottom, `draw-order.ts#bottomPinned`), and otherwise
    tapped and stopped on; `scroll_until` strokes over the screen's middle, which may miss the scroll view that holds
    it (the lab's F, C) — until two reads see the target carried, then a stroke carrying content back goes over the
-   region its motion showed (residual 6, refined 2026-10-21). Why not more: a screenshot per tap or plain stop would
+   region its motion showed (residual 6, refined 2026-10-21); **narrowed 2026-11-12** (A38b, below): a SIDEWAYS stroke
+   for a target the read lists goes over the target's own row, so C is stroked inside its carousel's band. Why not more: a screenshot per tap or plain stop would
    double the cost of the commonest verbs
    under the default tree source (idb), and nothing cheaper sees the clip — idb's `Scrollable` trait marks 372 of the
    409 nodes idb lists in the 33 iOS lab captures (the 32 above and the React Native app's), contents and all, and an
@@ -923,6 +924,36 @@ message (`Invalid duration -5 — …`), NaN by zod's number type. `0` stays a d
 
 (d) The engine's optional-tap split (`runOptionalSteps`) stays outside its `try` — the `catch` reads it — but no longer
 for the malformed `timeout:` it was put there for: that cannot reach it.
+
+## Amendment: A38b — on idb, a sideways stroke goes over the target's own row (2026-11-12)
+
+**Context.** Gate C on main 8e60cb2b (docs/truth/live-records/a36-gate-c/) filed carousel-in-list's C under idb as
+R-direction, and its replay (tests/fixtures/truth/ios-iphone17-ios27/carousel-in-list.idb.json) as a known golden
+mismatch. idb lists C at `378,138 354x85` and no carousel; WDA lists the carousel at `24,138 354x85`. With no scroll
+view told, and before two reads see C carried (residual 6), the strokes went over the screen box: `idb ui swipe 322
+437 80 437`, 256 pt below the carousel. Nothing moved, and the reply said "content exhausted … a layout defect".
+
+**Decision.** On a tree that tells no scroll view of the target (`Clips.drawnIn` untold: idb's flat list), the read
+that finds it leaves the plan the target's y band (`interact/stroke-plan.ts#Memory.band`, kept across reads that lose
+the target, as the target's scroll views are). A sideways stroke with no room among the plan's candidates (none
+before the motion ledger shows a region, or, with a region, a stroke moving content the way it was first seen moving)
+goes over the gesture box cut to that band (`bandOf`, clamped to the usable screen by `strokeRoom`'s meet with the
+gesture box). Why it is sound: a horizontal scroller holding the target spans the target's band, so a stroke along
+that band touches down on it. It changes only where the stroke lands. Every claim is still judged from the reads, and
+the motion ledger's region takes over once the target moves. On carousel-in-list C's strokes are `322 181 → 80 181`
+twice, then `80 181 → 201 181` back, and the replay is green.
+
+**Scope, stated.** Sideways strokes only: a vertical stroke on idb keeps the screen box, because the target's column
+is no evidence of a vertical list's extent. Not before the target is read: a target in no read has no band. A target
+listed off the usable screen has no band on it either, so the screen box stays. Android and WDA tell the target's
+scroll views (`isUntold` false), never set a band, and plan exactly as before. The golden moved one row,
+carousel-in-list.idb C scroll_until, and nothing else. The flush probe (`planProbe`) never takes the band. Like the
+region, the band is no node of the tree, so `touchedOn`, `strokedAcross` and `strokedContent` say nothing of it.
+
+**Residual.** The band is the target's own row, not the scroller's: if a horizontal scroller's touch-down region
+narrower than the screen excludes the gesture box's 0.8 / 0.2 points, the stroke still touches down beside it. That
+holds on the lab's carousel (24..378 holds 322 and 80) but is unmeasured elsewhere. A target listed partly off the
+screen vertically is stroked over the part on it.
 
 ## Bug note
 

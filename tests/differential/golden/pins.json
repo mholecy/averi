@@ -307,9 +307,6 @@
   "ios-iphone17-ios27/blur-menu.wda.json D tap": [
     "Tapped id:\"lab.blur-menu.D\""
   ],
-  "ios-iphone17-ios27/carousel-in-list.idb.json C scroll_until": [
-    "ERROR scroll_until id:\"lab.carousel-in-list.C\" failed after 3 swipes — element is in the viewport but CLIPPED at right, 7% of it is in the viewport, and the content is exhausted: swiping right no longer moves it, nor does swiping left. The element cannot be fully revealed — that is a layout defect (no clearance for an overlay?), not a scroll that needs more swipes. Last rect {\"x\":378,\"y\":138,\"width\":354,\"height\":85} in a 402x874 viewport"
-  ],
   "ios-iphone17-ios27/chooser-over-list.idb.json R colour": [
     "1/1 asserts FAILED",
     "FAIL  element id:\"lab.chooser-over-list.R\" fill within dE00 8 of #FFFFFF — button \"SWIFT payment\" (45,453 312x52) overlaps the element (element 24,435 354x52), the two listed in reading order: which is drawn on top is not told — the capture may show it, not the element; no scroll tells which is on top: a screenshot could not tell either (it shows the colour around it #FFFFFF beside the overlap: it may draw nothing there) — if the other is drawn over the element (a menu, a popover), close it first; if the element is the one on top, assert something in it that lies clear of the other; failing closed, color unchecked",

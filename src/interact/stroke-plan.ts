@@ -92,7 +92,10 @@ import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION,
  * line) for a stroke that carries content back the other way from how it was first seen moving
  * (interact/motion-ledger.ts#overRegion, which the round passes as `StrokeAsk.screenBox`); one moving it that way keeps
  * the screen box, the stroke that made the region.
- * Before a read sees the target move — the scroll's first stroke — the screen box, as before. Only where the
+ * Before a read sees the target move — the scroll's first stroke — the screen box, as before; but a SIDEWAYS stroke
+ * for a target a read listed goes over the target's own row (`bandOf`, A38b: any horizontal scroller holding it spans
+ * its band — carousel-in-list's C, stroked at y 437 below its carousel until then, now at 181 inside it), and so does
+ * one the region does not take (`screenBox`). Only where the
  * tree tells no scroll view: Android and WDA list ancestry and plan as above, untouched. Cost: no device call; one
  * walk of the listed nodes a read under idb. And the stop: a target in the band short of where a stroke over the
  * region touches down, or carried past the region toward a node that held still (under a header idb lists it
@@ -143,6 +146,13 @@ interface Memory {
    * Undefined when none was named.
    */
   readonly named: ScrollView | undefined;
+  /**
+   * The target's row on a tree that tells no scroll view of it (idb's): its y band at the last read that found it
+   * (`seeRead`), the box of a sideways stroke no scroll view (nor the region its motion showed) has room for — any
+   * horizontal scroller holding the target spans that band (`bandOf`, A38b). Undefined until such a read; kept across
+   * reads that do not find the target, as `target` is.
+   */
+  readonly band: { readonly y: number; readonly height: number } | undefined;
   /** The candidates the last plan judged its stroke's scroll view from, for the stroke of a round whose tree did not read — judged again with that round's gesture box, cut by the rects they carry. */
   readonly last: readonly ScrollView[];
   /** The keyboard line the last read that READ stroked above (scroll-read.ts#strokeLine: the cover it applied — none when it applied none — and idb's band), for the stroke of a round whose tree did not read. */
@@ -166,7 +176,7 @@ const close = (m: Memory): StrokeMemory => m as unknown as StrokeMemory;
 
 /** The memory before any read: no scroll view known, no keyboard line, no stroke sent. */
 export function startStrokes(): StrokeMemory {
-  return close({ target: undefined, named: undefined, last: [], line: undefined, strokedOver: undefined, chosen: undefined, chosenAt: undefined, touchDowns: [], roomless: [], carry: undefined });
+  return close({ target: undefined, named: undefined, band: undefined, last: [], line: undefined, strokedOver: undefined, chosen: undefined, chosenAt: undefined, touchDowns: [], roomless: [], carry: undefined });
 }
 
 /**
@@ -215,7 +225,8 @@ export function seeRead(memory: StrokeMemory, { facts, line, target, region }: S
     return close({ ...m, line, target: targetScrollers(facts, target).map((rect) => scrollViewOn(facts, { ...rect })) });
   }
   // Nothing is listed over it (idb lists no draw order over a scroll view), and nothing nested in it.
-  return close({ ...m, line, target: region === undefined ? [] : [{ rect: { ...region.rect }, over: [], axes: { axis: region.axis, nested: [] } }] });
+  const band = { y: target.rect.y, height: target.rect.height };
+  return close({ ...m, line, band, target: region === undefined ? [] : [{ rect: { ...region.rect }, over: [], axes: { axis: region.axis, nested: [] } }] });
 }
 
 /** What a round asks of the plan for its stroke toward the target. */
@@ -369,7 +380,8 @@ export function planStroke(memory: StrokeMemory, { toward, reach: turnsReach, ge
   const kept = m.line?.y;
   // On a tree that tells no scroll view, only a stroke carrying content back over where it was seen moving goes over
   // that region; one moving it the way it was first seen moving keeps the screen box (`screenBox`).
-  const over = screenBox === true ? [] : candidates;
+  // A sideways stroke there with no room among them (none before its motion is seen) goes over the target's own row.
+  const over = [...(screenBox === true ? [] : candidates), ...bandOf(m.band, gesture, toward)];
   const room = strokeRoom(gesture, over, toward, kept, 'any axis');
   const coverTop = room === undefined ? kept : room.coverTop;
   const box = room?.box ?? gesture;
@@ -399,6 +411,20 @@ export function planStroke(memory: StrokeMemory, { toward, reach: turnsReach, ge
   // D80: no room in the named scroll view nor any nested in it — the gesture box whole is no stroke of the one named.
   const noRoom = room === undefined && gesture !== undefined && screenBox !== true && m.target === undefined && m.named !== undefined ? roomOfNamed(m.named.rect, gesture, toward, kept) : undefined;
   return { stroke, presented, memory: close({ ...planned, chosen: room === undefined ? undefined : { ...room.scrollView }, chosenAt, roomless: room?.roomless ?? [] }), noRoom };
+}
+
+/**
+ * The target's row as a stroke box (`Memory.band`, A38b): the gesture box cut to the target's y band — clamped to it by
+ * `strokeRoom`, which meets every candidate with the gesture box — for a SIDEWAYS stroke only; none for a vertical one,
+ * before any read found the target, or with no gesture box. On idb's flat list, which tells no scroll view, a
+ * horizontal scroller holding the target spans its band, so a sideways stroke over that band touches down on it, where
+ * one over the screen box's centre row touches down wherever the screen's middle is — on carousel-in-list 256 pt below
+ * the carousel holding C, moving nothing. Only where the stroke lands: nothing is drawn over it, nothing nested (the
+ * tree tells neither), its axis the stroke's own, and every claim is still judged from the reads.
+ */
+function bandOf(band: Memory['band'], gesture: Rect | undefined, toward: Direction): ScrollView[] {
+  if (band === undefined || gesture === undefined || axisOf(toward) !== 'horizontal') return [];
+  return [{ rect: { x: gesture.x, y: band.y, width: gesture.width, height: band.height }, over: [], axes: { axis: 'horizontal', nested: [] } }];
 }
 
 /** `StrokePlan.noRoom` of the named scroll view `rect`: its length along a stroke `toward` on `gesture`, above a keyboard whose top is `keyboardTop` (vertical strokes only, as `roomIn` judges). */

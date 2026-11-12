@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { everyNode, type Point, type Rect, type UiNode } from '../../src/adapters/types.js';
+import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { MIN_STROKE_BOX, nameScrollView, planProbe, planStroke, seeRead, startStrokes, strokedAcross, strokedBeside, strokeSent, touchedOn, TOUCH_DOWN_CUT_FLOOR, type StrokeMemory } from '../../src/interact/stroke-plan.js';
 import { shortenStroke, swipeVector, swipeVectorAbove, type Direction } from '../../src/interact/swipe.js';
@@ -878,5 +879,56 @@ describe('the presented touch-down — asked of the scene at the points as sent'
     const plan = planOn(tree, 'down', { target: cell, gesture: { x: 0, y: 0, width: 402, height: 874 } });
     expect(plan.stroke.points).toBeDefined();
     expect(plan.presented).toBeUndefined();
+  });
+});
+
+// A38b: idb lists no scroll view, so before its motion is seen a sideways stroke for a target it lists went over the
+// screen box — on the lab's carousel-in-list, C (378,138 354x85, past the carousel's right clip) was stroked at y 437,
+// 256 pt below the carousel, and nothing moved. Any horizontal scroller holding C spans C's band: the stroke goes there.
+describe('the band — on a tree that tells no scroll view, a sideways stroke for a listed target goes over its own row', () => {
+  const idb = (): UiNode => parseIdbDescribeAll(readFileSync(new URL('../fixtures/truth/ios-iphone17-ios27/carousel-in-list.idb.json', import.meta.url), 'utf8'));
+  const byId = (tree: UiNode, id: string): UiNode => {
+    const found = [...everyNode(tree)].find((n) => n.identifier === id);
+    if (found === undefined) throw new Error(`no ${id}`);
+    return found;
+  };
+  const BAND: Rect = { x: 0, y: 138, width: 402, height: 85 };
+
+  it('carousel-in-list under idb, C stroked `right`: over the screen box cut to C\'s band — 322,181 → 80,181, not 322,437', () => {
+    const tree = idb();
+    const plan = planOn(tree, 'right', { target: byId(tree, 'lab.carousel-in-list.C'), gesture: PHONE });
+    expect(plan.stroke).toMatchObject({ box: BAND, points: { from: { x: 322, y: 181 }, to: { x: 80, y: 181 } } });
+    expect(planOn(tree, 'left', { target: byId(tree, 'lab.carousel-in-list.C'), gesture: PHONE }).stroke).toMatchObject({ box: BAND, points: swipeVector(BAND, 'left', 'content') });
+  });
+
+  it('only sideways, only with the target read, only on the screen: a vertical stroke, no target, or a target off the screen keeps the screen box', () => {
+    const tree = idb();
+    const c = byId(tree, 'lab.carousel-in-list.C');
+    expect(planOn(tree, 'down', { target: c, gesture: PHONE }).stroke).toMatchObject({ box: PHONE, points: swipeVector(PHONE, 'down', 'content') });
+    expect(planOn(tree, 'right', { gesture: PHONE }).stroke).toMatchObject({ box: PHONE, points: swipeVector(PHONE, 'right', 'content') });
+    expect(planOn(tree, 'right', { target: byId(tree, 'lab.carousel-in-list.U'), gesture: PHONE }).stroke).toMatchObject({ box: PHONE, points: swipeVector(PHONE, 'right', 'content') });
+  });
+
+  it('a later read that does not find the target keeps the band, as it keeps the target\'s scroll views', () => {
+    const tree = idb();
+    const memory = seeRead(after(tree, { target: byId(tree, 'lab.carousel-in-list.C') }), { facts: factsOf(tree), line: undefined, target: undefined });
+    expect(planStroke(memory, { kind: 'full', toward: 'right', reach: 1, gesture: PHONE, read: undefined }).stroke.box).toEqual(BAND);
+  });
+
+  it('once the motion shows a region: a stroke carrying content back goes over the region; one the region does not take (`screenBox`) over the band, not the screen box', () => {
+    const tree = idb();
+    const c = byId(tree, 'lab.carousel-in-list.C');
+    const region: Rect = { x: 24, y: 140, width: 354, height: 80 };
+    const memory = seeRead(startStrokes(), { facts: factsOf(tree), line: undefined, target: c, region: { rect: region, axis: 'horizontal' } });
+    const ask = { kind: 'full', toward: 'left', reach: 1, gesture: PHONE, read: { facts: factsOf(tree), target: c } } as const;
+    expect(planStroke(memory, ask).stroke.box).toEqual(region);
+    expect(planStroke(memory, { ...ask, toward: 'right', screenBox: true }).stroke.box).toEqual(BAND);
+  });
+
+  it('a tree that tells the target\'s scroll view is untouched: WDA\'s carousel-in-list strokes inside the carousel, as before', async () => {
+    const wda = parseWdaSource(await readFile(new URL('../fixtures/wda-capture-lab-carousel-in-list.json', import.meta.url), 'utf8'));
+    const c = [...everyNode(wda)].find((n) => n.identifier === 'lab.carousel-in-list.C');
+    expect(c).toBeDefined();
+    expect(planOn(wda, 'right', { target: c, gesture: PHONE }).stroke.box).toEqual({ x: 24, y: 138, width: 354, height: 85 });
   });
 });
