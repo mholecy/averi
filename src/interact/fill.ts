@@ -14,7 +14,7 @@ import { sleep } from '../util/sleep.js';
 import { resolveClearOfKeyboard } from './keyboard.js';
 import type { TapOptions } from './tap.js';
 import { describeTarget, type Target } from './resolve.js';
-import { assertTypeable } from './type-text.js';
+import { assertTypeableOn } from './type-text.js';
 import { fillFailureText, focusTapNote } from './fill-text.js';
 import { heldText, shownText, type FillFailure, type FillResult, type NearbyInput, type ReadBack } from './fill-facts.js';
 import { fieldRefetch } from './fill-refetch.js';
@@ -148,14 +148,21 @@ export async function fillField(
   // no focus tap and no clear (type-text.ts). A dropped tail typed again
   // (fill-type.ts, ADR 0023) is a suffix of this value: checked here too.
   // Marked 'refused' (FillValueFailure) — the message is type-text.ts's.
-  try {
-    assertTypeable(value, adapter.typeable);
-  } catch (e) {
-    throw new FillValueFailure(errorMessage(e), 'refused', { cause: e });
-  }
+  const refuseUntypeable = (): void => {
+    try {
+      assertTypeableOn(adapter, value);
+    } catch (e) {
+      throw new FillValueFailure(errorMessage(e), 'refused', { cause: e });
+    }
+  };
+  refuseUntypeable();
   const { clear } = opts;
   const pollMs = opts.valuePollMs ?? opts.pollMs ?? DEFAULT_VALUE_POLL_MS;
   const { node, note: resolutionNote, keyboardHidden, point, moved, tree: resolvedIn } = await resolveClearOfKeyboard(adapter, target, opts);
+  // Again after the resolution, before the focus tap: what an adapter types can change with its first read — iOS
+  // `treeSource: auto` falls back to idb there (A41a, ADR 0046), and a value only WebDriverAgent types is then refused
+  // with nothing tapped or cleared. Pure, so free where nothing changed.
+  refuseUntypeable();
   // A focus tap moved off a covered centre (tap-judgement.ts#TapJudge.aim) is said in the note, after what the
   // resolution said.
   const note = focusTapNote(resolutionNote, moved);

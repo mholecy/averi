@@ -1,7 +1,7 @@
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 import type { LaunchIntent, Platform, Rect } from '../adapters/types.js';
-import { DEFAULT_IOS_TREE_SOURCE, IOS_TREE_SOURCE_KINDS, type IosTreeSourceKind } from '../adapters/ios-node.js';
+import { DEFAULT_IOS_TREE_SOURCE, IOS_TREE_SOURCE_SETTINGS, type IosTreeSourceSetting } from '../adapters/ios-node.js';
 import {
   elementSpecObject,
   elementSpecSchema,
@@ -63,7 +63,7 @@ type KeyboardDismissStrategy = { tap: ElementSpec } | { accessory: true };
  * idb tree marks no node as the keyboard — every reader keys on
  * `KEYBOARD_ROLE` (ui-tree/soft-keyboard.ts), which only the WDA parser
  * assigns (wda-source.ts#keyboardMarks) and the idb parser never does — so
- * under `treeSource: idb` — the default — no guard dismisses anything and
+ * under `treeSource: idb` no guard dismisses anything and
  * the list is inert. What the tap does refuse there is a centre under idb's
  * band, read by its shape (ADR 0006, keyboard-position.ts#KeyboardPosition.line);
  * the sentence says so, since "no tap is ever refused" (until 2026-10-13)
@@ -86,10 +86,12 @@ type KeyboardDismissStrategy = { tap: ElementSpec } | { accessory: true };
 export function inertKeyboardDismissNote(cfg: AveriConfig): string | undefined {
   const ios = cfg.app.ios;
   if (ios?.keyboardDismiss === undefined) return undefined;
-  const kind = ios.treeSource ?? DEFAULT_IOS_TREE_SOURCE;
-  if (kind === 'wda') return undefined;
+  // Only a project that pins idb: under `auto` (the default since A41a) the list applies whenever WebDriverAgent comes
+  // up, and a fallback to idb is said on the claiming replies (adapters/auto-tree-source.ts).
+  const kind: IosTreeSourceSetting = ios.treeSource ?? DEFAULT_IOS_TREE_SOURCE;
+  if (kind !== 'idb') return undefined;
   return (
-    `app.ios.keyboardDismiss is set but app.ios.treeSource is ${kind}${ios.treeSource === undefined ? ' (the default)' : ''}: ` +
+    `app.ios.keyboardDismiss is set but app.ios.treeSource is ${kind}: ` +
     `the ${kind} tree marks no node as the keyboard (on iOS 27 it lists the keys, as plain buttons), so no guard hides it before a tap and the list is inert (a tap whose centre lies under its band, read by shape, is refused instead) — set treeSource: wda for it to apply`
   );
 }
@@ -429,20 +431,22 @@ const configSchema = z
             bundleId: z.string(),
             app: z.string().optional(),
             /**
-             * Which backend reads the accessibility tree. Default idb —
-             * native projects see zero change. React Native projects opt in
-             * with `treeSource: wda`: RN puts testID on the HOST view whose
+             * Which backend reads the accessibility tree. Default `auto`
+             * (A41a, docs/adr/0046-the-ios-tree-source-is-webdriveragent-
+             * when-it-comes-up.md): WebDriverAgent when it can be brought up,
+             * idb when it cannot, chosen at the adapter's first read and said
+             * on each claiming reply. `wda` and `idb` pin one. idb misses
+             * what WDA lists: RN puts testID on the HOST view whose
              * AX child carries no identifier, so idb sees nothing (measured
              * 2026-08-12, docs/plans/ios-wda-tree-source.md §Problem). The
              * same goes for a native SwiftUI identifier on a container
              * (`.accessibilityElement(children: .contain)`, measured
              * 2026-10-05) — a `wait:` or a `scroll_until` on one under idb
              * says so when it gives up (ui-tree/miss.ts, `idUnlisted`).
-             * No `auto` value — deferred until the Phase 4 latency
-             * measurement of /source on deep trees. The kinds are the
-             * tree-source seam's (adapters/ios-node.ts), spelled once.
+             * The settings are the tree-source seam's (adapters/ios-node.ts),
+             * spelled once.
              */
-            treeSource: z.enum(IOS_TREE_SOURCE_KINDS).optional(),
+            treeSource: z.enum(IOS_TREE_SOURCE_SETTINGS).optional(),
             /**
              * How to hide the soft keyboard when it covers a tap target, in
              * order of preference (stage B, 2026-10-07; see

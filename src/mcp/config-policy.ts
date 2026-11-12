@@ -34,7 +34,8 @@ import { NO_CONFIG, OPTIONAL_CONFIG, REQUIRED_CONFIG, REQUIRED_CONFIG_AND_ENV } 
 
 /**
  * The device tools' entry: the iOS tree source (and, for tap and type_text, the keyboard dismissals) are iOS-only
- * values, so android reads nothing. `optional`: without a file the kind is undefined — the registry's default, idb.
+ * values, so android reads nothing. `optional`: without a file the kind is undefined — the registry's default,
+ * auto (A41a).
  */
 const onIos = (p: Platform) => (p === 'ios' ? OPTIONAL_CONFIG : NO_CONFIG);
 

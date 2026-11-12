@@ -3,8 +3,9 @@ import { runIdb } from './idb.js';
 import { rebootSimulatorAdvice } from './simulator-reboot.js';
 import { formatSeconds } from '../util/duration.js';
 import { attachFieldErrors } from './field-errors.js';
-import { IOS_ROLE_MAP, normalizeIosElement, type IosTreeSourceKind } from './ios-node.js';
+import { IOS_ROLE_MAP, normalizeIosElement, type IosTreeSourceKind, type IosTreeSourceSetting } from './ios-node.js';
 import { WdaTreeSource } from './wda-tree-source.js';
+import { AutoTreeSource } from './auto-tree-source.js';
 import type { WdaServerOptions } from './wda.js';
 import type { IdbHelper } from './idb-helper.js';
 import { PersistentReadError, rectArea, rectIntersection, zeroRect, type Rect, type SystemAlert, type UiNode } from './types.js';
@@ -43,12 +44,25 @@ import { countOf } from '../util/count.js';
  */
 export interface IosTreeSource {
   /**
-   * The configured kind this source serves (mcp/registry.ts wires it). No reader above the adapter dispatches on it: a
+   * The kind of backend that answers this source's reads now: fixed for idb and wda; under `auto` (auto-tree-source.ts)
+   * `wda` once WebDriverAgent was chosen, else `idb` — the source that answers its label reads before the choice and
+   * all its reads after a fallback. No reader above the adapter dispatches on it: a
    * tree says its own source by its marks (UiNode.flatList, idb's), which is what a miss reads (ui-tree/miss.ts). The
    * adapter reads it for its keyboard advice (ios.ts#keyboardAdvice) and the wording of its launch's foreground note
    * (ios-foreground.ts#ForegroundCheck.source) only; its screenshots do not follow it (ios.ts#screenshotVia).
    */
   readonly kind: IosTreeSourceKind;
+  /**
+   * One line every reply that claims what it read through this source carries (DeviceAdapter.claimNote) — set only by
+   * `auto` once it fell back to idb (AutoTreeSource, A41a). Absent on idb and wda: a configured source says nothing.
+   */
+  readonly claimNote?: string;
+  /**
+   * Whether this source fell back from the backend it was asked for — `auto` whose WebDriverAgent did not come up, so
+   * its typer is gone (AutoTreeSource, A41a). What IosAdapter.typeText's backstop decides by; absent (not fallen back)
+   * on idb and wda.
+   */
+  readonly fellBack?: boolean;
   /**
    * The cadence at which two of this source's reads may prove an element holds still (types.ts#DeviceAdapter.
    * settleCadenceMs, which IosAdapter forwards; docs/adr/0040-the-settle-cadence-is-the-tree-sources.md). The SOURCE's
@@ -128,20 +142,30 @@ export type IosTreeSourceDeps = Omit<WdaServerOptions, 'udid'> & {
 };
 
 /**
- * The adapter for a configured kind, bound to one simulator. Lives with the
- * seam, not in the registry: which backend serves a kind is adapter knowledge
+ * The adapter for a configured setting, bound to one simulator. Lives with the
+ * seam, not in the registry: which backend serves a setting is adapter knowledge
  * (ARCHITECTURE §2, §3), and the registry's one line is to ask for it.
- * A Record over the kind, so a new kind without a constructor is a compile
+ * A Record over the setting, so a new one without a constructor is a compile
  * error here — not a runtime default somewhere above (moved out of
- * mcp/registry.ts on review 2026-10-03).
+ * mcp/registry.ts on review 2026-10-03). `auto` (A41a) is both sources, of which its first read keeps one.
  */
-const constructors: Record<IosTreeSourceKind, (udid: string, deps: IosTreeSourceDeps) => IosTreeSource> = {
-  idb: (udid, deps) => new IdbTreeSource({ udid, exec: deps.exec, helper: deps.idbHelper }),
-  wda: (udid, { idbHelper: _idb, ...deps }) => new WdaTreeSource({ ...deps, udid }),
+const idbSource = (udid: string, deps: IosTreeSourceDeps): IdbTreeSource =>
+  new IdbTreeSource({ udid, exec: deps.exec, helper: deps.idbHelper });
+const wdaSource = (udid: string, { idbHelper: _idb, ...deps }: IosTreeSourceDeps): WdaTreeSource =>
+  new WdaTreeSource({ ...deps, udid });
+
+const constructors: Record<IosTreeSourceSetting, (udid: string, deps: IosTreeSourceDeps) => IosTreeSource> = {
+  idb: idbSource,
+  wda: wdaSource,
+  auto: (udid, deps) => new AutoTreeSource({ wda: wdaSource(udid, deps), idb: idbSource(udid, deps) }),
 };
 
-export function createIosTreeSource(kind: IosTreeSourceKind, udid: string, deps: IosTreeSourceDeps = {}): IosTreeSource {
-  return constructors[kind](udid, deps);
+export function createIosTreeSource(
+  setting: IosTreeSourceSetting,
+  udid: string,
+  deps: IosTreeSourceDeps = {},
+): IosTreeSource {
+  return constructors[setting](udid, deps);
 }
 
 // --- idb adapter at the seam ---
@@ -494,7 +518,7 @@ export const DESCRIBE_ALL_TIMEOUT_MS = 15_000;
 export const IDB_SETTLE_CADENCE_MS = 300;
 
 /**
- * The default tree source: one `idb ui describe-all --json` per read, nothing
+ * The idb tree source (`treeSource: idb`, and `auto`'s fallback): one `idb ui describe-all --json` per read, nothing
  * to start and nothing to dispose. `exec` defaults to the real one — the same
  * function IosAdapter defaults to, so in production the two share the
  * memoized Xcode probe without anyone passing anything. A test passes its

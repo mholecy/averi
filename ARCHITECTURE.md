@@ -124,8 +124,9 @@ re-exported by `ui-tree/geometry.ts`), the one pre-order walk `adapters/types.ts
 `STRUCTURAL_ROLES`, `PresentationKind`, and the ports wired at the composition root (`DrawnOverStrip`).
 
 Vocabulary: **adapter** — a `DeviceAdapter` bound to one device (serial or UDID, a constructor invariant);
-**tree source** — where iOS reads its tree, idb or WebDriverAgent (`IosTreeSource`); **dialect** — what a source's
-listing means (`flatList`, `unclippedFrames`, `boundsCutAtScreen`, …: marks the parser puts on the root);
+**tree source** — where iOS reads its tree, idb or WebDriverAgent (`IosTreeSource`; `auto` picks one per adapter);
+**dialect** — what a source's listing means (`flatList`, `unclippedFrames`, `boundsCutAtScreen`, …: marks the parser
+puts on the root);
 **capability** — an optional member present only where the platform has the fact (`keyboard?`, `dragSpeed?`,
 `treeReadSettles?`, `settleCadenceMs?`, `capture?`); **`AppHolder`** — what holds the app after a launch or link
 (`alert`, `chooser`, `unknown`, `none`); **`DeviceScreen`** — the device's raw size with its status band, before a tree
@@ -308,7 +309,8 @@ Composes the two engines; its own layer because it needs BOTH and neither may de
   resolved adapter (or a resolver) and the config its handler read, never a path.
 - `preflight.ts` — `refuseUnknownEnvironment`, before any adapter is resolved.
 - `app-health.ts` (`appHealth`, the `appAlive:` line, §8), `log-excerpt.ts` (`get_logs`' grep and tail),
-  `run-reply.ts` (the final frame and the asserts' verdict) — leaves of the replies (A29).
+  `run-reply.ts` (the final frame and the asserts' verdict), `claims.ts` (the claim note's `⚠` line on a reply that
+  claims what it read, and on a failed engine run's error; ADR 0046) — leaves of the replies (A29).
 
 Vocabulary: **leg** — one platform's part of a `verify` run; **parity table** — a per-anchor comparison across legs
 and against the contract.
@@ -413,17 +415,25 @@ error and trace line says the same, host paths stripped; the error's fields keep
 - idb calls all go through `adapters/idb.ts#runIdb`; a persistent helper per adapter (`idb-helper.ts`) runs the CLI
   in-process (ADR 0032). What iOS types, and through which path, is `ios-typing.ts`'s (ADR 0037).
 - **Tree sources** — `adapters/ios-tree-source.ts#IosTreeSource` (`read()`, `applicationLabel()`, `dispose()`), chosen
-  by `app.ios.treeSource` and injected at construction; node normalization is one pure module, `ios-node.ts`
-  (`normalizeIosElement`; the default kind, `DEFAULT_IOS_TREE_SOURCE`). Two adapters:
-  - **idb** (`IdbTreeSource`, the default): `idb ui describe-all`, a FLAT list under a synthetic root. An empty or
-    area-less list is a read error (`IdbEmptyTreeError`), never a tree that reads "absent"; a wedged service is
-    `PersistentReadError` (ADR 0036). Settle cadence 300 ms (`IDB_SETTLE_CADENCE_MS`, ADR 0040). Its presented
-    marks: the root when the list holds UIKit's dismiss region (`listsPresentedLayer`), and a menu's `backdrop`, the
-    unlabelled, id-less element over the whole screen not listed first (`backdropOf`, ADR 0018).
-  - **WebDriverAgent** (`WdaTreeSource`, opt-in `treeSource: wda`): the NESTED XCUIElement tree, for the React Native
-    and SwiftUI container ids idb drops. `wda.ts` owns the server's lifecycle (build once per Xcode, from the pinned
-    `appium-webdriveragent` optional dependency), `wda-source.ts` parses `/source` and marks the keyboard band, hidden
-    subtrees (ADR 0019) and presented layers (ADR 0018). Plan: docs/plans/ios-wda-tree-source.md.
+  by `app.ios.treeSource` (`auto`, `idb` or `wda`) and injected at construction; node normalization is one pure module,
+  `ios-node.ts` (`normalizeIosElement`; the settings and the default, `auto`, `DEFAULT_IOS_TREE_SOURCE`). Two adapters,
+  and `auto` over both:
+  - **auto** (`AutoTreeSource`, `auto-tree-source.ts`, the default; ADR 0046): the first tree read asks WDA to come up
+    (`WdaTreeSource.bringUp`) and keeps ONE source for the adapter's life — WDA when it came up, else idb, said once on
+    stderr and on every claiming reply and failed flow (`claimNote`, printed `⚠ …` by `run/claims.ts#claimed`), with
+    WDA's reason in a few words. Two trees are never reconciled. Before the choice the launch's label is idb's. A
+    `select_device` of the simulator drops a fallen-back adapter (`registry.ts#select`), and the next call tries WDA
+    again.
+  - **idb** (`IdbTreeSource`, `treeSource: idb`, and `auto`'s fallback): `idb ui describe-all`, a FLAT list under a
+    synthetic root. An empty or area-less list is a read error (`IdbEmptyTreeError`), never a tree that reads "absent";
+    a wedged service is `PersistentReadError` (ADR 0036). Settle cadence 300 ms (`IDB_SETTLE_CADENCE_MS`, ADR 0040). Its
+    presented marks: the root when the list holds UIKit's dismiss region (`listsPresentedLayer`), and a menu's
+    `backdrop`, the unlabelled, id-less element over the whole screen not listed first (`backdropOf`, ADR 0018).
+  - **WebDriverAgent** (`WdaTreeSource`, `treeSource: wda`, and `auto`'s choice when it comes up): the NESTED
+    XCUIElement tree, for the React Native and SwiftUI container ids idb drops. `wda.ts` owns the server's lifecycle
+    (build once per Xcode, from the pinned `appium-webdriveragent` optional dependency), `wda-source.ts` parses
+    `/source` and marks the keyboard band, hidden subtrees (ADR 0019) and presented layers (ADR 0018). Plan:
+    docs/plans/ios-wda-tree-source.md.
 - The iOS exception to "adapters know no averi.yaml": the tree source is shaped by a config key, but the kind arrives
   as a value (`flow/tool-config.ts#iosToolSettings` → `registry.get` → the factory); the adapter never reads the file.
   What does cross is words: a refusal may name the config key that is the reader's next move (`keyboardAdvice` names

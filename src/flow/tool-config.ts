@@ -1,5 +1,5 @@
 import type { Platform } from '../adapters/types.js';
-import type { IosTreeSourceKind } from '../adapters/ios-node.js';
+import type { IosTreeSourceSetting } from '../adapters/ios-node.js';
 import type { KeyboardDismissal } from '../interact/keyboard.js';
 import { keyboardDismissals, type AveriConfig } from './config.js';
 import type { EnvValues } from './credentials.js';
@@ -117,8 +117,8 @@ export async function loadForCall(policy: ConfigPolicy, configPath?: string): Pr
  * android, and for a call that read no config.
  */
 export interface IosToolSettings {
-  /** `app.ios.treeSource` — the registry's default (idb) when undefined. */
-  treeSource: IosTreeSourceKind | undefined;
+  /** `app.ios.treeSource` — the registry's default (`auto`) when undefined. */
+  treeSource: IosTreeSourceSetting | undefined;
   /** `app.ios.keyboardDismiss` in the guard's vocabulary (flow/config.ts#keyboardDismissals) — stage A, a covered target refused, when undefined. */
   dismissals: readonly KeyboardDismissal[] | undefined;
 }

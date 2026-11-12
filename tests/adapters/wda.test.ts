@@ -51,7 +51,7 @@ describe('wdaProjectPath', () => {
     // The advice reinstalls averi with optional dependencies — never `npm i -D`
     // in the app repo, which an npx or global averi does not resolve from.
     expect(() => wdaProjectPath(failingResolve)).toThrow(
-      /^treeSource: wda requires the appium-webdriveragent package, an optional dependency of averi /,
+      /^WebDriverAgent requires the appium-webdriveragent package, an optional dependency of averi /,
     );
     expect(() => wdaProjectPath(failingResolve)).toThrow(/reinstall averi without --omit=optional/);
     expect(() => wdaProjectPath(failingResolve)).toThrow('clear its cache (`rm -rf ~/.npm/_npx`)');
@@ -251,6 +251,21 @@ describe('WdaServer.ensureRunning', () => {
     expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('first WDA build'));
     expect(errSpy).toHaveBeenCalledWith(expect.stringContaining(server.logPath));
     server.stop();
+    errSpy.mockRestore();
+  });
+
+  it('a missing package is said before, and instead of, the first-build line — no xcodebuild runs (A41a review m4)', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { dd } = await tempDerivedData();
+    const exec = fakeExec();
+    const server = new WdaServer({
+      udid: 'AAAA-1111', exec: exec.fn, fetchFn: fakeFetch(() => 'refused').fn, spawnFn: fakeSpawn().fn,
+      derivedDataPath: dd, pollIntervalMs: 5,
+      resolvePackage: () => { throw new Error("Cannot find module 'appium-webdriveragent/package.json'"); },
+    });
+    await expect(server.ensureRunning()).rejects.toThrow(/^WebDriverAgent requires the appium-webdriveragent package/);
+    expect(errSpy).not.toHaveBeenCalledWith(expect.stringContaining('first WDA build'));
+    expect(exec.calls.filter((c) => c.startsWith('xcodebuild'))).toEqual([]);
     errSpy.mockRestore();
   });
 

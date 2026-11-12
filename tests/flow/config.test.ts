@@ -433,13 +433,13 @@ flows:
     ).toThrow(/flows\.f\.steps\.0\.assert\.0\.match: not a valid regular expression — .*Unterminated group/);
   });
 
-  it('accepts app.ios.treeSource wda, leaves it undefined by default, rejects unknown values', () => {
+  it('accepts app.ios.treeSource wda, idb and auto (A41a), leaves it undefined by default, rejects unknown values', () => {
     const cfg = parseConfig('app:\n  ios: { bundleId: md.bank.app, treeSource: wda }\n');
     expect(cfg.app.ios?.treeSource).toBe('wda');
     expect(parseConfig('app:\n  ios: { bundleId: md.bank.app, treeSource: idb }\n').app.ios?.treeSource).toBe('idb');
+    expect(parseConfig('app:\n  ios: { bundleId: md.bank.app, treeSource: auto }\n').app.ios?.treeSource).toBe('auto');
     expect(parseConfig(VALID).app.ios?.treeSource).toBeUndefined();
-    // `auto` is explicitly deferred (plan, decision 3) — it must not parse yet
-    expect(() => parseConfig('app:\n  ios: { bundleId: md.bank.app, treeSource: auto }\n'))
+    expect(() => parseConfig('app:\n  ios: { bundleId: md.bank.app, treeSource: xcui }\n'))
       .toThrow(/Invalid averi\.yaml/);
   });
 
@@ -495,13 +495,14 @@ flows:
     /** Review round 1: the key under the default tree source cannot act — said once at load time (flow/load.ts), decided here. */
     describe('inertKeyboardDismissNote — the key set where the tree marks no keyboard', () => {
       const LIST = '    keyboardDismiss:\n      - accessory: true\n';
-      it('treeSource omitted (idb, the default): the note names the default and the fix', () => {
-        expect(inertKeyboardDismissNote(parseConfig(ios(LIST)))).toBe(
-          'app.ios.keyboardDismiss is set but app.ios.treeSource is idb (the default): the idb tree marks no node as the keyboard (on iOS 27 it lists the keys, as plain buttons), so no guard hides it before a tap and the list is inert (a tap whose centre lies under its band, read by shape, is refused instead) — set treeSource: wda for it to apply',
+      it('treeSource: idb written out: the note names it and the fix', () => {
+        expect(inertKeyboardDismissNote(parseConfig(ios(`${LIST}    treeSource: idb\n`)))).toBe(
+          'app.ios.keyboardDismiss is set but app.ios.treeSource is idb: the idb tree marks no node as the keyboard (on iOS 27 it lists the keys, as plain buttons), so no guard hides it before a tap and the list is inert (a tap whose centre lies under its band, read by shape, is refused instead) — set treeSource: wda for it to apply',
         );
       });
-      it('treeSource: idb written out: the note, without "(the default)"', () => {
-        expect(inertKeyboardDismissNote(parseConfig(ios(`${LIST}    treeSource: idb\n`)))).toMatch(/^app\.ios\.keyboardDismiss is set but app\.ios\.treeSource is idb: /);
+      it('treeSource omitted or auto (the default since A41a): nothing — the list applies whenever WebDriverAgent comes up', () => {
+        expect(inertKeyboardDismissNote(parseConfig(ios(LIST)))).toBeUndefined();
+        expect(inertKeyboardDismissNote(parseConfig(ios(`${LIST}    treeSource: auto\n`)))).toBeUndefined();
       });
       it('treeSource: wda, or no keyboardDismiss, or no ios section: nothing', () => {
         expect(inertKeyboardDismissNote(parseConfig(ios(`${LIST}    treeSource: wda\n`)))).toBeUndefined();

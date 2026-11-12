@@ -1,6 +1,6 @@
 import { AndroidAdapter } from '../adapters/android.js';
 import { IosAdapter } from '../adapters/ios.js';
-import { DEFAULT_IOS_TREE_SOURCE, type IosTreeSourceKind } from '../adapters/ios-node.js';
+import { DEFAULT_IOS_TREE_SOURCE, type IosTreeSourceSetting } from '../adapters/ios-node.js';
 import { createIosTreeSource, type IosTreeSourceDeps } from '../adapters/ios-tree-source.js';
 import { IdbHelper } from '../adapters/idb-helper.js';
 import { androidUnusable, defaultDiscovery, type DeviceDiscovery, type ListOpts } from '../adapters/discovery.js';
@@ -23,11 +23,11 @@ function unusableNamed(device: Device | undefined): string | undefined {
 /**
  * Per-call adapter options — today only the iOS tree-source kind (averi.yaml `app.ios.treeSource`). Required by
  * `get` (D41, 2026-11-01): a caller states the project's kind, or that it has none (`treeSource` undefined — the
- * default), and cannot forget it — the eight tools that once asked without it were served, in a `treeSource: wda`
- * project, by a second adapter of the default kind.
+ * default, `auto`), and cannot forget it — the eight tools that once asked without it were served, in a
+ * `treeSource: wda` project, by a second adapter of the default kind.
  */
 export interface AdapterOpts {
-  treeSource?: IosTreeSourceKind;
+  treeSource?: IosTreeSourceSetting;
 }
 
 /**
@@ -67,7 +67,11 @@ export const defaultFactory: AdapterFactory = (platform, deviceId, opts) => {
  * drive it from one server (ADR 0032, amendment D41). `deps` reach the tree source: the
  * server passes none; scripts/perf/baseline.ts passes its lab WebDriverAgent's port and derived data.
  */
-export function iosAdapterFor(udid: string, kind: IosTreeSourceKind, deps: Omit<IosTreeSourceDeps, 'idbHelper'> = {}): IosAdapter {
+export function iosAdapterFor(
+  udid: string,
+  kind: IosTreeSourceSetting,
+  deps: Omit<IosTreeSourceDeps, 'idbHelper'> = {},
+): IosAdapter {
   const idbHelper = new IdbHelper();
   return new IosAdapter({ udid, treeSource: createIosTreeSource(kind, udid, { ...deps, idbHelper }), idbHelper });
 }
@@ -80,7 +84,7 @@ export function iosAdapterFor(udid: string, kind: IosTreeSourceKind, deps: Omit<
  * the default-kind instance. Resolving the default HERE is what makes the
  * cache key and the factory call agree: the factory is handed the resolved kind.
  */
-function kindFor(platform: Platform, opts: AdapterOpts): IosTreeSourceKind | undefined {
+function kindFor(platform: Platform, opts: AdapterOpts): IosTreeSourceSetting | undefined {
   return platform === 'ios' ? opts.treeSource ?? DEFAULT_IOS_TREE_SOURCE : undefined;
 }
 
@@ -153,7 +157,12 @@ export class AdapterRegistry {
     return this.bindings.get(platform)?.deviceId;
   }
 
-  /** Pin the platform's tools to one booted device (id from listAll). */
+  /**
+   * Pin the platform's tools to one booted device (id from listAll). Selecting the device already bound keeps its
+   * adapters, except one that fell back (DeviceAdapter.fellBack: an iOS `treeSource: auto` adapter whose WebDriverAgent
+   * did not come up, A41a): that one is dropped, so the next call builds a fresh adapter that tries WebDriverAgent
+   * again — the retry its note names.
+   */
   async select(platform: Platform, deviceId: string): Promise<Device> {
     this.assertOpen();
     const devices = await this.probe(platform);
@@ -169,6 +178,7 @@ export class AdapterRegistry {
     this.assertOpen(); // before the write, as in get(): a shutdown during the probe must not leave a binding behind
     const previous = this.bindings.get(platform);
     if (previous && previous.deviceId !== deviceId) this.evict(platform, previous.deviceId);
+    else this.evict(platform, deviceId, (adapter) => adapter.fellBack === true);
     this.bindings.set(platform, { deviceId, pinned: true });
     return device;
   }
@@ -243,10 +253,10 @@ export class AdapterRegistry {
     return entry.adapter;
   }
 
-  /** Drop and dispose every cached adapter (every kind) bound to one device. */
-  private evict(platform: Platform, deviceId: string): void {
+  /** Drop and dispose every cached adapter (every kind) bound to one device — or, with `only`, those it holds to. */
+  private evict(platform: Platform, deviceId: string, only: (adapter: DeviceAdapter) => boolean = () => true): void {
     for (const [key, entry] of this.adapters) {
-      if (entry.platform === platform && entry.deviceId === deviceId) {
+      if (entry.platform === platform && entry.deviceId === deviceId && only(entry.adapter)) {
         this.adapters.delete(key);
         void disposeQuietly(entry.adapter);
       }

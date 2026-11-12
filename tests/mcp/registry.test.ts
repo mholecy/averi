@@ -235,7 +235,7 @@ describe('AdapterRegistry', () => {
       expect(await registry.get('ios', {})).toBe(adapter);
       expect(plistReads).toEqual(['sim']);
       expect(probes).toEqual(['ios']); // the bound call listed nothing
-      expect(bound).toEqual(['sim+idb']);
+      expect(bound).toEqual(['sim+auto']);
     });
 
     it('a PINNED simulator proven booted lists only for select_device, not for each call', async () => {
@@ -277,7 +277,7 @@ describe('AdapterRegistry', () => {
       await registry.select('ios', 'b'); // evicts a, binds b
       release();
       const adapter = await racing;
-      expect(bound).toEqual(['a+idb', 'b+idb']);
+      expect(bound).toEqual(['a+auto', 'b+auto']);
       expect(adapter).toBe(created[1]);
       expect(adapter).not.toBe(first);
       expect(registry.boundId('ios')).toBe('b');
@@ -299,16 +299,18 @@ describe('AdapterRegistry', () => {
     expect(bound).toEqual(['first', 'second']);
   });
 
-  it('caches per tree-source kind: same kind shares an instance, wda gets its own', async () => {
+  it('caches per tree-source setting: same setting shares an instance, wda and idb get their own', async () => {
     const { registry, bound } = makeRegistry([device('sim', 'booted', 'ios')]);
-    // `{}` is a project that configures no kind: the default's instance.
+    // `{}` is a project that configures no setting: the default's instance.
     const dflt = await registry.get('ios', {});
     const wda = await registry.get('ios', { treeSource: 'wda' });
     expect(await registry.get('ios', { treeSource: 'wda' })).toBe(wda);
     expect(wda).not.toBe(dflt);
-    // an explicit idb IS the default — no third instance
-    expect(await registry.get('ios', { treeSource: 'idb' })).toBe(dflt);
-    expect(bound).toEqual(['sim+idb', 'sim+wda']);
+    // an explicit auto IS the default (A41a) — no third instance; an explicit idb is one
+    expect(await registry.get('ios', { treeSource: 'auto' })).toBe(dflt);
+    const idb = await registry.get('ios', { treeSource: 'idb' });
+    expect(idb).not.toBe(dflt);
+    expect(bound).toEqual(['sim+auto', 'sim+wda', 'sim+idb']);
   });
 
   it('android has no tree source — a stray kind neither forks the cache nor reaches the factory', async () => {
@@ -326,7 +328,24 @@ describe('AdapterRegistry', () => {
     await registry.select('ios', 'b');
     await registry.get('ios', {});
     await registry.get('ios', { treeSource: 'wda' });
-    expect(bound).toEqual(['b+idb', 'b+wda']);
+    expect(bound).toEqual(['b+auto', 'b+wda']);
+  });
+
+  it('select() of the device already bound drops only an adapter that fell back (fellBack, A41a): the next get builds a fresh one', async () => {
+    const { registry, created } = makeRegistry([device('sim', 'booted', 'ios')]);
+    await registry.select('ios', 'sim');
+    const fallen = Object.assign((await registry.get('ios', {})) as FakeAdapter, { fellBack: true });
+    const wda = (await registry.get('ios', { treeSource: 'wda' })) as FakeAdapter;
+    await registry.select('ios', 'sim');
+    expect(fallen.disposed).toBe(1);
+    expect(wda.disposed).toBe(0);
+    expect(await registry.get('ios', { treeSource: 'wda' })).toBe(wda);
+    const fresh = await registry.get('ios', {});
+    expect(fresh).not.toBe(fallen);
+    expect(created).toHaveLength(3);
+    // A healthy adapter survives a re-select of its device, as before.
+    await registry.select('ios', 'sim');
+    expect(await registry.get('ios', {})).toBe(fresh);
   });
 
   it('select() to a DIFFERENT device disposes the old device\'s cached adapters', async () => {
@@ -364,7 +383,7 @@ describe('AdapterRegistry', () => {
       () => gate,
     );
     const first = (await registry.get('ios', {})) as FakeAdapter; // auto-binds a
-    expect(bound).toEqual(['a+idb']);
+    expect(bound).toEqual(['a+auto']);
 
     let release!: () => void;
     gate = new Promise((r) => { release = r; });
@@ -376,7 +395,7 @@ describe('AdapterRegistry', () => {
     release();
     const resumed = (await racing) as FakeAdapter;
     expect(resumed).not.toBe(first);
-    expect(bound).toEqual(['a+idb', 'b+idb']); // no second adapter for the deselected a
+    expect(bound).toEqual(['a+auto', 'b+auto']); // no second adapter for the deselected a
     expect(resumed).toBe(await registry.get('ios', {})); // and it IS b's cached adapter
     expect(created.filter((a) => a.disposed > 0)).toEqual([first]);
   });
@@ -461,15 +480,21 @@ describe('defaultFactory — the wiring the injected factories above never see',
     expect(wdaPortFor('booted')).toBe(8101);
   });
 
-  it("'idb', and an omitted kind, build NO WebDriverAgent: no port is allocated for the device", () => {
+  it("'idb' builds NO WebDriverAgent: no port is allocated for the device", () => {
     // The inverse of the pin above, and the one that catches a factory that
     // ignores the kind: with no wda source constructed, nothing has asked the
     // allocator for this udid, so the first asker after the reset still gets
     // 8100 — here, this test.
     resetWdaPortAllocatorForTests();
     defaultFactory('ios', 'AAAA-1111', { treeSource: 'idb' });
-    defaultFactory('ios', 'BBBB-2222');
     expect(wdaPortFor('X')).toBe(8100);
+  });
+
+  it('an omitted setting is auto (A41a): it holds a WebDriverAgent source, so the port is allocated — no process yet', () => {
+    resetWdaPortAllocatorForTests();
+    defaultFactory('ios', 'BBBB-2222');
+    expect(wdaPortFor('BBBB-2222')).toBe(8100);
+    expect(wdaPortFor('X')).toBe(8101);
   });
 
   it("'wda' DOES allocate the device's port — the kind, not the call, decides", () => {

@@ -629,6 +629,35 @@ describe('createIosTreeSource — which backend a kind gets, pinned by what the 
     expect(exec.calls.filter((c) => c.full.startsWith('idb'))).toEqual([]);
   });
 
+  it("'auto' (A41a), WDA comes up: the first read brings it up and every read is WDA's; idb is never asked for a tree", async () => {
+    const { spawner, exec, deps } = await fakes(IDB_DESCRIBE_ALL);
+    const source = createIosTreeSource('auto', 'BBBB-2222', deps);
+    expect(await source.read()).toMatchObject({ role: 'container', label: 'FromWDA' });
+    expect(await source.read()).toMatchObject({ label: 'FromWDA' });
+    expect(spawner.spawns).toHaveLength(1);
+    expect(exec.calls.filter((c) => c.full.startsWith('idb'))).toEqual([]);
+    expect(source.kind).toBe('wda');
+    expect(source.claimNote).toBeUndefined();
+  });
+
+  it("'auto' (A41a), WDA cannot come up (a WebDriverAgent not ours holds the port): every read is idb's, with the note", async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { dd } = await tempDerivedData(true);
+    const spawner = fakeSpawn();
+    const fetcher = fakeFetch(() => ({ status: 200, body: WDA_STATUS }));
+    const exec = fakeExec({ 'idb ui describe-all': IDB_DESCRIBE_ALL });
+    const source = createIosTreeSource('auto', 'AAAA-1111', { exec: exec.fn, fetchFn: fetcher.fn, spawnFn: spawner.fn, derivedDataPath: dd, pollIntervalMs: 5 });
+    expect((await source.read()).children[0]).toMatchObject({ identifier: 'login_button' });
+    await source.read();
+    expect(spawner.spawns).toEqual([]);
+    expect(fetcher.urls.filter((u) => u.endsWith('/status'))).toHaveLength(1); // asked once, at the first read
+    expect(exec.calls.filter((c) => c.full === 'idb ui describe-all --json --udid AAAA-1111')).toHaveLength(2);
+    expect(source.kind).toBe('idb');
+    expect(source.claimNote).toMatch(/^read through idb: WebDriverAgent did not come up/);
+    expect(errors.mock.calls.flat().join('\n')).toMatch(/treeSource auto — WebDriverAgent did not come up, so this simulator's tree is read through idb: A WebDriverAgent answers \/status on port/);
+    errors.mockRestore();
+  });
+
   it("'wda': applicationLabel of a WebDriverAgent not up yet is declined — none started, no idb call", async () => {
     const { spawner, fetcher, exec, deps } = await fakes(IDB_DESCRIBE_ALL);
     expect(await createIosTreeSource('wda', 'BBBB-2222', deps).applicationLabel()).toEqual({ kind: 'declined' });

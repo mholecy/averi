@@ -111,7 +111,7 @@ describe('loadForCall — the one read of a tool call, judged by its policy', ()
 
   /** Review round 1 of stage B: the key under the default tree source is inert — said on stderr once per file, by every loader. */
   describe('the inert-key note', () => {
-    const INERT = 'app:\n  ios: { bundleId: md.bank.app, keyboardDismiss: [{ accessory: true }] }\n';
+    const INERT = 'app:\n  ios: { bundleId: md.bank.app, treeSource: idb, keyboardDismiss: [{ accessory: true }] }\n';
     const notes = () => said().filter((line) => line.includes('keyboardDismiss'));
 
     it('the optional read (the config-optional tools) says it', async () => {
@@ -136,7 +136,7 @@ describe('iosToolSettings — the iOS settings of a config already read', () => 
   const cfg = (yaml: string) => parseConfig(yaml);
   const CONFIGURED = 'app:\n  ios: { bundleId: md.bank.app, keyboardDismiss: [{ tap: { id: login_title } }, { accessory: true }] }\n';
 
-  it('no config → neither field: the registry\'s default (idb) and stage A for the guard', () => {
+  it('no config → neither field: the registry\'s default (auto) and stage A for the guard', () => {
     expect(iosToolSettings(undefined, 'ios')).toEqual(NONE);
     expect(iosToolSettings(undefined, 'android')).toEqual(NONE);
   });

@@ -36,6 +36,7 @@ import {
 } from '../verify/text-parity.js';
 import type { Contribution } from '../verify/contribution.js';
 import { countOf } from '../util/count.js';
+import { claimed } from './claims.js';
 
 /**
  * The `verify` tool's orchestration: run the same sequence on each requested
@@ -408,8 +409,11 @@ export async function runVerification(
   // it still never asks for a compiler.
   const ocr = ocrEngineFor(req.ocrEngine);
 
+  /** The legs' adapters, for the reply's claim note (claims.ts): it closes the last section. */
+  const resolved: DeviceAdapter[] = [];
   const runOne = async (p: Platform): Promise<VerificationLeg> => {
     const adapter = await resolveAdapter(p);
+    resolved.push(adapter);
     // ONE engine run per leg (2026-10-07): the state and the flow share its
     // trace, environment line and recovery budget, so a flow that fails after
     // the state was ensured fails with the state's lines too. Until then the
@@ -529,6 +533,7 @@ export async function runVerification(
     }
   }
 
+  sections.push(claimed(resolved, sections.pop() ?? ''));
   return { sections, screenshots: await Promise.all(screenshots) };
 }
 

@@ -5,7 +5,7 @@ import type { AdapterFactory, AdapterRegistry } from '../../src/mcp/registry.js'
 import type { DeviceDiscovery } from '../../src/adapters/discovery.js';
 import type { createAveriServer } from '../../src/mcp/tools.js';
 import type { IosAdapter } from '../../src/adapters/ios.js';
-import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
+import type { IosTreeSourceSetting } from '../../src/adapters/ios-node.js';
 import type { IosTreeSourceDeps } from '../../src/adapters/ios-tree-source.js';
 import type { Recording } from './corpus.js';
 import { logCall, useDevice, type DeviceProfile } from './fake-device.js';
@@ -70,7 +70,8 @@ export type LiveIosWiring = 'registry-helper-on' | 'registry-helper-off' | 'fall
 
 /** A side's live iOS adapter (`Side.liveIos`): the adapter for one simulator and tree-source kind, and which wiring built it. */
 export interface LiveIos {
-  adapter(udid: string, kind: IosTreeSourceKind, deps: LiveIosDeps): DeviceAdapter;
+  /** `kind`: the case's pinned source; `auto` only from a side that has it (A41a) — the truth cases pin idb or wda. */
+  adapter(udid: string, kind: IosTreeSourceSetting, deps: LiveIosDeps): DeviceAdapter;
   wiring: LiveIosWiring;
   /**
    * For a registry wiring, who read the kill switch: the side's own src/adapters/idb-helper.ts `idbHelperDisabled`
@@ -111,7 +112,9 @@ function liveIosOf(
     };
   }
   if (typeof treeSource.createIosTreeSource !== 'function') return undefined;
-  const create = treeSource.createIosTreeSource as (kind: IosTreeSourceKind, udid: string, deps: LiveIosDeps) => ConstructorParameters<Side['IosAdapter']>[0]['treeSource'];
+  type Source = ConstructorParameters<Side['IosAdapter']>[0]['treeSource'];
+  type Create = (kind: IosTreeSourceSetting, udid: string, deps: LiveIosDeps) => Source;
+  const create = treeSource.createIosTreeSource as Create;
   return { adapter: (udid, kind, deps) => new Ios({ udid, treeSource: create(kind, udid, deps) }), wiring: 'fallback' };
 }
 

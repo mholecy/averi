@@ -176,7 +176,7 @@ export function wdaProjectPath(
     pkgJson = resolvePkg('appium-webdriveragent/package.json');
   } catch (err) {
     throw new Error(
-      'treeSource: wda requires the appium-webdriveragent package, an optional dependency of averi ' +
+      'WebDriverAgent requires the appium-webdriveragent package, an optional dependency of averi ' +
         'that is not installed (optional dependencies were skipped, e.g. --omit=optional, or its install failed) — ' +
         'reinstall averi without --omit=optional (and with npm_config_omit unset); under npx, clear its cache ' +
         '(`rm -rf ~/.npm/_npx`) and run it again',
@@ -200,6 +200,8 @@ export interface WdaServerOptions {
   pollIntervalMs?: number;
   /** Seam for shutdown()'s last resort — production is process.kill. */
   killProcess?: (pid: number, signal: NodeJS.Signals) => void;
+  /** Test knob — the package resolve wdaProjectPath preflights; production is require.resolve. */
+  resolvePackage?: (id: string) => string;
 }
 
 export class WdaServer {
@@ -214,6 +216,7 @@ export class WdaServer {
   private readonly readyTimeoutMs: number;
   private readonly pollIntervalMs: number;
   private readonly killProcess: (pid: number, signal: NodeJS.Signals) => void;
+  private readonly resolvePackage: ((id: string) => string) | undefined;
 
   private inflight: Promise<void> | undefined;
   /** Set by shutdown(): terminal — unlike stop(), no restart may follow. */
@@ -252,6 +255,7 @@ export class WdaServer {
     this.readyTimeoutMs = opts.readyTimeoutMs ?? READY_TIMEOUT_MS;
     this.pollIntervalMs = opts.pollIntervalMs ?? POLL_INTERVAL_MS;
     this.killProcess = opts.killProcess ?? ((pid, signal) => process.kill(pid, signal));
+    this.resolvePackage = opts.resolvePackage;
     this.logPath = join(tmpdir(), `averi-wda-${opts.udid}.log`);
   }
 
@@ -637,12 +641,15 @@ export class WdaServer {
     let xctestrun = await this.findXctestrun();
     assertNotStopped();
     if (!xctestrun) {
+      // The package first (A41a review m4): a missing one is said before, and instead of, the build line below — the
+      // build could never start, and "takes minutes" followed by "not installed" sent readers of stderr waiting.
+      const project = wdaProjectPath(this.resolvePackage);
       // Loud by design (plan, Risks): a silent multi-minute first build reads
       // as a hang. stderr is the sanctioned channel (server.ts logs there too).
       console.error(
         `averi: first WDA build for this Xcode version — takes minutes, cached afterwards; log: ${this.logPath}`,
       );
-      await this.build();
+      await this.build(project);
       assertNotStopped();
       xctestrun = await this.findXctestrun();
       assertNotStopped();
@@ -720,8 +727,8 @@ export class WdaServer {
     return stats[0].path;
   }
 
-  private async build(): Promise<void> {
-    const project = wdaProjectPath(); // preflight — its failure is a missing-package error, not a build failure
+  /** `project`: wdaProjectPath()'s, preflighted by the caller — a missing package is no failed build. */
+  private async build(project: string): Promise<void> {
     const env = await detectXcodeEnv(this.exec);
     try {
       const { stdout, stderr } = await this.exec(

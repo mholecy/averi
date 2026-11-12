@@ -13,6 +13,8 @@ a side), Android tap/fill (5 a side) — Δ slept ≈ 0 (≤ 3 ms); device calls
 wrong settle sets `IDB_SETTLE_CADENCE_MS` to 400) was not needed. ADR 0029's rule (`pauseAfterRead`) is unchanged.
 This record adds a fact: which `pollMs` the settle is given.
 Amended 2026-11-03 (T5: the batch-11 trace replayed through resolveSettled) — see the amendment below.
+Amended 2026-11-12 (A41a: under `treeSource: auto` the cadence is undefined — the default 500 — until the first read
+chose a source, then that source's; ADR 0046).
 
 ## Context
 

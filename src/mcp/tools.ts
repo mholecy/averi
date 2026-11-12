@@ -30,6 +30,7 @@ import { DEFAULT_SIZE_TOLERANCE_PCT } from '../verify/text-parity.js';
 import { baselineDirFor, runAsserts, runEnsureState, runNamedFlow } from '../run/commands.js';
 import { formatLogExcerpt, LOG_GREP_FLAGS, LOG_MAX_LINES } from '../run/log-excerpt.js';
 import { runVerification } from '../run/verify.js';
+import { claimed } from '../run/claims.js';
 import { normalizePlatforms } from './platforms.js';
 import { regexSource } from '../util/regex.js';
 import { FOREGROUND_WAIT_MS, type DeviceAdapter, type Platform, type UiNode } from '../adapters/types.js';
@@ -211,7 +212,7 @@ export const serverInstructions = (version: string): string => [
     'Double-quote a value with spaces: text:"Sign in" (text:Sign in fails at "in"). Prefer stable id:s.',
   'Coordinates and rects are in tree units: pixels on Android, points on iOS.',
   'configPath: averi.yaml is read only when a call uses a value from it; an invalid file fails the call, naming it; a missing one fails only the tools that cannot work without it (ensure_state, run_flow, verify, install_app without a path).',
-  'iOS tree source (app.ios.treeSource in averi.yaml): idb by default — no scroll views, no container ids, nothing beneath the keyboard or a presented layer; wda (WebDriverAgent) sees those, ~2x slower.',
+  'iOS tree source (app.ios.treeSource): auto — WebDriverAgent, or idb if it cannot start (a ⚠ line says so; no scroll views, container ids, keyboard or presented layers); wda/idb pin one.',
   'A refusal taps, types or swipes nothing on its target (a keyboard dismissal it tried is named in it) and names its cause and remedy (scroll_until it first, close the presented screen first, hide the keyboard): follow it rather than retrying unchanged. Under a screen presented over the target (an alert, a sheet, a modal, an Android dialog) no scroll helps: close it first. ' +
     'An empty or bare tree is not absence: compare with screenshot.',
   `Full behaviour of each tool: the averi skill's references/tools.md (without the skill: ${toolsReferenceUrl(version)}); error lines by symptom: references/troubleshooting.md.`,
@@ -407,7 +408,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'Normalized accessibility tree as JSON — cheap text-based verification. filter (a selector) returns only the matching nodes, without their children. Rects are in tree units (px on Android, pt on iOS). ' +
         `A filter that matches nothing returns [] plus a second text block: the tree's size and roles, or a ⚠ that the tree is bare (${BARE_TREE_CONTENTS}) — still loading, or stuck on a rendered screen: compare with screenshot, and never read the element as absent from a bare tree. ` +
         `iOS idb's stuck tree (a 0×0 Application) fails the call instead. Does not wait, but for one re-read of an unreadable first read; to wait for an element, assert polls (${ASSERT_BUDGET} by default; set "timeout" in the spec). ` +
-        'iOS: an id: that finds nothing on screen is often the default idb tree source (React Native static text and containers, SwiftUI .contain containers, some UIKit ids) — set app.ios.treeSource: wda in averi.yaml and retry, or ask by text:/label:. ' +
+        'iOS: an id: that finds nothing on screen is often idb (pinned, or auto without WDA), which drops React Native static text and containers, SwiftUI .contain containers, some UIKit ids — set app.ios.treeSource: wda and retry, or ask by text:/label:. ' +
         'An EMPTY textfield\'s "value" is often its placeholder; a node whose "placeholder" equals its value is an empty field. ' +
         'Marks: "presentation" ("alert", "actionSheet", "popover", "screen", "backdrop"; on an Android root "dialog"/"screen") — a layer presented over the screen, covering everything beneath it: targets there are refused until it is closed; ' +
         '"hidden": true (iOS wda) — listed but not shown (a tab bar a pushed screen hides), no cover; role "keyboard" (iOS wda) — the band where a tap is refused, while "ofKeyboard": true nodes are the keyboard\'s own, tappable UI; ' +
@@ -461,7 +462,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     async ({ platform: p, selector, x, y, configPath: cp }) => {
       const served = await serve(p, TOOL_CONFIG.tap(p), cp);
       if (selector !== undefined) {
-        return text(tapText(selector, await tapElement(served.adapter, selector, acting(served))));
+        const tapped = await tapElement(served.adapter, selector, acting(served));
+        return text(claimed([served.adapter], tapText(selector, tapped)));
       }
       if (x === undefined || y === undefined) {
         throw new Error('Provide either selector or both x and y');
@@ -524,7 +526,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'typed — APPENDING to pre-filled content unless clear: true deletes it first — then read back. "Filled …" only when the field shows the text (a dropped clear-fill is retried once); otherwise "Typed … — NOT verified" (or "Cleared …"/"Focused … — NOT verified") with the reason; a match that is not a textfield gets a ⚠ naming the nearest input. ' +
         'A text the app transforms (auto-capitalisation, autocorrect, a mask) FAILS the read-back, saying whether only letter case differs — never the text. If the tree cannot be re-read after typing, the call FAILS. ' +
         'A placeholder the tree reports as the value is not content. The keyboard is NOT dismissed afterwards (a flow\'s fill: has dismissKeyboard). ' +
-        'Types printable ASCII, and under `ios.treeSource: wda` also Latin, Greek, Cyrillic and Han letters, punctuation and symbols; anything else is refused before anything is sent (ADR 0037). ' +
+        'Types printable ASCII, and under WDA (`wda`, or `auto` once up) also Latin, Greek, Cyrillic and Han letters, punctuation and symbols; anything else is refused before anything is sent (ADR 0037). ' +
         'Every case in full: references/tools.md#type_text.',
       inputSchema: {
         platform,
@@ -542,7 +544,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         return text(typedText(value.length));
       }
       const fill = await fillField(served.adapter, selector, value, { ...acting(served), clear });
-      return text(fillReply(fill, selector));
+      return text(claimed([served.adapter], fillReply(fill, selector)));
     },
   );
 
@@ -582,7 +584,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       const { adapter, eyes } = await serve(p, TOOL_CONFIG.scroll_until(p), cp);
       // The eyes a `fully visible` claim is confirmed with (ui-tree/eyes.ts), served here: interact/ may not import verify/.
       const result = await scrollUntilVisible(adapter, selector, { direction, maxSwipes, fully, timeoutMs, within, eyes });
-      return text(`Element ${selector} ${describeScrollResult(result)}`);
+      const reply = `Element ${selector} ${describeScrollResult(result)}`;
+      return text(claimed([adapter], reply));
     },
   );
 

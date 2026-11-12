@@ -74,6 +74,22 @@ export class WdaTreeSource implements IosTreeSource {
   }
 
   /**
+   * Brings WebDriverAgent up without reading a tree — WdaServer.ensureRunning, within its own bounds (the package, a
+   * first build, /status). What `treeSource: auto` asks before its first read (auto-tree-source.ts, A41a): a failure
+   * here is "WDA cannot be brought up", unlike a failed /source on a WDA that is up. Released → the released error, as
+   * read().
+   */
+  async bringUp(): Promise<void> {
+    if (this.disposed) throw this.released();
+    try {
+      await this.server.ensureRunning();
+    } catch (err) {
+      if (this.disposed) throw this.released(err);
+      throw err;
+    }
+  }
+
+  /**
    * Which app WebDriverAgent reads — asked only of a WDA that is up (D48,
    * 2026-11-02; ADR 0032's D48 amendment). Until 2026-11-02 this declined
    * always, by decision (2026-10-09): the idb lag after an app switch had not

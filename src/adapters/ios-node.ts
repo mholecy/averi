@@ -11,15 +11,22 @@ import { zeroRect, type Rect, type UiNode } from './types.js';
  */
 
 /**
- * The configured kind — `app.ios.treeSource` in averi.yaml, the registry's
- * cache key, and the one place the two literals are written. flow/config.ts
- * builds its enum from the tuple; mcp/registry.ts keys its cache on the type
- * and picks the adapter (ios-tree-source.ts, wda-tree-source.ts) from it.
+ * The kind of a tree source — which backend reads the tree: idb's describe-all or WebDriverAgent's /source. What a
+ * source says it is (ios-tree-source.ts#IosTreeSource.kind) and the one place the two literals are written.
  */
 export const IOS_TREE_SOURCE_KINDS = ['idb', 'wda'] as const;
 export type IosTreeSourceKind = (typeof IOS_TREE_SOURCE_KINDS)[number];
-/** Native projects see no change by default; RN projects opt into `wda`. */
-export const DEFAULT_IOS_TREE_SOURCE: IosTreeSourceKind = 'idb';
+
+/**
+ * The configured setting — `app.ios.treeSource` in averi.yaml and the registry's cache key: a kind, or `auto`
+ * (A41a, docs/adr/0046-the-ios-tree-source-is-webdriveragent-when-it-comes-up.md): WebDriverAgent when it can be
+ * brought up, idb when it cannot, chosen once per adapter at its first tree read (auto-tree-source.ts). flow/config.ts
+ * builds its enum from the tuple; ios-tree-source.ts#createIosTreeSource builds the source for each.
+ */
+export const IOS_TREE_SOURCE_SETTINGS = ['auto', ...IOS_TREE_SOURCE_KINDS] as const;
+export type IosTreeSourceSetting = (typeof IOS_TREE_SOURCE_SETTINGS)[number];
+/** A project that names no source gets `auto` (A41a); `idb` and `wda` pin one, as before. */
+export const DEFAULT_IOS_TREE_SOURCE: IosTreeSourceSetting = 'auto';
 
 /**
  * iOS element `type` → normalized role vocabulary, shared by both tree

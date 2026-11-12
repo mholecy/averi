@@ -203,7 +203,7 @@ table **fail closed** on a width that cannot be trusted — they print no deltas
 
 - **a content width** — the widest rect starts inset, so every delta would be scaled wrong
   (until 2026-10-07 this was only a warning, and a real -4.2 % defect could read WITHIN
-  TOLERANCE under it). On iOS this typically means the default idb tree source surfaced no real
+  TOLERANCE under it). On iOS this typically means the idb tree source surfaced no real
   window rect (width came from the widest accessibility element): set `app.ios.treeSource: wda`
   in `averi.yaml`, whose tree carries a real window rect. On Android it is usually the app's own
   window letterboxed or freeform (a fixed-orientation or non-resizable app on a large screen),
