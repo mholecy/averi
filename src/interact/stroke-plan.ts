@@ -414,8 +414,8 @@ export function planStroke(memory: StrokeMemory, { toward, reach: turnsReach, ge
 }
 
 /**
- * The target's row as a stroke box (`Memory.band`, A38b): the gesture box cut to the target's y band — clamped to it by
- * `strokeRoom`, which meets every candidate with the gesture box — for a SIDEWAYS stroke only; none for a vertical one,
+ * The target's row as a stroke box (`Memory.band`, A38b): the gesture box cut to the target's y band — none where the
+ * band misses the gesture box — for a SIDEWAYS stroke only; none for a vertical one,
  * before any read found the target, or with no gesture box. On idb's flat list, which tells no scroll view, a
  * horizontal scroller holding the target spans its band, so a sideways stroke over that band touches down on it, where
  * one over the screen box's centre row touches down wherever the screen's middle is — on carousel-in-list 256 pt below
@@ -423,15 +423,20 @@ export function planStroke(memory: StrokeMemory, { toward, reach: turnsReach, ge
  * tree tells neither), its axis the stroke's own, and every claim is still judged from the reads.
  *
  * Above the keyboard line `keyboardTop` (the plan's kept line, `Memory.line`), as every stroke: a band at or below it
- * is none — the screen box above the keyboard strokes, as before A38b — and one it cuts is cut at it; what is left
- * under TOUCH_SLOP is none either (too thin to hold the stroke's line). A stroke on the keys may swipe-type a word,
+ * is none — the screen box above the keyboard strokes, as before A38b — and one it cuts is cut at it; what the cut
+ * leaves under TOUCH_SLOP is none either (too thin to hold the stroke's line). A band no keyboard cuts is kept however
+ * thin: the target's centre line lies inside the scroller holding it. A stroke on the keys may swipe-type a word,
  * and swipe.ts#swipeVectorAbove's keyboard top must lie inside the box it is handed.
  */
 function bandOf(band: Memory['band'], gesture: Rect | undefined, toward: Direction, keyboardTop: number | undefined): ScrollView[] {
   if (band === undefined || gesture === undefined || axisOf(toward) !== 'horizontal') return [];
-  const height = keyboardTop === undefined ? band.height : Math.min(band.height, keyboardTop - band.y);
-  if (height < TOUCH_SLOP) return [];
-  return [{ rect: { x: gesture.x, y: band.y, width: gesture.width, height }, over: [], axes: { axis: 'horizontal', nested: [] } }];
+  // On the gesture box first, then above the keyboard line.
+  const top = Math.max(band.y, gesture.y);
+  const bottom = Math.min(band.y + band.height, gesture.y + gesture.height);
+  const cutAt = keyboardTop !== undefined && keyboardTop < bottom ? keyboardTop : bottom;
+  const height = cutAt - top;
+  if (height <= 0 || (cutAt < bottom && height < TOUCH_SLOP)) return [];
+  return [{ rect: { x: gesture.x, y: top, width: gesture.width, height }, over: [], axes: { axis: 'horizontal', nested: [] } }];
 }
 
 /** `StrokePlan.noRoom` of the named scroll view `rect`: its length along a stroke `toward` on `gesture`, above a keyboard whose top is `keyboardTop` (vertical strokes only, as `roomIn` judges). */

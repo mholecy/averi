@@ -950,10 +950,10 @@ scroll views (`isUntold` false), never set a band, and plan exactly as before. T
 carousel-in-list.idb C scroll_until, and nothing else. The flush probe (`planProbe`) never takes the band. Like the
 region, the band is no node of the tree, so `touchedOn`, `strokedAcross` and `strokedContent` say nothing of it.
 The keyboard line the plan keeps bounds the band as it bounds every stroke box: a band at or below the line is no band,
-so the screen box's stroke above the keyboard applies as before; a band the line cuts is cut at it; and what is left
-under TOUCH_SLOP (24 pt, too thin to hold the stroke's line) is no band either. A stroke on the keys could swipe-type
-a word, and `swipeVectorAbove` requires the keyboard top inside the box it is given. The same floor drops the band of a
-target under 24 pt tall with no keyboard up.
+so the screen box's stroke above the keyboard applies as before; a band the line cuts is cut at it; and what the cut
+leaves under TOUCH_SLOP (24 pt, too thin to hold the stroke's line) is no band either. A stroke on the keys could
+swipe-type a word, and `swipeVectorAbove` requires the keyboard top inside the box it is given. A band no keyboard cuts
+is kept however thin, since the target's centre line lies inside the scroller holding it.
 
 **Residual.** The band is the target's own row, not the scroller's: if a horizontal scroller's touch-down region
 narrower than the screen excludes the gesture box's 0.8 / 0.2 points, the stroke still touches down beside it. That

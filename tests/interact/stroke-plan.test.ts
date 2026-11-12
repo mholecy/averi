@@ -924,6 +924,14 @@ describe('the band — on a tree that tells no scroll view, a sideways stroke fo
     expect(right(400)).toMatchObject({ box: BAND, points: { from: { x: 322, y: 181 }, to: { x: 80, y: 181 } } });
   });
 
+  it('the floor is the keyboard\'s alone (review round 2): a thin target with no keyboard up, or one no keyboard cuts, gets its band whole — its centre line lies inside its scroller', () => {
+    const thin = node({ role: 'button', identifier: 'thin', rect: { x: 378, y: 300, width: 354, height: 20 } });
+    const flat = node({ role: 'container', flatList: true, readingOrder: true, rect: { x: 0, y: 0, width: 0, height: 0 }, children: [node({ role: 'other', rect: { ...PHONE } }), thin] });
+    const band: Rect = { x: 0, y: 300, width: 402, height: 20 };
+    expect(planOn(flat, 'right', { target: thin, gesture: PHONE }).stroke).toMatchObject({ box: band, points: swipeVector(band, 'right', 'content') });
+    expect(planOn(flat, 'right', { target: thin, gesture: PHONE, keyboardTop: 500 }).stroke.box).toEqual(band);
+  });
+
   it('a later read that does not find the target keeps the band, as it keeps the target\'s scroll views', () => {
     const tree = idb();
     const memory = seeRead(after(tree, { target: byId(tree, 'lab.carousel-in-list.C') }), { facts: factsOf(tree), line: undefined, target: undefined });
