@@ -360,10 +360,11 @@ drawn over it.
   WDA's: a run of classic Views passes it; a run listed so by chance passes it too.
 - LEFT-TO-RIGHT is assumed: the dump names no layout direction, so a right-to-left run (sorted by right edges) reads
   out of order and is not marked — it keeps its order as draw order, as before.
-- NOT a node a node provider lists (narrowed by A42a, "Amendment: a View with a ViewGroup child hosts no provider"
-  below: not when a direct child is an `android.view.ViewGroup`): any node of the class `android.view.View` hosts virtual nodes (a plain View holds no
-  child views, so any children it lists are virtual) — Compose's AndroidComposeView, under a `ComposeView` on a screen and under a bare
-  ViewGroup in a Compose dialog's window — and nothing under it is marked (android-tree-dialect.ts#providesNodes).
+- NOT a node a node provider lists: a node of the class `android.view.View` with no direct `android.view.ViewGroup`
+  child hosts virtual nodes (a plain View holds no child views, so any children it lists are virtual) — Compose's
+  AndroidComposeView, under a `ComposeView` on a screen and under a bare ViewGroup in a Compose dialog's window — and
+  nothing under it is marked (android-tree-dialect.ts#providesNodes). One with a direct ViewGroup child is a renamed
+  ViewGroup, no provider's host (since A42a: "Amendment: a View with a ViewGroup child hosts no provider" below).
   Compose's order is composition order: form-shared-id lists each outlined field (left 55) before its label drawn over
   its outline (left 77) — location order by chance; marked, the five labels would gain their fields as untold covers.
 - From there LR3's rules apply unchanged, through `listsNestedReadingOrder` (any nested run marked so):
@@ -793,7 +794,7 @@ read as drawn beneath its target: every tap `Tapped` at the centre, on the cover
   (P1).
 
 Measured: over the 70 uiautomator dumps of tests/fixtures, exactly three nodes match the rule — rn-banner-role's T, U
-and C slots. Golden over the truth corpus against main 3e2df45b (1691 checks): exactly rn-banner-role's six rows change,
+and C slots. Golden over the truth corpus against the branch base 3e2df45b (1691 checks): exactly rn-banner-role's six rows change,
 MISMATCH → ok (T, U and C refused, "drawn over it as a screenshot shows (the two are listed in reading order)"; the
 colour asserts fail closed naming the cover); mismatches 113 → 107; the six rows struck from react-native.known.ts and
 their pins from pins.json. tests/ui-tree/draw-order-android-views-twin.test.ts P3 flipped: each slot marked, each cover

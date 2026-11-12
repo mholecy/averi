@@ -270,8 +270,8 @@ interface Around {
  * residual 5, narrowed by A42a: rn-banner-role). A role container whose children all carry classes other than
  * `android.view.ViewGroup` (each a role, a Text, an Image) still reads as a provider's host, unmarked.
  */
-const providesNodes = (raw: RawNode): boolean =>
-  raw.class === 'android.view.View' && !childrenOf(raw).some((child) => child.class === 'android.view.ViewGroup');
+const providesNodes = (raw: RawNode, children: readonly RawNode[]): boolean =>
+  raw.class === 'android.view.View' && !children.some((child) => child.class === 'android.view.ViewGroup');
 
 function normalizeNode(raw: RawNode, around: Around): UiNode {
   const className = raw.class?.split('.').pop() ?? '';
@@ -279,7 +279,7 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
   const rawText = emptyToNull(raw.text);
   const text = emptyToNull(raw.text === undefined ? undefined : trimOuter(String(raw.text)));
   const contentDesc = emptyToNull(raw['content-desc']);
-  const rawChildren = raw.node === undefined ? [] : Array.isArray(raw.node) ? raw.node : [raw.node];
+  const rawChildren = childrenOf(raw);
   // Compose text inputs don't always dump as EditText: a BasicTextField with
   // scroll semantics surfaces as (Horizontal)ScrollView carrying the content
   // in `text` (measured on the login username field — value came back
@@ -292,7 +292,7 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
   const isTextInput = className.endsWith('EditText') || composeTextInput;
   const { rect, clippedOut } = nodeBounds(raw.bounds, around.parent);
   const clips = raw.scrollable === 'true';
-  const inProvider = around.inProvider || providesNodes(raw);
+  const inProvider = around.inProvider || providesNodes(raw, rawChildren);
   const children = rawChildren.map((child) => normalizeNode(child, { ...around, parent: rect, clip: clips ? rect : around.clip, inProvider }));
   const whole = around.clip === undefined ? undefined : uncut(rect, children, around.clip);
   const node: UiNode = {
