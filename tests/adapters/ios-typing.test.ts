@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { IDB_TYPEABLE, typingPathOf, WDA_TYPEABLE } from '../../src/adapters/ios-typing.js';
+import { IDB_TYPEABLE, idbTypingRefusal, typingPathOf, WDA_TYPEABLE } from '../../src/adapters/ios-typing.js';
 import { refusalOf, type Typeable } from '../../src/adapters/typeable.js';
 
 /**
@@ -181,5 +181,16 @@ describe('WDA_TYPEABLE against the gate\'s measured corpus (batch-10 G2, batch-9
 
   it('idb routing unchanged: the gate\'s ASCII G3 texts (typed through WDA by the gate) go to idb under averi', () => {
     for (const text of ['q', 'qx7Wz3k', 'qx7Wz3kV9pj2Mb8ty5Hn', 'qx7Wz3kV9pj2Mb8ty5Hn4dG6rc1fL0sxe5uA2yQ8']) expect(typingPathOf(text)).toBe('idb');
+  });
+});
+
+describe('idbTypingRefusal — idb\'s refusal, built once (A41a: a text only WDA types after `auto` fell back)', () => {
+  it('a text idb cannot type: refusalOf\'s refusal against IDB_TYPEABLE, byte for byte', () => {
+    expect(idbTypingRefusal('Šťastný')).toBe(refusalOf('Šťastný', IDB_TYPEABLE));
+    expect(idbTypingRefusal('Šťastný')).toMatch(/^cannot type U\+0160 /);
+  });
+
+  it('a text idb types (no caller sends one): the set\'s own words, never an empty refusal', () => {
+    expect(idbTypingRefusal('abc')).toBe(`cannot type it: ${IDB_TYPEABLE.says}`);
   });
 });
