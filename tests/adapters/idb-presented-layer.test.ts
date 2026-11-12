@@ -149,7 +149,7 @@ describe('tap: the wait for a target beneath idb\'s presented layer names the la
 // parser marks the backdrop (adapters/ios-tree-source.ts#backdropOf), and on a flat list a marked layer covers what is
 // listed AFTER it (ui-tree/presentation.ts#byMarks), never what is listed before it.
 describe('the idb parser marks an unlabelled, id-less element over the whole screen a `backdrop`', () => {
-  type El = { AXLabel?: string | null; AXUniqueId?: string | null; type?: string; frame: { x: number; y: number; width: number; height: number } };
+  type El = { AXLabel?: string | null; AXUniqueId?: string | null; AXValue?: string | null; type?: string; frame: { x: number; y: number; width: number; height: number } };
   const elements = (): El[] => JSON.parse(raw('blur-menu-unhidden')) as El[];
   const backdrops = (list: readonly unknown[]): string[] =>
     [...everyNode(parseIdbDescribeAll(JSON.stringify(list)))].filter((n) => n.presentation === 'backdrop').map((n) => `${n.role} ${n.rect.x},${n.rect.y} ${n.rect.width}x${n.rect.height}`);
@@ -179,6 +179,14 @@ describe('the idb parser marks an unlabelled, id-less element over the whole scr
     expect(backdrops(list.map((el) => (el.type === 'Application' ? { ...el, frame: { x: 0, y: 0, width: 0, height: 0 } } : el)))).toEqual([]);
   });
 
+  it('only the measured type: an unlabelled full-screen element of another type (a web or map view) is no backdrop', () => {
+    expect(backdrops(atBackdrop((el) => ({ ...el, type: 'WebView' })))).toEqual([]);
+  });
+
+  it('only with no value: an unlabelled full-screen GenericElement carrying a value is no backdrop', () => {
+    expect(backdrops(atBackdrop((el) => ({ ...el, AXValue: 'map' })))).toEqual([]);
+  });
+
   it('only the first such element is marked', () => {
     const list = elements();
     expect(backdrops([...list, { ...list[3]!, frame: { x: 0, y: 0, width: 402, height: 874 } }])).toEqual(['other 0,0 402x874']);
@@ -195,7 +203,7 @@ describe('the presentation module: a flat list\'s backdrop covers what is listed
     const presentation = presentationOf(tree, order);
     for (const tag of ['A', 'B', 'C', 'D']) {
       const over = presentation.over(byTag(tag));
-      expect(over.coversListedBefore).toEqual([backdrop]);
+      expect(over.listedAhead).toEqual([backdrop]);
       expect(over.wholeScreen(backdrop)).toBe(true);
       expect(over.surface(backdrop)).toBe('fact');
     }
@@ -205,14 +213,14 @@ describe('the presentation module: a flat list\'s backdrop covers what is listed
     const presentation = presentationOf(tree, order);
     for (const tag of ['K', 'W']) {
       const over = presentation.over(byTag(tag));
-      expect(over.coversListedBefore).toEqual([]);
+      expect(over.listedAhead).toEqual([]);
       expect(order.filter((p) => over.wholeScreen(p) || over.surface(p) !== undefined || !over.drawn(p))).toEqual([]);
     }
   });
 
   it('named by its kind and where it is listed; never the list alone; for no target, the touch-down lands on it', () => {
     const presentation = presentationOf(tree, order);
-    expect(presentation.press(backdrop.node)).toEqual({ surface: backdrop.node, reach: { x: 0, y: 0, width: 402, height: 874 }, layer: { kind: 'backdrop', coversListedAfter: true } });
+    expect(presentation.press(backdrop.node)).toEqual({ surface: backdrop.node, reach: { x: 0, y: 0, width: 402, height: 874 }, layer: { kind: 'backdrop', listedAhead: true } });
     expect(presentation.alone).toBeUndefined();
     expect(presentation.topmostAt({ x: 201, y: 142 })?.cover).toBe(backdrop);
   });
@@ -223,13 +231,13 @@ describe('the presentation module: a flat list\'s backdrop covers what is listed
     const presentation = presentationOf(nested, placed);
     expect(presentation.over(byTag('K')).wholeScreen(placed[4]!)).toBe(true);
     expect(presentation.over(byTag('A')).wholeScreen(placed[4]!)).toBe(false);
-    expect(presentation.over(byTag('A')).coversListedBefore).toEqual([]);
+    expect(presentation.over(byTag('A')).listedAhead).toEqual([]);
     expect(presentation.press(placed[4]!.node).layer).toEqual({ kind: 'backdrop' });
   });
 });
 
 describe('the words: idb\'s backdrop names idb\'s evidence, WDA\'s keeps its own', () => {
-  const IDB = { kind: 'backdrop', coversListedAfter: true } as const;
+  const IDB = { kind: 'backdrop', listedAhead: true } as const;
   it('the tap, the pixel assert and scroll_until\'s stop', () => {
     expect(presentedRemedy('touch', IDB)).toBe(
       "a menu's backdrop is presented over it (an empty element idb lists over the whole screen, before the screen's content) — close it first " +

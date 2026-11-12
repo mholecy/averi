@@ -79,10 +79,10 @@ const BACKDROP = "a menu's backdrop";
 /**
  * The evidence a `backdrop` rests on, as its source lists it: WDA's in-window backdrop is listed AFTER the screen's
  * content (adapters/wda-source.ts#inWindowBackdrops); idb's, in its flat list, BEFORE it, after the menu's card
- * (`MarkedLayer.coversListedAfter`, adapters/ios-tree-source.ts#backdropOf).
+ * (`MarkedLayer.listedAhead`, adapters/ios-tree-source.ts#backdropOf).
  */
 const backdropEvidence = (layer: MarkedLayer): string =>
-  layer.coversListedAfter === true ? "an empty element idb lists over the whole screen, before the screen's content" : "an empty element WDA lists over the whole screen, after the screen's content";
+  layer.listedAhead === true ? "an empty element idb lists over the whole screen, before the screen's content" : "an empty element WDA lists over the whole screen, after the screen's content";
 
 /**
  * The `backdrop` remedy over the node (`purpose`'s pronoun), its way out (`wayOut`: what to do by coordinates or on the screenshot) in a

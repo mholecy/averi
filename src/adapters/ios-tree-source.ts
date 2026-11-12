@@ -286,24 +286,25 @@ function listsPresentedLayer(elements: readonly IdbElement[]): boolean {
 
 /**
  * THE BACKDROP idb lists (types.ts#UiNode.presentation `backdrop`; ADR 0018, the amendment "idb's backdrop"): the
- * index of the first element that is unlabelled and id-less, whose frame covers the `Application` element's frame
- * whole, and that is not the first element listed — undefined when none. idb lists a SwiftUI menu's unhidden dimmed
- * backdrop so, BETWEEN the menu's card and the screen beneath it: on the lab's blur-menu-unhidden `K 380, W 448,
- * GenericElement 0,0 402x874 (no label, no id, traits [Scrollable]), A 110, B 290, C 470, D 650`, where WDA reads the
- * same backdrop shown and A–D wholly `isVisible="0"` (tests/fixtures/truth/ios-iphone17-ios27/blur-menu-unhidden.
- * {idb,wda}.json). Read as an excused structural leaf it covered nothing, and a tap on A answered Tapped while the
- * backdrop took the touch. Marked, it covers what the flat list lists AFTER it (ui-tree/presentation.ts#byMarks) —
- * only ever a refusal more. Not the first listed: that is the `Application` element itself (labelled anyway). The
- * sweep of the 53 idb lists in the repo (tests/adapters/idb-presented-layer.test.ts pins 51 of them) finds no other such element: UIKit's dismiss region has an id and a label
- * (`listsPresentedLayer`), the keyboard's unlabelled `Spacer` is 402x284. Residuals, stated: a screen-wide unlabelled
- * overlay that lets touches through (a decorative tint) refuses what idb lists after it — the safe direction, with the
- * backdrop's way out in the reply; a hidden backdrop idb does not list (blur-menu, -grouped, -stacked) stays unseen
- * (ADR 0018 residual 9).
+ * index of the first `GenericElement` with no label, no id and no value whose frame covers the `Application`
+ * element's frame whole, and that is not the first element listed — undefined when none. idb lists a SwiftUI menu's
+ * unhidden dimmed backdrop so, BETWEEN the menu's card and the screen beneath it: on the lab's blur-menu-unhidden
+ * `K 380, W 448, GenericElement 0,0 402x874 (no label, no id, traits [Scrollable]), A 110, B 290, C 470, D 650`, where
+ * WDA reads the same backdrop shown and A–D wholly `isVisible="0"` (tests/fixtures/truth/ios-iphone17-ios27/
+ * blur-menu-unhidden.{idb,wda}.json). Marked, it covers what the flat list lists AFTER it (ui-tree/presentation.ts
+ * #byMarks) — only ever a refusal more. The measured shape only: an unlabelled full-screen element of another type or
+ * carrying a value (a web or map view) is content, never a menu's backdrop. Not the first listed: that is the
+ * `Application` element itself. Not UIKit's dismiss region (an id and a label: `listsPresentedLayer`), nor the
+ * keyboard's unlabelled `Spacer` (402x284). Residuals, stated: a screen-wide unlabelled overlay that lets touches
+ * through (a decorative tint) refuses what idb lists after it — the safe direction, with the backdrop's way out in
+ * the reply; a hidden backdrop idb does not list (blur-menu, -grouped, -stacked) stays unseen (ADR 0018 residual 9).
  */
 function backdropOf(elements: readonly IdbElement[]): number | undefined {
   const app = elements.find((el) => el.type === 'Application')?.frame;
   if (app === undefined || rectArea(app) === 0) return undefined;
-  const i = elements.findIndex((el, at) => at > 0 && !el.AXLabel && !el.AXUniqueId && el.frame !== undefined && coversWhole(el.frame, app));
+  const i = elements.findIndex(
+    (el, at) => at > 0 && el.type === 'GenericElement' && !el.AXLabel && !el.AXUniqueId && !el.AXValue && el.frame !== undefined && coversWhole(el.frame, app),
+  );
   return i < 0 ? undefined : i;
 }
 

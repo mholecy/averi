@@ -1336,17 +1336,18 @@ and `W 448`, then `GenericElement 0,0 402x874` (no label, no id, traits `[Scroll
 excused — no cover — and on a flat list a later-listed node as the one drawn over, so nothing covered A, B or D.
 
 **Decision.** The idb parser marks such an element a presented `backdrop` (adapters/ios-tree-source.ts#backdropOf,
-beside `listsPresentedLayer`): unlabelled and id-less, its frame covering the `Application` element's frame whole, not
-the first element listed (that is the `Application` itself); the first such element only. On a flat list
-(`UiNode.flatList`) a marked non-root layer covers what is listed AFTER it — idb lists the card, then the backdrop,
-then the screen beneath — and never what is listed before it (ui-tree/presentation.ts#byMarks, `coversListedAfter`;
-`MarkedLayer.coversListedAfter`). Draw order counts it among what is drawn over such a target, after everything listed
-after the target (`PresentedOver.coversListedBefore`, draw-order.ts#laterFor), so the tap, `scroll_until`'s stop and
-the pixel assert read it as they read WDA's backdrop: a presented surface reaching the whole screen, the remedy
-`presented` first. Its words name idb's evidence (ui-tree/remedy-text.ts#backdropEvidence): "a menu's backdrop is
-presented over it (an empty element idb lists over the whole screen, before the screen's content) — close it first
-(if a screenshot shows no menu up, …)", the way out as WDA's. It only ever adds refusals: a target listed after the
-backdrop is refused "close it first", one listed before it (the card's rows) reads as before.
+beside `listsPresentedLayer`): a `GenericElement` with no label, no id and no value — the measured shape only, so an
+unlabelled full-screen web or map view is never read as a menu's backdrop — its frame covering the `Application`
+element's frame whole, not the first element listed (that is the `Application` itself); the first such element only. On
+a flat list (`UiNode.flatList`) a marked non-root layer covers what is listed AFTER it — idb lists the card, then the
+backdrop, then the screen beneath — and never what is listed before it: it is LISTED AHEAD of what it covers
+(ui-tree/presentation.ts#byMarks, `listedAhead`; `MarkedLayer.listedAhead`). Draw order counts it among what is drawn
+over such a target, after everything listed after the target (`PresentedOver.listedAhead`, draw-order.ts#laterFor), so
+the tap, `scroll_until`'s stop and the pixel assert read it as they read WDA's backdrop: a presented surface reaching
+the whole screen, the remedy `presented` first. Its words name idb's evidence (ui-tree/remedy-text.ts#backdropEvidence):
+"a menu's backdrop is presented over it (an empty element idb lists over the whole screen, before the screen's content)
+— close it first (if a screenshot shows no menu up, …)", the way out as WDA's. It only ever adds refusals: a target
+listed after the backdrop is refused "close it first", one listed before it (the card's rows) reads as before.
 
 The sweep: of the 53 idb lists committed (the 51 of the lab's captures and tests/fixtures/idb-*, which
 tests/adapters/idb-presented-layer.test.ts sweeps, and the two describe-all records under docs/truth/live-records/) only
@@ -1362,8 +1363,8 @@ Residuals of the amendment:
 - **One lab cell.** The shape is measured on one SwiftUI cell (an accessibility element as the backdrop); no app is
   measured. An app's unlabelled screen-wide overlay that lets touches through (a decorative tint idb lists) refuses
   what is listed after it: a false refusal, the safe direction, with the way out in the reply.
-- **The hidden backdrop stays unseen under idb** (blur-menu, -grouped, -stacked: idb lists no trace of it) — residual 9
-  stands there; and a reading-break rule that would infer it refuses open targets on fab and tabbar-floating (A38's
+- **The hidden backdrop stays unseen under idb** (blur-menu, -grouped, -stacked: idb lists no trace of it) — residual
+  9 stands there; and a reading-break rule that would infer it refuses open targets on fab and tabbar-floating (A38's
   analysis), so none is added. Way out: `treeSource: wda`.
 - **C's centre cover is named the backdrop under idb, W under WDA.** Both are drawn over C's centre; the presented
   remedy, first in precedence, is the same.
@@ -1505,11 +1506,11 @@ Residuals of the amendment:
    beneath each an accessibility container (the lab's `blur-menu-grouped`, `-stacked`, `-unhidden`): see "Amendment:
    an in-window backdrop". **Stands**:
    - under idb, which lists no trace of a hidden backdrop. (An unhidden one, listed as an unlabelled, id-less element
-     over the whole screen, is a presented `backdrop` since 2026-11-12: see "Amendment: idb's backdrop".) Indirect signs (idb dropping the host's tab bar) are no evidence of a backdrop. A
-     screenshot per tap gives none either: a dimmed, blurred backdrop reads as the screen beneath it, only darker and
-     softer, and nothing in its pixels tells "covered" from an app's own dim or blur, so a judgement from them would
-     refuse taps on screens nothing covers. The cost is the lesser reason: an estimated +20–40 % of a tap's wall time
-     under the default tree source (not measured);
+     over the whole screen, is a presented `backdrop` since 2026-11-12: see "Amendment: idb's backdrop".) Indirect
+     signs (idb dropping the host's tab bar) are no evidence of a backdrop. A screenshot per tap gives none either: a
+     dimmed, blurred backdrop reads as the screen beneath it, only darker and softer, and nothing in its pixels tells
+     "covered" from an app's own dim or blur, so a judgement from them would refuse taps on screens nothing covers. The
+     cost is the lesser reason: an estimated +20–40 % of a tap's wall time under the default tree source (not measured);
    - under WDA in a reading-order run (the ungrouped `blur-menu`: the backdrop and the targets siblings), where the
      backdrop is listed first by its top and its order against the targets is untold;
    - for mp-native's own menu, until a raw `/source` with it up shows which shape it is (only a normalized snapshot,
