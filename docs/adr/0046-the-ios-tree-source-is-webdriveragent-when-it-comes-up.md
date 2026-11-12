@@ -156,17 +156,17 @@ start, and returns at once. It never throws and never rejects. Nothing awaits it
 **Acceptance, restated (review r1, the orchestrator's decision; the owner re-runs `npm run truth:lab:ios:a41`).**
 - *WDA tap no more than 100 ms slower than idb's*: plausible. The 300 ms cadence (ADR 0040's A41b amendment) takes
   about 200 ms off a WDA tap's settle, from 687 to about 490 ms against idb's 476.
-- The first tap is judged in two legs (scripts/perf/a41.ts, its summary), each with "first tap ok n/n" (the catalog's
-  tap claimed: the app in front):
-  - *(a) as the probe ran:* `select_device`, `simctl terminate`, `launch_app`, the tap at once. The criterion is that
-    the start overlaps the launch: first − warm ≤ max(0, WDA cold start − launch_app) + 500 ms. The original "first ≤
-    warm + 500" is not reachable in this order, whatever the code does. The allowance assumes the whole launch_app
-    (~1.9 s) overlaps. The pre-warm now starts after `simctl launch`, so only the foreground wait overlaps. Leg (a)
-    can miss by the time the accessibility writes and `simctl launch` take, and the probe's numbers will show it.
-  - *(b) the waited leg:* a fresh session whose tap starts `WAITED_GAP_MS` (4 s: WDA's cold start, 3.1–3.6 s, and a
+- The first tap after `launch_app` is measured in two legs (scripts/perf/a41.ts, its summary), each with "first tap
+  ok n/n" (the catalog's tap claimed: the app in front). Only leg (b) is judged:
+  - *(a) as the probe ran, information only:* `select_device`, `simctl terminate`, `launch_app`, the tap at once. The
+    summary prints first − warm and WDA's cold start against launch_app, with no verdict. The pre-warm overlaps only
+    the launch's foreground wait, which the probe cannot time apart from the rest of launch_app, so any allowance
+    would be a guess (review 2, the orchestrator's decision). The original "first ≤ warm + 500" is not reachable in
+    this order, whatever the code does.
+  - *(b) the acceptance:* a fresh session whose tap starts `WAITED_GAP_MS` (4 s: WDA's cold start, 3.1–3.6 s, and a
     margin) after `launch_app` started, with no read before it: first ≤ warm + 500 ms, judged only when every gap was
-    at least 3.5 s (else unproven). Plausible: WDA is up by then, and the tap with WDA up measured 1 202 against 1 157
-    warm.
+    at least 3.5 s and no step fell back to idb (else unproven). Plausible: WDA is up by then, and the tap with WDA up
+    measured 1 202 against 1 157 warm.
 - *Foreground after launch ok n/n:* 5 fresh sessions, the first a `clearState` launch, each reading at once after
   `launch_app`: the read's root label is the lab app's (AveriLab) and WDA's active bundle is `dev.averi.lab`. It
   measures what is left of the overlap: WDA's start beside the launch's foreground wait.

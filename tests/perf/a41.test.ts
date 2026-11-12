@@ -269,7 +269,7 @@ describe('summaryLines — the short summary', () => {
       "WDA tap median within 100 ms of idb's, one-sided (WDA no more than 100 ms slower; faster always passes): yes (wda−idb +46 ms)",
     );
     // (a): 7000 − 600 = 6400 against max(0, 6000 − 1200) + 500 = 5300.
-    expect(lines).toContain('first tap after launch_app (a, at once): first − warm ≤ max(0, WDA cold start − launch_app) + 500 ms: no (7000 − 600 = 6400 vs max(0, 6000 − 1200) + 500 = 5300); first tap ok 5/5');
+    expect(lines).toContain('first tap after launch_app (a, at once; information, not judged): first − warm 7000 − 600 = 6400 ms; WDA cold start 6000 ms against launch_app 1200 ms; first tap ok 5/5');
     expect(lines).toContain('first tap after launch_app (b, ≥ 3.5 s after it started) ≤ the same tap warm + 500 ms: yes (1000 vs 600 + 500); first tap ok 4/5');
     expect(lines).toContain('foreground after launch ok 5/5 (1 clearState; n ≥ 5 with one: yes)');
     expect(lines).toContain('auto, the same first tap 4010 ms (n 5, 4009–4011) after launch_app started (no read before it): 1000 ms (n 5, 999–1001)');
@@ -293,17 +293,17 @@ describe('summaryLines — the short summary', () => {
   });
   it('an auto step that fell back to idb makes the first-tap acceptance unproven; what was left out is said', () => {
     const lines = summaryLines({ ...full, autoTap: { ...full.autoTap!, fellBack: 2, paidPush: 2, catalogUnsettled: 1, failed: 1 } });
-    expect(lines.filter((l) => l.includes("unproven (2 auto steps fell back to idb: not WDA's taps)"))).toHaveLength(2);
+    // Only leg (b) judges; leg (a) is information and carries no verdict.
+    expect(lines.filter((l) => l.includes("unproven (2 auto steps fell back to idb: not WDA's taps)"))).toHaveLength(1);
+    expect(lines.find((l) => l.includes('(b, '))).toContain("unproven (2 auto steps fell back to idb: not WDA's taps)");
     expect(lines).toContain('auto, left out: 2 fell back to idb; 2 warm taps paid the push; 1 warm catalog taps on an unsettled catalog; 1 sessions with a failed step');
   });
-  it('leg (a) passes on the allowance: what is left of the cold start after launch_app, never below 0, + 500', () => {
-    const at = (first: number, cold: number) =>
-      summaryLines({ ...full, wdaCold: { ...full.wdaCold!, coldRead: sp(cold, 5) }, autoTap: { ...full.autoTap!, firstCold: sp(first, 5) } }).find((l) => l.includes('(a, at once)'));
-    expect(at(600 + 5300, 6000)).toMatch(/: yes \(5900 − 600 = 5300 vs .* = 5300\)/);
-    expect(at(600 + 5301, 6000)).toMatch(/: no \(/);
-    expect(at(1100, 1000)).toMatch(/: yes \(1100 − 600 = 500 vs max\(0, 1000 − 1200\) \+ 500 = 500\)/); // cold start under the launch: 500
-    expect(at(1101, 1000)).toMatch(/: no \(/);
-    expect(summaryLines({ ...full, wdaCold: undefined }).find((l) => l.includes('(a, at once)'))).toMatch(/: not measured; first tap ok 5\/5$/);
+  it('leg (a) is information only: its numbers, a dash for a part not measured, never a yes or no', () => {
+    const a = (r: A41Report) => summaryLines(r).find((l) => l.includes('(a, at once'));
+    expect(a(full)).not.toMatch(/: (yes|no|unproven) /);
+    expect(a({ ...full, wdaCold: undefined, autoTap: { ...full.autoTap!, firstCold: undefined } })).toBe(
+      'first tap after launch_app (a, at once; information, not judged): first − warm — − 600 = — ms; WDA cold start — ms against launch_app 1200 ms; first tap ok 5/5',
+    );
   });
   it('leg (b) at warm + 500 exactly passes; the foreground says what was read instead, and needs n ≥ 5 with a clearState', () => {
     const b = (w: number) => summaryLines({ ...full, autoTap: { ...full.autoTap!, firstWaited: sp(w, 5) } }).find((l) => l.includes('(b, '));
