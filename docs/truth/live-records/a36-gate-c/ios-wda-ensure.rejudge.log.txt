@@ -1,0 +1,8 @@
+<!-- averi: this checkout (rejudged from <out>/wda-ensure/run-20261112-105423-52633/ios-wda-ensure.json) -->
+# Live golden: 3 cases, 3 ok, 0 loud, 0 mismatches (0 not known), 0 skipped
+
+## wda
+- ok h1 held-no: ensure_state from a bare launch onto Welcome, no wipe ahead: the hold ends the look heldS after Welcome, said in one line — Continue tapped 2.94 s after Welcome; held 2.013 s, then continue
+- ok h2 held-no-spinner: the same through 4 s of an unlabelled spinner: the hold carries across a spinner phase — Continue tapped only once Welcome itself has held (the spinner's idb spelling is block G's raw describe-all check) — Continue tapped 2.69 s after Welcome; held 2.011 s, then continue
+- ok h3 held-no: the same with a destructive rung after Continue: no hold — the look keeps its full window — the full window: Continue tapped 21.35 s after the bare phase (15.09 s after Welcome), no held line
+

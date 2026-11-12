@@ -1,0 +1,51 @@
+10:54:23 ---- lab-run-ios run 20261112-105423-52633, blocks lab,idb-forms,idb-visibility,idb-dismissal,idb-ensure,wda-forms,wda-visibility,wda-dismissal,wda-ensure
+10:54:23 OK checkout: main's HEAD 8e60cb2b, clean
+10:54:23 NOTE ios-reset: D8DACDE6-6352-437C-AA22-86FB06275C3F, its idb companion and the lab's WebDriverAgent
+10:54:40 OK   ios-reset
+10:54:40 NOTE com.apple.launchservices.schemeapproval's finportal key at the iOS stretch's start: sk.finportal.myport (read only: no batch writes it)
+10:54:49 LAB ios: OK — averi-lab iPhone 17 simulator, iOS 27.0, reset; this run's build installed; the installed cells.json is main's
+10:54:52 OK   ios-health before ios-idb-forms
+11:01:04 OK   idb-forms live ios-idb-forms
+11:01:04 OK   idb-forms rejudge ios-idb-forms
+11:01:07 OK   ios-health before ios-idb-visibility
+11:22:58 OK   idb-visibility live ios-idb-visibility
+11:22:59 OK   idb-visibility rejudge ios-idb-visibility
+11:23:01 OK   ios-health before ios-idb-dismissal
+11:25:12 OK   idb-dismissal live ios-idb-dismissal
+11:25:12 OK   idb-dismissal rejudge ios-idb-dismissal
+11:25:15 OK   ios-health before ios-idb-ensure
+11:26:10 OK   idb-ensure live ios-idb-ensure
+11:26:10 OK   idb-ensure rejudge ios-idb-ensure
+11:26:13 OK   ios-health before the WDA window
+11:26:14 OK   D43 backup: com.apple.keyboard.preferences exported, com.apple.Preferences exported, com.apple.Accessibility exported; state <out>/wda-forms/run-20261112-105423-52633/state.json (dirty until the restore verifies)
+11:26:16 OK   ios-health before ios-wda-forms
+11:32:39 OK   wda-forms live ios-wda-forms
+11:32:39 OK   wda-forms rejudge ios-wda-forms
+11:32:48 OK   ios-health before iOS end
+11:32:52 OK   ios-health before the WDA window
+11:32:53 OK   D43 backup: com.apple.keyboard.preferences exported, com.apple.Preferences exported, com.apple.Accessibility exported; state <out>/wda-visibility/run-20261112-105423-52633/state.json (dirty until the restore verifies)
+11:32:55 OK   ios-health before ios-wda-visibility
+11:52:09 OK   wda-visibility live ios-wda-visibility
+11:52:09 OK   wda-visibility rejudge ios-wda-visibility
+11:52:18 OK   ios-health before iOS end
+11:52:22 OK   ios-health before the WDA window
+11:52:23 OK   D43 backup: com.apple.keyboard.preferences exported, com.apple.Preferences exported, com.apple.Accessibility exported; state <out>/wda-dismissal/run-20261112-105423-52633/state.json (dirty until the restore verifies)
+11:52:25 OK   ios-health before ios-wda-dismissal
+11:54:15 OK   wda-dismissal live ios-wda-dismissal
+11:54:16 OK   wda-dismissal rejudge ios-wda-dismissal
+11:54:24 OK   ios-health before iOS end
+11:54:28 OK   ios-health before the WDA window
+11:54:29 OK   D43 backup: com.apple.keyboard.preferences exported, com.apple.Preferences exported, com.apple.Accessibility exported; state <out>/wda-ensure/run-20261112-105423-52633/state.json (dirty until the restore verifies)
+11:54:32 OK   ios-health before ios-wda-ensure
+11:55:32 OK   wda-ensure live ios-wda-ensure
+11:55:33 OK   wda-ensure rejudge ios-wda-ensure
+11:55:41 OK   ios-health before iOS end
+11:55:43 NOTE the lab's WebDriverAgent (port 8120 free) and idb_companion of D8DACDE6-6352-437C-AA22-86FB06275C3F ended
+11:55:43 OK   idb-forms analyze
+11:55:43 OK   idb-visibility analyze
+11:55:43 OK   idb-dismissal analyze
+11:55:43 OK   idb-ensure analyze
+11:55:43 OK   wda-forms analyze
+11:55:43 OK   wda-visibility analyze
+11:55:43 OK   wda-dismissal analyze
+11:55:43 OK   wda-ensure analyze

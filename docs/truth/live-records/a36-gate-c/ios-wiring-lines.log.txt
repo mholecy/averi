@@ -1,0 +1,8 @@
+ios-idb-dismissal.log: ios: registry.ts#iosAdapterFor — the server's iOS wiring, its idb helper on (ADR 0032; the side's idb-helper.ts#idbHelperDisabled)
+ios-idb-ensure.log: ios: registry.ts#iosAdapterFor — the server's iOS wiring, its idb helper on (ADR 0032; the side's idb-helper.ts#idbHelperDisabled)
+ios-idb-forms.log: ios: registry.ts#iosAdapterFor — the server's iOS wiring, its idb helper on (ADR 0032; the side's idb-helper.ts#idbHelperDisabled)
+ios-idb-visibility.log: ios: registry.ts#iosAdapterFor — the server's iOS wiring, its idb helper on (ADR 0032; the side's idb-helper.ts#idbHelperDisabled)
+ios-wda-dismissal.log: ios: registry.ts#iosAdapterFor — the server's iOS wiring, its idb helper on (ADR 0032; the side's idb-helper.ts#idbHelperDisabled)
+ios-wda-ensure.log: ios: registry.ts#iosAdapterFor — the server's iOS wiring, its idb helper on (ADR 0032; the side's idb-helper.ts#idbHelperDisabled)
+ios-wda-forms.log: ios: registry.ts#iosAdapterFor — the server's iOS wiring, its idb helper on (ADR 0032; the side's idb-helper.ts#idbHelperDisabled)
+ios-wda-visibility.log: ios: registry.ts#iosAdapterFor — the server's iOS wiring, its idb helper on (ADR 0032; the side's idb-helper.ts#idbHelperDisabled)
