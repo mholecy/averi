@@ -15,6 +15,7 @@ This record adds a fact: which `pollMs` the settle is given.
 Amended 2026-11-03 (T5: the batch-11 trace replayed through resolveSettled) — see the amendment below.
 Amended 2026-11-12 (A41a: under `treeSource: auto` the cadence is undefined — the default 500 — until the first read
 chose a source, then that source's; ADR 0046).
+Amended 2026-11-12 (A41b: WDA's `/source` declares 300, `WDA_SETTLE_CADENCE_MS`, measured) — see the amendment below.
 
 ## Context
 
@@ -146,3 +147,34 @@ run; the fixture pins the shipped one.
 - The probe kept only `lab.*` ids and the tracked labels, the last node winning on a duplicate key, and no roles. A
   duplicate match in the real tree, which `ambiguous` would judge, is not recorded.
 - Date is whole ms, while the probe's clock was fractional. Below 250 ms this moves a few settles against d35's replay.
+
+## Amendment: A41b — WDA's cadence is 300, measured (2026-11-12)
+
+**The measurement.** The A41 probe (`npm run truth:lab:ios:a41`, owner run 2026-11-12 on main 7ca241d5, averi-lab
+iPhone 17 simulator, iOS 27.0; docs/truth/live-records/a41-probe/, summary.log.txt) ran this record's rule for WDA:
+d35-motion-style trials through WDA's `/source`, read back to back after each trigger, the settle replayed offline
+through `resolveSettled` with the product's `pauseAfterRead` at 300 and at 500 ms (scripts/perf/a41-settle.ts).
+60 trials, 20 each of M1a (sheet fling), M1b (scroll-bounded) and M2 (carousel-in-list), every one seen moving:
+
+| | settles | of moving ids | censored (< 500 ms of reads after) | wrong |
+|---|---|---|---|---|
+| 300 ms | 160 (M1a 0, M1b 100, M2 60) | 60 | 0 | **0** |
+| 500 ms | 160 (M1a 0, M1b 100, M2 60) | 60 | 0 | 0 |
+
+The rule set before the run: shorten only at 0 wrong in at least 60 moving, uncensored settles. It held.
+
+**The decision.** `WdaTreeSource.settleCadenceMs = WDA_SETTLE_CADENCE_MS` = 300 (`adapters/wda-tree-source.ts`). Under
+`treeSource: auto` the adapter's cadence is still undefined (500) until the first read chose, then the chosen source's:
+300 either way now. The recorded source of the differential harness still declares none.
+
+**Consequences.** A settle's pause on WDA drops from 500 − r to 300 − r. WDA's warm read in the same run was 102 ms
+(median, 81–119), so the pause falls from about 400 to about 200 ms, above the 150 ms floor: about 200 ms off each
+WDA tap and fill and each keyboard re-look, as D35 gave idb. The probe's warm tap was WDA 687 ms against idb 476 (+212):
+the expected WDA tap is about 490 ms, within the 100 ms A41b asks; the owner's re-run of the probe is the check.
+Replies are unchanged.
+
+**Risks.** R1–R3 above hold for WDA as for idb, with one difference: a WDA snapshot falls anywhere inside a read of
+0.03–1.7 s, so two reads 300 ms apart can be closer in snapshot time than in start time. The replay ran on WDA's own
+reads, so that is in the measurement, not outside it; 0/60 still bounds the per-settle rate of wrong settles below
+≈ 5 % (95 %), and 500 has the same bound.
+

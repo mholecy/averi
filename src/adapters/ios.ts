@@ -193,6 +193,14 @@ export class IosAdapter implements DeviceAdapter {
   get fellBack(): boolean {
     return this.treeSource.fellBack === true;
   }
+
+  /**
+   * DeviceAdapter.prewarm: the source's (IosTreeSource.prewarm — WebDriverAgent's start under `auto` and `wda`, A41b),
+   * forwarded as it stands; idb has none and starts nothing. Returns at once.
+   */
+  prewarm(): void {
+    this.treeSource.prewarm?.();
+  }
   private readonly exec: ExecFn;
   private readonly udid: string;
   private readonly treeSource: IosTreeSource;
@@ -345,6 +353,8 @@ export class IosAdapter implements DeviceAdapter {
           'use open_deep_link, or wrap the step in an `android:` platform override',
       );
     }
+    // A41b: WebDriverAgent's start, if it is not up, runs beside the launch — never awaited (prewarm).
+    this.prewarm();
     if (opts.clearState) await this.clearAppData(bundleId);
     await this.prepareForOpen(`launching ${bundleId}`);
     await this.simctl(['launch', this.udid, bundleId]);
@@ -843,7 +853,7 @@ export class IosAdapter implements DeviceAdapter {
 
   /**
    * The settle cadence (types.ts#DeviceAdapter.settleCadenceMs, ADR 0040): the tree source's own fact
-   * (ios-tree-source.ts#IosTreeSource.settleCadenceMs) — idb's 300, none under WDA. Forwarded, not chosen here: no
+   * (ios-tree-source.ts#IosTreeSource.settleCadenceMs) — idb's 300, WDA's 300 (A41b). Forwarded, not chosen here: no
    * dispatch on the source's kind.
    */
   get settleCadenceMs(): number | undefined {

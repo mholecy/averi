@@ -30,6 +30,7 @@ function fallenBack() {
   const wda: WdaSide = {
     kind: 'wda',
     bringUp: () => Promise.reject(new Error('WebDriverAgent requires the appium-webdriveragent package, an optional dependency')),
+    buildCached: async () => true,
     read: () => Promise.reject(new Error('never read')),
     applicationLabel: () => Promise.reject(new Error('never asked')),
     typeText: () => Promise.reject(new Error('never typed')),

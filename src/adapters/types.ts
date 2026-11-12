@@ -1374,6 +1374,14 @@ export interface DeviceAdapter {
    */
   readonly fellBack?: boolean;
   /**
+   * Starts, in the background, what the adapter's first tree read would otherwise start, and returns at once — never
+   * awaited, never throwing, never rejecting (A41b): an iOS adapter under `treeSource: auto` or `wda` begins bringing
+   * WebDriverAgent up (adapters/ios.ts#prewarm; ADR 0046's A41b amendment), so the first read finds it up or joins its
+   * start. Asked by mcp/registry.ts when it builds the adapter, and by an iOS launch. Changes nothing the device shows.
+   * Absent (Android, idb's tree): nothing to start.
+   */
+  prewarm?(): void;
+  /**
    * What a fill tells the adapter after a REPAIRED drop (interact/fill-type.ts, docs/adr/0023-fill-types-a-dropped-
    * tail-again.md, its D24 amendment): the field kept a strict prefix of a typing whose delivery is `on-return`, the
    * tail was typed again, and the typing then LANDED whole — the app in front drops the end of a burst. Never for a

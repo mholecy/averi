@@ -3,6 +3,8 @@
 Status: accepted 2026-11-12 (performance backlog rows A41, decided by the owner, and A41a,
 docs/plans/2026-10-30-performance-backlog.md). Golden unchanged: every recording pins its source. The next Gate C
 checks the default block (see Acceptance).
+Amended 2026-11-12 (A41b: WebDriverAgent is pre-warmed when the adapter is built and at a launch, never awaited, and only
+with its build cached) — see the amendment below.
 
 ## Context
 
@@ -100,3 +102,63 @@ read is idb's for the adapter's life, and every reply that claims what it read c
 Golden Changed 0, because golden pins its source. Unit tests cover the choice, its caching, the fallback note and
 typing. At the next Gate C (owner): the default block has ≤ 6 known unsafe, and its wall time is ≤ the idb block
 + 10 %.
+
+## Amendment: A41b — WebDriverAgent pre-warmed, never awaited (2026-11-12)
+
+**Measured first** (A41 probe, docs/truth/live-records/a41-probe/, main 7ca241d5): under `auto` the catalog's first tap
+after `launch_app` took 4 333 ms against 1 157 for the same tap warm. WDA's bring-up inside it cost +3 131 ms. WDA's
+cold start alone, first read, was 3 151 ms (n 5), the read after it 30 ms.
+
+**Decision.** `DeviceAdapter.prewarm?(): void` and `IosTreeSource.prewarm?(): void` start, in the background, what the
+first tree read would otherwise start, and return at once. They never throw and never reject. Nothing awaits them.
+
+- **Where.** `mcp/registry.ts#adapterFor` asks it of each adapter it builds, once. That is the first moment averi knows
+  both the device and the project's tree source. `IosAdapter.launch` asks it again, first thing, so a launch on an
+  adapter whose WDA is not up starts it beside the launch. A flow's `launch:` goes through the same method.
+- **`auto`.** `AutoTreeSource.prewarm` starts the choice itself (`source()`), the same single attempt the first read
+  would start. The first read finds it made or joins it in flight. One bring-up, chosen once, and the outcome is the one
+  that read would have met: WDA if it came up, else idb with the stderr line and the claim note (Decision, above). A
+  failed pre-warm is no error of the tool that started it. It is the fallback, and its reason is the note's. A release
+  during the choice is still the read's released error (`AutoTreeSource.choose`). Nothing is asked once a choice was
+  started, made, or the source released.
+- **`wda`.** `WdaTreeSource.prewarm` calls `WdaServer.ensureRunning`, which is single-flight, so a read joins the start
+  in flight. A failed pre-warm is dropped. The next read starts WDA again and fails in its own words, as every read on
+  `wda` did before.
+- **`idb`**, and the differential harness's recorded source, have none: nothing is started.
+- **Only with WDA's build cached** (`WdaTreeSource.buildCached`, `WdaServer.isBuilt`: an xctestrun under DerivedData's
+  Build/Products, a directory listing). Without one, a pre-warm starts nothing, and the first read builds as before.
+  The reasons:
+  1. The build is `xcodebuild build-for-testing`, bounded at 10 minutes and CPU-bound. A pre-warm would run it beside the
+     agent's own install, launch and idb reads, unasked, and possibly in a session that never reads a tree.
+  2. What it saves is seconds: the time between the adapter's creation and the first read, against a build of minutes.
+  3. Under `wda` a failed background build is dropped and the first read builds again: two builds where there was one.
+  4. The "first WDA build … takes minutes" line would reach stderr during an unrelated tool call.
+- **Not at `select_device`.** `select_device` takes no `configPath`, so it does not know the project's tree source
+  (D41). A guess of `auto` would build an adapter of the wrong kind in a `wda` project: a second WdaServer on the same
+  per-UDID port (Residual 5). Whichever started first would make the other's start fail with "A WebDriverAgent answers
+  /status … but this session did not start it". The pre-warm starts at the first device tool after `select_device`,
+  which builds the adapter: in practice `install_app` or `launch_app`.
+- `prewarm` is classed `reads` in `ui-tree/read-handoff.ts#ADAPTER_SURFACE`. Starting WDA changes nothing the device
+  shows. The probe's first taps found the lab app in front, with WDA started after its launch.
+
+**Behaviour that moves.**
+- Under `auto`, a launch may see the choice made during its foreground wait. The wait asks idb's label until then and
+  WDA's active app after it (both are answers the wait already handles). Its `source`, which words a deadline note's
+  lag, is read when the wait starts, so it says idb's.
+- WDA's start now overlaps `simctl launch` when the adapter is built by `launch_app`. The probe measured WDA starting
+  after a launch, not during one. The owner's re-run checks that the first tap still finds the app in front.
+
+**Acceptance (the owner re-runs `npm run truth:lab:ios:a41`).**
+- *WDA tap no more than 100 ms slower than idb's*: plausible. The 300 ms cadence (ADR 0040's A41b amendment) takes
+  about 200 ms off a WDA tap's settle, from 687 to about 490 ms against idb's 476.
+- *First tap after `launch_app` ≤ the same tap warm + 500 ms*: not plausible in the probe as written. Its session runs
+  `select_device`, `simctl terminate`, then `launch_app`, so the adapter is built by `launch_app`, and the pre-warm
+  starts about 1.9 s (launch_app's median, 1 924 ms) before the timed tap. WDA's cold start is about 3.1 s, so the tap
+  should still pay about 1.2 s of it, more if the two compete for the CPU. That puts it near 2.2 s against a warm tap
+  of about 0.96 s (after the cadence) + 0.5. The criterion holds once about 3 s pass between the adapter's creation and
+  the first read: an `install_app` first, a screenshot, or an agent's own time between calls. The probe's tap is timed
+  from `launch_app`'s reply, and nothing in the probe waits there.
+
+**Residual 2, now.** A warm-built machine's first read pays only what is left of WDA's cold start after the time since
+the adapter was built. A fresh machine still pays the whole first build at the first read.
+

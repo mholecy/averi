@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
+import { WDA_SETTLE_CADENCE_MS, WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
 import { SYSTEM_ALERT_SOURCE_TIMEOUT_MS, type FetchFn } from '../../src/adapters/wda.js';
 import { findAll } from '../../src/ui-tree/selectors.js';
 import { fakeExec, fakeFetch, fakeSpawn, tempDerivedData, WDA_STATUS } from '../helpers/fake-wda.js';
@@ -153,6 +153,99 @@ describe('WdaTreeSource.bringUp — WebDriverAgent up without a tree read (treeS
     await expect(source.bringUp()).rejects.toThrow(/select the device again/);
     expect(spawner.spawns).toEqual([]);
     expect(fetcher.urls).toEqual([]);
+  });
+});
+
+describe('WdaTreeSource.prewarm — WebDriverAgent started in the background, never awaited (treeSource wda, A41b)', () => {
+  const drain = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it('returns before anything started; the start runs in the background and the first read reuses it — one WebDriverAgent', async () => {
+    const { source, spawner, fetcher } = await setup();
+    expect(source.prewarm()).toBeUndefined();
+    expect(spawner.spawns).toEqual([]);
+    await vi.waitFor(() => expect(spawner.spawns).toHaveLength(1));
+    expect(fetcher.urls.filter((u) => u.includes('/source'))).toEqual([]);
+    await source.read();
+    source.prewarm();
+    await source.read();
+    expect(spawner.spawns).toHaveLength(1);
+    await source.dispose();
+  });
+
+  it('a read racing it joins the same start (WdaServer.ensureRunning is single-flight)', async () => {
+    const { source, spawner } = await setup();
+    source.prewarm();
+    await source.read();
+    expect(spawner.spawns).toHaveLength(1);
+    await source.dispose();
+  });
+
+  it('WebDriverAgent not built: nothing at all — no build, no /status, no spawn; the first read builds as before', async () => {
+    const { dd } = await tempDerivedData(false);
+    const spawner = fakeSpawn();
+    const fetcher = fakeFetch(() => 'refused');
+    const exec = fakeExec();
+    const source = new WdaTreeSource({ udid: 'AAAA-1111', exec: exec.fn, fetchFn: fetcher.fn, spawnFn: spawner.fn, derivedDataPath: dd, pollIntervalMs: 5 });
+    source.prewarm();
+    await drain();
+    await drain();
+    expect(spawner.spawns).toEqual([]);
+    expect(fetcher.urls).toEqual([]);
+    expect(exec.calls).toEqual([]);
+  });
+
+  it('a start that fails is no rejection anywhere; the read after it fails in its own words', async () => {
+    const { dd } = await tempDerivedData(true);
+    const fetcher = fakeFetch(() => ({ status: 200, body: WDA_STATUS })); // answering before we spawned: not ours
+    const source = new WdaTreeSource({ udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fetcher.fn, spawnFn: fakeSpawn().fn, derivedDataPath: dd, pollIntervalMs: 5 });
+    const unhandled: unknown[] = [];
+    const hear = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', hear);
+    try {
+      source.prewarm();
+      await vi.waitFor(() => expect(fetcher.urls.length).toBeGreaterThan(0));
+      await drain();
+      await drain();
+    } finally {
+      process.off('unhandledRejection', hear);
+    }
+    expect(unhandled).toEqual([]);
+    await expect(source.read()).rejects.toThrow(/but this session did not start it/);
+  });
+
+  it('released: starts nothing', async () => {
+    const { source, spawner, fetcher } = await setup();
+    await source.dispose();
+    source.prewarm();
+    await drain();
+    expect(spawner.spawns).toEqual([]);
+    expect(fetcher.urls).toEqual([]);
+  });
+
+  it('released while it looked for the build: starts nothing', async () => {
+    const { source, spawner, fetcher } = await setup();
+    source.prewarm();
+    await source.dispose();
+    await drain();
+    await drain();
+    expect(spawner.spawns).toEqual([]);
+    expect(fetcher.urls.filter((u) => !u.endsWith('/status'))).toEqual([]);
+  });
+
+  it('buildCached answers whether the WebDriverAgent build is in DerivedData', async () => {
+    const built = await tempDerivedData(true);
+    const none = await tempDerivedData(false);
+    const at = (dd: string) => new WdaTreeSource({ udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fakeFetch(() => 'refused').fn, spawnFn: fakeSpawn().fn, derivedDataPath: dd });
+    expect(await at(built.dd).buildCached()).toBe(true);
+    expect(await at(none.dd).buildCached()).toBe(false);
+  });
+});
+
+describe('WdaTreeSource.settleCadenceMs — measured 300 (A41b, ADR 0040)', () => {
+  it('is WDA_SETTLE_CADENCE_MS, 300 ms', async () => {
+    expect(WDA_SETTLE_CADENCE_MS).toBe(300);
+    const { source } = await setup();
+    expect(source.settleCadenceMs).toBe(WDA_SETTLE_CADENCE_MS);
   });
 });
 

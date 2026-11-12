@@ -32,15 +32,18 @@ export function fallbackReason(err: unknown): string {
   return clause.length <= REASON_MAX ? clause : `${clause.slice(0, REASON_MAX - 1)}…`;
 }
 
-/** WebDriverAgent's source as `auto` uses it: a tree source that can be asked to come up without reading a tree. */
-export type WdaSide = IosTreeSource & { bringUp(): Promise<void> };
+/**
+ * WebDriverAgent's source as `auto` uses it: a tree source that can be asked to come up without reading a tree, and
+ * whether its build is cached (what decides a pre-warm, A41b).
+ */
+export type WdaSide = IosTreeSource & { bringUp(): Promise<void>; buildCached(): Promise<boolean> };
 
 /**
  * `treeSource: auto` (A41a, docs/adr/0046-the-ios-tree-source-is-webdriveragent-when-it-comes-up.md): WebDriverAgent
  * when it can be brought up, idb when it cannot — ONE source per adapter, chosen once, never two trees reconciled
- * (ADR 0032). The choice is made lazily, at the first tree read, by asking WDA to come up within its own bounds
- * (WdaTreeSource.bringUp: the package, a first build, /status) — no probe at construction or launch. It is kept for
- * the adapter's life:
+ * (ADR 0032). The choice is made by asking WDA to come up within its own bounds (WdaTreeSource.bringUp: the package,
+ * a first build, /status) — at the first tree read, or before it by a pre-warm (below); constructing the source asks
+ * nothing. It is kept for the adapter's life:
  * - WDA came up → every call is WDA's, exactly as under `treeSource: wda` — a later WDA failure is WDA's error, never a
  *   switch to idb.
  * - It did not → the reason is said once on stderr, WDA is shut down, every read is idb's, and `claimNote` is set: the
@@ -49,6 +52,10 @@ export type WdaSide = IosTreeSource & { bringUp(): Promise<void> };
  * Before the choice, what is asked without a tree read is idb's: a launch's application label (WDA's would be
  * `declined` — it is not up), `kind` (the label's wording) and no settle cadence (the default 500). Typing waits for
  * the choice (typeText).
+ *
+ * The choice may start before the first read (prewarm, A41b): the registry asks it when it builds the adapter, and a
+ * launch asks again, so WDA's start runs beside the agent's work, when its build is cached. It is the same choice — one
+ * attempt, which the first read joins, and whose outcome is the one that read would have met.
  */
 export class AutoTreeSource implements IosTreeSource {
   private readonly wda: WdaSide;
@@ -104,6 +111,22 @@ export class AutoTreeSource implements IosTreeSource {
 
   async read(): Promise<UiNode> {
     return (await this.source()).read();
+  }
+
+  /**
+   * Starts the choice in the background and returns at once (A41b) — only while none is made or in flight, and only
+   * when WDA's build is cached: an uncached first build is up to 10 minutes of xcodebuild beside the agent's own work,
+   * which the first read then runs, as before (ADR 0046's A41b amendment). Never rejects: a WDA that does not come up
+   * is the fallback the first read meets (choose); a release mid-choice is that read's error.
+   */
+  prewarm(): void {
+    // `choosing` is set once a choice started, and stays: made, in flight, or never asked.
+    if (this.choosing !== undefined || this.disposed) return;
+    void this.chooseIfBuilt().catch(() => undefined);
+  }
+
+  private async chooseIfBuilt(): Promise<void> {
+    if ((await this.wda.buildCached()) && !this.disposed) await this.source();
   }
 
   applicationLabel(): Promise<ApplicationLabel> {
