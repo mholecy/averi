@@ -47,12 +47,10 @@ export const edges: KnownFile = {
     ...keys(`${IOS}/scroll-bounded-footer.idb.json`, ['O'], ['tap'], { cls: 'Tapped', kind: 'Tapped', calls: ['idb ui tap 201 670'], note: 'idb lists no scroll view — moved clear of Continue, Tapped on the background beneath the clip', as: IDB_NO_SCROLL_VIEW }),
     ...keys(`${IOS}/scroll-bounded-footer.idb.json`, ['O'], ['scroll_until'], { cls: 'no swipe', kind: 'refused', calls: [], note: 'idb lists no scroll view — refused before any swipe: Continue overlaps its centre, the order not told', as: IDB_NO_SCROLL_VIEW }),
     // LE2 across, on carousel-in-list's C (the card right of the carousel's clip, 378,138 354x85 against its
-    // scrollable 24,138 354x85): idb lists no carousel, so scroll_until strokes sideways across the SCREEN's middle
-    // (y 437, below the carousel), twice right, then once back, failing "content exhausted" — the residual. Its colour
-    // row is green (the 7 % of it on the screen reads as the page's #EEEEEE around it: failed closed). WDA answers all
-    // three rows as the truth does: its two strokes 307 181 → 95 181 lie inside the carousel, along its axis (round
-    // 6's S4, the measurement this cell was built for).
-    ...keys(`${IOS}/carousel-in-list.idb.json`, ['C'], ['scroll_until'], { cls: 'touched down outside its scroll view carousel at (322,437) (322,437) (80,437)', kind: 'refused', calls: ['idb ui swipe 322 437 80 437 --duration 0.694', 'idb ui swipe 322 437 80 437 --duration 0.694', 'idb ui swipe 80 437 201 437 --duration 0.347'], note: 'idb lists no carousel — the screen\'s sideways stroke, below the carousel holding C', as: IDB_NO_SCROLL_VIEW }),
+    // scrollable 24,138 354x85): idb lists no carousel, so scroll_until stroked sideways across the SCREEN's middle
+    // (y 437, below the carousel) and failed "content exhausted". Fixed by A38b (interact/stroke-plan.ts#rowOf): a
+    // sideways stroke for a target idb lists goes over its own row, 322 181 → 80 181, inside the carousel — ok,
+    // struck off here.
     // LAB FINDING LE4 — fixed on arch/r21-strokes (958bd27, round 5's 0a), merged with arch/round-21: WDA's O and F of
     // scroll-bounded, stroked over the screen beside `lower` until then, are stroked inside it (201 524 → 416) and green;
     // struck off here, calibrated in scripts/truth/calibration.json.
@@ -85,7 +83,7 @@ export const edges: KnownFile = {
     [`${ANDROID}/scroll-collapsing.xml`]: 5,
     // T6's L7 carousels (Android only): B and U as carousel-in-list's (R-off's three each), and C — laid out nowhere at
     // launch (CellTruth.absent) — R-absent's R-stroke and R-fully (golden-spec/edges.ts#absentRows): all green, D59b's
-    // strokes (824,497)→(256,497) inside the carousel's band.
+    // strokes (824,497)→(256,497) inside the carousel.
     [`${ANDROID}/carousel-lazy.xml`]: 8,
     [`${ANDROID}/carousel-recycler.xml`]: 8,
     [`${ANDROID}/carousel-lazy-free.xml`]: 8,
