@@ -33,8 +33,9 @@ class A41Seam extends FakeSeam {
     super(world, HEAD);
   }
   protected answer(cmd: string, args: readonly string[], options: StartOptions): Answer | undefined {
-    if (cmd !== process.execPath) return this.world.answer(cmd, args, { cwd: options.cwd });
-    const script = scriptOf(args);
+    const script = cmd === process.execPath ? scriptOf(args) : undefined;
+    // Anything else — the lab build's own node child among them — is the fake lab's.
+    if (script === undefined || !['golden.ts', 'baseline.ts', 'a41-probe.ts', 'a41-report.ts'].includes(script)) return this.world.answer(cmd, args, { cwd: options.cwd });
     if (script === 'golden.ts') return { code: this.codes.golden ?? 0, out: this.goldenOut, err: '' };
     if (script === 'a41-report.ts') {
       const [idb, wda, out] = [at(args, '--idb'), at(args, '--wda'), at(args, '--out')];
