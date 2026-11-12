@@ -11,11 +11,10 @@ import {
   iosLabel,
   iosRunName,
   labRunIos,
-  windowStateHand,
 } from '../../../scripts/truth/batch/lab-run-ios.js';
 import type { LiveCases, LiveTable } from '../../../scripts/truth/batch/live-table.js';
 import type { StartOptions } from '../../../scripts/truth/batch/proc.js';
-import { groupsOf, onlyWith, STANDING_EXIT as LAB_RUN_EXIT } from '../../../scripts/truth/batch/standing.js';
+import { groupsOf, onlyWith, STANDING_EXIT as LAB_RUN_EXIT, windowStateHand } from '../../../scripts/truth/batch/standing.js';
 import { LIVE_GOLDEN_HEADER } from '../../../scripts/truth/batch/steps.js';
 import { CATALOG, FakeSeam, LAB_UDID, labWorld, rejudgeWith, until, type Answer, type LabWorld, type Rejudged, type WorldOptions } from './lab-fakes.js';
 

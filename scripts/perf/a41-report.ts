@@ -2,35 +2,26 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { isMain } from '../is-main.js';
-import { reportOf, summaryLines, type A41Parts, type CadencePass, type Trial } from './a41.js';
+import { A41_CHILD_NAMES, A41_CHILDREN, CADENCES, childLog, reportOf, summaryLines, WDA_BUILD_LINE, type A41Parts, type CadencePass, type Trial } from './a41.js';
 import { installReplayClock, replaySettles } from './a41-settle.js';
 
 /**
  * The A41 probe's files summed, device-free (scripts/truth/batch/lab-a41-ios.ts's last block; rerunnable by hand on
- * the run's folders): the idb block's baseline and hit test, the WDA block's baseline, cold starts, auto taps and
- * settle trace — the trace replayed through the production settle at each of CADENCES (a41-settle.ts, on virtual
- * time) — into `a41.json` (the report, a41.ts#A41Report, with the trace kept beside it as evidence) and `summary.txt`
- * (a41.ts#summaryLines), both in `--out`, the summary on stdout too. A file missing or unreadable is named in the
- * report's `missing` and its part said MISSING, never a number. Exit 0 once both are written; 1 when the report itself
- * could not be.
+ * the run's folders): each child's file of a41.ts#A41_CHILDREN from its block's folder — the settle trace replayed
+ * through the production settle at each of a41.ts#CADENCES (a41-settle.ts, on virtual time) — and whether a
+ * WebDriverAgent build ran (a41.ts#WDA_BUILD_LINE in a WDA child's log), into `a41.json` (the report, a41.ts#A41Report,
+ * with the trace beside it as evidence) and `summary.txt` (a41.ts#summaryLines), both in `--out`, the summary on stdout
+ * too. A file missing or unreadable is named in the report's `missing` and its part said MISSING, never a number. Exit
+ * 0 once both are written; 1 when the report itself could not be.
  *
  *   node --import tsx scripts/perf/a41-report.ts --idb <a41-idb run folder> --wda <a41-wda run folder> --out <dir>
  */
 
-/** The cadences the trace is replayed at: the shorter one A41b asks about, and WDA's 500 today (ADR 0040). */
-export const CADENCES = [300, 500] as const;
-
-/** The probe's files, by folder: the idb block's, then the WDA block's. */
-export const A41_FILES = {
-  idb: { baselineIdb: 'baseline-idb.json', hitTest: 'hit-test.json' },
-  wda: { baselineWda: 'baseline-wda.json', wdaCold: 'wda-cold.json', autoTap: 'auto-tap.json', cadence: 'cadence-trace.json' },
-} as const;
-
-async function readJson(file: string): Promise<{ ok: true; value: unknown } | { ok: false }> {
+async function readText(file: string): Promise<string | undefined> {
   try {
-    return { ok: true, value: JSON.parse(await readFile(file, 'utf8')) as unknown };
+    return await readFile(file, 'utf8');
   } catch {
-    return { ok: false };
+    return undefined;
   }
 }
 
@@ -44,14 +35,21 @@ export function a41Json(report: object, trials: readonly Trial[] | undefined): s
 export async function main(argv: readonly string[]): Promise<number> {
   const { values } = parseArgs({ args: [...argv], options: { idb: { type: 'string' }, wda: { type: 'string' }, out: { type: 'string' } } });
   if (values.idb === undefined || values.wda === undefined || values.out === undefined) throw new Error('usage: a41-report.ts --idb <dir> --wda <dir> --out <dir>');
+  const dirs = { idb: values.idb, wda: values.wda };
   const parts: Record<string, unknown> = {};
   const missing: string[] = [];
-  for (const [side, files] of Object.entries(A41_FILES)) {
-    for (const [key, name] of Object.entries(files)) {
-      const r = await readJson(join(side === 'idb' ? values.idb : values.wda, name));
-      if (r.ok) parts[key] = r.value;
-      else missing.push(name);
+  let wdaBuilt: boolean | undefined;
+  for (const name of A41_CHILD_NAMES) {
+    const c = A41_CHILDREN[name];
+    const text = await readText(join(dirs[c.block], c.file));
+    try {
+      parts[c.part] = JSON.parse(text ?? '') as unknown;
+    } catch {
+      missing.push(c.file);
     }
+    if (c.block !== 'wda') continue;
+    const log = await readText(join(dirs.wda, childLog(name)));
+    if (log !== undefined) wdaBuilt = wdaBuilt === true || WDA_BUILD_LINE.test(log);
   }
   let trials: Trial[] | undefined;
   const trace = parts.cadence as { meta?: unknown; trials?: Trial[] } | undefined;
@@ -66,7 +64,7 @@ export async function main(argv: readonly string[]): Promise<number> {
     }
     parts.cadence = { meta: trace.meta, trials, passes };
   }
-  const report = reportOf(parts as A41Parts, missing, new Date().toISOString());
+  const report = reportOf(parts as A41Parts, missing, new Date().toISOString(), wdaBuilt);
   const lines = summaryLines(report);
   await mkdir(values.out, { recursive: true });
   await writeFile(join(values.out, 'a41.json'), a41Json(report, trials));

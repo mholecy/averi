@@ -6,7 +6,7 @@ import { nodeFs } from '../../../scripts/truth/batch/io.js';
 import { A41_BLOCK_IDS, A41_SECS, EXPECTED_OVERHEAD_SECS, EXPECTED_SECS, labA41Ios, siblingDir } from '../../../scripts/truth/batch/lab-a41-ios.js';
 import type { LiveCases, LiveTable } from '../../../scripts/truth/batch/live-table.js';
 import type { StartOptions } from '../../../scripts/truth/batch/proc.js';
-import { A41_FILES } from '../../../scripts/perf/a41-report.js';
+import { A41_CHILD_NAMES, A41_CHILDREN } from '../../../scripts/perf/a41.js';
 import { CATALOG, FakeSeam, LAB_UDID, labWorld, type Answer, type LabWorld } from './lab-fakes.js';
 
 // The A41 probe batch (scripts/truth/batch/lab-a41-ios.ts) under runBatch, over the shared fake lab (lab-fakes.ts) and a
@@ -36,13 +36,11 @@ class A41Seam extends FakeSeam {
     const script = cmd === process.execPath ? scriptOf(args) : undefined;
     // Anything else — the lab build's own node child among them — is the fake lab's.
     if (script === undefined || !['golden.ts', 'baseline.ts', 'a41-probe.ts', 'a41-report.ts'].includes(script)) return this.world.answer(cmd, args, { cwd: options.cwd });
-    if (script === 'golden.ts') return { code: this.codes.golden ?? 0, out: this.goldenOut, err: '' };
+    if (script === 'golden.ts') return { code: this.codes.golden ?? 0, out: this.goldenOut, err: 'golden stderr\n' };
     if (script === 'a41-report.ts') {
       const [idb, wda, out] = [at(args, '--idb'), at(args, '--wda'), at(args, '--out')];
-      const missing = [
-        ...Object.values(A41_FILES.idb).filter((f) => !existsSync(join(idb, f))),
-        ...Object.values(A41_FILES.wda).filter((f) => !existsSync(join(wda, f))),
-      ];
+      const dirs = { idb, wda };
+      const missing = A41_CHILD_NAMES.map((n) => A41_CHILDREN[n]).filter((c) => !existsSync(join(dirs[c.block], c.file))).map((c) => c.file);
       writeFileSync(join(out, 'a41.json'), JSON.stringify({ missing }));
       writeFileSync(join(out, 'summary.txt'), 'A41 probe\n');
       return { code: 0, out: 'A41 probe\n', err: '' };
@@ -134,13 +132,16 @@ describe('lab-a41-ios.ts: a clean run — the lab, the idb probes, the WDA probe
       `${tsx('scripts/perf/baseline.ts')} --platform ios --device ${LAB_UDID} --tree-source idb --repeat 8 --scenarios tree,tap,fill,scroll,ensure-cold,ensure-warm --out ${join(dirOf('a41-idb'), 'baseline-idb.json')}`,
     );
     expect(word('--mode hit-test')).toBe(
-      `${tsx('scripts/perf/a41-probe.ts')} --mode hit-test --device ${LAB_UDID} --out ${join(dirOf('a41-idb'), 'hit-test.json')} --golden ${join(dirOf('a41-idb'), 'golden.json')}`,
+      `${tsx('scripts/perf/a41-probe.ts')} --mode hit-test --device ${LAB_UDID} --out ${join(dirOf('a41-idb'), 'hit-test.json')} --repeat 3 --golden ${join(dirOf('a41-idb'), 'golden.json')}`,
     );
     expect(word('--mode wda-cold')).toBe(`${tsx('scripts/perf/a41-probe.ts')} --mode wda-cold --device ${LAB_UDID} --out ${join(dirOf('a41-wda'), 'wda-cold.json')} --repeat 5`);
     expect(word('--mode cadence')).toBe(`${tsx('scripts/perf/a41-probe.ts')} --mode cadence --device ${LAB_UDID} --out ${join(dirOf('a41-wda'), 'cadence-trace.json')} --repeat 20`);
     expect(word('a41-report.ts')).toBe(`${tsx('scripts/perf/a41-report.ts')} --idb ${dirOf('a41-idb')} --wda ${dirOf('a41-wda')} --out ${dirOf('a41-report')}`);
     // The golden's stdout is the file the hit test reads; each child logged beside its file.
     expect(readFileSync(join(dirOf('a41-idb'), 'golden.json'), 'utf8')).toBe(seam.goldenOut);
+    // The golden's stderr is its log, and its step line is said like any other child's.
+    expect(readFileSync(join(dirOf('a41-idb'), 'golden.log'), 'utf8')).toBe('golden stderr\n');
+    expect(readFileSync(join(out, 'steps.log'), 'utf8')).toMatch(/OK +a41-idb golden \(exit 0\)/);
     expect(readFileSync(join(dirOf('a41-wda'), 'cadence.log'), 'utf8')).toBe('cadence ran\n');
   });
 
@@ -194,7 +195,7 @@ describe('a probe that is not whole: INCONCLUSIVE naming it, the window still pu
     // Two boots: the failed reset before auto-tap, and the window's own end check (ios-lab.ts#wdaWindow, as Gate C) — none
     // before cadence.
     expect(n).toBe(2);
-    expect(verdicts().find((l) => l.startsWith('a41 wda probe verdict: INCONCLUSIVE'))).toMatch(/the iOS reset before a41 auto-tap failed: .* — no a41 auto-tap; not run: cadence$/);
+    expect(verdicts().find((l) => l.startsWith('a41 wda probe verdict: INCONCLUSIVE'))).toMatch(/the iOS reset before a41 auto-tap failed: .* — no a41 auto-tap; not run: auto-tap, cadence$/);
   });
 
   it('the golden prints no JSON: no hit test, the idb block INCONCLUSIVE', async () => {
@@ -202,7 +203,7 @@ describe('a probe that is not whole: INCONCLUSIVE naming it, the window still pu
     seam.codes.golden = 1;
     expect(await go()).toBe(3);
     expect(children()).not.toContain('hit-test');
-    expect(verdicts()[0]).toBe('a41 idb probe verdict: INCONCLUSIVE — golden: no JSON (exit 1) — no hit test');
+    expect(verdicts()[0]).toBe(`a41 idb probe verdict: INCONCLUSIVE — golden: no JSON (exit 1) — see ${join(dirOf('a41-idb'), 'golden.log')} — no hit-test`);
   });
 });
 

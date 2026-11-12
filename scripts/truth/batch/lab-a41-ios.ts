@@ -1,12 +1,11 @@
 import { basename, dirname, join } from 'node:path';
 import { isMain } from '../../is-main.js';
-import { A41B_SCENARIOS } from '../../perf/a41.js';
+import { A41_CHILD_NAMES, A41_CHILDREN, A41B_SCENARIOS, type A41ChildName, type ChildSpec } from '../../perf/a41.js';
 import { iosCheck, iosLab, wdaWindow, type IosSim } from './ios-lab.js';
-import { windowStateHand } from './lab-run-ios.js';
 import { labBlock, labBuild } from './lab-build.js';
 import type { Block, BlockCtx } from './runner.js';
 import { knobs as readKnobs } from './select.js';
-import { KNOBS, standingRun, standingSelection, type Standing, type StandingExit, type StandingKnobs, type StandingOptions } from './standing.js';
+import { KNOBS, standingRun, standingSelection, windowStateHand, type Standing, type StandingExit, type StandingKnobs, type StandingOptions } from './standing.js';
 import { exitText, failedCall } from './words.js';
 
 /**
@@ -61,75 +60,67 @@ export const A41_STANDING: Standing<A41Group> = {
   blocksOf: (g) => [a41BlockId(g), A41_REPORT],
 };
 
-/** baseline.ts's repeats per source: the first carries a fresh server's one-time costs, the 7 after it are the warm n. */
-export const BASELINE_REPEAT = 8;
-/** wda-cold's and auto-tap's fresh servers. */
-export const SESSION_REPEAT = 5;
-/** The cadence trace's trials per motion (D35's 20; 60 in all). */
-export const CADENCE_PER_MOTION = 20;
+/** A run's bounded steps: the device children (a41.ts#A41_CHILDREN), the golden's JSON before them, the report after. */
+export type A41Step = A41ChildName | 'golden' | 'report';
 
 /**
- * Each child's bound, in seconds — about three times its expected length on the lab (EXPECTED_SECS): baseline.ts's
- * WDA run pays a WebDriverAgent build when none is cached.
+ * Each step's bound, in seconds — about three times its expected length on the lab (EXPECTED_SECS) or more:
+ * baseline.ts's WDA run pays a WebDriverAgent build when none is cached.
  */
-export const A41_SECS = { golden: 300, 'baseline-idb': 900, 'hit-test': 600, 'baseline-wda': 1800, 'wda-cold': 900, 'auto-tap': 900, cadence: 1500, report: 120 } as const;
-export type A41Child = keyof typeof A41_SECS;
+export const A41_SECS: Readonly<Record<A41Step, number>> = {
+  golden: 300,
+  'baseline-idb': 900,
+  'hit-test': 600,
+  'baseline-wda': 1800,
+  'wda-cold': 900,
+  'auto-tap': 900,
+  cadence: 1500,
+  report: 120,
+};
+
 /**
- * What each child is expected to take on the lab, in seconds: 21 min of children. EXPECTED_OVERHEAD_SECS adds the rest
- * of a run that goes well — the lab block (reset, a cached build, install: 26 s in Gate C 2026-11-12), the 7 health
- * checks (~3 s each), the window's backup, restore and end check (~15 s) — about 23 min in all. A WebDriverAgent build
- * not cached adds its minutes to baseline-wda.
+ * What each step is expected to take on the lab, in seconds: about 22 min of steps. EXPECTED_OVERHEAD_SECS adds the
+ * rest of a run that goes well — the lab block (its reset, a cached build, the install: 26 s in Gate C on 2026-11-12),
+ * the 8 health checks (one before each device child, the window's first and its end check; ~4 s each), the window's
+ * backup and restore (~15 s) — about 23–24 min in all. A WebDriverAgent build not cached adds its minutes to
+ * baseline-wda (the summary then says WDA was built).
  *
- * The worst case is the bounds: the children's A41_SECS (7 020 s, 117 min), the lab block's build (B_BUILD, 2 400 s by
- * default) and installs, and any reset a health check makes (simctl shutdown, boot and bootstatus, each up to 300 s:
- * ~16 min a reset; a reset that fails ends the WDA block, M3) — well over two hours, reached only when every call
- * hangs to its bound.
+ * The worst case is the bounds: the steps' A41_SECS (7 020 s, 117 min), the lab block's build (B_BUILD, 2 400 s by
+ * default) and installs, and any reset a health check makes (simctl shutdown, boot and bootstatus, each bounded at
+ * 300 s: ~16 min a reset; a reset that fails ends its block) — well over two hours, reached only when every call hangs
+ * to its bound.
  */
-export const EXPECTED_OVERHEAD_SECS = 26 + 7 * 3 + 15;
-export const EXPECTED_SECS: Readonly<Record<A41Child, number>> = {
+export const EXPECTED_SECS: Readonly<Record<A41Step, number>> = {
   golden: 20,
   'baseline-idb': 200,
-  'hit-test': 90,
+  'hit-test': 100,
   'baseline-wda': 240,
   'wda-cold': 90,
-  'auto-tap': 150,
+  'auto-tap': 200,
   cadence: 480,
   report: 5,
 };
+export const EXPECTED_OVERHEAD_SECS = 26 + 8 * 4 + 15;
 
 const tsx = (repo: string, script: string): string[] => ['--import', 'tsx', join(repo, script)];
 
 /** The golden's `--json` over the committed corpus: device-free, its stdout the file. */
 export const goldenArgs = (repo: string): string[] => [...tsx(repo, 'scripts/differential/golden.ts'), '--corpus', join(repo, 'tests/fixtures/truth'), '--json'];
 
-/** baseline.ts on the lab simulator under one tree source: the A41b scenarios, BASELINE_REPEAT repeats. */
-export const baselineArgs = (repo: string, udid: string, source: 'idb' | 'wda', out: string): string[] => [
-  ...tsx(repo, 'scripts/perf/baseline.ts'),
-  '--platform',
-  'ios',
-  '--device',
-  udid,
-  '--tree-source',
-  source,
-  '--repeat',
-  String(BASELINE_REPEAT),
-  '--scenarios',
-  A41B_SCENARIOS.join(','),
-  '--out',
-  out,
-];
-
-/** a41-probe.ts in one mode. */
-export const probeArgs = (repo: string, udid: string, mode: 'hit-test' | 'wda-cold' | 'auto-tap' | 'cadence', out: string, extra: readonly string[] = []): string[] => [
-  ...tsx(repo, 'scripts/perf/a41-probe.ts'),
-  '--mode',
-  mode,
-  '--device',
-  udid,
-  '--out',
-  out,
-  ...extra,
-];
+/**
+ * A device child's argv, from its row of a41.ts#A41_CHILDREN: baseline.ts on its block's tree source (the A41b
+ * scenarios), or a41-probe.ts in its mode (the hit test reading the golden's JSON); `--repeat` the row's.
+ */
+export function childArgs(repo: string, udid: string, name: A41ChildName, out: string, golden?: string): string[] {
+  const c: ChildSpec = A41_CHILDREN[name];
+  const repeat = ['--repeat', String(c.repeat)];
+  if (c.mode === undefined) {
+    const scenarios = ['--scenarios', A41B_SCENARIOS.join(',')];
+    return [...tsx(repo, 'scripts/perf/baseline.ts'), '--platform', 'ios', '--device', udid, '--tree-source', c.block, ...repeat, ...scenarios, '--out', out];
+  }
+  const extra = c.mode === 'hit-test' ? ['--golden', golden ?? ''] : [];
+  return [...tsx(repo, 'scripts/perf/a41-probe.ts'), '--mode', c.mode, '--device', udid, '--out', out, ...repeat, ...extra];
+}
 
 /** a41-report.ts over the two blocks' folders. */
 export const reportArgs = (repo: string, idb: string, wda: string, out: string): string[] => [...tsx(repo, 'scripts/perf/a41-report.ts'), '--idb', idb, '--wda', wda, '--out', out];
@@ -137,25 +128,73 @@ export const reportArgs = (repo: string, idb: string, wda: string, out: string):
 /** Another block's folder of this run: `<out>/<block>/run-<id>`, beside this block's. */
 export const siblingDir = (dir: string, block: string): string => join(dirname(dirname(dir)), block, basename(dir));
 
+/** A block's children, in their run order (a41.ts#A41_CHILDREN's). */
+export const childrenOf = (block: ChildSpec['block']): A41ChildName[] => A41_CHILD_NAMES.filter((n) => A41_CHILDREN[n].block === block);
+
 /**
- * A child run: bounded, from the checkout, its output in `<name>.log`; ok when it exited 0 and wrote `file` — else
- * why not (a step says it either way).
+ * A step run: bounded, from the checkout, logged in `<name>.log` — or, `stdout` (the golden's JSON), its stdout the file
+ * and its stderr the log. Ok when it exited 0 (the golden: any exit, its stdout JSON) and wrote `file`; else why not. A
+ * step line says it either way.
  */
-async function child(ctx: BlockCtx<StandingKnobs>, name: A41Child, args: readonly string[], file: string): Promise<string | undefined> {
+async function child(ctx: BlockCtx<StandingKnobs>, name: A41Step, args: readonly string[], file: string, o: { stdout?: true } = {}): Promise<string | undefined> {
   const log = join(ctx.dir, `${name}.log`);
   ctx.print(`== ${ctx.id} ${name} (bound ${A41_SECS[name]} s; log: ${log}) ==`);
-  const r = await ctx.bounded(process.execPath, args, { secs: A41_SECS[name], cwd: ctx.config.repo, log });
-  const why = failedCall(r) ? `${name}: ${exitText(r)} — see ${log}` : ctx.fs.read(file) === undefined ? `${name}: wrote no ${basename(file)} — see ${log}` : undefined;
-  ctx.step(why === undefined ? 'OK' : 'FAIL', why === undefined ? `${ctx.id} ${name}` : `${ctx.id} ${why}`);
+  const r = await ctx.bounded(process.execPath, args, { secs: A41_SECS[name], cwd: ctx.config.repo, ...(o.stdout === true ? {} : { log }) });
+  let why: string | undefined;
+  if (o.stdout === true) {
+    ctx.fs.createExclusive(log, r.err);
+    try {
+      JSON.parse(r.out);
+      ctx.fs.createExclusive(file, r.out);
+    } catch {
+      why = `${name}: no JSON (${r.timedOut ? `past its ${A41_SECS[name]} s bound` : `exit ${r.code}`}) — see ${log}`;
+    }
+  } else if (failedCall(r)) why = `${name}: ${exitText(r)} — see ${log}`;
+  else if (ctx.fs.read(file) === undefined) why = `${name}: wrote no ${basename(file)} — see ${log}`;
+  ctx.step(why === undefined ? 'OK' : 'FAIL', why === undefined ? `${ctx.id} ${name}${o.stdout === true ? ` (exit ${r.code})` : ''}` : `${ctx.id} ${why}`);
   return why;
 }
 
-/** The health check before a child (iosCheck: the lab's WebDriverAgent ended, the alert, describe-all and a swipe; a reset when sick). */
+/**
+ * The health check before a child (iosCheck: the lab's WebDriverAgent ended, the alert, describe-all and a swipe; a
+ * reset when sick); why not fit.
+ */
 async function fit(ctx: BlockCtx<StandingKnobs>, sim: IosSim, name: string, warnings: string[]): Promise<string | undefined> {
   const done = await iosCheck(ctx, sim, name);
   if (!done.ok) return `${done.why} — no ${name}`;
   if (done.warning !== undefined) warnings.push(done.warning);
   return undefined;
+}
+
+/**
+ * A block's children in order, each after its health check: a check whose reset failed ends them there — no more
+ * checks or resets on the shared simulator (lab-run-ios.ts's way) — what is left said not run. `skip` names a child
+ * that cannot run (the hit test with no golden JSON). The whys, in order.
+ */
+async function children(
+  ctx: BlockCtx<StandingKnobs>,
+  sim: IosSim,
+  names: readonly A41ChildName[],
+  o: { warnings: string[]; golden?: string; skip?: (name: A41ChildName) => string | undefined },
+): Promise<string[]> {
+  const whys: string[] = [];
+  for (const [i, name] of names.entries()) {
+    const skipped = o.skip?.(name);
+    if (skipped !== undefined) {
+      whys.push(skipped);
+      continue;
+    }
+    const unfit = await fit(ctx, sim, `a41 ${name}`, o.warnings);
+    if (unfit !== undefined) {
+      whys.push(unfit, `not run: ${names.slice(i).join(', ')}`);
+      ctx.step('ERROR', `${ctx.id}: ${unfit}`);
+      break;
+    }
+    const file = join(ctx.dir, A41_CHILDREN[name].file);
+    const why = await child(ctx, name, childArgs(ctx.config.repo, sim.udid, name, file, o.golden), file);
+    if (why !== undefined) whys.push(why);
+  }
+  return whys;
 }
 
 /** A probe block's verdict: PASS with every child whole, else INCONCLUSIVE naming what is not. */
@@ -180,41 +219,16 @@ export async function labA41Ios(o: StandingOptions): Promise<StandingExit> {
     async run(ctx) {
       const sim = await ios.open(ctx);
       if (!sim.ok) return ctx.verdict('INCONCLUSIVE', sim.why);
-      const [repo, lab, whys, warnings] = [ctx.config.repo, sim.value, [] as string[], [] as string[]];
+      const warnings: string[] = [];
       const golden = join(ctx.dir, 'golden.json');
-      const g = await ctx.bounded(process.execPath, goldenArgs(repo), { secs: A41_SECS.golden, cwd: repo });
-      try {
-        JSON.parse(g.out);
-        ctx.fs.createExclusive(golden, g.out);
-        ctx.step('OK', `${ctx.id} golden --json (exit ${g.code})`);
-      } catch {
-        whys.push(`golden: no JSON (${g.timedOut ? `past its ${A41_SECS.golden} s bound` : `exit ${g.code}`}) — no hit test`);
-        ctx.step('FAIL', `${ctx.id} ${whys[0]}`);
-      }
-      const unfit = await fit(ctx, lab, 'a41 baseline-idb', warnings);
-      if (unfit !== undefined) return ctx.verdict('INCONCLUSIVE', `${unfit}; not run: baseline-idb, hit-test`);
-      const base = join(ctx.dir, 'baseline-idb.json');
-      const b = await child(ctx, 'baseline-idb', baselineArgs(repo, lab.udid, 'idb', base), base);
-      if (b !== undefined) whys.push(b);
-      if (ctx.fs.read(golden) !== undefined) {
-        const unfitHit = await fit(ctx, lab, 'a41 hit-test', warnings);
-        const hit = join(ctx.dir, 'hit-test.json');
-        const h = unfitHit === undefined ? await child(ctx, 'hit-test', probeArgs(repo, lab.udid, 'hit-test', hit, ['--golden', golden]), hit) : `${unfitHit}; not run: hit-test`;
-        if (h !== undefined) whys.push(h);
-      }
+      const g = await child(ctx, 'golden', goldenArgs(ctx.config.repo), golden, { stdout: true });
+      const names = childrenOf('idb');
+      const skip = (n: A41ChildName) => (n === 'hit-test' && g !== undefined ? `${g} — no hit-test` : undefined);
+      const whys = await children(ctx, sim.value, names, { warnings, golden, skip });
       if (warnings.length > 0) ctx.step('WARN', `${ctx.id}: ${warnings.join('; ')}`);
-      verdictOf(ctx, whys, 'baseline-idb and hit-test measured');
+      verdictOf(ctx, whys, `${names.join(' and ')} measured`);
     },
   };
-
-  /** The WDA children, in their order: baseline.ts first, so a WebDriverAgent build, if any, is its cost alone. */
-  const wdaChildren = (repo: string, sim: IosSim, dir: string) =>
-    [
-      ['baseline-wda', 'baseline-wda.json', (out: string) => baselineArgs(repo, sim.udid, 'wda', out)],
-      ['wda-cold', 'wda-cold.json', (out: string) => probeArgs(repo, sim.udid, 'wda-cold', out, ['--repeat', String(SESSION_REPEAT)])],
-      ['auto-tap', 'auto-tap.json', (out: string) => probeArgs(repo, sim.udid, 'auto-tap', out, ['--repeat', String(SESSION_REPEAT)])],
-      ['cadence', 'cadence-trace.json', (out: string) => probeArgs(repo, sim.udid, 'cadence', out, ['--repeat', String(CADENCE_PER_MOTION)])],
-    ].map(([name, file, args]) => ({ name: name as A41Child, file: join(dir, file as string), args: args as (out: string) => string[] }));
 
   const wdaBlock: Block<StandingKnobs> = {
     id: a41BlockId('wda'),
@@ -225,29 +239,17 @@ export async function labA41Ios(o: StandingOptions): Promise<StandingExit> {
     async run(ctx) {
       const sim = await ios.open(ctx);
       if (!sim.ok) return ctx.verdict('INCONCLUSIVE', sim.why);
-      const [whys, said] = [[] as string[], [] as string[]];
+      const said: string[] = [];
+      const names = childrenOf('wda');
+      let whys: string[] = [];
       const w = await wdaWindow(ctx, sim.value, {
         secs: ctx.knobs.B_RESTORE,
-        work: async () => {
-          const children = wdaChildren(ctx.config.repo, sim.value, ctx.dir);
-          for (const [i, c] of children.entries()) {
-            const unfit = await fit(ctx, sim.value, `a41 ${c.name}`, said);
-            if (unfit !== undefined) {
-              // A reset that failed: no more checks or resets on the shared simulator (lab-run-ios.ts's way) — what is
-              // left is said not run.
-              whys.push(unfit, `not run: ${children.slice(i + 1).map((x) => x.name).join(', ') || 'none left'}`);
-              ctx.step('ERROR', `${ctx.id}: ${unfit}`);
-              break;
-            }
-            const why = await child(ctx, c.name, c.args(c.file), c.file);
-            if (why !== undefined) whys.push(why);
-          }
-        },
+        work: async () => void (whys = await children(ctx, sim.value, names, { warnings: said })),
       });
       const warnings = [...w.warnings, ...said];
       if (warnings.length > 0) ctx.step('WARN', `${ctx.id}: ${warnings.join('; ')}`);
       // The window's own INCONCLUSIVE (not run, not put back) stands; the probe's verdict is said only beside a window that ran.
-      if (w.ran && w.putBack) verdictOf(ctx, whys, 'baseline-wda, wda-cold, auto-tap and cadence measured');
+      if (w.ran && w.putBack) verdictOf(ctx, whys, `${names.slice(0, -1).join(', ')} and ${names.at(-1)} measured`);
     },
   };
 

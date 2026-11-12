@@ -154,6 +154,9 @@ export const DEVICE_CHECK_WDA_PORTS: readonly number[] = [8100, 8101];
  * The lab's own WebDriverAgent build: never the default `averi-wda` derived data, which device-check builds use — a
  * lab capture must not rebuild or replace theirs.
  */
+/** The lab's WebDriverAgent port: never device-check's 8100/8101. capture.ts, live.ts, baseline.ts and a41-probe.ts use it. */
+export const LAB_WDA_PORT = 8120;
+
 export const LAB_WDA_DERIVED_DATA = join(homedir(), 'Library', 'Developer', 'Xcode', 'DerivedData', 'averi-wda-lab');
 
 export class IosLab implements LabDevice {
@@ -178,7 +181,7 @@ export class IosLab implements LabDevice {
     this.app = opts.app ?? 'native';
     this.bundle = LAB_APP[this.app].bundle;
     if (opts.wdaPort !== undefined && DEVICE_CHECK_WDA_PORTS.includes(opts.wdaPort)) {
-      throw new Error(`WDA port ${opts.wdaPort} is the device-check simulator's (${DEVICE_CHECK_WDA_PORTS.join(', ')}): the lab runs WDA on a port of its own (8120)`);
+      throw new Error(`WDA port ${opts.wdaPort} is the device-check simulator's (${DEVICE_CHECK_WDA_PORTS.join(', ')}): the lab runs WDA on a port of its own (${LAB_WDA_PORT})`);
     }
   }
 
@@ -281,7 +284,7 @@ export class IosLab implements LabDevice {
   }
 
   private wda(): WdaServer {
-    const port = this.opts.wdaPort ?? 8120;
+    const port = this.opts.wdaPort ?? LAB_WDA_PORT;
     console.error(`WDA: port ${port}, derived data ${LAB_WDA_DERIVED_DATA}`);
     return new WdaServer({ udid: this.udid, port, derivedDataPath: LAB_WDA_DERIVED_DATA });
   }

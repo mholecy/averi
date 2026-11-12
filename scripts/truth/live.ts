@@ -11,7 +11,7 @@ import type { Platform } from '../differential/corpus.js';
 import { liveIosLine, loadSide } from '../differential/side.js';
 import { readPremiseInto } from './chooser-premise.js';
 import { deviceLabelling, type DeviceReadMode } from './device-state.js';
-import { AndroidLab, IosLab, LAB_AVD, LAB_WDA_DERIVED_DATA } from './lab-device.js';
+import { AndroidLab, IosLab, LAB_AVD, LAB_WDA_DERIVED_DATA, LAB_WDA_PORT } from './lab-device.js';
 import { SwipeHook } from './live-carousel.js';
 import { liveFactory } from './live-factory.js';
 import { finishRun } from './live-finish.js';
@@ -170,7 +170,7 @@ const deviceReadMode: DeviceReadMode = deviceReadFlag === 'none' ? 'none' : 'rea
 const platform: Platform = rejudging?.platform ?? (values.serial !== undefined ? 'android' : 'ios');
 const app: LabApp = rejudging?.app ?? parseLabApp(values.app);
 const device = (values.udid ?? values.serial ?? 'rejudged')!;
-const port = Number(values['wda-port'] ?? 8120);
+const port = Number(values['wda-port'] ?? LAB_WDA_PORT);
 /** The tree sources the cases run under: iOS's (idb, wda), Android's one. */
 const sources: Source[] = rejudging !== undefined ? [...new Set(rejudging.results.map((r) => r.source))] : platform === 'android' ? ['uiautomator'] : ((values.sources ?? 'idb,wda').split(',') as IosTreeSourceKind[]);
 const only = values.cases?.split(',');

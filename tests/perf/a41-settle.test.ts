@@ -33,21 +33,27 @@ describe('replaySettles: a settle of a static id, and one with too little window
     const reads: [number, number][] = [0, 1, 2, 3, 4, 5].map((i) => [i * 400 + 1, i * 400 + 31]);
     const t: Trial = { motion: 'M', cell: 'x', trial: 0, trigger: [0, 1], appMoved: null, reads, rects: { 'lab.x.s': '+.....', 'lab.x.m': '++++..' } };
     // s settles at read 1 (2000 ms of reads after: not censored); m at read 4 (400 ms after: censored).
-    expect(await replay(300, [t])).toEqual({ pollMs: 300, settles: { M: 2 }, wrong: [], moving: 1, censored: 1 });
+    expect(await replay(300, [t])).toEqual({ pollMs: 300, settles: { M: 2 }, wrong: [], moving: 1, censored: 1, judged: 0, wrongJudged: 0 });
+  });
+  it('a wrong settle with under 500 ms of reads after it is wrong, but not judged', async () => {
+    // m holds for reads 0–1 (settled at 1, 400 ms of reads after it: censored), then moves at read 3.
+    const reads: [number, number][] = [[0, 30], [300, 330], [600, 630], [700, 730]];
+    const t: Trial = { motion: 'M', cell: 'x', trial: 0, trigger: [0, 0], appMoved: null, reads, rects: { 'lab.x.m': '+..+' } };
+    expect(await replay(300, [t])).toEqual({ pollMs: 300, settles: { M: 1 }, wrong: ['M#0 lab.x.m @1'], moving: 1, censored: 1, judged: 0, wrongJudged: 0 });
   });
 });
 
 describe('replaySettles on the d35 fixture: T5\'s pins', () => {
   it('at 300: 0 wrong settles in 160 (M1a 0, M1b 100, M2 60)', async () => {
-    expect(await replay(300)).toEqual({ pollMs: 300, settles: { M1a: 0, M1b: 100, M2: 60 }, wrong: [], moving: 80, censored: 12 });
+    expect(await replay(300)).toEqual({ pollMs: 300, settles: { M1a: 0, M1b: 100, M2: 60 }, wrong: [], moving: 80, censored: 12, judged: 68, wrongJudged: 0 });
   });
 
   it('at 100: the carousel settles wrong once, in its late deceleration (M2#14, C)', async () => {
-    expect(await replay(100)).toEqual({ pollMs: 100, settles: { M1a: 245, M1b: 100, M2: 60 }, wrong: ['M2#14 lab.carousel-in-list.C @20'], moving: 325, censored: 245 });
+    expect(await replay(100)).toEqual({ pollMs: 100, settles: { M1a: 245, M1b: 100, M2: 60 }, wrong: ['M2#14 lab.carousel-in-list.C @20'], moving: 325, censored: 245, judged: 80, wrongJudged: 1 });
   });
 
   it('a trial whose window ends before any settle counts none, and a motion with no trial is not listed', async () => {
     const t: Trial = { motion: 'M9', cell: 'x', trial: 0, trigger: [0, 1], appMoved: null, reads: [[1, 2]], rects: { 'lab.x.A': '+' } };
-    expect(await replay(300, [t])).toEqual({ pollMs: 300, settles: { M9: 0 }, wrong: [], moving: 0, censored: 0 });
+    expect(await replay(300, [t])).toEqual({ pollMs: 300, settles: { M9: 0 }, wrong: [], moving: 0, censored: 0, judged: 0, wrongJudged: 0 });
   });
 });

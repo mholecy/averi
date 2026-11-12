@@ -1,4 +1,4 @@
-import { median } from './stats.js';
+import { median, type Spread } from './stats.js';
 
 /**
  * The A41b/A41c probe's device-free arithmetic (docs/plans/2026-10-30-performance-backlog.md, rows A41b and A41c): what
@@ -19,7 +19,13 @@ import { median } from './stats.js';
  *   per id a token per read: `-` absent, `.` the class of the read before, `+` a rect not seen before, `(k)` its k-th
  *   rect again — and ADR 0040's wrong settle: a later read in the window has the id at another rect.
  * - The cadence judgement (cadenceJudgement): ADR 0040's rule for a value — measured, 0 wrong settles at the shorter
- *   cadence, every motion seen moving at least MOVING_PER_MOTION times (D35's ≥ 15 a motion).
+ *   cadence over at least JUDGED_MIN settles of ids that moved with CENSOR_MS of reads after them, every motion seen
+ *   moving at least MOVING_PER_MOTION times (D35's ≥ 15 a motion).
+ * - The cover (coverIdsOf, coverUp): a hit-test cell is probed only with its cover up — the lab's `ready` (the layer
+ *   presented, its animation done) and every cover id its recorded idb capture lists (the blur menus list none: idb
+ *   lists no presented layer, which is A41c's question).
+ * - The children (A41_CHILDREN): each device run's file, mode and repeats — one table for the probe, the batch and the
+ *   report.
  * - The summary (summaryLines): the A41b table and acceptance numbers, the cadence, the A41c counts; a part not measured
  *   is said MISSING, never a number.
  */
@@ -37,15 +43,11 @@ export interface Point {
 
 // ------------------------------------------------------------------------------------------------- the medians
 
-export interface Spread {
-  n: number;
-  median: number;
-  min: number;
-  max: number;
-}
+/** stats.ts's median and range, with how many numbers they are of. */
+export type CountedSpread = Spread & { n: number };
 
 /** n, the median and the range of the numbers; undefined for none. */
-export const spreadOf = (xs: readonly number[]): Spread | undefined =>
+export const spreadOf = (xs: readonly number[]): CountedSpread | undefined =>
   xs.length === 0 ? undefined : { n: xs.length, median: median(xs), min: Math.min(...xs), max: Math.max(...xs) };
 
 /** A baseline run as scripts/perf/baseline.ts writes it (the fields read here). */
@@ -58,7 +60,7 @@ export interface BaselineRunLike {
 /** A scenario under one source: its first repeat's wall clock (ok only), the warm spread after it, how many failed. */
 export interface TableCell {
   first?: number;
-  warm?: Spread;
+  warm?: CountedSpread;
   failed: number;
 }
 
@@ -77,6 +79,8 @@ export type LabAppKind = 'native' | 'react-native';
 export interface HitTarget {
   kind: 'false-tapped' | 'control';
   app: LabAppKind;
+  /** The capture's run folder under tests/fixtures/truth (`ios-iphone17-ios27`): its idb capture names the cover. */
+  run: string;
   cell: string;
   target: string;
   id: string;
@@ -103,14 +107,14 @@ export interface GoldenResultLike {
 /** The cells probed as controls beside the false targets' own: blur-menu-unhidden's K and W, open under the menu. */
 export const CONTROL_CELLS: readonly string[] = ['blur-menu-unhidden'];
 
-const IDB_RECORDING = /^ios(-rn)?-[^/]+\/([a-z0-9-]+)\.idb\.json$/;
+const IDB_RECORDING = /^(ios(-rn)?-[^/]+)\/([a-z0-9-]+)\.idb\.json$/;
 const IDB_TAP = /^idb ui tap (-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)$/;
 
 export function hitTargetsOf(results: readonly GoldenResultLike[], controlCells: readonly string[] = CONTROL_CELLS): HitTarget[] {
   const taps = results.flatMap((r) => {
     const m = IDB_RECORDING.exec(r.recording);
     if (m === null) return [];
-    const [app, cell] = [m[1] === undefined ? ('native' as const) : ('react-native' as const), m[2]];
+    const [run, app, cell] = [m[1], m[2] === undefined ? ('native' as const) : ('react-native' as const), m[3]];
     return r.checks
       .filter((c) => c.verb === 'tap' && c.kind === 'Tapped')
       .map((c) => {
@@ -118,7 +122,7 @@ export function hitTargetsOf(results: readonly GoldenResultLike[], controlCells:
         const call = c.calls.map((x) => IDB_TAP.exec(x)).find((x) => x !== null);
         if (call === undefined) throw new Error(`${id}: its golden check sent no idb ui tap`);
         const kind = c.mismatch === undefined ? ('control' as const) : ('false-tapped' as const);
-        return { kind, app, cell, target: c.target, id, point: { x: Number(call[1]), y: Number(call[2]) }, says: c.says ?? '' };
+        return { kind, app, run, cell, target: c.target, id, point: { x: Number(call[1]), y: Number(call[2]) }, says: c.says ?? '' };
       });
   });
   const falseCells = new Set(taps.filter((t) => t.kind === 'false-tapped').map((t) => t.cell));
@@ -127,6 +131,35 @@ export function hitTargetsOf(results: readonly GoldenResultLike[], controlCells:
     ...taps.filter((t) => t.kind === 'control' && (falseCells.has(t.cell) || controlCells.includes(t.cell))),
   ];
 }
+
+// --------------------------------------------------------------------------------------------- A41c: the cover
+
+/** An element of an idb capture or describe-all, as read here. */
+export interface IdbElementLike {
+  AXUniqueId?: string | null;
+  frame?: Rect;
+}
+
+/**
+ * The cover ids a cell's recorded idb capture lists: its `lab.<cell>.*` ids that are no target (a target is one
+ * capital letter) — rn-banner's `T.cover`, scroll-bounded-footer's `continue`. The blur menus list none.
+ */
+export const coverIdsOf = (capture: readonly IdbElementLike[], cell: string): string[] =>
+  capture
+    .map((e) => e.AXUniqueId)
+    .filter((id): id is string => typeof id === 'string' && id.startsWith(`lab.${cell}.`) && !/^[A-Z]$/.test(id.slice(`lab.${cell}.`.length)));
+
+/** The cover up: the lab said `ready` (its layer presented, the animation done) and describe-all lists every cover id. */
+export function coverUp(o: { ready: boolean; listed: readonly IdbElementLike[]; coverIds: readonly string[] }): { up: boolean; how: string } {
+  const listed = new Set(o.listed.map((e) => e.AXUniqueId));
+  const missing = o.coverIds.filter((id) => !listed.has(id));
+  if (!o.ready) return { up: false, how: 'the lab never said ready' };
+  if (missing.length > 0) return { up: false, how: `describe-all lists no ${missing.join(', ')}` };
+  return { up: true, how: o.coverIds.length === 0 ? 'ready (idb lists no cover here)' : `ready; ${o.coverIds.join(', ')} listed` };
+}
+
+/** How a cell whose cover is not up is said: its targets unproven, never sound or unsound. */
+export const COVER_NOT_UP = 'unproven (cover not up)';
 
 // ------------------------------------------------------------------------------------------ A41c: the hit test
 
@@ -157,7 +190,10 @@ export function parseDescribePoint(stdout: string): HitElement {
   return { type: text(el.type), label: text(el.AXLabel), id: text(el.AXUniqueId), frame: rectOf(el.frame) };
 }
 
-/** What a hit names: the target (its id), an unidentified element inside its frame, another element, or nothing (none, or the app). */
+/**
+ * What a hit names: the target (its id), an unidentified element inside its frame, another element, or nothing (none,
+ * or the app).
+ */
 export type Named = 'target' | 'inside-target' | 'other' | 'nothing';
 export const namesTarget = (n: Named): boolean => n === 'target' || n === 'inside-target';
 
@@ -297,20 +333,31 @@ export const wrongSettle = (classes: readonly Record<string, number>[], id: stri
 
 /** D35's rule: a motion counts only when seen moving at least this many times. */
 export const MOVING_PER_MOTION = 15;
+/** The shorter cadence A41b asks about, then WDA's 500 today (ADR 0040): the trace is replayed at each. */
+export const CADENCES = [300, 500] as const;
+/** A settle followed by less recorded time than this is censored: its wrongness is not observable. */
+export const CENSOR_MS = 500;
+/** A41b's "0 wrong in 60": the judged settles (of ids that moved, uncensored) a shorter cadence needs. */
+export const JUDGED_MIN = 60;
 
-/** A replay of the trace at one cadence: settles per motion, the wrong ones (`<motion>#<trial> <id> @<read>`). */
+/**
+ * A replay of the trace at one cadence: settles per motion and the wrong ones (`<motion>#<trial> <id> @<read>`); of
+ * them, the judged ones — an id that moved in its trial (a static id settles trivially and proves nothing) with
+ * CENSOR_MS of reads after it (a later move could be seen) — and the wrong among those; the censored count.
+ */
 export interface CadencePass {
   pollMs: number;
   settles: Record<string, number>;
   wrong: string[];
-  /** Of the settles: those of an id that moved in its trial (a static id settles trivially and proves nothing). */
+  /** Of the settles: those of an id that moved in its trial. */
   moving: number;
-  /** Of the settles: those with under CENSOR_MS of reads after the settled read — a later move could not be seen. */
+  /** Of the settles: those with under CENSOR_MS of reads after the settled read. */
   censored: number;
+  /** Of the settles: moving and not censored — what A41b's "N wrong in M" counts. */
+  judged: number;
+  /** Of the wrong ones: those judged. */
+  wrongJudged: number;
 }
-
-/** A settle followed by less recorded time than this is censored: its wrongness is not observable. */
-export const CENSOR_MS = 500;
 
 /** An id that held two rects in its trial's window. */
 export const movedId = (classes: readonly Record<string, number>[], id: string): boolean =>
@@ -318,6 +365,13 @@ export const movedId = (classes: readonly Record<string, number>[], id: string):
 
 /** Censored: the trial's last read ends under CENSOR_MS after read k ends. */
 export const censoredAt = (reads: readonly [number, number][], k: number): boolean => reads[reads.length - 1][1] - reads[k][1] < CENSOR_MS;
+
+/** Per motion, how many trials moved — counted once (movedTrial), for the judgement and the summary alike. */
+export function movingTally(trials: readonly Pick<Trial, 'motion' | 'reads' | 'rects'>[]): Record<string, number> {
+  const moving: Record<string, number> = {};
+  for (const t of trials) moving[t.motion] = (moving[t.motion] ?? 0) + (movedTrial(t) ? 1 : 0);
+  return moving;
+}
 
 export interface CadenceJudgement {
   verdict: 'shorten' | 'keep' | 'unproven';
@@ -330,17 +384,96 @@ const perMotionText = (r: Record<string, number>): string =>
     .map(([m, n]) => `${m} ${n}`)
     .join(', ');
 
-export function cadenceJudgement(o: { trials: readonly { motion: string; moved: boolean }[]; at300: CadencePass }): CadenceJudgement {
-  const moving: Record<string, number> = {};
-  for (const t of o.trials) moving[t.motion] = (moving[t.motion] ?? 0) + (t.moved ? 1 : 0);
-  const said = perMotionText(moving);
-  if (o.trials.length === 0) return { verdict: 'unproven', why: 'no trial recorded' };
-  if (Object.values(moving).some((n) => n < MOVING_PER_MOTION)) return { verdict: 'unproven', why: `a motion seen moving fewer than ${MOVING_PER_MOTION} times: ${said}` };
-  const settles = sumOf(o.at300.settles);
-  if (settles === 0) return { verdict: 'unproven', why: `no settle at 300 ms in the window; moving trials ${said}` };
-  if (o.at300.moving === 0) return { verdict: 'unproven', why: `no settle of an id that moved, at 300 ms (${settles} of static ids only); moving trials ${said}` };
-  if (o.at300.wrong.length > 0) return { verdict: 'keep', why: `${o.at300.wrong.length} wrong settles in ${settles} at 300 ms (${o.at300.wrong.join('; ')})` };
-  return { verdict: 'shorten', why: `0 wrong settles in ${settles} at 300 ms (${o.at300.moving} of moving ids, ${o.at300.censored} censored); moving trials ${said}` };
+/** A41b's line: the wrong judged settles over the judged ones, over the trials. */
+export const judgedText = (p: CadencePass, trials: number): string =>
+  `${p.wrongJudged} wrong in ${p.judged} moving, uncensored settles over ${trials} trials`;
+
+/**
+ * Shorten to the short cadence only on 0 wrong settles there over at least JUDGED_MIN judged ones, every motion seen
+ * moving MOVING_PER_MOTION times; any wrong settle there keeps 500 (a wrong one is seen, censored or not).
+ */
+export function cadenceJudgement(o: { trials: number; moving: Record<string, number>; short: CadencePass }): CadenceJudgement {
+  const said = perMotionText(o.moving);
+  const p = o.short;
+  if (o.trials === 0) return { verdict: 'unproven', why: 'no trial recorded' };
+  if (Object.values(o.moving).some((n) => n < MOVING_PER_MOTION)) return { verdict: 'unproven', why: `a motion seen moving fewer than ${MOVING_PER_MOTION} times: ${said}` };
+  if (p.wrong.length > 0) return { verdict: 'keep', why: `${p.wrong.length} wrong settles at ${p.pollMs} ms (${p.wrong.join('; ')})` };
+  if (p.judged < JUDGED_MIN) {
+    return { verdict: 'unproven', why: `${judgedText(p, o.trials)} at ${p.pollMs} ms: under ${JUDGED_MIN} judged; moving trials ${said}` };
+  }
+  return { verdict: 'shorten', why: `${judgedText(p, o.trials)} at ${p.pollMs} ms; moving trials ${said}` };
+}
+
+// --------------------------------------------------------------------------------------------- the children
+
+/** A probe child: which block runs it, its file, its a41-probe.ts mode (none: baseline.ts), its repeats, its part. */
+export interface ChildSpec {
+  block: 'idb' | 'wda';
+  file: string;
+  mode?: ProbeMode;
+  /** baseline.ts's `--repeat`; a probe mode's default `--repeat` (hit-test: describe-points per path). */
+  repeat: number;
+  /** Its key in A41Parts. */
+  part: keyof A41Parts;
+}
+export const PROBE_MODES = ['hit-test', 'wda-cold', 'auto-tap', 'cadence'] as const;
+export type ProbeMode = (typeof PROBE_MODES)[number];
+
+/**
+ * The device children, in their run order: the idb block's (baseline.ts with its first repeat kept apart, so 8 for a
+ * warm n of 7; the hit test, 3 describe-points a path), then the WDA block's (baseline.ts first, so a WebDriverAgent
+ * build is its cost alone; 5 fresh servers each for the cold start and the auto taps; 20 trials a motion, D35's).
+ */
+export const A41_CHILDREN = {
+  'baseline-idb': { block: 'idb', file: 'baseline-idb.json', repeat: 8, part: 'baselineIdb' },
+  'hit-test': { block: 'idb', file: 'hit-test.json', mode: 'hit-test', repeat: 3, part: 'hitTest' },
+  'baseline-wda': { block: 'wda', file: 'baseline-wda.json', repeat: 8, part: 'baselineWda' },
+  'wda-cold': { block: 'wda', file: 'wda-cold.json', mode: 'wda-cold', repeat: 5, part: 'wdaCold' },
+  'auto-tap': { block: 'wda', file: 'auto-tap.json', mode: 'auto-tap', repeat: 5, part: 'autoTap' },
+  cadence: { block: 'wda', file: 'cadence-trace.json', mode: 'cadence', repeat: 20, part: 'cadence' },
+} as const satisfies Record<string, ChildSpec>;
+export type A41ChildName = keyof typeof A41_CHILDREN;
+export const A41_CHILD_NAMES = Object.keys(A41_CHILDREN) as A41ChildName[];
+
+/** A child's log beside its file (the batch writes `<name>.log`). */
+export const childLog = (name: A41ChildName): string => `${name}.log`;
+
+/** The WebDriverAgent build's line on averi's stderr (src/adapters/wda.ts): the run paid a build. */
+export const WDA_BUILD_LINE = /first WDA build for this Xcode version/;
+
+// ----------------------------------------------------------------------------------- the probe's records
+
+/** One timed tool call and whether its reply claims what was asked; `fellBack`: an `auto` reply read through idb. */
+export interface Step {
+  ms: number;
+  ok: boolean;
+  reply: string;
+  fellBack?: true;
+}
+
+export interface ColdRun {
+  repeat: number;
+  cold?: Step;
+  warm?: Step;
+  error?: string;
+}
+
+/**
+ * An `auto` session: launch_app (WDA stopped), the first tap (the catalog's `open`), the open cell waited for
+ * (`openSettled`: listed in time — else the warm taps paid the push), two warm taps on its A; launch_app again and the
+ * same first tap with WDA up; launch_app a third time, the catalog waited for (`catalogSettled`), and the same tap warm.
+ */
+export interface AutoRun {
+  repeat: number;
+  launch?: Step;
+  firstCold?: Step;
+  openSettled?: boolean;
+  warm: Step[];
+  relaunch?: Step;
+  firstWdaUp?: Step;
+  catalogSettled?: boolean;
+  warmCatalog?: Step;
+  error?: string;
 }
 
 // ----------------------------------------------------------------------------------------------- the report
@@ -364,35 +497,67 @@ export interface A41Report {
   meta: { commit?: string; device?: string; generated: string };
   /** The parts not found or not readable (their files), each said in the summary. */
   missing: string[];
+  /** Whether a WebDriverAgent build ran (WDA_BUILD_LINE in a WDA child's log); undefined: no log read. */
+  wdaBuilt?: boolean;
   table: { scenario: string; idb: TableCell; wda: TableCell }[];
-  wdaCold?: { coldRead?: Spread; warmRead?: Spread; failed: number };
-  autoTap?: { firstCold?: Spread; firstWdaUp?: Spread; warm?: Spread; fellBack: number; failed: number };
+  wdaCold?: { coldRead?: CountedSpread; warmRead?: CountedSpread; failed: number };
+  autoTap?: {
+    launch?: CountedSpread;
+    relaunch?: CountedSpread;
+    firstCold?: CountedSpread;
+    firstWdaUp?: CountedSpread;
+    warmCatalog?: CountedSpread;
+    warm?: CountedSpread;
+    fellBack: number;
+    /** Warm taps left out: their open cell was not seen settled (they paid the push). */
+    paidPush: number;
+    /** Warm catalog taps left out: the catalog was not seen settled. */
+    catalogUnsettled: number;
+    failed: number;
+  };
   cadence?: { trials: number; moving: Record<string, number>; passes: CadencePass[]; judgement: CadenceJudgement };
   hitTest?: {
     rows: HitRow[];
     counts: { falseTapped: number; sound: number; unsound: number; unprovenFalse: number; controls: number; open: number; falseRefusal: number; unprovenControls: number };
-    cli?: Spread;
-    helper?: Spread;
+    cli?: CountedSpread;
+    helper?: CountedSpread;
   };
 }
 
 const ms = (n: number): string => `${Math.round(n)} ms`;
-const spreadText = (s: Spread): string => `${ms(s.median)} (n ${s.n}, ${Math.round(s.min)}–${Math.round(s.max)})`;
+const spreadText = (s: CountedSpread, extras: readonly string[] = []): string =>
+  `${ms(s.median)} (n ${s.n}, ${Math.round(s.min)}–${Math.round(s.max)}${extras.map((e) => `; ${e}`).join('')})`;
+const orDash = (s: CountedSpread | undefined): string => (s === undefined ? '—' : spreadText(s));
 
 function cellText(c: TableCell): string {
   const extras = [...(c.first !== undefined ? [`first ${Math.round(c.first)}`] : []), ...(c.failed > 0 ? [`${c.failed} failed`] : [])];
-  if (c.warm === undefined) return `— (${extras.join('; ') || 'no run'})`;
-  const head = `${ms(c.warm.median)} (n ${c.warm.n}, ${Math.round(c.warm.min)}–${Math.round(c.warm.max)}`;
-  return `${head}${extras.length > 0 ? `; ${extras.join('; ')}` : ''})`;
+  return c.warm === undefined ? `— (${extras.join('; ') || 'no run'})` : spreadText(c.warm, extras);
 }
 
 const signed = (n: number): string => `${n >= 0 ? '+' : '−'}${Math.round(Math.abs(n))} ms`;
 const deltaOf = (row: A41Report['table'][number]): number | undefined =>
   row.idb.warm === undefined || row.wda.warm === undefined ? undefined : row.wda.warm.median - row.idb.warm.median;
 
+function autoLines(a: NonNullable<A41Report['autoTap']>): string[] {
+  const left = [
+    ...(a.fellBack > 0 ? [`${a.fellBack} fell back to idb`] : []),
+    ...(a.paidPush > 0 ? [`${a.paidPush} warm taps paid the push`] : []),
+    ...(a.catalogUnsettled > 0 ? [`${a.catalogUnsettled} warm catalog taps on an unsettled catalog`] : []),
+  ];
+  const bringUp = a.firstCold === undefined || a.firstWdaUp === undefined ? '—' : signed(a.firstCold.median - a.firstWdaUp.median);
+  return [
+    `auto, launch_app: ${orDash(a.launch)} (WDA stopped); relaunch: ${orDash(a.relaunch)} (WDA up)`,
+    `auto, the catalog's open tap — first after launch_app (WDA stopped): ${orDash(a.firstCold)}; first after a relaunch, WDA up: ${orDash(a.firstWdaUp)}; warm: ${orDash(a.warmCatalog)}`,
+    `auto, warm tap on open.A (another target, for information): ${orDash(a.warm)}`,
+    `auto, WDA's bring-up in the first tap (first − first with WDA up): ${bringUp}`,
+    ...(left.length > 0 || a.failed > 0 ? [`auto, left out: ${[...left, ...(a.failed > 0 ? [`${a.failed} sessions with a failed step`] : [])].join('; ')}`] : []),
+  ];
+}
+
 export function summaryLines(r: A41Report): string[] {
   const lines = [`A41 probe — ${r.meta.device ?? 'device not read'} — commit ${r.meta.commit?.slice(0, 8) ?? '?'} — ${r.meta.generated}`];
   if (r.missing.length > 0) lines.push(`MISSING: ${r.missing.join(', ')}`);
+  if (r.wdaBuilt === true) lines.push("WDA was built in this run: baseline-wda's first repeat and the run's length include the build");
   lines.push('', 'A41b — idb vs WDA, one session per source (warm median, n, range; first = the first repeat)');
   for (const row of r.table) {
     const d = deltaOf(row);
@@ -401,25 +566,21 @@ export function summaryLines(r: A41Report): string[] {
   if (r.wdaCold === undefined) lines.push('WDA cold start: not measured');
   else {
     const c = r.wdaCold;
-    lines.push(`WDA cold start, first read: ${c.coldRead === undefined ? '—' : spreadText(c.coldRead)}; the read after it: ${c.warmRead === undefined ? '—' : spreadText(c.warmRead)}${c.failed > 0 ? `; ${c.failed} failed` : ''}`);
+    lines.push(`WDA cold start, first read: ${orDash(c.coldRead)}; the read after it: ${orDash(c.warmRead)}${c.failed > 0 ? `; ${c.failed} failed` : ''}`);
   }
   if (r.autoTap === undefined) lines.push('auto, first tap after launch_app: not measured');
-  else {
-    const a = r.autoTap;
-    const s = (x: Spread | undefined) => (x === undefined ? '—' : spreadText(x));
-    const bringUp = a.firstCold === undefined || a.firstWdaUp === undefined ? '—' : signed(a.firstCold.median - a.firstWdaUp.median);
-    lines.push(`auto, first tap after launch_app (WDA stopped): ${s(a.firstCold)}; after a relaunch, WDA up: ${s(a.firstWdaUp)}; warm tap: ${s(a.warm)}${a.fellBack > 0 ? `; ${a.fellBack} fell back to idb (left out of these)` : ''}${a.failed > 0 ? `; ${a.failed} failed` : ''}`);
-    lines.push(`auto, WDA's bring-up in the first tap (first − first with WDA up): ${bringUp}`);
-  }
+  else lines.push(...autoLines(r.autoTap));
   lines.push('', 'A41b acceptance (current main: the numbers before any pre-warm)');
   const tapRow = r.table.find((x) => x.scenario === 'tap');
   const tapDelta = tapRow === undefined ? undefined : deltaOf(tapRow);
-  lines.push(`WDA tap median no more than 100 ms slower than idb's: ${tapDelta === undefined ? 'not measured' : `${tapDelta <= 100 ? 'yes' : 'no'} (wda−idb ${signed(tapDelta)})`}`);
-  const first = r.autoTap?.firstCold;
-  const warm = r.autoTap?.warm;
-  const fell = r.autoTap?.fellBack ?? 0;
   lines.push(
-    `first tap after launch_app ≤ warm tap + 500 ms: ${
+    `WDA tap median within 100 ms of idb's, one-sided (WDA no more than 100 ms slower; faster always passes): ${
+      tapDelta === undefined ? 'not measured' : `${tapDelta <= 100 ? 'yes' : 'no'} (wda−idb ${signed(tapDelta)})`
+    }`,
+  );
+  const [first, warm, fell] = [r.autoTap?.firstCold, r.autoTap?.warmCatalog, r.autoTap?.fellBack ?? 0];
+  lines.push(
+    `first tap after launch_app ≤ the same tap warm + 500 ms: ${
       fell > 0
         ? `unproven (${fell} auto steps fell back to idb: not WDA's taps)`
         : first === undefined || warm === undefined
@@ -427,16 +588,18 @@ export function summaryLines(r: A41Report): string[] {
           : `${first.median <= warm.median + 500 ? 'yes' : 'no'} (${Math.round(first.median)} vs ${Math.round(warm.median)} + 500)`
     }`,
   );
-  lines.push('', "A41b cadence — WDA's settle replayed at 300 ms against its 500 (ADR 0040)");
+  lines.push('', `A41b cadence — WDA's settle replayed at ${CADENCES[0]} ms against its ${CADENCES[1]} (ADR 0040)`);
   if (r.cadence === undefined) lines.push('cadence: not measured');
   else {
-    lines.push(`trials: ${r.cadence.trials}; seen moving: ${perMotionText(r.cadence.moving)}`);
-    for (const p of r.cadence.passes) {
+    const c = r.cadence;
+    lines.push(`trials: ${c.trials}; seen moving: ${perMotionText(c.moving)}`);
+    for (const p of c.passes) {
       lines.push(
-        `wrong settles at ${p.pollMs} ms: ${p.wrong.length} in ${sumOf(p.settles)} settles (${perMotionText(p.settles)}); of moving ids ${p.moving}, censored (< ${CENSOR_MS} ms of reads after) ${p.censored}${p.wrong.length > 0 ? ` — ${p.wrong.join('; ')}` : ''}`,
+        `at ${p.pollMs} ms: ${judgedText(p, c.trials)} — of ${sumOf(p.settles)} settles (${perMotionText(p.settles)}), ${p.moving} of moving ids, ` +
+          `${p.censored} censored (< ${CENSOR_MS} ms of reads after), ${p.wrong.length} wrong in all${p.wrong.length > 0 ? ` — ${p.wrong.join('; ')}` : ''}`,
       );
     }
-    lines.push(`cadence: ${r.cadence.judgement.verdict} — ${r.cadence.judgement.why}`);
+    lines.push(`cadence: ${c.judgement.verdict} — ${c.judgement.why}`);
   }
   lines.push('', 'A41c — idb ui describe-point at the stroke point');
   if (r.hitTest === undefined) lines.push('A41c: not measured');
@@ -444,10 +607,11 @@ export function summaryLines(r: A41Report): string[] {
     const c = r.hitTest.counts;
     lines.push(`false-Tapped targets: ${c.falseTapped} — sound ${c.sound}, unsound ${c.unsound}, unproven ${c.unprovenFalse}`);
     lines.push(`controls (truly open): ${c.controls} — open ${c.open}, false refusals ${c.falseRefusal}, unproven ${c.unprovenControls}`);
-    const lat = (x: Spread | undefined) => (x === undefined ? '—' : `${ms(x.median)} (n ${x.n})`);
+    const lat = (x: CountedSpread | undefined) => (x === undefined ? '—' : `${ms(x.median)} (n ${x.n})`);
     lines.push(`describe-point latency: CLI ${lat(r.hitTest.cli)}, helper ${lat(r.hitTest.helper)}`);
     for (const row of r.hitTest.rows) {
-      lines.push(`  ${row.verdict.padEnd(13)} ${row.kind.padEnd(12)} ${row.id} at ${row.point.x},${row.point.y}: ${row.skipped ?? row.named.map((n, i) => `${n} [${row.rules[i]}]`).join(' | ')}`);
+      const said = row.skipped ?? row.named.map((n, i) => `${n} [${row.rules[i]}]`).join(' | ');
+      lines.push(`  ${row.verdict.padEnd(13)} ${row.kind.padEnd(12)} ${row.id} at ${row.point.x},${row.point.y}: ${said}`);
     }
   }
   return lines;
@@ -463,38 +627,33 @@ interface MetaLike {
   described?: string;
   commit?: { head?: string };
 }
-/** A timed tool call as a41-probe.ts writes it. */
-export interface StepLike {
-  ms: number;
-  ok: boolean;
-  reply: string;
-  fellBack?: true;
+interface BaselineLike {
+  meta?: MetaLike;
+  scenarios: { id: string; runs: BaselineRunLike[] }[];
 }
 
-/** The probe's files, as read (absent: missing — said in `missing`). */
+/** The probe's files, as read (absent: missing — said in `missing`), in a41-probe.ts's own record types. */
 export interface A41Parts {
-  baselineIdb?: { meta?: MetaLike; scenarios: { id: string; runs: BaselineRunLike[] }[] };
-  baselineWda?: { meta?: MetaLike; scenarios: { id: string; runs: BaselineRunLike[] }[] };
-  wdaCold?: { meta?: MetaLike; runs: { repeat: number; cold?: StepLike; warm?: StepLike; error?: string }[] };
-  autoTap?: {
-    meta?: MetaLike;
-    runs: { repeat: number; launch?: StepLike; firstCold?: StepLike; warm: StepLike[]; relaunch?: StepLike; firstWdaUp?: StepLike; error?: string }[];
-  };
+  baselineIdb?: BaselineLike;
+  baselineWda?: BaselineLike;
+  wdaCold?: { meta?: MetaLike; runs: ColdRun[] };
+  autoTap?: { meta?: MetaLike; runs: AutoRun[] };
   hitTest?: { meta?: MetaLike; helperReady: boolean; results: HitResult[] };
-  /** The trace and its replays (a41-settle.ts#replaySettles at each cadence). */
+  /** The trace and its replays (a41-settle.ts#replaySettles at each of CADENCES). */
   cadence?: { meta?: MetaLike; trials: Trial[]; passes: CadencePass[] };
 }
 
-const okMs = (steps: readonly (StepLike | undefined)[]): Spread | undefined => spreadOf(steps.filter((s): s is StepLike => s?.ok === true).map((s) => s.ms));
+const okMs = (steps: readonly (Step | undefined)[]): CountedSpread | undefined =>
+  spreadOf(steps.filter((s): s is Step => s?.ok === true).map((s) => s.ms));
 /** WDA's own taps: ok, and not read through idb (an `auto` step that fell back is idb's, never WDA's). */
-const wdaMs = (steps: readonly (StepLike | undefined)[]): Spread | undefined => okMs(steps.filter((s) => s?.fellBack !== true));
+const wdaMs = (steps: readonly (Step | undefined)[]): CountedSpread | undefined => okMs(steps.filter((s) => s?.fellBack !== true));
 
 const probeName = (path: string, p: HitProbe): string =>
   p.error !== undefined ? `${path} error: ${p.error}` : `${path} ${p.hit?.id ?? `${p.hit?.type ?? '?'} "${p.hit?.label ?? ''}"`}`;
 
 function hitRow(r: HitResult): HitRow {
-  const ms = (ps: readonly HitProbe[]) => spreadOf(ps.filter((p) => p.error === undefined).map((p) => p.ms))?.median;
-  const [cliMs, helperMs] = [ms(r.cli), ms(r.helper)];
+  const msOf = (ps: readonly HitProbe[]) => spreadOf(ps.filter((p) => p.error === undefined).map((p) => p.ms))?.median;
+  const [cliMs, helperMs] = [msOf(r.cli), msOf(r.helper)];
   return {
     kind: r.target.kind,
     id: r.target.id,
@@ -509,14 +668,58 @@ function hitRow(r: HitResult): HitRow {
   };
 }
 
-export function reportOf(p: A41Parts, missing: readonly string[], generated: string): A41Report {
+function autoOf(runs: readonly AutoRun[]): NonNullable<A41Report['autoTap']> {
+  const steps = (r: AutoRun) => [r.launch, r.firstCold, ...r.warm, r.relaunch, r.firstWdaUp, r.warmCatalog];
+  const settledWarm = runs.filter((r) => r.openSettled === true).flatMap((r) => r.warm);
+  const settledCatalog = runs.filter((r) => r.catalogSettled === true).map((r) => r.warmCatalog);
+  return {
+    ...spreadField('launch', okMs(runs.map((r) => r.launch))),
+    ...spreadField('relaunch', okMs(runs.map((r) => r.relaunch))),
+    ...spreadField('firstCold', wdaMs(runs.map((r) => r.firstCold))),
+    ...spreadField('firstWdaUp', wdaMs(runs.map((r) => r.firstWdaUp))),
+    ...spreadField('warmCatalog', wdaMs(settledCatalog)),
+    ...spreadField('warm', wdaMs(settledWarm)),
+    fellBack: runs.flatMap(steps).filter((s) => s?.fellBack === true).length,
+    paidPush: runs.filter((r) => r.openSettled === false).flatMap((r) => r.warm).length,
+    catalogUnsettled: runs.filter((r) => r.catalogSettled === false && r.warmCatalog !== undefined).length,
+    failed: runs.filter((r) => r.error !== undefined || steps(r).some((s) => s !== undefined && !s.ok)).length,
+  };
+}
+
+function hitOf(h: NonNullable<A41Parts['hitTest']>): NonNullable<A41Report['hitTest']> {
+  const rows = h.results.map(hitRow);
+  const of = (kind: HitTarget['kind']) => rows.filter((r) => r.kind === kind);
+  const count = (kind: HitTarget['kind'], v: HitVerdict) => of(kind).filter((r) => r.verdict === v).length;
+  const latency = (path: 'cli' | 'helper') => spreadOf(h.results.flatMap((r) => r[path]).filter((x) => x.error === undefined).map((x) => x.ms));
+  return {
+    rows,
+    counts: {
+      falseTapped: of('false-tapped').length,
+      sound: count('false-tapped', 'sound'),
+      unsound: count('false-tapped', 'unsound'),
+      unprovenFalse: count('false-tapped', 'unproven'),
+      controls: of('control').length,
+      open: count('control', 'open'),
+      falseRefusal: count('control', 'false-refusal'),
+      unprovenControls: count('control', 'unproven'),
+    },
+    ...spreadField('cli', latency('cli')),
+    ...spreadField('helper', latency('helper')),
+  };
+}
+
+const NO_PASS = (pollMs: number): CadencePass => ({ pollMs, settles: {}, wrong: [], moving: 0, censored: 0, judged: 0, wrongJudged: 0 });
+
+/** The parts summed; `wdaBuilt` as read from the WDA children's logs (undefined: none read). */
+export function reportOf(p: A41Parts, missing: readonly string[], generated: string, wdaBuilt?: boolean): A41Report {
   const metas = [p.baselineWda?.meta, p.baselineIdb?.meta, p.wdaCold?.meta, p.autoTap?.meta, p.hitTest?.meta, p.cadence?.meta];
   const commit = metas.find((m) => m?.commit?.head !== undefined)?.commit?.head;
   const device = metas.find((m) => m?.described !== undefined)?.described;
-  const runsOf = (b: A41Parts['baselineIdb'], id: string) => b?.scenarios.find((s) => s.id === id)?.runs ?? [];
+  const runsOf = (b: BaselineLike | undefined, id: string) => b?.scenarios.find((s) => s.id === id)?.runs ?? [];
   const report: A41Report = {
     meta: { ...(commit !== undefined && { commit }), ...(device !== undefined && { device }), generated },
     missing: [...missing],
+    ...(wdaBuilt !== undefined && { wdaBuilt }),
     table: A41B_SCENARIOS.map((scenario) => ({ scenario, idb: baselineCell(runsOf(p.baselineIdb, scenario)), wda: baselineCell(runsOf(p.baselineWda, scenario)) })),
   };
   if (p.wdaCold !== undefined) {
@@ -527,47 +730,17 @@ export function reportOf(p: A41Parts, missing: readonly string[], generated: str
       failed: runs.filter((r) => r.error !== undefined || r.cold?.ok !== true).length,
     };
   }
-  if (p.autoTap !== undefined) {
-    const runs = p.autoTap.runs;
-    const steps = (r: (typeof runs)[number]) => [r.launch, r.firstCold, ...r.warm, r.relaunch, r.firstWdaUp];
-    report.autoTap = {
-      ...spreadField('firstCold', wdaMs(runs.map((r) => r.firstCold))),
-      ...spreadField('firstWdaUp', wdaMs(runs.map((r) => r.firstWdaUp))),
-      ...spreadField('warm', wdaMs(runs.flatMap((r) => r.warm))),
-      fellBack: runs.flatMap(steps).filter((s) => s?.fellBack === true).length,
-      failed: runs.filter((r) => r.error !== undefined || steps(r).some((s) => s !== undefined && !s.ok)).length,
-    };
-  }
+  if (p.autoTap !== undefined) report.autoTap = autoOf(p.autoTap.runs);
   if (p.cadence !== undefined) {
-    const moving: Record<string, number> = {};
-    const trials = p.cadence.trials.map((t) => ({ motion: t.motion, moved: movedTrial(t) }));
-    for (const t of trials) moving[t.motion] = (moving[t.motion] ?? 0) + (t.moved ? 1 : 0);
-    const at300 = p.cadence.passes.find((x) => x.pollMs === 300) ?? { pollMs: 300, settles: {}, wrong: [], moving: 0, censored: 0 };
-    report.cadence = { trials: trials.length, moving, passes: p.cadence.passes, judgement: cadenceJudgement({ trials, at300 }) };
+    const { trials, passes } = p.cadence;
+    const moving = movingTally(trials);
+    const short = passes.find((x) => x.pollMs === CADENCES[0]) ?? NO_PASS(CADENCES[0]);
+    report.cadence = { trials: trials.length, moving, passes, judgement: cadenceJudgement({ trials: trials.length, moving, short }) };
   }
-  if (p.hitTest !== undefined) {
-    const rows = p.hitTest.results.map(hitRow);
-    const of = (kind: HitTarget['kind']) => rows.filter((r) => r.kind === kind);
-    const count = (kind: HitTarget['kind'], v: HitVerdict) => of(kind).filter((r) => r.verdict === v).length;
-    const latency = (path: 'cli' | 'helper') => spreadOf(p.hitTest!.results.flatMap((r) => r[path]).filter((x) => x.error === undefined).map((x) => x.ms));
-    report.hitTest = {
-      rows,
-      counts: {
-        falseTapped: of('false-tapped').length,
-        sound: count('false-tapped', 'sound'),
-        unsound: count('false-tapped', 'unsound'),
-        unprovenFalse: count('false-tapped', 'unproven'),
-        controls: of('control').length,
-        open: count('control', 'open'),
-        falseRefusal: count('control', 'false-refusal'),
-        unprovenControls: count('control', 'unproven'),
-      },
-      ...spreadField('cli', latency('cli')),
-      ...spreadField('helper', latency('helper')),
-    };
-  }
+  if (p.hitTest !== undefined) report.hitTest = hitOf(p.hitTest);
   return report;
 }
 
 /** `{ [name]: spread }`, or nothing when there is none (no key holding undefined). */
-const spreadField = <K extends string>(name: K, s: Spread | undefined): Partial<Record<K, Spread>> => (s === undefined ? {} : ({ [name]: s } as Record<K, Spread>));
+const spreadField = <K extends string>(name: K, s: CountedSpread | undefined): Partial<Record<K, CountedSpread>> =>
+  s === undefined ? {} : ({ [name]: s } as Record<K, CountedSpread>);

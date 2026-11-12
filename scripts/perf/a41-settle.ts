@@ -15,7 +15,8 @@ import { censoredAt, classesOf, movedId, wrongSettle, type CadencePass, type Tri
  * clock then advances by that read's own length, so pollTree's readMs is the device's. The clock is whole
  * milliseconds, as T5's faked Date is. The settle starts at the trial's first read. When the recorded window ends the
  * fake throws a PersistentReadError, which ends the settle at once: not settled in the window. A settle is wrong when
- * a later read in the window has the id at another rect (a.ts#wrongSettle).
+ * a later read in the window has the id at another rect (a41.ts#wrongSettle); a41.ts#CadencePass says
+ * which settles are judged.
  *
  * The clock is the caller's: a test fakes Date and mocks src/util/sleep.ts (T5's way); the device-free CLI
  * (scripts/perf/a41-report.ts) installs installReplayClock for its process.
@@ -66,7 +67,7 @@ function tracedAdapter(t: Trial, trees: readonly UiNode[], clock: ReplayClock): 
 
 /** Every (trial, id) settle of the trace at `pollMs`: the settles per motion and the wrong ones. */
 export async function replaySettles(trials: readonly Trial[], o: { pollMs: number }, clock: ReplayClock): Promise<CadencePass> {
-  const pass: CadencePass = { pollMs: o.pollMs, settles: Object.fromEntries(trials.map((t) => [t.motion, 0])), wrong: [], moving: 0, censored: 0 };
+  const pass: CadencePass = { pollMs: o.pollMs, settles: Object.fromEntries(trials.map((t) => [t.motion, 0])), wrong: [], moving: 0, censored: 0, judged: 0, wrongJudged: 0 };
   for (const t of trials) {
     const classes = classesOf(t);
     const trees = classes.map(
@@ -86,10 +87,13 @@ export async function replaySettles(trials: readonly Trial[], o: { pollMs: numbe
         const settled = await resolveSettled(tracedAdapter(t, trees, clock), selectorOf(id), { ambiguous: 'refuse', pollMs: o.pollMs });
         const k = readOf.get(settled.tree);
         if (k === undefined) throw new Error('the settle returned a tree the trace never served');
+        const [moved, censored, wrong] = [movedId(classes, id), censoredAt(t.reads, k), wrongSettle(classes, id, k)];
         pass.settles[t.motion]++;
-        if (movedId(classes, id)) pass.moving++;
-        if (censoredAt(t.reads, k)) pass.censored++;
-        if (wrongSettle(classes, id, k)) pass.wrong.push(`${t.motion}#${t.trial} ${id} @${k}`);
+        if (moved) pass.moving++;
+        if (censored) pass.censored++;
+        if (moved && !censored) pass.judged++;
+        if (wrong) pass.wrong.push(`${t.motion}#${t.trial} ${id} @${k}`);
+        if (wrong && moved && !censored) pass.wrongJudged++;
       } catch (e) {
         if (!(e instanceof WindowEnded)) throw e;
       }

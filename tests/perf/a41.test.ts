@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  A41_CHILD_NAMES,
+  A41_CHILDREN,
   baselineCell,
+  CADENCES,
+  coverIdsOf,
+  coverUp,
+  movingTally,
   cadenceJudgement,
   classesOf,
   encodeRects,
@@ -17,6 +23,8 @@ import {
   tenths,
   wrongSettle,
   type A41Report,
+  type CadencePass,
+  type ChildSpec,
   type GoldenResultLike,
   type HitResult,
   type HitTarget,
@@ -60,7 +68,7 @@ describe('hitTargetsOf — the false-Tapped idb taps the golden lists, and the o
       'control native lab.blur-menu.K 201,412',
       'control native lab.blur-menu-unhidden.W 201,480',
     ]);
-    expect(t[0]).toEqual({ kind: 'false-tapped', app: 'native', cell: 'blur-menu', target: 'A', id: 'lab.blur-menu.A', point: { x: 201, y: 142 }, says: 'says A' });
+    expect(t[0]).toEqual({ kind: 'false-tapped', app: 'native', run: 'ios-iphone17-ios27', cell: 'blur-menu', target: 'A', id: 'lab.blur-menu.A', point: { x: 201, y: 142 }, says: 'says A' });
   });
 
   it('the control cells are a parameter: none named, only the false targets\' own cells give controls', () => {
@@ -100,7 +108,7 @@ describe('namedBy / hitVerdict — does the hit test name the target?', () => {
     expect(namedBy(undefined, target)).toBe('nothing');
   });
 
-  const t = (kind: HitTarget['kind']): HitTarget => ({ kind, app: 'native', cell: 'c', target: 'A', id: 'lab.c.A', point: { x: 1, y: 2 }, says: '' });
+  const t = (kind: HitTarget['kind']): HitTarget => ({ kind, app: 'native', run: 'ios-x', cell: 'c', target: 'A', id: 'lab.c.A', point: { x: 1, y: 2 }, says: '' });
   const r = (kind: HitTarget['kind'], named: string[], error?: string): HitResult => ({
     target: t(kind),
     cli: named.map((n) => ({ ms: 100, named: n as never })),
@@ -178,26 +186,54 @@ describe('traceIds / tenths — what a trace keeps of one read', () => {
   });
 });
 
-describe('cadenceJudgement — shorten WDA\'s settle to 300 only on 0 wrong settles, every motion seen moving ≥ 15 times', () => {
-  const trials = (perMotion: Record<string, number>, moved = true) => Object.entries(perMotion).flatMap(([motion, n]) => Array.from({ length: n }, () => ({ motion, moved })));
-  const at300 = (wrong: string[], settles = 10, moving = 6) => ({ pollMs: 300, settles: { M1a: settles }, wrong, moving, censored: 2 });
-  it('shorten: 0 wrong, every motion moving ≥ 15', () => {
-    expect(cadenceJudgement({ trials: trials({ M1a: 20, M2: 15 }), at300: at300([]) })).toEqual({ verdict: 'shorten', why: '0 wrong settles in 10 at 300 ms (6 of moving ids, 2 censored); moving trials M1a 20, M2 15' });
+describe('cadenceJudgement — shorten to 300 only on 0 wrong in ≥ 60 judged settles, every motion seen moving ≥ 15 times', () => {
+  const pass = (o: Partial<CadencePass> = {}): CadencePass => ({ pollMs: 300, settles: { M1a: 90 }, wrong: [], moving: 70, censored: 5, judged: 65, wrongJudged: 0, ...o });
+  const judge = (moving: Record<string, number>, short: CadencePass, trials = 60) => cadenceJudgement({ trials, moving, short });
+  it('shorten: 0 wrong in 65 judged, every motion moving ≥ 15', () => {
+    expect(judge({ M1a: 20, M2: 15 }, pass())).toEqual({ verdict: 'shorten', why: '0 wrong in 65 moving, uncensored settles over 60 trials at 300 ms; moving trials M1a 20, M2 15' });
   });
-  it('keep: a wrong settle at 300', () => {
-    expect(cadenceJudgement({ trials: trials({ M1a: 20 }), at300: at300(['M1a#3 lab.x @2']) }).verdict).toBe('keep');
+  it('keep: any wrong settle at 300, judged or censored', () => {
+    expect(judge({ M1a: 20 }, pass({ wrong: ['M1a#3 lab.x @2'] }))).toEqual({ verdict: 'keep', why: '1 wrong settles at 300 ms (M1a#3 lab.x @2)' });
   });
-  it('unproven: a motion seen moving under 15 times, or no settle at all', () => {
-    const few = [...trials({ M1a: 20 }), ...trials({ M2: 14 }), ...trials({ M2: 6 }, false)];
-    expect(cadenceJudgement({ trials: few, at300: at300([]) })).toEqual({ verdict: 'unproven', why: 'a motion seen moving fewer than 15 times: M1a 20, M2 14' });
-    expect(cadenceJudgement({ trials: trials({ M1a: 20 }), at300: at300([], 0) }).verdict).toBe('unproven');
-    expect(cadenceJudgement({ trials: trials({ M1a: 20 }), at300: at300([], 10, 0) })).toEqual({ verdict: 'unproven', why: 'no settle of an id that moved, at 300 ms (10 of static ids only); moving trials M1a 20' });
-    expect(cadenceJudgement({ trials: [], at300: at300([]) }).verdict).toBe('unproven');
+  it('unproven: under 60 judged settles (censored and static ones do not count), a motion moving under 15 times, no trial', () => {
+    expect(judge({ M1a: 20 }, pass({ judged: 59 }))).toEqual({ verdict: 'unproven', why: '0 wrong in 59 moving, uncensored settles over 60 trials at 300 ms: under 60 judged; moving trials M1a 20' });
+    expect(judge({ M1a: 20 }, pass({ judged: 60 })).verdict).toBe('shorten');
+    expect(judge({ M1a: 20, M2: 14 }, pass())).toEqual({ verdict: 'unproven', why: 'a motion seen moving fewer than 15 times: M1a 20, M2 14' });
+    expect(judge({}, pass(), 0)).toEqual({ verdict: 'unproven', why: 'no trial recorded' });
+  });
+  it('movingTally: per motion, the trials that moved', () => {
+    const t = (motion: string, a: string): Trial => ({ motion, cell: 'c', trial: 0, trigger: [0, 1], appMoved: null, reads: [[1, 2], [2, 3]], rects: { a } });
+    expect(movingTally([t('M1', '+.'), t('M1', '++'), t('M2', '++')])).toEqual({ M1: 1, M2: 1 });
+  });
+});
+
+describe('coverIdsOf / coverUp — a hit-test cell is probed only with its cover up', () => {
+  const capture = [{ AXUniqueId: null }, { AXUniqueId: 'lab.rn-banner.T.cover' }, { AXUniqueId: 'lab.rn-banner.T' }, { AXUniqueId: 'lab.rn-banner.continue' }, { AXUniqueId: 'lab.other.x' }];
+  it("the cell's non-target ids its recorded idb capture lists; none for a cell whose cover idb does not list", () => {
+    expect(coverIdsOf(capture, 'rn-banner')).toEqual(['lab.rn-banner.T.cover', 'lab.rn-banner.continue']);
+    expect(coverIdsOf([{ AXUniqueId: 'lab.blur-menu.A' }, { AXUniqueId: 'lab.blur-menu.K' }], 'blur-menu')).toEqual([]);
+  });
+  it("up: the lab ready and every cover id listed; else why not", () => {
+    const listed = [{ AXUniqueId: 'lab.rn-banner.T.cover' }];
+    expect(coverUp({ ready: true, listed, coverIds: ['lab.rn-banner.T.cover'] })).toEqual({ up: true, how: 'ready; lab.rn-banner.T.cover listed' });
+    expect(coverUp({ ready: true, listed: [], coverIds: [] })).toEqual({ up: true, how: 'ready (idb lists no cover here)' });
+    expect(coverUp({ ready: true, listed: [], coverIds: ['lab.rn-banner.T.cover'] })).toEqual({ up: false, how: 'describe-all lists no lab.rn-banner.T.cover' });
+    expect(coverUp({ ready: false, listed, coverIds: ['lab.rn-banner.T.cover'] })).toEqual({ up: false, how: 'the lab never said ready' });
+  });
+});
+
+describe('A41_CHILDREN — one table for the probe, the batch and the report', () => {
+  it('each child once, its file, its part; the probe modes each a child', () => {
+    expect(A41_CHILD_NAMES).toEqual(['baseline-idb', 'hit-test', 'baseline-wda', 'wda-cold', 'auto-tap', 'cadence']);
+    expect(new Set(A41_CHILD_NAMES.map((n) => A41_CHILDREN[n].file)).size).toBe(6);
+    expect(A41_CHILD_NAMES.map((n) => (A41_CHILDREN[n] as ChildSpec).mode).filter((m) => m !== undefined)).toEqual(['hit-test', 'wda-cold', 'auto-tap', 'cadence']);
+    expect(CADENCES[0]).toBe(300);
   });
 });
 
 describe('summaryLines — the short summary', () => {
   const sp = (median: number, n = 7) => ({ n, median, min: median - 1, max: median + 1 });
+  const pass = (pollMs: number, judged: number): CadencePass => ({ pollMs, settles: { M1a: 4, M1b: 50, M2: 30 }, wrong: [], moving: 40, censored: 5, judged, wrongJudged: 0 });
   const full: A41Report = {
     meta: { commit: 'abcdef1234', device: 'averi-lab iPhone 17 simulator, iOS 27.0', generated: '2026-11-12T10:00:00.000Z' },
     missing: [],
@@ -206,8 +242,8 @@ describe('summaryLines — the short summary', () => {
       { scenario: 'fill', idb: { failed: 2 }, wda: { warm: sp(1700), failed: 0 } },
     ],
     wdaCold: { coldRead: sp(6000, 5), warmRead: sp(400, 5), failed: 0 },
-    autoTap: { firstCold: sp(7000, 5), firstWdaUp: sp(900, 5), warm: sp(500, 10), fellBack: 0, failed: 0 },
-    cadence: { trials: 60, moving: { M1a: 20, M1b: 20, M2: 20 }, passes: [{ pollMs: 300, settles: { M1a: 4, M1b: 50, M2: 30 }, wrong: [], moving: 40, censored: 5 }, { pollMs: 500, settles: { M1a: 3, M1b: 50, M2: 30 }, wrong: [], moving: 39, censored: 9 }], judgement: { verdict: 'shorten', why: 'w' } },
+    autoTap: { launch: sp(1200, 5), relaunch: sp(800, 5), firstCold: sp(7000, 5), firstWdaUp: sp(900, 5), warmCatalog: sp(600, 5), warm: sp(500, 10), fellBack: 0, paidPush: 0, catalogUnsettled: 0, failed: 0 },
+    cadence: { trials: 60, moving: { M1a: 20, M1b: 20, M2: 20 }, passes: [pass(300, 35), pass(500, 33)], judgement: { verdict: 'unproven', why: 'w' } },
     hitTest: {
       rows: [],
       counts: { falseTapped: 15, sound: 12, unsound: 3, unprovenFalse: 0, controls: 10, open: 9, falseRefusal: 1, unprovenControls: 0 },
@@ -215,32 +251,45 @@ describe('summaryLines — the short summary', () => {
       helper: sp(30, 75),
     },
   };
-  it('the table with n, the A41b acceptance numbers, the cadence and the A41c counts', () => {
+  it('the table with n, launch_app, the A41b acceptance numbers, the cadence and the A41c counts', () => {
     const lines = summaryLines(full);
     expect(lines).toContain('tap | idb 474 ms (n 7, 473–475; first 900) | wda 520 ms (n 7, 519–521; first 9000) | wda−idb +46 ms');
     expect(lines).toContain('fill | idb — (2 failed) | wda 1700 ms (n 7, 1699–1701) | wda−idb —');
-    expect(lines).toContain("WDA tap median no more than 100 ms slower than idb's: yes (wda−idb +46 ms)");
-    expect(lines).toContain('first tap after launch_app ≤ warm tap + 500 ms: no (7000 vs 500 + 500)');
-    expect(lines).toContain('wrong settles at 300 ms: 0 in 84 settles (M1a 4, M1b 50, M2 30); of moving ids 40, censored (< 500 ms of reads after) 5');
+    expect(lines).toContain('auto, launch_app: 1200 ms (n 5, 1199–1201) (WDA stopped); relaunch: 800 ms (n 5, 799–801) (WDA up)');
+    expect(lines).toContain(
+      "WDA tap median within 100 ms of idb's, one-sided (WDA no more than 100 ms slower; faster always passes): yes (wda−idb +46 ms)",
+    );
+    expect(lines).toContain('first tap after launch_app ≤ the same tap warm + 500 ms: no (7000 vs 600 + 500)');
+    expect(lines).toContain(
+      'at 300 ms: 0 wrong in 35 moving, uncensored settles over 60 trials — of 84 settles (M1a 4, M1b 50, M2 30), 40 of moving ids, 5 censored (< 500 ms of reads after), 0 wrong in all',
+    );
     expect(lines).toContain("auto, WDA's bring-up in the first tap (first − first with WDA up): +6100 ms");
-    expect(lines).toContain('cadence: shorten — w');
+    expect(lines).toContain('cadence: unproven — w');
     expect(lines).toContain('false-Tapped targets: 15 — sound 12, unsound 3, unproven 0');
     expect(lines).toContain('controls (truly open): 10 — open 9, false refusals 1, unproven 0');
     expect(lines).toContain('describe-point latency: CLI 180 ms (n 75), helper 30 ms (n 75)');
+    expect(lines.some((l) => l.startsWith('auto, left out'))).toBe(false);
+    expect(lines.some((l) => l.startsWith('WDA was built'))).toBe(false);
   });
   it('"within 100 ms" is one way: WDA 150 ms faster passes, 101 ms slower does not', () => {
     const table = (wda: number) => [{ scenario: 'tap', idb: { warm: sp(700), failed: 0 }, wda: { warm: sp(wda), failed: 0 } }];
-    expect(summaryLines({ ...full, table: table(550) })).toContain("WDA tap median no more than 100 ms slower than idb's: yes (wda−idb −150 ms)");
-    expect(summaryLines({ ...full, table: table(801) })).toContain("WDA tap median no more than 100 ms slower than idb's: no (wda−idb +101 ms)");
+    const line = (wda: number) => summaryLines({ ...full, table: table(wda) }).find((l) => l.startsWith('WDA tap median'));
+    expect(line(550)).toMatch(/: yes \(wda−idb −150 ms\)$/);
+    expect(line(801)).toMatch(/: no \(wda−idb \+101 ms\)$/);
   });
-  it('an auto step that fell back to idb makes the first-tap acceptance unproven', () => {
-    const lines = summaryLines({ ...full, autoTap: { ...full.autoTap!, fellBack: 2 } });
-    expect(lines).toContain('first tap after launch_app ≤ warm tap + 500 ms: unproven (2 auto steps fell back to idb: not WDA\'s taps)');
+  it('an auto step that fell back to idb makes the first-tap acceptance unproven; what was left out is said', () => {
+    const lines = summaryLines({ ...full, autoTap: { ...full.autoTap!, fellBack: 2, paidPush: 2, catalogUnsettled: 1, failed: 1 } });
+    expect(lines).toContain("first tap after launch_app ≤ the same tap warm + 500 ms: unproven (2 auto steps fell back to idb: not WDA's taps)");
+    expect(lines).toContain('auto, left out: 2 fell back to idb; 2 warm taps paid the push; 1 warm catalog taps on an unsettled catalog; 1 sessions with a failed step');
+  });
+  it('a run that built WDA says so', () => {
+    expect(summaryLines({ ...full, wdaBuilt: true })).toContain("WDA was built in this run: baseline-wda's first repeat and the run's length include the build");
+    expect(summaryLines({ ...full, wdaBuilt: false }).some((l) => l.startsWith('WDA was built'))).toBe(false);
   });
   it('a part not measured is said as missing, never as a number', () => {
     const lines = summaryLines({ ...full, wdaCold: undefined, autoTap: undefined, cadence: undefined, hitTest: undefined, missing: ['wda-cold.json', 'cadence-trace.json'] });
     expect(lines).toContain('MISSING: wda-cold.json, cadence-trace.json');
-    expect(lines).toContain('first tap after launch_app ≤ warm tap + 500 ms: not measured');
+    expect(lines).toContain('first tap after launch_app ≤ the same tap warm + 500 ms: not measured');
     expect(lines).toContain('cadence: not measured');
     expect(lines).toContain('A41c: not measured');
   });
@@ -253,7 +302,7 @@ describe('reportOf — the probe\'s files summed', () => {
     scenarios: [{ id: 'tap', runs: tapMs.map((wallMs, i) => ({ repeat: i + 1, status: 'ok', wallMs })) }, { id: 'tree', runs: [] }],
     tree,
   });
-  const target = (kind: HitTarget['kind'], id: string): HitTarget => ({ kind, app: 'native', cell: 'c', target: id.slice(-1), id, point: { x: 1, y: 2 }, says: '' });
+  const target = (kind: HitTarget['kind'], id: string): HitTarget => ({ kind, app: 'native', run: 'ios-x', cell: 'c', target: id.slice(-1), id, point: { x: 1, y: 2 }, says: '' });
   const hit = (id: string | null, type = 'Button') => ({ type, label: 'L', id, frame: null });
 
   it('the table, WDA cold start, the auto taps, the hit counts and latencies; meta from the files', () => {
@@ -264,8 +313,19 @@ describe('reportOf — the probe\'s files summed', () => {
         wdaCold: { runs: [{ repeat: 1, cold: ok(6000), warm: ok(400) }, { repeat: 2, cold: { ms: 5, ok: false, reply: 'ERROR' }, warm: ok(300) }, { repeat: 3, error: 'select_device failed' }] },
         autoTap: {
           runs: [
-            { repeat: 1, launch: ok(1), firstCold: ok(7000), warm: [ok(500), ok(520)], relaunch: ok(1), firstWdaUp: ok(900) },
-            { repeat: 2, launch: ok(1), firstCold: ok(8000, { fellBack: true }), warm: [ok(480), { ms: 1, ok: false, reply: 'ERROR' }, ok(10, { fellBack: true })], firstWdaUp: ok(1000) },
+            { repeat: 1, launch: ok(1200), firstCold: ok(7000), openSettled: true, warm: [ok(500), ok(520)], relaunch: ok(800), firstWdaUp: ok(900), catalogSettled: true, warmCatalog: ok(600) },
+            {
+              repeat: 2,
+              launch: ok(1000),
+              firstCold: ok(8000, { fellBack: true }),
+              openSettled: true,
+              warm: [ok(480), { ms: 1, ok: false, reply: 'ERROR' }, ok(10, { fellBack: true })],
+              firstWdaUp: ok(1000),
+              catalogSettled: false,
+              warmCatalog: ok(5000),
+            },
+            // The open cell never seen: its warm taps paid the push, left out.
+            { repeat: 3, openSettled: false, warm: [ok(3000), ok(3100)], catalogSettled: false },
           ],
         },
         hitTest: {
@@ -274,25 +334,33 @@ describe('reportOf — the probe\'s files summed', () => {
             { target: target('false-tapped', 'lab.c.A'), cli: [{ ms: 200, named: 'other', hit: hit('lab.c.W') }], helper: [{ ms: 30, named: 'other', hit: hit(null, 'Other') }] },
             { target: target('false-tapped', 'lab.c.B'), cli: [{ ms: 100, named: 'target', hit: hit('lab.c.B') }], helper: [{ ms: 5, error: 'boom' }] },
             { target: target('control', 'lab.c.K'), cli: [{ ms: 300, named: 'target', hit: hit('lab.c.K') }], helper: [] },
-            { target: target('control', 'lab.c.W'), cli: [], helper: [], skipped: 'not installed' },
+            { target: target('control', 'lab.c.W'), cli: [], helper: [], skipped: 'unproven (cover not up): the lab never said ready' },
           ],
         },
       },
       ['cadence-trace.json'],
       '2026-11-12T00:00:00.000Z',
+      true,
     );
     expect(r.meta).toEqual({ commit: 'feedface00', device: 'averi-lab iPhone 17 simulator, iOS 27.0', generated: '2026-11-12T00:00:00.000Z' });
     expect(r.missing).toEqual(['cadence-trace.json']);
+    expect(r.wdaBuilt).toBe(true);
     expect(r.table.map((x) => x.scenario)).toEqual(['tree', 'tap', 'fill', 'scroll', 'ensure-cold', 'ensure-warm']);
     expect(r.table[1]).toEqual({ scenario: 'tap', idb: { first: 900, warm: { n: 3, median: 500, min: 400, max: 600 }, failed: 0 }, wda: { first: 9000, warm: { n: 2, median: 500, min: 450, max: 550 }, failed: 0 } });
     expect(r.table[2]).toEqual({ scenario: 'fill', idb: { failed: 0 }, wda: { failed: 0 } });
     expect(r.wdaCold).toEqual({ coldRead: { n: 1, median: 6000, min: 6000, max: 6000 }, warmRead: { n: 2, median: 350, min: 300, max: 400 }, failed: 2 });
     expect(r.autoTap).toEqual({
+      launch: { n: 2, median: 1100, min: 1000, max: 1200 },
+      relaunch: { n: 1, median: 800, min: 800, max: 800 },
       // The fell-back first tap (8000) and warm tap (10) are idb's: left out of WDA's spreads.
       firstCold: { n: 1, median: 7000, min: 7000, max: 7000 },
       firstWdaUp: { n: 2, median: 950, min: 900, max: 1000 },
+      // Run 2's catalog was not seen settled: its 5000 is left out.
+      warmCatalog: { n: 1, median: 600, min: 600, max: 600 },
       warm: { n: 3, median: 500, min: 480, max: 520 },
       fellBack: 2,
+      paidPush: 2,
+      catalogUnsettled: 1,
       failed: 1,
     });
     expect(r.cadence).toBeUndefined();
@@ -302,14 +370,18 @@ describe('reportOf — the probe\'s files summed', () => {
     expect(r.hitTest!.rows[0]).toEqual({ kind: 'false-tapped', id: 'lab.c.A', point: { x: 1, y: 2 }, verdict: 'sound', named: ['cli lab.c.W', 'helper Other "L"'], rules: ['other', 'other'], cliMs: 200, helperMs: 30 });
     expect(r.hitTest!.rows[1].named).toEqual(['cli lab.c.B', 'helper error: boom']);
     expect(r.hitTest!.rows[1].rules).toEqual(['target', 'error']);
-    expect(r.hitTest!.rows[3]).toEqual({ kind: 'control', id: 'lab.c.W', point: { x: 1, y: 2 }, verdict: 'unproven', named: [], rules: [], skipped: 'not installed' });
+    expect(r.hitTest!.rows[3]).toEqual({ kind: 'control', id: 'lab.c.W', point: { x: 1, y: 2 }, verdict: 'unproven', named: [], rules: [], skipped: 'unproven (cover not up): the lab never said ready' });
   });
 
-  it('the cadence: trials, moving per motion, the passes, the judgement at 300', () => {
+  it('the cadence: trials, moving per motion, the passes, the judgement at CADENCES[0]; no build read, no wdaBuilt', () => {
     const t = (motion: string, rects: Record<string, string>): Trial => ({ motion, cell: 'c', trial: 0, trigger: [0, 1], appMoved: null, reads: [[1, 2], [2, 3]], rects });
-    const trials = [t('M1', { a: '+.' }), t('M1', { a: '++' })];
-    const passes = [{ pollMs: 300, settles: { M1: 2 }, wrong: [], moving: 1, censored: 0 }, { pollMs: 500, settles: { M1: 2 }, wrong: [], moving: 1, censored: 0 }];
+    const trials = [t('M1', { a: '+.' }), ...Array.from({ length: 15 }, () => t('M1', { a: '++' }))];
+    const p = (pollMs: number, wrong: string[]): CadencePass => ({ pollMs, settles: { M1: 2 }, wrong, moving: 1, censored: 0, judged: 1, wrongJudged: 0 });
+    // The 500 ms pass's wrong settle does not decide; the 300's would.
+    const passes = [p(500, ['M1#0 a @0']), p(300, [])];
     const r = reportOf({ cadence: { trials, passes } }, [], 'g');
-    expect(r.cadence).toEqual({ trials: 2, moving: { M1: 1 }, passes, judgement: { verdict: 'unproven', why: 'a motion seen moving fewer than 15 times: M1 1' } });
+    const why = '0 wrong in 1 moving, uncensored settles over 16 trials at 300 ms: under 60 judged; moving trials M1 15';
+    expect(r.cadence).toEqual({ trials: 16, moving: { M1: 15 }, passes, judgement: { verdict: 'unproven', why } });
+    expect('wdaBuilt' in r).toBe(false);
   });
 });

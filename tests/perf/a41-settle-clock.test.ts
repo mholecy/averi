@@ -23,7 +23,7 @@ describe('installReplayClock: the production settle on virtual time, in a plain 
     } finally {
       clock.uninstall();
     }
-    expect(pass).toEqual({ pollMs: 100, settles: { M2: 60 }, wrong: ['M2#14 lab.carousel-in-list.C @20'], moving: 20, censored: 0 });
+    expect(pass).toEqual({ pollMs: 100, settles: { M2: 60 }, wrong: ['M2#14 lab.carousel-in-list.C @20'], moving: 20, censored: 0, judged: 20, wrongJudged: 1 });
     expect([Date.now, globalThis.setTimeout]).toEqual([now, timer]);
   });
 
