@@ -333,7 +333,7 @@ export const wrongSettle = (classes: readonly Record<string, number>[], id: stri
 
 /** D35's rule: a motion counts only when seen moving at least this many times. */
 export const MOVING_PER_MOTION = 15;
-/** The shorter cadence A41b asks about, then WDA's 500 today (ADR 0040): the trace is replayed at each. */
+/** The shorter cadence A41b asks about, then WDA's 500 before A41b (ADR 0040): the trace is replayed at each. */
 export const CADENCES = [300, 500] as const;
 /** A settle followed by less recorded time than this is censored: its wrongness is not observable. */
 export const CENSOR_MS = 500;
@@ -459,9 +459,54 @@ export interface ColdRun {
 }
 
 /**
+ * How long after launch_app's reply the waited leg's first tap starts — WDA's cold start (3.1–3.6 s on the lab) and a
+ * margin. From the reply, not the call: the launch pre-warms WDA only once `simctl launch` returned, before the reply.
+ */
+export const WAITED_GAP_MS = 4000;
+/** The least gap after launch_app's reply leg (b) is judged on: a tap that started earlier is unproven. */
+export const WAITED_GAP_MIN_MS = 3500;
+
+/**
+ * A fresh `auto` session (A41b review r1): launch_app (WDA stopped; a `clearState` one on the first repeat), then the
+ * first tree read at once (ui_snapshot) — which app it read: its root's label, and the bundle WDA's activeAppInfo names
+ * after it. `expected`: the lab app's. Whether WDA's start, run beside the launch, kept the app in front.
+ */
+export interface ForegroundRun {
+  clearState: boolean;
+  expected: { label: string; bundle: string };
+  launch?: Step;
+  label?: string;
+  bundle?: string;
+  fellBack?: true;
+  error?: string;
+}
+
+/** The app in front after the launch: the read's root label and WDA's active bundle are the lab's. */
+export const foregroundOk = (f: ForegroundRun): boolean =>
+  f.error === undefined && f.label === f.expected.label && f.bundle === f.expected.bundle;
+
+/**
+ * The root's label of a ui_snapshot reply — its JSON first (mcp/tools.ts#snapshotJson, 2-space indent: the root's
+ * closing brace is the first at column 0), then any note; undefined for an error, an unreadable reply or no label.
+ */
+export function snapshotRootLabel(reply: string): string | undefined {
+  const end = reply.indexOf('\n}');
+  if (reply.startsWith('ERROR') || end < 0) return undefined;
+  try {
+    const label = (JSON.parse(reply.slice(0, end + 2)) as { label?: unknown }).label;
+    return typeof label === 'string' ? label : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * An `auto` session: launch_app (WDA stopped), the first tap (the catalog's `open`), the open cell waited for
  * (`openSettled`: listed in time — else the warm taps paid the push), two warm taps on its A; launch_app again and the
  * same first tap with WDA up; launch_app a third time, the catalog waited for (`catalogSettled`), and the same tap warm.
+ * Then two more fresh sessions (A41b review r1): the waited leg — launch_app, an untimed wait of WAITED_GAP_MS after
+ * it replied (no tree read), the same first tap (`firstWaited`; `waitedGapMs`, the time from launch_app's reply to the
+ * tap's) — and `foreground` (ForegroundRun).
  */
 export interface AutoRun {
   repeat: number;
@@ -474,6 +519,11 @@ export interface AutoRun {
   catalogSettled?: boolean;
   warmCatalog?: Step;
   error?: string;
+  waitedLaunch?: Step;
+  waitedGapMs?: number;
+  firstWaited?: Step;
+  waitedError?: string;
+  foreground?: ForegroundRun;
 }
 
 // ----------------------------------------------------------------------------------------------- the report
@@ -508,6 +558,14 @@ export interface A41Report {
     firstWdaUp?: CountedSpread;
     warmCatalog?: CountedSpread;
     warm?: CountedSpread;
+    /** The waited leg's first tap (WDA's own), and the gap it had from the adapter's creation. */
+    firstWaited?: CountedSpread;
+    waitedGap?: CountedSpread;
+    /** The first taps that claimed the catalog's `open` (the app in front), of those made: each leg. */
+    firstTaps: { ok: number; n: number };
+    waitedTaps: { ok: number; n: number };
+    /** The first read after a launch named the lab app (foregroundOk), of the launches made; how many wiped. */
+    foreground: { ok: number; n: number; clearState: number; seen: string[] };
     fellBack: number;
     /** Warm taps left out: their open cell was not seen settled (they paid the push). */
     paidPush: number;
@@ -550,7 +608,43 @@ function autoLines(a: NonNullable<A41Report['autoTap']>): string[] {
     `auto, the catalog's open tap — first after launch_app (WDA stopped): ${orDash(a.firstCold)}; first after a relaunch, WDA up: ${orDash(a.firstWdaUp)}; warm: ${orDash(a.warmCatalog)}`,
     `auto, warm tap on open.A (another target, for information): ${orDash(a.warm)}`,
     `auto, WDA's bring-up in the first tap (first − first with WDA up): ${bringUp}`,
+    `auto, the same first tap ${orDash(a.waitedGap)} after launch_app replied (no read before it): ${orDash(a.firstWaited)}`,
     ...(left.length > 0 || a.failed > 0 ? [`auto, left out: ${[...left, ...(a.failed > 0 ? [`${a.failed} sessions with a failed step`] : [])].join('; ')}`] : []),
+  ];
+}
+
+const okOf = (c: { ok: number; n: number }): string => `${c.ok}/${c.n}`;
+
+/**
+ * The first tap after launch_app in two legs (A41b reviews), each with how many first taps found the app in front:
+ * (a) as the session runs — launch_app, then the tap at once — information only: first − warm, and WDA's cold start
+ * against launch_app (no verdict: the probe cannot time the foreground wait, the only part of the launch the pre-warm
+ * overlaps); (b) the acceptance — the tap WAITED_GAP_MS after launch_app replied: `first ≤ warm + 500`, unproven when
+ * a gap was under WAITED_GAP_MIN_MS or a step fell back to idb (not WDA's taps). Then whether every first read after
+ * a launch was the lab app.
+ */
+function firstTapLines(r: A41Report): string[] {
+  const a = r.autoTap;
+  if (a === undefined) return ['first tap after launch_app: not measured'];
+  const unproven = a.fellBack > 0 ? `unproven (${a.fellBack} auto steps fell back to idb: not WDA's taps)` : undefined;
+  const [first, warm, launch, cold] = [a.firstCold, a.warmCatalog, a.launch, r.wdaCold?.coldRead];
+  const msOr = (x: CountedSpread | undefined): string => (x === undefined ? '—' : `${Math.round(x.median)}`);
+  const over = first === undefined || warm === undefined ? '—' : `${Math.round(first.median - warm.median)}`;
+  const legA = `first − warm ${msOr(first)} − ${msOr(warm)} = ${over} ms; WDA cold start ${msOr(cold)} ms against launch_app ${msOr(launch)} ms`;
+  const [waited, gap] = [a.firstWaited, a.waitedGap];
+  const legB =
+    unproven ??
+    (waited === undefined || warm === undefined || gap === undefined
+      ? 'not measured'
+      : gap.min < WAITED_GAP_MIN_MS
+        ? `unproven (a tap ${Math.round(gap.min)} ms after launch_app replied, under ${WAITED_GAP_MIN_MS})`
+        : `${waited.median <= warm.median + 500 ? 'yes' : 'no'} (${Math.round(waited.median)} vs ${Math.round(warm.median)} + 500)`);
+  const f = a.foreground;
+  const front = f.n === 0 ? 'not measured' : `${f.ok === f.n && f.n >= 5 && f.clearState >= 1 ? 'yes' : 'no'}`;
+  return [
+    `first tap after launch_app (a, at once; information, not judged): ${legA}; first tap ok ${okOf(a.firstTaps)}`,
+    `first tap after launch_app (b, ≥ ${WAITED_GAP_MIN_MS / 1000} s after it replied) ≤ the same tap warm + 500 ms: ${legB}; first tap ok ${okOf(a.waitedTaps)}`,
+    `foreground after launch ok ${okOf(f)} (${f.clearState} clearState; n ≥ 5 with one: ${front})${f.seen.length > 0 ? ` — read instead: ${f.seen.join('; ')}` : ''}`,
   ];
 }
 
@@ -570,7 +664,7 @@ export function summaryLines(r: A41Report): string[] {
   }
   if (r.autoTap === undefined) lines.push('auto, first tap after launch_app: not measured');
   else lines.push(...autoLines(r.autoTap));
-  lines.push('', 'A41b acceptance (current main: the numbers before any pre-warm)');
+  lines.push('', 'A41b acceptance');
   const tapRow = r.table.find((x) => x.scenario === 'tap');
   const tapDelta = tapRow === undefined ? undefined : deltaOf(tapRow);
   lines.push(
@@ -578,16 +672,7 @@ export function summaryLines(r: A41Report): string[] {
       tapDelta === undefined ? 'not measured' : `${tapDelta <= 100 ? 'yes' : 'no'} (wda−idb ${signed(tapDelta)})`
     }`,
   );
-  const [first, warm, fell] = [r.autoTap?.firstCold, r.autoTap?.warmCatalog, r.autoTap?.fellBack ?? 0];
-  lines.push(
-    `first tap after launch_app ≤ the same tap warm + 500 ms: ${
-      fell > 0
-        ? `unproven (${fell} auto steps fell back to idb: not WDA's taps)`
-        : first === undefined || warm === undefined
-          ? 'not measured'
-          : `${first.median <= warm.median + 500 ? 'yes' : 'no'} (${Math.round(first.median)} vs ${Math.round(warm.median)} + 500)`
-    }`,
-  );
+  lines.push(...firstTapLines(r));
   lines.push('', `A41b cadence — WDA's settle replayed at ${CADENCES[0]} ms against its ${CADENCES[1]} (ADR 0040)`);
   if (r.cadence === undefined) lines.push('cadence: not measured');
   else {
@@ -668,8 +753,23 @@ function hitRow(r: HitResult): HitRow {
   };
 }
 
+const tapsOk = (steps: readonly (Step | undefined)[]): { ok: number; n: number } => {
+  const made = steps.filter((s): s is Step => s !== undefined);
+  return { ok: made.filter((s) => s.ok).length, n: made.length };
+};
+
+function foregroundOf(runs: readonly AutoRun[]): NonNullable<A41Report['autoTap']>['foreground'] {
+  const made = runs.flatMap((r) => (r.foreground === undefined ? [] : [r.foreground]));
+  return {
+    ok: made.filter(foregroundOk).length,
+    n: made.length,
+    clearState: made.filter((f) => f.clearState).length,
+    seen: made.filter((f) => !foregroundOk(f)).map((f) => f.error ?? `${f.label ?? 'no label'} / ${f.bundle ?? 'no bundle'}${f.fellBack === true ? ' (idb)' : ''}`),
+  };
+}
+
 function autoOf(runs: readonly AutoRun[]): NonNullable<A41Report['autoTap']> {
-  const steps = (r: AutoRun) => [r.launch, r.firstCold, ...r.warm, r.relaunch, r.firstWdaUp, r.warmCatalog];
+  const steps = (r: AutoRun) => [r.launch, r.firstCold, ...r.warm, r.relaunch, r.firstWdaUp, r.warmCatalog, r.waitedLaunch, r.firstWaited, r.foreground?.launch];
   const settledWarm = runs.filter((r) => r.openSettled === true).flatMap((r) => r.warm);
   const settledCatalog = runs.filter((r) => r.catalogSettled === true).map((r) => r.warmCatalog);
   return {
@@ -679,10 +779,15 @@ function autoOf(runs: readonly AutoRun[]): NonNullable<A41Report['autoTap']> {
     ...spreadField('firstWdaUp', wdaMs(runs.map((r) => r.firstWdaUp))),
     ...spreadField('warmCatalog', wdaMs(settledCatalog)),
     ...spreadField('warm', wdaMs(settledWarm)),
+    ...spreadField('firstWaited', wdaMs(runs.map((r) => r.firstWaited))),
+    ...spreadField('waitedGap', spreadOf(runs.flatMap((r) => (r.waitedGapMs === undefined ? [] : [r.waitedGapMs])))),
+    firstTaps: tapsOk(runs.map((r) => r.firstCold)),
+    waitedTaps: tapsOk(runs.map((r) => r.firstWaited)),
+    foreground: foregroundOf(runs),
     fellBack: runs.flatMap(steps).filter((s) => s?.fellBack === true).length,
     paidPush: runs.filter((r) => r.openSettled === false).flatMap((r) => r.warm).length,
     catalogUnsettled: runs.filter((r) => r.catalogSettled === false && r.warmCatalog !== undefined).length,
-    failed: runs.filter((r) => r.error !== undefined || steps(r).some((s) => s !== undefined && !s.ok)).length,
+    failed: runs.filter((r) => r.error !== undefined || r.waitedError !== undefined || steps(r).some((s) => s !== undefined && !s.ok)).length,
   };
 }
 

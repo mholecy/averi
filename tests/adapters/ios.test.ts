@@ -8,7 +8,8 @@ import { tapText } from '../../src/mcp/tool-text.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { FIRST_KEY_ALONE_MS, IDB_EMPTY_RETRY_MS, IosAdapter, PGREP_TIMEOUT_MS } from '../../src/adapters/ios.js';
 import { IDB_SETTLE_CADENCE_MS, IdbEmptyTreeError, IdbTreeSource, parseIdbDescribeAll, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
-import { WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
+import { WDA_SETTLE_CADENCE_MS, WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
+import { AutoTreeSource } from '../../src/adapters/auto-tree-source.js';
 import { ReadHandOff } from '../../src/ui-tree/read-handoff.js';
 import { fakeFetch, fakeSpawn } from '../helpers/fake-wda.js';
 import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
@@ -92,15 +93,15 @@ describe('IosAdapter interactions', () => {
   });
 
   // D35 → L5 (ADR 0040): the settle cadence is the tree SOURCE's fact, forwarded by the adapter.
-  it("its settle cadence is its tree source's: idb's describe-all 300 (measured), WDA none (unmeasured)", () => {
+  it("its settle cadence is its tree source's: idb's describe-all 300, WDA's /source 300 (both measured), a source without one none", () => {
     expect(IDB_SETTLE_CADENCE_MS).toBe(300);
     const { fn } = fakeExec({});
     const idb = new IdbTreeSource({ udid: 'AAAA-1111', exec: fn });
     expect(idb.settleCadenceMs).toBe(IDB_SETTLE_CADENCE_MS);
     expect(new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: idb }).settleCadenceMs).toBe(IDB_SETTLE_CADENCE_MS);
     const wda: IosTreeSource = new WdaTreeSource({ udid: 'AAAA-1111', exec: fn, fetchFn: fakeFetch(() => 'refused').fn, spawnFn: fakeSpawn().fn });
-    expect(wda.settleCadenceMs).toBeUndefined();
-    expect(new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda }).settleCadenceMs).toBeUndefined();
+    expect(wda.settleCadenceMs).toBe(WDA_SETTLE_CADENCE_MS);
+    expect(new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda }).settleCadenceMs).toBe(WDA_SETTLE_CADENCE_MS);
     expect(new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: WDA_NO_TREE }).settleCadenceMs).toBeUndefined();
   });
 
@@ -444,6 +445,52 @@ describe('IosAdapter re-enables accessibility automation before every launch and
     const { fn, calls } = fakeExec({});
     const wda: IosTreeSource = { kind: 'wda', read: () => Promise.reject(new Error('unused')), applicationLabel: async () => ({ kind: 'declined' }), dispose: () => Promise.resolve() };
     await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda }).launch('com.app');
+    expect(simctlCalls(calls)).toEqual([...WRITES, 'xcrun simctl launch AAAA-1111 com.app']);
+  });
+
+  // A41b: the launch asks its source to pre-warm (WebDriverAgent's start in the background) right after `simctl launch`
+  // — never before it (review r1: a start racing the app's launch is unmeasured) — and never waits for it.
+  it('a launch pre-warms its tree source after simctl launch, before the foreground wait, and does not wait for it', async () => {
+    const { fn, calls } = fakeExec({});
+    const order: string[] = [];
+    const wda: IosTreeSource = {
+      kind: 'wda',
+      read: () => new Promise(() => undefined),
+      applicationLabel: async () => ({ kind: 'declined' }),
+      prewarm: () => void order.push(`prewarm after ${calls.at(-1)?.full ?? 'nothing'}`),
+      dispose: () => Promise.resolve(),
+    };
+    await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda }).launch('com.app');
+    expect(order).toEqual(['prewarm after xcrun simctl launch AAAA-1111 com.app']);
+    expect(simctlCalls(calls)).toEqual([...WRITES, 'xcrun simctl launch AAAA-1111 com.app']);
+  });
+
+  it('under auto: the launch returns while WebDriverAgent is still coming up; the first read then joins that one start', async () => {
+    const { fn } = fakeExec({});
+    let up!: () => void;
+    let bringUps = 0;
+    const wda = {
+      ...WDA_NO_TREE,
+      read: async () => screen(el({ identifier: 'from.wda' })),
+      bringUp: () => (bringUps++, new Promise<void>((resolve) => { up = resolve; })),
+      buildCached: async () => true,
+    };
+    const idb: IosTreeSource = { ...NO_TREE, applicationLabel: async () => ({ kind: 'declined' }) };
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: new AutoTreeSource({ wda, idb }) });
+    await expect(adapter.launch('com.app')).resolves.toBeDefined();
+    expect(bringUps).toBe(1); // started by the launch, not finished: the launch did not wait for it
+    const reading = adapter.uiTree();
+    up();
+    expect(JSON.stringify(await reading)).toContain('from.wda');
+    expect(bringUps).toBe(1);
+  });
+
+  it('idb has no pre-warm: a launch over it starts nothing beyond the launch', async () => {
+    const { fn, calls } = fakeExec({ 'idb ui describe-all': IDB_DESCRIBE_ALL });
+    const idb = new IdbTreeSource({ udid: 'AAAA-1111', exec: fn });
+    expect((idb as IosTreeSource).prewarm).toBeUndefined();
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: { ...NO_TREE, applicationLabel: async () => ({ kind: 'declined' }) } });
+    await adapter.launch('com.app');
     expect(simctlCalls(calls)).toEqual([...WRITES, 'xcrun simctl launch AAAA-1111 com.app']);
   });
 

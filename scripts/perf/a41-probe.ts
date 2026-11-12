@@ -27,8 +27,11 @@ import {
   PROBE_MODES,
   tenths,
   traceIds,
+  snapshotRootLabel,
+  WAITED_GAP_MS,
   type AutoRun,
   type ColdRun,
+  type ForegroundRun,
   type GoldenResultLike,
   type HitProbe,
   type HitResult,
@@ -69,7 +72,11 @@ import { averiServer, commitOf } from './session.js';
  *   catalog), the first tap after it (`text:"open"`, WDA's bring-up inside it); untimed, the open cell waited for
  *   (`openSettled`), two warm taps on its A; launch_app again and the same first tap with WDA up; launch_app a third
  *   time, untimed the catalog waited for (`catalogSettled`), and the same catalog tap warm — the tap the first one is
- *   judged against. A reply that fell back to idb is marked; a41.ts leaves it out of WDA's numbers.
+ *   judged against. Then two more fresh servers each (A41b review r1): launch_app, no read until WAITED_GAP_MS after it
+ *   replied, and the same first tap (the pre-warm given the time WDA's start takes); and launch_app (a `clearState`
+ *   one on the first repeat) with the first read at once — its root's label and WDA's active bundle, the app in
+ *   front while WDA came up beside the launch's foreground wait. A reply that fell back to idb is marked; a41.ts leaves
+ *   it out of WDA's numbers.
  * - `cadence` (A41b, ADR 0040, under WDA): MOTIONS × `--repeat` trials (20: D35's count) — the cell launched, one read
  *   before the trigger (WDA attached), the trigger (an idb swipe, as averi strokes), then WDA reads back to back for
  *   WINDOW_MS after it; each trial kept in the d35 fixture's shape (a41.ts#encodeRects). The settle is replayed offline
@@ -180,6 +187,58 @@ async function settledOn(s: Session, listed: RegExp): Promise<boolean> {
   return seen;
 }
 
+/** WebDriverAgent's active app's bundle (GET /wda/activeAppInfo on the lab's port); undefined when it cannot say. */
+async function activeBundle(): Promise<string | undefined> {
+  try {
+    const res = await fetch(`http://127.0.0.1:${LAB_WDA_PORT}/wda/activeAppInfo`, { signal: AbortSignal.timeout(5000) });
+    const id = ((await res.json()) as { value?: { bundleId?: unknown } }).value?.bundleId;
+    return typeof id === 'string' ? id : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The waited leg: a fresh `auto` server, launch_app, no read until WAITED_GAP_MS after it replied, the first tap. */
+async function waitedTap(stop: () => Promise<unknown>, device: string, run: AutoRun, tap: Record<string, unknown>): Promise<void> {
+  let s: Session | undefined;
+  try {
+    s = await session(device, 'auto');
+    await stop();
+    run.waitedLaunch = await step(s, 'launch_app', { appId: LAB_APP.native.bundle }, (x) => !isError(x));
+    // From the reply, not the call: the launch pre-warms WDA only once `simctl launch` returned (ADR 0046).
+    const replied = performance.now();
+    await sleep(WAITED_GAP_MS);
+    run.waitedGapMs = performance.now() - replied;
+    run.firstWaited = await step(s, 'tap', tap, claimsTap);
+  } catch (e) {
+    run.waitedError = said(e);
+  } finally {
+    await s?.close();
+  }
+}
+
+/** The foreground leg: a fresh `auto` server, launch_app (wiping when `clearState`), the first read at once. */
+async function foreground(stop: () => Promise<unknown>, device: string, clearState: boolean): Promise<ForegroundRun> {
+  const run: ForegroundRun = { clearState, expected: { label: LAB_APP.native.name, bundle: LAB_APP.native.bundle } };
+  let s: Session | undefined;
+  try {
+    s = await session(device, 'auto');
+    await stop();
+    run.launch = await step(s, 'launch_app', { appId: LAB_APP.native.bundle, clearState }, (x) => !isError(x));
+    const read = await s.call('ui_snapshot', {});
+    const label = snapshotRootLabel(read);
+    if (label !== undefined) run.label = label;
+    if (/read through idb/.test(read)) run.fellBack = true;
+    const bundle = await activeBundle();
+    if (bundle !== undefined) run.bundle = bundle;
+  } catch (e) {
+    run.error = said(e);
+  } finally {
+    await s?.close();
+  }
+  return run;
+}
+
 async function autoTap(lab: IosLab, device: string, repeat: number): Promise<AutoRun[]> {
   const bundle = LAB_APP.native.bundle;
   const ok = (x: string) => !isError(x);
@@ -209,10 +268,15 @@ async function autoTap(lab: IosLab, device: string, repeat: number): Promise<Aut
     } finally {
       await s?.close();
     }
+    await waitedTap(stop, device, run, catalogTap);
+    run.foreground = await foreground(stop, device, r === 1);
     const t = (x: Step | undefined) => (x === undefined ? '—' : `${x.ms.toFixed(0)}${x.ok ? '' : ' (not ok)'}`);
+    const f = run.foreground;
     console.error(
-      `auto-tap ${r}/${repeat}: first ${t(run.firstCold)}, after relaunch ${t(run.firstWdaUp)}, warm ${t(run.warmCatalog)}, open.A ${run.warm.map(t).join('/')} ms` +
-        (run.error === undefined ? '' : ` — ${run.error}`),
+      `auto-tap ${r}/${repeat}: first ${t(run.firstCold)}, after relaunch ${t(run.firstWdaUp)}, warm ${t(run.warmCatalog)}, open.A ${run.warm.map(t).join('/')} ms; ` +
+        `waited ${t(run.firstWaited)} ms (${run.waitedGapMs?.toFixed(0) ?? '—'} ms after launch_app replied); ` +
+        `foreground${f.clearState ? ' (clearState)' : ''}: ${f.label ?? 'no label'} / ${f.bundle ?? 'no bundle'}` +
+        [run.error, run.waitedError, f.error].filter((x) => x !== undefined).map((x) => ` — ${x}`).join(''),
     );
   }
   return runs;

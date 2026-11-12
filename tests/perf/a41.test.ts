@@ -10,6 +10,10 @@ import {
   cadenceJudgement,
   classesOf,
   encodeRects,
+  foregroundOk,
+  snapshotRootLabel,
+  WAITED_GAP_MIN_MS,
+  WAITED_GAP_MS,
   hitTargetsOf,
   hitVerdict,
   movedTrial,
@@ -242,7 +246,12 @@ describe('summaryLines — the short summary', () => {
       { scenario: 'fill', idb: { failed: 2 }, wda: { warm: sp(1700), failed: 0 } },
     ],
     wdaCold: { coldRead: sp(6000, 5), warmRead: sp(400, 5), failed: 0 },
-    autoTap: { launch: sp(1200, 5), relaunch: sp(800, 5), firstCold: sp(7000, 5), firstWdaUp: sp(900, 5), warmCatalog: sp(600, 5), warm: sp(500, 10), fellBack: 0, paidPush: 0, catalogUnsettled: 0, failed: 0 },
+    autoTap: {
+      launch: sp(1200, 5), relaunch: sp(800, 5), firstCold: sp(7000, 5), firstWdaUp: sp(900, 5), warmCatalog: sp(600, 5), warm: sp(500, 10),
+      firstWaited: sp(1000, 5), waitedGap: sp(4010, 5),
+      firstTaps: { ok: 5, n: 5 }, waitedTaps: { ok: 4, n: 5 }, foreground: { ok: 5, n: 5, clearState: 1, seen: [] },
+      fellBack: 0, paidPush: 0, catalogUnsettled: 0, failed: 0,
+    },
     cadence: { trials: 60, moving: { M1a: 20, M1b: 20, M2: 20 }, passes: [pass(300, 35), pass(500, 33)], judgement: { verdict: 'unproven', why: 'w' } },
     hitTest: {
       rows: [],
@@ -259,7 +268,12 @@ describe('summaryLines — the short summary', () => {
     expect(lines).toContain(
       "WDA tap median within 100 ms of idb's, one-sided (WDA no more than 100 ms slower; faster always passes): yes (wda−idb +46 ms)",
     );
-    expect(lines).toContain('first tap after launch_app ≤ the same tap warm + 500 ms: no (7000 vs 600 + 500)');
+    // (a): 7000 − 600 = 6400 against max(0, 6000 − 1200) + 500 = 5300.
+    expect(lines).toContain('first tap after launch_app (a, at once; information, not judged): first − warm 7000 − 600 = 6400 ms; WDA cold start 6000 ms against launch_app 1200 ms; first tap ok 5/5');
+    expect(lines).toContain('first tap after launch_app (b, ≥ 3.5 s after it replied) ≤ the same tap warm + 500 ms: yes (1000 vs 600 + 500); first tap ok 4/5');
+    expect(lines).toContain('foreground after launch ok 5/5 (1 clearState; n ≥ 5 with one: yes)');
+    expect(lines).toContain('auto, the same first tap 4010 ms (n 5, 4009–4011) after launch_app replied (no read before it): 1000 ms (n 5, 999–1001)');
+    expect(lines).toContain('A41b acceptance');
     expect(lines).toContain(
       'at 300 ms: 0 wrong in 35 moving, uncensored settles over 60 trials — of 84 settles (M1a 4, M1b 50, M2 30), 40 of moving ids, 5 censored (< 500 ms of reads after), 0 wrong in all',
     );
@@ -279,8 +293,37 @@ describe('summaryLines — the short summary', () => {
   });
   it('an auto step that fell back to idb makes the first-tap acceptance unproven; what was left out is said', () => {
     const lines = summaryLines({ ...full, autoTap: { ...full.autoTap!, fellBack: 2, paidPush: 2, catalogUnsettled: 1, failed: 1 } });
-    expect(lines).toContain("first tap after launch_app ≤ the same tap warm + 500 ms: unproven (2 auto steps fell back to idb: not WDA's taps)");
+    // Only leg (b) judges; leg (a) is information and carries no verdict.
+    expect(lines.filter((l) => l.includes("unproven (2 auto steps fell back to idb: not WDA's taps)"))).toHaveLength(1);
+    expect(lines.find((l) => l.includes('(b, '))).toContain("unproven (2 auto steps fell back to idb: not WDA's taps)");
     expect(lines).toContain('auto, left out: 2 fell back to idb; 2 warm taps paid the push; 1 warm catalog taps on an unsettled catalog; 1 sessions with a failed step');
+  });
+  it('leg (a) is information only: its numbers, a dash for a part not measured, never a yes or no', () => {
+    const a = (r: A41Report) => summaryLines(r).find((l) => l.includes('(a, at once'));
+    expect(a(full)).not.toMatch(/: (yes|no|unproven) /);
+    expect(a({ ...full, wdaCold: undefined, autoTap: { ...full.autoTap!, firstCold: undefined } })).toBe(
+      'first tap after launch_app (a, at once; information, not judged): first − warm — − 600 = — ms; WDA cold start — ms against launch_app 1200 ms; first tap ok 5/5',
+    );
+  });
+  it('leg (b) at warm + 500 exactly passes; the foreground says what was read instead, and needs n ≥ 5 with a clearState', () => {
+    const b = (w: number) => summaryLines({ ...full, autoTap: { ...full.autoTap!, firstWaited: sp(w, 5) } }).find((l) => l.includes('(b, '));
+    expect(b(1100)).toMatch(/: yes \(1100 vs 600 \+ 500\)/);
+    expect(b(1101)).toMatch(/: no \(1101 vs 600 \+ 500\)/);
+    expect(summaryLines({ ...full, autoTap: { ...full.autoTap!, firstWaited: undefined } }).find((l) => l.includes('(b, '))).toMatch(/: not measured; first tap ok 4\/5$/);
+    expect(summaryLines({ ...full, autoTap: { ...full.autoTap!, waitedGap: undefined } }).find((l) => l.includes('(b, '))).toMatch(/: not measured;/);
+    // A gap under 3.5 s did not give WDA's start its time: unproven, whatever the tap took.
+    const gapped = (min: number) =>
+      summaryLines({ ...full, autoTap: { ...full.autoTap!, waitedGap: { n: 5, median: 4000, min, max: 4100 } } }).find((l) => l.includes('(b, '));
+    expect(gapped(3499)).toMatch(/: unproven \(a tap 3499 ms after launch_app replied, under 3500\); first tap ok 4\/5$/);
+    expect(gapped(3500)).toMatch(/: yes \(1000 vs 600 \+ 500\)/);
+    const front = (f: NonNullable<A41Report['autoTap']>['foreground']) =>
+      summaryLines({ ...full, autoTap: { ...full.autoTap!, foreground: f } }).find((l) => l.startsWith('foreground after launch'));
+    expect(front({ ok: 4, n: 5, clearState: 1, seen: ['Contacts / com.apple.MobileAddressBook'] })).toBe(
+      'foreground after launch ok 4/5 (1 clearState; n ≥ 5 with one: no) — read instead: Contacts / com.apple.MobileAddressBook',
+    );
+    expect(front({ ok: 5, n: 5, clearState: 0, seen: [] })).toMatch(/\(0 clearState; n ≥ 5 with one: no\)$/);
+    expect(front({ ok: 4, n: 4, clearState: 1, seen: [] })).toMatch(/: no\)$/);
+    expect(front({ ok: 0, n: 0, clearState: 0, seen: [] })).toMatch(/: not measured\)$/);
   });
   it('a run that built WDA says so', () => {
     expect(summaryLines({ ...full, wdaBuilt: true })).toContain("WDA was built in this run: baseline-wda's first repeat and the run's length include the build");
@@ -289,7 +332,7 @@ describe('summaryLines — the short summary', () => {
   it('a part not measured is said as missing, never as a number', () => {
     const lines = summaryLines({ ...full, wdaCold: undefined, autoTap: undefined, cadence: undefined, hitTest: undefined, missing: ['wda-cold.json', 'cadence-trace.json'] });
     expect(lines).toContain('MISSING: wda-cold.json, cadence-trace.json');
-    expect(lines).toContain('first tap after launch_app ≤ the same tap warm + 500 ms: not measured');
+    expect(lines).toContain('first tap after launch_app: not measured');
     expect(lines).toContain('cadence: not measured');
     expect(lines).toContain('A41c: not measured');
   });
@@ -313,7 +356,11 @@ describe('reportOf — the probe\'s files summed', () => {
         wdaCold: { runs: [{ repeat: 1, cold: ok(6000), warm: ok(400) }, { repeat: 2, cold: { ms: 5, ok: false, reply: 'ERROR' }, warm: ok(300) }, { repeat: 3, error: 'select_device failed' }] },
         autoTap: {
           runs: [
-            { repeat: 1, launch: ok(1200), firstCold: ok(7000), openSettled: true, warm: [ok(500), ok(520)], relaunch: ok(800), firstWdaUp: ok(900), catalogSettled: true, warmCatalog: ok(600) },
+            {
+              repeat: 1, launch: ok(1200), firstCold: ok(7000), openSettled: true, warm: [ok(500), ok(520)], relaunch: ok(800), firstWdaUp: ok(900), catalogSettled: true, warmCatalog: ok(600),
+              waitedLaunch: ok(1900), waitedGapMs: 4001, firstWaited: ok(1050),
+              foreground: { clearState: true, expected: { label: 'AveriLab', bundle: 'dev.averi.lab' }, launch: ok(2500), label: 'AveriLab', bundle: 'dev.averi.lab' },
+            },
             {
               repeat: 2,
               launch: ok(1000),
@@ -323,6 +370,8 @@ describe('reportOf — the probe\'s files summed', () => {
               firstWdaUp: ok(1000),
               catalogSettled: false,
               warmCatalog: ok(5000),
+              waitedError: 'select_device failed',
+              foreground: { clearState: false, expected: { label: 'AveriLab', bundle: 'dev.averi.lab' }, launch: ok(1900), label: 'Contacts', bundle: 'com.apple.MobileAddressBook' },
             },
             // The open cell never seen: its warm taps paid the push, left out.
             { repeat: 3, openSettled: false, warm: [ok(3000), ok(3100)], catalogSettled: false },
@@ -358,10 +407,16 @@ describe('reportOf — the probe\'s files summed', () => {
       // Run 2's catalog was not seen settled: its 5000 is left out.
       warmCatalog: { n: 1, median: 600, min: 600, max: 600 },
       warm: { n: 3, median: 500, min: 480, max: 520 },
+      firstWaited: { n: 1, median: 1050, min: 1050, max: 1050 },
+      waitedGap: { n: 1, median: 4001, min: 4001, max: 4001 },
+      // Run 2's fell-back first tap claimed the tap all the same: the app was in front.
+      firstTaps: { ok: 2, n: 2 },
+      waitedTaps: { ok: 1, n: 1 },
+      foreground: { ok: 1, n: 2, clearState: 1, seen: ['Contacts / com.apple.MobileAddressBook'] },
       fellBack: 2,
       paidPush: 2,
       catalogUnsettled: 1,
-      failed: 1,
+      failed: 1, // run 2 (its failed warm tap and its waited leg's error) — counted once
     });
     expect(r.cadence).toBeUndefined();
     expect(r.hitTest!.counts).toEqual({ falseTapped: 2, sound: 1, unsound: 0, unprovenFalse: 1, controls: 2, open: 1, falseRefusal: 0, unprovenControls: 1 });
@@ -385,3 +440,27 @@ describe('reportOf — the probe\'s files summed', () => {
     expect('wdaBuilt' in r).toBe(false);
   });
 });
+
+describe('the foreground leg (A41b review r1): which app the first read after a launch was', () => {
+  const expected = { label: 'AveriLab', bundle: 'dev.averi.lab' };
+  it('snapshotRootLabel: the root\'s label from ui_snapshot\'s JSON, a note after it ignored; none for an error or no label', () => {
+    const json = JSON.stringify({ role: 'container', label: 'AveriLab', children: [{ role: 'button', label: 'open', children: [] }] }, null, 2);
+    expect(snapshotRootLabel(json)).toBe('AveriLab');
+    expect(snapshotRootLabel(`${json}\n⚠ a note`)).toBe('AveriLab');
+    expect(snapshotRootLabel(JSON.stringify({ role: 'container', label: null, children: [] }, null, 2))).toBeUndefined();
+    expect(snapshotRootLabel('ERROR {\n}')).toBeUndefined();
+    expect(snapshotRootLabel('no json here')).toBeUndefined();
+    expect(snapshotRootLabel('{ not json\n}')).toBeUndefined();
+  });
+  it('foregroundOk: the lab\'s label AND bundle, and no error', () => {
+    expect(foregroundOk({ clearState: false, expected, label: 'AveriLab', bundle: 'dev.averi.lab' })).toBe(true);
+    expect(foregroundOk({ clearState: false, expected, label: 'AveriLab', bundle: 'com.apple.springboard' })).toBe(false);
+    expect(foregroundOk({ clearState: false, expected, label: 'Contacts', bundle: 'dev.averi.lab' })).toBe(false);
+    expect(foregroundOk({ clearState: false, expected, label: 'AveriLab', bundle: 'dev.averi.lab', error: 'x' })).toBe(false);
+  });
+  it('the waited leg starts its tap at least 3.5 s after launch_app replied, the least gap it is judged on', () => {
+    expect(WAITED_GAP_MIN_MS).toBe(3500);
+    expect(WAITED_GAP_MS).toBeGreaterThanOrEqual(WAITED_GAP_MIN_MS);
+  });
+});
+

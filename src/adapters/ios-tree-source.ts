@@ -67,11 +67,17 @@ export interface IosTreeSource {
    * The cadence at which two of this source's reads may prove an element holds still (types.ts#DeviceAdapter.
    * settleCadenceMs, which IosAdapter forwards; docs/adr/0040-the-settle-cadence-is-the-tree-sources.md). The SOURCE's
    * fact, not the kind's: it is where inside a read the snapshot falls. Set only from a measurement of this source
-   * (idb: IDB_SETTLE_CADENCE_MS). Absent: unmeasured, and the settle runs at its default 500 (WDA's /source, which may
-   * snapshot anywhere inside a 0.3–1.7 s read, and the differential harness's recorded source).
+   * (idb: IDB_SETTLE_CADENCE_MS; WDA's /source: wda-tree-source.ts#WDA_SETTLE_CADENCE_MS, A41b). Absent: unmeasured,
+   * and the settle runs at its default 500 (the differential harness's recorded source).
    */
   readonly settleCadenceMs?: number;
   read(): Promise<UiNode>;
+  /**
+   * Starts, in the background, what this source's first read would otherwise start — WebDriverAgent's bring-up (A41b;
+   * WdaTreeSource, and AutoTreeSource's choice) — and returns at once: never awaited, never throwing, never rejecting.
+   * The read after it finds the start done or joins it. Absent on idb and on the recorded source: nothing to start.
+   */
+  prewarm?(): void;
   /**
    * Which app a fresh read is OF. idb: the label of the payload's
    * `Application` element — its display name ("Skeleton Internal",

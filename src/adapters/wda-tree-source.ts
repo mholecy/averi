@@ -1,8 +1,16 @@
 import { WdaServer, type WdaServerOptions } from './wda.js';
 import { parseWdaSourceValue } from './wda-source.js';
 import { alertInWda } from './ios-system-alert.js';
+import { startInBackgroundIfBuilt } from './prewarm.js';
 import type { ApplicationLabel, IosTreeSource } from './ios-tree-source.js';
 import type { SystemAlert, UiNode } from './types.js';
+
+/**
+ * The cadence at which two WebDriverAgent `/source` reads may prove an element holds still (ADR 0040): 300 ms, measured
+ * (A41b, 2026-11-12, docs/truth/live-records/a41-probe/: WDA's settle replayed at 300 ms, 0 wrong in 60 moving,
+ * uncensored settles over 60 trials — M1a, M1b, M2 20 each). Until then none was declared and WDA settled at 500.
+ */
+export const WDA_SETTLE_CADENCE_MS = 300;
 
 /**
  * The WebDriverAgent adapter at the iOS tree-source seam (ios-tree-source.ts):
@@ -14,7 +22,7 @@ import type { SystemAlert, UiNode } from './types.js';
  *
  * The server is constructed with the source. That is cheap (a per-UDID port
  * allocation and a log path — no process until the first read, since
- * WdaServer.source() runs ensureRunning itself) and it makes the source
+ * WdaServer.source() runs ensureRunning itself, or a pre-warm, A41b) and it makes the source
  * terminal after dispose(). That state IS reachable from a tool call: run_flow
  * and ensure_state hold one adapter across many reads, and a select_device
  * that lands mid-flow evicts and disposes that adapter (registry.evict). Before
@@ -39,6 +47,7 @@ import type { SystemAlert, UiNode } from './types.js';
  */
 export class WdaTreeSource implements IosTreeSource {
   readonly kind = 'wda' as const;
+  readonly settleCadenceMs = WDA_SETTLE_CADENCE_MS;
   private readonly udid: string;
   private readonly server: WdaServer;
   private disposed = false;
@@ -87,6 +96,22 @@ export class WdaTreeSource implements IosTreeSource {
       if (this.disposed) throw this.released(err);
       throw err;
     }
+  }
+
+  /**
+   * Starts WebDriverAgent in the background and returns at once (A41b; startInBackgroundIfBuilt): what a launch
+   * asks after `simctl launch` (IosAdapter.launch), so the first read finds WDA up or joins its start
+   * (WdaServer.ensureRunning is single-flight). A start that fails is dropped here: the next read starts again and
+   * fails in its own words. WDA already up (WdaServer.upGeneration) → nothing, so a launch sends no `/status` probe.
+   */
+  prewarm(): void {
+    if (this.server.upGeneration() !== undefined) return;
+    startInBackgroundIfBuilt(this, () => this.disposed, () => this.server.ensureRunning());
+  }
+
+  /** Whether WDA's build is cached, so a start runs no `xcodebuild build-for-testing` (WdaServer.isBuilt). */
+  buildCached(): Promise<boolean> {
+    return this.server.isBuilt();
   }
 
   /**

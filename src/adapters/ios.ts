@@ -349,6 +349,10 @@ export class IosAdapter implements DeviceAdapter {
     await this.prepareForOpen(`launching ${bundleId}`);
     await this.simctl(['launch', this.udid, bundleId]);
     this.front = { kind: 'launched', bundleId };
+    // A41b: WebDriverAgent's start, if it is not up, runs beside the foreground wait — never awaited
+    // (IosTreeSource.prewarm; idb has none). After `simctl launch`, never before it: a start racing the app's own
+    // launch is unmeasured (ADR 0046's A41b amendment).
+    this.treeSource.prewarm?.();
     // `simctl launch` returns before the app is in front: for ~1–2 s idb (and
     // WDA's /source, D48) can still hand out the previous app's (or
     // SpringBoard's) tree, complete and labelled, which no reader doubts. Wait
@@ -843,7 +847,7 @@ export class IosAdapter implements DeviceAdapter {
 
   /**
    * The settle cadence (types.ts#DeviceAdapter.settleCadenceMs, ADR 0040): the tree source's own fact
-   * (ios-tree-source.ts#IosTreeSource.settleCadenceMs) — idb's 300, none under WDA. Forwarded, not chosen here: no
+   * (ios-tree-source.ts#IosTreeSource.settleCadenceMs) — idb's 300, WDA's 300 (A41b). Forwarded, not chosen here: no
    * dispatch on the source's kind.
    */
   get settleCadenceMs(): number | undefined {

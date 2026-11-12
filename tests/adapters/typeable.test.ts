@@ -75,7 +75,7 @@ describe('IosAdapter.typeable comes from the tree source', () => {
 
   it('auto (A41a): WDA_TYPEABLE until its first read chose idb, IDB_TYPEABLE from then on; its claim note forwarded', async () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const wda = { ...treeSource('wda', true), bringUp: () => Promise.reject(new Error('no WebDriverAgent')) };
+    const wda = { ...treeSource('wda', true), bringUp: () => Promise.reject(new Error('no WebDriverAgent')), buildCached: async () => true };
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: recordingExec().fn, treeSource: new AutoTreeSource({ wda, idb: { ...treeSource('idb'), read: async () => parseIdbDescribeAll('[]') } }) });
     expect(adapter.typeable).toBe(WDA_TYPEABLE);
     expect(adapter.claimNote).toBeUndefined();

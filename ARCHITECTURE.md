@@ -423,14 +423,17 @@ error and trace line says the same, host paths stripped; the error's fields keep
     stderr and on every claiming reply and failed flow (`claimNote`, printed `⚠ …` by `run/claims.ts#claimed`), with
     WDA's reason in a few words. Two trees are never reconciled. Before the choice the launch's label is idb's. A
     `select_device` of the simulator drops a fallen-back adapter (`registry.ts#select`), and the next call tries WDA
-    again.
+    again. A launch starts the choice in the background just after `simctl launch` (`IosTreeSource.prewarm`, ADR
+    0046's A41b amendment), and the first read joins that one attempt; only with WDA's build cached, else the first
+    read builds it. `treeSource: wda` pre-warms the same way; idb has nothing to start.
   - **idb** (`IdbTreeSource`, `treeSource: idb`, and `auto`'s fallback): `idb ui describe-all`, a FLAT list under a
     synthetic root. An empty or area-less list is a read error (`IdbEmptyTreeError`), never a tree that reads "absent";
     a wedged service is `PersistentReadError` (ADR 0036). Settle cadence 300 ms (`IDB_SETTLE_CADENCE_MS`, ADR 0040). Its
     presented marks: the root when the list holds UIKit's dismiss region (`listsPresentedLayer`), and a menu's
     `backdrop`, the unlabelled, id-less element over the whole screen not listed first (`backdropOf`, ADR 0018).
   - **WebDriverAgent** (`WdaTreeSource`, `treeSource: wda`, and `auto`'s choice when it comes up): the NESTED
-    XCUIElement tree, for the React Native and SwiftUI container ids idb drops. `wda.ts` owns the server's lifecycle
+    XCUIElement tree, for the React Native and SwiftUI container ids idb drops. Settle cadence 300 ms
+    (`WDA_SETTLE_CADENCE_MS`, ADR 0040's A41b amendment). `wda.ts` owns the server's lifecycle
     (build once per Xcode, from the pinned `appium-webdriveragent` optional dependency), `wda-source.ts` parses
     `/source` and marks the keyboard band, hidden subtrees (ADR 0019) and presented layers (ADR 0018). Plan:
     docs/plans/ios-wda-tree-source.md.
