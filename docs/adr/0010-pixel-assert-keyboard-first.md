@@ -181,9 +181,9 @@ Bug note: docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-co
    tapped and stopped on; `scroll_until` strokes over the screen's middle, which may miss the scroll view that holds
    it (the lab's F, C) — until two reads see the target carried, then a stroke carrying content back goes over the
    region its motion showed (residual 6, refined 2026-10-21); **narrowed 2026-11-12** (A38b, below): a SIDEWAYS stroke
-   for a target the read lists goes over the target's own row, so C is stroked inside its carousel's band. Why not more: a screenshot per tap or plain stop would
-   double the cost of the commonest verbs
-   under the default tree source (idb), and nothing cheaper sees the clip — idb's `Scrollable` trait marks 372 of the
+   for a target the read lists goes over the target's own row, so C is stroked inside its carousel's band. Why not
+   more: a screenshot per tap or plain stop would double the cost of the commonest verbs under the default tree source
+   (idb), and nothing cheaper sees the clip — idb's `Scrollable` trait marks 372 of the
    409 nodes idb lists in the 33 iOS lab captures (the 32 above and the React Native app's), contents and all, and an
    element "listed past the screen" is no clip (13 of those 33 captures, 11 with nothing cut); refusing every untold node would refuse 88 green taps. The remedy is the tree source that lists
    the scroll views: `treeSource: wda`, which the tool descriptions name, and under which every one of these rows is
@@ -949,11 +949,20 @@ listed off the usable screen has no band on it either, so the screen box stays. 
 scroll views (`isUntold` false), never set a band, and plan exactly as before. The golden moved one row,
 carousel-in-list.idb C scroll_until, and nothing else. The flush probe (`planProbe`) never takes the band. Like the
 region, the band is no node of the tree, so `touchedOn`, `strokedAcross` and `strokedContent` say nothing of it.
+The keyboard line the plan keeps bounds the band as it bounds every stroke box: a band at or below the line is no band,
+so the screen box's stroke above the keyboard applies as before; a band the line cuts is cut at it; and what is left
+under TOUCH_SLOP (24 pt, too thin to hold the stroke's line) is no band either. A stroke on the keys could swipe-type
+a word, and `swipeVectorAbove` requires the keyboard top inside the box it is given. The same floor drops the band of a
+target under 24 pt tall with no keyboard up.
 
 **Residual.** The band is the target's own row, not the scroller's: if a horizontal scroller's touch-down region
 narrower than the screen excludes the gesture box's 0.8 / 0.2 points, the stroke still touches down beside it. That
 holds on the lab's carousel (24..378 holds 322 and 80) but is unmeasured elsewhere. A target listed partly off the
-screen vertically is stroked over the part on it.
+screen vertically is stroked over the part on it. A swipe-action cell or a slider in the target's own row gets the
+sideways drag. The old screen-box stroke had the same exposure, but on whatever row lay at mid-screen. The band is not
+narrowed for it. The region box (residual 6) can break `swipeVectorAbove`'s precondition the same way: a sideways
+stroke over a region lying below the keyboard line hands it a keyboard top outside the box, because a sideways stroke's
+room is judged on width alone. That is out of scope here.
 
 ## Bug note
 

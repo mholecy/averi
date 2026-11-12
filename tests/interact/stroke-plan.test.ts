@@ -909,6 +909,21 @@ describe('the band — on a tree that tells no scroll view, a sideways stroke fo
     expect(planOn(tree, 'right', { target: byId(tree, 'lab.carousel-in-list.U'), gesture: PHONE }).stroke).toMatchObject({ box: PHONE, points: swipeVector(PHONE, 'right', 'content') });
   });
 
+  it('the keyboard line (review round 1): a band at or below it is no band — the screen box above the keyboard, as before; one it cuts is stroked above it; one it leaves under TOUCH_SLOP is none', () => {
+    const tree = idb();
+    const c = byId(tree, 'lab.carousel-in-list.C');
+    const right = (keyboardTop: number) => planOn(tree, 'right', { target: c, gesture: PHONE, keyboardTop }).stroke;
+    // Above the band (138): the old screen box's stroke, above the keys — never on them (y 130 before the fix).
+    expect(right(100)).toMatchObject({ box: PHONE, points: swipeVectorAbove(PHONE, 100, 'right', 'content') });
+    expect(right(138)).toMatchObject({ box: PHONE, points: swipeVectorAbove(PHONE, 138, 'right', 'content') });
+    // Inside it: the band cut at the line, 138..180, its stroke at 159, above the keys.
+    expect(right(180)).toMatchObject({ box: { ...BAND, height: 42 }, points: { from: { x: 322, y: 159 }, to: { x: 80, y: 159 } } });
+    // Inside it, 12 pt left (under TOUCH_SLOP 24): too thin for the stroke's line — the screen box above the keys.
+    expect(right(150)).toMatchObject({ box: PHONE, points: swipeVectorAbove(PHONE, 150, 'right', 'content') });
+    // Below it: the band whole, as with no keyboard.
+    expect(right(400)).toMatchObject({ box: BAND, points: { from: { x: 322, y: 181 }, to: { x: 80, y: 181 } } });
+  });
+
   it('a later read that does not find the target keeps the band, as it keeps the target\'s scroll views', () => {
     const tree = idb();
     const memory = seeRead(after(tree, { target: byId(tree, 'lab.carousel-in-list.C') }), { facts: factsOf(tree), line: undefined, target: undefined });
