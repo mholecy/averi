@@ -32,11 +32,10 @@ export function parseDuration(value: string | number): number {
 }
 
 /**
- * The one schema of a duration field — every `timeout` of a flow step (tap, scroll_until, wait) and of an assert spec
- * (the MCP `assert` tool's and an `assert:` step's) (A19). A value parseDuration would refuse is refused here, with its
- * message, so averi.yaml fails at load naming the field (`flows.f.steps.0.wait.timeout: Invalid duration "5 sec" — …`)
- * and a tool call fails before a device is bound — never a plain Error mid-flow, which a reach rung would escalate past
- * and an `optional:` would log as skipped. The value is kept as written, not turned into ms: the spec types stay
+ * The one schema of a duration field (A19). A value parseDuration would refuse is refused here, with its message, so
+ * averi.yaml fails at load naming the field (`flows.f.steps.0.wait.timeout: Invalid duration "5 sec" — …`) and a tool
+ * call fails before a device is bound — never a plain Error mid-flow, which a reach rung would escalate past and an
+ * `optional:` would log as skipped. The value is kept as written, not turned into ms: the spec types stay
  * `string | number` for the code and tests that build specs directly, and each consumer converts with parseDuration,
  * which a value that passed here cannot make throw — util/regex.ts#regexSource's shape.
  */
@@ -52,7 +51,6 @@ export const durationSchema: z.ZodEffects<z.ZodUnion<[z.ZodNumber, z.ZodString]>
  * ("5 s", "0.4 s"). The inverse direction of parseDuration for the one
  * place a default is SHOWN rather than read: the MCP tool descriptions cite
  * each module's exported default through it, so the number an agent reads
- * has the module's constant as its one owner (architecture review
- * 2026-10-07, mcp-surface candidate 3).
+ * has the module's constant as its one owner.
  */
 export const formatSeconds = (ms: number): string => `${ms / 1000} s`;

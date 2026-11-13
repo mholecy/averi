@@ -170,8 +170,8 @@ export interface AssertResult {
 
 /**
  * Where screenshot baselines live, relative to the project root. Kept relative
- * (resolved by the caller) so the value is one string in one place while the
- * cwd-at-access-time behaviour of the default stays exactly as it was.
+ * (resolved by the caller) so the value is one string in one place and the
+ * default resolves against the cwd at access time.
  */
 export const DEFAULT_BASELINE_DIR = '.averi/baselines';
 
@@ -190,12 +190,9 @@ export const ASSERT_TIMEOUT_MS = 3_000;
  * with a clock or a caret. Measured on the Android emulator (the bug note
  * below): one round is a 2.7 s uiautomator read plus two 0.65 s
  * screencaps 300 ms apart, ~4.3 s, so two rounds and the 150 ms floor
- * between them are ~8.75 s (~8.9 s before 2026-10-31, when the whole 300 ms
- * poll was slept after a read that already outlasts it — pollTree, ADR
- * 0029). With the shared 3 s these asserts could not pass on that device
- * even on a still screen: the 3 s only ever "worked" because
- * the capture overran it, which the capture no longer does. 12 s covers two
- * rounds there with a margin for a slower emulator; a poll that passes
+ * between them (pollTree, ADR 0029) are ~8.75 s. With the shared 3 s these
+ * asserts could not pass on that device even on a still screen. 12 s covers
+ * two rounds there with a margin for a slower emulator; a poll that passes
  * returns as soon as it does, so the larger budget costs only a failing
  * assert. Exported for the `assert` tool's description, which quotes it.
  * docs/bugs/2026-10-06-pixel-assert-default-timeout-fits-no-round-on-device.md
@@ -232,15 +229,14 @@ export interface VerifierOptions {
    * accessibility service). `throw` (the default, safe): the error propagates as it came, after the assert's one
    * read — so a flow's `assert:` step stops the flow on the named error, which the engine's `isTerminal` holds
    * (`optional:` does not skip it, the ladder neither escalates past it nor salvages it). `fail`: the assert fails,
-   * its message the detail, and the next assert runs — asked only by the two callers whose reply is the assert
-   * results themselves: a `verify` leg (run/verify.ts — a throw would lose its frame, screenshot and health line) and
-   * the MCP `assert` tool (run/commands.ts#runAsserts). D21 review round 2: a failing result everywhere turned a
-   * flow's wedged assert into a plain "flow asserts failed" that `optional:` skipped and the ladder escalated past.
+   * its message the detail, and the next assert runs — for a caller whose reply is the assert results themselves
+   * (a `verify` leg, where a throw would lose its frame, screenshot and health line). D21 review round 2: a failing
+   * result everywhere would turn a flow's wedged assert into a plain "flow asserts failed" that `optional:` skips and
+   * the ladder escalates past.
    */
   persistentRead?: PersistentReadMode;
 }
 
-/** VerifierOptions.persistentRead: whether an assert throws a read no wait cures (`throw`) or fails on it (`fail`). */
 export type PersistentReadMode = 'throw' | 'fail';
 
 /**
@@ -295,7 +291,6 @@ export class Verifier {
   private readonly handOff: ReadHandOff;
   /** The device, as `handOff` watches it: what an action through it would invalidate is never handed on. */
   private readonly adapter: DeviceAdapter;
-  /** VerifierOptions.persistentRead: whether a read no wait cures fails the assert or is thrown. */
   private readonly persistentRead: PersistentReadMode;
 
   constructor(adapter: DeviceAdapter, opts: VerifierOptions = {}) {
@@ -329,9 +324,9 @@ export class Verifier {
    * The one step every assert runs through (A20): run its plan — whichever poll it is — and map the verdict to the
    * AssertResult, applying VerifierOptions.persistentRead once. A PersistentReadError (D21 — a read no wait cures,
    * which every poll throws at once, after its one read) is the assert's failing result under `fail`, its message the
-   * detail; under `throw`, and for any other error, it propagates as it came. Until A20 the tree poll caught it and
-   * each pixel assert by a hand `.catch`: one forgotten would have rejected a whole verify leg (run/verify.ts),
-   * losing its frame, screenshot and health line — what D21 round 2 set `fail` up to keep.
+   * detail; under `throw`, and for any other error, it propagates as it came. Applied here once, no assert can
+   * forget it: one that did would reject a whole verify leg (run/verify.ts), losing its frame, screenshot and health
+   * line — what D21 round 2 set `fail` up to keep.
    */
   private async decided({ description, run }: PlannedAssert): Promise<AssertResult> {
     try {
@@ -551,7 +546,7 @@ export class Verifier {
    *
    * `pollMs` is the cadence of the rounds (reads start at least pollMs
    * apart: pollTree sleeps what the read left of it) and NOTHING else: forwarded to
-   * the capture as its stability delay too, it made an assert inside a flow
+   * the capture as its stability delay too, it would make an assert inside a flow
    * (engine pollMs 500) wait 500 ms between stability captures and the same
    * assert from the MCP tool 300 — the budget capture.ts documents as one.
    * The round's deadline is handed to the capture instead (by the pixel
@@ -605,12 +600,12 @@ export class Verifier {
    *
    * And not on a BARE tree (ui-tree/verdict.ts): nothing in a cold launch's
    * Android decor or WDA's splash matches any selector, so without that
-   * rule this assert PASSED there before the app had drawn a pixel.
+   * rule this assert would PASS there before the app had drawn a pixel.
    * The leaf rule is the flow engine's too (flow/condition.ts asks the same
    * `absenceVerdict`), so an absent detect, wait, branch and assert cannot
    * disagree about one tree. An `unknown` round keeps polling like a visible
    * one; a timeout whose last tree was bare fails as "could not verify",
-   * the wording an unreadable tree already had — both are "we could not
+   * the wording an unreadable tree gets — both are "we could not
    * tell", never "still visible".
    */
   private planAbsent(element: ElementSpec, timeoutMs: number): PlannedAssert {
@@ -672,7 +667,6 @@ export class Verifier {
     // blinking caret or a clock inside the 1.5 s budget passes the diff
     // under threshold, and the threshold exists for exactly that — a refusal
     // there (tried, and withdrawn) would tighten a passing assert.
-    // Re-baseline any screenshot assert that was flaky under a bare read.
     //
     // The baseline file is read BEFORE the capture, because the two paths
     // capture differently. CREATION takes
@@ -684,16 +678,15 @@ export class Verifier {
     // schedule, its simulation and its cost are on capture.ts's
     // BASELINE_CONFIRMATION_DELAYS_MS).
     // A refusal there gets its own sentence, because two captures DID match. A DIFF takes plain
-    // `captureFrame` exactly as before — same captures, same sleeps, same
-    // `⚠ frame:` note — so only the once-per-baseline path pays the window.
+    // `captureFrame` — the settled pair alone, with its `⚠ frame:` note — so
+    // only the once-per-baseline path pays the window.
     // docs/bugs/2026-10-06-whole-screen-stability-aliases-a-blinking-caret.md
-    // A read that fails for any reason means "create", as it did when the
-    // read came second; reading first changes nothing but the order — except
-    // that the read-to-write window is now the whole creation capture, ≈3 s
-    // on the Android emulator where it was a file read: two concurrent first
-    // runs of the same baseline can both find no file and both write, the
-    // later write winning. Each wrote a confirmed still frame, so nothing
-    // unexamined is stored; no lock is taken.
+    // A read that fails for any reason means "create". Reading first makes
+    // the read-to-write window the whole creation capture, ≈3 s on the
+    // Android emulator: two concurrent first runs of the same baseline can
+    // both find no file and both write, the later write winning. Each writes
+    // a confirmed still frame, so nothing unexamined is stored; no lock is
+    // taken.
     let baseline: Buffer;
     try {
       baseline = await readFile(path);
@@ -706,11 +699,10 @@ export class Verifier {
       } catch (e) {
         return { pass: false, detail: screenshotFailed(captureRefusal(e), 'baseline match') };
       }
-      // Fail closed: ONLY a confirmed window creates.
-      // The first cut refused on `confirmed === false`, so a frame without
-      // the field — `unjudged`, which a deadline on this path would produce —
-      // would have been stored unexamined. Each refusal is worded for what
-      // was actually seen.
+      // Fail closed: ONLY a confirmed window creates. Refusing on
+      // `confirmed === false` alone would store unexamined a frame without
+      // the field — `unjudged`, which a deadline on this path would produce.
+      // Each refusal is worded for what was actually seen.
       if (candidate.confirmed !== true) {
         return { pass: false, detail: `baseline not created: ${baselineRefusal(candidate)}` };
       }
@@ -735,7 +727,7 @@ export class Verifier {
         detail: withNote(`size mismatch: baseline ${a.width}x${a.height}, current ${b.width}x${b.height}`),
       };
     }
-    // D26b: iOS leaves its status band out of both images (iosBandRows); every other row is compared as before.
+    // D26b: iOS leaves its status band out of both images (iosBandRows); every other row is compared.
     const band = this.adapter.platform === 'ios' ? await iosBandRows(this.adapter, a.width, a.height) : 0;
     const from = band * a.width * 4;
     const rows = a.height - band;
@@ -763,7 +755,7 @@ export class Verifier {
  * This LOOSENS the check, so it is held to exactly that: iOS only (Android's captures have one source), the band's
  * rows only — `ceil(statusBand × scale)`, the scale the png's width over the viewport's. A png that is not the viewport
  * at one scale (both axes within 2 %) is compared whole (defensive; whether a rotated simulator's capture is ever
- * landscape is unmeasured). A viewport that cannot be read is compared whole too, as before D26b — the diff never fails on it.
+ * landscape is unmeasured). A viewport that cannot be read is compared whole too — the diff never fails on it.
  */
 async function iosBandRows(adapter: DeviceAdapter, width: number, height: number): Promise<number> {
   let viewport;

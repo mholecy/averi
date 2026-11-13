@@ -75,12 +75,12 @@ export const orderOfFrame = (frame: MeasuredFrame, question: PairQuestion): read
  *   rather than certify the background;
  * - `apart`: it is not — the region shows something of its own (a label, a border), or no strip beside it is its colour;
  * - `untold`: the frame cannot say (`why`: its scale refused, the region off it, no plain strip beside it) — the
- *   assert measures as before.
+ *   assert measures the region.
  * What it costs: an element genuinely drawn in the colour of the screen around it with nothing at all of its own (an
  * empty, unbordered white card on a white page) fails closed under idb too — it is told apart from the background by
  * nothing in the frame either; under WDA, which lists the scroll views, it is measured. Measured over every node idb
- * lists in the 32 iOS lab captures: only O and C blend (tests/verify/eyes-apart.test.ts). What it does not see —
- * measured as before, so a PASS on what lies beneath the clip: anything of that beneath in the region (a separator, a
+ * lists in the 32 iOS lab captures: only O and C blend (tests/verify/eyes-apart.test.ts). What it does not see is
+ * measured, so it can PASS on what lies beneath the clip: anything of that beneath in the region (a separator, a
  * shadow, text: more than a point of it reads `apart`), and no plain strip beside it (`untold`). Asked on a frame
  * settled over the region only too (verify/pixel-poll.ts#blendsUntold): a strip beside still moving is no plain strip.
  */
@@ -138,7 +138,6 @@ export function apartOfFrame(frame: MeasuredFrame, region: Rect): ApartSeen {
   return plain.some((c) => distance(c, own) <= EYES_SAME_DE) ? { seen: 'blends', colour: rgbToHex(own) } : { seen: 'apart' };
 }
 
-/** Every pair of `question` untold, for `why`. */
 export const untoldAll = (question: PairQuestion, why: string): readonly OrderSeen[] => question.pairs.map(({ peer }) => ({ peer, seen: 'untold', why }));
 
 /**
@@ -265,13 +264,11 @@ function judgeClipLine(png: RgbaImage, scale: number, regionRect: Rect, edge: Ed
   return { sees: 'surface', edge, by: CLIP_LINE, depth, surface: rgbToHex(surface), own: rgbToHex(drawn) };
 }
 
-/** `strip` is one plain colour of its own (its dominant, `oneColour`), told apart from `from` (further than EYES_APART_DE). */
 function plainOtherThan(png: RgbaImage, strip: EdgeBounds, from: Rgb): boolean {
   const colour = sampleDominant(png, [strip])?.rgb;
   return colour !== undefined && distance(colour, from) > EYES_APART_DE && oneColour(png, strip, colour);
 }
 
-/** ΔE00 of two colours (the line test memoises it per pixel colour, `oneColour`). */
 const distance = (a: Rgb, b: Rgb): number => ciede2000(srgbToLab(...a), srgbToLab(...b));
 
 /**
@@ -289,7 +286,7 @@ function nearShare(png: RgbaImage, bounds: EdgeBounds, ref: Rgb, within: number)
   return total === 0 ? 0 : near / total;
 }
 
-/** How many of `bounds`' pixels lie within `within` (ΔE00) of `ref`, of how many, each pixel judged as it is (`oneColour`'s count). */
+/** How many of `bounds`' pixels lie within `within` (ΔE00) of `ref`, of how many, each pixel judged as it is. */
 function nearCount(png: RgbaImage, bounds: EdgeBounds, ref: Rgb, within: number): { readonly near: number; readonly total: number } {
   const { data, width } = png;
   const memo = new Map<number, boolean>();
@@ -351,7 +348,7 @@ function lineOf(r: EdgeBounds, edge: Edge, i: number): EdgeBounds {
   }
 }
 
-/** A band's or the overlap's dominant colour counts only when it holds at least this share of the region (`sampleDominant`): a region mostly one surface. */
+/** The order judge counts a band's or the overlap's dominant colour only when it holds at least this share of the region (`sampleDominant`): a region mostly one surface. */
 const DOMINANT_SHARE = 0.5;
 
 /**
@@ -408,11 +405,12 @@ export function judgeOrder(png: RgbaImage, scale: number, q: PairQuestion): read
  *    count `apartOfFrame` reads — not LINE_SHARE, which would pass a 1-px line of ink across a 6-px band) — `clear`:
  *    the text paints nothing a screenshot, an OCR crop or a colour sample of the control reads. Else `under`: it draws
  *    ink or a background of its own over the control (`other`: the commonest colour of what differs).
- * Asymmetric on purpose, as `judgePair`: `clear` excuses a cover, so it is said only on pixel identity, every missing
- * piece of evidence `untold` (the cover stands). Residuals (ADR 0026): one frame caught mid-animation (ADR 0013's); a
- * text box over drawn content of the same plain colour with no ink in the band (nothing visible is hidden); ink fainter
- * than ΔE 1. Measured on the lab's form-keyboard and form-errors: every overlap (6 and 11 px) #FFFFFF to the pixel, as
- * the field's rows beside the text.
+ * Asymmetric on purpose, as `judgePair`: `clear` excuses a cover, so it is said only when the overlap is the control's
+ * colour to within OWN_PIXELS_MAX points' worth of strays, every missing piece of evidence `untold` (the cover
+ * stands). Residuals (ADR 0026): one frame caught mid-animation (ADR 0013's); a text box over drawn content of the
+ * same plain colour with no ink in the band (nothing visible is hidden); ink fainter than ΔE 1. Measured on the lab's
+ * form-keyboard and form-errors: every overlap (6 and 11 px) #FFFFFF to the pixel, as the field's rows beside the
+ * text.
  * docs/adr/0026-a-text-in-a-controls-touch-margin-is-judged-by-the-eyes.md
  */
 function judgeClear(png: RgbaImage, scale: number, pair: ClearPair): PairSeen {

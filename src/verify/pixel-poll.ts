@@ -98,8 +98,8 @@ import { keyboardOver, pixelMissText } from './pixel-text.js';
  * time for the confirming read; a different one is a miss that quotes
  * both rects, so a poll in which the element never held still says so,
  * rather than "not found" or "did not settle". A frame that settled over the
- * whole SCREEN is measured as before: two identical captures already say
- * nothing moved, the element included.
+ * whole SCREEN is measured without the confirmation: two identical captures
+ * already say nothing moved, the element included.
  *
  * WHAT LIES OVER THE ELEMENT (`overElement`), before anything is captured —
  * a miss naming it, never a measurement, and a finding like any other: the
@@ -131,7 +131,7 @@ import { keyboardOver, pixelMissText } from './pixel-text.js';
  *   docs/bugs/2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element.md
  *
  * Residuals (one line each; the ADRs above have the rest):
- * - A keyboard the reading cannot see (a floating or split IME with no insets frame) is measured, as before the check.
+ * - A keyboard the reading cannot see (a floating or split IME with no insets frame) is measured.
  * - A stale `shown` costs covered rounds until the window state catches up; under a short timeout it fails closed.
  * - A colour assert fails closed on a keyboard under only its element's bottom edge, which its 12 % inset would skip.
  * - An element reaching into a band by design (a full-bleed header or footer in no scroll view) fails closed whatever it shows; its advice leads with its title or its content above the bar.
@@ -173,8 +173,7 @@ interface PixelPollSpec {
   /**
    * The cadence of the rounds (pollTree sleeps what the read left of it,
    * ADR 0029) and NOTHING else — never forwarded as the stability delay,
-   * which is capture.ts's constant (the "one budget" rule; see the header
-   * there for the 300-vs-500 split it closed).
+   * which is capture.ts's constant (the "one budget" rule).
    */
   pollMs: number;
   /** The fail-closed noun for the two sentences this module words itself: a moving frame and an undecodable png. */
@@ -293,12 +292,10 @@ class PixelPollMemory {
     return { pass: false, detail: failClosed(reason, this.unchecked) };
   }
 
-  /** One round — its tree read and its captures — took this long. */
   roundTook(ms: number): void {
     this.slowestRoundMs = Math.max(this.slowestRoundMs, ms);
   }
 
-  /** Nothing to capture: the deadline has passed. */
   outOfTime(deadline: number): boolean {
     if (Date.now() < deadline) return false;
     this.foundSilently = 'cut';
@@ -309,12 +306,13 @@ class PixelPollMemory {
    * The eyes' order answer this poll keeps (ADR 0024) — on this round's tree, `tree`: a covered element's order question
    * captures the round's frame, and an answer that keeps it covered (no pair seen `over`) would cost that capture again
    * every round for nothing. So such an answer, judged on a frame settled over the whole screen, is kept and handed back
-   * while the tree reads the same (ui-tree/read-tree.ts#treeFingerprint: every node's role, text, id and rect) and the
-   * question asks the same pairs — the poll asks once per distinct tree. An answer that unlocks (`unlocks`: a pair seen
-   * `over`, or a text in the touch margin seen `clear`, ADR 0026) is never kept: that round measures the very frame it
-   * was judged on, so keeping it saves nothing, and each round's unlock rests on its own frame — the tree reads the same
-   * while the pixels need not (a text that gains ink, a field's own background changing). Nor is an untold one for want of a frame (a failed, unsettled or undecoded capture): the next
-   * round looks again.
+   * while the tree reads the same (ui-tree/read-tree.ts#treeFingerprint: every node's role, label, identifier, value and
+   * rect) and the question asks the same pairs — the poll asks once per distinct tree. An answer that unlocks
+   * (`unlocks`: a pair seen `over`, or a text in the touch margin seen `clear`, ADR 0026) is never kept: that round
+   * measures the very frame it was judged on, so keeping it saves nothing, and each round's unlock rests on its own
+   * frame — the tree reads the same while the pixels need not (a text that gains ink, a field's own background
+   * changing). Nor is an untold one for want of a frame (a failed, unsettled or undecoded capture): the next round
+   * looks again.
    */
   keptOrder(tree: UiNode): KeptOrder {
     let fingerprint: string | undefined;
@@ -502,8 +500,8 @@ interface KeptOrder {
  * THE POLL'S EYES for the order question (ADR 0024): the answer `kept` from an earlier round of the same tree, else
  * judged on THE round's one capture (`capture`, memoised by the round: the measurement reuses it). Never throws, as the
  * production eyes (verify/eyes.ts#eyesOn) never do: a capture that fails is every pair `untold`, said why, and the
- * element stays covered — that round a covered miss, as before the eyes, and the poll goes on (a refused capture ends
- * the poll only where the round measures). Judged only on a frame settled over the WHOLE screen: the bands and the
+ * element stays covered — that round a covered miss, and the poll goes on (a refused capture ends the poll only where
+ * the round measures). Judged only on a frame settled over the WHOLE screen: the bands and the
  * strips around the two lie outside the element's region, which a region-settled frame does not vouch for.
  */
 async function orderOnCapture(question: PairQuestion, kept: KeptOrder, capture: () => Promise<TreeRequestedFrame>): Promise<readonly OrderSeen[]> {

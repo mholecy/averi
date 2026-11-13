@@ -21,7 +21,6 @@ export interface Column {
 const cell = (text: string, column: Column): string =>
   column.align === 'left' ? text.padEnd(column.width) : text.padStart(column.width);
 
-/** The header line and the `-` rule sized to match it. */
 export function headerWithRule(columns: Column[], trailing = ''): [header: string, rule: string] {
   const header = columns.map((c) => cell(c.title, c)).join(' ') + trailing;
   return [header, '-'.repeat(header.length)];

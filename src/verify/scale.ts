@@ -24,15 +24,13 @@ import { usableSize, type DeviceScreen, type Rect, type UiNode } from '../adapte
  * and demotes a content-width tree to a note, because the tree is then only
  * its cross-check, while `windowWidth` still refuses it, because the tree's
  * width IS the rect denominator.
- * With no owner for the second, the rect table and the `rect` assert each
- * asked geometry.ts for the width and kept its `reliable` flag as a remark —
- * the table printed "every delta below is scaled wrong" and then a WITHIN
- * TOLERANCE verdict under it, the assert passed with "(UNRELIABLE …)" in its
- * detail — while `pngScale`, on the same tree, refused that width. A width
- * this file does not trust reaches no verdict of either kind, and the
- * tree-side refusals are worded once (`untrustedTreeWidth`). The scale's
- * plausibility bound (`PLAUSIBLE_SCALE_*`) is here too, so no comparator
- * keeps a scale-trust rule of its own.
+ * A width this file does not trust reaches no verdict of either kind: kept
+ * as a remark beside a verdict, it would print "every delta below is scaled
+ * wrong" over a WITHIN TOLERANCE verdict, or pass an assert with
+ * "(UNRELIABLE …)" in its detail, while `pngScale`, on the same tree, refuses
+ * that width. The tree-side refusals are worded once (`untrustedTreeWidth`).
+ * The scale's plausibility bound (`PLAUSIBLE_SCALE_*`) is here too, so no
+ * comparator keeps a scale-trust rule of its own.
  */
 
 /**
@@ -49,7 +47,7 @@ import { usableSize, type DeviceScreen, type Rect, type UiNode } from '../adapte
  *
  * 1.5 sits between them with room on both sides. It is deliberately blunt: a
  * tighter bound would fail closed on real 3-button-navigation Android windows,
- * where the old width-only scale was CORRECT.
+ * where a width-only scale is CORRECT.
  *
  * The same number bounds the device-screen check, where it means something
  * narrower: the device cannot report an inflated width, so what is left to
@@ -66,10 +64,10 @@ export type PngScale =
 
 /**
  * The ONE sentence any surface prints about how a scale was derived. It is
- * produced here rather than by each caller because the callers kept
- * re-deriving the condition and wording it three ways — and one of them keyed
- * off `screen === undefined`, which misses a screen that WAS supplied and was
- * unusable (a 0 or NaN size), the exact case worth admitting to.
+ * produced here rather than by each caller so that no caller re-derives the
+ * condition: keyed off `screen === undefined`, it would miss a screen that WAS
+ * supplied and was unusable (a 0 or NaN size), the exact case worth admitting
+ * to.
  */
 const TREE_SCALED =
   'scaled from the UI tree — no usable device screen size, so a node that is not the window could still inflate it';
@@ -95,9 +93,8 @@ export type { DeviceScreen };
  * the same screen. A NOTE, never a refusal: a scale inside the range proves
  * nothing (the measured halved scale was 1.5, comfortably inside), and the
  * policy that does refuse is the rest of this file. It rides on the scale's
- * note, not on one comparator's table, so every pixel reader
- * that prints the note — the colour table and assert, the text table — says
- * it in one wording.
+ * note, not on one comparator's table, so every pixel reader that prints the
+ * note says it in one wording.
  */
 const PLAUSIBLE_SCALE_MIN = 0.5;
 const PLAUSIBLE_SCALE_MAX = 4.0;
@@ -106,9 +103,7 @@ const PLAUSIBLE_SCALE_MAX = 4.0;
  * Why a width read from the TREE alone cannot be measured against, or
  * `undefined` when it can — the ONE wording of the two refusals both answers
  * in this file share, so the png scale and the rect denominator cannot
- * disagree about which tree widths are usable or say it two ways (the rect
- * assert had its own copy of the first sentence, the rect table a warning
- * paragraph standing in for the second).
+ * disagree about which tree widths are usable or say it two ways.
  *
  * - a 0-wide tree: dividing by it makes every delta NaN, and `NaN > tol` is
  *   false — a silent vacuous pass.
@@ -247,18 +242,17 @@ const TREE_WIDTH_UNWITNESSED =
  *   pixels), so the side is chosen by the WINDOW's own aspect when the tree
  *   has a window rect (`trustworthyHeight`): a portrait window faces the
  *   short side, a landscape one the long side. The longer side alone is not
- *   enough: a pixel-scale window on a 414x896 @2x
- *   phone is 828 wide, under 896, and was measured at half scale under a
- *   "split view?" note. Only the walked fallback,
- *   whose height is a content maximum and says nothing about orientation,
- *   keeps the longer side as its bound.
+ *   enough: a pixel-scale window on a 414x896 @2x phone is 828 wide, under
+ *   896, and would be measured at half scale under a "split view?" note.
+ *   Only the walked fallback, whose height is a content maximum and says
+ *   nothing about orientation, keeps the longer side as its bound.
  * - A window that agrees with EITHER side is measured silently (a top
  *   split pane is landscape-shaped but spans the short side). One NARROWER
  *   than the side it faces is measured, with a note: that is the split-view
  *   canvas this function exists to return — or a crowned sub-view, which
- *   the reader is now told to rule out. A walked width that
- *   lies BETWEEN the two sides gets its own note, saying the tree cannot
- *   tell which it is.
+ *   the note asks the reader to rule out. A walked width that lies BETWEEN
+ *   the two sides gets its own note, saying the tree cannot tell which it
+ *   is.
  * - No usable screen (none supplied, a failed read, a 0 or NaN size): the
  *   tree's width, with `TREE_WIDTH_UNWITNESSED` — the degraded path says so.
  *
@@ -275,23 +269,22 @@ const TREE_WIDTH_UNWITNESSED =
  *
  * Run on a device (the plan below): the units contract of
  * `DeviceAdapter.viewport()` held — the same units as the tree, `wm size`'s
- * override size when one is set. `viewport()` is memoized for the adapter's
- * life, so a screen changed after it was read (a fold or unfold, `wm size`)
- * would refuse until the server restarted; a wider-than-screen refusal
- * carries `widerThanScreen` and its
- * caller re-reads the screen once (`viewport({ fresh: true })`) and judges
- * again (capture.ts#ScreenWitness.judge). Not measured: a real foldable, an
- * Android letterboxed or freeform window (refused as a CONTENT width — it
- * starts inset by design, and portrait-shaped or past the bar bound),
- * iPad Stage Manager, an Android landscape window beside a 3-button nav bar
- * or a cutout (the A1/A2 shapes are pinned from the platform's layout
- * rules, not a dump).
+ * override size when one is set. `viewport()` memoizes a successful read, so
+ * a screen changed after it was read (a fold or unfold, `wm size`) is judged
+ * against a stale size; a wider-than-screen refusal carries `widerThanScreen`
+ * and its caller re-reads the screen once (`viewport({ fresh: true })`) and
+ * judges again (capture.ts#ScreenWitness.judge). Not measured: a real
+ * foldable, an Android letterboxed or freeform window (refused as a CONTENT
+ * width — it starts inset by design, and portrait-shaped or past the bar
+ * bound), iPad Stage Manager, an Android landscape window beside a 3-button
+ * nav bar or a cutout (the A1/A2 shapes are pinned from the platform's
+ * layout rules, not a dump).
  * docs/plans/2026-10-07-top4-device-check.md
  */
 export function windowWidth(
   tree: UiNode,
   screen?: DeviceScreen,
-  /** The tree's `inferScreenSize`, when the caller already walked it for this frame (capture.ts). */
+  /** The tree's `inferScreenSize`, when the caller already walked it for this frame. */
   size: ScreenSize = inferScreenSize(tree),
 ): WindowWidth {
   const witnessed = screen !== undefined && usableSize(screen) ? screen : undefined;
@@ -373,15 +366,14 @@ export function windowWidth(
  * describe a screen), and the two axes disagreeing past
  * `MAX_AXIS_SCALE_RATIO`.
  *
- * The two holes left open in 0.5.0 — a rootless tree whose oversized node is
+ * The two holes of the 0.5.0 fix — a rootless tree whose oversized node is
  * anchored at x=0, and a window NARROWER than the capture — are shut whenever
  * a device screen is supplied. Without one:
  *
- * - hole 1 no longer scales silently, but it does now FAIL CLOSED where 0.5.0
- *   returned a (halved) number — the oversized node reaches the axis check,
- *   and a tree that contradicts its own window is refused rather than
- *   resolved. That is the one way this change can break a run that used to
- *   produce output, and it takes an iOS box with no working idb to reach.
+ * - hole 1 FAILS CLOSED rather than scaling silently by a (halved) number —
+ *   the oversized node reaches the axis check, and a tree that contradicts its
+ *   own window is refused rather than resolved. It takes an iOS box with no
+ *   working idb to reach.
  * - hole 2 is unfalsifiable from a tree alone and stays pinned in
  *   tests/verify/scale.test.ts, alongside two more: a partial capture whose
  *   aspect matches the device rotated cannot be told from a rotation, and a
@@ -393,7 +385,7 @@ export function pngScale(
   pngWidth: number,
   pngHeight: number,
   screen?: DeviceScreen,
-  /** The tree's `inferScreenSize`, when the caller already walked it for this frame (capture.ts). */
+  /** The tree's `inferScreenSize`, when the caller already walked it for this frame. */
   size: ScreenSize = inferScreenSize(tree),
 ): PngScale {
   const got = derivePngScale(size, pngWidth, pngHeight, screen);
@@ -447,18 +439,17 @@ const MAX_ROTATION_DISAGREEMENT = 1.05;
  *
  * The swap is decided by the CAPTURE alone: take the orientation whose two
  * axes agree, and only when that agreement is tight. Nothing else can be
- * trusted to say. An earlier draft let the tree cast a vote, on the grounds
- * that a wide short png is also what a band-shaped partial capture looks like
- * — but the tree's orientation comes from a walked height, the one number
- * geometry.ts documents as inflated without limit, and a landscape iPhone
- * was found whose scroll container made the tree read "portrait": the
- * swap was refused and the crop scaled by 6.52 instead of 3.0, in the ACROSS
- * direction that the one-sided check below cannot see. Aspect agreement needs
- * no witness: a rotation agrees in the swapped orientation, a band capture
- * agrees in neither and is left alone.
+ * trusted to say. The tree gets no vote, though a wide short png is also what
+ * a band-shaped partial capture looks like: the tree's orientation comes from
+ * a walked height, the one number geometry.ts documents as inflated without
+ * limit; measured on a landscape iPhone whose scroll container made the tree
+ * read "portrait": a tree vote would refuse the swap and the crop would scale
+ * by 6.52 instead of 3.0, in the ACROSS direction that the one-sided check
+ * below cannot see. Aspect agreement needs no witness: a rotation agrees in
+ * the swapped orientation, a band capture agrees in neither and is left
+ * alone.
  *
- * Anything degenerate returns undefined and the caller falls back to the tree,
- * which is the pre-0.6 behavior rather than a new failure.
+ * Anything degenerate returns undefined and the caller falls back to the tree.
  */
 function orient(
   screen: DeviceScreen | undefined,

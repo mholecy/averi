@@ -16,14 +16,12 @@ import { pngScale, windowWidth, type PngScale, type WindowWidth } from './scale.
  * One settled frame, one scale, one crop — the module every pixel reading in
  * this package goes through.
  *
- * Before 2026-10-02 the pieces of "capture something trustworthy to measure"
- * had four owners. The stability wait lived in assert.ts and was re-declared
- * (with its own constants) by the `screenshot` tool, while the `verify` legs
- * and `ensure_state` took a BARE screenshot — so the frame that fed the color
- * and text parity tables was the one frame the color assert's own doc says
- * must never be the verdict: a mid-animation one. The png scale was derived
- * at four call sites with four failure policies, and the rect→png crop was
- * written twice (color-parity.ts with an inset, text-parity.ts without).
+ * Spread over its consumers, "capture something trustworthy to measure"
+ * drifts apart: a stability wait re-declared with its own constants, a BARE
+ * screenshot feeding the color and text parity tables — the one frame the
+ * color assert's own doc says must never be the verdict, a mid-animation
+ * one — a png scale derived per call site with a failure policy each, and a
+ * rect→png crop written once with an inset and once without.
  *
  * This module is the one owner of three facts about a capture:
  * - the png is STABLE: two identical consecutive captures, bounded attempts;
@@ -47,58 +45,51 @@ import { pngScale, windowWidth, type PngScale, type WindowWidth } from './scale.
  * that round's tree in), and rect parity, which scales from the tree on
  * purpose (docs/bugs/2026-08-26-png-scale-needs-out-of-tree-screen-size.md —
  * its denominator is the app's canvas, not the device screen). What IS here
- * since 2026-10-07 is that denominator's trust: each tree-bearing frame
- * carries `window` (verify/scale.ts#windowWidth — still the tree's window,
- * the device screen only witnessing it), derived once beside the scale and
- * before the png is decoded, so the rect table reads it from the frame
- * instead of measuring the tree itself.
+ * is that denominator's trust: each tree-bearing frame carries `window`
+ * (verify/scale.ts#windowWidth — still the tree's window, the device screen
+ * only witnessing it), derived once beside the scale and before the png is
+ * decoded, so the rect table reads it from the frame instead of measuring
+ * the tree itself.
  *
- * "Every pixel reading" holds since 2026-10-04: until then the screenshot
- * baseline assert took a bare `adapter.screenshot()` — the one reader the
- * 2026-10-02 change missed, so the frame it diffed and the baseline it wrote
- * could both be mid-animation. It now takes the png-only arm of
- * `captureFrame`. The pure tail (tree + png + screen → measured frame) is
- * exported as `measuredFrameFor`, and the comparator tests build their
- * fixtures with it rather than re-deriving the scale themselves; it runs the
- * same `scaleFor` / `windowFor` pair over one tree walk that `captureFrame`
- * runs, which adds only the one fresh screen re-read (`ScreenWitness`) —
- * that needs an adapter.
+ * "Every pixel reading" includes the screenshot baseline assert, which takes
+ * the png-only arm of `captureFrame`: on a bare `adapter.screenshot()` the
+ * frame it diffs and the baseline it writes could both be mid-animation.
+ * The pure tail (tree + png + screen → measured frame) is exported as
+ * `measuredFrameFor`, and the comparator tests build their fixtures with it
+ * rather than re-deriving the scale themselves; it runs the same
+ * `scaleFor` / `windowFor` pair over one tree walk that `captureFrame` runs,
+ * which adds only the one fresh screen re-read (`ScreenWitness`) — that
+ * needs an adapter.
  *
- * Since 2026-10-05 the budget has ONE owner and the frame SAYS whether it
- * settled:
- * - The stability delay is this module's constant and nothing else's. Until
- *   then `CaptureOptions.delayMs` existed "so tests stay fast", and the
- *   Verifier forwarded its poll interval as that delay at three sites — so
- *   the color, ocr and baseline asserts inside a FLOW (FlowEngine's pollMs
- *   defaults to 500) waited 500 ms between captures while the same asserts
- *   from the MCP `assert` tool waited 300, and the sentence "the same budget
- *   for every consumer" below was false in production. `pollMs` now means
- *   the poll interval only; the tests that need speed mock util/sleep, as
- *   the engine tests always did.
+ * The budget has ONE owner and the frame SAYS whether it settled:
+ * - The stability delay is this module's constant and nothing else's. A
+ *   delay option "so tests stay fast" would let a caller forward its poll
+ *   interval as the delay, and the color, ocr and baseline asserts inside a
+ *   FLOW (FlowEngine's pollMs defaults to 500) would wait 500 ms between
+ *   captures while the same asserts from the MCP `assert` tool wait 300. The
+ *   tests that need speed mock util/sleep.
  * - `Frame.stability` reports what the wait concluded (settled / moving /
- *   unjudged) and `Frame.captures` how many were taken. Until then a screen
- *   that never settled (spinner, caret, live content) silently yielded its
- *   LAST frame as if it were settled, and the consumers could not tell: the
- *   color and ocr asserts measured it and called the measurement a verdict;
- *   the baseline assert stored it as the ground truth for every later run.
- *   Now the polling asserts treat an unsettled frame as a miss (the deadline,
- *   not a moving frame, decides), and the baseline assert refuses to create
- *   or diff against one. The `verify` legs and the `screenshot` /
- *   `ensure_state` tools still return the best frame — a tool hands the
- *   picture to the agent, whose own eyes judge it — and read `settled` only
- *   if they choose to say so.
+ *   unjudged) and `Frame.captures` how many were taken. Without them a screen
+ *   that never settles (spinner, caret, live content) would yield its LAST
+ *   frame as if it were settled, and the consumers could not tell: the color
+ *   and ocr asserts would call its measurement a verdict, the baseline assert
+ *   would store it as the ground truth for every later run. The polling
+ *   asserts treat an unsettled frame as a miss (the deadline, not a moving
+ *   frame, decides), and the baseline assert refuses to create or diff
+ *   against one. The `verify` legs and the `screenshot` / `ensure_state`
+ *   tools return the best frame — a tool hands the picture to the agent,
+ *   whose own eyes judge it — and read `settled` only if they choose to say
+ *   so.
  * - `CaptureOptions.deadline` lets a caller with a budget of its own bound
  *   the wait: a re-capture that would end after the deadline is not taken,
  *   and the frame comes back `moving` (or `unjudged`, with one capture). The
- *   before/after figures (2026-10-05) are kept ONCE, on `Verifier.treePoll` in
- *   assert.ts; passing the deadline in is the pixel poll's since 2026-10-06
- *   (verify/pixel-poll.ts).
+ *   pixel poll passes its deadline in (verify/pixel-poll.ts); the figures are
+ *   kept ONCE, on `Verifier.treePoll` in assert.ts.
  *
- * Done 2026-10-06 (recorded until then as "not done"): stability can be
- * judged over the ELEMENT'S REGION. Until that date it was judged on the
- * whole screenshot only, so a clock in the status bar or a blinking caret
- * elsewhere on the screen kept a frame "moving" while the element a color
- * or ocr assert measured held perfectly still, and the assert failed "the
+ * Stability can be judged over the ELEMENT'S REGION. Judged on the whole
+ * screenshot only, a clock in the status bar or a blinking caret elsewhere
+ * on the screen would keep a frame "moving" while the element a color or
+ * ocr assert measures holds perfectly still, and the assert would fail "the
  * screen did not settle" about pixels it never reads. `CaptureOptions.region`
  * (a rect in tree points, accepted only beside a SUPPLIED tree — the pixel
  * poll passes the first match's) adds a second question to the wait when two
@@ -132,7 +123,7 @@ import { pngScale, windowWidth, type PngScale, type WindowWidth } from './scale.
  * (verify/pixel-poll.ts). The cost is one extra round, about one tree read
  * (~1.5 s for an Android dump), paid only when the whole screen is NOT
  * still. Two agreeing reads confirm the TREE, not the pixels, and two
- * false-pass windows remain, recorded here (review 2026-10-06):
+ * false-pass windows remain, recorded here:
  * - the tree reports where the element WILL be: iOS AX frames come from the
  *   model layer, so both reads give a UIKit animation's final rect, and
  *   Android keeps alpha-0 and not-yet-drawn views in the tree. A staggered
@@ -151,16 +142,17 @@ import { pngScale, windowWidth, type PngScale, type WindowWidth } from './scale.
  * STABILITY_DELAY_MS plus one capture time apart, ≈0.95 s on the Android
  * emulator and ≈0.8 s on the iOS simulator when measured, so a ≈1 s caret
  * blink usually lands in phase and the pair compares equal. The lab
- * emulator's capture has since measured faster — `adb exec-out screencap`
- * 312–352 ms per call (docs/plans/2026-10-30-performance-backlog.md, D13
- * note (2026-10-31, averi_lab API 33)), a pair ≈0.64 s apart; the blind
- * spot is the pair's whatever its spacing, and the baseline's window below
- * was chosen over a grid of capture times that spans both. Every other
- * consumer keeps the pair as its rule — a tool's `⚠ frame:` note therefore
- * stays silent on a caret screen on those devices (its absence does not
- * prove a still screen), and a polling assert still judges per round, its
- * region and deadline unchanged. A baseline is the one frame stored and read
- * for every later run, so it alone pays the confirmation window
+ * emulator's capture measures faster (averi_lab API 33, 2026-10-31):
+ * `adb exec-out screencap` 312–352 ms per call in D3's live baseline,
+ * 347–365 ms in D13's (docs/plans/2026-10-30-performance-backlog.md, D13),
+ * a pair ≈0.61–0.67 s apart; the blind spot is the pair's whatever its
+ * spacing, and the baseline's window below was chosen over a grid of
+ * capture times that spans both. Every other consumer keeps the pair as its
+ * rule — a tool's `⚠ frame:` note therefore stays silent on a caret screen
+ * on those devices (its absence does not prove a still screen), and a
+ * polling assert still judges per round, its region and deadline unchanged.
+ * A baseline is the one frame stored and read for every later run, so it
+ * alone pays the confirmation window
  * (docs/bugs/2026-10-06-whole-screen-stability-aliases-a-blinking-caret.md).
  */
 
@@ -168,11 +160,11 @@ import { pngScale, windowWidth, type PngScale, type WindowWidth } from './scale.
  * The stability budget: up to 5 re-captures 300 ms apart, i.e. a frame that
  * does not settle costs 6 captures and 1.5 s before the LAST one is returned
  * as the best available — marked `stability: moving`. The same budget for every
- * consumer: a `verify` leg, the `screenshot` tool, and an assert inside a
- * flow all wait exactly the same (since 2026-10-05; see the header for the
- * 300-vs-500 split this closed).
+ * consumer — a `verify` leg, the `screenshot` tool, an assert inside a flow —
+ * which a caller's `CaptureOptions.deadline` may cut short (the pixel poll's
+ * does); the header says why the delay is not a caller's option.
  *
- * What that costs a leg that used to take one bare screenshot: a floor of
+ * What that costs a leg over one bare screenshot: a floor of
  * one 300 ms sleep and one extra capture when the screen is already still,
  * up to 1.5 s and five extra captures when it is not. And 2 to 6
  * `screenshot()` calls per leg instead of 1 is that many more chances for
@@ -182,8 +174,8 @@ import { pngScale, windowWidth, type PngScale, type WindowWidth } from './scale.
  * only rect anchors, which never read a pixel; that decode is paid once and
  * is cheap next to the wait, so it is not gated.
  *
- * Not options: a smaller budget "for tests" was how the 300-vs-500 split
- * crept in. Tests mock util/sleep and pin the DELAY SEQUENCE instead.
+ * Not options: a smaller budget "for tests" is how a 300-vs-500 split
+ * creeps in. Tests mock util/sleep and pin the DELAY SEQUENCE instead.
  */
 const STABILITY_ATTEMPTS = 5;
 /** Exported for the tests, which pin the delay SEQUENCE against it; no production importer. */
@@ -206,7 +198,7 @@ export type { RgbaImage } from './png.js';
  * A frame that decoded and has a tree beside it: what the pixel comparators
  * measure against. `scale` is the ONE derivation for this frame — consumers
  * read `.error` and apply their own policy, never re-derive. `window` is the
- * same for the rect denominator (since 2026-10-07, `windowFor`).
+ * same for the rect denominator (`windowFor`).
  */
 export interface MeasuredFrame {
   tree: UiNode;
@@ -220,7 +212,7 @@ export interface MeasuredFrame {
  * The tree is here, the pixels are not: the png did not decode. Rect parity
  * can still use the tree — and its `window`, which is why that is derived
  * without the png: the rect table must not lose its witness, or its
- * refusal, to a decode failure (2026-10-07).
+ * refusal, to a decode failure.
  */
 export interface Undecoded {
   tree: UiNode;
@@ -260,7 +252,7 @@ export interface Frame {
    * What the stability wait concluded — decided HERE, once, so no consumer
    * re-derives it from the capture count:
    * - `settled`: two consecutive captures matched — over the whole png, or
-   *   over the caller's `region` when one was given (since 2026-10-06) —
+   *   over the caller's `region` when one was given —
    *   within the budget (and the caller's `deadline`, when one was given);
    * - `moving`: two or more captures were taken and every one differed from
    *   the last — the screen was still changing when the wait stopped. The
@@ -272,7 +264,7 @@ export interface Frame {
    */
   stability: 'settled' | 'moving' | 'unjudged';
   /**
-   * HOW a `settled` frame settled (2026-10-06), present only when it did —
+   * HOW a `settled` frame settled, present only when it did —
    * decided here, once, no consumer re-derives it:
    * - `screen`: two whole captures were byte-identical — the fast path, and
    *   the only answer a caller without a `region` can get;
@@ -283,7 +275,7 @@ export interface Frame {
    *   it first — the pixel poll does, with a second tree read.
    */
   settledOver?: 'screen' | 'region';
-  /** Captures taken: 2 for a still screen, up to STABILITY_ATTEMPTS + 1 for one that never settles; 1 when the deadline cut the wait before a second. A `BaselineFrame` adds the confirmations it took (2026-10-06). */
+  /** Captures taken: 2 for a still screen, up to STABILITY_ATTEMPTS + 1 for one that never settles; 1 when the deadline cut the wait before a second. A `BaselineFrame` adds the confirmations it took. */
   captures: number;
   /**
    * Present whenever a tree was read or supplied; absent for a png-only frame
@@ -317,7 +309,7 @@ export const unsettledNote = (frame: Pick<Frame, 'stability' | 'captures'>): str
 
 /**
  * The confirmation window a frame must hold still across before it may
- * become a BASELINE (2026-10-06, docs/bugs/2026-10-06-whole-screen-stability-
+ * become a BASELINE (docs/bugs/2026-10-06-whole-screen-stability-
  * aliases-a-blinking-caret.md): after the settled pair, one wait of this
  * many ms before each further capture, every one of which must be
  * byte-identical to the settled shot. A zero is no wait at all — the next
@@ -327,8 +319,8 @@ export const unsettledNote = (frame: Pick<Frame, 'stability' | 'captures'>): str
  * apart, and the real spacing is that delay PLUS the device's capture time c:
  * ≈0.95 s on the Android emulator (c ≈ 0.65 s), ≈0.8 s on the iOS simulator,
  * as measured 2026-10-06 — the figures the schedule below was chosen on.
- * The lab emulator's c has since measured faster (the module header's
- * blind-spot paragraph has the figure); the simulation's grid below spans it.
+ * The lab emulator's c measures faster (the module header's blind-spot
+ * paragraph has the figure); the simulation's grid below spans it.
  * A text caret blinks with a ≈1 s period at ≈50% duty, so the pair usually
  * lands one period apart, in the same phase, and compares equal — measured
  * 2026-10-06 on both devices: no `⚠ frame:` on a caret screen, and a
@@ -342,7 +334,7 @@ export const unsettledNote = (frame: Pick<Frame, 'stability' | 'captures'>): str
  * period 0.4–2.0 s, 20 phase offsets, capture times c ∈ {0.15, 0.4, 0.65,
  * 0.8} s. The criterion: creation refused for ≥99% of that grid at 50% duty
  * and for EVERY point with period 0.9–1.1 s at the two measured c (0.65,
- * 0.15). Measured: the old pair alone refuses 14.3% (24% of the 1 s band);
+ * 0.15). Measured: the pair alone refuses 14.3% (24% of the 1 s band);
  * this schedule 99.8% (100% of the band); 30%/70% duty 86.9%, recorded, not
  * the criterion. Those are the IDEALISED model's figures — a fixed c, exact
  * sleeps, a capture that samples the instant it starts — and "100% of the
@@ -362,20 +354,19 @@ export const unsettledNote = (frame: Pick<Frame, 'stability' | 'captures'>): str
  * period (at the fast end the waits carry the window; at device speeds the
  * captures themselves fill it).
  *
- * What was tried and failed the criterion (2026-10-06): within a ≈2.1 s
- * budget at c=0.65, no three-capture schedule reached it (best 94% overall,
- * never 100% of the 1 s band), nor did three captures at fixed offsets from
- * the pair's start (best 97%). Outside that budget, [300, 0, 0] — this
- * schedule minus its last capture — reaches 100% of the band and 98.6%
- * overall, ≈2.25 s at c=0.65: the cheaper alternative, excluded by the 99%
- * line and not by the band (review 2026-10-06). Four captures is the
- * cheapest that clears both, so on a still screen the cost is 0.3 s + 4
- * captures, ≈2.9 s at c=0.65, ≈0.9 s at c=0.15 — paid by baseline CREATION
- * only, once per baseline. A
- * diff against an existing baseline, and every other consumer, takes the
- * plain `captureFrame` budget, unchanged. The 0.3 s matches
- * STABILITY_DELAY_MS by result of the search, not by reference: neither
- * constant may move with the other.
+ * What fails the criterion: within a ≈2.1 s budget at c=0.65, no
+ * three-capture schedule reaches it (best 94% overall, never 100% of the
+ * 1 s band), nor do three captures at fixed offsets from the pair's start
+ * (best 97%). Outside that budget, [300, 0, 0] — this schedule minus its
+ * last capture — reaches 100% of the band and 98.6% overall, ≈2.25 s at
+ * c=0.65: the cheaper alternative, excluded by the 99% line and not by the
+ * band. Four captures is the cheapest that clears both, so on a still
+ * screen the cost is 0.3 s + 4 captures, ≈2.9 s at c=0.65, ≈0.9 s at
+ * c=0.15 — paid by baseline CREATION only, once per baseline. A diff
+ * against an existing baseline, and every other consumer, takes the plain
+ * `captureFrame` budget. The 0.3 s matches STABILITY_DELAY_MS by
+ * result of the search, not by reference: neither constant may move with
+ * the other.
  *
  * Not options, as the stability budget is not (the 300-vs-500 split). The
  * tests pin the sequence: [STABILITY_DELAY_MS, 300] for a still screen.
@@ -383,7 +374,7 @@ export const unsettledNote = (frame: Pick<Frame, 'stability' | 'captures'>): str
 export const BASELINE_CONFIRMATION_DELAYS_MS: readonly number[] = [300, 0, 0, 0];
 
 /**
- * A frame offered as a baseline (2026-10-06): the plain frame, plus what the
+ * A frame offered as a baseline: the plain frame, plus what the
  * confirmation window concluded — present only when the pair settled (a
  * moving frame is refused on its own wording, before any confirmation):
  * - `true`: every confirming capture matched the settled shot;
@@ -392,9 +383,9 @@ export const BASELINE_CONFIRMATION_DELAYS_MS: readonly number[] = [300, 0, 0, 0]
  *   everything before, and `shot` is still the settled pair's (the frame
  *   that WOULD have been stored), never the differing one.
  * `stability` keeps describing the pair alone; a consumer creating a
- * baseline reads `confirmed`, and creates ONLY on `true` (review 2026-10-06:
- * the check was `=== false` first, which would have stored an `unjudged`
- * frame — `confirmed` absent — if a deadline ever reached this path). The
+ * baseline reads `confirmed`, and creates ONLY on `true`: a check of
+ * `=== false` would store an `unjudged` frame — `confirmed` absent — if a
+ * deadline ever reached this path. The
  * type says it: `confirmed` is a boolean exactly when the pair settled, and
  * absent otherwise, so a consumer narrowing on `stability` gets the field
  * it can read.
@@ -423,16 +414,13 @@ export interface TreeRequestedFrame extends Frame {
 }
 
 /**
- * A frame that HAS a tree (2026-10-05): the captured bytes, the tree (with or
- * without decoded pixels) beside them, and whatever else the frame says
- * about itself (`stability`, `captures`). Derived from `Frame` rather than
+ * A frame that HAS a tree: the captured bytes, the tree (with or without
+ * decoded pixels) beside them, and whatever else the frame says about
+ * itself (`stability`, `captures`). Derived from `Frame` rather than
  * spelled as `{ shot, measured }`, so a field added to the frame reaches
  * every consumer without an edit here; the one narrowing is `measured`,
  * which has lost its treeless arm — the difference from `TreeRequestedFrame`
- * above, which only promises the question was asked. Until this date the
- * shape was `TextLegFrame` in text-parity.ts: a text-named type one consumer
- * handed to all three parity tables, and a freestanding copy that would have
- * silently dropped `stability`.
+ * above, which only promises the question was asked.
  */
 export interface TreeFrame extends Omit<Frame, 'measured'> {
   measured: MeasuredFrame | Undecoded;
@@ -462,7 +450,7 @@ type CaptureOptions = {
       tree: UiNode;
       readTree?: never;
       /**
-       * The element's rect in TREE points, from the supplied tree (2026-10-06):
+       * The element's rect in TREE points, from the supplied tree:
        * when two captures differ, the wait also asks whether they match INSIDE
        * this rect, so live content elsewhere (a status-bar clock, a caret) does
        * not keep the frame moving. Allowed only beside a supplied tree — the
@@ -486,31 +474,30 @@ type CaptureOptions = {
  * Order, when the tree is READ here (`readTree`): the png first — its
  * stability is the evidence the screen stopped moving — then the tree, so
  * the tree read describes the screen the wait found settled rather than one
- * it found still moving. Until 2026-10-02 the `verify` leg did the reverse,
- * and uiautomator reports LIVE bounds during an animation, so a tree read
- * before the wait could carry mid-animation rects against a settled png.
+ * it found still moving. uiautomator reports LIVE bounds during an
+ * animation, so a tree read before the wait could carry mid-animation rects
+ * against a settled png.
  *
  * When the tree is SUPPLIED (`tree`, the color and ocr asserts), the caller
  * owns its freshness and it predates the wait by one poll round's read. That
  * is acceptable where it happens because the poll retries: a crop that lands
  * wrong on a frame that settled after the read fails this round and the next
  * round reads a tree of the settled screen. Its `region`, when given, is
- * the rect the wait judges stability over (header, 2026-10-06).
+ * the rect the wait judges stability over (the header).
  *
- * The residual race of png-then-tree, recorded 2026-10-02: the screen can
- * change BETWEEN the stable pair and the tree read — a toast, a late async
- * render — and on Android that window is a whole uiautomator dump, seconds
- * long. It is rarer than the old order's race, which needed only an
- * animation already in flight; this one needs a NEW change to begin after
- * two identical captures. The cheap mitigation — one confirming capture
- * after the tree read, a note on the frame when it differs — was rejected
- * here because it is a tree-read/poll concern (which capture confirms what)
- * and the step that owns those primitives should decide it, not this one.
+ * The residual race of png-then-tree: the screen can change BETWEEN the
+ * stable pair and the tree read — a toast, a late async render — and on
+ * Android that window is a whole uiautomator dump, seconds long. It is
+ * rarer than the reverse order's race, which needs only an animation
+ * already in flight; this one needs a NEW change to begin after two
+ * identical captures. The cheap mitigation — one confirming capture after
+ * the tree read, a note on the frame when it differs — is not taken here
+ * because it is a tree-read/poll concern (which capture confirms what) and
+ * the step that owns those primitives should decide it, not this one.
  *
  * The scale is derived once both halves are in hand; the device screen is
- * asked for only then, and a failed read degrades to the tree (the pre-0.6
- * derivation, still correct for every root-bearing capture) rather than
- * failing the frame.
+ * asked for only then, and a failed read degrades to the tree (correct for
+ * every root-bearing capture) rather than failing the frame.
  */
 export function captureFrame(
   adapter: Pick<DeviceAdapter, 'screenshot' | 'capture' | 'uiTree' | 'viewport'>,
@@ -529,8 +516,7 @@ export async function captureFrame(
   // settled, captures); only the measured half is added below.
   // The supplied tree is walked ONCE for the whole capture — the region
   // check's scale on every differing pair, the frame's scale and its window
-  // all read this one size (the parity code review's A4: until then each
-  // measured frame walked it twice, and each region pair once more).
+  // all read this one size (the parity code review's A4).
   const suppliedSize = opts.tree === undefined ? undefined : treeSizeOf(opts.tree);
   const wait = await stableScreenshot(
     adapter,
@@ -572,7 +558,7 @@ export async function captureFrame(
         tree,
         window,
         error:
-          // No platform command here (2026-10-08): the adapter refuses bytes
+          // No platform command here: the adapter refuses bytes
           // that are not a PNG at all, naming its own command
           // (adapters/screenshot-bytes.ts), so what reaches this decode
           // started like one and broke after its signature.
@@ -585,18 +571,17 @@ export async function captureFrame(
 }
 
 /**
- * A frame fit to become a BASELINE (2026-10-06): `captureFrame`'s png-only
- * arm — the one stability budget, unchanged — and then, only when that pair
- * settled, the confirmation window (`BASELINE_CONFIRMATION_DELAYS_MS`, whose
- * doc carries the why, the simulation and the cost). Its one caller is the
- * screenshot assert when no baseline file exists yet; a DIFF against an
- * existing one takes plain `captureFrame`, so its captures and sleeps are
- * exactly what they were. A dedicated export rather than an arm of
+ * A frame fit to become a BASELINE: `captureFrame`'s png-only arm — the one
+ * stability budget, unchanged — and then, only when that pair settled, the
+ * confirmation window (`BASELINE_CONFIRMATION_DELAYS_MS`, whose doc carries
+ * the why, the simulation and the cost). It is for creating a baseline when
+ * no baseline file exists yet; a DIFF against an existing one takes plain
+ * `captureFrame` and its budget. A dedicated export rather than an arm of
  * `captureFrame`, so no other consumer — a tool, `ensure_state`, a `verify`
  * leg, a pixel assert — can opt into a ≈3 s wait by a flag, and the arm
  * types above stay as they are.
  *
- * Deadline: none, as baseline creation has none today — the window is
+ * Deadline: none, as baseline creation has none — the window is
  * bounded by its own four captures. If a deadline ever reaches this path,
  * the confirmations must count against it as the re-captures do, and a
  * window the deadline cuts short is UNconfirmed, never confirmed: a
@@ -629,10 +614,9 @@ export async function captureBaselineFrame(
  * `undefined` when it cannot be read — a failed read degrades every answer
  * that would have been checked against it (the png scale, the window width)
  * to the tree's alone, each saying so in its own note; it never fails the
- * frame or the assert. One owner for that degradation (review round 1,
- * 2026-10-07): the capture, the region check and the `rect` assert each
- * spelled the `.catch` themselves. Not for `absent`, whose viewport is the
- * reference frame itself and whose failed read is an error.
+ * frame or the assert. One owner for that degradation, so no reader spells
+ * the catch its own way. Not for `absent`, whose viewport is the reference
+ * frame itself and whose failed read is an error.
  */
 export const witnessScreen = (adapter: Pick<DeviceAdapter, 'viewport'>): Promise<DeviceScreen | undefined> =>
   adapter.viewport().catch(() => undefined);
@@ -643,9 +627,9 @@ export const witnessScreen = (adapter: Pick<DeviceAdapter, 'viewport'>): Promise
  * re-read FRESH at most once — when a window reads wider than the side it
  * faces (`WindowWidth.widerThanScreen`), the one refusal a stale screen can
  * cause — and the window judged again against what the device says now.
- * The parity code review's A3 (2026-10-07): the screen was memoized for
- * the adapter's life, so a `wm size` or an unfold after the first read kept
- * refusing until the MCP server was restarted (the device check, row 18c).
+ * The parity code review's A3: with the screen memoized and no re-read, a
+ * `wm size` or an unfold after the first read would keep refusing until the
+ * MCP server restarted (the device check, row 18c).
  *
  * The refusal that survives says which: the screen was read again and
  * still says so (the tree, not a stale size), or the re-read failed (a
@@ -700,18 +684,16 @@ export class ScreenWitness {
  * device would say) its screen become the ONE measured frame — the scale
  * derived once, a throwing geometry walk carried as the scale's failure
  * reason. `screen` undefined → the scale comes from the tree, with the
- * scale's own note saying so (verify/scale.ts). Exported since 2026-10-04
- * so the comparator tests build their fixtures through the same derivation
- * production uses: until then
- * color-parity.test.ts and text-parity.test.ts each re-spelled this line as
- * `{ tree, png, scale: pngScale(tree, png.width, png.height, screen) }`, so
- * a change to what the capture feeds the scale (the oriented screen, a
- * caught throw) would have left the comparator tests green against fixtures
- * built the old way — the shape of the 2026-08-26 ocr-crop-scale bug, which
- * was a dropped field at the call site, not a wrong unit. The two failure
- * arms (`Undecoded`, `Treeless`) are decided before this tail; `Undecoded`
- * shares only its window derivation (`windowFor`), the one fact it carries
- * that does not need pixels.
+ * scale's own note saying so (verify/scale.ts). Exported so the comparator
+ * tests build their fixtures through the same derivation production uses: a
+ * test that re-spelled this line as
+ * `{ tree, png, scale: pngScale(tree, png.width, png.height, screen) }`
+ * would stay green after a change to what the capture feeds the scale (the
+ * oriented screen, a caught throw) — the shape of the 2026-08-26
+ * ocr-crop-scale bug, which was a dropped field at the call site, not a
+ * wrong unit. The two failure arms (`Undecoded`, `Treeless`) are decided
+ * before this tail; `Undecoded` shares only its window derivation
+ * (`windowFor`), the one fact it carries that does not need pixels.
  */
 export function measuredFrameFor(tree: UiNode, image: RgbaImage, screen?: DeviceScreen): MeasuredFrame {
   const size = treeSizeOf(tree);
@@ -736,9 +718,7 @@ function treeSizeOf(tree: UiNode): TreeSize {
 /** The frame's png scale from an already-walked tree size, with the walk's containment. */
 function scaleFor(tree: UiNode, image: RgbaImage, screen: DeviceScreen | undefined, size: TreeSize): PngScale {
   // The geometry walk assumes a well-formed tree. A node without children
-  // or a pathological depth must fail THIS frame's scale, not the leg: the
-  // walk used to run inside the parity tables' containment, and moving it
-  // here must not widen what a bad tree can take down.
+  // or a pathological depth must fail THIS frame's scale, not the leg.
   if (size.thrown !== undefined) return { error: malformedTree('the png scale', size.thrown) };
   try {
     return pngScale(tree, image.width, image.height, screen, size.size);
@@ -786,16 +766,16 @@ function windowFor(tree: UiNode, screen: DeviceScreen | undefined, size: TreeSiz
  * unless the deadline has already passed; the first capture is always taken
  * — one honest look.
  *
- * With a `region` (2026-10-06, the supplied-tree arm only), a pair whose
+ * With a `region` (the supplied-tree arm only), a pair whose
  * whole buffers differ gets a second question — do they match inside the
  * element's rect? — answered by `regionSettled` below; the header says what
  * it falls back to and why. Identical captures never reach it, so a still
  * screen costs no decode and no device read, region or not. Each capture is
  * decoded at most once across the wait AND the frame: a Shot memoizes its
  * decode (verify/shot.ts), the later shot of one pair is the earlier of the
- * next, and `captureFrame` measures the returned shot. Since D19 an Android
- * capture is raw pixels: compared as they are, never decoded, and encoded to
- * a PNG only where one leaves the process (`Shot.png`).
+ * next, and `captureFrame` measures the returned shot. An Android capture is
+ * raw pixels (D19): compared as they are, never decoded, and encoded to a
+ * PNG only where one leaves the process (`Shot.png`).
  */
 async function stableScreenshot(
   adapter: Pick<DeviceAdapter, 'screenshot' | 'capture' | 'viewport'>,
@@ -817,13 +797,13 @@ async function stableScreenshot(
         return { shot: current, stability: 'settled', settledOver: 'region', captures };
       }
     }
-    // Taken AFTER the region check (review 2026-10-06): its decode is part of
+    // Taken AFTER the region check: its decode is part of
     // what the next re-capture will cost. The fast path above returns first,
     // so a still screen's count and sleeps are untouched.
     recaptureMs = Date.now() - started;
     previous = current;
   }
-  // The ONE place "one capture is no verdict" is decided (2026-10-05): a
+  // The ONE place "one capture is no verdict" is decided: a
   // consumer reads `stability`, never the count.
   return { shot: previous, stability: captures < 2 ? 'unjudged' : 'moving', captures };
 }
@@ -833,9 +813,8 @@ async function stableScreenshot(
  * Why a capture threw, in one line: the first line of the error — the
  * adapter's own sentence naming its device and command
  * (adapters/screenshot-bytes.ts). `captureFrame` throws for nothing else (its
- * doc), so a caller that catches it quotes this — the pixel and baseline
- * asserts as a fail-closed reason (2026-10-08), a run's final capture as its
- * `⚠ screenshot:` line (run/run-reply.ts#finalFrame).
+ * doc), so a caller that catches it quotes this — as a fail-closed reason,
+ * or as a run's `⚠ screenshot:` line.
  */
 export const captureRefusal = (e: unknown): string => errorMessage(e).split('\n')[0];
 
@@ -871,8 +850,7 @@ async function regionSettled(
   if (earlier === undefined || later === undefined) return undefined;
   if (earlier.width !== later.width || earlier.height !== later.height) return undefined;
   const screen = await witnessScreen(adapter);
-  // The scale only — the window is not this check's question (A4: it used
-  // to run the whole measuredFrameFor, both walks, per differing pair).
+  // The scale only — the window is not this check's question (A4).
   const scale = scaleFor(region.tree, later, screen, region.size);
   if (scale.error !== undefined) return undefined;
   const bounds = pngRegion(region.rect, scale.scale, later);
@@ -977,8 +955,9 @@ export function pngRegion(
  * (verify/color-parity.ts#colorSampleRect, `unit: 'units'`, the screen judged as the frame). The colour sampler
  * (`pngRegion`, the png as the frame) asks the same two steps apart — `clipTo`, then `insetBy` with `unit: 'pixels'` —
  * since it also needs the clip alone for its clipped fraction; the judge and the sampler share `clipTo` and `insetBy`,
- * so the two read ONE region — of one `rect`, the element's part its scroll views draw (the pixel poll and the standing
- * both ask it of ui-tree/standing.ts#Scene.pixelRegion). Undefined when nothing of `rect` lies in `frame` (no width or no height left).
+ * so the two read ONE region — of one `rect`, the element's part its scroll views draw
+ * (ui-tree/standing.ts#Scene.pixelRegion). Undefined when nothing of `rect` lies in `frame` (no width or no height
+ * left).
  *
  * Clip, THEN inset, in that order, both of them: a rect running past the screen's edge is sampled on the part that
  * shows. Measured: the SWIFT form's `payee_street_input 24,869 354x52` beneath the Fees sheet's dim, on a 402x874

@@ -17,16 +17,15 @@ import { errorMessage } from '../util/error-message.js';
  * zod parse error at load time, and would reject a contract whose colour
  * fields are wrong even for a caller only asking for geometry.
  *
- * 2026-10-03: the deferred diagnosis no longer waits for the device. It still
- * belongs to the comparators — and it now ALSO runs before the legs, through
- * the validator each one exports (`validateRectContract`,
- * `validateColorContract`, `validateTextContract`): the comparator's own field
- * parsing run over the contract alone, collected by `problemsThrownBy` below.
- * run/verify.ts asks only the dimensions whose table this contract would
- * produce, so the geometry-only caller above is still never rejected for a
- * colour field, and refuses the run when any of them answers. Before that a
- * `bg: "#white"` cost a full two-platform device run to discover. The schema
- * is unchanged, and so is every other user of `parseLayoutContract`.
+ * The deferred diagnosis does not wait for the device. It belongs to the
+ * comparators — and it ALSO runs before the legs, through the validator each
+ * one exports (`validateRectContract`, `validateColorContract`,
+ * `validateTextContract`): the comparator's own field parsing run over the
+ * contract alone, collected by `problemsThrownBy` below. run/verify.ts asks
+ * only the dimensions whose table this contract would produce, so the
+ * geometry-only caller above is never rejected for a colour field, and
+ * refuses the run when any of them answers. Without it a `bg: "#white"`
+ * would cost a full two-platform device run to discover.
  *
  * Both schemas stay `.passthrough()`: unknown fields (`_note`, future
  * dimensions) must survive a round trip, never be rejected.
@@ -101,16 +100,15 @@ const contractSchema = z
     tolerance_size_pct: z.unknown().optional(),
     /**
      * Max spread in % for the derived `aspect` row, android-vs-ios. Separate
-     * from `tolerance_pct` because they are DIFFERENT QUANTITIES that used to
-     * share one threshold: `tolerance_pct` is a delta in % of screen width,
-     * while an aspect spread is a relative % of a ratio. Nothing converts one
-     * into the other, and the confusion is worst on high-ratio elements, where
-     * the short side dominates and a 1 px measurement difference reads as
-     * several percent.
+     * from `tolerance_pct` because they are DIFFERENT QUANTITIES:
+     * `tolerance_pct` is a delta in % of screen width, while an aspect spread
+     * is a relative % of a ratio. Nothing converts one into the other, and the
+     * confusion is worst on high-ratio elements, where the short side
+     * dominates and a 1 px measurement difference reads as several percent.
      *
-     * Defaults to `tolerance_pct`, i.e. exactly the historical behaviour — a
-     * looser default would have to clear 10.73% to silence the measured false
-     * positives, which is above the 11.71% of a real bug this check caught.
+     * Defaults to `tolerance_pct` — a looser default would have to clear
+     * 10.73% to silence the measured false positives, which is above the
+     * 11.71% of a real bug this check caught.
      * Loosen it per contract, with the measurement that justifies it.
      */
     tolerance_aspect_pct: z.unknown().optional(),
@@ -151,7 +149,7 @@ export function positiveTolerance(raw: unknown, what: string): number {
  * Where the comparator stops at its FIRST throw, this visits every check, so
  * one refusal lists everything there is to fix in one edit.
  *
- * `prefix` is how a contract problem is told from a BUG (review 2026-10-03):
+ * `prefix` is how a contract problem is told from a BUG:
  * every diagnosis a comparator words opens with its own name ('color parity:
  * '), so only a throw whose message opens with it is collected; anything else
  * — a TypeError inside a thunk — is rethrown. Catching everything would have

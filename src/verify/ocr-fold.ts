@@ -2,8 +2,7 @@ import { escapeRegExp } from '../util/regex.js';
 
 /**
  * What a text recognizer may read the app's copy as — one notion of "a
- * recognizer difference", shared by the ocr assert, the text parity table's
- * drift check and the element assert's not-found hint (`readingDifference`).
+ * recognizer difference".
  * docs/adr/0025-what-the-recognizer-may-read-the-apps-copy-as.md
  *
  * Measured on device: macOS Vision reads Slovak `Prihlásiť sa` as
@@ -57,7 +56,6 @@ const PUNCTUATION: Readonly<Record<string, string>> = {
  */
 const foldMarks = (s: string): string => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').normalize('NFC');
 
-/** One character's fold: its ASCII look-alike, or itself without combining marks. */
 const foldChar = (c: string): string => PUNCTUATION[c] ?? foldMarks(c);
 
 /** Code points of the composed form, so `ť` is one character whether it arrived as one or as `t` + caron. */
@@ -94,7 +92,7 @@ const escapedLiteral = (c: string | undefined): string | undefined =>
  *   fold is one character and not already listed adds that fold as a class of
  *   its own beside the class as written — `[’ -]` is `(?:[’ -]|['])`, so no
  *   trailing `-` becomes a range — and a negated class refuses it too:
- *   `[^’]` is `(?:(?![\'])[^’])`; range endpoints and multi-character folds
+ *   `[^’]` is `(?:(?!['])[^’])`; range endpoints and multi-character folds
  *   (`[…]`) stay as written;
  * - other escapes (`\u2019`, `\d`), group names and backreference names stay
  *   as written;
@@ -188,7 +186,8 @@ export function foldFree(source: string): boolean {
 /**
  * The characters of `read` the fold changed, as `[read, fold]` pairs, where
  * their folds lie in `[start, end)` of `ocrFold(read)` (a dropped mark: where
- * it stood) — what a match found there in the folded reading took on trust.
+ * it stood, `end` included) — what a match found there in the folded reading
+ * took on trust.
  */
 export function readingFolds(read: string, start: number, end: number): [string, string][] {
   const pairs: [string, string][] = [];
@@ -308,7 +307,6 @@ const CANNOT_TELL: Readonly<Record<Kind, string>> = {
   separator: 'a thousands separator between digit groups from no space',
 };
 
-/** The fold's kinds the characters of `s` show: a punctuation look-alike, a letter with marks. */
 function foldKinds(s: string): Kind[] {
   return charsOf(s).flatMap((c): Kind[] =>
     PUNCTUATION[c] !== undefined ? ['punctuation']
