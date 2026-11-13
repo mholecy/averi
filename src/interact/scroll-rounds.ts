@@ -1308,7 +1308,7 @@ type VisibleStop = Extract<ScrollOutcome, { kind: 'visible' }>;
 
 /**
  * THE UNKNOWN CENTRE (D17): the plain stop `visible` made — or, first, ONE more stroke. uiautomator cuts a node's bounds
- * at the screen's edge whatever scroll view it lies past (ui-tree/dialect.ts#TreeDialect.cutAtScreen), so a carousel's
+ * at the screen's edge whatever scroll view it lies past (ui-tree/dialect.ts#TreeDialect.cutsAtScreen), so a carousel's
  * card running past its carousel's edge is listed ending at the screen's: its centre, which the stop judges, is
  * unknown — measured, C laid at x 586 948 wide was dumped `[586,380][1080,614]`, its listed centre 833 inside the
  * carousel ending at 1014, its true one 1060 past it, and the stop said "visible". A vertical list's row dumped ending at

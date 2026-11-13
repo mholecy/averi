@@ -946,7 +946,7 @@ export interface DrawnFrame {
   /**
    * The sides along which the node runs on an UNKNOWN distance past its listed rect (`cutAtScreenEdges`): each lies on
    * the screen's edge while the frame's side lies inside the screen, on a tree whose source cuts a node's bounds at the
-   * screen whatever scroll view it lies past (`clipsOf`'s `cutAtScreen`, dialect.ts#TreeDialect.cutAtScreen:
+   * screen whatever scroll view it lies past (`clipsOf`'s `cutAtScreen`, dialect.ts#TreeDialect.cutsAtScreen:
    * uiautomator's). There the listed rect is the screen's cut, not the
    * node's: its visible fraction is an upper bound and its centre along that axis unknown
    * (ui-tree/standing.ts#StandingFacts.unknownPast). Absent when none.
@@ -1038,8 +1038,9 @@ function stackedAcross(nodes: readonly UiNode[], axis: ScrollAxis): boolean {
  * `inScroller` and `drawnIn` ask; `unclipped`: whether its source reports
  * frames unclipped (dialect.ts#TreeDialect.framesUnclipped), which `axesOf` and
  * `contentToward` ask; `cutAtScreen`: whether its source cuts a node's bounds at
- * the screen's edge (dialect.ts#TreeDialect.cutAtScreen), which `drawnIn`'s
- * `unknownPast` asks — the three readers of the tree's dialect, all in draw order.
+ * the screen's edge (dialect.ts#TreeDialect.cutsAtScreen), which `drawnIn`'s
+ * `unknownPast` asks — three fields of the tree's dialect, handed in by the caller
+ * (standing.ts#sceneOf asks dialect.ts#dialectOf).
  */
 export function clipsOf(tree: UiNode, { ancestry, unclipped = false, cutAtScreen = false }: { readonly ancestry: boolean; readonly unclipped?: boolean; readonly cutAtScreen?: boolean }): Clips {
   const chains = new Map<UiNode, readonly Rect[]>();

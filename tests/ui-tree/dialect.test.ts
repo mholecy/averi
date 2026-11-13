@@ -24,7 +24,7 @@ const unmarked: UiNode = { role: 'container', label: null, identifier: null, val
 const NESTED: TreeDialect = {
   ancestry: true,
   framesUnclipped: false,
-  cutAtScreen: false,
+  cutsAtScreen: false,
   cutsAtLater: true,
   padsTouchTargets: false,
   judgesPresentations: false,
@@ -40,7 +40,7 @@ describe('dialectOf — the root marks, read once', () => {
   });
 
   it("uiautomator's tree: cut at the screen and at a later node, touch targets padded, the active window only — which may hide the screen", () => {
-    expect(dialectOf(uiautomator())).toEqual({ ...NESTED, cutAtScreen: true, padsTouchTargets: true, activeWindow: 'mayHide' });
+    expect(dialectOf(uiautomator())).toEqual({ ...NESTED, cutsAtScreen: true, padsTouchTargets: true, activeWindow: 'mayHide' });
   });
 
   it("the window manager's word that the window is the screen alone (window-mark.ts) is read as such", () => {

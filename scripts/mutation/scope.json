@@ -69,7 +69,7 @@
     "group": "core",
     "tests": ["tests/ui-tree/dialect.test.ts"],
     "floor": 95,
-    "baseline": "100 % on 2026-11-13 (A45, new: `npm run mutate -- --group core --force`, cold, 461 s at load 5 → 30): 42 mutants, 22 killed, 20 timeouts (counted killed), 0 survived. The timeouts are mutants of a field every reader asks (ancestry, framesUnclipped, cutAtScreen, topLayerOnly, judgesPresentations): a wrong dialect hangs a scroll loop in another suite before dialect.test.ts reports; each was checked killed by dialect.test.ts alone, by hand. Floor 95 (the row's bar)"
+    "baseline": "100 % on 2026-11-13 (A45 review round 1) on direct kills: 42 mutants, 42 killed by tests/ui-tree/dialect.test.ts alone, 0 timeouts, 0 survived (a one-off Stryker run mutating dialect.ts with only that test file, cold). In the cold group run (`npm run mutate -- --group core --force`, 419 s at load 4 → 19) it reads 100 % as 20 killed and 22 timeouts: every reader asks the dialect, so a wrong field hangs a scroll loop in another suite before dialect.test.ts reports. The same round's cold scene group (`npm run mutate -- --group scene --force`, 149 s at load 19 → 27) passed: standing.ts 95.26 %, reading-order.ts 87.98 %, later-edges.ts 97.28 %, remedy-text.ts 98.46 %, touch-remedy.ts 97.06 %; core: draw-order.ts 90.38 %, geometry.ts 95.34 %, within.ts 100 %. Floor 95 (the row's bar)"
   },
   "src/ui-tree/geometry.ts": {
     "group": "core",

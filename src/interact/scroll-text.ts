@@ -253,7 +253,7 @@ const boundedBy = (unknownPast: readonly Edge[] | undefined): unknownPast is rea
 /** An element's share in the frame as the clip sentences quote it: `N%`, or `at most N%` where the tree does not say how far it runs past the screen's edge (`boundedBy`). */
 const shareText = (visible: number, unknownPast: readonly Edge[] | undefined): string => `${boundedBy(unknownPast) ? 'at most ' : ''}${percent(visible)}%`;
 
-/** Why a share is only an upper bound (`shareText`), or nothing: the source cut the element at the screen's edge there (D17, ui-tree/dialect.ts#TreeDialect.cutAtScreen — uiautomator's only). */
+/** Why a share is only an upper bound (`shareText`), or nothing: the source cut the element at the screen's edge there (D17, ui-tree/dialect.ts#TreeDialect.cutsAtScreen — uiautomator's only). */
 const unknownPastText = (unknownPast: readonly Edge[] | undefined): string =>
   boundedBy(unknownPast) ? ` — uiautomator does not say how far it runs past the screen's ${unknownPast.join('/')} edge` : '';
 

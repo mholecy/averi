@@ -185,9 +185,8 @@ export function presentationOf(tree: UiNode, order: readonly Placed[] = walkOf(t
   const screen = screenOf(tree);
   const screenArea = rectArea(screen);
   const dialect = dialectOf(tree);
-  const flatList = !dialect.ancestry;
   const fallback = dialect.judgesPresentations ? undefined : ('shape' as const);
-  const adapters: readonly PresentationAdapter[] = [byMarks(order, screen, flatList), ...(fallback === 'shape' ? [byShape(screenArea, flatList)] : [])];
+  const adapters: readonly PresentationAdapter[] = [byMarks(order, screen, dialect.ancestry), ...(fallback === 'shape' ? [byShape(screenArea, dialect.ancestry)] : [])];
   return {
     fallback,
     alone: adapters.reduce<MarkedLayer | undefined>((found, a) => found ?? a.alone, undefined),
@@ -237,23 +236,23 @@ interface PresentedLayer {
  * `layer` is, among the walk's `order`; undefined for any other node. A typed layer whose element is not marked (a
  * hand-built tree) is its own cover, named by its own label.
  */
-const markOf = (layer: Placed, order: readonly Placed[], flatList: boolean): PresentedLayer | undefined => {
+const markOf = (layer: Placed, order: readonly Placed[], ancestry: boolean): PresentedLayer | undefined => {
   const kind = layer.node.presentation;
   if (kind === undefined) return undefined;
   const element = isTyped(kind) ? order.slice(layer.at, layer.end).find((p) => p.node.presentationElement === true) : undefined;
   const cover = element ?? layer;
-  const named: MarkedLayer = { kind, ...(cover.node.label ? { label: cover.node.label } : {}), ...(isListedAhead(layer, flatList) && { listedAhead: true as const }) };
+  const named: MarkedLayer = { kind, ...(cover.node.label ? { label: cover.node.label } : {}), ...(isListedAhead(layer, ancestry) && { listedAhead: true as const }) };
   return { layer, kind, ...(element !== undefined && { element }), cover, named };
 };
 
 /**
  * A marked `layer` is LISTED AHEAD of what it covers — it covers what is listed after it, not before it: a non-root
- * layer of a FLAT LIST (idb's: `flatList`, the caller's, dialect.ts#TreeDialect.ancestry false). idb lists the unhidden blur menu's backdrop between the
+ * layer of a FLAT LIST (idb's: no `ancestry`, the caller's, dialect.ts#TreeDialect). idb lists the unhidden blur menu's backdrop between the
  * menu's card and the screen beneath it (K, W, the backdrop, A–D: adapters/ios-tree-source.ts#backdropOf) — so the
  * card, listed before it, is drawn over it, and the screen, listed after it, beneath it. A marked ROOT is the whole
  * list (`alone`) and covers nothing of it.
  */
-const isListedAhead = (layer: Placed, flatList: boolean): boolean => flatList && layer.parent !== undefined;
+const isListedAhead = (layer: Placed, ancestry: boolean): boolean => !ancestry && layer.parent !== undefined;
 
 /**
  * THE MARKS ADAPTER: the layers the tree source marks presented (`markOf`), read on every tree. A LAYER it marks covers
@@ -270,7 +269,7 @@ const isListedAhead = (layer: Placed, flatList: boolean): boolean => flatList &&
  * listed ALONE (`alone`): uiautomator's one window, idb's flat list — nothing of the tree lies outside it, so it covers
  * no target, and for no target its cover takes every touch-down (`topmostAt`).
  */
-function byMarks(order: readonly Placed[], screen: Rect, flatList: boolean): PresentationAdapter {
+function byMarks(order: readonly Placed[], screen: Rect, ancestry: boolean): PresentationAdapter {
   /**
    * The marked layers whose cover lies ON the screen, in the walk's order: one whose rect shares no area with the
    * screen (0x0, or wholly off it — WDA keeps a dismissed alert in its tree) presents nothing. Judged by the rect alone,
@@ -279,7 +278,7 @@ function byMarks(order: readonly Placed[], screen: Rect, flatList: boolean): Pre
    * #parseIdbDescribeAll), and a mark on it is the whole listing's, which lies where its nodes do — on the screen.
    */
   const marked = order.flatMap((p) => {
-    const layer = markOf(p, order, flatList);
+    const layer = markOf(p, order, ancestry);
     if (layer === undefined) return [];
     const rect = layer.cover.node.rect;
     if (p.parent === undefined && rectArea(rect) === 0) return [layer];
@@ -444,11 +443,11 @@ const OVER_PRESENTED: Record<FrameRow, { readonly overPresented: (node: UiNode, 
  * stroke's stop for a target not in the tree. The decision and its residuals:
  * docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
  */
-function byShape(screenArea: number, flatList: boolean): PresentationAdapter {
+function byShape(screenArea: number, ancestry: boolean): PresentationAdapter {
   const givesWay = (row: FrameRow, placed: Placed, target: Placed): boolean =>
     OVER_PRESENTED[row].overPresented(placed.node, screenArea) && !(emptyFrame(placed.node) && !carriesContent(placed.node)) && presentedOver(placed, target, screenArea);
   const presentedSurface = (placed: Placed, target: Placed): boolean =>
-    (Object.keys(OVER_PRESENTED) as FrameRow[]).some((row) => OVER_PRESENTED[row].surfaceCandidate(placed.node, () => FRAME_EXCUSES[row](placed, target, screenArea, flatList)) && givesWay(row, placed, target));
+    (Object.keys(OVER_PRESENTED) as FrameRow[]).some((row) => OVER_PRESENTED[row].surfaceCandidate(placed.node, () => FRAME_EXCUSES[row](placed, target, screenArea, ancestry)) && givesWay(row, placed, target));
   return {
     over([target]) {
       return {

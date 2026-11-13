@@ -488,19 +488,16 @@ export interface UiNode {
    * Set on the ROOT of a tree its source gives as a FLAT LIST: idb's `describe-all`, every element
    * a child of a synthetic 0×0 root (adapters/ios-tree-source.ts#idbTree)
    * in the list's order — no node has a parent of its own, so nothing in
-   * the tree says what a node belongs to. Draw order judges such a list by
-   * rules of its own (ui-tree/draw-order.ts: `flatListChrome`,
-   * `flatListReadingOrder`, `bottomPinned`, `onTarget`), and a miss words
-   * idb's dialect (`noIdListed`, `idUnlisted`). A mark of the source,
+   * the tree says what a node belongs to. A mark of the source,
    * like `ofKeyboard` and `clipsDescendants`: ui-tree knows no platform,
    * and the shape alone (a rectless root over leaves) would also match a
    * test's or a future source's tree that is not idb's. Absent on WDA and
    * Android trees.
    *
    * THE ROOT MARKS — this, `paddedTouchTargets`, `activeWindowOnly`, `windowAlone`, `unclippedFrames`,
-   * `boundsCutAtScreen` and `presentationsJudged` — are read through one reader, ui-tree/dialect.ts#dialectOf, whose
-   * doc is the one list of their writers and readers (`flatList` is its `ancestry` and `topLayerOnly`). The source's
-   * mark decides, never the tree's shape.
+   * `boundsCutAtScreen` and `presentationsJudged` — say what the source's listing means, and are read only through
+   * ui-tree/dialect.ts#dialectOf, which names their writers and how to find their readers (`flatList` is its
+   * `ancestry` and `topLayerOnly`). The source's mark decides, never the tree's shape.
    */
   flatList?: true;
   /**
@@ -510,11 +507,8 @@ export interface UiNode {
    * smaller than 48 dp to a 48-dp touch target, and Google Contacts' Cancel
    * reaches the dump as `container 11,88 132x132` → the label node
    * `other 'Cancel' 44,121 66x66`, `button 22,99 110x110` (a 40-dp
-   * IconButton at 2.75 px/dp). Draw order's `ownControl` row takes a
-   * control PADDED evenly in such a wrapper and centred on the label for
-   * the label's own (`paddedOn`) only where the shape was measured; read
-   * through ui-tree/dialect.ts#TreeDialect.padsTouchTargets. A mark of
-   * the source, like `flatList`: ui-tree knows no platform. Absent on WDA and
+   * IconButton at 2.75 px/dp). Read as ui-tree/dialect.ts#TreeDialect.padsTouchTargets.
+   * A mark of the source, like `flatList`: ui-tree knows no platform. Absent on WDA and
    * idb trees — no wrapper of that shape was seen there, and an unlabelled
    * button laid with an even margin over a centred text (a card's overlay)
    * stays its cover.
@@ -526,10 +520,9 @@ export interface UiNode {
    * with a dialog or a bottom sheet up the dump IS that window, and the screen it was opened over is not in the tree at
    * all (measured on the lab app's AlertDialog and ModalBottomSheet,
    * docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md). So a target missing
-   * from such a tree may lie beneath a presented window rather than be absent: when the parser also marks the root
-   * presented (`presentation`), ui-tree/presentation.ts#Presentation.alone names that window, and the wait for a target
-   * "to appear" says close it first instead (interact/resolve.ts); when it does not, every not-found says the window
-   * may be one (ui-tree/miss.ts#ACTIVE_WINDOW_HINT). Read through ui-tree/dialect.ts#TreeDialect.activeWindow. A mark of the source, like `flatList`: ui-tree knows no platform. Absent on WDA's trees
+   * from such a tree may lie beneath a presented window rather than be absent, whether or not the parser also marks
+   * the root presented (`presentation`). Read as ui-tree/dialect.ts#TreeDialect.activeWindow. A mark of the source,
+   * like `flatList`: ui-tree knows no platform. Absent on WDA's trees
    * (every window of the app, the keyboard's too) and idb's flat list (which lists only a presented layer as well —
    * measured on the lab's SwiftUI alert and sheets — but not by window: its parser marks the root presented only when
    * the list holds UIKit's dismiss region, adapters/ios-tree-source.ts #listsPresentedLayer, and an idb miss names no
@@ -540,9 +533,8 @@ export interface UiNode {
    * Set on the ROOT of an `activeWindowOnly` tree that the window manager says is the app's screen ALONE: the focused
    * window is the activity's own (TYPE_BASE_APPLICATION), at the root's bounds, and no other window of an app is
    * visible — so a target missing from it is not beneath a window the dump does not show. Set after the read, on a
-   * miss only, by ui-tree/window-mark.ts#markByWindow (from `DeviceAdapter.focusedWindow`); read through
-   * ui-tree/dialect.ts#TreeDialect.activeWindow (`screenAlone`): a miss then says no active-window hint. Absent
-   * everywhere else.
+   * miss only, by ui-tree/window-mark.ts#markByWindow (from `DeviceAdapter.focusedWindow`). Read as
+   * ui-tree/dialect.ts#TreeDialect.activeWindow (`screenAlone`). Absent everywhere else.
    */
   windowAlone?: true;
   /**
@@ -550,11 +542,9 @@ export interface UiNode {
    * #parseWdaSourceValue). It lists a scroll view's content at its laid-out rect even past the scroll view's frame,
    * where the scroll view draws none of it (UIKit's `UIScrollView` clips to its bounds; so do a table, a collection
    * view and SwiftUI's `ScrollView`) — measured: the at-rest SWIFT form lists `payee_name_input` at `24,801 354x52`,
-   * below its `ScrollView 0,0 402x780`, and the capture shows the bare background there. Read through
-   * ui-tree/dialect.ts#TreeDialect.framesUnclipped: a scroll view's axis is read off its content past its frame
-   * (ui-tree/scroll-containers.ts#scrollAxis), its end off none (geometry.ts#Clips.contentToward), and `scroll_until`'s carry
-   * model measures a row's motion as the content's (interact/course.ts#stillNeeds). Not what cuts a node by
-   * what scrolls above it: geometry.ts#Clips.drawnIn does that on every tree that lists ancestry. A mark of the
+   * below its `ScrollView 0,0 402x780`, and the capture shows the bare background there. Read as
+   * ui-tree/dialect.ts#TreeDialect.framesUnclipped. Not what cuts a node by what scrolls above it: that holds on every
+   * tree that lists ancestry. A mark of the
    * source, like `flatList`: ui-tree knows no platform. Absent on Android's trees (uiautomator cuts most nodes' bounds
    * to their scroll container; not all: lab note LE1,
    * docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md) and on idb's flat
@@ -571,7 +561,7 @@ export interface UiNode {
    * frame's matching side lies inside the screen, how far the node runs past that side is unknown
    * (geometry.ts#DrawnFrame.unknownPast): its visible fraction is an upper bound, and its centre unknown along that
    * axis. A full-width row in a full-width list is not such a node: its scroll view ends at the screen's edge too. Read
-   * through ui-tree/dialect.ts#TreeDialect.cutAtScreen. A mark of the source, like `flatList`: ui-tree knows no platform.
+   * as ui-tree/dialect.ts#TreeDialect.cutsAtScreen. A mark of the source, like `flatList`: ui-tree knows no platform.
    * Absent on WDA's trees (frames unclipped, `unclippedFrames`) and idb's flat list (no scroll view listed).
    * docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md (its amendment "a side cut at the screen's edge")
    */
@@ -727,12 +717,11 @@ export interface UiNode {
   /**
    * Set on the ROOT of a tree whose source JUDGED presented layers from its own evidence: a WDA payload carrying
    * visibility flags (adapters/wda-source.ts#parseWdaSourceValue) — its presented layers are the ones it marks
-   * (`presentation`), so the presentation module never asks a fallback of it (ui-tree/presentation.ts#byShape).
+   * (`presentation`), so no presented screen is inferred from shape on it.
    * Absent on a tree whose source does not judge every layer (idb; Android, whose parser marks the one
    * window it dumps when that window is presented, but judges no layer inside a window; a flagless WDA payload; a
    * normalized snapshot without it): there a presented screen is still inferred from shape, through that fallback.
-   * Read through ui-tree/dialect.ts#TreeDialect.judgesPresentations: the fallback is built only without it (so on a
-   * judged tree draw order's `hidden` row's shape guard holds of no node); printed by `ui_snapshot`.
+   * Read as ui-tree/dialect.ts#TreeDialect.judgesPresentations; printed by `ui_snapshot`.
    */
   presentationsJudged?: true;
 }

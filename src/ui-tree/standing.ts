@@ -301,7 +301,7 @@ export interface Scene {
    * draw order was told (`sceneOf`'s `seen`); absent when no one looked. The remedy reads it for why a pair stayed untold.
    */
   readonly orderSeen?: SeenOrder;
-  /** The tree's clip facts (geometry.ts#clipsOf), its dialect as dialect.ts#TreeDialect says it (`ancestry`, `framesUnclipped`, `cutAtScreen`). */
+  /** The tree's clip facts (geometry.ts#clipsOf), its dialect as dialect.ts#TreeDialect says it (`ancestry`, `framesUnclipped`, `cutsAtScreen`). */
   readonly clips: Clips;
   /** The pixel assert's standing: its own union (`PixelStanding`), on the usable screen's `oriented` box, picked here. */
   standing(node: UiNode, screen: UsableScreen | undefined, purpose: PixelPurpose): PixelStanding;
@@ -710,7 +710,7 @@ export function sceneOf(tree: UiNode, seen?: SeenOrder): Scene {
     },
     ...(seen !== undefined && { orderSeen: seen }),
     get clips() {
-      return (clips ??= clipsOf(tree, { ancestry: dialect.ancestry, unclipped: dialect.framesUnclipped, cutAtScreen: dialect.cutAtScreen }));
+      return (clips ??= clipsOf(tree, { ancestry: dialect.ancestry, unclipped: dialect.framesUnclipped, cutAtScreen: dialect.cutsAtScreen }));
     },
     standing,
     pixelRegion: (node, screen) => pixelDrawn(node, pixelScreen(screen)).rect,

@@ -103,7 +103,7 @@ import { dialectOf } from './dialect.js';
  * ui-tree/standing.ts#Scene. Knows no
  * platform commands; the platform shapes are in the rows, each with the
  * device tree it was measured on, and the marks of a source it reads are
- * on the tree's root, read through dialect.ts#dialectOf (`ancestry`, `paddedTouchTargets`). The
+ * on the tree's root, read through dialect.ts#dialectOf (`ancestry`, `padsTouchTargets`). The
  * rect arithmetic it asks — the
  * subtraction of a cover from a target included — is geometry.ts's.
  */
@@ -407,14 +407,14 @@ interface Seen {
 
 /**
  * What the `target` column is judged against besides: the target, at its
- * first place in the walk, what is presented over it (`over`), whether the tree is a flat list (dialect.ts#TreeDialect.ancestry
- * false), and — in one — where its content starts (`contentFrom`).
+ * first place in the walk, what is presented over it (`over`), the tree's `ancestry` (dialect.ts#TreeDialect: false on a
+ * flat list), and — in a flat list — where its content starts (`contentFrom`).
  */
 interface SeenFor extends Seen {
   readonly target: Placed;
   /** What the presentation module says of the nodes drawn after the target (presentation.ts#PresentedOver). */
   readonly over: PresentedOver;
-  readonly flatList: boolean;
+  readonly ancestry: boolean;
   /** The walk index of a flat list's first content node (`firstContent`): the nodes before it are its top bar. The walk's length when there is none, or the tree is not a flat list. */
   readonly contentFrom: number;
   /** The bottom of the top bar's band (`FLAT_LIST_TOP_BAR_FRACTION` of the screen): content ending above it may lie under the bar. */
@@ -424,7 +424,7 @@ interface SeenFor extends Seen {
   /** A flat list's bottom chrome — the nodes pinned at its bottom (`bottomPinned`), idb's keyboard (`keyboardOf`) and a floating tab bar's items (`tabBarsOf`): never past the break. */
   readonly bottomChrome: ReadonlySet<Placed>;
   /** The tree's source lists a control's touch target as its wrapper (dialect.ts#TreeDialect.padsTouchTargets): `ownControl`'s padded shape is asked only then. */
-  readonly paddedTouchTargets: boolean;
+  readonly padsTouchTargets: boolean;
   /** How far a label may overhang its own field on this tree's screen, in its units (`labelOverhang`): `ownControl`'s text input. */
   readonly labelOverhang: number;
   /** What the target's listing, given in reading order, says of its order against its siblings (reading-order.ts#readingOrderOf): the break never excuses its `coversAfter`. */
@@ -461,12 +461,12 @@ const repeats = (node: UiNode, target: UiNode): boolean => {
 const siblingOf = (placed: Placed, target: Placed): placed is Placed & { readonly parent: Placed } => placed.parent !== undefined && placed.parent === target.parent;
 
 /** The `onTarget` row's sibling: see the row. */
-const drawnOn = (placed: Placed, { target, flatList }: SeenFor): boolean => {
+const drawnOn = (placed: Placed, { target, ancestry }: SeenFor): boolean => {
   const { node } = placed;
   return (
     siblingOf(placed, target) &&
     !isInteractive(node) &&
-    (!flatList || repeats(node, target.node)) &&
+    (ancestry || repeats(node, target.node)) &&
     node.rect.width < target.node.rect.width &&
     node.rect.y + node.rect.height <= target.node.rect.y + target.node.rect.height &&
     containsPoint(target.node.rect, tapPoint(node))
@@ -565,11 +565,11 @@ const unlabelledControl = (node: UiNode): boolean => isInteractive(node) && !nod
  * `target`, holds its rect whole and spans its parent's width (`spansWidth`) or — on a tree whose source pads touch
  * targets — is padded in it (`paddedOn`); the parent not screen-sized.
  */
-const ownButton = (control: Placed, { target, screenArea, paddedTouchTargets }: SeenFor): boolean =>
+const ownButton = (control: Placed, { target, screenArea, padsTouchTargets }: SeenFor): boolean =>
   unlabelledControl(control.node) &&
   siblingOf(control, target) &&
   rectWithin(target.node.rect, control.node.rect) &&
-  (spansWidth(control.node.rect, control.parent.node.rect) || (paddedTouchTargets && paddedOn(control.node.rect, control.parent.node.rect, target.node.rect))) &&
+  (spansWidth(control.node.rect, control.parent.node.rect) || (padsTouchTargets && paddedOn(control.node.rect, control.parent.node.rect, target.node.rect))) &&
   !screenSized(control.parent.node, screenArea);
 
 /**
@@ -620,7 +620,7 @@ const spansHeight = (label: Rect, field: Rect, overhang: number): boolean =>
  * back over a screen presented over the target's (presentation.ts#PresentedOver.givesWay: the shape fallback, on a
  * tree whose source did not judge presented layers).
  */
-const frameExcused = (row: FrameRow, placed: Placed, { target, screenArea, flatList, over }: SeenFor): boolean => FRAME_EXCUSES[row](placed, target, screenArea, flatList) && !over.givesWay(row, placed);
+const frameExcused = (row: FrameRow, placed: Placed, { target, screenArea, ancestry, over }: SeenFor): boolean => FRAME_EXCUSES[row](placed, target, screenArea, ancestry) && !over.givesWay(row, placed);
 
 /**
  * THE judgement of what draws, one row per kind of node that does not. A
@@ -1647,9 +1647,7 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
   const screen = screenOf(tree);
   const screenArea = rectArea(screen);
   const seen: Seen = { screenArea };
-  const dialect = dialectOf(tree);
-  const flatList = !dialect.ancestry;
-  const paddedTouchTargets = dialect.padsTouchTargets;
+  const { ancestry, padsTouchTargets } = dialectOf(tree);
   const minPiece = minTapPiece(screen);
   const overhang = labelOverhang(screen);
   const order = walkOf(tree);
@@ -1658,16 +1656,16 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
   /** What is presented over what (presentation.ts#presentationOf), over this walk. */
   const presentation = presentationOf(tree, order, places);
   const barLine = flatListBarLine(screen);
-  const contentFrom = flatList ? firstContent(order, screen, seen.screenArea, barLine) : order.length;
-  const keyboard = flatList ? keyboardOf(order, screen, barLine) : undefined;
-  const pinned = flatList ? bottomPinned(order, screen, keyboard) : new Map<Placed, number>();
+  const contentFrom = ancestry ? order.length : firstContent(order, screen, seen.screenArea, barLine);
+  const keyboard = ancestry ? undefined : keyboardOf(order, screen, barLine);
+  const pinned = ancestry ? new Map<Placed, number>() : bottomPinned(order, screen, keyboard);
   /** Each floating tab bar's item, with its bar (`tabBarsOf`). */
   const tabItems = new Map(tabBarsOf(order, screen, keyboard?.keys ?? new Set()).flatMap((bar) => [...bar.items].map((item) => [item, bar] as const)));
   /** The bottom chrome of a flat list: never a reading-order break, never past one (`flatListReadingOrder`) — a floating tab bar's items included. */
   const bottomChrome: ReadonlySet<Placed> = new Set([...pinned.keys(), ...(keyboard?.keys ?? []), ...tabItems.keys()]);
   /** The controls pinned at the screen's bottom, of a flat list (`pinned`) or of a nested tree by the same shape (`bottomPinned`) — reading-order.ts#readingOrderOf's guard, read on first use. */
   let pinnedNested: ReadonlyMap<Placed, number> | undefined;
-  const pinnedTargets = (): ReadonlyMap<Placed, number> => (flatList ? pinned : (pinnedNested ??= bottomPinned(order, screen, undefined)));
+  const pinnedTargets = (): ReadonlyMap<Placed, number> => (ancestry ? (pinnedNested ??= bottomPinned(order, screen, undefined)) : pinned);
   /**
    * Where a cover of a target presses (`exposure`): its rect — or, for a node
    * pinned at a flat list's bottom (`bottomPinned`), its rect run down to the
@@ -1713,12 +1711,12 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
       ...seen,
       target,
       over: presentation.over(target.node),
-      flatList,
+      ancestry,
       contentFrom,
       barLine,
       readingBreak: readingBreak(order, target, contentFrom, bottomChrome, barLine),
       bottomChrome,
-      paddedTouchTargets,
+      padsTouchTargets,
       labelOverhang: overhang,
       orderSeen,
     };
@@ -1731,7 +1729,7 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
     return {
       ...base,
       get readingOrder() {
-        return (readingOrder ??= readingOrderOf(order, { target, flatList, contentFrom, bottomChrome, drawn }, pinnedTargets, orderSeen));
+        return (readingOrder ??= readingOrderOf(order, { target, ancestry, contentFrom, bottomChrome, drawn }, pinnedTargets, orderSeen));
       },
     };
   };
@@ -1760,7 +1758,7 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
   /** `paintsOver`'s own content (`DrawOrder.paintsOver`): inside the node's rect and on its own branch — or, in a flat list, which has no branches, saying something and all of it the node's. */
   const ownContentOf = (target: Placed, cover: Placed, reach: Rect): boolean => {
     if (!rectWithin(reach, target.node.rect)) return false;
-    if (!flatList) return ownBranch(target, cover);
+    if (ancestry) return ownBranch(target, cover);
     const said = wordsOf(cover.node);
     const says = wordsOf(target.node);
     return said.size > 0 && [...said].every((w) => says.has(w));
@@ -1768,7 +1766,7 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
   /** `paintsOver`'s clickable layer: unlabelled, unvalued, interactive, holding the node whole, on its own branch — never in a flat list. */
   const clickableLayer = (target: Placed, cover: Placed): boolean => {
     const n = cover.node;
-    return !flatList && isInteractive(n) && !n.label && !n.value && rectWithin(target.node.rect, n.rect) && ownBranch(target, cover);
+    return ancestry && isInteractive(n) && !n.label && !n.value && rectWithin(target.node.rect, n.rect) && ownBranch(target, cover);
   };
 
   /**
@@ -1852,7 +1850,7 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
       // In idb's flat list a floating tab bar's items cover what lies outside the bar whatever their place in the list (idb lists them first); a nested
       // tree's order IS its draw order (an action sheet listed after the bar is drawn over it), so there only the items listed after the target count.
       // A flat list has no nesting, so no item listed before the target is its ancestor.
-      const tabsBefore = places.length === 0 || !flatList ? [] : order.slice(0, places[0].at).filter((p) => floatsOver(p) !== undefined);
+      const tabsBefore = places.length === 0 || ancestry ? [] : order.slice(0, places[0].at).filter((p) => floatsOver(p) !== undefined);
       // In a listing given in reading order, what is listed before it but drawn over it: a heading that overlaps it, and the controls that
       // overlap it whose order is not told when one of them holds its centre.
       const peers = about?.readingOrder;
