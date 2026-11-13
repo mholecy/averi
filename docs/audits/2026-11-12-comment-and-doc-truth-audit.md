@@ -2357,6 +2357,19 @@ comparison counts findings on unchanged text only as far as the orchestrator cou
 - Evidence (Sonnet, unverified): ACTIVE_WINDOW_HINT is defined in src/ui-tree/miss.ts:101, not in ui-tree/remedy-text.ts. The bare `#ACTIVE_WINDOW_HINT` reads as a member of the same file as the two builders named just before it. presentedRemedy (remedy-text.ts:112) and presentedStop (remedy-text.ts:128) are correct.
 - Fix: the active-window hint (ui-tree/miss.ts#ACTIVE_WINDOW_HINT)
 
+## Fixed since (2026-11-13)
+
+Entries below keep their text as audited; this section says which are closed. The backlog rows (docs/plans/2026-10-30-performance-backlog.md, A46 to A57) hold the detail.
+
+- **A46** (merged `ade0c4f6`): F026, F044, F047, F051, F052, F056, F059, F068, F088, F092, F099, F100, F105, F107, F117, F125, F130, F148, F151, F171, F178, F180, F194, F203, F207, F260, G001, G002, G003, G005. Each was re-read against the code by the implementer, an independent reviewer and
+  a two-axis code review before merge.
+- **A47** (merged `7e0dab29`): F030, F080, F132, G004, and every comment pointer to the seven scripts no longer in the repo.
+- **F188**: no change needed; the `type_text` description no longer names the key.
+- **F039: the finding was wrong**, though verification had confirmed it. The Android toolbar cells never reach
+  `FalseCoversScreen`: their layers are not in `Lab.kt#SUPPORTED_LAYERS`, the app shows them unsupported and a capture
+  skips them, as the old comment said. A verified entry of this file is still a claim to re-read against the code.
+- Everything else is open (A48 to A53 by directory; A54 and A55 are code decisions).
+
 ## Appendix: deletion candidates (490, unverified)
 
 Comments Haiku judged to only restate the code. Line numbers are those of `48f92c5c`.
