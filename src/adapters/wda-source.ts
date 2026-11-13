@@ -66,7 +66,8 @@ const ROLE_MAP: Record<string, string> = {
   // progress type. Not structural, unlike `other`, so beside showsProgress: an unlabelled spinner covers its rect in
   // ui-tree/draw-order.ts (a structural leaf does not); in ui-tree/bare-tree.ts `progress` is decoration, counted only
   // when LABELLED — so a spinner with a value and no label counts toward bare, and a labelled screen-sized one counts
-  // as content; one `isVisible`/`isAccessible` 0/0 can root a hidden subtree (hiddenRoots, below).
+  // as content; one `isVisible`/`isAccessible` 0/0 can root a hidden subtree (hiddenRoots, below). A selector matches
+  // it by `role:progress`, not by `role:other`.
   // Residual, by decision (D27 review): showsProgress counts EVERY progress node with area, so an invisible spinner (a
   // covered layer, 0/0) or an off-screen one (a FlatList footer spinner below the viewport) also reads as loading — not
   // filtered, since a footer spinner below the fold means the list is still loading a page. The safe direction: the
@@ -816,7 +817,7 @@ function isInputHostPlaceholder(el: WdaElement, ancestors: readonly WdaElement[]
   const at = windowIndex(ancestors);
   if (at < 0) return false;
   const window = ancestors[at];
-  if (at === 1 && ancestors[0].children?.[0] === window) return false; // the Application's first Window: the app's
+  if (at === 1 && ancestors[0].children?.[0] === window) return false; // a Window that is the Application's first child: the app's
   const screen = usableRect(window.rect);
   const rect = usableRect(el.rect);
   if (screen === undefined || rect === undefined) return false;

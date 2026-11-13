@@ -39,9 +39,8 @@ export interface DeviceScreen {
    * or ends short of the screen, by that bar's width — and uiautomator's
    * root is that window. Set by the Android adapter only. iOS leaves it
    * unset: its app window is the screen and the safe areas lie INSIDE it,
-   * so an inset rect in an iOS tree is content, never the window. Read by
-   * verify/scale.ts, which measures such a window instead of refusing it as
-   * a CONTENT width.
+   * so an inset rect in an iOS tree is content, never the window. Such a
+   * window is measured, not refused as a CONTENT width.
    */
   windowsBesideSystemBars?: boolean;
   /**
@@ -231,15 +230,14 @@ export function rectIntersection(a: Rect, b: Rect): Rect | undefined {
  * adapters/wda-source.ts#keyboardMarks). Its rect is the screen band the
  * keyboard covers — keys, AutoFill bar, accessory toolbar slot and dictation
  * row together — not the `Keyboard` element's own rect, which was measured
- * 17–44 pt short of the drawn area (the bug note below). Read by `ui-tree/soft-keyboard.ts#keyboardInTree`, the
- * in-tree half of the soft-keyboard reading the tap guard and the pixel
- * poll share with the Android oracle. Defined beside UiNode because the
- * adapter writes it and ui-tree reads it, and neither may spell the string.
- * Not in INTERACTIVE_ROLES (a selector never prefers it) and not structural
- * (ui-tree/bare-tree.ts: a screen with its keyboard up has rendered).
- * Absent from a tree means nothing — an idb tree never carries one and a
- * WDA tree without one has no keyboard on screen, and the tree cannot say
- * which source it came from.
+ * 17–44 pt short of the drawn area (the bug note below). It is the in-tree
+ * half of the soft-keyboard reading, beside the Android oracle. Defined
+ * beside UiNode because the adapter writes it and ui-tree reads it, and
+ * neither may spell the string. Not in INTERACTIVE_ROLES (a selector never
+ * prefers it) and not structural (ui-tree/bare-tree.ts: a screen with its
+ * keyboard up has rendered). Absent from a tree means nothing — an idb tree
+ * never carries one and a WDA tree without one has no keyboard on screen, and
+ * the tree cannot say which source it came from.
  * docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md
  */
 export const KEYBOARD_ROLE = 'keyboard';
@@ -362,10 +360,8 @@ export interface UiNode {
    * row half behind a pinned bar reads shorter, with an edge exactly on the
    * container's edge — measured on the SWIFT form, container
    * `[0,242][1080,1978]`, a 143-px row read `{y:242, height:92}` — and
-   * nothing in the rect says the rest exists. Read by
-   * ui-tree/geometry.ts#clipsOf, which `scroll_until`'s round asks for
-   * each match's such ancestors so a `fully: true` stop flush with one is
-   * checked before it is reported (interact/flush-check.ts).
+   * nothing in the rect says the rest exists. So a `fully: true` stop flush
+   * with such an ancestor is checked before it is reported.
    * docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md
    *
    * A flag, not a role: mapping a Compose scroller to
@@ -407,9 +403,8 @@ export interface UiNode {
    * adapters/wda-source.ts). Absent where the type does not say: a WDA `ScrollView` or `CollectionView` — on a tree of
    * unclipped frames its content's extent past its frame may say it instead (ui-tree/scroll-containers.ts#scrollAxis)
    * — and every idb node (its flat list lists no scroll view). Never on a text input (a Compose text field with scroll
-   * semantics dumps as a scroll view too). Read by `scroll_until`'s stroke plan
-   * (interact/stroke-plan.ts): a stroke goes over a scroll view that scrolls on its axis, and its path keeps off a
-   * nested one that scrolls only on the other.
+   * semantics dumps as a scroll view too). What it is for: a `scroll_until` stroke goes over a scroll view that scrolls
+   * on its axis, and its path keeps off a nested one that scrolls only on the other.
    * docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md
    */
   scrollAxis?: ScrollAxis;
@@ -461,13 +456,11 @@ export interface UiNode {
    * nor in the frame. `rect` is clamped to zero size at the container's
    * edge (`y` 297, height 0), so it is never a target, and this says which
    * way it went: `top` — clipped out above its scroll container — and
-   * `bottom`, `left`, `right` likewise. Read by a miss's zero-area note
-   * (ui-tree/miss.ts#missOf, `zeroArea`), by `scroll_until`, which reads a
-   * node clipped out past its far edge as beyond it
-   * (interact/course.ts#seeTarget), and by the cut-sliver rule, to which a descendant
-   * clipped out past an edge its ancestor lies flush with is evidence of a
-   * cut there (ui-tree/geometry.ts#evidentCut). Absent on iOS and on every
-   * node dumped the right way round.
+   * `bottom`, `left`, `right` likewise. A miss's zero-area note says it; a
+   * node clipped out past its far edge is beyond it for `scroll_until`; and a
+   * descendant clipped out past an edge its ancestor lies flush with is
+   * evidence of a cut there. Absent on iOS and on every node dumped the right
+   * way round.
    * docs/bugs/2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md
    */
   clippedOut?: ClippedSide;
@@ -563,16 +556,15 @@ export interface UiNode {
    * markWdaDialect). On WDA it is a SORT CHECK, not a fact WDA states: most top-to-bottom layouts pass it, UIKit's (which
    * lists in draw order) included; a run listed out of top order is surely no reading order and keeps its order as draw
    * order (Contacts' new-contact form, tests/fixtures/wda-capture-contacts-new-contact.json: its run lists an image at
-   * y 62 after a button at y 319). Read by ui-tree/reading-order.ts (`listsInReadingOrder`, and `listsNestedReadingOrder`
-   * for a nested run, which placed.ts's structural excuse asks too) for one question: which of two overlapping nodes of
-   * such a run is drawn on top is not told (cover.ts#CoverOrder's `untold`) — two controls, or, in a nested run, a sibling
-   * listed before any target that draws there (React Native's covers, lab note LR3) — so those listed before a target
-   * cover it when one of them holds its centre. A mark of the source, like `flatList`: ui-tree
-   * knows no platform. On Android, set by the uiautomator parser on every node of a classic View whose two or more
-   * children are listed in AOSP's LOCATION order (adapters/android-accessibility-order.ts#markLocationSorted: AOSP sorts
-   * a ViewGroup's accessibility children by location, not by Z — the lab's rn-banner, every cover listed before the
-   * target it is drawn over, lab note LR4), also a sort check; never on the nodes a node provider lists (Compose's), whose
-   * order is kept as draw order. Printed by `ui_snapshot` with the node.
+   * y 62 after a button at y 319). It answers one question: which of two overlapping nodes of such a run is drawn on
+   * top is not told (cover.ts#CoverOrder's `untold`) — two controls, or, in a nested run, a sibling listed before any
+   * target that draws there (React Native's covers, lab note LR3) — so those listed before a target cover it when one
+   * of them holds its centre. A mark of the source, like `flatList`: ui-tree knows no platform. On Android, set by the
+   * uiautomator parser on every node of a classic View whose two or more children are listed in AOSP's LOCATION order
+   * (adapters/android-accessibility-order.ts#markLocationSorted: AOSP sorts a ViewGroup's accessibility children by
+   * location, not by Z — the lab's rn-banner, every cover listed before the target it is drawn over, lab note LR4),
+   * also a sort check; never on the nodes a node provider lists (Compose's), whose order is kept as draw order. Printed
+   * by `ui_snapshot` with the node.
    * docs/bugs/2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath.md
    */
   readingOrder?: true;
@@ -617,8 +609,10 @@ export interface UiNode {
    * target unless, on a tree whose source did not judge presented layers (`presentationsJudged`), it is the surface of
    * a screen presented over the target's by shape (ui-tree/presentation.ts#PresentedOver.surface, `inferred`); on a
    * judged tree a marked layer covers through its own cover instead. A TARGET's own flag is not read there (a target
-   * under a modal is `isVisible="0"` too). `ui_snapshot` prints it with the tree's JSON (mcp/tools.ts), so later
-   * device trees can be swept for it.
+   * under a modal is `isVisible="0"` too). Excused there, a hidden node holding the target's centre is still listed in
+   * `Exposure.centreExcused`, as every excused node is, so the dismissal picker still sees it. Selectors, asserts and
+   * the stroke box's `drawnOver` column do not read the flag. `ui_snapshot` prints it with the tree's JSON
+   * (mcp/tools.ts), so later device trees can be swept for it.
    *
    * On EVERY node of the subtree, not only its root (unlike `ofKeyboard`): `ui_snapshot` with a filter prints the
    * matched nodes without their ancestors, and a filtered tab button must still say it is hidden. Absent, never false,
@@ -673,25 +667,19 @@ export interface UiNode {
    * it, through the whole screen, whatever the frames around it; its own nodes are not beneath it (a popover's dismiss
    * region, an alert's buttons are reached).
    *
-   * How it is read:
-   * - ui-tree/presentation.ts#markOf (with `presentationElement`; the presentation module's marks adapter, `byMarks`):
-   *   a typed layer's element, when its rect has area on the screen (never judged by `hidden`), is that layer's ONE
-   *   cover through the whole screen; a `screen` layer reaches the whole screen and its own nodes stay covers, each a
-   *   presented surface (presentation.ts#PresentedOver, which draw order reads for each cover's `presented` flag,
-   *   cover.ts#Cover, `presentedAt`, `presentedOver`, `markedAt`); the module hands the mark on as `MarkedLayer` (its
-   *   kind and label, presentation.ts#Presentation.press) — to the standing's remedy
-   *   (ui-tree/remedy-text.ts#presentedRemedy: "an alert is presented over it ("Exit confirmation")") and to
-   *   `scroll_until`'s stroke (interact/scroll-rounds.ts), never the node itself.
-   * - `ui_snapshot`, which prints it with the tree's JSON (mcp/tools.ts), so later device trees carry it.
-   * Absent everywhere else — on an idb tree but on a presented layer's root and its backdrop, on an Android tree but
-   * on a presented window's root.
+   * What it means: a typed layer's element (`presentationElement`), when its rect has area on the screen (never judged
+   * by `hidden`), is that layer's ONE cover through the whole screen; a `screen` layer reaches the whole screen and its
+   * own nodes stay covers, each a presented surface (presentation.ts#PresentedOver). The mark goes on as `MarkedLayer`
+   * (its kind and label) — to the standing's remedy ("an alert is presented over it ("Exit confirmation")") and to
+   * `scroll_until`'s stroke, never the node itself. `ui_snapshot` prints it with the tree's JSON, so later device trees
+   * carry it. Absent everywhere else — on an idb tree but on a presented layer's root and its backdrop, on an Android
+   * tree but on a presented window's root.
    */
   presentation?: PresentationKind;
   /**
    * Set on the ELEMENT that names a layer marked by type (`presentation` `alert`, `actionSheet` or `popover`): the
    * `Alert`, the `Sheet` or the `Popover` itself — its label is the layer's in the remedy, its rect where the layer
-   * is named; the layer's one cover. Read with `presentation` (ui-tree/presentation.ts#markOf); printed by
-   * `ui_snapshot`.
+   * is named; the layer's one cover. Meaningful only with `presentation`; printed by `ui_snapshot`.
    */
   presentationElement?: true;
   /**
@@ -993,11 +981,10 @@ export const FOREGROUND_WAIT_MS = 3_000;
 export const WDA_READY_TIMEOUT_MS = 60_000;
 
 /**
- * Android's chooser a link or a `-p` launch waits behind (D55, D55b, adapters/android-chooser.ts; the name is D55's,
- * kept through A10 as `LinkAlert`'s is): its component as the window manager names it
- * (`android/com.android.internal.app.ResolverActivity`), and `sheet`: what its tree shows, read once the component
- * named it (android-chooser.ts#chooserSheet; ADR 0041's D55c amendment). No `sheet` when the dump failed or was not the
- * measured layout: the reply is then D55's, by the component alone.
+ * Android's chooser a link or a `-p` launch waits behind (D55, D55b, adapters/android-chooser.ts): its component as the
+ * window manager names it (`android/com.android.internal.app.ResolverActivity`), and `sheet`: what its tree shows, read
+ * once the component named it (android-chooser.ts#chooserSheet; ADR 0041's D55c amendment). No `sheet` when the dump
+ * failed or was not the measured layout: the reply is then D55's, by the component alone.
  */
 export interface LinkChooser {
   component: string;

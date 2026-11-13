@@ -56,6 +56,7 @@ function stderrForAgent(command: string, stderr: string, home: string): string {
   return `${toolOf(command)} crashed${exception === undefined ? '' : `: ${bounded(withoutHostPaths(exception, home))}`} (Python traceback left out: run the command by hand, with the real text and paths, to see it)`;
 }
 
+/** What stands where a typed text stood. */
 const TYPED_TEXT = '<typed text>';
 
 /**

@@ -418,7 +418,8 @@ export class AndroidAdapter implements DeviceAdapter {
   /**
    * The chooser after averi's own start (openDeepLink, a `-p` launch): the focus read (chooserInFront) and, only once
    * it named the chooser, the one dump of its tree (chooserSheetInFront, D55c) — `{ component, sheet? }`, or undefined
-   * when the focus names no chooser.
+   * when the focus names no chooser. monkey's refusal reads the focus alone (chooserInFront), without the dump's
+   * 2–2.5 s: the chooser is not why monkey refused.
    */
   private async linkChooserInFront(): Promise<LinkChooser | undefined> {
     const component = await this.chooserInFront();
@@ -480,9 +481,10 @@ export class AndroidAdapter implements DeviceAdapter {
    * The command is ONE word, the pipe in it — exec-out's first word reaches the device's sh unescaped (execOut).
    * screenshot-bytes.ts#screencapRaw judges the answer: a frame, a transport error, or a refusal of the raw path. On a
    * refusal this call captures with `screencap -p`, whose own check says whether the device is alive. A LASTING
-   * refusal (the shell says there is no gzip; a format other than RGBA_8888) on a live device pins this adapter to
-   * `-p` (`#rawPinned`), said once on stderr with its reason; any other refusal (the shell's `Killed`, a stream cut
-   * short) costs that one call a `-p` and the next one tries raw again.
+   * refusal (the shell says there is no gzip; a format other than RGBA_8888) on a live device pins this adapter to `-p`
+   * (`#rawPinned`) — the path every refusal falls back to anyway, so the pin is never slower — said once on stderr with
+   * its reason; any other refusal (the shell's `Killed`, a stream cut short) costs that one call a `-p` and the next
+   * one tries raw again.
    */
   async capture(): Promise<ScreenCapture> {
     if (!this.#rawPinned) {

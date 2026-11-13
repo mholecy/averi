@@ -124,6 +124,7 @@ export function chooserSheet(tree: UiNode): ChooserSheet | undefined {
   return { ...(title !== undefined && { title }), apps, once, always };
 }
 
+/** The nodes among `nodes` with resource id `id` (its last segment). */
 const withId = (nodes: readonly UiNode[], id: string): UiNode[] => nodes.filter((n) => n.identifier === id);
 
 /** The one button with id `id` and a label, as the sheet quotes it; undefined when there is none, or more than one. */

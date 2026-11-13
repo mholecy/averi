@@ -366,6 +366,7 @@ export class WdaServer {
     throw new Error(`WDA /wda/keys failed: ${describeWdaError(answer.status, { error: answer.error })} ${this.where()}`);
   }
 
+  /** This WDA start's session for keys(): the one made on it, or a new one (KEYS_SESSION), single-flight. */
   private sessionId(): Promise<string> {
     const generation = this.upGeneration() ?? -1;
     if (this.session?.generation !== generation) {
@@ -612,6 +613,7 @@ export class WdaServer {
     this.killChild();
   }
 
+  /** The tail of a failure that names where: `on port … (udid …) — xcodebuild log: …`. */
   private where(): string {
     return `on port ${this.port} (udid ${this.udid}) — xcodebuild log: ${this.logPath}`;
   }

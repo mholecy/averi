@@ -65,11 +65,11 @@ export function iosScreenshotViaSimctl(env: NodeJS.ProcessEnv = process.env): bo
 
 /**
  * How long a typing into an app seen dropping a tail waits after its first character, before the rest in one burst
- * (D24, docs/adr/0023-fill-types-a-dropped-tail-again.md, amendment 2026-10-31; 50 ms, not 150, by the same ADR's D25
- * amendment). Measured 2026-10-31 on the lab simulator (iPhone 17, iOS 27.0), `Jan Novak Bratislava` or its
- * prefixes typed into AveriLabRN's `rn-field` (React Native 0.88's controlled single-line TextInput), read back from
- * the app's state file (the scripts and the figures: docs/plans/2026-10-30-performance-backlog.md, "### D7 and D24
- * measured" and "### D25 diag").
+ * (D24, docs/adr/0023-fill-types-a-dropped-tail-again.md, amendment 2026-10-31; 50 ms by the same ADR's D25 amendment).
+ * Measured 2026-10-31 on the lab simulator (iPhone 17, iOS 27.0), `Jan Novak Bratislava` or its prefixes typed into
+ * AveriLabRN's `rn-field` (React Native 0.88's controlled single-line TextInput), read back from the app's state file
+ * (the scripts and the figures: docs/plans/2026-10-30-performance-backlog.md, "### D7 and D24 measured" and "### D25
+ * diag").
  *
  * D24, 15 runs a mode, 20 characters, typed through the `idb ui text` CLI (a Python start-up on every call, ADR 0032):
  *

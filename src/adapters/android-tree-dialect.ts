@@ -224,6 +224,7 @@ function scrimAndSheet(scrim: RawNode, sheet: RawNode): { s: Rect; below: Rect }
   return s.height > 0 && below.x === s.x && below.width === s.width ? { s, below } : undefined;
 }
 
+/** The recognizers `presentedWindow` asks, in order. */
 const PRESENTED_WINDOWS: readonly PresentedWindowRecognizer[] = [floatingDialog, composeSheetScrim, materialSheetDialog];
 
 const childrenOf = (n: RawNode): RawNode[] => (n.node === undefined ? [] : Array.isArray(n.node) ? n.node : [n.node]);

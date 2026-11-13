@@ -271,6 +271,7 @@ type AlertEnd = { kind: 'alert'; alert: SystemAlert; names: readonly string[] };
 const after = (check: ForegroundCheck): string =>
   check.link === undefined ? `launching ${check.bundleId}` : `opening ${check.link} in ${check.bundleId}`;
 
+/** The wait itself: how it ended, and the detail's words. */
 async function poll(check: ForegroundCheck): Promise<WaitEnd> {
   let deadline = Date.now() + FOREGROUND_WAIT_MS;
   let names: readonly string[] | undefined;
@@ -375,6 +376,7 @@ const quoted = (names: readonly string[]) => names.map((n) => `"${n}"`).join(' o
 /** Whether an Application label is SpringBoard's, labelled with a single space. */
 const isSpringBoard = (label: string): boolean => label.trim() === '';
 
+/** The label read, SpringBoard's named as what it is, not as `" "`. */
 const whose = (label: string) =>
   isSpringBoard(label) ? "SpringBoard's (the home screen or the launch animation)" : `the app labelled "${label}"`;
 
