@@ -4,13 +4,7 @@ import { inferScreenSize, SCREEN_AGREEMENT_PCT, screenOf, windowTurnsScreen, typ
 /**
  * THE USABLE SCREEN — the one value every judgement of "on screen" reads,
  * built in one place, for every verb that asks "can this be used where it
- * stands?" (standing.ts#Scene judges on it): the tap (whose standing
- * the in-tree keyboard dismissal picker asks too,
- * interact/keyboard-in-tree.ts), `scroll_until`'s stop
- * (interact/scroll-read.ts, over the screen interact/scroll.ts reads each
- * round), the pixel assert (verify/pixel-poll.ts#overElement) and, for
- * its box, the swipe (interact/swipe.ts#screenBox, which keeps its note and
- * its throw over it and judges nothing).
+ * stands?" (standing.ts#Scene judges on it).
  *
  * THE ONE SCREEN TYPE a judgement takes: `Scene.standing` takes it for every
  * purpose — the touches read its `box`, `boxes` and bands, the pixel purpose
@@ -138,9 +132,7 @@ export function usableScreenOf(device: DeviceScreen | undefined, size: ScreenSiz
  * one draw-order.ts sizes its hosts against — the root's rect, or the
  * largest node's when the root has no area) as a usable screen,
  * `from: 'tree'`, with no band. Every judgement with no usable screen reads
- * it, and nothing else: standing.ts#Scene's purposes when handed
- * none, the pixel assert's last resort (verify/pixel-poll.ts) and the tap
- * refusal's quoted screen (interact/tap-judgement.ts#judgeTap).
+ * it, and nothing else.
  *
  * `failsOpen`: the root has no area (idb's synthetic 0x0 root). A TOUCH
  * purpose — the tap, either stop — then places every point on the screen
@@ -166,7 +158,7 @@ export function treeScreen(tree: UiNode): UsableScreen & { readonly failsOpen: b
  */
 const TURNED_WIDTH_SLACK_PCT = 5;
 
-/** A window's own sides say the panel is turned: width the turned panel's within TURNED_WIDTH_SLACK_PCT, height within its height (SCREEN_AGREEMENT_PCT of slack) — a window may be short, never taller. */
+/** A window's own sides say the panel is turned: width the turned panel's within TURNED_WIDTH_SLACK_PCT, height within its height (SCREEN_AGREEMENT_PCT of slack) — a window may be short, and taller only by that slack. */
 const turnedWindow = (size: { width: number; height: number }, panelTurned: { width: number; height: number }): boolean =>
   Math.abs(size.width - panelTurned.width) <= (panelTurned.width * TURNED_WIDTH_SLACK_PCT) / 100 &&
   size.height <= panelTurned.height * (1 + SCREEN_AGREEMENT_PCT / 100);

@@ -13,10 +13,9 @@ import { rectIntersection, rectWithin } from './geometry.js';
  * holds (`keyboard-cover.ts#readKeyboard`, which reads the band and the
  * keyboard's own nodes through here), so none pays a device read for the
  * answer (a WDA `/source` is 0.6–0.98 s, measured). It also answers
- * "which of the keyboard's own controls
- * hides it" — `accessoryDismissButton`, the app's input-accessory toolbar's
- * trailing button — for the in-tree model's configured dismissals
- * (interact/keyboard-in-tree.ts). And it holds the vocabulary of what an
+ * "which of the keyboard's own controls hides it" — `accessoryDismissButton`,
+ * the app's input-accessory toolbar's trailing button — for the in-tree
+ * model's configured dismissals. And it holds the vocabulary of what an
  * adapter can do about a covering keyboard (`KeyboardRemedy`, `cannotHide`),
  * the lowest layer every sentence that says so imports. It also reads
  * idb's keyboard band, which carries no mark, by
@@ -55,11 +54,9 @@ export function keyboardInTree(tree: UiNode): SoftKeyboard {
 
 /**
  * idb's SOFT KEYBOARD BAND, read by its shape over a flat list's nodes in
- * the list's order (`nodes`, pre-order: the synthetic root first). Draw
- * order (ui-tree/draw-order.ts) reads it through `keyboardOf` for `flatListReadingOrder` and `bottomPinned`
- * unchanged, and for its top (`DrawOrder.keyboardBandTop`, the one way the
- * keyboard line knows it, keyboard-position.ts#KeyboardPosition.line). idb marks no keyboard node, so its keys — plain `button`s
- * listed LAST — are the only covers of the rows under it. Its background is
+ * the list's order (`nodes`, pre-order: the synthetic root first). idb
+ * marks no keyboard node, so its keys — plain `button`s listed LAST — are
+ * the only covers of the rows under it. Its background is
  * a screen-wide, unlabelled structural node ending at the screen's bottom
  * and starting at or below `barLine` (the top bar's band, so never the
  * screen's size), listed right AFTER the keys — the node listed just before
@@ -127,9 +124,7 @@ export function flatListKeyboardBand(nodes: readonly UiNode[], screen: Rect, bar
  * Every node of the tree in pre-order with the two marks its ancestry gives
  * it: whether it lies under (or is) an `ofKeyboard` root — the keyboard's
  * own UI, keys and accessory toolbar alike — and whether it lies under (or
- * is) the `KEYBOARD_ROLE` band node. The one walk `keyboardSideNodes` and
- * `accessoryDismissButton` share, rather than each carrying the flags
- * through a recursion of its own.
+ * is) the `KEYBOARD_ROLE` band node.
  */
 function* markedNodes(
   tree: UiNode,
@@ -152,8 +147,6 @@ function* markedNodes(
  * from); a node the tree does not hold is not part of its keyboard. One
  * walk for every node at once (`scroll_until` asks it of every match each
  * round; a per-node walk would walk again per question). Empty for a tree with no mark (every Android tree).
- * Read through a reading's `ofKeyboard` (keyboard-cover.ts#readKeyboard),
- * which builds it once per reading.
  */
 export function keyboardSideNodes(tree: UiNode): ReadonlySet<UiNode> {
   const out = new Set<UiNode>();
@@ -205,15 +198,14 @@ export function accessoryDismissButton(tree: UiNode): UiNode | undefined {
  * adapter, not a decision: `back` on the oracle's window model (a `back`
  * hides it, witness-vetoed, interact/keyboard-window.ts), `none` on the in-tree
  * model, where no key does and the configured dismissals are tried instead.
- * The pixel poll words its remedy by it. What one call then DOES —
- * interact/keyboard-window.ts#dismissal's `'back' | 'nothing' | 'unlocated'` — is a different
- * question with its own literals, kept apart on purpose: with `back` in
- * hand the decision is still `nothing` when the state is hidden or the
- * witness denies the keyboard.
+ * What one call then DOES — interact/keyboard-window.ts#dismissal's
+ * `'back' | 'nothing' | 'unlocated'` — is a different question with its own
+ * literals, kept apart on purpose: with `back` in hand the decision is still
+ * `nothing` when the state is hidden or the witness denies the keyboard.
  */
 export type DismissalMeans = 'back' | 'none';
 
-/** What the adapter can do about a covering keyboard, for the sentence that says so (the pixel poll's miss, the guard's refusal). */
+/** What the adapter can do about a covering keyboard, for the sentence that says so. */
 export interface KeyboardRemedy {
   dismissal: DismissalMeans;
   /** With `none`: the adapter's own sentence on why, and what works instead (`DeviceAdapter.keyboardAdvice`), when it has one. */
@@ -222,15 +214,13 @@ export interface KeyboardRemedy {
 
 /**
  * The generic half of the in-tree model's sentence, written once for the
- * guard's refusal (interact/keyboard-in-tree.ts, KeyboardWithoutDismissal) and the
- * pixel poll's covered miss (verify/pixel-poll.ts) — here, the lowest layer
- * both import, so "one phrase" holds by
- * construction and not by two matching literals. "On its own", because the
- * `advice` that follows it is what DOES work.
+ * guard's refusal and the pixel poll's covered miss — here, the lowest layer
+ * both import, so "one phrase" holds by construction and not by two
+ * matching literals. "On its own", because the `advice` that follows it is
+ * what DOES work.
  */
 export const CANNOT_HIDE = 'this adapter cannot hide it on its own';
 
-/** `CANNOT_HIDE`, then the adapter's `advice` in parentheses when it has one — the one composition both sentences use. */
 export function cannotHide(advice: string | undefined): string {
   return advice === undefined ? CANNOT_HIDE : `${CANNOT_HIDE} (${advice})`;
 }

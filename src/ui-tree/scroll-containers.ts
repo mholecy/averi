@@ -17,10 +17,7 @@ import { rectArea, sameRect, type Rect, type ScrollAxis, type UiNode } from '../
  * - `scrolls` — this node's content moves under its frame. A fact about
  *   REACHABILITY and DRAW ORDER: whether `scroll_until` can move a node
  *   (geometry.ts#Clips.inScroller), and, for draw order, a node's nearest
- *   scroller (`Placed.scroller`), which three target rows read: scrolled
- *   content (draw-order.ts's `scrolledContent` row), `structural`'s wrapper excuse (`holdsWhole`: a wrapper holding
- *   the target's nearest scroller whole) and the scroll indicator (a child
- *   of a node that scrolls). A node that clips scrolls (Android's
+ *   scroller (`Placed.scroller`). A node that clips scrolls (Android's
  *   flag means "scrolls now"); so does a node of a `SCROLLING_ROLES` role,
  *   with or without the flag: a scroll view, and a web view, whose page
  *   scrolls under its frame. A classic Android list whose content fits
@@ -42,10 +39,10 @@ import { rectArea, sameRect, type Rect, type ScrollAxis, type UiNode } from '../
  * either give iOS clip chains that do not exist or take scrolling away from
  * classic Android lists.
  *
- * NOT a scroll predicate: draw-order.ts's CONTENT_FRAMED_ROLES. "Its frame
- * is not a drawing surface" is a draw judgement, measured on iOS and narrow
- * on purpose (a web view scrolls, yet its frame IS its surface); it is kept
- * in draw order and never derived from `scrolls`.
+ * NOT a scroll predicate: placed.ts's CONTENT_FRAMED_ROLES. "Its frame is
+ * not a drawing surface" is a draw judgement, measured on iOS and narrow on
+ * purpose (a web view scrolls, yet its frame IS its surface); it is kept
+ * with the placed frame predicates and never derived from `scrolls`.
  */
 
 /** The source cut this node's descendants' rects to its own (Android's `scrollable="true"`). */
@@ -56,15 +53,13 @@ export function clips(n: UiNode): boolean {
 /** The roles whose content scrolls under their frame, whatever the source says of clipping. */
 const SCROLLING_ROLES: ReadonlySet<string> = new Set(['scrollable', 'webview']);
 
-/** This node's content scrolls under its frame: it clips, or its role is one of `SCROLLING_ROLES`. `clips(n) ⇒ scrolls(n)`. */
 export function scrolls(n: UiNode): boolean {
   return clips(n) || SCROLLING_ROLES.has(n.role);
 }
 
 /**
  * `n` is THE scroll view of rect `container`: it scrolls, with exactly that rect — the one test by which a scroll view
- * remembered as a rect is found again in a tree, first in tree order (draw-order.ts#DrawOrder.drawnOver, which also
- * leaves out the keyboard's own nodes, geometry.ts#Clips.axesOf and #Clips.contentToward).
+ * remembered as a rect is found again in a tree, first in tree order.
  */
 export function isScrollViewOf(n: UiNode, container: Rect): boolean {
   return scrolls(n) && sameRect(n.rect, container);
@@ -114,7 +109,6 @@ const PAST_FRAME = 1;
  */
 const STRADDLE_REACH = 1 / 4;
 
-/** The span of `r` along `axis`. */
 const spanOf = (r: Rect, axis: ScrollAxis): readonly [number, number] => (axis === 'horizontal' ? [r.x, r.x + r.width] : [r.y, r.y + r.height]);
 
 /** `r` lies, in part, inside `frame`'s span along `axis`. */
