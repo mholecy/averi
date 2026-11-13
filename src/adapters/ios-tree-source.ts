@@ -27,15 +27,15 @@ import { countOf } from '../util/count.js';
  * fresh normalized tree per call (the layers above mutate nodes — field-error
  * pairing writes `error` — so no source may hand out a cached graph).
  * `applicationLabel()` answers the one question the normalized tree cannot —
- * which app a read is of — for the foreground wait alone: launch's
- * (2026-10-09) and a link's (its doc below). `dispose()` releases whatever
- * the source started; it is awaited by the process shutdown, so it resolves
- * when the resource is gone, not when the release was queued (the WDA source
- * stops its WebDriverAgent and waits for the port to go quiet). Both sources
- * are bound to ONE concrete simulator at construction: idb rejects simctl's
- * `booted` alias and WDA needs a UDID for `xcodebuild -destination`, so the
- * alias is resolved by whoever constructs the source — the registry, which
- * only ever binds concrete device ids.
+ * which app a read is of — for the foreground wait alone, launch's and a
+ * link's (its doc below). `dispose()` releases whatever the source started;
+ * it is awaited by the process shutdown, so it resolves when the resource is
+ * gone, not when the release was queued (the WDA source stops its
+ * WebDriverAgent and waits for the port to go quiet). Both sources are bound
+ * to ONE concrete simulator at construction: idb rejects simctl's `booted`
+ * alias and WDA needs a UDID for `xcodebuild -destination`, so the alias is
+ * resolved by whoever constructs the source — the registry, which only ever
+ * binds concrete device ids.
  *
  * Only the tree read lives behind this seam. Taps, typing, install and launch
  * stay on idb/simctl whichever source is configured (plan, decision 4): WDA
@@ -514,7 +514,7 @@ const NO_FRONTMOST = /accessibility service named no frontmost application/i;
 export const DESCRIBE_ALL_TIMEOUT_MS = 15_000;
 
 /**
- * idb's settle cadence (IosTreeSource.settleCadenceMs, ADR 0040): 300 ms, measured (D35). describe-all
+ * idb's settle cadence (IosTreeSource.settleCadenceMs, ADR 0040): 300 ms, measured. describe-all
  * snapshots AX at once, in a 20–31 ms read (batch-3 B2 medians), so two reads 300 ms apart compare two snapshots about
  * 300 ms apart. Back-to-back reads through 105 moving trials (batch-2 B 45, batch-3 B2 60: list flings, a bounded
  * scroll, a paging carousel in a list), with resolveSettled replayed offline at each cadence: 0 wrong settles at 300,
