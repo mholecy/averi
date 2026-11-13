@@ -186,7 +186,8 @@ export function foldFree(source: string): boolean {
 /**
  * The characters of `read` the fold changed, as `[read, fold]` pairs, where
  * their folds lie in `[start, end)` of `ocrFold(read)` (a dropped mark: where
- * it stood, `end` included) — what a match found there in the folded reading took on trust.
+ * it stood, `end` included) — what a match found there in the folded reading
+ * took on trust.
  */
 export function readingFolds(read: string, start: number, end: number): [string, string][] {
   const pairs: [string, string][] = [];

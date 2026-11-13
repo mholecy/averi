@@ -11,8 +11,8 @@ import { errorMessage } from './error-message.js';
  * element assert's `match: "("` would throw out of the tree poll's predicate
  * a few milliseconds in, out of assertAll mid-batch, losing every result
  * already judged; an ocr assert's would throw inside the measure, whose catch
- * turns it into "OCR failed: Invalid regular expression…" every round and
- * polls the whole 12 s budget for a mistake no screen could fix; and an
+ * would turn it into "OCR failed: Invalid regular expression…" every round
+ * and poll the whole 12 s budget for a mistake no screen could fix; and an
  * averi.yaml carrying the element kind in an `assert:` step (the only kind a
  * flow step takes) would load clean and fail only mid-flow, on a device. The
  * schema says it instead: the MCP call's arguments, or averi.yaml at load,

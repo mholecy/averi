@@ -252,8 +252,8 @@ export function renderedTextFromTree(tree: UiNode, id: string): string[] {
  * deliberately: a wholly covered region still has no survivor and still
  * reports OCCLUDED, the same blindness exists for the two-node spelling of the
  * same row (the caller is itself a `.some()` over tree strings), and the
- * systematic false positive of a whole-string rule suppresses the copy check
- * on EVERY combined row.
+ * systematic false positive of a whole-string rule would suppress the copy
+ * check on EVERY combined row.
  */
 
 /**

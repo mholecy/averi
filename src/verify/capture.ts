@@ -614,7 +614,8 @@ export async function captureBaselineFrame(
  * `undefined` when it cannot be read — a failed read degrades every answer
  * that would have been checked against it (the png scale, the window width)
  * to the tree's alone, each saying so in its own note; it never fails the
- * frame or the assert. Not for `absent`, whose viewport is the reference
+ * frame or the assert. One owner for that degradation, so no reader spells
+ * the catch its own way. Not for `absent`, whose viewport is the reference
  * frame itself and whose failed read is an error.
  */
 export const witnessScreen = (adapter: Pick<DeviceAdapter, 'viewport'>): Promise<DeviceScreen | undefined> =>

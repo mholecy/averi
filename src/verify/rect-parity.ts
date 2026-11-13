@@ -325,7 +325,7 @@ function compareAspect(anchor: LayoutAnchor, a: Rect, i: Rect, ctx: CompareConte
  *
  * The tolerances live in the contract and nowhere else (parity review
  * 2026-10-07 P2): a test-facing `tolerancePct` option that production never
- * passes can leak — with the overridden width as the aspect fallback, it
+ * passed would leak — with the overridden width as the aspect fallback, it
  * would widen the shape check whenever the contract left
  * `tolerance_aspect_pct` unset. So there is one width to fall back to, and
  * tests set `tolerance_pct` in the contract — the interface production uses.
@@ -520,7 +520,6 @@ function judgedFields(r: RectParityResult): RectField[] {
   return [...out];
 }
 
-/** One-line verdict — the number the caller quotes. */
 export function rectParityVerdict(r: RectParityResult): string {
   if (r.pass) {
     const scope =

@@ -83,8 +83,8 @@ export class Shot {
  * command (adapters/screenshot-bytes.ts) — so in production this never fires; it is the wait's own floor under that
  * contract, for an adapter that breaks it: two empty buffers are equal, so a dead emulator's two 0-byte captures would
  * come back as a SETTLED frame the `screenshot` tool returns with no note. Length only, not the signature: the frames
- * are opaque bytes to the wait (the tests' fakes use short tags),
- * and a non-PNG that reaches a measuring caller already fails its decode, with its own wording, in `captureFrame`.
+ * are opaque bytes to the wait (the tests' fakes use short tags), and a non-PNG that reaches a measuring caller already
+ * fails its decode, with its own wording, in `captureFrame`.
  */
 export async function captureShot(adapter: Pick<DeviceAdapter, 'screenshot' | 'capture'>): Promise<Shot> {
   if (adapter.capture === undefined) return Shot.ofPng(nonEmpty(await adapter.screenshot()));

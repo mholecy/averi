@@ -5,9 +5,10 @@ import { fileURLToPath } from 'node:url';
  * The package's own version, for the MCP handshake's `serverInfo`.
  *
  * Read from package.json at runtime rather than written out here, because a
- * hand-copied literal drifts, and `serverInfo` is the one place a caller can
- * ask which averi it is talking to. A JSON import is not the alternative —
- * package.json sits outside `rootDir`, so it would not compile.
+ * hand-copied literal drifts (it reported 0.0.1 for every release), and
+ * `serverInfo` is the one place a caller can ask which averi it is talking
+ * to. A JSON import is not the alternative — package.json sits outside
+ * `rootDir`, so it would not compile.
  *
  * Its own module because mcp/server.ts connects stdio at import and therefore
  * cannot be imported by a test.

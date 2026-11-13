@@ -79,10 +79,10 @@ export const orderOfFrame = (frame: MeasuredFrame, question: PairQuestion): read
  * What it costs: an element genuinely drawn in the colour of the screen around it with nothing at all of its own (an
  * empty, unbordered white card on a white page) fails closed under idb too — it is told apart from the background by
  * nothing in the frame either; under WDA, which lists the scroll views, it is measured. Measured over every node idb
- * lists in the 32 iOS lab captures: only O and C blend (tests/verify/eyes-apart.test.ts). What it does not see —
- * measured, so a PASS on what lies beneath the clip: anything of that beneath in the region (a separator, a shadow,
- * text: more than a point of it reads `apart`), and no plain strip beside it (`untold`). Asked on a frame settled over
- * the region only too (verify/pixel-poll.ts#blendsUntold): a strip beside still moving is no plain strip.
+ * lists in the 32 iOS lab captures: only O and C blend (tests/verify/eyes-apart.test.ts). What it does not see is
+ * measured, so it can PASS on what lies beneath the clip: anything of that beneath in the region (a separator, a
+ * shadow, text: more than a point of it reads `apart`), and no plain strip beside it (`untold`). Asked on a frame
+ * settled over the region only too (verify/pixel-poll.ts#blendsUntold): a strip beside still moving is no plain strip.
  */
 export type ApartSeen = { readonly seen: 'apart' } | { readonly seen: 'blends'; readonly colour: string } | { readonly seen: 'untold'; readonly why: string };
 
