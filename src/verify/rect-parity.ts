@@ -20,16 +20,15 @@ import { headerWithRule, row, type Column } from './table.js';
  * Semantics preserved from the script:
  * - Every comparison is in PERCENT OF SCREEN WIDTH. Per-platform width = the
  *   WINDOW's width, read from the WHOLE tree (the root/window node, which
- *   carries no id — inferring from id-bearing children only scaled every
- *   delta by the content inset and reported a phantom +5.7% on correct
- *   geometry). Since 2026-10-07 neither the table nor the `rect` assert
- *   measures it: both are handed `verify/scale.ts#windowWidth`'s answer —
- *   the table on the leg's frame, the assert from its caller — and a width
- *   that answer refuses (0 wide, a CONTENT width, wider than the device
- *   screen) reaches no verdict. Until then both read geometry.ts directly
- *   and kept its "unreliable" flag as a remark, so a content width printed
- *   a warning and then WITHIN TOLERANCE under it (the 2026-10-07 parity
- *   review, P1).
+ *   carries no id — inferring from id-bearing children only would scale
+ *   every delta by the content inset and report a phantom +5.7% on correct
+ *   geometry). Neither the table nor the `rect` assert measures it: both are
+ *   handed `verify/scale.ts#windowWidth`'s answer — the table on the leg's
+ *   frame, the assert from its caller — and a width that answer refuses (0
+ *   wide, a CONTENT width, wider than the device screen) reaches no verdict.
+ *   Were geometry.ts's "unreliable" flag kept as a remark, a content width
+ *   would print a warning and then WITHIN TOLERANCE under it (the 2026-10-07
+ *   parity review, P1).
  * - Contract values are Figma-frame units, normalized by `figma_frame_width`
  *   (fallback: the widest anchor `w`). Omitted anchor fields are compared
  *   platform-to-platform only, never against the contract.
@@ -133,7 +132,6 @@ const FIELDS: { field: 'x' | 'y' | 'w' | 'h'; get: (r: Rect) => number }[] = [
   { field: 'h', get: (r) => r.height },
 ];
 
-/** Shared inputs for the per-anchor comparisons. */
 interface CompareContext {
   platforms: readonly Platform[];
   widthOf: Partial<Record<Platform, number>>;
@@ -150,7 +148,6 @@ interface Comparison {
   findings: RectFinding[];
 }
 
-/** A finding, but only when the delta actually exceeds the tolerance. */
 const findingIfOver = (
   ctx: CompareContext,
   anchor: string,
@@ -324,17 +321,14 @@ function compareAspect(anchor: LayoutAnchor, a: Rect, i: Rect, ctx: CompareConte
  * `tolerancePct`: the contract's `tolerance_pct` (typed, so already a
  * positive number), else the default. `aspectTolerancePct`: the contract's
  * `tolerance_aspect_pct` when it declares one — never a non-number — else
- * that same width tolerance, so an untouched contract behaves exactly as
- * before.
+ * that same width tolerance.
  *
- * The tolerances live in the contract and nowhere else (2026-10-08, parity
- * review 2026-10-07 P2). Until then the comparator also took a test-facing
- * `tolerancePct` option that production never passed, and it had already
- * leaked once: until 2026-10-03 the aspect fallback here was the overridden
- * width, so the option widened the shape check whenever the contract left
- * `tolerance_aspect_pct` unset. With the option gone there is one width to
- * fall back to, and tests set `tolerance_pct` in the contract — the
- * interface production uses.
+ * The tolerances live in the contract and nowhere else (parity review
+ * 2026-10-07 P2): a test-facing `tolerancePct` option that production never
+ * passes can leak — with the overridden width as the aspect fallback, it
+ * would widen the shape check whenever the contract left
+ * `tolerance_aspect_pct` unset. So there is one width to fall back to, and
+ * tests set `tolerance_pct` in the contract — the interface production uses.
  */
 function tolerancesOf(contract: LayoutContract): { tolerancePct: number; aspectTolerancePct: number } {
   const tolerancePct = contract.tolerance_pct ?? DEFAULT_TOLERANCE_PCT;
@@ -348,7 +342,7 @@ function tolerancesOf(contract: LayoutContract): { tolerancePct: number; aspectT
 /**
  * Every problem `compareRectParity` would raise about the contract's fields
  * ALONE — no tree, no device — so run/verify.ts can refuse a run before its
- * legs instead of reporting `FAILED:` after them (2026-10-03).
+ * legs instead of reporting `FAILED:` after them.
  *
  * That is one field: `tolerance_aspect_pct`, the only geometry value the
  * schema leaves `unknown` (x/y/w/h, `tolerance_pct`, `figma_frame_width` and
@@ -356,8 +350,7 @@ function tolerancesOf(contract: LayoutContract): { tolerancePct: number; aspectT
  * parsed by the comparator's own `tolerancesOf`, so the message is the
  * read-time one byte for byte and stays so if `tolerancesOf` ever grows a
  * rule. It takes no options because the comparator takes none: everything
- * it reads is in the contract (2026-10-08 — until then both took a
- * test-only `tolerancePct` override, see `tolerancesOf`).
+ * it reads is in the contract (see `tolerancesOf`).
  *
  * Deliberately NOT lifted here: the "single-platform run with neither
  * figma_frame_width nor any anchor w" refusal. It depends on how many legs
@@ -365,7 +358,7 @@ function tolerancesOf(contract: LayoutContract): { tolerancePct: number; aspectT
  * which is a fact about the run, not the contract; and a contract without a
  * frame width is not invalid, it is merely unusable for THIS table on one
  * platform, where the colour and text tables can still stand. That one stays
- * contained in the rect section, as before.
+ * contained in the rect section.
  */
 export function validateRectContract(contract: LayoutContract): string[] {
   return problemsThrownBy('rect parity: ', [() => void tolerancesOf(contract)]);
@@ -378,8 +371,6 @@ export function compareRectParity(
   const platforms = (['android', 'ios'] as const).filter((p) => legs[p] !== undefined);
   if (platforms.length === 0) throw new Error('rect parity: no platform tree provided');
   const single = platforms.length === 1;
-  // The aspect threshold defaults to the contract's width tolerance, so an
-  // untouched contract behaves exactly as before (tolerancesOf).
   const { tolerancePct, aspectTolerancePct } = tolerancesOf(contract);
   const frameWidth =
     contract.figma_frame_width ?? Math.max(0, ...contract.anchors.map((a) => a.w ?? 0));
@@ -397,8 +388,8 @@ export function compareRectParity(
 
   // A refused width fails the WHOLE table, as a failed scale fails the colour
   // one: dropping the platform and printing a verdict over the other would
-  // read as a completed comparison, and a table that prints the deltas with
-  // a warning above them is the false WITHIN TOLERANCE this replaced.
+  // read as a completed comparison, and a table that printed the deltas with
+  // a warning above them would be a false WITHIN TOLERANCE.
   const present = platforms.map((p) => ({ platform: p, leg: legs[p] as RectLeg }));
   const widths: RectParityResult['widths'] = [];
   const widthOf: Partial<Record<Platform, number>> = {};
@@ -549,7 +540,7 @@ export function rectParityVerdict(r: RectParityResult): string {
 /** Python-%g-ish number: no trailing zeros, 6 significant digits. */
 const g = (v: number): string => String(Number(v.toPrecision(6)));
 
-/** |device width / figma frame width − 1| above this prints the width-bias note. */
+/** |iOS window width / declared figma frame width − 1| above this prints the width-bias note. */
 const WIDTH_BIAS_NOTE_PCT = 5;
 
 const fmtDelta = (v: number | undefined): string =>
@@ -709,7 +700,6 @@ export interface RectExpectation {
   tolerancePct?: number;
 }
 
-/** The rects with `x` measured from the window's left edge (`WindowWidth.left`), unchanged when it is 0. */
 function fromWindowLeft(rects: Map<string, Rect>, left: number | undefined): Map<string, Rect> {
   if (left === undefined || left === 0) return rects;
   return new Map([...rects].map(([id, r]) => [id, { ...r, x: r.x - left }]));
@@ -719,16 +709,19 @@ function fromWindowLeft(rects: Map<string, Rect>, left: number | undefined): Map
  * Single-element rect check, same normalization rules as the whole-screen
  * comparator. Unlike the table it gets no frame: the `rect` assert polls
  * bare trees (Verifier.planRect, through the tree poll — no capture), so
- * its caller asks `windowWidth(tree, screen)` for each round's tree against
- * the adapter's memoized screen. Same trust module, no second rule. `y` is measured and reported but NEVER fails the assert —
- * absolute y drifts with device aspect ratio alone; whole-screen gap rows
- * are the vertical-position check.
+ * its caller judges each round's tree with
+ * `verify/capture.ts#ScreenWitness.judge`: `windowWidth` against the device
+ * screen, read once and re-read fresh at most once before a
+ * wider-than-screen refusal. Same trust module, no second rule. `y` is
+ * measured and reported but NEVER fails the assert — absolute y drifts with
+ * device aspect ratio alone; whole-screen gap rows are the vertical-position
+ * check.
  *
  * `window` is `verify/scale.ts#windowWidth` for the tree the rect came from.
  * A refused one fails the assert closed — the 0-wide tree (dividing by 0
- * makes every delta NaN, and NaN > tol is false: a vacuous PASS) and, since
- * 2026-10-07, a CONTENT width too, which until then PASSED with
- * "(UNRELIABLE …)" in the detail.
+ * makes every delta NaN, and NaN > tol is false: a vacuous PASS) and a
+ * CONTENT width too, which would otherwise PASS with "(UNRELIABLE …)" in the
+ * detail.
  */
 export function evaluateRectAssert(
   rect: Rect,
