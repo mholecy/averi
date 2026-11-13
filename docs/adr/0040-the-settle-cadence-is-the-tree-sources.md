@@ -106,8 +106,8 @@ when a later read in the window moves the rect.
   not proven; JS-driven RN animations; Lottie.
 - (R3) A wrong settle is not caught later. A tap lands where the element WAS, and no later step re-checks a tap's
   landing. The check before merge was the product-path settle run (Status); that probe is not kept in the repo.
-  Today tests/interact/settle-trace.test.ts pins the shipped value over a recorded trace (the T5 amendment), and a
-  new value comes only from a re-measure on the device.
+  Today tests/interact/settle-trace.test.ts pins idb's shipped value (`IDB_SETTLE_CADENCE_MS`) over a recorded idb
+  trace (the T5 amendment); no test replays WDA's 300. A new value comes only from a re-measure on the device.
 - The floor and the run-of-one late read (~150–167 ms back to back, ADR 0029) are unchanged. 300 is still twice the
   gap the proof already accepts there.
 

@@ -27,14 +27,15 @@ import { countOf } from '../util/count.js';
  * fresh normalized tree per call (the layers above mutate nodes — field-error
  * pairing writes `error` — so no source may hand out a cached graph).
  * `applicationLabel()` answers the one question the normalized tree cannot —
- * which app a read is of — for the foreground wait alone, launch's and a
- * link's (2026-10-09; its doc below). `dispose()` releases whatever the source started; it is awaited by the
- * process shutdown, so it resolves when the resource is gone, not when the
- * release was queued (the WDA source stops its WebDriverAgent and waits for
- * the port to go quiet). Both sources are bound to ONE concrete simulator at
- * construction: idb rejects simctl's `booted` alias and WDA needs a UDID for
- * `xcodebuild -destination`, so the alias is resolved by whoever constructs
- * the source — the registry, which only ever binds concrete device ids.
+ * which app a read is of — for the foreground wait alone: launch's
+ * (2026-10-09) and a link's (its doc below). `dispose()` releases whatever
+ * the source started; it is awaited by the process shutdown, so it resolves
+ * when the resource is gone, not when the release was queued (the WDA source
+ * stops its WebDriverAgent and waits for the port to go quiet). Both sources
+ * are bound to ONE concrete simulator at construction: idb rejects simctl's
+ * `booted` alias and WDA needs a UDID for `xcodebuild -destination`, so the
+ * alias is resolved by whoever constructs the source — the registry, which
+ * only ever binds concrete device ids.
  *
  * Only the tree read lives behind this seam. Taps, typing, install and launch
  * stay on idb/simctl whichever source is configured (plan, decision 4): WDA
@@ -86,11 +87,11 @@ export interface IosTreeSource {
    * of its active app, the app its sessionless `/source` reads (D48;
    * wda-tree-source.ts), once its WebDriverAgent is up. Asked by the
    * foreground wait only (ios-foreground.ts; launch's and a link's), never
-   * by a reader of the tree: the normalized tree keeps no element types (idb's Application is
-   * a plain `other`), so the question is answered by the source that has
-   * the answer. The answers are ApplicationLabel's. Throws as `read()`
-   * throws; one device call per call — except a `declined` answer, which
-   * calls nothing.
+   * by a reader of the tree: the normalized tree keeps no element types
+   * (idb's Application is a plain `other`), so the question is answered by
+   * the source that has the answer. The answers are ApplicationLabel's.
+   * Throws as `read()` throws; one device call per call — except a
+   * `declined` answer, which calls nothing.
    */
   applicationLabel(): Promise<ApplicationLabel>;
   /**

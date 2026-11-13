@@ -11,7 +11,7 @@ import { firstLineOf, messageOf, nameInLine, verdictLine } from './words.js';
  * ancestry instead; runner.ts (T2 S6a) makes the blocks INCONCLUSIVE, batch-11's way; the result is the same.
  *
  * Every answer is git's, read through a bounded call (bounded.ts, git's own 30 s bound): never a grep of a symbol in
- * the sources (batch-11-README:101), and never git run unbounded, as batch-11's was. The cases and cells are read from
+ * the sources, and never git run unbounded, as batch-11's was. The cases and cells are read from
  * main's own live-cases.ts table and catalog (live-table.ts#liveTableOf), never grepped.
  *
  * A why is one short line an agent can act on: it names the sha, the file or the case id, and git's own first line of
