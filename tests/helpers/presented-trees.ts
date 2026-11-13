@@ -2,10 +2,9 @@ import type { UiNode } from '../../src/adapters/types.js';
 import { node } from './fake.js';
 
 /**
- * Hand-built trees with a PRESENTED LAYER over a list screen, shared by the presentation module's tests
- * (tests/ui-tree/presentation.test.ts) and draw order's, which reads it (tests/ui-tree/draw-order-marked-layers.test.ts):
- * the list beneath, a page sheet's layer marked `screen`, a popover's layer typed `actionSheet`, and the app's Window
- * under a root whose source judged presented layers. Each builder returns fresh nodes.
+ * Hand-built trees with a PRESENTED LAYER over a list screen: the list beneath, a page sheet's layer marked `screen`, a
+ * popover's layer typed `actionSheet`, and the app's Window under a root whose source judged presented layers. Each
+ * builder returns fresh nodes.
  */
 
 export const IPHONE = { x: 0, y: 0, width: 402, height: 874 };

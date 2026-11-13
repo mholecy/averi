@@ -184,7 +184,7 @@ function specifiers(source: string): string[] {
   return found;
 }
 
-/** The src files `source`, the text of `file`, imports, resolved (`.js` → `.ts`). */
+/** The resolved paths of the relative imports in `source`, the text of `file` (`.js` → `.ts`). */
 const importsIn = (file: string, source: string): string[] =>
   specifiers(source)
     .filter((s) => s.startsWith('.'))

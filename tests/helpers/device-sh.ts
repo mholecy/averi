@@ -2,11 +2,11 @@ import { spawnSync } from 'node:child_process';
 import type { ExecFn, ExecResult } from '../../src/adapters/exec.js';
 
 /**
- * A REAL shell playing the device's (2026-10-07, adb-shell.ts): what the
- * device command receives is decided by sh's parsing, so a fake that only
- * joins the argv with a space — the way `fakeExec` in android.test.ts does,
- * and the way adb itself does — reads `-d app://x?a=1&b=2` as intact while
- * the device cuts it at the `&`. This one parses the line as the device does.
+ * A REAL shell playing the device's (adb-shell.ts): what the device command
+ * receives is decided by sh's parsing, so a fake that only joins the argv
+ * with a space — the way `fakeExec` in android.test.ts does, and the way adb
+ * itself does — reads `-d app://x?a=1&b=2` as intact while the device cuts
+ * it at the `&`. This one parses the line as the device does.
  *
  * Host `/bin/sh` (bash in sh mode on macOS, dash on Linux) stands in for
  * Android's mksh. What the tests here rely on — single quotes deliver their

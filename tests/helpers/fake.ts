@@ -154,8 +154,8 @@ export class FakeAdapter implements DeviceAdapter {
   screenshots: Buffer[] = [];
   /**
    * Opaque bytes, not a png — enough for every caller that never decodes.
-   * Not empty (2026-10-08): DeviceAdapter.screenshot never returns 0 bytes,
-   * and the capture refuses an adapter that does (verify/shot.ts#captureShot).
+   * Not empty: DeviceAdapter.screenshot never returns 0 bytes, and the
+   * capture refuses an adapter that does (verify/shot.ts#captureShot).
    */
   nextScreenshot: Buffer = Buffer.from('fake:screen');
   logLines: string[] = [];
@@ -206,8 +206,7 @@ export class FakeAdapter implements DeviceAdapter {
    * one. A fake without it behaves like IosAdapter — taps unguarded, nothing
    * queried, `dismissKeyboard` presses enter — whatever `platform` says: the
    * interact layer reads the capability, not the label. Tests of the guard
-   * and of the Android dismissal attach one; until 2026-10-04 every fake
-   * carried the simulation and answered `unknown`.
+   * and of the Android dismissal attach one.
    */
   keyboard: FakeKeyboard | undefined;
 
@@ -282,7 +281,7 @@ export class FakeAdapter implements DeviceAdapter {
   /**
    * Overrides what the "device" reports as its screen. Leave it unset and the
    * fake derives the size from the screen it is currently showing, so it
-   * cannot contradict its own tree — production code now COMPARES the two
+   * cannot contradict its own tree — production code COMPARES the two
    * (verify/scale.ts), and a fake that disagreed with itself would quietly
    * make every test exercise the mismatch note instead of the table under
    * test. A test that wants a mismatch must ask for one.
@@ -334,7 +333,6 @@ export class FakeAdapter implements DeviceAdapter {
     return this.onDispose?.();
   }
 
-  // Unused by tests:
   async install(_path: string): Promise<void> {}
   async terminate(): Promise<void> {}
   async longPress(): Promise<void> {}
@@ -386,7 +384,7 @@ export class FakeKeyboard implements KeyboardOracle {
     return this.witnessAnswers.next();
   }
 
-  /** The keyboard window's touchable region with the input method's word (2026-10-08). Default: the witness could not be asked and no region read — no panel, the band alone, as before that date. */
+  /** The keyboard window's touchable region with the input method's word. Default: the witness could not be asked and no region read — no panel, the band alone. */
   readonly touchableAnswers = new ScriptedAnswer<KeyboardTouchable>({ witness: 'unknown', region: undefined });
 
   async touchable(): Promise<KeyboardTouchable> {
@@ -394,10 +392,10 @@ export class FakeKeyboard implements KeyboardOracle {
   }
 }
 
-/** The guard's settle options, fast: `first` on ambiguity, a 200 ms budget, a 2 ms poll, eyes that see nothing (NO_EYES: the verbs require them, A30) — the two keyboard-*.test.ts files share it (fill.test.ts keeps an identical one of its own). */
+/** The guard's settle options, fast: `first` on ambiguity, a 200 ms budget, a 2 ms poll, eyes that see nothing (NO_EYES: the verbs require them, A30). */
 export const FAST = { ambiguous: 'first' as const, timeoutMs: 200, pollMs: 2, eyes: NO_EYES };
 
-/** One ordered log of everything the keyboard guard and dismissal do to the device — and ask of its keyboard oracle, when it has one: `read`, `keyboard?`, `witness?`, `touchable?` (2026-10-08), `key:back`, `tap:x,y`. */
+/** One ordered log of everything the keyboard guard and dismissal do to the device — and ask of its keyboard oracle, when it has one: `read`, `keyboard?`, `witness?`, `touchable?`, `key:back`, `tap:x,y`. */
 export function recorded(fake: FakeAdapter): string[] {
   const events: string[] = [];
   const wrap = <T extends object, K extends keyof T>(on: T, name: K, label: (...args: never[]) => string) => {

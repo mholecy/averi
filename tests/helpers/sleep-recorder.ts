@@ -10,17 +10,12 @@ import { vi } from 'vitest';
  * fake that reacts on a real timer. Under a faked Date (vi.useFakeTimers
  * with Date ONLY — faking setTimeout would hang the yield) each sleep moves
  * the clock by its own length, so a deadline plays out in virtual time,
- * deterministically. One copy (2026-10-05) for the verify, run, mcp and
- * ui-tree/interact tests that touch the deadline loop; before, the capture,
- * assert and run/verify tests each carried their own and had drifted on the
- * clock rule. Since T1 (2026-11-02) the flow engine and ladder tests, the
- * Android adapter's and the eyes' polls take it too, the Date faked where a
- * budget runs out. fill.test.ts and the two keyboard-*.test.ts keep a
+ * deterministically. fill.test.ts and the two keyboard-*.test.ts keep a
  * no-yield recorder of their own on purpose (their fakes never react on a
- * timer), but share this clock rule (since 2026-10-31): they fake Date for
- * every test and their recorders advance it, so a fake read takes exactly
- * 0 ms and pollTree's pause after it (ui-tree/read-tree.ts#pauseAfterRead,
- * ADR 0029) is exact.
+ * timer), but share this clock rule: they fake Date for every test and
+ * their recorders advance it, so a fake read takes exactly 0 ms and
+ * pollTree's pause after it (ui-tree/read-tree.ts#pauseAfterRead, ADR 0029)
+ * is exact.
  */
 export const sleeps: number[] = [];
 

@@ -14,8 +14,8 @@ import { NO_EYES } from '../helpers/eyes.js';
  * parsers (tests/adapters/android.test.ts) reading real dump lines in between.
  * One file, two scenarios, deliberately: the adapter tests assert adb
  * behaviour and the interact tests assert the protocol; pinning the guard's
- * cadence from the adapter's file (where these sat until 2026-10-04) broke
- * the adapter tests whenever interact/ changed its mind.
+ * cadence from the adapter's file would break the adapter tests whenever
+ * interact/ changed its mind.
  */
 
 // The one sleep owner is recorded, not waited on — the guard's pauses are not this test's subject.
@@ -24,13 +24,13 @@ vi.mock('../../src/util/sleep.js', () => ({ sleep: async () => {} }));
 const dump = 'adb -s emulator-5554 exec-out uiautomator dump /dev/tty';
 const query = 'adb -s emulator-5554 shell dumpsys window displays';
 const witness = 'adb -s emulator-5554 shell dumpsys input_method | grep -m1 -w mInputShown';
-// The keyboard window's region beside the input method's word (2026-10-08): asked once state() read the band up.
+// The keyboard window's region beside the input method's word: asked once state() read the band up.
 const touchable = "adb -s emulator-5554 shell dumpsys input_method | grep -m1 -w mInputShown; dumpsys window InputMethod | grep -F 'touchable region='; true";
-// The screen the tap point is judged against (2026-10-08, interact/tap-judgement.ts#judgeTap):
+// The screen the tap point is judged against (interact/tap-judgement.ts#judgeTap):
 // asked once per adapter, after the first settle, before the keyboard — the adapter memoizes it.
 const wmSize = 'adb -s emulator-5554 shell wm size';
 const PHYSICAL = 'Physical size: 1080x2220\n';
-// The status band, read with the screen size and memoized with it (2026-10-12, types.ts#DeviceScreen.statusBand): the same
+// The status band, read with the screen size and memoized with it (types.ts#DeviceScreen.statusBand): the same
 // `dumpsys window displays` as the keyboard's query, asked once after `wm size` — these dumps hold no status bar, so no band.
 const band = query;
 
@@ -83,7 +83,7 @@ describe('the keyboard guard through AndroidAdapter and adb', () => {
       calls.push(full);
       const out = (text: string) => ({ stdout: Buffer.from(text), stderr: '' });
       if (full.includes('uiautomator dump')) return out(tree);
-      // The first read is the status band's, with the screen size (2026-10-12); the keyboard's two after it are stale.
+      // The first read is the status band's, with the screen size; the keyboard's two after it are stale.
       if (full.includes('dumpsys window displays')) return out(++windowQueries <= 3 ? stale : caughtUp);
       if (full.includes('dumpsys input_method')) return out(INPUT_SHOWN_LINE(false));
       if (full === wmSize) return out(PHYSICAL);
@@ -117,7 +117,7 @@ describe('the keyboard guard through AndroidAdapter and adb', () => {
     };
     const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
     const { note } = await tapElement(adapter, 'id:message_for_payee_input', { eyes: NO_EYES, ambiguous: 'refuse', pollMs: 1 });
-    // Until 2026-10-08: [dump, dump, wmSize, query, tap 540 1586] — Gboard's `d` key, typed into the IBAN field.
+    // Unguarded, the tap at (540,1586) would land on Gboard's `d` key, typed into the IBAN field.
     expect(calls).toEqual([dump, dump, wmSize, band, query, touchable, witness, 'adb -s emulator-5554 shell input keyevent 4', dump, dump, query, 'adb -s emulator-5554 shell input tap 540 1586']);
     expect(note).toBe('the soft keyboard covered id:message_for_payee_input; hidden before tapping');
 

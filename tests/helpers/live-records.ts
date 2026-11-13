@@ -23,11 +23,9 @@ export interface RecordedCase {
   late?: LabState;
 }
 
-/** A record of docs/truth/live-records by its file name. */
 export const readLiveRecord = (file: string): LiveRecord =>
   JSON.parse(readFileSync(new URL(`../../docs/truth/live-records/${file}`, import.meta.url), 'utf8')) as LiveRecord;
 
-/** A recorded case by its source and id. */
 export const recordedCase = (record: LiveRecord, source: string, id: string): RecordedCase =>
   record.results.find((r) => r.source === source && r.id === id)!;
 

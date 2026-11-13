@@ -10,9 +10,8 @@ import { appinfo } from './simctl-appinfo.js';
 
 /**
  * The lab app (dev.averi.lab, scheme `averilab`) on an IosAdapter with a fake exec — the D49a/D54/D56 foreground-wait
- * fakes, shared by tests/adapters/ios-deep-link.test.ts and the end-to-end reply and flow tests built on them
- * (tests/mcp/ios-alert-replies.test.ts, tests/flow/launch-alert.test.ts). A caller mocks src/util/sleep.js with the
- * sleep recorder and fakes Date, so the wait's deadline plays out in virtual time.
+ * fakes. A caller mocks src/util/sleep.js with the sleep recorder and fakes Date, so the wait's deadline plays out in
+ * virtual time.
  */
 
 export const LAB = 'dev.averi.lab';

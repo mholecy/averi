@@ -6,10 +6,9 @@ import type { Eyes, OrderEyes } from '../../src/ui-tree/eyes.js';
 
 /**
  * A30 (ADR 0024, amendment A30): the verbs that ask the eyes take them as a REQUIRED option, so a caller cannot forget
- * them — the composition roots (mcp/tools.ts, flow/engine.ts) wire verify/eyes.ts#eyesOn, a test hands a fake
- * (tests/helpers/eyes.ts). Until A30 `eyes?` was optional at each verb, and a production site that forgot
- * `eyesOn(adapter)` typechecked and silently lost ADR 0024: the tap's order untold, `scroll_until`'s `fully visible`
- * said as the tree's, "no screenshot was taken".
+ * them — the composition roots wire verify/eyes.ts#eyesOn, a test hands a fake (tests/helpers/eyes.ts). With an
+ * optional `eyes?` at each verb, a production site that forgot `eyesOn(adapter)` would typecheck and silently lose
+ * ADR 0024: the tap's order untold, `scroll_until`'s `fully visible` said as the tree's, "no screenshot was taken".
  *
  * Type-level: `npm run lint` (tsconfig.test.json) is what fails, not the run — an optional `eyes` is `X | undefined`
  * here and `toEqualTypeOf` refuses it.

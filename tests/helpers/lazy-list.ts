@@ -49,7 +49,6 @@ export class LazyList extends FakeAdapter {
   private readonly screenSize: { width: number; height: number };
   private readonly carry: (travel: number, durationMs: number | undefined) => number;
 
-  /** The furthest the content scrolls. */
   get maxOffset(): number {
     return Math.max(0, this.labels.length * this.rowHeight - this.container.height);
   }

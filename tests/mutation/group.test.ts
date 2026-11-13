@@ -4,8 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { filesOf, GROUPS, GROUP_ENV, groupScope, isGroup, readScopeFile, scopeErrors, scopeOf } from '../../scripts/mutation/group.mjs';
 
-// scripts/mutation/group.mjs: the mutation run's groups (ADR 0038, the T2 amendment's T2b-2 part), read by
-// stryker.config.mjs, vitest.mutation.config.ts and mutate.ts alike.
+// scripts/mutation/group.mjs: the mutation run's groups (ADR 0038, the T2 amendment's T2b-2 part).
 
 const entry = (group: unknown, tests = ['tests/a.test.ts']) => ({ tests, floor: 90, baseline: '', group });
 const scope = { 'src/a.ts': entry('core'), 'src/adapters/android-w.ts': entry('android', ['tests/w.test.ts']), 'src/ui-tree/s.ts': entry('scene', ['tests/s.test.ts']), 'scripts/truth/batch/lab-x.ts': entry('lab', ['tests/x.test.ts']) };

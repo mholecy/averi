@@ -102,12 +102,10 @@ export interface Row {
  * The stroke a row hands back when it names none: the step's own `points`,
  * the ones the driver sends (interact/stroke-plan.ts makes them once, the
  * touch-down question asked at them — A1 of the round-21 architecture pass),
- * so nothing here re-derives geometry; before deep/r3-scroll a stand-in
- * built from the step's shape, which could not see the driver's own
- * judgement of the box (the probe drawn off its container under the IME
- * passed through it), and until A1 the same points made again from the
- * step. A row that means another stroke — one shorter than twice
- * TOUCH_SLOP — hands it in `drawn`.
+ * so nothing here re-derives geometry: a stand-in built from the step's
+ * shape would not see the driver's own judgement of the box (the probe drawn
+ * off its container under the IME would pass through it). A row that means
+ * another stroke — one shorter than twice TOUCH_SLOP — hands it in `drawn`.
  */
 export const drawnFor = (step: Extract<RoundStep, { do: 'stroke' }>): Stroke => {
   const { points } = step;
@@ -118,9 +116,9 @@ export const drawnFor = (step: Extract<RoundStep, { do: 'stroke' }>): Stroke => 
 /**
  * The tree a row read: the screen, the matches inside their clipping
  * containers (outermost first, each `clipsDescendants`; with none, one
- * screen-sized `scrollable` unless `unscrolled`), `mainScroller`
- * beside them (listing `mainContent`), the nodes drawn `over` them, a progress node when `loading`,
- * and `rest`. The round
+ * screen-sized `scrollable` unless `unscrolled` or there is no match),
+ * `mainScroller` beside them (listing `mainContent`), the nodes drawn `over`
+ * them, a progress node when `loading`, and `rest`. The round
  * derives every tree fact from it (scroll-read.ts#TreeFacts) as it does
  * from a device's — the row says what is ON the screen, never what the
  * round should conclude. A match nested in another match (an id on a
@@ -173,7 +171,7 @@ export interface Played {
   rounds: { asks: Ask[]; step: Step }[];
   steps: Step[];
   asks: Ask[];
-  /** The stop, when a row ended the scroll (the last row must). */
+  /** The stop, when a row ended the scroll. */
   outcome: ScrollOutcome | undefined;
 }
 
@@ -250,5 +248,4 @@ export const NO_BACK: KeyboardRemedy = { dismissal: 'none', advice: 'ADVICE' };
 /** A shown keyboard covering `band` alone, as the reading's `cover()` gives it. */
 export const coverOver = (band: Rect, remedy: KeyboardRemedy = BACK): KeyboardCover => ({ rects: [band], top: band, band, remedy });
 
-/** A match: identifier `id`, at `rect`. */
 export const match = (rect: Rect, id = 't'): UiNode => node({ role: 'button', identifier: id, rect: { ...rect } });

@@ -1,11 +1,9 @@
 /**
  * `simctl appinfo` as it prints (an old-style plist), trimmed to the keys
- * read and two around them — shared by the parser's tests
- * (simctl-appinfo.test.ts) and the launch's foreground wait
- * (ios-foreground.test.ts), and the liveness check (ios.test.ts). `display`
- * and `name` are written as given (quote a name with spaces); undefined
- * leaves the key out. `bin` gives the binary: `executable` (default
- * Contacts) and a `path`, written quoted (no Path line without one).
+ * read and two around them. `display` and `name` are written as given
+ * (quote a name with spaces); undefined leaves the key out. `bin` gives the
+ * binary: `executable` (default Contacts) and a `path`, written quoted (no
+ * Path line without one).
  */
 export const appinfo = (
   display: string | undefined,

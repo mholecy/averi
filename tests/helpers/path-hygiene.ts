@@ -5,11 +5,9 @@ import { join } from 'node:path';
 import { escapeRegExp } from '../../src/util/regex.js';
 
 /**
- * The path hygiene rules (T2 S1 seeded them over the batch module, T8 made them repo-wide): what no committed file may
- * name — a scratchpad, a temporary folder, the evidence folder, a home directory, the user. Read by
- * tests/docs/path-hygiene.test.ts (the repo's trees) and tests/truth/batch/hygiene.test.ts (the batch module's UUID
- * rule). The forbidden fragments are built here, never written whole, so this file holds none of them itself and is
- * scanned like any other.
+ * The path hygiene rules (T2 S1, T8): what no committed file may name — a scratchpad, a temporary folder, the evidence
+ * folder, a home directory, the user. The forbidden fragments are built here, never written whole, so this file holds
+ * none of them itself and is scanned like any other.
  */
 
 /** The averi checkout's root. */

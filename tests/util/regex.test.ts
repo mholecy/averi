@@ -3,9 +3,8 @@ import { escapeRegExp } from '../../src/util/regex.js';
 
 /**
  * A string, escaped, matches as literal text, and the escaped text itself is pinned: the text hint shows it verbatim as
- * the `match:` to write. Pinned directly since T18: the indirect tests through textHint pin only `.`
- * (tests/verify/assert.test.ts, "1,250.00 MDL"), so the other 13 characters of the class were unpinned. In
- * tests/verify/text-hint.test.ts until T22 moved the helper to src/util/regex.ts.
+ * the `match:` to write. Pinned directly (T18): the indirect tests through textHint pin only `.`
+ * (tests/verify/assert.test.ts, "1,250.00 MDL"), so the other 13 characters of the class would go unpinned.
  */
 describe('escapeRegExp', () => {
   // Every character the escape's class claims: . * + ? ^ $ { } ( ) | [ ] \
