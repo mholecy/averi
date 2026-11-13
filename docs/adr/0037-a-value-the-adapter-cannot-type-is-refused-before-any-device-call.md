@@ -10,6 +10,8 @@ every refusal names the remedy true for its adapter — see the D43 amendment be
 Amended 2026-11-03 (batch-11: D43 proven live — the last paragraph of the D43 amendment).
 Amended 2026-11-12 (A41a: `IosAdapter.typeable` is asked of the tree source per call — under `auto` WDA's set until a
 fallback to idb, idb's after it, and a fill checks the value again after its first read; ADR 0046).
+Amended 2026-11-13 (A40: the pasteboard route stays rejected for idb, with the reasons found and the bar a reopening
+must meet — the pasteboard entry under Rejected; ADR 0046's A40 amendment).
 
 ## Context
 
@@ -81,6 +83,28 @@ control-character check and before any device call.**
 - **The pasteboard** (`simctl pbcopy` then paste, or Android's clipboard then paste). It overwrites the user's
   pasteboard, which may hold what they copied. It needs a Cmd+V chord or a long-press menu that averi does not drive.
   The simulator's pasteboard may sync to the host's.
+  Looked at again for A40 (2026-11-13), for an iOS adapter on idb, without a device run. It is still rejected:
+  - idb has no pasteboard command and no chord. `ui key-sequence` presses one key after another and never holds one,
+    so Cmd+V would need a new HID verb in averi's idb helper and in its argv allowlist (`adapters/idb.ts`).
+  - `simctl pbcopy` and the paste are two calls. Another simulator, or the host's pasteboard sync, can write the
+    pasteboard between them, and the field then takes text averi did not choose. Restoring the user's pasteboard
+    after it (`simctl pbpaste`) keeps its text only.
+  - iOS 16 and later can show an "Allow Paste" alert when an app reads the pasteboard on its own. A paste through
+    UIKit's `paste:` (the edit menu, or Cmd+V) is expected not to show it. This is Apple's stated behaviour, not
+    measured here. An engine that reads the pasteboard itself, as Flutter's `Clipboard.getData` and some web views
+    do, can show the alert, which then covers the fill.
+  - The landing rule would judge a paste as it judges typing, since interact/fill-landing.ts judges the field's reading,
+    not how the text got there. But a dropped tail (ADR 0023) is typed again through idb, which cannot type a non-ASCII
+    tail, so the retype that makes a fill recover would not exist for a paste. A field that refuses or reformats a paste
+    (a length limit, an input mask: ADR 0034) would be changed and still miss, where the refusal changes nothing.
+  - When it would matter at all: ADR 0046's A40 amendment, "When it matters".
+
+  **The bar for reopening it** is a device probe on the lab simulator, before any code. `simctl pbcopy` and a
+  helper-sent Cmd+V must fill form-basic's b1d and b7 values exactly, 20 of 20, in each field kind: a UIKit field
+  (form-basic), the React Native lab's rn-field and a SwiftUI `TextField`, plus a Flutter field if the lab gains one.
+  The tree must show 0 "Allow Paste" alerts over all of them. The probe must run with the host's pasteboard sync on
+  and off. The pasteboard must read back as it was before each fill. A field with a length limit or an input mask
+  must be refused, or left exactly as it was.
 - **The ADB keyboard IME** (a third-party APK that types broadcast text). It installs an app averi does not own and
   switches the IME away from the one averi's typing was measured against (Gboard: the commit nudge, `typingDelivery`,
   the floating-keyboard cases).
