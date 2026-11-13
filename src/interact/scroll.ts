@@ -216,7 +216,7 @@ export type ScrollAdapter = Pick<
  *   above a node drawn over the container's lower part — a floating tab bar
  *   took the touch-down), its length the container's, and on an adapter with
  *   a `dragSpeed` (Android) at that speed (swipe.ts#dragMs) — the time it
- *   costs against the 15 s default is on adapters/android.ts #dragSpeed. On
+ *   costs against the 15 s default is on adapters/android.ts#dragSpeed. On
  *   idb's flat list a full stroke is paced by its plan (stroke-plan.ts#PACED,
  *   524 pt in 1.5 s; D20) — estimated, not measured: a round ≈ 2.2–2.5 s (the
  *   stroke, the 400 ms settle, an idb read, overhead) against ~1 s before, so

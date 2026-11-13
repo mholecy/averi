@@ -11,10 +11,10 @@ import type { EnvValues } from './credentials.js';
  * (`appBuildPath`). It is kept apart from flow/config.ts, which holds the
  * schema, the types and the pure walks over them, so parsing a payload loads
  * no I/O; the `.env.averi` reading is one function here that returns a value
- * rather than writing `process.env` (`envBeside`, below). Which of these loaders a TOOL
- * CALL runs, and when a missing or invalid file is tolerated, is
- * flow/tool-config.ts's; only the mapping of each tool name to its policy is
- * the MCP layer's (mcp/config-policy.ts).
+ * rather than writing `process.env` (`envBeside`, below). Which of these
+ * loaders a TOOL CALL runs, and when a missing or invalid file is tolerated,
+ * is flow/tool-config.ts's; only the mapping of each tool name to its policy
+ * is the MCP layer's (mcp/config-policy.ts).
  */
 
 /** What a config-requiring tool starts from: the parsed descriptor and the environment its values resolve in. */
@@ -165,9 +165,9 @@ export async function loadConfigIfPresent(path: string): Promise<AveriConfig | u
  * variable the user set is never overridden; the file is re-read on EVERY
  * load, so editing .env.averi mid-session takes effect on the next tool call
  * (a first-load-wins read was seen to keep typing stale credentials for the
- * server's whole lifetime). Returned, not written into `process.env`: a
- * merged value leaves no written names to refresh on the next load, and no
- * state that decides a value. A missing file contributes nothing.
+ * server's whole lifetime). Returned, not written into `process.env`:
+ * nothing is written, so nothing needs refreshing on the next load, and no
+ * state decides a value. A missing file contributes nothing.
  *
  * So a name REMOVED from .env.averi is gone on the next load (kept in
  * `process.env`, a removed `AVERI_ENV` would keep every later run on the old

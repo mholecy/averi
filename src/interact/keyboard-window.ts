@@ -105,9 +105,8 @@ export class KeyboardStateDisagreement extends KeyboardGuardError implements Ref
 // again). With one table, every call site switches over answers its moment
 // cannot get, runtime throws guard arms no input reaches, and one word means
 // two things (`hold`: "wait and ask again" in the guard, "do nothing" in the
-// dismissal). So each moment is its own pure, synchronous decision with its
-// own result type, and the compiler — not a runtime throw — rules out the
-// impossible arms.
+// dismissal). So each moment is its own decision with its own result type,
+// and the compiler — not a runtime throw — rules out the impossible arms.
 //
 // Two of the four are one ternary each over one input, so they are written
 // where they are used, not as functions whose row tests would test the

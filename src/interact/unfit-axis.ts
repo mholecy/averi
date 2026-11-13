@@ -14,7 +14,7 @@ import { axisOf, type Direction } from './swipe.js';
  * What it reaches depends on how the source lists the card. A Compose card is listed where it lies, so it can be
  * `clipped` past the carousel's edge and judged. A RecyclerView's (or a ViewPager2's) card is a View child, listed cut
  * flush to the carousel, never `clipped`, so D59 does not reach it. Should a dump ever list one clipped, D59 would
- * apply to it as to any other: that case is D68's slice, not this one.
+ * apply to it as to any other.
  *
  * No device call: the strokes are the ones the call sent anyway, and the movements are the ones the motion ledger
  * already records (interact/motion-ledger.ts#cardMoves). A told axis wins: this is asked only where the tree tells none.

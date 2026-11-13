@@ -216,10 +216,10 @@ class ReentryError extends Error {
  * It is raised too (D81) for a `scroll_until` whose `within` names no scroll view for any reason but `absent`
  * (interact/within.ts#WithinRefusedError): several matches, a match in no scroll view, one that scrolls only across
  * the stroke, a tree that lists no scroll view (idb) — an authoring error no screen cures, terminal like a config
- * refusal. An `absent` one is skipped: the list, like the interstitial, may not be on this screen. One (D80) whose
- * named scroll view has no room for a swipe (`noRoom`: the keyboard over it, too little of it on screen) is terminal
- * too, with its own reason: the list IS on this screen, so skipping would run on as if it had been scrolled — the
- * room is an earlier step's to make (hide the keyboard), as a refused tap's cover is.
+ * refusal. An `absent` one is skipped: the list, like the interstitial, may not be on this screen. One whose named
+ * scroll view has no room for a swipe (`noRoom`: the keyboard over it, too little of it on screen, D80) is terminal
+ * too, with its own reason: the list IS on this screen, so skipping would run on as if it had been scrolled — the room
+ * is an earlier step's to make (hide the keyboard), as a refused tap's cover is.
  *
  * Only an `optional:` raises it. The same refusal outside one is the step's
  * plain failure and a rung that throws it escalates — the owner's decision is
@@ -752,8 +752,8 @@ export class FlowEngine {
       // (read-tree.ts#showsProgress) never holds — it is a screen saying it
       // still loads — and a held "no" says so in one `state` line before the
       // rung. The accepted risk: a rendered loading screen whose indicator
-      // the tree source does not report as `progress` (D27 made a React
-      // Native ActivityIndicator through WDA one that it does) that holds for
+      // the tree source does not report as `progress` (through WDA a React
+      // Native ActivityIndicator is one it does report, D27) that holds for
       // 2 s costs a cheap rung run on it, or an escalation to the next cheap
       // one. A bare or a failed read restarts the hold.
       //
@@ -1082,12 +1082,12 @@ export class FlowEngine {
    * (flow/hold-tracker.ts — same fingerprint across reads spanning `holdMs`;
    * a fingerprint change, a bare tree, a spinner or a failed read starts it
    * over), and once it says held the probe answers `no` without polling to
-   * its deadline. A spinner or a bare tree is otherwise counted as without
-   * `holdMs` (a spinner tree still counts as rendered). A handed-on read is never shown
-   * to it (it may only answer `yes`); a failed read is, through pollTree's
-   * observer below (pollTree shows the predicate trees only): the same tree
-   * on both sides of reads that saw nothing did not provably hold. Without
-   * `holdMs` a `no` still waits for the deadline. A held `no` carries
+   * its deadline. A spinner or a bare tree is otherwise counted as it is
+   * without `holdMs` (a spinner tree still counts as rendered). A handed-on
+   * read is never shown to it (it may only answer `yes`); a failed read is,
+   * through pollTree's observer below (pollTree shows the predicate trees
+   * only): the same tree on both sides of reads that saw nothing did not
+   * provably hold. Without `holdMs` a `no` still waits for the deadline. A held `no` carries
    * `heldMs`, how long its tree held, for the ladder's trace line.
    */
   private async detects(
@@ -1541,9 +1541,9 @@ export class FlowEngine {
         if (tap && isRefusedOnPresentElement(e)) throw this.failed(s, new OptionalNotSkipped(e));
         // A config refusal is not an absent interstitial: an empty secret, a
         // `type_pin` value with no digits, an undeclared credential (a
-        // malformed `timeout:` is refused at load, A19). Skipping it would let
-        // the flow run on with the login half-typed and fail a screen later,
-        // the shape flow/credentials.ts exists to prevent.
+        // malformed `timeout:` never gets here: it is refused at load, A19).
+        // Skipping it would let the flow run on with the login half-typed and
+        // fail a screen later, the shape flow/credentials.ts exists to prevent.
         // `isTerminal` is the ladder's own "re-running cannot fix this" set: a
         // SetupError, and an UnreadTreeRefusal, which no step inside an
         // `optional:` can raise today (only the ladder does, and no step runs

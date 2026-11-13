@@ -61,7 +61,7 @@ export const defaultFactory: AdapterFactory = (platform, deviceId, opts) => {
  * wda-backed adapter starts one as well (its input is idb's). Every tool of a project asks for the project's kind
  * (D41), so a simulator runs one helper; two only when two projects with different tree sources drive it from one
  * server (ADR 0032, amendment D41). `deps` are the tree source's WebDriverAgent server options (adapters/wda.ts) — a
- * lab WebDriverAgent's port and derived data, say; the server's own wiring (defaultFactory) passes none.
+ * lab WebDriverAgent's port and derived data, say; the server's own wiring passes none.
  */
 export function iosAdapterFor(
   udid: string,

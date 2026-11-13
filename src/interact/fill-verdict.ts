@@ -40,21 +40,23 @@
  *   `not-taken`, `lost`, `placeholder`) first, then the clear's
  *   (`clear-unmeasured`, `clear-unchanged`, `clear-no-length` — at most
  *   one), never when the read-back `landed` — with clear, `landed` is "the
- *   field shows exactly the value", which is what the clear was for. A clear
- *   ALONE (nothing typed, read-back `nothing-typed`) that stopped on
- *   unchanged deletes is therefore unverified: `cleared` in deletes, its
- *   reason the only one.
+ *   field shows the value, exactly or reformatted by the field (D18)", which
+ *   is what the clear was for. A clear ALONE (nothing typed, read-back
+ *   `nothing-typed`) that stopped on unchanged deletes is therefore
+ *   unverified: `cleared` in deletes, its reason the only one.
  * - `caveats` order: the not-an-input finding, then the masked-append
  *   warning, then a reformat's added point, then text around the value
  *   unread. Two can come together: not-input with masked-append (a node of
  *   another role that showed bullets after focus, whose read-back did not
- *   land), and masked-append with a reformatted point only if a field that
- *   showed bullets after focus reads plain after the typing. The other pairs
- *   exclude each other: a reformatted point and a focus-unread need a landed
- *   read-back, which a not-input finding never has; a focus-unread needs the
- *   post-focus re-read skipped, so there is no held count to warn of; and a
- *   landing is reformatted or focus-unread, never both
- *   (fill-landing.ts#landingOf).
+ *   land), and masked-append with a reformatted point, without clear, when
+ *   the reading keeps the bullets the field held after focus and shows the
+ *   typing after them with an added point (`••••1.234` for `1234`: the
+ *   bullets are the earlier text, `priorsOf`); a plain reading of such a
+ *   field (`1.234`) does not land. The other pairs exclude each other: a
+ *   reformatted point and a focus-unread need a landed read-back, which a
+ *   not-input finding never has; a focus-unread needs the post-focus re-read
+ *   skipped, so there is no held count to warn of; and a landing is
+ *   reformatted or focus-unread, never both (fill-landing.ts#landingOf).
  *
  * It judges facts, never a reading: what a read-back that missed the value
  * differs by (`Difference`) is interact/fill-landing.ts#readingOf's,

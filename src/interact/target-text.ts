@@ -135,9 +135,8 @@ export const keyboardUpText = (lineY: number): string => `the soft keyboard is u
 
 /**
  * `clause` — the sentence that says how to hide the soft keyboard, `hideKeyboardHow`'s words alone by default — then,
- * unless the adapter hides it with `back`, the adapter's `cannotHide` with its advice. Every sentence that says how to
- * hide the keyboard composes it here. Both branches are reached: `back` on Android, the other on iOS (WDA's and idb's
- * remedy is `none`).
+ * unless the adapter hides it with `back`, the adapter's `cannotHide` with its advice. Both branches are reached: `back`
+ * on Android, the other on iOS (WDA's and idb's remedy is `none`).
  */
 export function hideClause(remedy: KeyboardRemedy, clause: string = hideKeyboardHow(remedy)): string {
   return remedy.dismissal === 'back' ? clause : `${clause}; ${cannotHide(remedy.advice)}`;

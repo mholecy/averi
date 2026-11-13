@@ -21,13 +21,13 @@ import { NO_CONFIG, OPTIONAL_CONFIG, REQUIRED_CONFIG, REQUIRED_CONFIG_AND_ENV } 
  * Each entry takes only what its decision reads. Every tool that resolves a
  * device is here (D41): on iOS each reads averi.yaml for the tree source,
  * because the registry keeps one adapter per (simulator, tree source) and a
- * tool that asked without the project's kind would be served by a second,
- * idb-kind adapter (ADR 0032, amendment D41). Two entries depend on the call:
- * `launch_app` reads averi.yaml on Android only when the `app.android.activity`
- * fallback can apply (flow/launch.ts#launchConsultsConfigActivity), and
- * `install_app` requires it only when the call names no path — the config is
- * then the only source of the build; a call with a path reads it as any
- * device tool does.
+ * tool that asked without the project's kind would be served by a second
+ * adapter of the default kind (ADR 0032, amendment D41). Two entries depend
+ * on the call: `launch_app` reads averi.yaml on Android only when the
+ * `app.android.activity` fallback can apply
+ * (flow/launch.ts#launchConsultsConfigActivity), and `install_app` requires
+ * it only when the call names no path — the config is then the only source
+ * of the build; a call with a path reads it as any device tool does.
  */
 
 /**

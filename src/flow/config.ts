@@ -34,10 +34,11 @@ interface FillSpec extends ElementSpec {
 /**
  * One entry of `app.ios.keyboardDismiss` (stage B): how the guard may hide
  * the iOS soft keyboard when it covers a tap target, and how `fill {
- * dismissKeyboard: true }` hides it after typing. Either a `tap` on an element of the app's
- * that hides the keyboard without a side effect — the screen title was
- * measured to (docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md, K5b)
- * — or `accessory: true`, the input-accessory toolbar's trailing button (the
+ * dismissKeyboard: true }` hides it after typing. Either a `tap` on an
+ * element of the app's that hides the keyboard without a side effect — the
+ * screen title was measured to
+ * (docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md, K5b) — or
+ * `accessory: true`, the input-accessory toolbar's trailing button (the
  * app's "Done" above a number pad, K4). The list is ordered: the first entry
  * whose element is on screen is used, and the next one when that left the
  * keyboard up. Once an entry WAS tapped and left the keyboard up, the guard
@@ -372,7 +373,7 @@ function routeStep(v: unknown): StepRoute {
 /**
  * A step, judged by its one key (D86): the kind it names parses the value under that key, and the kind's own issues
  * are said with their path — `steps.3.scroll_until.within.id: Expected string, received number`. Not a `z.union` of
- * every kind (D86): there a wrong type inside a step's object collapses to the union's bare "Unrecognized key(s) in
+ * every kind: there a wrong type inside a step's object collapses to the union's bare "Unrecognized key(s) in
  * object: 'scroll_until'" at the step — when every member fails, zod's union reports the first member that failed
  * only softly, which is the platform override, its fields all optional, failing on the unknown key alone — never the
  * member the step's key named. A discriminated union needs a literal field to pick by, which a one-key step lacks —
