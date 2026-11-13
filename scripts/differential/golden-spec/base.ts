@@ -24,7 +24,7 @@ import { BUDGET_MS, classed, first, notTapped, passed, passes, pointsText, reach
  * `absent` (target-contract.ts#askedUnlistedBy, the target as the tap and the stop ask it) and `nodeAbsent` (#unlistedBy,
  * the colour's identifier): why the replayed source's capture did not list the target — the lab's UIKit table row under
  * idb, which lists no identifier on any element (docs/bugs/2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-
- * identifier.md). The truth that the source does not list it outranks "open → Tapped" (proposed ADR 0020): no reply of
+ * identifier.md). The truth that the source does not list it outranks "open → Tapped" (ADR 0020): no reply of
  * that source can find it, so the honest one says the source's limit (replies.ts#noIdListedSaid) — a not-found that
  * says nothing of why is a mismatch.
  */
@@ -87,7 +87,7 @@ export function probeDelivered(t: Pick<TargetTruth, 'frame' | 'probe'>): Point {
  * tools' rounding (a uiautomator centre falls on a half pixel, idb's frames carry thirds of a point). averi's tap on an
  * open target is centre-based (ADR 0009 N-a), the centre of the target's node in the tree it reads — the tree the
  * harness replays, so the point is known exactly: a tap moved off it by a cover averi imagines, however small, is
- * caught whether or not the reply says it moved (the plan's phase 3 follow-up, round 4).
+ * caught whether or not the reply says it moved (the plan's phase 3 follow-up).
  */
 export const NODE_CENTRE_SLACK = 1;
 

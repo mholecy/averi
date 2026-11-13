@@ -103,8 +103,8 @@ export interface CaseRecord {
 }
 
 /**
- * What a judge reads beyond the app's states: the strokes averi drew (CaseRecord `swipes`, a carousel case's), the device's
- * focus reads (CaseRecord `focus`, a chooser case's: live-chooser.ts).
+ * What a judge reads beyond the app's states: the strokes averi drew (CaseRecord `swipes`, a carousel case's), the
+ * device's focus reads (CaseRecord `focus`, a chooser case's: live-chooser.ts).
  */
 export interface DeviceLog {
   swipes?: readonly SwipeEntry[];
@@ -127,10 +127,11 @@ export interface CaseReads {
   /** The app read after every call but the last (`after`): a stop is judged as scroll_until left it. */
   betweenCalls?: true;
   /**
-   * The strokes averi draws during the calls, logged by the SwipeHook (CaseRecord `swipes`, the judge's `log`); `{}` logs
-   * them. `drop`: each stroke listed (1-based) is not sent (live-carousel.ts#SwipeHook), which needs the log, so it lives inside this field.
-   * `shorten`: stroke `stroke` is sent only its first `px` px, averi handed back the stroke it asked for, the short carry
-   * of a device whose frames run long, drawn whatever the device does (T11; both device states seen).
+   * The strokes averi draws during the calls, logged by the SwipeHook (CaseRecord `swipes`, the judge's `log`); `{}`
+   * logs them. `drop`: each stroke listed (1-based) is not sent (live-carousel.ts#SwipeHook), which needs the log, so
+   * it lives inside this field. `shorten`: stroke `stroke` is sent only its first `px` px, averi handed back the stroke
+   * it asked for, the short carry of a device whose frames run long, drawn whatever the device does (T11; both device
+   * states seen).
    */
   swipes?: { drop?: readonly number[]; shorten?: Shorten };
   /** Never read again after a first read not ok (wantsLateRead): a later read would let a fling finish behind the reply's back. */
@@ -544,9 +545,10 @@ const FORMS: Omit<Case, 'group'>[] = [
   { id: 'f8', cell: F, says: "a flow's tap + `type:` into the grouping field", flows: typeFlow(F, 'iban', 'SK3112000000'), calls: [{ tool: 'run_flow', args: { flow: 'type_it' } }], judge: holds('iban', 'SK31 1200 0000') },
   { id: 'f9', cell: F, says: "a flow's `fill:` (clear) into the grouping field", flows: fillFlow(F, 'iban', 'SK3112000000'), calls: [{ tool: 'run_flow', args: { flow: 'fill_it' } }], judge: holds('iban', 'SK31 1200 0000') },
   { id: 'f10', cell: F, says: "a flow's tap + `type_pin:` into the amount field that groups by thousands", flows: pinFlow(F, 'amount', '1234567'), calls: [{ tool: 'run_flow', args: { flow: 'pin_it' } }], judge: holds('amount', `1${NBSP}234${NBSP}567`) },
-  // D37: a dotted date (schema.ts#FieldFormat's `date`; ADR 0034 failed it by rule until D51) under a placeholder with no letter or
-  // digit (`__.__.____`), and a phone that does not reformat under a `+421` placeholder — ADR 0034's D29 gaps. Batch-3
-  // ran them (main 6b4a44df): f11 failed-holds under every source, f12–f14 ok; D51 (ADR 0034's amendment) fixed f11.
+  // D37: a dotted date (schema.ts#FieldFormat's `date`; ADR 0034 failed it by rule) under a placeholder with no letter
+  // or digit (`__.__.____`), and a phone that does not reformat under a `+421` placeholder — ADR 0034's D29 gaps.
+  // Batch-3 ran them (main 6b4a44df): f11 failed-holds under every source, f12–f14 ok; D51 (ADR 0034's amendment) fixed
+  // f11.
   { id: 'f11', cell: F, says: 'fill, no clear, a date the field dots as typed', calls: [fill(F, 'date', '31122026'), shows(F, 'date', '31.12.2026')], judge: holdsShown('date', '31.12.2026') },
   { id: 'f12', cell: F, says: 'fill, clear, a date typed with its own dots into the field that dots it', calls: [fill(F, 'date', '31.12.2026', true)], judge: holds('date', '31.12.2026') },
   { id: 'f13', cell: F, says: 'fill, no clear, a phone number under a `+421` placeholder', calls: [fill(F, 'phone', '421903123456')], judge: holds('phone', '421903123456') },
@@ -785,7 +787,8 @@ export async function rejudgedResults(record: RunRecord, selection: RejudgeSelec
 
 // --- the summary: every case, a known one marked with its note (live-known.ts); exit 1 on an unknown MISMATCH, and on
 // a known case not intermittent that came out ok in a run of this checkout (fixed: strike it off), on a SKIP of a case
-// marked skipFails, on a case with no first state (T10), and on a stale chooser premise (T20a) ---
+// marked skipFails, on a case with no first state (T10), on a failing hedged ceiling, and on a stale chooser premise
+// (T20a) ---
 
 /**
  * What a run (or a rejudged record) reports: the summary's lines, as live.ts prints them; its failure reasons, as data

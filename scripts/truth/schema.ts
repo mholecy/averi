@@ -31,7 +31,10 @@ export type Direction = 'up' | 'down' | 'left' | 'right';
 
 export interface CatalogTarget {
   tag: string;
-  /** `#RRGGBB`: the target is a solid rectangle of it — a text or label target's, its control's box, with the text or icon drawn on it (below). */
+  /**
+   * `#RRGGBB`: the target is a solid rectangle of it — for a text or label target, its control's box, with the text or
+   * icon drawn on it.
+   */
   color: string;
   slot: number;
   /** `layer`: the target lies on the cell's layer (inside the sheet), not on the screen beneath it. */
@@ -407,7 +410,10 @@ export interface ProbeEvent {
 
 export interface TargetTruth {
   tag: string;
-  /** The target's accessibility identifier, as every tree source lists it (rows ask a text or label target by its text or label instead: truth.ts#elementOf). */
+  /**
+   * The target's accessibility identifier, as every tree source lists it (rows ask a text or label target by its text
+   * or label instead: truth.ts#elementOf).
+   */
   id: string;
   /**
    * A text target's text (CatalogTarget.text): its rows ask by it; `drawn` and `seen` are measured over its control's
@@ -680,6 +686,7 @@ export interface FormTruth {
   keyboard: { frame: Rect; field: string | null; panels?: Rect[] } | null;
   screenError: (Message & { frame: Rect }) | null;
   submits: { valid: boolean }[];
+  /** The picker sheet's frame, when it is presented. */
   sheet?: Rect;
   /**
    * The principal title (CatalogForm.titleId), its frame and its probe: `reached` when a raw tap at its centre ended

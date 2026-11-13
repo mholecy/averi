@@ -803,9 +803,9 @@ export function judgeBlankStretch(tag: string, view: string, replies: readonly s
 /**
  * The within cases (D78, ADR 0010's D78 amendment): a row of a list beside the screen's largest scroller — android
  * scroll-bounded's O and F, rows of `lower`, which uiautomator does not list at launch — reached by `scroll_until` with
- * `within` naming that list: O by its rect (the capture's `scrollViews`, in px as uiautomator dumps it), F by a selector
- * of S, a row of it (its nearest scroll view). Without `within` every stroke would go over `upper` (D76). F lies ~2300 px
- * down a 495-px list — about 8 strokes at 60 % of it — so the call is given 12 swipes and 30 s. Judged by
+ * `within` naming that list: O by its rect (the capture's `scrollViews`, in px as uiautomator dumps it), F by a
+ * selector of S, a row of it (its nearest scroll view). Without `within` every stroke would go over `upper` (D76). F
+ * lies ~2300 px down a 495-px list — about 8 strokes at 60 % of it — so the call is given 12 swipes and 30 s. Judged by
  * `judgeWithin`: every stroke on the list bringing the target closer, the stop, then the tap. Android only: on iOS the
  * WDA capture's rect is in points and idb lists no scroll view (refused there by design).
  */

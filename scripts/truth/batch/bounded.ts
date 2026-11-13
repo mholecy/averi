@@ -6,13 +6,13 @@ import type { Exec } from '../lab-device.js';
 import { exitText, messageOf } from './words.js';
 
 /**
- * Every call a batch makes is bounded: a wedged device call cannot hold the batch longer than its bound (batch-7's
- * `perl -e 'alarm …; exec …'`). A call past its bound is a failed call like any other, exit 142 —
- * but here its whole process group goes, not the direct child alone: live.ts or a Gradle build left grandchildren
- * that perl's alarm and src/adapters/exec.ts never reached.
+ * Every call a batch makes is bounded: a wedged device call cannot hold the batch longer than its bound (a shell
+ * batch's `perl -e 'alarm …'`). A call past its bound is a failed call like any other, exit 142 — but here its whole
+ * process group goes, not the direct child alone: live.ts or a Gradle build left grandchildren that perl's alarm and
+ * src/adapters/exec.ts never reached.
  *
  * Two kinds of call, both in a group of their own (proc.ts): `bounded`, a probe, which the abort stops before it puts
- * anything back (a probe no longer gets the terminal's Ctrl-C, so the runner must stop it); and `detached`, a restore
+ * anything back (a probe does not get the terminal's Ctrl-C, so the runner must stop it); and `detached`, a restore
  * or a check, which nothing but its own bound stops (a second Ctrl-C must not kill the restore) — or
  * its `scope`'s stop, when the restore that started it passed its own bound.
  *

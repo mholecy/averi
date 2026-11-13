@@ -36,6 +36,7 @@ export function probePoint(frame: Rect): { x: number; y: number } {
  */
 export const within = (p: { x: number; y: number }, r: Rect) => p.x >= r.x && p.x < r.x + r.width && p.y >= r.y && p.y < r.y + r.height;
 
+/** Whether two points lie within TOUCH_SLACK of each other on each axis — a touch counts as the tap's (touchesAt). */
 export const nearPoint = (p: { x: number; y: number }, q: { x: number; y: number }) => Math.abs(p.x - q.x) <= TOUCH_SLACK && Math.abs(p.y - q.y) <= TOUCH_SLACK;
 
 /**
@@ -653,7 +654,8 @@ export function geometryOf(frame: Rect, ctx: GeometryContext): Geometry {
 }
 
 /**
- * Whether a state reports anything a geometry is measured from — else the targets carry none.
+ * Whether a state reports anything a geometry is measured from — else the targets carry none (the committed captures of
+ * the plan's phase-1/2 cells).
  */
 export const measuresGeometry = (s: Pick<LabState, 'safeArea' | 'scrollViews' | 'chrome'>) => s.safeArea !== undefined || s.scrollViews !== undefined || s.chrome !== undefined;
 

@@ -77,7 +77,8 @@ export const messageOf = (e: unknown): string => (e instanceof Error ? e.message
 export const failedCall = (r: CallResult): boolean => r.code !== 0 || r.timedOut;
 
 /**
- * A failed call in words: `exit n <its first line>`, or that it passed its bound — stderr's first line before stdout's.
+ * A failed call in words: `exit n <its first line>`, or that it passed its bound — the first line of stderr and stdout
+ * joined (stderr first).
  */
 export const exitText = (r: CallResult): string => {
   const said = firstLineOf(r.err + r.out);

@@ -324,7 +324,7 @@ export async function withMeasuredPanel(
  * One focus read as the device printed it (AndroidLab.focus; the chooser group's, live-chooser.ts): the two greps, the
  * window the last one read; `settle` when it waited for the window transition (`windowInTransition`) — how long, and the
  * first window read, what the device showed when averi had replied; or the error that stopped it. Review round 1's
- * records keep `waitedMs` and `firstWindow` at the top instead (live-chooser.ts#frontOf reads both).
+ * records keep `waitedMs` and `firstWindow` at the top instead.
  */
 export type FocusRead = { window: string; activities: string; settle?: { waitedMs: number; firstWindow: string } } | { error: string };
 

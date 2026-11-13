@@ -12,8 +12,8 @@ import { BUDGET_MS, first, landed, notTapped, passed, passes, pointsText, reache
  * Phase 3's row types (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 3 B1): what each verb must answer of an
  * open target whose MEASURED geometry (truth.ts#geometryOf) is not `whole`, and of the dismissal and the stroke's
  * direction. Shared by the families: edges.ts and bars.ts map a geometry to its rows; B2–B5 wire them to their cells. A
- * target carries a geometry only when its capture's state reported the bands, scroll views or chrome — no capture
- * before phase 3 does — so none of them asks anything of the existing corpus.
+ * target carries a geometry only when its capture's state reported the bands, scroll views or chrome; a capture without
+ * them asks none of these rows.
  *
  * WHAT a row asks — the tap must fire, may refuse, must refuse (and with which remedy); a stop holds where the target
  * lies or not; `fully` asked or not; the target allowed missing from the tree — is the target contract's
@@ -179,7 +179,7 @@ export function colourFails(platform: Platform, t: TargetTruth, why: string, opt
  * navigation band under three buttons, where the bar takes the tap. Under gesture navigation that band is the app's
  * (truth.ts#navigationBandTakes, by the capture's CellTruth.navigation): measured on the averi_lab AVD, bands' N there
  * is reached, 90 % drawn and seen in its own colour beneath the gesture handle, so a PASS on its own colour is right
- * about what shows (proposed ADR 0020: the measured truth outranks a hand-written expectation) and a FAIL is averi failing
+ * about what shows (ADR 0020: the measured truth outranks a hand-written expectation) and a FAIL is averi failing
  * closed on the band it models (ADR 0009 N-a): either is accepted, nothing else. With no mode recorded consistency
  * holds the target broken, and no row is asked. Who takes the band is truth.ts#navigationBandTakes' alone (the bar only
  * on Android); iOS's home-indicator band never comes here — the contract judges a target there by what else lies

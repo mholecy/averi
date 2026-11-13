@@ -80,6 +80,7 @@ export class Recorder {
     };
   }
 
+  /** A sleep begins; the returned function is called when it fires. */
   sleep(ms: number, caller: string): () => void {
     if (!this.open) return () => undefined;
     const entry: OpenSleep = { ms, caller, startMs: this.now() };

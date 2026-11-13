@@ -291,9 +291,9 @@ const PROBES_HELD = /(a probe swipe|(\d+) probe swipes) toward it moved nothing/
 /**
  * The side of a flush edge the `fully` stop says it probed (src/interact/scroll-text.ts#flushText: "its <side> edge
  * lies on its scroll container's (…), and a probe swipe toward it moved nothing" — or, at a node pinned in it (VA1),
- * "its <side> edge lies on the edge of <node> (…), pinned at its scroll container's (…) <side> and drawn after it, and a
- * probe swipe toward it moved nothing"; since T12 "2 probe swipes toward it moved nothing", both read, as records keep
- * the older), or undefined when it says none.
+ * "its <side> edge lies on the edge of <node> (…), pinned at its scroll container's (…) <side> and drawn after it, and
+ * a probe swipe toward it moved nothing"; since T12 "2 probe swipes toward it moved nothing", both read, as records
+ * keep the older), or undefined when it says none.
  */
 export function flushProbedSide(reply: string): 'top' | 'bottom' | 'left' | 'right' | undefined {
   return new RegExp(`its (top|bottom|left|right) edge lies on (?:its scroll container's|the edge of) .*${PROBES_HELD.source}`).exec(reply)?.[1] as 'top' | 'bottom' | 'left' | 'right' | undefined;
@@ -430,7 +430,7 @@ export const refusedUnsentSaid = (reply: string) => reply.includes(UNSENT);
  * What a fill's error says of a field the typing left as it was (src/interact/fill-text.ts's `unchanged` caveat, "the
  * field did not change: …"). Bare, so it also accepts the deletes' sentence (fill-text.ts, "… that the deletes did not
  * change") and scroll_until's "did not change the screen"; tightening it to "the field did not change" would be a judge
- * change, not this read's move here.
+ * change.
  */
 export const UNCHANGED_SAID = UNCHANGED;
 

@@ -326,7 +326,7 @@ function answer(cmd: string, args: string[], stdin: string | undefined): Answer 
   }
   if (cmd === 'idb') {
     // runIdb's `--udid U` out, and the `--` a typing's text follows (D74, `ui text --udid U -- <text>`): the call is
-    // recorded as `idb ui text <text>`, so a replay's calls read alike.
+    // recorded as `idb ui text <text>`, as a side from before D74 sends it, so both sides' calls read alike.
     const at = args.indexOf('--udid');
     const rest = at === -1 ? [] : args.slice(at + 2);
     const argv = at === -1 ? args : [...args.slice(0, at), ...(rest[0] === '--' ? rest.slice(1) : rest)];

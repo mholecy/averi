@@ -415,6 +415,7 @@ export function disposition(rs: readonly NoteResult[], out?: string, partial = f
   return { path: out, stale: `${out}.failed`, code };
 }
 
+/** The notes `--note` names (all without it), in the table's order; a name that is no note of the table is an error. */
 export function notesOf(table: Pick<Calibration, 'notes'>, only: readonly string[] | undefined): CalibrationEntry[] {
   const notes = table.notes.filter((e) => only === undefined || only.includes(e.n));
   const unknown = (only ?? []).filter((n) => !table.notes.some((e) => e.n === n));

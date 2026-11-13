@@ -68,7 +68,7 @@ import { verdictLine, type Verdict } from './words.js';
 
 /**
  * The live groups the batch runs, in its order: the chooser group, then live.ts's other Android groups (dismissal is
- * iOS only).
+ * iOS only: lab-run-ios.ts runs it).
  */
 export const LAB_RUN_GROUPS = ['chooser', 'forms', 'visibility', 'ensure', 'carousel'] as const;
 export type LabRunGroup = (typeof LAB_RUN_GROUPS)[number];
@@ -125,6 +125,8 @@ const liveBlock = (group: LabRunGroup): Pick<Block<StandingKnobs>, 'id' | 'label
 
 /**
  * The batch's state file, written clean: no probe keeps lab data here, so putting the state back is writing the file.
+ * The chooser window's restore writes it before its own --check: a check that fails there still leaves its RESTORE
+ * line, which refuses the next run.
  */
 export function cleanState(fs: BatchFs, file: string): StateRestore {
   return {

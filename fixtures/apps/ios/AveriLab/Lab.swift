@@ -20,8 +20,8 @@ struct Catalog: Decodable {
 
 struct Cell: Decodable, Identifiable {
     let id: String
-    /// base, presented, forms, edges, bars, false-covers, text, held — CellRouter (AveriLabApp.swift) routes by it; also
-    /// `views`, which only the Android app builds.
+    /// base, presented, forms, edges, bars, false-covers, text, held — CellRouter (AveriLabApp.swift) routes by it;
+    /// also `views`, which only the Android app builds.
     let family: String?
     let layer: String
     let targets: [Target]
@@ -62,8 +62,8 @@ struct FieldSpec: Decodable, Identifiable {
     let kind: String
     let title: String
     let titleId: String?
-    /// The field's own identifier, else lab.<cell>.<tag>. The title's is `titleId`, else `<field's identifier>.title`; a
-    /// design-system component (FE2) sets both to one id, shared by every field and its title.
+    /// The field's own identifier, else lab.<cell>.<tag>. The title's is `titleId`, else `<field's identifier>.title`;
+    /// a design-system component (FE2) sets both to one id, shared by every field and its title.
     let fieldId: String?
     let placeholder: String?
     let prefill: String?
@@ -134,7 +134,8 @@ struct LabEvent: Codable {
     /// "tap" (a target's action fired), "dismissed" (a layer went away), "button" (a layer's own button); on a form
     /// "focus" (the field `tag` took the focus, "" none), "submit" (`tag` valid / invalid), "select" (a picker row);
     /// "touch" (a touch began in one of the app's windows, `tag` "x,y" in screen points — the probe's positive
-    /// control); on a held cell "phase" (what it draws now: bare, spinner, welcome, home, or unconfigured — Held.swift).
+    /// control); on a held cell "phase" (what it draws now: bare, spinner, welcome, home, or unconfigured —
+    /// Held.swift).
     let kind: String
     let tag: String
     let at: Double

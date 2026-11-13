@@ -14,10 +14,10 @@ import { firstLineOf, messageOf, NOTHING_DONE, oneLine, refusedLine, stepLine, t
  * state file not clean. A leftover RESTORE refuses, since a new run would bury it, and the state of every earlier run
  * folder is read, not only the last.
  *
- * The exclusive mkdir guards another run's data: this run's folder is made by this run or the run refuses. It is weaker
- * only against this run's own earlier step writing into a later block's folder, which no batch does. A refusal of a
- * pre-D62 worktree an earlier run left registered is the batch's own check (it knows its worktree): its lines go into
- * `refusals` as `batchReasons` and print with the module's.
+ * The exclusive mkdir guards another run's data: this run's folder is made by this run or the run refuses. This guard
+ * does not cover this run's own earlier step writing into a later block's folder, which no batch does. A batch's own
+ * refusals (e.g. a worktree an earlier run left registered) go into `refusals` as `batchReasons` and print with the
+ * module's.
  */
 
 /** A probe's state file: `{dirty: false, …}` once a restore has been verified; anything else is not proven clean. */

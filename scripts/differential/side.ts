@@ -125,7 +125,7 @@ export type Listing = DeviceDiscovery['list'];
 type DiscoveryOver = typeof import('../../src/adapters/discovery.js').discoveryOver;
 
 /**
- * A side's discovery over the harness's listing, read by every constructor since 8413120: callable as the listing
+ * A side's discovery over the harness's listing, read by every constructor: callable as the listing
  * (a side before A3 takes a function), and an object with `list` and `check` (A3 on). `check` is the side's own
  * `discoveryOver`'s, built without a proof — no host file is read, and the bound check lists. A side without
  * `discoveryOver` never asks `check`.

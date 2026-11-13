@@ -156,6 +156,7 @@ export class StepLog {
     this.fs.append(this.options.stepsFile, `${timed}\n`);
   }
 
+  /** A step line, timed (`09:44:26 OK   kf analyze`). */
   step(word: StepWord, text: string): void {
     this.note(stepLine(word, text));
   }

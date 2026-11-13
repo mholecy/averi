@@ -16,10 +16,10 @@ import type { LabState } from './schema.js';
  */
 
 /**
- * A case's focus reads (CaseReads.focus, CaseRecord `focus`): before its calls (after the launch, or the launcher it was
- * sent to), between them, after them, and after the teardown's BACK when the chooser was left in front (run-case.ts);
- * and, a case started from the launcher (Case.fromLauncher), the HOME activity the device resolves (`home`; absent from
- * the records before T7b's review round 1).
+ * A case's focus reads (CaseReads.focus, CaseRecord `focus`): before its calls (after the launch, or the launcher it
+ * was sent to), between them, after them, and after the teardown's BACK when the chooser was left in front
+ * (run-case.ts); and, a case started from the launcher (Case.fromLauncher), the HOME activity the device resolves
+ * (`home`; absent from the records before T7b's review round 1).
  */
 export interface FocusReads {
   home?: HomeRead;
@@ -137,6 +137,7 @@ const RAN_OUT: LiveVerdict = verdict('SKIP', 'the read after the calls did not s
 /** An old record's read after the calls, taken once, mid-transition: what is left is unread. */
 const NOT_WAITED: LiveVerdict = verdict('SKIP', 'the read after the calls was not waited (an old record) and is mid-transition (mCurrentFocus=null): whether a chooser is left on the stack is unread');
 
+/** The chooser records on the stack, top first. */
 const choosers = (f: Front): string[] => f.records.filter(isChooser);
 const labRecords = (f: Front): number => f.records.filter(ofLab).length;
 

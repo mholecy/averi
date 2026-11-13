@@ -75,7 +75,7 @@ import { averiServer, commitOf } from './session.js';
  *   together, a41.ts#legAAnswer); untimed, the open cell waited for
  *   (`openSettled`), two warm taps on its A; launch_app again and the same first tap with WDA up; launch_app a third
  *   time, untimed the catalog waited for (`catalogSettled`), and the same catalog tap warm — the tap the first one is
- *   judged against. Then two more fresh servers each (A41b review r1): launch_app (its time kept per repeat), no read
+ *   judged against. Then two more fresh servers each (A41b): launch_app (its time kept per repeat), no read
  *   until WAITED_GAP_MS after it replied, and the same first tap (leg (b)); and launch_app (a `clearState`
  *   one on the last repeat, a41.ts#clearsStateOn: auto-tap is the WDA block's last child, so no later session runs on
  *   the wiped app — A44) with the first read at once — its root's label and WDA's active bundle, the app in

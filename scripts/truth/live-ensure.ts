@@ -36,13 +36,15 @@ export const EPS_S = 0.05;
 export const POLL_S = 0.5;
 /**
  * One tree read, with room: idb `describe-all` ~150 ms and a WDA `/source` 35–90 ms warm, uiautomator's dump ~2.3 s
- * (docs/plans/2026-10-30-performance-backlog.md, the per-verb measurements). Kept by D30's calibration (batch-9, three
- * runs a source): every residual under half of heldSlackS.
+ * (docs/plans/2026-10-30-performance-backlog.md, the per-verb measurements). Kept by D30's calibration (the same file,
+ * D30: one run a source in batch-3, two more in batch-9): every residual under half of heldSlackS, the thinnest
+ * uiautomator's, 5.12 s of 5.25 s.
  */
 export const READ_S: Record<Source, number> = { idb: 0.5, wda: 0.5, uiautomator: 3 };
 /** One tap: idb `ui tap` ~185 ms, WDA's alike; adb `input tap` slower — the same measurements, with room. */
 export const TAP_S: Record<Source, number> = { idb: 0.5, wda: 0.5, uiautomator: 1 };
-// Upper bounds with room on purpose: the residual, tap − Welcome − heldS per source, is measured against them (the D30 row).
+// Upper bounds with room on purpose: the residual, tap − Welcome − heldS per source, is measured against them (the D30
+// row).
 /** How long after Welcome + heldS Continue may be tapped: a read in flight, a poll and a read to see Welcome; a read and a tap to tap it. */
 export const heldSlackS = (source: Source) => POLL_S + 3 * READ_S[source] + TAP_S[source];
 

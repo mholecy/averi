@@ -38,9 +38,9 @@ val SUPPORTED_LAYERS = setOf("none", "sheet-medium", "alert", "dialog-fullscreen
 data class Target(val tag: String, val color: Long, val slot: Int, val onLayer: Boolean, val text: String? = null, val label: String? = null)
 
 /**
- * `family`: base, presented, forms, edges, bars, false-covers, text, held, views. `form`: a form cell's catalog entry as
- * it stands — a form builds its own picker sheet, so its `sheet-large` is supported where a coloured-target cell's is
- * not. `held`: a held cell's phase lengths as they stand.
+ * `family`: base, presented, forms, edges, bars, false-covers, text, held, views. `form`: a form cell's catalog entry
+ * as it stands — a form builds its own picker sheet, so its `sheet-large` is supported where a coloured-target cell's
+ * is not. `held`: a held cell's phase lengths as they stand.
  */
 data class Cell(val id: String, val layer: String, val targets: List<Target>, val family: String? = null, val form: JSONObject? = null, val held: JSONObject? = null) {
     val supported get() = layer in SUPPORTED_LAYERS || (form != null && layer == "sheet-large")
@@ -87,12 +87,12 @@ class Lab(context: Context, private val screen: Rect) {
     private var ready = false
     private val frames = linkedMapOf<String, Rect>()
     private val events = mutableListOf<JSONObject>()
-    // The geometry (scripts/truth/schema.ts#LabState): absent from the file on a cell that reports none.
+    // Phase 3's geometry (scripts/truth/schema.ts#LabState): absent from the file on a cell that reports none.
     private var safeArea: Rect? = null
     private val scrollViews = linkedMapOf<String, Rect>()
     private val chrome = linkedMapOf<String, Rect>()
-    // The live oracle (scripts/truth/live.ts; schema.ts#LabState's offsets, strokes): absent from the file on a cell
-    // with no scroll container that reports them.
+    // Phase 5's live oracle (scripts/truth/live.ts; schema.ts#LabState's offsets, strokes): absent from the file on a
+    // cell with no scroll container that reports them.
     private val offsets = linkedMapOf<String, Int>()
     private val strokes = JSONArray()
     private val strokeFrom = mutableMapOf<String, Int>()
@@ -159,7 +159,7 @@ class Lab(context: Context, private val screen: Rect) {
         write()
     }
 
-    // --- the live oracle: where each scroll container is, and each stroke it took ---
+    // --- phase 5's live oracle: where each scroll container is, and each stroke it took ---
 
     /**
      * A scroll container's state, read in one snapshot: its content offset (pixels down its content, 0 its top) and
@@ -271,7 +271,7 @@ class Lab(context: Context, private val screen: Rect) {
     }
 }
 
-// --- the geometry, read once for every family that reports it ---
+// --- phase 3's geometry, read once for every family that reports it ---
 
 /** A View's unclipped frame on the screen, in pixels. */
 internal fun onScreen(v: View): Rect =

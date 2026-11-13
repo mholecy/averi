@@ -51,11 +51,11 @@ import { exitText, failedCall, firstLineOf, messageOf, nameInLine, verdictLine, 
 import type { Point } from '../../../src/adapters/types.js';
 
 /**
- * The lab emulator around a block that may leave the chooser up or a preferred activity behind, over the emulator:
- * --check's reads, the chooser dismissed, the one guarded tap, the install read (`adb get-state` first), the abort-safe
- * reinstall that clears a lab default, the cleanup that branches on --check's exit, and the chooser's dirty window for
- * the abort. What is decided and said is lab-chooser.ts's; here are the calls, through the injected Run, and the files,
- * through io.ts.
+ * The lab emulator around a block that may leave the chooser up or a preferred activity behind (D55, E5), over the
+ * emulator: --check's reads, the chooser dismissed, the one guarded tap, the install read (`adb get-state` first), the
+ * abort-safe reinstall that clears a lab default, the cleanup that branches on --check's exit, and the chooser's dirty
+ * window for the abort. What is decided and said is lab-chooser.ts's; here are the calls, through the injected Run, and
+ * the files, through io.ts.
  *
  * Every call goes to the lab AVD only: a `LabEmu` is had only through lab-device.ts's Android guard (`adb -s <serial>
  * emu avd name` says `averi_lab`), and every adb call names its serial first. Nothing here taps but `tapSafely`, at the
@@ -241,7 +241,7 @@ export interface StateRestore {
 
 /** What the reinstall and the chooser's window share. */
 export interface LabOptions {
-  /** The APK pulled at the lab check (`lab/installed.apk`): the one reinstalled. */
+  /** The APK pulled at the lab check (`lab/run-<id>/installed.apk`): the one reinstalled. */
   apk: string;
   /** main's catalog (fixtures/apps/cells.json): an installed APK's `assets/cells.json` must equal it byte for byte. */
   catalog: string;
@@ -385,8 +385,8 @@ const unknownDuringReinstall = (b: HandBase, why: string): Putback => ({ ok: fal
 
 /**
  * The chooser's dirty window (abort.ts): its restore this module's, over the abort's detached runner — `adb get-state`
- * first (unreachable: nothing pressed; once the reinstall had started, the install is unknown, never "missing" and
- * never "put back", else nothing could be read or put back, with the check hand line; review round 1); BACK and HOME;
+ * first (unreachable: nothing pressed; if the reinstall had started, the install is unknown, never "missing" and never
+ * "put back"; if not, nothing could be read or put back, with the check hand line; review round 1); BACK and HOME;
  * when interrupted inside the reinstall, the install read: missing is installed again from the pulled APK, and the lab
  * installed — again or found so — is proven by its cells.json as the reinstall proves it, or not put back; the probe's
  * state put back (`putBack`) whenever its state file is not clean (review round 4); then --check (BACK and HOME again

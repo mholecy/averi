@@ -7,8 +7,8 @@ import type { StopAsk, TapAsk } from '../../truth/target-contract.js';
 /**
  * The judges every family's rows share (golden-spec.ts, the façade, says what the table is): the verbs, an
  * expectation's shape, what a call SENT (the taps and swipes the fake device logged), and the one classification every
- * row goes through (classed). What a reply SAYS is read by scripts/truth/replies.ts, the live judges' reader too; the
- * helpers here that take an Outcome hand it its reply.
+ * row goes through (classed). What a reply SAYS is read by scripts/truth/replies.ts alone (but for closesItsOwnLayer's
+ * own `scroll_until` check), the live judges' reader too; the helpers here that take an Outcome hand it its reply.
  */
 
 /**
@@ -182,6 +182,7 @@ export function classed<E extends Expectation>(e: E): E {
 /** The taps and swipes the device was sent — what a reply DID, recorded on every golden check. */
 export const sent = (o: Outcome) => o.device.filter((c) => /^(idb ui|adb shell input) (tap|swipe) /.test(c));
 export const notTapped = (o: Outcome) => (claimsTap(o.reply) ? `Tapped: ${first(o)}` : taps(o).length > 0 ? `refused, but sent ${taps(o).join('; ')}` : undefined);
+/** A plain stop that must reach the target where it is: not an ERROR, and no swipe. */
 export const reachedWithNoSwipe = (o: Outcome) => (isError(o.reply) ? `stopped: ${first(o)}` : swipes(o) > 0 ? `swiped ${swipes(o)}×: ${first(o)}` : undefined);
 export const passes = (o: Outcome) => (passed(o) ? undefined : `failed: ${first(o)}`);
 

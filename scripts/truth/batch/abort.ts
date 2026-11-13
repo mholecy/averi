@@ -6,16 +6,16 @@ import type { StepLog } from './steps.js';
 import { EXIT, firstLineOf, messageOf, stepLine, summaryLines, timeOf, twoDigits, verdictLine, type BlockReport } from './words.js';
 
 /**
- * The dirty windows, and what stops a run inside one: batch-6's `on_abort`, batch-7's TRAPEXIT.
+ * The dirty windows, and what stops a run inside one.
  *
  * A **dirty window** is open from before a run's first change to a device until a verified restore closes it (the
  * remembered "Open" answer, the chooser, the simulator settings, a worktree registered in the repo). Whatever stops the
  * run inside one puts it back first:
  * - SIGINT, SIGTERM or SIGHUP (a Ctrl-C, a kill, a closed terminal);
- * - a throw out of the run's body or an uncaught exception or unhandled rejection anywhere — TRAPEXIT's port. Never the
+ * - a throw out of the run's body or an uncaught exception or unhandled rejection anywhere. Never the
  *   `exit` event: it is synchronous, and a restore is not.
  *
- * The abort, once: later signals are only noted; the running probes are stopped, each its whole group (they no longer
+ * The abort, once: later signals are only noted; the running probes are stopped, each its whole group (they do not
  * get the terminal's Ctrl-C); each dirty window is put back, the last opened first, by its own restore through
  * detached calls (a second Ctrl-C cannot kill them) and within its bound; what is not provably put back goes to the
  * RESTORE file as hand lines; then the SUMMARY — INTERRUPTED, each block whose records are complete judged now,
@@ -235,7 +235,7 @@ export class AbortGuard {
   }
 
   /**
-   * Run the batch's body with the abort installed. A throw out of it aborts the run (TRAPEXIT's port). It returns
+   * Run the batch's body with the abort installed. A throw out of it aborts the run. It returns
    * only when the body finished and no abort began; else it rejects once the abort is done (the real seam has exited).
    */
   async run<T>(body: () => Promise<T>): Promise<T> {

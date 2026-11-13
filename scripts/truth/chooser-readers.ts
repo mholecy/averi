@@ -21,6 +21,7 @@ export const LAB_PACKAGE = LAB_APP.native.package;
 /** A RESTORE line's start: every hand line of the chooser's. */
 export const HAND_PREFIX = 'D55 (Android): ';
 
+/** The preferred read: `dumpsys package preferred` (`preferred-activities` reads alike, batch-9). */
 export const PREFERRED_ARGV = ['dumpsys', 'package', 'preferred'] as const;
 
 // --------------------------------------------------------------------------------------- the preferred activities

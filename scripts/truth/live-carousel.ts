@@ -103,7 +103,7 @@ export interface Swiper {
 
 /**
  * The adapter with its `swipe` routed through `hook`, on the instance (the registry's factory, live.ts): a stroke the
- * hook drops is not sent and resolves after its duration (`wait`); every other one goes to the device as before.
+ * hook drops is not sent and resolves after its duration (`wait`); every other one goes to the device.
  */
 export function hookSwipes<A extends Swiper>(adapter: A, hook: SwipeHook, wait: (ms: number) => Promise<unknown> = pause): A {
   const send = adapter.swipe.bind(adapter);
@@ -453,9 +453,9 @@ export const CAROUSEL_CASES: readonly CarouselCase[] = [
     calls: [fullyC(RECYCLER_FREE, 'left'), fullyC(RECYCLER_FREE, 'left')],
     judge: judgeDropTwo,
   },
-  // T12: the first probe after the pre-drag dropped, resolved as drawn — a held first probe with no proof, which must not
-  // read `checked` with C cut (T11's final A/B, short-fix-12). The same first probe goes again (the `no-retry` check
-  // reads it), carries C and proves the cut: then as lv-d62-control.
+  // T12: the first probe after the pre-drag dropped, resolved as drawn — a held first probe with no proof, which would
+  // read `checked` with C cut without T12 (T11's final A/B, short-fix-12). The same first probe goes again (the
+  // `no-retry` check reads it), carries C and proves the cut: then as lv-d62-control.
   {
     id: 'lv-t12-drop-first',
     cell: RECYCLER_FREE,

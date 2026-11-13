@@ -211,6 +211,7 @@ internal fun EdgesScreen(cell: Cell, lab: Lab) {
         } else if (cell.id == "scroll-collapsing") {
             CollapsingList(cell, lab)
         } else {
+            // Laid out down a column (not offset): each container's clip is where the layout puts it.
             val screenHeight = maxHeight
             Column(Modifier.fillMaxWidth()) {
                 var bottom = 0.dp

@@ -25,10 +25,10 @@ import type { ReplyKind } from './replies.js';
  * The kind is pinned (round 5). The committed records measured it (docs/truth/live-records, rejudged by
  * tests/truth/live-rejudge.test.ts): every entry's kind below is what its case's record reads; and the cases with
  * several records, LV2's two flush cases (android-vis.json, cal12-*.json: three runs at 9c7885e, two at d043e65), read
- * `visible` in all six — ok in four, a stop-claim in two: the timing moved the outcome, not the kind;
- * LV5's case likewise (ios-vis-2725e76.json and ios-scroll-bounded-wda-2725e76-*.json, three runs at
- * b71cbbb's src): `refused` where it is not reached, ok in two.
- * A run that reads another kind for a known case fails as NOT known, naming both: refile it.
+ * `visible` in all six — ok in four, a stop-claim in two: the timing moved the outcome, not the kind (its entry since
+ * struck off); LV5's case likewise (ios-vis-2725e76.json and ios-scroll-bounded-wda-2725e76-*.json, three runs at
+ * b71cbbb's src): `refused` where it is not reached, ok in two. A run that reads another kind for a known case fails as
+ * NOT known, naming both: refile it.
  */
 
 /** LE2's rest, accepted — the static KNOWN's own wording (tests/differential/golden/edges.known.ts). */

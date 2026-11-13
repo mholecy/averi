@@ -108,7 +108,7 @@ export function judgedContext(platform: Platform, s: JudgedScreen, view: string 
  * geometry naming no navigation band is the judged one as measured, and one naming it on iOS is measured again in the
  * judged context. tests/truth/target-contract.test.ts holds this over the committed truth (every target's geometry in
  * the judged context equals this; it differs from the measured one for bands' N and Q on iOS only). A target measured
- * nothing (`geometry` undefined) has none to judge.
+ * nothing (`geometry` undefined: the committed captures of the plan's phase-1/2 cells) has none to judge.
  */
 export function judgedGeometry(platform: Platform, t: Pick<TargetTruth, 'geometry' | 'frame' | 'scrollView'>, cell: JudgedScreen): Geometry | undefined {
   if (t.geometry === undefined) return undefined;

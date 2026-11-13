@@ -2,7 +2,7 @@
 
 package dev.averi.lab
 
-// The text family (fixtures/apps/cells/text.json): text targets carrying P5's sample strings — each a box of
+// The text family (fixtures/apps/cells/text.json, phase 4): text targets carrying P5's sample strings — each a box of
 // its colour with the string drawn on it in black, the box the target: one clickable node whose text is the string,
 // identified lab.<cell>.<tag>, its frame reported as `<tag>` and `<tag>.box` (the one `drawn` is measured over:
 // scripts/truth/capture-run.ts). A tap on it logs the target's `tap`.

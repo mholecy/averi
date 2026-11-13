@@ -40,7 +40,7 @@ export const COMPARE_LABEL = 'D43 WDA-window compare';
 /**
  * What a domains window's lines call it (T2b, batch-13 gap 3): its restore's and its compare's verdict labels, its
  * backup's step, its RESTORE lines' starts (`hand`, and `lateHand` for a late writer's). The WDA window's are
- * D43_LABELS; domainLabels(id) gives another window's, so no line of it says D43.
+ * D43_LABELS; another block's window takes domainLabels(its id), so no line of it says D43.
  */
 export interface DomainLabels {
   restore: string;
@@ -51,7 +51,7 @@ export interface DomainLabels {
 }
 /** The WDA window's labels: the default of every domains-window function. */
 export const D43_LABELS: DomainLabels = { restore: RESTORE_LABEL, compare: COMPARE_LABEL, backup: 'D43 backup', hand: HAND_PREFIX, lateHand: LATE_HAND_PREFIX };
-/** Another window's labels: `<id> window restore`, `<id> (iOS): `, …. */
+/** Another block's domains-window labels: `<id> window restore`, `<id> (iOS): `, …. */
 export const domainLabels = (id: string): DomainLabels => ({
   restore: `${id} window restore`,
   compare: `${id} window compare`,

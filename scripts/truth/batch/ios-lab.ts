@@ -370,6 +370,7 @@ export function iosLab(o: IosLabOptions = {}): IosLab {
 
 // ----------------------------------------------------------------------------------------- the WDA window
 
+/** The WDA window's dirty window's name. */
 export const WDA_WINDOW = 'WDA window';
 
 /**

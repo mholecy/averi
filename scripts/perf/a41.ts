@@ -477,8 +477,8 @@ export interface ColdRun {
 
 /**
  * How long after launch_app's reply the waited leg's first tap starts — WDA's cold start (3.1–3.6 s on the lab) and a
- * margin. From the reply, not the call. The launch brings WDA up before `simctl launch` (ADR 0046's A41d amendment), so
- * WDA is up at the reply; the gap stays at its A41b value, so the leg is comparable with probes 2 and 3.
+ * margin. From the reply, not the call. Sized for A41b's pre-warm (WDA started once `simctl launch` returned); under
+ * the A41d amendment WDA is up at the reply, and the gap is kept so the leg stays comparable with probes 2 and 3.
  */
 export const WAITED_GAP_MS = 4000;
 /** The least gap after launch_app's reply leg (b) is judged on: a tap that started earlier is unproven. */
@@ -492,10 +492,11 @@ export const WAITED_GAP_MIN_MS = 3500;
 export const LEG_A_BEFORE_A41D_MS = 7173;
 
 /**
- * A fresh `auto` session (A41b review r1): launch_app (WDA stopped; a `clearState` one on the first repeat), then the
- * first tree read at once (ui_snapshot) — which app it read: its root's label, and the bundle WDA's activeAppInfo names
- * after it. `expected`: the lab app's. Whether the app is in front after the launch (WDA's bring-up is done before
- * `simctl launch`, ADR 0046's A41d amendment).
+ * A fresh `auto` session (A41b): launch_app (WDA stopped; a `clearState` one on the first repeat), then the first tree
+ * read at once (ui_snapshot) — which app it read: its root's label, and the bundle WDA's activeAppInfo names after it.
+ * `expected`: the lab app's. Whether the app is in front after the launch: the leg was set because WDA's start beside
+ * the launch's foreground wait could leave the app behind (ADR 0046); under the A41d amendment WDA's bring-up is done
+ * before `simctl launch`.
  */
 export interface ForegroundRun {
   clearState: boolean;
@@ -530,7 +531,7 @@ export function snapshotRootLabel(reply: string): string | undefined {
  * An `auto` session: launch_app (WDA stopped), the first tap (the catalog's `open`), the open cell waited for
  * (`openSettled`: listed in time — else the warm taps paid the push), two warm taps on its A; launch_app again and the
  * same first tap with WDA up; launch_app a third time, the catalog waited for (`catalogSettled`), and the same tap warm.
- * Then two more fresh sessions (A41b review r1): the waited leg — launch_app, an untimed wait of WAITED_GAP_MS after
+ * Then two more fresh sessions (A41b): the waited leg — launch_app, an untimed wait of WAITED_GAP_MS after
  * it replied (no tree read), the same first tap (`firstWaited`; `waitedGapMs`, the time from launch_app's reply to the
  * tap's) — and `foreground` (ForegroundRun).
  */

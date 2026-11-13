@@ -79,7 +79,7 @@ export interface RecordingResult {
 export interface Options {
   /** At most this many targets per tree (default: every one). */
   cap?: number;
-  /** Which tools to call (default: all of `plan`'s). */
+  /** Which tools to call (default: `EVERY`). */
   tools?: ReadonlySet<ToolName>;
   /** Keep every call's result, not only the diffs. */
   keepAll?: boolean;
