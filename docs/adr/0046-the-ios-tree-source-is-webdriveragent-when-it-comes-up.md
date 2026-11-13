@@ -263,16 +263,23 @@ launch` awaits it first, before `clearState`'s wipe, the accessibility defaults 
 none when the registry builds an adapter.
 
 - **`auto`** (`AutoTreeSource.startBeforeLaunch`) makes the choice, the same single attempt the first read would make
-  (`source()`), and resolves once it is made. A choice in flight is joined. A choice already made asks nothing: WDA
-  up is not probed or restarted, and a fallback is not retried (`select_device` is the retry). A WDA that does not
-  come up is the fallback, exactly as at a first read: the stderr line, idb for the adapter's life, and the claim
-  note on every claiming reply. The start resolves and the launch goes on over idb.
+  (`source()`), and resolves once it is made. A choice in flight is joined. Once WDA was chosen, the start is WDA's
+  own (below): nothing while WDA is up, and a WDA that died since is started again before the launch. Its failure is
+  WDA's error and fails the launch, because a later WDA failure is never a switch to idb (Decision). Once idb was
+  chosen, nothing is asked: a fallback is not retried (`select_device` is the retry). A WDA that does not come up at
+  the choice is the fallback, exactly as at a first read: the stderr line, idb for the adapter's life, and the claim
+  note on every claiming reply. The start resolves and the launch goes on over idb. The launch_app reply itself
+  deliberately carries no note (the owner, 2026-11-13): launch_app claims nothing it read, and the next claiming reply
+  carries the note.
 - **`wda`** (`WdaTreeSource.startBeforeLaunch`) calls `bringUp` (`WdaServer.ensureRunning`, single-flight). WDA
   already up (`upGeneration`) asks nothing. A failure rejects with WDA's own error, as a read on `wda` fails. The
-  launch fails with it before anything is wiped or launched. The failed start is not kept, so the next call tries again.
+  launch fails before anything is wiped or launched (the owner, 2026-11-13), as `WebDriverAgent did not come up before
+  launching <bundle> — nothing was wiped or launched: <WDA's error>`, with WDA's error as its `cause`. The failed start
+  is not kept, so the next call tries again.
 - **Bounded** by WDA's own bounds. With the build cached, a start is `xcodebuild test-without-building` and /status
   within the ready timeout (60 s, `WdaServer`'s `readyTimeoutMs`). There is no second timer.
-- **Only with WDA's build cached** (`buildCached`; a check that throws counts as not cached). Without one, the launch
+- **Only with WDA's build cached** (`wda-tree-source.ts#mayStartBeforeLaunch`, both sources' one guard; a check that
+  throws counts as not cached). Without one, the launch
   starts nothing and waits for nothing. The first read builds and chooses, as before A41b. The reasons are the A41b
   amendment's: a build is minutes of `xcodebuild`, and it should not run inside an unrelated `launch_app`.
 - **idb**, and the differential harness's recorded source, have none: nothing is started.
@@ -291,17 +298,24 @@ still precede every launch.
   3.6 s loaded). The first read or tap after it no longer pays it.
 - Under `auto`, the launch's foreground wait now asks WDA's active app (`/wda/activeAppInfo`, D48) from the first
   launch on, not idb's label, because the choice is made before the wait. Both are answers the wait already handles.
-- Under `wda`, a WDA that cannot come up fails `launch_app` (or a flow's `launch:`) with WDA's error, and nothing is
-  launched. Before, the launch succeeded and the first read failed with the same error.
+- Under `wda` (and under `auto` once WDA was chosen), a WDA that cannot come up fails `launch_app` (or a flow's
+  `launch:`) with the wrapped error above, and nothing is launched. Before, the launch succeeded and the first read
+  failed with WDA's error.
+- launch_app's tool description says it: with WebDriverAgent and its build cached, the first launch on a simulator
+  first brings WDA up (seconds, at most 60 s, `WdaServer`'s ready timeout), and under `wda` a WDA that cannot come up
+  fails the launch before anything is wiped or launched.
 
 **Acceptance (the owner's `npm run truth:lab:ios:a41`).** scripts/perf/a41.ts judges two legs.
-- *Leg (a), now judged:* the median, per session, of launch_app + the first tap at once after it is ≤ the same run's
-  launch_app with WDA up (`relaunch`) + WDA's cold start (`wda-cold`'s first read) + the first tap with WDA up + 500 ms
-  (`legATotal`). The bar is built from the same run's parts, not from a fixed figure: load moves them together, and
-  the same total was 7 173 ms on probe-2 and 10 298 on probe-3. The bar is also under the total before A41d in both
-  recorded runs: probe-2 1 949 + 3 101 + 1 202 + 500 = 6 752 < 7 173, and probe-3 2 839 + 3 595 + 2 207 + 500 =
-  9 141 < 10 298. So a pass also means no slower than before. The 500 ms is leg (b)'s allowance (noise, and the cold
-  read's own ~100 ms read). The summary prints 7 173 (`LEG_A_BEFORE_A41D_MS`) for information. Leg (a) is unproven
+- *Leg (a), now judged on two bars (`legAAnswer`), both from the same run:*
+  - The total: the median, per session, of launch_app + the first tap at once after it is ≤ launch_app with WDA up
+    (`relaunch`) + WDA's cold start (`wda-cold`'s first read) + the first tap with WDA up + 500 ms. The bar is built
+    from the same run's parts, not from a fixed figure: load moves them together, and the same total was 7 173 ms on
+    probe-2 and 10 298 on probe-3. A pass means the bring-up costs no more than its serial parts + 500. Before A41d,
+    both recorded runs exceeded that bar: probe-2 1 949 + 3 101 + 1 202 + 500 = 6 752 against 7 173, and probe-3
+    2 839 + 3 595 + 2 207 + 500 = 9 141 against 10 298. The 500 ms is leg (b)'s allowance (noise, and the cold read's
+    own ~100 ms read).
+  - The tap: the first tap at once after launch_app is ≤ the first tap with WDA up + 500 ms, since WDA is up when
+    launch_app replies. The summary prints 7 173 (`LEG_A_BEFORE_A41D_MS`) for information. Leg (a) is unproven
   when a step fell back to idb, or when a part is not measured (wda-cold's file included).
 - *Leg (b), unchanged:* the tap `WAITED_GAP_MS` after launch_app replied is ≤ warm + 500, on 5 of 5 first taps ok. It
   is judged only with every gap ≥ 3.5 s and no fallback. WDA is now up at the reply, so the leg no longer depends on
@@ -320,11 +334,13 @@ still precede every launch.
 - **An uncached build** still pays the whole first build at the first read, as Residual 2 says.
 
 Tests: tests/adapters/ios.test.ts (the start is awaited before any wipe, write or `simctl launch`; `wda`'s failure
-fails the launch with nothing touched; under `auto`, WDA is chosen before `simctl launch` and the first read and a
+fails the launch with nothing touched, in the wrapped words and with its cause; under `auto`, WDA is chosen before `simctl launch` and the first read and a
 second launch start nothing; the fallback goes on over idb with the note; an uncached build waits for nothing; idb
 has no start); tests/adapters/auto-tree-source.test.ts (awaited, single-flight with a read and with a second start,
-fallback resolves with its note, uncached, a throwing build check, nothing after the choice, released and released
-mid-choice); tests/adapters/wda-tree-source.test.ts (up then reused, joins a read's start, bounded by the ready
+fallback resolves with its note, uncached, a throwing build check, nothing after a fallback, WDA chosen and since gone
+started again with its failure WDA's error, the ready-timeout bound through a real WdaTreeSource, released and
+released mid-choice); tests/adapters/wda-tree-source.test.ts (up then reused, joins a read's start, bounded by the ready
 timeout, a failure rejects and is not kept, uncached, already up asks nothing, released); tests/perf/a41.test.ts
-(leg (a)'s bar, at the bar and 1 ms over, not measured without any part, unproven on a fallback; `waitedLaunches`).
+(leg (a)'s two bars, each at its edge and 1 ms over, not measured without any part, unproven on a fallback;
+`waitedLaunches`); tests/mcp/tool-descriptions.test.ts (launch_app's new sentence).
 Each was hand-mutated and killed.

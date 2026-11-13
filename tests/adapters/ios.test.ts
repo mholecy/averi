@@ -481,15 +481,18 @@ describe('IosAdapter re-enables accessibility automation before every launch and
     }
   });
 
-  it('a start that fails fails the launch with its own error, before anything is wiped or launched (treeSource wda)', async () => {
+  it('a start that fails fails the launch, saying nothing was wiped or launched, WDA\'s error quoted and kept as the cause (treeSource wda)', async () => {
     const { fn, calls } = fakeExec({});
-    const wda: IosTreeSource = {
-      ...WDA_NO_TREE,
-      startBeforeLaunch: () => Promise.reject(new Error('WDA did not answer /status on port 8100 within 60 s')),
-    };
-    await expect(new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda }).launch('com.app', { clearState: true })).rejects.toThrow(
-      'WDA did not answer /status on port 8100 within 60 s',
+    const cause = new Error('WDA did not answer /status on port 8100 within 60 s');
+    const wda: IosTreeSource = { ...WDA_NO_TREE, startBeforeLaunch: () => Promise.reject(cause) };
+    const err = await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda }).launch('com.app', { clearState: true }).then(
+      () => undefined,
+      (e: Error) => e,
     );
+    expect(err?.message).toBe(
+      'WebDriverAgent did not come up before launching com.app — nothing was wiped or launched: WDA did not answer /status on port 8100 within 60 s',
+    );
+    expect(err?.cause).toBe(cause);
     expect(calls).toEqual([]);
   });
 

@@ -21,7 +21,7 @@ export const WDA_SETTLE_CADENCE_MS = 300;
  *
  * The server is constructed with the source. That is cheap (a per-UDID port
  * allocation and a log path — no process until the first read, since
- * WdaServer.source() runs ensureRunning itself, or a launch's start, A41d) and it makes the source
+ * WdaServer.source() runs ensureRunning itself, or a launch's start) and it makes the source
  * terminal after dispose(). That state IS reachable from a tool call: run_flow
  * and ensure_state hold one adapter across many reads, and a select_device
  * that lands mid-flow evicts and disposes that adapter (registry.evict). Before
@@ -44,6 +44,15 @@ export const WDA_SETTLE_CADENCE_MS = 300;
  * deliberately no second seam for a fake server: the one adapter it would
  * ever have is WdaServer, and one adapter means a hypothetical seam.
  */
+/**
+ * Whether a start before a launch may begin (ADR 0046's A41d amendment): WebDriverAgent's build is cached — a check
+ * that fails counts as not cached — and the source was not released while it was asked. A build is minutes of
+ * `xcodebuild`, never run inside a launch; the first read runs it.
+ */
+export async function mayStartBeforeLaunch(wda: { buildCached(): Promise<boolean> }, released: () => boolean): Promise<boolean> {
+  return (await wda.buildCached().catch(() => false)) && !released();
+}
+
 export class WdaTreeSource implements IosTreeSource {
   readonly kind = 'wda' as const;
   readonly settleCadenceMs = WDA_SETTLE_CADENCE_MS;
@@ -98,17 +107,16 @@ export class WdaTreeSource implements IosTreeSource {
   }
 
   /**
-   * Brings WebDriverAgent up before a launch and resolves once it is up (A41d; IosTreeSource.startBeforeLaunch): what
-   * IosAdapter.launch awaits before it touches the app, so the first read finds WDA up. WdaServer.ensureRunning — its
-   * own bounds (/status within the ready timeout) and single-flight, so a read starting WDA is joined. WDA already up
-   * (WdaServer.upGeneration) → nothing, so a launch sends no `/status` probe and restarts nothing. WDA's build not cached
-   * (or the check failing) → nothing: the first read builds, as before. Released → nothing. A start that fails rejects
-   * with WDA's own error (bringUp), and is not kept: the next start or read tries again.
+   * Brings WebDriverAgent up before a launch and resolves once it is up (IosTreeSource.startBeforeLaunch, ADR 0046's
+   * A41d amendment), so the first read after the launch finds it up. WdaServer.ensureRunning — its own bounds (/status
+   * within the ready timeout) and single-flight, so a read starting WDA is joined. WDA up (WdaServer.upGeneration) →
+   * nothing: a launch sends no `/status` probe and restarts nothing. Not mayStartBeforeLaunch (no cached build, or
+   * released) → nothing: a build is minutes, and the first read runs it. A start that fails rejects with WDA's own
+   * error (bringUp) and is not kept: the next start or read tries again.
    */
   async startBeforeLaunch(): Promise<void> {
     if (this.disposed || this.server.upGeneration() !== undefined) return;
-    if (!(await this.buildCached().catch(() => false)) || this.disposed) return;
-    await this.bringUp();
+    if (await mayStartBeforeLaunch(this, () => this.disposed)) await this.bringUp();
   }
 
   /** Whether WDA's build is cached, so a start runs no `xcodebuild build-for-testing` (WdaServer.isBuilt). */
@@ -134,12 +142,10 @@ export class WdaTreeSource implements IosTreeSource {
    * idb's Application label (another reader, whose lag is not `/source`'s).
    *
    * - WDA not up (WdaServer.upGeneration: no start of ours reached /status, or it
-   *   exited or was stopped since) → `declined`, no device call. The
-   *   2026-10-09 objection stands for this case: asking would start WDA
-   *   here, and a build on first use is minutes. Since A41d a launch brings
-   *   a WDA whose build is cached up before `simctl launch`
-   *   (startBeforeLaunch), so this case is an uncached build, or a start
-   *   that failed.
+   *   exited or was stopped since) → `declined`, no device call: asking
+   *   would start WDA here, and a build on first use is minutes (a launch
+   *   starts a WDA whose build is cached before `simctl launch`,
+   *   startBeforeLaunch).
    * - up → `bundle` with the payload's `value.bundleId`, `unlabelled` when it
    *   is not a non-empty string; WDA's error (port, log) when the ask fails —
    *   asked once per WDA child until it proves it answers: after a failed

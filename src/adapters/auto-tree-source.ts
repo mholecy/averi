@@ -2,6 +2,7 @@ import { errorMessage } from '../util/error-message.js';
 import { withNoteLine } from '../util/note-line.js';
 import type { IosTreeSourceKind } from './ios-node.js';
 import { idbTypingRefusal } from './ios-typing.js';
+import { mayStartBeforeLaunch } from './wda-tree-source.js';
 import type { ApplicationLabel, IosTreeSource } from './ios-tree-source.js';
 import type { SystemAlert, UiNode } from './types.js';
 
@@ -34,7 +35,7 @@ export function fallbackReason(err: unknown): string {
 
 /**
  * WebDriverAgent's source as `auto` uses it: a tree source that can be asked to come up without reading a tree, and
- * whether its build is cached (what decides a start before a launch, A41d).
+ * whether its build is cached (what decides a start before a launch).
  */
 export type WdaSide = IosTreeSource & { bringUp(): Promise<void>; buildCached(): Promise<boolean> };
 
@@ -53,7 +54,7 @@ export type WdaSide = IosTreeSource & { bringUp(): Promise<void>; buildCached():
  * `declined` — it is not up), `kind` (the label's wording) and no settle cadence (the default 500). Typing waits for
  * the choice (typeText).
  *
- * The choice may be made before the first read (startBeforeLaunch, A41d): a launch awaits it before it touches the app,
+ * The choice may be made before the first read (startBeforeLaunch): a launch awaits it before it touches the app,
  * when WDA's build is cached. It is the same choice — one attempt, which a read joins, and whose outcome is the one that
  * read would have met.
  */
@@ -114,19 +115,21 @@ export class AutoTreeSource implements IosTreeSource {
   }
 
   /**
-   * Makes the choice before a launch and resolves once it is made (A41d; IosTreeSource.startBeforeLaunch): the same
-   * single attempt the first read would make, so the read after the launch finds it made. A choice in flight (a read
-   * making it) is joined; a choice made (WDA, or the fallback) asks nothing — WDA up is not asked again, a fallback is
-   * not retried (select_device is the retry). Not in flight and WDA's build not cached (or the check failing): nothing
-   * started — the first read builds and chooses, as before. A WDA that does not come up is the fallback (choose): the
-   * start resolves, and the stderr line and the claim note are the ones the first read would have met. Released: nothing;
-   * released mid-choice: the read's released error.
+   * Makes the choice before a launch and resolves once it is made (IosTreeSource.startBeforeLaunch, ADR 0046's A41d
+   * amendment): the same single attempt the first read would make, so the read after the launch finds it made.
+   * - A choice in flight (a read making it) is joined.
+   * - WDA chosen → WDA's own startBeforeLaunch: nothing while it is up; one that died since is started again before
+   *   the launch, and its failure is WDA's error (a later WDA failure never switches to idb).
+   * - idb chosen (the fallback) → nothing: select_device is the retry.
+   * - No choice started and not mayStartBeforeLaunch (no cached build, or released) → nothing: the first read builds
+   *   and chooses.
+   * A WDA that does not come up is the fallback (choose): the start resolves, with the stderr line and the claim note
+   * the first read would have met. Released: nothing; released mid-choice: the read's released error.
    */
   async startBeforeLaunch(): Promise<void> {
     if (this.disposed) return;
-    // `choosing` is set when a choice starts and kept once it is made: a choice started is joined (or its outcome
-    // returned at once); none started asks the build first.
-    if (this.choosing === undefined && (!(await this.wda.buildCached().catch(() => false)) || this.disposed)) return;
+    if (this.chosen !== undefined) return this.chosen === this.wda ? this.wda.startBeforeLaunch?.() : undefined;
+    if (this.choosing === undefined && !(await mayStartBeforeLaunch(this.wda, () => this.disposed))) return;
     await this.source();
   }
 

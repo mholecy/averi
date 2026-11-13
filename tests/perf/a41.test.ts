@@ -277,7 +277,7 @@ describe('summaryLines — the short summary', () => {
     ],
     wdaCold: { coldRead: sp(6000, 5), warmRead: sp(400, 5), failed: 0 },
     autoTap: {
-      launch: sp(1200, 5), relaunch: sp(800, 5), firstCold: sp(7000, 5), firstWdaUp: sp(900, 5), warmCatalog: sp(600, 5), warm: sp(500, 10),
+      launch: sp(1200, 5), relaunch: sp(800, 5), firstCold: sp(1400, 5), firstWdaUp: sp(900, 5), warmCatalog: sp(600, 5), warm: sp(500, 10),
       firstWaited: sp(1000, 5), waitedGap: sp(4010, 5), firstTotal: sp(8200, 5), waitedLaunch: sp(1900, 5), waitedLaunches: [],
       firstTaps: { ok: 5, n: 5 }, waitedTaps: { ok: 4, n: 5 }, foreground: { ok: 5, n: 5, clearState: 1, seen: [] },
       fellBack: 0, paidPush: 0, catalogUnsettled: 0, failed: 0,
@@ -298,9 +298,11 @@ describe('summaryLines — the short summary', () => {
     expect(lines).toContain(
       "WDA tap median within 100 ms of idb's, one-sided (WDA no more than 100 ms slower; faster always passes): yes (wda−idb +46 ms)",
     );
-    // (a), A41d: launch_app + the first tap, per session, against the same run's relaunch + WDA cold start + the tap with WDA up + 500.
+    // (a), A41d: launch_app + the first tap, per session, against the same run's relaunch + WDA cold start + the tap with
+    // WDA up + 500; and the first tap against the tap with WDA up + 500.
     expect(lines).toContain(
-      `first tap after launch_app (a, at once) — launch_app + the first tap ≤ relaunch (WDA up) + WDA cold start + the first tap with WDA up + 500 ms: yes (8200 vs 800 + 6000 + 900 + 500 = 8200); first tap ok 5/5; before A41d ${LEG_A_BEFORE_A41D_MS} (probe-2, idle)`,
+      'first tap after launch_app (a, at once) — launch_app + the first tap ≤ relaunch (WDA up) + WDA cold start + the first tap with WDA up + 500 ms, ' +
+        `and the first tap ≤ the first tap with WDA up + 500 ms: yes (total 8200 vs 800 + 6000 + 900 + 500 = 8200; tap 1400 vs 900 + 500); first tap ok 5/5; before A41d ${LEG_A_BEFORE_A41D_MS} (probe-2, idle)`,
     );
     expect(lines).toContain('first tap after launch_app (b, ≥ 3.5 s after it replied) ≤ the same tap warm + 500 ms: yes (1000 vs 600 + 500); first tap ok 4/5');
     expect(lines).toContain('foreground after launch ok 5/5 (1 clearState; n ≥ 5 with one: yes)');
@@ -309,7 +311,7 @@ describe('summaryLines — the short summary', () => {
     expect(lines).toContain(
       'at 300 ms: 0 wrong in 35 moving, uncensored settles over 60 trials — of 84 settles (M1a 4, M1b 50, M2 30), 40 of moving ids, 5 censored (< 500 ms of reads after), 0 wrong in all',
     );
-    expect(lines).toContain("auto, WDA's bring-up in launch_app (launch_app − relaunch): +400 ms; in the first tap (first − first with WDA up): +6100 ms");
+    expect(lines).toContain("auto, WDA's bring-up in launch_app (launch_app − relaunch): +400 ms; in the first tap (first − first with WDA up): +500 ms");
     expect(lines).toContain("auto, the waited leg's launch_app (WDA stopped): 1900 ms (n 5, 1899–1901)");
     expect(lines).toContain('cadence: unproven — w');
     expect(lines).toContain('false-Tapped targets: 15 — sound 12, unsound 3, unproven 0');
@@ -332,12 +334,14 @@ describe('summaryLines — the short summary', () => {
     expect(lines.find((l) => l.includes('(b, '))).toContain("unproven (2 auto steps fell back to idb: not WDA's taps)");
     expect(lines).toContain('auto, left out: 2 fell back to idb; 2 warm taps paid the push; 1 warm catalog taps on an unsettled catalog; 1 sessions with a failed step');
   });
-  it('leg (a) at the bar exactly passes, 1 ms over does not; a part not measured leaves it not measured', () => {
+  it('leg (a): each bar passes at its edge and fails 1 ms over; a part not measured leaves it not measured', () => {
     const a = (r: A41Report) => summaryLines(r).find((l) => l.includes('(a, at once'));
-    const total = (median: number) => ({ ...full, autoTap: { ...full.autoTap!, firstTotal: sp(median, 5) } });
-    expect(a(total(8200))).toMatch(/: yes \(8200 vs 800 \+ 6000 \+ 900 \+ 500 = 8200\);/);
-    expect(a(total(8201))).toMatch(/: no \(8201 vs 800 \+ 6000 \+ 900 \+ 500 = 8200\);/);
+    const with_ = (firstTotal: number, firstCold: number) => ({ ...full, autoTap: { ...full.autoTap!, firstTotal: sp(firstTotal, 5), firstCold: sp(firstCold, 5) } });
+    expect(a(with_(8200, 1400))).toMatch(/: yes \(total 8200 vs 800 \+ 6000 \+ 900 \+ 500 = 8200; tap 1400 vs 900 \+ 500\);/);
+    expect(a(with_(8201, 1400))).toMatch(/: no \(total 8201 vs 800 \+ 6000 \+ 900 \+ 500 = 8200; tap 1400 vs 900 \+ 500\);/);
+    expect(a(with_(8200, 1401))).toMatch(/: no \(total 8200 vs 800 \+ 6000 \+ 900 \+ 500 = 8200; tap 1401 vs 900 \+ 500\);/);
     for (const r of [
+      { ...full, autoTap: { ...full.autoTap!, firstCold: undefined } },
       { ...full, wdaCold: undefined },
       { ...full, wdaCold: { failed: 5 } },
       { ...full, autoTap: { ...full.autoTap!, firstTotal: undefined } },
@@ -503,7 +507,7 @@ describe('reportOf — the probe\'s files summed', () => {
     const sp = (median: number, n = 5) => ({ n, median, min: median - 1, max: median + 1 });
     const auto: NonNullable<A41Report['autoTap']> = {
       warmCatalog: sp(600), firstWaited: sp(1000), waitedGap: sp(4010),
-      relaunch: sp(800), firstWdaUp: sp(900), firstTotal: sp(8200), waitedLaunches: [],
+      relaunch: sp(800), firstWdaUp: sp(900), firstCold: sp(1000), firstTotal: sp(8200), waitedLaunches: [],
       firstTaps: { ok: 5, n: 5 }, waitedTaps: { ok: 5, n: 5 }, foreground: { ok: 5, n: 5, clearState: 1, seen: [] },
       fellBack: 0, paidPush: 0, catalogUnsettled: 0, failed: 0,
     };

@@ -346,12 +346,13 @@ export class IosAdapter implements DeviceAdapter {
           'use open_deep_link, or wrap the step in an `android:` platform override',
       );
     }
-    // A41d: WebDriverAgent up first, if its build is cached and it is not up (IosTreeSource.startBeforeLaunch; idb has
-    // none) — awaited, before the wipe, the writes and `simctl launch`, so its start completes or fails before the app
-    // launches and never races it; the first read after launch_app then finds it up. Under `auto` a WDA that does not
-    // come up is the fallback to idb, and the launch goes on; under `wda` its error fails the launch, nothing touched
-    // (ADR 0046's A41d amendment).
-    await this.treeSource.startBeforeLaunch?.();
+    // The tree source's start first, awaited, so it never races the wipe or the launch (IosTreeSource.startBeforeLaunch,
+    // ADR 0046's A41d amendment). Its failure fails the launch, nothing touched.
+    try {
+      await this.treeSource.startBeforeLaunch?.();
+    } catch (err) {
+      throw new Error(`WebDriverAgent did not come up before launching ${bundleId} — nothing was wiped or launched: ${errorMessage(err)}`, { cause: err });
+    }
     if (opts.clearState) await this.clearAppData(bundleId);
     await this.prepareForOpen(`launching ${bundleId}`);
     await this.simctl(['launch', this.udid, bundleId]);

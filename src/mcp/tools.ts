@@ -24,6 +24,7 @@ import { TOOL_CONFIG } from './config-policy.js';
 import { ASSERT_TIMEOUT_MS, assertSpecSchema, PIXEL_ASSERT_TIMEOUT_MS } from '../verify/assert.js';
 import { DEFAULT_ENSURE_TIMEOUT_MS } from '../flow/engine.js';
 import { formatSeconds } from '../util/duration.js';
+import { READY_TIMEOUT_MS } from '../adapters/wda.js';
 import { captureFrame, unsettledNote } from '../verify/capture.js';
 import { CONTRACT_TOL_FACTOR, DEFAULT_TOLERANCE_DE } from '../verify/color-parity.js';
 import { DEFAULT_SIZE_TOLERANCE_PCT } from '../verify/text-parity.js';
@@ -333,7 +334,9 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'Launch an app by package name / bundle id. clearState wipes its data first (forces a fresh login); the reply then carries a ⚠ clearState line counting this session\'s wipes, flow launches included. ' +
         'Android: without activity (or app.android.activity in averi.yaml) the launcher activity is picked arbitrarily — LeakCanary instead of the app on debug builds that bundle it; ' +
         'intent reaches non-launcher entry points (share/SEND) within the app\'s package and fails if no activity there handles it. ' +
-        `iOS: returns once the tree source names the launched app (idb: the tree's Application label; WebDriverAgent: its active app, once WDA is running), waiting at most ${FOREGROUND_BUDGET}; a ⚠ line means it never saw the app — read again before trusting a read (the screenshot switches before the tree).`,
+        `iOS: returns once the tree source names the launched app (idb: the tree's Application label; WebDriverAgent: its active app, once WDA is running), waiting at most ${FOREGROUND_BUDGET}; a ⚠ line means it never saw the app — read again before trusting a read (the screenshot switches before the tree). ` +
+          `With WebDriverAgent (treeSource auto/wda, build cached) the first launch on a simulator brings WDA up first (seconds, ≤ ${formatSeconds(READY_TIMEOUT_MS)}); ` +
+          'under wda, a WDA that cannot come up fails the launch with nothing wiped or launched.',
       inputSchema: {
         platform,
         appId: z.string().describe('Android package name or iOS bundle id'),

@@ -4,6 +4,7 @@ import { createIosTreeSource, IdbTreeSource, type ApplicationLabel, type IosTree
 import { WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
 import { IOS_TREE_SOURCE_SETTINGS, DEFAULT_IOS_TREE_SOURCE } from '../../src/adapters/ios-node.js';
 import { zeroRect, type UiNode } from '../../src/adapters/types.js';
+import { fakeExec, fakeFetch, fakeSpawn, tempDerivedData } from '../helpers/fake-wda.js';
 
 /**
  * `treeSource: auto` (A41a, docs/adr/0046-the-ios-tree-source-is-webdriveragent-when-it-comes-up.md): one source per
@@ -276,11 +277,46 @@ describe('AutoTreeSource.startBeforeLaunch — the choice made before a launch, 
     expect([wda.cachedAsks, wda.bringUps]).toEqual([0, 1]);
 
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const failing = fakeWda(down);
+    let wdaStarts = 0;
+    const failing = Object.assign(fakeWda(down), { startBeforeLaunch: async () => void wdaStarts++ });
     const fellBack = new AutoTreeSource({ wda: failing, idb: fakeIdb() });
     await fellBack.read();
     await fellBack.startBeforeLaunch();
-    expect([failing.cachedAsks, failing.bringUps]).toEqual([0, 1]);
+    expect([failing.cachedAsks, failing.bringUps, wdaStarts]).toEqual([0, 1, 0]); // a fallback's WDA is not started again
+  });
+
+  it('WDA chosen and since gone: WDA\'s own start runs before the launch — restarted, and its failure is WDA\'s error', async () => {
+    let starts = 0;
+    let fail: Error | undefined;
+    const wda: FakeWda = Object.assign(fakeWda(), {
+      async startBeforeLaunch() {
+        starts++;
+        if (fail !== undefined) throw fail;
+      },
+    });
+    const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
+    await auto.read();
+    await auto.startBeforeLaunch();
+    expect([starts, wda.bringUps]).toEqual([1, 1]);
+    fail = new Error('WDA did not answer /status on port 8100 within 60 s');
+    await expect(auto.startBeforeLaunch()).rejects.toBe(fail);
+    expect(auto.kind).toBe('wda'); // never a switch to idb
+  });
+
+  it('bounded by WDA\'s ready timeout: a real WdaTreeSource whose /status never answers falls back, its reason the timeout', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { dd } = await tempDerivedData(true);
+    const spawner = fakeSpawn();
+    const wda = new WdaTreeSource({
+      udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fakeFetch(() => 'refused').fn, spawnFn: spawner.fn,
+      derivedDataPath: dd, readyTimeoutMs: 40, pollIntervalMs: 5,
+    });
+    const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
+    await expect(auto.startBeforeLaunch()).resolves.toBeUndefined();
+    expect(auto.fellBack).toBe(true);
+    expect(auto.claimNote).toMatch(/WebDriverAgent did not come up \(WDA did not answer \/status on port \d+ within 0\.04 s;/);
+    expect(spawner.kills).toContain('SIGTERM');
+    await auto.dispose();
   });
 
   it('released: starts nothing; released mid-choice: the released error, no fallback', async () => {

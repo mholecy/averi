@@ -72,7 +72,7 @@ import { averiServer, commitOf } from './session.js';
  *   started and waits for the port). A WDA this server did not start is refused by WdaServer, never measured as cold.
  * - `auto-tap` (A41b, under `treeSource: auto`): `--repeat` fresh servers, each (a41.ts#AutoRun) — launch_app (the
  *   catalog; since A41d WDA's bring-up inside it), the first tap after it (`text:"open"`; leg (a) judges the two
- *   together, a41.ts#legATotal); untimed, the open cell waited for
+ *   together, a41.ts#legAAnswer); untimed, the open cell waited for
  *   (`openSettled`), two warm taps on its A; launch_app again and the same first tap with WDA up; launch_app a third
  *   time, untimed the catalog waited for (`catalogSettled`), and the same catalog tap warm — the tap the first one is
  *   judged against. Then two more fresh servers each (A41b review r1): launch_app (its time kept per repeat), no read

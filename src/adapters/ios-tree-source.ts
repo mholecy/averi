@@ -73,12 +73,10 @@ export interface IosTreeSource {
   readonly settleCadenceMs?: number;
   read(): Promise<UiNode>;
   /**
-   * Brings up what this source's first read would otherwise start — WebDriverAgent (A41d; WdaTreeSource, and
-   * AutoTreeSource's choice) — and resolves when it is up, or chosen against. IosAdapter.launch awaits it before it
-   * touches the app (ADR 0046's A41d amendment), so the read after launch_app finds WDA up. Only with WDA's build cached
-   * (an uncached build: nothing started, the first read builds); WDA already up, or the choice made: nothing asked;
-   * released: nothing. In flight (a read starting it): joined, never a second start. Rejects only where a read would
-   * fail for the same reason (`wda`: WDA's own error). Absent on idb and on the recorded source: nothing to start.
+   * Does what this source's first read would otherwise start, and resolves when that is done — or decides to start
+   * nothing (the implementations say when). Rejects only where a read would fail for the same reason. Awaited by
+   * IosAdapter.launch before it touches the app (ADR 0046's A41d amendment). Absent on idb and on the recorded source:
+   * nothing to start.
    */
   startBeforeLaunch?(): Promise<void>;
   /**

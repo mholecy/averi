@@ -65,8 +65,8 @@ export const keysTimeoutMs = (characters: number): number => 2_000 + 50 * charac
  * the three simulator domains and the sessionless /source unchanged, and `/wda/keys` types with no keyboard shown.
  */
 export const KEYS_SESSION = { capabilities: { alwaysMatch: { forceSimulatorSoftwareKeyboardPresence: false }, firstMatch: [{}] } };
-/** Post-build: the first app-install on the simulator dominates this. */
-const READY_TIMEOUT_MS = 60_000;
+/** Post-build: the first app-install on the simulator dominates this. The bound of a launch's start too (launch_app's description). */
+export const READY_TIMEOUT_MS = 60_000;
 const POLL_INTERVAL_MS = 500;
 /**
  * shutdown()'s phases must ADD UP to less than mcp/lifecycle.ts's
