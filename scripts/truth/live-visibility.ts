@@ -243,8 +243,8 @@ export function judgeDismissal(tag: string, reply: string, source: string, s: La
  * How far the target lies from showing whole, at a scroll offset `o` of its scroll view: the target's frame at launch
  * (`f0`, the view at offset `o0`) moved by the offset's change along the view's `axis` (`y` down its content, `x`
  * across a horizontal one's — a carousel's, LabState.offsets), against `region` — its scroll view's clip on the screen
- * below the status band, less any chrome at least half its width at its top or bottom edge (a sticky header, a tab bar,
- * a pinned bar: showRegion). 0 when it shows whole there.
+ * below the status band, less any chrome at least half the region's width at its top or bottom edge (a sticky header,
+ * a tab bar, a pinned bar: showRegion). 0 when it shows whole there.
  */
 export function distanceAt(o: number, f0: Rect, o0: number, region: Rect, axis: 'x' | 'y' = 'y'): number {
   const [start, size, from, extent] = axis === 'y' ? [f0.y, f0.height, region.y, region.height] : [f0.x, f0.width, region.x, region.width];

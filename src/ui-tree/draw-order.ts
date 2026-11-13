@@ -367,9 +367,9 @@ export interface Exposure {
   readonly centreCover?: Cover;
   /**
    * The nodes listed after it — or listed before it and judged with them (a
-   * floating tab bar's items in a flat list, a reading-order peer) — that hold its
-   * centre (inside `within`, at their reach, as cover.ts#coverAtPoint asks)
-   * and that the `target` column EXCUSED —
+   * floating tab bar's items in a flat list, a reading-order peer) — that
+   * hold its centre (inside `within`, at their reach, as
+   * cover.ts#coverAtPoint asks) and that the `target` column EXCUSED —
    * drawn there, by the table, as no cover of it — in pre-order; empty when
    * none, or when the centre lies outside `within` — a node of a hidden
    * subtree (`UiNode.hidden`, the `hidden` row) included: WDA's

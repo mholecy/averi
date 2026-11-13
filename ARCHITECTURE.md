@@ -660,10 +660,10 @@ only what the tool descriptions do not already say:
   `mInputShown`) asked right before it; when the two disagree past a short wait, nothing is sent. Every failure after a
   `back` says it was pressed. On iOS (WDA) the keyboard is in the tree: a covered target is hidden by the configured
   dismissal (`app.ios.keyboardDismiss`) — and when a configured move left the keyboard up, by averi's own upward drag
-  of the target's scroll view (ADR 0022) — else, with nothing configured usable or every move spent, refused on a
-  second look with the adapter's advice; under idb the reading stays `unknown` and nothing is pressed blind. What is
-  guaranteed: averi sends no `back` the input method denies, and taps no point both sources place under a keyboard
-  (ADR 0017, ADR 0022, ADR 0027).
+  of the target's scroll view (ADR 0022), which hides the keyboard or scrolls the target out from under it — else,
+  with nothing configured usable or every move spent, refused on a second look with the adapter's advice; under idb
+  the reading stays `unknown` and nothing is pressed blind. What is guaranteed: averi sends no `back` the input method
+  denies, and taps no point both sources place under a keyboard (ADR 0017, ADR 0022, ADR 0027).
 - **Crash detection.** A successful `ensure_state` or `run_flow`, every returning `assert` and each completed `verify`
   leg ends with `appAlive: true | false | unknown` (`run/app-health.ts#appHealth`) when averi.yaml names the app:
   `false` with a crash excerpt from the last 60 s of logs, `unknown` when the device could not be asked — deliberately

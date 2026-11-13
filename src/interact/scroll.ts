@@ -110,8 +110,9 @@ export type ScrollAdapter = Pick<
  * ElementNotFoundError (the rule's one owner is resolve.ts's absenceError),
  * so an `optional:` scroll_until to an element that is not on this screen
  * is skipped "(not present)" like a tap or a fill would be. Every other stop
- * (found but clipped or off the viewport, a failed last read, content that
- * ran out) stays a plain Error: the element was there, or nobody could see.
+ * stays a plain Error — one where some read held the element (found but
+ * clipped or off the viewport, content that ran out with it seen), or whose
+ * last read failed: the element was there, or nobody could see.
  * A `within` refusal is a WithinRefusedError (scroll-text.ts#scrollFailure).
  *
  * The soft keyboard:
