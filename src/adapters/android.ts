@@ -224,7 +224,7 @@ export class AndroidAdapter implements DeviceAdapter {
     return this.runAdb(['-s', this.serial, ...args], { timeoutMs: opts.timeoutMs });
   }
 
-  /** The `adb` binary with a complete argv — `adb` and `shell` both end here; `typed` indexes this argv (exec's). */
+  /** The `adb` binary with a complete argv — `typed` indexes this argv (exec's). */
   private runAdb(argv: string[], opts: ShellCallOptions) {
     return this.exec('adb', argv, execOptions(opts.timeoutMs, opts.typed));
   }
@@ -262,7 +262,7 @@ export class AndroidAdapter implements DeviceAdapter {
    * pipe, `|| true` — sent as ONE argument and run by the device's sh as
    * written. The named exception to `shell`: the caller owns the line, and
    * any word in it that did not come from this file goes through
-   * `shellCommandLine` first (isAppRunning).
+   * `shellCommandLine` first.
    */
   private rawShell(line: string, opts: AdbCallOptions = {}) {
     return this.adb(['shell', line], opts);
@@ -418,7 +418,8 @@ export class AndroidAdapter implements DeviceAdapter {
   /**
    * The chooser after averi's own start (openDeepLink, a `-p` launch): the focus read (chooserInFront) and, only once
    * it named the chooser, the one dump of its tree (chooserSheetInFront, D55c) — `{ component, sheet? }`, or undefined
-   * when the focus names no chooser. monkey's refusal asks chooserInFront alone.
+   * when the focus names no chooser. monkey's refusal reads the focus alone (chooserInFront), without the dump's
+   * 2–2.5 s: the chooser is not why monkey refused.
    */
   private async linkChooserInFront(): Promise<LinkChooser | undefined> {
     const component = await this.chooserInFront();
@@ -431,7 +432,7 @@ export class AndroidAdapter implements DeviceAdapter {
    * The chooser's component when the window manager's focus names it (android-chooser.ts#chooserInFocus), else
    * undefined. One `dumpsys window displays | grep` (ADR 0041 estimated ≈ 20–26 ms from FOCUSED_WINDOW_COMMAND's
    * 25–26 ms; batch-11 measured it at a median 70 ms, 58–99, n=10 — ADR 0041's D55b amendment). Never throws: a failed
-   * or timed-out call is undefined, so the reply falls back to today's ("Opened", "Launched", monkey's error).
+   * or timed-out call is undefined, so the reply names no chooser ("Opened", "Launched", monkey's error).
    */
   private async chooserInFront(): Promise<string | undefined> {
     try {
@@ -445,7 +446,7 @@ export class AndroidAdapter implements DeviceAdapter {
    * The chooser's sheet (android-chooser.ts#chooserSheet) from ONE `uiautomator dump`, asked only once chooserInFront
    * named the chooser (D55c; ADR 0041's D55c amendment). Its own 5 s bound (CHOOSER_TREE_TIMEOUT_MS), and never
    * uiTree(): its 15 s bound, its "null root node" retry and its diagnosis (an `adb get-state`) are the costs of a read
-   * the caller needs, not of an optional enrichment. ≈ 2–2.5 s on the chooser path only — the ui_snapshot today's
+   * the caller needs, not of an optional enrichment. ≈ 2–2.5 s on the chooser path only — the ui_snapshot the
    * advice sends the agent to is the same dump. Never throws: a failed, timed-out or XML-less dump, or a tree that is
    * not the measured layout, is undefined, and the reply is D55's (or D55b's) byte for byte.
    */
@@ -462,7 +463,7 @@ export class AndroidAdapter implements DeviceAdapter {
   /**
    * The tree in a `uiautomator dump /dev/tty`'s output: the XML up to its last `>`, parsed (uiautomator appends a status
    * line after it); undefined when the output holds no XML (its status alone: `null root node`, `Killed`, nothing).
-   * Throws what the parser throws. uiTree's and chooserSheetInFront's one reading of a dump.
+   * Throws what the parser throws.
    */
   private dumpedTree(raw: string): UiNode | undefined {
     const xmlEnd = raw.lastIndexOf('>');
@@ -480,9 +481,10 @@ export class AndroidAdapter implements DeviceAdapter {
    * The command is ONE word, the pipe in it — exec-out's first word reaches the device's sh unescaped (execOut).
    * screenshot-bytes.ts#screencapRaw judges the answer: a frame, a transport error, or a refusal of the raw path. On a
    * refusal this call captures with `screencap -p`, whose own check says whether the device is alive. A LASTING
-   * refusal (the shell says there is no gzip; a format other than RGBA_8888) on a live device pins this adapter to
-   * `-p` (`#rawPinned`) — today's path, never a slower one — said once on stderr with its reason; any other refusal
-   * (the shell's `Killed`, a stream cut short) costs that one call a `-p` and the next one tries raw again.
+   * refusal (the shell says there is no gzip; a format other than RGBA_8888) on a live device pins this adapter to `-p`
+   * (`#rawPinned`) — the path every refusal falls back to anyway, so the pin is never slower — said once on stderr with
+   * its reason; any other refusal (the shell's `Killed`, a stream cut short) costs that one call a `-p` and the next
+   * one tries raw again.
    */
   async capture(): Promise<ScreenCapture> {
     if (!this.#rawPinned) {
@@ -509,7 +511,7 @@ export class AndroidAdapter implements DeviceAdapter {
     return shot.kind === 'png' ? shot.bytes : encodePng(shot.image);
   }
 
-  /** `screencap -p`: the device's PNG — the capture before D19, and its fallback (`capture`). */
+  /** `screencap -p`: the device's PNG — the capture's fallback (`capture`). */
   private async pngScreenshot(): Promise<Buffer> {
     const { stdout } = await this.execOut(['screencap', '-p']);
     // exec-out exits 0 with whatever the guest wrote — nothing, or `Killed`,
@@ -589,8 +591,8 @@ export class AndroidAdapter implements DeviceAdapter {
     } catch (e) {
       // A get-state that never answered has no state to quote: its stderr is
       // node's "Command failed: <cmd>" (exec.ts substitutes it for an empty
-      // one), and the reply read `adb get-state says "Command failed: …"`
-      // What hangs is adb — its server or this device's
+      // one), and quoting it would read `adb get-state says "Command
+      // failed: …"`. What hangs is adb — its server or this device's
       // transport — so say that, and how to tell which.
       if (e instanceof ExecError && e.timedOut) {
         return `device ${this.serial} is not answering: adb get-state timed out after ${formatSeconds(GET_STATE_TIMEOUT_MS)} — ` +
@@ -686,8 +688,8 @@ export class AndroidAdapter implements DeviceAdapter {
    *   the status bar, for a target the app shows at the very top — a
    *   refusal, never a false "visible";
    * - SHOWN since an answer that found none: no band until the next launch
-   *   or fresh read — a point under the bar is judged on the screen, as
-   *   before the band existed (fail open).
+   *   or fresh read — a point under the bar is judged on the screen (fail
+   *   open).
    * And a launch's own: the band is read at the first `viewport()` after
    * `launch`, which may come right after it — while the app's STARTING
    * window shows, before an app that hides the bar in onCreate (or later)
@@ -708,7 +710,7 @@ export class AndroidAdapter implements DeviceAdapter {
    * ViewportMemo's fresh read becomes the memo at once and a failed one
    * empties it (types.ts#viewport's contract, both adapters' sizes). Folding
    * would change one of the two: the band's lifetime stated above, or the
-   * size's on iOS and Android. Neither is this refactor's to change.
+   * size's on iOS and Android.
    */
   #band: { band: SystemBands; timedOut?: true } | undefined;
   /** The band read in flight, shared by concurrent `viewport()` calls. */
@@ -727,9 +729,8 @@ export class AndroidAdapter implements DeviceAdapter {
    * docs/bugs/2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen.md
    *
    * FAILS OPEN, as keyboardState does: a failed call, or a dump that does not
-   * say one visible bar, is no band — the judgements behave as before the
-   * band existed. Kept or not as `#band` says. The size's own failure is
-   * still the screen's.
+   * say one visible bar, is no band. Kept or not as `#band` says. The
+   * size's own failure is still the screen's.
    *
    * The navigation bar's band (types.ts#DeviceScreen.navigationBand) comes
    * out of the same dump, android-wm.ts#parseNavigationBand, and is kept with the
@@ -804,14 +805,14 @@ export class AndroidAdapter implements DeviceAdapter {
    * SWIFT form's 1042 px 1.04 s (+0.74 s), a probe or a halved stroke
    * floored at 300 ms (+0) — so the 6 default swipes cost up to ≈ 6 s more
    * of the 15 s, where the measured fling runs spent ≈ 3 s a round; and a
-   * stroke now moves the content ≈ its own length, not ≈ 1.6×, so content
+   * stroke moves the content ≈ its own length, not ≈ 1.6×, so content
    * far below the fold takes more strokes. What it buys: no row is carried
    * across the list between two reads.
    *
-   * NET, in one place: within the unchanged
+   * NET, in one place: within the
    * 15 s default, Settings' list is reached about 40 % less far — the
    * measured fling runs fit 5 rounds of ≈ 3 s, ≈ 5 × 1332 ≈ 6700 px of
-   * finger travel (≈ 6800 px of content once flung, rows skipped); now ≈ 4
+   * finger travel (≈ 6800 px of content once flung, rows skipped); paced, ≈ 4
    * rounds of ≈ 3.5 s, each ≈ 850 px over the list plus ≈ 90 of fling,
    * ≈ 3950 px, every row read. And the deadline is checked once a round,
    * before the stroke, so the last round can overrun `timeoutMs` by a
@@ -936,8 +937,7 @@ export class AndroidAdapter implements DeviceAdapter {
    *   dumpsys input_method        791 KB   276–318 ms   mInputShown, but no frame — and over
    *                                                      the budget on its own
    *
-   * THE COST OF THIS CALL — the one place the figures live;
-   * every other comment and ARCHITECTURE.md §8 point here:
+   * THE COST OF THIS CALL — the one place the figures live:
    *   - from a shell (the table above; process start included): 56–96 ms;
    *   - through this adapter's execFile, eleven runs: 18–37 ms.
    *

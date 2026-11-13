@@ -5,13 +5,12 @@ import { PRINTABLE_ASCII, refusalOf, type Typeable } from './typeable.js';
  * device-call.md, the D43 amendment). Pure: no device, no adapter. IosAdapter declares one of the two sets
  * (`typeable`) by its tree source and routes each `typeText` call by `typingPathOf`.
  *
- * - **idb** (`idb ui text`, every project): printable ASCII and `\n`, unchanged since D43a.
+ * - **idb** (`idb ui text`, every project): printable ASCII and `\n`.
  * - **WebDriverAgent** (`POST /session/:id/wda/keys`, a project with `ios.treeSource: wda` only): what idb cannot type
  *   of the set below. idb keeps every text it can type, byte for byte — WDA costs ~300 ms + ~16 ms a character where
  *   idb is flat at ~200 ms (batch-10's G3), so only the text idb refuses pays it.
  */
 
-/** One character `idb ui text` cannot type (IDB_TYPEABLE). */
 const IDB_REFUSES = new RegExp(`[^${PRINTABLE_ASCII}\\n]`, 'u');
 
 /**

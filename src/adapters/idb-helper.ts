@@ -53,7 +53,7 @@ export interface IdbInterpreter {
   idb: string;
 }
 
-/** `AVERI_IDB_HELPER=off`: no helper — every idb call is the CLI, as before D7 (SETUP.md, troubleshooting). */
+/** `AVERI_IDB_HELPER=off`: no helper — every idb call is the CLI (SETUP.md, troubleshooting). */
 export function idbHelperDisabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.AVERI_IDB_HELPER === 'off';
 }
@@ -62,16 +62,16 @@ export function idbHelperDisabled(env: NodeJS.ProcessEnv = process.env): boolean
  * After this many failures in a row the helper is off for the process. A failure is:
  * - a start that never said `ready`;
  * - a helper that died before it answered any request — one that says ready and then dies under every request would
- *   otherwise restart forever (review 2026-10-31, MINOR-4).
+ *   otherwise restart forever.
  * The first answered request resets the count. Timeouts have a latch of their own: TIMEOUTS_IN_A_ROW.
  */
 export const MAX_FAILURES_IN_A_ROW = 2;
 
 /**
- * After this many requests in a row timed out in the helper, with no answer between, it is off for the process (review
- * round 2, NIT-B): each costs the caller's whole budget (15 s for describe-all), and a helper that hangs would make
- * every read pay it forever. One alone is not: the CLI would likely have timed out too (a stuck companion), and the
- * next helper may answer. Any answer resets the count.
+ * After this many requests in a row timed out in the helper, with no answer between, it is off for the process: each
+ * costs the caller's whole budget (15 s for describe-all), and a helper that hangs would make every read pay it
+ * forever. One alone is not: the CLI would likely have timed out too (a stuck companion), and the next helper may
+ * answer. Any answer resets the count.
  */
 export const TIMEOUTS_IN_A_ROW = 2;
 
@@ -79,13 +79,12 @@ export const TIMEOUTS_IN_A_ROW = 2;
 const STDERR_TAIL = 2_000;
 
 /**
- * Every live helper child in the process, for the ONE `process.once('exit')` backstop all helpers share (review
- * 2026-10-31, MINOR-3: a hook per helper would pass node's 10-listener warning with the 11th simulator).
+ * Every live helper child in the process, for the ONE `process.once('exit')` backstop all helpers share (a hook per
+ * helper would pass node's 10-listener warning with the 11th simulator).
  */
 const liveChildren = new Set<ChildProcess>();
 let exitHookInstalled = false;
 
-/** SIGKILL, and nothing if it is gone already. */
 function killChild(child: ChildProcess): void {
   try {
     child.kill('SIGKILL');
@@ -163,7 +162,7 @@ async function firstLine(file: string): Promise<string | undefined> {
   }
 }
 
-/** What one helper child has done so far — its start() closure's, read by gone() when it exits. */
+/** What one helper child has done so far — its start() closure's. */
 interface ChildRun {
   /** It said `{"ready"}`. */
   ready: boolean;
@@ -195,11 +194,11 @@ interface Pending {
 }
 
 /**
- * One persistent fb-idb client per adapter, started by the first call it could serve — since D7b an input too, so a
- * wda-backed adapter starts one as well (its input is idb's), and a simulator served under both tree sources at once
- * runs two — since D41 only across two projects (D7, docs/adr/0032-a-persistent-idb-helper-runs-the-cli-in-process.md,
+ * One persistent fb-idb client per adapter, started by the first call it could serve — an input too, so a wda-backed
+ * adapter starts one as well (its input is idb's), and a simulator served under both tree sources at once runs two,
+ * which happens only across two projects (D7, docs/adr/0032-a-persistent-idb-helper-runs-the-cli-in-process.md,
  * section "D7b" and amendment D41): a Python process that imported idb's CLI once and runs it in-process per request
- * (idb-helper-script.ts), so a call no longer pays the CLI's Python start-up — measured 114.3 → 24.7 ms a
+ * (idb-helper-script.ts), so a call does not pay the CLI's Python start-up — measured 114.3 → 24.7 ms a
  * `describe-all` (D7, n = 20, the lab simulator). Created by the registry per iOS adapter (registry.ts#iosAdapterFor)
  * and shared, like `exec`, by IosAdapter and IdbTreeSource; runIdb (idb.ts) decides which argv may come here.
  *
@@ -216,8 +215,8 @@ interface Pending {
  * - The caller's timeout kills it (SIGKILL) and rejects with IdbHelperTimeout; the caller throws the CLI's timeout.
  * - No orphans: the child and its pipes are unref'd (the server stays free to exit), it exits on stdin's EOF (dispose,
  *   or node's death closing the pipe), dispose() kills it, and one `process.once('exit')` hook for all helpers
- *   (killIdbHelpersOnExit) kills it as the backstop for anything dispose did not reach — the pattern of WdaServer
- *   (wda.ts, spawnChild).
+ *   (killIdbHelpersOnExit) kills it as the backstop for anything dispose did not reach — the pattern of WdaServer's
+ *   `exitHook` (wda.ts).
  */
 export class IdbHelper {
   private readonly spawn: IdbHelperSpawn;

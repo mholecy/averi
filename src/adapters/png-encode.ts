@@ -47,7 +47,6 @@ export const PHOTO_RATIO = 0.08;
 const deflate = promisify(zlib.deflate);
 const SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
-/** Every 16th row deflated at level 1: its compressed size over its size. */
 async function compressedRatio(data: Buffer, width: number, height: number): Promise<number> {
   const rowBytes = width * 4;
   const rows: Buffer[] = [];
@@ -58,8 +57,7 @@ async function compressedRatio(data: Buffer, width: number, height: number): Pro
 
 /**
  * The scanlines, each with the filter its content wants — None or Up, the two that cost no per-byte arithmetic beyond
- * Up's word subtraction. A photo (`photo`) is Up on every row after the first. A UI screen chooses per row (D19
- * review, MINOR-2):
+ * Up's word subtraction. A photo (`photo`) is Up on every row after the first. A UI screen chooses per row:
  * - a row identical to the one above is Up, all zeros (a flat UI is mostly these);
  * - a "noisy" row — more than a quarter of its pixels differ from their left neighbour: a photo strip, a gradient — is
  *   Up, which turns a smooth image into small numbers deflate folds;
@@ -98,7 +96,6 @@ function scanlines(data: Buffer, width: number, height: number, photo: boolean):
 /** Above this share of pixels differing from their left neighbour a UI screen's row is Up-filtered (`scanlines`). */
 const NOISY_ROW = 0.25;
 
-/** How many of row `y`'s pixels differ from their left neighbour. */
 function changesInRow(pixels: Uint32Array, y: number, width: number): number {
   let changes = 0;
   for (let x = 1, i = y * width + 1; x < width; x++, i++) if (pixels[i] !== pixels[i - 1]) changes++;
@@ -118,7 +115,6 @@ function upRow(pixels: Uint32Array, row: Uint32Array, y: number, width: number):
   }
 }
 
-/** A PNG chunk: length, type, data, and the CRC of type and data. */
 function chunk(type: string, data: Buffer): Buffer {
   const head = Buffer.alloc(8);
   head.writeUInt32BE(data.length, 0);

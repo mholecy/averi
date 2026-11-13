@@ -7,7 +7,7 @@ import type { SystemAlert, UiNode } from './types.js';
 /**
  * The cadence at which two WebDriverAgent `/source` reads may prove an element holds still (ADR 0040): 300 ms, measured
  * (A41b, 2026-11-12, docs/truth/live-records/a41-probe/: WDA's settle replayed at 300 ms, 0 wrong in 60 moving,
- * uncensored settles over 60 trials — M1a, M1b, M2 20 each). Until then none was declared and WDA settled at 500.
+ * uncensored settles over 60 trials — M1a, M1b, M2 20 each).
  */
 export const WDA_SETTLE_CADENCE_MS = 300;
 
@@ -39,11 +39,10 @@ export class TreeSourceReleasedError extends Error {}
  * WdaServer.source() runs ensureRunning itself, or a launch's start) and it makes the source
  * terminal after dispose(). That state IS reachable from a tool call: run_flow
  * and ensure_state hold one adapter across many reads, and a select_device
- * that lands mid-flow evicts and disposes that adapter (registry.evict). Before
- * 2026-10-02 the next read then built a fresh WdaServer for the DESELECTED
- * simulator — an orphan of the 0.8.1 bug class, since nothing would dispose
- * it (IosAdapter had cleared its server promise on dispose). Now the read is
- * refused, with wording for the two ways it happens — the device was
+ * that lands mid-flow evicts and disposes that adapter (registry.evict). A
+ * fresh WdaServer for the next read would serve the DESELECTED simulator —
+ * an orphan of the 0.8.1 bug class, since nothing would dispose it. So the
+ * read is refused, with wording for the two ways it happens — the device was
  * deselected, or averi is shutting down — rather than WdaServer's own "the
  * process is exiting", which is only true for the second.
  *
@@ -88,7 +87,7 @@ export class WdaTreeSource implements IosTreeSource {
       // process is exiting", "stopped during startup" — neither of which
       // names the deselection or how to recover. The flag decides: a failure
       // after dispose is the release, whatever the server called it; before
-      // it, the server's wording stands (review 2026-10-02, round 3).
+      // it, the server's wording stands.
       if (this.disposed) throw this.released(err);
       throw err;
     }
@@ -98,9 +97,8 @@ export class WdaTreeSource implements IosTreeSource {
 
   /**
    * Brings WebDriverAgent up without reading a tree — WdaServer.ensureRunning, within its own bounds (the package, a
-   * first build, /status). What `treeSource: auto` asks before its first read (auto-tree-source.ts, A41a): a failure
-   * here is "WDA cannot be brought up", unlike a failed /source on a WDA that is up. Released → the released error, as
-   * read().
+   * first build, /status). A failure here is "WDA cannot be brought up", unlike a failed /source on a WDA that is up.
+   * Released → the released error, as read().
    */
   async bringUp(): Promise<void> {
     if (this.disposed) throw this.released();
@@ -131,15 +129,13 @@ export class WdaTreeSource implements IosTreeSource {
   }
 
   /**
-   * Which app WebDriverAgent reads — asked only of a WDA that is up (D48,
-   * 2026-11-02; ADR 0032's D48 amendment). Until 2026-11-02 this declined
-   * always, by decision (2026-10-09): the idb lag after an app switch had not
-   * been measured on WDA's sessionless `/source`. It is now: batch-2 D
-   * (main 39c1fcda) read Contacts' whole tree in 2 of 5 `ui_snapshot`s right
-   * after `launch_app` of the lab app. The mechanism (WDA 16.1.7's source):
-   * with no session, `/source` reads `fb_activeApplication` — the first app
-   * AX lists as active — and AX still lists the previous app for a moment
-   * after `simctl launch` returns.
+   * Which app WebDriverAgent reads — asked only of a WDA that is up (D48;
+   * ADR 0032's D48 amendment). WDA's sessionless `/source` lags an app
+   * switch as idb does: batch-2 D (main 39c1fcda) read Contacts' whole tree
+   * in 2 of 5 `ui_snapshot`s right after `launch_app` of the lab app. The
+   * mechanism (WDA 16.1.7's source): with no session, `/source` reads
+   * `fb_activeApplication` — the first app AX lists as active — and AX still
+   * lists the previous app for a moment after `simctl launch` returns.
    *
    * So the launch asks the same question `/source` answers, by bundle id:
    * `GET /wda/activeAppInfo` (WdaServer.activeAppInfo) resolves the app the
@@ -158,9 +154,8 @@ export class WdaTreeSource implements IosTreeSource {
    *   ask the same child is not asked again — the remembered error is thrown
    *   at once, so every later launch still carries its "could not check"
    *   note (never a silent decline, which is D48's bug) without paying the
-   *   ask's budget again on a wedged runner (review 2026-11-02). A /source
-   *   read that succeeds clears it, and so does a restart (a new
-   *   upGeneration).
+   *   ask's budget again on a wedged runner. A /source read that succeeds
+   *   clears it, and so does a restart (a new upGeneration).
    *   The bundle id is matched exactly by the wait (ios-foreground.ts): WDA
    *   reports the app's canonical CFBundleIdentifier, the id `simctl launch`
    *   was given — no case folding, by design.
@@ -185,11 +180,10 @@ export class WdaTreeSource implements IosTreeSource {
   }
 
   /**
-   * iOS's system alert in one SHORT `/source` (D54, ADR 0032's D54 amendment): asked by a deep link's foreground wait
-   * — and a launch's, D56 — at its bound, when activeAppInfo last named SpringBoard. WdaServer.quickSourceIfUp — its
-   * own 2 s budget, no start, no /status probe, no restart, unlike read(): an aid to the reply, never a recovery. WDA
-   * not up → undefined, no call; a failed read throws as WDA said it (the wait then gives its note); released → the
-   * released error. Leaves `failedAsk` alone: this read proves nothing about the ask.
+   * iOS's system alert in one SHORT `/source` (D54, ADR 0032's D54 amendment). WdaServer.quickSourceIfUp — its own 2 s
+   * budget, no start, no /status probe, no restart, unlike read(): an aid to the reply, never a recovery. WDA not up →
+   * undefined, no call; a failed read throws as WDA said it (the wait then gives its note); released → the released
+   * error. Leaves `failedAsk` alone: this read proves nothing about the ask.
    */
   async systemAlert(): Promise<SystemAlert | undefined> {
     if (this.disposed) throw this.released();
@@ -206,8 +200,8 @@ export class WdaTreeSource implements IosTreeSource {
   /**
    * Types `text` into whatever holds keyboard focus through WebDriverAgent (D43, ADR 0037's D43 amendment):
    * WdaServer.keys — a session per WDA start, one retry on a lost session, none after a request that did not complete.
-   * IosAdapter sends only what idb cannot type (ios-typing.ts#typingPathOf). Starts WDA when it is not up, as read()
-   * does. Released → the released error, nothing sent; a failure after dispose is the release, as read()'s.
+   * Starts WDA when it is not up, as read() does. Released → the released error, nothing sent; a failure after dispose
+   * is the release, as read()'s.
    */
   async typeText(text: string): Promise<void> {
     if (this.disposed) throw this.released();

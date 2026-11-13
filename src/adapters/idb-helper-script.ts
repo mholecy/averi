@@ -16,13 +16,12 @@
  * `{"ready": <pid>}`, written only after the import succeeded: an fb-idb without `gen_main`, or an interpreter that cannot import it, exits
  * before it, and node reads that as a failed start.
  *
- * The import sees what the shebang'd CLI sees (review 2026-10-31, MINOR-5): no `-I`, so `PYTHONPATH` and the user
- * site-packages count as they do for `idb`; and its first statement replaces `sys.path[0]` — `''`, the cwd, under
- * `-c` — with the directory of idb's real path, the entry Python puts there when it runs the script. Only when it IS
- * `''`: under safe-path mode (`PYTHONSAFEPATH`, Python 3.11+) `-c` prepends nothing and neither does the script run,
- * so the path is left as it is — the CLI's exactly (review round 2, NIT-A). `sys` is built in and `os` was imported by
- * `site` before any of this runs, so nothing is looked up on the cwd before it is gone, and nothing from averi's cwd
- * can be imported after.
+ * The import sees what the shebang'd CLI sees: no `-I`, so `PYTHONPATH` and the user site-packages count as they do
+ * for `idb`; and its first statement replaces `sys.path[0]` — `''`, the cwd, under `-c` — with the directory of idb's
+ * real path, the entry Python puts there when it runs the script. Only when it IS `''`: under safe-path mode
+ * (`PYTHONSAFEPATH`, Python 3.11+) `-c` prepends nothing and neither does the script run, so the path is left as it is
+ * — the CLI's exactly. `sys` is built in and `os` was imported by `site` before any of this runs, so nothing is looked
+ * up on the cwd before it is gone, and nothing from averi's cwd can be imported after.
  *
  * Parity with the CLI (the contract test, tests/adapters/idb-helper-contract.test.ts, runs both against the real
  * fb-idb): `sys.argv[0]` is idb's own path, as the shebang'd script sees it, so argparse names itself `idb` in usage

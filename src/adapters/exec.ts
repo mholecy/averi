@@ -23,18 +23,13 @@ export interface ExecOptions {
   /**
    * The indexes into `args` whose word is typed text (A17, ADR 0043's amendment): a failure shows `<typed text>` there,
    * in ExecError's `command`, its message and node's own `Command failed: <argv>` line. Every typing call site declares
-   * its own (ios.ts#idbText, android.ts#typeText); a fake ExecFn honours it by building its command with
-   * failure-text.ts#shownCommand.
+   * its own; a fake ExecFn honours it by building its command with failure-text.ts#shownCommand.
    */
   typed?: readonly number[];
 }
 
 export type ExecFn = (cmd: string, args: string[], opts?: ExecOptions) => Promise<ExecResult>;
 
-/**
- * A call's budget and typed indexes as ExecOptions, each only when given: how runIdb and android.ts#runAdb build
- * them.
- */
 export function execOptions(timeoutMs?: number, typed?: readonly number[]): ExecOptions {
   return { ...(timeoutMs ? { timeoutMs } : {}), ...(typed ? { typed } : {}) };
 }
@@ -86,7 +81,7 @@ export class ExecError extends Error {
      * monkey stdout tail), and the error it re-reads as `cause`. It is given
      * HERE, to a new error, never appended to a thrown one's `message`: V8
      * writes `stack`'s header once, at construction, so a message extended
-     * afterwards is missing from every logged stack (code review, 2026-10-07).
+     * afterwards is missing from every logged stack.
      */
     options: { note?: string; cause?: unknown } = {},
   ) {

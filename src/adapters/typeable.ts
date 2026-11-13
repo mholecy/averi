@@ -28,10 +28,10 @@ export interface Typeable {
    * Another configuration of the same platform that types part of what this one refuses (D43: an iOS project on the
    * idb tree source, whose characters WebDriverAgent's `/wda/keys` may take): `refuses` is that path's own set, and
    * `blockedBy(char)` the remedy said in place of `otherPath` for a value that path would refuse too — a path that
-   * refuses a later character of the value is no way out (review round 1). `char` is the first character of the value
-   * that path refuses, named as the refusal names one (`U+1F600 '😀'`): the one that blocks every path (review round
-   * 2). A function inside the declaration, not a method of the adapter: the read hand-off's Proxy wraps only the
-   * adapter's own methods. Absent: no such path.
+   * refuses a later character of the value is no way out. `char` is the first character of the value that path
+   * refuses, named as the refusal names one (`U+1F600 '😀'`): the one that blocks every path. A function inside the
+   * declaration, not a method of the adapter: the read hand-off's Proxy wraps only the adapter's own methods. Absent:
+   * no such path.
    */
   readonly widerPath?: Pick<Typeable, 'refuses'> & { blockedBy(char: string): string };
 }

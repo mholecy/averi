@@ -8,7 +8,7 @@ import { sleep } from '../util/sleep.js';
 
 /**
  * After an iOS launch, wait until the tree is the launched app's
- * (2026-10-09, docs/bugs/2026-10-09-ios-launch-app-reads-previous-apps-tree.md).
+ * (docs/bugs/2026-10-09-ios-launch-app-reads-previous-apps-tree.md).
  *
  * The device facts. `simctl launch` returns as soon as the app is asked to
  * come forward, not when it has: measured on iOS 27.0 (iPhone 17 simulator,
@@ -20,8 +20,8 @@ import { sleep } from '../util/sleep.js';
  * neither empty (IdbEmptyTreeError) nor bare (ui-tree/bare-tree.ts), so
  * nothing downstream doubted it: an `absent:` assert passed 3 of 3 on the
  * wrong app, and a presence assert on the old app's own field passed too. A
- * COLD launch has the same window with SpringBoard in it (2026-10-08,
- * docs/bugs/2026-10-08-ios-launch-transition-tree-reads-as-rendered.md: the
+ * COLD launch has the same window with SpringBoard in it
+ * (docs/bugs/2026-10-08-ios-launch-transition-tree-reads-as-rendered.md: the
  * status bar and the zooming icon for ~2 s), which the bare-tree rules
  * recognize by shape; this check recognizes it by name too.
  *
@@ -34,27 +34,26 @@ import { sleep } from '../util/sleep.js';
  * naming what it read when it never matched.
  *
  * Fail open: the check only ever DELAYS a launch, never fails it. But it
- * is never SILENT when it could not check (review 2026-10-09): a check
- * that quietly switched itself off — a drift in appinfo's unmeasured
- * format, a tree shape not yet seen — would leave this P0 open on every
- * launch with nothing to say so. So the wait stops at once WITH a note
- * when it cannot tell: the bundle's names could not be read (appinfo
- * failed, or listed neither name), or a read error other than
- * idb's empty tree (the device was not read; the readers after the launch
- * meet the same error in their own words). A read with no Application or
- * an unlabelled one (`unlabelled` — unmeasured shapes, and possibly idb's
+ * is never SILENT when it could not check: a check that quietly switched
+ * itself off — a drift in appinfo's unmeasured format, a tree shape not yet
+ * seen — would leave this P0 open on every launch with nothing to say so. So
+ * the wait stops at once WITH a note when it cannot tell: the bundle's names
+ * could not be read (appinfo failed, or listed neither name), or a read error
+ * other than idb's empty tree (the device was not read; the readers after the
+ * launch meet the same error in their own words). A read with no Application
+ * or an unlabelled one (`unlabelled` — unmeasured shapes, and possibly idb's
  * full-frame launch transient) is a poll miss instead, remembered: if no
  * labelled read follows by the deadline, the note says it could not check.
  * Only a source that does not ask (`declined` — WDA before its WebDriverAgent
- * is up, wda-tree-source.ts) stays silent. idb's
- * empty tree (IdbEmptyTreeError — no tree yet, measured 0.4 s after a
- * launch) is a poll miss: the window this exists for is right behind it.
+ * is up, wda-tree-source.ts) stays silent. idb's empty tree
+ * (IdbEmptyTreeError — no tree yet, measured 0.4 s after a launch) is a poll
+ * miss: the window this exists for is right behind it.
  *
  * The note's honesty. A label that never matches is either the previous app
  * (or SpringBoard) still in idb's tree, or THIS app under a name its Info.plist
  * does not carry — a localized display name (InfoPlist.strings) on a device
  * in another language, unmeasured. The screenshot does NOT tell them apart
- * (corrected 2026-10-09, docs/bugs/2026-10-09-ios-launch-give-up-note-says-
+ * (docs/bugs/2026-10-09-ios-launch-give-up-note-says-
  * ignore-when-tree-is-stale.md): the pixels switch before idb's tree does,
  * so in both cases it shows the launched app — measured at 347e70d, the
  * session's first launch, after the bank app (in front since before
@@ -69,12 +68,12 @@ import { sleep } from '../util/sleep.js';
  *  - SpringBoard's `' '` — never the launched app under another name: read
  *    again.
  *  - the name of ANOTHER app whose names the adapter holds (`ownerOf`;
- *    IosAdapter's appinfo cache — the bundles this adapter's launches looked
- *    names up for: idb source, this server process; the first match when
- *    two share a name, which can name the wrong one of them but never the
- *    launched app, whose own names matched earlier): the tree is that
- *    app's, whatever the screenshot shows — read again; no localized-name
- *    reading. A flow or session that launched the app it now leaves.
+ *    IosAdapter's appinfo cache — the bundles this adapter asked appinfo for,
+ *    in this server process; the first match when two share a name, which can
+ *    name the wrong one of them but never the launched app, whose own names
+ *    matched earlier): the tree is that app's, whatever the screenshot shows
+ *    — read again; no localized-name reading. A flow or session that launched
+ *    the app it now leaves.
  *  - any other label — an app averi never launched (the MEASURED case:
  *    opened by hand, or before the server started) or a localized name:
  *    treat the tree as the previous app's until a read carries one of the
@@ -107,41 +106,40 @@ import { sleep } from '../util/sleep.js';
  * slow first appinfo — up to its 10 s budget — is added to it, not taken
  * from it), plus the read in flight when it ends: no read is STARTED at or
  * after the deadline, but one already started is idb's, under its own 15 s
- * budget (ios-tree-source.ts) — so a launch on a hung idb now takes up to
+ * budget (ios-tree-source.ts) — so a launch on a hung idb takes up to
  * 15 s before its "could not check" note. And nothing is cached about a
  * never-matching app: a localized display name costs the full window and a
  * note on EVERY launch — N windows for an ensure_state ladder with N launch
  * rungs.
  *
- * On the WDA source (D48, 2026-11-02; ADR 0032's D48 amendment). WDA has the
- * same lag: batch-2 D (main 39c1fcda) read Contacts' whole tree in 2 of 5
- * `ui_snapshot`s right after a `launch_app` that, declining by decision
- * (2026-10-09, unmeasured then), had waited for nothing. Its sessionless
- * `/source` reads the app AX lists as active, so the source answers that
- * app's bundle id (`bundle`, WDA's `/wda/activeAppInfo`) — exact, never
- * localized: a match is `bundleId ===` the launched one, with no names and no
- * appinfo; another bundle is polled like a stale label, and at the bound the
- * note names it (`stillReads`; SpringBoard as what it is) with no
- * localized-name branch. A WDA not yet up declines (the first read's start
+ * On the WDA source (ADR 0032's D48 amendment). WDA has the same lag: batch-2
+ * D (main 39c1fcda) read Contacts' whole tree in 2 of 5 `ui_snapshot`s right
+ * after a `launch_app` that, declining by decision, had waited for nothing.
+ * Its sessionless `/source` reads the app AX lists as active, so the source
+ * answers that app's bundle id (`bundle`, WDA's `/wda/activeAppInfo`) —
+ * exact, never localized: a match is `bundleId ===` the launched one, with no
+ * names and no appinfo; another bundle is polled like a stale label, and at
+ * the bound the note names it (`stillReads`; SpringBoard as what it is) with
+ * no localized-name branch. A WDA not yet up declines (the first read's start
  * outlasts the switch), so a project's first launch still waits for nothing.
  * Cost there: one `/wda/activeAppInfo` per ask (unmeasured, estimated tens of
- * ms; D48's device check) — an ask in flight at the bound is under WdaServer's
- * ACTIVE_APP_TIMEOUT_MS.
+ * ms; D48's device check) — an ask in flight at the bound is under
+ * WdaServer's ACTIVE_APP_TIMEOUT_MS.
  *
- * After `openDeepLink` only for the project's own scheme (D49a, 2026-11-02;
- * ADR 0032's D49a amendment). A link may legitimately bring ANOTHER app
- * forward (a universal link handed to Safari, `tel:`, another app's scheme),
- * so a link in general has no bundle to wait for. But one whose scheme the
- * project's app declares (its Info.plist's CFBundleURLTypes, ios-url-schemes.ts)
- * is expected to bring that app forward, and when it is not in front iOS
- * first asks "Open in “AveriLab”?" over SpringBoard — batch-1 D's probe: the
- * reply said "Opened", and every launch after it stayed behind the alert.
- * Such a link waits here as a launch does (`link` set: the detail says
- * "opening <url> in <bundle>"), and how the wait ended goes up as a fact: the
- * link's reply LEADS with what the agent must do, in
- * interact/app-holder-text.ts#appHolderText's words (A10).
+ * After `openDeepLink` only for the project's own scheme (ADR 0032's D49a
+ * amendment). A link may legitimately bring ANOTHER app forward (a universal
+ * link handed to Safari, `tel:`, another app's scheme), so a link in general
+ * has no bundle to wait for. But one whose scheme the project's app declares
+ * (its Info.plist's CFBundleURLTypes, ios-url-schemes.ts) is expected to
+ * bring that app forward, and when it is not in front iOS first asks "Open in
+ * “AveriLab”?" over SpringBoard — batch-1 D's probe: the reply said "Opened",
+ * and every launch after it stayed behind the alert. Such a link waits here
+ * as a launch does (`link` set: the detail says "opening <url> in <bundle>"),
+ * and how the wait ended goes up as a fact: the link's reply LEADS with what
+ * the agent must do, in interact/app-holder-text.ts#appHolderText's words
+ * (A10).
  *
- * The alert itself, named (D54, 2026-11-02; ADR 0032's D54 amendment), from
+ * The alert itself, named (ADR 0032's D54 amendment), from
  * its shape as batch-5 D49A captured it (ios-system-alert.ts): a link's wait
  * that finds it ends with it (`alert`), and the reply names its title and its
  * buttons at their centres instead of the note — never a tap. On idb at no
@@ -153,19 +151,19 @@ import { sleep } from '../util/sleep.js';
  * (ForegroundCheck.alert, WdaTreeSource.systemAlert: its own 2 s budget, no
  * start, no restart) is read, and only at the bound, only when the last
  * bundle named was SpringBoard: a matched link reads nothing more, and a
- * failed or alert-less read is the note of before (fail open).
+ * failed or alert-less read leaves the note (fail open).
  *
- * A launch finds the same alert the same way (D56, 2026-11-02; ADR 0032's D56
- * amendment): an unanswered "Open in “AveriLab”?" keeps every later launch
- * behind it (batch-2), and D48's "read again" cannot answer it. Its wait ends
- * on it as a link's does, and the launch's note names the alert and its
- * buttons' centres in place of D48's — the launch still never
- * fails. Never "it asks": the alert belongs to something earlier, and may name
- * another app; so a WDA launch, which has no names cached, asks no appinfo for
- * it. The alert goes up as a fact (AppHolder's `alert`, A10), on both verbs;
- * interact/app-holder-text.ts#appHolderText words it. Not on Android: the previous app's
- * tree after a switch has not been measured there (uiautomator dumps the
- * focused window), so android.ts waits for nothing.
+ * A launch finds the same alert the same way (ADR 0032's D56 amendment): an
+ * unanswered "Open in “AveriLab”?" keeps every later launch behind it
+ * (batch-2), and D48's "read again" cannot answer it. Its wait ends on it as a
+ * link's does, and the launch's note names the alert and its buttons' centres
+ * in place of D48's — the launch still never fails. Never "it asks": the alert
+ * belongs to something earlier, and may name another app; so a WDA launch,
+ * which has no names cached, asks no appinfo for it. The alert goes up as a
+ * fact (AppHolder's `alert`, A10), on both verbs;
+ * interact/app-holder-text.ts#appHolderText words it. Not on Android: the
+ * previous app's tree after a switch has not been measured there (uiautomator
+ * dumps the focused window), so android.ts waits for nothing.
  */
 
 // The bound is FOREGROUND_WAIT_MS, in adapters/types.ts beside AppHolder (A16): the MCP tool descriptions quote it,
@@ -197,7 +195,6 @@ const STALE_TREE_MEASURED_MS = 4_500;
  */
 const LOCALIZED_REREAD_MS = 20_000;
 
-/** What the wait needs: the launched bundle, one read of the tree's Application label, and the bundle's names (cached by the caller). */
 export interface ForegroundCheck {
   bundleId: string;
   /** IosTreeSource.applicationLabel — one device call per call (none when `declined`). */
@@ -212,9 +209,9 @@ export interface ForegroundCheck {
   names(): Promise<readonly string[]>;
   /**
    * The bundle id of an app whose names include `label`, among those the
-   * caller already holds (IosAdapter: the bundles its launches looked names
-   * up for — idb source, this process) — undefined when none does, the first
-   * when several do. No device call: asked only for the note.
+   * caller already holds (IosAdapter: the bundles it asked appinfo for, in
+   * this process) — undefined when none does, the first when several do. No
+   * device call: asked only for the note.
    */
   ownerOf(label: string): string | undefined;
   /**
@@ -274,7 +271,7 @@ type AlertEnd = { kind: 'alert'; alert: SystemAlert; names: readonly string[] };
 const after = (check: ForegroundCheck): string =>
   check.link === undefined ? `launching ${check.bundleId}` : `opening ${check.link} in ${check.bundleId}`;
 
-/** The wait itself: how it ended, and the detail's words (awaitForeground). */
+/** The wait itself: how it ended, and the detail's words. */
 async function poll(check: ForegroundCheck): Promise<WaitEnd> {
   let deadline = Date.now() + FOREGROUND_WAIT_MS;
   let names: readonly string[] | undefined;
@@ -303,7 +300,7 @@ async function poll(check: ForegroundCheck): Promise<WaitEnd> {
         if (read.bundleId === check.bundleId) return { kind: 'matched' };
         staleBundle = read.bundleId;
       } else if (read.kind === 'unlabelled') {
-        // A poll miss, like the empty tree — not a stop (review round 2):
+        // A poll miss, like the empty tree — not a stop:
         // idb's other launch transient, a lone full-frame Application that
         // IdbEmptyTreeError deliberately leaves a tree, may come unlabelled
         // (unmeasured; the 2026-10-06 note allows either), and stopping on
@@ -351,7 +348,7 @@ async function poll(check: ForegroundCheck): Promise<WaitEnd> {
  * WDA's system alert at the bound (D54; a launch's too, D56): one `check.alert()`, and — for a link only — the names
  * it is judged against (appinfo's, which the link's scheme lookup has cached; unreadable names are no name). A launch
  * asks no names: its text never judges the title (AppHolder), and a WDA launch has none cached. Fails open: a read
- * that throws, or holds no alert, is undefined, and the wait's note is the one of before.
+ * that throws, or holds no alert, is undefined, and the wait's note stands.
  */
 async function alertAtBound(check: ForegroundCheck): Promise<AlertEnd | undefined> {
   if (check.alert === undefined) return undefined;
@@ -420,8 +417,8 @@ function notInFront(check: ForegroundCheck, label: string, names: readonly strin
 }
 
 /**
- * The one advice of the notes that could not confirm the app (review 2026-11-02): read again — never "compare with
- * screenshot", which shows the launched app before either source's tree does (the 2026-10-09 correction above).
+ * The one advice of the notes that could not confirm the app: read again — never "compare with screenshot", which
+ * shows the launched app before either source's tree does (the module comment's "The note's honesty").
  */
 const READ_AGAIN = 'read again before trusting a read (the screenshot switches before the tree)';
 

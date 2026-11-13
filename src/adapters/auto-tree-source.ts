@@ -94,10 +94,10 @@ export class AutoTreeSource implements IosTreeSource {
   }
 
   /**
-   * WDA's typer while WDA is or may be chosen; none once idb was — what IosAdapter's `typeable` and its typing route
-   * read per call, so a fallback refuses what idb cannot type before anything is sent (ADR 0037). Before the choice it
-   * makes it: a text sent here is one idb cannot type, and if WDA does not come up it is refused as idb refuses it,
-   * with the claim note's line (the reason, the retry) — nothing typed.
+   * WDA's typer while WDA is or may be chosen; none once idb was, so a fallback refuses what idb cannot type before
+   * anything is sent (ADR 0037). Before the choice it makes it: a text sent here is one idb cannot type, and if WDA
+   * does not come up it is refused as idb refuses it, with the claim note's line (the reason, the retry) — nothing
+   * typed.
    */
   get typeText(): ((text: string) => Promise<void>) | undefined {
     return this.chosen === this.idb ? undefined : this.typeThroughWda;

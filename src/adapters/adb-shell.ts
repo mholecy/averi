@@ -1,7 +1,6 @@
 /**
  * What `adb shell` hands the device: ONE command line, run by the device's
- * `sh -c`. The one owner of turning an argv into that line (2026-10-07, the
- * Android adapter review's candidate 1).
+ * `sh -c`. The one owner of turning an argv into that line.
  *
  * Why this module exists. The adb client does not pass an argv through: it
  * JOINS every argument after `shell` with a single space — unescaped, "just
@@ -16,13 +15,8 @@
  *   --es key "hello world"     the extra arrived as `hello`, with a stray word `world`
  *   -d app://x/$HOME;id       `$HOME` was expanded and `id` was executed
  *
- * Before this module the adapter knew about the join in three places, each
- * its own way — typeText's backslash-escape regex, isAppRunning's package-name
- * validation ("could escape the shell"), INPUT_SHOWN_COMMAND's comment — and
- * the launch's intent data / extras and openDeepLink did not know at all: a
- * deep link with a second query parameter opened silently without it. The
- * tests could not see it, because their fake exec joined the argv with a
- * space exactly as lossily as adb does.
+ * A test cannot see the loss through a fake exec that joins the argv with a
+ * space: that join is exactly as lossy as adb's.
  *
  * The rule here: every word that is not made only of characters `sh` never
  * interprets goes inside single quotes, where POSIX sh (mksh included)
@@ -47,33 +41,22 @@
  *   `input text` reads `%s` as a space — that is `input`'s vocabulary, and
  *   typeText keeps it.
  *
- * What changed for the adapter's callers, and what is not yet measured —
- * the ONE place this is written down (android.ts, its tests and
- * ARCHITECTURE.md §3 point here):
- * - typeText: until 2026-10-07 it escaped a list of shell metacharacters
- *   with a backslash of its own, a partial copy of this rule that missed
- *   `!`, `^`, a tab and a newline. Now each character is one quoted word.
- *   For `'`, `\` and the other escaped characters the argv `input text`
- *   receives is the same as before; UNVERIFIED on a device (the per-char
- *   typing and its pacing were measured in e594a21 / 00db84c / 2070647).
- * - typeText REFUSES a newline, a return or a tab. The old escaping let the
- *   device sh swallow them as separators (`input text` got no argument and
- *   failed), so refusing is no regression; delivering them literally would
- *   be one — `input text` likely turns a newline into an ENTER key event,
- *   which submits a form mid-fill (UNVERIFIED on a device; not risked). The
- *   deliberate route is `pressKey('enter')`. Since the code review the same
- *   day the refusal is stated where text is ACCEPTED, interact/type-text.ts,
- *   and widened: every C0 control character and DEL, on BOTH platforms,
- *   before any device call — a fill used to tap and clear its field before
- *   this adapter refused, and iOS still typed the characters. That CHANGED
- *   iOS: a `\n` in a value used to reach idb's `ui text` (typed as Return);
- *   it is refused now. The adapter's own check stays, as a defensive assert.
- * - isAppRunning: it validated the package name instead ("could escape the
- *   shell"), a third private answer to the same fact. The name is now quoted
- *   into its `rawShell` line; a name that is no real package simply matches
- *   no process.
- * - launch (intent data, extras) and openDeepLink had no answer at all; the
- *   three measured cases above are theirs.
+ * What this means for the adapter's callers, and what is not yet measured:
+ * - typeText: each character is one quoted word. The argv `input text`
+ *   receives for `'`, `\` and the other shell metacharacters is UNVERIFIED
+ *   on a device (the per-char typing and its pacing were measured in
+ *   e594a21 / 00db84c / 2070647).
+ * - typeText REFUSES every C0 control character and DEL. Delivering a
+ *   newline literally could submit a form mid-fill — `input text` likely
+ *   turns it into an ENTER key event (UNVERIFIED on a device; not risked).
+ *   The deliberate route is `pressKey('enter')`. The refusal is stated where
+ *   text is ACCEPTED, interact/type-text.ts, on BOTH platforms, before any
+ *   device call, so a fill does not tap and clear its field first. The
+ *   adapter's own check stays, as a defensive assert.
+ * - isAppRunning: the package name is quoted into its `rawShell` line, not
+ *   validated; a name that is no real package simply matches no process.
+ * - launch (intent data, extras) and openDeepLink: the three measured cases
+ *   above are theirs.
  */
 
 /**
@@ -103,8 +86,7 @@ export function shellCommandLine(argv: readonly string[]): string {
 /**
  * `adb -s <serial> shell <argv>` as the argv handed to the `adb` binary, each
  * device word quoted by shellQuote — the one builder of a device shell
- * command (2026-10-08): AndroidAdapter's `shell` and discovery.ts's getprop
- * on a listed device both call it, so neither spells the quoting itself.
+ * command, so no caller spells the quoting itself.
  */
 export function adbShellArgv(serial: string, argv: readonly string[]): string[] {
   return ['-s', serial, 'shell', ...argv.map(shellQuote)];

@@ -8,7 +8,7 @@ import { everyNode, labelOf, rectCentre, type ChooserApp, type ChooserButton, ty
  * `am start -a VIEW -d <url>` with no package is an implicit intent. When two activities handle the url and none is
  * the preferred one, Android starts its resolver instead of either app, and `am start` reports an activity started
  * (android-start.ts): the start was right, but which activity it started was never asked. So openDeepLink reads the
- * focus once after the start (CHOOSER_FOCUS_COMMAND) and asks chooserInFocus. Since D55b launch_app does the same
+ * focus once after the start (android-wm.ts#CHOOSER_FOCUS_COMMAND) and asks chooserInFocus. launch_app does the same
  * after its `-p` start (an intent scoped to the package, which two of its activities may handle), and after monkey's
  * refusal, where the chooser is only also in front: ADR 0041's D55b and D73 amendments. monkey itself starts over the
  * chooser, which goes (D73, on API 33), so its success reads nothing.
@@ -27,11 +27,11 @@ import { everyNode, labelOf, rectCentre, type ChooserApp, type ChooserButton, ty
  * (packages/modules/IntentResolver). An OEM's own chooser component is not in this list: it reads as no chooser.
  *
  * The chooser goes up as a fact (adapters/types.ts#AppHolder's `chooser`), and interact/app-holder-text.ts#appHolderText
- * words it (A10). What stays worded here is monkey's refusal: a thrown error of the adapter's, not an answer.
+ * words it. What stays worded here is monkey's refusal: a thrown error of the adapter's, not an answer.
  *
  * Why it is safe to name: no app can own package `android` or `com.android.intentresolver`, so a positive match is
  * the platform's chooser in front, never an app's activity of the same name. Anything else, including no focus at
- * all, is undefined: openDeepLink then answers as before ("Opened"), never a warning without a match.
+ * all, is undefined: openDeepLink then answers "Opened", never a warning without a match.
  */
 
 /** The packages the platform's chooser runs in: the framework's, and the IntentResolver module's (later APIs). */
@@ -43,7 +43,6 @@ const CHOOSER_PACKAGES: ReadonlySet<string> = new Set(['android', 'com.android.i
  */
 const CHOOSER_CLASS = /\.(?:Resolver|Chooser)Activity$/;
 
-/** Whether `pkg/class` is the platform's chooser. */
 const isChooser = (component: string): boolean => {
   const [pkg, cls] = component.split('/') as [string, string];
   return CHOOSER_PACKAGES.has(pkg) && CHOOSER_CLASS.test(cls);

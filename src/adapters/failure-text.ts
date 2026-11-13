@@ -69,10 +69,7 @@ export function shownCommand(cmd: string, args: readonly string[], typed: readon
   return [cmd, ...shownArgs(args, typed)].join(' ');
 }
 
-/**
- * `args` as shownCommand shows them, word by word: what a channel or a log publishes
- * (idb.ts#IDB_HELPER_CALL_START).
- */
+/** `args` as shownCommand shows them, word by word: what a channel or a log publishes. */
 export function shownArgs(args: readonly string[], typed: readonly number[]): string[] {
   return args.map((word, at) => (typed.includes(at) ? TYPED_TEXT : word));
 }
@@ -118,9 +115,9 @@ function wordWithoutHostFolders(word: string): string {
 }
 
 /**
- * `text` with its host paths out: the rule of every quote of a host command's words, the three readers that quote
- * `stderr` themselves included (android.ts's dump and get-state diagnosis, ios-liveness.ts#pgrepReason). The own home goes
- * first, over the whole text, since it may hold a space; every other rule goes word by word.
+ * `text` with its host paths out: the rule of every quote of a host command's words, a reader that quotes `stderr`
+ * itself included. The own home goes first, over the whole text, since it may hold a space; every other rule goes word
+ * by word.
  */
 export function withoutHostPaths(text: string, home: string): string {
   return withoutOwnHome(text, home).replace(/\S+/g, wordWithoutHostFolders);

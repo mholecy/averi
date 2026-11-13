@@ -13,8 +13,8 @@ import { errorMessage } from '../util/error-message.js';
 import { WDA_READY_TIMEOUT_MS } from './types.js';
 
 /**
- * WebDriverAgent lifecycle for one simulator (docs/plans/ios-wda-tree-source.md,
- * Phase 1). WDA ships as the `appium-webdriveragent` optional dependency (pinned in package.json);
+ * WebDriverAgent lifecycle for one simulator (docs/plans/ios-wda-tree-source.md). WDA ships as the
+ * `appium-webdriveragent` optional dependency (pinned in package.json);
  * measured 2026-08-12 on Xcode 26.6 / iOS 26.5:
  * - build once per Xcode version (`xcodebuild build-for-testing`, cached in
  *   DerivedData — the first build takes MINUTES, then it's a no-op),
@@ -23,9 +23,9 @@ import { WDA_READY_TIMEOUT_MS } from './types.js';
  * - readiness = `GET /status` 200 with
  *   value.build.productBundleIdentifier === com.facebook.WebDriverAgentRunner.
  *
- * The tree read lives here, and since D43 the typing of what idb cannot type (keys(): one WebDriver session per WDA
- * start, the one session averi holds — docs/adr/0037-a-value-the-adapter-cannot-type-is-refused-before-any-device-
- * call.md, the D43 amendment); taps, every other typing and install stay on idb/simctl (plan, decision 4).
+ * The tree read lives here, and the typing of what idb cannot type (keys(): one WebDriver session per WDA start, the
+ * one session averi holds — docs/adr/0037-a-value-the-adapter-cannot-type-is-refused-before-any-device-call.md, the
+ * D43 amendment); taps, every other typing and install stay on idb/simctl (plan, decision 4).
  */
 
 const WDA_BUNDLE_ID = 'com.facebook.WebDriverAgentRunner';
@@ -39,7 +39,7 @@ const BUILD_TIMEOUT_MS = 600_000;
  * answer into a "could not check" note.
  */
 const ACTIVE_APP_TIMEOUT_MS = 2_000;
-/** /source on deep trees is the known WDA weakness — Phase 4 measures it. */
+/** /source on deep trees is the known WDA weakness. */
 const SOURCE_TIMEOUT_MS = 30_000;
 /**
  * quickSourceIfUp's budget (D54): the one /source a deep link's foreground wait reads at its 3 s bound to name iOS's system
@@ -74,8 +74,8 @@ const POLL_INTERVAL_MS = 500;
  * SHUTDOWN_BUDGET_MS (1 500), or the budget cuts off the one step that frees
  * the port: wait ≤ 600, plus one straggling probe that may START just before
  * the deadline (≤ 150), + lsof ≤ 300 + the kills ≈ 1 050 < 1 500 — measured
- * 694–833 ms against real sockets; the earlier 1 000 + 2 000 sizing measured
- * 1 030–1 134 ms, i.e. over budget (review 2026-09-18).
+ * 694–833 ms against real sockets; a 1 000 + 2 000 sizing measures
+ * 1 030–1 134 ms, over budget.
  */
 const SHUTDOWN_GONE_MS = 600;
 const SHUTDOWN_POLL_MS = 100;
@@ -110,7 +110,7 @@ function wdaErrorOf(body: unknown): WdaError {
 /**
  * An error answer as a reply says it: the status, WDA's `error`, and its `message` (cut to 200 characters) when given.
  * `/wda/keys` never passes the message: it is NSError's description and may hold the typed value, escaped (`\U0161`) or
- * in part, where no cut of the text can find it (review round 1).
+ * in part, where no cut of the text can find it.
  */
 function describeWdaError(status: number, { error, message }: WdaError): string {
   return `HTTP ${status}${error === undefined ? '' : ` ${error}`}${message === undefined || message === '' ? '' : `: ${message.slice(0, 200)}`}`;
@@ -135,11 +135,12 @@ const defaultSpawn: SpawnFn = (cmd, args, opts) => nodeSpawn(cmd, args, opts);
 
 /**
  * In-process port allocator: sequential from 8100, one port per UDID for the
- * life of the process — two WdaServers in this process can NEVER share a port.
- * (The previous 8100 + hash(udid) % 100 scheme collided at ~1% per pair, and a
- * collision silently delivered the WRONG device's tree.) Servers left behind
- * by OTHER processes cannot be solved by allocation; they are caught at probe
- * time instead — see the not-ours check in doEnsureRunning.
+ * life of the process — two UDIDs in this process never share a default port
+ * (an explicit `port` option bypasses the allocator). A hash of the UDID would
+ * collide (8100 + hash % 100: ~1 % per pair), and a collision silently
+ * delivers the WRONG device's tree. Servers
+ * left behind by OTHER processes cannot be solved by allocation; they are
+ * caught at probe time instead — see the not-ours check in doEnsureRunning.
  */
 const WDA_BASE_PORT = 8100;
 const portByUdid = new Map<string, number>();
@@ -282,8 +283,7 @@ export class WdaServer {
 
   /**
    * Whether WebDriverAgent's build is in DerivedData (an xctestrun under Build/Products), so a start needs no
-   * `xcodebuild build-for-testing` — a directory listing, no device call, no process. What a launch's start asks before it
-   * starts anything (wda-tree-source.ts#startBeforeLaunch, A41d).
+   * `xcodebuild build-for-testing` — a directory listing, no device call, no process.
    */
   async isBuilt(): Promise<boolean> {
     return (await this.findXctestrun()) !== undefined;
@@ -358,7 +358,7 @@ export class WdaServer {
     const id = this.sessionId();
     let answer = await this.postKeys(await id, text);
     if (answer.kind === 'lost') {
-      // Only the session this typing was sent on: a typing beside it may already have made the next one (review round 1).
+      // Only the session this typing was sent on: a typing beside it may already have made the next one.
       if (this.session?.id === id) this.session = undefined;
       answer = await this.postKeys(await this.sessionId(), text);
     }
@@ -466,10 +466,10 @@ export class WdaServer {
       // Two failures share this catch and want opposite remedies. A server
       // that still answers /status is ALIVE: /source on a deep tree is the
       // known WDA weakness (SOURCE_TIMEOUT_MS), and killing it would trade a
-      // slow read for a lost session and a false "still does not answer"
-      // (review 2026-09-18). A server that answers nothing is dead or gone —
-      // measured 2026-09-18 (finportal, overnight idle): `pkill -f
-      // WebDriverAgentRunner` + retry was the manual cure. Apply that cure
+      // slow read for a lost session and a false "still does not answer". A
+      // server that answers nothing is dead or gone — measured 2026-09-18
+      // (finportal, overnight idle): `pkill -f WebDriverAgentRunner` + retry
+      // was the manual cure. Apply that cure
       // once, here: the child is OURS (adoption is refused in doEnsureRunning),
       // so killing it costs nobody else a server.
       // Two probes: STATUS_PROBE_TIMEOUT_MS is 1 s, and the loaded host this
@@ -512,8 +512,8 @@ export class WdaServer {
    *
    * "Free" means the connection is REFUSED. A probe that times out or resets
    * is a listener that is wedged, not gone — the state a shutdown mid-/source
-   * most often meets — so it keeps waiting and then escalates; reading it as
-   * quiet returned in 1 ms and left the runner up (review 2026-09-18).
+   * most often meets — so it keeps waiting and then escalates; read as quiet,
+   * the wait would return in 1 ms and leave the runner up.
    *
    * Killing by port is safe only because of `hadChild`: this runs solely when
    * WE spawned onto the port, and doEnsureRunning refused to spawn if anything
@@ -562,9 +562,9 @@ export class WdaServer {
    * Last resort: SIGKILL every process that LISTENS on our port. `-sTCP:LISTEN`
    * is load-bearing — a bare `lsof -t -i tcp:<port>` also lists the CLIENT end,
    * which after the probes above is this very process: the first cut SIGKILLed
-   * averi itself, before the runner (review 2026-09-18, measured with the real
-   * lsof). `-n -P` skip host/port name lookups, the usual reason lsof takes
-   * seconds. Our own pid is filtered as a second belt.
+   * averi itself, before the runner (measured with the real lsof). `-n -P`
+   * skip host/port name lookups, the usual reason lsof takes seconds. Our own
+   * pid is filtered as a second belt.
    */
   private async killListener(): Promise<void> {
     let pids: number[];
@@ -598,10 +598,9 @@ export class WdaServer {
   }
 
   /**
-   * Sync teardown: signal and unhook, without waiting. The restart path
-   * (sourceAttempt) and the process 'exit' hook need this form — neither can
-   * await. Anything that CAN await calls shutdown(), which also verifies the
-   * port went free. Tolerates not-running.
+   * Sync teardown: signal and unhook, without waiting, and a restart may
+   * follow — unlike shutdown(), which is terminal and also verifies the port
+   * went free. Tolerates not-running.
    */
   stop(): void {
     this.stopEpoch++;
@@ -651,11 +650,11 @@ export class WdaServer {
     let xctestrun = await this.findXctestrun();
     assertNotStopped();
     if (!xctestrun) {
-      // The package first (A41a review m4): a missing one is said before, and instead of, the build line below — the
-      // build could never start, and "takes minutes" followed by "not installed" sent readers of stderr waiting.
+      // The package first: a missing one is said before, and instead of, the build line below — the build could
+      // never start, and "takes minutes" followed by "not installed" sent readers of stderr waiting.
       const project = wdaProjectPath(this.resolvePackage);
       // Loud by design (plan, Risks): a silent multi-minute first build reads
-      // as a hang. stderr is the sanctioned channel (server.ts logs there too).
+      // as a hang. stderr is the sanctioned channel.
       console.error(
         `averi: first WDA build for this Xcode version — takes minutes, cached afterwards; log: ${this.logPath}`,
       );

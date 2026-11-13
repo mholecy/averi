@@ -95,8 +95,7 @@ const INPUT_SHOWN_RE = /(?:^|\s)mInputShown=(true|false)(?=\s|$)/g;
  * A `rawShell` line (the adapter's named exception to quoted argv, adb-shell.ts):
  * ONE argument for `adb shell`, run by the device's sh as written, so the
  * pipe runs on the device. Every word in it is a constant that needs no
- * quoting. Exported for the live golden's IME capture (AndroidLab.ime in
- * scripts/truth/lab-device.ts), which asks it word for word.
+ * quoting. Exported so the live goldens ask it word for word.
  */
 export const INPUT_SHOWN_COMMAND = 'dumpsys input_method | grep -m1 -w mInputShown';
 
@@ -118,8 +117,7 @@ export function parseInputShown(out: string): KeyboardWitness {
  * then every `touchable region=` line of the IME window's dump (no `-m1`:
  * two that disagree must be seen, parseTouchableRegion reads them as none),
  * then `true`, so a grep that matched nothing does not fail the call. Every
- * word a constant. Exported for the live golden's kf launch read
- * (AndroidLab.imeTouchable in scripts/truth/lab-device.ts), which asks it word for word.
+ * word a constant. Exported so the live goldens ask it word for word.
  */
 export const TOUCHABLE_COMMAND = `${INPUT_SHOWN_COMMAND}; dumpsys window InputMethod | grep -F 'touchable region='; true`;
 
@@ -135,17 +133,15 @@ export const FOCUSED_WINDOW_COMMAND = "dumpsys window displays | grep -E 'mCurre
 /**
  * The focused window, one line a display: `mCurrentFocus=Window{c6f91da u0 dev.averi.lab/…}` (`mCurrentFocus=null` in
  * a transition) — its hash, and its component when the record names one (`u<user> <pkg>/<class>}`, ended by the
- * record's `}`; a window named by a title, `Window{… u0 NotificationShade}`, has none). ONE reader for both readers of
- * the line (A27): parseFocusedWindow asks the hash, defaultDisplayFocus the component. The hash is read of any
- * `Window{<hash> ` record, the component of the user-token shape only, as the two regexes before A27 read them (every
- * captured line has the token: tests/adapters/android-wm.test.ts).
+ * record's `}`; a window named by a title, `Window{… u0 NotificationShade}`, has none). The hash is read of any
+ * `Window{<hash> ` record, the component of the user-token shape only (every captured line has the token:
+ * tests/adapters/android-wm.test.ts).
  */
 const CURRENT_FOCUS_RE = /mCurrentFocus=Window\{([0-9a-f]+) (?:u\d+ ([^\s/}]+\/[^\s}]+)\})?/g;
 
-/** A focus line, `null` or not: each display prints one (defaultDisplayFocusRead cuts the focus read at each). */
+/** A focus line, `null` or not: each display prints one, and the focus read is cut at each. */
 const CURRENT_FOCUS_LINE_RE = /mCurrentFocus=/g;
 
-/** Each focus line of `dump`, in its order: the window's hash, and its component when the record names one. */
 const focusLines = (dump: string): { hash: string; component: string | undefined }[] =>
   [...dump.matchAll(CURRENT_FOCUS_RE)].map(([, hash, component]) => ({ hash, component }));
 /** One window's block of `dumpsys window windows`: its header, `  Window #9 Window{c6f91da u0 …}:`. */
@@ -177,7 +173,6 @@ const TYPE_BASE_APPLICATION = 1;
 const TYPE_APPLICATION_STARTING = 3;
 const isAppWindow = (type: number): boolean => (type >= 1 && type <= 99) || (type >= 1000 && type <= 1999);
 
-/** One window of the dump as parseFocusedWindow reads it. */
 interface WmWindow {
   hash: string;
   type: number | undefined;
@@ -217,7 +212,6 @@ export function parseFocusedWindow(dump: string): FocusedWindow {
   return { of: 'stacked', frame, screen };
 }
 
-/** One window block as parseFocusedWindow reads it. */
 function wmWindow({ hash, text: block }: WindowBlock): WmWindow {
   const ty = WINDOW_TYPE_RE.exec(block)?.[1];
   const f = WINDOW_FRAME_RE.exec(block);
@@ -246,8 +240,8 @@ const TOUCHABLE_RECT_RE = /\(\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+
  * guessed: no such line, a line whose region is not wholly `(l,t,r,b)`
  * groups (a different notation, a truncated dump), a rect with right < left
  * or bottom < top, or several lines that do not all say the same thing →
- * `undefined`, and the caller reads no panel (the band alone, as before the
- * question existed). `SkRegion()` — an empty region — is `[]`.
+ * `undefined`, and the caller reads no panel (the band alone). `SkRegion()`
+ * — an empty region — is `[]`.
  */
 export function parseTouchableRegion(out: string): readonly Rect[] | undefined {
   const lines = out.split('\n').filter((line) => line.includes('touchable region='));
@@ -338,7 +332,7 @@ const IME_SHOWING_LINE_RE = /^[ \t]*mIsImeShowing=(true|false)[ \t]*$/gm;
  *
  * Never guess (the answer gates a `back` key press, which NAVIGATES when no
  * keyboard is up — so the worst outcome is a false `shown`, the second worst
- * a silent `hidden`; `unknown` costs nothing, the callers behave as before):
+ * a silent `hidden`; `unknown` costs nothing):
  * - no InsetsSource entry that reads fully (type, frame, visible) → unknown:
  *   the format is not one this parser knows;
  * - an IME entry that does not read fully, or a visible one with an empty
@@ -495,12 +489,12 @@ export function parseNavigationBand(dump: string): number | undefined {
  * activity: `ActivityRecord{<hash> u0 <component>} t<task>}` on API 33, `… u0 <component> t<task>}` on API 36; API 29
  * wraps it in its window token). `dumpsys window displays` prints one pair per display, on API 29 and later
  * (measured on 33; the API 36 fixture holds them too). When nothing prints, grep exits 1 and the call fails: no
- * chooser. Every word a constant. The chooser's read (android-chooser.ts#chooserInFocus), read by defaultDisplayFocus.
+ * chooser. Every word a constant.
  */
 export const CHOOSER_FOCUS_COMMAND = "dumpsys window displays | grep -E 'Display: mDisplayId=|mCurrentFocus=|mFocusedApp='";
 
 // The component capture is written twice, here and in CURRENT_FOCUS_RE, on purpose: Stryker mutates only regex
-// literals (code review, D55).
+// literals.
 /**
  * The focused activity's component: an ActivityRecord anywhere on the `mFocusedApp` line — the line itself on API 30
  * and later, inside `AppWindowToken{… token=Token{… ActivityRecord{…}}}` on API 29 (AOSP 10's dump, not captured).

@@ -10,19 +10,17 @@ import { everyNode, KEYBOARD_ROLE, rectArea, rectsOverlap, sameRect, SCREEN_SIZE
  * idb's AX output drops it entirely (measured 2026-08-12, WDA 16.1.7,
  * fixtures in tests/fixtures/wda-source-*.json).
  *
- * Since 2026-10-07 the nesting carries a second thing idb cannot see: the
- * soft keyboard. iOS keeps it in the accessibility tree as a `Keyboard`
- * element under its own `Window`, so the band of screen it covers is a
- * tree question, and this parser answers it ONCE per read (`keyboardMarks`,
- * below): one node per on-screen keyboard gets `KEYBOARD_ROLE` and its rect
- * is the band; the Windows that ARE the keyboard's UI get `ofKeyboard`, so
- * a tap on a key or on the accessory toolbar's Done is never read as a tap
- * under the keyboard. Zero extra device reads: the tap guard and the pixel
- * poll read both marks off the same tree that resolved their target. The
- * measured facts the rules rest on are in
- * docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md and in
- * tests/adapters/wda-source-keyboard.test.ts, over the five fixtures
- * captured that day.
+ * The nesting carries a second thing idb cannot see: the soft keyboard. iOS
+ * keeps it in the accessibility tree as a `Keyboard` element under its own
+ * `Window`, so the band of screen it covers is a tree question, and this
+ * parser answers it ONCE per read (`keyboardMarks`, below): one node per
+ * on-screen keyboard gets `KEYBOARD_ROLE` and its rect is the band; the
+ * Windows that ARE the keyboard's UI get `ofKeyboard`, so a tap on a key or
+ * on the accessory toolbar's Done is never read as a tap under the keyboard.
+ * Zero extra device reads: the tap guard and the pixel poll read both marks
+ * off the same tree that resolved their target. The measured facts the rules
+ * rest on are in docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md and
+ * in tests/adapters/wda-source-keyboard.test.ts, over its five fixtures.
  */
 
 /**
@@ -46,38 +44,35 @@ const ROLE_MAP: Record<string, string> = {
   Alert: 'container',
   Keyboard: 'container',
   StatusBar: 'container',
-  // `Toolbar` is `toolbar` (stage B, 2026-10-07): an app's
-  // `inputAccessoryView` arrives as a `Toolbar` element in the input-host
-  // Window (the 2FA fixtures: "Toolbar" {0,518,402,48} holding the "Done"
-  // Button), and ui-tree/soft-keyboard.ts#accessoryDismissButton finds the
-  // dismissal by that role. Until then the type fell through to `other`.
-  // Not interactive (ui-tree/selectors.ts: a selector never prefers it).
-  // Non-structural in ui-tree/bare-tree.ts, where `other` IS structural: as
-  // `other` a Toolbar counted as content only when labelled and not
-  // screen-sized; as `toolbar` it always does — a toolbar on screen is
-  // rendered UI, labelled or not. `role:toolbar` now matches it where
-  // `role:other` did. Here and not in the shared IOS_ROLE_MAP: the element
-  // was measured through WDA only, and idb's flat AX list has not been
-  // seen to carry a Toolbar (it does carry the keyboard on iOS 27 — the
-  // keys as plain buttons, the band as `other` — but nothing marks them).
+  // `Toolbar` is `toolbar`: an app's `inputAccessoryView` arrives as a
+  // `Toolbar` element in the input-host Window (the 2FA fixtures: "Toolbar"
+  // {0,518,402,48} holding the "Done" Button), and
+  // ui-tree/soft-keyboard.ts#accessoryDismissButton finds the dismissal by
+  // that role. Not interactive (ui-tree/selectors.ts: a selector never
+  // prefers it). Non-structural in ui-tree/bare-tree.ts, where `other` IS
+  // structural: as `toolbar` it always counts as content — a toolbar on
+  // screen is rendered UI, labelled or not. Here and not in the shared
+  // IOS_ROLE_MAP: the element was measured through WDA only, and idb's flat
+  // AX list has not been seen to carry a Toolbar (it does carry the keyboard
+  // on iOS 27 — the keys as plain buttons, the band as `other` — but nothing
+  // marks them).
   Toolbar: 'toolbar',
-  // `ActivityIndicator` is `progress` (D27, 2026-10-31): XCUIElementTypeActivityIndicator, a UIActivityIndicatorView —
+  // `ActivityIndicator` is `progress` (D27): XCUIElementTypeActivityIndicator, a UIActivityIndicatorView —
   // React Native's <ActivityIndicator> — is a spinner, so ui-tree/read-tree.ts#showsProgress must see it: a loading
   // screen then never holds (flow/hold-tracker.ts, ADR 0033) and a scroll does not call it exhausted
-  // (interact/scroll-read.ts `loading`). Until then the type fell through to `other`, a structural role. The spelling
-  // is XCUI's enum name less the prefix, which WDA strips (above) — no capture holds one yet. Here and not in the
-  // shared IOS_ROLE_MAP: idb names no such type and spells its spinner its own way (D50,
-  // adapters/ios-tree-source.ts#idbSpinner); `ProgressIndicator`, already shared, is XCUI's other progress type.
-  // Leaving `other` (structural) changes, beside showsProgress: an unlabelled spinner now covers its rect in
-  // ui-tree/draw-order.ts (a structural leaf did not); in ui-tree/bare-tree.ts `progress` is decoration, counted only
-  // when LABELLED — so a spinner with a value and no label now counts toward bare, and a labelled screen-sized one
-  // counts as content (as `other` it was a wrapper by size); one `isVisible`/`isAccessible` 0/0 can root a hidden
-  // subtree (hiddenRoots, below); `role:other` no longer matches it, `role:progress` does.
-  // Residual, by decision (D27 review, 2026-10-31): showsProgress counts EVERY progress node with area, so an
-  // invisible spinner (a covered layer, 0/0) or an off-screen one (a FlatList footer spinner below the viewport) also
-  // reads as loading — not filtered, since a footer spinner below the fold means the list is still loading a page.
-  // The safe direction: the hold falls back to the whole ensureTimeoutMs window, scroll_until to its maxSwipes /
-  // timeoutMs bound, instead of "exhausted".
+  // (interact/scroll-read.ts `loading`). The spelling is XCUI's enum name less the prefix, which WDA strips (above) —
+  // no capture holds one yet. Here and not in the shared IOS_ROLE_MAP: idb names no such type and spells its spinner
+  // its own way (D50, adapters/ios-tree-source.ts#idbSpinner); `ProgressIndicator`, already shared, is XCUI's other
+  // progress type. Not structural, unlike `other`, so beside showsProgress: an unlabelled spinner covers its rect in
+  // ui-tree/draw-order.ts (a structural leaf does not); in ui-tree/bare-tree.ts `progress` is decoration, counted only
+  // when LABELLED — so a spinner with a value and no label counts toward bare, and a labelled screen-sized one counts
+  // as content; one `isVisible`/`isAccessible` 0/0 can root a hidden subtree (hiddenRoots, below). A selector matches
+  // it by `role:progress`, not by `role:other`.
+  // Residual, by decision (D27 review): showsProgress counts EVERY progress node with area, so an invisible spinner (a
+  // covered layer, 0/0) or an off-screen one (a FlatList footer spinner below the viewport) also reads as loading — not
+  // filtered, since a footer spinner below the fold means the list is still loading a page. The safe direction: the
+  // hold falls back to the whole ensureTimeoutMs window, scroll_until to its maxSwipes / timeoutMs bound, instead of
+  // "exhausted".
   ActivityIndicator: 'progress',
 };
 
@@ -108,12 +103,12 @@ const PRESENTATIONS: readonly (readonly [string, TypedPresentationKind])[] = [
  * too). The normalized node carries neither flag itself, but for `isEnabled`
  * "0" (or 0): it is marked `disabled` (UiNode.disabled, D66; the `NotEnabled`
  * trait, which agrees in both captures, is not read).
- * `placeholderValue` (since 2026-10-09) is the text XCUITest says the field
- * shows while empty; WDA's `value` of an EMPTY field is that same text
- * (measured 2026-10-09, iPhone 17 / iOS 27.0, Contacts "New Contact":
- * `textfield id:Company value 'Company'`), so it is carried as the node's
- * `placeholder` (UiNode) and fill counts a value equal to it as empty.
- * Not seen in a captured fixture: the shrunk ones dropped it.
+ * `placeholderValue` is the text XCUITest says the field shows while empty;
+ * WDA's `value` of an EMPTY field is that same text (measured 2026-10-09,
+ * iPhone 17 / iOS 27.0, Contacts "New Contact": `textfield id:Company value
+ * 'Company'`), so it is carried as the node's `placeholder` (UiNode) and fill
+ * counts a value equal to it as empty. Not seen in a captured fixture: the
+ * shrunk ones dropped it.
  */
 interface WdaElement {
   type?: string;
@@ -130,7 +125,6 @@ interface WdaElement {
   children?: WdaElement[] | null;
 }
 
-/** Parse the raw `/source?format=json` response body. */
 export function parseWdaSource(json: string): UiNode {
   return parseWdaSourceValue(JSON.parse(json));
 }
@@ -258,9 +252,10 @@ function toUiNode(el: WdaElement, marks: SourceMarks, inherited: Inherited): UiN
   const presentation = marks.presented.layers.get(el);
   if (presentation !== undefined) node.presentation = presentation;
   if (marks.presented.elements.has(el)) node.presentationElement = true;
-  // The band node is an `Other` (or, in the fallback, the `Keyboard` itself)
-  // whose measured rect IS the covered band — the role changes, the rect,
-  // label, identifier and children stay what WDA reported.
+  // The band node is the first ancestor below the Window whose rect is a band
+  // (measured: an `Other`), or in the fallback the `Keyboard` itself, and its
+  // rect IS the covered band — the role changes, the rect, label, identifier
+  // and children stay what WDA reported.
   if (marks.bands.has(el)) node.role = KEYBOARD_ROLE;
   if (marks.roots.has(el)) node.ofKeyboard = true;
   // A string only, and not an empty one: absent means "none reported".
@@ -288,13 +283,12 @@ function toUiNode(el: WdaElement, marks: SourceMarks, inherited: Inherited): UiN
  * android-vs-ios and ios-vs-contract drift that is not on screen — Android's
  * uiautomator reports the same `<Text>` as ONE TextView; a `text:` selector
  * matched two nodes (interact/resolve.ts's "2 matches … picked the first",
- * a refusal under `ambiguous: 'refuse'`); ui_snapshot printed the line twice
- * (round 3 phase 2 device check, finding 4).
+ * a refusal under `ambiguous: 'refuse'`); ui_snapshot printed the line twice.
  *
- * The rule (2026-10-08): the outer element is the one element — the one
- * that carries the `testID` when there is one (no id is required: the
- * unidentified `podpora@finportal.sk` is echoed too, in …-login-keyboard.json
- * and both 2FA fixtures, and loses its echo the same way) —
+ * The rule: the outer element is the one element — the one that carries the
+ * `testID` when there is one (no id is required: the unidentified
+ * `podpora@finportal.sk` is echoed too, in …-login-keyboard.json and both 2FA
+ * fixtures, and loses its echo the same way) —
  * and the echo is dropped, ONLY when the parent is a `StaticText` with
  * exactly one child, and that child is a `StaticText` with no identifier, no
  * children (once its own echo is gone), and a label, value and rect equal to
@@ -369,8 +363,8 @@ function isTextEcho(el: WdaElement, node: UiNode): boolean {
  *   whether the cell is laid out — not the element's own nearest: a below-the-fold cell holding a scroller of its own
  *   parks that scroller's content all the same.
  * - Whatever lies between the element and its cell: the nearest `Cell` ancestor decides, through any wrapper.
- * - A SCROLLED table parks the same content ABOVE it (2026-10-18, `atParkedFrame`): the parked frame is the scroll
- *   view's content origin, which the table's offset moves up past its top.
+ * - A SCROLLED table parks the same content ABOVE it (`atParkedFrame`): the parked frame is the scroll view's content
+ *   origin, which the table's offset moves up past its top.
  *   docs/bugs/2026-10-18-lab-ios-wda-scrolled-tables-parked-row-text-reads-above-the-screen.md
  *
  * Residuals: a parked element that happens to meet its cell's rect (a cell parked near the sheet's origin) keeps its
@@ -416,7 +410,7 @@ function atParkedFrame(own: Rect, view: Rect): boolean {
 
 /**
  * WDA's "0" and "1" — strings in the JSON format, a number in older payloads, compared as strings; a missing or null
- * flag is neither. The one reading of a visibility or enabled flag's value in this file (`onScreen` reads `isOne` too).
+ * flag is neither.
  */
 const flagIs = (flag: string | number | null | undefined, value: '0' | '1'): boolean =>
   flag !== undefined && flag !== null && String(flag) === value;
@@ -466,11 +460,8 @@ interface PresentedLayers {
  */
 const carriesFlags = (root: WdaElement): boolean => root.isVisible !== undefined && root.isVisible !== null;
 
-/** `el` or some element of its subtree passes `test`. */
 const someIn = (el: WdaElement, test: (e: WdaElement) => boolean): boolean => test(el) || (el.children ?? []).some((c) => someIn(c, test));
-/** `el` and every element of its subtree pass `test`. */
 const allIn = (el: WdaElement, test: (e: WdaElement) => boolean): boolean => test(el) && (el.children ?? []).every((c) => allIn(c, test));
-/** The first element of `el`'s subtree, pre-order, passing `test`. */
 const firstIn = (el: WdaElement, test: (e: WdaElement) => boolean): WdaElement | undefined => {
   if (test(el)) return el;
   for (const c of el.children ?? []) {
@@ -542,12 +533,12 @@ function presentedLayers(root: WdaElement, keyboardWindows: ReadonlySet<WdaEleme
  * medium sheet over a scrolled host, its `dismiss popup` and its card nested `Other`s, nothing of a non-structural role
  * (ADR 0018, "Amendment: a presented layer of only empty frames"). The hidden layer beneath is the fact; what the
  * presented one holds only picks which later layer it is, so a content layer still wins over an empty one before it.
- * What shows is asked of the layer's CHILDREN, never of the layer itself: Contacts' sheet with the keyboard up
- * (corpus run16-ios/contacts-sheet-keyboard-wda.json) ends its Window with a bare shown leaf `Other 0,0 402x874`, which
- * presents nothing; and a frame shown only off the Window shows nothing. Only in the APP's Window (`appWindow`: the
- * payload's first — measured: the first Window in every corpus payload, 89 of 89 shown, holding every mark): a later
- * Window — the keyboard's, the input host's, which read wholly `0` while the keyboard is down and are then not the
- * keyboard's Windows (`keyboardMarks`) — lays no presented screen by empty frames alone.
+ * What shows is asked of the layer's CHILDREN, never of the layer itself: Contacts' sheet with the keyboard up (corpus
+ * run16-ios/contacts-sheet-keyboard-wda.json, not in the repo) ends its Window with a bare shown leaf `Other 0,0
+ * 402x874`, which presents nothing; and a frame shown only off the Window shows nothing. Only in the APP's Window
+ * (`appWindow`: the payload's first — measured: the first Window in every corpus payload, 89 of 89 shown, holding every
+ * mark): a later Window — the keyboard's, the input host's, which read wholly `0` while the keyboard is down and are
+ * then not the keyboard's Windows (`keyboardMarks`) — lays no presented screen by empty frames alone.
  * docs/bugs/2026-10-16-lab-ios-wda-scrolled-host-beneath-a-medium-sheet-loses-the-presented-remedy.md
  *
  * Measured (iPhone 17 simulator, iOS 27.0, WDA): over every raw capture of a page sheet, a SwiftUI half or expanded
@@ -682,13 +673,12 @@ function hiddenRoots(root: WdaElement): ReadonlySet<WdaElement> {
 }
 
 /**
- * A band may cover at most this fraction of its window's height (review
- * 2026-10-07): the measured bands are 38–41 % of an 874-pt screen (335,
- * 308, 356 pt), a phone in landscape reaches about half, and a wrapper that
- * is merely a little smaller than its Window — a safe-area inset, a Stage
- * Manager frame, a raw 873.67 against 874 before rounding — is not a
- * keyboard. Without the bound such a wrapper would be crowned the band and
- * every tap on the screen refused.
+ * A band may cover at most this fraction of its window's height: the measured
+ * bands are 35–41 % of an 874-pt screen (335, 308, 356 pt), a phone in
+ * landscape reaches about half, and a wrapper that is merely a little smaller
+ * than its Window — a safe-area inset, a Stage Manager frame, a raw 873.67
+ * against 874 before rounding — is not a keyboard. Without the bound such a
+ * wrapper would be crowned the band and every tap on the screen refused.
  */
 export const MAX_BAND_FRACTION = 0.6;
 
@@ -732,17 +722,18 @@ export const MAX_BAND_FRACTION = 0.6;
  *   on 2026-10-05): both halves of the test agree, and it emits nothing.
  *   With nothing focused there is no `Keyboard` node at all
  *   (…-login-no-keyboard.json). Both conditions are required, not one:
- *   visibility alone was not measured without the geometry agreeing, and a
- *   window with no usable rect (WDA roots a sheet tree in a rect-less node,
- *   ui-tree/geometry.ts) leaves visibility to decide alone.
+ *   visibility alone was not measured without the geometry agreeing. A
+ *   window with no usable rect is judged against the root's rect; only when
+ *   neither has one (WDA roots a sheet tree in a rect-less node,
+ *   ui-tree/geometry.ts) does visibility decide alone.
  * - An ancestor WITHOUT a usable rect is skipped, not crowned: a 0×0 band
  *   would read as covering nothing while a keyboard is up.
  *
- * THE KEYBOARD'S OWN UI (`ofKeyboard`, review round 1 the same day): a tap
- * on a key, on the AutoFill bar, on the dictation button or on the accessory
- * toolbar's Done lands INSIDE the band — and is exactly what the user does
- * (an OTP digit, the one non-submitting dismissal). The guard must not
- * refuse it as "under the keyboard". In every keyboard-up fixture the
+ * THE KEYBOARD'S OWN UI (`ofKeyboard`): a tap on a key, on the AutoFill bar,
+ * on the dictation button or on the accessory toolbar's Done lands INSIDE the
+ * band — and is exactly what the user does (an OTP digit, the one
+ * non-submitting dismissal). The guard must not refuse it as "under the
+ * keyboard". In every keyboard-up fixture the
  * keyboard's UI is two Windows after the app's: the one holding the
  * `Keyboard` (keys, bar, dictation), and UIKit's input-host Window holding
  * an element identified `inputView` (the keyboard's placeholder, 539/566
@@ -756,15 +747,15 @@ export const MAX_BAND_FRACTION = 0.6;
  * Toolbar Window holds no `inputView` and is not marked — with no band on
  * screen nothing is refused there either.
  *
- * The `inputView` half is guarded twice (review round 2): `rawIdentifier`
- * is app-settable (a React Native `testID`), and an app element so named
- * would otherwise mark the APP's Window and exempt every target in it from
- * the guard — fail-open, silently (measured on the K1 fixture with
- * `login_card` renamed: `login_submit` was tapped). So (a) the element
- * must be shaped like UIKit's placeholder, which in every fixture has the
- * BAND's own rect — full window width, reaching the window's bottom edge,
- * and a band by `isBand` ({0,539,402,335}, {0,566,402,308} twice); and (b)
- * the Application's FIRST Window child is never marked through it — UIKit
+ * The `inputView` half is guarded twice: `rawIdentifier` is app-settable (a
+ * React Native `testID`), and an app element so named would otherwise mark
+ * the APP's Window and exempt every target in it from the guard —
+ * fail-open, silently (measured on the K1 fixture with `login_card`
+ * renamed: `login_submit` was tapped). So (a) the element must be shaped
+ * like UIKit's placeholder, which in every fixture has the BAND's own rect
+ * — full window width, reaching the window's bottom edge, and a band by
+ * `isBand` ({0,539,402,335}, {0,566,402,308} twice); and (b) a Window that
+ * is the Application's FIRST child is never marked through it — UIKit
  * orders windows by level, the app's own window comes first and the
  * keyboard's and the input host's after it, in all five fixtures. Each
  * alone is defeatable (a band-shaped bottom sheet named `inputView`; an app
@@ -772,9 +763,9 @@ export const MAX_BAND_FRACTION = 0.6;
  * `Keyboard` half stays unconditional: the element TYPE is UIKit's, not
  * the app's.
  *
- * Other residuals (recorded, not handled — stage A): the parked case's
- * accessory toolbar stays on screen at 826–874 with `isVisible=1` and no
- * Keyboard on screen, so a target under it is not covered by this rule; an
+ * Other residuals (recorded, not handled): the parked case's accessory
+ * toolbar stays on screen at 826–874 with `isVisible=1` and no Keyboard on
+ * screen, so a target under it is not covered by this rule; an
  * iPad floating or split keyboard, landscape, and a `Keyboard` with more
  * than one band-bearing ancestor were not measured (the first on-screen
  * Keyboard's band is the one `keyboardInTree` reads).
@@ -815,18 +806,18 @@ function windowIndex(ancestors: readonly WdaElement[]): number {
 const nearestWindow = (ancestors: readonly WdaElement[]): WdaElement | undefined => ancestors[windowIndex(ancestors)];
 
 /**
- * Is an `inputView`-identified element UIKit's input-host placeholder and
- * not an app element that borrowed the name (keyboardMarks, review round
- * 2)? Both guards: the band shape in its window — full width, flush with
- * the window's bottom, `isBand` — and a Window that is not the
- * Application's first (the app's own). Without a Window, or without a
- * usable window rect, the shape cannot be judged and the answer is no.
+ * Is an `inputView`-identified element UIKit's input-host placeholder and not
+ * an app element that borrowed the name (keyboardMarks)? Both guards: the
+ * band shape in its window — full width, flush with the window's bottom,
+ * `isBand` — and a Window that is not the Application's first child (the
+ * app's own). Without a Window, or without a usable window rect, the shape
+ * cannot be judged and the answer is no.
  */
 function isInputHostPlaceholder(el: WdaElement, ancestors: readonly WdaElement[]): boolean {
   const at = windowIndex(ancestors);
   if (at < 0) return false;
   const window = ancestors[at];
-  if (at === 1 && ancestors[0].children?.[0] === window) return false; // the Application's first Window: the app's
+  if (at === 1 && ancestors[0].children?.[0] === window) return false; // a Window that is the Application's first child: the app's
   const screen = usableRect(window.rect);
   const rect = usableRect(el.rect);
   if (screen === undefined || rect === undefined) return false;
@@ -862,9 +853,9 @@ const onScreen = (el: WdaElement, screen: Rect | undefined): boolean => {
 /**
  * The rect when it has positive area, else undefined — a missing or
  * degenerate rect decides nothing here. "Positive area" is `rectArea`'s
- * (adapters/types.ts) since 2026-10-08, not a third spelling of it: the
- * same both-sides-positive test, which NaN fails too. It differs only where
- * the product is not a positive finite number — an infinite side (WDA's
+ * (adapters/types.ts), not a third spelling of it: the same
+ * both-sides-positive test, which NaN fails too. It differs only where the
+ * product is not a positive finite number — an infinite side (WDA's
  * JSON never writes one), a product past Number.MAX_VALUE or one under the
  * smallest double (sides near 1e±154): WDA's points are none of these.
  */

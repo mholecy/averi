@@ -5,9 +5,7 @@ import { zeroRect, type Rect, type UiNode } from './types.js';
  * Both tree sources (ios-tree-source.ts for idb, wda-source.ts for WDA's
  * payload) build their nodes through normalizeIosElement, and flow/config.ts
  * takes the kind enum from here, so none of them needs to load exec or the
- * Xcode probe to parse a payload or a YAML file. Split out of
- * ios-tree-source.ts on review (2026-10-02): importing the pure WDA parser
- * had started to pull in child_process.
+ * Xcode probe to parse a payload or a YAML file.
  */
 
 /**
@@ -20,19 +18,17 @@ export type IosTreeSourceKind = (typeof IOS_TREE_SOURCE_KINDS)[number];
 /**
  * The configured setting — `app.ios.treeSource` in averi.yaml and the registry's cache key: a kind, or `auto`
  * (A41a, docs/adr/0046-the-ios-tree-source-is-webdriveragent-when-it-comes-up.md): WebDriverAgent when it can be
- * brought up, idb when it cannot, chosen once per adapter at its first tree read (auto-tree-source.ts). flow/config.ts
- * builds its enum from the tuple; ios-tree-source.ts#createIosTreeSource builds the source for each.
+ * brought up, idb when it cannot, chosen once per adapter (auto-tree-source.ts).
  */
 export const IOS_TREE_SOURCE_SETTINGS = ['auto', ...IOS_TREE_SOURCE_KINDS] as const;
 export type IosTreeSourceSetting = (typeof IOS_TREE_SOURCE_SETTINGS)[number];
-/** A project that names no source gets `auto` (A41a); `idb` and `wda` pin one, as before. */
+/** A project that names no source gets `auto` (A41a); `idb` and `wda` pin one. */
 export const DEFAULT_IOS_TREE_SOURCE: IosTreeSourceSetting = 'auto';
 
 /**
  * iOS element `type` → normalized role vocabulary, shared by both tree
  * sources (wda-source.ts extends it with structural types only the nested
- * tree has). One owner per rule — the two copies this replaced were
- * identical and would have drifted.
+ * tree has). One owner per rule — two copies would drift.
  */
 export const IOS_ROLE_MAP: Record<string, string> = {
   Button: 'button',
@@ -74,14 +70,12 @@ export interface RawIosElement {
 /**
  * The per-node rule both sources apply: role via the given map (unknown →
  * `other`; an OWN key only — a plain-object map answers `constructor` and
- * friends from its prototype, and a type named like one produced a node
- * whose role was a function, in both copies, until 2026-10-02),
- * empty/null/absent strings → null, rects rounded to integer
- * points (both backends emit fractional points; selectors and the geometry
- * layer want integers), a missing rect → zeroRect(). Until 2026-10-02 this
- * was written out twice, in ios.ts and wda-source.ts, and the tests pinned
- * each copy separately — nothing pinned that they agreed. The rect is a
- * fresh object per node: nodes are mutated downstream and must not share one.
+ * friends from its prototype, and a type named like one would produce a
+ * node whose role is a function), empty/null/absent strings → null, rects
+ * rounded to integer points (both backends emit fractional points;
+ * selectors and the geometry layer want integers), a missing rect →
+ * zeroRect(). The rect is a fresh object per node: nodes are mutated
+ * downstream and must not share one.
  */
 export function normalizeIosElement(
   el: RawIosElement,
@@ -110,7 +104,7 @@ export function normalizeIosElement(
  * `other` for a type the map does not name or no type at all (the own-key
  * rule above: a plain-object map answers `constructor` from its prototype).
  * `normalizeIosElement`'s rule, exported for a parser that asks a raw
- * element's role before normalizing it (wda-source.ts's hidden-subtree roots).
+ * element's role before normalizing it.
  */
 export function iosRoleOf(type: string | undefined, roles: Record<string, string>): string {
   return type !== undefined && Object.hasOwn(roles, type) ? roles[type] : 'other';

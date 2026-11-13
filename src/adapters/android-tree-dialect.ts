@@ -86,10 +86,10 @@ export function parseUiautomatorXml(xml: string, drawnOverStrip: DrawnOverStrip)
     // A text input's value keeps its outer spaces, as the app holds them (D72; iOS's reading does too, ios-node.ts):
     // the parser's own trim cut them, so `Jan ` read back `Jan` — a false failure, and with clear a wipe one short per
     // space (`JJan `). `text` and `hint` keep them — a hint is compared with a reading exactly (fill-landing.ts), so an
-    // empty field showing `Name ` reads empty. Every other attribute is trimmed as before (`trimOuter`), and a label
-    // drawn from `text` is trimmed in normalizeNode: matching through the LABEL is unchanged. The `value` path
-    // (`value:`, and `text:`, which asks the value too) sees the field's real text, as on iOS — a flow that matched a
-    // trimmed Android value quotes the space (`text:"Jan "`) or uses `~`.
+    // empty field showing `Name ` reads empty. Every other attribute is trimmed (`trimOuter`), and a label drawn from
+    // `text` is trimmed in normalizeNode: matching through the LABEL is unchanged. The `value` path (`value:`, and
+    // `text:`, which asks the value too) sees the field's real text, as on iOS — a flow that matched a trimmed Android
+    // value quotes the space (`text:"Jan "`) or uses `~`.
     trimValues: false,
     attributeValueProcessor: (name: string, value: string) => (name === 'text' || name === 'hint' ? value : trimOuter(value)),
     isArray: (name) => name === 'node',
@@ -131,12 +131,12 @@ export function parseUiautomatorXml(xml: string, drawnOverStrip: DrawnOverStrip)
  *   it between the bars against the left edge, no fact telling it from an app's screen) are none either; an app's own
  *   sheet built without Material's dialog layout is none, nor is Material's `SideSheetDialog` (other ids; unmeasured);
  *   a window offset on both axes that is the app's own — a freeform (desktop-mode) window, a compat-mode app boxed on
- *   both axes — reads as a `dialog`; an app's own clickable, labelled leaf laid from its window's top edge at full
- *   width, with a full-width sibling under it to the bottom, reads as a scrim, and an app's own views it gave
- *   Material's three ids, laid so, as Material's sheet dialog. What a mark changes is asked only for a target the tree
- *   does not hold (presentation.ts#Presentation.topmostAt, #alone), so a misreading costs a refusal, never a false
- *   `Tapped`. The windows the dump has no fact for — the full-screen dialog, the expanded sheet, a window against an
- *   edge — are typed after the read, on a miss, by the window manager's word (`focusedWindow`,
+ *   both axes — reads as a `dialog`; an app's own clickable leaf with a `content-desc` laid from its window's top
+ *   edge at full width, with a full-width sibling under it to the bottom, reads as a scrim, and an app's own views it
+ *   gave Material's three ids, laid so, as Material's sheet dialog. What a mark changes is asked only for a target the
+ *   tree does not hold (presentation.ts#Presentation.topmostAt, #alone), so a misreading costs a refusal, never a
+ *   false `Tapped`. The windows the dump has no fact for — the full-screen dialog, the expanded sheet, a window
+ *   against an edge — are typed after the read, on a miss, by the window manager's word (`focusedWindow`,
  *   ui-tree/window-mark.ts#markByWindow).
  * docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md
  */
@@ -158,7 +158,7 @@ interface PresentedWindowRecognizer {
  * at 0,0 whatever its bars, and also one offset on ONE axis only — a landscape window beside a cutout the app does not
  * draw into, a letterboxed or pillarboxed compat-mode app on a tablet or a foldable, the lower window of a split
  * screen. A dialog laid in the middle floats off both. Measured: the lab's Compose AlertDialog, `[155,851][925,1368]`
- * on 1080x2220 (alert-dim); a touch outside it dismisses it. Why not "smaller than the screen", the round-5 plan: the
+ * on 1080x2220 (alert-dim); a touch outside it dismisses it. Why not "smaller than the screen": the
  * parser has no screen size — the adapter's `wm size` is memoized as a pending read (viewport-memo.ts), with no answer
  * to peek at before a tree's first read, and awaiting it would add an adb call before the first dump and make the mark
  * depend on which verb read first.
@@ -170,11 +170,12 @@ const floatingDialog: PresentedWindowRecognizer = {
 
 /**
  * A full-screen window whose content lays a SCRIM above a SHEET is a `screen`: some node's child that is clickable,
- * labelled and childless, spanning the window's width from its top edge, followed at once by a sibling spanning the
- * width down to the window's bottom edge from no lower than the scrim's bottom. Measured: the lab's half-expanded
- * Material 3 ModalBottomSheet (sheet-medium), its scrim `content-desc="Close sheet"` `[0,0][1080,1110]`, the sheet
- * `[0,1110][1080,2220]`; a stroke inside the sheet drags it to full height. The label is the guard: an unlabelled
- * full-width clickable leaf over a full-width sibling is common app content (a card's touch layer).
+ * labelled by a `content-desc` and childless, spanning the window's width from its top edge, followed at once by a
+ * sibling spanning the width down to the window's bottom edge from no lower than the scrim's bottom. Measured: the
+ * lab's half-expanded Material 3 ModalBottomSheet (sheet-medium), its scrim `content-desc="Close sheet"`
+ * `[0,0][1080,1110]`, the sheet `[0,1110][1080,2220]`; a stroke inside the sheet drags it to full height. The
+ * `content-desc` is the guard: a full-width clickable leaf without one over a full-width sibling is common app content
+ * (a card's touch layer).
  */
 const composeSheetScrim: PresentedWindowRecognizer = {
   as: 'screen',
@@ -452,11 +453,11 @@ function nodeBounds(bounds: string | undefined, parent: Rect | undefined): { rec
 }
 
 /**
- * An attribute's outer whitespace cut, as fast-xml-parser's `trimValues` cut it before D72 — but after the entities
- * are decoded, where the parser trimmed before: so a newline, a tab or a return, which uiautomator writes only as a
- * reference (`&#10;`, `&#9;`, `&#13;`, never raw), is kept at the edges as it was, and every other whitespace is cut.
- * Exactly as before for uiautomator's output; a space written as a reference at an edge (`&#32;`, `&#160;`), which
- * uiautomator never writes, is cut now where the old trim kept it.
+ * An attribute's outer whitespace cut after the entities are decoded (fast-xml-parser's own `trimValues`, off here,
+ * cuts before): so a newline, a tab or a return, which uiautomator writes only as a reference (`&#10;`, `&#9;`,
+ * `&#13;`, never raw), is kept at the edges, and every other whitespace is cut. For uiautomator's output that is what
+ * `trimValues` cuts; a space written as a reference at an edge (`&#32;`, `&#160;`), which uiautomator never writes, is
+ * cut here where `trimValues` keeps it.
  */
 function trimOuter(value: string): string {
   return value.replace(/^[^\S\n\t\r]+|[^\S\n\t\r]+$/g, '');

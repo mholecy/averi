@@ -4,9 +4,9 @@ import { everyNode, type Rect, type UiNode } from './types.js';
  * AOSP's ACCESSIBILITY ORDER of a classic ViewGroup's children, read off the dumped bounds: the stripe comparator of
  * `ViewGroup.ViewLocationHolder.compareBoundsOfTree` (COMPARISON_STRATEGY_STRIPE), which `ChildListForAccessibility`
  * sorts the children by before they are handed to accessibility (`ViewGroup.addChildrenForAccessibility`,
- * `onInitializeAccessibilityNodeInfoInternal`; android-36 sources, ViewGroup.java ~2477, ~9195–9227, ~9308–9355) —
- * so uiautomator lists them by LOCATION, not in the order they are drawn. Negative: `a` is listed first; positive: `b`;
- * 0: a tie the dump cannot break.
+ * `onInitializeAccessibilityNodeInfoInternal`; android-36 sources, ViewGroup.java) — so uiautomator lists them by
+ * LOCATION, not in the order they are drawn. Negative: `a` is listed first; positive: `b`; 0: a tie the dump cannot
+ * break.
  * - `a` wholly above `b` (its bottom at or above `b`'s top) is first, and wholly below it last;
  * - in one STRIPE (their vertical extents overlap) the left edge decides — before the top: rn-banner's C.cover
  *   (left 73, top 1321) is listed before C (left 128, top 1293), though it starts lower;

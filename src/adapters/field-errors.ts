@@ -47,8 +47,7 @@ import { everyNode, type UiNode } from './types.js';
  * One owner because BOTH iOS tree sources need it and their trees have
  * different shapes: idb returns a flat AX list, WDA a nested XCUIElement tree
  * where a field and its labels sit in different branches. Only the traversal
- * differs — rects are absolute in both, so the rule itself is identical, and
- * it was previously written out twice.
+ * differs — rects are absolute in both, so the rule itself is identical.
  */
 
 export function attachFieldErrors(nodes: Iterable<UiNode>): void {
