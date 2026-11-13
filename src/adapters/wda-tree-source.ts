@@ -1,7 +1,6 @@
 import { WdaServer, type WdaServerOptions } from './wda.js';
 import { parseWdaSourceValue } from './wda-source.js';
 import { alertInWda } from './ios-system-alert.js';
-import { startInBackgroundIfBuilt } from './prewarm.js';
 import type { ApplicationLabel, IosTreeSource } from './ios-tree-source.js';
 import type { SystemAlert, UiNode } from './types.js';
 
@@ -22,7 +21,7 @@ export const WDA_SETTLE_CADENCE_MS = 300;
  *
  * The server is constructed with the source. That is cheap (a per-UDID port
  * allocation and a log path — no process until the first read, since
- * WdaServer.source() runs ensureRunning itself, or a pre-warm, A41b) and it makes the source
+ * WdaServer.source() runs ensureRunning itself, or a launch's start, A41d) and it makes the source
  * terminal after dispose(). That state IS reachable from a tool call: run_flow
  * and ensure_state hold one adapter across many reads, and a select_device
  * that lands mid-flow evicts and disposes that adapter (registry.evict). Before
@@ -99,14 +98,17 @@ export class WdaTreeSource implements IosTreeSource {
   }
 
   /**
-   * Starts WebDriverAgent in the background and returns at once (A41b; startInBackgroundIfBuilt): what a launch
-   * asks after `simctl launch` (IosAdapter.launch), so the first read finds WDA up or joins its start
-   * (WdaServer.ensureRunning is single-flight). A start that fails is dropped here: the next read starts again and
-   * fails in its own words. WDA already up (WdaServer.upGeneration) → nothing, so a launch sends no `/status` probe.
+   * Brings WebDriverAgent up before a launch and resolves once it is up (A41d; IosTreeSource.startBeforeLaunch): what
+   * IosAdapter.launch awaits before it touches the app, so the first read finds WDA up. WdaServer.ensureRunning — its
+   * own bounds (/status within the ready timeout) and single-flight, so a read starting WDA is joined. WDA already up
+   * (WdaServer.upGeneration) → nothing, so a launch sends no `/status` probe and restarts nothing. WDA's build not cached
+   * (or the check failing) → nothing: the first read builds, as before. Released → nothing. A start that fails rejects
+   * with WDA's own error (bringUp), and is not kept: the next start or read tries again.
    */
-  prewarm(): void {
-    if (this.server.upGeneration() !== undefined) return;
-    startInBackgroundIfBuilt(this, () => this.disposed, () => this.server.ensureRunning());
+  async startBeforeLaunch(): Promise<void> {
+    if (this.disposed || this.server.upGeneration() !== undefined) return;
+    if (!(await this.buildCached().catch(() => false)) || this.disposed) return;
+    await this.bringUp();
   }
 
   /** Whether WDA's build is cached, so a start runs no `xcodebuild build-for-testing` (WdaServer.isBuilt). */
@@ -133,10 +135,11 @@ export class WdaTreeSource implements IosTreeSource {
    *
    * - WDA not up (WdaServer.upGeneration: no start of ours reached /status, or it
    *   exited or was stopped since) → `declined`, no device call. The
-   *   2026-10-09 objection stands for this case: asking would move WDA's
-   *   start (a build on first use, then up to 60 s for /status) into every
-   *   first `launch_app`, and the first read's own start (7.7 s measured in
-   *   that run) outlasts the switch anyway.
+   *   2026-10-09 objection stands for this case: asking would start WDA
+   *   here, and a build on first use is minutes. Since A41d a launch brings
+   *   a WDA whose build is cached up before `simctl launch`
+   *   (startBeforeLaunch), so this case is an uncached build, or a start
+   *   that failed.
    * - up → `bundle` with the payload's `value.bundleId`, `unlabelled` when it
    *   is not a non-empty string; WDA's error (port, log) when the ask fails —
    *   asked once per WDA child until it proves it answers: after a failed

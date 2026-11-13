@@ -6,7 +6,8 @@ checks the default block (see Acceptance).
 Amended 2026-11-12 (A41b: a launch pre-warms WebDriverAgent just after `simctl launch`, never awaited, and only with
 its build cached) — see the amendment below. Amended 2026-11-12 (A44: the probe's cadence before auto-tap, its
 `clearState` launch last; an unproven required part makes the report INCONCLUSIVE) — its section. Amended 2026-11-13
-(A40: residual 4 is kept; idb gets no non-ASCII path) — the last section.
+(A40: residual 4 is kept; idb gets no non-ASCII path) — its section. Amended 2026-11-13 (A41d: a launch awaits
+WebDriverAgent's bring-up before `simctl launch`, replacing A41b's background pre-warm) — the last section.
 
 ## Context
 
@@ -242,3 +243,88 @@ The refusal is ADR 0037's idb wording (`adapters/ios-typing.ts#idbTypingRefusal`
 scripts/truth/live-known.ts keeps b1d and b7 KNOWN on `ios idb` as `loud-untouched` on `refused`. The bug note
 docs/bugs/2026-10-15-lab-ios-type-text-cannot-type-non-ascii.md stays as ADR 0037 left it. No test changes: the rule
 was already pinned.
+
+## Amendment: A41d — a launch awaits WebDriverAgent before it launches (2026-11-13)
+
+Supersedes the A41b amendment's mechanism (`IosTreeSource.prewarm`, `adapters/prewarm.ts`, both removed). Its
+measurements, the restated acceptance and the A44 rules stand.
+
+**Measured first.** Under `auto`, a session pays WDA's bring-up in its first tap right after `launch_app`. On an idle
+machine (probe-2, 6f80d529, docs/truth/live-records/a41-probe-2/): launch_app 1 993 ms, the first tap 5 180 against
+1 202 with WDA up, total 7 173 ms; WDA's cold start alone 3 101 ms. Under load (probe-3, 27ac6a68,
+docs/truth/live-records/a41-probe-3/): launch_app 3 053, the first tap 7 245, total 10 298; cold start 3 595. The
+background pre-warm hid little of the start. In probe-3, WDA's bring-up (+5 038 ms) outlasted leg (b)'s 4 s wait, and
+leg (b) failed.
+
+**Decision (the owner, 2026-11-13).** Trade launch_app latency, about +3 s (WDA's cold start), for the first tap's.
+`IosTreeSource.startBeforeLaunch?(): Promise<void>` brings up what the first read would otherwise start. `IosAdapter.
+launch` awaits it first, before `clearState`'s wipe, the accessibility defaults writes and `simctl launch`. A flow's
+`launch:` goes through the same method. Nothing else asks it: no start at `select_device` (no `configPath`, D41) and
+none when the registry builds an adapter.
+
+- **`auto`** (`AutoTreeSource.startBeforeLaunch`) makes the choice, the same single attempt the first read would make
+  (`source()`), and resolves once it is made. A choice in flight is joined. A choice already made asks nothing: WDA
+  up is not probed or restarted, and a fallback is not retried (`select_device` is the retry). A WDA that does not
+  come up is the fallback, exactly as at a first read: the stderr line, idb for the adapter's life, and the claim
+  note on every claiming reply. The start resolves and the launch goes on over idb.
+- **`wda`** (`WdaTreeSource.startBeforeLaunch`) calls `bringUp` (`WdaServer.ensureRunning`, single-flight). WDA
+  already up (`upGeneration`) asks nothing. A failure rejects with WDA's own error, as a read on `wda` fails. The
+  launch fails with it before anything is wiped or launched. The failed start is not kept, so the next call tries again.
+- **Bounded** by WDA's own bounds. With the build cached, a start is `xcodebuild test-without-building` and /status
+  within the ready timeout (60 s, `WdaServer`'s `readyTimeoutMs`). There is no second timer.
+- **Only with WDA's build cached** (`buildCached`; a check that throws counts as not cached). Without one, the launch
+  starts nothing and waits for nothing. The first read builds and chooses, as before A41b. The reasons are the A41b
+  amendment's: a build is minutes of `xcodebuild`, and it should not run inside an unrelated `launch_app`.
+- **idb**, and the differential harness's recorded source, have none: nothing is started.
+- **Released** (a `select_device` mid-call): nothing is started. If the release comes while the choice is in flight,
+  the start rejects with the released error, as a read would.
+
+**Why this order does not race.** A pre-warm when the registry built the adapter (2cfce947, removed in 071de5ec)
+started WDA *before* `clearAppData` and `simctl launch`, and ran beside them. A failure in that window was the
+choice, and pinned idb for the adapter's life. Here, the start completes or fails before the wipe and the launch
+begin. Nothing of the launch runs beside it, and its outcome is the outcome the first read would have met. The
+accessibility defaults writes (ios.ts#prepareForOpen) come after WDA's start and before `simctl launch`, so they
+still precede every launch.
+
+**Behaviour that moves.**
+- launch_app under `auto` and `wda`, with a cached build and WDA not up, takes WDA's start longer (about 3.1 s idle,
+  3.6 s loaded). The first read or tap after it no longer pays it.
+- Under `auto`, the launch's foreground wait now asks WDA's active app (`/wda/activeAppInfo`, D48) from the first
+  launch on, not idb's label, because the choice is made before the wait. Both are answers the wait already handles.
+- Under `wda`, a WDA that cannot come up fails `launch_app` (or a flow's `launch:`) with WDA's error, and nothing is
+  launched. Before, the launch succeeded and the first read failed with the same error.
+
+**Acceptance (the owner's `npm run truth:lab:ios:a41`).** scripts/perf/a41.ts judges two legs.
+- *Leg (a), now judged:* the median, per session, of launch_app + the first tap at once after it is ≤ the same run's
+  launch_app with WDA up (`relaunch`) + WDA's cold start (`wda-cold`'s first read) + the first tap with WDA up + 500 ms
+  (`legATotal`). The bar is built from the same run's parts, not from a fixed figure: load moves them together, and
+  the same total was 7 173 ms on probe-2 and 10 298 on probe-3. The bar is also under the total before A41d in both
+  recorded runs: probe-2 1 949 + 3 101 + 1 202 + 500 = 6 752 < 7 173, and probe-3 2 839 + 3 595 + 2 207 + 500 =
+  9 141 < 10 298. So a pass also means no slower than before. The 500 ms is leg (b)'s allowance (noise, and the cold
+  read's own ~100 ms read). The summary prints 7 173 (`LEG_A_BEFORE_A41D_MS`) for information. Leg (a) is unproven
+  when a step fell back to idb, or when a part is not measured (wda-cold's file included).
+- *Leg (b), unchanged:* the tap `WAITED_GAP_MS` after launch_app replied is ≤ warm + 500, on 5 of 5 first taps ok. It
+  is judged only with every gap ≥ 3.5 s and no fallback. WDA is now up at the reply, so the leg no longer depends on
+  the margin probe-3 lacked.
+- The waited leg's launch_app is kept per repeat in a41.json (`autoTap.waitedLaunches`, `waitedLaunch`), and the
+  summary prints WDA's bring-up in launch_app (launch_app − relaunch) beside the bring-up in the first tap.
+- A44's rules stand: any unproven required part, leg (a) now included, makes the block INCONCLUSIVE.
+
+**Residuals.**
+- **A session that launches and never reads pays the bring-up**, about 3 s per first launch on an adapter. So does a
+  session that only launches and screenshots. A session that reads with no launch pays it at its first read, as
+  before.
+- **The D21 analog, unchanged and still unmeasured.** WDA's runner (XCTest automation) now starts before `simctl
+  launch`, at the session's first launch_app, possibly seconds after a boot. That is earlier than A41b's pre-warm
+  started it. Gate C boots and resets the lab simulator, so a wedge would show there first.
+- **An uncached build** still pays the whole first build at the first read, as Residual 2 says.
+
+Tests: tests/adapters/ios.test.ts (the start is awaited before any wipe, write or `simctl launch`; `wda`'s failure
+fails the launch with nothing touched; under `auto`, WDA is chosen before `simctl launch` and the first read and a
+second launch start nothing; the fallback goes on over idb with the note; an uncached build waits for nothing; idb
+has no start); tests/adapters/auto-tree-source.test.ts (awaited, single-flight with a read and with a second start,
+fallback resolves with its note, uncached, a throwing build check, nothing after the choice, released and released
+mid-choice); tests/adapters/wda-tree-source.test.ts (up then reused, joins a read's start, bounded by the ready
+timeout, a failure rejects and is not kept, uncached, already up asks nothing, released); tests/perf/a41.test.ts
+(leg (a)'s bar, at the bar and 1 ms over, not measured without any part, unproven on a fallback; `waitedLaunches`).
+Each was hand-mutated and killed.

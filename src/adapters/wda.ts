@@ -281,8 +281,8 @@ export class WdaServer {
 
   /**
    * Whether WebDriverAgent's build is in DerivedData (an xctestrun under Build/Products), so a start needs no
-   * `xcodebuild build-for-testing` — a directory listing, no device call, no process. What a pre-warm asks before it
-   * starts anything (wda-tree-source.ts#prewarm, A41b).
+   * `xcodebuild build-for-testing` — a directory listing, no device call, no process. What a launch's start asks before it
+   * starts anything (wda-tree-source.ts#startBeforeLaunch, A41d).
    */
   async isBuilt(): Promise<boolean> {
     return (await this.findXctestrun()) !== undefined;

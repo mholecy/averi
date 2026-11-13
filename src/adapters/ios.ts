@@ -346,14 +346,16 @@ export class IosAdapter implements DeviceAdapter {
           'use open_deep_link, or wrap the step in an `android:` platform override',
       );
     }
+    // A41d: WebDriverAgent up first, if its build is cached and it is not up (IosTreeSource.startBeforeLaunch; idb has
+    // none) — awaited, before the wipe, the writes and `simctl launch`, so its start completes or fails before the app
+    // launches and never races it; the first read after launch_app then finds it up. Under `auto` a WDA that does not
+    // come up is the fallback to idb, and the launch goes on; under `wda` its error fails the launch, nothing touched
+    // (ADR 0046's A41d amendment).
+    await this.treeSource.startBeforeLaunch?.();
     if (opts.clearState) await this.clearAppData(bundleId);
     await this.prepareForOpen(`launching ${bundleId}`);
     await this.simctl(['launch', this.udid, bundleId]);
     this.front = { kind: 'launched', bundleId };
-    // A41b: WebDriverAgent's start, if it is not up, runs beside the foreground wait — never awaited
-    // (IosTreeSource.prewarm; idb has none). After `simctl launch`, never before it: a start racing the app's own
-    // launch is unmeasured (ADR 0046's A41b amendment).
-    this.treeSource.prewarm?.();
     // `simctl launch` returns before the app is in front: for ~1–2 s idb (and
     // WDA's /source, D48) can still hand out the previous app's (or
     // SpringBoard's) tree, complete and labelled, which no reader doubts. Wait

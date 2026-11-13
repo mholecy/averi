@@ -431,9 +431,11 @@ error and trace line says the same, host paths stripped; the error's fields keep
     stderr and on every claiming reply and failed flow (`claimNote`, printed `⚠ …` by `run/claims.ts#claimed`), with
     WDA's reason in a few words. Two trees are never reconciled. Before the choice the launch's label is idb's. A
     `select_device` of the simulator drops a fallen-back adapter (`registry.ts#select`), and the next call tries WDA
-    again. A launch starts the choice in the background just after `simctl launch` (`IosTreeSource.prewarm`, ADR
-    0046's A41b amendment), and the first read joins that one attempt; only with WDA's build cached, else the first
-    read builds it. `treeSource: wda` pre-warms the same way; idb has nothing to start.
+    again. A launch makes the choice first and awaits it, before the wipe, the defaults writes and `simctl launch`
+    (`IosTreeSource.startBeforeLaunch`, ADR 0046's A41d amendment): launch_app pays WDA's bring-up and the first read
+    after it finds WDA up; a WDA that does not come up is the fallback and the launch goes on. Only with WDA's build
+    cached, else the first read builds it. `treeSource: wda` brings WDA up the same way, and its failure fails the
+    launch in WDA's words, nothing touched; WDA already up is asked nothing. idb has nothing to start.
   - **idb** (`IdbTreeSource`, `treeSource: idb`, and `auto`'s fallback): `idb ui describe-all`, a FLAT list under a
     synthetic root. An empty or area-less list is a read error (`IdbEmptyTreeError`), never a tree that reads "absent";
     a wedged service is `PersistentReadError` (ADR 0036). Settle cadence 300 ms (`IDB_SETTLE_CADENCE_MS`, ADR 0040). Its

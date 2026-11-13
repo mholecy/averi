@@ -156,28 +156,47 @@ describe('WdaTreeSource.bringUp — WebDriverAgent up without a tree read (treeS
   });
 });
 
-describe('WdaTreeSource.prewarm — WebDriverAgent started in the background, never awaited (treeSource wda, A41b)', () => {
-  const drain = () => new Promise((resolve) => setTimeout(resolve, 0));
-
-  it('returns before anything started; the start runs in the background and the first read reuses it — one WebDriverAgent', async () => {
+describe('WdaTreeSource.startBeforeLaunch — WebDriverAgent brought up before a launch, awaited (treeSource wda, A41d)', () => {
+  it('resolves with WebDriverAgent up; the first read reuses it — one WebDriverAgent, no /source before the read', async () => {
     const { source, spawner, fetcher } = await setup();
-    expect(source.prewarm()).toBeUndefined();
-    expect(spawner.spawns).toEqual([]);
-    await vi.waitFor(() => expect(spawner.spawns).toHaveLength(1));
+    await source.startBeforeLaunch();
+    expect(spawner.spawns).toHaveLength(1);
     expect(fetcher.urls.filter((u) => u.includes('/source'))).toEqual([]);
-    await source.read();
-    source.prewarm();
     await source.read();
     expect(spawner.spawns).toHaveLength(1);
     await source.dispose();
   });
 
-  it('a read racing it joins the same start (WdaServer.ensureRunning is single-flight)', async () => {
+  it('single-flight: a start while a read is starting WebDriverAgent joins it (WdaServer.ensureRunning)', async () => {
     const { source, spawner } = await setup();
-    source.prewarm();
-    await source.read();
+    const reading = source.read();
+    await source.startBeforeLaunch();
+    await reading;
     expect(spawner.spawns).toHaveLength(1);
     await source.dispose();
+  });
+
+  it('bounded by WDA\'s ready timeout: a /status that never answers rejects in WDA\'s own words, the child stopped', async () => {
+    const { dd } = await tempDerivedData(true);
+    const spawner = fakeSpawn();
+    const source = new WdaTreeSource({
+      udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fakeFetch(() => 'refused').fn, spawnFn: spawner.fn,
+      derivedDataPath: dd, readyTimeoutMs: 40, pollIntervalMs: 5,
+    });
+    await expect(source.startBeforeLaunch()).rejects.toThrow(/did not answer \/status on port \d+ within 0\.04 s/);
+    expect(spawner.kills).toContain('SIGTERM');
+    await source.dispose();
+  });
+
+  it('a start that fails rejects with WDA\'s error, and is not kept: the read after it starts again', async () => {
+    const { dd } = await tempDerivedData(true);
+    const fetcher = fakeFetch(() => ({ status: 200, body: WDA_STATUS })); // answering before we spawned: not ours
+    const source = new WdaTreeSource({ udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fetcher.fn, spawnFn: fakeSpawn().fn, derivedDataPath: dd, pollIntervalMs: 5 });
+    await expect(source.startBeforeLaunch()).rejects.toThrow(/but this session did not start it/);
+    const probes = () => fetcher.urls.filter((u) => u.endsWith('/status')).length;
+    const before = probes();
+    await expect(source.read()).rejects.toThrow(/but this session did not start it/);
+    expect(probes()).toBeGreaterThan(before);
   });
 
   it('WebDriverAgent not built: nothing at all — no build, no /status, no spawn; the first read builds as before', async () => {
@@ -186,62 +205,35 @@ describe('WdaTreeSource.prewarm — WebDriverAgent started in the background, ne
     const fetcher = fakeFetch(() => 'refused');
     const exec = fakeExec();
     const source = new WdaTreeSource({ udid: 'AAAA-1111', exec: exec.fn, fetchFn: fetcher.fn, spawnFn: spawner.fn, derivedDataPath: dd, pollIntervalMs: 5 });
-    source.prewarm();
-    await drain();
-    await drain();
+    await source.startBeforeLaunch();
     expect(spawner.spawns).toEqual([]);
     expect(fetcher.urls).toEqual([]);
     expect(exec.calls).toEqual([]);
   });
 
-  it('a start that fails is no rejection anywhere; the read after it fails in its own words', async () => {
-    const { dd } = await tempDerivedData(true);
-    const fetcher = fakeFetch(() => ({ status: 200, body: WDA_STATUS })); // answering before we spawned: not ours
-    const source = new WdaTreeSource({ udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fetcher.fn, spawnFn: fakeSpawn().fn, derivedDataPath: dd, pollIntervalMs: 5 });
-    const unhandled: unknown[] = [];
-    const hear = (reason: unknown) => unhandled.push(reason);
-    process.on('unhandledRejection', hear);
-    try {
-      source.prewarm();
-      await vi.waitFor(() => expect(fetcher.urls.length).toBeGreaterThan(0));
-      await drain();
-      await drain();
-    } finally {
-      process.off('unhandledRejection', hear);
-    }
-    expect(unhandled).toEqual([]);
-    const probes = () => fetcher.urls.filter((u) => u.endsWith('/status')).length;
-    const before = probes();
-    await expect(source.read()).rejects.toThrow(/but this session did not start it/);
-    expect(probes()).toBeGreaterThan(before); // the read started again — the failed start was not kept
-  });
-
-  it('WebDriverAgent already up: nothing is asked — no /status probe at every launch', async () => {
-    const { source, fetcher } = await setup();
+  it('WebDriverAgent already up: nothing is asked — no /status probe, no restart, at every launch', async () => {
+    const { source, spawner, fetcher } = await setup();
     await source.read();
     const asked = fetcher.urls.length;
-    source.prewarm();
-    await drain();
-    await drain();
+    await source.startBeforeLaunch();
     expect(fetcher.urls.length).toBe(asked);
+    expect(spawner.spawns).toHaveLength(1);
     await source.dispose();
   });
 
   it('released: starts nothing', async () => {
     const { source, spawner, fetcher } = await setup();
     await source.dispose();
-    source.prewarm();
-    await drain();
+    await source.startBeforeLaunch();
     expect(spawner.spawns).toEqual([]);
     expect(fetcher.urls).toEqual([]);
   });
 
   it('released while it looked for the build: starts nothing', async () => {
     const { source, spawner, fetcher } = await setup();
-    source.prewarm();
+    const starting = source.startBeforeLaunch();
     await source.dispose();
-    await drain();
-    await drain();
+    await starting;
     expect(spawner.spawns).toEqual([]);
     expect(fetcher.urls.filter((u) => !u.endsWith('/status'))).toEqual([]);
   });
