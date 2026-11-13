@@ -1,5 +1,6 @@
 import { rectArea, sameRect, type Rect, type UiNode } from '../adapters/types.js';
-import { listsAncestry, listsUnclippedFrames, type DrawOrder } from './draw-order.js';
+import { dialectOf } from './dialect.js';
+import type { DrawOrder } from './draw-order.js';
 import { across, EDGES, flushEdges, rectWithin, type Clips, type Edge } from './geometry.js';
 
 /**
@@ -152,7 +153,7 @@ export interface LaterScene {
  * a node of no area, every edge is `none`.
  */
 export function laterEdgesIn(tree: UiNode, scene: LaterScene): (node: UiNode) => LaterEdges {
-  const cutsAtLater = listsAncestry(tree) && !listsUnclippedFrames(tree);
+  const { cutsAtLater } = dialectOf(tree);
   return (node) => (cutsAtLater && rectArea(node.rect) !== 0 ? classified(scene, node) : uncut(node));
 }
 

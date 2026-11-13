@@ -65,6 +65,12 @@
     "floor": 84,
     "baseline": "89.56 % on 2026-11-11 (D84: draw-order.ts unchanged, its behaviour moved through reading-order.ts#peersOf; tests/verify/eyes-views-drawn-over.test.ts joins its tests; `npm run mutate -- --group core --force --mutate src/ui-tree/draw-order.ts`, cold): 948 mutants, 818 killed, 31 timeouts (counted killed — they inflate it: 86.29 % without them), 96 survived (as many as before the new test file joined), 3 without coverage; the floor stays"
   },
+  "src/ui-tree/dialect.ts": {
+    "group": "core",
+    "tests": ["tests/ui-tree/dialect.test.ts"],
+    "floor": 95,
+    "baseline": "100 % on 2026-11-13 (A45, new: `npm run mutate -- --group core --force`, cold, 461 s at load 5 → 30): 42 mutants, 22 killed, 20 timeouts (counted killed), 0 survived. The timeouts are mutants of a field every reader asks (ancestry, framesUnclipped, cutAtScreen, topLayerOnly, judgesPresentations): a wrong dialect hangs a scroll loop in another suite before dialect.test.ts reports; each was checked killed by dialect.test.ts alone, by hand. Floor 95 (the row's bar)"
+  },
   "src/ui-tree/geometry.ts": {
     "group": "core",
     "tests": ["tests/ui-tree/geometry*.test.ts"],

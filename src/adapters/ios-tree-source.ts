@@ -47,7 +47,7 @@ export interface IosTreeSource {
    * The kind of backend that answers this source's reads now: fixed for idb and wda; under `auto` (auto-tree-source.ts)
    * `wda` once WebDriverAgent was chosen, else `idb` — the source that answers its label reads before the choice and
    * all its reads after a fallback. No reader above the adapter dispatches on it: a
-   * tree says its own source by its marks (UiNode.flatList, idb's), which is what a miss reads (ui-tree/miss.ts). The
+   * tree says its own source by its marks (UiNode.flatList, idb's), read through ui-tree/dialect.ts#dialectOf. The
    * adapter reads it for its keyboard advice (ios.ts#keyboardAdvice) and the wording of its launch's foreground note
    * (ios-foreground.ts#ForegroundCheck.source) only; its screenshots do not follow it (ios.ts#screenshotVia).
    */
@@ -212,8 +212,8 @@ function idbElements(json: string): IdbElement[] {
 }
 
 /**
- * The idb source's dialect, marked on its flat list's root: a flat list (UiNode.flatList: ui-tree/draw-order.ts reads
- * the list's order by a rule of its own) listed in READING order, not draw order (UiNode.readingOrder,
+ * The idb source's dialect, marked on its flat list's root: a flat list (UiNode.flatList: ui-tree/dialect.ts#dialectOf
+ * reads it, and lists who asks) listed in READING order, not draw order (UiNode.readingOrder,
  * docs/adr/0015-flat-list-reading-order-break.md). THE marks: the parser sets them on every tree, and an idb
  * `ui_snapshot` capture that lacks them (older captures do) is given them with this
  * (scripts/differential/recorded-source.ts), so it is judged as the live source's tree. Returns `tree`.

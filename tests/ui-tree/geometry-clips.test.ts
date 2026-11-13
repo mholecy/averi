@@ -21,7 +21,7 @@ const iphone = (...children: UiNode[]): UiNode => node({ role: 'container', rect
 /** A Pixel 3a window, 1080x2220 px. */
 const android = (...children: UiNode[]): UiNode => node({ role: 'container', rect: rect(0, 0, 1080, 2220), children });
 
-/** WDA's dialect: nested, frames unclipped (draw-order.ts#listsUnclippedFrames). */
+/** WDA's dialect: nested, frames unclipped (dialect.ts#TreeDialect.framesUnclipped). */
 const WDA = { ancestry: true, unclipped: true } as const;
 /** uiautomator's: nested, rects cut to their scroll view. */
 const UIAUTOMATOR = { ancestry: true } as const;

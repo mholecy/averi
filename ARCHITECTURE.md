@@ -98,8 +98,8 @@ from `adapters/`:
   - `verify/shot.ts` → `adapters/png-encode.ts`: a raw capture encoded on the host (the codec split, backlog A5).
 
 One platform fact sits above the adapters on purpose: the stroke pace `interact/stroke-plan.ts#PACED`, an
-idb-measured constant that `interact/scroll-rounds.ts#strokeKind` picks by the tree's `flatList` mark (ADR 0018
-Decision 4; backlog A4 tracks moving it onto the adapter).
+idb-measured constant that `interact/scroll-rounds.ts#strokeKind` picks by the tree's `flatList` mark (read as
+`ui-tree/dialect.ts#TreeDialect.topLayerOnly`; ADR 0018 Decision 4; backlog A4 tracks moving it onto the adapter).
 
 The rule earned its keep: the platform layer once imported the selector layer (for a `tapElement` with no platform
 code in it), and `flow/config.ts` had become the home of vocabulary neither flow nor config owns. Both inversions were
@@ -126,7 +126,7 @@ re-exported by `ui-tree/geometry.ts`), the one pre-order walk `adapters/types.ts
 Vocabulary: **adapter** — a `DeviceAdapter` bound to one device (serial or UDID, a constructor invariant);
 **tree source** — where iOS reads its tree, idb or WebDriverAgent (`IosTreeSource`; `auto` picks one per adapter);
 **dialect** — what a source's listing means (`flatList`, `unclippedFrames`, `boundsCutAtScreen`, …: marks the parser
-puts on the root);
+puts on the root, read above the adapters only through `ui-tree/dialect.ts#dialectOf`);
 **capability** — an optional member present only where the platform has the fact (`keyboard?`, `dragSpeed?`,
 `treeReadSettles?`, `settleCadenceMs?`, `capture?`); **`AppHolder`** — what holds the app after a launch or link
 (`alert`, `chooser`, `unknown`, `none`); **`DeviceScreen`** — the device's raw size with its status band, before a tree
@@ -136,6 +136,11 @@ orients it.
 
 The normalized tree and everything asked OF it. Knows no platform command and no averi.yaml. Its modules, by
 question:
+
+- **The tree's dialect** — `dialect.ts` (`dialectOf`): the one reader of the marks a source puts on the tree's root
+  (`TreeDialect`: ancestry, frames unclipped, cut at the screen or at a later node, padded touch targets, top layer
+  only, the active window, presentations judged). Its doc is the one list of the marks' writers and readers; a module
+  that needs the dialect asks it, or is handed it by its caller (ADR 0018, the A45 amendment).
 
 - **Finding** — `selectors.ts` (the selector grammar, §3), `element-spec.ts` (the structured `ElementSpec`, matched by
   the grammar's own matcher), `verdict.ts` (an element question against one tree: `yes` / `no` / `unknown`, `unknown`
@@ -450,7 +455,7 @@ error and trace line says the same, host paths stripped; the error's fields keep
 
 **Normalized UI tree** — the key abstraction, identical on both platforms: `{role, label, identifier, value, rect,
 children}` plus the optional source marks `adapters/types.ts#UiNode` documents (`error`, `ofKeyboard`, `hidden`,
-`secure`, `presentation`, `readingOrder`, …) and the root's dialect marks.
+`secure`, `presentation`, `readingOrder`, …) and the root's dialect marks (read through `ui-tree/dialect.ts`).
 
 **Selectors** resolve against it on either OS (`ui-tree/selectors.ts`): space-separated conditions, all must match —
 `id:login_pin_field`, `text:"Continue"`, `role:button label~"Pay.*"`. Fields `id`, `text`, `role`, `label`, `value`;

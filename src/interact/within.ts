@@ -1,5 +1,5 @@
 import type { Rect, ScrollAxis } from '../adapters/types.js';
-import { listsAncestry } from '../ui-tree/draw-order.js';
+import { dialectOf } from '../ui-tree/dialect.js';
 import { quoted, type QuotedNode, type ScrollAxes } from '../ui-tree/geometry.js';
 import { findTarget, parseSelector, type Target } from '../ui-tree/selectors.js';
 import type { TreeFacts } from './scroll-read.js';
@@ -32,7 +32,7 @@ import { axisOf, type Direction } from './swipe.js';
  * scroll-text.ts's) but `noRoom` (D80), which the stroke plan finds at any round and stops after the swipes sent: no
  * silent fallback to the largest scroller, nor to the gesture box whole — a caller who named a list and had another
  * stroked would read the exhausted reply as that list's. On a tree that lists no scroll view (idb's flat list,
- * draw-order.ts#listsAncestry) nothing can be named: refused whatever the form.
+ * dialect.ts#TreeDialect.ancestry) nothing can be named: refused whatever the form.
  *
  * Resolved ONCE, at the scroll's first read that reads (scroll-rounds.ts#round), before any swipe; the plan remembers
  * the rect (stroke-plan.ts#nameScrollView). Pure: no adapter, no clock. Cost: a walk of the tree for the selector, one
@@ -122,7 +122,7 @@ export const isRect = (within: Within): within is Rect => typeof within !== 'str
  * screen clear of its system bands (the scroll views a stale rect's refusal names are those meeting it, as D76's are).
  */
 export function resolveWithin(facts: Pick<TreeFacts, 'tree' | 'scene' | 'reading'>, within: Within, direction: Direction, screen: Rect): { rect: Rect } | { refused: WithinRefusal } {
-  if (!listsAncestry(facts.tree)) return { refused: { of: 'untold' } };
+  if (!dialectOf(facts.tree).ancestry) return { refused: { of: 'untold' } };
   const { clips } = facts.scene;
   const way = axisOf(direction);
   let rect: Rect;

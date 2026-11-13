@@ -175,13 +175,14 @@ export type FrameRow = 'structural' | 'screenSizedHost' | 'contentFramed';
  * rows of the same names (draw-order.ts#NOT_DRAWN: `structural`, `screenSizedHost`, `contentFramed`, whose docs have
  * the rules and their measurements) ask them, less what the presentation module takes back over a screen presented
  * over the target's (presentation.ts#PresentedOver.givesWay); the shape adapter (presentation.ts#byShape) asks them
- * too, to name such a screen's surface from the same rows (`presentedSurface`).
+ * too, to name such a screen's surface from the same rows (`presentedSurface`). Each caller hands in whether the tree is
+ * a flat list (`flatList`: dialect.ts#TreeDialect's `ancestry`, false), which `structural` asks of a named leaf.
  */
 export const FRAME_EXCUSES = {
-  structural: ({ node, parent }: Placed, target: Placed, screenArea: number): boolean =>
-    STRUCTURAL_ROLES.has(node.role) && !node.label && !node.value && ((node.children.length === 0 && (!node.identifier || parent === undefined || !listsNestedReadingOrder(parent) || flattenedWrapper(node, parent))) || holdsWhole(node, target, screenArea) || (!node.identifier && framesOnly(node))),
+  structural: ({ node, parent }: Placed, target: Placed, screenArea: number, flatList: boolean): boolean =>
+    STRUCTURAL_ROLES.has(node.role) && !node.label && !node.value && ((node.children.length === 0 && (!node.identifier || parent === undefined || !listsNestedReadingOrder(parent, flatList) || flattenedWrapper(node, parent))) || holdsWhole(node, target, screenArea) || (!node.identifier && framesOnly(node))),
   screenSizedHost: ({ node }: Placed, _target: Placed, screenArea: number): boolean => !isInteractive(node) && screenSized(node, screenArea),
   // `!isInteractive` is moot while `scrollable` is no interactive role (selectors.ts); it guards CONTENT_FRAMED_ROLES
   // growing one.
   contentFramed: ({ node }: Placed, _target: Placed, _screenArea: number): boolean => !isInteractive(node) && node.children.length > 0 && CONTENT_FRAMED_ROLES.has(node.role),
-} as const satisfies Record<FrameRow, (placed: Placed, target: Placed, screenArea: number) => boolean>;
+} as const satisfies Record<FrameRow, (placed: Placed, target: Placed, screenArea: number, flatList: boolean) => boolean>;

@@ -1,6 +1,7 @@
 import { isTyped, rectArea, rectIntersection, STRUCTURAL_ROLES, type Point, type PresentationKind, type Rect, type UiNode } from '../adapters/types.js';
 import { containsPoint, screenOf } from './geometry.js';
 import { CONTENT_FRAMED_ROLES, emptyFrame, FRAME_EXCUSES, fillsScreen, holderOf, itemless, placesBy, stackedScreens, walkOf, within, type FrameRow, type Placed } from './placed.js';
+import { dialectOf } from './dialect.js';
 import { scrolls } from './scroll-containers.js';
 
 /**
@@ -21,7 +22,7 @@ import { scrolls } from './scroll-containers.js';
  *   payload still types an alert. A ROOT the source marks is a presented layer listed ALONE — the screen beneath it is
  *   not in the tree, so a target missing from it may lie there, unlisted (`alone`; lab note L1, iOS point 4).
  * - BY SHAPE (`byShape`): the FALLBACK for a tree whose source did not judge presented layers (no
- *   `UiNode.presentationsJudged` on its root): a later screen-sized layer stacked over the target's own screen inside
+ *   dialect.ts#TreeDialect.judgesPresentations): a later screen-sized layer stacked over the target's own screen inside
  *   one window, carrying content — idb's flat list (where it never holds), Android's window, a flagless WDA payload,
  *   a normalized snapshot printed without the mark. Never asked of a judged tree: there the marks are the presented
  *   layers, and a layer the source did not mark presents nothing.
@@ -48,13 +49,13 @@ import { scrolls } from './scroll-containers.js';
 export interface Presentation {
   /**
    * The adapter that infers presented screens on this tree (`byShape`): undefined on a tree whose source judged
-   * presented layers itself (`UiNode.presentationsJudged`), which no shape is asked of. No production caller reads
+   * presented layers itself (dialect.ts#TreeDialect.judgesPresentations), which no shape is asked of. No production caller reads
    * it: it is the test surface for which adapters a tree gets (tests/ui-tree/presentation.test.ts).
    */
   readonly fallback: 'shape' | undefined;
   /**
    * The presented layer the tree lists ALONE, as a sentence names it (`MarkedLayer`): the source marks the tree's ROOT
-   * presented — uiautomator's one window (it lists the active window only, `UiNode.activeWindowOnly`), idb's flat list
+   * presented — uiautomator's one window (it lists the active window only, dialect.ts#TreeDialect.activeWindow), idb's flat list
    * holding UIKit's dismiss region (it lists only what a presentation leaves to accessibility) — so the screen beneath
    * it is not in the tree and a target not found may lie there. Undefined on any other tree: one that lists every
    * window (WDA's, which marks layers, never its root), where a target missing beside a marked alert is missing, and
@@ -183,8 +184,10 @@ const NOTHING_OVER: PresentedOver = { drawn: () => true, wholeScreen: () => fals
 export function presentationOf(tree: UiNode, order: readonly Placed[] = walkOf(tree), places: ReadonlyMap<UiNode, readonly Placed[]> = placesBy(order)): Presentation {
   const screen = screenOf(tree);
   const screenArea = rectArea(screen);
-  const fallback = tree.presentationsJudged === true ? undefined : ('shape' as const);
-  const adapters: readonly PresentationAdapter[] = [byMarks(order, screen), ...(fallback === 'shape' ? [byShape(screenArea)] : [])];
+  const dialect = dialectOf(tree);
+  const flatList = !dialect.ancestry;
+  const fallback = dialect.judgesPresentations ? undefined : ('shape' as const);
+  const adapters: readonly PresentationAdapter[] = [byMarks(order, screen, flatList), ...(fallback === 'shape' ? [byShape(screenArea, flatList)] : [])];
   return {
     fallback,
     alone: adapters.reduce<MarkedLayer | undefined>((found, a) => found ?? a.alone, undefined),
@@ -234,23 +237,23 @@ interface PresentedLayer {
  * `layer` is, among the walk's `order`; undefined for any other node. A typed layer whose element is not marked (a
  * hand-built tree) is its own cover, named by its own label.
  */
-const markOf = (layer: Placed, order: readonly Placed[]): PresentedLayer | undefined => {
+const markOf = (layer: Placed, order: readonly Placed[], flatList: boolean): PresentedLayer | undefined => {
   const kind = layer.node.presentation;
   if (kind === undefined) return undefined;
   const element = isTyped(kind) ? order.slice(layer.at, layer.end).find((p) => p.node.presentationElement === true) : undefined;
   const cover = element ?? layer;
-  const named: MarkedLayer = { kind, ...(cover.node.label ? { label: cover.node.label } : {}), ...(isListedAhead(layer, order) && { listedAhead: true as const }) };
+  const named: MarkedLayer = { kind, ...(cover.node.label ? { label: cover.node.label } : {}), ...(isListedAhead(layer, flatList) && { listedAhead: true as const }) };
   return { layer, kind, ...(element !== undefined && { element }), cover, named };
 };
 
 /**
  * A marked `layer` is LISTED AHEAD of what it covers — it covers what is listed after it, not before it: a non-root
- * layer of a FLAT LIST (`UiNode.flatList` on the root, idb's). idb lists the unhidden blur menu's backdrop between the
+ * layer of a FLAT LIST (idb's: `flatList`, the caller's, dialect.ts#TreeDialect.ancestry false). idb lists the unhidden blur menu's backdrop between the
  * menu's card and the screen beneath it (K, W, the backdrop, A–D: adapters/ios-tree-source.ts#backdropOf) — so the
  * card, listed before it, is drawn over it, and the screen, listed after it, beneath it. A marked ROOT is the whole
  * list (`alone`) and covers nothing of it.
  */
-const isListedAhead = (layer: Placed, order: readonly Placed[]): boolean => layer.parent !== undefined && order[0]?.node.flatList === true;
+const isListedAhead = (layer: Placed, flatList: boolean): boolean => flatList && layer.parent !== undefined;
 
 /**
  * THE MARKS ADAPTER: the layers the tree source marks presented (`markOf`), read on every tree. A LAYER it marks covers
@@ -267,7 +270,7 @@ const isListedAhead = (layer: Placed, order: readonly Placed[]): boolean => laye
  * listed ALONE (`alone`): uiautomator's one window, idb's flat list — nothing of the tree lies outside it, so it covers
  * no target, and for no target its cover takes every touch-down (`topmostAt`).
  */
-function byMarks(order: readonly Placed[], screen: Rect): PresentationAdapter {
+function byMarks(order: readonly Placed[], screen: Rect, flatList: boolean): PresentationAdapter {
   /**
    * The marked layers whose cover lies ON the screen, in the walk's order: one whose rect shares no area with the
    * screen (0x0, or wholly off it — WDA keeps a dismissed alert in its tree) presents nothing. Judged by the rect alone,
@@ -276,7 +279,7 @@ function byMarks(order: readonly Placed[], screen: Rect): PresentationAdapter {
    * #parseIdbDescribeAll), and a mark on it is the whole listing's, which lies where its nodes do — on the screen.
    */
   const marked = order.flatMap((p) => {
-    const layer = markOf(p, order);
+    const layer = markOf(p, order, flatList);
     if (layer === undefined) return [];
     const rect = layer.cover.node.rect;
     if (p.parent === undefined && rectArea(rect) === 0) return [layer];
@@ -397,7 +400,7 @@ const OVER_PRESENTED: Record<FrameRow, { readonly overPresented: (node: UiNode, 
 
 /**
  * THE SHAPE ADAPTER: a PRESENTED SCREEN INFERRED FROM SHAPE, the fallback asked only of a tree whose source did not
- * judge presented layers itself (no `UiNode.presentationsJudged` on its root): idb's flat list, a WDA payload carrying
+ * judge presented layers itself (no dialect.ts#TreeDialect.judgesPresentations): idb's flat list, a WDA payload carrying
  * no visibility flags, and a normalized snapshot whose root carries no such mark (as the snapshots kept as fixtures and
  * in the differential corpus do not) — and Android's tree, whose parser marks only the one window it dumps. A tree
  * whose source judged never reaches it: there the marked layers are the presented ones (`byMarks`), and a later
@@ -441,11 +444,11 @@ const OVER_PRESENTED: Record<FrameRow, { readonly overPresented: (node: UiNode, 
  * stroke's stop for a target not in the tree. The decision and its residuals:
  * docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
  */
-function byShape(screenArea: number): PresentationAdapter {
+function byShape(screenArea: number, flatList: boolean): PresentationAdapter {
   const givesWay = (row: FrameRow, placed: Placed, target: Placed): boolean =>
     OVER_PRESENTED[row].overPresented(placed.node, screenArea) && !(emptyFrame(placed.node) && !carriesContent(placed.node)) && presentedOver(placed, target, screenArea);
   const presentedSurface = (placed: Placed, target: Placed): boolean =>
-    (Object.keys(OVER_PRESENTED) as FrameRow[]).some((row) => OVER_PRESENTED[row].surfaceCandidate(placed.node, () => FRAME_EXCUSES[row](placed, target, screenArea)) && givesWay(row, placed, target));
+    (Object.keys(OVER_PRESENTED) as FrameRow[]).some((row) => OVER_PRESENTED[row].surfaceCandidate(placed.node, () => FRAME_EXCUSES[row](placed, target, screenArea, flatList)) && givesWay(row, placed, target));
   return {
     over([target]) {
       return {

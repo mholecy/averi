@@ -29,7 +29,7 @@ const FULLY = { of: 'fully' } as const;
 const OCR = (_n?: UiNode, keyboardTop?: KeyboardLine): PixelPurpose => ({ of: 'pixel', reads: (r) => r, glyphs: true, ...(keyboardTop !== undefined && { keyboardTop }) });
 const COLOUR: PixelPurpose = { of: 'pixel', reads: colorSampleRect, glyphs: false };
 
-/** A nested tree (draw-order.ts#listsAncestry): `inScroller` is told for every node. */
+/** A nested tree (dialect.ts#TreeDialect.ancestry): `inScroller` is told for every node. */
 const root = (...children: UiNode[]): UiNode => node({ role: 'container', rect: box(400, 800), children });
 /** A scroll view (geometry.ts#Clips.inScroller: it clips its descendants). */
 const list = (rect: Rect, ...children: UiNode[]): UiNode => node({ role: 'container', identifier: 'list', clipsDescendants: true, rect, children });

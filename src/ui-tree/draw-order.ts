@@ -8,6 +8,7 @@ import { clips, isScrollViewOf, scrolls } from './scroll-containers.js';
 import { NO_READING_ORDER, readingOrderOf, type ReadingOrder } from './reading-order.js';
 import type { SeenOrder } from './seen-order.js';
 import { flatListKeyboardBand } from './soft-keyboard.js';
+import { dialectOf } from './dialect.js';
 
 /**
  * DRAW ORDER: what a tree says is drawn on top of what — and, for a target,
@@ -89,7 +90,7 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * box) does not read it. Behind it sit the tree source's marks (a LAYER WDA marks presented: a typed alert, action
  * sheet or popover through its element alone, a `screen` its visibility flags show presented through the whole screen
  * with its own nodes covering where they draw; the one window uiautomator dumps, and idb's flat list, when its parser marks it presented)
- * and, only on a tree whose source did not judge presented layers (`UiNode.presentationsJudged`), the shape fallback. A verb learns of a
+ * and, only on a tree whose source did not judge presented layers (dialect.ts#TreeDialect.judgesPresentations), the shape fallback. A verb learns of a
  * mark from `presentation.press` (`MarkedLayer`: its kind and label), never from the node.
  *
  * The two columns read the rows differently on purpose — each column of
@@ -102,7 +103,7 @@ import { flatListKeyboardBand } from './soft-keyboard.js';
  * ui-tree/standing.ts#Scene. Knows no
  * platform commands; the platform shapes are in the rows, each with the
  * device tree it was measured on, and the marks of a source it reads are
- * on the tree's root (`UiNode.flatList`, `UiNode.paddedTouchTargets`). The
+ * on the tree's root, read through dialect.ts#dialectOf (`ancestry`, `paddedTouchTargets`). The
  * rect arithmetic it asks — the
  * subtraction of a cover from a target included — is geometry.ts's.
  */
@@ -234,7 +235,7 @@ export interface DrawOrder {
    * K5d). One reader: ui-tree/keyboard-position.ts#KeyboardPosition.line, the one
    * merge of every keyboard source into the line the tap, `scroll_until` and
    * the pixel assert judge and stroke against. Only a FLAT LIST
-   * (`UiNode.flatList`, idb's mark) is read: WDA marks its band itself
+   * (dialect.ts#TreeDialect.ancestry false, idb's mark) is read: WDA marks its band itself
    * (`KEYBOARD_ROLE`) and Android's keyboard is never in the tree — both
    * always undefined here. Read off the band this draw order already found
    * for its own rows, not by a second walk of the tree.
@@ -406,8 +407,8 @@ interface Seen {
 
 /**
  * What the `target` column is judged against besides: the target, at its
- * first place in the walk, what is presented over it (`over`), whether the tree is a flat list (`UiNode.flatList`
- * on its root), and — in one — where its content starts (`contentFrom`).
+ * first place in the walk, what is presented over it (`over`), whether the tree is a flat list (dialect.ts#TreeDialect.ancestry
+ * false), and — in one — where its content starts (`contentFrom`).
  */
 interface SeenFor extends Seen {
   readonly target: Placed;
@@ -422,7 +423,7 @@ interface SeenFor extends Seen {
   readonly readingBreak: number;
   /** A flat list's bottom chrome — the nodes pinned at its bottom (`bottomPinned`), idb's keyboard (`keyboardOf`) and a floating tab bar's items (`tabBarsOf`): never past the break. */
   readonly bottomChrome: ReadonlySet<Placed>;
-  /** The tree's source lists a control's touch target as its wrapper (`UiNode.paddedTouchTargets` on its root): `ownControl`'s padded shape is asked only then. */
+  /** The tree's source lists a control's touch target as its wrapper (dialect.ts#TreeDialect.padsTouchTargets): `ownControl`'s padded shape is asked only then. */
   readonly paddedTouchTargets: boolean;
   /** How far a label may overhang its own field on this tree's screen, in its units (`labelOverhang`): `ownControl`'s text input. */
   readonly labelOverhang: number;
@@ -619,7 +620,7 @@ const spansHeight = (label: Rect, field: Rect, overhang: number): boolean =>
  * back over a screen presented over the target's (presentation.ts#PresentedOver.givesWay: the shape fallback, on a
  * tree whose source did not judge presented layers).
  */
-const frameExcused = (row: FrameRow, placed: Placed, about: SeenFor): boolean => FRAME_EXCUSES[row](placed, about.target, about.screenArea) && !about.over.givesWay(row, placed);
+const frameExcused = (row: FrameRow, placed: Placed, { target, screenArea, flatList, over }: SeenFor): boolean => FRAME_EXCUSES[row](placed, target, screenArea, flatList) && !over.givesWay(row, placed);
 
 /**
  * THE judgement of what draws, one row per kind of node that does not. A
@@ -856,8 +857,8 @@ const NOT_DRAWN = {
   },
 
   /**
-   * CONTENT OVER THE TOP BAR, IN A FLAT LIST: under idb (`UiNode.flatList`
-   * on the root), a node at or after the list's first CONTENT node that
+   * CONTENT OVER THE TOP BAR, IN A FLAT LIST: under idb (dialect.ts#TreeDialect.ancestry
+   * false), a node at or after the list's first CONTENT node that
    * ends inside the top bar's band (`barLine`), over a target listed before
    * that node — the top bar's (`firstContent`, `contentFrom`).
    * `target` only: chrome before content, the owner's decision — the bar's
@@ -881,7 +882,7 @@ const NOT_DRAWN = {
 
   /**
    * CONTENT LISTED PAST A READING-ORDER BREAK, IN A FLAT LIST: under idb
-   * (`UiNode.flatList`), a node at or after the first node listed after a
+   * (dialect.ts#TreeDialect.ancestry false), a node at or after the first node listed after a
    * CONTENT target (`contentFrom`) whose top lies ABOVE the target's top —
    * where idb resumes listing another container in reading order
    * (`readingBreak`) — unless it is the list's bottom chrome: pinned at
@@ -961,7 +962,7 @@ const NOT_DRAWN = {
 
   /**
    * ON THE TARGET: a NON-INTERACTIVE SIBLING of the target, narrower than
-   * it, whose centre lies on it — and, in idb's flat list (`UiNode.flatList`),
+   * it, whose centre lies on it — and, in idb's flat list (dialect.ts#TreeDialect.ancestry false),
    * which REPEATS the target: its identifier, or its text (label or value)
    * equal to the target's label, placeholder or value. `target` only:
    * idb's list is FLAT
@@ -1088,7 +1089,7 @@ const NOT_DRAWN = {
    * 22,99 110x80` in its 132×132 wrapper: 11, 11, 11, 41) — refused, the
    * safe direction; nor one spanning its wrapper's height
    * only (a tall narrow one). And only on a tree whose source lists a
-   * control's touch target as its wrapper (`UiNode.paddedTouchTargets`,
+   * control's touch target as its wrapper (dialect.ts#TreeDialect.padsTouchTargets,
    * uiautomator's root): the shape was
    * measured there alone. No other mark tells uiautomator's tree from
    * WDA's — `clipsDescendants` is a node's, absent on an Android screen with
@@ -1639,43 +1640,6 @@ const wordsOf = (n: UiNode): ReadonlySet<string> =>
   new Set([n.label ?? '', n.value ?? ''].flatMap((t) => t.toLowerCase().split(/[^\p{L}\p{N}]+/u)).filter((w) => w.length > 0));
 
 /**
- * Whether the tree's nesting is its nodes' ancestry: false for idb's flat
- * list (`UiNode.flatList`), whose nodes are all siblings of one root. The
- * tree's dialect is read here and in its reading-order module — this and `listsUnclippedFrames` (a third,
- * reading-order.ts#listsInReadingOrder, is that module's alone); outside draw order only ui-tree/miss.ts reads the
- * same mark, for a miss (`noIdListed`, `idUnlisted`) and for strokes (`topLayerOnlySource`) — what geometry.ts#clipsOf's `inScroller` and
- * `drawnIn` ask, through ui-tree/standing.ts#sceneOf, and the pixel
- * standing's flat-list root (ui-tree/standing.ts#Standing,
- * `covered.overRoot`).
- */
-export function listsAncestry(tree: UiNode): boolean {
-  return tree.flatList !== true;
-}
-
-/**
- * Whether the tree's source reports every frame unclipped (`UiNode.unclippedFrames`: WDA's) — a scroll view's
- * content at its laid-out rect past the scroll view's frame, always — so the content past a frame says which way it
- * scrolls and where it ends (geometry.ts#Clips.axesOf, #Clips.contentToward), and a row's motion as it comes in is the
- * content's (interact/course.ts#farFacts, the carry model's `window`); its negation, on a nested tree, is a
- * source that cuts a node's bounds at what is drawn after it (later-edges.ts#laterEdgesIn: Compose's). Not what the
- * drawn frame asks (geometry.ts#Clips.drawnIn, on every tree that lists ancestry: uiautomator too lists some content
- * past its frame). The second half of the tree's dialect (`listsAncestry`'s doc).
- */
-export function listsUnclippedFrames(tree: UiNode): boolean {
-  return tree.unclippedFrames === true;
-}
-
-/**
- * Whether the tree's source cuts a node's bounds at the screen's edge whatever scroll view it lies past
- * (`UiNode.boundsCutAtScreen`: uiautomator's) — so a side lying on the screen's edge, where its drawn frame's side lies
- * inside the screen, runs on an unknown distance past it (geometry.ts#DrawnFrame.unknownPast). What the drawn frame
- * asks (geometry.ts#clipsOf's `cutAtScreen`, through ui-tree/standing.ts#sceneOf).
- */
-export function listsBoundsCutAtScreen(tree: UiNode): boolean {
-  return tree.boundsCutAtScreen === true;
-}
-
-/**
  * The draw order of `tree` — `orderSeen`: the order a screenshot saw of controls the tree lists in reading order
  * (ui-tree/seen-order.ts; reading-order.ts#readingOrderOf), when the caller looked; absent, the listing alone.
  */
@@ -1683,8 +1647,9 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
   const screen = screenOf(tree);
   const screenArea = rectArea(screen);
   const seen: Seen = { screenArea };
-  const flatList = !listsAncestry(tree);
-  const paddedTouchTargets = tree.paddedTouchTargets === true;
+  const dialect = dialectOf(tree);
+  const flatList = !dialect.ancestry;
+  const paddedTouchTargets = dialect.padsTouchTargets;
   const minPiece = minTapPiece(screen);
   const overhang = labelOverhang(screen);
   const order = walkOf(tree);

@@ -1,4 +1,5 @@
 import { sameRectWithinPixel, type DeviceAdapter, type FocusedWindow, type Rect, type UiNode } from '../adapters/types.js';
+import { dialectOf } from './dialect.js';
 import { findTarget, type Target } from './selectors.js';
 
 /**
@@ -37,7 +38,7 @@ import { findTarget, type Target } from './selectors.js';
  */
 
 /** A tree whose window the window manager may still type: it lists the active window only, and its parser marked none. */
-const windowMayBeTyped = (tree: UiNode): boolean => tree.activeWindowOnly === true && tree.presentation === undefined && tree.windowAlone !== true;
+const windowMayBeTyped = (tree: UiNode): boolean => dialectOf(tree).activeWindow === 'mayHide' && tree.presentation === undefined;
 
 /** THE decision: `tree` marked by the window manager's word on its window (the module doc), or `tree` itself. Pure. */
 export function markByWindow(tree: UiNode, window: FocusedWindow): UiNode {

@@ -977,7 +977,7 @@ large sheet's blank content, the one gesture that dismisses a swipe-dismissable 
 loud `presented-changed`. Beneath alert-dim and dim-cover (A–D) and the sheet's C and D nothing is dismissed: two
 strokes on the layer, the unmoved stop. idb's tree gives no evidence of the layer before the first stroke (the sheet's
 button alone). So `scroll_until` FEELS before it strokes: on a tree that lists only what a presented layer leaves
-(ui-tree/miss.ts#topLayerOnlySource, idb's flat list; the call's evidence `unfelt`, interact/scroll-rounds.ts#CallEvidence), for a target NEVER SEEN in the call, a
+(ui-tree/dialect.ts#TreeDialect.topLayerOnly, idb's flat list; the call's evidence `unfelt`, interact/scroll-rounds.ts#CallEvidence), for a target NEVER SEEN in the call, a
 stroke toward content `up` is a feeler (interact/stroke-plan.ts#StrokeKind, `FEELER`) while no stroke of the call has
 moved the tree (motion-ledger.ts#treeMoved): the full stroke's touch-down, its travel capped at 160 pt, sent over
 600 ms (`PlannedStroke.durationMs`, which the driver, interact/scroll.ts, passes to `swipe` over the adapter's own
@@ -1041,7 +1041,7 @@ feeler, 160 pt in 600 ms, ~3 rows. So on idb a full stroke flings about twice it
 the read before listed; idb's flat list keeps no scroll view's rect to excuse the fling with, and Decision 2 read a
 dismissal that did not happen — the residual ui-tree/read-tree.ts#ScreenChange states as RECYCLED ROWS, met on the
 first real list. Now a full stroke planned on a tree whose source lists only the top layer
-(ui-tree/miss.ts#topLayerOnlySource — judged on the last read's tree, not on the call's evidence: the strokes after
+(ui-tree/dialect.ts#TreeDialect.topLayerOnly — judged on the last read's tree, not on the call's evidence: the strokes after
 the first are `felt` and still idb's) is `paced` (interact/scroll-rounds.ts#strokeKind,
 interact/stroke-plan.ts#PACED): sent over `max(300, ceil(travel / 349 pt/s × 1000))` ms — 524 pt in 1502 ms, 354 pt
 above the keyboard in 1015 ms — through the same `PlannedStroke.durationMs` the feeler uses; no adapter changes. The
@@ -1371,6 +1371,34 @@ Residuals of the amendment:
   analysis), so none is added. Way out: `treeSource: wda`.
 - **C's centre cover is named the backdrop under idb, W under WDA.** Both are drawn over C's centre; the presented
   remedy, first in precedence, is the same.
+
+## Amendment: one reader of the root marks, the tree's dialect (2026-11-13, A45)
+
+**Context.** Decision 1 made `activeWindowOnly` a root mark "in the dialect of `flatList` and `unclippedFrames`". By
+A45 there were seven such marks — `flatList` (idb), `unclippedFrames` and `presentationsJudged` (WDA),
+`paddedTouchTargets`, `activeWindowOnly` and `boundsCutAtScreen` (uiautomator), `windowAlone` (the window manager's
+word, ui-tree/window-mark.ts) — read in nine files, through three helpers in draw-order.ts (`listsAncestry`,
+`listsUnclippedFrames`, `listsBoundsCutAtScreen`), one in miss.ts (`topLayerOnlySource`) and raw property reads
+elsewhere. Two lists of who read them, in draw-order.ts and adapters/types.ts, had gone stale. `flatList` carried four
+meanings (no ancestry, idb's top-layer-only listing, a flat list's own draw-order rules, a layer listed ahead), and two
+readers (reading-order.ts#listsNestedReadingOrder, presentation.ts's listed-ahead test) read it off the node in hand,
+which held only while that node was the root. later-edges.ts inferred Compose's cut at a later node from ABSENT marks.
+
+**Decision.** One reader, `ui-tree/dialect.ts#dialectOf(tree): TreeDialect` (it imports adapters/types.ts only, so any
+layer from ui-tree up may ask it and none below needs it). Its fields are named for what they say, not after the marks:
+`ancestry`, `framesUnclipped`, `cutAtScreen`, `cutsAtLater`, `padsTouchTargets`, `topLayerOnly` (`'idb'`),
+`activeWindow` (`screenAlone` | `mayHide`), `judgesPresentations`. Its doc is the one list of the marks' writers (the
+three parsers and window-mark.ts) and of each field's readers; adapters/types.ts#UiNode and draw-order.ts point to it.
+The helpers are gone. `cutsAtLater` keeps its derivation from absent marks (a tree with ancestry whose frames are not
+unclipped), now named and documented as that inference. reading-order.ts#listsNestedReadingOrder and
+placed.ts#FRAME_EXCUSES take `flatList` from their caller (draw order's, or presentation's), and the listed-ahead test takes it
+from presentationOf's dialect. No behaviour changes: the full suite and the golden corpus (1691 checks, Changed 0) are
+as before.
+
+**Consequences.** A read of a raw root mark (`.flatList`, `.unclippedFrames`, …) outside dialect.ts and the writers
+stands out to a grep; a new root mark is added to the parser, adapters/types.ts and dialect.ts, and nowhere else lists
+its readers. Not done here (the smaller slice): splitting `ancestry`'s remaining meanings into their own fields, and
+replacing `cutsAtLater`'s inference by a mark the uiautomator parser sets.
 
 ## Residuals accepted
 

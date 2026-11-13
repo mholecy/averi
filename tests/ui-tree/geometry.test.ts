@@ -26,7 +26,7 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { node as fakeNode } from '../helpers/fake.js';
 
-/** A nested tree's listing: its nesting is its ancestry (draw-order.ts#listsAncestry). */
+/** A nested tree's listing: its nesting is its ancestry (dialect.ts#TreeDialect.ancestry). */
 const NESTED = { ancestry: true } as const;
 
 /**
@@ -723,7 +723,7 @@ describe('clipsOf(tree).inScroller — some ancestor scrolls (scroll-containers.
 });
 
 describe('clipsOf(tree).drawnIn — the frame a node is drawn in, cut by every ancestor that scrolls, on every tree that lists ancestry', () => {
-  /** A nested tree whose source reports its frames unclipped (WDA's, draw-order.ts#listsUnclippedFrames). */
+  /** A nested tree whose source reports its frames unclipped (WDA's, dialect.ts#TreeDialect.framesUnclipped). */
   const UNCLIPPED = { ancestry: true, unclipped: true } as const;
   const r = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
   const SCREEN_RECT = r(0, 0, 402, 874);

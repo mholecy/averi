@@ -1,4 +1,5 @@
 import { everyNode, rectArea, rectIntersection, type DeviceAdapter, type Point, type Rect, type UiNode } from '../adapters/types.js';
+import { dialectOf } from '../ui-tree/dialect.js';
 import { outsideScrollViewText, screenOf } from '../ui-tree/geometry.js';
 import type { Look } from '../ui-tree/look.js';
 import { isUnnamedWrapper } from '../ui-tree/placed.js';
@@ -303,7 +304,7 @@ const THE_DRAG: DismissalStrategy = {
   async choose(ground) {
     const found = await blankPoint(ground);
     if ('skipped' in found) return found;
-    if (scrollAxis(found.scroller, ground.look.tree.unclippedFrames === true) === 'horizontal') return { skipped: "the target's scroll view scrolls sideways" };
+    if (scrollAxis(found.scroller, dialectOf(ground.look.tree).framesUnclipped) === 'horizontal') return { skipped: "the target's scroll view scrolls sideways" };
     const lift = Math.max(DRAG_LENGTH, found.centre.y - found.at.y + PAN_SLOP);
     const to = { x: found.at.x, y: Math.max(found.at.y - lift, found.top) };
     if (found.at.y - to.y < 2 * BLANK_MARGIN) return { skipped: 'no room to drag above the keyboard' };

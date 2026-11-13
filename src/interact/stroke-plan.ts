@@ -266,7 +266,7 @@ export interface StrokeAsk {
  * The kinds of stroke a round may ask for. A `full` stroke: the plan's reach over its box (a probe's travel capped by
  * the probe), at the adapter's own speed.
  * A `paced` stroke: a full stroke on a tree whose source lists only the top layer (idb's flat list,
- * ui-tree/miss.ts#topLayerOnlySource), sent over its travel at `PACED`'s speed — the idb counterpart of Android's
+ * ui-tree/dialect.ts#TreeDialect.topLayerOnly), sent over its travel at `PACED`'s speed — the idb counterpart of Android's
  * `dragSpeed`, set on the stroke and not on the adapter, which WDA's trees share (`PACED`).
  * A `feeler`: the same touch-down, its travel capped and sent slowly (`FEELER`), so a swipe-dismissable sheet the tree
  * does not list springs back where a list still moves — when the round asks for one is scroll-rounds.ts#CallEvidence's
