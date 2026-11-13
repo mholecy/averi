@@ -1,6 +1,6 @@
 /**
- * iOS's STATUS BAND (2026-10-09, the owner's decision on device check C3-1.3
- * of docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-
+ * iOS's STATUS BAND (the owner's decision on device check C3-1.3 of
+ * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-
  * chrome.md): the top of a portrait screen down to the safe area,
  * which the layers above count as OFF the screen for the point a tap
  * presses — the tap's on-screen rule, where a moved tap may go, and
@@ -8,13 +8,14 @@
  * Measured: one 0.3-s stroke flung `priority_select` to `24,-20`, its centre
  * (201,6) on the screen and under no node of the idb tree; the plain stop
  * stopped there, and the tap went to the status bar, which scrolled the form
- * back to its top. Neither tree source lists the status bar.
+ * back to its top. The app's tree (idb's or WDA's) lists no status bar; only
+ * SpringBoard's tree, read during a launch transition, does.
  *
  * Here, in the adapter layer, because it is a fact of the iOS DEVICE: the
  * iOS adapter reports it with the screen (`DeviceScreen.statusBand`,
  * ios.ts#viewport) and interact/ only reads it — the one source of truth.
- * Android reports its own since 2026-10-12, read off the device rather than
- * a table (android-wm.ts#parseStatusBand).
+ * Android reports its own, read off the device rather than a table
+ * (android-wm.ts#parseStatusBand).
  */
 
 /**
@@ -61,7 +62,7 @@ const IOS_SAFE_AREA_TOPS: Readonly<Record<string, number>> = {
  * was not measured on, and a point in the top 20 pt, which every status bar
  * takes, is still caught. Residual, stated: on such a screen (an iPhone Air,
  * a Dynamic Island model newer than the table) a point between 20 pt and
- * its real inset is judged on screen, as before the band existed.
+ * its real inset is judged on screen.
  */
 export const IOS_MIN_STATUS_BAND = 20;
 

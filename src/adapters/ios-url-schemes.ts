@@ -1,7 +1,7 @@
 /**
- * Which app a deep link names (D49a, 2026-11-02; ADR 0032's D49a amendment): the URL's scheme, and the schemes an
- * app declares in its Info.plist's `CFBundleURLTypes`. `simctl appinfo` and `simctl listapps` carry no URL types
- * (measured on the lab simulator, iOS 27.0); the app's own Info.plist does, read on the host with
+ * Which app a deep link names (ADR 0032's D49a amendment): the URL's scheme, and the schemes an app declares in its
+ * Info.plist's `CFBundleURLTypes`. `simctl appinfo` and `simctl listapps` carry no URL types (measured on the lab
+ * simulator, iOS 27.0); the app's own Info.plist does, read on the host with
  * `plutil -extract CFBundleURLTypes json -o - <Path>/Info.plist` — measured on the lab app:
  *
  *     [{"CFBundleURLName":"dev.averi.lab","CFBundleURLSchemes":["averilab"]}]
@@ -26,7 +26,7 @@ export const isWebScheme = (scheme: string): boolean => scheme === 'http' || sch
 
 /**
  * iOS's own schemes — handled by a system app (Phone, Mail, Messages, FaceTime, Maps, the App Store, Settings,
- * Shortcuts), never by the project's app — so a link to one costs no lookup at all (review of D49a). Small on purpose:
+ * Shortcuts), never by the project's app — so a link to one costs no lookup at all. Small on purpose:
  * a scheme missing here costs one cached lookup per bundle, never a wrong wait (the lookup then finds it undeclared).
  * `x-apple-*` is Apple's private family (`x-apple-health`, `x-apple-reminderkit`, …).
  */

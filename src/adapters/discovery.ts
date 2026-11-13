@@ -8,19 +8,16 @@ import type { Device, Platform } from './types.js';
 
 /**
  * Which devices a platform has — a question about the PLATFORM, not about a
- * device, so it is not a member of the bound DeviceAdapter (2026-10-08, the
- * iOS adapter stack review's candidate 1). Until then `listDevices()` sat on
- * the adapter interface, and both adapters carried an "unbound" mode for it
- * that the registry used for nothing else: an IosAdapter without a udid
- * (simctl's `booted` alias, a lazily resolved UDID for idb, a uiTree() that
- * refused, a `<udid>` placeholder in a reboot hint) and an AndroidAdapter
- * without a serial (adb with no `-s`, a "the default adb device" wording, a
- * "more than one device" diagnosis `adb -s <serial> get-state` never
- * returns). The registry built one such probe adapter per probe. Now the
+ * device, so it is not a member of the bound DeviceAdapter. On the adapter
+ * interface it would need an "unbound" mode in both adapters that the
+ * registry uses for nothing else: an IosAdapter without a udid (simctl's
+ * `booted` alias, a lazily resolved UDID for idb, a uiTree() that refuses, a
+ * `<udid>` placeholder in a reboot hint) and an AndroidAdapter without a
+ * serial (adb with no `-s`, a "the default adb device" wording, a "more than
+ * one device" diagnosis `adb -s <serial> get-state` never returns). So the
  * registry has two dependencies — this module's `DeviceDiscovery` (at the
  * end: the listings below, and the bound device's check) and the factory of
- * bound adapters, whose device id is a constructor invariant — and the
- * unbound mode is gone.
+ * bound adapters, whose device id is a constructor invariant.
  *
  * Plain functions over an `ExecFn`, like the adapters: the tests hand them a
  * fake exec, and the registry's tests hand `discoveryOver` a fake listing.
@@ -33,9 +30,8 @@ interface AdbStateRow {
 }
 
 /**
- * THE adb states averi lists, one row each (code review S8: until then the
- * listing and `androidUnusable` each switched on the state) — the line
- * pattern is built from its keys.
+ * THE adb states averi lists, one row each — the line pattern is built from
+ * its keys.
  */
 const ADB_STATES: Readonly<Record<'device' | 'offline' | 'unauthorized', AdbStateRow>> = {
   device: { state: 'booted' },
@@ -63,14 +59,14 @@ const ADB_LINE = new RegExp(`^(\\S+)\\s+(${Object.keys(ADB_STATES).join('|')})\\
 /**
  * What a listing is asked for beyond which devices exist and in what state.
  * `versions: false` leaves every OS version `unknown` — on Android it skips
- * the getprop per attached device; on iOS the version comes free with the
- * listing (the runtime key), so the flag changes nothing there. Default: the
- * versions are read.
+ * the getprop per device in adb's `device` state; on iOS the version comes
+ * free with the listing (the runtime key), so the flag changes nothing
+ * there. Default: the versions are read.
  *
- * Why the flag (D13, 2026-10-31): the bound device's per-call check
- * (`discoveryOver`, asked by mcp/registry.ts#get) asks only "is it still
- * booted?", and a getprop is a full `adb shell` round trip — ≈30–35 ms, up
- * to ~70 ms, per attached device, on every tool call
+ * Why the flag: the bound device's per-call check (`discoveryOver`, asked by
+ * mcp/registry.ts#get) asks only "is it still booted?", and a getprop is a
+ * full `adb shell` round trip — ≈30–35 ms, up to ~70 ms, per device in
+ * adb's `device` state, on every tool call
  * (docs/plans/2026-10-30-performance-backlog.md, D13 note (2026-10-31,
  * averi_lab API 33)) — for a version only select_device's reply and the
  * device listing show. Those two still ask for it.
@@ -82,20 +78,19 @@ export interface ListOpts {
 /**
  * `adb devices -l`, then `getprop ro.build.version.release` on each device
  * adb calls `device` (an offline or unauthorized one cannot answer; its
- * version is `unknown`). The getprop's argv is adb-shell.ts#adbShellArgv's,
- * the one builder AndroidAdapter's `shell` uses too — every word quoted, even
- * words that need no quoting.
+ * version is `unknown`). The getprop's argv is adb-shell.ts#adbShellArgv's —
+ * every word quoted, even words that need no quoting.
  *
- * `versions: false` (D13, 2026-10-31) lists from `adb devices -l` alone —
- * why, and what it saves, is on `ListOpts`.
+ * `versions: false` lists from `adb devices -l` alone — why, and what it
+ * saves, is on `ListOpts`.
  *
- * `unauthorized` is listed since 2026-10-09 (C5): until then its line did not
- * match, so a phone waiting on its "Allow USB debugging?" prompt vanished and
- * every tool said "No booted Android emulator/device found". Its line shape
- * (`<serial>  unauthorized [usb:…] transport_id:N`, no model) is adb's client
- * source, NOT measured on a device. adb's other states (`authorizing`,
- * `connecting`, `no permissions (…)`, `recovery`, `sideload`, `bootloader`,
- * …) are still left out — unmeasured, and not asked for.
+ * `unauthorized` is listed so that a phone waiting on its "Allow USB
+ * debugging?" prompt does not vanish behind "No booted Android
+ * emulator/device found". Its line shape (`<serial>  unauthorized [usb:…]
+ * transport_id:N`, no model) is adb's client source, NOT measured on a
+ * device. adb's other states (`authorizing`, `connecting`, `no permissions
+ * (…)`, `recovery`, `sideload`, `bootloader`, …) are left out — unmeasured,
+ * and not asked for.
  */
 export async function listAndroidDevices(exec: ExecFn = defaultExec, opts: ListOpts = {}): Promise<Device[]> {
   const versions = opts.versions ?? true;
@@ -138,11 +133,9 @@ export function androidUnusable(device: Device): string | undefined {
 }
 
 /**
- * `xcrun simctl list devices --json` through xcode-env.ts#simctl, the one
- * spelling of a simctl call the iOS adapter uses too (under the DEVELOPER_DIR probe
- * WdaServer shares). Unavailable simulators (a
- * runtime that is not installed) are left out; the OS version is read from
- * the runtime key.
+ * `xcrun simctl list devices --json` through xcode-env.ts#simctl (under its
+ * DEVELOPER_DIR probe). Unavailable simulators (a runtime that is not
+ * installed) are left out; the OS version is read from the runtime key.
  */
 export async function listIosDevices(exec: ExecFn = defaultExec): Promise<Device[]> {
   const { stdout } = await simctl(exec, ['list', 'devices', '--json']);
@@ -184,11 +177,11 @@ const DEVICE_PLIST_BOOTED_STATE = '3';
  * default device set — `~/Library/Developer/CoreSimulator/Devices/<udid>/device.plist`
  * — without spawning simctl. `true` only when that file says so; `false`
  * means "cannot tell from the file", NOT "shut down": the caller then asks
- * simctl (`listIosDevices`), which words every refusal as before (D22).
+ * simctl (`listIosDevices`), which words every refusal.
  *
  * Why (D22, docs/plans/2026-10-30-performance-backlog.md, "iOS per-call
  * costs"): the bound device is checked on EVERY tool call (`discoveryOver`,
- * asked by mcp/registry.ts#get), and on iOS that was `xcrun simctl list
+ * asked by mcp/registry.ts#get), and on iOS a listing is `xcrun simctl list
  * devices --json` — ~110 ms in the D0 windows on the lab iPhone 17
  * (iOS 27.0), 80 ms timed alone on an idle host (2026-10-31) — for one bit.
  * This read and parse: 0.045 ms median, 0.09 ms p95, ~0.4 ms cold, over
@@ -205,9 +198,9 @@ const DEVICE_PLIST_BOOTED_STATE = '3';
  * each appear exactly once, the UDID is the one asked for, the state is
  * exactly `3`, and `isDeleted` is not true (`<true/>`, `<true />`). Anything
  * else — another state (Booting, Shutting Down), a missing or unreadable
- * file, garbage, another UDID — returns false, and
- * the cost is simctl's, as before. A future Xcode that changes the format
- * therefore costs time, not correctness.
+ * file, garbage, another UDID — returns false, and the cost is simctl's. A
+ * future Xcode that changes the format therefore costs time, not
+ * correctness.
  *
  * The device set: averi never passes simctl `--set`, and neither simctl nor
  * CoreSimulator (strings of both, 2026-10-31) reads a device-set override
@@ -225,7 +218,7 @@ const DEVICE_PLIST_BOOTED_STATE = '3';
  * - A booted simulator whose runtime became unavailable (the runtime
  *   deleted, or an xcode-select / DEVELOPER_DIR switch to an Xcode without
  *   it) still reads 3 here, where `listIosDevices` drops it
- *   (`isAvailable: false`) and the registry said "no longer booted".
+ *   (`isAvailable: false`) and the registry would say "no longer booted".
  * In both the verb's own simctl or idb call fails with its own error, as
  * when a device dies mid-call today — the registry's "no longer booted"
  * wording is not given for it. That is the trade.
@@ -254,15 +247,13 @@ export async function iosBootedFromDevicePlist(udid: string, read: ReadText = re
 /**
  * What a bound device's check found. Unusable carries `listed`, the first
  * listing entry with the device's id (undefined: not listed at all), for the
- * refusal's wording (mcp/registry.ts words it).
+ * refusal's wording.
  */
 export type BoundCheck = { usable: true } | { usable: false; listed: Device | undefined };
 
 /**
  * Which devices a platform has, and whether the bound one is still usable —
- * the registry's second dependency beside the factory of bound adapters
- * (2026-10-08, the iOS adapter stack review's candidate 1; `check` since A3,
- * 2026-11-01).
+ * the registry's second dependency beside the factory of bound adapters.
  */
 export interface DeviceDiscovery {
   /** Every device on the platform, booted or not. `versions: false` leaves versions `unknown` (D13, `ListOpts`); on iOS it changes nothing. */
@@ -284,13 +275,13 @@ export type BootedProof = (udid: string) => Promise<boolean>;
  *    ~110 ms a call (D22; what the file cannot prove, and the trade:
  *    docs/adr/0031-the-bound-simulator-is-proven-booted-from-its-own-record.md).
  *    Not proven — false, or a proof that throws or rejects — is "cannot
- *    tell", never "shut down": step 2 decides, as before. Android has no such
- *    proof and never asks it; a discovery built without one never proves, so
- *    no host file is read by omission.
+ *    tell", never "shut down": step 2 decides. Android has no such proof and
+ *    never asks it; a discovery built without one never proves, so no host
+ *    file is read by omission.
  * 2. The listing, without versions (D13: the check reads ids and states, and
- *    on Android a version is a getprop per attached device). Every entry with
- *    the id counts — cheap phones can share a serial, and any booted entry
- *    keeps the device usable, as before the C5 refusals.
+ *    on Android a version is a getprop per device in adb's `device` state).
+ *    Every entry with the id counts — cheap phones can share a serial, and
+ *    any booted entry keeps the device usable.
  */
 export function discoveryOver(listing: DeviceDiscovery['list'], iosBooted?: BootedProof): DeviceDiscovery {
   const proven = async (udid: string): Promise<boolean> => {

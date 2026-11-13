@@ -25,9 +25,9 @@ export interface Device {
 }
 
 /**
- * Screen size in the platform's own tree units — see `DeviceAdapter.viewport`,
- * which is the one place that reads it. Named here rather than in verify/ so
- * the reading and every use of it share a definition.
+ * Screen size in the platform's own tree units — see `DeviceAdapter.viewport`.
+ * Named here rather than in verify/ so the reading and every use of it share a
+ * definition.
  */
 export interface DeviceScreen {
   width: number;
@@ -80,10 +80,7 @@ export interface DeviceScreen {
 
 /**
  * A screen size that can be divided by, or swiped in: finite and positive on
- * both axes. The one spelling of "this size is usable", read wherever a
- * size is: verify/scale.ts's witness, ui-tree/usable-screen.ts#usableScreenOf,
- * ui-tree/geometry.ts#windowTurnsScreen and interact/swipe.ts#screenBox's
- * refusal.
+ * both axes. The one spelling of "this size is usable".
  */
 export const usableSize = ({ width, height }: { width: number; height: number }): boolean =>
   Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0;
@@ -91,9 +88,7 @@ export const usableSize = ({ width, height }: { width: number; height: number })
 /**
  * A point in the platform's tree units (Android pixels, iOS points) — a tap
  * point, a swipe's end. Named here, beside the screen it lies on, because
- * `DeviceAdapter.swipe` takes it; the adapters, ui-tree's point helpers
- * (`tapPoint`, `containsPoint`, draw order's `drawnOverAt`) and interact/ all
- * name it here.
+ * `DeviceAdapter.swipe` takes it.
  */
 export interface Point {
   x: number;
@@ -135,10 +130,9 @@ export type ScrollAxis = 'vertical' | 'horizontal';
 
 /**
  * width × height, and 0 for anything degenerate — a zero rect (`zeroRect`),
- * a negative or NaN side. The one spelling of "has this rect an area": the
- * visible fraction and the bare-tree rule above this layer (ui-tree/
- * geometry.ts re-exports it), and the idb source's empty-tree check here
- * (ios-tree-source.ts), which may not import ui-tree/.
+ * a negative or NaN side. The one spelling of "has this rect an area", here
+ * below ui-tree/geometry.ts (which re-exports it): the adapters may not import
+ * ui-tree/.
  */
 export function rectArea(rect: Rect): number {
   if (!(rect.width > 0 && rect.height > 0)) return 0;
@@ -147,24 +141,20 @@ export function rectArea(rect: Rect): number {
 }
 
 /**
- * The centre of a rect as a tap presses it: each coordinate rounded to a whole unit, as every tap is sent.
- * ui-tree/selectors.ts#tapPoint is it of a node's rect, ui-tree/draw-order.ts#exposure of the piece a moved tap aims
- * at; here, below ui-tree/geometry.ts (which re-exports it), so the system-alert and chooser judges
- * (ios-system-alert.ts, android-chooser.ts) quote a button's centre with no second spelling.
+ * The centre of a rect as a tap presses it: each coordinate rounded to a whole unit, as every tap is sent. Here,
+ * below ui-tree/geometry.ts (which re-exports it), so the adapters quote a button's centre with no second spelling.
  */
 export const rectCentre = (r: Rect): Point => ({ x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) });
 
-/** A node's label when it has one that is not empty, else undefined — what the alert and chooser judges quote. */
 export const labelOf = (n: UiNode | undefined): string | undefined => (n?.label !== null && n?.label !== undefined && n.label !== '' ? n.label : undefined);
 
 /**
  * Exactly the same rect — x, y, width AND height; a resize is a change.
  * The pixel poll's rect confirmation (verify/pixel-poll.ts) asks it of two
  * consecutive tree reads; exact, because tree rects are whole points and
- * "nearly the same place" is the stale-crop case it exists to catch. The
- * WDA parser's text-echo rule (wda-source.ts#isTextEcho) asks it of a
- * StaticText and its one child; here, below ui-tree/geometry.ts (which
- * re-exports it), so adapters/ need no second spelling.
+ * "nearly the same place" is the stale-crop case it exists to catch. Here,
+ * below ui-tree/geometry.ts (which re-exports it), so adapters/ need no second
+ * spelling.
  */
 export function sameRect(a: Rect, b: Rect): boolean {
   return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
@@ -206,8 +196,8 @@ export function sameSizeWithinPixel(a: Rect, b: Rect): boolean {
 /**
  * Do two rects share any area at all? Positive area only: rects that merely
  * touch along an edge or at a corner — `a` ending at y=1285 where `b` begins —
- * do not overlap, and neither does a zero-area rect with anything. The pixel
- * poll's soft-keyboard check (verify/pixel-poll.ts) asks it:
+ * do not overlap, and neither does a zero-area rect with anything. The
+ * soft-keyboard reading's coverage check (ui-tree/keyboard-cover.ts) asks it:
  * an element any part of which lies under the keyboard is measured as the
  * keyboard, so ANY overlap counts there, and an element sitting flush on top
  * of the keyboard's frame is not under it. Both rects in the same units —
@@ -259,9 +249,7 @@ export const KEYBOARD_ROLE = 'keyboard';
  * SecureTextField, TextView; adapters/android-tree-dialect.ts: EditText,
  * AutoCompleteTextView and the Compose input that dumps as a focusable,
  * long-clickable scroll view). Defined beside UiNode, as KEYBOARD_ROLE is,
- * because the adapters write it and both ui-tree (draw-order.ts: a text
- * input's own scroll indicator and its label) and interaction (fill.ts acts
- * on it, fill-text.ts names it in the not-an-input caveat) read it,
+ * because the adapters write it and both ui-tree and interact/ read it,
  * imported from here directly.
  */
 export const INPUT_ROLE = 'textfield';
@@ -356,13 +344,12 @@ export interface UiNode {
    * when there is none, so trees that carry none are unchanged.
    *
    * `value` is NOT rewritten: a selector on `value:"Company"` and the
-   * ui_snapshot JSON read what the source reported, as before; the
-   * placeholder rides beside it (and ui_snapshot prints it, which is how a
-   * reader tells the empty field from the full one). The one reader that
-   * acts on it is interact/fill.ts, which counts a value EXACTLY equal to
-   * the placeholder as an empty field — so a real value equal to its own
-   * placeholder reads as empty there (the accepted cost: the tree cannot
-   * tell the two apart).
+   * ui_snapshot JSON read what the source reported; the placeholder rides
+   * beside it (and ui_snapshot prints it, which is how a reader tells the
+   * empty field from the full one). A fill (interact/fill-facts.ts#heldText)
+   * counts a value EXACTLY equal to the placeholder as an empty field — so a
+   * real value equal to its own placeholder reads as empty there (the
+   * accepted cost: the tree cannot tell the two apart).
    */
   placeholder?: string;
   /**
@@ -387,7 +374,7 @@ export interface UiNode {
    * Compose screen whose only node is an empty scroller would stop reading
    * bare (the unsafe direction for `absent:`, verdict.ts); `role:container`
    * and `role:scrollable` selectors written against today's trees would
-   * change what they match; and ui-tree/draw-order.ts's
+   * change what they match; and ui-tree/placed.ts's
    * CONTENT_FRAMED_ROLES would start excusing those frames. Absent on iOS:
    * WDA and idb report a node's frame unclipped — a row under the top bar
    * reads at y -48, past the frame (interact/course.ts#beyondFarEdge
@@ -418,9 +405,9 @@ export interface UiNode {
    * `horizontalScroll` as `HorizontalScrollView`, while a lazy list or grid, which carries collection info, keeps
    * `android.view.View` and a RecyclerView dumps no orientation — neither says) and WDA's `Table` (vertical:
    * adapters/wda-source.ts). Absent where the type does not say: a WDA `ScrollView` or `CollectionView` — on a tree of
-   * unclipped frames its content's extent past its frame may say it instead (ui-tree/scroll-containers.ts#scrollAxis,
-   * the one reader) — and every idb node (its flat list lists no scroll view). Never on a text input (a Compose text
-   * field with scroll semantics dumps as a scroll view too). Read by `scroll_until`'s stroke plan
+   * unclipped frames its content's extent past its frame may say it instead (ui-tree/scroll-containers.ts#scrollAxis)
+   * — and every idb node (its flat list lists no scroll view). Never on a text input (a Compose text field with scroll
+   * semantics dumps as a scroll view too). Read by `scroll_until`'s stroke plan
    * (interact/stroke-plan.ts): a stroke goes over a scroll view that scrolls on its axis, and its path keeps off a
    * nested one that scrolls only on the other.
    * docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md
@@ -563,7 +550,7 @@ export interface UiNode {
    * axis. A full-width row in a full-width list is not such a node: its scroll view ends at the screen's edge too. Read
    * as ui-tree/dialect.ts#TreeDialect.cutsAtScreen. A mark of the source, like `flatList`: ui-tree knows no platform.
    * Absent on WDA's trees (frames unclipped, `unclippedFrames`) and idb's flat list (no scroll view listed).
-   * docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md (its amendment "a side cut at the screen's edge")
+   * docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md (its amendment "a side uiautomator cut at the screen's edge")
    */
   boundsCutAtScreen?: true;
   /**
@@ -608,8 +595,8 @@ export interface UiNode {
    * `traits` naming `SecureTextField` or its `subrole` `AXSecureTextField` → true, traits printed naming neither →
    * false (idb types a secure field `TextField` too: the lab's `lab.form-basic.pin`,
    * adapters/ios-tree-source.ts#idbSecure). ABSENT is unknown, never plain: a node of another role, an input-like node
-   * of another one (an iOS search field reads `other`), a source or a dump that did not print it. The one reader: an
-   * Android fill's post-focus re-read is skipped for an empty input that says `false` (interact/fill.ts,
+   * of another one (an iOS search field reads `other`), a source or a dump that did not print it. An Android fill's
+   * post-focus re-read is skipped for an empty input that says `false` (interact/fill-landing.ts,
    * docs/adr/0028-a-fill-re-reads-after-focus-only-where-focus-can-change-the-count.md), and a field said plain that
    * reads as bullets then fails unless it shows exactly the typed length. A mark of the source, like `heading`:
    * ui-tree knows no platform. Printed by `ui_snapshot` only when `true` (mcp/tools.ts#snapshotJson).
@@ -626,18 +613,12 @@ export interface UiNode {
    * wrapper never roots one: WDA reports the form's `payee_name_input` row `0/0` with an invisible subtree too (it
    * lies below its form's ScrollView, undrawn — the standing's drawn frame, not this flag, judges that).
    *
-   * Its readers, all of them:
-   * - ui-tree/draw-order.ts's `hidden` row, in the `target` column only: such a node is no cover of a target unless, on
-   *   a tree whose source did not judge presented layers (`presentationsJudged`), it is the surface of a screen
-   *   presented over the target's by shape (ui-tree/presentation.ts#PresentedOver.surface, `inferred`); on a
-   *   judged tree a marked layer covers through its own cover instead. Through that column it reaches every caller of
-   *   `exposure`, `paintsOver` and `coversOf`: the tap's aim (interact/tap-judgement.ts), `scroll_until`'s standing and
-   *   the pixel assert's covers (ui-tree/standing.ts), the in-tree dismissal picker (interact/keyboard-in-tree.ts,
-   *   which still sees an excused hidden node in `Exposure.centreExcused`), and the uiautomator parser's strip question
-   *   (never met: only WDA sets the mark).
-   * - `ui_snapshot`, which prints it with the tree's JSON (mcp/tools.ts), so later device trees can be swept for it.
-   * Nothing else: a TARGET's own flag is never read (a target under a modal is `isVisible="0"` too), and selectors,
-   * asserts and the stroke box's `drawnOver` column are as before.
+   * In draw order (ui-tree/draw-order.ts's `hidden` row, in the `target` column only) such a node is no cover of a
+   * target unless, on a tree whose source did not judge presented layers (`presentationsJudged`), it is the surface of
+   * a screen presented over the target's by shape (ui-tree/presentation.ts#PresentedOver.surface, `inferred`); on a
+   * judged tree a marked layer covers through its own cover instead. A TARGET's own flag is not read there (a target
+   * under a modal is `isVisible="0"` too). `ui_snapshot` prints it with the tree's JSON (mcp/tools.ts), so later
+   * device trees can be swept for it.
    *
    * On EVERY node of the subtree, not only its root (unlike `ofKeyboard`): `ui_snapshot` with a filter prints the
    * matched nodes without their ancestors, and a filtered tab button must still say it is hidden. Absent, never false,
@@ -650,10 +631,9 @@ export interface UiNode {
    * `enabled="false"` (adapters/android-tree-dialect.ts#normalizeNode), WDA's `isEnabled` "0" or 0
    * (adapters/wda-source.ts#toUiNode), idb's `enabled: false` (adapters/ios-tree-source.ts#idbTree). Any other value —
    * the attribute missing, true, anything else — leaves it absent: absent is enabled OR unknown, never false (fail
-   * open). Read by a tap by selector alone, which still taps and warns in the MCP reply and the flow's trace
-   * (interact/tap.ts#DISABLED_TAP); printed by `ui_snapshot` with the tree's JSON. Selectors, asserts, draw order and
-   * the tap's judgement are as before: a disabled bar still covers. A mark of the source, like `heading`: ui-tree knows
-   * no platform.
+   * open). A tap by selector still taps and warns in the MCP reply and the flow's trace (interact/tap.ts#DISABLED_TAP);
+   * printed by `ui_snapshot` with the tree's JSON. Selectors, asserts, draw order and the tap's judgement do not read
+   * it: a disabled bar still covers. A mark of the source, like `heading`: ui-tree knows no platform.
    * docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md
    */
   disabled?: true;
@@ -693,13 +673,13 @@ export interface UiNode {
    * it, through the whole screen, whatever the frames around it; its own nodes are not beneath it (a popover's dismiss
    * region, an alert's buttons are reached).
    *
-   * Its readers, all of them:
-   * - ui-tree/presentation.ts#markOf, the one reading of it in code (with `presentationElement`; the presentation
-   *   module's marks adapter, `byMarks`): a typed layer's element, when its rect has area on the screen (never judged
-   *   by `hidden`), is that layer's ONE cover through the whole screen; a `screen` layer reaches the whole screen and
-   *   its own nodes stay covers, each a presented surface (presentation.ts#PresentedOver, which draw order reads for
-   *   each cover's `presented` flag, cover.ts#Cover, `presentedAt`, `presentedOver`, `markedAt`); the module hands the mark on as `MarkedLayer`
-   *   (its kind and label, presentation.ts#Presentation.press) — to the standing's remedy
+   * How it is read:
+   * - ui-tree/presentation.ts#markOf (with `presentationElement`; the presentation module's marks adapter, `byMarks`):
+   *   a typed layer's element, when its rect has area on the screen (never judged by `hidden`), is that layer's ONE
+   *   cover through the whole screen; a `screen` layer reaches the whole screen and its own nodes stay covers, each a
+   *   presented surface (presentation.ts#PresentedOver, which draw order reads for each cover's `presented` flag,
+   *   cover.ts#Cover, `presentedAt`, `presentedOver`, `markedAt`); the module hands the mark on as `MarkedLayer` (its
+   *   kind and label, presentation.ts#Presentation.press) — to the standing's remedy
    *   (ui-tree/remedy-text.ts#presentedRemedy: "an alert is presented over it ("Exit confirmation")") and to
    *   `scroll_until`'s stroke (interact/scroll-rounds.ts), never the node itself.
    * - `ui_snapshot`, which prints it with the tree's JSON (mcp/tools.ts), so later device trees carry it.
@@ -710,7 +690,7 @@ export interface UiNode {
   /**
    * Set on the ELEMENT that names a layer marked by type (`presentation` `alert`, `actionSheet` or `popover`): the
    * `Alert`, the `Sheet` or the `Popover` itself — its label is the layer's in the remedy, its rect where the layer
-   * is named; the layer's one cover. Read only with `presentation`, by ui-tree/presentation.ts#markOf; printed by
+   * is named; the layer's one cover. Read with `presentation` (ui-tree/presentation.ts#markOf); printed by
    * `ui_snapshot`.
    */
   presentationElement?: true;
@@ -727,11 +707,9 @@ export interface UiNode {
 }
 
 /**
- * Every node under `root`, pre-order, the root first. The one tree walk:
- * field-error pairing feeds WDA's nested tree to its flat rule with it, the
- * text hint flattens with it, ui_snapshot's note counts with it. It lives
- * beside UiNode rather than in a verify/ or adapters/ sibling because all
- * three layers need it and none owns it. It yields nodes
+ * Every node under `root`, pre-order, the root first. The one tree walk. It
+ * lives beside UiNode rather than in a verify/ or adapters/ sibling because
+ * every layer that walks a tree needs it and none owns it. It yields nodes
  * only: a walk that needs each node's subtree end in the order
  * (ui-tree/draw-order.ts) or what its ancestors hand down
  * (ui-tree/geometry.ts#clipsOf) recurses on its own.
@@ -1004,7 +982,7 @@ export type AppHolder =
  * SpringBoard tree lasted ~2 s after `launch_app` returned. The once-over-2 s case can outlast it — the note is then
  * the honest outcome, rather than a longer wait that every never-matching launch (a localized name) would pay.
  *
- * Here, not in ios-foreground.ts, since A16: the launch_app and open_deep_link descriptions quote it
+ * Here, not in ios-foreground.ts: the launch_app and open_deep_link descriptions quote it
  * (mcp/tools.ts#FOREGROUND_BUDGET), and mcp/ imports no platform module outside its composition root (mcp/registry.ts;
  * tests/architecture/layering.test.ts). The interface module is the one both may read.
  */
@@ -1018,11 +996,11 @@ export const FOREGROUND_WAIT_MS = 3_000;
 export const WDA_READY_TIMEOUT_MS = 60_000;
 
 /**
- * Android's chooser a link or a `-p` launch waits behind (D55, D55b, adapters/android-chooser.ts; the name is D55's, kept
- * through A10 as `LinkAlert`'s is): its component as the window manager names
- * it (`android/com.android.internal.app.ResolverActivity`), and, since D55c, `sheet`: what its tree shows, read once
- * the component named it (android-chooser.ts#chooserSheet; ADR 0041's D55c amendment). No `sheet` when the dump
- * failed or was not the measured layout: the reply is then D55's, by the component alone.
+ * Android's chooser a link or a `-p` launch waits behind (D55, D55b, adapters/android-chooser.ts; the name is D55's,
+ * kept through A10 as `LinkAlert`'s is): its component as the window manager names it
+ * (`android/com.android.internal.app.ResolverActivity`), and `sheet`: what its tree shows, read once the component
+ * named it (android-chooser.ts#chooserSheet; ADR 0041's D55c amendment). No `sheet` when the dump failed or was not the
+ * measured layout: the reply is then D55's, by the component alone.
  */
 export interface LinkChooser {
   component: string;
@@ -1077,11 +1055,10 @@ export interface LinkAlert extends SystemAlert {
 }
 
 /**
- * What a deep link is opened with (D49a, 2026-11-02). `appId`: the project's app (averi.yaml's `app.ios.bundleId` —
- * open_deep_link passes it on iOS). On iOS, when the link's scheme is one that app declares (its Info.plist's
- * CFBundleURLTypes), the link is expected to bring it forward, and openDeepLink waits for that as a launch does
- * (adapters/ios-foreground.ts); without it, or for any other link, nothing is expected and nothing is read. Android
- * ignores it.
+ * What a deep link is opened with (D49a). `appId`: the project's app (averi.yaml's `app.ios.bundleId` — open_deep_link
+ * passes it on iOS). On iOS, when the link's scheme is one that app declares (its Info.plist's CFBundleURLTypes), the
+ * link is expected to bring it forward, and openDeepLink waits for that as a launch does (adapters/ios-foreground.ts);
+ * without it, or for any other link, nothing is expected and nothing is read. Android ignores it.
  */
 export interface DeepLinkOptions {
   appId?: string;
@@ -1114,16 +1091,15 @@ export type FocusedWindow =
   | { readonly of: 'unknown' };
 
 /**
- * A UI tree read failure that no wait cures (D21, 2026-10-31) — what `uiTree()` throws when the device's own state
- * makes every later read fail the same way until something outside averi's reach is done to it (the error says what).
- * Every other read error is a poll miss (ui-tree/read-tree.ts#readTreeOrMiss: a device still launching, a tree
- * momentarily unproducible), and the loops that wait on a tree read past it until their deadline. This one they do
- * not — the read seam throws it (docs/adr/0036-a-read-failure-no-wait-cures-is-thrown-by-the-read-seam.md) — and the
- * flow engine's ladder neither escalates past it nor re-runs rungs on it (engine.ts#isTerminal), because a re-read, a relaunch or a
+ * A UI tree read failure that no wait cures (D21) — what `uiTree()` throws when the device's own state makes every
+ * later read fail the same way until something outside averi's reach is done to it (the error says what). Every other
+ * read error is a poll miss (ui-tree/read-tree.ts#readTreeOrMiss: a device still launching, a tree momentarily
+ * unproducible), and the loops that wait on a tree read past it until their deadline. This one they do not — the read
+ * seam throws it (docs/adr/0036-a-read-failure-no-wait-cures-is-thrown-by-the-read-seam.md) — and the flow engine's
+ * ladder neither escalates past it nor re-runs rungs on it (engine.ts#isTerminal), because a re-read, a relaunch or a
  * re-run reach flow cannot end it, and polling it to a deadline only spends the budget (D20's device run: a
- * `scroll_until` made 133 failing reads over 90 s and then said so). The one subclass today is the idb tree source's
- * IdbNoFrontmostError (ios-tree-source.ts). A base class here, beside the adapter contract, so the read loops ask
- * "does this heal?" without knowing which platform said no.
+ * `scroll_until` made 133 failing reads over 90 s and then said so). A base class here, beside the adapter contract, so
+ * the read loops ask "does this heal?" without knowing which platform said no.
  */
 export class PersistentReadError extends Error {}
 
@@ -1191,15 +1167,14 @@ export interface DeviceAdapter {
    * Pollers leave it off — their interval already is the retry.
    *
    * A failed read throws; the read loops above treat that as a miss and read
-   * again (ui-tree/read-tree.ts#readTreeOrMiss) — except a PersistentReadError
-   * (above, D21: a failure no wait cures, idb's wedged accessibility service),
-   * on which every read loop stops at once, and which the flow
-   * engine treats as terminal — a flow's `assert:` step included. The one
-   * place it becomes a value is an assert whose caller asked for that
-   * (VerifierOptions.persistentRead: 'fail' — a `verify` leg and the MCP
-   * `assert` tool only): a failing result with its message. An adapter throws
-   * one only for a state that a re-read, a relaunch or a re-run reach flow
-   * cannot end.
+   * again (ui-tree/read-tree.ts#readTreeOrMiss) — except a
+   * PersistentReadError (above, D21: a failure no wait cures, idb's wedged
+   * accessibility service), on which every read loop stops at once, and which
+   * the flow engine treats as terminal — a flow's `assert:` step included.
+   * The one place it becomes a value is an assert whose caller asked for that
+   * (VerifierOptions.persistentRead: 'fail'): a failing result with its
+   * message. An adapter throws one only for a state that a re-read, a
+   * relaunch or a re-run reach flow cannot end.
    */
   uiTree(opts?: { settle?: boolean }): Promise<UiNode>;
 
@@ -1275,14 +1250,12 @@ export interface DeviceAdapter {
    * user taps it). Set only by an adapter WITHOUT the oracle,
    * quoted verbatim — in parentheses, after "this adapter cannot hide it on
    * its own" (`ui-tree/soft-keyboard.ts#cannotHide`, the one phrase: the
-   * advice is what DOES work) — by the refusals in interact/keyboard-in-tree.ts,
-   * interact/tap-judgement.ts, interact/scroll-text.ts and
-   * verify/pixel-poll.ts, which own the generic halves of their sentences
-   * and no platform fact. The adapter owns it because its facts are the
-   * platform's — which key submits, which endpoint fails, which config key
-   * names the measured dismissal — and the layers above are
-   * platform-agnostic (ARCHITECTURE.md §2). Absent, the refusal says only
-   * that the adapter cannot hide it on its own.
+   * advice is what DOES work) — by the refusals above this layer, which own
+   * the generic halves of their sentences and no platform fact. The adapter
+   * owns it because its facts are the platform's — which key submits, which
+   * endpoint fails, which config key names the measured dismissal — and the
+   * layers above are platform-agnostic (ARCHITECTURE.md §2). Absent, the
+   * refusal says only that the adapter cannot hide it on its own.
    */
   readonly keyboardAdvice?: string;
   /**
@@ -1329,7 +1302,7 @@ export interface DeviceAdapter {
    * settle (interact/resolve.ts#resolveSettled, "the same rect on two consecutive reads") runs at when its caller
    * pins none (resolve.ts#settleCadence). It claims that two SNAPSHOTS about this far apart — reads starting this far
    * apart, the pause being ui-tree/read-tree.ts#pauseAfterRead — do not show a moving element at one rect, on this
-   * source's motions. Absent: DEFAULT_POLL_MS (500), the cadence the settle always ran at.
+   * source's motions. Absent: DEFAULT_POLL_MS (500).
    *
    * A measurement, never a judgement (docs/adr/0040-the-settle-cadence-is-the-tree-sources.md): a value is set only
    * from a measured run of that source (back-to-back reads through real motions, the settle replayed at each
@@ -1350,8 +1323,7 @@ export interface DeviceAdapter {
    * The characters `typeText` can type (adapters/typeable.ts#Typeable, docs/adr/0037-a-value-the-adapter-cannot-type-
    * is-refused-before-any-device-call.md) — the platform's fact, so the adapter's, and REQUIRED: an adapter that does
    * not say what it types cannot be written. interact/type-text.ts#assertTypeable refuses a value holding any other
-   * character before any device call (no tap, no clear, nothing typed): the fill, the type_text tool and the flow's
-   * `type:` and `fill:` steps. Data, not a method (typeable.ts says why).
+   * character before any device call (no tap, no clear, nothing typed). Data, not a method (typeable.ts says why).
    */
   readonly typeable: Typeable;
   /**
@@ -1365,7 +1337,7 @@ export interface DeviceAdapter {
   /**
    * Whether this adapter's tree source fell back from the backend it was configured for — an iOS `treeSource: auto`
    * adapter whose WebDriverAgent did not come up (A41a). The one signal for it: `claimNote` is the words, this the
-   * fact — mcp/registry.ts#select drops such an adapter, and IosAdapter.typeText refuses by it. Absent: never.
+   * fact. Absent: never.
    */
   readonly fellBack?: boolean;
   /**
@@ -1390,17 +1362,16 @@ export interface DeviceAdapter {
   /** logcat / os_log excerpt for crash detection. */
   logs(sinceMs: number): Promise<string[]>;
 
-  /** Is the app process currently running? Used for appAlive crash detection. */
   isAppRunning(appId: string): Promise<boolean>;
 
   /**
-   * Release device-bound resources the adapter lazily started (today: the
-   * WdaServer behind the iOS wda tree source). Optional and idempotent. Two callers: the registry when it
-   * evicts an adapter (a rebind must not leak a server driving the old
-   * device), and the process shutdown, which AWAITS it — so a returned promise
-   * must resolve when the resource is actually released, not when the release
-   * was queued. It may reject; both callers swallow the rejection, since the
-   * adapter is gone either way.
+   * Release device-bound resources the adapter started (on iOS the WdaServer
+   * behind the wda tree source, and the idb helper). Optional and idempotent.
+   * Two callers: the registry when it evicts an adapter (a rebind must not
+   * leak a server driving the old device), and the process shutdown, which
+   * AWAITS it — so a returned promise must resolve when the resource is
+   * actually released, not when the release was queued. It may reject; both
+   * callers swallow the rejection, since the adapter is gone either way.
    */
   dispose?(): void | Promise<void>;
 }

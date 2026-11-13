@@ -2,25 +2,17 @@ import { ExecError, type ExecResult } from './exec.js';
 
 /**
  * "Did the device start anything?" — the one owner of reading a start
- * command's result (2026-10-07, the Android adapter review's candidate 2).
+ * command's result.
  *
  * Why this module exists. `adb shell` exiting 0 does not mean an activity
  * was started: the device commands that start one report a start that did
  * not happen in their OUTPUT, and `am start` still exits 0 when it does.
- * Until this module the knowledge lived in the adapter's private `amStart`,
- * whose interface was shaped for the launch's message (package, component,
- * intent), so the two other starts could not use it:
- * - openDeepLink sent `am start -a VIEW -d <url>` and reported success for a
- *   url nothing handles — measured by the review on emulator-5554 (API 33):
- *   exit 0 and an `Error: Activity not started …` line, and `open_deep_link`
- *   answered "Opened …";
- * - the launcher launch (`monkey -p <package> -c LAUNCHER 1`) did fail —
- *   measured the same day: exit 252 — but monkey prints its reason on
- *   STDOUT, and the ExecError's message carries only stderr, so the reason
- *   was dropped.
- * The earlier review (2026-10-04, C10) left the launch code in android.ts
- * with "revisit when openDeepLink shares amStart"; this is that revisit, not
- * a split of the file.
+ * Measured on emulator-5554 (API 33):
+ * - `am start -a VIEW -d <url>` for a url nothing handles: exit 0 and an
+ *   `Error: Activity not started …` line;
+ * - the launcher launch (`monkey -p <package> -c LAUNCHER 1`) failing: exit
+ *   252, but monkey prints its reason on STDOUT, and an ExecError's message
+ *   carries only stderr.
  *
  * The interface is one call: the command's argv and a function that sends
  * it. The argv's first words pick how its result is read (`am start` or
@@ -66,13 +58,10 @@ import { ExecError, type ExecResult } from './exec.js';
  * monkey before any event (exit 251, D73; ADR 0041's D73 amendment) and which
  * the launch's `--pct-… 0` flags keep from being reached (android.ts).
  *
- * What is NOT measured, written down here once (android.ts, the tests and
- * ARCHITECTURE.md point here): the exact text of monkey's line. The review
- * measured the exit and that the reason is on stdout, and did not quote it;
- * "** No activities found to run, monkey aborted." is the line in AOSP's
- * Monkey.java (getMainApps, printed with Logger.out — stdout; run() then
- * returns -4, which is the measured 252), and is the sample the tests use;
- * measured since, stdout, exit 252, with those flags (D73).
+ * monkey's line: "** No activities found to run, monkey aborted." is the
+ * line in AOSP's Monkey.java (getMainApps, printed with Logger.out —
+ * stdout; run() then returns -4, which is the measured 252), and is the
+ * sample the tests use; measured on stdout, exit 252, with those flags (D73).
  * Every diagnosis in that file starts `** `, but not all go to stdout: that
  * one is Logger.out, while `** Error: Unknown option …` (run() returns -1,
  * exit 255), `** Error: Unable to connect to activity manager …` (-3, exit
@@ -168,7 +157,6 @@ const READING: Record<StartCommand, { exit0IsVerdict: boolean; diagnosis: RegExp
   monkey: { exit0IsVerdict: true, diagnosis: MONKEY_DIAGNOSIS_LINE_RE, stdoutIntoFailure: true },
 };
 
-/** The start command an argv is, or undefined when it is none. */
 function startCommandOf(argv: readonly string[]): StartCommand | undefined {
   if (argv[0] === 'am' && argv[1] === 'start') return 'am start';
   if (argv[0] === 'monkey') return 'monkey';
@@ -215,11 +203,10 @@ export async function runStart(
  * A non-zero exit with no diagnosis is NOT read as a refusal — exit 255 is
  * also adb's own transport failure — but what the command printed to stdout
  * is kept: its last non-empty lines go onto the message of a NEW ExecError
- * with the same fields, the one that was thrown as its `cause`. Until the
- * 2026-10-07 code review the tail was appended to the thrown error's
- * `message`, after V8 had already written `stack`'s header from the old one,
- * so anything that logged the stack showed the failure without monkey's
- * reason. With no stdout to add, the error is thrown as it came.
+ * with the same fields, the one that was thrown as its `cause`. A new one,
+ * because V8 writes `stack`'s header when an error is made: a tail appended
+ * to the thrown error's `message` would leave a logged stack without
+ * monkey's reason. With no stdout to add, the error is thrown as it came.
  */
 function withStdoutTail(error: ExecError, command: StartCommand): ExecError {
   const tail = error.stdout

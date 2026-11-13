@@ -26,7 +26,7 @@ import { IDB_TYPEABLE, idbTypingRefusal, typingPathOf, WDA_TYPEABLE } from './io
 
 /**
  * How long uiTree({ settle: true }) waits before its one re-read of an idb
- * tree that came back empty (2026-10-08). One second because that is where
+ * tree that came back empty. One second because that is where
  * the measurements put the line: on a simulator whose idb was healthy all 10
  * launches had a tree with area at +1 s (0 of 30 reads empty at +1/+5/+15 s,
  * docs/bugs/2026-10-06-wda-read-wakes-stuck-idb-tree.md, I4), and
@@ -56,8 +56,8 @@ const idbCaptureRemedy = (reboot?: string): string =>
 const capitalized = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
 
 /**
- * `AVERI_IOS_SCREENSHOT=simctl`: every iOS screenshot through `simctl io screenshot`, as before D26b (SETUP.md,
- * troubleshooting). Read once per adapter, when it is made.
+ * `AVERI_IOS_SCREENSHOT=simctl`: every iOS screenshot through `simctl io screenshot` (SETUP.md, troubleshooting). Read
+ * once per adapter, when it is made.
  */
 export function iosScreenshotViaSimctl(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.AVERI_IOS_SCREENSHOT === 'simctl';
@@ -65,8 +65,8 @@ export function iosScreenshotViaSimctl(env: NodeJS.ProcessEnv = process.env): bo
 
 /**
  * How long a typing into an app seen dropping a tail waits after its first character, before the rest in one burst
- * (D24, docs/adr/0023-fill-types-a-dropped-tail-again.md, amendment 2026-10-31; lowered 150 → 50 ms by D25, the same
- * ADR's D25 amendment). Measured 2026-10-31 on the lab simulator (iPhone 17, iOS 27.0), `Jan Novak Bratislava` or its
+ * (D24, docs/adr/0023-fill-types-a-dropped-tail-again.md, amendment 2026-10-31; 50 ms, not 150, by the same ADR's D25
+ * amendment). Measured 2026-10-31 on the lab simulator (iPhone 17, iOS 27.0), `Jan Novak Bratislava` or its
  * prefixes typed into AveriLabRN's `rn-field` (React Native 0.88's controlled single-line TextInput), read back from
  * the app's state file (the scripts and the figures: docs/plans/2026-10-30-performance-backlog.md, "### D7 and D24
  * measured" and "### D25 diag").
@@ -169,8 +169,7 @@ function appKey(front: FrontApp): AppKey | undefined {
  * idb's describe-all or WebDriverAgent's /source, chosen by the registry from
  * averi.yaml). Everything idb-specific for INPUT stays in the `idb*` methods;
  * the tree read belongs to the source, so swapping the tree backend touches
- * no line of this class (ARCHITECTURE.md §3, §10). Until 2026-10-02 the
- * adapter dispatched on a `treeSource` flag and owned the WdaServer itself.
+ * no line of this class (ARCHITECTURE.md §3, §10).
  */
 export class IosAdapter implements DeviceAdapter {
   readonly platform = 'ios' as const;
@@ -201,7 +200,7 @@ export class IosAdapter implements DeviceAdapter {
   /** The simulator's idb helper (D7a, idb-helper.ts) — owned here: dispose() kills it. */
   private readonly idbHelper: IdbHelper | undefined;
   /**
-   * Where screenshot() captures: `idb` (D26b; on the WDA tree source too since D44, ADR 0032 amendment) — the helper
+   * Where screenshot() captures: `idb` (D26b; on the WDA tree source too, ADR 0032's D44 amendment) — the helper
    * first, the `idb` CLI as its fallback — and `simctl` under AVERI_IOS_SCREENSHOT=simctl. Fixed for the adapter's
    * life: one source for every frame (types.ts#DeviceAdapter.screenshot).
    */
@@ -216,23 +215,21 @@ export class IosAdapter implements DeviceAdapter {
 
   constructor(opts: {
     /**
-     * The simulator this adapter drives — required (2026-10-08): listing
-     * simulators is discovery.ts's, not an adapter's, so there is no unbound
-     * adapter any more, and with it went simctl's `booted` alias and the
-     * lazy `simctl list` that resolved a UDID for idb (which rejects the
-     * alias).
+     * The simulator this adapter drives — required: listing simulators is
+     * discovery.ts's, not an adapter's, and idb rejects simctl's `booted`
+     * alias.
      */
     udid: string;
     exec?: ExecFn;
     /**
      * Where uiTree() reads from. Injected, not defaulted: both sources need
      * the concrete UDID (idb rejects simctl's `booted` alias, WDA builds
-     * `-destination id=`), and the registry is the one caller that has it.
+     * `-destination id=`).
      */
     treeSource: IosTreeSource;
     /**
      * The simulator's idb helper (D7a), the same one the tree source was handed. Every idb call is offered to it
-     * (runIdb decides which it serves: `ui describe-all`, and since D7b every HID argv this adapter sends — a death under
+     * (runIdb decides which it serves: `ui describe-all`, and every HID argv this adapter sends (D7b) — a death under
      * an input is reported, not retried); this adapter owns it and disposes it.
      */
     idbHelper?: IdbHelper;
@@ -244,7 +241,6 @@ export class IosAdapter implements DeviceAdapter {
     this.screenshotVia = iosScreenshotViaSimctl() ? 'simctl' : 'idb';
   }
 
-  /** `xcrun simctl` under the DEVELOPER_DIR probe shared with WdaServer — see xcode-env.ts. */
   private simctl(args: string[], timeoutMs?: number) {
     return simctl(this.exec, args, timeoutMs);
   }
@@ -271,13 +267,11 @@ export class IosAdapter implements DeviceAdapter {
 
   /**
    * The source's read, and with `settle` (DeviceAdapter.uiTree — a one-shot
-   * caller, `ui_snapshot` today) one bounded retry of an idb read that came
-   * back with no tree: IdbEmptyTreeError, once, after IDB_EMPTY_RETRY_MS —
-   * Android's null-root retry (android.ts), for iOS's own launch transient.
-   * Until 2026-10-08 `settle` was ignored here on the belief that neither idb
-   * nor WDA had a "no window yet" transient; the round-3 device check
-   * (docs/plans/2026-10-08-round3-phase2-device-check.md, finding 5)
-   * falsified it for idb: a single `ui_snapshot` 0.4 s after launch_app read
+   * caller) one bounded retry of an idb read that came back with no tree:
+   * IdbEmptyTreeError, once, after IDB_EMPTY_RETRY_MS — Android's null-root
+   * retry (android.ts), for iOS's own launch transient. The round-3 device
+   * check (docs/plans/2026-10-08-round3-phase2-device-check.md, finding 5)
+   * measured it on idb: a single `ui_snapshot` 0.4 s after launch_app read
    * the 0×0 Application that IdbEmptyTreeError names, a read 0.3 s later was a
    * bare tree, and the screen rendered within ~4 s. WDA has shown no such
    * shape, and its errors are not retried.
@@ -325,8 +319,6 @@ export class IosAdapter implements DeviceAdapter {
   dispose(): Promise<void> {
     return Promise.all([this.treeSource.dispose(), this.idbHelper?.dispose()]).then(() => undefined);
   }
-
-  // --- simctl-backed lifecycle ---
 
   async install(appPath: string): Promise<void> {
     // A reinstall can move the bundle container (a new GUID in Path) and rename the app or its executable: every
@@ -377,7 +369,10 @@ export class IosAdapter implements DeviceAdapter {
    * bundle's entry. An answer is cached when it carries a name or a Path — a name-less one with a Path too (appNames
    * throws on it from the cache: the launch's note says so without asking again); a failed call, or an answer with
    * neither (a format drift, maybe a bundle not installed), is asked again.
-   * Also what the foreground note's `ownerOf` searches (2026-10-09): a stale label that is another app's name from here is that app's tree, not a localized name. It holds only what this adapter looked up (an idb-source launch — WDA answers a bundle id and is never matched by name; a liveness check; this process), so an app never launched or checked through this server is not in it.
+   * Also what the foreground note's `ownerOf` searches: a stale label that is another app's name from here is that
+   * app's tree, not a localized name. It holds only the bundles this adapter asked appinfo for (a launch's foreground
+   * wait, a link's scheme lookup, a liveness check; this process), so an app never launched, linked to or checked
+   * through this server is not in it.
    */
   private readonly appInfoCache = new Map<string, AppInfo>();
 
@@ -406,10 +401,10 @@ export class IosAdapter implements DeviceAdapter {
   /**
    * The bundle's display names, from `simctl appinfo` — THROWS when the
    * call fails or lists neither name, and the foreground wait then says it
-   * could not check, quoting the first line (review 2026-10-09: appinfo's
-   * format is unmeasured, and a drift must not switch the check off
-   * unseen). Through appInfo's cache rule: a failed lookup, or one with
-   * neither a name nor a Path, is asked again on the next launch.
+   * could not check, quoting the first line (appinfo's format is unmeasured,
+   * and a drift must not switch the check off unseen). Through appInfo's
+   * cache rule: a failed lookup, or one with neither a name nor a Path, is
+   * asked again on the next launch.
    */
   private async appNames(bundleId: string): Promise<readonly string[]> {
     const { names } = await this.appInfo(bundleId);
@@ -546,15 +541,15 @@ export class IosAdapter implements DeviceAdapter {
    * for a link to a scheme the project's app (`opts.appId`) declares, launch's foreground wait (D49a,
    * ios-foreground.ts: iOS may ask "Open in …?" first, and `openurl` returns either way) — with a note whenever it did
    * not confirm the app, a WDA not up yet included; every other link — none given, `http(s)`, iOS's own schemes,
-   * another app's scheme, schemes that could not be read — expects no app and reads nothing of the UI after `openurl`,
-   * as before D49a. The scheme lookup runs first (D58: it decides the pre-approval, which must land before `openurl`):
-   * one `simctl appinfo` (shared with launch's cache) and one host `plutil` per bundle, cached until install() — a
-   * failed one too. For an own-scheme link the accessibility writes carry the scheme's pre-approval for simctl's opener
-   * (prepareForOpen, D58), so iOS should not ask "Open in “…”?" at all; every other link writes what it wrote before.
-   * `front` moves to the app only when the wait saw it in front. When iOS's system alert holds the link (D54), the
-   * answer names it instead of `unknown`: on idb from the wait's own reads, on WDA from one short `/source`
-   * read at the bound (IosTreeSource.systemAlert) — never a tap. A link no app on the simulator handles throws that
-   * fact (ios-link-failure.ts, D65); any other `openurl` failure is exec's error.
+   * another app's scheme, schemes that could not be read — expects no app and reads nothing of the UI after `openurl`.
+   * The scheme lookup runs first (D58: it decides the pre-approval, which must land before `openurl`): one `simctl
+   * appinfo` (shared with launch's cache) and one host `plutil` per bundle, cached until install() — a failed one too.
+   * For an own-scheme link the accessibility writes carry the scheme's pre-approval for simctl's opener
+   * (prepareForOpen, D58), so iOS should not ask "Open in “…”?" at all; every other link writes the accessibility keys
+   * alone. `front` moves to the app only when the wait saw it in front. When iOS's system alert holds the link (D54),
+   * the answer names it instead of `unknown`: on idb from the wait's own reads, on WDA from one short `/source` read at
+   * the bound (IosTreeSource.systemAlert) — never a tap. A link no app on the simulator handles throws that fact
+   * (ios-link-failure.ts, D65); any other `openurl` failure is exec's error.
    */
   async openDeepLink(url: string, opts: DeepLinkOptions = {}): Promise<AppHolder> {
     const approval = await this.linkHandler(url, opts.appId);
@@ -601,9 +596,9 @@ export class IosAdapter implements DeviceAdapter {
   /**
    * The schemes a bundle declares (its Info.plist's CFBundleURLTypes, lower-cased; ios-url-schemes.ts), per bundle
    * until install() — "declares none" included, and `undefined` for a plutil read that failed on a bundle whose
-   * appinfo named its Path (review of D49a: one lookup and one stderr line per bundle, not one per link). An appinfo
-   * failure, or no Path, is NOT cached, as appInfo's own rule (review round 2): the app may be installed later outside
-   * averi (Xcode, `simctl install` by hand), and every later own-scheme link would then reply a bare "Opened".
+   * appinfo named its Path (one lookup and one stderr line per bundle, not one per link). An appinfo failure, or no
+   * Path, is NOT cached, as appInfo's own rule: the app may be installed later outside averi (Xcode, `simctl install`
+   * by hand), and every later own-scheme link would then reply a bare "Opened".
    */
   private readonly urlSchemesCache = new Map<string, readonly string[] | undefined>();
 
@@ -660,7 +655,7 @@ export class IosAdapter implements DeviceAdapter {
    *   120 (no simctl variant avoided it). No simctl fallback when idb fails (one source,
    *   types.ts#DeviceAdapter.screenshot): idb draws the Dynamic Island where simctl shows the app's background — the
    *   idb error is the answer, and the kill switch is the way back (AVERI_IOS_SCREENSHOT=simctl).
-   * - simctl (the kill switch): `xcrun simctl io <udid> screenshot <file>`, as before D26b.
+   * - simctl (the kill switch): `xcrun simctl io <udid> screenshot <file>`.
    * Either way the bytes are judged here (screenshot-bytes.ts): a command that succeeds with an empty or foreign answer
    * is a transport error naming that command.
    */
@@ -684,10 +679,9 @@ export class IosAdapter implements DeviceAdapter {
 
   /**
    * `idb screenshot -`, judged. A failed or timed-out call is exec's error (or runIdb's, alike) with the remedy put on
-   * its FIRST line, after the command: that line is all a capture's callers quote (verify/capture.ts#captureRefusal —
-   * the pixel and baseline asserts' fail-closed reason, a run's `⚠ screenshot:` line), and without it an agent would
-   * read only `Command failed (exit 1): idb screenshot - --udid U`, the companion's stderr below it unseen. The rest of
-   * the message (the stderr) follows as before, and the ExecError is the `cause`.
+   * its FIRST line, after the command: that line is all a capture's callers quote, and without it an agent would read
+   * only `Command failed (exit 1): idb screenshot - --udid U`, the companion's stderr below it unseen. The rest of the
+   * message (the stderr) follows as before, and the ExecError is the `cause`.
    */
   private async idbScreenshot(): Promise<Buffer> {
     let stdout: Buffer;
@@ -695,7 +689,6 @@ export class IosAdapter implements DeviceAdapter {
       ({ stdout } = await this.idb(['screenshot', '-'], IDB_SCREENSHOT_TIMEOUT_MS));
     } catch (e) {
       if (!(e instanceof ExecError)) throw e;
-      // A plain Error, the ExecError as `cause`: the remedy must sit on the first line, the one captureRefusal quotes.
       const [first, ...rest] = e.message.split('\n');
       throw new Error([`${first} — ${idbCaptureRemedy()}`, ...rest].join('\n'), { cause: e });
     }
@@ -705,8 +698,6 @@ export class IosAdapter implements DeviceAdapter {
       remedy: `${capitalized(idbCaptureRemedy(rebootSimulatorAdvice(this.udid)))}.`,
     });
   }
-
-  // --- input (idb) ---
 
   async tap(x: number, y: number): Promise<void> {
     await this.idbUi(['tap', String(x), String(y)]);
@@ -741,7 +732,7 @@ export class IosAdapter implements DeviceAdapter {
    * 524 pt in 1502 ms; its `minDurationMs` floor is kept equal to this
    * 300 ms default — change both) —
    * on a WDA tree none: this adapter sets no `dragSpeed` (types.ts#DeviceAdapter
-   * .dragSpeed; decided 2026-10-09 with the Android one), which would pace
+   * .dragSpeed; decided with the Android one), which would pace
    * WDA's strokes too and switch the motion ledger to drag rules. A
    * UIScrollView decelerates by a rate per ms, its fling roughly linear in
    * the lift speed (measured under WDA: a 344-pt stroke in 300 ms, 1147
@@ -753,7 +744,7 @@ export class IosAdapter implements DeviceAdapter {
    * between 300 ms and 1.5 s, a UIKit table and a horizontal stroke are
    * unmeasured. The scroll's turn — every turn
    * halving the reach — was device-checked on that form, and a lazy list's
-   * dropped row now turns the stroke too (interact/scroll-rounds.ts) —
+   * dropped row turns the stroke too (interact/scroll-rounds.ts) —
    * and, on WDA's trees, no stroke reaches further than the target still
    * needs at what a stroke of the scroll was seen to carry it, the fling
    * included (interact/course.ts#stillNeeds: a 108-pt drag flung a
@@ -776,20 +767,17 @@ export class IosAdapter implements DeviceAdapter {
     // D43 (ios-typing.ts): a text idb cannot type goes whole to the source's typer — WDA's `/wda/keys`, which delivers
     // on return (batch-10's G1: 20/20), so `typingDelivery` holds for it too. No D24 split there: batch-10's G5 typed
     // 10/10 into the RN field with no tail dropped, and the fill's retype stays the net. Every text idb can type stays
-    // on idb, byte for byte; over a source without a typer every text does, as before D43.
+    // on idb, byte for byte; over a source without a typer every text does.
     if (this.treeSource.typeText !== undefined && typingPathOf(text) === 'wda') {
       await this.treeSource.typeText(text);
       return;
     }
-    // A backstop, not a path (A41a review M2): a source that fell back (IosTreeSource.fellBack — `auto` whose
-    // WebDriverAgent did not come up) lost its typer after a caller checked `typeable`. A text only WDA types gets
-    // ADR 0037's refusal, nothing sent, instead of idb's trace. Over idb and the recorded source (never fallen back)
-    // nothing changes.
+    // A backstop, not a path: a source that fell back (IosTreeSource.fellBack — `auto` whose WebDriverAgent did not
+    // come up) lost its typer after a caller checked `typeable`. A text only WDA types gets ADR 0037's refusal, nothing
+    // sent, instead of idb's trace. Over idb and the recorded source (never fallen back) nothing changes.
     if (this.fellBack && typingPathOf(text) === 'wda') {
       throw new Error(withNoteLine(idbTypingRefusal(text), this.treeSource.claimNote));
     }
-    // Every typing here goes through idbText: `ui text --udid U -- <text>`, so a leading dash is typed (D74), and its
-    // text declared typed (A17), so no failure shows it.
     // An app seen dropping a tail (D24, FIRST_KEY_ALONE_MS): its first character alone, a wait, then the rest. The
     // first character is a grapheme (Intl.Segmenter), so a surrogate pair or a letter with its combining mark is never
     // split between two idb calls. A one-character text has no rest: one call, no wait.
@@ -836,20 +824,19 @@ export class IosAdapter implements DeviceAdapter {
 
   // No `keyboard` oracle (KeyboardOracle, types.ts): the iOS keyboard is part
   // of the accessibility tree — its keys are nodes — so "which rect does it
-  // cover" is a tree question, answered since 2026-10-07 by the WDA source
+  // cover" is a tree question, answered by the WDA source
   // (wda-source.ts#keyboardMarks: the band the keyboard draws over, and the
   // Windows that are its own UI) and read by ui-tree/soft-keyboard.ts off
   // the tree that resolved the target; the in-tree keyboard model (interact/
   // keyboard-in-tree.ts, what an adapter without the oracle gets) queries no
   // device here and presses no key of its own — a covered target is refused,
   // with the sentence below, unless `app.ios.keyboardDismiss` names a
-  // dismissal on screen, which the guard taps first (stage B, 2026-10-07;
-  // the advice's doc). The idb source marks no node as the keyboard (on
-  // iOS 27 it lists the keys, as plain `button`s, and the band, as an
-  // unmapped `other` — ios-tree-source.ts's IOS_ROLE_MAP has no keyboard
-  // role; docs/bugs/2026-10-09-ios-inert-keyboard-dismiss-note-says-idb-
-  // carries-no-keyboard.md), so under it the guard is as it was. Until 2026-10-04 this class answered `unknown` from
-  // two stub methods without running anything.
+  // dismissal on screen, which the guard taps first (the advice's doc). The
+  // idb source marks no node as the keyboard (on iOS 27 it lists the keys, as
+  // plain `button`s, and the band, as an unmapped `other` — ios-node.ts's
+  // IOS_ROLE_MAP has no keyboard role; docs/bugs/2026-10-09-ios-inert-
+  // keyboard-dismiss-note-says-idb-carries-no-keyboard.md), so under it no
+  // guard acts.
 
   /**
    * The settle cadence (types.ts#DeviceAdapter.settleCadenceMs, ADR 0040): the tree source's own fact
@@ -872,16 +859,15 @@ export class IosAdapter implements DeviceAdapter {
    * hid it and submitted nothing, twice; and there is no back key
    * (`pressKey('back')` throws above). The simulator shows no software
    * keyboard while it believes a hardware keyboard is typing, which is the
-   * other way the target is clear. Since stage B (the same day) the
-   * sentence also says where the measured dismissal is configured —
-   * `app.ios.keyboardDismiss` in averi.yaml (flow/config.ts), which the
-   * guard taps before a covered target — so the refusals above this layer
-   * point at the fix without naming an iOS config key themselves. That holds
-   * under WDA only: under idb no guard acts (the idb source marks no node as
-   * the keyboard — the comment above), the list is inert
-   * (config.ts#inertKeyboardDismissNote), and the refusal that reaches an
-   * idb user is the band line's (ADR 0006) — so there the sentence says to
-   * tap the dismissal yourself, and that the list applies under WDA.
+   * other way the target is clear. The sentence also says where the measured
+   * dismissal is configured — `app.ios.keyboardDismiss` in averi.yaml
+   * (flow/config.ts), which the guard taps before a covered target — so the
+   * refusals above this layer point at the fix without naming an iOS config
+   * key themselves. That holds under WDA only: under idb no guard acts (the
+   * idb source marks no node as the keyboard — the comment above), the list
+   * is inert (config.ts#inertKeyboardDismissNote), and the refusal that
+   * reaches an idb user is the band line's (ADR 0006) — so there the sentence
+   * says to tap the dismissal yourself, and that the list applies under WDA.
    */
   get keyboardAdvice(): string {
     const fix =
@@ -917,9 +903,9 @@ export class IosAdapter implements DeviceAdapter {
    * 2026-11-02) → launchctl for the adapter's life, said once on stderr with pgrep's reason. A disagreement twice in a
    * row for one bundle (pgrep no, launchctl running — even after the second check re-read appinfo) means the pattern
    * misses that app's process (an argv form not seen yet): launchctl alone for that bundle from then on, said once —
-   * otherwise every check would pay appinfo + pgrep + launchctl. A launchctl that cannot be asked throws, as
-   * before (appHealth's `unknown`). `/usr/bin/pgrep`, absolute: a Homebrew procps pgrep earlier on PATH has other exit
-   * codes and regex flavour.
+   * otherwise every check would pay appinfo + pgrep + launchctl. A launchctl that cannot be asked throws (appHealth's
+   * `unknown`). `/usr/bin/pgrep`, absolute: a Homebrew procps pgrep earlier on PATH has other exit codes and regex
+   * flavour.
    */
   async isAppRunning(bundleId: string): Promise<boolean> {
     if (this.hostListUnreadable || this.launchctlOnly.has(bundleId)) return this.launchctlLists(bundleId);
@@ -976,8 +962,8 @@ export class IosAdapter implements DeviceAdapter {
   }
 
   /**
-   * The simulator's launchd lists the app: `UIKitApplication:<bundle>[` — the bracket makes it exact (D33, a
-   * deliberate verdict change: the old `includes` without it read `com.x.app` running while only `com.x.app.dev` ran).
+   * The simulator's launchd lists the app: `UIKitApplication:<bundle>[` — the bracket makes it exact (D33: without it,
+   * `com.x.app` reads running while only `com.x.app.dev` runs).
    */
   private async launchctlLists(bundleId: string): Promise<boolean> {
     const { stdout } = await this.simctl(['spawn', this.udid, 'launchctl', 'list']);

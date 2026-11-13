@@ -1,22 +1,20 @@
 /**
  * What a device handed back for a screenshot, judged before anyone above the
- * adapter sees it (2026-10-08, the Android adapter review's candidate 3, its
- * screenshot half). The one owner of "these bytes are a screenshot".
+ * adapter sees it. The one owner of "these bytes are a screenshot".
  *
  * Why. `adb exec-out screencap -p` exits 0 with whatever the guest wrote:
  * the dump on the same transport was measured exiting 0 with `Killed`, then
  * with nothing at all, as the emulator died underneath it
  * (docs/bugs/2026-09-18-handoff-run5-and-finportal-login-findings.md, a1/a4;
  * the screencap shape itself is not measured, it is the same transport).
- * Until this module the adapter returned those bytes unchecked, and the
- * stability wait in verify/capture.ts compares two captures with
- * `Buffer.equals` — two empty buffers are equal, so a dead device came back
- * as a SETTLED 0-byte frame, the `screenshot` tool handed it to the agent as
- * an image with no note, and the one hint anyone got was the png decode
- * failure a measuring caller words later in verify/, by naming adb and simctl
- * commands from a layer that should know neither. `simctl io … screenshot`
- * has the same shape — it exits 0 and the file is read afterwards — so iOS
- * passes through here too.
+ * Unchecked, those bytes would reach the stability wait in verify/capture.ts,
+ * which compares two captures with `Buffer.equals` — two empty buffers are
+ * equal, so a dead device would come back as a SETTLED 0-byte frame, the
+ * `screenshot` tool would hand it to the agent as an image with no note, and
+ * the one hint anyone got would be the png decode failure a measuring caller
+ * words later in verify/, by naming adb and simctl commands from a layer that
+ * should know neither. `simctl io … screenshot` has the same shape — it exits
+ * 0 and the file is read afterwards — so iOS passes through here too.
  *
  * The check is the 8-byte PNG signature, not only the length: a guest that
  * says `Killed` on stdout is as dead as one that says nothing, and the
@@ -27,15 +25,13 @@
  *
  * Not here: why the transport failed. `adb get-state` (the Android adapter's
  * diagnoseDumpFailure) would say offline / unauthorized / slow, but it costs
- * up to 5 s and the review's candidate 3 moves that diagnosis into adb()
- * for every call — out of scope for this change.
+ * up to 5 s.
  */
 
 import * as zlib from 'node:zlib';
 import { errorMessage } from '../util/error-message.js';
 import type { RawImage } from './types.js';
 
-/** Every PNG starts with these 8 bytes (PNG spec §5.2). */
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 /** Where the bytes came from, for the error: the device as the user knows it, and the command to re-run by hand. */
@@ -81,15 +77,15 @@ function transportError(source: ScreenshotSource, what: string, expected = 'a sc
  *   must be exactly one of the two. Its pixels are the device's `screencap -p` decoded, byte for byte (pinned on a
  *   real pair: tests/adapters/screenshot-raw.test.ts). The image is a view of the stream, not a copy;
  * - `refused`: the raw path gave no frame this time, though the device answered. `lasting` says whether it never
- *   will on this device — only on positive evidence (the D19 review, MINOR-1): the shell's word that there is no
- *   gzip (`gzip: not found`, `inaccessible or not found`), or a format other than RGBA_8888 (RGBX_8888's alpha is
- *   undefined, RGB_565 is another layout). Refused for this call only: an answer that is not a gzip stream otherwise —
+ *   will on this device — only on positive evidence: the shell's word that there is no gzip (`gzip: not found`,
+ *   `inaccessible or not found`), or a format other than RGBA_8888 (RGBX_8888's alpha is undefined, RGB_565 is
+ *   another layout). Refused for this call only: an answer that is not a gzip stream otherwise —
  *   screencap's stdout is gzip's input and its stderr goes to /dev/null, so what comes ahead of the stream is the
  *   device shell's own (exec-out merges its stderr): `Killed` on a dying guest, a shell that could not fork — or a
  *   stream cut before its second byte; and an EMPTY frame — screencap failed, its own words ("Capturing failed.")
- *   went to /dev/null, and gzip compressed nothing (round 3, NIT-1). Either way the adapter captures with
- *   `screencap -p`, whose own check decides whether the device is alive (`screenshotPng`) — and for a failing
- *   screencap, `-p` hands back the device's message that the redirection dropped;
+ *   went to /dev/null, and gzip compressed nothing. Either way the adapter captures with `screencap -p`, whose own
+ *   check decides whether the device is alive (`screenshotPng`) — and for a failing screencap, `-p` hands back the
+ *   device's message that the redirection dropped;
  * - a transport error, worded as `screenshotPng`'s: nothing at all came back, a gzip stream that breaks, or a length
  *   that is not the header plus the pixels — the raw counterpart of the signature check, and stronger. A stream cut
  *   in transit already fails gunzip (its trailer holds the length and a CRC); the length check catches screencap
@@ -103,8 +99,8 @@ export function screencapRaw(bytes: Buffer, source: ScreenshotSource): RawVerdic
   }
   let frame: Buffer;
   try {
-    // Sync: 1–2 ms for a UI frame's 9.6 MB, 7 ms for a photo's (up to ~22 under load, review round 1); the thread
-    // pool's chunked inflate took 6–8 ms and ~4× the CPU on a UI frame (2026-10-31).
+    // Sync: 1–2 ms for a UI frame's 9.6 MB, 7 ms for a photo's (up to ~22 under load); the thread pool's chunked
+    // inflate took 6–8 ms and ~4× the CPU on a UI frame (2026-10-31).
     frame = zlib.gunzipSync(bytes);
   } catch (e) {
     throw transportError(source, `a damaged gzip stream (${bytes.length} bytes: ${errorMessage(e)})`);
@@ -139,7 +135,6 @@ const LEGACY_HEADER_BYTES = 12;
 /** android.graphics.PixelFormat.RGBA_8888 — the one format whose bytes are the PNG's pixels as they are. */
 const RGBA_8888 = 1;
 
-/** "0 bytes", or the size and up to 60 characters of the start, non-printables as `.`. */
 function described(bytes: Buffer): string {
   if (bytes.length === 0) return '0 bytes';
   const head = bytes.subarray(0, 60).toString('latin1').trim().replace(/[^\x20-\x7e]/g, '.');

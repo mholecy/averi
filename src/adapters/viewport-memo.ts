@@ -7,13 +7,11 @@ import type { DeviceScreen } from './types.js';
  * - A successful read is kept and every later call shares it.
  * - Calls while a read is in flight share that read.
  * - A FAILED read is dropped once it settles, so the next call asks the
- *   device again. Until the 2026-10-07 parity code review (A3) the rejection
- *   was memoized too: one transient `idb describe` / `wm size` failure took
- *   the device-screen witness away for the life of the MCP server.
+ *   device again: a memoized rejection would let one transient
+ *   `idb describe` / `wm size` failure take the device-screen witness away
+ *   for the life of the MCP server.
  * - `{ fresh: true }` starts a new read and makes it the memo: the screen can
- *   change under a session (a fold or unfold, `wm size`), and the one caller
- *   that needs to know — the window-width check, before refusing a window as
- *   wider than the screen (verify/capture.ts#ScreenWitness.judge) — asks for it.
+ *   change under a session (a fold or unfold, `wm size`).
  */
 export class ViewportMemo {
   #pending: Promise<DeviceScreen> | undefined;

@@ -13,44 +13,40 @@ import { alertShapeInIdb } from './ios-system-alert.js';
 import { countOf } from '../util/count.js';
 
 /**
- * The iOS tree-source seam (2026-10-02). `simctl` cannot read the
- * accessibility tree, so IosAdapter reads it through one of two backends:
+ * The iOS tree-source seam. `simctl` cannot read the accessibility tree,
+ * so IosAdapter reads it through one of two backends:
  * `idb ui describe-all` (a FLAT list of AX elements) or WebDriverAgent's
  * `/source` (the NESTED XCUIElement tree that still carries the React Native
  * host-view identifiers idb drops — docs/plans/ios-wda-tree-source.md).
- * Before this file the adapter held both: a `treeSource` flag, a dispatch in
- * uiTree(), the lazily started WdaServer and its disposal, and a copy of the
- * per-node normalization that wda-source.ts also had. Two real adapters
- * behind one small interface is what makes this a seam and not a flag.
+ * Two real adapters behind one small interface is what makes this a seam and
+ * not a flag.
  *
  * The interface is deliberately small: three methods. `read()` returns a
  * fresh normalized tree per call (the layers above mutate nodes — field-error
  * pairing writes `error` — so no source may hand out a cached graph).
  * `applicationLabel()` answers the one question the normalized tree cannot —
- * which app a read is of — for the foreground wait alone, launch's and a
- * link's (its doc below). `dispose()` releases whatever the source started;
- * it is awaited by the process shutdown, so it resolves when the resource is
- * gone, not when the release was queued (the WDA source stops its
- * WebDriverAgent and waits for the port to go quiet). Both sources are bound
- * to ONE concrete simulator at construction: idb rejects simctl's `booted`
- * alias and WDA needs a UDID for `xcodebuild -destination`, so the alias is
- * resolved by whoever constructs the source — the registry, which only ever
- * binds concrete device ids.
+ * which app a read is of (its doc below). `dispose()` releases whatever the
+ * source started; it is awaited by the process shutdown, so it resolves when
+ * the resource is gone, not when the release was queued (the WDA source stops
+ * its WebDriverAgent and waits for the port to go quiet). Both sources are
+ * bound to ONE concrete simulator at construction: idb rejects simctl's
+ * `booted` alias and WDA needs a UDID for `xcodebuild -destination`, so the
+ * alias is resolved by whoever constructs the source — the registry, which
+ * only ever binds concrete device ids.
  *
  * Only the tree read lives behind this seam. Taps, typing, install and launch
  * stay on idb/simctl whichever source is configured (plan, decision 4): WDA
  * frames are points, the same units idb rects use, so the coordinates agree.
- * One exception since D43: WDA's source types what idb cannot (`typeText`,
- * optional, as `systemAlert`), on the WebDriverAgent it already owns.
+ * One exception: WDA's source types what idb cannot (`typeText`, optional,
+ * as `systemAlert`), on the WebDriverAgent it already owns.
  */
 export interface IosTreeSource {
   /**
    * The kind of backend that answers this source's reads now: fixed for idb and wda; under `auto` (auto-tree-source.ts)
    * `wda` once WebDriverAgent was chosen, else `idb` — the source that answers its label reads before the choice and
-   * all its reads after a fallback. No reader above the adapter dispatches on it: a
-   * tree says its own source by its marks (UiNode.flatList, idb's), read through ui-tree/dialect.ts#dialectOf. The
-   * adapter reads it for its keyboard advice (ios.ts#keyboardAdvice) and the wording of its launch's foreground note
-   * (ios-foreground.ts#ForegroundCheck.source) only; its screenshots do not follow it (ios.ts#screenshotVia).
+   * all its reads after a fallback. No reader above the adapter dispatches on it: a tree says its own source by its
+   * marks (UiNode.flatList, idb's), read through ui-tree/dialect.ts#dialectOf. The adapter's screenshots do not follow
+   * it (ios.ts#screenshotVia).
    */
   readonly kind: IosTreeSourceKind;
   /**
@@ -83,11 +79,10 @@ export interface IosTreeSource {
   /**
    * Which app a fresh read is OF. idb: the label of the payload's
    * `Application` element — its display name ("Skeleton Internal",
-   * "Contacts"), or `' '` for SpringBoard (2026-10-09). WDA: the bundle id
+   * "Contacts"), or `' '` for SpringBoard. WDA: the bundle id
    * of its active app, the app its sessionless `/source` reads (D48;
-   * wda-tree-source.ts), once its WebDriverAgent is up. Asked by the
-   * foreground wait only (ios-foreground.ts; launch's and a link's), never
-   * by a reader of the tree: the normalized tree keeps no element types
+   * wda-tree-source.ts), once its WebDriverAgent is up. Never asked by a
+   * reader of the tree: the normalized tree keeps no element types
    * (idb's Application is a plain `other`), so the question is answered by
    * the source that has the answer. The answers are ApplicationLabel's.
    * Throws as `read()` throws; one device call per call — except a
@@ -112,8 +107,8 @@ export interface IosTreeSource {
 
 /**
  * IosTreeSource.applicationLabel's answer — a tagged union, not
- * `string | null | undefined` (review 2026-10-09: the two absences meant
- * different things and only a comment told them apart).
+ * `string | null | undefined`: the two absences mean different things, and
+ * only a comment would tell them apart.
  *
  * - `label`: the Application element's label as read — SpringBoard's `' '`
  *   included, never trimmed (the caller names it). On SpringBoard's, from
@@ -154,8 +149,8 @@ export type IosTreeSourceDeps = Omit<WdaServerOptions, 'udid'> & {
  * seam, not in the registry: which backend serves a setting is adapter knowledge
  * (ARCHITECTURE §2, §3), and the registry's one line is to ask for it.
  * A Record over the setting, so a new one without a constructor is a compile
- * error here — not a runtime default somewhere above (moved out of
- * mcp/registry.ts on review 2026-10-03). `auto` (A41a) is both sources, of which its first read keeps one.
+ * error here — not a runtime default somewhere above. `auto` (A41a) is both
+ * sources, of which its first read keeps one.
  */
 const idbSource = (udid: string, deps: IosTreeSourceDeps): IdbTreeSource =>
   new IdbTreeSource({ udid, exec: deps.exec, helper: deps.idbHelper });
@@ -260,13 +255,13 @@ function idbTree(elements: IdbElement[]): UiNode {
  * `ProgressView()` — a UIActivityIndicatorView beneath — lists as a `GenericElement` with no label and the
  * `UpdatesFrequently` trait (docs/truth/live-records/ios-idb-held-no-spinner-describe-all-d30-1.json: value `'1'`,
  * traits `["UpdatesFrequently","Scrollable"]`, 20×20). So it reads `progress` — read-tree.ts#showsProgress stops a hold
- * on it and bare-tree.ts counts it, unlabelled, as decoration — as WDA's `ActivityIndicator` does since D27. Here, not
+ * on it and bare-tree.ts counts it, unlabelled, as decoration — as WDA's `ActivityIndicator` does (D27). Here, not
  * in the shared IOS_ROLE_MAP: the rule reads a trait, which WDA does not print. All three parts narrow it:
  * `GenericElement` alone is too wide (the keyboard's unlabelled `["Scrollable","Spacer"]` element, 402×284, would
  * read as loading on every keyboard-up screen); the trait alone is too wide (a `StaticText` clock or timer carries
  * it); a label makes it content. No value test: a stopped or older spinner may read `'0'` or a word — so an UNVALUED
  * one is re-roled too and, no longer an unlabelled, unvalued structural leaf, now covers its rect in
- * ui-tree/draw-order.ts (as WDA's does since D27): a tap under it reads covered — the safe direction.
+ * ui-tree/draw-order.ts (as WDA's does): a tap under it reads covered — the safe direction.
  * Residuals, stated: a LABELLED idb spinner stays `other` and content; UIKit's and React Native's spinners through idb
  * are assumed to share this shape (unmeasured, D37); an app-made unlabelled live element (a custom counter carrying
  * the trait) reads as loading — the safe direction, bounded by `ensureTimeoutMs` / `maxSwipes`.
@@ -302,13 +297,12 @@ const DISMISS_REGION = 'PopoverDismissRegion';
  * (ui-tree/presentation.ts#byMarks: `scroll_until` sends no stroke for a target not in the tree — one at (201,175)
  * on the dim dismissed the sheet and read the target "fully visible after 1 swipe" — and the tap's wait says close it
  * first, `Presentation.alone`). Read here, where the raw element is, as android-tree-dialect.ts#presentedWindow reads
- * its dump. Specific: of every idb capture committed (the lab's 31, tests/fixtures/idb-*.json) only those two hold the
- * region. Residuals, stated: a presentation UIKit lays with no dimming view — a large-detent or full-screen sheet
- * (sheet-background.idb.json lists the sheet's button alone, no sign of the sheet), an alert, a transparent cover —
- * is no presented layer here; a dismiss region that does not reach the whole screen (a popover's on an iPad?
- * unmeasured) neither; and the screen beneath the region, were idb ever to list it too (unmeasured), reads as the
- * layer's own — covered by nothing, as the whole listing is the layer.
- * docs/truth/live-ios-2026-10-18-visibility.md (iOS point 4); ADR 0018 residual 6.
+ * its dump. Specific: of every idb capture committed, only those two hold the region. Residuals, stated: a presentation
+ * UIKit lays with no dimming view — a large-detent or full-screen sheet (sheet-background.idb.json lists the sheet's
+ * button alone, no sign of the sheet), an alert, a transparent cover — is no presented layer here; a dismiss region
+ * that does not reach the whole screen (a popover's on an iPad? unmeasured) neither; and the screen beneath the region,
+ * were idb ever to list it too (unmeasured), reads as the layer's own — covered by nothing, as the whole listing is the
+ * layer. docs/truth/live-ios-2026-10-18-visibility.md (iOS point 4); ADR 0018 residual 6.
  */
 function listsPresentedLayer(elements: readonly IdbElement[]): boolean {
   const app = appFrame(elements);
@@ -378,16 +372,15 @@ const coversWhole = (frame: Rect, whole: Rect): boolean => {
  * relaunch-does-not-restart.md). Hence the advice names terminate-then-launch,
  * then a reboot.
  *
- * The reboot names the simulator this source is bound to (2026-10-08, the iOS
- * adapter stack review's candidate 2): the command comes from
- * simulator-reboot.ts with the real UDID, not a `<udid>` placeholder the
- * reader had to fill in. And the advice no longer says "or the stderr said
- * that write failed": averi's reader is an agent reading a tool result, who
- * never sees the server's stderr, and the reboot is the next step whether
- * the pre-launch write failed or not — so the condition added nothing it
- * could act on. (Saying WHICH it was would need the source to know the
- * adapter's last write — the review's larger version, one module per
- * simulator owning the write and this error; not done.)
+ * The reboot names the simulator this source is bound to: the command comes
+ * from simulator-reboot.ts with the real UDID, not a `<udid>` placeholder
+ * for the reader to fill in. The advice does not say whether the stderr
+ * said that write failed: averi's reader is an agent reading a tool result,
+ * who never sees the server's stderr, and the reboot is the next step
+ * whether the pre-launch write failed or not — so the condition would add
+ * nothing it could act on. (Saying WHICH it was would need the source to
+ * know the adapter's last write — one module per simulator owning the write
+ * and this error; not done.)
  *
  * The signature is deliberately narrow — no element with positive area, NOT
  * ui-tree/bare-tree.ts's `isBareTree`. A full-frame `Application` alone is
@@ -467,9 +460,9 @@ const describeEmptyPayload = (types: readonly (string | undefined)[]): string =>
  * (133 in a 90 s `scroll_until`, 5 of 5 repeats); `ios-run.sh`, which starts it after bootstatus and 3 s, never did
  * in 13 runs.
  *
- * Hence a PersistentReadError: no poll retries it (types.ts — before this, every waiting caller polled it to its
- * deadline, which is all D20's 90 s were), and averi neither re-fronts the app, nor re-reads, nor reboots: nothing
- * short of a reboot cures it, and averi does not boot simulators. The message says so and names the cure — the reboot
+ * Hence a PersistentReadError: no poll retries it (types.ts — polled, every waiting caller would wait to its deadline,
+ * which is all D20's 90 s were), and averi neither re-fronts the app, nor re-reads, nor reboots: nothing short of a
+ * reboot cures it, and averi does not boot simulators. The message says so and names the cure — the reboot
  * (simulator-reboot.ts, the one owner of the command, with the bound UDID), a companion started a few seconds after
  * the boot completes, or the WDA tree source, which does not read through idb.
  *
@@ -510,7 +503,7 @@ export class IdbNoFrontmostError extends PersistentReadError {
 /** idb's words for the wedged accessibility service (IdbNoFrontmostError), as its stderr says them. */
 const NO_FRONTMOST = /accessibility service named no frontmost application/i;
 
-/** The budget uiTree() gave describe-all before the seam existed — a busy screen is slower than a tap. */
+/** describe-all's budget — a busy screen is slower than a tap. */
 export const DESCRIBE_ALL_TIMEOUT_MS = 15_000;
 
 /**
@@ -534,7 +527,6 @@ export const IDB_SETTLE_CADENCE_MS = 300;
  */
 export class IdbTreeSource implements IosTreeSource {
   readonly kind = 'idb' as const;
-  /** Measured: IDB_SETTLE_CADENCE_MS's doc. */
   readonly settleCadenceMs = IDB_SETTLE_CADENCE_MS;
   private readonly udid: string;
   private readonly exec: ExecFn;

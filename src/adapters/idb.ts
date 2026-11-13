@@ -23,12 +23,12 @@ type Word = string | RegExp | typeof NUMS;
  *   its timeout is the caller's (ios.ts, 15 s as describe-all's) and counts toward TIMEOUTS_IN_A_ROW like any other.
  *   `screenshot <file>` (or none) is the CLI's: averi never sends it.
  * - D7b: every HID argv IosAdapter sends (ios.ts) — tap, longPress (`tap … --duration`), swipe, typeText (D24's
- *   split included: two `ui text`; since D74 the text after `--`, so none is taken for an option), clearText
+ *   split included: two `ui text`; the text after `--` (D74), so none is taken for an option), clearText
  *   (`key-sequence` 42… then 76…), pressKey (`key 40`, `button HOME`). Input: a helper that dies under one is NOT
  *   retried — the event may have reached the simulator (HID_ARGV, runIdb).
  * Exactly these shapes and nothing near them: an argv averi does not send, or a word out of shape (a number that is
- * no plain decimal, another button), is the CLI's, as before D7. `describe --json` (the memoized viewport, one call an
- * adapter) stays on the CLI: not worth a shape.
+ * no plain decimal, another button), is the CLI's. `describe --json` (the memoized viewport, one call an adapter)
+ * stays on the CLI: not worth a shape.
  */
 const READ_ARGV: readonly (readonly Word[])[] = [
   ['ui', 'describe-all', '--json'],
@@ -59,7 +59,7 @@ function fits(shape: readonly Word[], args: readonly string[]): boolean {
  * A word the CLI and the helper would receive differently (D7b, `ui text` takes any string): a lone surrogate reaches
  * the CLI's argv as U+FFFD (node encodes it so) but the helper's JSON as the surrogate itself, which fb-idb's gRPC
  * cannot encode; a NUL makes execFile refuse the call where the helper would type it. Measured 2026-10-31 (node 22).
- * Such an argv is the CLI's, so either way the outcome is what it was before D7.
+ * Such an argv is the CLI's, so its outcome is the CLI's alone.
  */
 const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 const sameForBoth = (args: readonly string[]) => args.every((w) => !w.includes('\0') && !LONE_SURROGATE.test(w));
@@ -80,8 +80,7 @@ function helperKind(args: readonly string[]): 'read' | 'input' | undefined {
  * and runs on the CLI.) Thrown in exec's shape — an ExecError, exit `null` as a CLI killed by a signal reads, not
  * timed out — so the first line is exec's, `Command failed (exit null): idb ui tap 120 640 --udid U` (the command
  * as shown: shownCommand), and INPUT_LOST stands where the CLI's stderr would. The one error text the helper adds
- * (ADR 0032, D7b); nothing in averi matches idb's input errors by text (grep 2026-10-31: only ExecError.timedOut is
- * read, by OCR and Android).
+ * (ADR 0032, D7b); nothing in averi matches idb's input errors by text.
  */
 export const INPUT_LOST =
   'the idb helper exited during this input; it may or may not have reached the simulator — look at the screen before repeating it';
@@ -125,15 +124,13 @@ export function withUdid(
 }
 
 /**
- * One idb invocation, the way every idb caller makes it — IosAdapter's input
- * methods (tap, swipe, text, keys, viewport) and the idb tree source alike:
- * the Xcode env probe first (xcode-env.ts, memoized per ExecFn), then
- * `idb <args> --udid <udid>` — the flag after the subcommand, last or before
- * a `--` (withUdid, D74). Beside xcode-env.ts, not part of the tree-source seam, because
- * input uses it and input is not behind that seam (review 2026-10-03).
- * Written once since 2026-10-03; the two copies were identical. Since D7a it
- * also routes to the idb helper (idb-helper.ts) and publishes the helper's
- * calls on the diagnostics channels above, their argv as shown (shownArgs).
+ * One idb invocation, the way every idb caller makes it: the Xcode env probe
+ * first (xcode-env.ts, memoized per ExecFn), then `idb <args> --udid <udid>`
+ * — the flag after the subcommand, last or before a `--` (withUdid, D74).
+ * Beside xcode-env.ts, not part of the tree-source seam, because input uses
+ * it and input is not behind that seam. It also routes to the idb helper
+ * (idb-helper.ts, D7a) and publishes the helper's calls on the diagnostics
+ * channels above, their argv as shown (shownArgs).
  *
  * With a `helper` (D7a, docs/adr/0032-a-persistent-idb-helper-runs-the-cli-in-process.md) an argv on READ_ARGV or
  * HID_ARGV (helperKind) is offered to it first; when it takes the call, the answer is the CLI's, to the byte of the
@@ -142,7 +139,7 @@ export function withUdid(
  * died under a read is retried once on the CLI, whose answer or error is the one returned — under an input it had
  * taken (D7b) it is not: inputLost says the event may or may not have landed. A request the helper never took
  * (`unsent`: the write failed, or it died before it acknowledged the line) runs on the CLI either way. When the helper
- * does not take the call (not ready yet, busy, off), the CLI runs as before.
+ * does not take the call (not ready yet, busy, off), the CLI runs it.
  *
  * `typed` (A17, ExecOptions.typed: indexes into `args`) names the words that are typed text. Every error thrown
  * here shows the argv with `<typed text>` there (shownCommand) — exec's on the CLI, and on the helper's path the
