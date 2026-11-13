@@ -45,8 +45,8 @@ function fakeExec(responses: Record<string, string | Buffer>) {
 }
 
 /**
- * The tree source of an adapter whose test reads no tree: required since
- * 2026-10-08 (there is no unbound adapter), and loud if a read reaches it.
+ * The tree source of an adapter whose test reads no tree: required (there is
+ * no unbound adapter), and loud if a read reaches it.
  */
 const NO_TREE: IosTreeSource = {
   kind: 'idb',
@@ -172,9 +172,9 @@ describe('IosAdapter interactions', () => {
     expect(calls.filter((c) => c.full.startsWith('idb describe'))).toHaveLength(1);
   });
 
-  // adapters/types.ts#viewport since the parity code review (A3, 2026-10-07):
-  // a FAILED read is not kept — one transient `idb describe` failure used to
-  // strip the device-screen witness for the life of the server.
+  // adapters/types.ts#viewport (the parity code review's A3, 2026-10-07): a
+  // FAILED read is not kept — kept, one transient `idb describe` failure
+  // would strip the device-screen witness for the life of the server.
   it('viewport does not memoize a FAILED read: the next call asks idb again, and its success is kept', async () => {
     const responses: Record<string, string> = { 'idb describe --json': JSON.stringify({}) };
     const { fn, calls } = fakeExec(responses);
@@ -887,7 +887,7 @@ describe('IosAdapter.screenshot — through idb on either tree source (D26b, D44
 // D24 (2026-10-31, docs/adr/0023-fill-types-a-dropped-tail-again.md, amendment): once a fill has seen an app's field
 // drop the tail of a typing (noteDroppedTail), later typings into that app send the first character alone, wait
 // FIRST_KEY_ALONE_MS, then the rest — measured 15/15 whole where one burst kept 5/15. The wait is pinned as a literal
-// (50 ms since the ADR's D25 amendment: any pause of ~50 ms after the first key landed the rest; 150 bought nothing).
+// (50 ms, the ADR's D25 amendment: any pause of ~50 ms after the first key landed the rest; 150 bought nothing).
 describe('IosAdapter.typeText — the first key alone, on an app seen dropping a tail', () => {
   beforeEach(() => {
     resetSleeps();
@@ -1105,7 +1105,7 @@ describe('IosAdapter + fillField — a dropped tail on one fill makes the next f
     await adapter.launch('com.lab.rn');
     const first = await fillField(adapter, { id: 'rn-field' }, 'Jan Novak', FAST);
     expect(first.retyped).toEqual([6]);
-    expect(typed()).toEqual(['Jan Novak', ' Novak']); // fill 1 as before D24: one burst, then the tail
+    expect(typed()).toEqual(['Jan Novak', ' Novak']); // fill 1: one burst, then the tail
     const second = await fillField(adapter, { id: 'rn-field' }, 'Jan Novak', FAST);
     expect(second.retyped).toBeUndefined();
     expect(typed()).toEqual(['J', FIRST_KEY_ALONE_MS, 'an Novak']);

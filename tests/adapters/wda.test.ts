@@ -99,7 +99,7 @@ describe('WdaServer.ensureRunning', () => {
 
   // Measured 2026-09-18 (finportal): the WDA died overnight; `/source` failed with
   // "may have died mid-session" and `pkill -f WebDriverAgentRunner` + retry was
-  // the manual cure. source() now applies that cure once, on our own child.
+  // the manual cure. source() applies that cure once, on our own child.
   it('a DEAD server (nothing answers /status either): restart once (kill + respawn), then read again', async () => {
     const { dd } = await tempDerivedData(true);
     const spawner = fakeSpawn();
@@ -353,8 +353,8 @@ describe('WdaServer.ensureRunning', () => {
     const err = await server.ensureRunning().then(() => undefined, (e: Error) => e);
     expect(err?.message).toContain(server.logPath);
     expect(err?.message).toContain('first WDA build per Xcode version takes minutes');
-    // The budget in util/duration.ts#formatSeconds's spelling (round 4): until
-    // then Math.round(ms / 1000) + "s", which said "within 0s" for this one.
+    // The budget in util/duration.ts#formatSeconds's spelling (round 4):
+    // Math.round(ms / 1000) + "s" would say "within 0s" for this one.
     expect(err?.message).toMatch(/\/status on port \d+ within 0\.04 s —/);
     expect(spawner.kills).toContain('SIGTERM'); // no orphaned xcodebuild
     server.stop();
@@ -480,7 +480,7 @@ describe('WdaServer.ensureRunning', () => {
 });
 
 describe('WdaServer.source', () => {
-  /** A server that reached ready through OUR OWN spawn (adoption is an error now). */
+  /** A server that reached ready through OUR OWN spawn (adoption is an error). */
   async function readySetup(sourceHandler: (url: string) => 'refused' | { status: number; body?: unknown }) {
     const { dd } = await tempDerivedData(true);
     const spawner = fakeSpawn();

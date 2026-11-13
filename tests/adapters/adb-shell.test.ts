@@ -17,7 +17,7 @@ vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'))
  * These tests parse that line with a real sh (tests/helpers/device-sh.ts),
  * so "the device command got exactly this argv" is checked by the same
  * parsing the device does — not by joining strings the way adb does, which
- * is how the old fake missed the injection.
+ * would miss the injection.
  *
  * The values are the review's measured failures (2026-10-07, emulator-5554:
  * a deep link cut at `&`, an extra split at a space, `$HOME` expanded and

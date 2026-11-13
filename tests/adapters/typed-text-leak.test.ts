@@ -14,8 +14,8 @@ import { drawnOverStrip } from '../helpers/android-dumps.js';
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 
 // The LEAK SWEEP (A17, ADR 0043's amendment): a typed text is out of every failure's words only because each typing
-// call site declares its word typed (ExecOptions.typed). Nothing recognises an argv by its shape any more, so a call
-// site that forgets is a leak no other test sees. Here both adapters' typeText runs through every way a typing fails
+// call site declares its word typed (ExecOptions.typed). Nothing recognises an argv by its shape, so a call site
+// that forgets is a leak no other test sees. Here both adapters' typeText runs through every way a typing fails
 // — the CLI, a real child, through the real exec (exit 1, exit 2, a silent exit, a timeout); on iOS also the idb
 // helper (a nonzero answer, silent or not, a death after it took the input, its timeout, a request it never took),
 // the helper off, and D24's split, failing on either of its two calls — and no piece of the text may stand in the

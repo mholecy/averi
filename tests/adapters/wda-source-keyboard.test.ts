@@ -110,9 +110,9 @@ describe('parseWdaSource — the on-screen keyboard\'s band carries KEYBOARD_ROL
 
   /**
    * Stage B (2026-10-07): the app's `inputAccessoryView` is a `Toolbar`
-   * element, now role `toolbar` (it fell through to `other` before), and
-   * its trailing Button is the generic non-submitting dismissal measured on
-   * the 2FA pad (K4; the device check's `tap text:"Done"` hid it).
+   * element, role `toolbar`, and its trailing Button is the generic
+   * non-submitting dismissal measured on the 2FA pad (K4; the device check's
+   * `tap text:"Done"` hid it).
    */
   describe('the accessory toolbar: role `toolbar`, and accessoryDismissButton finds its trailing button', () => {
     it('both 2FA dumps carry one Toolbar, role toolbar — matched by role:toolbar, not interactive, not preferred', () => {
@@ -214,10 +214,10 @@ describe('parseWdaSource — the on-screen keyboard\'s band carries KEYBOARD_ROL
   });
 
   it('keeps every node of the dumps but the text echoes (218 / 208 / 167 / 163 / 152)', () => {
-    // The measured counts are 225 / 216 / 174 / 170 / 159; since 2026-10-08
-    // the parser drops the one unidentified StaticText child each React
-    // Native <Text> echoes (wda-source.ts#isTextEcho) — 7 / 8 / 7 / 7 / 7
-    // of them, one per text on screen — and nothing else.
+    // The measured counts are 225 / 216 / 174 / 170 / 159; the parser drops
+    // the one unidentified StaticText child each React Native <Text> echoes
+    // (wda-source.ts#isTextEcho) — 7 / 8 / 7 / 7 / 7 of them, one per text on
+    // screen — and nothing else.
     expect([LOGIN_BAR, LOGIN_NO_BAR, TWOFA_TOOLBAR, TWOFA_PARKED, LOGIN_NONE].map((t) => [...everyNode(t)].length)).toEqual([218, 208, 167, 163, 152]);
   });
 
@@ -296,11 +296,11 @@ describe('keyboardMarks — the band rule on synthetic shapes', () => {
     expect(bands(tree).map((n) => n.rect)).toEqual([{ x: 0, y: 539, width: 402, height: 335 }]);
   });
 
-  // usableRect reads rectArea (adapters/types.ts) since 2026-10-08: a rect
-  // that is present but has no area — zero, negative or NaN on either side —
-  // is skipped like a missing one. Without the area test each of these
-  // band-shaped wrappers (y below the window's top, height under the bound)
-  // would be crowned the band, and the band would cover nothing.
+  // usableRect reads rectArea (adapters/types.ts): a rect that is present but
+  // has no area — zero, negative or NaN on either side — is skipped like a
+  // missing one. Without the area test each of these band-shaped wrappers (y
+  // below the window's top, height under the bound) would be crowned the
+  // band, and the band would cover nothing.
   it.each([
     ['0×0', { x: 0, y: 520, width: 0, height: 0 }],
     ['zero height', { x: 0, y: 520, width: 402, height: 0 }],

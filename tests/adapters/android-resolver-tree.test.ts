@@ -92,8 +92,8 @@ describe('the chooser\'s real tree (batch-10 E2, API 33): what the uiautomator p
   });
 
   it('"Just once" and "Always" by their ids, buttons marked `disabled` as the dump\'s enabled="false" says (D66); no other node is', () => {
-    // Fixed by D66 (was KNOWN-WRONG: the mark was dropped, and a tap on one replied a bare "Tapped" while nothing
-    // happened). The fresh layout's buttons stay disabled until a row is selected; D55c reads the mark.
+    // D66: without the mark, a tap on one would reply a bare "Tapped" while nothing happened. The fresh layout's
+    // buttons stay disabled until a row is selected; D55c reads the mark.
     expect(raw).toMatch(/text="Just once" resource-id="android:id\/button_once" class="android.widget.Button" [^>]*clickable="true" enabled="false"/);
     expect(raw).toMatch(/text="Always" resource-id="android:id\/button_always" class="android.widget.Button" [^>]*clickable="true" enabled="false"/);
     const root = chooserTree;

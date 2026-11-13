@@ -6,8 +6,7 @@ import type { ExecFn, ExecOptions } from '../../src/adapters/exec.js';
 import { simctl } from '../../src/adapters/xcode-env.js';
 
 /**
- * xcode-env.ts#simctl, the one spelling of a simctl call (IosAdapter's
- * `simctl` and discovery.ts's listing both call it): the argv after
+ * xcode-env.ts#simctl, the one spelling of a simctl call: the argv after
  * `xcrun simctl`, the probe's DEVELOPER_DIR as the env, and a timeout only
  * when one is given.
  */

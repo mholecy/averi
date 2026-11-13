@@ -26,10 +26,11 @@ beforeEach(() => {
 const FILL = { ambiguous: 'first' as const, timeoutMs: 200, pollMs: 2, eyes: NO_EYES };
 
 /**
- * One Android field (`id:f`) behind fillField, every tree read a fresh parse of its dump (the parser is the seam: base
- * trimmed `Jan ` to `Jan`): it holds `start`, shows `hint` named as its hint, keeps `keep(typed, nth)` of each typing
- * and loses one character a delete; a focus tap makes it hold `onFocus` when given. Its typing may arrive late, as
- * AndroidAdapter's does — no dropped tail is typed again, and a sole `id` skips the post-focus re-read (ADR 0028).
+ * One Android field (`id:f`) behind fillField, every tree read a fresh parse of its dump (the parser is the seam: a
+ * parser that trimmed would read `Jan ` as `Jan`): it holds `start`, shows `hint` named as its hint, keeps
+ * `keep(typed, nth)` of each typing and loses one character a delete; a focus tap makes it hold `onFocus` when given.
+ * Its typing may arrive late, as AndroidAdapter's does — no dropped tail is typed again, and a sole `id` skips the
+ * post-focus re-read (ADR 0028).
  */
 function androidField(start: string, opts: { hint?: string; keep?: (typed: string, nth: number) => string; onFocus?: string } = {}) {
   let held = start;
@@ -57,8 +58,8 @@ describe('parseUiautomatorXml', () => {
   const tree = parseDump(UIAUTOMATOR_XML.slice(0, UIAUTOMATOR_XML.lastIndexOf('>') + 1));
 
   // D72: a text input's value keeps its outer spaces, as the app holds them (iOS's too, ios-node.ts), and so does a
-  // hint; what names a node — its label, content-desc, resource-id — is trimmed as before, so matching through the
-  // label is unchanged, while the `value` path (`value:`, and `text:`, which asks the value too) sees the real text.
+  // hint; what names a node — its label, content-desc, resource-id — is trimmed, while the `value` path (`value:`, and
+  // `text:`, which asks the value too) sees the real text.
   describe("a value's outer spaces (D72)", () => {
     it('an EditText holding `Jan ` reads value `Jan `, labelled `Jan`', () => {
       const field = parseDump('<hierarchy><node class="android.widget.EditText" text="Jan " bounds="[0,0][100,100]" /></hierarchy>');
@@ -100,10 +101,10 @@ describe('parseUiautomatorXml', () => {
       expect(fake.typed).toEqual(['Jan Novak', 'Jan Novak']);
       expect(result.readBack).toEqual({ kind: 'landed' });
       expect(fillReply(result, 'id:f')).toBe('Filled id:f (9 characters)');
-      expect(held()).toBe('Jan Novak'); // base: `JJan Novak`
+      expect(held()).toBe('Jan Novak'); // a trimmed reading would leave `JJan Novak`
     });
 
-    // Review round 1, MAJOR-1: matching through the LABEL is unchanged; the `value` path sees the field's real text, as
+    // Review round 1, MAJOR-1: matching through the LABEL is trimmed; the `value` path sees the field's real text, as
     // on iOS — a flow that matched a trimmed Android value quotes the space or uses `~`.
     it('an input named by its content-desc: `text:"Jan"` no longer matches its value, `text:"Jan "` and `value:"Jan "` do', () => {
       const tree = parseDump('<hierarchy><node class="android.widget.EditText" content-desc="First name" text="Jan " bounds="[0,0][100,100]" /></hierarchy>');
@@ -163,10 +164,10 @@ describe('parseUiautomatorXml', () => {
     });
   });
 
-  // D64b-3 (ADR 0028's amendment), re-pinned by D72: the parser no longer trims a value's outer spaces, so the ⚠ line
-  // counts what the app holds (5, where it counted 4), and a typed `+421` over an inserted `+421 ` is no longer silent.
-  // The field is empty before the tap, the focus inserts `+421 `, the typing takes none of the keys; the post-focus
-  // re-read is skipped (a sole `id`, Android's late typing), so the reading is `+421 `.
+  // D64b-3 (ADR 0028's amendment), D72: the parser keeps a value's outer spaces, so the ⚠ line counts what the app
+  // holds (5), and a typed `+421` over an inserted `+421 ` is not silent. The field is empty before the tap, the focus
+  // inserts `+421 `, the typing takes none of the keys; the post-focus re-read is skipped (a sole `id`, Android's late
+  // typing), so the reading is `+421 `.
   describe('a field holding `+421 `, the re-read skipped: the reading is `+421 `', () => {
     const fillDial = async (value: string) => {
       const { fake } = androidField('', { onFocus: '+421 ', keep: () => '' });
@@ -762,8 +763,8 @@ describe('parseUiautomatorXml — the dialect\'s rules, one by one', () => {
   });
 });
 
-// The parser's marks on its root, moved from tests/adapters/android-presented-window.test.ts (A27), which keeps the
-// verbs' cases over them: what the dump shows of the one window it lists (ADR 0018, "Android's presented window").
+// The parser's marks on its root (A27; the verbs' cases over them are tests/adapters/android-presented-window.test.ts's):
+// what the dump shows of the one window it lists (ADR 0018, "Android's presented window").
 
 type Cell = 'alert-dim' | 'sheet-medium' | 'bottom-sheet-dialog' | 'dialog-fullscreen' | 'form-picker' | 'open';
 

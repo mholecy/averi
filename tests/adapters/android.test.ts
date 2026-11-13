@@ -241,7 +241,7 @@ describe('AndroidAdapter interactions', () => {
       const fn = throwing(realShape('adb -s e shell pidof x || true', 1, 'error: device offline'));
       await expect(new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn }).isAppRunning('x')).rejects.toThrow(/device offline/);
     });
-    // Quoted, no longer refused — see adb-shell.ts; pinned through a real sh in adb-shell.test.ts.
+    // Quoted, not refused — see adb-shell.ts; pinned through a real sh in adb-shell.test.ts.
     it('quotes a package name that could escape the shell, rather than refusing it', async () => {
       const { fn, calls } = fakeExec({});
       expect(await new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn }).isAppRunning('x; rm -rf /')).toBe(false);
@@ -261,7 +261,7 @@ describe('AndroidAdapter interactions', () => {
     expect(calls).toEqual([
       'adb -s emulator-5554 shell input text a',
       'adb -s emulator-5554 shell input text %s',
-      // quoted for the device's sh (adb-shell.ts), no longer backslash-escaped here
+      // quoted for the device's sh (adb-shell.ts), not backslash-escaped here
       "adb -s emulator-5554 shell input text '$'",
       'adb -s emulator-5554 shell input text b',
       // DPAD_LEFT + DPAD_RIGHT: the cursor nudge that commits GBoard's trailing
@@ -272,10 +272,9 @@ describe('AndroidAdapter interactions', () => {
   });
 
   // The iOS side of this (2026-10-07, docs/bugs/2026-10-07-ios-fill-empty-
-  // value-fails-in-idb.md) returns before idb; Android's loop already ran zero
-  // times for "" and passed, but the commit nudge (DPAD_LEFT, DPAD_RIGHT, a
-  // sleep) still went out — pinned as a decision when the iOS fix landed, and
-  // corrected later that day: the contract says "" types nothing on both.
+  // value-fails-in-idb.md) returns before idb; Android's loop runs zero times
+  // for "", but without a guard the commit nudge (DPAD_LEFT, DPAD_RIGHT, a
+  // sleep) would still go out: the contract says "" types nothing on both.
   it('typeText with an empty string sends nothing: neither a character nor the commit nudge', async () => {
     const { fn, calls } = fakeExec({});
     await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).typeText('');
@@ -570,7 +569,7 @@ describe('AndroidAdapter interactions', () => {
         holder: 'chooser',
         chooser: { component: 'android/com.android.internal.app.ResolverActivity' },
       });
-      // D55c: the pin changed on purpose — the chooser named, its tree is read once.
+      // D55c: the chooser named, its tree is read once.
       expect(argvs).toEqual([START, FOCUS, DUMP]);
       expect(timeouts[2]).toBe(5_000);
     });
@@ -711,7 +710,7 @@ describe('AndroidAdapter interactions', () => {
       const { adapter, argvs, timeouts } = scripted({ start: STARTED, focus });
       const outcome = worded(await adapter.launch('dev.averi.lab', { intent: INTENT }));
       expect(outcome).toEqual({ note: NOTE });
-      // D55c: the pin changed on purpose — the chooser named, its tree is read once (here it prints no XML: the note as before).
+      // D55c: the chooser named, its tree is read once (here it prints no XML).
       expect(argvs).toEqual([START_P, FOCUS, DUMP]);
       expect(timeouts[1]).toBe(2_000);
       expect(timeouts[2]).toBe(5_000);
@@ -918,9 +917,9 @@ describe('AndroidAdapter interactions', () => {
     expect(calls.filter((c) => c.includes('wm size'))).toHaveLength(1);
   });
 
-  // adapters/types.ts#viewport since the parity code review (A3, 2026-10-07):
-  // a FAILED read is not kept — one transient `wm size` failure used to strip
-  // the device-screen witness for the life of the server.
+  // adapters/types.ts#viewport (the parity code review's A3, 2026-10-07): a
+  // FAILED read is not kept — kept, one transient `wm size` failure would
+  // strip the device-screen witness for the life of the server.
   it('viewport does not memoize a FAILED read: the next call asks wm size again, and its success is kept', async () => {
     const responses: Record<string, string> = { 'adb -s emulator-5554 shell wm size': 'error: device offline\n' };
     const { fn, calls } = fakeExec(responses);
@@ -1040,8 +1039,7 @@ describe('AndroidAdapter.keyboard.state — is a soft keyboard shown, and which 
   });
 
   // The guard driven end to end through this adapter — the adb call order of
-  // a dismissal and of the stale-window wait — is tests/integration/android-keyboard.test.ts
-  // (moved 2026-10-04: it pinned interact/'s cadence from the adapter's test file).
+  // a dismissal and of the stale-window wait — is tests/integration/android-keyboard.test.ts.
 });
 
 /**
@@ -1118,7 +1116,7 @@ describe('AndroidAdapter.viewport — the status band, out of `dumpsys window di
     expect(reads).toHaveLength(2); // the failure, the answer — then kept
   });
 
-  // Code review of fix/r8-band, round 2: retried every call, a hung dumpsys cost up to 2 s on each viewport().
+  // Code review of fix/r8-band, round 2: retried every call, a hung dumpsys would cost up to 2 s on each viewport().
   it('a band read that TIMED OUT is kept as no band: the next viewport() makes no dumpsys call — until launch, or a fresh read', async () => {
     let answer: string | Error = execErrorLikeExec('adb shell dumpsys window displays', null, '', { timedOut: true });
     const { adapter, reads } = scripted(() => answer);
@@ -1318,7 +1316,7 @@ describe('AndroidAdapter.keyboard.touchable — the IME window\'s touchable regi
  * adapters/screenshot-bytes.ts): an empty or non-PNG capture is a transport
  * error naming the device and the command, never bytes handed upward — the
  * stability wait would have read two empty captures as a settled frame.
- * Since D19 that is the fallback's check: the capture is `screencap 2>/dev/null | gzip -1`
+ * That is the fallback's check (D19): the capture is `screencap 2>/dev/null | gzip -1`
  * first, and `-p` only on a device that refuses the raw path (no gzip).
  */
 describe('AndroidAdapter.screenshot — the bytes are a PNG or the call fails', () => {

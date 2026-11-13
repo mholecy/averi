@@ -22,8 +22,8 @@ vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'))
 // D49a (2026-11-02, spec-D49 and its orchestrator decisions; ADR 0032's D49a amendment): `open_deep_link` replied
 // "Opened" while iOS asked "Open in “AveriLab”?" over SpringBoard — batch-1 D's probe, where every launch after the
 // link stayed behind the alert. A link whose scheme the project's own app declares (its Info.plist's
-// CFBundleURLTypes, read on the host with plutil at appinfo's Path) is now followed by launch's bounded foreground
-// wait (ios-foreground.ts); any other link is opened exactly as before.
+// CFBundleURLTypes, read on the host with plutil at appinfo's Path) is followed by launch's bounded foreground wait
+// (ios-foreground.ts); any other link is opened with no wait.
 
 
 let stderr: { mock: { calls: unknown[][] } };
@@ -77,8 +77,7 @@ describe("IosAdapter.openDeepLink — a link nothing expects is opened exactly a
     const d = lab([bundle(LAB)]);
     expect(await d.adapter.openDeepLink('contacts://new', { appId: LAB })).toEqual({ holder: 'none' });
     expect(await d.adapter.openDeepLink('x-apples://new', { appId: LAB })).toEqual({ holder: 'none' });
-    // D58: the lookup now runs before the writes (it decides the pre-approval); no pre-approval for a scheme not
-    // declared.
+    // D58: the lookup runs before the writes (it decides the pre-approval); no pre-approval for a scheme not declared.
     expect(d.calls).toEqual([
       'xcrun simctl appinfo AAAA-1111 dev.averi.lab',
       PLUTIL,
@@ -178,8 +177,7 @@ describe("IosAdapter.openDeepLink — a link to the project's own scheme waits l
     expect(d.calls.filter((c) => c.startsWith('plutil'))).toEqual([PLUTIL, PLUTIL]);
   });
 
-  // D58 rewrote this pin on purpose (it read "the writes and openurl first; the lookup after them"): the lookup decides
-  // the scheme's pre-approval, which must land before openurl.
+  // D58: the lookup decides the scheme's pre-approval, which must land before openurl.
   it('the lookup first, then the writes with the pre-approval, then openurl', async () => {
     const d = lab([bundle(LAB)]);
     await d.adapter.openDeepLink('averilab://d49', { appId: LAB });
@@ -587,7 +585,7 @@ describe('IosAdapter.openDeepLink — which app the typing goes into', () => {
 });
 
 // D58 (2026-11-02; ADR 0032's D58 amendment): iOS asks "Open in “AveriLab”?" once per simulator because simctl's opener
-// (CoreSimulatorBridge) has no remembered answer for the scheme. Before a link to the project's own scheme, averi now
+// (CoreSimulatorBridge) has no remembered answer for the scheme. Before a link to the project's own scheme, averi
 // writes the answer an Open tap records — com.apple.launchservices.schemeapproval,
 // com.apple.CoreSimulator.CoreSimulatorBridge-->averilab = dev.averi.lab — beside the accessibility writes, so the
 // alert should not come. Every other link, and launch(), writes nothing new; every reply is unchanged; D54's naming
