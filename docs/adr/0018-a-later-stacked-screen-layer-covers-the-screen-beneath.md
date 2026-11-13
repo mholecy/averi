@@ -1409,7 +1409,9 @@ visibility cases are built from the committed truth only, so the capture comes f
 1. Build and install the lab app from this checkout (scripts/differential/README.md, "Recapturing iOS"):
    `cd fixtures/apps/ios && xcodegen generate && xcodebuild -scheme AveriLab -destination 'id=<udid>' -derivedDataPath build build`,
    then from the repo root `xcrun simctl install <udid> fixtures/apps/ios/build/Build/Products/Debug-iphonesimulator/AveriLab.app`.
-2. `node --import tsx scripts/truth/capture.ts --udid <udid> --out tests/fixtures/truth/ios-iphone17-ios27 --cells tap-catcher-beneath-flat`
+2. With idb's companion up for the simulator (`idb_companion --udid <udid> --grpc-domain-sock <socket>`, the socket path
+   as scripts/differential/README.md's golden-mode live run gives it),
+   `node --import tsx scripts/truth/capture.ts --udid <udid> --out tests/fixtures/truth/ios-iphone17-ios27 --cells tap-catcher-beneath-flat`
    — exit 0 (1: the cell broken or failed; the manifest says why).
 3. In tests/differential/golden/false-covers.known.ts add the two counts,
    `` [`${IOS}/tap-catcher-beneath-flat.idb.json`]: 12 `` and `` [`${IOS}/tap-catcher-beneath-flat.wda.json`]: 12 `` (golden's
