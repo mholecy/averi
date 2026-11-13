@@ -1,0 +1,6 @@
+  Display: mDisplayId=4 (organized)
+  mCurrentFocus=null
+  mFocusedApp=null
+  Display: mDisplayId=0 (organized)
+  mCurrentFocus=Window{f324dc u0 com.android.settings/com.android.settings.Settings}
+  mFocusedApp=ActivityRecord{fd4be08 u0 com.android.settings/.Settings} t6385}

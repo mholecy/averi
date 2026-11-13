@@ -139,7 +139,8 @@ Bug note: docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-co
 1. When the reading cannot see the keyboard, the old behaviour returns silently. Examples: a floating or split IME that
    supplies no insets frame, and the transient read right after the focus tap.
 2. The API 34+ `type=ime` line comes from AOSP and has not been captured on a device.
-3. A multi-display device reads unknown.
+3. A multi-display device reads unknown. (Until A35: display 0's IME entry alone is read now, ADR 0041's A35
+   amendment.)
 4. A stale `shown` costs covered rounds until the window state catches up. Under a short timeout it fails closed with the
    covered wording, never a false pass.
 5. **idb lists no scroll view** (a flat list) — **refined 2026-10-20** (round 14, LE2): the drawn frame is UNTOLD there

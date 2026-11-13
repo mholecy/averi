@@ -2015,7 +2015,8 @@ above its floor, and lab-chooser.ts holds A22's 99.85 %.
 Every captured dump holds one display: 35 `dumpsys window displays` dumps and 29 focused-window reads. On each of
 them, display 0's block reads the same as the whole dump, so no fixture can say which rule is right for two displays.
 tests/adapters/android-wm.test.ts pins that census, and synthetic two-display dumps pin where the rules differ today.
-Merging them needs a dump from a device with two displays.
+Merging them needs a dump from a device with two displays. (Taken by A35 on a real two-display capture: one rule, the
+default display's, ADR 0041's A35 amendment.)
 
 **A34 (2026-11-11).** Each live block's bound (ADR 0041's A34 amendment) changed three lab-group modules: runner.ts (a
 live run's header names its bound), standing.ts (`liveSecsOf`, and `keptLiveRun` applying it) and lab-run.ts

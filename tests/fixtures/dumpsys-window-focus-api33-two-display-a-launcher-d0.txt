@@ -1,0 +1,6 @@
+  Display: mDisplayId=4 (organized)
+  mCurrentFocus=null
+  mFocusedApp=null
+  Display: mDisplayId=0 (organized)
+  mCurrentFocus=Window{f3b8bae u0 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity}
+  mFocusedApp=ActivityRecord{72b88fc u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity} t6107}

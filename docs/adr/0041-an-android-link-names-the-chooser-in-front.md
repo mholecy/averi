@@ -19,6 +19,8 @@ Amended 2026-11-11 (A27: the focus read moves to `adapters/android-wm.ts`, one `
 stays here, byte for byte; implemented on `refactor/a27-android-split`).
 Amended 2026-11-11 (A34: each live block of the standing lab batch a bound that fits it, the visibility group's own
 3000 s; implemented on `fix/a34-live-block-bounds`).
+Amended 2026-11-13 (A35: this ADR's display rule, display 0's block, becomes every `dumpsys window` read's, proven on a
+real two-display capture; a dump with no display 0 now reads nothing; implemented on `feat/a35-two-display`).
 
 ## Context
 
@@ -909,3 +911,87 @@ keeps `B_LIVE` for every iOS block (backlog A36).
 loaded machine the visibility group can pass even its own bound, and the emulator's framework may not hold: Gate B is run
 when the machine is not loaded. The lab mutation baseline A34 recorded, 548 s at load 53–57
 (scripts/mutation/scope.json), is load-inflated, as A22's first 562 s at load 45–38 was; a cold rerun on main replaces it.
+
+## Amendment: one display rule, the default display's, for the window manager's dumps (2026-11-13, A35)
+
+**Context.** A27 left three multi-display rules in `adapters/android-wm.ts` (ADR 0038's A27 amendment): every display
+must agree (the IME, status and navigation reads), the first one found (`parseFocusedWindow`, whose
+FOCUSED_WINDOW_COMMAND prints no display headers) and display 0's block (this ADR's chooser read). No captured dump held
+two displays. A35 captured three states on emulator-5554 with an overlay display (id 4, 720x1280/320) set for the
+capture only (docs/truth/live-records/a35-two-display/, fixtures `tests/fixtures/*-api33-two-display-*`): a, the
+launcher on display 0; b, Settings on display 0; c, Settings on display 0 and the clock focused on display 4. What they
+show:
+
+- the top-focused display is printed last, and only it has a window focus (`mCurrentFocus=null` on every other);
+- the overlay display has its own InsetsState, with its own hidden IME entry and `mIsImeShowing=false`, and no status or
+  navigation bar;
+- FOCUSED_WINDOW_COMMAND's grep has no headers, but each display's `mCurrentFocus` line comes before its own
+  `DisplayFrames` line, and every window block of `dumpsys window windows` names its display (`mDisplayId=<n>`).
+
+The three rules read them differently, and two were wrong. In b, the first found paired Settings on display 0 with the
+overlay's size: `screenAlone` with a 720x1280 frame, where the window is [0,0][1080,2220]. In every state, every
+display must agree lost the navigation band (the two `DisplayFrames` sizes differ), which display 0 alone reads as 2154.
+
+**Decision.** The five reads of `dumpsys window displays` and `dumpsys window windows` (`parseImeInsets`,
+`parseStatusBand`, `parseNavigationBand`, `parseFocusedWindow`, `defaultDisplayFocus`) answer for the default display,
+id 0, and no other display's line is read. Display 0 is where `am start` with no `--display` starts the app and the link
+(this ADR's reason), and what `input tap`/`swipe` and `screencap` with no `-d` act on: the display averi verifies. The
+input method's reads (`parseInputShown`, `parseTouchableRegion`) print no display and have no display scope: they are
+read whole, as before. Two readers in `android-wm.ts` hold the rule, one per dump shape, each answering `undefined` when
+the default display's part is not there: `defaultDisplayBlock` (headered dumps; the insets reads and the chooser's) and
+`defaultDisplayFocusRead` (FOCUSED_WINDOW_COMMAND's answer). Where the dump says which display a line is, that decides:
+
+- a dump with display headers: display 0's block. No block is display 0's: no answer (`unknown`, no band, no
+  chooser). A deliberate choice: before A35 the chooser read the first display's block then, a guess at whose link it
+  was; `Display.DEFAULT_DISPLAY` always exists, so no device prints that dump;
+- FOCUSED_WINDOW_COMMAND's answer: the focus line whose window's block says display 0, the lines after it up to the
+  next focus line (its `DisplayFrames`), then display 0's window blocks only. A `null` focus, or one whose window the
+  windows dump does not list, is no display that can be told; two focus lines that both name a display 0 window are no
+  one focus, so the answer is `unknown`. Another display's visible app window is not "beside" display 0's focus;
+- a dump that names no display is one display's, whole. Every captured one-display dump is display 0's (the census in
+  tests/adapters/android-wm.test.ts), so it reads as before.
+
+The shell lines are unchanged. Adding the header to FOCUSED_WINDOW_COMMAND's grep would have meant fixtures not
+captured, and the window blocks already name their display.
+
+On the capture: a, b and c read the IME hidden, the status band 66 and the navigation band 2154; b's focused window is
+`screenAlone` [0,0][1080,2220]; a is `unknown` (the launcher's visible GoogleDiscoverWindow beside it, as on one
+display); c is `unknown` (display 0 has no window focus). The chooser reads a, b and c as before.
+
+**What changed in the tests.** Single-display replies are byte for byte: the golden corpus shows 0 checks changed of
+1691. The pins of the old rules changed, each with a note in the test:
+
+- the A35 fixtures' expectations (b's frame, the navigation band);
+- the synthetic headered two-display dumps: display 0's keyboard and band are read instead of no answer;
+- the synthetic focus reads with a second focus line: the line whose window the dump does not list is not read, so
+  dialog-fullscreen stays `stacked` instead of `unknown`;
+- the chooser with no display 0 among the headers: no chooser instead of the first display's.
+
+The header-less synthetic dumps that list two entries keep their refusals: inside one display's part, entries that
+disagree are still no answer, since one display prints one. Only their labels changed.
+
+**Residuals.**
+
+- Not measured on the capture:
+  - a keyboard shown on either display. The IME read's change, display 0's entry and witness alone, is proven on
+    synthetic dumps only; on the capture both displays' IME entries were hidden. `parseInputShown` and
+    `parseTouchableRegion` read the input method's dumps, which name no display: with two displays they answer for
+    wherever the keyboard is;
+  - `am start` with no `--display`: the capture always passed `--display 0` (and `--display 4` for the clock), so that
+    it lands on display 0 is AOSP's documented default, not a measurement;
+  - what `uiautomator dump` and `input keyevent` (no `-d`) act on with two displays. AOSP sends a key with no display to
+    the focused display, and uiautomator's root is the active window, so with another display top-focused (state c)
+    averi's `back` and tree may be that display's. The focus read then answers `unknown`, display 0 having no window
+    focus, so nothing is guessed from it.
+- A window block that names no display is read as display 0's, and so is a dump that names none: the rule for dumps
+  of one display, unproven on a second Android's format.
+- The focused-window read takes each focus line and the lines after it up to the next as one display's, so it needs
+  each display's `mCurrentFocus` line before its own `DisplayFrames` line, on one display too (a size line before the
+  focus line is not read: `unknown`). That order is measured on API 33 only (A35's capture and every lab capture).
+- UT4 (one tree-dialect reader of the root marks), named in the A35 row, is not done here: its readers span about 18
+  core modules (ui-tree, interact, flow, mcp, the iOS tree sources) and have nothing to do with displays. It is left to
+  a row of its own.
+- Mutation: the `android` group cold, android-wm.ts 96.59 % (floor 94 → 95), 21 survivors, as many as A27 left: 3 of
+  A27's survivors are now killed (the `focus === undefined || w === undefined` group, gone with the reader) and 3 new
+  ones are equivalent (scripts/mutation/scope.json); the first run's `\d+` → `\d` survivor was not (a two-digit display
+  id read as none, so as display 0's) and is killed by a window on display 12.

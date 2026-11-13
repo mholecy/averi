@@ -1,0 +1,6 @@
+  Display: mDisplayId=0 (organized)
+  mCurrentFocus=null
+  mFocusedApp=ActivityRecord{fd4be08 u0 com.android.settings/.Settings} t6385}
+  Display: mDisplayId=4 (organized)
+  mCurrentFocus=Window{1a1f85 u0 com.google.android.deskclock/com.android.deskclock.DeskClock}
+  mFocusedApp=ActivityRecord{d5affd3 u0 com.google.android.deskclock/com.android.deskclock.DeskClock} t6386}
