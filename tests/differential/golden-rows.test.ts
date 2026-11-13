@@ -556,8 +556,8 @@ describe('an absent target (CellTruth.absent: the L7 carousels\' C, not composed
 describe('R-stroke of a FRAMED target its tree does not list: a touch-down beside its scroll view the tree lists a scroller passes only when the reply names that scroll view (D76)', () => {
   // scroll-bounded's O and F on Android: rows of `lower`, one of two vertical lists, unlisted by uiautomator — averi
   // cannot tell which list holds a row it never saw, so it strokes the largest (T6: holding the strokes inside `lower`
-  // turned both rows red). Since D76 its exhausted stop names the listed scroll views the swipes did not go over: that
-  // is what is held. Only a target laid out nowhere (CellTruth.absent) is held inside outright (absentExpectations, above).
+  // turned both rows red). Its exhausted stop names the listed scroll views the swipes did not go over: that is what
+  // is held. Only a target laid out nowhere (CellTruth.absent) is held inside outright (absentExpectations, above).
   const cell: CellTruth = { ...CELL, chrome: {}, scrollViews: { list: rect(0, 380, 402, 180) } };
   const off = target('off-screen', { frame: rect(51, 908, 300, 64), reached: false, probe: [], visible: null, scrollView: 'list', listed: { uiautomator: false } });
   const NEVER = 'ERROR scroll_until id:"lab.edges.A" failed after 2 swipes — element never appeared in the tree';

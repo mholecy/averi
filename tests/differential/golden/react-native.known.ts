@@ -3,9 +3,8 @@ import { ANDROID_RN, IOS_RN, type KnownFile } from './known.js';
 // The react-native family's ratchet (fixtures/apps/cells/react-native.json, round 7): rn-field, captured from the
 // React Native lab app (fixtures/apps/rn) on both platforms — calibration.json #18's field half. No known mismatch:
 // N's and M's labels, refused as under their own field under WDA (an input in an unnamed wrapper of its rect, LR1) and
-// on Android (a label overhanging its EditText by 3 px, LR2), are their own field's since ce19c234 + f3a7043f
-// (src/ui-tree/draw-order.ts; docs/adr/0014-a-text-input-is-no-cover-of-its-own-label.md) — tap, scroll_until and
-// ocr green under every source (the ocr rows judged outside the sandbox, where Vision runs).
+// on Android (a label overhanging its EditText by 3 px, LR2), are their own field's (src/ui-tree/draw-order.ts;
+// docs/adr/0014-a-text-input-is-no-cover-of-its-own-label.md).
 // rn-banner (round 9, lab note LR3): each target under a later sibling drawn over its centre (`declared: covered`) —
 // green under WDA (ADR 0015's amendment of 2026-10-25); under idb its residual: idb lists no bare View (U's and C's
 // covers), and T's toast above the flat list's top-bar line is read as its bar — every tap Tapped, every colour assert
@@ -13,13 +12,11 @@ import { ANDROID_RN, IOS_RN, type KnownFile } from './known.js';
 // (docs/bugs/2026-11-09-lab-android-uiautomator-lists-a-react-native-cover-before-its-target-so-it-is-tapped-and-measured.md,
 // calibration.json LR4, backlog D75) — uiautomator lists each cover (T's `Saved`, U's and C's bare `.cover` Views)
 // BEFORE its target, though the JSX draws it over the target as its later sibling: AOSP sorts a classic ViewGroup's
-// children by location. Green since D75 (the parser marks such a run `readingOrder`; the eyes tell each cover over its
-// target: every tap refused, every colour assert failing closed; ADR 0015's amendment "Android Views list children by
-// location").
+// children by location. The parser marks such a run `readingOrder`; the eyes tell each cover over its target: every
+// tap refused, every colour assert failing closed (ADR 0015's amendment "Android Views list children by location").
 // rn-banner-role (backlog D77, sub-case b; captured 2026-11-11): rn-banner with each target and its cover in a slot View
-// of role `toolbar` (slot left 72.5 px, dumped 73) — ADR 0015's residual 5 as captured: every tap Tapped on the cover,
-// every colour assert passing on it. Green since A42a: the slot (`android.view.View`) lists React Native's ViewGroups
-// as its children, so it is no node provider's host (android-tree-dialect.ts#providesNodes) and its run is marked — every
+// of role `toolbar` (slot left 72.5 px, dumped 73). The slot (`android.view.View`) lists React Native's ViewGroups as
+// its children, so it is no node provider's host (android-tree-dialect.ts#providesNodes) and its run is marked — every
 // tap refused, every colour assert failing closed (ADR 0015's residual 5, narrowed).
 
 const IDB_COVER_UNSEEN = 'residual:ADR 0015 residual 4 — idb lists no bare React Native View, and reads a cover above its top-bar line as the bar';
