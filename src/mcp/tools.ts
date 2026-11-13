@@ -43,13 +43,7 @@ import { PIXEL_OVERLAP_SLACK } from '../ui-tree/geometry.js';
  * Importing this file has no side effects — no registry, no transport, no
  * version read. Registrations in mcp/server.ts, which constructs the server
  * and ends in a top-level `await server.connect(stdio)`, would open a stdio
- * transport on import, so no handler could be exercised by a test. That
- * wall was hit three times — a mutant replacing ensure_state's settled frame with a bare
- * `adapter.screenshot()` survived the whole suite, "tap and type_text refuse
- * an ambiguous selector" was verified only by reading, and tool-text.ts,
- * lifecycle.ts and util/version.ts were each split out because server.ts
- * could not be imported. (That still holds for the last two, which
- * server.ts itself uses; tool-text.ts stays for the reason in its header.)
+ * transport on import, so no handler could be exercised by a test.
  *
  * The seam is construction vs connection. `createAveriServer` takes what the
  * handlers depend on and returns the server; mcp/server.ts (the bin) connects
@@ -68,19 +62,14 @@ import { PIXEL_OVERLAP_SLACK } from '../ui-tree/geometry.js';
  * such a fake would skip.
  *
  * What a handler holds (the same list as ARCHITECTURE.md §2): its description and input schema, which includes
- * parsing the assert specs; resolving the platform to an adapter through the
- * registry, this layer's own state; the config it needs, read ONCE per
- * call by flow/tool-config.ts#loadForCall under the tool's entry in
- * mcp/config-policy.ts#TOOL_CONFIG (not one of four loaders chosen by hand
- * per handler, where `assert` ran two of them), and the
- * answers asked of that loaded config (which build to install, which iOS
- * tree source and dismissals — flow/); one call into an adapter method,
- * interact/, run/ or flow/launch.ts (launch_app's, which resolves the
- * activity itself), handed the loaded config rather than a
- * path to read again; and the response — text through tool-text.ts or the
- * callee (a fill's through interact/fill-text.ts, shared with the flow line), wrapped by `text`/`image` below. The sequences once written out
- * here (ensure_state, run_flow, assert, the contract file read) are below
- * this layer.
+ * parsing the assert specs; resolving the platform to an adapter through the registry, this layer's own state; the
+ * config it needs, read ONCE per call by flow/tool-config.ts#loadForCall under the tool's entry in
+ * mcp/config-policy.ts#TOOL_CONFIG, and the answers asked of that loaded config (which build to install, which iOS
+ * tree source and dismissals — flow/); one call into an adapter method, interact/, run/ or flow/launch.ts
+ * (launch_app's, which resolves the activity itself), handed the loaded config rather than a path to read again; and
+ * the response — text through tool-text.ts or the callee (a fill's through interact/fill-text.ts, shared with the
+ * flow line), wrapped by `text`/`image` below. The sequences (ensure_state, run_flow, assert, the contract file
+ * read) are below this layer.
  *
  * That is several statements, not "ONE delegation". `install_app` chooses between the given path
  * and the config's; `assert` parses its specs, resolves the adapter and the
@@ -161,9 +150,8 @@ const launchIntentInput = z
 /**
  * The operation defaults as the tool descriptions quote them — each derived
  * from the constant its module owns, so a default changed there cannot leave
- * a description stale (literals — "3 s" in three places, "12 s", "Default
- * 6", "~20 s" — went stale beside derived numbers). tests/mcp/tool-descriptions.test.ts pins each
- * description against its constant.
+ * a description stale. tests/mcp/tool-descriptions.test.ts pins each description
+ * against its constant.
  */
 const SETTLE_BUDGET = formatSeconds(DEFAULT_SETTLE_TIMEOUT_MS); // interact/resolve.ts
 const ASSERT_BUDGET = formatSeconds(ASSERT_TIMEOUT_MS); // verify/assert.ts
@@ -242,21 +230,17 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
 
   // The session's state that outlives one engine run — the clearState count
   // (flow/launch.ts#EngineSession). One per server: the server IS the
-  // session. Every tool that runs the engine (ensure_state, run_flow, verify)
-  // hands it down, and launch_app, which wipes through the same launch. Not
-  // a module global in the engine, which every server in the process would
-  // share.
+  // session. Not a module global in the engine, which every server in the
+  // process would share.
   const session = new EngineSession();
 
   /**
-   * The ONE way a handler reaches a device (D41, 2026-11-01): the registry's adapter for the platform's bound device
-   * and the project's iOS tree source — the `iosToolSettings` of the config the call loaded (android gets none; no
-   * config is the registry's default kind). One adapter per simulator and configured source, so every tool of a
-   * project shares its idb helper, its launch memory and its screenshot source (ADR 0032, amendment D41). Until D41
-   * eight handlers asked without the kind and, in a wda project, got a second, idb-kind adapter. The engine tools hand
-   * it to the run layer as their lazy form; every other handler reaches it through `serve`. tests/mcp/tools.test.ts
-   * calls every tool of the policy table in a wda project and pins that one wda adapter alone is bound (ADR 0032,
-   * amendment A30).
+   * The ONE way a handler reaches a device: the registry's adapter for the platform's bound device and the project's
+   * iOS tree source — the `iosToolSettings` of the config the call loaded (android gets none; no config is the
+   * registry's default kind). One adapter per simulator and configured source, so every tool of a project shares its
+   * idb helper, its launch memory and its screenshot source (ADR 0032, amendment D41). The engine tools hand it to the
+   * run layer as their lazy form; every other handler reaches it through `serve`. tests/mcp/tools.test.ts calls every
+   * tool of the policy table in a wda project and pins that one wda adapter alone is bound (ADR 0032, amendment A30).
    */
   const deviceFor = (p: Platform, cfg: AveriConfig | undefined): Promise<DeviceAdapter> =>
     registry.get(p, { treeSource: iosToolSettings(cfg, p).treeSource });
@@ -426,7 +410,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     async ({ platform: p, filter, configPath: cp }) => {
       const { adapter } = await serve(p, TOOL_CONFIG.ui_snapshot(p), cp);
       const tree = await adapter.uiTree({ settle: true });
-      // An empty filter string is no filter, as `filter ? … : tree` always read it.
+      // An empty filter string is no filter.
       const selector = filter || undefined;
       const matched = selector === undefined ? undefined : findAll(tree, selector).map(stripChildren);
       // The JSON first and unchanged; the note (if any) is a second block, as

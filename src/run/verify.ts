@@ -44,13 +44,9 @@ import { claimed } from './claims.js';
  *
  * It lives in its own layer above flow/ and verify/ because it COMPOSES both —
  * a FlowEngine to get the app where it needs to be, a Verifier to check it —
- * and neither engine may depend on the other. It used to live inline in
- * mcp/server.ts, where a module-scope `server.connect(transport)` made it
- * impossible to import, so the most intricate error containment in the tool
- * was also the only code with no tests.
+ * and neither engine may depend on the other.
  */
 
-/** The engine context (environment, session) is flow/engine.ts#EngineContext, shared with run/commands.ts. */
 interface VerificationRequestBase extends EngineContext {
   /** Already normalized: deduped, canonical android-then-ios order. */
   platforms: Platform[];
@@ -63,10 +59,8 @@ interface VerificationRequestBase extends EngineContext {
   baselineDir: string;
   /**
    * Test seam: the OCR recognizer behind every OCR read the run makes itself
-   * — the text-parity table AND each leg's `ocr` asserts (2026-10-08; until
-   * then only the table's, and the asserts chose the host's engine on their
-   * own). A flow's `assert:` steps build their own Verifier in the engine
-   * and are outside this choice.
+   * — the text-parity table AND each leg's `ocr` asserts. A flow's `assert:`
+   * steps build their own Verifier in the engine and are outside this choice.
    */
   ocrEngine?: OcrEngine;
 }
@@ -82,11 +76,6 @@ interface VerificationRequestBase extends EngineContext {
  *   message that names the file is the one its author can act on.
  * - `contract`: one already in memory (the run-level tests; a caller that
  *   built it). Validated the same way; a refusal cannot name a file.
- *
- * Until 2026-10-03 the MCP handler read and parsed the file and passed the
- * result in with a separate `contractSource` beside it, while this module
- * owned the validation: the pre-flight lived in two layers, and the name in
- * the refusal was a second field that had to be kept in step with the first.
  */
 type ContractInput =
   | { contractPath?: string; contract?: never }
@@ -143,9 +132,7 @@ const withTree = (leg: VerificationLeg, p: Platform): Contribution<TreeFrame> =>
 /**
  * What the rect table reads off a leg: the tree and the window width judged
  * for it at capture (verify/scale.ts#windowWidth) — both tree-bearing arms
- * carry them, so a png that did not decode costs this table nothing. Until
- * 2026-10-07 this kept the tree alone and the comparator measured the width
- * itself, dropping the device screen the frame had already read.
+ * carry them, so a png that did not decode costs this table nothing.
  */
 const rectLegOf = (leg: VerificationLeg, p: Platform): Contribution<RectLeg> => {
   const got = withTree(leg, p);
@@ -178,35 +165,27 @@ const measuredOf = (leg: VerificationLeg, p: Platform): Contribution<MeasuredFra
  * over a field no table would ever have read (the geometry-only caller of
  * layout-contract.ts's header), or running one whose table can only fail.
  *
- * One owner for the OPTIONS for the same reason (review 2026-10-03): the
- * validator answers "what would the comparator raise" only if both are asked
- * under the same options — the colour theme picks the contract key that is
- * read. `COLOR_OPTIONS` is the ONE object handed to both the colour `validate`
- * (dimensionProblems) and the compare call below; a dark-mode round that set
- * the theme for the comparator alone would let a bad `bg_dark` through
- * validation and fail it after the legs, which is the cost this whole check
- * exists to remove. Colour is the only dimension with options (2026-10-08):
- * the rect and text comparators, and their validators, read everything from
- * the contract — each comparator used to take a test-only tolerance override
- * production never passed (`{}` here), which the validators had to take too
- * only to mirror it (parity review 2026-10-07 P2; rect-parity.ts#
- * tolerancesOf). Until then this record carried an `options` field per
- * dimension, two of three always `{}`.
+ * One owner for the OPTIONS for the same reason: the validator answers "what
+ * would the comparator raise" only if both are asked under the same options —
+ * the colour theme picks the contract key that is read. `COLOR_OPTIONS` is the
+ * ONE object handed to both the colour `validate` (dimensionProblems) and the
+ * compare call below; a dark-mode round that set the theme for the comparator
+ * alone would let a bad `bg_dark` through validation and fail it after the
+ * legs, which is the cost this whole check exists to remove. Colour is the
+ * only dimension with options: the rect and text comparators, and their
+ * validators, read everything from the contract.
  *
  * The table holds FACTS only — title, produced, validate — the three
  * that are asked at two moments (before the legs, after them) and must agree
  * between the two. Everything about HOW one table is built — what a leg
  * contributes, what the section says when no leg could, what the run decided
  * before any leg — is handed to `paritySection` at the one call that builds
- * it. For one day (2026-10-04 → 2026-10-05) those hooks sat in this record
- * too, with a run-context object only the text collector read — one or two
- * users each, so they failed the deletion test and went back to the call
- * sites (ARCHITECTURE §2 has the full account). Comparing and formatting
- * stay hand-written per dimension below, on purpose: the three degrade
- * differently, and the 2026-08-14 review's decision stands — no generic
- * reporting framework. Rejected on 2026-10-05: its opposite, a `report()` in
- * the record and one loop over the three, which would have needed type
- * erasure to iterate a heterogeneous record.
+ * it: those hooks have one or two users each, so they fail the deletion test
+ * as fields of this record. Comparing and formatting stay hand-written per
+ * dimension below, on purpose: the three degrade differently, and the
+ * 2026-08-14 review's decision stands — no generic reporting framework.
+ * Rejected: its opposite, a `report()` in the record and one loop over the
+ * three, which would need type erasure to iterate a heterogeneous record.
  */
 interface ParityDimension {
   title: string;
@@ -254,7 +233,6 @@ const DIMENSIONS: { rect: ParityDimension; color: ParityDimension; text: ParityD
 /** The one sentence two tables share for "no leg had a tree" — rect and text both stand on the tree alone. */
 const SKIPPED_NO_TREE = 'SKIPPED: no leg produced a UI tree.';
 
-/** One dimension's problems — none when this contract does not produce its table. */
 const dimensionProblems = (d: ParityDimension, contract: LayoutContract): string[] =>
   d.produced(contract) ? d.validate(contract) : [];
 
@@ -262,12 +240,12 @@ const dimensionProblems = (d: ParityDimension, contract: LayoutContract): string
  * Every problem the run's own tables would raise about the contract's field
  * values, one line each, named by dimension — empty when there is none.
  *
- * Why it exists (2026-10-03): the schema leaves bg / bg_dark / sample / text /
- * text_dynamic and three tolerances `unknown` so the comparator that knows a
- * field words its diagnosis. Until now that diagnosis was only reachable at
- * READ time — after both legs — so `bg: "#white"` or `tolerance_de: "6"` cost
- * minutes of device work to surface as a `FAILED:` section. The contract is in
- * hand before any leg starts; so is the answer.
+ * Why it exists: the schema leaves bg / bg_dark / sample / text / text_dynamic
+ * and three tolerances `unknown` so the comparator that knows a field words
+ * its diagnosis. Without this, that diagnosis is only reachable at READ time
+ * — after both legs — so `bg: "#white"` or `tolerance_de: "6"` would cost
+ * minutes of device work to surface as a `FAILED:` section. The contract is
+ * in hand before any leg starts; so is the answer.
  *
  * A dimension is asked only if this contract would produce its table, so a
  * contract with no colour anchors is never refused over `tolerance_de`.
@@ -312,29 +290,6 @@ const contractRefusal = (problems: string[], source?: string): string =>
   '\nFix the contract and re-run; nothing was run on a device.';
 
 /**
- * The contract file the request names, read and parsed.
- *
- * The path resolves against the process cwd, as it always has — NOT against
- * averi.yaml's directory, which is where the baselines and the build paths
- * hang (flow/load.ts). The asymmetry is inherited, and is why the read
- * error prints the resolved path beside the one given: a relative contract
- * path next to a `configPath` in another directory is the likely way to get
- * this wrong.
- *
- * A read failure is wrapped (2026-10-03): the bare `ENOENT: no such file or
- * directory, open '…'` said neither which argument it was about nor that no
- * device had been touched. A file that reads but is not a contract keeps
- * parseLayoutContract's own wording, which already names the source.
- *
- * `contract` beside `contractPath` is a type error, but a caller without the
- * types would silently get the file; refused here instead, naming both.
- *
- * Both errors speak this module's vocabulary — `contractPath`, the request
- * field — not the MCP tool's (`contract` is its argument name, and mcp/ is
- * above run/). The read error still says in words what the field is, so an
- * agent holding only the tool error knows which argument to fix.
- */
-/**
  * Why a file read failed, WITHOUT the path: Node's message ends in
  * `, open '<path>'`, and the sentence around it has already named the file —
  * printing it twice made the one line an agent has to act on harder to read.
@@ -352,6 +307,29 @@ function readFailure(e: unknown): string {
   return READ_FAILURES[code] === undefined ? code : `${code} (${READ_FAILURES[code]})`;
 }
 
+/**
+ * The contract file the request names, read and parsed.
+ *
+ * The path resolves against the process cwd — NOT against averi.yaml's
+ * directory, which is where the baselines and the build paths hang
+ * (flow/load.ts). The asymmetry is inherited, and is why the read error
+ * prints the resolved path beside the one given: a relative contract path
+ * next to a `configPath` in another directory is the likely way to get this
+ * wrong.
+ *
+ * A read failure is wrapped: the bare `ENOENT: no such file or directory,
+ * open '…'` says neither which argument it is about nor that no device has
+ * been touched. A file that reads but is not a contract keeps
+ * parseLayoutContract's own wording, which already names the source.
+ *
+ * `contract` beside `contractPath` is a type error, but a caller without the
+ * types would silently get the file; refused here instead, naming both.
+ *
+ * Both errors speak this module's vocabulary — `contractPath`, the request
+ * field — not the MCP tool's (`contract` is its argument name, and mcp/ is
+ * above run/). The read error still says in words what the field is, so an
+ * agent holding only the tool error knows which argument to fix.
+ */
 async function loadContract(req: VerificationRequest & { contractPath: string }): Promise<LayoutContract> {
   const { contractPath } = req;
   if ((req as { contract?: unknown }).contract !== undefined) {
@@ -393,20 +371,16 @@ export async function runVerification(
     if (problems.length > 0) throw new Error(contractRefusal(problems, req.contractPath));
   }
   // Same rule for the environment — run/preflight.ts#refuseUnknownEnvironment
-  // has the why (2026-10-05): a thrown refusal here, before any leg, where it
-  // used to be a contained per-leg FAILED section after resolveAdapter.
+  // has the why: a thrown refusal here, before any leg.
   refuseUnknownEnvironment(cfg, env, req.environment);
 
-  // The run's ONE OCR decision (2026-10-08, review 2026-10-07 assert-capture-
-  // ocr C1): the text table and every leg's Verifier read with the same
-  // engine, or fail closed on the same reason. Until then only the table
-  // got `req.ocrEngine`; each leg's Verifier called `ocrEngineFor` itself,
-  // so a run-level fake never reached the ocr asserts (on a host without
-  // Vision they failed closed with the fake unused) and a two-platform run
-  // built up to three VisionOcr instances, each probing `swiftc --version`
-  // (0.1–0.5 s) before its binary cache. Deciding costs nothing — the
-  // engine probes its toolchain on its first read — so a run with no OCR in
-  // it still never asks for a compiler.
+  // The run's ONE OCR decision: the text table and every leg's Verifier read
+  // with the same engine, or fail closed on the same reason. A Verifier that
+  // called `ocrEngineFor` itself would leave a run-level fake unused by the
+  // ocr asserts, and a two-platform run would build up to three VisionOcr
+  // instances, each probing `swiftc --version` (0.1–0.5 s) before its binary
+  // cache. Deciding costs nothing — the engine probes its toolchain on its
+  // first read — so a run with no OCR in it still never asks for a compiler.
   const ocr = ocrEngineFor(req.ocrEngine);
 
   /** The legs' adapters, for the reply's claim note (claims.ts): it closes the last section. */
@@ -414,11 +388,9 @@ export async function runVerification(
   const runOne = async (p: Platform): Promise<VerificationLeg> => {
     const adapter = await resolveAdapter(p);
     resolved.push(adapter);
-    // ONE engine run per leg (2026-10-07): the state and the flow share its
-    // trace, environment line and recovery budget, so a flow that fails after
-    // the state was ensured fails with the state's lines too. Until then the
-    // leg called the engine's two entries in turn and concatenated their
-    // traces — and a failing flow's error carried only its own half.
+    // ONE engine run per leg: the state and the flow share its trace,
+    // environment line and recovery budget, so a flow that fails after the
+    // state was ensured fails with the state's lines too.
     // Neither named (or both empty, as `if (req.state)` always read them):
     // no run, an empty trace.
     const request = runRequestOf(req.state, req.flow);
@@ -439,30 +411,29 @@ export async function runVerification(
     // The asserts never reject the leg on a tree read either: with persistentRead: 'fail' a read no wait cures
     // (adapters/types.ts#PersistentReadError, D21 — idb's wedged accessibility service) fails each assert after its
     // one read, its message the detail (VerifierOptions.persistentRead), so the leg still captures its frame below —
-    // idb's screenshot works while its tree read is wedged — and asks its health line. Only this leg and the MCP
-    // `assert` tool ask for that; everywhere else, a flow's `assert:` step included, the error is thrown and terminal.
+    // idb's screenshot works while its tree read is wedged — and asks its health line.
     const verifier = new Verifier(adapter, { baselineDir: req.baselineDir, ocr, handOff, persistentRead: 'fail' });
     const results = await verifier.assertAll(specs);
-    // The frame the leg ended on, captured SETTLED — until 2026-10-02 this was
-    // a bare screenshot, so the color and text tables could be fed the one
-    // frame the color assert's own doc rules out: a mid-animation one. With a
-    // contract the tree is read beside it (bounded retry, the transient "null
-    // root node" the polling asserts absorb) and the png scale derived once;
-    // a failed tree read or device-screen read must NOT reject the leg — that
-    // would discard the trace, assert results and screenshot of a minutes-long
-    // device run over an optional extra read — so both land on the frame as
-    // reasons the tables quote.
+    // The frame the leg ended on, captured SETTLED, so the color and text
+    // tables are never fed the one frame the color assert's own doc rules
+    // out: a mid-animation one. With a contract the tree is read beside it
+    // (bounded retry, the transient "null root node" the polling asserts
+    // absorb) and the png scale derived once; a failed tree read or
+    // device-screen read must NOT reject the leg — that would discard the
+    // trace, assert results and screenshot of a minutes-long device run over
+    // an optional extra read — so both land on the frame as reasons the
+    // tables quote.
     // The capture itself throwing (a dead device's refused screenshot) is
     // caught the same way, by finalFrame: no image, one ⚠ line, the rest kept.
     // The health check comes AFTER the frame, on purpose — not beside it, as
-    // ensure_state's does (run/commands.ts, D13 2026-10-31). A leg's
-    // health line is read as the app's state at the END of the frame's
-    // settle: an app that dies while the frame settles must read dead here.
-    // Run side by side, the question would be answered at the frame's start
-    // and could say `true` about an app gone by the time the picture was
-    // taken. ensure_state always asked before its frame, so overlapping
-    // there changed nothing it promised; here it would, for one pidof a leg
-    // (its cost on run/commands.ts#runOnEngine).
+    // ensure_state's does (run/commands.ts). A leg's health line is read as
+    // the app's state at the END of the frame's settle: an app that dies
+    // while the frame settles must read dead here. Run side by side, the
+    // question would be answered at the frame's start and could say `true`
+    // about an app gone by the time the picture was taken. ensure_state's
+    // health line promises nothing about the frame's end, so it can overlap;
+    // here overlapping would break that promise to save one pidof a leg (its
+    // cost on run/commands.ts#runOnEngine).
     const final = await finalFrame(adapter, { readTree: contract !== undefined });
     const health = await appHealth(adapter, cfg);
     return { trace, results, health, ...final };
@@ -481,9 +452,9 @@ export async function runVerification(
     }
     const { trace, results, frame, failed, health } = run.value;
     const verdict = specs.length === 0 ? '' : `\n${assertSummary(results)}`;
-    // One line when the leg's frame did not settle (2026-10-05): the picture
-    // below may be mid-animation, and the tables that read it say nothing.
-    // In the same place, one line when there is no frame at all (2026-10-08).
+    // One line when the leg's frame did not settle: the picture below may be
+    // mid-animation, and the tables that read it say nothing. In the same
+    // place, one line when there is no frame at all.
     const note = frame === undefined ? screenshotFailedLine(failed) : unsettledNote(frame);
     const frameLine = note === undefined ? '' : `\n${note}`;
     sections.push(`## ${p}\n${formatTrace(trace)}${verdict}\n${formatAsserts(results)}${frameLine}${health}`);
@@ -563,11 +534,8 @@ interface SectionBuild<T> {
  * recognizer per leg) and their notes printed in platform order: the run's
  * own notes first (why the whole table is degraded), then each leg's — the
  * leg that could not contribute, or the caveats of the one that did.
- * (2026-10-04: per-leg notes in platform order after the run-level note;
- * previously the per-leg OCR notes came first, in Promise.all completion
- * order — nondeterministic.)
  *
- * Exported for its containment test only; runVerification is the caller.
+ * Exported for its containment test only.
  */
 export async function paritySection<T>(
   title: string,

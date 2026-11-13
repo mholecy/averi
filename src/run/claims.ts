@@ -5,8 +5,7 @@ import { withNoteLine } from '../util/note-line.js';
  * The claim note on what a tool says (A41a, docs/adr/0046-the-ios-tree-source-is-webdriveragent-when-it-comes-up.md):
  * an adapter whose tree source fell back (DeviceAdapter.claimNote — iOS `treeSource: auto` reading through idb) puts
  * its line, `⚠ <note>`, after every reply that claims what it read. Asked after the call, whose first read made the
- * choice. A leaf of the replies, beside run-reply.ts: the tools (mcp/tools.ts) wrap tap, fill and scroll_until replies
- * in `claimed`; the compositions here wrap assert, ensure_state, run_flow (commands.ts) and verify (verify.ts).
+ * choice. A leaf of the replies, beside run-reply.ts.
  */
 
 /**

@@ -11,9 +11,8 @@ import { drawnOverStrip } from '../ui-tree/draw-order.js';
  * An Android device adb lists but averi cannot drive, named for a refusal:
  * `"<serial>" is unauthorized: …` — the quoted serial, then the reason and
  * remedy (adapters/discovery.ts#androidUnusable). One spelling for the
- * registry's three refusals — select_device, a pinned device, the auto-pick
- * (code review S8). undefined for a device that can be driven, one not on
- * Android, or none.
+ * registry's three refusals — select_device, a pinned device, the auto-pick.
+ * undefined for a device that can be driven, one not on Android, or none.
  */
 function unusableNamed(device: Device | undefined): string | undefined {
   const why = device === undefined ? undefined : androidUnusable(device);
@@ -22,9 +21,9 @@ function unusableNamed(device: Device | undefined): string | undefined {
 
 /**
  * Per-call adapter options — today only the iOS tree-source kind (averi.yaml `app.ios.treeSource`). Required by
- * `get` (D41, 2026-11-01): a caller states the project's kind, or that it has none (`treeSource` undefined — the
- * default, `auto`), and cannot forget it — the eight tools that once asked without it were served, in a
- * `treeSource: wda` project, by a second adapter of the default kind.
+ * `get`: a caller states the project's kind, or that it has none (`treeSource` undefined — the default, `auto`), and
+ * cannot forget it — a tool that asked without it would be served, in a `treeSource: wda` project, by a second
+ * adapter of the default kind.
  */
 export interface AdapterOpts {
   treeSource?: IosTreeSourceSetting;
@@ -33,10 +32,8 @@ export interface AdapterOpts {
 /**
  * Builds the adapter that drives ONE device — the id is required: listing
  * devices is DeviceDiscovery's (adapters/discovery.ts), so there is no
- * unbound adapter (2026-10-08; until then a factory call without an id
- * built a probe adapter whose only use was `listDevices()`). The registry
- * resolves `opts` to a kind before calling (kindFor): an ios call always
- * carries one, an android call never does.
+ * unbound adapter. The registry resolves `opts` to a kind before calling
+ * (kindFor): an ios call always carries one, an android call never does.
  */
 export type AdapterFactory = (
   platform: Platform,
@@ -46,11 +43,10 @@ export type AdapterFactory = (
 
 /**
  * Exported for its tests: the registry's own tests inject a factory, so this
- * is the one piece of wiring they cannot see (review 2026-10-02). Which
- * backend serves a kind is NOT decided here — adapters/ios-tree-source.ts
- * owns that (review 2026-10-03); this only hands it the bound device id —
- * and, to Android's parser, the draw order's judgement it asks before
- * widening a node (adapters/types.ts#DrawnOverStrip).
+ * is the one piece of wiring they cannot see. Which backend serves a kind
+ * is NOT decided here — adapters/ios-tree-source.ts owns that; this only
+ * hands it the bound device id — and, to Android's parser, the draw order's
+ * judgement it asks before widening a node (adapters/types.ts#DrawnOverStrip).
  */
 export const defaultFactory: AdapterFactory = (platform, deviceId, opts) => {
   if (platform === 'android') return new AndroidAdapter({ serial: deviceId, drawnOverStrip });
@@ -60,12 +56,11 @@ export const defaultFactory: AdapterFactory = (platform, deviceId, opts) => {
 };
 
 /**
- * The iOS adapter's wiring, in one place (review round 2 of D7a): one idb helper per adapter, shared like `exec` by
- * the adapter (which owns and disposes it) and its tree source. It starts on the first call it could serve — since D7b
- * an input too, so a wda-backed adapter starts one as well (its input is idb's). Since D41 every tool of a project asks
- * for the project's kind, so a simulator runs one helper; two only when two projects with different tree sources
- * drive it from one server (ADR 0032, amendment D41). `deps` reach the tree source: the
- * server passes none; scripts/perf/baseline.ts passes its lab WebDriverAgent's port and derived data.
+ * The iOS adapter's wiring, in one place: one idb helper per adapter, shared like `exec` by the adapter (which owns
+ * and disposes it) and its tree source. It starts on the first call it could serve — an input too, so a wda-backed
+ * adapter starts one as well (its input is idb's). Every tool of a project asks for the project's kind, so a
+ * simulator runs one helper; two only when two projects with different tree sources drive it from one server
+ * (ADR 0032, amendment D41). `deps` reach the tree source.
  */
 export function iosAdapterFor(
   udid: string,
@@ -88,7 +83,6 @@ function kindFor(platform: Platform, opts: AdapterOpts): IosTreeSourceSetting | 
   return platform === 'ios' ? opts.treeSource ?? DEFAULT_IOS_TREE_SOURCE : undefined;
 }
 
-/** The registry's two seams: the factory of bound adapters and discovery (adapters/discovery.ts#DeviceDiscovery) — both or neither. */
 export interface RegistryDeps {
   factory: AdapterFactory;
   discovery: DeviceDiscovery;
@@ -104,7 +98,7 @@ export const defaultRegistryDeps: Readonly<RegistryDeps> = {
  * Dispose one adapter without letting its failure escape: the adapter is being
  * torn down either way, and a synchronous throw and a rejected promise are the
  * same event — the async wrapper is what turns the first into the second. The
- * ONE place that rule lives; both call sites below use it.
+ * ONE place that rule lives.
  */
 const disposeQuietly = (adapter: DeviceAdapter): Promise<void> =>
   (async () => adapter.dispose?.())().catch(() => undefined);
@@ -152,16 +146,14 @@ export class AdapterRegistry {
     return [...android, ...ios];
   }
 
-  /** Device id the platform's tools currently target, if any binding exists. */
   boundId(platform: Platform): string | undefined {
     return this.bindings.get(platform)?.deviceId;
   }
 
   /**
-   * Pin the platform's tools to one booted device (id from listAll). Selecting the device already bound keeps its
-   * adapters, except one that fell back (DeviceAdapter.fellBack: an iOS `treeSource: auto` adapter whose WebDriverAgent
-   * did not come up, A41a): that one is dropped, so the next call builds a fresh adapter that tries WebDriverAgent
-   * again — the retry its note names.
+   * Selecting the device already bound keeps its adapters, except one that fell back (DeviceAdapter.fellBack: an iOS
+   * `treeSource: auto` adapter whose WebDriverAgent did not come up, A41a): that one is dropped, so the next call
+   * builds a fresh adapter that tries WebDriverAgent again — the retry its note names.
    */
   async select(platform: Platform, deviceId: string): Promise<Device> {
     this.assertOpen();
@@ -217,7 +209,7 @@ export class AdapterRegistry {
     if (this.bindings.get(platform) !== undefined) return this.get(platform, opts);
     if (booted.length === 0) {
       // adb lists devices it cannot drive (unauthorized, offline): name them
-      // and the remedy rather than "no booted device" (C5, 2026-10-09).
+      // and the remedy rather than "no booted device".
       const unusable = devices.flatMap((d) => unusableNamed(d) ?? []);
       if (unusable.length > 0) {
         throw new Error(`No usable Android emulator/device found (adb devices): ${unusable.join(' ')}`);
@@ -239,8 +231,8 @@ export class AdapterRegistry {
     // the check before its unbound write). It stays because THIS is the line
     // that creates and caches — a get() parked on a probe when shutdown() ran
     // would otherwise cache a fresh adapter nobody disposes and, on iOS/wda,
-    // spawn the very WebDriverAgent just stopped (review 2026-09-18). Do not
-    // remove the earlier guards on the strength of this one being here.
+    // spawn the very WebDriverAgent just stopped. Do not remove the earlier
+    // guards on the strength of this one being here.
     this.assertOpen();
     const kind = kindFor(platform, opts);
     const key = JSON.stringify([platform, deviceId, kind ?? null]);
@@ -284,9 +276,9 @@ export class AdapterRegistry {
   }
 
   /**
-   * One listing per call: get()'s unbound path asks with `versions: false`
-   * (D13, 2026-10-31) — it reads only ids and states, and on Android a
-   * version is a getprop per attached device (adapters/discovery.ts#ListOpts).
+   * One listing per call: get()'s unbound path asks with `versions: false` —
+   * it reads only ids and states, and on Android a version is a getprop per
+   * attached device (adapters/discovery.ts#ListOpts).
    * select() and listAll() keep the versions: select_device's reply and the
    * device listing are where a version is read. (get()'s bound path asks
    * discovery's `check` instead.)

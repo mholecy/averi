@@ -1,22 +1,12 @@
 /**
  * The one-line responses of the tap, type_text, swipe, launch_app and open_deep_link tools, as pure functions.
  *
- * They are here rather than inline in server.ts because server.ts connects a
- * transport at module load and cannot be imported by a test — and these lines
- * carry information the agent acts on: the resolution note (which of several
- * nodes was tapped) and, until 2026-10-09, the fill's warnings. A regression
- * that dropped either would otherwise be invisible to every test in the repo
- * (review 2026-10-03).
+ * They are pure, and tool-text.test.ts pins every wording variant without
+ * building a server, a registry or a fake device to provoke each one.
  *
- * 2026-10-03, later the same day: the reason above no longer holds — the
- * handlers moved to mcp/tools.ts, which is importable and tested through an
- * in-memory transport. The functions stay here anyway: they are pure, and
- * tool-text.test.ts pins every wording variant without building a server, a
- * registry or a fake device to provoke each one.
- *
- * The type_text reply WITH a selector (a fill) is not here since 2026-10-09:
- * it is interact/fill-text.ts#fillReply, beside the flow's fill line it must
- * agree with — the flow engine may not import this layer.
+ * The type_text reply WITH a selector (a fill) is not here: it is
+ * interact/fill-text.ts#fillReply, beside the flow's fill line it must agree
+ * with — the flow engine may not import this layer.
  */
 
 import { everyNode, type AppHolder, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
@@ -37,8 +27,8 @@ const warnLine = (note: string | undefined): string => (note !== undefined ? `\n
 
 /**
  * `Tapped <selector>`, then — when the tap went elsewhere than the centre
- * (interact/tap-judgement.ts#TapJudge.aim, 2026-10-09) — where and why, then
- * the resolution note in parentheses when there was one. And on its own line
+ * (interact/tap-judgement.ts#TapJudge.aim) — where and why, then the
+ * resolution note in parentheses when there was one. And on its own line
  * below (warnLine), `⚠ <DISABLED_TAP>` when the tapped node is marked disabled
  * (adapters/types.ts#UiNode.disabled, D66): the tap was sent all the same.
  * Unmarked, the reply is one line. `tapped` is what interact/tap.ts#tapElement
@@ -50,7 +40,6 @@ export const tapText = (selector: string, { note, moved, disabled }: TapMarks): 
 /**
  * `Typed N characters` — type_text without a selector: the focused field
  * is typed into and nothing is read back, so there is no fill to render.
- * Moved out of the handler 2026-10-08 with the singular (charactersText).
  */
 export const typedText = (length: number): string => `Typed ${charactersText(length)}`;
 
@@ -58,8 +47,7 @@ export const typedText = (length: number): string => `Typed ${charactersText(len
  * `Swiped[ <direction>] (x,y) → (x,y)` — the stroke actually sent, for a
  * direction and for raw coordinates alike — and on its own line below,
  * `⚠ <note>` when the direction's screen box was not witnessed as the screen
- * (interact/swipe.ts#ScreenBox's note). Both forms were spelled inline in the
- * handler until 2026-10-08 (code review of the swipe commit).
+ * (interact/swipe.ts#ScreenBox's note).
  */
 export const swipeText = (swipe: Stroke & { direction?: Direction; note?: string }): string =>
   `Swiped ${swipe.direction !== undefined ? `${swipe.direction} ` : ''}` +
@@ -70,15 +58,14 @@ export const swipeText = (swipe: Stroke & { direction?: Direction; note?: string
  * `Launched <appId>[/<Activity>] on <platform>[ (state cleared)]` — after
  * `Launched`, the launch's own line (flow/launch.ts#launchedLine, shared with
  * the flow's `launch` trace line: the activity whichever one the launch
- * actually used, so a fallback to averi.yaml's is visible). Moved out of the
- * handler 2026-10-03: wording, not delegation.
+ * actually used, so a fallback to averi.yaml's is visible).
  *
  * And on their own lines below, as swipeText lays out its note: `⚠ <note>`
- * when the launch said one (Launched.note, 2026-10-09 — what holds the app,
- * adapters/types.ts#AppHolder, in interact/app-holder-text.ts's words), then
- * `⚠ clearState: <…>` when it wiped (since 2026-10-09, with the session's
- * count) — the flow's
- * `⚠ launch` and `⚠ clearState` trace lines, in the same words and order.
+ * when the launch said one (Launched.note — what holds the app,
+ * adapters/types.ts#AppHolder, in interact/app-holder-text.ts's words),
+ * then `⚠ clearState: <…>` when it wiped (with the session's count) — the
+ * flow's `⚠ launch` and `⚠ clearState` trace lines, in the same words and
+ * order.
  * The `clearState:` label is kept because the flow line reads exactly so;
  * the note's `launch:` is not, the reply's first line already saying it.
  */
@@ -102,14 +89,14 @@ export const deepLinkText = (platform: Platform, url: string, answer: AppHolder)
 /**
  * ui_snapshot's SECOND text block, after the JSON — or nothing. The array
  * itself never changes (existing parsers read the first block as before);
- * this says what a bare `[]` could not (2026-10-06, docs/bugs/2026-10-06-
+ * this says what a bare `[]` could not (docs/bugs/2026-10-06-
  * ui-snapshot-empty-right-after-launch.md: `role:button` → `[]` two seconds
  * after launch_app returned, on a PIN screen with ten buttons; the same
  * day's addendum: the idb tree stayed a 0×0 Application for 4+ minutes on
- * the RENDERED PIN screen, so no retry promise is made; since the fix of
- * that addendum idb's stuck shape no longer reaches this note — the idb
- * source throws it as a read error, adapters/ios-tree-source.ts
- * IdbEmptyTreeError — and the note covers the bare trees that remain):
+ * the RENDERED PIN screen, so no retry promise is made; idb's stuck shape
+ * does not reach this note — the idb source throws it as a read error,
+ * adapters/ios-tree-source.ts IdbEmptyTreeError — and the note covers the
+ * bare trees that remain):
  *
  * - filter given, nothing matched, the tree has content: the plain fact —
  *   `0 matches for <filter> in a tree of N nodes (roles: …)`. No ⚠: "absent"
@@ -126,7 +113,7 @@ export const deepLinkText = (platform: Platform, url: string, answer: AppHolder)
  * - filter matched, or an unfiltered tree with content: undefined.
  *
  * `match` is the selector together with what it matched, so the two cannot
- * disagree (review 2026-10-06: a selector and a separate count were a clump).
+ * disagree (a selector and a separate count would be a clump).
  */
 export const snapshotNote = (tree: UiNode, match?: { selector: string; matched: readonly unknown[] }): string | undefined => {
   if (match !== undefined && match.matched.length > 0) return undefined;

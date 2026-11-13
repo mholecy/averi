@@ -4,10 +4,8 @@ import { errorMessage } from '../util/error-message.js';
 
 /**
  * App health: is the app under test still running, and if not, what the device's logs say about why — the
- * `appAlive:` line (ARCHITECTURE.md §8). One module since A29 (docs/plans/2026-10-30-performance-backlog.md;
- * docs/adr/0039-ios-liveness-asks-the-hosts-process-list.md, the A29 amendment): until then the crash signatures sat in
- * verify/assert.ts, which never used them, and the line in run/verify.ts, the `verify` tool's orchestration. The
- * device-log excerpt `get_logs` returns is not health, and is its own leaf (run/log-excerpt.ts).
+ * `appAlive:` line (ARCHITECTURE.md §8; docs/adr/0039-ios-liveness-asks-the-hosts-process-list.md, the A29
+ * amendment). The device-log excerpt `get_logs` returns is not health, and is its own leaf (run/log-excerpt.ts).
  *
  * Its place is run/ (A24's order, tests/architecture/layering.test.ts): the app to ask about is averi.yaml's
  * (`app.<platform>`, flow/config.ts#appIdOf), above verify/, and its callers are run/'s compositions.
@@ -16,11 +14,11 @@ import { errorMessage } from '../util/error-message.js';
  *
  * The failure policy, one for every caller (A29): **appHealth words every device failure into the line, and catches
  * nothing else.** A question the device cannot answer is `appAlive: unknown`; logs that cannot be read — the read
- * rejecting or throwing before it returns — cost the crash excerpt, never the verdict. So the callers —
- * `ensure_state`, `run_flow`, `assert` and each `verify` leg — await it bare. What is left to throw is an adapter that
- * breaks its contract (a `platform` that throws on read, a `logs` that resolves to no array), and that is a bug, so it fails the call as any other throw in it does: `ensure_state`, `run_flow` and `assert` reject, a
- * `verify` leg is its `FAILED:` section (the leg's containment of any throw, run/verify.ts). Until A29 `assert`
- * alone caught it and dropped the line; no real adapter reaches that (run/commands.ts#runAsserts).
+ * rejecting or throwing before it returns — cost the crash excerpt, never the verdict. So the callers await it bare.
+ * What is left to throw is an adapter that breaks its contract (a `platform` that throws on read, a `logs` that
+ * resolves to no array), and that is a bug, so it fails the call as any other throw in it does: `ensure_state`,
+ * `run_flow` and `assert` reject, a `verify` leg is its `FAILED:` section (the leg's containment of any throw,
+ * run/verify.ts).
  */
 
 /** Crash signatures per platform, scanned over recent device logs. */
@@ -51,8 +49,7 @@ function scanForCrashes(lines: string[], platform: Platform): string[] {
 /**
  * The health line, opening with its own newline, or '' when averi.yaml names no app for the adapter's platform. When
  * the app died, a crash excerpt from the last 60 s of logs follows, so a run that ended on a blank screen says why.
- * Which replies carry it is the callers' call (run/commands.ts, run/verify.ts); what it does on a failure is this
- * module's (above).
+ * Which replies carry it is the callers' call; what it does on a failure is this module's (above).
  */
 export async function appHealth(adapter: DeviceAdapter, cfg: AveriConfig): Promise<string> {
   const appId = appIdOf(cfg, adapter.platform);
