@@ -1372,6 +1372,31 @@ Residuals of the amendment:
 - **C's centre cover is named the backdrop under idb, W under WDA.** Both are drawn over C's centre; the presented
   remedy, first in precedence, is the same.
 
+## Amendment: the flat tap-catcher control cell (2026-11-13, A43)
+
+A42's analysis left WDA's ungrouped `blur-menu` KNOWN (A, B, D Tapped through the backdrop; C under W): WDA lists the
+hidden backdrop first of seven siblings by its top (0), the card's rows among the targets, and nothing in the tree
+marks the card — so every rule found would also refuse open targets. Whether that is so for good is a question of one
+listing, which the lab did not have: a hidden screen-wide tap-catcher drawn BENEATH ungrouped targets. The round-16
+probes (`tap-catcher-beneath`, `tap-catcher-stacked`) group the targets in a container, which WDA lists after the
+catcher at the same top — a different shape from blur-menu's flat run.
+
+**Decision.** A lab cell, `tap-catcher-beneath-flat` (fixtures/apps/cells/false-covers.json, iOS only; AveriLab/
+FalseCovers.swift#TapCatcherScreen): the four slot targets ungrouped, declared as the ungrouped blur-menu declares its
+layers (the content first at zIndex 1, the `.accessibilityHidden` catcher after it at zIndex 0), drawn the other way
+round — the catcher under every target. Truth: A–D `open`, a tap fires each. Predicted listing: WDA as blur-menu (the
+hidden childless `Other 0,0 402x874` first, then A–D its siblings), idb no trace of the catcher; averi taps all four
+under both sources (pinned on that predicted listing: tests/interact/tap-judgement.test.ts, "A43 prediction"). No src
+change. The capture is the owner's (`capture.ts --cells tap-catcher-beneath-flat` into ios-iphone17-ios27, before the
+Gate C whose visibility cases come from the committed truth); until then golden has no row for it.
+
+**What the capture settles.** Listed as predicted: one listing, two truths (blur-menu's A covered, this cell's A
+open) — no rule on WDA's tree can refuse the one without the other, and blur-menu.wda's rows stay KNOWN for good
+(residual 9; the way out is the eyes or the menu closed first). Listed otherwise (an order, a flag or a frame that
+differs from blur-menu's backdrop): that difference is the evidence an inference needs, filed as its own row. No
+Android twin: the question is WDA's and idb's listing of a SwiftUI run; Android's lab builds none of the blur or
+tap-catcher layers (`LAB_APP`'s `androidLayers` in scripts/truth/lab-device.ts).
+
 ## Residuals accepted
 
 (Numbered as before; 8 replaced by the sheet's bare dim after the full-screen leaf condition removed the Android background case.)

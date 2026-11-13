@@ -5,6 +5,12 @@ import { ANDROID, IOS, type KnownFile } from './known.js';
 // button alone, labelled Close, and tap it by its label: green), toolbar-dismiss, toolbar-dismiss-bar and
 // toolbar-dismiss-short (iOS: form cells); tap-catcher-beneath and tap-catcher-stacked (round 16, iOS: a hidden
 // screen-wide tap-catcher beneath the targets — ADR 0018 residual 9's false-positive probe; every row green).
+// tap-catcher-beneath-flat (backlog A43, iOS): the same catcher beneath the four targets laid ungrouped — the ungrouped
+// blur-menu's shape with the catcher drawn under the targets. Not captured yet — the capture is on the owner's list
+// (capture.ts --cells tap-catcher-beneath-flat, before the next Gate C, whose visibility cases come from the committed
+// truth) — so no row and no count. Every target is declared open: predicted A–D tapped under both sources, 12 rows a
+// source, all green (tests/interact/tap-judgement.test.ts, "A43 prediction"). If WDA lists it as it lists blur-menu
+// (the hidden catcher first, A–D its siblings), blur-menu.wda's A, B, D stay KNOWN for good (presented.known.ts).
 
 export const falseCovers: KnownFile = {
   family: 'false-covers',

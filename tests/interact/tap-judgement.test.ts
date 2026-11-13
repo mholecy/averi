@@ -364,6 +364,31 @@ describe('judgeTap(…).aim() — a later stacked screen layer over the target (
     );
   });
 
+  // A43 (lab cell tap-catcher-beneath-flat, awaiting its first capture): a hidden screen-wide tap-catcher drawn BENEATH
+  // four ungrouped targets. Predicted WDA listing: the ungrouped blur-menu's — the hidden childless `Other 0,0 402x874`
+  // first by its top, the targets its siblings after it — less the card's rows K and W. There every target is open and
+  // must be tapped; on blur-menu the same listing hides A, B and D under the backdrop (presented.known.ts, ADR 0018
+  // residual 9). Pinned here so the capture tells: if WDA lists the cell so, no rule on the tree can refuse blur-menu's
+  // A without refusing these, and blur-menu.wda stays KNOWN.
+  it('A43 prediction: tap-catcher-beneath-flat listed as the ungrouped blur-menu is (WDA) — A–D tapped at their centres, as blur-menu\'s A–D are, nothing marked', async () => {
+    const raw = await readFile(new URL('../fixtures/truth/ios-iphone17-ios27/blur-menu.wda.json', import.meta.url), 'utf8');
+    const flat = raw.replaceAll('lab.blur-menu.', 'lab.tap-catcher-beneath-flat.');
+    const value = JSON.parse(flat) as { value: { children?: unknown[] } };
+    const drop = (n: { rawIdentifier?: string; children?: unknown[] }): boolean => {
+      if (n.children !== undefined) n.children = n.children.filter((c) => drop(c as typeof n));
+      return n.rawIdentifier !== 'lab.tap-catcher-beneath-flat.K' && n.rawIdentifier !== 'lab.tap-catcher-beneath-flat.W';
+    };
+    drop(value.value);
+    const tree = parseWdaSource(JSON.stringify(value));
+    expect([...everyNode(tree)].filter((n) => n.presentation !== undefined)).toEqual([]);
+    const listed = [...everyNode(tree)].filter((n) => n.identifier?.startsWith('lab.') === true).map((n) => n.identifier);
+    expect(listed).toEqual(['A', 'B', 'C', 'D'].map((t) => `lab.tap-catcher-beneath-flat.${t}`));
+    const centres: Record<string, number> = { A: 142, B: 322, C: 502, D: 682 };
+    for (const t of ['A', 'B', 'C', 'D']) {
+      expect(said((await judge(tree, `lab.tap-catcher-beneath-flat.${t}`, { first: IPHONE })).outcome)).toBe(`{"point":{"x":201,"y":${centres[t]}}}`);
+    }
+  });
+
   // A38a (ADR 0018, the amendment "idb's backdrop"): idb lists the unhidden blur menu's backdrop as an unlabelled,
   // id-less `GenericElement 0,0 402x874` BETWEEN the card (K, W) and the screen beneath (A–D). Read as an excused
   // structural leaf, A answered Tapped while the backdrop took the touch.
