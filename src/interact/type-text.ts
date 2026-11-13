@@ -6,8 +6,7 @@ import { withNoteLine } from '../util/note-line.js';
 
 /**
  * Which text averi types, stated ONCE, where text is accepted — and checked
- * before anything is sent to the device (code review of the top-4 pass,
- * 2026-10-07).
+ * before anything is sent to the device.
  *
  * The rule: no C0 control character (U+0000–U+001F — newline, return, tab,
  * escape, form feed, …) and no DEL (U+007F), on either platform. A control
@@ -19,34 +18,27 @@ import { withNoteLine } from '../util/note-line.js';
  * `press_key` tool); there is no tab key, nor one for any other control
  * character (input-text.ts#controlCharRemedy words which).
  *
- * Why here and not in the adapter. Until this review the refusal of `\n`,
- * `\r` and `\t` lived inside the Android adapter's `typeText` only, so:
- * - a fill reached it AFTER its focus tap and its clear — a refused value
- *   wiped the field and then failed, and the device check (row 4b) saw the
- *   type_text tool's selector tap go out before the refusal;
- * - iOS accepted the same characters, so one value passed on one platform
- *   leg and failed on the other;
- * - every other control character (`\v`, `\f`, `\x1b`, …) went to `input
- *   text` unrefused.
- * Now `fillField` refuses before it resolves the field (no keyboard
- * dismissal, no tap, no clear), and the two places that type into whatever
- * is focused — the type_text tool without a selector and the flow's `type:`
- * step — go through `typeIntoFocused`. This CHANGED iOS: a `\n` used to be
- * typed there (as Return); it is refused now, like on Android. The Android
+ * Why here and not in the adapter: an adapter's check runs AFTER a fill's
+ * focus tap and its clear — a refused value wipes the field and then fails
+ * (the device check, row 4b, saw a selector tap go out before such a
+ * refusal) — and a check in one adapter lets a value pass on one platform
+ * leg and fail on the other. `fillField` refuses before it resolves the
+ * field (no keyboard dismissal, no tap, no clear), and a caller that types
+ * into whatever is focused goes through `typeIntoFocused`. The Android
  * adapter keeps a defensive assert of its own for a caller that bypasses
  * interact/.
  *
  * Then what the adapter can type (D43a, docs/adr/0037-a-value-the-adapter-
- * cannot-type-is-refused-before-any-device-call.md): a character outside its
- * `typeable` set (DeviceAdapter.typeable — printable ASCII on Android and on
- * iOS's idb; on iOS over WDA's tree source also the letters, punctuation and
- * symbols `/wda/keys` types, D43) is refused here too, by the same callers, before the same nothing.
- * Before it, iOS's `idb ui text` failed the whole call with a Python trace
- * AFTER the fill's tap and clear, and Android's `input text` typed every
- * character before it and then crashed, the field half-typed. The control
- * check comes first: a control character is a key on every platform, and its
- * remedy (`pressKey`) is its own. An ASCII value pays one regex test more —
- * no device call, no wait.
+ * cannot-type-is-refused-before-any-device-call.md): a character outside
+ * its `typeable` set (DeviceAdapter.typeable — printable ASCII on Android
+ * and on iOS's idb; on iOS over WDA's tree source also the letters,
+ * punctuation and symbols `/wda/keys` types, D43) is refused here too,
+ * before any device call. Unrefused, iOS's `idb ui text` fails the whole call with
+ * a Python trace AFTER the fill's tap and clear, and Android's `input text`
+ * types every character before it and then crashes, the field half-typed.
+ * The control check comes first: a control character is a key on every
+ * platform, and its remedy (`pressKey`) is its own. An ASCII value pays one
+ * regex test more — no device call, no wait.
  *
  * The error names the character by code point, never the value around it:
  * values may be credentials.
@@ -56,8 +48,8 @@ const SHORT_ESCAPES: Readonly<Record<string, string>> = { '\n': '\\n', '\t': '\\
 
 /**
  * A refused character as a visible, quoted escape — never the raw character.
- * `JSON.stringify` was used until 2026-10-08 and escapes C0 but not DEL, so a
- * DEL refusal printed `("", …)` with an invisible U+007F inside the quotes.
+ * Not `JSON.stringify`: it escapes C0 but not DEL, so a DEL refusal would
+ * print `("", …)` with an invisible U+007F inside the quotes.
  */
 function visibleEscape(ch: string): string {
   return `"${SHORT_ESCAPES[ch] ?? `\\u${ch.charCodeAt(0).toString(16).padStart(4, '0')}`}"`;

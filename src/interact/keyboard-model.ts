@@ -152,10 +152,9 @@ export interface GuardOptions extends SettleOptions {
    */
   dismissals?: readonly KeyboardDismissal[];
   /**
-   * The eyes' order question (ui-tree/eyes.ts#Eyes.order; verify/eyes.ts#eyesOn, wired at the composition root —
-   * mcp/tools.ts, flow/engine.ts): asked once by the tap's judgement of a centre covered by a control the listing does
-   * not order (tap-judgement.ts#TapAsks). REQUIRED (A30; ADR 0024, amendment A30): a caller that forgot them would
-   * typecheck and leave that order untold. A test hands a fake (tests/helpers/eyes.ts#NO_EYES) or its own table.
+   * The eyes' order question (ui-tree/eyes.ts#Eyes.order; verify/eyes.ts#eyesOn): asked once by the tap's judgement
+   * of a centre covered by a control the listing does not order (tap-judgement.ts#TapAsks). REQUIRED (A30; ADR 0024,
+   * amendment A30): a caller that forgot them would typecheck and leave that order untold.
    */
   eyes: OrderEyes;
 }
@@ -174,11 +173,9 @@ export interface DismissResult {
 /**
  * A settled resolution as one LOOK: the node, and the look of the tree read
  * that holds it (ui-tree/look.ts#Look: its scene, its keyboard reading and
- * position) — read by every judgement of the look: the tap's
- * (tap-judgement.ts#judgeTap, a TapLook as it stands) and the dismissal
- * picker's (keyboard-dismissal.ts#configuredStrategy). None derives a scene or a
- * position of its own, so a look is at most one draw-order walk; the scroll
- * read builds its own look once per read (scroll-read.ts#factsOf).
+ * position). No judgement of the look derives a scene or a position of its
+ * own, so a look is at most one draw-order walk; the scroll read builds its
+ * own look once per read (scroll-read.ts#factsOf).
  */
 export interface SeenLook extends Resolved {
   readonly look: Look;
@@ -199,7 +196,6 @@ export interface ClearedLook extends SeenLook {
   keyboardHidden?: string;
 }
 
-/** The guard's answer: the node and its look — the same look — with the keyboard sentence folded into the resolution note and kept alone beside it. */
 export const withNote = (resolved: SeenLook, keyboardHidden: string): ClearedLook => ({
   node: resolved.node,
   look: resolved.look,
@@ -272,12 +268,11 @@ export async function lookAgain(adapter: KeyboardAdapter, target: Target, opts: 
 export type ConfirmLook<T, S> = { gone: T } | { stillUp: S };
 
 /**
- * The confirmation after a side effect, shared by the guard (both models) and the in-tree dismissal: up to `looks`
- * looks, KEYBOARD_HIDE_DELAY_MS before each — the first that finds the keyboard gone answers, and only the LAST still-up
- * look is handed back, with how many looks there were, for the caller to refuse over or (the in-tree model) to judge
- * its next strategy on. A look that throws (the target not coming back, or the tree not reading) ends it there. Never a
- * side effect between the looks: the loop has no way to act, so what a refusal says was done — "back was pressed",
- * "that tap cannot be untapped" — is what was done.
+ * The confirmation after a side effect: up to `looks` looks, KEYBOARD_HIDE_DELAY_MS before each — the first that
+ * finds the keyboard gone answers, and only the LAST still-up look is handed back, with how many looks there were, for
+ * the caller to refuse over or (the in-tree model) to judge its next strategy on. A look that throws (the target not
+ * coming back, or the tree not reading) ends it there. Never a side effect between the looks: the loop has no way to
+ * act, so what a refusal says was done — "back was pressed", "that tap cannot be untapped" — is what was done.
  */
 export async function confirmHidden<T, S>(looks: number, look: () => Promise<ConfirmLook<T, S>>): Promise<ConfirmLook<T, S> & { looks: number }> {
   for (let n = 1; ; n++) {

@@ -15,8 +15,7 @@ import type { AppHolder, ChooserButton, ChooserSheet, LinkAlert, LinkChooser, Po
  *
  * Why in interact/ rather than mcp/tool-text.ts: a launch's text is a line of the flow's trace too, and the flow engine
  * may not import mcp/ (ARCHITECTURE.md §2), the precedent being interact/fill-text.ts and interact/scroll-text.ts: the
- * judge emits facts, the renderer owns every sentence. Where each text goes is its callers': a link's headline or ⚠
- * line (mcp/tool-text.ts#deepLinkText), a launch's ⚠ line (flow/launch.ts#launchApp).
+ * judge emits facts, the renderer owns every sentence.
  */
 
 /** What is held: the link a deep link opens, or the app a launch brings forward. */
@@ -62,7 +61,7 @@ const linkSaw = (app: string): string =>
   `averi did not see ${app} come forward after the link: iOS may be asking to confirm it ("Open in “…”?") or ` +
   `another app may be in front ${ANSWER_IT}`;
 
-/** A link's lead when the wait could not tell which app is in front (review of D49a: no over-claim). */
+/** A link's lead when the wait could not tell which app is in front: no over-claim. */
 const linkUnchecked = (app: string): string =>
   `averi could not check that ${app} came forward after the link: if iOS asks to confirm it ("Open in “…”?"), the ` +
   `link waits behind the alert ${ANSWER_IT}`;
@@ -76,9 +75,9 @@ const linkNotAsked = (app: string): string =>
 const SPRINGBOARD_TREE = '. A screenshot does tell one thing here: whether a system alert is in front (answer it) or the home screen still is';
 
 /**
- * The wait did not confirm the app, and knows no holder (D48, D49a): the wait's `detail` (its account and its advice on re-reading), led for
- * a link by what may hold it — never a bare "Opened" for a link that may wait behind iOS's "Open in …?". A WDA not up
- * says so for a link and nothing for a launch, which has no confirmation to ask for.
+ * The wait did not confirm the app, and knows no holder (D48, D49a): the wait's `detail` (its account and its advice
+ * on re-reading), led for a link by what may hold it — never a bare "Opened" for a link that may wait behind iOS's
+ * "Open in …?". A WDA not up says so for a link and nothing for a launch, which has no confirmation to ask for.
  */
 function unknownText(subject: HeldSubject, answer: Extract<AppHolder, { holder: 'unknown' }>): string | undefined {
   const forLink = 'link' in subject;

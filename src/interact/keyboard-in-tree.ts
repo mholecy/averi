@@ -134,12 +134,10 @@ export class AfterDismissalTap extends KeyboardGuardError {
 }
 
 /**
- * What a refusal after the in-tree model's moves says in all four places (the guard's still-up look and its failed
- * look, `dismissKeyboard`'s still-up read and its failed read): a move cannot be undone, and the screen is the
- * reader's to look at. One tap is said as before the fallbacks; several moves, or a drag, say what more they may have
- * done. Not the window model's sentence after a failed look (keyboard-window.ts, the `hint` its Hiding carries): that
- * one says back may have NAVIGATED if no keyboard was really up, and whether the witness could be asked — a different
- * fact about a different key, so it is written there.
+ * What a refusal after the in-tree model's moves says: a move cannot be undone, and the screen is the reader's to look
+ * at. Not the window model's sentence after a failed look (keyboard-window.ts, the `hint` its Hiding carries): that one
+ * says back may have NAVIGATED if no keyboard was really up, and whether the witness could be asked — a different fact
+ * about a different key, so it is written there.
  */
 const mayHaveChanged = (moves: readonly DismissalMove[]): string =>
   moves.length === 1 && moves[0].kind === 'tap'
@@ -169,7 +167,6 @@ const movesDone = (moves: readonly DismissalMove[]): string => {
 /** `tapped id:"login_title"`, `tapped id:"login_title", dragged the target's scroll view up` — the trace's. */
 const movesTrace = (moves: readonly DismissalMove[]): string => moves.map((m) => wordsOf(m).moved).join(', ');
 
-/** `nothing else was tapped`, or `done` once a drag was among the moves. */
 const nothingElse = (moves: readonly DismissalMove[]): string => `nothing else was ${moves.some((m) => m.kind === 'drag') ? 'done' : 'tapped'}`;
 
 /** ` (passed over: <skip lines>)` — why each strategy judged after the first move was passed over — or nothing when none was. */

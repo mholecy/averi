@@ -26,9 +26,7 @@ import { judgeTap, type Aim } from './tap-judgement.js';
  * shares — the first look and its fail-open rule, the one side effect, the
  * confirming looks — and chooses the model; what a model decides, does and
  * says is its own module (keyboard-window.ts, keyboard-in-tree.ts). The
- * callers see only this file: `tapElement` and `fillField` take
- * `resolveClearOfKeyboard`, the flow engine `dismissKeyboard`, and the
- * failures they catch are the classes re-exported below.
+ * failures callers catch are the classes re-exported below.
  */
 export { KeyboardGuardError, type DismissOptions, type DismissResult, type GuardOptions, type KeyboardDismissal, type ResolvedClear } from './keyboard-model.js';
 export { AfterKeyboardDismissal, KeyboardStateDisagreement } from './keyboard-window.js';
@@ -61,9 +59,7 @@ function keyboardModel(adapter: KeyboardAdapter): KeyboardModel {
  * stands is ui-tree/standing.ts#Scene's; the tap's judgement of one look is
  * ONE `judgeTap` — asked of the first look, and of the look a guard that
  * acted hands back.
- * The answer carries the point to tap (`ResolvedClear.point`). Used by
- * tapElement (the flow `tap:` step and the MCP `tap` tool) and by
- * fillField's focus tap; there is no third tap on a resolved node.
+ * The answer carries the point to tap (`ResolvedClear.point`).
  *
  * The problem, measured on a device (finportal login, Pixel_3a,
  * Android 13): after the password fill the keyboard was up, covering
@@ -123,17 +119,16 @@ function keyboardModel(adapter: KeyboardAdapter): KeyboardModel {
  * Rejected: hiding the keyboard before every tap (a `back` per tap, and a
  * navigation whenever the adapter is wrong); scrolling the target into view
  * instead (scrolls a screen the author did not ask to scroll, and a
- * non-scrolling login form has nowhere to go) — still rejected as the
- * FIRST move; since 2026-10-18 the in-tree model's last fallback is a drag
- * that lifts the target, once the configured dismissals the author opted
- * into have left the keyboard up (ADR 0022); tapping anyway and reporting
- * it (the stray character is already in the field) — which is also why a
- * tap is not sent on ONE sample in which the input method contradicts the
- * window state: the input method can be the
- * stale side too (an IME switch or restart, a hide recorded but not yet
- * applied), and then that tap is the stray character. Also rejected: one
- * decision table over all four window-model phases (keyboard-window.ts says
- * why).
+ * non-scrolling login form has nowhere to go) — still rejected as the FIRST
+ * move; the in-tree model's last fallback is a drag that lifts the target,
+ * once the configured dismissals the author opted into have left the
+ * keyboard up (ADR 0022); tapping anyway and reporting it (the stray
+ * character is already in the field) — which is also why a tap is not sent
+ * on ONE sample in which the input method contradicts the window state: the
+ * input method can be the stale side too (an IME switch or restart, a hide
+ * recorded but not yet applied), and then that tap is the stray character.
+ * Also rejected: one decision table over all four window-model phases
+ * (keyboard-window.ts says why).
  */
 export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: Target, opts: GuardOptions): Promise<ResolvedClear> {
   const first = seenLook(adapter, await resolveSettled(adapter, target, opts));
@@ -149,7 +144,6 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
   // scroll view scrolls back down). The screen comes from the first look —
   // the orientation does not turn inside one tap — or from the re-read a
   // refusal makes first.
-  // The eyes' order question (GuardOptions.eyes, required since A30).
   const asks = { eyes: opts.eyes };
   const judge = await judgeTap(adapter, target, first, await usableScreen(adapter, first.look), asks);
   const { screen } = judge;
@@ -179,8 +173,6 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
     // Handed back clear, nothing sent: judged again on the look that holds the node, off its reading.
     return clearOf(ready.cleared, await (await judgeTap(adapter, target, ready.cleared, screen, asks)).aim());
   }
-  // Each hiding: its one side effect, then its confirming looks; still covered on the last, the model's refusal — or,
-  // in-tree, the next hiding it chose on that look, performed and confirmed the same way.
   let { hiding } = ready;
   for (;;) {
     const current = hiding;

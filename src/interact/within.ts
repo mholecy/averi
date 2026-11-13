@@ -11,16 +11,15 @@ import { axisOf, type Direction } from './swipe.js';
  * `scroll_until`'s `within` (D78): the scroll view the caller names for the strokes to go over until the target is
  * first read — before that read the plan strokes the screen's largest scroller and the scroll views nested in it
  * (interact/stroke-plan.ts#candidatesOf), so a row of a SIBLING list (the lab's `scroll-bounded`: O and F, rows of
- * `lower`, beside the larger `upper`) was never reached; D76's exhausted reply named such lists and left the remedy
- * manual. Named here as the caller can name it (ADR 0010's D78 amendment):
+ * `lower`, beside the larger `upper`) is never reached. Named here as the caller can name it (ADR 0010's D78
+ * amendment):
  * - a SELECTOR of exactly one node — a selector string (the MCP tool's), or an element spec (a flow's `scroll_until`,
  *   D81: matched as a step's `element` is, ui-tree/selectors.ts#findTarget, every field exact) — by one rule: the
  *   scroll view of that node's very rect (ui-tree/scroll-containers.ts#isScrollViewOf, through `Clips.axesOf` — the
  *   node itself when it scrolls, the list a wrapper is laid exactly over, and so too the list an unrelated overlay of
  *   its rect lies over: the rect is that scroll view's), else the NEAREST scroll view of the node, by the rule that
- *   takes a found target's
- *   (stroke-plan.ts#targetScrollers: Android's clipping chain, else the scrolling ancestors); a node under none is
- *   refused;
+ *   takes a found target's (stroke-plan.ts#targetScrollers: Android's clipping chain, else the scrolling ancestors); a
+ *   node under none is refused;
  * - a RECT, as ui_snapshot and a failure reply quote one: the listed scroll view of exactly that rect
  *   (ui-tree/geometry.ts#Clips.axesOf finds it by scroll-containers.ts#isScrollViewOf, the test every remembered scroll
  *   view is found again by), so a rect a pixel off is none.
@@ -56,7 +55,6 @@ export interface OfferedScrollView {
 export type WithinRefusal =
   /** The selector matches several nodes, listed in tree order. */
   | { readonly of: 'ambiguous'; readonly matches: readonly QuotedNode[] }
-  /** The selector matches nothing in the tree. */
   | { readonly of: 'absent' }
   /** The selector's one match neither scrolls nor lies in anything that scrolls. */
   | { readonly of: 'unscrolled'; readonly node: QuotedNode }
