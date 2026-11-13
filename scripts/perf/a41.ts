@@ -530,9 +530,9 @@ export function snapshotRootLabel(reply: string): string | undefined {
 /**
  * An `auto` session: launch_app (WDA stopped), the first tap (the catalog's `open`), the open cell waited for
  * (`openSettled`: listed in time — else the warm taps paid the push), two warm taps on its A; launch_app again and the
- * same first tap with WDA up; launch_app a third time, the catalog waited for (`catalogSettled`), and the same tap warm.
- * Then two more fresh sessions (A41b): the waited leg — launch_app, an untimed wait of WAITED_GAP_MS after
- * it replied (no tree read), the same first tap (`firstWaited`; `waitedGapMs`, the time from launch_app's reply to the
+ * same first tap with WDA up; launch_app a third time, the catalog waited for (`catalogSettled`), and the same tap
+ * warm. Then two more fresh sessions (A41b): the waited leg — launch_app, an untimed wait of WAITED_GAP_MS after it
+ * replied (no tree read), the same first tap (`firstWaited`; `waitedGapMs`, the time from launch_app's reply to the
  * tap's) — and `foreground` (ForegroundRun).
  */
 export interface AutoRun {

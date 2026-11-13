@@ -100,8 +100,8 @@ function ownScrollerListed(t: Pick<TargetTruth, 'scrollView'>, cell: CellTruth, 
  * along `toward`'s axis (why only an absent target is held to its scroll view outright:
  * rows.ts#StrokeOptions.scrollerListed; a framed one the tree does not list is held to its scroll view or the reply's
  * naming it, edgeRows, D76). What the contract asks of it is target-contract.ts#ABSENT_STOPS. No tap or colour row: it
- * has no frame, so nothing of it is on the screen to tap or measure (the off-screen rows ask both of framed
- * off-screen targets).
+ * has no frame, so nothing of it is on the screen to tap or measure (the off-screen rows ask both of framed off-screen
+ * targets).
  */
 export function absentRows(platform: Platform, a: AbsentTarget, cell: CellTruth, source: SourceKind, tree?: string): Expectation[] {
   if (a.toward === undefined) return [];

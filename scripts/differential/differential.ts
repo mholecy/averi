@@ -210,9 +210,9 @@ function tally(values: (string | null | undefined)[]): Map<string, number> {
 }
 
 /**
- * The targets of one side's tree, in tree order: each node by the first selector that names it alone — its
- * identifier, else its text (its label, when no other node's label or value reads the same), else its label (unique
- * among labels), else its value, else its role and text, else its role and identifier.
+ * The targets of one side's tree, in tree order: each node by the first selector that names it alone — its identifier,
+ * else its text (its label, when no other node's label or value reads the same), else its label (unique among labels),
+ * else its value, else its role and text, else its role and identifier.
  */
 function targetsOf(tree: SnapNode): { targets: Target[]; shared: string[]; keyboard: boolean; neutral?: string } {
   const nodes = [...walk(tree)];

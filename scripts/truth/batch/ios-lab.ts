@@ -133,9 +133,9 @@ async function portFree(k: Killer): Promise<{ port: PortRead; killed: boolean; w
 }
 
 /**
- * The lab's WebDriverAgent ended: pkill by its two exact patterns, then port 8120 proven free
- * (portFree). Returns the port as read last, whether a listener was killed, and the whys of what failed (none: all
- * asked; a port not free is the caller's to say).
+ * The lab's WebDriverAgent ended: pkill by its two exact patterns, then port 8120 proven free (portFree). Returns the
+ * port as read last, whether a listener was killed, and the whys of what failed (none: all asked; a port not free is
+ * the caller's to say).
  */
 export async function killLabWda(k: Killer): Promise<{ port: PortRead; killed: boolean; whys: string[] }> {
   const whys: string[] = [];
@@ -192,9 +192,9 @@ export async function health(lab: IosSim): Promise<string | undefined> {
 export type Dismissal = { state: 'none' } | { state: 'dismissed'; how: string } | { state: 'stuck'; why: string } | { state: 'unread'; why: string };
 
 /**
- * A leftover "Open in …?" confirmation: read; found, Cancel tapped at its centre — at most
- * ALERT_TAPS times, each followed by ALERT_WAIT_MS and a fresh read; stuck when it has no Cancel with a frame or is
- * still up. Nothing but that Cancel is ever tapped.
+ * A leftover "Open in …?" confirmation: read; found, Cancel tapped at its centre — at most ALERT_TAPS times, each
+ * followed by ALERT_WAIT_MS and a fresh read; stuck when it has no Cancel with a frame or is still up. Nothing but that
+ * Cancel is ever tapped.
  */
 export async function dismissOpenIn(lab: IosSim): Promise<Dismissal> {
   const read = async () => openInAlertOf(await lab.idb(['ui', 'describe-all', '--json']));
@@ -217,10 +217,10 @@ export type ResetResult = { ok: true; warning?: string } | { ok: false; why: str
 
 /**
  * The reset: the companion ended and its entry dropped (endCompanion; batch-13), the lab's WebDriverAgent ended,
- * shutdown (boundFor's 120 s), boot and bootstatus (its 300 s each), RESET_WAIT_MS, the lab launched,
- * RESET_WAIT_MS, the health check. No companion is started by hand: idb starts its own (when its list has no entry for
- * the udid), kept in its call's group (bounded.ts#KEEPS_GROUP), ended at the run's end. A disconnect that failed is
- * the reset's WARN and its warning; the health check decides whether the reset is done.
+ * shutdown (boundFor's 120 s), boot and bootstatus (its 300 s each), RESET_WAIT_MS, the lab launched, RESET_WAIT_MS,
+ * the health check. No companion is started by hand: idb starts its own (when its list has no entry for the udid), kept
+ * in its call's group (bounded.ts#KEEPS_GROUP), ended at the run's end. A disconnect that failed is the reset's WARN
+ * and its warning; the health check decides whether the reset is done.
  */
 export async function reset(c: LabCtx, lab: IosSim): Promise<ResetResult> {
   c.step('NOTE', `ios-reset: ${nameInLine(lab.udid)}, its idb companion and the lab's WebDriverAgent`);
@@ -245,9 +245,9 @@ export async function reset(c: LabCtx, lab: IosSim): Promise<ResetResult> {
 }
 
 /**
- * The check before `label`: the lab's WebDriverAgent ended, CHECK_WAIT_MS, the Open-in alert dismissed, the
- * health check; a stuck alert or a failed health check resets the simulator. Fit to run — with the reset's warning
- * when it left one (its companion entry may be stale, batch-13) — or why not.
+ * The check before `label`: the lab's WebDriverAgent ended, CHECK_WAIT_MS, the Open-in alert dismissed, the health
+ * check; a stuck alert or a failed health check resets the simulator. Fit to run — with the reset's warning when it
+ * left one (its companion entry may be stale, batch-13) — or why not.
  */
 export async function iosCheck(c: LabCtx, lab: IosSim, label: string): Promise<ResetResult> {
   await killLabWda(lab);
@@ -427,11 +427,11 @@ export interface WdaWindowOptions {
  * The WDA window, in its order: the `.cases` of its runs; the health check; the backup (S4) — failed, the block's
  * INCONCLUSIVE naming why, and nothing changed or run; the window opened; the work; the window put back (the
  * WebDriverAgent ended, the 4 s wait, port 8120 free, the domains key by key) — its line one of the block's verdict
- * lines, and the window closed only when it verified, else left for RESTORE; the end check; then, with the state
- * clean, the compare (a late writer: its line a verdict line, its hand lines to RESTORE). Whether the work ran, and
- * whether the window was put back — not put back, the block's own verdict is INCONCLUSIVE at once, so no judge's PASS
- * can stand for a run that left the lab's settings changed (T2 S6b review round 2); and the warnings its two checks'
- * resets left (the companion entry's, batch-13), for the block to say.
+ * lines, and the window closed only when it verified, else left for RESTORE; the end check; then, with the state clean,
+ * the compare (a late writer: its line a verdict line, its hand lines to RESTORE). Whether the work ran, and whether
+ * the window was put back — not put back, the block's own verdict is INCONCLUSIVE at once, so no judge's PASS can stand
+ * for a run that left the lab's settings changed (T2 S6b review round 2); and the warnings its two checks' resets left
+ * (the companion entry's, batch-13), for the block to say.
  */
 export async function wdaWindow(ctx: BlockCtx, lab: IosSim, o: WdaWindowOptions): Promise<{ ran: boolean; putBack: boolean; warnings: string[] }> {
   for (const r of o.runs ?? []) ctx.asksLive(r.name, r.asked);

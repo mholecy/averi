@@ -9,15 +9,15 @@ import { NO_UDID, type NeedResult } from './runner-lines.js';
 import { exitText, failedCall, nameInLine } from './words.js';
 
 /**
- * The lab apps built from the checkout under test (T2 S6b), as two needs a block names — `ios-build`,
- * `android-build` — so a build that fails makes every block needing it INCONCLUSIVE naming why (the runner's need
- * rule), and a block that does not need it runs on the app already installed: main's catalog `--check`ed first, once
- * for both (S3's not-ported row: a stale cells.json builds nothing); the iOS build (xcodegen, xcodebuild) and the
- * Android build (`gradlew assembleDebug` under JDK 17: `jdk17Of` in lab-lines.ts, T23), each a bounded step logged in
- * the lab folder, its product's cells.json main's; then `gradlew --stop`, after every Android build: the Gradle
- * daemon leaves the call's group by design, so S2's group kill cannot reach it. xcodebuild needs no pkill: its group
- * ends with it (S2). The devices' needs (ios-lab.ts, android-lab.ts) install this run's build (`built`) before their
- * cells check; and `labBlock` is the `lab` block — `ONLY=lab` runs just its needs.
+ * The lab apps built from the checkout under test (T2 S6b), as two needs a block names — `ios-build`, `android-build` —
+ * so a build that fails makes every block needing it INCONCLUSIVE naming why (the runner's need rule), and a block that
+ * does not need it runs on the app already installed: main's catalog `--check`ed first, once for both (S3's not-ported
+ * row: a stale cells.json builds nothing); the iOS build (xcodegen, xcodebuild) and the Android build
+ * (`gradlew assembleDebug` under JDK 17: `jdk17Of` in lab-lines.ts, T23), each a bounded step logged in the lab folder,
+ * its product's cells.json main's; then `gradlew --stop`, after every Android build: the Gradle daemon leaves the
+ * call's group by design, so S2's group kill cannot reach it. xcodebuild needs no pkill: its group ends with it (S2).
+ * The devices' needs (ios-lab.ts, android-lab.ts) install this run's build (`built`) before their cells check; and
+ * `labBlock` is the `lab` block — `ONLY=lab` runs just its needs.
  */
 
 /** A build's bound when the batch names none (the B_BUILD knob's default). */
@@ -274,8 +274,8 @@ export function labBuild(o: { secs?: number; jvms?: readonly string[] } = {}): L
 }
 
 /**
- * The `lab` block: it runs only its needs (the builds, the devices' checks, as the batch names them) and says they
- * were met — so `ONLY=lab` checks the lab and runs nothing else; a need not met makes it INCONCLUSIVE naming why (the
+ * The `lab` block: it runs only its needs (the builds, the devices' checks, as the batch names them) and says they were
+ * met — so `ONLY=lab` checks the lab and runs nothing else; a need not met makes it INCONCLUSIVE naming why (the
  * runner's rule), each need's LAB line the details.
  */
 export function labBlock(needs: readonly Need[], o: { build?: Pick<LabBuild, 'failures'> } = {}): Block {

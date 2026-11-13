@@ -23,8 +23,8 @@ import { TOUCH_SLACK } from './truth.js';
 
 /**
  * The cut the oracle forgives, in px: truth.ts's TOUCH_SLACK, the lab's one slack — a View's rect and the app's frame
- * may differ by a pixel or two, far under the cuts the lab's carousels leave (17–44 px short at the
- * bound on carousel-recycler-free, 372 px in batch-9's false pass).
+ * may differ by a pixel or two, far under the cuts the lab's carousels leave (17–44 px short at the bound on
+ * carousel-recycler-free, 372 px in batch-9's false pass).
  */
 export const CUT_TOLERANCE_PX = TOUCH_SLACK;
 

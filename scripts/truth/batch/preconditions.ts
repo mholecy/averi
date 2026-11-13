@@ -185,9 +185,9 @@ const missingOf = (ids: readonly string[], have: ReadonlySet<string>): string[] 
 
 /**
  * The live cases a block runs are main's: selectCases (live-cases.ts) picks each id for the platform, the lab app
- * (native by default) and the groups (forms by default) — the table, never a grep. Every id it does not pick is
- * named. No id is never a pass: a block judged on no case proves nothing. A table that does not load or read is said,
- * never thrown.
+ * (native by default) and the groups (forms by default) — the table, never a grep. Every id it does not pick is named.
+ * No id is never a pass: a block judged on no case proves nothing. A table that does not load or read is said, never
+ * thrown.
  */
 export async function casesOnMain({
   ids,

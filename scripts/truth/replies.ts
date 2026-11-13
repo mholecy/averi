@@ -128,8 +128,8 @@ export function hedgeWhy(reply: string): HedgeWhy | undefined {
 export const fullyHedged = (reply: string) => hedgedLead(reply) !== undefined;
 
 /**
- * The hedge covers a cut (`WHOLE`, alone or with `UNCOVERED`): what a flush edge no probe checked leaves unconfirmed.
- * A guard, true only of a lead that hedges a cut — false of no lead and of an UNCOVERED one alike.
+ * The hedge covers a cut (`WHOLE`, alone or with `UNCOVERED`): what a flush edge no probe checked leaves unconfirmed. A
+ * guard, true only of a lead that hedges a cut — false of no lead and of an UNCOVERED one alike.
  */
 export const hedgesCut = (lead: HedgedLead | undefined): lead is HedgedLead & { what: Exclude<HedgeWhat, 'UNCOVERED'> } => lead !== undefined && lead.what !== 'UNCOVERED';
 
@@ -141,8 +141,8 @@ export const claimsVisible = (reply: string) => VISIBLE_STOP.test(reply);
  * resolve.ts, "…waiting for element X to appear"), scroll_until's give-up (src/interact/scroll-text.ts, "element never
  * appeared in the tree"), the assert poll's (src/verify/poll-verdict.ts, "not found within N s"). Not a timeout whose
  * hint says the selector MATCHED nodes, none of them usable (src/ui-tree/miss.ts#ZERO_AREA_HINT and the clipped-out
- * hint: "it matched only 0×0 nodes …", "it matched only nodes clipped out above its scroll container …")
- * — the target is in the tree, refused for where it lies (edges/scroll-collapsing's A, its uiautomator bounds inverted:
+ * hint: "it matched only 0×0 nodes …", "it matched only nodes clipped out above its scroll container …") — the target
+ * is in the tree, refused for where it lies (edges/scroll-collapsing's A, its uiautomator bounds inverted:
  * calibration.json #10).
  */
 export const notInTree = (reply: string) => /waiting for element .* to appear(?![\s\S]*\(it matched only )|never appeared in the tree|not found within/.test(reply);
@@ -355,12 +355,12 @@ export const CAROUSEL_REPLY_WORDS = [
 const [UNAIMABLE, UNFIT, PROVEN_CUT, INFERRED_AXIS, HELD_CUT] = CAROUSEL_REPLY_WORDS;
 
 /**
- * What a carousel's `scroll_until … fully: true` replied, from a closed set (T7a): `unaimable`
- * (D68's stop: no swipe can bring it whole, the round sent nothing more — it says "drop fully: true" too, so it is
- * asked first), `unfit` (D52's: as wide as its scroll view), `maxSwipes-hedged` (the bound, with the flush cut a probe
- * proved: "may still be cut there" — D62's honest end and ADR 0021's residual), `fully-visible` (the stop claimed whole,
- * by the tree or the eyes, its lead no hedge — `fullyHedged`, T17 — batch-9's false pass reads so),
- * and `other` (a bound without that hedge, a stuck stop, a plain stop, any other error).
+ * What a carousel's `scroll_until … fully: true` replied, from a closed set (T7a): `unaimable` (D68's stop: no swipe
+ * can bring it whole, the round sent nothing more — it says "drop fully: true" too, so it is asked first), `unfit`
+ * (D52's: as wide as its scroll view), `maxSwipes-hedged` (the bound, with the flush cut a probe proved: "may still be
+ * cut there" — D62's honest end and ADR 0021's residual), `fully-visible` (the stop claimed whole, by the tree or the
+ * eyes, its lead no hedge — `fullyHedged`, T17 — batch-9's false pass reads so), and `other` (a bound without that
+ * hedge, a stuck stop, a plain stop, any other error).
  */
 export type CarouselReply = 'unaimable' | 'unfit' | 'maxSwipes-hedged' | 'fully-visible' | 'other';
 export function carouselReply(reply: string): CarouselReply {

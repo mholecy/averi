@@ -39,11 +39,10 @@ import { shellQuote } from './shell.js';
 import { exitText, firstLineOf, messageOf, nameInLine, stepLine, verdictLine } from './words.js';
 
 /**
- * The lab simulator's settings around the WDA window (batch-10's D43 gate), over the
- * simulator: the three domains a WebDriverAgent runner's exit changes, backed up before the window's first change
- * and put back KEY BY KEY after, verified; and the schemeapproval domain, which no batch writes, its finportal key
- * only read. What is decided and said is ios-defaults.ts's; here are the calls, through the injected Run, and the
- * files, through io.ts.
+ * The lab simulator's settings around the WDA window (batch-10's D43 gate), over the simulator: the three domains a
+ * WebDriverAgent runner's exit changes, backed up before the window's first change and put back KEY BY KEY after,
+ * verified; and the schemeapproval domain, which no batch writes, its finportal key only read. What is decided and
+ * said is ios-defaults.ts's; here are the calls, through the injected Run, and the files, through io.ts.
  *
  * The state-file protocol: `backup` writes `{dirty: true, udid, port, domains}` before the
  * window's first change, the backups beside it; `restore` clears `dirty` only after every domain's read-back equals

@@ -28,8 +28,8 @@ import { bareImports, packFileProblems, toolProblems, undeclaredImports, type Pa
  *    version left unbumped passes here — the bump is Gate D's to check by eye.
  *
  * Not part of `npm test`: it needs `npm run build` first (dist is the package's), and packs and spawns. No device, no
- * network. Prints no absolute path (its output goes into the release record), removes its temporary folder, and exits
- * 0 on PASS, 1 on FAIL (any problem, e.g. a bin missing from the tarball), 2 when dist/ is missing.
+ * network. Prints no absolute path (its output goes into the release record), removes its temporary folder, and exits 0
+ * on PASS, 1 on FAIL (any problem, e.g. a bin missing from the tarball), 2 when dist/ is missing.
  */
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));

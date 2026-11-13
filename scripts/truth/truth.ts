@@ -44,8 +44,8 @@ export const nearPoint = (p: { x: number; y: number }, q: { x: number; y: number
  * pinned submit's bar — its frame as the app reports it, `frames["<submit>.bar"]` (Forms.swift, Forms.kt: the bar the
  * submit rides in, its padding and background included) — covers what is laid under it; a control straddling the
  * keyboard's top, or with its centre under the bar, is `covered` — partly hidden. A pinned submit whose state reports
- * no bar covers nothing here — the capture refuses such a state (capture-run.ts#formTruth). Every committed state of
- * a pinned submit holds its bar.
+ * no bar covers nothing here — the capture refuses such a state (capture-run.ts#formTruth). Every committed state of a
+ * pinned submit holds its bar.
  */
 export function situationOf(frame: Rect | undefined, s: LabState, form: CatalogForm, own: { tag: string; inSheet: boolean }, panels: readonly Rect[] = []): Situation {
   if (frame === undefined) return 'not-rendered';
@@ -204,8 +204,8 @@ function atClip(o: Record<string, unknown>, source: SourceKind, clip: Rect): boo
  * when it tells none: a uiautomator node marked `scrollable="true"` whose class fixes its axis — averi's own table,
  * src/adapters/android-tree-dialect.ts#AXIS_BY_CLASS, so the row asks `unfit` exactly where averi reads a told axis (a
  * Compose `horizontalScroll` dumps as `android.widget.HorizontalScrollView`; a LazyRow or a RecyclerView tells none).
- * Uiautomator only: WDA's axis comes from a node's type or its content's extent (src/adapters/wda-source.ts), which
- * the harness does not read, and idb lists no scroller (ADR 0010 residual 5).
+ * Uiautomator only: WDA's axis comes from a node's type or its content's extent (src/adapters/wda-source.ts), which the
+ * harness does not read, and idb lists no scroller (ADR 0010 residual 5).
  */
 export function scrollAxisToldIn(payload: string, source: SourceKind, clip: Rect): ScrollAxis | undefined {
   if (source !== 'uiautomator') return undefined;

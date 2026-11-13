@@ -20,9 +20,9 @@ export type StepWord = (typeof STEP_WORDS)[number];
 
 /**
  * Verdict words. A block or one of its parts: PASS, FAIL, INCONCLUSIVE (its precondition not shown, or too few runs
- * judged — never a number from a run that could not set its state up), REPRODUCED (a control side shows the bug the
- * fix removes), OBSERVED (a fact recorded, nothing judged), SKIP (not run, by a knob or a premise). INTERRUPTED: a
- * block the abort SUMMARY could not judge. OK, WARN and ERROR: a cleanup or check line (`E5 cleanup: OK — …`,
+ * judged — never a number from a run that could not set its state up), REPRODUCED (a control side shows the bug the fix
+ * removes), OBSERVED (a fact recorded, nothing judged), SKIP (not run, by a knob or a premise). INTERRUPTED: a block
+ * the abort SUMMARY could not judge. OK, WARN and ERROR: a cleanup or check line (`E5 cleanup: OK — …`,
  * `D43 WDA-window compare: WARN — …`), the lab lines. WARN alone never fails the run (exitCodeOf).
  */
 export const VERDICTS = ['PASS', 'FAIL', 'INCONCLUSIVE', 'REPRODUCED', 'OBSERVED', 'SKIP', 'INTERRUPTED', 'OK', 'WARN', 'ERROR'] as const;
@@ -106,9 +106,9 @@ export function parseVerdictLine(line: string): { label: string; verdict: Verdic
 }
 
 /**
- * Whether a SUMMARY line says FAIL: the exit rule, `^[^:]+: FAIL( |$)` — FAIL right after the first colon,
- * whatever follows it (`lv-d62 verdict: FAIL 2/3 dropped` too, which parseVerdictLine, strict for the lines this module
- * writes, reads as none) — or a step line whose word is FAIL.
+ * Whether a SUMMARY line says FAIL: the exit rule, `^[^:]+: FAIL( |$)` — FAIL right after the first colon, whatever
+ * follows it (`lv-d62 verdict: FAIL 2/3 dropped` too, which parseVerdictLine, strict for the lines this module writes,
+ * reads as none) — or a step line whose word is FAIL.
  */
 export const failsIn = (line: string): boolean => /^(?:[^:]+: )?FAIL(?: |$)/.test(line);
 
@@ -198,8 +198,8 @@ export function exitCodeOf(s: Summary): 0 | 1 | 2 | 130 {
 
 /**
  * A JSON value as one key (T2 S6b review round 1, NIT 8: a run's identity, asked and done; it lives here so the pure
- * halves need no io): every object's fields sorted, at every depth, so two equal values built in
- * another field order give the same text; arrays keep their order.
+ * halves need no io): every object's fields sorted, at every depth, so two equal values built in another field order
+ * give the same text; arrays keep their order.
  */
 export function canonicalJson(v: unknown): string {
   if (Array.isArray(v)) return `[${v.map(canonicalJson).join(',')}]`;

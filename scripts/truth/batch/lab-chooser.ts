@@ -115,9 +115,9 @@ export function focusOf(r: CallResult): FocusRead {
 /**
  * --check's exits: 0 no lab entry, no chooser; 1 a lab default (a leak: "Always" is never tapped, so it predates the
  * batch or is a defect); 3 not proven (a read failed, no Preferred Activities block, or a lab entry with no mAlways
- * line — one that cannot be compared never triggers a reinstall: code review); 4 a chooser in front; 5 only
- * last-chosen entries, every one accepted; 6 a last-chosen entry not accepted (no default — a WARN, never a RESTORE:
- * no reinstall clears it).
+ * line — one that cannot be compared never triggers a reinstall: code review); 4 a chooser in front; 5 only last-chosen
+ * entries, every one accepted; 6 a last-chosen entry not accepted (no default — a WARN, never a RESTORE: no reinstall
+ * clears it).
  */
 export const CHECK_EXIT = { clean: 0, leak: 1, unproven: 3, chooser: 4, accepted: 5, lastChosen: 6 } as const;
 export type CheckExit = (typeof CHECK_EXIT)[keyof typeof CHECK_EXIT];
@@ -377,12 +377,12 @@ function targetOf(nodes: readonly UiNode[], target: TapTarget): { node: UiNode; 
 /**
  * The one point a batch may tap on the chooser: the target's centre, or `at` when given (a reply's quoted centre)
  * within CENTRE_SLACK_PX of it. Refused, by name: no such target, or more than one; a tree that is not the chooser's
- * fresh sheet (android-chooser.ts#chooserSheet reads none: AOSP's with_default layout, no chooser); a target that
- * reads as "Always" itself; a disabled one ("Just once" until a row is selected: batch-10); a point outside it or off
- * its centre; any "Always" node — by id or text, anywhere — holding the point or overlapping the target; and any other
- * node holding the point that is not the target, inside it, nor above it (a scrim, a sibling laid there). src's tree
- * carries no `clickable`, so "another node" is any node there, which is every clickable one and more: rows are not
- * clickable in uiautomator (batch-10), the list above takes the click.
+ * fresh sheet (android-chooser.ts#chooserSheet reads none: AOSP's with_default layout, no chooser); a target that reads
+ * as "Always" itself; a disabled one ("Just once" until a row is selected: batch-10); a point outside it or off its
+ * centre; any "Always" node — by id or text, anywhere — holding the point or overlapping the target; and any other node
+ * holding the point that is not the target, inside it, nor above it (a scrim, a sibling laid there). src's tree carries
+ * no `clickable`, so "another node" is any node there, which is every clickable one and more: rows are not clickable in
+ * uiautomator (batch-10), the list above takes the click.
  */
 export function safeTap(dump: Dump, target: TapTarget, at?: Point): SafeTap {
   const tree = dump.root;

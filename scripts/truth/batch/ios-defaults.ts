@@ -20,8 +20,8 @@ export const DOMAINS = ['com.apple.keyboard.preferences', 'com.apple.Preferences
 export const LAB_WDA_PORT = 8120;
 
 /**
- * The read-only key: the remembered "Open in" answer for finportal's scheme. No batch writes its
- * domain at all; batch-5's one backup of it stays unopened.
+ * The read-only key: the remembered "Open in" answer for finportal's scheme. No batch writes its domain at all;
+ * batch-5's one backup of it stays unopened.
  */
 export const PROTECTED = { domain: 'com.apple.launchservices.schemeapproval', key: 'com.apple.CoreSimulator.CoreSimulatorBridge-->sk.finportal.myport' } as const;
 
@@ -161,8 +161,8 @@ const WRITTEN: ReadonlySet<string> = new Set(DOMAINS);
  * The argv of `xcrun simctl spawn <udid> defaults <args>` — the only place one is built. It throws for a verb it does
  * not run (rename, an option first), and for any verb but a read whose domain is not exactly one of the window's three
  * (an allowlist: another case, a long s, a plist path, a prefix — refused alike). A read may name any domain: it is how
- * the schemeapproval key is watched. No batch writes that domain; a future need for it is a new
- * decision, not a new call.
+ * the schemeapproval key is watched. No batch writes that domain; a future need for it is a new decision, not a new
+ * call.
  */
 export function defaultsArgv(udid: string, args: readonly string[]): string[] {
   const verb = args[0] ?? '';

@@ -334,10 +334,10 @@ function notReachedStill(platform: Platform, t: TargetTruth, cell: CellTruth, ro
  * where Android's uiautomator cuts a node's bounds, is checked by a probe swipe toward it (ADR 0005, course.ts
  * #PROBE_REACH; docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md, its fix
  * 9c7885e) — on the device the probe moves a cut row and the stop goes on; in a replayed tree nothing moves. So a stop
- * that says it probed a flush edge (replies.ts#flushProbedSide) is accepted only where the TRUTH bears it out (flushProbe): what shows
- * of the target ends on that side within a pixel of its own scroll view's edge (at a top or left edge also where its
- * piece ends at a pinned chrome's inner edge), and a swipe was sent from inside that scroll view toward
- * that edge. The replay checks only that the probe is sent toward the cut; whether it reveals the row and
+ * that says it probed a flush edge (replies.ts#flushProbedSide) is accepted only where the TRUTH bears it out
+ * (flushProbe): what shows of the target ends on that side within a pixel of its own scroll view's edge (at a top or
+ * left edge also where its piece ends at a pinned chrome's inner edge), and a swipe was sent from inside that scroll
+ * view toward that edge. The replay checks only that the probe is sent toward the cut; whether it reveals the row and
  * the stop goes on is live (phase 5). Any other "visible" is red.
  */
 export function fullyRow(platform: Platform, t: TargetTruth, cell: CellTruth, ask: StopAsk): Expectation {

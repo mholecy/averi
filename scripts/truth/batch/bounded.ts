@@ -12,18 +12,17 @@ import { exitText, messageOf } from './words.js';
  * src/adapters/exec.ts never reached.
  *
  * Two kinds of call, both in a group of their own (proc.ts): `bounded`, a probe, which the abort stops before it puts
- * anything back (a probe does not get the terminal's Ctrl-C, so the runner must stop it); and `detached`, a restore
- * or a check, which nothing but its own bound stops (a second Ctrl-C must not kill the restore) — or
- * its `scope`'s stop, when the restore that started it passed its own bound.
+ * anything back (a probe does not get the terminal's Ctrl-C, so the runner must stop it); and `detached`, a restore or
+ * a check, which nothing but its own bound stops (a second Ctrl-C must not kill the restore) — or its `scope`'s stop,
+ * when the restore that started it passed its own bound.
  *
  * Once a call's leader has ended, its group gets SIGKILL: nothing it started outlives it, unless the call keeps its
  * group (`keepGroup`, by default per tool: `KEEPS_GROUP`): stopAll leaves it, and stopKept ends it — at the abort,
  * after the restores and the judging, which may need it, and at the normal end; a block done with its companion ends
  * its own with stopKept(owner), the owner recorded when the group is kept (Call.owner) — no seam query tells owners
- * apart.
- * Its result comes once its pipes have closed, or `CLOSE_GRACE_MS` after its leader's end if a grandchild in another
- * group holds them; what a grandchild writes after that is dropped on purpose — the result is the leader's, and a
- * daemon's output is no part of it. Its code is its leader's: a leader that ended before the bound is never 142,
+ * apart. Its result comes once its pipes have closed, or `CLOSE_GRACE_MS` after its leader's end if a grandchild in
+ * another group holds them; what a grandchild writes after that is dropped on purpose — the result is the leader's, and
+ * a daemon's output is no part of it. Its code is its leader's: a leader that ended before the bound is never 142,
  * however long its pipes took.
  *
  * A group kill never rejects a call or a stop. A kill the system refuses with EPERM (seen under load: delivery not

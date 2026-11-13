@@ -352,8 +352,8 @@ const groupsOf = (asked: Asked): string => (asked.groups ?? DEFAULT_GROUPS).join
 const liveTs = (repo: string): string[] => ['--import', 'tsx', join(repo, LIVE_TS)];
 
 /**
- * live.ts's argv for a run: the device, the app unless native, the groups (forms by default), the
- * cases asked (none: all of the groups), the record.
+ * live.ts's argv for a run: the device, the app unless native, the groups (forms by default), the cases asked (none:
+ * all of the groups), the record.
  */
 export const liveArgs = ({ repo, asked, device, record }: LiveRunSpec & { device: readonly string[] }): string[] => [
   ...liveTs(repo),

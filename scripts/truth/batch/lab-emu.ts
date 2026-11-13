@@ -228,9 +228,9 @@ export interface ReinstallProgress {
 export const reinstallProgress = (): ReinstallProgress => ({ step: 'not started' });
 
 /**
- * The probe's own state put back onto the lab (its `--restore`: the reinstall wipes the lab's data), through the Run
- * it is given; when it succeeds it leaves its state file clean. `command` is how a person runs it by hand: a RESTORE
- * line names it when the restore fails with no hand line of its own.
+ * The probe's own state put back onto the lab (its `--restore`: the reinstall wipes the lab's data), through the Run it
+ * is given; when it succeeds it leaves its state file clean. `command` is how a person runs it by hand: a RESTORE line
+ * names it when the restore fails with no hand line of its own.
  */
 export interface StateRestore {
   restore(run: Run): Promise<Putback>;
@@ -281,10 +281,10 @@ export function freshApkOf(fs: BatchFs, dir: string): string {
  * that cannot be marked, and nothing is uninstalled (code review: the protocol needs its dirty mark) — the chooser
  * dismissed, then uninstall and install (`progress` started — an abort from here asks `adb get-state` and `pm path`
  * before anything else); proven by `pm path`, the reinstalled APK's cells.json equal to main's catalog and --check
- * after with an exit that proves the lab put back (CHECK_OUTCOME: 0, 5 or 6 — a chooser up or a read that failed
- * proves nothing: review round 1), only then `progress` proven and the probe's state put back (`putBack`), so its state
- * is written clean only after the proof. Refused, nothing done, with no pulled APK or no catalog to compare with too.
- * Each step that fails gets its own hand line. A last-chosen entry is never reinstalled for: no reinstall clears it
+ * after with an exit that proves the lab put back (CHECK_OUTCOME: 0, 5 or 6 — a chooser up or a read that failed proves
+ * nothing: review round 1), only then `progress` proven and the probe's state put back (`putBack`), so its state is
+ * written clean only after the proof. Refused, nothing done, with no pulled APK or no catalog to compare with too. Each
+ * step that fails gets its own hand line. A last-chosen entry is never reinstalled for: no reinstall clears it
  * (batch-11 measured).
  */
 export async function clearLabEntry(emu: LabEmu, o: ReinstallOptions): Promise<Reinstalled> {
@@ -386,8 +386,8 @@ const unknownDuringReinstall = (b: HandBase, why: string): Putback => ({ ok: fal
 /**
  * The chooser's dirty window (abort.ts): its restore this module's, over the abort's detached runner — `adb get-state`
  * first (unreachable: nothing pressed; if the reinstall had started, the install is unknown, never "missing" and never
- * "put back"; if not, nothing could be read or put back, with the check hand line; review round 1); BACK and HOME;
- * when interrupted inside the reinstall, the install read: missing is installed again from the pulled APK, and the lab
+ * "put back"; if not, nothing could be read or put back, with the check hand line; review round 1); BACK and HOME; when
+ * interrupted inside the reinstall, the install read: missing is installed again from the pulled APK, and the lab
  * installed — again or found so — is proven by its cells.json as the reinstall proves it, or not put back; the probe's
  * state put back (`putBack`) whenever its state file is not clean (review round 4); then --check (BACK and HOME again
  * on a chooser), judged by CHECK_OUTCOME: the cleanup's word and words, exit by exit, a WARN put back for 6. Its hand

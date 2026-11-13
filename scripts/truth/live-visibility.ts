@@ -9,13 +9,13 @@ import { askedUnlistedBy, contractOf, CUT_GEOMETRIES, judgedContext, stopHolds, 
 import { axisOf, bandsOf, directionOf, geometryOf, intersect, selectorOf, type Direction, type GeometryContext } from './truth.js';
 
 /**
- * The live golden's visibility cases (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 5): averi's
- * `tap` and `scroll_until` against the REAL lab app on the coloured-target cells, the app's own log the oracle — its
- * tap log (LabState.events: the target's action fired, nothing else), each scroll view's offset and the strokes it took
+ * The live golden's visibility cases (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 5): averi's `tap` and
+ * `scroll_until` against the REAL lab app on the coloured-target cells, the app's own log the oracle — its tap log
+ * (LabState.events: the target's action fired, nothing else), each scroll view's offset and the strokes it took
  * (LabState.offsets, LabState.strokes), and the targets' frames as the app lays them out after the call. What a
  * replayed tree cannot show: which scroll view a stroke moved and which way, whether a stop's target is where the reply
- * says, the turn back of a stroke that did not bring the target closer (R-direction, golden-spec/rows.ts), and whether a
- * tap fired what it says.
+ * says, the turn back of a stroke that did not bring the target closer (R-direction, golden-spec/rows.ts), and whether
+ * a tap fired what it says.
  *
  * The cases come from the static truth (tests/fixtures/truth, one CellTruth per cell and platform), and WHAT each asks
  * from the target contract (target-contract.ts), the one the replayed golden's rows read too: a tap on every target the

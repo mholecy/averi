@@ -21,9 +21,9 @@ import { consistency, controlConsistency, controlPiece, imePanels, listedIn, mea
  * differential corpus run: one capture per tree, sharing the cell's screenshot and truth.
  *
  * When the state reports the screen's bands, scroll views or chrome, each target also carries its measured geometry
- * (truth.ts#geometryOf): an off-screen target is not probed, and a target whose tappable piece is not centred where
- * its frame is gets a second probe at the piece's centre (`reachedAtPiece`). A state reporting none of it (the
- * committed captures of the plan's phase-1/2 cells) captures with no geometry. On any cell, a target whose probe point
+ * (truth.ts#geometryOf): an off-screen target is not probed, and a target whose tappable piece is not centred where its
+ * frame is gets a second probe at the piece's centre (`reachedAtPiece`). A state reporting none of it (the committed
+ * captures of the plan's phase-1/2 cells) captures with no geometry. On any cell, a target whose probe point
  * (probePoint, its rounded centre) lies off the screen is not tapped there — a raw tap off the screen reaches no window
  * of the app and would log no touch — and records why (`unprobed`), `reached` false (unmeasured, a declared-open one is
  * then broken: truth.ts#consistency). A centre in a system band is probed: measured, the tap there is the app's or the

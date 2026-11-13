@@ -31,11 +31,11 @@ import { exitText, failedCall } from './words.js';
  * Every child is bounded (A41_SECS, each its own process group: a child past its bound goes whole) and logged
  * (`<name>.log` beside its JSON). A block's verdict is PASS when every child exited 0 and wrote its file, else
  * INCONCLUSIVE naming which — a probe measures, its verdict says only whether the measurement is whole. The report
- * block is PASS only with no file missing and no required part unproven (a41.ts#unprovenOf: the cadence, legs (a)
- * and (b) of the first tap, the foreground leg — A44, A41d). The ios need's end reads the finportal key again; the
- * run's last step ends the lab's WebDriverAgent and idb_companion. A signal puts an open window back and exits 130.
- * What it leaves on the simulator is what Gate C leaves: the WDA window's domains put back and compared; the lab app
- * (and, if installed, the React Native lab app) launched on cells through lab-device.ts, as live.ts launches them.
+ * block is PASS only with no file missing and no required part unproven (a41.ts#unprovenOf: the cadence, legs (a) and
+ * (b) of the first tap, the foreground leg — A44, A41d). The ios need's end reads the finportal key again; the run's
+ * last step ends the lab's WebDriverAgent and idb_companion. A signal puts an open window back and exits 130. What it
+ * leaves on the simulator is what Gate C leaves: the WDA window's domains put back and compared; the lab app (and, if
+ * installed, the React Native lab app) launched on cells through lab-device.ts, as live.ts launches them.
  *
  *     npm run truth:lab:ios:a41 -- --out <dir outside the checkout> --udid <lab simulator> [--groups idb|wda]
  *

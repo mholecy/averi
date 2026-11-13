@@ -67,15 +67,14 @@ import {
  *
  * Output: the JSON (`--out`; default `$TMPDIR/averi-perf-<platform>-<app>-<time>.json`) holds the meta (commit, device,
  * load), and per scenario the summary, the breakdown (which commands and which sleep callers the time went to, per run)
- * and every run's window (each call and sleep with its times) and reply; a table goes to stdout.
- * D26: `simctl io screenshot` stalls ~+1 000 ms in ~10 % of calls, which makes a median of a few runs noisy — so the
- * JSON always carries `stalls`: per scenario (after its `runs`) its screenshots, stalls and wall clock over the
- * stall-free ok runs, and at the root the whole run's (stats.ts#SCREENSHOT_STALL_MS says what a stall is). iOS captures
- * with `idb screenshot` on either tree source (D26b, D44): both captures are counted (stats.ts#SCREENSHOT_LABELS), and
- * the root's `stalls.byLabel` gives each apart. Only the table depends on screenshots: when the run took any, two more
- * columns and a stall line per capture under it (report.ts).
- * scripts/perf/stalls.ts recomputes the same from a JSON written before.
- * Not a vitest test: it needs the device. Its arithmetic and wrappers are tested in tests/perf/.
+ * and every run's window (each call and sleep with its times) and reply; a table goes to stdout. D26:
+ * `simctl io screenshot` stalls ~+1 000 ms in ~10 % of calls, which makes a median of a few runs noisy — so the JSON
+ * always carries `stalls`: per scenario (after its `runs`) its screenshots, stalls and wall clock over the stall-free
+ * ok runs, and at the root the whole run's (stats.ts#SCREENSHOT_STALL_MS says what a stall is). iOS captures with
+ * `idb screenshot` on either tree source (D26b, D44): both captures are counted (stats.ts#SCREENSHOT_LABELS), and the
+ * root's `stalls.byLabel` gives each apart. Only the table depends on screenshots: when the run took any, two more
+ * columns and a stall line per capture under it (report.ts). scripts/perf/stalls.ts recomputes the same from a JSON
+ * written before. Not a vitest test: it needs the device. Its arithmetic and wrappers are tested in tests/perf/.
  */
 
 const { values } = parseArgs({

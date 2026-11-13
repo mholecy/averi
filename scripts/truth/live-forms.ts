@@ -122,9 +122,9 @@ export const refusedUnchanged = (tag: string, kept: string) => refusedHolding(ta
 
 /**
  * f16 (D64): a field at its length cap that keeps only the head of the typing while its earlier text holds the value —
- * form-format's `date` holding `31.12.202` after a first fill, typed `12` without clear, keeps the `1`: `31.12.2021`.
- * A containment check would pass that reading (the `12` inside `31.12`). The error's wording is not judged: a tail
- * typed again on iOS and the poll on Android word it alike, by length (`refusedHolding`).
+ * form-format's `date` holding `31.12.202` after a first fill, typed `12` without clear, keeps the `1`: `31.12.2021`. A
+ * containment check would pass that reading (the `12` inside `31.12`). The error's wording is not judged: a tail typed
+ * again on iOS and the poll on Android word it alike, by length (`refusedHolding`).
  */
 export const refusedCapped = (tag: string, kept: string) => refusedHolding(tag, kept);
 

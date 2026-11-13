@@ -15,12 +15,12 @@ import { EXIT, firstLineOf, messageOf, stepLine, summaryLines, timeOf, twoDigits
  * - a throw out of the run's body or an uncaught exception or unhandled rejection anywhere. Never the
  *   `exit` event: it is synchronous, and a restore is not.
  *
- * The abort, once: later signals are only noted; the running probes are stopped, each its whole group (they do not
- * get the terminal's Ctrl-C); each dirty window is put back, the last opened first, by its own restore through
- * detached calls (a second Ctrl-C cannot kill them) and within its bound; what is not provably put back goes to the
- * RESTORE file as hand lines; then the SUMMARY — INTERRUPTED, each block whose records are complete judged now,
- * device-free, the others INTERRUPTED — and exit 130. Everything durable is written before the terminal gets the
- * SUMMARY: a tty paused with Ctrl-S blocks inside that last write (steps.ts#terminalOf), and so holds only the exit.
+ * The abort, once: later signals are only noted; the running probes are stopped, each its whole group (they do not get
+ * the terminal's Ctrl-C); each dirty window is put back, the last opened first, by its own restore through detached
+ * calls (a second Ctrl-C cannot kill them) and within its bound; what is not provably put back goes to the RESTORE file
+ * as hand lines; then the SUMMARY — INTERRUPTED, each block whose records are complete judged now, device-free, the
+ * others INTERRUPTED — and exit 130. Everything durable is written before the terminal gets the SUMMARY: a tty paused
+ * with Ctrl-S blocks inside that last write (steps.ts#terminalOf), and so holds only the exit.
  *
  * What the abort relies on, and what it does not:
  * - The windows it puts back are those open when it began, taken before its first await. The run's body goes on
@@ -40,10 +40,10 @@ import { EXIT, firstLineOf, messageOf, stepLine, summaryLines, timeOf, twoDigits
  *   blocks, not past the run; a block may end its own earlier with stopKept(owner).
  *
  * How long it can take, at worst: the probes' stop (`graceMs`, 2 s), then each dirty window's restore bound (`secs`,
- * 300 s by default) and its stop (2 s), then the judges' one budget (`judgeBudgetSecs`, 120 s) and its stop (2 s),
- * then the kept groups' stop (2 s), then the run's last steps (`lastlySecs`, 60 s by default, when a `lastly` is
- * given) and their stop (2 s) — one window at the defaults, about 8 minutes. No block is judged once a restore has
- * passed its bound.
+ * 300 s by default) and its stop (2 s), then the judges' one budget (`judgeBudgetSecs`, 120 s) and its stop (2 s), then
+ * the kept groups' stop (2 s), then the run's last steps (`lastlySecs`, 60 s by default, when a `lastly` is given) and
+ * their stop (2 s) — one window at the defaults, about 8 minutes. No block is judged once a restore has passed its
+ * bound.
  *
  * Should this file grow further, the judging (reports, judged, the budget) and the RESTORE writing (writeRestore,
  * undeliveredHand) are the parts to move into files of their own, each behind the guard.
@@ -128,8 +128,8 @@ export interface AbortHead {
 /** A restore's bound when its window names none. */
 export const RESTORE_SECS = 300;
 /**
- * The judges' budget when none is given: all complete blocks together. One budget for all keeps the abort's worst
- * case short, and a block not judged in it is INTERRUPTED and rerun.
+ * The judges' budget when none is given: all complete blocks together. One budget for all keeps the abort's worst case
+ * short, and a block not judged in it is INTERRUPTED and rerun.
  */
 export const JUDGE_BUDGET_SECS = 120;
 /** The run's last steps' bound when none is given: a few bounded kills, each with its own bound. */
@@ -235,8 +235,8 @@ export class AbortGuard {
   }
 
   /**
-   * Run the batch's body with the abort installed. A throw out of it aborts the run. It returns
-   * only when the body finished and no abort began; else it rejects once the abort is done (the real seam has exited).
+   * Run the batch's body with the abort installed. A throw out of it aborts the run. It returns only when the body
+   * finished and no abort began; else it rejects once the abort is done (the real seam has exited).
    */
   async run<T>(body: () => Promise<T>): Promise<T> {
     this.install();

@@ -113,8 +113,8 @@ export interface LabDevice {
    */
   windows?(): Promise<string>;
   /**
-   * Android: hide the IME as averi's tap guard does (one `input keyevent 4`; src/interact/tap.ts hides the keyboard
-   * and resolves the target again first) and give it time to go. Absent on iOS.
+   * Android: hide the IME as averi's tap guard does (one `input keyevent 4`; src/interact/tap.ts hides the keyboard and
+   * resolves the target again first) and give it time to go. Absent on iOS.
    */
   hideKeyboard?(): Promise<void>;
 }

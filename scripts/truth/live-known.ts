@@ -11,8 +11,8 @@ import type { ReplyKind } from './replies.js';
  * lab-notes.test.ts ties them to docs/bugs and calibration.json. A forms case is filed alike (D31): a fill verdict
  * names its rule (live-forms.ts#holds — `loud-untouched`, `loud-changed`, `fill-claim`, `failed-holds`) and rests on
  * the case's last reply; an ensure case (batch-3; live-ensure.ts's classes — `held-early`, `held-late`, …) on its one
- * reply. A LOUD fails no run, so a known LOUD that reads another rule or kind is marked NOT known and
- * no more; tests/truth/live-rejudge.test.ts holds the committed records to their marks.
+ * reply. A LOUD fails no run, so a known LOUD that reads another rule or kind is marked NOT known and no more;
+ * tests/truth/live-rejudge.test.ts holds the committed records to their marks.
  *
  * Its contract is weaker than ADR 0020 §4's in two ways, on purpose. The strokes are not pinned: a device's timing
  * moves how many a scroll_until sends, run to run. And a case on the device can pass by chance of timing: so live.ts

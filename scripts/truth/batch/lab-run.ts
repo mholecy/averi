@@ -44,13 +44,13 @@ import { verdictLine, type Verdict } from './words.js';
  *
  *     npm run truth:lab -- --out <dir outside the checkout> --serial emulator-5554 [--groups chooser|forms|…]
  *
- * `--groups` is a selection, as ONLY= is (both together: the blocks both name): every block stays the batch's, so
- * every block's state file is checked before a run starts. A release gate (docs/release.md's Gate B, backlog T24): run
- * before every release, by the agent on emulator-5554 or by the owner — the cleanup may uninstall and reinstall the lab
- * app (lab-emu.ts#clearLabEntry), a lab APK install the release allows. Everything it writes is under `--out`, apart
- * from the git-ignored Gradle build products in the checkout. A run with no serial is refused before anything is done;
- * a serial that is not the lab AVD is refused by the lab guard (lab-device.ts, through the android need, before
- * anything is built: every block INCONCLUSIVE, nothing done to the device).
+ * `--groups` is a selection, as ONLY= is (both together: the blocks both name): every block stays the batch's, so every
+ * block's state file is checked before a run starts. A release gate (docs/release.md's Gate B, backlog T24): run before
+ * every release, by the agent on emulator-5554 or by the owner — the cleanup may uninstall and reinstall the lab app
+ * (lab-emu.ts#clearLabEntry), a lab APK install the release allows. Everything it writes is under `--out`, apart from
+ * the git-ignored Gradle build products in the checkout. A run with no serial is refused before anything is done; a
+ * serial that is not the lab AVD is refused by the lab guard (lab-device.ts, through the android need, before anything
+ * is built: every block INCONCLUSIVE, nothing done to the device).
  *
  * The --check before speaks in its own words (it presses nothing). A lab default it finds is a FAIL with its hand
  * lines in RESTORE; a chooser in front or a read that failed is an ERROR with none (the run touched nothing); either

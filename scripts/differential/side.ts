@@ -45,19 +45,19 @@ export interface Side {
   /**
    * The side's registry over `deps`, whichever constructor the side has: from 8413120 on it takes
    * `{ factory, discovery }`; an older one takes the factory alone and lists devices through an UNBOUND adapter's
-   * `listDevices()` — so it gets a factory that answers an unbound call with the listing. Which one is
-   * told by the constructor's own behaviour (`takesDeps`), not by what else the module exports. The harness hands a
-   * listing; each side gets it as the discovery it reads (`discoveryFor`).
+   * `listDevices()` — so it gets a factory that answers an unbound call with the listing. Which one is told by the
+   * constructor's own behaviour (`takesDeps`), not by what else the module exports. The harness hands a listing; each
+   * side gets it as the discovery it reads (`discoveryFor`).
    */
   registry(deps: { factory: AdapterFactory; discovery: Listing }): AdapterRegistry;
   /**
    * The side's iOS adapter for a real simulator — what the live golden (scripts/truth/live.ts, `--side` or not) drives
    * the lab simulator with; the replay does not use it. A side with src/mcp/registry.ts#iosAdapterFor (D7a) gets the
-   * server's own wiring, its idb helper included (ADR 0032, A23), so Gate C runs the transport users get. An older
-   * side gets its IosAdapter over its src/adapters/ios-tree-source.ts#createIosTreeSource, no helper (every idb call
-   * the CLI). `wiring` tags which, and
-   * for the server's wiring whether the kill switch (`AVERI_IDB_HELPER=off`, read when the side is loaded) puts every
-   * idb call on the CLI as well; `liveIosLine` words it for the run's log. A side with neither has none.
+   * server's own wiring, its idb helper included (ADR 0032, A23), so Gate C runs the transport users get. An older side
+   * gets its IosAdapter over its src/adapters/ios-tree-source.ts#createIosTreeSource, no helper (every idb call the
+   * CLI). `wiring` tags which, and for the server's wiring whether the kill switch (`AVERI_IDB_HELPER=off`, read when
+   * the side is loaded) puts every idb call on the CLI as well; `liveIosLine` words it for the run's log. A side with
+   * neither has none.
    */
   liveIos?: LiveIos;
 }
@@ -125,10 +125,9 @@ export type Listing = DeviceDiscovery['list'];
 type DiscoveryOver = typeof import('../../src/adapters/discovery.js').discoveryOver;
 
 /**
- * A side's discovery over the harness's listing, read by every constructor: callable as the listing
- * (a side before A3 takes a function), and an object with `list` and `check` (A3 on). `check` is the side's own
- * `discoveryOver`'s, built without a proof — no host file is read, and the bound check lists. A side without
- * `discoveryOver` never asks `check`.
+ * A side's discovery over the harness's listing, read by every constructor: callable as the listing (a side before A3
+ * takes a function), and an object with `list` and `check` (A3 on). `check` is the side's own `discoveryOver`'s, built
+ * without a proof — no host file is read, and the bound check lists. A side without `discoveryOver` never asks `check`.
  * Delete this shim (and pass `over(listing)` straight) once no replayed side predates A3.
  */
 function discoveryFor(listing: Listing, over: DiscoveryOver | undefined): Listing & DeviceDiscovery {
