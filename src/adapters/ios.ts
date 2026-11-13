@@ -19,6 +19,7 @@ import { ViewportMemo } from './viewport-memo.js';
 import { iosStatusBand } from './ios-status-band.js';
 import { isAppDataContainer, resetDataContainer } from './ios-data-container.js';
 import { sleep } from '../util/sleep.js';
+import { TreeSourceReleasedError } from './wda-tree-source.js';
 import type { Typeable } from './typeable.js';
 import { withNoteLine } from '../util/note-line.js';
 import { IDB_TYPEABLE, idbTypingRefusal, typingPathOf, WDA_TYPEABLE } from './ios-typing.js';
@@ -347,10 +348,11 @@ export class IosAdapter implements DeviceAdapter {
       );
     }
     // The tree source's start first, awaited, so it never races the wipe or the launch (IosTreeSource.startBeforeLaunch,
-    // ADR 0046's A41d amendment). Its failure fails the launch, nothing touched.
+    // ADR 0046's A41d amendment). Its failure fails the launch, nothing touched; a release is passed on as it is.
     try {
       await this.treeSource.startBeforeLaunch?.();
     } catch (err) {
+      if (err instanceof TreeSourceReleasedError) throw err;
       throw new Error(`WebDriverAgent did not come up before launching ${bundleId} — nothing was wiped or launched: ${errorMessage(err)}`, { cause: err });
     }
     if (opts.clearState) await this.clearAppData(bundleId);

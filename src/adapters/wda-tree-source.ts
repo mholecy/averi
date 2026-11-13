@@ -12,6 +12,21 @@ import type { SystemAlert, UiNode } from './types.js';
 export const WDA_SETTLE_CADENCE_MS = 300;
 
 /**
+ * Whether a start before a launch may begin (ADR 0046's A41d amendment): WebDriverAgent's build is cached — a check
+ * that fails counts as not cached — and the source was not released while it was asked. A build is minutes of
+ * `xcodebuild`, never run inside a launch; the first read runs it.
+ */
+export async function mayStartBeforeLaunch(wda: { buildCached(): Promise<boolean> }, released: () => boolean): Promise<boolean> {
+  return (await wda.buildCached().catch(() => false)) && !released();
+}
+
+/**
+ * The error of a call on a released WebDriverAgent source (a select_device deselected the simulator, or averi is
+ * shutting down): a release, never a WDA that "did not come up" — IosAdapter.launch passes it on unchanged.
+ */
+export class TreeSourceReleasedError extends Error {}
+
+/**
  * The WebDriverAgent adapter at the iOS tree-source seam (ios-tree-source.ts):
  * owns ONE WdaServer for its simulator and turns `/source` into the
  * normalized tree. This is the only module that joins wda.ts (the server's
@@ -44,15 +59,6 @@ export const WDA_SETTLE_CADENCE_MS = 300;
  * deliberately no second seam for a fake server: the one adapter it would
  * ever have is WdaServer, and one adapter means a hypothetical seam.
  */
-/**
- * Whether a start before a launch may begin (ADR 0046's A41d amendment): WebDriverAgent's build is cached — a check
- * that fails counts as not cached — and the source was not released while it was asked. A build is minutes of
- * `xcodebuild`, never run inside a launch; the first read runs it.
- */
-export async function mayStartBeforeLaunch(wda: { buildCached(): Promise<boolean> }, released: () => boolean): Promise<boolean> {
-  return (await wda.buildCached().catch(() => false)) && !released();
-}
-
 export class WdaTreeSource implements IosTreeSource {
   readonly kind = 'wda' as const;
   readonly settleCadenceMs = WDA_SETTLE_CADENCE_MS;
@@ -214,7 +220,7 @@ export class WdaTreeSource implements IosTreeSource {
   }
 
   private released(cause?: unknown): Error {
-    return new Error(
+    return new TreeSourceReleasedError(
       `The WebDriverAgent tree source for simulator ${this.udid} has been released — ` +
         'this simulator was deselected or averi is shutting down; select the device again and rerun',
       cause === undefined ? undefined : { cause },

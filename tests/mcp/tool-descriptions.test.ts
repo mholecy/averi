@@ -208,7 +208,7 @@ describe('tool descriptions quote each operation default from its owner', () => 
     // A41d: the first launch with WebDriverAgent brings it up first; under wda its failure fails the launch.
     expect(description('launch_app')).toContain(
       'With WebDriverAgent (treeSource auto/wda, build cached) the first launch on a simulator brings WDA up first (seconds, ≤ 60 s); ' +
-        'under wda, a WDA that cannot come up fails the launch with nothing wiped or launched.',
+        'once WebDriverAgent is the source, one that cannot come up fails the launch with nothing wiped or launched.',
     );
   });
 

@@ -8,10 +8,10 @@ import { tapText } from '../../src/mcp/tool-text.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { FIRST_KEY_ALONE_MS, IDB_EMPTY_RETRY_MS, IosAdapter, PGREP_TIMEOUT_MS } from '../../src/adapters/ios.js';
 import { IDB_SETTLE_CADENCE_MS, IdbEmptyTreeError, IdbTreeSource, parseIdbDescribeAll, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
-import { WDA_SETTLE_CADENCE_MS, WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
+import { TreeSourceReleasedError, WDA_SETTLE_CADENCE_MS, WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
 import { AutoTreeSource } from '../../src/adapters/auto-tree-source.js';
 import { ReadHandOff } from '../../src/ui-tree/read-handoff.js';
-import { fakeFetch, fakeSpawn } from '../helpers/fake-wda.js';
+import { fakeFetch, fakeSpawn, tempDerivedData } from '../helpers/fake-wda.js';
 import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
 import { NoLinkHandlerError } from '../../src/adapters/ios-link-failure.js';
 import { captureRefusal } from '../../src/verify/capture.js';
@@ -494,6 +494,24 @@ describe('IosAdapter re-enables accessibility automation before every launch and
     );
     expect(err?.cause).toBe(cause);
     expect(calls).toEqual([]);
+  });
+
+  it('a source released during its start (select_device mid-launch): the release is passed on unchanged, never "did not come up"', async () => {
+    const { fn, calls } = fakeExec({});
+    const released = new TreeSourceReleasedError('The WebDriverAgent tree source for simulator AAAA-1111 has been released — …');
+    const wda: IosTreeSource = { ...WDA_NO_TREE, startBeforeLaunch: () => Promise.reject(released) };
+    await expect(new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda }).launch('com.app')).rejects.toBe(released);
+    expect(calls).toEqual([]);
+  });
+
+  it('a real WdaTreeSource released during its start: the launch fails with its released error', async () => {
+    const { fn } = fakeExec({});
+    const { dd } = await tempDerivedData(true);
+    const source = new WdaTreeSource({ udid: 'AAAA-1111', exec: fn, fetchFn: fakeFetch(() => 'refused').fn, spawnFn: fakeSpawn().fn, derivedDataPath: dd, pollIntervalMs: 5 });
+    const launching = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: source }).launch('com.app');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await source.dispose();
+    await expect(launching).rejects.toThrow(/^The WebDriverAgent tree source for simulator AAAA-1111 has been released/);
   });
 
   /** An `auto` source over fakes: WDA's bring-up as given, its build cached as given; idb answering a label. */

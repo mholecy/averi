@@ -302,8 +302,10 @@ still precede every launch.
   `launch:`) with the wrapped error above, and nothing is launched. Before, the launch succeeded and the first read
   failed with WDA's error.
 - launch_app's tool description says it: with WebDriverAgent and its build cached, the first launch on a simulator
-  first brings WDA up (seconds, at most 60 s, `WdaServer`'s ready timeout), and under `wda` a WDA that cannot come up
-  fails the launch before anything is wiped or launched.
+  first brings WDA up (seconds, at most 60 s, `WdaServer`'s ready timeout), and once WebDriverAgent is the source
+  (`wda`, or `auto` after it came up), one that cannot come up fails the launch before anything is wiped or launched.
+- A release during the start (`TreeSourceReleasedError`, a `select_device` mid-launch) is passed on unchanged, never
+  worded as a WDA that did not come up.
 
 **Acceptance (the owner's `npm run truth:lab:ios:a41`).** scripts/perf/a41.ts judges two legs.
 - *Leg (a), now judged on two bars (`legAAnswer`), both from the same run:*
