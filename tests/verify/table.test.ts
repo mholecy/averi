@@ -50,8 +50,7 @@ describe('row', () => {
   });
 
   it('ends the row at the last supplied cell rather than padding empty columns', () => {
-    // The aspect row on a single-platform run supplies no delta cells; the old
-    // hand-rolled code ended the line there and this must keep doing so.
+    // The aspect row on a single-platform run supplies no delta cells.
     expect(row(COLUMNS, ['card', '345'], '  <-- ASPECT')).toBe('card          345  <-- ASPECT');
   });
 

@@ -12,8 +12,8 @@ import type { UiNode } from '../../src/adapters/types.js';
  *
  * The follow-up (docs/bugs/2026-08-26-png-scale-needs-out-of-tree-screen-size.md)
  * adds the device's own screen size as the first source. The tree paths are
- * kept and still tested: the device read can fail, and a failed read must
- * degrade to the old behavior rather than take an assert down.
+ * tested too: the device read can fail, and a failed read must degrade to
+ * the tree's reading rather than take an assert down.
  */
 
 const node = (rect: UiNode['rect'], children: UiNode[] = []): UiNode => ({
@@ -107,10 +107,10 @@ describe('pngScale — the holes, and what the device screen does to them', () =
   const SCREEN = { width: 402, height: 874 };
 
   /**
-   * Case 3 of the bug doc's table, and hole 1 of the 0.5.0 fix. The tree can
-   * no longer tell which origin-anchored child is the window, so it hands the
+   * Case 3 of the bug doc's table, and hole 1 of the 0.5.0 fix. The tree
+   * cannot tell which origin-anchored child is the window, so it hands the
    * WIDEST to the axis check — which fails closed rather than scaling by it.
-   * Loud and wrong-free beats the silent 1.5x this used to return.
+   * Loud and wrong-free beats the silent 1.5x that scaling by it would return.
    */
   it('a rootless tree with an oversized node at x=0 now fails closed instead of scaling by it', () => {
     const idb = node({ x: 0, y: 0, width: 0, height: 0 }, [
@@ -118,7 +118,6 @@ describe('pngScale — the holes, and what the device screen does to them', () =
       node({ x: 0, y: 0, width: 804, height: 874 }),
     ]);
     expect(pngScale(idb, PNG_W, PNG_H).error).toMatch(/1\.500 across but 3\.000 down/);
-    // …and with the device screen it is simply right.
     expect(pngScale(idb, PNG_W, PNG_H, SCREEN)).toMatchObject({ scale: 3, width: 402 });
   });
 
@@ -133,13 +132,13 @@ describe('pngScale — the holes, and what the device screen does to them', () =
   });
 
   /**
-   * A THIRD hole, found in review 2026-08-27 and left open knowingly: a
-   * partial capture whose aspect happens to match the device rotated is
-   * indistinguishable from an actual rotation. 1206x555 fits the rotated
-   * 402x874 screen to within 1.0005, so it is read as landscape and scaled by
-   * 1.38 where a full capture would scale by 3.0. Nothing in the png or the
-   * device says which it is. It stays open because production captures come
-   * from `adapter.screenshot()`, which is always the whole screen — if that
+   * A THIRD hole, left open knowingly: a partial capture whose aspect
+   * happens to match the device rotated is indistinguishable from an actual
+   * rotation. 1206x555 fits the rotated 402x874 screen to within 1.0005, so
+   * it is read as landscape and scaled by 1.38 where a full capture would
+   * scale by 3.0. Nothing in the png or the device says which it is. It stays
+   * open because production captures come from `captureShot` (the adapter's
+   * `capture()`, else its `screenshot()`), always the whole screen — if that
    * ever changes, this is the test that should start failing.
    */
   it('does NOT catch a band crop whose aspect matches the device rotated', () => {
@@ -147,15 +146,13 @@ describe('pngScale — the holes, and what the device screen does to them', () =
   });
 
   /**
-   * A FOURTH hole, named in review 2026-08-27 and left open with its eyes
-   * open. A left|right split screen — two window-sized panes, the second
-   * starting exactly at the first's right edge — is BYTE-IDENTICAL in geometry
-   * to the iOS sheet class, where the node at x=screenWidth is off-viewport
-   * junk that must be ignored. The tree cannot tell them apart, so it reads
-   * the measured case: 2208x1840 of two 1104-wide panes scales by 2.0 (a
-   * full-screen reading would be 1.0). 0.5.0 refused this shape, which was
-   * accidental rather than principled — it refused the sheet class too.
-   * The device screen resolves it, and says the tree disagreed.
+   * A FOURTH hole, left open with its eyes open. A left|right split screen —
+   * two window-sized panes, the second starting exactly at the first's right
+   * edge — is BYTE-IDENTICAL in geometry to the iOS sheet class, where the
+   * node at x=screenWidth is off-viewport junk that must be ignored. The tree
+   * cannot tell them apart, so it reads the measured case: 2208x1840 of two
+   * 1104-wide panes scales by 2.0 (a full-screen reading would be 1.0). The
+   * device screen resolves it, and says the tree disagreed.
    */
   it('does NOT catch a left|right split screen on the tree path', () => {
     const split = node({ x: 0, y: 0, width: 0, height: 0 }, [
@@ -201,12 +198,12 @@ describe('pngScale — the device screen', () => {
   });
 
   /**
-   * Found in review 2026-08-27. An earlier draft let the TREE vote on whether
-   * a landscape png was a rotation; a scroll container that won the window
-   * tie-break made the tree read "portrait", the swap was refused, and the
-   * crop scaled by 6.522 instead of 3.0 — in the across direction, which the
-   * one-sided check below cannot see. Supplying the device screen was WORSE
-   * than withholding it. Aspect agreement decides it now, with no witness.
+   * Were the TREE to vote on whether a landscape png is a rotation, a scroll
+   * container that won the window tie-break would make the tree read
+   * "portrait", the swap would be refused, and the crop would scale by 6.522
+   * instead of 3.0 — in the across direction, which the one-sided check below
+   * cannot see: supplying the device screen would be WORSE than withholding
+   * it. Aspect agreement decides it, with no witness.
    */
   it('rotates on a landscape capture even when the tree reads portrait', () => {
     const landscape = node({ x: 0, y: 0, width: 0, height: 0 }, [
@@ -214,7 +211,6 @@ describe('pngScale — the device screen', () => {
       node({ x: 0, y: 0, width: 874, height: 6000 }), // scroll content: tree reads 874x6000
     ]);
     expect(pngScale(landscape, 2622, 1206, SCREEN)).toMatchObject({ scale: 3, width: 874 });
-    // …and the tree-only path, which 0.5.0 also got right, still does.
     expect(pngScale(landscape, 2622, 1206)).toMatchObject({ scale: 3, width: 874 });
   });
 
@@ -228,7 +224,7 @@ describe('pngScale — the device screen', () => {
   });
 
   it('falls back to the tree when the device size is degenerate', () => {
-    // …and says so, which keying the note off `screen === undefined` did not:
+    // …and says so, which keying the note off `screen === undefined` would not:
     // a size that WAS supplied and was unusable is the case worth admitting to.
     const degenerate = pngScale(IOS, PNG_W, PNG_H, { width: 0, height: 874 });
     expect(degenerate).toMatchObject({ scale: 3, width: 402 });
@@ -291,11 +287,11 @@ describe('pngScale on the real iOS filter-sheet dump', () => {
 });
 
 /**
- * The rect denominator (2026-10-07, the parity review's P1): the window's
- * width, judged under the png scale's policy. Until then the rect table and
- * the `rect` assert read geometry.ts directly and kept a CONTENT width as a
- * remark — so a width `pngScale` refused on the same tree still divided
- * every rect delta, and a real defect could read WITHIN TOLERANCE.
+ * The rect denominator (the parity review's P1): the window's width, judged
+ * under the png scale's policy. Were the rect table and the `rect` assert to
+ * read geometry.ts directly and keep a CONTENT width as a remark, a width
+ * `pngScale` refused on the same tree would still divide every rect delta,
+ * and a real defect could read WITHIN TOLERANCE.
  */
 describe('windowWidth — the rect denominator, one trust policy with the scale', () => {
   /**
@@ -355,9 +351,9 @@ describe('windowWidth — the rect denominator, one trust policy with the scale'
   });
 
   /**
-   * Review round 1: bounding by the LONGER side alone let a pixel-scale
-   * window on an @2x 2:1 phone through — 828 < 896 — measured at half scale
-   * under a "narrower than either side" note that was false on its face.
+   * Bounding by the LONGER side alone would let a pixel-scale window on an
+   * @2x 2:1 phone through — 828 < 896 — measured at half scale under a
+   * "narrower than either side" note false on its face.
    */
   it('a portrait window is bounded by the SHORT side: 828 on a 414x896 @2x phone is refused, not noted', () => {
     const got = windowWidth(node({ x: 0, y: 0, width: 828, height: 1792 }), { width: 414, height: 896 });
@@ -365,7 +361,7 @@ describe('windowWidth — the rect denominator, one trust policy with the scale'
     expect(got.error).toMatch(/^the tree's window is 828 wide but the 414x896 device screen is 414 on the short side/);
   });
 
-  // Code review 2026-10-07: landscape-SHAPED, yet exactly the short side wide.
+  // Landscape-SHAPED, yet exactly the short side wide.
   it('a top split pane that spans the short side is measured silently, not "narrower than the long side"', () => {
     expect(windowWidth(node({ x: 0, y: 0, width: 1080, height: 700 }), { width: 1080, height: 2400 })).toEqual({
       width: 1080,
@@ -379,9 +375,9 @@ describe('windowWidth — the rect denominator, one trust policy with the scale'
     );
   });
 
-  // A foldable unfolded after the memoized read. The refusal no longer names
-  // a remedy of its own: it is marked as the screen's, and its caller re-reads
-  // the screen once and says what that found (capture.ts#ScreenWitness, A3).
+  // A foldable unfolded after the memoized read. The refusal names no remedy
+  // of its own: it is marked as the screen's, and its caller re-reads the
+  // screen once and says what that found (capture.ts#ScreenWitness, A3).
   it('marks a wider-than-screen refusal as the screen\'s, so the caller can re-read it — and names no restart', () => {
     const got = windowWidth(node({ x: 0, y: 0, width: 1840, height: 2208 }), { width: 1080, height: 2340 });
     expect(got.widerThanScreen).toBe(true);
@@ -423,10 +419,10 @@ describe('windowWidth — the rect denominator, one trust policy with the scale'
   });
 
   /**
-   * Review round 1: a single-root uiautomator dump of a letterboxed app,
-   * [135,0][945,1800] on a 1080-wide panel, starts inset by design. It is
-   * refused like any content width — and the remedy must not send an
-   * Android run to an iOS tree-source setting.
+   * A single-root uiautomator dump of a letterboxed app, [135,0][945,1800] on
+   * a 1080-wide panel, starts inset by design. It is refused like any content
+   * width — and the remedy must not send an Android run to an iOS tree-source
+   * setting.
    */
   it('refuses an Android letterboxed window with an Android remedy beside the iOS one', () => {
     const letterbox = node({ x: 135, y: 0, width: 810, height: 1800 });
@@ -447,13 +443,13 @@ describe('windowWidth — the rect denominator, one trust policy with the scale'
 });
 
 /**
- * The parity code review's A1/A2 (2026-10-07): an Android app window laid
- * out BESIDE a side navigation bar or a display cutout in landscape. Numbers
- * of a 2400x1080 phone (`wm size` reports it portrait, as built): a 3-button
- * nav bar 126–168 px, a cutout 80–130 px. uiautomator's root is the app
- * window, so a window beside a left-hand bar starts inset — which the walk
- * alone calls a CONTENT width — and one beside a right-hand bar ends short
- * of the long side, which read as "split view?".
+ * The parity code review's A1/A2: an Android app window laid out BESIDE a
+ * side navigation bar or a display cutout in landscape. Numbers of a
+ * 2400x1080 phone (`wm size` reports it portrait, as built): a 3-button nav
+ * bar 126–168 px, a cutout 80–130 px. uiautomator's root is the app window,
+ * so a window beside a left-hand bar starts inset — which the walk alone
+ * calls a CONTENT width — and one beside a right-hand bar ends short of the
+ * long side, which would read as "split view?".
  */
 describe('windowWidth — an Android window beside its system bars (A1, A2)', () => {
   const ANDROID = { width: 1080, height: 2400, windowsBesideSystemBars: true };

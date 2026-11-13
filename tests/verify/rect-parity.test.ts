@@ -159,8 +159,6 @@ describe('compareRectParity — normalization and width inference', () => {
     expect(out).not.toContain('WIDTH-BIASED');
   });
 
-  // Until 2026-10-07 this was a warning paragraph above a table that went on
-  // to print deltas and a verdict (the parity review's P1).
   it('fails the table closed on a filtered tree (widest rect starts inset) — a CONTENT width reaches no verdict', () => {
     const filtered = root(1000, 2400, [leaf('header', px(24), px(100), px(345), px(60))], 40);
     const message = thrownBy(() =>
@@ -250,7 +248,7 @@ describe('compareRectParity — finding semantics', () => {
   });
 
   // ---- the 2026-08-27 finding: the derived aspect row fired on correct code,
-  // and omitting `h` — the only tool a contract author had — did not reach it.
+  // and omitting `h` did not reach it.
 
   it('aspect: false silences the shape row for an anchor whose height the platforms derive differently', () => {
     // Measured: Android's a11y touch-target floor inflates the section header's
@@ -459,8 +457,7 @@ describe('compareRectParity — finding semantics', () => {
     expect(r.findings.every((f) => Number.isFinite(f.delta))).toBe(true);
   });
 
-  // 2026-10-08: the tolerance lives in the contract only — the comparator's
-  // test-facing `tolerancePct` option is gone (parity review P2), so the
+  // The tolerance lives in the contract only (parity review P2), so the
   // looser threshold is set where production sets it.
   it('respects contract tolerance_pct: default 2.0 when unset, the contract\'s value when set', () => {
     const c = contract();
@@ -645,7 +642,6 @@ describe('evaluateRectAssert (the `rect` assert primitive)', () => {
     expect(detail).toContain('(measured only, never fails)');
   });
 
-  // Until 2026-10-07 this PASSED with "(UNRELIABLE …)" in the detail.
   it('fails closed on an unreliable (filtered) screen width, in the png scale\'s own words', () => {
     const tree = root(1000, 2400, [leaf('card', 100, 200, 800, 100)], 40);
     const { pass, detail } = assertRect(
@@ -681,15 +677,13 @@ describe('evaluateRectAssert (the `rect` assert primitive)', () => {
 });
 
 /**
- * Rect parity keeps deriving its denominator from the TREE — `% of screen
- * width` is compared against a Figma FRAME, i.e. the app's canvas, which under
- * split view is the window and not the device screen
+ * Rect parity derives its denominator from the TREE — `% of screen width` is
+ * compared against a Figma FRAME, i.e. the app's canvas, which under split
+ * view is the window and not the device screen
  * (docs/bugs/2026-08-26-png-scale-needs-out-of-tree-screen-size.md). But it
- * shares the tree's window walk with the png scale (since 2026-10-07 through
- * one owner, verify/scale.ts#windowWidth), so the geometry hardening
- * moved its numbers, and review 2026-08-27 rightly asked for that in a test
- * rather than in prose: on an iOS sheet the width was 804 with an UNRELIABLE
- * banner, and it is now the window's own 402.
+ * shares the tree's window walk with the png scale (through one owner,
+ * verify/scale.ts#windowWidth): on an iOS sheet the width is the window's
+ * own 402, not the scrims' 804.
  */
 describe('rect parity on the iOS filter-sheet shape', () => {
   it('normalizes by the window (402), not by the scrims\' extent (804)', async () => {
@@ -698,8 +692,8 @@ describe('rect parity on the iOS filter-sheet shape', () => {
     );
     expect(windowWidth(tree, { width: 402, height: 874 })).toEqual({ width: 402 });
 
-    // apply_button x=208 of a 402pt screen is 51.7%; against 804 it read 25.9%
-    // and a contract authored at ~52% would have hard-FAILED on a correct app.
+    // apply_button x=208 of a 402pt screen is 51.7%; against 804 it would read
+    // 25.9% and a contract authored at ~52% would hard-FAIL on a correct app.
     const { pass, detail } = assertRect(
       { x: 208, y: 791, width: 176, height: 44 },
       { x: 208, w: 176, frameWidth: 402 },
@@ -722,9 +716,9 @@ const thrownBy = (run: () => unknown): string => {
 };
 
 /**
- * The validator run/verify.ts asks BEFORE the legs (2026-10-03). Geometry has
- * one field the schema leaves `unknown` — `tolerance_aspect_pct` — and the
- * rest is typed, so this is the whole of it.
+ * The validator run/verify.ts asks BEFORE the legs. Geometry has one field
+ * the schema leaves `unknown` — `tolerance_aspect_pct` — and the rest is
+ * typed, so this is the whole of it.
  */
 describe('validateRectContract — the read-time diagnosis, without a tree', () => {
   it('a valid contract has no problems, with and without a tolerance_aspect_pct', () => {
@@ -803,10 +797,10 @@ describe('problemsThrownBy — contract problems are collected, bugs propagate',
 });
 
 /**
- * The parity code review's A1 (2026-10-07): an Android window beside a
- * left-hand nav bar or cutout starts inset, and tree rects are in SCREEN
- * coordinates — so x is measured from the window's left edge, as a Figma
- * frame's x is from the canvas's edge. A 2400x1080 phone, notch on the left.
+ * The parity code review's A1: an Android window beside a left-hand nav bar
+ * or cutout starts inset, and tree rects are in SCREEN coordinates — so x is
+ * measured from the window's left edge, as a Figma frame's x is from the
+ * canvas's edge. A 2400x1080 phone, notch on the left.
  */
 describe('a window that starts inset: x is measured from its left edge', () => {
   const ANDROID = { width: 1080, height: 2400, windowsBesideSystemBars: true };

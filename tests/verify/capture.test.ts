@@ -19,10 +19,10 @@ import { Shot } from '../../src/verify/shot.js';
 /**
  * verify/capture.ts is the one owner of frame stability and of the png
  * scale (ARCHITECTURE.md §8). What is worth pinning is the CONTRACT every
- * consumer now relies on: the frame that comes back is a settled one, the
- * budget is the `screenshot` tool's, a tree or device read that fails lands
- * on the frame as a reason rather than as an exception, and the scale is
- * derived from the device first.
+ * consumer relies on: the frame that comes back is a settled one, the budget
+ * is the `screenshot` tool's, a tree or device read that fails lands on the
+ * frame as a reason rather than as an exception, and the scale is derived
+ * from the device first.
  */
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on: the two
@@ -79,7 +79,6 @@ describe('captureFrame — the stability wait', () => {
     expect(fake.screenshots).toHaveLength(6);
     expect(got.shot.equals(Shot.ofPng(frame('f')))).toBe(true);
     expect(sleeps).toEqual(Array(5).fill(STABILITY_DELAY_MS));
-    // Until 2026-10-05 this frame was indistinguishable from a settled one.
     expect(got.stability).toBe('moving');
     expect(got.captures).toBe(6);
     expect(unsettledReason(got)).toBe(
@@ -98,14 +97,14 @@ describe('captureFrame — the stability wait', () => {
   });
 
   /**
-   * The budget has no knobs (2026-10-05): a `delayMs` "so tests stay fast"
-   * was how the Verifier came to forward its poll interval as the stability
-   * delay, and asserts inside flows waited 500 ms where the tool waited 300.
-   * The budget is the two constants, whoever calls.
+   * The budget has no knobs: a `delayMs` "so tests stay fast" would let the
+   * Verifier forward its poll interval as the stability delay, and asserts
+   * inside flows would wait 500 ms where the tool waits 300. The budget is
+   * the two constants, whoever calls.
    */
   it('takes no budget options — the delay sequence is the module\'s, whoever calls', async () => {
     const fake = device(['a', 'b', 'b'].map(frame));
-    // @ts-expect-error — delayMs/attempts are not options any more (2026-10-05)
+    // @ts-expect-error — delayMs/attempts are not options
     await captureFrame(fake, { delayMs: 5, attempts: 1 });
     expect(sleeps).toEqual([300, 300]);
   });
@@ -143,12 +142,12 @@ describe('captureFrame — the stability wait', () => {
 });
 
 /**
- * Element-region stability (2026-10-06): beside a supplied tree, a caller
- * may name the rect it will measure, and two captures that differ only
- * OUTSIDE it are settled. The device here reports the SCREEN's 1000x2000
- * points and the pngs are 100x200, so the scale is 0.1 and the card
- * (x 100..900, y 200..300 in points) lands on png x 10..90, y 20..30 —
- * the region check scales exactly as the measured frame will.
+ * Element-region stability: beside a supplied tree, a caller may name the
+ * rect it will measure, and two captures that differ only OUTSIDE it are
+ * settled. The device here reports the SCREEN's 1000x2000 points and the
+ * pngs are 100x200, so the scale is 0.1 and the card (x 100..900, y 200..300
+ * in points) lands on png x 10..90, y 20..30 — the region check scales
+ * exactly as the measured frame will.
  */
 describe('captureFrame — stability over the caller\'s region', () => {
   const CARD = SCREEN.children[0].rect;
@@ -204,9 +203,9 @@ describe('captureFrame — stability over the caller\'s region', () => {
 
   /**
    * The compare covers EXACTLY the crop the measurement will read, no inset
-   * and no missing edge (review 2026-10-06): the card lands on png x 10..90,
-   * y 20..30, half-open, so (10, 20) is its first pixel, (89, 29) its last,
-   * and (90, 29) the first one past it.
+   * and no missing edge: the card lands on png x 10..90, y 20..30, half-open,
+   * so (10, 20) is its first pixel, (89, 29) its last, and (90, 29) the first
+   * one past it.
    */
   it('the region\'s edges: a change on its first or last pixel moves the frame, one pixel past the last does not', async () => {
     const first = await captureFrame(ticking(10, 20), { tree: SCREEN, region: CARD });
@@ -239,11 +238,11 @@ describe('captureFrame — stability over the caller\'s region', () => {
     const got = await captureFrame(fake, { tree: SCREEN, region: CARD });
     expect(got).toMatchObject({ stability: 'settled', settledOver: 'screen', captures: 2 });
     expect(sleeps).toEqual([STABILITY_DELAY_MS]);
-    // One read, and it is not the wait's: since 2026-10-07 the frame reads the
-    // device screen once AFTER the wait and BEFORE the decode, so a png that
-    // does not decode still carries its window width, witnessed (here the
-    // read fails, and the width is the tree's, saying so). A wait that read
-    // the device too would make this 2 or more.
+    // One read, and it is not the wait's: the frame reads the device screen
+    // once AFTER the wait and BEFORE the decode, so a png that does not decode
+    // still carries its window width, witnessed (here the read fails, and the
+    // width is the tree's, saying so). A wait that read the device too would
+    // make this 2 or more.
     expect(viewportReads).toBe(1);
     // The capture's own decode, after the wait, is the one that words the failure.
     expect(got.measured.error).toMatch(/^screenshot PNG decode failed: /);
@@ -291,9 +290,9 @@ describe('captureFrame — stability over the caller\'s region', () => {
 
   it('a region is accepted only beside a supplied tree — the readTree and png-only arms reject it by type', async () => {
     const fake = device([clock(1), clock(1)]);
-    // @ts-expect-error — the readTree arm has no tree until after the wait (2026-10-06)
+    // @ts-expect-error — the readTree arm has no tree until after the wait
     await captureFrame(fake, { readTree: true, region: CARD });
-    // @ts-expect-error — the png-only arm has no tree at all (2026-10-06)
+    // @ts-expect-error — the png-only arm has no tree at all
     await captureFrame(fake, { region: CARD });
     // Options built elsewhere get no excess-property check: the `region?: never`
     // fields are what refuse these two, not the literal's freshness.
@@ -307,11 +306,11 @@ describe('captureFrame — stability over the caller\'s region', () => {
 });
 
 /**
- * Baseline creation's confirmation window (2026-10-06): the settled pair is
- * not enough to STORE a frame, because a pair ≈0.95 s apart lands in phase
- * with a ≈1 s caret blink. The criterion the schedule meets is the
- * simulation in baseline-confirmation.test.ts; what is pinned here is the
- * sequence and the frame's report, with the recorded sleeps.
+ * Baseline creation's confirmation window: the settled pair is not enough
+ * to STORE a frame, because a pair ≈0.95 s apart lands in phase with a ≈1 s
+ * caret blink. The criterion the schedule meets is the simulation in
+ * baseline-confirmation.test.ts; what is pinned here is the sequence and the
+ * frame's report, with the recorded sleeps.
  */
 describe('captureBaselineFrame — the confirmation window a baseline must hold still across', () => {
   it('a still screen: the pair, then four confirmations — six captures, and the only waits are the pair\'s 300 ms and the window\'s 300 ms', async () => {
@@ -377,7 +376,7 @@ describe('captureFrame — the tree beside the png', () => {
     // A png-only frame reports nothing about a tree — not even a reason: it
     // asked for nothing more. It still says whether it settled.
     expect(got.measured).toBeUndefined();
-    // It says HOW it settled since 2026-10-06 — over the whole screen, the only answer without a region.
+    // It says HOW it settled — over the whole screen, the only answer without a region.
     expect(Object.keys(got)).toEqual(['shot', 'stability', 'settledOver', 'captures']);
     expect(got).toMatchObject({ stability: 'settled', settledOver: 'screen', captures: 2 });
   });
@@ -400,7 +399,7 @@ describe('captureFrame — the tree beside the png', () => {
     expect(got.measured.scale).toMatchObject({ scale: 1, width: 1000 });
   });
 
-  // D21 (2026-10-31): a read error no wait cures (idb's wedged accessibility service) is not retried — four more
+  // D21: a read error no wait cures (idb's wedged accessibility service) is not retried — four more
   // reads 300 ms apart would only say it again. The frame carries it as any read failure, after the one attempt.
   it('a PersistentReadError is not retried: one attempt, its message on the frame, the png still returned', async () => {
     const fake = device([png(1000, 2000)]);
@@ -448,7 +447,7 @@ describe('captureFrame — the tree beside the png', () => {
     expect(got.measured.image).toBeUndefined();
     // The frame's one sentence: pngjs's own words, then how to recover.
     expect(got.measured.error).toMatch(/^screenshot PNG decode failed: unrecognised content at end of stream — re-run; if it repeats/);
-    // No adb or simctl here since 2026-10-08: a non-PNG is the adapter's refusal to word.
+    // No adb or simctl here: a non-PNG is the adapter's refusal to word.
     expect(got.measured.error).toContain('a damaged PNG (it starts like one but does not decode)');
     expect(got.measured.error).not.toMatch(/adb|simctl/);
   });
@@ -488,8 +487,7 @@ describe('captureFrame — the one scale', () => {
     // A rect-less root — one that is not itself the window, so windowRect
     // (ui-tree/geometry.ts) scans its children for one — with no `children`
     // array to scan. The throw comes from that child scan inside
-    // inferScreenSize, before any rect walk. Before 2026-10-02 it ran inside
-    // the parity tables' containment; moved into the capture it must stay
+    // inferScreenSize, before any rect walk. Inside the capture it must stay
     // contained.
     const malformed = { ...node({ rect: { x: 0, y: 0, width: 0, height: 0 } }), children: undefined as unknown as UiNode[] };
     const got = await captureFrame(fake, { tree: malformed });
@@ -532,9 +530,9 @@ describe('measuredFrameFor — the pure tail captureFrame and the comparator fix
     });
   });
 
-  // The parity code review's A3 (2026-10-07): a screen changed since the
-  // memoized read is re-read once before a wider-than-screen refusal, and
-  // the frame's scale and window both use what the device says now.
+  // The parity code review's A3: a screen changed since the memoized read
+  // is re-read once before a wider-than-screen refusal, and the frame's
+  // scale and window both use what the device says now.
   it('re-reads the device screen once before a wider-than-screen refusal, and measures the frame by the fresh screen', async () => {
     const fake = new FakeAdapter({ s: node({ rect: { x: 0, y: 0, width: 1000, height: 2000 } }) }, 's');
     fake.nextScreenshot = png(1000, 2000);
@@ -601,10 +599,10 @@ describe('pngRegion — the one rect → png mapping', () => {
 });
 
 /**
- * The wait's floor under the adapter contract (2026-10-08): DeviceAdapter
- * .screenshot throws on a failed capture (adapters/screenshot-bytes.ts), and
- * an adapter that returns 0 bytes anyway fails the capture here — two empty
- * buffers are `equals`, and before this they came back `settled`.
+ * The wait's floor under the adapter contract: DeviceAdapter.screenshot
+ * throws on a failed capture (adapters/screenshot-bytes.ts), and an adapter
+ * that returns 0 bytes anyway fails the capture here — two empty buffers are
+ * `equals`, and without the floor they would come back `settled`.
  */
 describe('captureFrame — an empty capture is no frame', () => {
   const EMPTY = /^the device adapter returned an empty screenshot \(0 bytes\) — no frame can settle on nothing/;

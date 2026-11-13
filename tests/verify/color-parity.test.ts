@@ -317,9 +317,8 @@ describe('compareColorParity — single-platform runs', () => {
   // NaN cannot reach here through a contract FILE — that is JSON, `NaN`
   // serializes to `null`, and `null ?? DEFAULT` takes the default. It IS
   // reachable from a contract built in code (the field is `unknown`), which
-  // is where the finite check earns its keep. Until 2026-10-08 this was
-  // pinned through a test-only `toleranceDe` option, now gone (parity
-  // review P2): the contract is the one way in.
+  // is where the finite check earns its keep. The contract is the one way in
+  // (parity review P2).
   it('a NaN tolerance_de in a contract built in code is rejected, and a null in the JSON just defaults', () => {
     const c: LayoutContract = { ...contract({ screen: 's', anchors: [{ id: 'card', bg: WHITE }] }), tolerance_de: Number.NaN };
     const captures = { android: capturePair(WHITE, WHITE).android };
@@ -366,7 +365,7 @@ describe('compareColorParity — failing closed', () => {
 
   it('throws on a filtered tree rather than scaling by a content width', () => {
     // Root inset at x=5 → not a window, and the widest rect is inset too, so
-    // the width is the CONTENT width. It used to be a note on a passing table.
+    // the width is the CONTENT width.
     const captures = capturePair(WHITE, WHITE);
     captures.android = measured(root(25, 400, [leaf('card', 2, 2, 12, 8)], 5), captures.android.image);
     expect(() => compareColorParity(cardContract(), captures)).toThrow(/CONTENT width/);
@@ -506,12 +505,11 @@ describe('evaluateColorAssert (the `color` assert primitive)', () => {
 });
 
 describe('PNG decode conformance (the pipeline decoder = pngjs)', () => {
-  // Ported from the Python script's self-test (f2): hardcoded filtered bytes,
-  // expected pixels computed BY HAND from the PNG spec (2x5 RGB, one row per
-  // filter type 0-4). Independent of any encoder — a shared filter-arithmetic
-  // bug cannot cancel out. This pins the decode path both asserts and verify
-  // sample through, plus our RGBA-normalization assumption (pngjs expands
-  // RGB to RGBA with alpha 255).
+  // Hardcoded filtered bytes, expected pixels computed BY HAND from the PNG
+  // spec (2x5 RGB, one row per filter type 0-4). Independent of any encoder —
+  // a shared filter-arithmetic bug cannot cancel out. This pins the decode
+  // path both asserts and verify sample through, plus our RGBA-normalization
+  // assumption (pngjs expands RGB to RGBA with alpha 255).
   it('decodes the hand-computed filtered bytes to the spec-derived pixels', async () => {
     const { deflateSync } = await import('node:zlib');
     const crc32 = (buf: Buffer): number => {
@@ -583,10 +581,10 @@ const thrownBy = (run: () => unknown): string => {
 };
 
 /**
- * The validator run/verify.ts asks BEFORE the legs (2026-10-03). What is
- * pinned: the exact message per invalid field, nothing for a valid contract,
- * and — the one-owner tests — that each message is the very string the
- * comparator throws for the same field at read time.
+ * The validator run/verify.ts asks BEFORE the legs. What is pinned: the
+ * exact message per invalid field, nothing for a valid contract, and — the
+ * one-owner tests — that each message is the very string the comparator
+ * throws for the same field at read time.
  */
 describe('validateColorContract — the read-time diagnosis, without a capture', () => {
   it('a valid contract (hex, hex+alpha, token, both sample modes, a tolerance) has no problems', () => {

@@ -24,8 +24,7 @@ import { captureBaselineFrame, captureFrame } from '../../src/verify/capture.js'
  * The sleep mock here does NOT yield a macrotask, unlike
  * tests/helpers/sleep-recorder.ts: the grid is ~10 000 runs, and a
  * setTimeout(0) per sleep would cost the suite tens of seconds. Nothing on
- * this path reacts on a timer (fill.test.ts and the two keyboard-*.test.ts keep a
- * no-yield recorder for the same reason).
+ * this path reacts on a timer.
  */
 /**
  * `jitter` scales every sleep and every capture by its own draw (1 = the
@@ -118,13 +117,13 @@ async function sweep(duty: number, creates: (device: ReturnType<typeof blinkingD
   return { refused: refused / n, refusedInBand: refusedInBand / inBand };
 }
 
-/** What the screenshot assert creates from since 2026-10-06: a settled pair the window then confirmed. */
+/** What the screenshot assert creates from: a settled pair the window then confirmed. */
 const confirmedRule = async (device: ReturnType<typeof blinkingDevice>): Promise<boolean> => {
   const frame = await captureBaselineFrame(device);
   return frame.stability === 'settled' && frame.confirmed === true;
 };
 
-/** What it created from until then: the settled pair alone. */
+/** What it would create from without the window: the settled pair alone. */
 const pairRule = async (device: ReturnType<typeof blinkingDevice>): Promise<boolean> =>
   (await captureFrame(device)).stability === 'settled';
 
