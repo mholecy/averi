@@ -39,6 +39,8 @@ Amended 2026-11-01 (D42: the keyboard guard's looks pass a terminal failure thro
   Interaction).
 - fill's not-input hint read (interact/fill.ts, `notInput`) still reads raw and swallows any failure, the terminal one
   included: it is a hint, read only when no re-read happened. Whether it should stop on a terminal failure is left open.
+  (Superseded by the D39 amendment below: `notInput` reads through `readTreeOrMiss`, and a terminal failure stops the
+  fill.)
 - The raw `uiTree()` calls outside src/adapters and the seam are pinned, with the reason each may read raw, by
   tests/ui-tree/raw-tree-reads.test.ts: a new one fails that test until it goes through the seam or is listed.
 

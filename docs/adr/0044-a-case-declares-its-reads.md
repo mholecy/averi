@@ -173,10 +173,13 @@ state by accident and T12, T13 and T19 needed it labelled; each labelled its run
   the key prints none, so every committed record rejudges byte-identically (698 records, in the forms groups and in
   `visibility,dismissal,ensure,carousel,chooser`, base 3b811b28 against T16).
 
-**Not yet run on a device.** `readDevice` has run only over a fake exec: the emulator was down when T16 was built, and
-the smoke went to the owner's list, its record and log to be committed as
-`docs/truth/live-records/t16-device-state/smoke-1.json` and `smoke-1.log.txt` (`live.ts --serial emulator-5554 --groups
-carousel --cases lv-d62-control --record …`). The first live carousel run must confirm: `deviceLabel.before` and `.after` each hold
+**Run on a device on 2026-11-11.** `readDevice` was built over a fake exec (the emulator was down when T16 was built);
+its smoke ran on emulator-5554, its record and log committed as `docs/truth/live-records/t16-device-state/smoke-1.json`
+and `smoke-1.log.txt` (`live.ts --serial emulator-5554 --groups carousel --cases lv-d62-control --record …`), the port's
+check beside them as `raw-strokes-1.jsonl` and `raw-strokes-1.log.txt`. It confirmed every point below: each read four
+rounds of four strokes, carries 135–145, the pre-drag 436–442 px, frames present (156 and 152), the start count 1 in
+both, `Device: before fast 0/16, after fast 0/16`, and raw-strokes.mjs on the same boot the same state and short count;
+a read took about 52 s. What the first live carousel run was to confirm: `deviceLabel.before` and `.after` each hold
 four rounds of four strokes with carries the state file gave (none NaN, none from a stale file), the pre-drag carrying
 about 438 px, frames present (`dumpsys gfxinfo` prints the four lines `parseGfxinfo` reads on this AVD) and the start
 count read; the `Device:` line printed under the summary and again, byte for byte, by `--rejudge` of the record; the
@@ -185,7 +188,7 @@ fidelity: `node docs/truth/live-records/t11-carousel-visible/raw/raw-strokes.mjs
 `--groups carousel` run on the same boot, each read's state and short count compared with the Device line's (the
 same state expected, short counts close; a disagreement is the port's to explain before any label is trusted).
 
-**Consequences.** A read costs about 55 s, estimated, not measured: T11's raw-1.jsonl rounds ran 12 s apart with the
+**Consequences.** A read costs about 55 s, estimated (the smoke above measured about 52 s): T11's raw-1.jsonl rounds ran 12 s apart with the
 script's 1.5-s launch sleep, and the settle on ready adds about half a second a round; four rounds and the frames' read.
 Two reads take a single-case carousel run from about 23 s to about 2 minutes, five times as long; a run of the whole
 group pays the same 110 s once. `--device-read none` is the opt-out where the label is not wanted. raw-strokes.mjs and

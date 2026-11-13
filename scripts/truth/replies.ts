@@ -316,10 +316,10 @@ export function flushProbesSaid(reply: string): number | undefined {
 /**
  * What a refused dismissal names as lying over it — `toolbar` (#7's first half: SwiftUI's screen-sized Toolbar host, #19's
  * bar), `scrollable` (#7's second half: a scroll view shorter than the screen, its frame over the title) — read from the
- * guard's own clause (src/interact/keyboard-in-tree.ts:361, `none of the configured dismissals is usable on this screen
- * (…)`, each skipped dismissal's `covered by <role> …` from :335-345), not from any "toolbar" in the reply: its advice
- * names the input-accessory toolbar whatever covered the dismissal (golden-spec/rows.ts#dismissRow). undefined: no such
- * clause.
+ * guard's own clause (src/interact/keyboard-in-tree.ts, `none of the configured dismissals is usable on this screen
+ * (…)`, each skipped dismissal's `covered by <role> …` from src/interact/keyboard-dismissal.ts), not from any "toolbar"
+ * in the reply: its advice names the input-accessory toolbar whatever covered the dismissal
+ * (golden-spec/rows.ts#dismissRow). undefined: no such clause.
  */
 // Errs safe: a `)` inside an earlier part of the clause (a selector's text) ends the match before `covered by`, and
 // the row then names no cover — the mismatch stays red, only its wording loses the role.

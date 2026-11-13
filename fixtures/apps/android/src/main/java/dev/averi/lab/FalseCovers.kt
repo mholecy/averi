@@ -8,7 +8,9 @@ package dev.averi.lab
 // text field's own label drawn over the empty field, as a placeholder is (on iOS the field lies over the label: #18);
 // and a label target (CatalogTarget.label), `I` a Material IconButton's icon, its content description the label (#8's
 // second fix: the button lists the 48-dp wrapper, the icon, then an unlabelled clickable inset on all four sides — the
-// note's B-1.7 shape). A tap on any of them fires its control, logged as the target's `tap`. The toolbar cells are form cells: phase 2b on Android (the capture skips them).
+// note's B-1.7 shape). A tap on any of them fires its control, logged as the target's `tap`. The toolbar cells are not
+// built on Android: their family routes them here, which draws no form and settles an empty screen. Only
+// toolbar-dismiss-short is marked iOS-only, so a capture does not skip toolbar-dismiss or toolbar-dismiss-bar.
 
 import android.graphics.Rect
 import androidx.compose.foundation.background

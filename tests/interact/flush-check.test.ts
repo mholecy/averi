@@ -280,7 +280,7 @@ describe('the flush check doubts a reveal that held on a proven cut (D62, T11)',
   });
 
   // ADR 0013 LV2 point 3's row cut by 40 px, which the 74-px probe brings whole at the list's end —
-  // the legitimate case the doubt pays for: one retry, then the hedge (a new call's first probe holds: `checked`).
+  // the legitimate case the doubt pays for: one retry, then the hedge.
   it('LV2\'s row cut by 40 px, revealed whole by the 74-px probe: the held reveal is sent again, and hedged when that one holds', () => {
     const doubted = seeFlush(sent(provedBy(40).verdict), stopAt(flushOn('bottom', 62)));
     expect(said(doubted)).toEqual(reveal(62));

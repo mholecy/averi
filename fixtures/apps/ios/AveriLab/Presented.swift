@@ -34,7 +34,7 @@ private let sheetDetents: [String: PresentationDetent] = [
 private let measuredLayers: Set<String> = ["sheet-medium-scrolled", "sheet-list", "sheet-list-short"]
 
 /// The cell's layer, raised after the screen beneath has appeared, and the state marked ready once it has settled — a
-/// cell with layer `none` (base's `open`) raises nothing and is ready after 300 ms.
+/// cell with layer `none` (base's `open`) raises nothing and is ready after 600 ms (two 300 ms waits).
 struct PresentedLayer: ViewModifier {
     @EnvironmentObject var lab: Lab
     let cell: Cell

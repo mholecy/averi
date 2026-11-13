@@ -48,8 +48,9 @@ import { absenceVerdict, presenceVerdict, type Verdict } from '../ui-tree/verdic
 export interface Condition {
   element?: ElementSpec;
   /**
-   * With element: true inverts the check — element gone or off-viewport; on a
-   * BARE tree neither, but undecided (flow/condition.ts, since 2026-10-08).
+   * `absent: true` beside `element` inverts the check — element gone or
+   * off-viewport; on a BARE tree neither, but undecided (flow/condition.ts,
+   * since 2026-10-08).
    */
   absent?: boolean;
   state?: string;

@@ -366,8 +366,10 @@ export interface Exposure {
   /** The cover drawn on top at its centre (`tapPoint`, the point a tap presses), when the centre lies inside `within` under one — cover.ts#coverAtPoint of the centre. What the tap's chrome check and `scroll_until`'s stop ask. */
   readonly centreCover?: Cover;
   /**
-   * The nodes listed after it that hold its centre (inside `within`, at
-   * their reach, as cover.ts#coverAtPoint asks) and that the `target` column EXCUSED —
+   * The nodes listed after it — or listed before it and judged with them (a
+   * floating tab bar's items in a flat list, a reading-order peer) — that hold its
+   * centre (inside `within`, at their reach, as cover.ts#coverAtPoint asks)
+   * and that the `target` column EXCUSED —
    * drawn there, by the table, as no cover of it — in pre-order; empty when
    * none, or when the centre lies outside `within` — a node of a hidden
    * subtree (`UiNode.hidden`, the `hidden` row) included: WDA's
@@ -383,8 +385,9 @@ export interface Exposure {
    */
   readonly centreExcused: readonly UiNode[];
   /**
-   * The nodes listed after it that meet what shows of it and that the `target` column excused as SEEN CLEAR (the
-   * `seenClear` row: a screenshot showed them paint nothing over it where they overlap), in pre-order; empty when none
+   * The nodes listed after it — or listed before it and judged with them, as for `centreExcused` — that meet what
+   * shows of it and that the `target` column excused as SEEN CLEAR (the `seenClear` row: a screenshot showed them
+   * paint nothing over it where they overlap), in pre-order; empty when none
    * — so a sentence can say what the eyes excused (interact/scroll-text.ts's fully visible claim).
    */
   readonly seenClear: readonly UiNode[];

@@ -292,7 +292,7 @@ export class WdaServer {
   /**
    * GET /source?format=json (sessionless — no WebDriver session needed).
    * Returns the raw WDA envelope `{ value: <root element>, sessionId }`;
-   * callers unwrap `.value` (parseWdaSource, Phase 2).
+   * wda-source.ts#parseWdaSourceValue unwraps it, so callers pass it as-is.
    */
   async source(): Promise<unknown> {
     return this.sourceAttempt(false);

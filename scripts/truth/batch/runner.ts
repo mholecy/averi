@@ -64,9 +64,9 @@ import { canonicalJson, EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parse
  * 5. the preconditions (preconditions.ts): the checkout, then each wanted block's own, all before the first block runs.
  *    One not shown makes its block INCONCLUSIVE naming why, never a refusal (the S3 choice: batch-11's way); a failed
  *    checkout does so for every block, and the SUMMARY is still written;
- * 6. each wanted block, in the batch's order: its needs (each checked once, by the first block that names it; S6b
- *    supplies the checks — the lab simulator, the lab emulator), a failed one making it INCONCLUSIVE, not run; then its
- *    `run(ctx)`;
+ * 6. each wanted block, in the batch's order: its needs (each checked in full by the first block that names it, then
+ *    rechecked before each later one — NeedSpec; S6b supplies the checks — the lab simulator, the lab emulator), a
+ *    failed one making it INCONCLUSIVE, not run; then its `run(ctx)`;
  * 7. the normal end: each need met that has an `end`, once (NeedSpec: the ios need's finportal read, its protected-key
  *    line); every window still open to RESTORE (finish); each block that ran with no verdict of its own judged
  *    (`judge`, device-free); the backstop for a wanted block still without one; the details; the SUMMARY; the exit code

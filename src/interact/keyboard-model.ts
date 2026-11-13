@@ -44,8 +44,7 @@ import { AmbiguityRefusal, resolveSettled, type Resolved, type ResolvedSettled, 
  * judgement of a look — the tap's and the dismissal picker's — reads the
  * look's and builds none of its own, so one look is at most one draw-order
  * walk and one reading; `scroll_until`'s read builds its own Look, once per
- * read (scroll-read.ts#factsOf). `grep lookOn src/interact` finds only
- * `seenLook` and the post-fill dismissal's tree reads (its first, and each confirming one).
+ * read (scroll-read.ts#factsOf).
  */
 
 /**
