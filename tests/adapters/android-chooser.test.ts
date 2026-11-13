@@ -309,9 +309,12 @@ describe.each(SHAPES)('chooserInFocus — synthetic `mFocusedApp` lines, the %s 
       expect(chooserInFocus(display(1, CHOOSER_WINDOW, CHOOSER_APP) + display(0, LAB_WINDOW, LAB_APP))).toBeUndefined();
     });
 
-    it('no display 0 among the headers: the first display\'s pair', () => {
-      expect(chooserInFocus(display(1, CHOOSER_WINDOW, CHOOSER_APP) + display(2, LAB_WINDOW, LAB_APP))).toBe(RESOLVER);
+    // A35: the one display rule (android-wm.ts#onDefaultDisplay) reads display 0 alone; before it, the first display's
+    // pair was read here (no device has lacked a display 0: Display.DEFAULT_DISPLAY always exists).
+    it('no display 0 among the headers: no pair, so no chooser', () => {
+      expect(chooserInFocus(display(1, CHOOSER_WINDOW, CHOOSER_APP) + display(2, LAB_WINDOW, LAB_APP))).toBeUndefined();
       expect(chooserInFocus(display(10, LAB_WINDOW, LAB_APP) + display(1, CHOOSER_WINDOW, CHOOSER_APP))).toBeUndefined();
+      expect(chooserInFocus(display(10, LAB_WINDOW, LAB_APP) + display(0, CHOOSER_WINDOW, CHOOSER_APP))).toBe(RESOLVER);
     });
   });
 });

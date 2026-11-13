@@ -5,11 +5,75 @@ import { rectIntersection, type FocusedWindow, type KeyboardWitness, type Rect, 
  * The window manager's and the input method's dumps (`dumpsys window …`, `dumpsys input_method`) as the adapter reads
  * them: each read's shell line and its parser, with no device call here (android.ts sends the lines).
  *
- * A second display is answered three ways, each read's own: every display must agree (parseImeInsets, parseStatusBand,
- * parseNavigationBand), the first found (parseFocusedWindow: its read prints no display headers) and display 0's block
- * (defaultDisplayFocus). They were not made one (A27): every captured dump holds one display, where the three read
- * alike, so none can say which is right for two: tests/adapters/android-wm.test.ts pins the census and the difference.
+ * Every read answers for ONE display, the default one (A35): onDefaultDisplay below is the rule, and each parser reads
+ * what it hands back.
  */
+
+/** What opens each display's block in `dumpsys window displays`, its id after it: `Display: mDisplayId=0 (organized)`. */
+const DISPLAY_HEADER = 'Display: mDisplayId=';
+
+/**
+ * The default display (`Display.DEFAULT_DISPLAY`): where `am start` with no `--display` starts the app and the link,
+ * and what `input tap`/`swipe` and `screencap` with no `-d` act on — the display averi verifies.
+ */
+const DEFAULT_DISPLAY = 0;
+
+/** A window block's display: the `mDisplayId=<n> rootTaskId=…` line its header opens on (API 33, tests/fixtures). */
+const WINDOW_DISPLAY_RE = /^ {4}mDisplayId=(\d+) /m;
+
+/**
+ * THE DISPLAY RULE (A35): the default display's part of a window manager dump, so every read answers for that display
+ * and another display's lines are never read. Where the dump says which display a line is, that decides:
+ * - a dump with display headers (`dumpsys window displays`, whole or grepped: the insets reads, the chooser's): display
+ *   0's block, from its header to the next. No block is display 0's: nothing (an empty part, which every read
+ *   answers as unread);
+ * - FOCUSED_WINDOW_COMMAND's answer, whose grep prints no headers: each display's `mCurrentFocus` line comes before
+ *   its own `DisplayFrames` line (A35's capture), and each window block of `dumpsys window windows` names its display
+ *   (`mDisplayId=<n>`). Display 0's part is its focus line with the lines up to the next focus line (its size), then
+ *   its own window blocks. Display 0's focus line is the one whose window's block is display 0's: a `null` focus
+ *   (only the top-focused display has a window focus), or one whose window the dump does not list, is no display's
+ *   that can be told, and two that both name a window of display 0's are no one focus — no focus line then;
+ * - a dump that names no display (no header, no window block naming one) is one display's, whole: every captured
+ *   one-display dump is display 0's, so it reads as before A35.
+ * Before A35 the reads answered a second display three ways (every display must agree, the first found, display 0's
+ * block); ADR 0041's A35 amendment says why this one.
+ */
+function onDefaultDisplay(dump: string): string {
+  const [, ...displays] = dump.split(DISPLAY_HEADER);
+  if (displays.length > 0) return displays.find((block) => Number.parseInt(block, 10) === DEFAULT_DISPLAY) ?? '';
+  const windows = windowBlocks(dump);
+  if (windows.length === 0) return dump;
+  const ours = windows.filter((w) => w.display === DEFAULT_DISPLAY);
+  const lines = dump.slice(0, windows[0].at);
+  const starts = [...lines.matchAll(CURRENT_FOCUS_LINE_RE)].map((m) => m.index);
+  const parts = starts.map((at, i) => lines.slice(at, starts[i + 1]));
+  const focus = parts.filter((part) => {
+    const hash = focusLines(part)[0]?.hash;
+    return ours.some((w) => w.hash === hash);
+  });
+  return (focus.length === 1 ? focus[0] : '') + ours.map((w) => w.text).join('');
+}
+
+/** One window block of `dumpsys window windows`: where it starts, its hash, its display, its text to the next block. */
+interface WindowBlock {
+  at: number;
+  hash: string;
+  display: number;
+  text: string;
+}
+
+/**
+ * Each window block of `dumpsys window windows`, in the dump's order. A block that names no display is the default
+ * display's (a dump that names none is one display's).
+ */
+function windowBlocks(dump: string): WindowBlock[] {
+  const headers = [...dump.matchAll(WINDOW_HEADER_RE)];
+  return headers.map((m, i) => {
+    const text = dump.slice(m.index, headers[i + 1]?.index ?? dump.length);
+    const display = WINDOW_DISPLAY_RE.exec(text)?.[1];
+    return { at: m.index, hash: m[1], display: display === undefined ? DEFAULT_DISPLAY : Number(display), text };
+  });
+}
 
 /**
  * `mInputShown=<bool>` as a whole `key=value` word: it follows whitespace (it
@@ -54,9 +118,10 @@ export const TOUCHABLE_COMMAND = `${INPUT_SHOWN_COMMAND}; dumpsys window InputMe
 
 /**
  * The window manager's word on the focused window, in one shell line: the focus and the display's size out of `dumpsys
- * window displays` (API 33 prints `mCurrentFocus` there, not in `windows`; one line each per display, the first
- * display's first), then `dumpsys window windows` — each window's hash, type (`mAttrs … ty=`), frame (`Frames: …
- * frame=`) and `isVisible=`. Every word a constant; the line's status is the last command's.
+ * window displays` (API 33 prints `mCurrentFocus` there, not in `windows`; one pair each per display, the focus line
+ * first, the top-focused display last, no display header), then `dumpsys window windows` — each window's hash, display
+ * (`mDisplayId=`), type (`mAttrs … ty=`), frame (`Frames: … frame=`) and `isVisible=`; onDefaultDisplay tells display
+ * 0's lines from them. Every word a constant; the line's status is the last command's.
  */
 export const FOCUSED_WINDOW_COMMAND = "dumpsys window displays | grep -E 'mCurrentFocus=|DisplayFrames w='; dumpsys window windows";
 
@@ -69,6 +134,9 @@ export const FOCUSED_WINDOW_COMMAND = "dumpsys window displays | grep -E 'mCurre
  * captured line has the token: tests/adapters/android-wm.test.ts).
  */
 const CURRENT_FOCUS_RE = /mCurrentFocus=Window\{([0-9a-f]+) (?:u\d+ ([^\s/}]+\/[^\s}]+)\})?/g;
+
+/** A focus line, `null` or not: each display prints one (onDefaultDisplay cuts the focus read at each). */
+const CURRENT_FOCUS_LINE_RE = /mCurrentFocus=/g;
 
 /** Each focus line of `dump`, in its order: the window's hash, and its component when the record names one. */
 const focusLines = (dump: string): { hash: string; component: string | undefined }[] =>
@@ -123,12 +191,13 @@ interface WmWindow {
  * clipped, `mAttrs` does not). A frame wholly off the display is none: `unknown`. Which window of the dump the
  * uiautomator root is, is not decided here: ui-tree/window-mark.ts matches the frame.
  */
-export function parseFocusedWindow(dump: string): FocusedWindow {
+export function parseFocusedWindow(whole: string): FocusedWindow {
+  const dump = onDefaultDisplay(whole);
   const focus = focusLines(dump)[0]?.hash;
   const [, w, h] = /DisplayFrames w=(\d+) h=(\d+)/.exec(dump) ?? [];
   if (focus === undefined || w === undefined) return { of: 'unknown' };
   const screen = { width: Number(w), height: Number(h) };
-  const windows = wmWindows(dump);
+  const windows = windowBlocks(dump).map(wmWindow);
   const focused = windows.find((x) => x.hash === focus);
   if (focused?.type === undefined || focused.frame === undefined || !isAppWindow(focused.type)) return { of: 'unknown' };
   const frame = rectIntersection(focused.frame, { x: 0, y: 0, ...screen });
@@ -141,21 +210,17 @@ export function parseFocusedWindow(dump: string): FocusedWindow {
   return { of: 'stacked', frame, screen };
 }
 
-/** Each window block of `dumpsys window windows`, in the dump's order. */
-function wmWindows(dump: string): WmWindow[] {
-  const headers = [...dump.matchAll(WINDOW_HEADER_RE)];
-  return headers.map((m, i) => {
-    const block = dump.slice(m.index, headers[i + 1]?.index ?? dump.length);
-    const ty = WINDOW_TYPE_RE.exec(block)?.[1];
-    const f = WINDOW_FRAME_RE.exec(block);
-    const [l, t, r, b] = f === null ? [] : f.slice(1, 5).map(Number);
-    return {
-      hash: m[1],
-      type: ty === undefined ? undefined : /^\d+$/.test(ty) ? Number(ty) : APP_WINDOW_TYPES[ty] ?? 0,
-      frame: f === null ? undefined : { x: l, y: t, width: r - l, height: b - t },
-      visible: WINDOW_VISIBLE_RE.test(block),
-    };
-  });
+/** One window block as parseFocusedWindow reads it. */
+function wmWindow({ hash, text: block }: WindowBlock): WmWindow {
+  const ty = WINDOW_TYPE_RE.exec(block)?.[1];
+  const f = WINDOW_FRAME_RE.exec(block);
+  const [l, t, r, b] = f === null ? [] : f.slice(1, 5).map(Number);
+  return {
+    hash,
+    type: ty === undefined ? undefined : /^\d+$/.test(ty) ? Number(ty) : APP_WINDOW_TYPES[ty] ?? 0,
+    frame: f === null ? undefined : { x: l, y: t, width: r - l, height: b - t },
+    visible: WINDOW_VISIBLE_RE.test(block),
+  };
 }
 
 /** `touchable region=SkRegion(<rects>)` — the whole line's value, the rects read by TOUCHABLE_RECT_RE. */
@@ -272,14 +337,12 @@ const IME_SHOWING_LINE_RE = /^[ \t]*mIsImeShowing=(true|false)[ \t]*$/gm;
  * - an IME entry that does not read fully, or a visible one with an empty
  *   frame → unknown;
  * - several IME entries, or several `mIsImeShowing` lines, that do not all
- *   say the same thing (state, and frame when visible) → unknown. That is
- *   the multi-display case: display 0 hidden and display 1 shown must not
- *   read as `shown` with display 1's frame. Chosen over scoping to the
- *   default display because all three real dumps are single-display — where
- *   one display's section ends is not something they can verify. The
- *   consequence, by design and not a bug: a device with a second display
- *   reads `unknown` whenever a keyboard is shown (the displays' witnesses
- *   disagree), i.e. it behaves as before the guard existed;
+ *   say the same thing (state, and frame when visible) → unknown: one
+ *   display prints one of each, so this is a dump not of the known shape.
+ *   A second display's entry and witness are not read at all
+ *   (onDefaultDisplay: display 0's block; A35's capture shows each display
+ *   its own IME entry and `mIsImeShowing`) — before A35 they had to agree,
+ *   so a keyboard shown beside a second display read `unknown`;
  * - `shown` = a visible IME entry with a frame, and `mIsImeShowing` not
  *   saying false (true, or absent);
  * - `hidden` = an IME entry with visible=false, and `mIsImeShowing` not
@@ -289,7 +352,8 @@ const IME_SHOWING_LINE_RE = /^[ \t]*mIsImeShowing=(true|false)[ \t]*$/gm;
  *   or an Android that renamed the type, must not silently switch the guard
  *   off or stop `dismissKeyboard` pressing back.
  */
-export function parseImeInsets(dump: string): SoftKeyboard {
+export function parseImeInsets(whole: string): SoftKeyboard {
+  const dump = onDefaultDisplay(whole);
   const unknown: SoftKeyboard = { state: 'unknown' };
   let recognised = 0;
   /** What each IME entry says: 'hidden', or the frame text of a visible one. */
@@ -337,10 +401,11 @@ export function parseImeInsets(dump: string): SoftKeyboard {
  *
  * Never guesses — no band (the judgements fail open) on: no status-bar entry; one that does not read fully (type, frame,
  * visible); a hidden one; an empty frame or one below the top; several
- * entries (one per display) that do not all say the same band — the
- * multi-display case parseImeInsets refuses alike.
+ * entries that do not all say the same band (a dump not of the known shape:
+ * one display prints one). Display 0's entry alone is read (onDefaultDisplay).
  */
-export function parseStatusBand(dump: string): number | undefined {
+export function parseStatusBand(whole: string): number | undefined {
+  const dump = onDefaultDisplay(whole);
   /** What each status-bar entry says: its band, or 'none' (hidden, unread, empty, not at the top). */
   const entries = new Set<number | 'none'>();
   for (const [, body] of dump.matchAll(INSETS_SOURCE_LINE_RE)) {
@@ -388,11 +453,14 @@ export function parseStatusBand(dump: string): number | undefined {
  * guesses — no band on: no entry; one that does not read fully (type,
  * frame, visible); a hidden one (an immersive app); a frame of any other
  * shape; no DisplayFrames line, or several that do not all say the same
- * size; several entries that do not all say the same band.
+ * size; several entries that do not all say the same band. Display 0's
+ * lines alone are read (onDefaultDisplay): before A35 a second display of
+ * another size (A35's overlay, 720x1280) took the band away.
  */
-export function parseNavigationBand(dump: string): number | undefined {
+export function parseNavigationBand(whole: string): number | undefined {
+  const dump = onDefaultDisplay(whole);
   const frames = [...dump.matchAll(DISPLAY_FRAMES_RE)];
-  if (new Set(frames.map(([line]) => line.trim())).size !== 1) return undefined; // none, or displays of different sizes
+  if (new Set(frames.map(([line]) => line.trim())).size !== 1) return undefined; // none, or several that differ
   const [, w, h, r] = frames[0].map(Number);
   if (r !== 0 || w > h) return undefined;
   /** What each navigation-bar entry says: its top, or 'none' (hidden, unread, or not a bar across the display's bottom). */
@@ -431,21 +499,6 @@ export const CHOOSER_FOCUS_COMMAND = "dumpsys window displays | grep -E 'Display
  */
 const FOCUSED_APP_RE = /mFocusedApp=[^\n]*?ActivityRecord\{[0-9a-f]+ u\d+ ([^\s/}]+\/[^\s}]+)[ }]/;
 
-/** What opens each display's block in the dump, its id after it: `Display: mDisplayId=0 (organized)`. */
-const DISPLAY_HEADER = 'Display: mDisplayId=';
-
-/** The id of the default display, where `am start` with no `--display` starts the link. */
-const DEFAULT_DISPLAY = 0;
-
-/**
- * The default display's block of the dump, from its header to the next one: display 0's, else the first display's
- * (no dump of averi's has lacked a display 0). A dump with no header (focus lines read alone) is one display's, whole.
- */
-function defaultDisplayBlock(dump: string): string {
-  const [whole = dump, ...displays] = dump.split(DISPLAY_HEADER);
-  return displays.find((block) => Number.parseInt(block, 10) === DEFAULT_DISPLAY) ?? displays[0] ?? whole;
-}
-
 /** The default display's focus as CHOOSER_FOCUS_COMMAND prints it: the focused activity's and window's components. */
 export interface DisplayFocus {
   /** `mFocusedApp`'s component, when its line names one. */
@@ -455,12 +508,12 @@ export interface DisplayFocus {
 }
 
 /**
- * The focused activity and window of the default display (defaultDisplayBlock), so both are one display's pair: another
+ * The focused activity and window of the default display (onDefaultDisplay), so both are one display's pair: another
  * display's focus is not a link's started on display 0. android-chooser.ts#chooserInFocus decides which of the two
  * counts.
  */
 export function defaultDisplayFocus(dump: string): DisplayFocus {
-  const block = defaultDisplayBlock(dump);
+  const block = onDefaultDisplay(dump);
   const app = FOCUSED_APP_RE.exec(block)?.[1];
   const window = focusLines(block).find((line) => line.component !== undefined)?.component;
   return { ...(app !== undefined && { app }), ...(window !== undefined && { window }) };

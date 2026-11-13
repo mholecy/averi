@@ -44,11 +44,13 @@ describe('the focus line, read once: the window\'s hash for parseFocusedWindow, 
     expect(chooserInFocus('  mCurrentFocus=Window{56b9ca0 android/com.android.internal.app.ResolverActivity}\n')).toBeUndefined();
   });
 
-  it('two focus lines in one block, the first a title (never captured): the hash is the first line\'s, the component the first one named', () => {
+  it('two focus lines in one block, the first a title (never captured): the component is the first one named; the focused window the one of display 0\'s', () => {
     const lines = '  mCurrentFocus=Window{1111111 u0 Dialog Title}\n  mCurrentFocus=Window{56b9ca0 u0 android/com.android.internal.app.ResolverActivity}\n';
     expect(defaultDisplayFocus(lines)).toStrictEqual({ window: 'android/com.android.internal.app.ResolverActivity' });
     const dump = focusRecordAs('u0 Dialog Title');
-    expect(parseFocusedWindow(dump.replace('mCurrentFocus=', 'mCurrentFocus=Window{2222222 u0 dev.averi.lab/dev.averi.lab.Other}\n  mCurrentFocus='))).toEqual({ of: 'unknown' });
+    // A35: the first line names a window the dump does not list, so it is no display's that can be told; the second's
+    // window is display 0's (before A35 the first line decided: unknown)
+    expect(parseFocusedWindow(dump.replace('mCurrentFocus=', 'mCurrentFocus=Window{2222222 u0 dev.averi.lab/dev.averi.lab.Other}\n  mCurrentFocus='))).toEqual(STACKED);
   });
 
   it('the focused activity beside the window: `mFocusedApp`\'s component, in either API\'s shape', () => {
@@ -58,17 +60,14 @@ describe('the focus line, read once: the window\'s hash for parseFocusedWindow, 
   });
 });
 
-// A27, step 3 — ONE MULTI-DISPLAY RULE, NOT TAKEN. The window manager's reads answer a second display three ways:
-// - every display must agree (parseImeInsets, parseStatusBand, parseNavigationBand: each display's InsetsState
-//   entries, and its DisplayFrames line, read over the whole `dumpsys window displays`; any disagreement is no answer);
-// - the first found (parseFocusedWindow: FOCUSED_WINDOW_COMMAND greps the focus and size lines without their display
-//   headers, so it reads the first `mCurrentFocus` and the first `DisplayFrames` of the answer);
-// - display 0's block (defaultDisplayFocus, the chooser's: from its `Display: mDisplayId=0` header to the next).
-// Merging them needs a dump that tells them apart, and every captured one holds ONE display (the census below): on
-// each, display 0's block is the whole dump, so the three read the same lines. Which rule is right for a second display
-// is a device question (a multi-display AVD's dump), left to a follow-up; the synthetic dumps after the census pin
-// where the three differ today. A35 captured that dump (an overlay display on emulator-5554): its fixtures are kept
-// out of the census and pinned as the three rules read them today, for the follow-up that makes them one.
+// A35 — ONE DISPLAY RULE. Every read of the window manager answers for the DEFAULT display (id 0): the display `am start`
+// with no `--display` starts the app on, `input tap` and `screencap` with no `-d` act on. Another display's lines are
+// not read. Where the dump says which display a line is, that decides: a `Display: mDisplayId=<n>` header (`dumpsys
+// window displays`, CHOOSER_FOCUS_COMMAND), or, in FOCUSED_WINDOW_COMMAND's answer (no headers), each window block's
+// `mDisplayId=<n>` — the focus line whose window is display 0's, the size line after it, display 0's windows. A dump
+// that names no display is one display's, whole. Before A35 the reads answered a second display three ways (every
+// display must agree; the first found; display 0's block, the chooser's) — pinned by A27 on synthetic dumps, decided
+// here on A35's capture (docs/truth/live-records/a35-two-display/).
 
 const fixtures = new URL('../fixtures/', import.meta.url);
 const truth = new URL('../fixtures/truth/', import.meta.url);
@@ -99,14 +98,15 @@ const displayZero = (dump: string): string => {
   return dump.slice(at, next === -1 ? undefined : next);
 };
 
-describe('the census: every captured dump holds one display, so no fixture tells the three rules apart', () => {
+describe('the census: every captured one-display dump is display 0\'s, whole — the rule reads it as before A35', () => {
   it('the fixtures are there', () => {
     expect(DISPLAYS.length).toBeGreaterThanOrEqual(30);
     expect(WINDOWS.length).toBeGreaterThanOrEqual(25);
   });
 
-  it.each(DISPLAYS)('%s: one display header, one DisplayFrames line; display 0\'s block alone reads as the whole dump', (_name, dump) => {
+  it.each(DISPLAYS)('%s: one display header, display 0\'s, one DisplayFrames line; display 0\'s block alone reads as the whole dump', (_name, dump) => {
     expect(count(dump, /Display: mDisplayId=/g)).toBe(1);
+    expect(count(dump, /Display: mDisplayId=0 /g)).toBe(1);
     expect(count(dump, /^[ \t]*DisplayFrames w=/gm)).toBe(1);
     const block = displayZero(dump);
     expect(parseImeInsets(block)).toEqual(parseImeInsets(dump));
@@ -115,62 +115,96 @@ describe('the census: every captured dump holds one display, so no fixture tells
     expect(defaultDisplayFocus(block)).toEqual(defaultDisplayFocus(dump));
   });
 
-  it.each(WINDOWS)('%s: one focus line, one DisplayFrames line — the first found is the only one', (_name, dump) => {
+  it.each(WINDOWS)('%s: one focus line, one DisplayFrames line, every window block display 0\'s', (_name, dump) => {
     expect(count(dump, /mCurrentFocus=/g)).toBe(1);
     expect(count(dump, /DisplayFrames w=/g)).toBe(1);
+    expect(count(dump, /^ {4}mDisplayId=0 /gm)).toBe(count(dump, /^ {2}Window #\d+ /gm));
   });
 });
 
-describe('A35: the captured two-display dumps (emulator-5554 + a 720x1280 overlay display 4), as the three rules read them today', () => {
+describe('A35: the captured two-display dumps (emulator-5554 + a 720x1280 overlay display 4) — every read answers for display 0', () => {
   const read = (kind: string, state: string): string => readFileSync(new URL(`dumpsys-window-${kind}${TWO_DISPLAY}${state}.txt`, fixtures), 'utf8');
   const STATES = ['a-launcher-d0', 'b-settings-d0', 'c-settings-d0-clock-d4'] as const;
 
-  it.each(STATES)('%s: two displays, each with its own IME entry and DisplayFrames line; the status and navigation bars display 0\'s alone', (state) => {
+  it.each(STATES)('%s: two displays, each with its own IME entry and DisplayFrames line; display 0\'s are read: IME hidden, status 66, navigation 2154', (state) => {
     const dump = read('displays', state);
     expect(count(dump, /Display: mDisplayId=/g)).toBe(2);
     expect(count(dump, /^[ \t]*DisplayFrames w=/gm)).toBe(2);
     expect(count(dump, /^[ \t]*InsetsSource type=ITYPE_IME /gm)).toBe(2);
     expect(count(dump, /^[ \t]*InsetsSource type=ITYPE_STATUS_BAR /gm)).toBe(1);
     expect(count(dump, /^[ \t]*InsetsSource type=ITYPE_NAVIGATION_BAR /gm)).toBe(1);
-    // every display must agree: the IME hidden on both, one status band; no navigation band (the sizes differ)
     expect(parseImeInsets(dump)).toEqual({ state: 'hidden' });
     expect(parseStatusBand(dump)).toBe(66);
-    expect(parseNavigationBand(dump)).toBeUndefined();
-    expect(parseNavigationBand(displayZero(dump))).toBe(2154);
+    // before A35 none: every display had to agree, and the two DisplayFrames sizes differ
+    expect(parseNavigationBand(dump)).toBe(2154);
+    expect(parseNavigationBand(dump)).toBe(parseNavigationBand(displayZero(dump)));
   });
 
-  it('the first found: no display headers, each display\'s focus line before its size line, the top-focused display last; b pairs display 0\'s window with display 4\'s size', () => {
+  it("each state's reads as display 0's block alone would read them, whichever display the dump lists first", () => {
+    for (const state of STATES) {
+      const dump = read('displays', state);
+      const zero = displayZero(dump);
+      expect([parseImeInsets(dump), parseStatusBand(dump), parseNavigationBand(dump)]).toEqual([parseImeInsets(zero), parseStatusBand(zero), parseNavigationBand(zero)]);
+      expect(defaultDisplayFocus(read('focus', state))).toEqual(defaultDisplayFocus(displayZero(read('focus', state))));
+    }
+  });
+
+  it('the focus read prints no display headers: each display\'s focus line before its size line, the top-focused display last', () => {
     const lines = (state: string) => read('focused-window', state).split('\n').filter((l) => /mCurrentFocus=|DisplayFrames w=/.test(l)).map((l) => l.trim().replace(/\{[0-9a-f]+ /, '{… '));
     expect(lines('b-settings-d0')).toEqual(['mCurrentFocus=null', 'DisplayFrames w=720 h=1280 r=0', 'mCurrentFocus=Window{… u0 com.android.settings/com.android.settings.Settings}', 'DisplayFrames w=1080 h=2220 r=0']);
     expect(lines('c-settings-d0-clock-d4')).toEqual(['mCurrentFocus=null', 'DisplayFrames w=1080 h=2220 r=0', 'mCurrentFocus=Window{… u0 com.google.android.deskclock/com.android.deskclock.DeskClock}', 'DisplayFrames w=720 h=1280 r=0']);
     expect(read('focused-window', 'b-settings-d0')).not.toMatch(/Display: mDisplayId=/);
-    // Settings' frame is [0,0][1080,2220] on display 0 (its block's `mDisplayId=0`), read clipped to display 4's size
-    expect(parseFocusedWindow(read('focused-window', 'b-settings-d0'))).toEqual({ of: 'screenAlone', frame: { x: 0, y: 0, width: 720, height: 1280 } });
+  });
+
+  it("the focused window: display 0's focus (the one whose window block says mDisplayId=0), display 0's size, display 0's windows beside it", () => {
+    // b: Settings' frame is [0,0][1080,2220] on display 0 — before A35 read as 720x1280, display 4's size (the first found)
+    expect(parseFocusedWindow(read('focused-window', 'b-settings-d0'))).toEqual({ of: 'screenAlone', frame: { x: 0, y: 0, width: 1080, height: 2220 } });
+    // a: the launcher's GoogleDiscoverWindow is a visible app window beside it on display 0, as on one display
     expect(parseFocusedWindow(read('focused-window', 'a-launcher-d0'))).toEqual({ of: 'unknown' });
+    // c: display 0 has no window focus (the clock on display 4 holds it): no focus of display 0's to read
     expect(parseFocusedWindow(read('focused-window', 'c-settings-d0-clock-d4'))).toEqual({ of: 'unknown' });
   });
 
-  it("display 0's block: the chooser's read; c keeps display 0's focused app but no window (only the top-focused display has one)", () => {
+  it("c: the clock's own window, read as display 0's, would be screenAlone — it is not, because its block says display 4", () => {
+    const c = read('focused-window', 'c-settings-d0-clock-d4');
+    // the clock's popup gone and its block moved to display 0: the clock alone on the 720x1280 frame, its size line's
+    const moved = c.replace(/  Window #0 Window\{5d3da71 [\s\S]*?(?=  Window #1 )/, '').replace(/(Window #1 Window\{1a1f85 [^\n]*\n {4}mDisplayId=)4/, '$10');
+    expect(parseFocusedWindow(moved)).toEqual({ of: 'unknown' }); // Settings, visible on display 0, beside it
+    expect(parseFocusedWindow(moved.replace(/(Window\{f324dc [^\n]*\n {4}mDisplayId=)0/g, '$14'))).toEqual({ of: 'screenAlone', frame: { x: 0, y: 0, width: 720, height: 1280 } });
+  });
+
+  it("the chooser's read: display 0's focused app and window; c keeps display 0's focused app but no window (only the top-focused display has one)", () => {
     expect(defaultDisplayFocus(read('focus', 'a-launcher-d0'))).toEqual({ app: 'com.google.android.apps.nexuslauncher/.NexusLauncherActivity', window: 'com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity' });
     expect(defaultDisplayFocus(read('focus', 'b-settings-d0'))).toEqual({ app: 'com.android.settings/.Settings', window: 'com.android.settings/com.android.settings.Settings' });
     expect(defaultDisplayFocus(read('focus', 'c-settings-d0-clock-d4'))).toEqual({ app: 'com.android.settings/.Settings' });
   });
 });
 
-describe('where the three rules differ today: two displays (synthetic — no device dump of two)', () => {
+describe('the one rule on synthetic two-display dumps (what the capture did not show)', () => {
   const header = (id: number): string => `  Display: mDisplayId=${id} (organized)\n`;
   const frames = '  DisplayFrames w=1080 h=2220 r=0\n';
   const status = (frame: string): string => `        InsetsSource type=ITYPE_STATUS_BAR frame=${frame} visible=true insetsRoundedCornerFrame=false\n`;
   const ime = (frame: string, visible: boolean): string => `        InsetsSource type=ITYPE_IME frame=${frame} visible=${visible} insetsRoundedCornerFrame=false\n`;
   const zero = header(0) + frames + status('[0,0][1080,66]') + ime('[0,1398][1080,2220]', true);
   const one = header(1) + frames + status('[0,0][1080,80]') + ime('[0,0][0,0]', false);
+  const SHOWN = { state: 'shown', frame: { x: 0, y: 1398, width: 1080, height: 822 } };
 
-  it('every display must agree: display 0 shows a keyboard and a 66 band, display 1 neither — no answer, as with one display unread', () => {
-    expect(parseImeInsets(zero + one)).toEqual({ state: 'unknown' });
-    expect(parseStatusBand(zero + one)).toBeUndefined();
-    // display 0's block alone answers: the rule a merge to the chooser's would give
-    expect(parseImeInsets(displayZero(zero + one))).toEqual({ state: 'shown', frame: { x: 0, y: 1398, width: 1080, height: 822 } });
-    expect(parseStatusBand(displayZero(zero + one))).toBe(66);
+  it("a keyboard and a 66 band on display 0, neither on display 1: display 0's answer, whichever display is listed first (before A35: no answer)", () => {
+    expect(parseImeInsets(zero + one)).toEqual(SHOWN);
+    expect(parseStatusBand(zero + one)).toBe(66);
+    expect(parseImeInsets(one + zero)).toEqual(SHOWN);
+    expect(parseStatusBand(one + zero)).toBe(66);
+    // a keyboard on display 1 alone is not display 0's
+    expect(parseImeInsets(header(0) + frames + status('[0,0][1080,66]') + ime('[0,0][0,0]', false) + header(1) + ime('[0,1398][1080,2220]', true))).toEqual({ state: 'hidden' });
+  });
+
+  it('a dump of displays none of which is display 0 reads nothing (before A35 the chooser read the first display\'s)', () => {
+    const focus = (window: string): string => `  mCurrentFocus=Window{56b9ca0 u0 ${window}}\n`;
+    const chooser = 'android/com.android.internal.app.ResolverActivity';
+    expect(defaultDisplayFocus(header(1) + focus(chooser) + header(2))).toEqual({});
+    expect(chooserInFocus(header(1) + focus(chooser))).toBeUndefined();
+    expect(parseImeInsets(one)).toEqual({ state: 'unknown' });
+    expect(parseStatusBand(one)).toBeUndefined();
   });
 
   it('display 0\'s block: the chooser on display 1 is not display 0\'s focus, whichever display the dump lists first', () => {
@@ -178,14 +212,40 @@ describe('where the three rules differ today: two displays (synthetic — no dev
     const chooser = 'android/com.android.internal.app.ResolverActivity';
     const lab = 'dev.averi.lab/dev.averi.lab.MainActivity';
     expect(defaultDisplayFocus(header(1) + focus(chooser) + header(0) + focus(lab))).toEqual({ window: lab });
+    expect(defaultDisplayFocus(header(0) + focus(lab) + header(1) + focus(chooser))).toEqual({ window: lab });
   });
 
-  it('the first found: the focus read has no display headers, so the first focus line decides whichever display it is', () => {
+  it("the focus read: another display's focus line, listed before display 0's or after it, is not read (before A35 the first decided)", () => {
     const dump = dumpOf('dialog-fullscreen');
-    const other = '  mCurrentFocus=Window{2222222 u0 other.app/.Main}\n';
-    // another display's focus listed first: its window is none of the windows dump's → unknown; listed after: unread
-    expect(parseFocusedWindow(dump.replace('  mCurrentFocus=', `${other}  mCurrentFocus=`))).toEqual({ of: 'unknown' });
-    expect(parseFocusedWindow(dump.replace(/(mCurrentFocus=[^\n]*\n)/, `$1${other}`))).toEqual(STACKED);
+    const other = '  mCurrentFocus=Window{2222222 u0 other.app/.Main}\n  DisplayFrames w=720 h=1280 r=0\n';
+    expect(parseFocusedWindow(dump.replace('  mCurrentFocus=', `${other}  mCurrentFocus=`))).toEqual(STACKED);
+    expect(parseFocusedWindow(dump.replace(/(DisplayFrames w=[^\n]*\n)/, `$1${other}`))).toEqual(STACKED);
+  });
+
+  it("the focus read: display 0's size is the line after display 0's focus line, not the dump's first", () => {
+    const dump = dumpOf('dialog-fullscreen');
+    const other = '  mCurrentFocus=null\n  DisplayFrames w=720 h=1280 r=0\n';
+    // display 0's focus listed second, after display 4's null focus and 720x1280 size: still 1080x2220
+    expect(parseFocusedWindow(dump.replace('  mCurrentFocus=', `${other}  mCurrentFocus=`))).toEqual(STACKED);
+    // display 0's focus with no size line of its own (only another display's, before it): unknown
+    expect(parseFocusedWindow(dump.replace(/DisplayFrames w=\d+ h=\d+ r=\d+/, 'x').replace('  mCurrentFocus=', `${other}  mCurrentFocus=`))).toEqual({ of: 'unknown' });
+  });
+
+  it("the focus read: two focus lines that both name a window of display 0's are no one display's focus — unknown", () => {
+    const dump = dumpOf('dialog-fullscreen');
+    const focused = FOCUS_LINE.exec(dump)?.[1];
+    // a second focus line, with its own size line, after display 0's: it names the dialog's window too
+    expect(parseFocusedWindow(dump.replace(/(DisplayFrames w=[^\n]*\n)/, `$1  mCurrentFocus=Window{${focused} u0 x}\n  DisplayFrames w=720 h=1280 r=0\n`))).toEqual({ of: 'unknown' });
+  });
+
+  it("the focus read: an app window of another display's, visible, is not beside display 0's focus", () => {
+    const open = dumpOf('open');
+    expect(parseFocusedWindow(open)).toEqual({ of: 'screenAlone', frame: { x: 0, y: 0, width: 1080, height: 2220 } });
+    const other = '  Window #99 Window{3333333 u0 other.app/other.app.Main}:\n    mDisplayId=4 rootTaskId=9 mSession=x\n    mAttrs={(0,0)(fillxfill) ty=BASE_APPLICATION\n    Frames: parent=[0,0][720,1280] display=[0,0][720,1280] frame=[0,0][720,1280] last=x\n    isVisible=true\n';
+    const at = open.indexOf('  Window #');
+    expect(parseFocusedWindow(open.slice(0, at) + other + open.slice(at))).toEqual({ of: 'screenAlone', frame: { x: 0, y: 0, width: 1080, height: 2220 } });
+    // the same window on display 0 is beside it
+    expect(parseFocusedWindow(open.slice(0, at) + other.replace('mDisplayId=4', 'mDisplayId=0') + open.slice(at))).toEqual({ of: 'unknown' });
   });
 });
 
@@ -312,7 +372,7 @@ describe('the InsetsState readers: an entry with a token missing, a frame of no 
 
   it('parseNavigationBand: a DisplayFrames line\'s rotation is all its digits, and blanks may end the line', () => {
     expect(parseNavigationBand('  DisplayFrames w=1080 h=2220 r=0 \t\n' + NAV('[0,2154][1080,2220]'))).toBe(2154);
-    // a second display at r=10 (no Android rotation; synthetic): read as a second size, so no band
+    // a second DisplayFrames line at r=10 (no Android rotation; synthetic, no display header): a second size, so no band
     expect(parseNavigationBand(FRAMES + '  DisplayFrames w=1080 h=2220 r=10\n' + NAV('[0,2154][1080,2220]'))).toBeUndefined();
   });
 
@@ -391,7 +451,7 @@ describe('parseImeInsets — is a soft keyboard shown, and which rect does it co
     ['an IME entry whose visible is neither true nor false', lines(STATUS_BAR_33, '        InsetsSource type=ITYPE_IME frame=[0,1285][1080,2220] visible=maybe')],
     ['an IME entry with only visibleFrame= (it is not the frame)', lines(STATUS_BAR_33, '        InsetsSource type=ITYPE_IME visibleFrame=[0,1285][1080,2220] visible=true')],
     ['a visible IME with an EMPTY frame (it says shown but not where)', lines(STATUS_BAR_33, '        InsetsSource type=ITYPE_IME frame=[0,0][0,0] visible=true')],
-    ['two visible IME entries with different frames (two displays)', lines(
+    ['two visible IME entries with different frames (no display header: one display\'s dump, not of the known shape)', lines(
       '        InsetsSource type=ITYPE_IME frame=[0,1285][1080,2220] visible=true',
       '        InsetsSource type=ITYPE_IME frame=[0,600][1920,1080] visible=true',
     )],
@@ -416,8 +476,8 @@ describe('parseImeInsets — is a soft keyboard shown, and which rect does it co
   });
 
   it.each([
-    ['two displays, d0 hidden and d1 shown (never display 1\'s frame)', lines(STATUS_BAR_33, IME_HIDDEN_33) + lines(STATUS_BAR_33, IME_SHOWN_33)],
-    ['two displays whose witnesses disagree', HIDING + lines(STATUS_BAR_33, IME_HIDDEN_33) + SHOWING + lines(STATUS_BAR_33, IME_HIDDEN_33)],
+    ['no display header, a hidden and a shown entry (never the shown one\'s frame)', lines(STATUS_BAR_33, IME_HIDDEN_33) + lines(STATUS_BAR_33, IME_SHOWN_33)],
+    ['no display header, two witnesses that disagree', HIDING + lines(STATUS_BAR_33, IME_HIDDEN_33) + SHOWING + lines(STATUS_BAR_33, IME_HIDDEN_33)],
     ['no IME entry and no mIsImeShowing line (a renamed type, an older dump)', lines(STATUS_BAR_36)],
     ['no IME entry with mIsImeShowing=true (a renamed type while a keyboard is up)', SHOWING + lines(STATUS_BAR_36)],
     ['visible=true contradicted by mIsImeShowing=false', HIDING + lines(STATUS_BAR_33, IME_SHOWN_33)],
@@ -452,7 +512,7 @@ describe('parseImeInsets — is a soft keyboard shown, and which rect does it co
     // Each anchor on its own: text BEFORE the token (nothing after), and text AFTER the value (nothing before).
     expect(parseImeInsets('    mLastState: foo=1 mIsImeShowing=true\n' + HIDING + lines(STATUS_BAR_33, IME_HIDDEN_33))).toEqual({ state: 'hidden' });
     expect(parseImeInsets('    mIsImeShowing=true mImeHeight=756\n' + HIDING + lines(STATUS_BAR_33, IME_HIDDEN_33))).toEqual({ state: 'hidden' });
-    // Two displays that agree are not a contradiction.
+    // Two entries and witnesses that agree (no display header) are not a contradiction.
     expect(parseImeInsets(HIDING + lines(STATUS_BAR_33, IME_HIDDEN_33) + HIDING + lines(STATUS_BAR_33, IME_HIDDEN_33))).toEqual({ state: 'hidden' });
   });
 });
@@ -482,13 +542,13 @@ describe('parseStatusBand — the status band, out of `dumpsys window displays` 
     ['an entry that does not read fully (no visible=)', '        InsetsSource type=statusBars frame=[0,0][1080,66] flags=\n'],
     ['an empty frame', lines(STATUS_36('[0,0][0,0]'))],
     ['a frame that does not start at the screen\'s top', lines(STATUS_36('[0,2154][1080,2220]'))],
-    ['two displays whose bars disagree (66 and hidden)', lines(STATUS_33('[0,0][1080,66]')) + lines(STATUS_33('[0,0][1080,66]', 'false'))],
-    ['two displays whose bars disagree (66 and 80)', lines(STATUS_36('[0,0][1080,66]')) + lines(STATUS_36('[0,0][1920,80]'))],
+    ['no display header, two bars that disagree (66 and hidden)', lines(STATUS_33('[0,0][1080,66]')) + lines(STATUS_33('[0,0][1080,66]', 'false'))],
+    ['no display header, two bars that disagree (66 and 80)', lines(STATUS_36('[0,0][1080,66]')) + lines(STATUS_36('[0,0][1920,80]'))],
   ])('no band — fail open, as before the band existed — on %s', (_name, dump) => {
     expect(parseStatusBand(dump)).toBeUndefined();
   });
 
-  it('two displays whose bars agree read as the one band', () => {
+  it('two bars that agree (no display header) read as the one band', () => {
     expect(parseStatusBand(lines(STATUS_33('[0,0][1080,66]')) + lines(STATUS_33('[0,0][1080,66]')))).toBe(66);
   });
 });
@@ -532,11 +592,11 @@ describe('parseNavigationBand — the visible navigation bar\'s top, out of `dum
     // A display whose natural rotation is landscape: its band, kept by the adapter, would be applied to the turned (portrait) box after a rotation.
     ['a natural-landscape tablet (w > h at r=0), its bar across the bottom — portrait displays only', display(FRAMES(2560, 1600), NAV_33('[0,1504][2560,1600]'))],
     ['no DisplayFrames line (the display\'s size unsaid)', `    mInsetsState:\n${NAV_33('[0,2154][1080,2220]')}\n`],
-    ['two displays of different sizes, their bars alike', lines(NAV_33('[0,2154][1080,2220]')) + display(FRAMES(1080, 2280), NAV_33('[0,2154][1080,2220]'))],
+    ['no display header, two DisplayFrames sizes, their bars alike', lines(NAV_33('[0,2154][1080,2220]')) + display(FRAMES(1080, 2280), NAV_33('[0,2154][1080,2220]'))],
     ['an entry that does not read fully (no visible=)', display(FRAMES(), '        InsetsSource type=navigationBars frame=[0,2154][1080,2220] flags=')],
     ['a malformed frame', lines('        InsetsSource type=ITYPE_NAVIGATION_BAR frame=[0,2154][1080] visible=true')],
     ['an empty frame', lines(NAV_36('[0,2220][1080,2220]'))],
-    ['two displays whose bars disagree (2154 and hidden)', lines(NAV_33('[0,2154][1080,2220]')) + lines(NAV_33('[0,2154][1080,2220]', 'false'))],
+    ['no display header, two bars that disagree (2154 and hidden)', lines(NAV_33('[0,2154][1080,2220]')) + lines(NAV_33('[0,2154][1080,2220]', 'false'))],
   ])('no band on %s', (_name, dump) => {
     expect(parseNavigationBand(dump)).toBeUndefined();
   });
