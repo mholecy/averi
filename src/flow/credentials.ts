@@ -3,27 +3,18 @@ import { SetupError, type AveriConfig } from './config.js';
 /**
  * Credentials: which values a flow's `$name` and `${VAR}` stand for.
  *
- * 2026-10-04 (architecture review, C2). Until this date the values travelled
- * through `process.env`: the loader wrote `.env.averi` INTO it (keeping a
- * module-level set of the names it had written, to refresh them), the
- * credential resolver read `AVERI_ENV` out of it, and the engine read every
- * `${VAR}` out of it at STEP time. Three modules shared one hidden global,
- * and the engine's interface silently included an ordering rule nobody's
- * type stated: construct it only after `loadProjectConfig`, never after
- * `parseConfig` or `loadConfig`, or `.env.averi` was skipped and the user was
- * told to create a file they already had. Config tests scrubbed the global by
- * hand with unique variable names.
+ * The environment is a VALUE. The loader (flow/load.ts) assembles it once —
+ * the real process environment over the sibling `.env.averi` — and hands it
+ * beside the config; this module turns config + environment + the requested
+ * environment name into frozen `Credentials`, and `process.env` is read in
+ * exactly one function under flow/ (the loader's) and written nowhere. With
+ * the values in `process.env`, modules would share one hidden global and the
+ * engine an ordering rule no type states (built before `loadProjectConfig`,
+ * it would skip `.env.averi` and tell the user to create a file they already
+ * have); as a parameter, an engine cannot be built without the environment
+ * it resolves from.
  *
- * Now the environment is a VALUE. The loader (flow/load.ts) assembles it once
- * — the real process environment over the sibling `.env.averi`, the same
- * precedence as before — and hands it beside the config; this module turns
- * config + environment + the requested environment name into frozen
- * `Credentials`, and `process.env` is read in exactly one function under
- * flow/ (the loader's) and written nowhere. The ordering rule is now a
- * parameter: an engine cannot be built without the environment it resolves
- * from.
- *
- * Expansion stays LAZY, at the step that uses the value, exactly as before:
+ * Expansion is LAZY, at the step that uses the value:
  * a declared credential whose `${VAR}` is unset fails the run that types it,
  * not every run — an `sms` credential only the OTP flow needs must not fail a
  * plain login. Eager resolution at construction was rejected for that reason.
@@ -49,8 +40,7 @@ export interface Credentials {
    * The credential NAMES the active environment overrides, in declaration
    * order; empty on base only. Computed where the layering is applied, so the
    * engine's first trace line reads it here instead of re-deriving it from
-   * `cfg.environments` (2026-10-05: until then the layering rule had two
-   * owners).
+   * `cfg.environments`.
    */
   readonly overriddenNames: readonly string[];
   /**
@@ -68,16 +58,16 @@ export interface Credentials {
  * Pick the credential set for a run: base `credentials:` overlaid per-key with
  * `environments.<name>.credentials`, resolved ONCE so a run cannot type one
  * environment's username and another's password. An unknown name throws here;
- * since 2026-10-05 the run layer calls this as a pre-flight so the refusal
- * lands before any device is touched (run/preflight.ts#refuseUnknownEnvironment),
- * and the engine resolves for itself once more, before any STEP.
+ * the run layer calls this as a pre-flight so the refusal lands before any
+ * device is touched (run/preflight.ts#refuseUnknownEnvironment), and the
+ * engine resolves for itself once more, before any STEP.
  *
  * Precedence, most specific first: explicit `requested` (tool argument) →
  * `AVERI_ENV` (settable from `.env.averi`, so switching backend is one line in
  * an already-gitignored file) → `defaultEnvironment:` → base only.
  *
- * Why this exists: one username for two backends caused an hour's misdiagnosis
- * on 2026-08-06 — the wrong login name is rejected by the bank one screen AFTER
+ * Why this exists: one username for two backends caused an hour's
+ * misdiagnosis — the wrong login name is rejected by the bank one screen AFTER
  * it is typed, so an environment mix-up presents as a credentials problem.
  */
 export function resolveCredentials(cfg: AveriConfig, env: EnvValues, requested?: string): Credentials {
@@ -111,11 +101,11 @@ export function resolveCredentials(cfg: AveriConfig, env: EnvValues, requested?:
     : '';
 
   /**
-   * THE rule, one owner: a secret is never empty. Since 2026-10-07 the
-   * adapters type "" as a no-op on both platforms, so a step that typed an
-   * empty secret would pass — `fill` as `***`, `type_pin` as "0 digits" — and
-   * the bank would reject the login one screen later: the 2026-08-06
-   * misdiagnosis shape this module exists to prevent.
+   * THE rule, one owner: a secret is never empty. The adapters type "" as a
+   * no-op on both platforms, so a step that typed an empty secret would pass
+   * — `fill` as `***`, `type_pin` as "0 digits" — and the bank would reject
+   * the login one screen later: the misdiagnosis shape this module exists to
+   * prevent.
    *
    * An empty secret has exactly two origins, and each gets the remedy for
    * its origin — one builder each, the pair below and nothing else in averi
@@ -126,9 +116,7 @@ export function resolveCredentials(cfg: AveriConfig, env: EnvValues, requested?:
    *   an empty variable is the misconfiguration either way.
    * - emptyCredential: a credential whose template is itself empty (`credentials:
    *   { password: "" }`), the one way a `$name` can be empty once every
-   *   variable in it is non-empty. Until 2026-10-08 this was typed as
-   *   nothing and the step passed (after-ios-idb review #4) — the variable
-   *   check was the only one, and a literal never meets a variable.
+   *   variable in it is non-empty — a literal never meets the variable check.
    *
    * Lazy like every other refusal here: at the step that uses the value, not
    * at load — a base `password: ""` that every environment overrides is

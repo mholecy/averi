@@ -19,13 +19,9 @@ import { conditionStateRefs, type Condition } from './condition.js';
  * infers, and the pure walks over them (reference validation, the container
  * and destructive-flow rules, the launch-activity rule). Nothing here reads a
  * file or the environment: loading is flow/load.ts, credentials are
- * flow/credentials.ts (split 2026-10-04, architecture review C2/C6 — this
- * file had grown from five responsibilities to seven and held the one
- * `process.env` write in the layer).
+ * flow/credentials.ts.
  */
 
-// Condition — the type and everything asked of it — lives in flow/condition.ts
-// since 2026-10-08; re-exported here with the rest of the schema's types.
 export type { Condition } from './condition.js';
 
 interface FillSpec extends ElementSpec {
@@ -36,18 +32,17 @@ interface FillSpec extends ElementSpec {
 }
 
 /**
- * One entry of `app.ios.keyboardDismiss` (stage B, 2026-10-07): how the
- * guard may hide the iOS soft keyboard when it covers a tap target, and how
- * `fill { dismissKeyboard: true }` hides it after typing. Either a `tap` on
- * an element of the app's that hides the keyboard without a side effect —
- * the screen title was measured to (docs/bugs/2026-10-05-ios-tap-lands-on-
- * soft-keyboard.md, K5b) — or `accessory: true`, the input-accessory
- * toolbar's trailing button (the app's "Done" above a number pad, K4). The
- * list is ordered: the first entry whose element is on screen is used, and
- * — since 2026-10-18 — the next one when that left the keyboard up. Once an
- * entry WAS tapped and left the keyboard up, the guard follows it with
- * averi's own fallback, an upward drag of the target's scroll view
- * (docs/adr/0022-averi-hides-the-keyboard-when-the-configured-dismissal-does-not.md);
+ * One entry of `app.ios.keyboardDismiss`: how the guard may hide the iOS soft
+ * keyboard when it covers a tap target, and how `fill { dismissKeyboard:
+ * true }` hides it after typing. Either a `tap` on an element of the app's
+ * that hides the keyboard without a side effect — the screen title was
+ * measured to (docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md, K5b)
+ * — or `accessory: true`, the input-accessory toolbar's trailing button (the
+ * app's "Done" above a number pad, K4). The list is ordered: the first entry
+ * whose element is on screen is used, and the next one when that left the
+ * keyboard up. Once an entry WAS tapped and left the keyboard up, the guard
+ * follows it with averi's own fallback, an upward drag of the target's
+ * scroll view (docs/adr/0022-averi-hides-the-keyboard-when-the-configured-dismissal-does-not.md);
  * an entry that is not on screen, or none at all, moves nothing.
  * Opt-in and app-specific on purpose: which element is neutral is the
  * app's business, and the keyboard's own return key SUBMITS (K5d). A `tap`
@@ -59,35 +54,34 @@ interface FillSpec extends ElementSpec {
 type KeyboardDismissStrategy = { tap: ElementSpec } | { accessory: true };
 
 /**
- * `app.ios.keyboardDismiss` set where it cannot act (review round 1): the
- * idb tree marks no node as the keyboard — every reader keys on
- * `KEYBOARD_ROLE` (ui-tree/soft-keyboard.ts), which only the WDA parser
- * assigns (wda-source.ts#keyboardMarks) and the idb parser never does — so
- * under `treeSource: idb` no guard dismisses anything and
- * the list is inert. What the tap does refuse there is a centre under idb's
- * band, read by its shape (ADR 0006, keyboard-position.ts#KeyboardPosition.line);
- * the sentence says so, since "no tap is ever refused" (until 2026-10-13)
- * stopped being true with that decision. NOT "the idb tree carries no keyboard"
- * (the sentence until 2026-10-09): on iOS 27 idb lists the keys, as plain
- * `button`s ('Q' … 'return'), and the band, as an unmapped type read as
- * `other` (0,590 402×284 on Contacts' "New Contact"; docs/bugs/2026-10-09-
- * ios-inert-keyboard-dismiss-note-says-idb-carries-no-keyboard.md), so a
- * reader who checks `ui_snapshot` sees them — the reason is that nothing
- * marks them, not that they are absent. Marking them under idb is a
- * separate step. The sentence the loader prints once per config
+ * `app.ios.keyboardDismiss` set where it cannot act: the idb tree marks no
+ * node as the keyboard — every reader keys on `KEYBOARD_ROLE`
+ * (adapters/types.ts), which only the WDA parser assigns
+ * (adapters/wda-source.ts#keyboardMarks) and the idb parser never does — so
+ * under `treeSource: idb` no guard dismisses anything and the list is inert.
+ * What the tap does refuse there is a centre under idb's band, read by its
+ * shape (ADR 0006, keyboard-position.ts#KeyboardPosition.line), and the
+ * sentence says so. NOT "the idb tree carries no keyboard": on iOS 27 idb
+ * lists the keys, as plain `button`s ('Q' … 'return'), and the band, as an
+ * unmapped type read as `other` (0,590 402×284 on Contacts' "New Contact";
+ * docs/bugs/2026-10-09-ios-inert-keyboard-dismiss-note-says-idb-carries-no-
+ * keyboard.md), so a reader who checks `ui_snapshot` sees them — the reason
+ * is that nothing marks them, not that they are absent. Marking them under
+ * idb is a separate step. The sentence the loader prints once per config
  * (flow/load.ts), so a project that set the key and forgot the tree source
  * is told at load time rather than by a tap that went into the keys
  * (measured once, iOS 27, on one form — docs/bugs/2026-10-08-scroll-until-
  * ignores-android-soft-keyboard.md §3: a covered target was absent from the
  * idb tree and the tap timed out waiting for it to appear; a target only
  * partly covered is presumably kept with its rect, and its centre can lie
- * under the keys — inferred, not measured). Pure: config in, sentence or nothing out.
+ * under the keys — inferred, not measured). Pure: config in, sentence or
+ * nothing out.
  */
 export function inertKeyboardDismissNote(cfg: AveriConfig): string | undefined {
   const ios = cfg.app.ios;
   if (ios?.keyboardDismiss === undefined) return undefined;
-  // Only a project that pins idb: under `auto` (the default since A41a) the list applies whenever WebDriverAgent comes
-  // up, and a fallback to idb is said on the claiming replies (adapters/auto-tree-source.ts).
+  // Only a project that pins idb: under `auto` (the default) the list applies whenever WebDriverAgent comes up, and
+  // a fallback to idb is said on the claiming replies (adapters/auto-tree-source.ts).
   const kind: IosTreeSourceSetting = ios.treeSource ?? DEFAULT_IOS_TREE_SOURCE;
   if (kind !== 'idb') return undefined;
   return (
@@ -99,12 +93,12 @@ export function inertKeyboardDismissNote(cfg: AveriConfig): string | undefined {
 export interface TapSpec extends ElementSpec {
   /**
    * Overrides the engine's tap budget (find + settle; default 5s) — for
-   * elements that render slowly enough that a `wait:` step used to have to
-   * babysit the tap. Inside `optional:` it overrides the PRESENCE-CHECK
-   * window (default 1.5s) instead: how long a maybe-interstitial gets to
-   * appear before the step is skipped "(not present)" — interact's
-   * ElementNotFoundError, the one failure an optional step logs that way. Note
-   * the cost: an optional tap burns this full window whenever the element
+   * elements that render slowly enough that a `wait:` step would otherwise
+   * have to babysit the tap. Inside `optional:` it overrides the
+   * PRESENCE-CHECK window (default 1.5s) instead: how long a
+   * maybe-interstitial gets to appear before the step is skipped "(not
+   * present)" — interact's ElementNotFoundError, the one failure an optional
+   * step logs that way. Note the cost: an optional tap burns this full window whenever the element
    * never shows — when the alternative screen is detectable, a state with
    * `any:` over both outcomes plus `branch:` exits immediately either way
    * and stays the better idiom.
@@ -119,9 +113,9 @@ export interface ScrollUntilSpec {
   maxSwipes?: number;
   /**
    * Require the element ENTIRELY inside the viewport, not merely overlapping
-   * it. Default false, which is the historical stop condition — one pixel of
-   * overlap satisfies it. Set this whenever the next step measures the element
-   * (a rect assert, a screenshot): a clipped rect measures the clipped box.
+   * it. Default false: one pixel of overlap satisfies it. Set this whenever
+   * the next step measures the element (a rect assert, a screenshot): a
+   * clipped rect measures the clipped box.
    */
   fully?: boolean;
   timeout?: string | number;
@@ -173,12 +167,12 @@ const condition: z.ZodType<Condition> = z.lazy(() =>
 
 /**
  * See KeyboardDismissStrategy. One object with both keys optional and
- * exactly one required, rather than a `z.union` of the two shapes (review
- * round 1): a union reports every bad entry as one bare "Invalid input" at
- * `keyboardDismiss.0`, where this form keeps each field's own message and
- * path — `tap` needs a selector, `tap` must not name an interactive role,
- * `accessory` takes only true, and the entry needs one of the two. The
- * transform narrows the parsed object back to the union the type promises.
+ * exactly one required, rather than a `z.union` of the two shapes: a union
+ * reports every bad entry as one bare "Invalid input" at `keyboardDismiss.0`,
+ * where this form keeps each field's own message and path — `tap` needs a
+ * selector, `tap` must not name an interactive role, `accessory` takes only
+ * true, and the entry needs one of the two. The transform narrows the parsed
+ * object back to the union the type promises.
  */
 const keyboardDismissStrategy = z
   .object({
@@ -377,13 +371,13 @@ function routeStep(v: unknown): StepRoute {
 
 /**
  * A step, judged by its one key (D86): the kind it names parses the value under that key, and the kind's own issues
- * are said with their path — `steps.3.scroll_until.within.id: Expected string, received number`. Until D86 the step
- * was a `z.union` of every kind, and a wrong type inside a step's object collapsed to the union's bare
- * "Unrecognized key(s) in object: 'scroll_until'" at the step: when every member fails, zod's union reports the first
- * member that failed only softly, and that was the platform override, the last member — its fields all optional, it
- * failed on the unknown key alone — never the member the step's key named. A discriminated union needs a literal
- * field to pick by, which a one-key step lacks — so the key is found here, and the step's shape (no key, several, an
- * unknown one, no mapping at all) is refused in words of its own.
+ * are said with their path — `steps.3.scroll_until.within.id: Expected string, received number`. Not a `z.union` of
+ * every kind: there a wrong type inside a step's object collapses to the union's bare "Unrecognized key(s) in object:
+ * 'scroll_until'" at the step — when every member fails, zod's union reports the first member that failed only
+ * softly, which is the platform override, its fields all optional, failing on the unknown key alone — never the
+ * member the step's key named. A discriminated union needs a literal field to pick by, which a one-key step lacks —
+ * so the key is found here, and the step's shape (no key, several, an unknown one, no mapping at all) is refused in
+ * words of its own.
  *
  * A check over a whole step belongs in validateReferences, never as a refine over this schema or a container of it: a
  * refused step's value here is z.NEVER, and a refine further up would still be handed it.
@@ -449,15 +443,14 @@ const configSchema = z
             treeSource: z.enum(IOS_TREE_SOURCE_SETTINGS).optional(),
             /**
              * How to hide the soft keyboard when it covers a tap target, in
-             * order of preference (stage B, 2026-10-07; see
-             * KeyboardDismissStrategy). Without it a covered target is
-             * refused (stage A) and `fill { dismissKeyboard: true }` leaves
-             * the keyboard up with a warning. Read under every tree source,
-             * but inert under `treeSource: idb` — idb's tree marks no node
-             * as the keyboard (on iOS 27 it lists the keys, as plain
-             * buttons, and the band, as `other`), so nothing is ever
-             * covered or dismissed there (the loader says so on stderr:
-             * inertKeyboardDismissNote).
+             * order of preference (see KeyboardDismissStrategy). Without
+             * it a covered target is refused (stage A) and `fill {
+             * dismissKeyboard: true }` leaves the keyboard up with a
+             * warning. Read under every tree source, but inert under
+             * `treeSource: idb` — idb's tree marks no node as the keyboard
+             * (on iOS 27 it lists the keys, as plain buttons, and the band,
+             * as `other`), so nothing is ever covered or dismissed there
+             * (the loader says so on stderr: inertKeyboardDismissNote).
              */
             keyboardDismiss: z.array(keyboardDismissStrategy).min(1).optional(),
           })
@@ -511,7 +504,7 @@ export type AveriConfig = z.infer<typeof configSchema>;
 
 /**
  * The app averi.yaml names for a platform — `app.android.package` or `app.ios.bundleId` — or undefined when it names
- * none. One owner (A29) for the flow's `launch:` step (flow/engine.ts) and the health line (run/app-health.ts).
+ * none.
  */
 export const appIdOf = (cfg: AveriConfig, platform: Platform): string | undefined => {
   const app = cfg.app[platform];
@@ -521,15 +514,13 @@ export const appIdOf = (cfg: AveriConfig, platform: Platform): string | undefine
 
 /**
  * `app.ios.keyboardDismiss` in the interaction module's vocabulary
- * (interact/keyboard.ts#KeyboardDismissal) — the one conversion, done once
- * per engine (FlowEngine's constructor) and once per config-optional tool
- * call (flow/tool-config.ts#iosToolSettings), so no config type crosses into
- * interact/ and no interact type is spelled in YAML. `undefined` when the
- * config, its iOS section or the key is absent: the guard then has nothing
- * to tap, exactly stage A. Not platform-gated here: the engine passes it to
- * every tap and fill, and interact/ reads it only on the oracle-less
- * branch, which Android never takes — the same shape as `treeSource`, which
- * the registry reads for the iOS adapter only.
+ * (interact/keyboard.ts#KeyboardDismissal) — the one conversion, so no
+ * config type crosses into interact/ and no interact type is spelled in
+ * YAML. `undefined` when the config, its iOS section or the key is absent:
+ * the guard then has nothing to tap, exactly stage A. Not platform-gated
+ * here: the engine passes it to every tap and fill, and interact/ reads it
+ * only on the oracle-less branch, which Android never takes — the same
+ * shape as `treeSource`, which the registry reads for the iOS adapter only.
  */
 export function keyboardDismissals(cfg: AveriConfig | undefined): readonly KeyboardDismissal[] | undefined {
   const configured = cfg?.app.ios?.keyboardDismiss;
@@ -538,19 +529,16 @@ export function keyboardDismissals(cfg: AveriConfig | undefined): readonly Keybo
 }
 
 /**
- * The one parse of an averi.yaml text — every loader (flow/load.ts's
- * loadConfig and loadConfigIfPresent, and through them loadProjectConfig and
- * flow/tool-config.ts#loadForCall) comes through here, so every way a file
- * can be broken is said in one shape, `Invalid <source>: …`, naming the file.
+ * The one parse of an averi.yaml text — every loader comes through here, so
+ * every way a file can be broken is said in one shape, `Invalid <source>: …`,
+ * naming the file.
  *
- * Until 2026-10-08 only a SCHEMA failure was: a YAML syntax error escaped as
- * the bare library message ("Block collections are not allowed within flow
- * collections at line 99, column 5: …") with no file in it. That mattered
- * more once the config-policy table made a broken file fail every call that
- * reads it — an Android assert or launch_app, an iOS tree tool — and promised
- * the failure names the file (found by the device check). The library's
- * message is kept whole (line, column, the excerpt), and the error itself is
- * the `cause`.
+ * A YAML syntax error too, not only a SCHEMA failure: the bare library
+ * message ("Block collections are not allowed within flow collections at
+ * line 99, column 5: …") has no file in it, and the config-policy table makes
+ * a broken file fail every call that reads it and promises the failure names
+ * the file. The library's message is kept whole (line, column, the excerpt),
+ * and the error itself is the `cause`.
  */
 export function parseConfig(yamlText: string, source = 'averi.yaml'): AveriConfig {
   let raw: unknown;
@@ -627,9 +615,8 @@ export function childSteps(step: Step): Step[] | undefined {
  * this takes any AveriConfig; a `requires` cycle can, and the engine refuses
  * it at run time only when no state on it is on screen). The only thing
  * it gates is whether a rung may be re-run in the recovery pass, so "cannot
- * prove it is safe" must land on the side of not re-running it — that is
- * exactly the pre-recovery behaviour,
- * which is merely slower, not more expensive.
+ * prove it is safe" must land on the side of not re-running it, which is
+ * merely slower, not more expensive.
  *
  * `requires` is followed because it pulls in a whole other reach ladder: a
  * one-step prelude that requires a state whose only way in is a `clearState`
@@ -637,7 +624,7 @@ export function childSteps(step: Step): Step[] | undefined {
  *
  * That transitive answer is the right one for a re-run and the wrong one for
  * the pre-flight warning the ladder prints before each rung; that line uses
- * `flowItselfIsDestructive` below. The two must not be merged again.
+ * `flowItselfIsDestructive` below. The two must not be merged.
  */
 export function flowIsDestructive(
   cfg: AveriConfig,
@@ -711,14 +698,12 @@ function bodyIsDestructive(flow: AveriConfig['flows'][string]): boolean {
  * and `checkSteps` merely skips one (a missed reference check), but a silent
  * skip HERE would call a `clearState` nested inside a later step kind safe to
  * repeat, and the recovery pass would run the wipe twice. So a kind added to
- * Step without a case here costs a skipped recovery — slower, exactly the
- * pre-2026-08-26 behaviour — never a wipe.
+ * Step without a case here costs a skipped recovery — slower, never a wipe.
  *
- * Since 2026-10-04 that cost is not paid silently either: `SAFE_LEAVES` must
- * name every kind of Step that is neither `launch` nor a container, or `tsc`
- * fails (the `satisfies` below). A new kind forces the one decision this walk
- * exists to make — safe to repeat, or not — at compile time, where before it
- * was made by omission (architecture review 2026-10-04, C4's one-line residue).
+ * That cost is not paid silently either: `SAFE_LEAVES` must name every kind
+ * of Step that is neither `launch` nor a container, or `tsc` fails (the
+ * `satisfies` below). A new kind forces the one decision this walk exists to
+ * make — safe to repeat, or not — at compile time, not by omission.
  */
 type StepKind = Step extends infer S ? (S extends unknown ? keyof S : never) : never;
 /**
