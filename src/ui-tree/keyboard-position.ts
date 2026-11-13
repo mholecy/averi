@@ -34,10 +34,9 @@ import type { KeyboardCover, KeyboardReading } from './keyboard-cover.js';
  * The sources, each read in ONE place, here: a reading's line
  * (`readingLine`: the cover a corroborated reading offers — the Android
  * window model's band or floating panel, WDA's marked band — `coverLine`)
- * and idb's band (`DrawOrder.keyboardBandTop` and `ofKeyboardBand`, whose
- * one reader this module is — draw order's own computation). A source that
- * one day gives a position the reading does not changes this module and its
- * table test, not the verbs.
+ * and idb's band (`DrawOrder.keyboardBandTop` and `ofKeyboardBand`, draw
+ * order's own computation). A source that one day gives a position the
+ * reading does not changes this module and its table test, not the verbs.
  *
  * RESIDUAL — what the keyboard's own UI is exempt from differs per verb,
  * and is kept as it is (ADR 0017; unifying it changes behaviour in cases no
@@ -93,7 +92,7 @@ export interface KeyboardPosition {
    * and never again for this position; none, asking nothing, for a position
    * built without a reading that can be asked (the scroll read's, whose
    * round asks the same two through its own protocol — interact/scroll-read.ts
-   * #AppliedKeyboard). The pixel poll never asks it.
+   * #AppliedKeyboard).
    */
   readingLine(): Promise<KeyboardLine | undefined>;
   /**
@@ -119,7 +118,6 @@ export function coverLine(cover: KeyboardCover): KeyboardLine {
   return { y: cover.top.y, witnessed: true };
 }
 
-/** The higher of two lines (the smaller y), either of which may be absent; a tie keeps `a`. */
 const higher = (a: KeyboardLine | undefined, b: KeyboardLine | undefined): KeyboardLine | undefined => (a === undefined ? b : b === undefined || a.y <= b.y ? a : b);
 
 /**

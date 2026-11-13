@@ -43,13 +43,8 @@ import { across, EDGES, flushEdges, rectWithin, type Clips, type Edge } from './
  * `pinnedInScrollView` in the list, a clipping container's edge or a flush neighbour outside it — and the eyes). And a
  * node in no scroll view has no flush neighbour: no scroll moves it, so no stop waits on its surface.
  *
- * Readers (ui-tree/standing.ts): the sliver cut by a later node (`cutByLater`: a control thinner than the tap minimum
- * across an edge of any class but `none`; a role-less strip only on an `overlaid` edge), the `fully` stop's and the pixel
- * assert's overlaid cover (`LaterEdges.overlaid`, cover.ts#overlaidCover), `Scene.flushNeighbours` (the eyes'
- * trigger, ui-tree/eyes.ts, which leaves out a neighbour spanning the screen — a question about the screen, not the
- * edge), and `Scene.pinnedEdges` (the `fully` stop's flush probe, interact/flush-check.ts). Edges are
- * asked top, bottom, left, right; the overlay top and bottom only (every measured Compose cut is vertical; sideways a
- * row's padded overflow icon reaches past its neighbour's ends).
+ * Edges are asked top, bottom, left, right; the overlay top and bottom only (every measured Compose cut is vertical;
+ * sideways a row's padded overflow icon reaches past its neighbour's ends).
  *
  * Not for the pixel assert: `pinnedInScrollView` refuses nothing there — it has no motion to ask, and failing closed
  * would fail every first row at rest under a sticky header (stated residual: the colour of a row cut at a merged
@@ -157,12 +152,10 @@ export function laterEdgesIn(tree: UiNode, scene: LaterScene): (node: UiNode) =>
   return (node) => (cutsAtLater && rectArea(node.rect) !== 0 ? classified(scene, node) : uncut(node));
 }
 
-/** Every edge `none`. */
 function uncut(node: UiNode): LaterEdges {
   return { at: (edge) => ({ kind: 'none', edge, depth: across(node.rect, edge) }), overlaid: () => undefined, flushNeighbours: () => [], pinned: () => [] };
 }
 
-/** `node`'s edges classified over `scene`, on a tree that cuts at later nodes. */
 function classified(scene: LaterScene, node: UiNode): LaterEdges {
   const r = node.rect;
   let scrollers: readonly Rect[] | undefined;
