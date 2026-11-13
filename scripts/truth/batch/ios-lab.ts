@@ -14,7 +14,7 @@ import { STATE_FILE, stateOf } from './run-dir.js';
 import { exitText, failedCall, nameInLine, type StepWord } from './words.js';
 
 /**
- * The lab simulator's plumbing around a batch's iOS blocks (T2 S6b; batch-11.sh:321–361, 383–410, 623–660): the `ios`
+ * The lab simulator's plumbing around a batch's iOS blocks (T2 S6b): the `ios`
  * need — the lab guard, the reset (boot, health), this run's build installed, the installed cells.json byte-equal to
  * main's catalog, and the finportal key's first read — and its cheap recheck; the health check before each run, the
  * Open-in alert dismissed; the WDA window (the `.cases` first, the backup, the work, the lab's WebDriverAgent ended,
@@ -32,17 +32,17 @@ import { exitText, failedCall, nameInLine, type StepWord } from './words.js';
 
 /** The wait after the lab's WebDriverAgent is ended, before the restore: its exit flips the domains (batch-10). */
 export const WDA_EXIT_WAIT_MS = 4000;
-/** The wait after a listener of port 8120 was killed, before the port is read again (d43-gate.ts's 1.5 s). */
+/** The wait after a listener of port 8120 was killed, before the port is read again. */
 export const PORT_RECHECK_MS = 1500;
-/** The wait after the WebDriverAgent is ended in the health check (batch-11.sh's ios_check: `sleep 2`). */
+/** The wait after the WebDriverAgent is ended in the health check. */
 export const CHECK_WAIT_MS = 2000;
-/** The reset's waits after the boot and after the launch (batch-11.sh's ios_reset: `sleep 3`). */
+/** The reset's waits after the boot and after the launch. */
 export const RESET_WAIT_MS = 3000;
 /** The wait after a tap on the alert's Cancel, before it is read again (open-in-alert.py's 1 s). */
 export const ALERT_WAIT_MS = 1000;
 /** How many taps on Cancel before the alert is called stuck (open-in-alert.py's two). */
 export const ALERT_TAPS = 2;
-/** pkill's, lsof's and kill's bound: host calls, each quick (d43-gate.ts's 10 s). */
+/** pkill's, lsof's and kill's bound: host calls, each quick. */
 export const HOST_SECS = 10;
 /** The need's name in a batch's `needs`. */
 export const IOS_NEED = 'ios';
@@ -122,7 +122,7 @@ async function killListeners(k: Killer, pids: readonly number[]): Promise<string
 }
 
 /**
- * Port 8120 proven free (d43-gate.ts's restore): read; listened on, its listeners killed, and read again after
+ * Port 8120 proven free: read; listened on, its listeners killed, and read again after
  * PORT_RECHECK_MS. `killed`: a listener was; `whys`: kills that failed.
  */
 async function portFree(k: Killer): Promise<{ port: PortRead; killed: boolean; whys: string[] }> {
@@ -161,7 +161,7 @@ export async function endCompanion(k: { run: Run; udid: string }): Promise<{ why
 }
 
 /**
- * The run's last step (batch-11.sh:660 and the end of on_abort): the lab's WebDriverAgent and the lab simulator's
+ * The run's last step (and the abort's): the lab's WebDriverAgent and the lab simulator's
  * idb_companion ended by their exact patterns, the companion's entry dropped after it (endCompanion; batch-13) — what
  * S2's kept groups cannot own (a runner launchd holds, a companion that left its group); only for a simulator the
  * guard cleared this run. A NOTE when done, a WARN naming what failed.
@@ -218,7 +218,7 @@ export type ResetResult = { ok: true; warning?: string } | { ok: false; why: str
 
 /**
  * batch-11's ios_reset: the companion ended and its entry dropped (endCompanion; batch-13), the lab's WebDriverAgent
- * ended, shutdown, boot and bootstatus (each bounded by boundFor's 300 s), RESET_WAIT_MS, the lab launched,
+ * ended, shutdown (boundFor's 120 s), boot and bootstatus (its 300 s each), RESET_WAIT_MS, the lab launched,
  * RESET_WAIT_MS, the health check. No companion is started by hand: idb starts its own (when its list has no entry for
  * the udid), kept in its call's group (bounded.ts#KEEPS_GROUP), ended at the run's end. A disconnect that failed is
  * the reset's WARN and its warning; the health check decides whether the reset is done.
@@ -271,7 +271,7 @@ export async function iosCheck(c: LabCtx, lab: IosSim, label: string): Promise<R
 // --------------------------------------------------------------------------------------- the installed lab
 
 /**
- * The installed app's cells.json against main's catalog, byte for byte (batch-11.sh:402–404): its container read
+ * The installed app's cells.json against main's catalog, byte for byte: its container read
  * through simctl (bounded), the file read and kept in the lab folder as evidence. Why not, or undefined.
  */
 export async function installedCells(lab: IosSim, o: { repo: string; labDir: string }): Promise<string | undefined> {
@@ -317,7 +317,7 @@ export interface IosLab {
 const readText = (p: ProtectedRead): string => (p.state === 'value' ? nameInLine(p.value) : p.state === 'absent' ? 'absent' : `unreadable (${p.why})`);
 
 /**
- * The lab simulator kit. The need's check (batch-11.sh:383–410): the udid given and guarded; the reset; the finportal
+ * The lab simulator kit. The need's check: the udid given and guarded; the reset; the finportal
  * key's first read (the iOS stretch's start, read only); this run's build installed if there is one; the installed
  * cells.json main's. Its `alive`: the guard and `idb ui describe-all` (a read, no swipe). Its `end` (the runner's, once
  * the blocks are done, for a need met; T2b, batch-13 gap 4): the guard again and the key's second read — a simulator

@@ -13,7 +13,7 @@ vi.mock('../../src/util/sleep.js', () => ({
 }));
 
 /**
- * T5: batch-11 B2's d35-motion trace, replayed through the production settle — resolveSettled → settleCadence →
+ * T5: batch-11 B2's motion trace, replayed through the production settle — resolveSettled → settleCadence →
  * pollTree → pauseAfterRead, all unmodified — at the iOS idb adapter's fact (IDB_SETTLE_CADENCE_MS, no pollMs).
  *
  * The fixture (tests/fixtures/d35-b11-settle.json) is trimmed from a device batch: 60 trials (20 each of
@@ -68,7 +68,7 @@ function classesOf(t: Trial): Record<string, number>[] {
 
 /**
  * The wrong settle, defined once: a settle of id X at read k is wrong when a later read in the window has X present
- * at another rect. X vanishing later is not wrong — this is a motion corpus (d35-motion's motion mode).
+ * at another rect. X vanishing later is not wrong — this is a motion corpus.
  */
 const settledWrong = (classes: Record<string, number>[], id: string, k: number): boolean =>
   classes.slice(k + 1).some((c) => c[id] !== undefined && c[id] !== classes[k][id]);

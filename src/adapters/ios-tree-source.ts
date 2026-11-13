@@ -27,8 +27,8 @@ import { countOf } from '../util/count.js';
  * fresh normalized tree per call (the layers above mutate nodes — field-error
  * pairing writes `error` — so no source may hand out a cached graph).
  * `applicationLabel()` answers the one question the normalized tree cannot —
- * which app a read is of — for IosAdapter.launch alone (2026-10-09; its doc
- * below). `dispose()` releases whatever the source started; it is awaited by the
+ * which app a read is of — for the foreground wait alone, launch's and a
+ * link's (2026-10-09; its doc below). `dispose()` releases whatever the source started; it is awaited by the
  * process shutdown, so it resolves when the resource is gone, not when the
  * release was queued (the WDA source stops its WebDriverAgent and waits for
  * the port to go quiet). Both sources are bound to ONE concrete simulator at
@@ -84,9 +84,9 @@ export interface IosTreeSource {
    * `Application` element — its display name ("Skeleton Internal",
    * "Contacts"), or `' '` for SpringBoard (2026-10-09). WDA: the bundle id
    * of its active app, the app its sessionless `/source` reads (D48;
-   * wda-tree-source.ts), once its WebDriverAgent is up. Asked by
-   * IosAdapter.launch only (ios-foreground.ts), never by a reader of the
-   * tree: the normalized tree keeps no element types (idb's Application is
+   * wda-tree-source.ts), once its WebDriverAgent is up. Asked by the
+   * foreground wait only (ios-foreground.ts; launch's and a link's), never
+   * by a reader of the tree: the normalized tree keeps no element types (idb's Application is
    * a plain `other`), so the question is answered by the source that has
    * the answer. The answers are ApplicationLabel's. Throws as `read()`
    * throws; one device call per call — except a `declined` answer, which
@@ -513,7 +513,7 @@ const NO_FRONTMOST = /accessibility service named no frontmost application/i;
 export const DESCRIBE_ALL_TIMEOUT_MS = 15_000;
 
 /**
- * idb's settle cadence (IosTreeSource.settleCadenceMs, ADR 0040): 300 ms, measured (D35, d35-motion). describe-all
+ * idb's settle cadence (IosTreeSource.settleCadenceMs, ADR 0040): 300 ms, measured (D35). describe-all
  * snapshots AX at once, in a 20–31 ms read (batch-3 B2 medians), so two reads 300 ms apart compare two snapshots about
  * 300 ms apart. Back-to-back reads through 105 moving trials (batch-2 B 45, batch-3 B2 60: list flings, a bounded
  * scroll, a paging carousel in a list), with resolveSettled replayed offline at each cadence: 0 wrong settles at 300,

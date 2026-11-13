@@ -24,7 +24,7 @@ import {
 } from '../../../scripts/truth/batch/ios-defaults.js';
 import { exitCodeOf, type Summary } from '../../../scripts/truth/batch/words.js';
 
-// scripts/truth/batch/ios-defaults.ts, the pure module: the typed diff, d43-gate.ts's restore rule over batch-10's
+// scripts/truth/batch/ios-defaults.ts, the pure module: the typed diff, the restore rule over batch-10's
 // real exports (tests/fixtures/batch/d43-b10/, typed maps), the one `defaults` argv builder and its read-only domain,
 // the state file's shape and the protected-key line. ios-domains.ts over a simulator, through a recording fake Run, is
 // tests/truth/batch/ios-domains-sim.test.ts.

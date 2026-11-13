@@ -1332,11 +1332,11 @@ export interface DeviceAdapter {
    * source's motions. Absent: DEFAULT_POLL_MS (500), the cadence the settle always ran at.
    *
    * A measurement, never a judgement (docs/adr/0040-the-settle-cadence-is-the-tree-sources.md): a value is set only
-   * from a d35-motion-style run of that source (back-to-back reads through real motions, the settle replayed at each
+   * from a measured run of that source (back-to-back reads through real motions, the settle replayed at each
    * cadence). The fact is the tree SOURCE's — where in a read its snapshot falls — so IosAdapter forwards its source's
-   * (ios-tree-source.ts#IosTreeSource.settleCadenceMs): idb's describe-all, 300 (IDB_SETTLE_CADENCE_MS); WDA, none
-   * (unmeasured). Android sets none, and needs none: a 2.2–2.5 s dump makes the pause the 150 ms floor at any cadence
-   * up to the read + 150.
+   * (ios-tree-source.ts#IosTreeSource.settleCadenceMs): idb's describe-all, 300 (IDB_SETTLE_CADENCE_MS); WDA's
+   * /source, 300 (wda-tree-source.ts#WDA_SETTLE_CADENCE_MS). Android sets none, and needs none: a 2.2–2.5 s dump
+   * makes the pause the 150 ms floor at any cadence up to the read + 150.
    */
   readonly settleCadenceMs?: number;
   /**

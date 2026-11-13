@@ -50,7 +50,7 @@ an element holds still. `settleCadence(adapter, opts) = opts.pollMs ?? adapter.s
   value poll is passed on its own (`FillOptions.valuePollMs: this.pollMs`), so it stays 500. Its five rounds are the
   window a late value has to land in (RN on WDA). `fillField` takes `valuePollMs ?? pollMs ?? DEFAULT_VALUE_POLL_MS`,
   so MCP's 400 and every test that pins both through `pollMs` are unchanged.
-- **A value is set only from a measurement of that source.** The measurement is a d35-motion-style run: back-to-back
+- **A value is set only from a measurement of that source.** The measurement is a motion run of it: back-to-back
   reads through real motions, with the settle replayed offline at each cadence using the product's own
   `pauseAfterRead`. A judgement does not set a value.
 
@@ -105,7 +105,9 @@ when a later read in the window moves the rect.
 - (R2) Some motion kinds are unmeasured: navigation pushes, which should be moot by the M3/M4 mechanism but that is
   not proven; JS-driven RN animations; Lottie.
 - (R3) A wrong settle is not caught later. A tap lands where the element WAS, and no later step re-checks a tap's
-  landing. The product-path run (`d35-motion --settle`) is the check before merge.
+  landing. The check before merge was the product-path settle run (Status); that probe is not kept in the repo.
+  Today tests/interact/settle-trace.test.ts pins the shipped value over a recorded trace (the T5 amendment), and a
+  new value comes only from a re-measure on the device.
 - The floor and the run-of-one late read (~150–167 ms back to back, ADR 0029) are unchanged. 300 is still twice the
   gap the proof already accepts there.
 

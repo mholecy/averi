@@ -10,7 +10,7 @@ import { LIVE_GOLDEN_HEADER } from '../../../scripts/truth/batch/steps.js';
 import { exitCodeOf, parseVerdictLine, type Summary } from '../../../scripts/truth/batch/words.js';
 
 // scripts/truth/batch/cases.ts: what a live run was asked (`<name>.cases`, written before the run's health check), the
-// judged exit-1 rule, and when a run counts — b11-analyze.ts's completeness rule. Real files in a temp dir; a fake
+// judged exit-1 rule, and when a run counts — the completeness rule. Real files in a temp dir; a fake
 // selector stands in for main's live-cases.ts, which tests/truth/batch/cases-live.test.ts reads for real (kept apart:
 // the mutation run's sandbox holds only scripts/truth/batch/).
 

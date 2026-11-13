@@ -522,7 +522,7 @@ Decisions S4 pins:
   restoreDomain, and over the fake: backup, and restore (batch-10's run end to end and its line, a refused write and
   import, an unreadable read-back, a domain that fails beside two that are put back, a key already gone with batch-9's
   stderr, an absent-before domain, a state that cannot be cleared, a state naming no domain or one twice); domainsWindow
-  for the abort path (batch-11.sh:158–164).
+  for the abort path.
 - "schemeapproval key read-only": defaultsArgv (every non-read verb, any key, another case, a long s, a path, a prefix),
   a forged state naming the domain, the recorder's invariants in every simulator test, readProtected (value, batch-8's
   and batch-9's stderr as absent, the words about another domain, other failures and 142 as unreadable) and
@@ -1126,7 +1126,7 @@ S6b's checklist (the S6a part's rows marked S6b, the S4 and S5 parts' "not porte
 What of batch-11's and batch-12's lab plumbing S6b does not port, each with the reason:
 - batch-11's explicit idb_companion start (`--grpc-port 10971`, IDB_COMPANION): above — a daemon cannot run under a
   bound; idb starts its own in a kept group. batch-13 shows whether that holds.
-- the `adb devices` presence check before the Android guard (batch-11.sh:426): the guard's `emu avd name` fails for a
+- the `adb devices` presence check before the Android guard: the guard's `emu avd name` fails for a
   serial adb does not list ("no emulator adb can name"), the same INCONCLUSIVE, one call fewer.
 - the `shasum` of the catalog and of main's APK (batch-12.sh:342, 373): evidence a reader never used; the cells.json
   copies kept in the lab folder say what was compared.

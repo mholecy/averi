@@ -168,7 +168,7 @@ export const lateLineNote = (need: string, line: string): string => `LAB ${need}
 /** The NOTE, once per need, when its calls' file cannot be written: never the need's failure. */
 export const callsNotRecordedNote = (need: string, message: string): string => `LAB ${need}: its calls not recorded (${firstLineOf(message)})`;
 
-/** The backstop's words for a block that asked nothing and wrote no verdict line (batch-11.sh:689–696). */
+/** The backstop's words for a block that asked nothing and wrote no verdict line. */
 export const NOT_RUN = 'not run (see the ERROR lines)';
 
 /** A run a block asked — a live run's Completeness or a record's — as the backstop reads it. */
@@ -297,7 +297,7 @@ export function detailLines(spec: DetailSpec, text: string): string[] {
 }
 
 /**
- * The details printout, before the SUMMARY (batch-11.sh:698–716): its header, the checkout line, this run's steps,
+ * The details printout, before the SUMMARY: its header, the checkout line, this run's steps,
  * each wanted block's folder and detail lines, and where everything is.
  */
 export function detailsLines(d: { checkout: string; runId: string; stepsFile: string; steps: readonly string[]; blocks: readonly { id: string; dir: string; lines: readonly string[] }[]; out: string }): string[] {
@@ -377,7 +377,7 @@ export const liveCalls = ({ repo, secs, rejudgeSecs, files }: LiveBounds & { rep
 });
 
 /**
- * live.ts's rejudge of a record: main's judges, the same groups (batch-11.sh:479); its failure reasons written to
+ * live.ts's rejudge of a record: main's judges, the same groups; its failure reasons written to
  * `failures` (../rejudge-failures.ts, A21).
  */
 export const rejudgeArgs = ({ repo, asked, record, failures }: LiveRunSpec & { failures: string }): string[] => [
@@ -390,5 +390,5 @@ export const rejudgeArgs = ({ repo, asked, record, failures }: LiveRunSpec & { f
   failures,
 ];
 
-/** A live step's text: OK bare; else its why and the log to read (batch-11.sh:234–237). */
+/** A live step's text: OK bare; else its why and the log to read. */
 export const liveStepText = (what: string, outcome: { word: 'OK' | 'DONE' | 'FAIL'; why: string }, log: string): string => (outcome.word === 'OK' ? what : `${what} (${outcome.why}) — see ${log}`);

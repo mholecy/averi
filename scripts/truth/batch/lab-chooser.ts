@@ -62,11 +62,11 @@ import { exitText, failedCall, firstLineOf, messageOf, nameInLine, verdictLine, 
  * batches' one host-shell quoter.
  */
 
-/** --check's verdict label (d55-b11.ts's `D55 check:` line). */
+/** --check's verdict label. */
 export const CHECK_LABEL = 'D55 check';
 /** The cleanup's verdict label (batch-11's `D55 cleanup:` line; batch-12 wrote `E5 cleanup:`). */
 export const CLEANUP_LABEL = 'D55 cleanup';
-/** The browser role holder read (batch-9's d55-probe.ts): API 33 has no such command — unread, never unchanged. */
+/** The browser role holder read: API 33 has no such command — unread, never unchanged. */
 export const ROLE_HOLDERS_ARGV = ['cmd', 'role', 'get-role-holders', 'android.app.role.BROWSER'] as const;
 /** The clipboard read (batch-9's D43 probe asked its help first): API 33 has no shell implementation — unread. */
 export const CLIPBOARD_ARGV = ['cmd', 'clipboard', 'help'] as const;
@@ -76,7 +76,7 @@ export const CENTRE_SLACK_PX = 2;
 // --------------------------------------------------------------------------------------- the preferred activities
 
 /**
- * The preferred read (d55-b11.ts's preferredOf): only the `Preferred Activities User N:` block(s), each running to the
+ * The preferred read: only the `Preferred Activities User N:` block(s), each running to the
  * next top-level line; in a block, each entry is its first line (a hash and a component) and every line after it
  * indented deeper, or blank. A read that failed, or a dump with no such block (API 33's whole dump cut short, another
  * command's output), is unread.
@@ -114,7 +114,7 @@ export function focusOf(r: CallResult): FocusRead {
 // ---------------------------------------------------------------------------------------------------- --check
 
 /**
- * --check's exits (d55-b11.ts --check, batch-12's final checkExit, in pure-b12.ts): 0 no lab entry, no chooser; 1 a lab
+ * --check's exits (batch-12's final checkExit): 0 no lab entry, no chooser; 1 a lab
  * default (a leak: "Always" is never tapped, so it predates the batch or is a defect); 3 not proven (a read failed, no
  * Preferred Activities block, or a lab entry with no mAlways line — one that cannot be compared never triggers a
  * reinstall: code review); 4 a chooser in front; 5 only last-chosen entries, every
@@ -220,7 +220,7 @@ export function comparedLine(label: string, c: ReadCompared): string {
 }
 
 /**
- * `cmd package query-activities --brief -a VIEW -d <url>` counted (batch-11.sh's handlers): the component lines, which
+ * `cmd package query-activities --brief -a VIEW -d <url>` counted: the component lines, which
  * must be as many as its `N activities found:` line says (`No activities found` is 0); else why not.
  */
 export function handlersOf(r: CallResult): number | { why: string } {
@@ -375,7 +375,7 @@ function targetOf(nodes: readonly UiNode[], target: TapTarget): { node: UiNode; 
 }
 
 /**
- * The one point a batch may tap on the chooser (d55-b11.ts's safeTap, batch-12's guardRow1 and guardOnce): the target's
+ * The one point a batch may tap on the chooser (batch-12's guardRow1 and guardOnce): the target's
  * centre, or `at` when given (a reply's quoted centre) within CENTRE_SLACK_PX of it. Refused, by name: no such target,
  * or more than one; a tree that is not the chooser's fresh sheet (android-chooser.ts#chooserSheet reads none: AOSP's
  * with_default layout, no chooser); a target that reads as "Always" itself; a disabled one ("Just once" until a row is
@@ -396,7 +396,7 @@ export function safeTap(dump: Dump, target: TapTarget, at?: Point): SafeTap {
   // The target itself, or a label inside it (a row's text1 or text2).
   if ([...everyNode(node)].some(isAlwaysNode)) return refused('always', `${name} reads as "Always"`);
   if (node.disabled === true) return refused('disabled', `${name} is disabled`);
-  // Fail closed: enabled only when the dump says so (d55-b11.ts and pure-b12.ts read `enabled="true"`).
+  // Fail closed: enabled only when the dump says so (`enabled="true"`).
   if (dump.attrs(node).enabled !== 'true') return refused('enabled-unshown', `${name}: the dump does not say it is enabled`);
   const centre = rectCentre(node.rect);
   const point = at ?? centre;
@@ -417,7 +417,7 @@ export function safeTap(dump: Dump, target: TapTarget, at?: Point): SafeTap {
 
 // ------------------------------------------------------------------------------------------------- the fixtures
 
-/** Device paths a captured fixture must not hold (d55-b11.ts's sanitizeFixture), built from parts as the hygiene test's. */
+/** Device paths a captured fixture must not hold, built from parts as the hygiene test's. */
 const slash = '/';
 const DEVICE_PATHS = ['/data/', '/sdcard', '/storage/', `${slash}Users${slash}`, '/private/', `${slash}tmp${slash}`, 'emulator-'];
 

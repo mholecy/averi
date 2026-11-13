@@ -74,7 +74,7 @@ function labEntryOf(e: OpenEntry): LabEntry | undefined {
 }
 
 /**
- * The preferred read's text (d55-b11.ts's preferredOf, a call that answered): only the `Preferred Activities User N:`
+ * The preferred read's text (a call that answered): only the `Preferred Activities User N:`
  * block(s), each running to the next top-level line; in a block, each entry is its first line (a hash and a component)
  * and every line after it indented deeper, or blank. A dump with no such block (API 33's whole dump cut short, another
  * command's output) is unread.
@@ -133,7 +133,7 @@ export const lastChosenOf = (p: { lab: readonly LabEntry[] }): LabEntry[] => p.l
 
 // ----------------------------------------------------------------------------------------------- the handlers
 
-/** The handler query of a link: `cmd package query-activities --brief -a VIEW -d <url>` (batch-11.sh's handlers). */
+/** The handler query of a link: `cmd package query-activities --brief -a VIEW -d <url>`. */
 export const handlersArgv = (url: string): string[] => [
   ...['cmd', 'package', 'query-activities', '--brief'],
   ...['-a', 'android.intent.action.VIEW', '-d', url],
