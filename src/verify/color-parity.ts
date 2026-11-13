@@ -97,8 +97,7 @@ const sampleRegion = (rect: Rect, scale: number, img: RgbaImage): PngRegion | un
  * the pixel poll measures it), so the scroll view's clip is shared as the screen's is. The png mapping's rounding is
  * left out (a fraction of a unit). When nothing of the rect lies on `screen`, the rect inset whole — off the screen as the rect
  * is, so the standing finds nothing of what it reads on the screen (ui-tree/standing.ts, its `offScreen` kind).
- * `patches` reads inside it too, but for a rect under ~60 png px a side, whose corner patches' 9-px squares reach a
- * few pixels past the 12 % line.
+ * `patches` reads inside it too.
  *
  * ONE region assumes `screen` times the png scale IS the png: the judge clips to `screen` in units, the sampler to the
  * png in pixels. It holds for the usable screen's `oriented` box, the device's screen as the png is, and for the
@@ -126,8 +125,8 @@ const SHARE_CAVEAT = 0.4;
 
 /**
  * The caveats a sample carries, worded ONCE for the table row and the single
- * -element assert — they were written twice and had already drifted apart
- * (one told the reader how to recover, one did not).
+ * -element assert — two copies would drift apart (one telling the reader how
+ * to recover, one not).
  */
 function sampleCaveats(region: PngRegion, sample: { share: number }): string[] {
   const notes: string[] = [];
@@ -146,7 +145,6 @@ function sampleCaveats(region: PngRegion, sample: { share: number }): string[] {
   return notes;
 }
 
-/** 5 patches: 4 corners inset 15% + center, each ~9x9 (smaller if tiny). */
 export function patchRegions(region: Region): Region[] {
   const { x0, y0, x1, y1 } = region;
   const w = x1 - x0;
@@ -223,7 +221,6 @@ export function sampleDominant(
 
 // ------------------------------------------------------- contract handling
 
-/** Do the contract's anchors opt into color checks at all? */
 export function contractHasColorAnchors(contract: LayoutContract): boolean {
   return contract.anchors.some((a) => a.bg !== undefined || a.bg_dark !== undefined || a.sample !== undefined);
 }
@@ -409,16 +406,15 @@ function statsFor(platform: Platform, capture: MeasuredFrame): ColorPlatformStat
 
 /**
  * One rect's fill, sampled the ONE way the table row and the single-element
- * assert both sample: scale the
- * rect into png pixels with the 12% inset, split into patches when asked,
- * take the dominant bucket, and word the caveats — one chain, where two
- * copies at the callers had drifted. Either the sample with its caveats or why there is
- * none — `off-png` (the rect lands nowhere on the png: off-screen in this
- * capture) or `empty` (nothing left after inset and clamp) — never both;
- * the callers word the absence, each in its own terms: a MISSING cell in
- * the table, a fail-closed sentence in the assert. The scale and its
- * policy stay with the callers too (the table fails a platform closed on
- * an unusable one in `statsFor`, the assert in its detail).
+ * assert both sample: scale the rect into png pixels with the 12% inset,
+ * split into patches when asked, take the dominant bucket, and word the
+ * caveats — one chain, so the two cannot drift apart. Either the sample with
+ * its caveats or why there is none — `off-png` (the rect lands nowhere on the
+ * png: off-screen in this capture) or `empty` (nothing left after inset and
+ * clamp) — never both; the callers word the absence, each in its own terms:
+ * a MISSING cell in the table, a fail-closed sentence in the assert. The
+ * scale and its policy stay with the callers too (the table fails a platform
+ * closed on an unusable one in `statsFor`, the assert in its detail).
  */
 function sampleFill(
   png: RgbaImage,
@@ -467,9 +463,6 @@ export function compareColorParity(
   const tol = toleranceDeOf(contract);
   const ctol = tol * CONTRACT_TOL_FACTOR;
 
-  // Per-platform stats + scale — failing closed on anything degenerate: a
-  // 0-width root or a 0-width png would make every region empty and every
-  // comparison vacuous.
   const stats: ColorPlatformStats[] = [];
   const scaleOf: Partial<Record<Platform, number>> = {};
   const rectsOf: Partial<Record<Platform, Map<string, Rect>>> = {};
@@ -587,7 +580,6 @@ export function compareColorParity(
 
 // -------------------------------------------------------------- rendering
 
-/** One-line verdict — the number the caller quotes. */
 export function colorParityVerdict(r: ColorParityResult): string {
   if (r.pass) {
     const n = r.rows.filter((row) => row.verdict !== 'MISSING').length;
@@ -623,8 +615,8 @@ export function formatColorParity(r: ColorParityResult): string {
       lines.push(line + ')');
       continue;
     }
-    // An implausible scale is no longer judged here: verify/scale.ts puts it
-    // on the scale's own note, printed below.
+    // An implausible scale is verify/scale.ts's to judge: it puts it on the
+    // scale's own note, printed below.
     let line = `${p}: png ${s.pngWidth}x${s.pngHeight}  root ${s.rootWidth}  scale ${s.scale.toFixed(3)}`;
     if (s.translucent) line += '   ! alpha<255 pixels present — alpha ignored, RGB used as stored';
     if (s.note !== undefined) line += `   ! ${s.note}`;
