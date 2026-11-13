@@ -106,7 +106,7 @@ import { sleep } from '../util/sleep.js';
  * slow first appinfo — up to its 10 s budget — is added to it, not taken
  * from it), plus the read in flight when it ends: no read is STARTED at or
  * after the deadline, but one already started is idb's, under its own 15 s
- * budget (ios-tree-source.ts) — so a launch on a hung idb now takes up to
+ * budget (ios-tree-source.ts) — so a launch on a hung idb takes up to
  * 15 s before its "could not check" note. And nothing is cached about a
  * never-matching app: a localized display name costs the full window and a
  * note on EVERY launch — N windows for an ensure_state ladder with N launch

@@ -507,7 +507,7 @@ export class IosAdapter implements DeviceAdapter {
   /**
    * One pre-approval's result (D58): the first success per key said on stderr (the keys are simulator-wide and persist,
    * as the accessibility write's announcement); a failure said once and remembered. A failure never fails the link —
-   * `openurl` runs as before, and if iOS then asks "Open in “…”?", the wait names the alert (D54/D56).
+   * `openurl` runs anyway, and if iOS then asks "Open in “…”?", the wait names the alert (D54/D56).
    */
   private judgeSchemeApproval(approval: SchemeApproval, result: PromiseSettledResult<unknown> | undefined): void {
     const key = approvalCacheKey(approval);
@@ -681,7 +681,7 @@ export class IosAdapter implements DeviceAdapter {
    * `idb screenshot -`, judged. A failed or timed-out call is exec's error (or runIdb's, alike) with the remedy put on
    * its FIRST line, after the command: that line is all a capture's callers quote, and without it an agent would read
    * only `Command failed (exit 1): idb screenshot - --udid U`, the companion's stderr below it unseen. The rest of the
-   * message (the stderr) follows as before, and the ExecError is the `cause`.
+   * message (the stderr) follows, and the ExecError is the `cause`.
    */
   private async idbScreenshot(): Promise<Buffer> {
     let stdout: Buffer;

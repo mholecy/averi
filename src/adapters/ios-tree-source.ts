@@ -260,7 +260,7 @@ function idbTree(elements: IdbElement[]): UiNode {
  * `GenericElement` alone is too wide (the keyboard's unlabelled `["Scrollable","Spacer"]` element, 402×284, would
  * read as loading on every keyboard-up screen); the trait alone is too wide (a `StaticText` clock or timer carries
  * it); a label makes it content. No value test: a stopped or older spinner may read `'0'` or a word — so an UNVALUED
- * one is re-roled too and, no longer an unlabelled, unvalued structural leaf, now covers its rect in
+ * one is re-roled too and, not an unlabelled, unvalued structural leaf, covers its rect in
  * ui-tree/draw-order.ts (as WDA's does): a tap under it reads covered — the safe direction.
  * Residuals, stated: a LABELLED idb spinner stays `other` and content; UIKit's and React Native's spinners through idb
  * are assumed to share this shape (unmeasured, D37); an app-made unlabelled live element (a custom counter carrying
@@ -297,12 +297,13 @@ const DISMISS_REGION = 'PopoverDismissRegion';
  * (ui-tree/presentation.ts#byMarks: `scroll_until` sends no stroke for a target not in the tree — one at (201,175)
  * on the dim dismissed the sheet and read the target "fully visible after 1 swipe" — and the tap's wait says close it
  * first, `Presentation.alone`). Read here, where the raw element is, as android-tree-dialect.ts#presentedWindow reads
- * its dump. Specific: of every idb capture committed, only those two hold the region. Residuals, stated: a presentation
- * UIKit lays with no dimming view — a large-detent or full-screen sheet (sheet-background.idb.json lists the sheet's
- * button alone, no sign of the sheet), an alert, a transparent cover — is no presented layer here; a dismiss region
- * that does not reach the whole screen (a popover's on an iPad? unmeasured) neither; and the screen beneath the region,
- * were idb ever to list it too (unmeasured), reads as the layer's own — covered by nothing, as the whole listing is the
- * layer. docs/truth/live-ios-2026-10-18-visibility.md (iOS point 4); ADR 0018 residual 6.
+ * its dump. Specific: of every idb capture committed (tests/fixtures/idb-*.json and *.idb.json), only those two hold
+ * the region. Residuals, stated: a presentation UIKit lays with no dimming view — a large-detent or full-screen sheet
+ * (sheet-background.idb.json lists the sheet's button alone, no sign of the sheet), an alert, a transparent cover — is
+ * no presented layer here; a dismiss region that does not reach the whole screen (a popover's on an iPad? unmeasured)
+ * neither; and the screen beneath the region, were idb ever to list it too (unmeasured), reads as the layer's own —
+ * covered by nothing, as the whole listing is the layer. docs/truth/live-ios-2026-10-18-visibility.md (iOS point 4);
+ * ADR 0018 residual 6.
  */
 function listsPresentedLayer(elements: readonly IdbElement[]): boolean {
   const app = appFrame(elements);

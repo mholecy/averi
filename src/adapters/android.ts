@@ -803,14 +803,14 @@ export class AndroidAdapter implements DeviceAdapter {
    * SWIFT form's 1042 px 1.04 s (+0.74 s), a probe or a halved stroke
    * floored at 300 ms (+0) — so the 6 default swipes cost up to ≈ 6 s more
    * of the 15 s, where the measured fling runs spent ≈ 3 s a round; and a
-   * stroke now moves the content ≈ its own length, not ≈ 1.6×, so content
+   * stroke moves the content ≈ its own length, not ≈ 1.6×, so content
    * far below the fold takes more strokes. What it buys: no row is carried
    * across the list between two reads.
    *
    * NET, in one place: within the
    * 15 s default, Settings' list is reached about 40 % less far — the
    * measured fling runs fit 5 rounds of ≈ 3 s, ≈ 5 × 1332 ≈ 6700 px of
-   * finger travel (≈ 6800 px of content once flung, rows skipped); now ≈ 4
+   * finger travel (≈ 6800 px of content once flung, rows skipped); paced, ≈ 4
    * rounds of ≈ 3.5 s, each ≈ 850 px over the list plus ≈ 90 of fling,
    * ≈ 3950 px, every row read. And the deadline is checked once a round,
    * before the stroke, so the last round can overrun `timeoutMs` by a

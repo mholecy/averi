@@ -74,7 +74,8 @@ const POLL_INTERVAL_MS = 500;
  * SHUTDOWN_BUDGET_MS (1 500), or the budget cuts off the one step that frees
  * the port: wait ≤ 600, plus one straggling probe that may START just before
  * the deadline (≤ 150), + lsof ≤ 300 + the kills ≈ 1 050 < 1 500 — measured
- * 694–833 ms against real sockets.
+ * 694–833 ms against real sockets; a 1 000 + 2 000 sizing measures
+ * 1 030–1 134 ms, over budget.
  */
 const SHUTDOWN_GONE_MS = 600;
 const SHUTDOWN_POLL_MS = 100;
@@ -136,7 +137,8 @@ const defaultSpawn: SpawnFn = (cmd, args, opts) => nodeSpawn(cmd, args, opts);
  * In-process port allocator: sequential from 8100, one port per UDID for the
  * life of the process — two UDIDs in this process never share a default port
  * (an explicit `port` option bypasses the allocator). A hash of the UDID would
- * collide, and a collision silently delivers the WRONG device's tree. Servers
+ * collide (8100 + hash % 100: ~1 % per pair), and a collision silently
+ * delivers the WRONG device's tree. Servers
  * left behind by OTHER processes cannot be solved by allocation; they are
  * caught at probe time instead — see the not-ours check in doEnsureRunning.
  */
@@ -509,7 +511,8 @@ export class WdaServer {
    *
    * "Free" means the connection is REFUSED. A probe that times out or resets
    * is a listener that is wedged, not gone — the state a shutdown mid-/source
-   * most often meets — so it keeps waiting and then escalates.
+   * most often meets — so it keeps waiting and then escalates; read as quiet,
+   * the wait would return in 1 ms and leave the runner up.
    *
    * Killing by port is safe only because of `hadChild`: this runs solely when
    * WE spawned onto the port, and doEnsureRunning refused to spawn if anything

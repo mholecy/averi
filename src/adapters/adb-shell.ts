@@ -15,6 +15,9 @@
  *   --es key "hello world"     the extra arrived as `hello`, with a stray word `world`
  *   -d app://x/$HOME;id       `$HOME` was expanded and `id` was executed
  *
+ * A test cannot see the loss through a fake exec that joins the argv with a
+ * space: that join is exactly as lossy as adb's.
+ *
  * The rule here: every word that is not made only of characters `sh` never
  * interprets goes inside single quotes, where POSIX sh (mksh included)
  * interprets NOTHING — a `'` inside the word is the one character that needs

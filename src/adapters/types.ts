@@ -95,7 +95,7 @@ export interface Point {
   y: number;
 }
 
-/** One swipe's from/to points — what interact/swipe.ts#swipeVector returns and `DeviceAdapter.swipe` draws. */
+/** One swipe's from/to points, in the platform's tree units. */
 export interface Stroke {
   from: Point;
   to: Point;
@@ -766,10 +766,9 @@ export type KeyboardWitness = 'shown' | 'hidden' | 'unknown';
  * `KeyboardOracle.state`. Three answers, not "a frame or undefined",
  * because the two callers need different things from the missing frame:
  * the tap guard only asks "does it cover my point" (hidden and
- * unknown both mean "tap as before"), but `dismissKeyboard` must tell "no
- * keyboard — pressing back would NAVIGATE" from "could not tell — keep doing
- * what was always done". One `undefined` would have forced one of them to
- * guess.
+ * unknown both mean "tap"), but `dismissKeyboard` must tell "no keyboard —
+ * pressing back would NAVIGATE" from "could not tell — press back". One
+ * `undefined` would have forced one of them to guess.
  *
  * `frame` is the screen rect the keyboard covers, in the SAME units as uiTree
  * rects (Android: pixels), so a tap point can be tested against it directly.
@@ -796,7 +795,7 @@ export type SoftKeyboard =
       panels?: readonly Rect[];
     }
   | { state: 'hidden' }
-  /** The platform did not answer, or answered in a shape the adapter does not recognise. Callers behave as before the question existed. */
+  /** The platform did not answer, or answered in a shape the adapter does not recognise. Callers behave as if no answer were given. */
   | { state: 'unknown' };
 
 /**
@@ -838,8 +837,8 @@ export type SoftKeyboard =
  * navigated)" would be false.
  *
  * Both methods NEVER throw and never guess: a command that fails, times out or
- * prints something unrecognised is `unknown`, and callers behave as before the
- * question existed. Neither is memoized (unlike `viewport`): the answer
+ * prints something unrecognised is `unknown`, and callers behave as if no
+ * answer were given. Neither is memoized (unlike `viewport`): the answer
  * changes with every focus, and the registry keeps one adapter for a whole
  * session — a cached `hidden` would veto every later dismissal.
  */
@@ -873,10 +872,9 @@ export interface KeyboardOracle {
    * only reported) — and in `scroll_until` before a `shown` band may change
    * its judgement or its stroke (a reading's `corroborated`, the same veto;
    * at most once a round, on every round a band matters — the answer is
-   * never kept). Every one of them asks through a reading
-   * (ui-tree/keyboard-cover.ts#readKeyboard), the one caller of this method,
-   * which asks it at most once per reading, relies on the never-throws
-   * contract above and has no catch.
+   * never kept). It is asked at most once per reading
+   * (ui-tree/keyboard-cover.ts#readKeyboard), which relies on the
+   * never-throws contract above and has no catch.
    *
    * A method of its own rather than an option on `state()`: the caller needs
    * it at a different moment (after the frame has been tested against the
@@ -891,9 +889,8 @@ export interface KeyboardOracle {
    * policy: what of the region counts as covered — only beside a `shown`
    * band, only with the input method saying shown, only rects that fit the
    * band's screen, never the band itself — is
-   * `ui-tree/keyboard-cover.ts#panelsBeyond`'s, and its one caller, a
-   * reading there (`readKeyboard`), asks this only after `state()` read
-   * `shown`, and only for a question about area (the region alone was measured
+   * `ui-tree/keyboard-cover.ts#panelsBeyond`'s, and it is asked only after
+   * `state()` read `shown`, and only for a question about area (the region alone was measured
    * non-empty while hidden and stale after a rotation, so it is never
    * evidence on its own). A method of its own, not part of `state()`, for
    * the reason `witness` gives: one call that sometimes runs two commands

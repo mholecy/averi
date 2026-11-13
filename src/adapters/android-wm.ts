@@ -139,7 +139,7 @@ export const FOCUSED_WINDOW_COMMAND = "dumpsys window displays | grep -E 'mCurre
  */
 const CURRENT_FOCUS_RE = /mCurrentFocus=Window\{([0-9a-f]+) (?:u\d+ ([^\s/}]+\/[^\s}]+)\})?/g;
 
-/** A focus line, `null` or not: each display prints one. */
+/** A focus line, `null` or not: each display prints one, and the focus read is cut at each. */
 const CURRENT_FOCUS_LINE_RE = /mCurrentFocus=/g;
 
 const focusLines = (dump: string): { hash: string; component: string | undefined }[] =>
@@ -150,6 +150,7 @@ const WINDOW_HEADER_RE = /^ {2}Window #\d+ Window\{([0-9a-f]+) [^\n]*:$/gm;
 const WINDOW_TYPE_RE = /\bty=([A-Z_]+|\d+)/;
 /** A window's frame on the display: `Frames: parent=… display=… frame=[0,66][1080,2153] last=…`. */
 const WINDOW_FRAME_RE = /^ +Frames: .*? frame=\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]/m;
+/** A window shown on the display: WindowState.isVisible's own line. */
 const WINDOW_VISIBLE_RE = /^ {4}isVisible=true$/m;
 
 /**
