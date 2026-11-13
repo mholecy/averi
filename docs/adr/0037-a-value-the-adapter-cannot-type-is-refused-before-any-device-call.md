@@ -93,13 +93,11 @@ control-character check and before any device call.**
     UIKit's `paste:` (the edit menu, or Cmd+V) is expected not to show it. This is Apple's stated behaviour, not
     measured here. An engine that reads the pasteboard itself, as Flutter's `Clipboard.getData` and some web views
     do, can show the alert, which then covers the fill.
-  - The landing rule would judge a paste unchanged, since interact/fill-landing.ts judges the field's reading, not
-    how the text got there. But a dropped tail (ADR 0023) is typed again through idb, which cannot type a non-ASCII
-    tail, so the retype that makes a fill recover would not exist for a paste. A field that refuses or reformats a
-    paste (a length limit, an input mask: ADR 0034) would be changed and still miss, where the refusal changes
-    nothing.
-  - The case it serves is narrow: under `treeSource: auto` only after WebDriverAgent did not come up, whose fix is
-    that reason and `select_device` again (ADR 0046, residual 4 and its A40 amendment), and `treeSource: idb`.
+  - The landing rule would judge a paste as it judges typing, since interact/fill-landing.ts judges the field's reading,
+    not how the text got there. But a dropped tail (ADR 0023) is typed again through idb, which cannot type a non-ASCII
+    tail, so the retype that makes a fill recover would not exist for a paste. A field that refuses or reformats a paste
+    (a length limit, an input mask: ADR 0034) would be changed and still miss, where the refusal changes nothing.
+  - When it would matter at all: ADR 0046's A40 amendment, "When it matters".
 
   **The bar for reopening it** is a device probe on the lab simulator, before any code. `simctl pbcopy` and a
   helper-sent Cmd+V must fill form-basic's b1d and b7 values exactly, 20 of 20, in each field kind: a UIKit field

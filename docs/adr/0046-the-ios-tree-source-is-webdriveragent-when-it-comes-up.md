@@ -219,10 +219,11 @@ the standing one, `unprovenOf` over every leg-(b), foreground and cadence outcom
 both unproven); tests/truth/batch/lab-a41-ios.test.ts (the new order, a cadence exit 3, the report block on unproven
 alone and with missing). Hand mutants, each killed.
 
-## Amendment 2026-11-13 (A40): residual 4 is kept; idb gets no non-ASCII path
+## Amendment: residual 4 is kept; idb gets no non-ASCII path (2026-11-13, A40)
 
 Gate C on main 8e60cb2b read form-basic's b1d (a name with diacritics) and b7 (’ “ ” – …) LOUD on the idb block,
-`loud-untouched`: refused before anything was sent, as residual 4 says. WDA fills both. A40 asked whether idb could
+`loud-untouched` (docs/truth/live-records/a36-gate-c/ios-idb-forms.rejudge.log.txt): refused before anything was
+sent, as residual 4 says. WDA fills both. A40 asked whether idb could
 enter such a value without breaking the fill's landing rule (ADR 0023, interact/fill-landing.ts). It cannot, at an
 acceptable cost, so the refusal stays. This is an analysis without a device run, and nothing in `src/` changes.
 
@@ -237,7 +238,7 @@ acceptable cost, so the refusal stays. This is an analysis without a device run,
   Option sequence depends on the simulator's keyboard layout, so each would need its own measurement.
 - **The pasteboard stays rejected** (ADR 0037, Rejected, where its reasons and the bar for reopening it are written).
 
-The refusal is ADR 0037's idb wording (`adapters/ios-typing.ts#idbTypingRefusal`), unchanged. scripts/truth/
-live-known.ts keeps b1d and b7 KNOWN on `ios idb` as `loud-untouched` on `refused`. The bug note
+The refusal is ADR 0037's idb wording (`adapters/ios-typing.ts#idbTypingRefusal`), unchanged.
+scripts/truth/live-known.ts keeps b1d and b7 KNOWN on `ios idb` as `loud-untouched` on `refused`. The bug note
 docs/bugs/2026-10-15-lab-ios-type-text-cannot-type-non-ascii.md stays as ADR 0037 left it. No test changes: the rule
 was already pinned.
