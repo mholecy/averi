@@ -1372,6 +1372,57 @@ Residuals of the amendment:
 - **C's centre cover is named the backdrop under idb, W under WDA.** Both are drawn over C's centre; the presented
   remedy, first in precedence, is the same.
 
+## Amendment: the flat tap-catcher control cell (2026-11-13, A43)
+
+A42's analysis left WDA's ungrouped `blur-menu` KNOWN (A, B, D Tapped through the backdrop; C under W): WDA lists the
+hidden backdrop first of seven siblings by its top (0), the card's rows among the targets, and nothing in the tree
+marks the card — so every rule found would also refuse open targets. Whether that is so for good is a question of one
+listing the lab did not have: a hidden screen-wide tap-catcher drawn BENEATH ungrouped targets. The round-16 probes
+(`tap-catcher-beneath`, `tap-catcher-stacked`) group the targets in a container, which WDA lists after the catcher at
+the same top — not blur-menu's flat run.
+
+**Decision.** A lab cell, `tap-catcher-beneath-flat` (fixtures/apps/cells/false-covers.json, iOS only; AveriLab/
+FalseCovers.swift, `TapCatcherScreen`): the four slot targets ungrouped, the `.accessibilityHidden` catcher declared
+before them as blur-menu's backdrop is (zIndex 0, the targets' content zIndex 1) — so against A–D the one difference
+from blur-menu is the draw order: the catcher under every target. Truth: A–D `open`, a tap fires each. No src change;
+no Android twin (the question is WDA's and idb's listing of a SwiftUI run, and the Android lab builds none of the blur
+or tap-catcher layers: `LAB_APP`'s `androidLayers` in scripts/truth/lab-device.ts).
+
+**The prediction.** WDA lists the cell as it lists blur-menu less the card's rows K and W: the hidden childless
+`Other 0,0 402x874` first, then A–D its siblings, in type, frame, order and `isVisible` (only the ids differ). idb is
+expected to list A–D alone, as it lists `tap-catcher-beneath` (tap-catcher-beneath.idb.json, ids aside) — no trace of
+the hidden catcher. On the WDA listing averi marks nothing and taps A–D at their centres (tests/interact/
+tap-judgement.test.ts, "A43"), so all 12 rows a source are expected green. The capture's listings are checked against
+both predictions by tests/truth/flat-catcher-listing.test.ts, keyed on false-covers.known.ts: while it holds no count
+for a source's capture, that capture must be absent; once it holds one, the capture must list as predicted.
+
+**What the capture settles.** Listed as predicted: one listing, two truths (blur-menu's A covered, this cell's A open)
+— no rule on WDA's tree can refuse the one without the other, and blur-menu.wda's rows stay KNOWN for good (residual
+9; the way out is the eyes, or the menu closed first). Listed otherwise (an order, a flag, a frame that differs): the
+listing test goes red; that difference is the evidence an inference needs — file it as its own backlog row and
+replace the test's expectation with the listing measured.
+
+**The owner's hand-off, before the next Gate C** (outside the agent's sandbox; the lab simulator `<udid>`, an
+`averi-lab …` simulator, never the device-check one). `capture.ts` neither builds nor installs the lab app, and Gate C's
+visibility cases are built from the committed truth only, so the capture comes first:
+
+1. Build and install the lab app from this checkout (scripts/differential/README.md, "Recapturing iOS"):
+   `cd fixtures/apps/ios && xcodegen generate && xcodebuild -scheme AveriLab -destination 'id=<udid>' -derivedDataPath build build`,
+   then from the repo root `xcrun simctl install <udid> fixtures/apps/ios/build/Build/Products/Debug-iphonesimulator/AveriLab.app`.
+2. With idb's companion up for the simulator (`idb_companion --udid <udid> --grpc-domain-sock <socket>`, the socket path
+   as scripts/differential/README.md's golden-mode live run gives it),
+   `node --import tsx scripts/truth/capture.ts --udid <udid> --out tests/fixtures/truth/ios-iphone17-ios27 --cells tap-catcher-beneath-flat`
+   — exit 0 (1: the cell broken or failed; the manifest says why).
+3. In tests/differential/golden/false-covers.known.ts add the two counts,
+   `` [`${IOS}/tap-catcher-beneath-flat.idb.json`]: 12 `` and `` [`${IOS}/tap-catcher-beneath-flat.wda.json`]: 12 `` (golden's
+   COUNTS line gives the real numbers if they differ; a mismatch row goes in `known` with its class).
+4. `npm test` — flat-catcher-listing.test.ts now checks the capture's listings; red there is "Listed otherwise" above
+   — and golden (`node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth`).
+5. Commit the capture (the cell's `.wda.json`, `.idb.json`, `.truth.json`, `.state.json`, `.png`, the manifest) and the
+   counts.
+6. `npm run truth:lab:ios -- --out <dir outside the checkout> --udid <udid>` (Gate C: its lab block builds and installs
+   the app itself; its visibility group now asks the cell's taps under both sources).
+
 ## Residuals accepted
 
 (Numbered as before; 8 replaced by the sheet's bare dim after the full-screen leaf condition removed the Android background case.)

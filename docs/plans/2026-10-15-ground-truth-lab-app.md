@@ -208,6 +208,8 @@ How to add a cell (B2–B5):
    with the first cell that needs them; a recapture of the existing cells then adds those keys to their state and
    `geometry: whole` to their targets, which asks no new row).
 3. **Capture** — `capture.ts --udid <lab> --out tests/fixtures/truth/<run> --family <family>` (and the Android one).
+   `capture.ts` neither builds nor installs the lab app: build and install it first, as scripts/differential/README.md,
+   "Recapturing iOS", gives it.
 4. **Spec rows** — a target's rows are chosen by its MEASURED geometry (truth.ts#geometryOf), not by its family:
    `golden-spec/edges.ts` and `golden-spec/bars.ts` are geometry groups, asked of a target of any family whose capture
    measured an edge, band or chrome geometry, so a B2 or B4 cell needs no spec change for a geometry they already map. A

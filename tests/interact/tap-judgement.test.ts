@@ -13,6 +13,7 @@ import { node } from '../helpers/fake.js';
 import { stackedLayers } from '../helpers/stacked-layers.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { remedyThenEscape } from '../helpers/escape-order.js';
+import { FLAT, predictedWda } from '../helpers/flat-catcher.js';
 
 // THE tap judgement of one look (interact/tap-judgement.ts#judgeTap), as a table over a look (ui-tree/look.ts#lookAt)
 // and a screen — no settle loop, no keyboard guard: a fake `viewport` that counts its fresh reads, static trees, and a
@@ -362,6 +363,20 @@ describe('judgeTap(…).aim() — a later stacked screen layer over the target (
         "a menu's backdrop is presented over it (an empty element WDA lists over the whole screen, after the screen's content) — close it first " +
         '(if a screenshot shows no menu up, the backdrop is an overlay that lets touches through: tap the target by its coordinates (its centre from ui_snapshot)); no scroll moves it out from under that backdrop; nothing was tapped',
     );
+  });
+
+  // A43 (ADR 0018, the A43 amendment): guards against a future rule that refuses the ungrouped blur-menu's A, B, D on
+  // WDA's tree — on the listing predicted for tap-catcher-beneath-flat (blur-menu's less K and W) such a rule would also
+  // refuse that cell's open targets. Whether WDA does list the cell so: tests/truth/flat-catcher-listing.test.ts.
+  it('A43: on the listing predicted for tap-catcher-beneath-flat (WDA) nothing is marked and A–D are tapped at their centres', async () => {
+    const tree = parseWdaSource(JSON.stringify(await predictedWda()));
+    expect([...everyNode(tree)].filter((n) => n.presentation !== undefined)).toEqual([]);
+    const listed = [...everyNode(tree)].filter((n) => n.identifier?.startsWith('lab.') === true).map((n) => n.identifier);
+    expect(listed).toEqual(['A', 'B', 'C', 'D'].map((t) => `lab.${FLAT}.${t}`));
+    const centres: Record<string, number> = { A: 142, B: 322, C: 502, D: 682 };
+    for (const t of ['A', 'B', 'C', 'D']) {
+      expect(said((await judge(tree, `lab.${FLAT}.${t}`, { first: IPHONE })).outcome)).toBe(`{"point":{"x":201,"y":${centres[t]}}}`);
+    }
   });
 
   // A38a (ADR 0018, the amendment "idb's backdrop"): idb lists the unhidden blur menu's backdrop as an unlabelled,

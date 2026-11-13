@@ -5,6 +5,9 @@ import { ANDROID, IOS, type KnownFile } from './known.js';
 // button alone, labelled Close, and tap it by its label: green), toolbar-dismiss, toolbar-dismiss-bar and
 // toolbar-dismiss-short (iOS: form cells); tap-catcher-beneath and tap-catcher-stacked (round 16, iOS: a hidden
 // screen-wide tap-catcher beneath the targets — ADR 0018 residual 9's false-positive probe; every row green).
+// tap-catcher-beneath-flat (backlog A43, iOS): no count until its capture is committed — its prediction and the owner's
+// hand-off (build, capture, the two counts here, npm test, commit, Gate C) are ADR 0018's A43 amendment;
+// tests/truth/flat-catcher-listing.test.ts keys on these counts.
 
 export const falseCovers: KnownFile = {
   family: 'false-covers',

@@ -790,6 +790,18 @@
       ]
     },
     {
+      "id": "tap-catcher-beneath-flat",
+      "family": "false-covers",
+      "layer": "tap-catcher-beneath-flat",
+      "platforms": ["ios"],
+      "targets": [
+        { "tag": "A", "color": "#E53935", "slot": 0, "declared": "open" },
+        { "tag": "B", "color": "#1E88E5", "slot": 1, "declared": "open" },
+        { "tag": "C", "color": "#43A047", "slot": 2, "declared": "open" },
+        { "tag": "D", "color": "#FB8C00", "slot": 3, "declared": "open" }
+      ]
+    },
+    {
       "id": "text-sample",
       "family": "text",
       "layer": "none",

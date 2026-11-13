@@ -27,12 +27,15 @@ import UIKit
 //   it (`.background`, the common "tap outside to end editing" shape) — the blur menu's backdrop's shape in the tree,
 //   but under the content, not over it; `tap-catcher-stacked` the same, the tap-catcher declared first in a ZStack
 //   with the content. A touch on it logs `dismissed background`; a tap on a target fires it.
+// - `tap-catcher-beneath-flat` (backlog A43): the same catcher beneath the four targets laid UNGROUPED, its siblings —
+//   the ungrouped blur-menu's run with the catcher drawn under the targets. Why, what it predicts and what its capture
+//   settles: ADR 0018, the A43 amendment.
 
 struct FalseCoversScreen: View {
     let cell: Cell
 
     var body: some View {
-        if cell.layer == "tap-catcher-beneath" || cell.layer == "tap-catcher-stacked" {
+        if TapCatcherScreen.layers.contains(cell.layer) {
             TapCatcherScreen(cell: cell)
         } else if let form = cell.form {
             FormScreen(cell: cell, form: form, scrollHeight: cell.layer == "toolbar-screen-short" ? 451 : nil).overlay(alignment: .top) { if cell.layer == "toolbar-bar" { ShadowToolbar() } }
@@ -42,24 +45,37 @@ struct FalseCoversScreen: View {
     }
 }
 
-/// `tap-catcher-beneath` and `tap-catcher-stacked`: the slot targets, grouped, over a hidden screen-wide tap-catcher
-/// (see the file's head).
+/// `tap-catcher-beneath` and `tap-catcher-stacked`: the slot targets, grouped, over a hidden screen-wide tap-catcher;
+/// `tap-catcher-beneath-flat` the targets ungrouped (see the file's head). A layer it does not build shows an
+/// UnbuiltCell, never ready.
 struct TapCatcherScreen: View {
     @EnvironmentObject var lab: Lab
     let cell: Cell
+
+    /// The layers this screen builds; FalseCoversScreen routes these alone here.
+    static let layers: Set<String> = ["tap-catcher-beneath", "tap-catcher-stacked", "tap-catcher-beneath-flat"]
 
     var body: some View {
         GeometryReader { geo in
             let screen = CGSize(width: geo.size.width + geo.safeAreaInsets.leading + geo.safeAreaInsets.trailing,
                                 height: geo.size.height + geo.safeAreaInsets.top + geo.safeAreaInsets.bottom)
             Group {
-                if cell.layer == "tap-catcher-stacked" {
+                switch cell.layer {
+                case "tap-catcher-beneath":
+                    content(screen, grouped: true).background { catcher }
+                case "tap-catcher-stacked":
                     ZStack(alignment: .topLeading) {
                         catcher
-                        content(screen)
+                        content(screen, grouped: true)
                     }
-                } else {
-                    content(screen).background { catcher }
+                case "tap-catcher-beneath-flat":
+                    // The catcher declared before the targets, as blur-menu's backdrop is; zIndex draws it under them.
+                    ZStack(alignment: .topLeading) {
+                        catcher.zIndex(0)
+                        content(screen, grouped: false).zIndex(1)
+                    }
+                default:
+                    UnbuiltCell(cell: cell)
                 }
             }
             .frame(width: screen.width, height: screen.height)
@@ -67,14 +83,16 @@ struct TapCatcherScreen: View {
         }
         .ignoresSafeArea()
         .task {
+            guard Self.layers.contains(cell.layer) else { return }
             try? await Task.sleep(for: .milliseconds(600))
             lab.settled()
         }
     }
 
     /// The screen's content: a fill passing every touch through (so the content's container lies at 0,0 the screen's
-    /// size, as the tap-catcher does — WDA lists the two at the same top) and the targets.
-    private func content(_ screen: CGSize) -> some View {
+    /// size, as the tap-catcher does — WDA lists the two at the same top) and the targets; `grouped`, one
+    /// accessibility container of them, else none (the targets ungrouped).
+    private func content(_ screen: CGSize, grouped: Bool) -> some View {
         ZStack(alignment: .topLeading) {
             Color(white: 0.98).allowsHitTesting(false)
             ForEach(cell.targets, id: \.tag) { t in
@@ -82,7 +100,7 @@ struct TapCatcherScreen: View {
             }
         }
         .frame(width: screen.width, height: screen.height)
-        .modifier(Grouped(on: true))
+        .modifier(Grouped(on: grouped))
     }
 
     /// The hidden tap-to-dismiss background.

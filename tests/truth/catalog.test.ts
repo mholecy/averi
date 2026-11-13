@@ -73,6 +73,7 @@ describe('the cell catalog', () => {
       'false-covers/toolbar-dismiss-short',
       'false-covers/tap-catcher-beneath',
       'false-covers/tap-catcher-stacked',
+      'false-covers/tap-catcher-beneath-flat',
       'text/text-sample',
       'text/text-under-bar',
       'text/text-nav-cut',
