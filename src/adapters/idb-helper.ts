@@ -209,9 +209,10 @@ interface Pending {
  *   iOS leg), off (the kill switch, MAX_FAILURES_IN_A_ROW failures or TIMEOUTS_IN_A_ROW timeouts in a row, no
  *   interpreter, disposed). Turning itself off writes one line to the server's stderr, with the tail of the helper's
  *   own.
- * - A helper that dies under a request it took (its ack read, or unknown: judge) answers `died` — the caller
- *   retries a read on the CLI and reports an input (D7b, idb.ts#inputLost); one whose request could not be written,
- *   or that died before taking it, answers `unsent`, and the caller runs the CLI. The next call starts a new one.
+ * - A helper that dies under a request answers `died` once it took it (its ack read) or when fd 3 stays open past
+ *   DRAIN_MS (judge) — the caller retries a read on the CLI and reports an input (idb.ts#inputLost); one whose
+ *   request could not be written, or whose fd 3 ended without the ack within DRAIN_MS, answers `unsent`, and the
+ *   caller runs the CLI. The next call starts a new one.
  * - The caller's timeout kills it (SIGKILL) and rejects with IdbHelperTimeout; the caller throws the CLI's timeout.
  * - No orphans: the child and its pipes are unref'd (the server stays free to exit), it exits on stdin's EOF (dispose,
  *   or node's death closing the pipe), dispose() kills it, and one `process.once('exit')` hook for all helpers

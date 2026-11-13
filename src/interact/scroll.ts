@@ -106,14 +106,12 @@ export type ScrollAdapter = Pick<
  * quoted at the stop.
  *
  * A stop that is absence — no read, at any swipe, held a match, and the
- * last read succeeded; a `covered` or a `bound` stop can be one — throws
- * ElementNotFoundError (the rule's one owner is resolve.ts's absenceError),
- * so an `optional:` scroll_until to an element that is not on this screen
- * is skipped "(not present)" like a tap or a fill would be. Every other stop
- * stays a plain Error — one where some read held the element (found but
- * clipped or off the viewport, content that ran out with it seen), or whose
- * last read failed: the element was there, or nobody could see.
- * A `within` refusal is a WithinRefusedError (scroll-text.ts#scrollFailure).
+ * last read succeeded; only a `covered` or a `bound` stop can be one —
+ * throws ElementNotFoundError (the rule's one owner is resolve.ts's
+ * absenceError), so an `optional:` scroll_until to an element that is not
+ * on this screen is skipped "(not present)" like a tap or a fill would be.
+ * Every other stop is a plain Error, and a `within` refusal a
+ * WithinRefusedError (scroll-text.ts#scrollFailure).
  *
  * The soft keyboard:
  * docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md
