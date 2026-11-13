@@ -314,7 +314,8 @@ function loggedSince(s: LabState, launched: LabState): string[] {
 /**
  * c2–c4: a tap on form-picker's name, country or submit beneath the picker sheet, open at launch and fully expanded.
  * Nothing may fire — no row selected, no submit, the sheet not dismissed, no field focused — and no `Tapped`; the reply
- * says the sheet's remedy once (`remedyUnderSheet`). Anything else, or "close it first" said twice, is LOUD.
+ * says the sheet's remedy once (`remedyUnderSheet`). A claimed tap, or anything logged, is a MISMATCH; "close it first"
+ * said twice, or not said, is LOUD.
  */
 export const judgeUnderSheet =
   (tag: string) =>

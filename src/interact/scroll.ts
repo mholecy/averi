@@ -71,7 +71,8 @@ export type ScrollAdapter = Pick<
 
 /**
  * Swipe until the element is present AND visibly inside the viewport
- * (ARCHITECTURE.md §4, C1). Throws with a diagnosis of the last tree.
+ * (ARCHITECTURE.md §2, Scroll; §5, the tool surface). Throws with a
+ * diagnosis of the last tree.
  *
  * THE DRIVER: the production
  * adapter of interact/scroll-rounds.ts#round. It owns every I/O of the
@@ -104,14 +105,13 @@ export type ScrollAdapter = Pick<
  * read-failure rule is the same — a failed read is a miss, the last error is
  * quoted at the stop.
  *
- * The one stop that is absence — no read, at any swipe, held a match, and
- * the last read succeeded — throws ElementNotFoundError (the
- * rule's one owner is resolve.ts's absenceError) with the same "element
- * never appeared in the tree" wording,
- * so an `optional:` scroll_until to an element that is not on this screen
- * is skipped "(not present)" like a tap or a fill would be. Every other stop
- * (found but clipped or off the viewport, a failed last read, content that
- * ran out) stays a plain Error: the element was there, or nobody could see.
+ * A stop that is absence — no read, at any swipe, held a match, and the
+ * last read succeeded; only a `covered` or a `bound` stop can be one —
+ * throws ElementNotFoundError (the rule's one owner is resolve.ts's
+ * absenceError), so an `optional:` scroll_until to an element that is not
+ * on this screen is skipped "(not present)" like a tap or a fill would be.
+ * Every other stop is a plain Error, and a `within` refusal a
+ * WithinRefusedError (scroll-text.ts#scrollFailure).
  *
  * The soft keyboard:
  * docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md

@@ -1195,10 +1195,10 @@ describe('AndroidAdapter.viewport — the status band, out of `dumpsys window di
 });
 
 /**
- * The navigation bar's band (data only: nothing judges it yet; mp-native draws edge-to-edge, and its rows lie in
- * 2154–2220 under the bar on the measured 1080x2220 emulator): read out of the same `dumpsys window displays` call
- * as the status band — its TOP, of a visible full-width frame that ends at the bottom of the display the dump
- * describes (`DisplayFrames w=… h=… r=0`).
+ * The navigation bar's band (judged as the bottom system band, ui-tree/standing.ts#systemBands; mp-native draws
+ * edge-to-edge, and its rows lie in 2154–2220 under the bar on the measured 1080x2220 emulator): read out of the same
+ * `dumpsys window displays` call as the status band — its TOP, of a visible full-width frame that ends at the bottom
+ * of the display the dump describes (`DisplayFrames w=… h=… r=0`).
  */
 describe('AndroidAdapter.viewport — the navigation band beside the status band, out of the same read', () => {
   const NAV_33 = (frame: string, visible = 'true') => `        InsetsSource type=ITYPE_NAVIGATION_BAR frame=${frame} visible=${visible} insetsRoundedCornerFrame=false`;

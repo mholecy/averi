@@ -1468,10 +1468,10 @@ export const frameText = ({ x, y, width, height }: Rect): string => `[${x},${y}]
  */
 export const FLAT_LIST_TOP_BAR_FRACTION = 0.2;
 
-/** The top bar's line on `screen` (geometry.ts#screenOf's): the bottom of its band, FLAT_LIST_TOP_BAR_FRACTION of the screen down — the one spelling, for draw-order.ts and soft-keyboard.ts. */
+/** The top bar's line on `screen` (geometry.ts#screenOf's): the bottom of its band, FLAT_LIST_TOP_BAR_FRACTION of the screen down — the one spelling. */
 export const flatListBarLine = (screen: Rect): number => screen.y + screen.height * FLAT_LIST_TOP_BAR_FRACTION;
 
-/** The screen as a host is sized against it: the root's rect, or the tree's largest rect when the root has none (bare-tree.ts's `wrapperBySize` notion; idb's synthetic 0×0 root). Here, not in draw-order.ts: soft-keyboard.ts sizes idb's keyboard band against the same screen. */
+/** The screen as a host is sized against it: the root's rect, or the tree's largest rect when the root has none (bare-tree.ts's `wrapperBySize` notion; idb's synthetic 0×0 root). */
 export function screenOf(tree: UiNode): Rect {
   if (rectArea(tree.rect) > 0) return tree.rect;
   return [...everyNode(tree)].reduce((best, n) => (rectArea(n.rect) > rectArea(best) ? n.rect : best), tree.rect);

@@ -8,8 +8,10 @@ import UIKit
 // shows and the identifier it shows it under. A fill is judged by that, never by a tree.
 //
 // Nothing here transforms what is typed (no autocapitalisation, no autocorrection, no mask): a value that does not land
-// as typed is averi's or idb's doing, not the app's — the one exception is iOS's own, a secure field that clears itself
-// when typed into again after losing the focus.
+// as typed is averi's or idb's doing, not the app's — but for a field with a `format`, a `focusInsert` or `keys:
+// refused`, which FormattingTextField reformats as typed, fills on focus or refuses every key (schema.ts#FieldFormat,
+// `formatted` below), and for iOS's own, a secure field that clears itself when typed into again after losing the
+// focus.
 
 struct FormScreen: View {
     @EnvironmentObject var lab: Lab

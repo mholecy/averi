@@ -108,7 +108,10 @@ export class Lab {
     this.write();
   }
 
-  /** A view's frame on the screen, in layout units (measureInWindow: the window is the screen, edge to edge). */
+  /**
+   * A view's frame on the screen, taken in layout units (measureInWindow: the window is the screen, edge to edge) and
+   * stored in the state's (points on iOS, screen pixels on Android).
+   */
   frame(tag: string, r: Rect) {
     const f = toState(r);
     const was = this.state.frames[tag];
@@ -139,7 +142,10 @@ export class Lab {
     this.event('focus', tag ?? '');
   }
 
-  /** The keyboard's end frame in layout units, screen coordinates (a hide: below the screen, or of no height). */
+  /**
+   * The keyboard's end frame, taken in layout units, screen coordinates, and stored in the state's (a hide: below the
+   * screen, or of no height).
+   */
   keyboard(end: Rect) {
     const frame = toState(end);
     this.state.keyboard = { frame, visible: frame.height > 0 && frame.y < this.state.screen.height, field: this.state.focus ?? null };

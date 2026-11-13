@@ -173,10 +173,11 @@ state by accident and T12, T13 and T19 needed it labelled; each labelled its run
   the key prints none, so every committed record rejudges byte-identically (698 records, in the forms groups and in
   `visibility,dismissal,ensure,carousel,chooser`, base 3b811b28 against T16).
 
-**Not yet run on a device.** `readDevice` has run only over a fake exec: the emulator was down when T16 was built, and
-the smoke went to the owner's list, its record and log to be committed as
-`docs/truth/live-records/t16-device-state/smoke-1.json` and `smoke-1.log.txt` (`live.ts --serial emulator-5554 --groups
-carousel --cases lv-d62-control --record …`). The first live carousel run must confirm: `deviceLabel.before` and `.after` each hold
+**Not yet run on a device.** (Superseded by the T16 smoke amendment below: it ran on 2026-11-11.) `readDevice` has
+run only over a fake exec: the emulator was down when T16 was built, and the smoke went to the owner's list, its record
+and log to be committed as `docs/truth/live-records/t16-device-state/smoke-1.json` and `smoke-1.log.txt` (`live.ts
+--serial emulator-5554 --groups carousel --cases lv-d62-control --record …`). The first live carousel run must
+confirm: `deviceLabel.before` and `.after` each hold
 four rounds of four strokes with carries the state file gave (none NaN, none from a stale file), the pre-drag carrying
 about 438 px, frames present (`dumpsys gfxinfo` prints the four lines `parseGfxinfo` reads on this AVD) and the start
 count read; the `Device:` line printed under the summary and again, byte for byte, by `--rejudge` of the record; the
@@ -222,3 +223,14 @@ state or SKIPs, so none throws; pinned), and the late read already drops one, so
 carries no KNOWN or NOT-known mark in the summary (`isStateless`, beside `isJudged`): no averi behaviour was judged.
 tests/truth/run-case.test.ts pins it, from the run to its summary and the rejudged record, in place of A11's pin;
 tests/truth/live-carousel.test.ts pins the ceiling and the residual tally.
+
+## Amendment: the T16 smoke ran on a device (2026-11-11)
+
+The smoke the T16 amendment left to the owner's list ran on emulator-5554 (`live.ts --serial emulator-5554 --groups
+carousel --cases lv-d62-control --record …`). Its record and log are
+`docs/truth/live-records/t16-device-state/smoke-1.json` and `smoke-1.log.txt`; the port's check, raw-strokes.mjs run
+on the same boot, is `raw-strokes-1.jsonl` and `raw-strokes-1.log.txt` beside them. What they show:
+`deviceLabel.before` and `.after` each hold four rounds of four strokes, carries 135–145 (none NaN), the pre-drag
+436–442 px, frames present (156 and 152 in all, 5 janky each) and the start count 1 in both reads; the log prints
+`Device: before fast 0/16, after fast 0/16 (frames p50 18 ms → 17 ms)`; raw-strokes.mjs read the same state (carries
+135–144, pre-drag 435–443 px). No committed record times a read: the 55-s estimate stands unmeasured.

@@ -332,11 +332,11 @@ export function panelsBeyond(band: Rect, touchable: KeyboardTouchable): { panels
 
 /**
  * The notices `withPanels` has written, per oracle — each distinct one once
- * for each. Per oracle, not per process: the registry keeps one
- * adapter, so one oracle, for a whole server session, so in production this
- * is still "once per process"; a test that builds its own oracle starts with
- * nothing said, and does not depend on which test ran first. Weak, so an oracle that is gone takes its notices with
- * it.
+ * for each. Per oracle, not per process: the registry keeps one adapter,
+ * so one oracle, per (platform, device, tree-source kind), so a session
+ * says each notice once per adapter; a test that builds its own oracle
+ * starts with nothing said, and does not depend on which test ran first.
+ * Weak, so an oracle that is gone takes its notices with it.
  */
 const noticed = new WeakMap<KeyboardOracle, Set<string>>();
 

@@ -170,7 +170,7 @@ export interface Case extends RunsUnder {
    * WDA starting or idb's companion coming up.
    */
   warmUp?: true;
-  /** A SKIP of the case proves nothing and fails the run (summarize): the ensure cases'. */
+  /** A SKIP of the case proves nothing and fails the run (summarize). */
   skipFails?: true;
   /** The platforms it runs on (both when unset). */
   platforms?: readonly Platform[];
@@ -840,7 +840,7 @@ export function summarize({
   const ofThisCheckout = side === THIS_CHECKOUT;
   /** Known, ok this run, and not intermittent: fixed without being struck off (live-known.ts's ratchet). */
   const fixed = ofThisCheckout ? cleared.filter((r) => knownEntry(platform, r.source, r.c.id)?.intermittent !== true) : [];
-  /** A case whose SKIP proves nothing (Case.skipFails: the ensure cases, live-ensure.ts): the run fails on it. */
+  /** A case whose SKIP proves nothing (Case.skipFails): the run fails on it. */
   const failingSkips = results.filter((r) => r.c.skipFails === true && r.verdict.outcome === 'SKIP');
   /** A case with no first state (T10, noFirstState): the lab app wrote none, nothing judged; the run fails on it. */
   const stateless = results.filter((r) => isStateless(r.verdict));

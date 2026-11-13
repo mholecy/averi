@@ -12,14 +12,15 @@ import { decodePng } from '../../src/verify/png.js';
 
 /**
  * The fake device of the differential harness: the PROCESS boundary, faked
- * once for the whole process. Every command averi runs goes through
- * `child_process.execFile` (adapters/exec.ts is the one caller), so that is
- * the one place a device can be answered without reaching into either side's
- * modules: `idb`, `xcrun simctl`, `adb` and the OCR recognizer's `swiftc`
- * are answered here from the recording and a small device profile, and each
- * command is written to the call log — what the tool would have SENT. Both
- * sides of a run share it; the harness runs one call at a time and resets
- * the device between calls.
+ * once for the whole process. averi's device commands go through
+ * `child_process.execFile` (adapters/exec.ts is its one caller; WDA's
+ * xcodebuild and the idb helper spawn instead, and the spawn throws here),
+ * so that is the one place a device can be answered without reaching into
+ * either side's modules: `idb`, `xcrun simctl`, `adb` and the OCR
+ * recognizer's `swiftc` are answered here from the recording and a small
+ * device profile, and each command is written to the call log — what the
+ * tool would have SENT. Both sides of a run share it; the harness runs one
+ * call at a time and resets the device between calls.
  *
  * It is also the guarantee that a differential run touches no device: every
  * other way to start a process (`spawn`, `exec`, the sync forms, `fork`) and

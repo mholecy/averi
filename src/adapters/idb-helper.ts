@@ -209,9 +209,10 @@ interface Pending {
  *   iOS leg), off (the kill switch, MAX_FAILURES_IN_A_ROW failures or TIMEOUTS_IN_A_ROW timeouts in a row, no
  *   interpreter, disposed). Turning itself off writes one line to the server's stderr, with the tail of the helper's
  *   own.
- * - A helper that dies under a request answers `died` — the caller retries a read on the CLI and reports an input
- *   (D7b, idb.ts#inputLost); one whose request could not be written answers `unsent`, and the caller runs the CLI. The
- *   next call starts a new one.
+ * - A helper that dies under a request answers `died` once it took it (its ack read) or when fd 3 stays open past
+ *   DRAIN_MS (judge) — the caller retries a read on the CLI and reports an input (idb.ts#inputLost); one whose
+ *   request could not be written, or whose fd 3 ended without the ack within DRAIN_MS, answers `unsent`, and the
+ *   caller runs the CLI. The next call starts a new one.
  * - The caller's timeout kills it (SIGKILL) and rejects with IdbHelperTimeout; the caller throws the CLI's timeout.
  * - No orphans: the child and its pipes are unref'd (the server stays free to exit), it exits on stdin's EOF (dispose,
  *   or node's death closing the pipe), dispose() kills it, and one `process.once('exit')` hook for all helpers
@@ -277,7 +278,8 @@ export class IdbHelper {
       this.pending = { id, taken: false, resolve, reject, timer };
       // A failed write never reached the helper: `unsent` (D7b — an input then runs on the CLI). The helper is killed,
       // if it is not gone already; its exit finds no pending request. A write that succeeded only says the line is in
-      // the pipe: a death after it is `died` (gone()), however far the helper got.
+      // the pipe: a death after it is judged by its ack (judge) — `unsent` only when fd 3 ends without the ack within
+      // DRAIN_MS, `died` otherwise.
       (child.stdin as Writable).write(JSON.stringify({ id, argv }) + '\n', (err) => {
         if (err == null || this.pending?.id !== id) return;
         clearTimeout(timer);
