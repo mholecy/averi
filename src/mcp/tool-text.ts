@@ -1,8 +1,10 @@
 /**
- * The one-line responses of the tap, type_text, swipe, launch_app and open_deep_link tools, as pure functions.
+ * The text replies of the tap, type_text, swipe, launch_app and open_deep_link tools, and ui_snapshot's note, as pure
+ * functions.
  *
- * They are pure, and tool-text.test.ts pins every wording variant without
- * building a server, a registry or a fake device to provoke each one.
+ * They stay out of the handlers because they are pure: tool-text.test.ts pins
+ * every wording variant without building a server, a registry or a fake
+ * device to provoke each one.
  *
  * The type_text reply WITH a selector (a fill) is not here: it is
  * interact/fill-text.ts#fillReply, beside the flow's fill line it must agree
@@ -88,7 +90,7 @@ export const deepLinkText = (platform: Platform, url: string, answer: AppHolder)
 
 /**
  * ui_snapshot's SECOND text block, after the JSON — or nothing. The array
- * itself never changes (existing parsers read the first block as before);
+ * itself never changes (existing parsers read the first block);
  * this says what a bare `[]` could not (docs/bugs/2026-10-06-
  * ui-snapshot-empty-right-after-launch.md: `role:button` → `[]` two seconds
  * after launch_app returned, on a PIN screen with ten buttons; the same

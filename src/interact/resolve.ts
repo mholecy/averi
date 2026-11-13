@@ -435,9 +435,9 @@ function keyboardMissNote(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdv
  * sighting. Throws ElementNotFoundError (or, when the last read failed, a plain
  * Error) in resolveSettled's never-found wording.
  *
- * Here, so the "found" fact has one owner. Its budget bounds the presence
- * check only, because a settle needs two reads and one Android dump alone
- * can outlast an optional step's budget.
+ * It lives here so the "found" fact has one owner. Its budget bounds the
+ * presence check only, because a settle needs two reads and one Android dump
+ * alone can outlast an optional step's budget.
  * pollTree always completes one read before its deadline is checked, so a
  * budget shorter than one read still gets one honest look.
  */
@@ -472,9 +472,9 @@ export async function resolvePresent(
  *
  * In a flow's `optional:` block (the bug note's item 3, below), an optional
  * step is skipped only when its element is absent, and one refused on a
- * present element FAILS the flow — the interstitial is
- * there, and skipping it ran the flow on into the ladder's destructive rung
- * (on iOS the same with the keyboard up over LOGIN and no dismissal).
+ * present element FAILS the flow — the interstitial is there, and skipping
+ * it ran the flow on into the ladder's destructive rung (on iOS the same
+ * with the keyboard up over LOGIN and no dismissal).
  * docs/bugs/2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md
  *
  * Deliberately NOT carried by:

@@ -46,15 +46,19 @@
  *   reason the only one.
  * - `caveats` order: the not-an-input finding, then the masked-append
  *   warning, then a reformat's added point, then text around the value
- *   unread. fill.ts never produces two of them together: a not-input finding
- *   needs a read-back that did not land, and the others a landed one — a
- *   masked-append an input whose masked reading took the text, after a re-read
- *   that ran; a reformatted point a plain reading (a masked one is never a
- *   reformat); a focus-unread a re-read skipped and no reformat.
+ *   unread. Two can come together: not-input with masked-append (a node of
+ *   another role that showed bullets after focus, whose read-back did not
+ *   land), and masked-append with a reformatted point only if a field that
+ *   showed bullets after focus reads plain after the typing. The other pairs
+ *   exclude each other: a reformatted point and a focus-unread need a landed
+ *   read-back, which a not-input finding never has; a focus-unread needs the
+ *   post-focus re-read skipped, so there is no held count to warn of; and a
+ *   landing is reformatted or focus-unread, never both
+ *   (fill-landing.ts#landingOf).
  *
  * It judges facts, never a reading: what a read-back that missed the value
  * differs by (`Difference`) is interact/fill-landing.ts#readingOf's,
- * carried in the mismatch FillFailure.
+ * carried in the mismatch FillFailure (A2).
  *
  * Its one import is the facts (interact/fill-facts.ts, a leaf). It imports
  * neither fill.ts, which measures, nor fill-text.ts, which reads the
@@ -110,7 +114,7 @@ export interface Sent {
  * - `masked-append`: a masked field held `held` characters after focus and
  *   clear was off — the length rule cannot tell the append from a correct
  *   fill (finportal 2026-09-17: backend `invalid_grant`).
- * - `reformatted-point` (D18, the orchestrator's decision of review round 1):
+ * - `reformatted-point` (D18, the orchestrator's decision):
  *   the field showed the typing reformatted with an added `.` or `,` — a
  *   thousands separator by its place, but the reading cannot tell it from a
  *   decimal point (`1.234` for `1234`: de-DE, or a three-decimal mask). The
@@ -205,10 +209,9 @@ export function judgeFill(r: FillResult): FillVerdict {
  * empty when the placeholder was there before any delete (`shown`: nothing
  * was deleted, so nothing was seen go) or the last deletes went into a
  * reading that started with its text (`prefix`: deletes go from the end, so
- * `Companyabc` with 3 of 10 landing leaves `Company` — review round 2,
- * probe K). From any other reading (`other`) the placeholder can only be
- * the field showing empty, and the clear is verified. Only a clear alone
- * asks (read-back `nothing-typed`): with a value, the exact read-back
- * decides.
+ * `Companyabc` with 3 of 10 landing leaves `Company` — probe K). From any
+ * other reading (`other`) the placeholder can only be the field showing
+ * empty, and the clear is verified. Only a clear alone asks (read-back
+ * `nothing-typed`): with a value, the exact read-back decides.
  */
 const clearSawNoEmpty = (end: FillResult['clearPlaceholder']): boolean => end === 'shown' || end === 'prefix';

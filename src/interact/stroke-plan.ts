@@ -218,7 +218,7 @@ export interface ScrollRegion {
  *
  * On a tree that tells no scroll view of the target (idb's), its one scroll view is the region its motion showed
  * (`region`, the round's motion ledger's: interact/motion-ledger.ts#regionOf): none until two reads saw the target
- * carried — the screen box, as before.
+ * carried — the screen box.
  */
 export function seeRead(memory: StrokeMemory, { facts, line, target, region }: SeenRead): StrokeMemory {
   const m = open(memory);
@@ -794,9 +794,9 @@ export function targetScrollers(facts: Pick<TreeFacts, 'scene'>, node: UiNode): 
  * went over the page, which scrolls across it (`strokeRoom`'s fallback), on its centre row: batch-11 measured every
  * stroke at (864,1110)→(216,1110), 496 px below the carousel's band (y 380–614), the carousel never moved, while a raw
  * stroke inside the band moved it. The page stays FIRST, so `strokeRoom`'s axis rule takes a nested one only when the
- * page scrolls across the stroke: every stroke along the page, a page of unknown axis and the all-across fallback are
- * as before; the lab's carousel is stroked inside, (824,497)→(256,497). Residuals (ADR 0010, the D59b amendment): a
- * nested scroll view of unknown axis that is really vertical is stroked sideways; of two carousels the larger is
+ * page scrolls across the stroke: every stroke along the page, a page of unknown axis and the all-across fallback
+ * stroke the page; the lab's carousel is stroked inside, (824,497)→(256,497). Residuals (ADR 0010, the D59b amendment):
+ * a nested scroll view of unknown axis that is really vertical is stroked sideways; of two carousels the larger is
  * stroked, which may not hold the target.
  */
 function candidatesOf(m: Memory, facts: Pick<TreeFacts, 'scene' | 'mainScroller'> | undefined, toward: Direction): readonly ScrollView[] {

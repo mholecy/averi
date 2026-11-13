@@ -34,7 +34,7 @@ export interface ScrollOptions {
   settleMs?: number;
   /**
    * The eyes a `fully visible` claim is confirmed with, and the order question asked of two controls listed in reading
-   * order (ui-tree/eyes.ts; verify/eyes.ts#eyesOn, which the composition roots hand in). REQUIRED (ADR 0024, amendment
+   * order (ui-tree/eyes.ts; verify/eyes.ts#eyesOn, which the composition roots hand in). REQUIRED (A30; ADR 0024, amendment
    * A30): were it optional, a caller that forgot them would typecheck and say every such claim as the tree's, unchecked
    * ("… a screenshot could not tell (no screenshot was taken)"). A test hands a fake (tests/helpers/eyes.ts).
    */
@@ -82,12 +82,12 @@ export type ScrollAdapter = Pick<
  * device behaviour that shaped those rules is recorded below.
  *
  * `fully: true` raises the bar from "intersects" to "entirely inside", and
- * keeps swiping until it is — then fails naming the shortfall when the content
- * runs out first. That failure message IS the app bug in the measured case:
- * a scroll container with no clearance for the floating bottom-nav bar can
- * never fully reveal its last row, however far it scrolls. Default stays
- * `false`: the stop condition is unchanged, only the REPORT gains the truth.
- * Both bars also count what the app draws over the element
+ * keeps swiping until it is — then fails naming the shortfall when the
+ * content runs out first. That failure message IS the app bug in the measured
+ * case: a scroll container with no clearance for the floating bottom-nav bar
+ * can never fully reveal its last row, however far it scrolls. Absent,
+ * `fully` is `false`: the element need only intersect the viewport. Both bars
+ * also count what the app draws over the element
  * (ui-tree/standing.ts#Scene.standing owns the rule): `fully: true` with
  * nothing drawn over any of it, the default with nothing drawn over its
  * centre — the point the next tap presses.
@@ -207,27 +207,25 @@ export type ScrollAdapter = Pick<
  *   rather than "never".
  * - The fling itself:
  *   docs/bugs/2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md
- *   A 1332-px Android stroke in 300 ms moved
- *   Settings' 1417-px list ≈ 2190 px, so a row could pass from below it to
- *   above it between two reads, in none — `Display` two rows below the fold
- *   was never reached. Each stroke is drawn over the target's scroll
- *   container (the screen's largest before the target is read in one;
- *   the round decides the box through its stroke plan, interact/stroke-plan.ts, above the keyboard
- *   and, for content below, above a node drawn over the
- *   container's lower part — a floating tab bar took the touch-down),
- *   its length the container's, and on an adapter
- *   with a `dragSpeed` (Android) at that speed (swipe.ts#dragMs) — the
- *   time it costs against the 15 s default is on adapters/android.ts
- *   #dragSpeed; the default is unchanged. On idb's flat list a full
- *   stroke is paced by its plan (stroke-plan.ts#PACED, 524 pt in 1.5 s;
- *   D20) — estimated, not measured: a round ≈ 2.2–2.5 s (the stroke, the
- *   400 ms settle, an idb read, overhead) against ~1 s before, so six
- *   rounds ≈ 13–15 s and the 15 s timeout may fire before `maxSwipes`; a
- *   call may end up to ~2.2 s past the timeout (judged before a stroke:
- *   the stroke, the settle and the read after it), ~1.2 s more than
- *   before; and six paced strokes reach ~3 400 pt, not the ~6 200 pt the
- *   fling did (ADR 0018, "idb's presented layer", Decision 4). The
- *   limits are unchanged until the owner's device run.
+ *   A 1332-px Android stroke in 300 ms moved Settings' 1417-px list ≈ 2190
+ *   px, so a row could pass from below it to above it between two reads, in
+ *   none — `Display` two rows below the fold was never reached. Each stroke
+ *   is drawn over the target's scroll container (the screen's largest before
+ *   the target is read in one; the round decides the box through its stroke
+ *   plan, interact/stroke-plan.ts, above the keyboard and, for content below,
+ *   above a node drawn over the container's lower part — a floating tab bar
+ *   took the touch-down), its length the container's, and on an adapter with
+ *   a `dragSpeed` (Android) at that speed (swipe.ts#dragMs) — the time it
+ *   costs against the 15 s default is on adapters/android.ts #dragSpeed. On
+ *   idb's flat list a full stroke is paced by its plan (stroke-plan.ts#PACED,
+ *   524 pt in 1.5 s; D20) — estimated, not measured: a round ≈ 2.2–2.5 s (the
+ *   stroke, the 400 ms settle, an idb read, overhead) against ~1 s before, so
+ *   six rounds ≈ 13–15 s and the 15 s timeout may fire before `maxSwipes`; a
+ *   call may end up to ~2.2 s past the timeout (judged before a stroke: the
+ *   stroke, the settle and the read after it), ~1.2 s more than before; and
+ *   six paced strokes reach ~3 400 pt, not the ~6 200 pt the fling did (ADR
+ *   0018, "idb's presented layer", Decision 4). The limits stay at their
+ *   defaults until the owner's device run.
  * - Exhausted (scroll-rounds.ts#UNMOVED_STROKES_EXHAUST): a
  *   target in the tree, off the frame, with a non-zero rect, that two
  *   identical strokes in a row left — with every other match — where it was,

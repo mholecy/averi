@@ -23,9 +23,9 @@ import { coverName, cutSliverText } from './target-text.js';
  *
  * 1. THE CONFIGURED ones (`configuredStrategies`: `app.ios.keyboardDismiss`, flow/config.ts), in the config's order: a
  *    `tap` on an app element the author named as neutral (a title), and the input-accessory toolbar's trailing button
- *    (`accessory`). Judged as the picker judges them (ADR 0016: the tap's standing, the explicit refusal), each its
- *    own entry — so a second configured dismissal is tried when the first, tapped, left the keyboard up. The guard and
- *    the post-fill dismissal both walk them.
+ *    (`accessory`). Judged as the picker judges them (stage B, ADR 0016: the tap's standing, the explicit refusal),
+ *    each its own entry — so a second configured dismissal is tried when the first, tapped, left the keyboard up. The
+ *    guard and the post-fill dismissal both walk them.
  * 2. AVERI'S OWN (`AVERIS_OWN`, docs/adr/0022-averi-hides-the-keyboard-when-the-configured-dismissal-does-not.md):
  *    walked by the guard only, and only after a configured strategy PERFORMED a move that its looks confirmed left the
  *    keyboard up — the author opted into touching this screen to hide the keyboard, and the configured touch was not

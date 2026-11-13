@@ -100,13 +100,14 @@ export class KeyboardStateDisagreement extends KeyboardGuardError implements Ref
 // The four moments at which the guard and the dismissal decide — the first
 // look, a re-check round, the look after the one `back`, the post-fill
 // dismissal — are NOT one table over one union of samples returning one
-// four-way action: each moment can produce only a subset of the four
-// answers (the first look never `refuse`s, the look after the back never
-// `back`s again), so one table makes every call site switch over answers
-// its moment cannot get, guard arms no input reaches, and lets one word
-// mean two things (`hold`: "wait and ask again" in the guard, "do nothing"
-// in the dismissal). Each moment decides on its own, and the compiler — not
-// a runtime throw — rules out the impossible arms.
+// four-way action: each moment can produce only a subset of the four answers
+// (the first look never `refuse`s, the look after the back never `back`s
+// again). With one table, every call site switches over answers its moment
+// cannot get, runtime throws guard arms no input reaches, and one word means
+// two things (`hold`: "wait and ask again" in the guard, "do nothing" in the
+// dismissal). So each moment is its own pure, synchronous decision with its
+// own result type, and the compiler — not a runtime throw — rules out the
+// impossible arms.
 //
 // Two of the four are one ternary each over one input, so they are written
 // where they are used, not as functions whose row tests would test the

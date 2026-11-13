@@ -58,11 +58,11 @@ interface EngineCall extends EngineContext {
  * engine has one entry, and every tool that runs it — these two and verify's
  * legs — names a state, a flow or both.
  *
- * The health line is the callers': computed here, ensure_state would ask the
- * app's health and only THEN take its final frame. Neither is an action and
- * neither reads the other — `appHealth` asks `isAppRunning` (and, for a dead
- * app, the logs); `finalFrame` reads the raw adapter, outside the engine's
- * read hand-off
+ * The health line is the callers' (D13): computed here, ensure_state would
+ * ask the app's health and only THEN take its final frame. Neither is an
+ * action and neither reads the other — `appHealth` asks `isAppRunning` (and,
+ * for a dead app, the logs); `finalFrame` reads the raw adapter, outside the
+ * engine's read hand-off
  * (docs/adr/0030-a-read-is-handed-on-only-as-a-first-sample-or-a-positive-verdict.md),
  * which dies with the run — so ensure_state runs them side by side, and the
  * pidof (44–48 ms; docs/plans/2026-10-30-performance-backlog.md, D13 note
@@ -94,11 +94,11 @@ async function runOnEngine(
  * failed (run/run-reply.ts#finalFrame): the state WAS ensured, so the trace
  * stands, with one `⚠ screenshot:` line where an unsettled frame's note goes.
  *
- * The health check and the capture run together (see runOnEngine); the reply
- * is laid out trace, health line, then the frame's one note line, if any.
- * Neither rejects for the device: appHealth words its failures into the line
- * (run/app-health.ts, the one policy) and finalFrame catches its own capture
- * failure.
+ * The health check and the capture run together (D13, see runOnEngine); the
+ * reply is laid out trace, health line, then the frame's one note line, if
+ * any. Neither rejects for the device: appHealth words its failures into the
+ * line (run/app-health.ts, the one policy) and finalFrame catches its own
+ * capture failure.
  */
 export async function runEnsureState(
   call: EngineCall & { state: string },
@@ -144,9 +144,9 @@ export interface AssertCall {
  * averi.yaml says which app to ask about.
  *
  * The config is the handler's single read, under which a broken file fails
- * the call on both platforms. appHealth is awaited bare: it words every
- * device failure into the line itself (run/app-health.ts, one policy), so
- * only an adapter that breaks its contract — a `platform` that throws, or
+ * the call on both platforms. appHealth is awaited bare (A29): it words
+ * every device failure into the line itself (run/app-health.ts, one policy),
+ * so only an adapter that breaks its contract — a `platform` that throws, or
  * `logs` resolving to no array; both real adapters hold `platform` in a
  * readonly field and return `logs` from a `split` — throws here, and that
  * fails the call, as it fails ensure_state, run_flow and a verify leg.

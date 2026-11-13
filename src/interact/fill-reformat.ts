@@ -1,6 +1,6 @@
 /**
- * The character rules of a field that reformats as it is typed — a pure leaf: whether a reading is a typing with
- * separators of the field's own added (`reformatOf`; D18,
+ * The character rules of a field that reformats as it is typed — a pure leaf (D28): whether a reading is a typing
+ * with separators of the field's own added (`reformatOf`; D18,
  * docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md), whether it is a strict prefix of a typing,
  * exact or reformatted (`prefixOf`; D28 and D60, that ADR's amendments), whether it is a typing with separators added
  * that those rules refuse (`separatedOf`; D53), and a text's letters and digits (`skeleton`). It knows texts, not
@@ -112,7 +112,8 @@ function markKind(
  * The reading walked against `expectedChars`, greedily (see `reformatOf`): each reading character the next expected one
  * (or a space shown for a typed space — `respaced`), else an added separator (-1 in `tokens`, an expected character's
  * index otherwise); undefined at the first character that is neither. `matched`: how many expected characters it
- * showed — all of them for a whole reading, fewer for a prefix. The one walk every rule here asks.
+ * showed — all of them for `reformatOf` and `separatedOf` (`walkWhole`), fewer for a prefix (`prefixOf`, which also
+ * reads whether the last token is an added separator: an eager trailing mark, D60). The one walk all three ask.
  */
 function walk(observed: string, expectedChars: readonly string[]): { tokens: number[]; matched: number; respaced: number } | undefined {
   const tokens: number[] = [];
@@ -212,7 +213,7 @@ export function prefixOf(held: string, whole: string): { prefix: string; reforma
   // D60: an eager trailing mark, judged with the next typed character after it (one the strict prefix leaves).
   const mark = walked.tokens.at(-1) === -1 ? [...held].at(-1) : undefined;
   const next = mark !== undefined && !holdsMark(wholeChars, mark) ? wholeChars[walked.matched] : '';
-  // With `next === ''` the call is the prefix's plain reformat judgment: the trailing-mark rule only adds to it.
+  // With `next === ''` the call is the prefix's plain reformat judgment, without D60's mark: the rule only adds to it.
   const reformatted = reformatOf(held + next, prefix + next, whole);
   return reformatted === undefined ? undefined : { prefix, reformatted };
 }

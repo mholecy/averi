@@ -134,9 +134,9 @@ export interface TreeFacts extends Look<Pick<RoundRead, 'ofKeyboard'>> {
   /**
    * The tree shows a progress indicator (ui-tree/read-tree.ts#showsProgress:
    * a `progress` node with area — Android's ProgressBar, which a Compose
-   * progress indicator also dumps as; through WDA an iOS ActivityIndicator)
-   * — the screen may be loading, so an unchanged fingerprint does not say
-   * the content is exhausted.
+   * progress indicator also dumps as; through WDA an iOS ActivityIndicator,
+   * D27) — the screen may be loading, so an unchanged fingerprint does not
+   * say the content is exhausted.
    */
   loading: boolean;
   /**
@@ -282,7 +282,7 @@ export function judgeRead(read: RoundRead, screen: UsableScreen, fully: boolean,
   // draw order, and which nodes are the keyboard's own — the read's `ofKeyboard`; the reading's line is the round's
   // protocol's (`offeredKeyboard`).
   const position = facts.keyboard;
-  // idb's band (`bandKeyboardOf`), when no reading offers a cover — never both today: idb's reading is always `unknown`.
+  // idb's band (`bandKeyboardOf`), when no reading offers a cover — never both: idb's reading is always `unknown`.
   const band = offered !== undefined ? undefined : bandKeyboardOf(position.line(), viewport, read.remedy);
   const applied = offered ?? band;
   let cover: AppliedKeyboard | undefined;
@@ -448,9 +448,9 @@ export const fullyClaimed = ({ clipped, covered }: { readonly clipped: readonly 
  * How much less than its scroll view's room a target may be along an axis and still count as filling it (`unfitAlong`),
  * and how much less than that room the drawn frame may be and still count as the scroll view's own: a pixel, a rounding
  * of the source's bounds — as geometry.ts's MOTION_EDGE_SLACK reads an edge flush with a frame's; the same pixel is how
- * far a card must shift to count as moved by a stroke (motion-ledger.ts#cardMoved, D59). A target with more
- * room than that fits at a range of offsets, however narrow, and is stroked for as before; one with a little more
- * (under about the shortest stroke's carry, ~53 px) can still run to the bound (ADR 0021, residual 3).
+ * far a card must shift to count as moved by a stroke (motion-ledger.ts#cardMoved, D59). A target with more room than
+ * that fits at a range of offsets, however narrow, and is stroked for; one with a little more (under about the shortest
+ * stroke's carry, ~53 px) can still run to the bound (ADR 0021, residual 3).
  */
 export const FIT_ROOM_PX = 1;
 

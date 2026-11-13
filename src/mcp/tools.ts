@@ -130,7 +130,6 @@ const text = (value: unknown) => ({
   ],
 });
 
-/** A PNG as MCP image content — the one spelling of it for screenshot, ensure_state and verify. */
 const image = (shot: Buffer) => ({
   type: 'image' as const,
   data: shot.toString('base64'),
@@ -235,12 +234,13 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
   const session = new EngineSession();
 
   /**
-   * The ONE way a handler reaches a device: the registry's adapter for the platform's bound device and the project's
-   * iOS tree source — the `iosToolSettings` of the config the call loaded (android gets none; no config is the
-   * registry's default kind). One adapter per simulator and configured source, so every tool of a project shares its
-   * idb helper, its launch memory and its screenshot source (ADR 0032, amendment D41). The engine tools hand it to the
-   * run layer as their lazy form; every other handler reaches it through `serve`. tests/mcp/tools.test.ts calls every
-   * tool of the policy table in a wda project and pins that one wda adapter alone is bound (ADR 0032, amendment A30).
+   * The ONE way a handler reaches a device (D41): the registry's adapter for the platform's bound device and the
+   * project's iOS tree source — the `iosToolSettings` of the config the call loaded (android gets none; no config is
+   * the registry's default kind). One adapter per simulator and configured source, so every tool of a project shares
+   * its idb helper, its launch memory and its screenshot source (ADR 0032, amendment D41). The engine tools hand it to
+   * the run layer as their lazy form; every other handler reaches it through `serve`. tests/mcp/tools.test.ts calls
+   * every tool of the policy table in a wda project and pins that one wda adapter alone is bound (ADR 0032, amendment
+   * A30).
    */
   const deviceFor = (p: Platform, cfg: AveriConfig | undefined): Promise<DeviceAdapter> =>
     registry.get(p, { treeSource: iosToolSettings(cfg, p).treeSource });
@@ -414,8 +414,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       const selector = filter || undefined;
       const matched = selector === undefined ? undefined : findAll(tree, selector).map(stripChildren);
       // The JSON first and unchanged; the note (if any) is a second block, as
-      // screenshot's unsettledNote is — a parser of the first block sees what
-      // it always saw.
+      // screenshot's unsettledNote is — a parser of the first block sees the
+      // JSON alone.
       const note = snapshotNote(tree, matched === undefined || selector === undefined ? undefined : { selector, matched });
       const body = text(snapshotJson(matched ?? tree));
       return note === undefined ? body : { content: [...body.content, ...text(note).content] };

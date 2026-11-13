@@ -21,9 +21,9 @@ function unusableNamed(device: Device | undefined): string | undefined {
 
 /**
  * Per-call adapter options — today only the iOS tree-source kind (averi.yaml `app.ios.treeSource`). Required by
- * `get`: a caller states the project's kind, or that it has none (`treeSource` undefined — the default, `auto`), and
- * cannot forget it — a tool that asked without it would be served, in a `treeSource: wda` project, by a second
- * adapter of the default kind.
+ * `get` (D41): a caller states the project's kind, or that it has none (`treeSource` undefined — the default,
+ * `auto`), and cannot forget it — a tool that asked without it would be served, in a `treeSource: wda` project, by
+ * a second adapter of the default kind.
  */
 export interface AdapterOpts {
   treeSource?: IosTreeSourceSetting;
@@ -56,11 +56,12 @@ export const defaultFactory: AdapterFactory = (platform, deviceId, opts) => {
 };
 
 /**
- * The iOS adapter's wiring, in one place: one idb helper per adapter, shared like `exec` by the adapter (which owns
- * and disposes it) and its tree source. It starts on the first call it could serve — an input too, so a wda-backed
- * adapter starts one as well (its input is idb's). Every tool of a project asks for the project's kind, so a
- * simulator runs one helper; two only when two projects with different tree sources drive it from one server
- * (ADR 0032, amendment D41). `deps` reach the tree source.
+ * The iOS adapter's wiring, in one place (D7a): one idb helper per adapter, shared like `exec` by the adapter (which
+ * owns and disposes it) and its tree source. It starts on the first call it could serve — an input too (D7b), so a
+ * wda-backed adapter starts one as well (its input is idb's). Every tool of a project asks for the project's kind
+ * (D41), so a simulator runs one helper; two only when two projects with different tree sources drive it from one
+ * server (ADR 0032, amendment D41). `deps` are the tree source's WebDriverAgent server options (adapters/wda.ts) — a
+ * lab WebDriverAgent's port and derived data, say; the server's own wiring (defaultFactory) passes none.
  */
 export function iosAdapterFor(
   udid: string,
@@ -276,9 +277,9 @@ export class AdapterRegistry {
   }
 
   /**
-   * One listing per call: get()'s unbound path asks with `versions: false` —
-   * it reads only ids and states, and on Android a version is a getprop per
-   * attached device (adapters/discovery.ts#ListOpts).
+   * One listing per call: get()'s unbound path asks with `versions: false`
+   * (D13) — it reads only ids and states, and on Android a version is a
+   * getprop per attached device (adapters/discovery.ts#ListOpts).
    * select() and listAll() keep the versions: select_device's reply and the
    * device listing are where a version is read. (get()'s bound path asks
    * discovery's `check` instead.)

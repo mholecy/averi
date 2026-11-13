@@ -120,9 +120,9 @@ function keyboardModel(adapter: KeyboardAdapter): KeyboardModel {
  * navigation whenever the adapter is wrong); scrolling the target into view
  * instead (scrolls a screen the author did not ask to scroll, and a
  * non-scrolling login form has nowhere to go) — still rejected as the FIRST
- * move; the in-tree model's last fallback is a drag that lifts the target,
- * once the configured dismissals the author opted into have left the
- * keyboard up (ADR 0022); tapping anyway and reporting it (the stray
+ * move, though the in-tree model's last fallback is a drag that lifts the
+ * target, once the configured dismissals the author opted into have left
+ * the keyboard up (ADR 0022); tapping anyway and reporting it (the stray
  * character is already in the field) — which is also why a tap is not sent
  * on ONE sample in which the input method contradicts the window state: the
  * input method can be the stale side too (an IME switch or restart, a hide
@@ -151,8 +151,8 @@ export async function resolveClearOfKeyboard(adapter: KeyboardAdapter, target: T
   const opening = await reading.over(at, first.node);
   // THE guard's one fail-open rule, applied here and wherever a model reads
   // the keyboard again: nothing over the point — hidden, a frame elsewhere —
-  // or a state that could not be read means the tap goes ahead as before
-  // the question existed. The question exists to make a tap safer and must
+  // or a state that could not be read means the tap goes ahead as if the
+  // question did not exist. The question exists to make a tap safer and must
   // never be the reason a tap did not happen; a device that is really gone
   // fails the tap itself, in the tap's own words. Only a COVERING reading —
   // the input method standing by it or denying it — reaches a model.

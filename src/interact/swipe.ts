@@ -193,8 +193,8 @@ export function dragMs(stroke: Stroke, speed: number, screen: { width: number; h
 }
 
 /**
- * For `scroll_until`'s "the same stroke twice" (interact/scroll-rounds.ts#UNMOVED_STROKES_EXHAUST) — points, not the
- * strokes' spelling (a `JSON.stringify` comparison would read key order too).
+ * Compares points, not the strokes' spelling (a `JSON.stringify` comparison would read key order too), for
+ * `scroll_until`'s "the same stroke twice" (interact/scroll-rounds.ts#UNMOVED_STROKES_EXHAUST).
  */
 export const sameStroke = (a: Stroke, b: Stroke): boolean =>
   a.from.x === b.from.x && a.from.y === b.from.y && a.to.x === b.to.x && a.to.y === b.to.y;

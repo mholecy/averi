@@ -496,17 +496,17 @@ export type Shortfall =
  *
  * A REBOUND's settled read (UNMOVED_STROKES_EXHAUST) is the stroke's first confirming read, spent like any other.
  *
- * A FLING STILL SLOWING spends none of them (`Observed.slowing`): a confirming read that found the target — the
- * same node — moved less over its settle pause than the read before found it moved over its own is read again
- * free, until the deadline. A fling slows read for read; an animation moves as much at every read and spends the
- * budget as before. Measured under WDA (the lab app's `carousel-in-list`, C a card as wide as its
- * carousel): one 212-pt stroke flung the carousel 447–532 pt over ~2.5 s, and the reads after it, 0.47 s apart,
- * found C moving 54, 21, 8 pt (66, 24, 10 in another run) — the third confirming read still 8–10 pt from rest, so
- * the stop was claimed "still moving"; in the run that flung 532 pt it was claimed on a read with C's centre inside
- * the carousel, and the fling then carried the centre a point out of it, the next tap refused
- * (docs/bugs/2026-10-18-lab-ios-wda-carousel-stop-claimed-while-the-fling-carries-the-card-past-its-centre.md). A
- * stop is judged on the read the fling comes to rest in. The first confirming read always spends one: a read after
- * a stroke measures the stroke too, and gives the next nothing to compare with.
+ * A FLING STILL SLOWING spends none of them (`Observed.slowing`): a confirming read that found the target — the same
+ * node — moved less over its settle pause than the read before found it moved over its own is read again free, until
+ * the deadline. A fling slows read for read; an animation moves as much at every read and spends the budget. Measured
+ * under WDA (the lab app's `carousel-in-list`, C a card as wide as its carousel): one 212-pt stroke flung the carousel
+ * 447–532 pt over ~2.5 s, and the reads after it, 0.47 s apart, found C moving 54, 21, 8 pt (66, 24, 10 in another run)
+ * — the third confirming read still 8–10 pt from rest, so the stop was claimed "still moving"; in the run that flung
+ * 532 pt it was claimed on a read with C's centre inside the carousel, and the fling then carried the centre a point
+ * out of it, the next tap refused
+ * (docs/bugs/2026-10-18-lab-ios-wda-carousel-stop-claimed-while-the-fling-carries-the-card-past-its-centre.md). A stop
+ * is judged on the read the fling comes to rest in. The first confirming read always spends one: a read after a stroke
+ * measures the stroke too, and gives the next nothing to compare with.
  */
 export const SETTLE_CONFIRM_READS = 3;
 
@@ -572,9 +572,9 @@ export const SETTLE_CONFIRM_READS = 3;
  * pixel, as every match's is: measured under idb, a page at its end read a point off after the first stroke (its rest
  * rounded the other way), and the exact fingerprint called it motion — a third stroke, and a side never stroked named
  * (ui-tree/read-tree.ts#sameTreeWithinPixel); where strokes drag (Android) it stays exact. Residuals: a settled read
- * still inside the bounce (400 ms and a read are not always past it) reads the list moved — the strokes run on as
- * before, and a list that never moved may name the side never stroked; a screen whose content moves on its own by less
- * than a stroke between reads takes the extra read too.
+ * still inside the bounce (400 ms and a read are not always past it) reads the list moved — the strokes run on, and a
+ * list that never moved may name the side never stroked; a screen whose content moves on its own by less than a stroke
+ * between reads takes the extra read too.
  * docs/bugs/2026-10-12-ios-scroll-until-never-reads-a-bouncing-list-end-as-exhausted.md
  */
 export const UNMOVED_STROKES_EXHAUST = 2;
@@ -977,7 +977,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // cover lies over a node in no scroll view, which has no flush neighbour to ask of.
   const question = inFrame && fullyClaimed({ clipped: best.standing.facts.clipped, covered: best.standing.facts.covers.some(drawOrderFound) }) ? eyesQuestion(now.facts.scene, now.read.tree, best.node, s.frame, fully ? 'fully' : 'stop') : undefined;
   // Refused again (`State.eyesRefused`): the read after a stroke finds the target and its neighbours where the eyes
-  // last refused them — no confirm, no screenshot; this stroke's read, short as before.
+  // last refused them — no confirm, no screenshot; this stroke's read, short of the stop as the refusal said.
   const refused = s.eyesRefused;
   const refusedAgain = current === 'stroke' && refused !== undefined && question !== undefined && sameQuestion(refused.asked, question);
   // A stop is judged on this read: the match a stop by its standing, not refused again, not held back by its motion.
@@ -1117,9 +1117,9 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // the first read that reads finds under a presented screen still gets its own); at the deadline the bound below says
   // no read succeeded (`neverRead`).
   if (callEvidence(s).of === 'unread' && seen.elapsedMs < s.rules.timeoutMs) return waitOut(s);
-  // A rebound that may be under way (UNMOVED_STROKES_EXHAUST's rebound, motion-ledger.ts#Moved `rebounding`): read again
-  // after a settle, the stroke's first confirming read (the stroke left none spent) — the settled read answers for the
-  // stroke. Only while time is left: at the deadline the bound, as before. At maxSwipes too: the last stroke is answered.
+  // A rebound that may be under way (UNMOVED_STROKES_EXHAUST's rebound, motion-ledger.ts#Moved `rebounding`): read
+  // again after a settle, the stroke's first confirming read (the stroke left none spent) — the settled read answers
+  // for the stroke. Only while time is left: at the deadline, the bound. At maxSwipes too: the last stroke is answered.
   if (motion.moved?.rebounding === true && mayConfirm(s, seen.elapsedMs)) return confirm(s);
   // A confirming read that did not read, or the read after a probe: read
   // again, within the same budget, rather than stroke away from a stop the
@@ -1150,7 +1150,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   let exhausted = observed?.exhausted;
   // The end turn (`EndTurn`): the content proven exhausted the caller's way, and the target past the far edge of the
   // very scroll view that proved it — turn once toward it, rather than fail with that direction as advice. Only while a
-  // swipe and time are left for it: at the bound the failure names the side, as before.
+  // swipe and time are left for it: at the bound the failure names the side.
   const ends = observed?.ends;
   const turned =
     exhausted === 'matches' && ends !== undefined && best !== undefined && now !== undefined && observed !== undefined && s.swipes < s.rules.maxSwipes && seen.elapsedMs < s.rules.timeoutMs && insideScrollView(best, ends, now.facts)
@@ -1240,20 +1240,20 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       ...(onPresented !== undefined && { presented: onPresented }),
     });
   }
-  // Where this stroke would touch down, asked on behalf of a target this read holds but did not judge in the frame
-  // (off it, under the soft keyboard, cut or clipped, or short of the stop under something of its own screen): a
-  // surface of a screen PRESENTED over the target's there (the plan's `presented`) means the stroke lands on that
-  // screen, not on the target's — it moves nothing toward the target and may dismiss the screen: the device check
-  // stroked from (201,699) for a cell below the fold of Contacts' New Contact sheet, closed the "Discard Changes"
-  // popover over it, and read the cell "fully visible after 1 swipe"; under the SWIFT form's Fees half sheet two
-  // strokes moved the sheet to another detent and read "content exhausted". So, as for a target judged under such a
-  // screen (above): one more read with no stroke between, then stop `presented` — or, should the screen be gone from
-  // the touch-down by then, stroke as before. And on behalf of NO target (none in the tree): a stroke that would touch
-  // down on a layer the tree marks as presented — an alert, an action sheet, a popover, a `screen` layer (its reach is
-  // the whole screen) — lands on it, not on any screen beneath it — the same hold and stop, it named; one on a scroll
-  // view of that layer's own (a search inside a sheet's list) is sent. A screen presented by shape alone is still
-  // stroked over for a target not in the tree: it has nothing to ask on behalf of. One question of the scene, at the
-  // touch-down of the points as sent (the plan's `presented`, ui-tree/standing.ts#Scene.presentedAt).
+  // Where this stroke would touch down, asked on behalf of a target this read holds but did not judge in the frame (off
+  // it, under the soft keyboard, cut or clipped, or short of the stop under something of its own screen): a surface of
+  // a screen PRESENTED over the target's there (the plan's `presented`) means the stroke lands on that screen, not on
+  // the target's — it moves nothing toward the target and may dismiss the screen: the device check stroked from
+  // (201,699) for a cell below the fold of Contacts' New Contact sheet, closed the "Discard Changes" popover over it,
+  // and read the cell "fully visible after 1 swipe"; under the SWIFT form's Fees half sheet two strokes moved the sheet
+  // to another detent and read "content exhausted". So, as for a target judged under such a screen (above): one more
+  // read with no stroke between, then stop `presented` — or, should the screen be gone from the touch-down by then, the
+  // stroke is sent. And on behalf of NO target (none in the tree): a stroke that would touch down on a layer the tree
+  // marks as presented — an alert, an action sheet, a popover, a `screen` layer (its reach is the whole screen) — lands
+  // on it, not on any screen beneath it — the same hold and stop, it named; one on a scroll view of that layer's own (a
+  // search inside a sheet's list) is sent. A screen presented by shape alone is still stroked over for a target not in
+  // the tree: it has nothing to ask on behalf of. One question of the scene, at the touch-down of the points as sent
+  // (the plan's `presented`, ui-tree/standing.ts#Scene.presentedAt).
   // THE NAMED SCROLL VIEW WITHOUT ROOM (D80): the plan found no room for this stroke in the scroll view `within` names
   // nor in any nested in it (the keyboard over it, too little of it on screen) — its fallback, the gesture box whole,
   // may touch down on another scroll view, and the reply would read as the named one's. Stopped, the stroke not sent;

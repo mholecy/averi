@@ -4,8 +4,8 @@ import { flowIsDestructive, type AveriConfig } from './config.js';
  * "Is a wipe ahead?" for the reach ladder (docs/adr/0033-a-held-rendered-no-ends-the-second-look-before-a-cheap-rung.md).
  * The second look before a cheap rung may end on a held rendered "no" only when no wipe lies ahead: a loading screen
  * that happens to hold still must not lead to a wipe, and a wipe AFTER the cheap rung is led to as surely as one before
- * it (`[dismiss_prompts, fresh_launch]` on a cold launch onto a "Loading" label: the hold would end the look, the
- * cheap rung's re-check would read the same screen as a rendered "no" and fresh_launch would wipe).
+ * it (D2: `[dismiss_prompts, fresh_launch]` on a cold launch onto a "Loading" label — the hold would end the look,
+ * the cheap rung's re-check would read the same screen as a rendered "no" and fresh_launch would wipe).
  *
  * "Ahead" is two things:
  * - in the rest of this ladder, the running rung included — TRANSITIVE (flow/config.ts#flowIsDestructive, which follows

@@ -3,8 +3,8 @@ import { showsProgress, treeFingerprint } from '../ui-tree/read-tree.js';
 import { isBareTreeMemo } from '../ui-tree/verdict.js';
 
 /**
- * Has a rendered screen held still? The second look's early end before a cheap rung
- * (docs/adr/0033-a-held-rendered-no-ends-the-second-look-before-a-cheap-rung.md): `detects` shows it each fresh read
+ * Has a rendered screen held still? The second look's early end before a cheap rung (D2,
+ * docs/adr/0033-a-held-rendered-no-ends-the-second-look-before-a-cheap-rung.md): `detects` shows it each fresh read
  * that did not answer "yes", and ends its window `no` once `observe` returns a number.
  */
 export interface HoldTracker {
@@ -20,8 +20,8 @@ export interface HoldTracker {
    * Not shown, and so not counted either way: a handed-on read (ADR 0030 — the probe asks it `yes` alone).
    *
    * A loading screen whose indicator a tree source does not report as `progress` holds like any other. On iOS an
-   * XCUI ActivityIndicator — React Native's ActivityIndicator — is `progress` through WDA's role map
-   * (adapters/wda-source.ts), and a SwiftUI ProgressView through idb (adapters/ios-tree-source.ts#idbSpinner); the
+   * XCUI ActivityIndicator — React Native's ActivityIndicator — is `progress` through WDA's role map (D27,
+   * adapters/wda-source.ts), and a SwiftUI ProgressView through idb (D50, adapters/ios-tree-source.ts#idbSpinner); the
    * residuals are in ADR 0033.
    */
   observe(tree: UiNode | undefined, nowMs: number): number | undefined;

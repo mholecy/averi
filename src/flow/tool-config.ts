@@ -8,13 +8,13 @@ import { loadConfig, loadConfigIfPresent, loadProjectConfig, projectConfigPath, 
 /**
  * What one MCP tool call reads of averi.yaml — declared once per tool, and
  * carried out by one function, at most once per call. With a loader picked
- * per handler, two reads can meet in one call (an iOS `assert` reading the
+ * per handler, two reads could meet in one call (an iOS `assert` reading the
  * file for its tree source and again, strictly and with `.env.averi`, for its
- * health line — which needs no credentials), and one broken file is judged
- * differently from tool to tool and platform to platform: one call fails on
- * it while another silently drops what it came for (a `launch_app` losing
- * `app.android.activity` — the LeakCanary case the tool's description warns
- * about).
+ * health line — which needs no credentials), and one broken file would be
+ * judged differently from tool to tool and platform to platform: one call
+ * would fail on it while another would silently drop what it came for (a
+ * `launch_app` losing `app.android.activity` — the LeakCanary case the
+ * tool's description warns about).
  *
  * The rule, for every tool and both platforms:
  *
@@ -24,14 +24,14 @@ import { loadConfig, loadConfigIfPresent, loadProjectConfig, projectConfigPath, 
  *   flows. A call that would use nothing reads nothing, so a broken file
  *   beside it is not its business (`tap` on Android, `launch_app` with an
  *   activity named on Android, `install_app` with a path on Android). On iOS
- *   every tool that touches the device uses the tree source (see
+ *   every tool that touches the device uses the tree source (D41; see
  *   mcp/config-policy.ts).
  * - Whatever a call reads, a present-but-invalid file FAILS it, naming the
  *   file — under `optional` as under `required`. Silently ignoring a broken
  *   config would lose the very setting the call came for.
- * - `optional` (the tools that keep working without averi.yaml): a MISSING
- *   file is no config, and the call proceeds on the defaults. `required`: a
- *   missing file fails the call too.
+ * - `optional` (the tools that predate averi.yaml, so must keep working
+ *   without one): a MISSING file is no config, and the call proceeds on the
+ *   defaults. `required`: a missing file fails the call too.
  * - `.env.averi` is read only by the tools that resolve credentials —
  *   `env: true`, only with `required`, since credentials without a config
  *   have nothing to fill.

@@ -8,10 +8,10 @@ import type { EnvValues } from './credentials.js';
  * Loading: everything that touches the file system to turn a project into a
  * config — which file, where its paths point, what the sibling `.env.averi`
  * contributes — plus the pure lookups that read the loaded result for a tool
- * (`appBuildPath`). Apart from flow/config.ts, which keeps the schema, the
- * types and the pure walks over them, so parsing a payload loads no I/O; the
- * `.env.averi` reading is one function here that returns a value rather than
- * writing `process.env` (`envBeside`, below). Which of these loaders a TOOL
+ * (`appBuildPath`). It is kept apart from flow/config.ts, which holds the
+ * schema, the types and the pure walks over them, so parsing a payload loads
+ * no I/O; the `.env.averi` reading is one function here that returns a value
+ * rather than writing `process.env` (`envBeside`, below). Which of these loaders a TOOL
  * CALL runs, and when a missing or invalid file is tolerated, is
  * flow/tool-config.ts's; only the mapping of each tool name to its policy is
  * the MCP layer's (mcp/config-policy.ts).
@@ -129,7 +129,7 @@ const announced = new Map<string, Record<string, string>>();
  * The build to install when the caller names none: averi.yaml's, for the
  * platform asked about (already resolved against the config's directory by
  * loadConfig). The error is the `install_app` tool's wording. `cfg` may be
- * undefined: install_app reads averi.yaml under a call-dependent entry
+ * undefined (D41): install_app reads averi.yaml under a call-dependent entry
  * (`required` only without a path), so the type it holds is optional; no
  * config names no build, the same error.
  */
@@ -140,10 +140,10 @@ export function appBuildPath(cfg: AveriConfig | undefined, platform: Platform): 
 }
 
 /**
- * loadConfig for tools that must keep working without averi.yaml (the
- * `optional` policy of flow/tool-config.ts): a MISSING file is `undefined`,
- * but a present-and-invalid file still throws — silently ignoring a broken
- * config would mask the very setting (app.ios.treeSource,
+ * loadConfig for tools that predate averi.yaml, so must keep working without
+ * one (the `optional` policy of flow/tool-config.ts): a MISSING file is
+ * `undefined`, but a present-and-invalid file still throws — silently
+ * ignoring a broken config would mask the very setting (app.ios.treeSource,
  * app.android.activity, the app the health line asks about) the caller came
  * for. Any other read error (a directory, no permission) throws as it came.
  */
@@ -165,9 +165,9 @@ export async function loadConfigIfPresent(path: string): Promise<AveriConfig | u
  * variable the user set is never overridden; the file is re-read on EVERY
  * load, so editing .env.averi mid-session takes effect on the next tool call
  * (a first-load-wins read was seen to keep typing stale credentials for the
- * server's whole lifetime). Returned, not written into `process.env`: with
- * the merge a value there is nothing to refresh, and no state that decides a
- * value. A missing file contributes nothing.
+ * server's whole lifetime). Returned, not written into `process.env`: a
+ * merged value leaves no written names to refresh on the next load, and no
+ * state that decides a value. A missing file contributes nothing.
  *
  * So a name REMOVED from .env.averi is gone on the next load (kept in
  * `process.env`, a removed `AVERI_ENV` would keep every later run on the old

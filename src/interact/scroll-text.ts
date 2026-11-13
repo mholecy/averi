@@ -53,8 +53,7 @@ export interface ScrollUntilResult {
   unknownPast?: Edge[];
   /**
    * The soft keyboard at the stop, when it changed what the result means
-   * — absent when none was read, so a run without a keyboard
-   * reports what it always did:
+   * — absent when none was read:
    * - `shown`: the stop was judged against the screen ABOVE `frame` (the
    *   highest covered rect, `AppliedKeyboard.topCover`: the band, or a floating
    *   panel above it), not the whole screen, and that changed it — the
@@ -79,10 +78,9 @@ export interface ScrollUntilResult {
   keyboard?: { state: 'shown'; frame: Rect; source?: 'idb-band' } | { state: 'unlocated' };
   /**
    * `false` when the stop was reached after a stroke and no read confirmed
-   * it held still: the target still moved on
-   * each of SETTLE_CONFIRM_READS confirming reads (an animated row? a long
-   * fling), or the stop came at the deadline. Absent on a settled stop — a
-   * run that settles reports what it always did. The reply says so.
+   * it held still: the target still moved on each of SETTLE_CONFIRM_READS
+   * confirming reads (an animated row? a long fling), or the stop came at
+   * the deadline. Absent on a settled stop. The reply says so.
    */
   settled?: false;
   /**
@@ -145,11 +143,10 @@ export interface ScrollUntilResult {
 
 /**
  * The result a `visible` outcome reports — `keyboard` and `settled` present
- * only when set, so a run without a keyboard, or one that settled, reports
- * what it always did. `shown` only when THIS stop was judged under a band
- * this round applied — a reading's the witness stood by, or idb's band
- * (`source: 'idb-band'`, said when its line is unwitnessed) — never a band
- * checked on an earlier one.
+ * only when set. `shown` only when THIS stop was judged under a band this
+ * round applied — a reading's the witness stood by, or idb's band (`source:
+ * 'idb-band'`, said when its line is unwitnessed) — never a band checked on
+ * an earlier one.
  */
 export function scrollResult(o: Extract<ScrollOutcome, { kind: 'visible' }>): ScrollUntilResult {
   const { judged } = o;
@@ -401,10 +398,11 @@ function unmovedText({ after, unmoved, way }: EndTurn): string {
 const endText = ({ way, scrollView }: EndProof): string => `the tree lists the content of ${nodeText(scrollView)} ending at its ${EDGE_TOWARD[way]}`;
 
 /**
- * The end turn's clause (course.ts#EndTurn), before the detent's in every reply and failure that made one —
- * `; 1 swipe up did not move it — the tree lists the content of scrollable (0,380 402x180) ending at its top — so
- * averi turned down, as the tree places the element below it`: the swipes the caller's way, why they proved the end
- * (`endText`), and that averi, not the caller, chose the way after. Empty when no end turn was made.
+ * The end turn's clause (course.ts#EndTurn), before the detent's in every reply and failure that made one — `; 1 swipe
+ * up did not move it — the tree lists the content of scrollable (0,380 402x180) ending at its top — so averi turned
+ * down, as the tree places the element below it`: the swipes the caller's way, why they proved the end (`endText`), and
+ * that averi, not the caller, chose the way after. Empty when no end turn was made. Exported because the
+ * troubleshooting reference quotes its rendering (tests/mcp/tool-descriptions.test.ts pins it).
  */
 export const endTurnText = (turn: EndTurn | undefined): string =>
   turn === undefined ? '' : `; ${unmovedText(turn)} — ${endText(turn)} — so averi turned ${turn.to}, as the tree places the element ${SIDES[EDGE_TOWARD[turn.to]].past} it`;
@@ -458,11 +456,11 @@ export function flushText(flush: Flush): string {
 }
 
 /**
- * Where a flush edge lies (flush-check.ts#Flush, #FlushCut) and what Android cuts there, in one dialect for the
- * stop's clause and the bound's: `its bottom edge lies on its scroll container's (0,1046 1080x495)`, `where Android
- * cuts a node's bounds to the container`. A pinned node's edge (`pinned`): where the container's content ends as it
- * shows, and the cut it may make is Compose's at a node drawn after the match, not the container's. `lies`: `still
- * lies` for a cut a probe proved (flush-check.ts#FlushCut).
+ * Where a flush edge lies (flush-check.ts#Flush, #FlushCut) and what Android cuts there, in one dialect for the stop's
+ * clause and the bound's (`flushProbedSide` in scripts/truth/replies.ts parses these words): `its bottom edge lies on
+ * its scroll container's (0,1046 1080x495)`, `where Android cuts a node's bounds to the container`. A pinned node's
+ * edge (`pinned`): where the container's content ends as it shows, and the cut it may make is Compose's at a node drawn
+ * after the match, not the container's. `lies`: `still lies` for a cut a probe proved (flush-check.ts#FlushCut).
  */
 function flushEdgeText({ edge, container, pinned }: FlushPlace, lies: 'lies' | 'still lies'): { where: string; cuts: string } {
   const box = rectText(container);
@@ -549,7 +547,8 @@ const otherWayText = (otherWay: Extract<ScrollOutcome, { kind: 'stuck' }>['other
  * would have landed (`next`); empty when it was judged in the frame. A touch-down outside where the surface reaches is
  * said to land on the dim outside it: Android's dialog window, listed alone, reaches only its own rect, and a touch
  * beside it lands on the dim the dialog lays around it (which dismisses it) —
- * docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md.
+ * docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md. Exported because the
+ * troubleshooting reference quotes its rendering (tests/mcp/tool-descriptions.test.ts pins the dim's).
  */
 export const touchDownText = (next: PresentedTouchDown | undefined): string =>
   next === undefined
@@ -825,7 +824,7 @@ const DIRECTIONS_ON: Readonly<Record<ScrollAxis, string>> = { vertical: 'up or d
 
 const OTHER_AXIS: Readonly<Record<ScrollAxis, ScrollAxis>> = { vertical: 'horizontal', horizontal: 'vertical' };
 
-/** A scroll view named with its rect as `within` takes it — `<node> as within: {…}`. */
+/** A scroll view named with its rect as `within` takes it — `<node> as within: {…}` (D76). */
 const asWithin = (n: QuotedNode): string => `${nodeText(n)} as within: ${withinRect(n.rect)}`;
 
 /**
@@ -1112,9 +1111,10 @@ export function boundText(by: BoundBy, swipes: number, remedy: WithinRemedy = WI
 
 /**
  * The timeout bound's words: the time spent, then the budget it ran past, the swipes sent and what the tree reads took
- * — `after 38204ms (timeout 15000ms; no swipe was sent; 1 tree read took 38204ms)`, `after 18000ms (timeout 15000ms;
- * 2 swipes sent; 3 tree reads took 18000ms, the last 6000ms)` — so a budget the reads spent (a tree source slow or
- * restarting under the scroll) does not read as content that never came into view.
+ * — `after 38204ms (timeout 15000ms; no swipe was sent; 1 tree read took 38204ms)`, `after 18000ms (timeout 15000ms; 2
+ * swipes sent; 3 tree reads took 18000ms, the last 6000ms)` — so a budget the reads spent (a tree source slow or
+ * restarting under the scroll) does not read as content that never came into view. Exported because the troubleshooting
+ * reference quotes its rendering (tests/mcp/tool-descriptions.test.ts pins it).
  */
 export function timeoutText(by: Extract<BoundBy, { of: 'timeout' }>, swipes: number, remedy: WithinRemedy = WITHIN_REMEDY.rect): string {
   const sent = swipes === 0 ? 'no swipe was sent' : `${swipesText(swipes)} sent`;
@@ -1217,6 +1217,8 @@ function unseenText({ strokes, within, toward }: UnseenStrokes): string {
 
 /**
  * A failure's words when the device's tree read failed (`readFailed`, `neverRead`): the device's fault, not a reading.
+ * Exported for `scrollVerdictSaid` in scripts/truth/replies.ts, which the live golden's kf judge uses to tell it from
+ * averi's own refusals.
  */
 export const TREE_READ_FAILED = 'last UI tree read failed';
 

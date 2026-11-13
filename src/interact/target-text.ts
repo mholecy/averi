@@ -135,8 +135,9 @@ export const keyboardUpText = (lineY: number): string => `the soft keyboard is u
 
 /**
  * `clause` — the sentence that says how to hide the soft keyboard, `hideKeyboardHow`'s words alone by default — then,
- * unless the adapter hides it with `back`, the adapter's `cannotHide` with its advice: the one composition. Both
- * branches are reached: `back` on Android, the other on iOS (WDA's and idb's remedy is `none`).
+ * unless the adapter hides it with `back`, the adapter's `cannotHide` with its advice. Every sentence that says how to
+ * hide the keyboard composes it here. Both branches are reached: `back` on Android, the other on iOS (WDA's and idb's
+ * remedy is `none`).
  */
 export function hideClause(remedy: KeyboardRemedy, clause: string = hideKeyboardHow(remedy)): string {
   return remedy.dismissal === 'back' ? clause : `${clause}; ${cannotHide(remedy.advice)}`;
@@ -194,9 +195,10 @@ export function cutRemedy(edge: Edge): string {
 }
 
 /**
- * Not geometry.ts#nodeText (`button "Sign in" (24,780 354x44)`, its id when
- * it has no label, an empty label skipped), on purpose: the skip line names a
- * cover in a list of reasons, where a rect adds length and not a decision.
+ * A cover's name is not geometry.ts#nodeText
+ * (`button "Sign in" (24,780 354x44)`, its id when it has no label, an empty
+ * label skipped), on purpose: the skip line names a cover in a list of
+ * reasons, where a rect adds length and not a decision.
  * The two phrasings are a choice, kept side by side: one phrasing would
  * change the skip lines `KeyboardWithoutDismissal` and the `dismiss()`
  * warning quote, words an agent may match on.

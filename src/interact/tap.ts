@@ -69,9 +69,9 @@ export type TapMarks = Pick<Tapped, 'note' | 'moved' | 'disabled'>;
  *
  * The poll is the retry, so the adapter's `settle` is not asked for
  * (adapters/types.ts: pollers leave it off). A free function rather than a
- * DeviceAdapter method: nothing in it is platform-specific, and as a method
- * both adapters would implement it identically, and the platform layer
- * would import the selector layer above it (ARCHITECTURE.md §2).
+ * DeviceAdapter method: nothing in it is platform-specific. As a method,
+ * both adapters would implement it identically and the platform layer would
+ * import the selector layer above it (ARCHITECTURE.md §2).
  *
  * `disabled` is the tapped node's own mark (adapters/types.ts#UiNode.disabled,
  * D66) — the node the guard handed back, after any re-resolve: the tap is sent

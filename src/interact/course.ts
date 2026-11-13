@@ -598,8 +598,8 @@ export interface NextStroke {
  * scroll down, and every round after while it stays there — is the caller's
  * direction to honour — until a stroke that way proves the content
  * exhausted: the end turn (`EndTurn`) turns the course itself, which this
- * reads in place of the caller's direction, at full reach. A target any of
- * which lies in the frame is not the caller's direction to honour
+ * reads in place of the caller's direction, at full reach. One across that
+ * far edge, some of it in the frame, is not: the strokes turn at once
  * (`seeTarget`'s `atFarEdge`, below). Turning back needs the target to STAY
  * in the tree once off the frame; a lazy list (Android
  * RecyclerView/LazyColumn, iOS List/UITableView under WDA) drops it, and on

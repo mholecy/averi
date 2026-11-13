@@ -32,9 +32,9 @@ interface FillSpec extends ElementSpec {
 }
 
 /**
- * One entry of `app.ios.keyboardDismiss`: how the guard may hide the iOS soft
- * keyboard when it covers a tap target, and how `fill { dismissKeyboard:
- * true }` hides it after typing. Either a `tap` on an element of the app's
+ * One entry of `app.ios.keyboardDismiss` (stage B): how the guard may hide
+ * the iOS soft keyboard when it covers a tap target, and how `fill {
+ * dismissKeyboard: true }` hides it after typing. Either a `tap` on an element of the app's
  * that hides the keyboard without a side effect — the screen title was
  * measured to (docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md, K5b)
  * — or `accessory: true`, the input-accessory toolbar's trailing button (the
@@ -80,8 +80,8 @@ type KeyboardDismissStrategy = { tap: ElementSpec } | { accessory: true };
 export function inertKeyboardDismissNote(cfg: AveriConfig): string | undefined {
   const ios = cfg.app.ios;
   if (ios?.keyboardDismiss === undefined) return undefined;
-  // Only a project that pins idb: under `auto` (the default) the list applies whenever WebDriverAgent comes up, and
-  // a fallback to idb is said on the claiming replies (adapters/auto-tree-source.ts).
+  // Only a project that pins idb: under `auto` (the default, A41a) the list applies whenever WebDriverAgent comes
+  // up, and a fallback to idb is said on the claiming replies (adapters/auto-tree-source.ts).
   const kind: IosTreeSourceSetting = ios.treeSource ?? DEFAULT_IOS_TREE_SOURCE;
   if (kind !== 'idb') return undefined;
   return (
@@ -98,10 +98,10 @@ export interface TapSpec extends ElementSpec {
    * PRESENCE-CHECK window (default 1.5s) instead: how long a
    * maybe-interstitial gets to appear before the step is skipped "(not
    * present)" — interact's ElementNotFoundError, the one failure an optional
-   * step logs that way. Note the cost: an optional tap burns this full window whenever the element
-   * never shows — when the alternative screen is detectable, a state with
-   * `any:` over both outcomes plus `branch:` exits immediately either way
-   * and stays the better idiom.
+   * step logs that way. Note the cost: an optional tap burns this full
+   * window whenever the element never shows — when the alternative screen is
+   * detectable, a state with `any:` over both outcomes plus `branch:` exits
+   * immediately either way and stays the better idiom.
    */
   timeout?: string | number;
 }
@@ -372,9 +372,9 @@ function routeStep(v: unknown): StepRoute {
 /**
  * A step, judged by its one key (D86): the kind it names parses the value under that key, and the kind's own issues
  * are said with their path — `steps.3.scroll_until.within.id: Expected string, received number`. Not a `z.union` of
- * every kind: there a wrong type inside a step's object collapses to the union's bare "Unrecognized key(s) in object:
- * 'scroll_until'" at the step — when every member fails, zod's union reports the first member that failed only
- * softly, which is the platform override, its fields all optional, failing on the unknown key alone — never the
+ * every kind (D86): there a wrong type inside a step's object collapses to the union's bare "Unrecognized key(s) in
+ * object: 'scroll_until'" at the step — when every member fails, zod's union reports the first member that failed
+ * only softly, which is the platform override, its fields all optional, failing on the unknown key alone — never the
  * member the step's key named. A discriminated union needs a literal field to pick by, which a one-key step lacks —
  * so the key is found here, and the step's shape (no key, several, an unknown one, no mapping at all) is refused in
  * words of its own.
@@ -443,8 +443,8 @@ const configSchema = z
             treeSource: z.enum(IOS_TREE_SOURCE_SETTINGS).optional(),
             /**
              * How to hide the soft keyboard when it covers a tap target, in
-             * order of preference (see KeyboardDismissStrategy). Without
-             * it a covered target is refused (stage A) and `fill {
+             * order of preference (stage B; see KeyboardDismissStrategy).
+             * Without it a covered target is refused (stage A) and `fill {
              * dismissKeyboard: true }` leaves the keyboard up with a
              * warning. Read under every tree source, but inert under
              * `treeSource: idb` — idb's tree marks no node as the keyboard

@@ -9,9 +9,9 @@
  *
  * Beside the types live `heldText` and `shownText` (and the small `isPoint`
  * and `hasPoint` guards): not judgements but the DEFINITIONS every
- * measurement of a field is taken in — what it shows of a node (`shownText`),
- * and what it holds as opposed to what it shows (`heldText`) — so every
- * module that measures a field counts the same characters.
+ * measurement of a field is taken in — what it shows of a node (`shownText`,
+ * A28), and what it holds as opposed to what it shows (`heldText`) — so
+ * every module that measures a field counts the same characters.
  */
 
 import type { Rect, UiNode } from '../adapters/types.js';
@@ -212,7 +212,7 @@ export type LostWhy = 'screen-changed' | 'unmatched';
 
 /**
  * One read of the field after the focus tap (interact/fill-refetch.ts): the node, found by the selector or by
- * identity, or why it was not found (`LostWhy`) — one answer, read by the clear and by the typing alike.
+ * identity, or why it was not found (`LostWhy`) — one answer, read by the clear and by the typing alike (A28).
  */
 export type FieldRead = { node: UiNode; lost?: undefined } | { node?: undefined; lost: LostWhy };
 
@@ -251,7 +251,10 @@ export const shownText = (n: Pick<UiNode, 'value'>, isInput: boolean): string | 
  *   which (`LostWhy`). Also set when the clear's own read after a delete
  *   did not find the field and nothing was typed (a clear alone, value
  *   ""): the delete went out, nothing saw the field empty. Nothing was read,
- *   so nothing is known about the node's value either way.
+ *   so nothing is known about the node's value either way. Not `no-value`:
+ *   on the iOS device check of 2026-10-08, a textfield that had just had 7
+ *   characters deleted and then held the typed text was said to "expose no
+ *   value" — the refusal was right, the reason blamed the node.
  * - `nothing-typed`: the value was empty — a focus (and clear) alone.
  * - `placeholder`: the read-back's reading is EXACTLY the field's named
  *   placeholder (UiNode.placeholder) and nothing shows more — the value
@@ -292,9 +295,9 @@ export type ReadBack =
  *   read-back, in order (`SentAgain`: a dropped tail, the clear's retype —
  *   `wiped` when it deleted what the field held first, else it only typed
  *   again, the field showing nothing or its placeholder), so the error says
- *   the read-back is not the first; `elsewhere` another input that changed
- *   while typing — the focus left the field, and nothing was sent again into
- *   it.
+ *   the read-back is not the first (D3); `elsewhere` another input that
+ *   changed while typing — the focus left the field, and nothing was sent
+ *   again into it.
  */
 export type FillFailure =
   | { code: 'reread-failed'; target: string; cause: string }
@@ -353,9 +356,8 @@ export interface OtherInput {
  *   punctuation, a mask.
  * - `unchanged`: the field shows exactly what it showed when typing began
  *   — the typing did not reach it (a focus tap that missed, a field that
- *   ignores input), or the field refused it (already at its maxLength).
- *   Review of this branch: probes D and D2 were told "the app transformed
- *   the input".
+ *   ignores input), or the field refused it (already at its maxLength) —
+ *   not "the app transformed the input" (probes D and D2).
  * - `dropped-tail` (D28): the field holds the first `landed` characters of
  *   the typing, reformatted (interact/fill-landing.ts#NotLanded): `grouped`
  *   when the field added separators of its own, else it only showed its typed
@@ -379,7 +381,7 @@ export interface OtherInput {
  *   else — separators ADR 0034's rules refuse as the field's grouping (a
  *   cents mask's `12.34` for `1234`, a sign, mixed or trailing marks, groups
  *   of one, autocorrect's `a lot` for `alot`), which would otherwise read
- *   `typed 4 characters but the field shows 5` and no remedy.
+ *   `typed 4 characters but the field shows 5` and no remedy (D53).
  * - `length`: none of these — the lengths are all that can be said (also
  *   a partly masked reading, `•••••t`, whose content is not comparable).
  * Still a FAILURE in every case: a field that shows `Hello` for `hello` does

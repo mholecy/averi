@@ -27,10 +27,10 @@ export const DEFAULT_FOCUS_DELAY_MS = 350;
 
 /**
  * Cadence of the value poll (five rounds) when the caller has none. 400 ms is
- * what the MCP type_text tool has always used; it is NOT the settle poll's
- * cadence. The engine passes its own 500 as `valuePollMs` (ADR 0040: its
- * `pollMs` reaches the settle only when pinned, and the settle's cadence is
- * otherwise the adapter's).
+ * what the MCP type_text tool uses; it is NOT the settle poll's cadence. The
+ * engine passes its own 500 as `valuePollMs` (ADR 0040: its `pollMs` reaches
+ * the settle only when pinned, and the settle's cadence is otherwise the
+ * adapter's).
  */
 export const DEFAULT_VALUE_POLL_MS = 400;
 
@@ -129,8 +129,8 @@ function rectGap(a: Rect, b: Rect): number {
  *
  * Keyboard dismissal is deliberately NOT in here: `dismissKeyboard`
  * (keyboard.ts) is a second call, so a warning this fill produced reaches the
- * caller before the key press can throw (a masked-append warning was lost
- * when `pressKey` failed after the text had landed).
+ * caller before the key press can throw (otherwise a masked-append warning
+ * is lost when `pressKey` fails after the text has landed).
  */
 export async function fillField(
   adapter: DeviceAdapter,
@@ -155,7 +155,7 @@ export async function fillField(
   const pollMs = opts.valuePollMs ?? opts.pollMs ?? DEFAULT_VALUE_POLL_MS;
   const { node, note: resolutionNote, keyboardHidden, point, moved, tree: resolvedIn } = await resolveClearOfKeyboard(adapter, target, opts);
   // Again after the resolution, before the focus tap: what an adapter types can change with its first read — iOS
-  // `treeSource: auto` falls back to idb there (ADR 0046), and a value only WebDriverAgent types is then refused
+  // `treeSource: auto` falls back to idb there (A41a, ADR 0046), and a value only WebDriverAgent types is then refused
   // with nothing tapped or cleared. Pure, so free where nothing changed.
   refuseUntypeable();
   // A focus tap moved off a covered centre (tap-judgement.ts#TapJudge.aim) is said in the note, after what the
@@ -274,7 +274,7 @@ export async function fillField(
     if (isInput) return undefined;
     let tree = field.lastTree();
     if (tree === undefined) {
-      // Through the seam (ADR 0036): a miss stays a hint, a read no wait cures stops the fill as it came.
+      // Through the seam (D39, ADR 0036): a miss stays a hint, a read no wait cures stops the fill as it came.
       const read = await readTreeOrMiss(adapter);
       if (read.tree === undefined) return { input: 'unread' };
       tree = read.tree;

@@ -181,8 +181,8 @@ export async function launchApp(
 /**
  * `<app>[ on <platform>][ (state cleared)]` — the flow's `launch` trace line
  * (no platform: a flow runs on one) and the body of launch_app's first line
- * (mcp/tool-text.ts#launchText, which has always named the platform before
- * the wipe). One spelling, so the two cannot word a wipe differently.
+ * (mcp/tool-text.ts#launchText, which names the platform before the wipe).
+ * One spelling, so the two cannot word a wipe differently.
  */
 export const launchedLine = ({ app, wiped }: Launched, platform?: Platform): string =>
   app + (platform === undefined ? '' : ` on ${platform}`) + (wiped === undefined ? '' : ' (state cleared)');

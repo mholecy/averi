@@ -61,7 +61,7 @@ const linkSaw = (app: string): string =>
   `averi did not see ${app} come forward after the link: iOS may be asking to confirm it ("Open in “…”?") or ` +
   `another app may be in front ${ANSWER_IT}`;
 
-/** A link's lead when the wait could not tell which app is in front: no over-claim. */
+/** A link's lead when the wait could not tell which app is in front (D49a: no over-claim). */
 const linkUnchecked = (app: string): string =>
   `averi could not check that ${app} came forward after the link: if iOS asks to confirm it ("Open in “…”?"), the ` +
   `link waits behind the alert ${ANSWER_IT}`;

@@ -1,6 +1,6 @@
 /**
- * The field found again on a fresh read — every read a fill makes of its field after the focus tap. One answer a read
- * (fill-facts.ts#FieldRead): the node, or why it was not found (`LostWhy`).
+ * The field found again on a fresh read — every read a fill makes of its field after the focus tap (A28). One answer
+ * a read (fill-facts.ts#FieldRead): the node, or why it was not found (`LostWhy`).
  *
  * Interface: `fieldRefetch(…) → FieldRefetch` — `read()`, `typingStarts()`, `lastTree()`. The rules it owns:
  * - by the selector first (resolveNow on the fresh tree: the one-shot mode of the policy that chose the field);

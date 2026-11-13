@@ -124,7 +124,7 @@ export function focusTapNote(resolved: string | undefined, moved: string | undef
  *   action column says it) and no note (the trace never printed one). A
  *   clear alone keeps the ` = ` with nothing after it
  *   (`id:"amount_input" =  (cleared 4 characters first)`): cosmetic, and
- *   pinned by the engine tests as it always read.
+ *   pinned by the engine tests.
  */
 export function fillStepText(fill: FillResult, as: { step: string; shown: string }): FillStepText {
   const v = judgeFill(fill);

@@ -213,13 +213,13 @@ class ReentryError extends Error {
  * owner chose "never escalate past a present-but-refused element". The refusal is the
  * `cause`; the message says why it was not skipped, then quotes it.
  *
- * So does a `scroll_until` whose `within` names no scroll view for any reason but `absent`
+ * It is raised too (D81) for a `scroll_until` whose `within` names no scroll view for any reason but `absent`
  * (interact/within.ts#WithinRefusedError): several matches, a match in no scroll view, one that scrolls only across
  * the stroke, a tree that lists no scroll view (idb) — an authoring error no screen cures, terminal like a config
- * refusal. An `absent` one is skipped: the list, like the interstitial, may not be on this screen. One whose named
- * scroll view has no room for a swipe (`noRoom`: the keyboard over it, too little of it on screen) is terminal too,
- * with its own reason: the list IS on this screen, so skipping would run on as if it had been scrolled — the room is
- * an earlier step's to make (hide the keyboard), as a refused tap's cover is.
+ * refusal. An `absent` one is skipped: the list, like the interstitial, may not be on this screen. One (D80) whose
+ * named scroll view has no room for a swipe (`noRoom`: the keyboard over it, too little of it on screen) is terminal
+ * too, with its own reason: the list IS on this screen, so skipping would run on as if it had been scrolled — the
+ * room is an earlier step's to make (hide the keyboard), as a refused tap's cover is.
  *
  * Only an `optional:` raises it. The same refusal outside one is the step's
  * plain failure and a rung that throws it escalates — the owner's decision is
@@ -267,7 +267,7 @@ const notSkippable = (e: unknown): e is NotSkippable =>
  * past it would run the wipe the inner one declined; an OptionalNotSkipped
  * is a rung's interstitial that is on screen and could not be tapped — the
  * next rung would run on the screen the cheap one was written for. A
- * PersistentReadError (adapters/types.ts) too — a tree read no wait cures,
+ * PersistentReadError (D21, adapters/types.ts) too — a tree read no wait cures,
  * idb's wedged accessibility service: not an absent element for `optional:`
  * to skip, and nothing a rung, a re-run or the next rung can cure (a relaunch
  * was measured 0 of 5), so the ladder stops on it, and the final wait's
@@ -318,11 +318,10 @@ const FLOW_AMBIGUITY: Ambiguity = 'first';
 export type RunRequest = { state: string; flow?: string } | { state?: undefined; flow: string };
 
 /**
- * The request a caller holding two OPTIONAL names makes — `verify`'s state
- * and flow — or undefined when it names neither (nothing for the engine to
- * do). An empty string is "none", as `verify` always read it. The one place
- * the union is built from optional strings, so no caller spells the
- * narrowing by hand.
+ * The request a caller holding two OPTIONAL names makes, or undefined when
+ * it names neither (nothing for the engine to do). An empty string is
+ * "none". The one place the union is built from optional strings, so no
+ * caller spells the narrowing by hand.
  */
 export const runRequestOf = (state?: string, flow?: string): RunRequest | undefined => {
   const s = state || undefined;
@@ -342,8 +341,8 @@ export interface EngineOptions {
    * Poll interval for waits — and ONLY that. It is handed to the Verifier the
    * inline `assert:` steps use as its poll interval too; the stability wait
    * before a pixel reading is verify/capture.ts's own budget, which this knob
-   * does not touch, so an assert inside a flow waits as long as the MCP
-   * `assert` tool does. Tests use a few ms.
+   * does not touch, so the stability wait of an assert inside a flow is the
+   * MCP `assert` tool's. Tests use a few ms.
    */
   pollMs?: number;
   tapTimeoutMs?: number;
@@ -741,21 +740,22 @@ export class FlowEngine {
       // (a map, a camera, an identified-only icon screen) delays a cheap rung
       // by up to ensureTimeoutMs.
       //
-      // The look also ends, answering `no`, once one rendered tree outside
-      // the state has held the same fingerprint across reads spanning
-      // reachRecheckMs (2 s, the grace a rung's own re-check already gives a
-      // screen to land; flow/hold-tracker.ts) — but only when no wipe lies
-      // ahead (flow/wipes-ahead.ts#WipesAhead; docs/adr/0033-a-held-rendered-
-      // no-ends-the-second-look-before-a-cheap-rung.md). Ending only on
-      // `yes`, a cold launch whose decor turned into a settled screen outside
-      // the state (a login screen for `logged_in`) would poll the full 20 s
-      // before its cheap rung. A tree that shows a spinner
+      // The look also ends, answering `no` (D2), once one rendered tree
+      // outside the state has held the same fingerprint across reads
+      // spanning reachRecheckMs (2 s, the grace a rung's own re-check already
+      // gives a screen to land; flow/hold-tracker.ts) — but only when no wipe
+      // lies ahead (flow/wipes-ahead.ts#WipesAhead; docs/adr/0033-a-held-
+      // rendered-no-ends-the-second-look-before-a-cheap-rung.md). Ending only
+      // on `yes`, a cold launch whose decor turned into a settled screen
+      // outside the state (a login screen for `logged_in`) would poll the
+      // full 20 s before its cheap rung. A tree that shows a spinner
       // (read-tree.ts#showsProgress) never holds — it is a screen saying it
       // still loads — and a held "no" says so in one `state` line before the
       // rung. The accepted risk: a rendered loading screen whose indicator
-      // the tree source does not report as `progress` that holds for 2 s
-      // costs a cheap rung run on it, or an escalation to the next cheap one.
-      // A bare or a failed read restarts the hold.
+      // the tree source does not report as `progress` (D27 made a React
+      // Native ActivityIndicator through WDA one that it does) that holds for
+      // 2 s costs a cheap rung run on it, or an escalation to the next cheap
+      // one. A bare or a failed read restarts the hold.
       //
       // The rung's re-detect below (the grace window after a rung) gets no
       // hold: it is not a second look. Its window IS reachRecheckMs, so a
@@ -914,9 +914,9 @@ export class FlowEngine {
       // recoveryPass logs the rung that got there, so there is no second
       // "reached" line here. A SetupError is exempt for the same reason the
       // ladder exempts it: re-running flows cannot fix a broken descriptor.
-      // The same holds for an error no rung can cure — `isTerminal`, whose
-      // other members the final wait cannot raise (it never enters a ladder
-      // or an `optional:`).
+      // The same holds (D21) for an error no rung can cure — `isTerminal`,
+      // whose other members the final wait cannot raise (it never enters a
+      // ladder or an `optional:`).
       if (isTerminal(e) || !(await this.recoveryPass(name, state, 'timed out'))) throw e;
       return;
     }
@@ -1053,7 +1053,7 @@ export class FlowEngine {
    *
    * An unreadable tree is not "in this state", and must not throw either:
    * right after a cold launch/reinstall (no window yet) is exactly when the
-   * reach flows are needed. The one exception: a read no wait cures
+   * reach flows are needed. The one exception (D21): a read no wait cures
    * (adapters/types.ts#PersistentReadError — idb's wedged accessibility
    * service) throws out of the probe, from pollTree's first round that met
    * it — no reach flow can cure it, and `isTerminal` stops the ladder on it.
@@ -1068,22 +1068,22 @@ export class FlowEngine {
    * one before it word for word: the second look after a bare or unread
    * entry probe reads the same decor and would say the same sentence, two
    * identical lines that do not tell the entry read from the window behind
-   * it. Its line says `(second look over 20 s)` — the window it polled,
-   * which an unanswered look spent whole.
+   * it (round-3 device check, 2026-10-08). Its line says `(second look over
+   * 20 s)` — the window it polled, which an unanswered look spent whole.
    *
    * `first` is a read handed on to the probe (ADR 0030; the ladder's
    * re-detect after a rung passes `handedFor`): it may answer `yes` and
    * nothing else, see below.
    *
-   * `holdMs` (docs/adr/0033-a-held-rendered-no-ends-the-second-look-before-
-   * a-cheap-rung.md; passed only by the second look when no wipe lies ahead,
-   * as reachRecheckMs) ends the window early on a settled "no": every fresh
-   * read that is not `yes` goes to a `holdTracker(holdMs)`
+   * `holdMs` (D2, docs/adr/0033-a-held-rendered-no-ends-the-second-look-
+   * before-a-cheap-rung.md; passed only by the second look when no wipe lies
+   * ahead, as reachRecheckMs) ends the window early on a settled "no": every
+   * fresh read that is not `yes` goes to a `holdTracker(holdMs)`
    * (flow/hold-tracker.ts — same fingerprint across reads spanning `holdMs`;
    * a fingerprint change, a bare tree, a spinner or a failed read starts it
    * over), and once it says held the probe answers `no` without polling to
-   * its deadline. A spinner's or a bare tree's other counting is unchanged (a
-   * spinner tree still counts as rendered). A handed-on read is never shown
+   * its deadline. A spinner or a bare tree is otherwise counted as without
+   * `holdMs` (a spinner tree still counts as rendered). A handed-on read is never shown
    * to it (it may only answer `yes`); a failed read is, through pollTree's
    * observer below (pollTree shows the predicate trees only): the same tree
    * on both sides of reads that saw nothing did not provably hold. Without
@@ -1353,8 +1353,8 @@ export class FlowEngine {
     });
     // ⚠ for a clipped stop, and for one the `unlocated` row qualifies: the
     // input method says a keyboard is up that nothing could place, so "fully
-    // visible" is not established either — nor on a flush edge no probe
-    // checked: both open NOT CONFIRMED (scroll-text.ts#stopHedges). The
+    // visible" is not established either — nor (T17) on a flush edge no
+    // probe checked: both open NOT CONFIRMED (scroll-text.ts#stopHedges). The
     // `unlocated` row is asked again on its own, defensively: stopHedges says
     // nothing of a stop with a surface the eyes saw, and such a stop never
     // carries it (under fully: true a surface is no stop, and the row is
@@ -1399,17 +1399,17 @@ export class FlowEngine {
     // keyboard) must not take them down with it. The keyboard line
     // (tracingDismissal's) comes first: it happened first, before the focus tap.
     for (const caveat of said.caveats) this.log(caveat.action, caveat.text);
-    // What the dismissal did: on the in-tree model it may tap a configured
-    // element — said on the fill line, since the step did it — or leave the
-    // keyboard up with a reason, a `⚠ fill` line like the masked-append one,
-    // so the next step's refusal is not a surprise. On the oracle model
-    // `hiddenBy` is always absent, and `warning` is set only by its
-    // `unlocated` row (the input method says shown, the window state gives no
-    // area, nothing was pressed). A dismissal that THROWS after tapping
-    // (AfterDismissalTap) gets its `⚠ fill` line before the `✗` through the
-    // guard's one catch (tracingGuardFailure) — not tracingDismissal: the
-    // result has no `keyboardHidden` to trace, only `hiddenBy` for the fill
-    // line.
+    // What the dismissal did (stage B): on the in-tree model it may tap a
+    // configured element — said on the fill line, since the step did it — or
+    // leave the keyboard up with a reason, a `⚠ fill` line like the
+    // masked-append one, so the next step's refusal is not a surprise. On the
+    // oracle model `hiddenBy` is always absent, and `warning` is set only by
+    // its `unlocated` row (the input method says shown, the window state
+    // gives no area, nothing was pressed). A dismissal that THROWS after
+    // tapping (AfterDismissalTap) gets its `⚠ fill` line before the `✗`
+    // through the guard's one catch (tracingGuardFailure) — not
+    // tracingDismissal: the result has no `keyboardHidden` to trace, only
+    // `hiddenBy` for the fill line.
     let closed: DismissResult = {};
     if (closeKeyboard) {
       closed = await this.tracingGuardFailure('⚠ fill', () =>
@@ -1540,9 +1540,10 @@ export class FlowEngine {
         // tap — as runStep gives it to a nested step's.
         if (tap && isRefusedOnPresentElement(e)) throw this.failed(s, new OptionalNotSkipped(e));
         // A config refusal is not an absent interstitial: an empty secret, a
-        // `type_pin` value with no digits, an undeclared credential. Skipping
-        // it would let the flow run on with the login half-typed and fail a
-        // screen later, the shape flow/credentials.ts exists to prevent.
+        // `type_pin` value with no digits, an undeclared credential (a
+        // malformed `timeout:` is refused at load, A19). Skipping it would let
+        // the flow run on with the login half-typed and fail a screen later,
+        // the shape flow/credentials.ts exists to prevent.
         // `isTerminal` is the ladder's own "re-running cannot fix this" set: a
         // SetupError, and an UnreadTreeRefusal, which no step inside an
         // `optional:` can raise today (only the ladder does, and no step runs
@@ -1573,9 +1574,9 @@ export class FlowEngine {
         //
         // Asked of interact, not deduced from missing evidence (a `present`
         // flag, `instanceof KeyboardGuardError` as the one failure known to
-        // have found the element): that reads a fill whose field was found
-        // and tapped, but whose text never landed, and a fill refused for a
-        // control character, as "skipped step (not present)". A
+        // have found the element, stage B): that reads a fill whose field was
+        // found and tapped, but whose text never landed, and a fill refused
+        // for a control character, as "skipped step (not present)". A
         // KeyboardGuardError quotes its headline because it is not
         // ElementNotFoundError — even when a target that did not come back is
         // its `cause`: something was sent.
@@ -1602,8 +1603,8 @@ export class FlowEngine {
    * the following digits are plain taps — unless the screen raises the
    * keyboard again). That is not a detail of which node was chosen: the flow
    * pressed `back` and the screen re-laid-out, and an author debugging the
-   * next step needs to see it. A tap that met no keyboard traces its tap line
-   * alone.
+   * next step needs to see it. A tap that met no keyboard gets no keyboard
+   * line.
    *
    * Likewise, D66: a tapped node the tree marks disabled gets a `⚠ tap` line
    * in the MCP reply's words (interact/tap.ts#DISABLED_TAP), after the
@@ -1627,8 +1628,8 @@ export class FlowEngine {
    * - the step succeeded after the guard pressed `back`: the sentence the
    *   result carries ("…; hidden before tapping", or "…; back pressed; the
    *   keyboard's state afterwards could not be read") — or, on the in-tree
-   *   model, after it tapped a configured dismissal ("…; hidden by tapping
-   *   id:"login_title" before tapping");
+   *   model (stage B), after it tapped a configured dismissal ("…; hidden by
+   *   tapping id:"login_title" before tapping");
    * - the step FAILED after it: the attempt ("…; back pressed"), BEFORE the
    *   step's `✗` line — the key press happened whether or not the step
    *   survived it, and if no keyboard was really up it navigated. Without
@@ -1652,7 +1653,7 @@ export class FlowEngine {
   }
 
   /**
-   * The failure half of `tracingDismissal`, on its own: any
+   * The failure half of `tracingDismissal`, on its own (stage B): any
    * KeyboardGuardError's `traceLine`, logged as `action` BEFORE the error
    * goes on to the step's `✗` line. The one catch for the guard's two steps
    * above and for the post-fill `dismissKeyboard` (runFill), whose result has

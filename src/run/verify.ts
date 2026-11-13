@@ -265,7 +265,7 @@ const dimensionProblems = (d: ParityDimension, contract: LayoutContract): string
  * owns "before the legs", and the handler stays a delegation); and dropping
  * the read-time checks now that this runs first (they remain the comparators'
  * own guard for every caller that is not this run, and paritySection's
- * containment is unchanged).
+ * containment stays).
  */
 export function contractProblems(contract: LayoutContract): string[] {
   return [
@@ -391,8 +391,7 @@ export async function runVerification(
     // ONE engine run per leg: the state and the flow share its trace,
     // environment line and recovery budget, so a flow that fails after the
     // state was ensured fails with the state's lines too.
-    // Neither named (or both empty, as `if (req.state)` always read them):
-    // no run, an empty trace.
+    // Neither named (or both empty): no run, an empty trace.
     const request = runRequestOf(req.state, req.flow);
     // One hand-off of the last read for the leg's run and its asserts (ui-tree/read-handoff.ts, docs/adr/0030-a-read-
     // is-handed-on-only-as-a-first-sample-or-a-positive-verdict.md): the state's detect that answered `yes`, or the
@@ -426,8 +425,8 @@ export async function runVerification(
     // The capture itself throwing (a dead device's refused screenshot) is
     // caught the same way, by finalFrame: no image, one ⚠ line, the rest kept.
     // The health check comes AFTER the frame, on purpose — not beside it, as
-    // ensure_state's does (run/commands.ts). A leg's health line is read as
-    // the app's state at the END of the frame's settle: an app that dies
+    // ensure_state's does (run/commands.ts, D13). A leg's health line is read
+    // as the app's state at the END of the frame's settle: an app that dies
     // while the frame settles must read dead here. Run side by side, the
     // question would be answered at the frame's start and could say `true`
     // about an app gone by the time the picture was taken. ensure_state's

@@ -11,8 +11,8 @@ import { axisOf, type Direction } from './swipe.js';
  * `scroll_until`'s `within` (D78): the scroll view the caller names for the strokes to go over until the target is
  * first read — before that read the plan strokes the screen's largest scroller and the scroll views nested in it
  * (interact/stroke-plan.ts#candidatesOf), so a row of a SIBLING list (the lab's `scroll-bounded`: O and F, rows of
- * `lower`, beside the larger `upper`) is never reached. Named here as the caller can name it (ADR 0010's D78
- * amendment):
+ * `lower`, beside the larger `upper`) is never reached; D76's exhausted reply names such lists and leaves the remedy
+ * to the caller. Named here as the caller can name it (ADR 0010's D78 amendment):
  * - a SELECTOR of exactly one node — a selector string (the MCP tool's), or an element spec (a flow's `scroll_until`,
  *   D81: matched as a step's `element` is, ui-tree/selectors.ts#findTarget, every field exact) — by one rule: the
  *   scroll view of that node's very rect (ui-tree/scroll-containers.ts#isScrollViewOf, through `Clips.axesOf` — the

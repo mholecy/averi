@@ -62,10 +62,9 @@ export type ClearStep =
  *     that reading was EXACTLY the named placeholder — `shown`: before any
  *     delete went out; `prefix`: the last deletes went into a reading that
  *     STARTED with the placeholder's text, so what they left may be held
- *     text (deletes go from the end; review round 2, probe K:
- *     `Companyabc` with 3 of 10 landing leaves `Company`); `other`: they
- *     went into one that did not, so it can only be the field showing
- *     empty.
+ *     text (deletes go from the end; probe K: `Companyabc` with 3 of 10
+ *     landing leaves `Company`); `other`: they went into one that did not,
+ *     so it can only be the field showing empty.
  *   - `unchanged`: a round's deletes left the reading exactly as it was,
  *     read twice a poll cadence apart — an empty field showing its hint, or
  *     one that ignores deletes. `shows` its held length, `deletes` every
@@ -108,8 +107,8 @@ export function startClear(placeholder: string | undefined): ClearState {
  * 1. Before any delete, a reading that holds nothing ends the clear: no
  *    delete at all (a named placeholder is no content, `heldText`).
  * 2. A read that found no field ends it `lost` — not empty: read as
- *    `left = 0`, a clear alone was "Filled … (cleared 7 characters first)"
- *    on a field the keyboard had moved and that still held `XX`.
+ *    `left = 0`, a clear alone would read "Filled … (cleared 7 characters
+ *    first)" on a field the keyboard had moved and that still held `XX`.
  * 3. An UNCHANGED reading may be a LATE one: synthetic input is droppable
  *    and slow end to end (Compose async state, an IME queue — 3 of 11
  *    characters landed at first, measured 2026-08-05), and one read right

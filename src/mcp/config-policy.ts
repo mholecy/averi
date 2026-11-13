@@ -19,10 +19,10 @@ import { NO_CONFIG, OPTIONAL_CONFIG, REQUIRED_CONFIG, REQUIRED_CONFIG_AND_ENV } 
  * table's tools are exactly the ones whose schema takes a `configPath`.
  *
  * Each entry takes only what its decision reads. Every tool that resolves a
- * device is here: on iOS each reads averi.yaml for the tree source, because
- * the registry keeps one adapter per (simulator, tree source) and a tool that
- * asked without the project's kind would be served by a second, idb-kind
- * adapter (ADR 0032, amendment D41). Two entries depend on the call:
+ * device is here (D41): on iOS each reads averi.yaml for the tree source,
+ * because the registry keeps one adapter per (simulator, tree source) and a
+ * tool that asked without the project's kind would be served by a second,
+ * idb-kind adapter (ADR 0032, amendment D41). Two entries depend on the call:
  * `launch_app` reads averi.yaml on Android only when the `app.android.activity`
  * fallback can apply (flow/launch.ts#launchConsultsConfigActivity), and
  * `install_app` requires it only when the call names no path — the config is
