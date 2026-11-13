@@ -7,13 +7,11 @@ import type { MeasuredFrame } from './capture.js';
 import type { Shot } from './shot.js';
 
 /**
- * The verifier's poll vocabulary, shared by `Verifier.treePoll` (the tree-only
- * asserts) and `pollPixels` (verify/pixel-poll.ts, the color and ocr asserts).
- * A leaf module since 2026-10-06, for the reason fail-closed.ts is one: both
- * need it and assert.ts imports the other. Until then the verdict-to-poll
- * translation and the not-found sentence lived inside assert.ts, and the
- * pixel asserts reached them only by running through `Verifier.treePoll`. The
- * tree poll (ui-tree/read-tree.ts) does not learn any of this: it speaks
+ * The verifier's poll vocabulary, shared by the tree-only asserts' poll and the
+ * pixel poll (verify/pixel-poll.ts, the color and ocr asserts). Its own module
+ * below assert.ts, importing no assert code, for the reason fail-closed.ts is
+ * one: both need it and assert.ts imports the other. The tree poll
+ * (ui-tree/read-tree.ts) does not learn any of this: it speaks
  * value-or-`PollMiss`, and the translation is the verifier's.
  */
 
@@ -27,17 +25,14 @@ import type { Shot } from './shot.js';
 export type PollVerdict = { pass: boolean; detail?: string; final?: undefined } | FinalVerdict;
 
 /**
- * A miss no later round can change (2026-10-08): the poll ends at once with
- * this verdict instead of polling to the deadline, which would only repeat
- * it and bury it under the timeout wording. Only the pixel poll honours it
- * (verify/pixel-poll.ts, the one place that turns it into control flow) —
- * today for the ocr assert's engine that will never read (text-parity.ts#
- * measureOcrAssert, on an `OcrUnavailableError`). The tree-only asserts
- * never set it. Its own member of the union since round 4 (2026-10-08):
- * a final verdict ENDS the assert and its detail IS the failure sentence,
- * so one that does not fail, or fails without its sentence, does not
- * type-check — until then `final?: true` sat beside an optional detail and
- * the poll read a missing one as `''`.
+ * A miss no later round can change: the poll ends at once with this verdict
+ * instead of polling to the deadline, which would only repeat it and bury it
+ * under the timeout wording. Only the pixel poll honours it — for the ocr
+ * assert's engine that will never read (text-parity.ts#measureOcrAssert, on
+ * an `OcrUnavailableError`). The tree-only asserts never set it. Its own
+ * member of the union because a final verdict ENDS the assert and its detail
+ * IS the failure sentence, so one that does not fail, or fails without its
+ * sentence, does not type-check.
  */
 export interface FinalVerdict {
   pass: false;
@@ -49,7 +44,7 @@ export interface FinalVerdict {
  * What a pixel assert's `measure` is handed (verify/pixel-poll.ts): the
  * element's rect and the frame captured against the same round's tree.
  * Named here, beside the verdict it returns, so the measurements that take
- * it (text-parity.ts#measureOcrAssert) do not respell it (2026-10-08).
+ * it (text-parity.ts#measureOcrAssert) do not respell it.
  */
 export interface PixelMeasureInput {
   /**
@@ -65,11 +60,11 @@ export interface PixelMeasureInput {
 }
 
 /**
- * A verdict in the tree poll's terms, written once (2026-10-06): a passing
- * verdict is the poll's value and carries its detail; a non-passing one with
- * a detail is a `PollMiss`, which is how "element found but content was: …"
- * survives the element vanishing again before the deadline; one with nothing
- * to say continues the poll without erasing an earlier detail.
+ * A verdict in the tree poll's terms, written once: a passing verdict is the
+ * poll's value and carries its detail; a non-passing one with a detail is a
+ * `PollMiss`, which is how "element found but content was: …" survives the
+ * element vanishing again before the deadline; one with nothing to say
+ * continues the poll without erasing an earlier detail.
  */
 export const verdictToPoll = (verdict: PollVerdict | undefined): { detail?: string } | PollMiss | undefined => {
   if (verdict?.pass) return { detail: verdict.detail };

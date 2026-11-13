@@ -41,12 +41,11 @@ import { systemBarName } from '../ui-tree/system-bar.js';
  * adapter's sentence on why and where that dismissal is configured
  * (`advice`, `DeviceAdapter.keyboardAdvice`) — no platform fact of this
  * module's. Both come as the reading's `KeyboardRemedy`
- * (ui-tree/soft-keyboard.ts). The sentence's head is `keyboardCovers`, its
- * advice `hideKeyboard`.
+ * (ui-tree/soft-keyboard.ts).
  */
 export const keyboardOver = (rect: Rect, keyboard: Rect, remedy: KeyboardRemedy): string => `${keyboardCovers(rect, keyboard)} — ${hideKeyboard(remedy)}`;
 
-/** The head of every miss under the soft keyboard, quoting both rects (`keyboardOver`; idb's band, `pixelMissText`). */
+/** The head of every miss under the soft keyboard, quoting both rects. */
 const keyboardCovers = (rect: Rect, keyboard: Rect): string => `the soft keyboard covers the element (element ${rectText(rect)}, keyboard ${rectText(keyboard)})`;
 
 /** How to hide the keyboard over the element, by the adapter's dismissal (`keyboardOver`'s doc). */
@@ -214,7 +213,7 @@ const coverRemedy = (remedy: CoverRemedy): string => {
 /** The remedies of an element under a system bar or a cover — what `coverRemedy` words: every case but `keyboard`. */
 type CoverRemedy = Extract<PixelStanding, { readonly kind: 'systemBar' | 'covered' }>['remedy'];
 
-/** The child to assert instead, when a scroll may not cure the element (`coverRemedy`). */
+/** The child to assert instead, when a scroll may not cure the element. */
 const CLEAR_CHILD = 'assert something in it that lies clear of that';
 
 /** `coverRemedy`'s `fixed` sentences: the advice leads with the child, then says why no scroll moves it. */
