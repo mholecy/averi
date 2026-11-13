@@ -149,7 +149,7 @@ start, and returns at once. It never throws and never rejects. Nothing awaits it
   3. Under `wda` a failed background build is dropped and the first read builds again: two builds where there was one.
   4. The "first WDA build … takes minutes" line would reach stderr during an unrelated tool call.
 - The rule (cached build, run in the background, never reject, nothing once released) is one function,
-  `adapters/prewarm.ts#startInBackgroundIfBuilt`, which both sources call.
+  `startInBackgroundIfBuilt` in adapters/prewarm.ts, which both sources called (both removed by A41d, below).
 
 **Behaviour that moves.**
 - Under `auto`, a launch may see the choice made during its foreground wait. The wait asks idb's label until then and
