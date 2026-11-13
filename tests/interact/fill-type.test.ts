@@ -7,9 +7,9 @@ import { node } from '../helpers/fake.js';
 vi.mock('../../src/util/sleep.js', () => ({ sleep: async () => undefined }));
 
 /**
- * The typing, its poll and what it sends again, through `typeAndConfirm`'s own interface with a scripted field; its
- * one caller, fillField, pins it end to end (fill.test.ts). Whether a reading landed, and what tail it proves dropped,
- * is fill-landing.test.ts's.
+ * The typing, its poll and what it sends again, through `typeAndConfirm`'s own interface with a scripted field;
+ * fillField pins it end to end (fill.test.ts). Whether a reading landed, and what tail it proves dropped, is
+ * fill-landing.test.ts's.
  */
 
 /** A read that found the field showing `value` (FieldIo.read: a node, or why it was lost). */
@@ -550,7 +550,7 @@ describe('typeAndConfirm — a reading unchanged since typing began is no landin
 
 /**
  * D64 (A): without clear, the value must be in what was typed past the earlier text (fill-landing.ts#landingOf), not
- * anywhere in the reading. A field whose earlier text holds the value no longer passes at the first read when only part
+ * anywhere in the reading. A field whose earlier text holds the value does not pass at the first read when only part
  * of the typing landed: on iOS the dropped tail is typed again, as for any other field; a capped field and keys that
  * went into another input end in a miss.
  */
@@ -603,7 +603,7 @@ describe('typeAndConfirm — an earlier text that holds the value is no landing 
   });
 
   // D71: `55` after `5` was the value itself and replied Filled at once, the second key dropped — an append should have
-  // left `555`. Refused now, and nothing typed again: a select-all field reads `55` too, and a retyped `5` there would
+  // left `555`. Refused, and nothing typed again: a select-all field reads `55` too, and a retyped `5` there would
   // end Filled over `555`.
   it.each(['on-return', 'may-arrive-late'] as const)('%s: `55` after `5`, the second key dropped — missed, a length that is a whole landing too, nothing typed again', async (delivery) => {
     const { io, intent, typed } = scripted({ prefilled: '5', keep: [1] });

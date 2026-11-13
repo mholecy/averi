@@ -5,7 +5,7 @@ import { appHolderText, holdsTheApp } from '../../src/interact/app-holder-text.j
 // A10 (ADR 0041's and ADR 0032's A10 amendments): every word about what holds the app, pinned through the module's one
 // interface: the subject (a link or an app) and the closed answer. The kind of holder decides the wording; no platform
 // is passed. The expected strings are the replies' bytes, as ADR 0032's D54/D56/D57 and ADR 0041's D55/D55b/D55c state
-// them; moved here from the adapters' tests and tool-text.test.ts with the words.
+// them.
 
 const LINK = { link: 'averilab://d54' };
 const APP = { app: 'dev.averi.lab' };

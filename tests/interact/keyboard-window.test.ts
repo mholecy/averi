@@ -12,8 +12,7 @@ import { boundReads } from '../helpers/terminal-read.js';
 // The WINDOW model (interact/keyboard-window.ts: Android, the adapter has the
 // keyboard oracle), through the module's interface — tapElement, fillField,
 // resolveClearOfKeyboard, dismissKeyboard — on the fake with an oracle
-// attached. The in-tree model's pins are tests/interact/keyboard-in-tree.test.ts;
-// the two files were one until 2026-10-07 (the keyboard-model review).
+// attached. The in-tree model's pins are tests/interact/keyboard-in-tree.test.ts.
 //
 // The one sleep owner (util/sleep.ts) is recorded, not waited on (as in
 // fill.test.ts): the pause after `back` is asserted as a delay in a sequence.
@@ -760,7 +759,7 @@ describe('dismissKeyboard — the `dismissal` decision, witness-vetoed (moved he
  * reads only the 132-px collapse strip as the band, the panel at
  * [359,1269][1040,1912] is a second rect of the IME window's touchable
  * region, and a tap on a field whose centre (540,1586) lay inside the panel
- * pressed Gboard's `d` key. The panel now covers as the band does: the same
+ * pressed Gboard's `d` key. The panel covers as the band does: the same
  * witness, the same one `back` (measured that day to hide the floating
  * keyboard and leave the form), the same look.
  */
@@ -792,7 +791,6 @@ describe('tapElement — a target under a FLOATING keyboard\'s panel, above its 
     const fake = sepaFake();
     const events = recorded(fake);
     const result = await tapElement(fake, 'id:message_for_payee_input', FAST);
-    // Until this date: ['read', 'read', 'keyboard?', 'tap:540,1586'] — the panel's `d` key.
     expect(events).toEqual(['read', 'read', 'keyboard?', 'touchable?', 'witness?', 'key:back', 'read', 'read', 'keyboard?', 'tap:540,1586']);
     expect(fake.keys).toEqual(['back']);
     expect(result.keyboardHidden).toBe('the soft keyboard covered id:message_for_payee_input; hidden before tapping');
@@ -803,8 +801,6 @@ describe('tapElement — a target under a FLOATING keyboard\'s panel, above its 
     fake.attachedKeyboard.witnessAnswers.queue = ['hidden', 'shown'];
     const events = recorded(fake);
     const result = await tapElement(fake, 'id:message_for_payee_input', FAST);
-    // Until the review the round read state() alone — the strip — called the point clear and tapped (540,1586):
-    // ['read', 'read', 'keyboard?', 'touchable?', 'witness?', 'keyboard?', 'read', 'read', 'tap:540,1586'].
     expect(events).toEqual([
       'read', 'read', 'keyboard?', 'touchable?', 'witness?', // vetoed
       'keyboard?', 'touchable?', 'witness?', 'key:back', // still under the panel; the input method now confirms

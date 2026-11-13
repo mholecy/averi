@@ -6,10 +6,9 @@ import { judgeFill, type FillVerdict } from '../../src/interact/fill-verdict.js'
  * The judgement is asserted as CODES — `did`, `sent`, `reasons`, `caveats`
  * — never as wording: a wording change touches the sentence tables' block
  * in fill-text.test.ts and nothing else. Every fact shape the old reply
- * tests built by hand (tool-text.test.ts until 2026-10-09) is judged here,
- * including the two fillField never produces (marked), because the
- * invariants must hold over the whole FillResult type, not only the shapes
- * measured today.
+ * tests built by hand is judged here, including the two fillField never
+ * produces (marked), because the invariants must hold over the whole
+ * FillResult type, not only the shapes measured today.
  */
 const fact = (f: Partial<FillResult> & Pick<FillResult, 'readBack' | 'typed'>): FillResult => ({ role: 'textfield', ...f });
 const landed = { kind: 'landed' } as const;
@@ -99,11 +98,10 @@ describe('judgeFill — what the facts mean', () => {
     expect(judgeFill(fact({ typed: 0, readBack: { kind: 'lost', why: 'unmatched' }, cleared: 0 }))).toMatchObject({ did: 'focused', reasons: [{ code: 'lost' }] });
   });
 
-  // The one judgement that changed on 2026-10-09: an unverified fill with
-  // nothing typed and NO clear asked read `Typed 0 characters into …` (the
-  // reply's fall-through). fillField cannot produce it — without clear an
-  // empty value is always `nothing-typed`, which is verified — and a fill
-  // that typed nothing is not "typed" whatever the facts: it is `focused`.
+  // An unverified fill with nothing typed and NO clear asked: fillField
+  // cannot produce it — without clear an empty value is always
+  // `nothing-typed`, which is verified — and a fill that typed nothing is not
+  // "typed" whatever the facts: it is `focused`.
   it('nothing typed, no clear, unverified (not produced by fillField) is focused, never typed', () => {
     expect(judgeFill(fact({ typed: 0, readBack: { kind: 'lost', why: 'unmatched' } }))).toMatchObject({ did: 'focused' });
     expect(judgeFill(fact({ typed: 0, readBack: { kind: 'no-value' } }))).toMatchObject({ did: 'focused', reasons: [{ code: 'no-value' }] });
@@ -190,7 +188,7 @@ describe('judgeFill — what the facts mean', () => {
 
   // Review of the hint-aware clear, probes C and K: a clear alone that ended
   // on its named placeholder without seeing the field empty. fill.ts reports
-  // the fact (clearPlaceholder); the judgement is here since 2026-10-09.
+  // the fact (clearPlaceholder); the judgement is here.
   it('clearPlaceholder: `shown` and `prefix` make a clear alone NOT verified (placeholder); `other`, or anything typed, does not', () => {
     const rows: [Partial<FillResult> & Pick<FillResult, 'readBack' | 'typed'>, Pick<FillVerdict, 'did' | 'sent' | 'reasons'>][] = [
       // C: the field read its placeholder before any delete — nothing sent.

@@ -10,11 +10,9 @@ import { charactersText } from '../../src/util/count.js';
  * lines — from the same facts, each judged by its renderer, so a layout change that
  * makes the two say different things fails here in one place (df8a91a: a
  * clear alone read `(N deletes sent)` in the reply and `cleared N characters
- * first` on the flow line). Every shape the reply tests pinned until
- * 2026-10-09 (tests/mcp/tool-text.test.ts) is here byte for byte, with its
- * flow line beside it. The judgement itself (codes) is
- * fill-verdict.test.ts's; the end-to-end agreement through a fake device
- * stays with tools.test.ts and engine.test.ts.
+ * first` on the flow line). The judgement itself (codes) is fill-verdict.test.ts's;
+ * the end-to-end agreement through a fake device stays with tools.test.ts and
+ * engine.test.ts.
  */
 const fact = (f: Partial<FillResult> & Pick<FillResult, 'readBack' | 'typed'>): FillResult => ({ role: 'textfield', ...f });
 const landed = { kind: 'landed' } as const;
@@ -186,7 +184,7 @@ describe('fillReply and fillStepText — the MCP reply and the flow line of the 
 
   // docs/bugs/2026-10-09-android-clear-reads-edittext-hint-as-content.md: a
   // clear alone that stopped on deletes that changed nothing — the field was
-  // never seen empty, and was failed until 2026-10-09.
+  // never seen empty.
   it('a clear alone whose deletes changed nothing: "Cleared … (N deletes sent)" and the hint-or-deaf-field reason, on both media', () => {
     const tail =
       'NOT verified: the field still shows 15 characters that the deletes did not change — its hint or placeholder (shown while empty), or a field that ignores deletes';
@@ -207,7 +205,6 @@ describe('fillReply and fillStepText — the MCP reply and the flow line of the 
       'Focused id:x — NOT verified: the field could not be found again (the selector no longer matches it)',
     );
     // Not produced by fillField either (no clear: an empty value is `nothing-typed`, verified).
-    // Until 2026-10-09 the reply fell through to "Typed 0 characters into id:x — …" here.
     expect(both('id:x', fact({ typed: 0, readBack: { kind: 'lost', why: 'unmatched' } })).reply).toBe(
       'Focused id:x — NOT verified: the field could not be found again (the selector no longer matches it)',
     );
@@ -309,9 +306,9 @@ describe('wordingOf — every sentence', () => {
 });
 
 /**
- * The errors fillField throws, worded here since 2026-10-09 (they were inline
- * in fill.ts). Every row takes lengths and counts only; the end-to-end shapes
- * through a fake device are fill.test.ts's.
+ * The errors fillField throws, worded here. Every row takes lengths and
+ * counts only; the end-to-end shapes through a fake device are
+ * fill.test.ts's.
  */
 describe('fillFailureText — every error a fill throws', () => {
   const mismatch = (differs: Extract<FillFailure, { code: 'mismatch' }>['differs'], typed = 5, shows = 5) =>

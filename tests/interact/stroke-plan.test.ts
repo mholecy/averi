@@ -16,11 +16,9 @@ import { stackedLayers } from '../helpers/stacked-layers.js';
 /**
  * `scroll_until`'s stroke plan through its interface (interact/stroke-plan.ts, A1 of the round-21 architecture pass):
  * a read's facts and the course's direction in, the stroke as the driver sends it out — its scroll view, box, cover
- * and points — with the presented surface at its touch-down and the node a sent stroke touched down on. The tests
- * that until A1 drove swipe.ts's `strokeRoom` and `scrollStroke` (now stroke-plan.ts#strokeRoom, #scrollStroke) with
- * hand-made rects, and the single-read stroke decisions tests/interact/scroll-rounds.test.ts asked of a whole round,
- * are asked here of the plan; what spans reads and the course (a turn, a failed read, a remembered scroll view across
- * the round's own reads) stays the round's to test.
+ * and points — with the presented surface at its touch-down and the node a sent stroke touched down on. The stroke
+ * decisions of a single read are asked here of the plan; what spans reads and the course (a turn, a failed read, a
+ * remembered scroll view across the round's own reads) stays the round's to test (tests/interact/scroll-rounds.test.ts).
  */
 
 /** The Pixel_3a's screen, the gesture box the tests stroke in. */
@@ -913,7 +911,7 @@ describe('the target\'s row — on a tree that tells no scroll view, a sideways 
     const tree = idb();
     const c = byId(tree, 'lab.carousel-in-list.C');
     const right = (keyboardTop: number) => planOn(tree, 'right', { target: c, gesture: PHONE, keyboardTop }).stroke;
-    // Above the row (138): the old screen box's stroke, above the keys — never on them (y 130 before the fix).
+    // Above the row (138): the screen box's stroke, above the keys — never on them.
     expect(right(100)).toMatchObject({ box: PHONE, points: swipeVectorAbove(PHONE, 100, 'right', 'content') });
     expect(right(138)).toMatchObject({ box: PHONE, points: swipeVectorAbove(PHONE, 138, 'right', 'content') });
     // Inside it: the row cut at the line, 138..180, its stroke at 159, above the keys.

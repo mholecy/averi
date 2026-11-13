@@ -152,7 +152,7 @@ describe('round — the end turn: the caller\'s way first, proven exhausted, the
   });
 
   it('once only: strokes the other way that the tree then shows at that end too stop on the proof, not turn back again', () => {
-    // A replayed tree never moves: down is not at its end, so the old two-stroke rule ends it — no second turn.
+    // A replayed tree never moves: down is not at its end, so the two-stroke rule ends it — no second turn.
     const played = play(IPHONE, [at(0), at(0), at(0), at(0)]);
     expect(strokesToward(played)).toEqual(['up', 'down', 'down']);
     expect(played.outcome).toMatchObject({ kind: 'bound', by: { of: 'exhausted', lastStroke: 'down' }, endTurn: { way: 'up', to: 'down' } });

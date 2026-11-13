@@ -179,9 +179,9 @@ describe('resolveSettled — appear AND hold still', () => {
     expect(reads).toBe(4);
   });
 
-  // 2026-10-08: the two ways a settle wait ends are two sentences, and only
-  // the first is ElementNotFoundError. Until then both read "(visible and
-  // settled)", and the flow's `optional:` had to guess which one it got.
+  // The two ways a settle wait ends are two sentences, and only the first is
+  // ElementNotFoundError: worded alike, the flow's `optional:` would have to
+  // guess which one it got.
   it('a target that NEVER resolves times out as ElementNotFoundError, worded "to appear" — nothing about settling', async () => {
     resetLayout();
     const fake = new FakeAdapter({ s: screen() }, 's');

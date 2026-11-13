@@ -751,7 +751,7 @@ describe('a refused tap on a target its moved tap keeps clear of a control liste
         `only a 300x10 part of it shows clear of button "W" (51,390 300x40), listed before it in reading order, under the 24x24 a tap may be moved to — ${orderRemedyText({ of: 'unordered' }, 'touch')}; nothing was tapped`,
     );
     const row: Row = { tree, found: [c], screen: USABLE };
-    // The order not told, scroll_until stops before any swipe (it swiped once before D84, the Banner then `drawn`).
+    // The order not told, scroll_until stops before any swipe.
     const failure = failureOf(play({ direction: 'down', fully: false, maxSwipes: 1, timeoutMs: 30_000, screen: IPHONE }, [row]), 'id:t').message;
     expect(failure).toMatch(/^scroll_until id:t stopped before any swipe — .* 33% of it shows; no swipe was sent — /);
   });
@@ -942,7 +942,7 @@ describe('one remedy for a target under a drawn cover where neither lies in a sc
 // D88: a target CUT to a sliver by a node drawn after it (geometry.ts#Cut.by), where neither lies in a scroll view as the
 // tree says — the lab's text-under-bar P on Android (Compose), cut to 825x22 by the later sibling Continue — takes
 // `bothPinned` too (ui-tree/standing.ts#Remedy, 5.): the pixel assert judges that target `covered` by the same node and
-// already said so (D87), so the tap, both stops and the pixel assert now agree, and scroll_until stops before any swipe
+// already said so (D87), so the tap, both stops and the pixel assert agree, and scroll_until stops before any swipe
 // instead of stroking until exhausted. The cut stays ambiguous — the dump cannot tell it from a control only that thin
 // laid flush against that node — and the words keep that way past; neither case is one a scroll changes. A cut by its
 // clipping container, or the same pair inside a scroll view, keeps the scroll. (idb's flat list, whose ancestry is untold,

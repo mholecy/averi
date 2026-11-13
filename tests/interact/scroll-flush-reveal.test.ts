@@ -64,8 +64,8 @@ describe('a probe that revealed more of a match still flush on the same edge pro
     expect(strokes(played).map((s) => s.do === 'stroke' && s.maxTravel)).toEqual([177, 206, 176]);
   });
 
-  // Rewritten on purpose (D62): this was "a reveal after which it holds is checked" — but a reveal that moved nothing
-  // may not have been taken by the app (batch-9). Doubted once: sent again, and hedged (T11) if that one holds.
+  // D62: a reveal that moved nothing may not have been taken by the app (batch-9). Doubted once: sent again, and hedged
+  // (T11) if that one holds.
   it('D62: a reveal that held right after the probe is sent again — the hedge when that one holds too, the cut when no swipe is left', () => {
     const played = play(RULES, [sAt(0), sAt(60), sAt(60), sAt(60)]);
     expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stroke', 'stop']);

@@ -169,10 +169,9 @@ describe('assertTypeable refuses a character the adapter cannot type', () => {
 });
 
 /**
- * D43 (ADR 0037's D43 amendment): every refusal ends with the remedy true for its adapter (Typeable.otherPath) — no
- * longer "averi has no other typing path yet" on every one. idb's names the WDA tree source for a character
- * WebDriverAgent types, and no path for one it does not; Android names none on API 33; WDA's names none, its set saying
- * what is not measured. None of them quotes the value.
+ * D43 (ADR 0037's D43 amendment): every refusal ends with the remedy true for its adapter (Typeable.otherPath). idb's
+ * names the WDA tree source for a character WebDriverAgent types, and no path for one it does not; Android names none
+ * on API 33; WDA's names none, its set saying what is not measured. None of them quotes the value.
  */
 describe('assertTypeable ends each refusal with its adapter\'s remedy', () => {
   it('iOS (idb): a character WebDriverAgent types — names `ios.treeSource: wda`', () => {
