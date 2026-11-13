@@ -141,9 +141,9 @@ export interface TextParityResult {
 /**
  * What the recognizer read on one platform's frame, WITH the normalizer that
  * turns its ink boxes into a size. One value, so a capture cannot carry OCR
- * results without the width that makes them comparable — until 2026-10-04 the
- * two were sibling optionals and a wiring that forgot the width silently
- * dropped every size check (`inkPctOf(lines, pngWidth ?? 0)`).
+ * results without the width that makes them comparable — as two sibling
+ * optionals, a wiring that forgot the width would silently drop every size
+ * check (`inkPctOf(lines, pngWidth ?? 0)`).
  */
 export interface TextOcr {
   /** Recognizer output keyed by anchor id. */
@@ -235,26 +235,25 @@ export function renderedTextFromTree(tree: UiNode, id: string): string[] {
  *   mismatch is normal (OCR merges and reorders lines a tree keeps separate)".
  *   ANY substantial part surviving means the region was read — which is the
  *   only question this guard asks. It does not mean the copy is right; that is
- *   the drift table's job, and a part-read anchor now reaches it instead of
- *   being silently withheld.
+ *   the drift table's job, and a part-read anchor reaches it instead of being
+ *   silently withheld.
  *
  * Drift comparison stays exact (`normalizeText` only collapses whitespace) —
  * a real case change is a real finding, and this leniency must not leak there.
- * It cannot: `survivesIn` has exactly one src caller, the UNREAD guard in
- * `measure`.
  *
  * WHAT THE PARTS RULE COSTS, recorded where the next reader will reach for it.
  * A part surviving answers only "was this region read at all". It cannot see a
  * dialog covering a combined row's VALUE while the leading label part stays
- * legible inside the anchor's region: pre-change that was OCCLUDED and failed
- * the run, and it is now reported as read. On a `text_dynamic` anchor — which
- * all four measured shapes are — no string comparison follows, so for that
- * class the honest trade is "false alarm that failed the run" → "no check, run
- * passes", NOT "now compared as drift". Accepted deliberately: a wholly covered
- * region still has no survivor and still reports OCCLUDED, the same blindness
- * has always existed for the two-node spelling of the same row (the caller is
- * itself a `.some()` over tree strings), and the systematic false positive it
- * replaces suppressed the copy check on EVERY combined row.
+ * legible inside the anchor's region: a whole-string rule would call that
+ * OCCLUDED and fail the run, and the parts rule reports it as read. On a
+ * `text_dynamic` anchor — which all four measured shapes are — no string
+ * comparison follows, so for that class the honest trade is "false alarm that
+ * fails the run" → "no check, run passes", NOT "compared as drift". Accepted
+ * deliberately: a wholly covered region still has no survivor and still
+ * reports OCCLUDED, the same blindness exists for the two-node spelling of the
+ * same row (the caller is itself a `.some()` over tree strings), and the
+ * systematic false positive of a whole-string rule suppresses the copy check
+ * on EVERY combined row.
  */
 
 /**
@@ -299,9 +298,9 @@ function survivesWhole(treeString: string, got: string): boolean {
  * Split on the RAW string, before `looseForm` drops the commas it is made of.
  * The trailing SPACE is load-bearing: it keeps a locale-formatted '1,121.00'
  * from splitting. A locale whose system separator is not ', ' (Arabic '، ',
- * CJK '、') simply never enters the parts rule and degrades to the pre-change
- * behaviour — a noisy false positive, never a new false negative, which is the
- * safe direction to fail.
+ * CJK '、') simply never enters the parts rule and degrades to the whole-string
+ * test — a noisy false positive, never a new false negative, which is the safe
+ * direction to fail.
  */
 const COMBINED_SEPARATOR = ', ';
 
@@ -318,8 +317,7 @@ const MIN_PART_LENGTH = 3;
 /**
  * Did a tree string survive into the reading? See the block above for the full
  * rationale and the cost the parts rule accepts. Exported for the acceptance
- * pins the bug report states at this level; the sole src caller is the UNREAD
- * guard in `measure`.
+ * pins the bug report states at this level.
  */
 export function survivesIn(treeString: string, seen: string): boolean {
   const got = looseForm(seen);
@@ -412,7 +410,7 @@ export function ocrRegionForRect(
     : { region, note: scaled.note };
 }
 
-/** The frame's crop (no inset — see above) in the recognizer's shape, shared by both callers. */
+/** The frame's crop (no inset — see above) in the recognizer's shape. */
 function regionForRect(
   id: string,
   rect: Rect,
@@ -428,18 +426,17 @@ function regionForRect(
 /**
  * The text table's measurement for ONE run, decided once: the engine choice
  * (verify/ocr.ts#ocrEngineFor, made by the run — the `ocr` assert fails
- * closed on the same choice, the same value since 2026-10-08) and BOTH halves of this table's policy on an absent engine, in one
- * value — the run-level caveat the section prints before any leg, and the
- * per-leg `measure` that then stands on tree evidence without a note of its
- * own. One function owns the two because they are one rule: a run that
- * prints the caveat and legs that keep quiet, never one without the other.
- * Until 2026-10-05 they were split — `textRecognizer` produced the notes
- * and a separately exported `measureTextLeg` took the engine as a bare
- * argument, returning tree-only SILENTLY when it was undefined and trusting
- * the caller to have printed the caveat; a caller that forgot would have
- * weakened the check without a word. OCR is macOS-only and needs a Swift
- * toolchain, and on iOS the tree carries authored a11y summaries rather than
- * rendered copy, so that silence is the one thing this table must not do.
+ * closed on the same choice, the same value) and BOTH halves of this table's
+ * policy on an absent engine, in one value — the run-level caveat the section
+ * prints before any leg, and the per-leg `measure` that then stands on tree
+ * evidence without a note of its own. One function owns the two because they
+ * are one rule: a run that prints the caveat and legs that keep quiet, never
+ * one without the other. Split, a leg measure that took the engine as a bare
+ * argument would return tree-only SILENTLY when it was undefined and trust
+ * the caller to have printed the caveat; a caller that forgot would weaken
+ * the check without a word. OCR is macOS-only and needs a Swift toolchain,
+ * and on iOS the tree carries authored a11y summaries rather than rendered
+ * copy, so that silence is the one thing this table must not do.
  */
 export interface TextMeasurementRun {
   /** What the section prints before any leg: the one caveat for an absent engine; empty when there is one. */
@@ -450,8 +447,8 @@ export interface TextMeasurementRun {
 
 /**
  * `choice` is the run's one OCR decision (run/verify.ts makes it once and
- * hands the same value to every leg's Verifier, 2026-10-08); left out, the
- * host's is asked here.
+ * hands the same value to every leg's Verifier); left out, the host's is
+ * asked here.
  */
 export function textMeasurement(contract: LayoutContract, choice: OcrEngineChoice = ocrEngineFor()): TextMeasurementRun {
   const runNotes =
@@ -476,11 +473,10 @@ const ocrFailedNote = (platform: Platform, reason: string): string =>
  * raised. OCR touches no device, so it costs no extra capture and cannot
  * race a UI change.
  *
- * This is the text dimension's measurement phase. Until 2026-10-04 it lived
- * one layer up, in run/verify.ts, which therefore had to know that OCR is
- * keyed by anchor id, that the png width is the ink normalizer, and which of
- * `ocrRegionsFor`'s throws are this table's policy — while rect and color
- * handed the run a one-line collector. Now all three do.
+ * This is the text dimension's measurement phase. Here, not in run/verify.ts,
+ * so the run need not know that OCR is keyed by anchor id, that the png width
+ * is the ink normalizer, or which of `ocrRegionsFor`'s throws are this
+ * table's policy: like rect and color, it hands the run a one-line collector.
  *
  * Every failure here degrades to a NOTE rather than an exception: an
  * undecodable png, an unusable scale or a recognizer crash must leave the
@@ -489,13 +485,13 @@ const ocrFailedNote = (platform: Platform, reason: string): string =>
  * bare note: the leg has a tree, or the run would not have asked; `notes` is
  * always present (`[]` when none).
  *
- * Reached only through `textMeasurement` (private since 2026-10-05, so the
- * no-engine path below cannot be taken without the run-level caveat that
- * explains it). No engine: tree only, no per-leg note — the run printed the
- * one caveat. A tree whose scale yields no region: tree only, no note —
- * nothing scaled, nothing to caveat. The scale's own caveat is carried AFTER
- * the recognizer ran, so a leg that ends up compared from the tree carries
- * THAT reason alone rather than a caveat about regions it never used.
+ * Reached only through `textMeasurement` (private, so the no-engine path
+ * below cannot be taken without the run-level caveat that explains it). No
+ * engine: tree only, no per-leg note — the run printed the one caveat. A tree
+ * whose scale yields no region: tree only, no note — nothing scaled, nothing
+ * to caveat. The scale's own caveat is carried AFTER the recognizer ran, so a
+ * leg that ends up compared from the tree carries THAT reason alone rather
+ * than a caveat about regions it never used.
  */
 async function measureTextLeg(
   contract: LayoutContract,
@@ -527,7 +523,6 @@ function wantsTextCheck(anchor: LayoutAnchor): boolean {
   return anchor.text !== undefined || anchor.text_dynamic !== undefined;
 }
 
-/** Do the contract's anchors opt into text checks at all? */
 export function contractHasTextAnchors(contract: LayoutContract): boolean {
   return contract.anchors.some(wantsTextCheck);
 }
@@ -556,10 +551,8 @@ function isDynamic(anchor: LayoutAnchor): boolean {
 
 /**
  * The size tolerance in force: the contract's `tolerance_size_pct`, else the
- * default — and never a non-number. Shared by the comparator and
- * `validateTextContract`. The contract is its only source (2026-10-08; a
- * `sizeTolerancePct` option nothing ever passed is gone —
- * rect-parity.ts#tolerancesOf has the account).
+ * default — and never a non-number. The contract is its only source, as for
+ * rect parity (rect-parity.ts#tolerancesOf).
  */
 function sizeTolerancePctOf(contract: LayoutContract): number {
   return positiveTolerance(contract.tolerance_size_pct ?? DEFAULT_SIZE_TOLERANCE_PCT, 'text parity: tolerance_size_pct');
@@ -568,7 +561,7 @@ function sizeTolerancePctOf(contract: LayoutContract): number {
 /**
  * Every problem `compareTextParity` would raise about the CONTRACT's copy
  * fields — no capture, no device — so run/verify.ts can refuse a run before
- * its legs instead of reporting `FAILED:` after them (2026-10-03).
+ * its legs instead of reporting `FAILED:` after them.
  *
  * One owner per rule: the list is produced by the same functions the
  * comparator reads the fields with (`sizeTolerancePctOf`, `expectedTextOf`,
@@ -874,7 +867,6 @@ export function compareTextParity(
 
 // -------------------------------------------------------------- rendering
 
-/** One-line verdict — the number the caller quotes. */
 export function textParityVerdict(r: TextParityResult): string {
   if (r.pass) {
     const n = r.rows.filter((row) => row.verdict !== 'MISSING').length;
@@ -1012,15 +1004,11 @@ export interface OcrExpectation {
 
 /**
  * The `ocr` assert's measurement of ONE settled, decoded frame, owned here
- * as the colour assert's is owned by color-parity.ts#evaluateColorAssert
- * (2026-10-08, review 2026-10-07 assert-capture-ocr C2): crop the element's
- * rect → recognize → the region's own error → the verdict. Until that date
- * the crop, the recognizer call and the error handling were a closure in
- * verify/assert.ts, and its fail-closed wording had drifted from the one
- * sentence (fail-closed.ts): a region the recognizer could not read came
- * back as its raw error ("region outside the screenshot") with no "failing
- * closed", and a recognizer that threw as "OCR failed: …", also without it.
- * Every "not read" now ends `failing closed, rendered text unchecked`:
+ * as the colour assert's is owned by color-parity.ts#evaluateColorAssert:
+ * crop the element's rect → recognize → the region's own error → the
+ * verdict. Owned here, its fail-closed wording cannot drift from the one
+ * sentence (fail-closed.ts): every "not read" ends `failing closed, rendered
+ * text unchecked`:
  *
  * - a rect the frame's scale leaves nowhere on the png, or a scale that
  *   could not be derived — `ocrRegionForRect`'s reason;
@@ -1033,17 +1021,19 @@ export interface OcrExpectation {
  *   same sentence comes back marked `final` (poll-verdict.ts), the pixel
  *   poll ends the assert at once and `assertAll` goes on. A value, not a
  *   throw: ending the poll is the pixel poll's control flow, not this
- *   measurement's. Until 2026-10-08 a missing compiler polled the whole
+ *   measurement's. Polled on, a missing compiler would run out the whole
  *   12 s default before saying so;
  * - nothing recognized, and a height asked of multi-line text —
  *   `evaluateOcrAssert`'s.
  *
- * Only the recognizer call is caught. A throw from anything else here is
- * this code's own bug, not an OCR failure, and propagates out of the poll
- * rather than being dressed as a reading (the regex, the one thing in the
- * verdict that could throw on input, is refused at parse since 83f99bb).
- * The frame's scale note rides along on every verdict, before the
- * fail-closed tail when there is one.
+ * Only the OCR work — encoding the frame and the recognizer call — is
+ * caught. A throw from anything else here is this code's own bug, not an OCR
+ * failure, and propagates out of the poll rather than being dressed as a
+ * reading (the regex, the one thing in the verdict that could throw on
+ * input, is refused at parse). The frame's scale note rides along on the
+ * verdicts built from the recognizer's reading — an unread region or an
+ * evaluated one — before the fail-closed tail when there is one; a
+ * recognizer that threw carries none, and a rect with no region has none.
  */
 export async function measureOcrAssert(
   engine: OcrEngine,
