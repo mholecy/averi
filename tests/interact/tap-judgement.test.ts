@@ -13,6 +13,7 @@ import { node } from '../helpers/fake.js';
 import { stackedLayers } from '../helpers/stacked-layers.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { remedyThenEscape } from '../helpers/escape-order.js';
+import { FLAT, predictedWda } from '../helpers/flat-catcher.js';
 
 // THE tap judgement of one look (interact/tap-judgement.ts#judgeTap), as a table over a look (ui-tree/look.ts#lookAt)
 // and a screen — no settle loop, no keyboard guard: a fake `viewport` that counts its fresh reads, static trees, and a
@@ -364,28 +365,17 @@ describe('judgeTap(…).aim() — a later stacked screen layer over the target (
     );
   });
 
-  // A43 (lab cell tap-catcher-beneath-flat, awaiting its first capture): a hidden screen-wide tap-catcher drawn BENEATH
-  // four ungrouped targets. Predicted WDA listing: the ungrouped blur-menu's — the hidden childless `Other 0,0 402x874`
-  // first by its top, the targets its siblings after it — less the card's rows K and W. There every target is open and
-  // must be tapped; on blur-menu the same listing hides A, B and D under the backdrop (presented.known.ts, ADR 0018
-  // residual 9). Pinned here so the capture tells: if WDA lists the cell so, no rule on the tree can refuse blur-menu's
-  // A without refusing these, and blur-menu.wda stays KNOWN.
-  it('A43 prediction: tap-catcher-beneath-flat listed as the ungrouped blur-menu is (WDA) — A–D tapped at their centres, as blur-menu\'s A–D are, nothing marked', async () => {
-    const raw = await readFile(new URL('../fixtures/truth/ios-iphone17-ios27/blur-menu.wda.json', import.meta.url), 'utf8');
-    const flat = raw.replaceAll('lab.blur-menu.', 'lab.tap-catcher-beneath-flat.');
-    const value = JSON.parse(flat) as { value: { children?: unknown[] } };
-    const drop = (n: { rawIdentifier?: string; children?: unknown[] }): boolean => {
-      if (n.children !== undefined) n.children = n.children.filter((c) => drop(c as typeof n));
-      return n.rawIdentifier !== 'lab.tap-catcher-beneath-flat.K' && n.rawIdentifier !== 'lab.tap-catcher-beneath-flat.W';
-    };
-    drop(value.value);
-    const tree = parseWdaSource(JSON.stringify(value));
+  // A43 (ADR 0018, the A43 amendment): guards against a future rule that refuses the ungrouped blur-menu's A, B, D on
+  // WDA's tree — on the listing predicted for tap-catcher-beneath-flat (blur-menu's less K and W) such a rule would also
+  // refuse that cell's open targets. Whether WDA does list the cell so: tests/truth/flat-catcher-listing.test.ts.
+  it('A43: on the listing predicted for tap-catcher-beneath-flat (WDA) nothing is marked and A–D are tapped at their centres', async () => {
+    const tree = parseWdaSource(JSON.stringify(await predictedWda()));
     expect([...everyNode(tree)].filter((n) => n.presentation !== undefined)).toEqual([]);
     const listed = [...everyNode(tree)].filter((n) => n.identifier?.startsWith('lab.') === true).map((n) => n.identifier);
-    expect(listed).toEqual(['A', 'B', 'C', 'D'].map((t) => `lab.tap-catcher-beneath-flat.${t}`));
+    expect(listed).toEqual(['A', 'B', 'C', 'D'].map((t) => `lab.${FLAT}.${t}`));
     const centres: Record<string, number> = { A: 142, B: 322, C: 502, D: 682 };
     for (const t of ['A', 'B', 'C', 'D']) {
-      expect(said((await judge(tree, `lab.tap-catcher-beneath-flat.${t}`, { first: IPHONE })).outcome)).toBe(`{"point":{"x":201,"y":${centres[t]}}}`);
+      expect(said((await judge(tree, `lab.${FLAT}.${t}`, { first: IPHONE })).outcome)).toBe(`{"point":{"x":201,"y":${centres[t]}}}`);
     }
   });
 
