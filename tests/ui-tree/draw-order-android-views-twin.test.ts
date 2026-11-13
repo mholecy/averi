@@ -105,10 +105,10 @@ describe('P2 the same run in Compose AndroidView interop: unmarked, tapped at th
  * a container of [cover, target] — location order, the cover's left 20 dp further left. The container ENCLOSES its
  * cover (the slot widened 20 dp left and right, 10 dp up and down), so no bound is clipped: a slot as small as its
  * target would clip the cover's dumped bounds to it (View#getBoundsOnScreen clips to each parent) and fail the location
- * check on its own — the cell would not tell the role rule from the clip. Until A42a the provider rule
- * (android-tree-dialect.ts#providesNodes) left the run unmarked and each target `Tapped` at the centre, on its cover (LR4's
- * lie, ADR 0015's residual 5, captured so 2026-11-11). The slot's direct children are React Native's ViewGroups, which no
- * node provider lists: since A42a it is no provider's host, its run is marked, and the slot reads as views-banner's run
+ * check on its own — the cell would not tell the role rule from the clip. Were the slot a provider's host
+ * (android-tree-dialect.ts#providesNodes), the run would be unmarked and each target `Tapped` at the centre, on its cover
+ * (LR4's lie, ADR 0015's residual 5, captured so 2026-11-11). The slot's direct children are React Native's ViewGroups,
+ * which no node provider lists: it is no provider's host, its run is marked, and the slot reads as views-banner's run
  * does (P1) — each cover an untold peer, refused with the eyes or without (ADR 0015's residual 5, narrowed).
  */
 describe('P3 rn-banner-role: the slot container dumps as android.view.View with ViewGroup children — marked, each cover an untold peer, refused', () => {
@@ -152,7 +152,7 @@ describe('P3 rn-banner-role: the slot container dumps as android.view.View with 
  * over it — by child order (A the later child) or by translationZ (A2) — each holding the other's centre. B's peer A,
  * listed before it, is untold: with no screenshot B is refused, and the eyes seeing B under A keep it refused. A's side
  * (B an untold peer, lifted when the eyes see A on top: A `Tapped`) is pinned at the cell's geometry on the captured
- * frame in tests/verify/eyes-views-drawn-over.test.ts (backlog D84: B, no control, became a peer when listed after A).
+ * frame in tests/verify/eyes-views-drawn-over.test.ts (backlog D84: B, no control, is a peer when listed after A).
  */
 describe('P4 views-drawn-over, B\'s side: A listed before and drawn over it — B refused, with and without the eyes', () => {
   const cell = 'views-drawn-over';

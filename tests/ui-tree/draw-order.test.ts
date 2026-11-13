@@ -22,17 +22,17 @@ const rect = (x: number, y: number, width: number, height: number) => ({ x, y, w
  * questions, each pinned on the device shapes its rows were measured on.
  */
 
-/** mp-native's SWIFT form under idb at six scroll positions, rows under the top bar (device check C3-3, 2026-10-09). */
 const PAD = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')) as { elements: unknown[] };
 const MODAL = JSON.parse(await readFile(new URL('../fixtures/idb-modal-listed-before-content.json', import.meta.url), 'utf8')) as { screens: Record<string, unknown[]> };
+/** mp-native's SWIFT form under idb at six scroll positions, rows under the top bar (device check C3-3, 2026-10-09). */
 const C33 = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-scrolled-under-top-bar.json', import.meta.url), 'utf8')) as { positions: Record<string, unknown[]> };
 /** The iPhone 17's screen, 402x874 pt. */
 const IPHONE_BOX = rect(0, 0, 402, 874);
 /** Measured ui_snapshots of a layer stacked over a screen, under WDA (ADR 0018). */
 const STACKED = { screens: await stackedLayers() };
-/** Contacts' discard popover with the keyboard down: the raw /source capture, parsed as ui_snapshot parses it now. */
 /** mp-native's SWIFT form pushed over the tab host, the host's hidden tab bar listed after it (ADR 0019): the raw /source capture. */
 const SWIFT_PUSHED = parseWdaSource(await readFile(new URL('../fixtures/wda-capture-swift-form-pushed.json', import.meta.url), 'utf8'));
+/** Contacts' discard popover with the keyboard down: the raw /source capture, parsed as ui_snapshot parses it. */
 const DISCARD_POPOVER_KEYBOARD_DOWN = parseWdaSource(await readFile(new URL('../fixtures/wda-capture-contacts-discard-popover.json', import.meta.url), 'utf8'));
 
 describe('drawnOver — the nodes drawn over a clipping container (the floating tab bar)', () => {
@@ -2070,7 +2070,6 @@ describe('exposure.centreExcused — the later nodes the target column excused t
 });
 
 describe('exposure — a React Native field\'s floating label is its own field\'s (the RN lab app, rn-field\'s N and M)', () => {
-  // Round 7's RN lab app.
   /** The RN lab app's rn-field under WDA (iPhone 17, iOS 27): each input inside an unnamed wrapper of its rect. Parsed afresh per case: the negatives edit it. */
   const wda = async () => parseWdaSource(await readFile(new URL('../fixtures/wda-source-rn-field.json', import.meta.url), 'utf8'));
   /** The same screen under uiautomator (averi_lab, API 33, 1080x2220 at 2.75): the label 3 px past its EditText above and below. */

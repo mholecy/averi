@@ -8,11 +8,7 @@ import { FakeAdapter, node, recorded, screen, type FakeKeyboard } from '../helpe
 // The keyboard reading (ui-tree/keyboard-cover.ts), through its interface:
 // `readKeyboard` over a FakeAdapter, with the oracle's calls counted on the
 // fake (`ScriptedAnswer.queries`) and the floating-Gboard rules over the
-// measured dumps (tests/helpers/android-dumps.ts). Since 2026-10-09 this file
-// holds what tests/ui-tree/soft-keyboard.test.ts held for `readSoftKeyboard`,
-// `oracleKeyboard`, `panelsBeyond`, `keyboardRects`/`highestCover` and
-// `partOfKeyboard`, and tests/interact/keyboard-window.test.ts for
-// `keyboardOver` — the helpers the reading replaced.
+// measured dumps (tests/helpers/android-dumps.ts).
 
 /** An adapter with the oracle (the window model), its window state and witness scripted; the tree is never read. */
 function withOracle(window: SoftKeyboard, witness: KeyboardWitness = 'unknown', tree: UiNode = screen()): { fake: FakeAdapter; oracle: FakeKeyboard; tree: UiNode } {

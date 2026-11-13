@@ -156,10 +156,9 @@ describe('pollTree — the one deadline loop', () => {
     if (outcome.timedOut) expect(outcome.readError?.message).toBe(`null root node (read ${reads})`);
   });
 
-  // D21 (2026-10-31): a read error that no wait cures — idb's wedged accessibility service — ends the poll at once,
-  // thrown as it came; before, D20's scroll read it 133 times in 90 s. Even after good reads: it says the device's
-  // state, not the screen's, and the next read would say it again. Bounded to the two reads (D38,
-  // tests/helpers/terminal-read.ts).
+  // D21: a read error that no wait cures — idb's wedged accessibility service — ends the poll at once, thrown as it
+  // came; polled instead, D20's scroll read it 133 times in 90 s. Even after good reads: it says the device's state, not
+  // the screen's, and the next read would say it again. Bounded to the two reads (D38, tests/helpers/terminal-read.ts).
   it('a PersistentReadError is thrown at once, not polled to the deadline — even after a tree was read', async () => {
     let reads = 0;
     const wedged = new PersistentReadError('wedged until a reboot');
@@ -211,8 +210,8 @@ describe('pollTree — the one deadline loop', () => {
     if (outcome.timedOut) expect(outcome.detail).toBe(`seen ${round - 1}`);
   });
 
-  // The optional-tap finding (2026-08-19): a budget shorter than one device
-  // read must still get one honest look, and a 0 ms budget is a single probe.
+  // The optional-tap finding: a budget shorter than one device read must
+  // still get one honest look, and a 0 ms budget is a single probe.
   it('timeoutMs 0 is exactly one read and one evaluation, and that one can hit', async () => {
     let reads = 0;
     let evaluations = 0;
@@ -225,10 +224,10 @@ describe('pollTree — the one deadline loop', () => {
     expect(evaluations).toBe(2);
   });
 
-  // 2026-10-06 (docs/bugs/2026-10-06-ios-idb-empty-tree-persists-on-pin-
-  // screen.md): the ladder refuses a destructive rung when the probe before
-  // it never read a tree, and the probe is a 0 ms poll — so its count must
-  // be exactly the one read it made, 0 when that read failed.
+  // docs/bugs/2026-10-06-ios-idb-empty-tree-persists-on-pin-screen.md: the
+  // ladder refuses a destructive rung when the probe before it never read a
+  // tree, and the probe is a 0 ms poll — so its count must be exactly the one
+  // read it made, 0 when that read failed.
   it('timeoutMs 0 is one uiTree call, and treesRead says whether that one read a tree', async () => {
     let reads = 0;
     const unreadable = await pollTree(
@@ -289,13 +288,13 @@ describe('pollTree — the one deadline loop', () => {
     if (outcome.timedOut) expect(outcome.readError?.message).toBe('transient');
   });
 
-  // 2026-10-05: the loop's deadline rule is HEAD's — checked after each
-  // round, never before a read — and that is pinned here because two
-  // tightenings were tried and withdrawn: projecting the previous round's
-  // cost (a static element under a 600 ms dump threw after ONE read at
-  // 615 ms of a 1500 ms budget; a `wait:` landing at 8.5 s of 10 timed out
-  // at 9.6 s) and refusing a round after a pause that crossed the deadline
-  // (the same two cases, timed out AT the deadline where HEAD found them).
+  // The loop's deadline rule — checked after each round, never before a
+  // read — is pinned here because two tightenings were tried and withdrawn:
+  // projecting the previous round's cost (a static element under a 600 ms
+  // dump threw after ONE read at 615 ms of a 1500 ms budget; a `wait:`
+  // landing at 8.5 s of 10 timed out at 9.6 s) and refusing a round after a
+  // pause that crossed the deadline (the same two cases, timed out AT the
+  // deadline where HEAD found them).
   // A predicate that waits bounds its own wait with the deadline it is
   // handed; the loop keeps the slack a late element is found by.
   it('a late round still inside the deadline IS taken: an element appearing at 2 s of 2.5 s is found by a read that ends past it', async () => {
@@ -355,8 +354,8 @@ describe('pollTree — the one deadline loop', () => {
     expect(reads).toBe(1);
   });
 
-  // docs/adr/0029-poll-cadence-counts-the-read.md (2026-10-31): the pause after a round is `pauseAfterRead` of the
-  // round's read — the rule, its floor and why are documented there, on ui-tree/read-tree.ts.
+  // docs/adr/0029-poll-cadence-counts-the-read.md: the pause after a round is `pauseAfterRead` of the round's read —
+  // the rule, its floor and why are documented there, on ui-tree/read-tree.ts.
   describe('the cadence counts the read (ADR 0029)', () => {
     /** A fake device whose every read costs `readMs` of the faked Date, and the starts of its reads. */
     const timedAdapter = (readMs: number) => {
@@ -438,10 +437,10 @@ describe('pollTree — the one deadline loop', () => {
       }
     });
 
-    // ADR 0029, R2 — the ACCEPTED RESIDUAL. The deadline is checked after each round; under the old cadence the whole
-    // pause pushed the last read's start up to pollMs later, past where the denser cadence puts it, and an element
-    // appearing at 2.5 s of a 3 s budget behind 1 s reads was found by the read that pause happened to push to 2.6 s.
-    // Now the reads start at 0, 1150 and 2300; the third ends at 3300, past the deadline, and the poll times out.
+    // ADR 0029, R2 — the ACCEPTED RESIDUAL. The deadline is checked after each round; a cadence pausing the whole
+    // pollMs would push the last read's start up to pollMs later, past where the denser cadence puts it, and an element
+    // appearing at 2.5 s of a 3 s budget behind 1 s reads would be found by the read that pause happened to push to
+    // 2.6 s. The reads start at 0, 1150 and 2300; the third ends at 3300, past the deadline, and the poll times out.
     // Neither cadence ever guaranteed finding an element that appears DURING the last read; the cure (always one read
     // starting at or after the deadline) would cost a full read on every timeout, ensure_state's detect probe included.
     it('accepted residual (R2): an element appearing at 2.5 s of a 3 s budget behind 1 s reads is no longer found by a read the pause pushed late', async () => {
@@ -679,16 +678,15 @@ describe('pollTimeoutMessage — the thrown timeout\'s shape, shared by the flow
     );
   });
 
-  // 2026-10-06: the idb empty-tree error puts its advice on a second line;
-  // inside the parenthesis it is indented under the cause, not flush left.
+  // The idb empty-tree error puts its advice on a second line; inside the
+  // parenthesis it is indented under the cause, not flush left.
   it('a multi-line read error keeps its later lines inside the parenthesis, indented under the first', () => {
     expect(pollTimeoutMessage('state s', 300, new Error('idb returned an empty accessibility tree (an empty list)\nCompare with screenshot'))).toBe(
       'Timed out after 300ms waiting for state s\n  (last UI tree read failed: idb returned an empty accessibility tree (an empty list)\n   Compare with screenshot)',
     );
   });
 
-  // The rule the flow engine relied on until it moved here (2026-10-06): a
-  // hint about what the trees held is dropped when the last read failed —
+  // A hint about what the trees held is dropped when the last read failed —
   // the reads are the story then. Conservative on purpose; the docblock
   // says why.
   it('drops the hint when the last read failed — the read error is the whole "why"', () => {

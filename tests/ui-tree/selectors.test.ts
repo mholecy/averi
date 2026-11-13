@@ -72,7 +72,6 @@ describe('parseSelector', () => {
   });
 });
 
-// findOne lived here until 2026-10-03; interact/resolve.ts owns resolution now (selectors.ts says so beside preferInteractive).
 describe('findAll', () => {
   it('finds by id anywhere in the tree', () => {
     const found = findAll(tree, 'id:login_button');
@@ -124,21 +123,20 @@ describe('tapPoint', () => {
 });
 
 /**
- * findBySpec is derived from the selector matcher since 2026-10-04
- * (`findMatching(root, conditionsOf(spec))`, eq-only). Before, it was a second
- * matcher over the spec's four fields, written by hand — and a second place
- * where "what does `text` mean" could drift. The refactor was proved by a
- * frozen copy of that hand-written body run as an oracle (zero differences
- * over 864 specs × 217 nodes); the oracle was deleted on 2026-10-05, once
- * trusted, because it hard-coded the four fields and so could never pin the
- * claim the derivation makes — "a field added to ElementSpec is matched with
- * no edit". What pins the behaviour now is the DEFINITION, stated once here
- * and checked against the same combinatorial tree: a node matches when every
- * field the spec sets equals the node's (`text` against label OR value),
- * never as a regex, and the result is the pre-order filter. The two traps
- * the oracle surfaced stay pinned below: the spec must NEVER be serialized
- * into a selector string (the grammar has no escape for `"`), and
- * `text: 'Pay.*'` is a literal.
+ * findBySpec is derived from the selector matcher (`findMatching(root,
+ * conditionsOf(spec))`, eq-only), not a second matcher over the spec's four
+ * fields — a second place where "what does `text` mean" could drift. The
+ * derivation was proved by a frozen copy of a hand-written matcher run as an
+ * oracle (zero differences over 864 specs × 217 nodes); no oracle is kept,
+ * because one hard-codes the four fields and so could never pin the claim the
+ * derivation makes — "a field added to ElementSpec is matched with no edit".
+ * What pins the behaviour is the DEFINITION, stated once here and checked
+ * against the same combinatorial tree: a node matches when every field the
+ * spec sets equals the node's (`text` against label OR value), never as a
+ * regex, and the result is the pre-order filter. The two traps the oracle
+ * surfaced stay pinned below: the spec must NEVER be serialized into a
+ * selector string (the grammar has no escape for `"`), and `text: 'Pay.*'`
+ * is a literal.
  */
 const NODE_FIELD: Record<(typeof SELECTOR_FIELDS)[number], (n: UiNode) => (string | null)[]> = {
   id: (n) => [n.identifier],

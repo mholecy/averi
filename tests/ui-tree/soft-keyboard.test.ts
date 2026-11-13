@@ -13,7 +13,7 @@ import { parseDump } from '../helpers/android-dumps.js';
 // The tree's own marks (ui-tree/soft-keyboard.ts). The reading built over
 // them — the switch between the oracle and the tree, the floating panel,
 // the veto, which nodes are the keyboard's own — is pinned through its
-// interface in tests/ui-tree/keyboard-cover.test.ts (2026-10-09).
+// interface in tests/ui-tree/keyboard-cover.test.ts.
 
 describe('keyboardInTree — what the tree says about the soft keyboard (2026-10-07)', () => {
   const BAND = { x: 0, y: 539, width: 402, height: 335 };
@@ -95,12 +95,11 @@ describe('accessoryDismissButton — the input-accessory toolbar\'s trailing but
 });
 
 /**
- * idb's keyboard band, by its shape (round 7, 2026-10-10: moved from ui-tree/draw-order.ts's private `keyboardOf`, whose
- * own pins stay in tests/ui-tree/draw-order.test.ts). Known outside draw-order as a LINE only — the keyboard edge
+ * idb's keyboard band, by its shape. Known outside draw-order as a LINE only — the keyboard edge
  * (ui-tree/keyboard-position.ts#KeyboardPosition.line) — never as "the keyboard is shown": the in-tree reading stays `unknown` on idb (K5d).
  */
 describe('keyboardBandTop — the top edge of idb\'s keyboard band, and nothing more (round 7)', () => {
-  /** Read off the draw order since the code review of round 7 (S3): `DrawOrder.keyboardBandTop`, the one derivation. */
+  /** Read off the draw order: `DrawOrder.keyboardBandTop`, the one derivation. */
   const keyboardBandTop = (tree: UiNode) => drawOrder(tree).keyboardBandTop;
   /** run2-ios #250: the SWIFT form with the number pad up, as idb lists it (`Keyboard 0,589 402x285` last, after `1`…`Delete`). */
   const pad = async () => parseIdbDescribeAll(JSON.stringify(JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')).elements));
