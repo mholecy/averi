@@ -15,9 +15,8 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  * as the screen beside it, on a tree that tells no drawn frame — and lives with its judge (verify/eyes.ts#apartOfFrame).
  *
  * THE EYES CONFIRM A FULLY CLAIM: the question a `fully visible` stop asks of the screenshot before it is claimed, and
- * the answer — the interface of the concept, here below interact/ (which asks) and verify/ (which looks: the one
- * production adapter, verify/eyes.ts#eyesOn, wired at the composition root — mcp/tools.ts, flow/engine.ts — as
- * adapters/types.ts#DrawnOverStrip is; the test adapters answer it from a captured png or a table).
+ * the answer — the interface of the concept, here below interact/ (which asks) and verify/ (which looks:
+ * verify/eyes.ts#eyesOn; the test adapters answer it from a captured png or a table).
  *
  * Why: the tree cannot see a surface that has no node. On the lab's `form-keyboard` (Android) the bar riding on the
  * IME draws 28 px of padding above its `Continue` and dumps no node for it; after one stroke `phone` lay flush with
@@ -32,8 +31,8 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  * (Android's) — the one shape where a node-less surface around that node may lie over the target unseen — and only
  * of a neighbour NARROWER than the screen along its edge (`spansScreen`): a Scaffold's top app bar or bottom bar laid
  * full width beside a row leaves no screen beside it to read its surface's colour from, so the eyes could only answer
- * "could not tell"; there the tree's claim stands unasked, as before the eyes (ADR 0013's residual). An ordinary stop
- * asks nothing and costs nothing.
+ * "could not tell"; there the tree's claim stands unasked (ADR 0013's residual). An ordinary stop asks nothing and
+ * costs nothing.
  *
  * WHAT is asked (`EyesQuestion`): whether the target's frame, from each flush edge inward, shows the colour of the
  * surface AROUND that neighbour rather than its own — every edge on ONE screenshot, judged by verify/eyes.ts over THE
@@ -131,7 +130,7 @@ export function eyesQuestion(scene: Scene, tree: UiNode, node: UiNode, screen: U
 /**
  * The answer when no screenshot could be judged (`why`: none taken, it failed, it did not decode): the first flush
  * neighbour's edge `unjudged` — the reply says the tree's claim and that it was not checked; with clip lines alone,
- * `own`: a clip line is looked for, not suspected, and the claim stands as the tree's, as before the eyes looked.
+ * `own`: a clip line is looked for, not suspected, and the claim stands as the tree's.
  */
 export function unseen(question: EyesQuestion, why: string): EyesAnswer {
   const first = question.edges.find((e): e is EyesEdge & { readonly by: UiNode } => e.by !== CLIP_LINE);
@@ -144,7 +143,6 @@ function spansScreen({ edge, by }: FlushNeighbour, box: Rect): boolean {
   return axisOfEdge(edge) === 'vertical' ? r.x <= box.x && r.x + r.width >= box.x + box.width : r.y <= box.y && r.y + r.height >= box.y + box.height;
 }
 
-/** The eyes' finding a reply or a failure quotes: what they saw that was not the target's own colour. */
 export type EyesFinding = Exclude<EyesAnswer, { readonly sees: 'own' }>;
 
 /** A finding of a band of a surface: what keeps a `fully: true` stop from being claimed, or a plain stop whose centre it reaches. */
@@ -212,12 +210,12 @@ export function reachesPoint({ edge, depth }: SurfaceFinding, region: Rect, poin
  * AND A TEXT IN A CONTROL'S TOUCH MARGIN (`ClearPair`, ADR 0026): a standing `covered` with remedy `scroll` whose every
  * cover is a text the tree suspects lies in the target's touch margin only (cover.ts#marginText: Compose dumps a
  * control's touch target, past what it draws, and lays the next field's title there) asks, per cover, whether the text
- * paints anything over the target where they overlap. The answer `clear` (verify/eyes.ts#judgeClear: the overlap
- * pixel-identical to the target's own rows beside the text) excuses the cover (draw-order.ts's `seenClear` row); `under`
- * or `untold` keep it — the first time the eyes may excuse a cover the tree's order TELLS, and only on pixel identity.
- * The tap never asks it: the text holds no part of the target's centre (marginText's rule 3), so no tap standing is
- * covered by one. One capture, unsettled for the tap and the stop: a
- * frame mid-animation reads a blend, which the judge cannot tell — the safe side.
+ * paints anything over the target where they overlap. The answer `clear` (verify/eyes.ts#judgeClear: every pixel of the
+ * overlap within EYES_SAME_DE of the target's own rows beside the text, at most OWN_PIXELS_MAX points' worth of strays)
+ * excuses the cover (draw-order.ts's `seenClear` row); `under` or `untold` keep it — the eyes excuse a cover the tree's
+ * order TELLS, so only on that strict match. The tap never asks it: the text holds no part of the target's centre
+ * (marginText's rule 3), so no tap standing is covered by one. One capture, unsettled for the tap and the stop: a frame
+ * mid-animation reads a blend, which the judge cannot tell — the safe side.
  *
  * WHAT is asked (`PairQuestion`): per `unordered` cover of the target (a `peer`), where the two overlap and where each
  * shows ALONE next to that overlap — its clear bands, along the overlap's edges — and the screen beside the two on the
@@ -235,7 +233,6 @@ export function reachesPoint({ edge, depth }: SurfaceFinding, region: Rect, poin
  * (interact/scroll-rounds.ts#State.marginKept).
  */
 
-/** The eyes as a verb is handed them for the order question (verify/eyes.ts#eyesOn at the composition root; a table in tests). */
 export type OrderEyes = Pick<Eyes, 'order'>;
 
 /** What `eyes` saw of `question`'s pairs, as they answered; no eyes wired, nothing seen. */
@@ -326,8 +323,7 @@ export interface ClearQuestion {
  * The question `standing` of `node` asks the eyes — when it is `covered` with remedy `unordered` (a cover the listing
  * does not order, ui-tree/standing.ts#Remedy) and not yet looked at (no `why`), the order pairs; when it is `covered`
  * with remedy `scroll` and every cover is a margin text (`clearQuestion`), the clear pairs — or undefined: every other
- * standing asks nothing. Its pairs are judged in its frame (`facts.screen`). A clear question is asked once per look by
- * its callers (ui-tree/eyes.ts#judgedWithOrder; interact/scroll-rounds.ts#round, which also keeps the answers per call).
+ * standing asks nothing. Its pairs are judged in its frame (`facts.screen`).
  */
 export function pairQuestion(tree: UiNode, node: UiNode, standing: Standing | PixelStanding): PairQuestion | undefined {
   if (standing.kind === 'covered' && standing.remedy.of === 'scroll') return clearQuestion(tree, node, standing.facts);
@@ -430,9 +426,6 @@ function bandsBeside(r: Rect, overlap: Rect): BandBeside[] {
   const under = below - bottom;
   const before = overlap.x - leftmost;
   const after = rightmost - right;
-  // A band above or below the overlap: ahead of it past `r`'s top or bottom edge, sideways past its left and right edges
-  // on the band's rows; a band left or right of it, ahead past `r`'s side edge, sideways past its top and bottom edges
-  // on the band's columns — every strip as deep as the band.
   const rows = (band: Rect, ahead: AroundStrip, d: number): BandBeside => ({
     band,
     around: [ahead, { rect: { x: r.x - d, y: band.y, width: d, height: band.height }, against: 'right' }, { rect: { x: r.x + r.width, y: band.y, width: d, height: band.height }, against: 'left' }],

@@ -31,15 +31,13 @@ import { scrolls } from './scroll-containers.js';
  * - `over(node)` — what presentation says of the nodes drawn after a TARGET (`PresentedOver`): which of them a
  *   presented layer leaves undrawn for it, which is a presented layer's cover reaching the whole screen, which is the
  *   surface of a screen presented over it (and on what evidence: a source's fact, or an inference), and which frame
- *   excuse gives way over such a screen. Draw order's `exposure`, `coversOf`, `presentedAt`, `presentedOver` and its
- *   frame and `hidden` rows read it.
+ *   excuse gives way over such a screen.
  * - `topmostAt(point)` — the presented layer on top at a point for NO target (`PresentedTop`), off its own scroll
- *   views: draw order's `markedAt`, `scroll_until`'s stroke for a target not in the tree.
+ *   views.
  * - `press(surface)` — a presented surface as a sentence quotes it (`PresentedPress`): where it presses and, when it
  *   is a marked layer's cover, what that layer is (`MarkedLayer`) — the verbs' one view of a source's mark.
  * - `alone` — the presented layer the tree lists ALONE: its root, which the source marks presented — the screen
- *   beneath it is not in the tree, so a target not found may lie there (the tap's wait, interact/resolve.ts, says
- *   close it first instead of "to appear").
+ *   beneath it is not in the tree, so a target not found may lie there.
  * - `fallback` — whether the shape adapter infers what the source did not judge (`shape`), none on a judged tree.
  *
  * The policy is ADR 0018's and unchanged by where it lives: the source's marks first, the shape only as the fallback
@@ -49,8 +47,7 @@ import { scrolls } from './scroll-containers.js';
 export interface Presentation {
   /**
    * The adapter that infers presented screens on this tree (`byShape`): undefined on a tree whose source judged
-   * presented layers itself (dialect.ts#TreeDialect.judgesPresentations), which no shape is asked of. No production caller reads
-   * it: it is the test surface for which adapters a tree gets (tests/ui-tree/presentation.test.ts).
+   * presented layers itself (dialect.ts#TreeDialect.judgesPresentations), which no shape is asked of.
    */
   readonly fallback: 'shape' | undefined;
   /**
@@ -81,7 +78,7 @@ export interface Presentation {
 
 /**
  * A presented layer the tree source marks (`UiNode.presentation`), as a sentence names it: its kind and its label (its
- * element's, for a typed layer). What the remedy words (remedy-text.ts#presentedRemedy, #presentedStop).
+ * element's, for a typed layer).
  */
 export interface MarkedLayer {
   readonly kind: PresentationKind;
@@ -130,7 +127,7 @@ export interface PresentedOver {
    * `p` is the COVER of a marked presented layer over the target (a typed layer's element, a `screen` layer itself):
    * it reaches the whole screen and draws whatever the rows say. A boolean, not a reach: each reader branches on it for
    * more than the rect (it skips the rows, and `exposure` otherwise asks a flat list's pinned reach), so answering a
-   * reach here would move no branch out of draw order (review round 1, NIT-1, left as is).
+   * reach here would move no branch out of draw order.
    */
   wholeScreen(p: Placed): boolean;
   /**
@@ -171,7 +168,6 @@ interface PresentationAdapter {
   layerOf(surface: UiNode): MarkedLayer | undefined;
 }
 
-/** Nothing presented over a target: every node drawn, none a layer's cover or a presented surface, no excuse given way. */
 const NOTHING_OVER: PresentedOver = { drawn: () => true, wholeScreen: () => false, surface: () => undefined, givesWay: () => false, coversAhead: [] };
 
 /**
@@ -232,9 +228,9 @@ interface PresentedLayer {
 
 /**
  * THE reading of the tree source's presented-layer marks (`UiNode.presentation` on the layer,
- * `UiNode.presentationElement` on a typed layer's element) — the one reader in code (ADR 0018): the presented layer
- * `layer` is, among the walk's `order`; undefined for any other node. A typed layer whose element is not marked (a
- * hand-built tree) is its own cover, named by its own label.
+ * `UiNode.presentationElement` on a typed layer's element) (ADR 0018): the presented layer `layer` is, among the walk's
+ * `order`; undefined for any other node. A typed layer whose element is not marked (a hand-built tree) is its own
+ * cover, named by its own label.
  */
 const markOf = (layer: Placed, order: readonly Placed[], ancestry: boolean): PresentedLayer | undefined => {
   const kind = layer.node.presentation;
@@ -356,7 +352,7 @@ const layerOf = (placed: Placed, both: Placed): Placed => {
  *   each lies in a screen-sized layer of its own) INSIDE ONE WINDOW — the node holding both is not the tree's root,
  *   whose children are WDA's Windows (the parser's 0×0 holder of Android's, idb's flat list): a later Window may be a
  *   pass-through one, the parked input-accessory Window over every screen (wda-source-myport-2fa-keyboard-parked.json),
- *   so across Windows only content covers, as before;
+ *   so across Windows only content covers;
  * - NOT IN SCROLLED CONTENT: the node holding both neither scrolls nor lies in anything that scrolls — layers of a
  *   scroll view's content are one screen's (Finportal's RN ScrollView lays a full-screen background container and
  *   then its `0,0 402x877` content container, which would read as a screen stacked over the background's frames);
