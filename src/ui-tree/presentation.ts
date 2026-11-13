@@ -47,7 +47,8 @@ import { scrolls } from './scroll-containers.js';
 export interface Presentation {
   /**
    * The adapter that infers presented screens on this tree (`byShape`): undefined on a tree whose source judged
-   * presented layers itself (dialect.ts#TreeDialect.judgesPresentations), which no shape is asked of.
+   * presented layers itself (dialect.ts#TreeDialect.judgesPresentations), which no shape is asked of. No production
+   * code reads it: it is the test surface for which adapters a tree gets (tests/ui-tree/presentation.test.ts).
    */
   readonly fallback: 'shape' | undefined;
   /**
@@ -227,9 +228,9 @@ interface PresentedLayer {
 }
 
 /**
- * THE reading of the tree source's presented-layer marks (`UiNode.presentation` on the layer,
- * `UiNode.presentationElement` on a typed layer's element) (ADR 0018): the presented layer `layer` is, among the walk's
- * `order`; undefined for any other node. A typed layer whose element is not marked (a hand-built tree) is its own
+ * THE reading of the tree source's presented-layer marks (ADR 0018: `UiNode.presentation` on the layer,
+ * `UiNode.presentationElement` on a typed layer's element): the presented layer `layer` is, among the walk's `order`;
+ * undefined for any other node. A typed layer whose element is not marked (a hand-built tree) is its own
  * cover, named by its own label.
  */
 const markOf = (layer: Placed, order: readonly Placed[], ancestry: boolean): PresentedLayer | undefined => {

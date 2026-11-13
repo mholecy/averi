@@ -50,8 +50,9 @@ import { inferScreenSize, SCREEN_AGREEMENT_PCT, screenOf, windowTurnsScreen, typ
  *   built, so a point right of the panel's width is refused.
  * - An iPad split pane (unmeasured) gets the panel as built.
  * - A node crowned as the window that spans the panel's long side within
- *   TURNED_WIDTH_SLACK_PCT and is no taller than its short side counts
- *   either way up (refusals relaxed, never added).
+ *   TURNED_WIDTH_SLACK_PCT and is no taller than its short side (within
+ *   SCREEN_AGREEMENT_PCT) counts either way up (refusals relaxed, never
+ *   added).
  * - A crowned child window that matches the panel neither way turns
  *   `oriented` (a gesture over it lands off-centre: the swipe's accepted
  *   cost, geometry.ts#windowTurnsScreen) but not `boxes`; the pixel assert

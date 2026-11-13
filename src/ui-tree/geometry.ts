@@ -264,12 +264,13 @@ function overhangs(tree: UiNode, window: Rect): boolean {
  *
  * The root is it when the root is origin-anchored with area; a root with area
  * elsewhere yields undefined here (`insetWindowRect` reads it). When the root
- * has NO usable rect the window is one level down: idb's flat `describe-all` and uiautomator's
- * multi-root dump are normalized under a synthetic 0x0 root (adapters/ios-tree-source.ts,
- * adapters/android-tree-dialect.ts), and WDA's live /source roots a sheet tree in a node
- * carrying no `rect` at all, which the parser zero-fills — in all three the
- * real window sits among the children (measured: the iOS filter
- * sheet's `Application "Skeleton Internal"` at {0,0,402,874}).
+ * has NO usable rect the window is one level down: idb's flat
+ * `describe-all` and uiautomator's multi-root dump are normalized under a
+ * synthetic 0x0 root (adapters/ios-tree-source.ts,
+ * adapters/android-tree-dialect.ts), and WDA's live /source roots a sheet
+ * tree in a node carrying no `rect` at all, which the parser zero-fills — in
+ * all three the real window sits among the children (measured: the iOS
+ * filter sheet's `Application "Skeleton Internal"` at {0,0,402,874}).
  *
  * A child must be SCREEN-SHAPED to qualify, which is what keeps a status bar
  * and a tall scroll container out of the running. Among what is left the
@@ -358,9 +359,8 @@ const FIT_SLACK = 1 + SCREEN_AGREEMENT_PCT / 100;
  * window? `wm size` and `idb describe` report the panel as built — portrait
  * on a phone — whichever way it is held; the tree's window is laid out as the
  * screen is now. The one owner of "which way does this window say the screen
- * faces", for ui-tree/usable-screen.ts#usableScreenOf (the box a gesture swipes
- * in and every judgement's usable screen). Here rather than in
- * verify/scale.ts: `interact/` may not import `verify/` (ARCHITECTURE.md
+ * faces" — for the box a gesture swipes in and every judgement's usable
+ * screen. Here rather than in verify/scale.ts: `interact/` may not import `verify/` (ARCHITECTURE.md
  * §2), and the question is rect arithmetic over a tree's size and the
  * device's.
  *
@@ -461,7 +461,8 @@ export function intersectsViewport(
  * off-screen nodes, iOS keeps them with off-viewport rects — and a state
  * detect (`absent: true`) and an absent assert must read the same tree the
  * same way, or a state the flow says it reached could fail the assert that
- * checks it.
+ * checks it. Here, below both, because verify/ sits below flow/ and
+ * interact/ and may import neither: the two read one rule.
  */
 export function absentFromViewport(
   found: readonly UiNode[],

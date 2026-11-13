@@ -10,11 +10,11 @@ import { absentFromViewport } from './geometry.js';
  * it would give is the one a bare tree gives for ANY selector, so it says
  * nothing about the screen.
  *
- * A boolean cannot say it: with `absent` as `absentFromViewport` alone,
- * nothing in a bare tree matches, so on the decor an `absent: true` detect
- * says "already active", a `branch:` arm on it is taken, a `wait:` on a state
- * detected by it passes at once, and the absent assert PASSES, all before the
- * app has drawn a pixel. The flow engine's detect probe refuses to call a MISS
+ * A boolean cannot say it: were `absent` `absentFromViewport` alone, nothing
+ * in a bare tree would match, so on the decor an `absent: true` detect would
+ * say "already active", a `branch:` arm on it would be taken, a `wait:` on a
+ * state detected by it would pass at once, and the absent assert would PASS,
+ * all before the app had drawn a pixel. The flow engine's detect probe refuses to call a MISS
  * on a bare tree knowledge; a HIT on absence is the same miss read the other
  * way round, and is refused the same way.
  *

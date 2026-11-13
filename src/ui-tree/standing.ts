@@ -203,10 +203,10 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *
  * Why so:
  * - The plain stop is the next tap's point: its centre on the screen and
- *   under nothing, so `scroll_until X` then `tap X` agree. A stop that was
- *   any intersection reported a row under a pinned CONTINUE bar "fully
+ *   under nothing, so `scroll_until X` then `tap X` agree. A stop at any
+ *   intersection would report a row under a pinned CONTINUE bar "fully
  *   visible after 0 swipes"; one with its centre past the screen's edge
- *   ("visible … CLIPPED 40%") handed the tap an off-screen refusal.
+ *   ("visible … CLIPPED 40%") would hand the tap an off-screen refusal.
  * - On the SCREEN, not the frame cut above a keyboard: a centre under a
  *   witnessed keyboard stops, and the tap's keyboard guard hides the
  *   keyboard. Under idb's band no guard acts, so a centre there is
@@ -468,10 +468,8 @@ export interface StandingFacts {
 
 /**
  * THE REMEDY for a node that does not stand `reachable`: what would bring it within reach, as one closed set of cases
- * decided once, here (`remedied`), for every purpose — the verbs only render a case in their own words (the tap's
- * refusal, interact/tap-judgement.ts; the pixel assert's miss, verify/pixel-text.ts#coverRemedy; `scroll_until`'s
- * `presented` stop, interact/scroll-rounds.ts). Every non-reachable standing carries one (`Standing`'s and
- * `PixelStanding`'s `remedy`).
+ * decided once, here (`remedied`), for every purpose — the verbs only render a case in their own words. Every
+ * non-reachable standing carries one (`Standing`'s and `PixelStanding`'s `remedy`).
  *
  * The cases, in THE PRECEDENCE, one for every purpose — the first that holds is the remedy:
  * 1. `presented` — a screen is presented over the node's own (a modal's dimming leaf, a sheet's form), judged of the

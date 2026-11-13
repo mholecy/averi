@@ -48,7 +48,7 @@ import { countOf } from '../util/count.js';
  * `{ role: image, label: null, identifier: "SplashScreenLogo" }`
  * (expo-splash-screen's id); the Android 12+ system splash icon is
  * likewise expected to carry a resource-id (not yet measured). A spinner is
- * `progress` only where its source names it so (idb's:
+ * `progress` only where its source names it so (idb's,
  * adapters/ios-tree-source.ts#idbSpinner). A "Bank logo" with a label is
  * something to select and counts. A `container`/`other` counts when it has
  * a LABEL or VALUE (an identifier alone does not: that is the Android

@@ -78,7 +78,7 @@ export function isScrollViewOf(n: UiNode, container: Rect): boolean {
  *   view (a carousel's cards past a page's sides are the carousel's extent, not the page's); a node of no area is not
  *   read. Content past both axes (a zoomed or two-way view) or neither (it fits, or runs on past it by less than a
  *   quarter of its side with no same-sized sibling past it, or the cells past the frame are not listed yet) says
- *   nothing. False negatives, each unknown and so stroked as before the axis: a chip carousel of mixed widths, a card
+ *   nothing. False negatives, each unknown and so stroked as with no axis: a chip carousel of mixed widths, a card
  *   carousel spaced more than a quarter card apart with no card straddling its edge, full-width cells paged exactly
  *   with the next cell unlisted. False readings left, named: a node of a page that fits, straddling its side by a
  *   quarter or more without scrolling (an overflowing row the page clips); a same-sized sibling laid beside a fitting

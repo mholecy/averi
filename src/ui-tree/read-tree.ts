@@ -94,7 +94,8 @@ export type TreeRead = { tree: UiNode; error?: undefined } | { tree?: undefined;
  * Throws only a failure no wait cures (adapters/types.ts#PersistentReadError,
  * D21 — idb's wedged accessibility service): polled like a miss it only spends
  * the budget, and its message, not a timeout's, is what the reader needs. So
- * every reader through this seam stops on it without knowing it exists.
+ * every reader through this seam stops on it without knowing it exists. One
+ * reader opts out and catches it itself (interact/swipe.ts#swipeScreen).
  *
  * A free function rather than a method on each poller, so the behaviour the
  * tool's reliability rests on has one owner. `Pick<…, 'uiTree'>` keeps it
@@ -236,7 +237,8 @@ export type PollOutcome<T> =
 
 /**
  * The wording a THROWN poll timeout shares — what was waited for, for how
- * long, and the last read error beneath it when there was one.
+ * long, and the last read error beneath it when there was one. The verifier
+ * does not use it: its timeouts are failing results, worded per assert.
  *
  * `hints`, when a caller has any, are probable causes the caller knows and
  * this layer cannot (the flow's wait on an id the iOS idb tree
