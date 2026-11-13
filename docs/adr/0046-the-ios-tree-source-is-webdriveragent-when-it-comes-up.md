@@ -5,7 +5,8 @@ docs/plans/2026-10-30-performance-backlog.md). Golden unchanged: every recording
 checks the default block (see Acceptance).
 Amended 2026-11-12 (A41b: a launch pre-warms WebDriverAgent just after `simctl launch`, never awaited, and only with
 its build cached) — see the amendment below. Amended 2026-11-12 (A44: the probe's cadence before auto-tap, its
-`clearState` launch last; an unproven required part makes the report INCONCLUSIVE) — the last section.
+`clearState` launch last; an unproven required part makes the report INCONCLUSIVE) — its section. Amended 2026-11-13
+(A40: residual 4 is kept; idb gets no non-ASCII path) — the last section.
 
 ## Context
 
@@ -94,7 +95,7 @@ read is idb's for the adapter's life, and every reply that claims what it read c
 4. After a fallback, a value only WDA types is refused before anything is sent: by the fill's second check, or by
    `type_text`'s own check. That refusal is ADR 0037's idb wording, and its remedy names `treeSource: wda`, which fails
    on this machine for the reason the note line after it gives. The way out is to fix that reason, then
-   `select_device` again.
+   `select_device` again. That refusal is kept: idb has no path for such a value (A40, the last section).
 5. Two adapters of one simulator, `auto` and `wda` (two projects, one server), each own a WdaServer on the same
    per-UDID port. That is the D41 situation of ADR 0032, unchanged.
 
@@ -217,3 +218,26 @@ the standing one, `unprovenOf` over every leg-(b), foreground and cadence outcom
 `unproven`); tests/perf/a41-report.test.ts (a trace with a few trials and errors, and one with none, read from files:
 both unproven); tests/truth/batch/lab-a41-ios.test.ts (the new order, a cadence exit 3, the report block on unproven
 alone and with missing). Hand mutants, each killed.
+
+## Amendment 2026-11-13 (A40): residual 4 is kept; idb gets no non-ASCII path
+
+Gate C on main 8e60cb2b read form-basic's b1d (a name with diacritics) and b7 (’ “ ” – …) LOUD on the idb block,
+`loud-untouched`: refused before anything was sent, as residual 4 says. WDA fills both. A40 asked whether idb could
+enter such a value without breaking the fill's landing rule (ADR 0023, interact/fill-landing.ts). It cannot, at an
+acceptable cost, so the refusal stays. This is an analysis without a device run, and nothing in `src/` changes.
+
+- **When it matters.** Only under `auto` after WDA did not come up (the package missing, its build failed, /status
+  unanswered), or in a project that pins `treeSource: idb`. In both, the refusal is sent before any device call, and
+  under `auto` it ends with the claim note's line, naming the reason and the retry. Fixing that reason and calling
+  `select_device` again gives a WDA adapter that types the value. A second typing path would serve only the case where
+  that fix is not made.
+- **`idb ui text` cannot carry it.** idb maps the whole string through its KEY_MAP (U+0020–U+007E and `\n`) before
+  it sends a key, and any other character fails the call (`adapters/ios-typing.ts#IDB_TYPEABLE`).
+- **HID keys cannot either.** idb sends USB HID usage codes of a US layout. No code is `Š` or `’`. A dead-key or
+  Option sequence depends on the simulator's keyboard layout, so each would need its own measurement.
+- **The pasteboard stays rejected** (ADR 0037, Rejected, where its reasons and the bar for reopening it are written).
+
+The refusal is ADR 0037's idb wording (`adapters/ios-typing.ts#idbTypingRefusal`), unchanged. scripts/truth/
+live-known.ts keeps b1d and b7 KNOWN on `ios idb` as `loud-untouched` on `refused`. The bug note
+docs/bugs/2026-10-15-lab-ios-type-text-cannot-type-non-ascii.md stays as ADR 0037 left it. No test changes: the rule
+was already pinned.
