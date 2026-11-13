@@ -1124,6 +1124,7 @@ function ordered<S>(placed: S | undefined, cut: S | undefined, cover: () => S | 
   return placed ?? cut ?? cover() ?? underLine ?? reachable;
 }
 
+/** A touch's place as its answer: off the screen — or outside what its scroll views draw, that scroll view named — or its centre in a system band; undefined when on the screen. */
 function pointPlaced(facts: StandingFacts, place: PointPlace, offScreenVisible: number): TapJudgement | undefined {
   if (place === 'off') return { facts, kind: 'offScreen', at: facts.centre, visible: offScreenVisible };
   if (place === 'on') return undefined;
@@ -1267,6 +1268,7 @@ function inStopFrame(judged: Judged, box: Rect, bands: JudgedBoxes | undefined, 
   return { facts, outside: { facts, kind: 'offScreen', at: centre, visible: 0 } };
 }
 
+/** THE ORDER past the frame, for both stops: where it lies, cut, covered by `cover`, its centre under a line no guard acts on — else `reachable` at its centre. */
 function stopOrdered(facts: StandingFacts, placed: PointPlace, cut: TouchJudgement | undefined, cover: Cover | undefined, line: KeyboardLine | undefined): TouchJudgement {
   return ordered<TouchJudgement>(
     pointPlaced(facts, placed, facts.visible),

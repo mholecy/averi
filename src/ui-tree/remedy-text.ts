@@ -13,8 +13,8 @@ import type { NoScrollRemedy, Remedy, RemedyCase } from './standing.js';
  * verbs' one sentence of a `cut` or `covered` remedy, which composes these with the keyboard's and the cut's words, is
  * interact/touch-remedy.ts's; the pixel verb's is verify/pixel-text.ts's.
  *
- * A leaf of ui-tree: it takes only types from standing.ts and presentation.ts, so the decision and its words are two
- * modules, and either changes alone.
+ * A leaf of the UI-tree layer: it imports standing.ts's types (and presentation.ts's `MarkedLayer`, adapters/types.ts's
+ * `isTyped`), no verb, so the decision and its words are two modules, and either changes alone.
  *
  * One `purpose` names whose sentence a clause sits in — `touch` (the tap, `scroll_until`) or `pixel` (the pixel assert)
  * — and the node's pronoun follows from it (`pronoun`): `it` in a touch's sentence, `the element` in the pixel

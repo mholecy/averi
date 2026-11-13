@@ -17,14 +17,13 @@ import { sceneOf, type Scene } from './standing.js';
  *   after their scene is built; a look is threaded to whoever judges it instead.
  * - `keyboard` is THE position of this look — over the scene's draw order and the look's reading — built on first use;
  *   asks nothing until a member is asked, and `readingLine` asks the reading once. ADR 0017's asymmetry is the
- *   position's members, not who built it: `line(subject)` exempts only a node of idb's band, `owns` — the reading's
- *   `ofKeyboard` or idb's band — is asked by the scroll read alone. The line never depends on the reading
- *   (tests/ui-tree/keyboard-position.test.ts), so a verb that asks only `line` reads the same line whatever reading its
- *   look holds.
+ *   position's members, not who built it: `line(subject)` exempts only a node of idb's band, `owns` the reading's
+ *   `ofKeyboard` too. The line never depends on the reading (tests/ui-tree/keyboard-position.test.ts), so a verb that
+ *   asks only `line` reads the same line whatever reading its look holds.
  * - `reading` is the reading this look was built with, never one of another tree's: its band and its `ofKeyboard` set
- *   are this tree's. `lookOn` takes the adapter's whole reading (the tap, the picker, the pixel poll ask it `over`,
- *   `frameOver`, `overlapping` and its `remedy`); `scroll_until`'s pure read holds only the synchronous facts its round
- *   hands in (`ofKeyboard`), its two async questions asked by the round's protocol (interact/scroll-read.ts#AppliedKeyboard).
+ *   are this tree's. `lookOn` takes the adapter's whole reading, for a verb that asks it `over`, `frameOver`,
+ *   `overlapping` or its `remedy`; `scroll_until`'s pure read holds only the synchronous facts its round hands in
+ *   (`ofKeyboard`), its two async questions asked by the round's protocol (interact/scroll-read.ts#AppliedKeyboard).
  *
  * The screen is not a look's — BY DECISION, where the architecture review's candidate (A3) put it in the Look: a verb
  * asks ui-tree/usable-screen.ts#usableScreen of the look's tree (a Look is a TreeRead) and falls back to its

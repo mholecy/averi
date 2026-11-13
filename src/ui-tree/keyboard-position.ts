@@ -118,6 +118,7 @@ export function coverLine(cover: KeyboardCover): KeyboardLine {
   return { y: cover.top.y, witnessed: true };
 }
 
+/** The higher of two lines (the smaller y), either of which may be absent; a tie keeps `a`. */
 const higher = (a: KeyboardLine | undefined, b: KeyboardLine | undefined): KeyboardLine | undefined => (a === undefined ? b : b === undefined || a.y <= b.y ? a : b);
 
 /**

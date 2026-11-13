@@ -310,7 +310,7 @@ export function panelsBeyond(band: Rect, touchable: KeyboardTouchable): { panels
     return witness === 'shown' ? { panels: [], refused: { kind: 'unreadable' } } : { panels: [] };
   }
   const beyond = region.filter((r) => !sameRect(r, band));
-  if (beyond.length === 0) return { panels: [] };
+  if (beyond.length === 0) return { panels: [] }; // the band alone (docked), or an empty region
   if (witness !== 'shown') return { panels: [], refused: { kind: 'witness-not-shown', witness } };
   if (!region.some((r) => sameRect(r, band))) return { panels: [], refused: { kind: 'no-band-rect' } };
   const right = band.x + band.width;

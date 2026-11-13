@@ -4,11 +4,12 @@ import { absentFromViewport } from './geometry.js';
 
 /**
  * What one tree says about one element question, in three values: `yes`,
- * `no`, or `unknown` — the tree is BARE (bare-tree.ts: only wrappers, unlabeled decoration, or iOS's status bar and launch icon, a
- * cold launch's Android decor for ~9 s, WDA's 7-node splash, iOS 27's
- * SpringBoard status bar and launch icon for ~2 s) and the answer
- * it would give is the one a bare tree gives for ANY selector, so it says
- * nothing about the screen.
+ * `no`, or `unknown` — the tree is BARE (bare-tree.ts: only wrappers,
+ * unlabeled decoration, or iOS's status bar and launch icon, a cold
+ * launch's Android decor for ~9 s, WDA's 7-node splash, iOS 27's SpringBoard
+ * status bar and launch icon for ~2 s) and the answer it would give is the
+ * one a bare tree gives for ANY selector, so it says nothing about the
+ * screen.
  *
  * A boolean cannot say it: were `absent` `absentFromViewport` alone, nothing
  * in a bare tree would match, so on the decor an `absent: true` detect would

@@ -22,8 +22,8 @@ import { across, EDGES, flushEdges, rectWithin, type Clips, type Edge } from './
  *   it (its inner edge within a pixel of the node's), at the content's START — the top or left edge, where a sticky
  *   header pins: a sticky header holding its list's top (`PinnedEdge`). The node runs on under it or it does not — a
  *   row Compose cut at its merged sticky header (the lab's `scroll-sticky-cut`, VA1) and a first row at rest whole
- *   under it are the same tree; only motion tells them, so its one reader is the `fully` stop's flush probe, pointed at
- *   the pinned node's inner edge as at a clipping container's edge. Not at the far edges (bottom, right): there the
+ *   under it are the same tree; only motion tells them, so it is a question for a flush probe, pointed at the pinned
+ *   node's inner edge as at a clipping container's edge. Not at the far edges (bottom, right): there the
  *   node flush with the row and with the scroll view's edge is the list's NEXT row cut at the fold, listed after the
  *   row as a pinned footer would be — every `fully` stop on the row above it would be probed, the probe carrying it
  *   on while the row after it lies cut at the fold. At the start the row before it is listed BEFORE it, so no later

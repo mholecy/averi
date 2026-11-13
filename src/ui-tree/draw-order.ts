@@ -66,7 +66,7 @@ import { dialectOf } from './dialect.js';
  *   the pixel row just past a thin control's edge?
  * - `presentedAt(node, point)` — is the touch-down of a stroke for a target
  *   not judged in the viewport on a surface of a screen presented over the
- *   target's own (`exposure`'s column, then the presentation module's
+ *   target's own (the `target` column, then the presentation module's
  *   surface: presentation.ts#PresentedOver)?
  * - `presentedOver(node)` — is a screen presented over the target's own at
  *   all, wherever the target lies — `presentedAt` less the point?
@@ -585,10 +585,10 @@ const ownField = (placed: Placed, { target, labelOverhang: overhang }: SeenFor):
  * spanning the height of the text input the target is (`inputOf`: it, or the one it is nothing but), each edge within
  * the label overhang (`spansHeight`). Asked of a sibling listed either side of a field in a nested run in reading
  * order (`asTarget`'s `drawn`, reading-order.ts#peersOf; a label listed after: ADR 0015's D84 amendment): React
- * Native lays a field after its label and draws it over it, transparent — rn-field's M label `69,491 175x23` before its field's
- * wrapper `69,492 264x20`. A label listed after its field is the same relation, excused as a peer too (it is then
- * judged a cover, or not, by the draw order's own rows). A text a field merely lies over (a header title under a
- * search field) spans no field's height, and a toast over a row is no text over a text input: both stay covers.
+ * Native lays a field after its label and draws it over it, transparent — rn-field's M label `69,491 175x23` before
+ * its field's wrapper `69,492 264x20`. A label listed after its field is the same relation, excused as a peer too (it
+ * is then judged a cover, or not, by the draw order's own rows). A text a field merely lies over (a header title under
+ * a search field) spans no field's height, and a toast over a row is no text over a text input: both stay covers.
  */
 const ownLabelOf = (label: Placed, field: Placed, overhang: number): boolean => {
   const input = inputOf(field.node);
@@ -1286,9 +1286,9 @@ const NOT_DRAWN = {
    * Except, on a tree whose source did not judge presented layers, the SURFACE of a screen presented over the target's
    * by shape (presentation.ts#PresentedOver.surface `inferred`: the shape adapter's `presentedSurface`, the mirror of
    * `givesWay`), which covers and stays `presented` (cover.ts#Cover.presented): a sheet layer WDA reports `0/0` whole,
-   * over a list with no second dim, would otherwise let a tap through to the list. On a tree whose source judged, no shape is asked and the guard holds
-   * of no node: a layer it marks covers through its cover, which no row excuses, and a hidden node of a marked `screen`
-   * layer stays excused (Contacts' discard popover over the New Contact sheet, whose form `Table 0,62 402x812` and
+   * over a list with no second dim, would otherwise let a tap through to the list. On a tree whose source judged, no
+   * shape is asked and the guard holds of no node: a layer it marks covers through its cover, which no row excuses, and
+   * a hidden node of a marked `screen` layer stays excused (Contacts' discard popover over the New Contact sheet, whose form `Table 0,62 402x812` and
    * photo buttons WDA reads `0/0`: tests/fixtures/wda-capture-contacts-discard-popover.json). The TARGET's own flag is
    * never read: a target under a modal is `isVisible="0"` too.
    *

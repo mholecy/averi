@@ -322,6 +322,7 @@ function insetWindowRect(tree: UiNode): Rect | undefined {
   return contradicted ? undefined : best;
 }
 
+/** {id → rect} for the FIRST occurrence of each identifier (pre-order). */
 export function collectRects(tree: UiNode): Map<string, Rect> {
   const out = new Map<string, Rect>();
   const walk = (n: UiNode): void => {
@@ -360,9 +361,9 @@ const FIT_SLACK = 1 + SCREEN_AGREEMENT_PCT / 100;
  * on a phone — whichever way it is held; the tree's window is laid out as the
  * screen is now. The one owner of "which way does this window say the screen
  * faces" — for the box a gesture swipes in and every judgement's usable
- * screen. Here rather than in verify/scale.ts: `interact/` may not import `verify/` (ARCHITECTURE.md
- * §2), and the question is rect arithmetic over a tree's size and the
- * device's.
+ * screen. Here rather than in verify/scale.ts: `interact/` may not import
+ * `verify/` (ARCHITECTURE.md §2), and the question is rect arithmetic over
+ * a tree's size and the device's.
  *
  * The witness is the window's REACH — its right and bottom edges, so a window
  * laid out beside a left-hand nav bar or a cutout counts with the bar it
@@ -1177,6 +1178,7 @@ function overhangAsFlush(rect: Rect, frame: Rect): Rect {
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
+/** A rect's extent across `edge` — its height at the top or bottom, its width at a side (`Cut.depth`). */
 export function across(rect: Rect, edge: Edge): number {
   return axisOfEdge(edge) === 'vertical' ? rect.height : rect.width;
 }

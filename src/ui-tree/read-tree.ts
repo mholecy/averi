@@ -512,12 +512,11 @@ export function sameTreeWithinPixel(a: UiNode, b: UiNode): boolean {
  * ProgressIndicator; through WDA an ActivityIndicator — React Native's
  * <ActivityIndicator>; through idb SwiftUI's ProgressView
  * (adapters/ios-tree-source.ts#idbSpinner). A spinner keeps a fixed rect and
- * no text, so `treeFingerprint` reads a loading screen as unchanged. Two
- * callers: `scroll_until` (interact/scroll-read.ts's `loading`) asks this so
- * a list still loading its next page is not called exhausted; D2's hold
- * (flow/hold-tracker.ts, ADR 0033) so a screen still loading never holds.
- * Every progress node with area counts, hidden or off-screen too (D27's
- * stated residual: the safe direction, both callers' windows bounded).
+ * no text, so `treeFingerprint` reads a loading screen as unchanged. Asked
+ * so a list still loading its next page is not called exhausted, and so a
+ * screen still loading never holds (ADR 0033). Every progress node with area
+ * counts, hidden or off-screen too (D27's stated residual: the safe
+ * direction, every wait that asks it bounded).
  * One walk.
  */
 export function showsProgress(tree: UiNode): boolean {
@@ -529,14 +528,14 @@ export function showsProgress(tree: UiNode): boolean {
  * THE SCREEN'S IDENTITY: the `role:identifier` pair of every node that carries an identifier — what of a read says WHICH
  * screen it is, as opposed to where its content lies. Values, labels and rects are left out: typing changes the one,
  * a scroll or the keyboard the others, while an identified node keeps its id wherever it is moved. Two questions are
- * asked of two reads' identities, by the two verbs that act between them:
- * - `sameScreen` (fill's read-back, interact/fill-refetch.ts#sameField): every id of the one is the other's and back — a
- *   node appearing with an id of its own (an inline error label) changes it, so the identity fallback refuses rather
- *   than read a next screen's twin field;
- * - `anotherScreen` (`scroll_until`'s stroke, `screenChangedUnder` below): each read lists ids and NONE of the one is
- *   the other's — not the content moved, which keeps the ids of what still shows (and on idb's
- *   SwiftUI lists, of what lies off the screen too), but the screen replaced: a sheet or a modal dismissed, the app
- *   gone to another screen. A read with no id at all says nothing either way.
+ * asked of two reads' identities, by an action between them:
+ * - `sameScreen` (a field read back after typing): every id of the one is the other's and back — a node appearing with
+ *   an id of its own (an inline error label) changes it, so the identity fallback refuses rather than read a next
+ *   screen's twin field;
+ * - `anotherScreen` (whether a stroke replaced the screen, `screenChangedUnder` below): each read lists ids and NONE of
+ *   the one is the other's — not the content moved, which keeps the ids of what still shows (and on idb's SwiftUI
+ *   lists, of what lies off the screen too), but the screen replaced: a sheet or a modal dismissed, the app gone to
+ *   another screen. A read with no id at all says nothing either way.
  * One walk.
  */
 export interface ScreenIdentity {
