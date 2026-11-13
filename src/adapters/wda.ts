@@ -10,6 +10,7 @@ import { rebootSimulatorAdvice } from './simulator-reboot.js';
 import { sleep } from '../util/sleep.js';
 import { formatSeconds } from '../util/duration.js';
 import { errorMessage } from '../util/error-message.js';
+import { WDA_READY_TIMEOUT_MS } from './types.js';
 
 /**
  * WebDriverAgent lifecycle for one simulator (docs/plans/ios-wda-tree-source.md,
@@ -65,8 +66,8 @@ export const keysTimeoutMs = (characters: number): number => 2_000 + 50 * charac
  * the three simulator domains and the sessionless /source unchanged, and `/wda/keys` types with no keyboard shown.
  */
 export const KEYS_SESSION = { capabilities: { alwaysMatch: { forceSimulatorSoftwareKeyboardPresence: false }, firstMatch: [{}] } };
-/** Post-build: the first app-install on the simulator dominates this. */
-const READY_TIMEOUT_MS = 60_000;
+/** types.ts#WDA_READY_TIMEOUT_MS: post-build, the first app-install on the simulator dominates this. */
+const READY_TIMEOUT_MS = WDA_READY_TIMEOUT_MS;
 const POLL_INTERVAL_MS = 500;
 /**
  * shutdown()'s phases must ADD UP to less than mcp/lifecycle.ts's
@@ -281,8 +282,8 @@ export class WdaServer {
 
   /**
    * Whether WebDriverAgent's build is in DerivedData (an xctestrun under Build/Products), so a start needs no
-   * `xcodebuild build-for-testing` — a directory listing, no device call, no process. What a pre-warm asks before it
-   * starts anything (wda-tree-source.ts#prewarm, A41b).
+   * `xcodebuild build-for-testing` — a directory listing, no device call, no process. What a launch's start asks before it
+   * starts anything (wda-tree-source.ts#startBeforeLaunch, A41d).
    */
   async isBuilt(): Promise<boolean> {
     return (await this.findXctestrun()) !== undefined;

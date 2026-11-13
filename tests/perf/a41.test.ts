@@ -13,6 +13,7 @@ import {
   encodeRects,
   foregroundOk,
   snapshotRootLabel,
+  LEG_A_BEFORE_A41D_MS,
   WAITED_GAP_MIN_MS,
   WAITED_GAP_MS,
   hitTargetsOf,
@@ -276,8 +277,8 @@ describe('summaryLines — the short summary', () => {
     ],
     wdaCold: { coldRead: sp(6000, 5), warmRead: sp(400, 5), failed: 0 },
     autoTap: {
-      launch: sp(1200, 5), relaunch: sp(800, 5), firstCold: sp(7000, 5), firstWdaUp: sp(900, 5), warmCatalog: sp(600, 5), warm: sp(500, 10),
-      firstWaited: sp(1000, 5), waitedGap: sp(4010, 5),
+      launch: sp(1200, 5), relaunch: sp(800, 5), firstCold: sp(1400, 5), firstWdaUp: sp(900, 5), warmCatalog: sp(600, 5), warm: sp(500, 10),
+      firstWaited: sp(1000, 5), waitedGap: sp(4010, 5), firstTotal: sp(8200, 5), waitedLaunch: sp(1900, 5), waitedLaunches: [],
       firstTaps: { ok: 5, n: 5 }, waitedTaps: { ok: 4, n: 5 }, foreground: { ok: 5, n: 5, clearState: 1, seen: [] },
       fellBack: 0, paidPush: 0, catalogUnsettled: 0, failed: 0,
     },
@@ -297,8 +298,12 @@ describe('summaryLines — the short summary', () => {
     expect(lines).toContain(
       "WDA tap median within 100 ms of idb's, one-sided (WDA no more than 100 ms slower; faster always passes): yes (wda−idb +46 ms)",
     );
-    // (a): 7000 − 600 = 6400 against max(0, 6000 − 1200) + 500 = 5300.
-    expect(lines).toContain('first tap after launch_app (a, at once; information, not judged): first − warm 7000 − 600 = 6400 ms; WDA cold start 6000 ms against launch_app 1200 ms; first tap ok 5/5');
+    // (a), A41d: launch_app + the first tap, per session, against the same run's relaunch + WDA cold start + the tap with
+    // WDA up + 500; and the first tap against the tap with WDA up + 500.
+    expect(lines).toContain(
+      'first tap after launch_app (a, at once) — launch_app + the first tap ≤ relaunch (WDA up) + WDA cold start + the first tap with WDA up + 500 ms, ' +
+        `and the first tap ≤ the first tap with WDA up + 500 ms: yes (total 8200 vs 800 + 6000 + 900 + 500 = 8200; tap 1400 vs 900 + 500); first tap ok 5/5; before A41d ${LEG_A_BEFORE_A41D_MS} (probe-2, idle)`,
+    );
     expect(lines).toContain('first tap after launch_app (b, ≥ 3.5 s after it replied) ≤ the same tap warm + 500 ms: yes (1000 vs 600 + 500); first tap ok 4/5');
     expect(lines).toContain('foreground after launch ok 5/5 (1 clearState; n ≥ 5 with one: yes)');
     expect(lines).toContain('auto, the same first tap 4010 ms (n 5, 4009–4011) after launch_app replied (no read before it): 1000 ms (n 5, 999–1001)');
@@ -306,7 +311,8 @@ describe('summaryLines — the short summary', () => {
     expect(lines).toContain(
       'at 300 ms: 0 wrong in 35 moving, uncensored settles over 60 trials — of 84 settles (M1a 4, M1b 50, M2 30), 40 of moving ids, 5 censored (< 500 ms of reads after), 0 wrong in all',
     );
-    expect(lines).toContain("auto, WDA's bring-up in the first tap (first − first with WDA up): +6100 ms");
+    expect(lines).toContain("auto, WDA's bring-up in launch_app (launch_app − relaunch): +400 ms; in the first tap (first − first with WDA up): +500 ms");
+    expect(lines).toContain("auto, the waited leg's launch_app (WDA stopped): 1900 ms (n 5, 1899–1901)");
     expect(lines).toContain('cadence: unproven — w');
     expect(lines).toContain('false-Tapped targets: 15 — sound 12, unsound 3, unproven 0');
     expect(lines).toContain('controls (truly open): 10 — open 9, false refusals 1, unproven 0');
@@ -322,17 +328,28 @@ describe('summaryLines — the short summary', () => {
   });
   it('an auto step that fell back to idb makes the first-tap acceptance unproven; what was left out is said', () => {
     const lines = summaryLines({ ...full, autoTap: { ...full.autoTap!, fellBack: 2, paidPush: 2, catalogUnsettled: 1, failed: 1 } });
-    // Only leg (b) judges; leg (a) is information and carries no verdict.
-    expect(lines.filter((l) => l.includes("unproven (2 auto steps fell back to idb: not WDA's taps)"))).toHaveLength(1);
+    // Both legs judge WDA's taps: a fallback leaves each unproven.
+    expect(lines.filter((l) => l.includes("unproven (2 auto steps fell back to idb: not WDA's taps)"))).toHaveLength(2);
+    expect(lines.find((l) => l.includes('(a, '))).toContain("unproven (2 auto steps fell back to idb: not WDA's taps)");
     expect(lines.find((l) => l.includes('(b, '))).toContain("unproven (2 auto steps fell back to idb: not WDA's taps)");
     expect(lines).toContain('auto, left out: 2 fell back to idb; 2 warm taps paid the push; 1 warm catalog taps on an unsettled catalog; 1 sessions with a failed step');
   });
-  it('leg (a) is information only: its numbers, a dash for a part not measured, never a yes or no', () => {
+  it('leg (a): each bar passes at its edge and fails 1 ms over; a part not measured leaves it not measured', () => {
     const a = (r: A41Report) => summaryLines(r).find((l) => l.includes('(a, at once'));
-    expect(a(full)).not.toMatch(/: (yes|no|unproven) /);
-    expect(a({ ...full, wdaCold: undefined, autoTap: { ...full.autoTap!, firstCold: undefined } })).toBe(
-      'first tap after launch_app (a, at once; information, not judged): first − warm — − 600 = — ms; WDA cold start — ms against launch_app 1200 ms; first tap ok 5/5',
-    );
+    const with_ = (firstTotal: number, firstCold: number) => ({ ...full, autoTap: { ...full.autoTap!, firstTotal: sp(firstTotal, 5), firstCold: sp(firstCold, 5) } });
+    expect(a(with_(8200, 1400))).toMatch(/: yes \(total 8200 vs 800 \+ 6000 \+ 900 \+ 500 = 8200; tap 1400 vs 900 \+ 500\);/);
+    expect(a(with_(8201, 1400))).toMatch(/: no \(total 8201 vs 800 \+ 6000 \+ 900 \+ 500 = 8200; tap 1400 vs 900 \+ 500\);/);
+    expect(a(with_(8200, 1401))).toMatch(/: no \(total 8200 vs 800 \+ 6000 \+ 900 \+ 500 = 8200; tap 1401 vs 900 \+ 500\);/);
+    for (const r of [
+      { ...full, autoTap: { ...full.autoTap!, firstCold: undefined } },
+      { ...full, wdaCold: undefined },
+      { ...full, wdaCold: { failed: 5 } },
+      { ...full, autoTap: { ...full.autoTap!, firstTotal: undefined } },
+      { ...full, autoTap: { ...full.autoTap!, relaunch: undefined } },
+      { ...full, autoTap: { ...full.autoTap!, firstWdaUp: undefined } },
+    ]) {
+      expect(a(r)).toMatch(/: not measured; first tap ok 5\/5;/);
+    }
   });
   it('leg (b) at warm + 500 exactly passes; the foreground says what was read instead, and needs n ≥ 5 with a clearState', () => {
     const b = (w: number) => summaryLines({ ...full, autoTap: { ...full.autoTap!, firstWaited: sp(w, 5) } }).find((l) => l.includes('(b, '));
@@ -407,7 +424,8 @@ describe('reportOf — the probe\'s files summed', () => {
               foreground: { clearState: false, expected: { label: 'AveriLab', bundle: 'dev.averi.lab' }, launch: ok(1900), label: 'Contacts', bundle: 'com.apple.MobileAddressBook' },
             },
             // The open cell never seen: its warm taps paid the push, left out.
-            { repeat: 3, openSettled: false, warm: [ok(3000), ok(3100)], catalogSettled: false },
+            // …and its waited leg's launch_app failed: no launch time recorded for it.
+            { repeat: 3, openSettled: false, warm: [ok(3000), ok(3100)], catalogSettled: false, waitedLaunch: { ms: 9, ok: false, reply: 'ERROR' } },
           ],
         },
         hitTest: {
@@ -442,6 +460,11 @@ describe('reportOf — the probe\'s files summed', () => {
       warm: { n: 3, median: 500, min: 480, max: 520 },
       firstWaited: { n: 1, median: 1050, min: 1050, max: 1050 },
       waitedGap: { n: 1, median: 4001, min: 4001, max: 4001 },
+      // Leg (a), per session launch_app + the first tap: run 1's 1200 + 7000; run 2's first tap fell back, left out.
+      firstTotal: { n: 1, median: 8200, min: 8200, max: 8200 },
+      // The waited leg's launch_app, per repeat (A41d: WDA's bring-up is inside it) — run 2's leg never launched.
+      waitedLaunch: { n: 1, median: 1900, min: 1900, max: 1900 },
+      waitedLaunches: [{ repeat: 1, ms: 1900 }],
       // Run 2's fell-back first tap claimed the tap all the same: the app was in front.
       firstTaps: { ok: 2, n: 2 },
       waitedTaps: { ok: 1, n: 1 },
@@ -449,7 +472,7 @@ describe('reportOf — the probe\'s files summed', () => {
       fellBack: 2,
       paidPush: 2,
       catalogUnsettled: 1,
-      failed: 1, // run 2 (its failed warm tap and its waited leg's error) — counted once
+      failed: 2, // run 2 (its failed warm tap and its waited leg's error) — counted once; run 3's failed waited launch_app
     });
     expect(r.cadence).toBeUndefined();
     expect(r.hitTest!.counts).toEqual({ falseTapped: 2, sound: 1, unsound: 0, unprovenFalse: 1, controls: 2, open: 1, falseRefusal: 0, unprovenControls: 1 });
@@ -484,19 +507,28 @@ describe('reportOf — the probe\'s files summed', () => {
     const sp = (median: number, n = 5) => ({ n, median, min: median - 1, max: median + 1 });
     const auto: NonNullable<A41Report['autoTap']> = {
       warmCatalog: sp(600), firstWaited: sp(1000), waitedGap: sp(4010),
+      relaunch: sp(800), firstWdaUp: sp(900), firstCold: sp(1000), firstTotal: sp(8200), waitedLaunches: [],
       firstTaps: { ok: 5, n: 5 }, waitedTaps: { ok: 5, n: 5 }, foreground: { ok: 5, n: 5, clearState: 1, seen: [] },
       fellBack: 0, paidPush: 0, catalogUnsettled: 0, failed: 0,
     };
-    expect(unprovenOf({ autoTap: auto })).toEqual([]);
-    expect(unprovenOf({ autoTap: { ...auto, firstWaited: sp(5000) } })).toEqual([]); // a measured no
-    expect(unprovenOf({ autoTap: { ...auto, firstWaited: undefined } })).toEqual(['first tap (b) (not measured)']);
-    expect(unprovenOf({ autoTap: { ...auto, fellBack: 1 } })).toEqual(["first tap (b) (unproven (1 auto steps fell back to idb: not WDA's taps))"]);
-    expect(unprovenOf({ autoTap: { ...auto, waitedGap: { n: 5, median: 4000, min: 3000, max: 4100 } } })).toEqual([
+    const wdaCold = { coldRead: sp(6000), failed: 0 };
+    expect(unprovenOf({ wdaCold, autoTap: auto })).toEqual([]);
+    expect(unprovenOf({ wdaCold, autoTap: { ...auto, firstWaited: sp(5000) } })).toEqual([]); // a measured no
+    expect(unprovenOf({ wdaCold, autoTap: { ...auto, firstTotal: sp(9000) } })).toEqual([]); // leg (a)'s measured no
+    expect(unprovenOf({ wdaCold, autoTap: { ...auto, firstWaited: undefined } })).toEqual(['first tap (b) (not measured)']);
+    // Leg (a) (A41d) needs the same run's WDA cold start: without it, not measured.
+    expect(unprovenOf({ autoTap: auto })).toEqual(['first tap (a) (not measured)']);
+    expect(unprovenOf({ wdaCold, autoTap: { ...auto, firstTotal: undefined } })).toEqual(['first tap (a) (not measured)']);
+    expect(unprovenOf({ wdaCold, autoTap: { ...auto, fellBack: 1 } })).toEqual([
+      "first tap (a) (unproven (1 auto steps fell back to idb: not WDA's taps))",
+      "first tap (b) (unproven (1 auto steps fell back to idb: not WDA's taps))",
+    ]);
+    expect(unprovenOf({ wdaCold, autoTap: { ...auto, waitedGap: { n: 5, median: 4000, min: 3000, max: 4100 } } })).toEqual([
       'first tap (b) (unproven (a tap 3000 ms after launch_app replied, under 3500))',
     ]);
     expect(unprovenOf({})).toEqual([]);
     // The foreground leg: n ≥ 5 with one clearState, else unproven with its counts; a launch not in front is a measured no.
-    const fg = (f: NonNullable<A41Report['autoTap']>['foreground']) => unprovenOf({ autoTap: { ...auto, foreground: f } });
+    const fg = (f: NonNullable<A41Report['autoTap']>['foreground']) => unprovenOf({ wdaCold, autoTap: { ...auto, foreground: f } });
     expect(fg({ ok: 4, n: 5, clearState: 1, seen: ['x'] })).toEqual([]);
     expect(fg({ ok: 4, n: 4, clearState: 1, seen: [] })).toEqual(['foreground (4 launches, 1 clearState: n ≥ 5 with one needed)']);
     expect(fg({ ok: 5, n: 5, clearState: 0, seen: [] })).toEqual(['foreground (5 launches, 0 clearState: n ≥ 5 with one needed)']);
@@ -506,7 +538,7 @@ describe('reportOf — the probe\'s files summed', () => {
     const c = (judgement: CadenceJudgement) => ({ trials: 60, moving: {}, passes: [], judgement });
     expect(unprovenOf({ cadence: c(keep) })).toEqual([]);
     expect(unprovenOf({ cadence: c(shorten) })).toEqual([]);
-    expect(unprovenOf({ cadence: c({ verdict: 'unproven', why: 'u' }), autoTap: { ...auto, firstWaited: undefined } })).toEqual([
+    expect(unprovenOf({ wdaCold, cadence: c({ verdict: 'unproven', why: 'u' }), autoTap: { ...auto, firstWaited: undefined } })).toEqual([
       'cadence (u)',
       'first tap (b) (not measured)',
     ]);

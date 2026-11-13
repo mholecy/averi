@@ -4,6 +4,7 @@ import { createIosTreeSource, IdbTreeSource, type ApplicationLabel, type IosTree
 import { WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
 import { IOS_TREE_SOURCE_SETTINGS, DEFAULT_IOS_TREE_SOURCE } from '../../src/adapters/ios-node.js';
 import { zeroRect, type UiNode } from '../../src/adapters/types.js';
+import { fakeExec, fakeFetch, fakeSpawn, tempDerivedData } from '../helpers/fake-wda.js';
 
 /**
  * `treeSource: auto` (A41a, docs/adr/0046-the-ios-tree-source-is-webdriveragent-when-it-comes-up.md): one source per
@@ -14,7 +15,7 @@ const tree = (from: string): UiNode => ({ identifier: from, role: 'other', label
 
 interface FakeWda extends WdaSide {
   bringUps: number;
-  /** How often prewarm asked whether the build is cached. */
+  /** How often startBeforeLaunch asked whether the build is cached. */
   cachedAsks: number;
   reads: number;
   typed: string[];
@@ -206,125 +207,147 @@ function deferred(): { promise: Promise<void>; settle: () => void; fail: (e: Err
 /** Lets every queued promise reaction and timer of this turn run: a background start gets as far as it can. */
 const drain = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-/** Every unhandled rejection while `fn` runs — vitest would only report one after the test. */
-async function unhandledDuring(fn: () => Promise<void>): Promise<unknown[]> {
-  const seen: unknown[] = [];
-  const hear = (reason: unknown) => seen.push(reason);
-  process.on('unhandledRejection', hear);
-  try {
-    await fn();
-    await drain();
-    await drain();
-  } finally {
-    process.off('unhandledRejection', hear);
-  }
-  return seen;
-}
-
-describe('AutoTreeSource.prewarm — WebDriverAgent asked to come up before the first read (A41b)', () => {
-  it('returns at once; the first read joins the attempt in flight — one bring-up, and the choice is WDA', async () => {
+describe('AutoTreeSource.startBeforeLaunch — the choice made before a launch, awaited (A41d)', () => {
+  it('makes the choice and resolves once it is made — WDA; the first read then starts nothing', async () => {
     const up = deferred();
     const wda = fakeWda(() => up.promise);
     const idb = fakeIdb();
     const auto = new AutoTreeSource({ wda, idb });
-    expect(auto.prewarm()).toBeUndefined();
+    let done = false;
+    const starting = auto.startBeforeLaunch().then(() => (done = true));
     await drain();
-    expect(wda.bringUps).toBe(1); // started in the background, not yet up
-    const reading = auto.read();
-    auto.prewarm(); // again (launch_app after select_device): the same attempt
-    await drain();
-    expect(wda.bringUps).toBe(1);
-    expect(wda.cachedAsks).toBe(1); // asked once: the second pre-warm found the choice in flight
+    expect([wda.bringUps, done]).toEqual([1, false]); // awaited: not done while WDA comes up
     up.settle();
-    expect((await reading).identifier).toBe('wda');
-    expect(wda.bringUps).toBe(1);
+    await starting;
     expect(auto.kind).toBe('wda');
+    expect((await auto.read()).identifier).toBe('wda');
+    expect(wda.bringUps).toBe(1);
     expect(idb.reads).toBe(0);
   });
 
-  it('a pre-warm that fails is no rejection anywhere: it is the fallback reason the first read meets', async () => {
-    const said = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  it('single-flight: a start while a read is choosing joins that choice, and a second start joins it too — one bring-up', async () => {
     const up = deferred();
     const wda = fakeWda(() => up.promise);
+    const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
+    const reading = auto.read();
+    const first = auto.startBeforeLaunch();
+    const second = auto.startBeforeLaunch();
+    await drain();
+    expect(wda.bringUps).toBe(1);
+    expect(wda.cachedAsks).toBe(0); // a choice in flight is joined, whatever the build
+    up.settle();
+    await Promise.all([first, second, reading]);
+    expect(wda.bringUps).toBe(1);
+  });
+
+  it('a bring-up that fails resolves the start (no rejection): the fallback, said once, with its claim note', async () => {
+    const said = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const wda = fakeWda(() => Promise.reject(new Error('WDA build failed (xcodebuild build-for-testing) — output: /tmp/x.log')));
     const idb = fakeIdb();
     const auto = new AutoTreeSource({ wda, idb });
-    const unhandled = await unhandledDuring(async () => {
-      auto.prewarm();
-      await drain();
-      up.fail(new Error('WDA build failed (xcodebuild build-for-testing) — output: /tmp/x.log'));
-    });
-    expect(unhandled).toEqual([]);
+    await expect(auto.startBeforeLaunch()).resolves.toBeUndefined();
+    expect(auto.fellBack).toBe(true);
+    expect(auto.claimNote).toBe(idbFallbackNote('WDA build failed'));
+    expect(said).toHaveBeenCalledTimes(1);
     expect((await auto.read()).identifier).toBe('idb');
     expect(wda.bringUps).toBe(1);
-    expect(said).toHaveBeenCalledTimes(1);
-    expect(auto.claimNote).toBe(idbFallbackNote('WDA build failed'));
   });
 
-  it('released while pre-warming: no unhandled rejection, no fallback, and the read is refused as released', async () => {
-    const said = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const up = deferred();
-    const wda = fakeWda(() => up.promise);
-    const idb = fakeIdb();
-    const auto = new AutoTreeSource({ wda, idb });
-    let reading: Promise<UiNode> | undefined;
-    const unhandled = await unhandledDuring(async () => {
-      auto.prewarm();
-      await drain();
-      reading = auto.read();
-      reading.catch(() => undefined);
-      await auto.dispose();
-      up.fail(new Error('released'));
-    });
-    expect(unhandled).toEqual([]);
-    await expect(reading).rejects.toThrow('released');
-    expect(said).not.toHaveBeenCalled();
-    expect(idb.reads).toBe(0);
-  });
-
-  it('WebDriverAgent not built: nothing is started — the first read makes the choice, the build inside it as before', async () => {
+  it('WebDriverAgent not built: nothing is started or awaited — the first read makes the choice, the build inside it', async () => {
     const wda = fakeWda(undefined, async () => false);
-    const idb = fakeIdb();
-    const auto = new AutoTreeSource({ wda, idb });
-    auto.prewarm();
-    await drain();
-    expect(wda.cachedAsks).toBe(1);
-    expect(wda.bringUps).toBe(0);
+    const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
+    await auto.startBeforeLaunch();
+    expect([wda.cachedAsks, wda.bringUps]).toEqual([1, 0]);
     expect((await auto.read()).identifier).toBe('wda');
     expect(wda.bringUps).toBe(1);
   });
 
-  it('after the choice, or once released, it asks nothing', async () => {
+  it('a build check that throws is no build: nothing started, the start resolves', async () => {
+    const wda = fakeWda(undefined, () => Promise.reject(new Error('EACCES')));
+    const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
+    await expect(auto.startBeforeLaunch()).resolves.toBeUndefined();
+    expect(wda.bringUps).toBe(0);
+  });
+
+  it('after the choice it asks nothing — WDA already up is not asked again, nor is a fallback retried', async () => {
     const wda = fakeWda();
     const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
     await auto.read();
-    auto.prewarm();
-    await drain();
+    await auto.startBeforeLaunch();
     expect([wda.cachedAsks, wda.bringUps]).toEqual([0, 1]);
 
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    let wdaStarts = 0;
+    const failing = Object.assign(fakeWda(down), { startBeforeLaunch: async () => void wdaStarts++ });
+    const fellBack = new AutoTreeSource({ wda: failing, idb: fakeIdb() });
+    await fellBack.read();
+    await fellBack.startBeforeLaunch();
+    expect([failing.cachedAsks, failing.bringUps, wdaStarts]).toEqual([0, 1, 0]); // a fallback's WDA is not started again
+  });
+
+  it('WDA chosen and since gone: WDA\'s own start runs before the launch — restarted, and its failure is WDA\'s error', async () => {
+    let starts = 0;
+    let fail: Error | undefined;
+    const wda: FakeWda = Object.assign(fakeWda(), {
+      async startBeforeLaunch() {
+        starts++;
+        if (fail !== undefined) throw fail;
+      },
+    });
+    const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
+    await auto.read();
+    await auto.startBeforeLaunch();
+    expect([starts, wda.bringUps]).toEqual([1, 1]);
+    fail = new Error('WDA did not answer /status on port 8100 within 60 s');
+    await expect(auto.startBeforeLaunch()).rejects.toBe(fail);
+    expect(auto.kind).toBe('wda'); // never a switch to idb
+  });
+
+  it('bounded by WDA\'s ready timeout: a real WdaTreeSource whose /status never answers falls back, its reason the timeout', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { dd } = await tempDerivedData(true);
+    const spawner = fakeSpawn();
+    const wda = new WdaTreeSource({
+      udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fakeFetch(() => 'refused').fn, spawnFn: spawner.fn,
+      derivedDataPath: dd, readyTimeoutMs: 40, pollIntervalMs: 5,
+    });
+    const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
+    await expect(auto.startBeforeLaunch()).resolves.toBeUndefined();
+    expect(auto.fellBack).toBe(true);
+    expect(auto.claimNote).toMatch(/WebDriverAgent did not come up \(WDA did not answer \/status on port \d+ within 0\.04 s;/);
+    expect(spawner.kills).toContain('SIGTERM');
+    await auto.dispose();
+  });
+
+  it('released: starts nothing; released mid-choice: the released error, no fallback', async () => {
     const later = fakeWda();
     const released = new AutoTreeSource({ wda: later, idb: fakeIdb() });
     await released.dispose();
-    released.prewarm();
-    await drain();
+    await released.startBeforeLaunch();
     expect([later.cachedAsks, later.bringUps]).toEqual([0, 0]);
+
+    const said = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const up = deferred();
+    const wda = fakeWda(() => up.promise);
+    const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
+    const starting = auto.startBeforeLaunch();
+    starting.catch(() => undefined);
+    await drain();
+    await auto.dispose();
+    up.fail(new Error('released'));
+    await expect(starting).rejects.toThrow('released');
+    expect(said).not.toHaveBeenCalled();
   });
 
   it('released while asking whether the build is cached: nothing is started', async () => {
     const cached = deferred();
     const wda = fakeWda(undefined, () => cached.promise.then(() => true));
     const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
-    auto.prewarm();
+    const starting = auto.startBeforeLaunch();
     await drain();
     await auto.dispose();
     cached.settle();
-    await drain();
-    expect(wda.bringUps).toBe(0);
-  });
-
-  it('a build check that throws starts nothing and rejects nowhere', async () => {
-    const wda = fakeWda(undefined, () => Promise.reject(new Error('EACCES')));
-    const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
-    expect(await unhandledDuring(async () => auto.prewarm())).toEqual([]);
+    await starting;
     expect(wda.bringUps).toBe(0);
   });
 });

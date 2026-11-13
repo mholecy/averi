@@ -1,7 +1,6 @@
 import { WdaServer, type WdaServerOptions } from './wda.js';
 import { parseWdaSourceValue } from './wda-source.js';
 import { alertInWda } from './ios-system-alert.js';
-import { startInBackgroundIfBuilt } from './prewarm.js';
 import type { ApplicationLabel, IosTreeSource } from './ios-tree-source.js';
 import type { SystemAlert, UiNode } from './types.js';
 
@@ -13,6 +12,21 @@ import type { SystemAlert, UiNode } from './types.js';
 export const WDA_SETTLE_CADENCE_MS = 300;
 
 /**
+ * Whether a start before a launch may begin (ADR 0046's A41d amendment): WebDriverAgent's build is cached — a check
+ * that fails counts as not cached — and the source was not released while it was asked. A build is minutes of
+ * `xcodebuild`, never run inside a launch; the first read runs it.
+ */
+export async function mayStartBeforeLaunch(wda: { buildCached(): Promise<boolean> }, released: () => boolean): Promise<boolean> {
+  return (await wda.buildCached().catch(() => false)) && !released();
+}
+
+/**
+ * The error of a call on a released WebDriverAgent source (a select_device deselected the simulator, or averi is
+ * shutting down): a release, never a WDA that "did not come up" — IosAdapter.launch passes it on unchanged.
+ */
+export class TreeSourceReleasedError extends Error {}
+
+/**
  * The WebDriverAgent adapter at the iOS tree-source seam (ios-tree-source.ts):
  * owns ONE WdaServer for its simulator and turns `/source` into the
  * normalized tree. This is the only module that joins wda.ts (the server's
@@ -22,7 +36,7 @@ export const WDA_SETTLE_CADENCE_MS = 300;
  *
  * The server is constructed with the source. That is cheap (a per-UDID port
  * allocation and a log path — no process until the first read, since
- * WdaServer.source() runs ensureRunning itself, or a pre-warm, A41b) and it makes the source
+ * WdaServer.source() runs ensureRunning itself, or a launch's start) and it makes the source
  * terminal after dispose(). That state IS reachable from a tool call: run_flow
  * and ensure_state hold one adapter across many reads, and a select_device
  * that lands mid-flow evicts and disposes that adapter (registry.evict). Before
@@ -99,14 +113,16 @@ export class WdaTreeSource implements IosTreeSource {
   }
 
   /**
-   * Starts WebDriverAgent in the background and returns at once (A41b; startInBackgroundIfBuilt): what a launch
-   * asks after `simctl launch` (IosAdapter.launch), so the first read finds WDA up or joins its start
-   * (WdaServer.ensureRunning is single-flight). A start that fails is dropped here: the next read starts again and
-   * fails in its own words. WDA already up (WdaServer.upGeneration) → nothing, so a launch sends no `/status` probe.
+   * Brings WebDriverAgent up before a launch and resolves once it is up (IosTreeSource.startBeforeLaunch, ADR 0046's
+   * A41d amendment), so the first read after the launch finds it up. WdaServer.ensureRunning — its own bounds (/status
+   * within the ready timeout) and single-flight, so a read starting WDA is joined. WDA up (WdaServer.upGeneration) →
+   * nothing: a launch sends no `/status` probe and restarts nothing. Not mayStartBeforeLaunch (no cached build, or
+   * released) → nothing: a build is minutes, and the first read runs it. A start that fails rejects with WDA's own
+   * error (bringUp) and is not kept: the next start or read tries again.
    */
-  prewarm(): void {
-    if (this.server.upGeneration() !== undefined) return;
-    startInBackgroundIfBuilt(this, () => this.disposed, () => this.server.ensureRunning());
+  async startBeforeLaunch(): Promise<void> {
+    if (this.disposed || this.server.upGeneration() !== undefined) return;
+    if (await mayStartBeforeLaunch(this, () => this.disposed)) await this.bringUp();
   }
 
   /** Whether WDA's build is cached, so a start runs no `xcodebuild build-for-testing` (WdaServer.isBuilt). */
@@ -132,11 +148,10 @@ export class WdaTreeSource implements IosTreeSource {
    * idb's Application label (another reader, whose lag is not `/source`'s).
    *
    * - WDA not up (WdaServer.upGeneration: no start of ours reached /status, or it
-   *   exited or was stopped since) → `declined`, no device call. The
-   *   2026-10-09 objection stands for this case: asking would move WDA's
-   *   start (a build on first use, then up to 60 s for /status) into every
-   *   first `launch_app`, and the first read's own start (7.7 s measured in
-   *   that run) outlasts the switch anyway.
+   *   exited or was stopped since) → `declined`, no device call: asking
+   *   would start WDA here, and a build on first use is minutes (a launch
+   *   starts a WDA whose build is cached before `simctl launch`,
+   *   startBeforeLaunch).
    * - up → `bundle` with the payload's `value.bundleId`, `unlabelled` when it
    *   is not a non-empty string; WDA's error (port, log) when the ask fails —
    *   asked once per WDA child until it proves it answers: after a failed
@@ -205,7 +220,7 @@ export class WdaTreeSource implements IosTreeSource {
   }
 
   private released(cause?: unknown): Error {
-    return new Error(
+    return new TreeSourceReleasedError(
       `The WebDriverAgent tree source for simulator ${this.udid} has been released — ` +
         'this simulator was deselected or averi is shutting down; select the device again and rerun',
       cause === undefined ? undefined : { cause },

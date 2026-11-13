@@ -1011,6 +1011,13 @@ export type AppHolder =
 export const FOREGROUND_WAIT_MS = 3_000;
 
 /**
+ * How long WebDriverAgent is given to answer /status once started (wda.ts's ready timeout; post-build, the first app
+ * install on the simulator dominates it) — the bound of a launch's start too. Here, as FOREGROUND_WAIT_MS, because
+ * launch_app's description quotes it (mcp/tools.ts) and mcp/ imports no platform module.
+ */
+export const WDA_READY_TIMEOUT_MS = 60_000;
+
+/**
  * Android's chooser a link or a `-p` launch waits behind (D55, D55b, adapters/android-chooser.ts; the name is D55's, kept
  * through A10 as `LinkAlert`'s is): its component as the window manager names
  * it (`android/com.android.internal.app.ResolverActivity`), and, since D55c, `sheet`: what its tree shows, read once

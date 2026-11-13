@@ -2,7 +2,7 @@ import { errorMessage } from '../util/error-message.js';
 import { withNoteLine } from '../util/note-line.js';
 import type { IosTreeSourceKind } from './ios-node.js';
 import { idbTypingRefusal } from './ios-typing.js';
-import { startInBackgroundIfBuilt } from './prewarm.js';
+import { mayStartBeforeLaunch } from './wda-tree-source.js';
 import type { ApplicationLabel, IosTreeSource } from './ios-tree-source.js';
 import type { SystemAlert, UiNode } from './types.js';
 
@@ -35,7 +35,7 @@ export function fallbackReason(err: unknown): string {
 
 /**
  * WebDriverAgent's source as `auto` uses it: a tree source that can be asked to come up without reading a tree, and
- * whether its build is cached (what decides a pre-warm, A41b).
+ * whether its build is cached (what decides a start before a launch).
  */
 export type WdaSide = IosTreeSource & { bringUp(): Promise<void>; buildCached(): Promise<boolean> };
 
@@ -43,7 +43,7 @@ export type WdaSide = IosTreeSource & { bringUp(): Promise<void>; buildCached():
  * `treeSource: auto` (A41a, docs/adr/0046-the-ios-tree-source-is-webdriveragent-when-it-comes-up.md): WebDriverAgent
  * when it can be brought up, idb when it cannot — ONE source per adapter, chosen once, never two trees reconciled
  * (ADR 0032). The choice is made by asking WDA to come up within its own bounds (WdaTreeSource.bringUp: the package,
- * a first build, /status) — at the first tree read, or before it by a pre-warm (below); constructing the source asks
+ * a first build, /status) — at the first tree read, or before it by a launch (below); constructing the source asks
  * nothing. It is kept for the adapter's life:
  * - WDA came up → every call is WDA's, exactly as under `treeSource: wda` — a later WDA failure is WDA's error, never a
  *   switch to idb.
@@ -54,9 +54,9 @@ export type WdaSide = IosTreeSource & { bringUp(): Promise<void>; buildCached():
  * `declined` — it is not up), `kind` (the label's wording) and no settle cadence (the default 500). Typing waits for
  * the choice (typeText).
  *
- * The choice may start before the first read (prewarm, A41b): a launch asks it after `simctl launch`, so WDA's start
- * runs beside the launch's foreground wait, when its build is cached. It is the same choice — one attempt, which the
- * first read joins, and whose outcome is the one that read would have met.
+ * The choice may be made before the first read (startBeforeLaunch): a launch awaits it before it touches the app,
+ * when WDA's build is cached. It is the same choice — one attempt, which a read joins, and whose outcome is the one that
+ * read would have met.
  */
 export class AutoTreeSource implements IosTreeSource {
   private readonly wda: WdaSide;
@@ -115,18 +115,22 @@ export class AutoTreeSource implements IosTreeSource {
   }
 
   /**
-   * Starts the choice in the background and returns at once (A41b; prewarm.ts#startInBackgroundIfBuilt), once:
-   * nothing after a choice started. A WDA that does not come up is the fallback the first read meets (choose); a
-   * release mid-choice is that read's error.
+   * Makes the choice before a launch and resolves once it is made (IosTreeSource.startBeforeLaunch, ADR 0046's A41d
+   * amendment): the same single attempt the first read would make, so the read after the launch finds it made.
+   * - A choice in flight (a read making it) is joined.
+   * - WDA chosen → WDA's own startBeforeLaunch: nothing while it is up; one that died since is started again before
+   *   the launch, and its failure is WDA's error (a later WDA failure never switches to idb).
+   * - idb chosen (the fallback) → nothing: select_device is the retry.
+   * - No choice started and not mayStartBeforeLaunch (no cached build, or released) → nothing: the first read builds
+   *   and chooses.
+   * A WDA that does not come up is the fallback (choose): the start resolves, with the stderr line and the claim note
+   * the first read would have met. Released: nothing; released mid-choice: the read's released error.
    */
-  prewarm(): void {
-    if (this.choiceStarted) return;
-    startInBackgroundIfBuilt(this.wda, () => this.disposed, () => this.source());
-  }
-
-  /** A choice was started: made, or in flight — `choosing` is set at its start and kept. */
-  private get choiceStarted(): boolean {
-    return this.choosing !== undefined;
+  async startBeforeLaunch(): Promise<void> {
+    if (this.disposed) return;
+    if (this.chosen !== undefined) return this.chosen === this.wda ? this.wda.startBeforeLaunch?.() : undefined;
+    if (this.choosing === undefined && !(await mayStartBeforeLaunch(this.wda, () => this.disposed))) return;
+    await this.source();
   }
 
   applicationLabel(): Promise<ApplicationLabel> {

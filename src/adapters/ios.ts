@@ -19,6 +19,7 @@ import { ViewportMemo } from './viewport-memo.js';
 import { iosStatusBand } from './ios-status-band.js';
 import { isAppDataContainer, resetDataContainer } from './ios-data-container.js';
 import { sleep } from '../util/sleep.js';
+import { TreeSourceReleasedError } from './wda-tree-source.js';
 import type { Typeable } from './typeable.js';
 import { withNoteLine } from '../util/note-line.js';
 import { IDB_TYPEABLE, idbTypingRefusal, typingPathOf, WDA_TYPEABLE } from './ios-typing.js';
@@ -346,14 +347,18 @@ export class IosAdapter implements DeviceAdapter {
           'use open_deep_link, or wrap the step in an `android:` platform override',
       );
     }
+    // The tree source's start first, awaited, so it never races the wipe or the launch (IosTreeSource.startBeforeLaunch,
+    // ADR 0046's A41d amendment). Its failure fails the launch, nothing touched; a release is passed on as it is.
+    try {
+      await this.treeSource.startBeforeLaunch?.();
+    } catch (err) {
+      if (err instanceof TreeSourceReleasedError) throw err;
+      throw new Error(`WebDriverAgent did not come up before launching ${bundleId} — nothing was wiped or launched: ${errorMessage(err)}`, { cause: err });
+    }
     if (opts.clearState) await this.clearAppData(bundleId);
     await this.prepareForOpen(`launching ${bundleId}`);
     await this.simctl(['launch', this.udid, bundleId]);
     this.front = { kind: 'launched', bundleId };
-    // A41b: WebDriverAgent's start, if it is not up, runs beside the foreground wait — never awaited
-    // (IosTreeSource.prewarm; idb has none). After `simctl launch`, never before it: a start racing the app's own
-    // launch is unmeasured (ADR 0046's A41b amendment).
-    this.treeSource.prewarm?.();
     // `simctl launch` returns before the app is in front: for ~1–2 s idb (and
     // WDA's /source, D48) can still hand out the previous app's (or
     // SpringBoard's) tree, complete and labelled, which no reader doubts. Wait

@@ -8,10 +8,10 @@ import { tapText } from '../../src/mcp/tool-text.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { FIRST_KEY_ALONE_MS, IDB_EMPTY_RETRY_MS, IosAdapter, PGREP_TIMEOUT_MS } from '../../src/adapters/ios.js';
 import { IDB_SETTLE_CADENCE_MS, IdbEmptyTreeError, IdbTreeSource, parseIdbDescribeAll, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
-import { WDA_SETTLE_CADENCE_MS, WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
+import { TreeSourceReleasedError, WDA_SETTLE_CADENCE_MS, WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
 import { AutoTreeSource } from '../../src/adapters/auto-tree-source.js';
 import { ReadHandOff } from '../../src/ui-tree/read-handoff.js';
-import { fakeFetch, fakeSpawn } from '../helpers/fake-wda.js';
+import { fakeFetch, fakeSpawn, tempDerivedData } from '../helpers/fake-wda.js';
 import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
 import { NoLinkHandlerError } from '../../src/adapters/ios-link-failure.js';
 import { captureRefusal } from '../../src/verify/capture.js';
@@ -448,47 +448,128 @@ describe('IosAdapter re-enables accessibility automation before every launch and
     expect(simctlCalls(calls)).toEqual([...WRITES, 'xcrun simctl launch AAAA-1111 com.app']);
   });
 
-  // A41b: the launch asks its source to pre-warm (WebDriverAgent's start in the background) right after `simctl launch`
-  // — never before it (review r1: a start racing the app's launch is unmeasured) — and never waits for it.
-  it('a launch pre-warms its tree source after simctl launch, before the foreground wait, and does not wait for it', async () => {
-    const { fn, calls } = fakeExec({});
-    const order: string[] = [];
-    const wda: IosTreeSource = {
-      kind: 'wda',
-      read: () => new Promise(() => undefined),
-      applicationLabel: async () => ({ kind: 'declined' }),
-      prewarm: () => void order.push(`prewarm after ${calls.at(-1)?.full ?? 'nothing'}`),
-      dispose: () => Promise.resolve(),
-    };
-    await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda }).launch('com.app');
-    expect(order).toEqual(['prewarm after xcrun simctl launch AAAA-1111 com.app']);
-    expect(simctlCalls(calls)).toEqual([...WRITES, 'xcrun simctl launch AAAA-1111 com.app']);
+  // A41d (ADR 0046's A41d amendment): the launch AWAITS its source's start (WebDriverAgent's bring-up) before it touches
+  // the app — before the wipe, the defaults writes and `simctl launch` — so the start completes or fails before the app
+  // launches, never racing it, and the first read after launch_app finds WDA up.
+  it('a launch awaits its tree source\'s start before anything else: no wipe, write or simctl launch until it is done', async () => {
+    const devices = await mkdtemp(join(tmpdir(), 'averi-test-devices-'));
+    const container = join(devices, 'AAAA-1111', 'data', 'Containers', 'Data', 'Application', '95E78B94-6D6B-4B15-8D47-45D88DDC2ABD');
+    try {
+      await mkdir(container, { recursive: true });
+      const { fn, calls } = fakeExec({ 'xcrun simctl get_app_container AAAA-1111 com.app data': `${container}\n` });
+      let done!: () => void;
+      let started = 0;
+      const wda: IosTreeSource = {
+        ...WDA_NO_TREE,
+        applicationLabel: async () => ({ kind: 'declined' }),
+        startBeforeLaunch: () => (started++, new Promise<void>((resolve) => { done = resolve; })),
+      };
+      const launching = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda }).launch('com.app', { clearState: true });
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      expect(started).toBe(1);
+      expect(calls).toEqual([]); // nothing terminated, wiped, written or launched while the start runs
+      done();
+      await launching;
+      expect(simctlCalls(calls)).toEqual([
+        'xcrun simctl terminate AAAA-1111 com.app',
+        'xcrun simctl get_app_container AAAA-1111 com.app data',
+        ...WRITES,
+        'xcrun simctl launch AAAA-1111 com.app',
+      ]);
+    } finally {
+      await rm(devices, { recursive: true, force: true });
+    }
   });
 
-  it('under auto: the launch returns while WebDriverAgent is still coming up; the first read then joins that one start', async () => {
+  it('a start that fails fails the launch, saying nothing was wiped or launched, WDA\'s error quoted and kept as the cause (treeSource wda)', async () => {
+    const { fn, calls } = fakeExec({});
+    const cause = new Error('WDA did not answer /status on port 8100 within 60 s');
+    const wda: IosTreeSource = { ...WDA_NO_TREE, startBeforeLaunch: () => Promise.reject(cause) };
+    const err = await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda }).launch('com.app', { clearState: true }).then(
+      () => undefined,
+      (e: Error) => e,
+    );
+    expect(err?.message).toBe(
+      'WebDriverAgent did not come up before launching com.app — nothing was wiped or launched: WDA did not answer /status on port 8100 within 60 s',
+    );
+    expect(err?.cause).toBe(cause);
+    expect(calls).toEqual([]);
+  });
+
+  it('a source released during its start (select_device mid-launch): the release is passed on unchanged, never "did not come up"', async () => {
+    const { fn, calls } = fakeExec({});
+    const released = new TreeSourceReleasedError('The WebDriverAgent tree source for simulator AAAA-1111 has been released — …');
+    const wda: IosTreeSource = { ...WDA_NO_TREE, startBeforeLaunch: () => Promise.reject(released) };
+    await expect(new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda }).launch('com.app')).rejects.toBe(released);
+    expect(calls).toEqual([]);
+  });
+
+  it('a real WdaTreeSource released during its start: the launch fails with its released error', async () => {
     const { fn } = fakeExec({});
-    let up!: () => void;
+    const { dd } = await tempDerivedData(true);
+    const source = new WdaTreeSource({ udid: 'AAAA-1111', exec: fn, fetchFn: fakeFetch(() => 'refused').fn, spawnFn: fakeSpawn().fn, derivedDataPath: dd, pollIntervalMs: 5 });
+    const launching = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: source }).launch('com.app');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await source.dispose();
+    await expect(launching).rejects.toThrow(/^The WebDriverAgent tree source for simulator AAAA-1111 has been released/);
+  });
+
+  /** An `auto` source over fakes: WDA's bring-up as given, its build cached as given; idb answering a label. */
+  const autoOver = (bringUp: () => Promise<void>, cached = true) => {
     let bringUps = 0;
     const wda = {
       ...WDA_NO_TREE,
       read: async () => screen(el({ identifier: 'from.wda' })),
-      bringUp: () => (bringUps++, new Promise<void>((resolve) => { up = resolve; })),
-      buildCached: async () => true,
+      applicationLabel: async () => ({ kind: 'declined' }) as const,
+      bringUp: () => (bringUps++, bringUp()),
+      buildCached: async () => cached,
     };
-    const idb: IosTreeSource = { ...NO_TREE, applicationLabel: async () => ({ kind: 'declined' }) };
-    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: new AutoTreeSource({ wda, idb }) });
-    await expect(adapter.launch('com.app')).resolves.toBeDefined();
-    expect(bringUps).toBe(1); // started by the launch, not finished: the launch did not wait for it
-    const reading = adapter.uiTree();
-    up();
-    expect(JSON.stringify(await reading)).toContain('from.wda');
-    expect(bringUps).toBe(1);
+    const idb: IosTreeSource = { ...NO_TREE, read: async () => screen(el({ identifier: 'from.idb' })), applicationLabel: async () => ({ kind: 'declined' }) };
+    return { source: new AutoTreeSource({ wda, idb }), bringUps: () => bringUps };
+  };
+
+  it('under auto: the launch returns with WebDriverAgent up — chosen before `simctl launch`, the first read starts nothing', async () => {
+    const { fn, calls } = fakeExec({});
+    let launchedWhenUp: boolean | undefined;
+    const auto = autoOver(async () => {
+      launchedWhenUp = calls.some((c) => c.full.startsWith('xcrun simctl launch'));
+    });
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: auto.source });
+    await adapter.launch('com.app');
+    expect(launchedWhenUp).toBe(false);
+    expect(auto.bringUps()).toBe(1);
+    expect(adapter.claimNote).toBeUndefined();
+    expect(JSON.stringify(await adapter.uiTree())).toContain('from.wda');
+    await adapter.launch('com.app'); // a second launch: WDA already chosen, nothing asked
+    expect(auto.bringUps()).toBe(1);
   });
 
-  it('idb has no pre-warm: a launch over it starts nothing beyond the launch', async () => {
+  it('under auto: a bring-up that fails is the fallback — the launch goes on over idb, and the claim note says it', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { fn, calls } = fakeExec({});
+    const auto = autoOver(() => Promise.reject(new Error('WDA build failed (xcodebuild) — output: /tmp/x.log')));
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: auto.source });
+    await expect(adapter.launch('com.app')).resolves.toBeDefined();
+    expect(simctlCalls(calls)).toEqual([...WRITES, 'xcrun simctl launch AAAA-1111 com.app']);
+    expect(adapter.claimNote).toMatch(/^read through idb: WebDriverAgent did not come up \(WDA build failed;/);
+    expect(JSON.stringify(await adapter.uiTree())).toContain('from.idb');
+    expect(auto.bringUps()).toBe(1);
+  });
+
+  it('under auto with no WebDriverAgent build cached: the launch waits for nothing — the first read builds and chooses', async () => {
+    const { fn } = fakeExec({});
+    const auto = autoOver(async () => undefined, false);
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: auto.source });
+    await adapter.launch('com.app');
+    expect(auto.bringUps()).toBe(0);
+    expect(JSON.stringify(await adapter.uiTree())).toContain('from.wda');
+    expect(auto.bringUps()).toBe(1);
+  });
+
+  it('idb has no start: a launch over it starts nothing beyond the launch', async () => {
     const { fn, calls } = fakeExec({ 'idb ui describe-all': IDB_DESCRIBE_ALL });
     const idb = new IdbTreeSource({ udid: 'AAAA-1111', exec: fn });
-    expect((idb as IosTreeSource).prewarm).toBeUndefined();
+    expect((idb as IosTreeSource).startBeforeLaunch).toBeUndefined();
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: { ...NO_TREE, applicationLabel: async () => ({ kind: 'declined' }) } });
     await adapter.launch('com.app');
     expect(simctlCalls(calls)).toEqual([...WRITES, 'xcrun simctl launch AAAA-1111 com.app']);

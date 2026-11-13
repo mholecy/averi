@@ -205,6 +205,11 @@ describe('tool descriptions quote each operation default from its owner', () => 
     // One piece of advice wherever a launch's wait is quoted (ios-foreground.ts#unchecked): the screenshot switches first.
     expect(description('launch_app')).toContain('a ⚠ line means it never saw the app — read again before trusting a read (the screenshot switches before the tree).');
     expect(description('launch_app')).not.toContain('compare with screenshot');
+    // A41d: the first launch with WebDriverAgent brings it up first; under wda its failure fails the launch.
+    expect(description('launch_app')).toContain(
+      'With WebDriverAgent (treeSource auto/wda, build cached) the first launch on a simulator brings WDA up first (seconds, ≤ 60 s); ' +
+        'once WebDriverAgent is the source, one that cannot come up fails the launch with nothing wiped or launched.',
+    );
   });
 
   it('scroll_until: the swipe and time bounds (interact/scroll.ts DEFAULT_MAX_SWIPES, DEFAULT_SCROLL_TIMEOUT_MS)', () => {

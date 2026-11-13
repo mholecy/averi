@@ -27,8 +27,8 @@ import { median, type Spread } from './stats.js';
  * - The children (A41_CHILDREN): each device run's file, mode and repeats — one table for the probe, the batch and the
  *   report.
  * - The summary (summaryLines): the A41b table and acceptance numbers, the cadence, the A41c counts; a part not measured
- *   is said MISSING, never a number; a required part read but not proven (unprovenOf: the cadence, leg (b) of the
- *   first tap, the foreground leg) is said UNPROVEN (A44).
+ *   is said MISSING, never a number; a required part read but not proven (unprovenOf: the cadence, legs (a) and (b)
+ *   of the first tap, the foreground leg) is said UNPROVEN (A44, A41d).
  */
 
 export interface Rect {
@@ -477,16 +477,26 @@ export interface ColdRun {
 
 /**
  * How long after launch_app's reply the waited leg's first tap starts — WDA's cold start (3.1–3.6 s on the lab) and a
- * margin. From the reply, not the call: the launch pre-warms WDA only once `simctl launch` returned, before the reply.
+ * margin. From the reply, not the call. Set for A41b's pre-warm, which started WDA once `simctl launch` returned; since
+ * A41d the launch brings WDA up before `simctl launch` (ADR 0046's A41d amendment), so WDA is up at the reply and the
+ * leg is kept unchanged, comparable with probes 2 and 3.
  */
 export const WAITED_GAP_MS = 4000;
 /** The least gap after launch_app's reply leg (b) is judged on: a tap that started earlier is unproven. */
 export const WAITED_GAP_MIN_MS = 3500;
 
 /**
+ * Leg (a)'s total before A41d, for information: launch_app 1 993 + the first tap 5 180 ms, probe-2 on 6f80d529, an idle
+ * machine (docs/truth/live-records/a41-probe-2/). Not the bar: probe-3 measured the same total at 10 298 ms under load
+ * (docs/truth/live-records/a41-probe-3/), so a fixed figure judges the machine. The bar is the same run's (legAAnswer).
+ */
+export const LEG_A_BEFORE_A41D_MS = 7173;
+
+/**
  * A fresh `auto` session (A41b review r1): launch_app (WDA stopped; a `clearState` one on the first repeat), then the
  * first tree read at once (ui_snapshot) — which app it read: its root's label, and the bundle WDA's activeAppInfo names
- * after it. `expected`: the lab app's. Whether WDA's start, run beside the launch, kept the app in front.
+ * after it. `expected`: the lab app's. Whether the app is in front after the launch (A41b: WDA's start ran beside the
+ * launch's foreground wait; since A41d it is done before `simctl launch`).
  */
 export interface ForegroundRun {
   clearState: boolean;
@@ -583,6 +593,11 @@ export interface A41Report {
     /** The waited leg's first tap (WDA's own), and the gap it had from the adapter's creation. */
     firstWaited?: CountedSpread;
     waitedGap?: CountedSpread;
+    /** Leg (a), per session: launch_app (WDA stopped) + the first tap after it, both ok and WDA's (A41d). */
+    firstTotal?: CountedSpread;
+    /** The waited leg's launch_app (WDA stopped; since A41d WDA's bring-up is inside it): its spread, and per repeat. */
+    waitedLaunch?: CountedSpread;
+    waitedLaunches: { repeat: number; ms: number }[];
     /** The first taps that claimed the catalog's `open` (the app in front), of those made: each leg. */
     firstTaps: { ok: number; n: number };
     waitedTaps: { ok: number; n: number };
@@ -615,6 +630,8 @@ function cellText(c: TableCell): string {
 }
 
 const signed = (n: number): string => `${n >= 0 ? '+' : '−'}${Math.round(Math.abs(n))} ms`;
+/** x's median − y's, signed; a dash when either is not measured. */
+const diffOr = (x: CountedSpread | undefined, y: CountedSpread | undefined): string => (x === undefined || y === undefined ? '—' : signed(x.median - y.median));
 const deltaOf = (row: A41Report['table'][number]): number | undefined =>
   row.idb.warm === undefined || row.wda.warm === undefined ? undefined : row.wda.warm.median - row.idb.warm.median;
 
@@ -624,12 +641,14 @@ function autoLines(a: NonNullable<A41Report['autoTap']>): string[] {
     ...(a.paidPush > 0 ? [`${a.paidPush} warm taps paid the push`] : []),
     ...(a.catalogUnsettled > 0 ? [`${a.catalogUnsettled} warm catalog taps on an unsettled catalog`] : []),
   ];
-  const bringUp = a.firstCold === undefined || a.firstWdaUp === undefined ? '—' : signed(a.firstCold.median - a.firstWdaUp.median);
+  const inTap = diffOr(a.firstCold, a.firstWdaUp);
+  const inLaunch = diffOr(a.launch, a.relaunch);
   return [
     `auto, launch_app: ${orDash(a.launch)} (WDA stopped); relaunch: ${orDash(a.relaunch)} (WDA up)`,
     `auto, the catalog's open tap — first after launch_app (WDA stopped): ${orDash(a.firstCold)}; first after a relaunch, WDA up: ${orDash(a.firstWdaUp)}; warm: ${orDash(a.warmCatalog)}`,
     `auto, warm tap on open.A (another target, for information): ${orDash(a.warm)}`,
-    `auto, WDA's bring-up in the first tap (first − first with WDA up): ${bringUp}`,
+    `auto, WDA's bring-up in launch_app (launch_app − relaunch): ${inLaunch}; in the first tap (first − first with WDA up): ${inTap}`,
+    `auto, the waited leg's launch_app (WDA stopped): ${orDash(a.waitedLaunch)}`,
     `auto, the same first tap ${orDash(a.waitedGap)} after launch_app replied (no read before it): ${orDash(a.firstWaited)}`,
     ...(left.length > 0 || a.failed > 0 ? [`auto, left out: ${[...left, ...(a.failed > 0 ? [`${a.failed} sessions with a failed step`] : [])].join('; ')}`] : []),
   ];
@@ -638,32 +657,54 @@ function autoLines(a: NonNullable<A41Report['autoTap']>): string[] {
 const okOf = (c: { ok: number; n: number }): string => `${c.ok}/${c.n}`;
 
 /**
- * The first tap after launch_app in two legs (A41b reviews), each with how many first taps found the app in front:
- * (a) as the session runs — launch_app, then the tap at once — information only: first − warm, and WDA's cold start
- * against launch_app (no verdict: the probe cannot time the foreground wait, the only part of the launch the pre-warm
- * overlaps); (b) the acceptance — the tap WAITED_GAP_MS after launch_app replied: `first ≤ warm + 500`, unproven when
- * a gap was under WAITED_GAP_MIN_MS or a step fell back to idb (not WDA's taps). Then whether every first read after
- * a launch was the lab app.
+ * The first tap after launch_app in two legs, each with how many first taps found the app in front: (a) as a session
+ * runs — launch_app, then the tap at once — judged on the total and on the tap (legAAnswer); (b) the tap WAITED_GAP_MS after
+ * launch_app replied: `first ≤ warm + 500`, unproven when a gap was under WAITED_GAP_MIN_MS or a step fell back to idb
+ * (not WDA's taps). Then whether every first read after a launch was the lab app.
  */
 function firstTapLines(r: A41Report): string[] {
   const a = r.autoTap;
   if (a === undefined) return ['first tap after launch_app: not measured'];
-  const [first, warm, launch, cold] = [a.firstCold, a.warmCatalog, a.launch, r.wdaCold?.coldRead];
-  const msOr = (x: CountedSpread | undefined): string => (x === undefined ? '—' : `${Math.round(x.median)}`);
-  const over = first === undefined || warm === undefined ? '—' : `${Math.round(first.median - warm.median)}`;
-  const legA = `first − warm ${msOr(first)} − ${msOr(warm)} = ${over} ms; WDA cold start ${msOr(cold)} ms against launch_app ${msOr(launch)} ms`;
+  const legA = legAAnswer(a, r.wdaCold).words;
   const legB = waitedTapAnswer(a).words;
   const f = a.foreground;
   const front = f.n === 0 ? 'not measured' : `${f.ok === f.n && foregroundJudged(f) ? 'yes' : 'no'}`;
   return [
-    `first tap after launch_app (a, at once; information, not judged): ${legA}; first tap ok ${okOf(a.firstTaps)}`,
+    `first tap after launch_app (a, at once) — launch_app + the first tap ≤ relaunch (WDA up) + WDA cold start + the first tap with WDA up + 500 ms, and the first tap ≤ the first tap with WDA up + 500 ms: ${legA}; first tap ok ${okOf(a.firstTaps)}; before A41d ${LEG_A_BEFORE_A41D_MS} (probe-2, idle)`,
     `first tap after launch_app (b, ≥ ${WAITED_GAP_MIN_MS / 1000} s after it replied) ≤ the same tap warm + 500 ms: ${legB}; first tap ok ${okOf(a.waitedTaps)}`,
     `foreground after launch ok ${okOf(f)} (${f.clearState} clearState; n ≥ 5 with one: ${front})${f.seen.length > 0 ? ` — read instead: ${f.seen.join('; ')}` : ''}`,
   ];
 }
 
-/** Leg (b)'s answer: yes or no measured; unproven or not measured, neither a measurement. */
-interface WaitedTapAnswer {
+/**
+ * Leg (a) (ADR 0046's A41d amendment), two bars, both from the same run:
+ * - the total: the median of launch_app + the first tap, per session, ≤ launch_app with WDA up (`relaunch`) + WDA's
+ *   cold start (wda-cold's first read) + the first tap with WDA up + 500 ms. launch_app awaits WDA's bring-up, so the
+ *   total should be those serial parts and no more; the 500 is leg (b)'s allowance (noise, and the cold read's own
+ *   ~100 ms read). Same-run parts, not a fixed figure: load moves them together (the total before A41d was 7 173 ms
+ *   on probe-2 and 10 298 on probe-3). A pass means the bring-up costs no more than its serial parts + 500; before
+ *   A41d both recorded runs exceeded that bar (probe-2 6 752, probe-3 9 141).
+ * - the tap: the first tap at once after launch_app ≤ the first tap with WDA up + 500 ms — WDA is up when launch_app
+ *   replies.
+ * `yes` when both pass, `no` when either fails; `unproven` when a step fell back to idb, `not-measured` without a part.
+ */
+function legAAnswer(a: NonNullable<A41Report['autoTap']>, cold: A41Report['wdaCold']): LegAnswer {
+  const [total, relaunch, coldRead, wdaUp, first] = [a.firstTotal, a.relaunch, cold?.coldRead, a.firstWdaUp, a.firstCold];
+  if (a.fellBack > 0) return fellBackAnswer(a.fellBack);
+  if (total === undefined || relaunch === undefined || coldRead === undefined || wdaUp === undefined || first === undefined) {
+    return { state: 'not-measured', words: 'not measured' };
+  }
+  const m = (x: CountedSpread): number => Math.round(x.median);
+  const parts = [relaunch, coldRead, wdaUp].map(m);
+  const bar = parts.reduce((x, y) => x + y, 500);
+  const state = m(total) <= bar && m(first) <= m(wdaUp) + 500 ? 'yes' : 'no';
+  return { state, words: `${state} (total ${m(total)} vs ${parts.join(' + ')} + 500 = ${bar}; tap ${m(first)} vs ${m(wdaUp)} + 500)` };
+}
+
+const fellBackAnswer = (n: number): LegAnswer => ({ state: 'unproven', words: `unproven (${n} auto steps fell back to idb: not WDA's taps)` });
+
+/** A leg's answer: yes or no measured; unproven or not measured, neither a measurement. */
+interface LegAnswer {
   state: 'yes' | 'no' | 'unproven' | 'not-measured';
   /** The acceptance line's words after its colon (firstTapLines). */
   words: string;
@@ -673,9 +714,9 @@ interface WaitedTapAnswer {
  * Leg (b), the waited first tap against the same tap warm + 500 ms: `unproven` when a step fell back to idb or a gap
  * was under WAITED_GAP_MIN_MS, `not-measured` without the waited tap, its warm tap or its gap; else yes or no.
  */
-function waitedTapAnswer(a: NonNullable<A41Report['autoTap']>): WaitedTapAnswer {
+function waitedTapAnswer(a: NonNullable<A41Report['autoTap']>): LegAnswer {
   const [waited, warm, gap] = [a.firstWaited, a.warmCatalog, a.waitedGap];
-  if (a.fellBack > 0) return { state: 'unproven', words: `unproven (${a.fellBack} auto steps fell back to idb: not WDA's taps)` };
+  if (a.fellBack > 0) return fellBackAnswer(a.fellBack);
   if (waited === undefined || warm === undefined || gap === undefined) return { state: 'not-measured', words: 'not measured' };
   if (gap.min < WAITED_GAP_MIN_MS) {
     return { state: 'unproven', words: `unproven (a tap ${Math.round(gap.min)} ms after launch_app replied, under ${WAITED_GAP_MIN_MS})` };
@@ -688,14 +729,17 @@ function waitedTapAnswer(a: NonNullable<A41Report['autoTap']>): WaitedTapAnswer 
 const foregroundJudged = (f: NonNullable<A41Report['autoTap']>['foreground']): boolean => f.n >= 5 && f.clearState >= 1;
 
 /**
- * The required parts read but not proven (A44): the cadence's judgement `unproven`; leg (b) of the first tap unproven
- * or not measured; the foreground leg on under 5 launches or none with `clearState` — each with its why. A measured no
- * (`keep`, leg (b)'s `no`, a launch not in front) is proven. A part whose file is absent is `missing`'s, not this.
+ * The required parts read but not proven (A44): the cadence's judgement `unproven`; leg (a) (A41d) or leg (b) of the
+ * first tap unproven or not measured; the foreground leg on under 5 launches or none with `clearState` — each with its
+ * why. A measured no (`keep`, a leg's `no`, a launch not in front) is proven. A part whose file is absent is
+ * `missing`'s, not this — but leg (a) without wda-cold's cold start is not measured, and said here too.
  */
-export function unprovenOf(r: Pick<A41Report, 'cadence' | 'autoTap'>): string[] {
+export function unprovenOf(r: Pick<A41Report, 'cadence' | 'autoTap' | 'wdaCold'>): string[] {
   const out: string[] = [];
   if (r.cadence?.judgement.verdict === 'unproven') out.push(`cadence (${r.cadence.judgement.why})`);
   if (r.autoTap === undefined) return out;
+  const a = legAAnswer(r.autoTap, r.wdaCold);
+  if (a.state === 'unproven' || a.state === 'not-measured') out.push(`first tap (a) (${a.words})`);
   const b = waitedTapAnswer(r.autoTap);
   if (b.state === 'unproven' || b.state === 'not-measured') out.push(`first tap (b) (${b.words})`);
   const f = r.autoTap.foreground;
@@ -786,8 +830,9 @@ export interface A41Parts {
 
 const okMs = (steps: readonly (Step | undefined)[]): CountedSpread | undefined =>
   spreadOf(steps.filter((s): s is Step => s?.ok === true).map((s) => s.ms));
-/** WDA's own taps: ok, and not read through idb (an `auto` step that fell back is idb's, never WDA's). */
-const wdaMs = (steps: readonly (Step | undefined)[]): CountedSpread | undefined => okMs(steps.filter((s) => s?.fellBack !== true));
+/** WDA's own step: ok, and not read through idb (an `auto` step that fell back is idb's, never WDA's). */
+const wdaOk = (s: Step | undefined): s is Step => s?.ok === true && s.fellBack !== true;
+const wdaMs = (steps: readonly (Step | undefined)[]): CountedSpread | undefined => spreadOf(steps.filter(wdaOk).map((s) => s.ms));
 
 const probeName = (path: string, p: HitProbe): string =>
   p.error !== undefined ? `${path} error: ${p.error}` : `${path} ${p.hit?.id ?? `${p.hit?.type ?? '?'} "${p.hit?.label ?? ''}"`}`;
@@ -837,6 +882,9 @@ function autoOf(runs: readonly AutoRun[]): NonNullable<A41Report['autoTap']> {
     ...spreadField('warm', wdaMs(settledWarm)),
     ...spreadField('firstWaited', wdaMs(runs.map((r) => r.firstWaited))),
     ...spreadField('waitedGap', spreadOf(runs.flatMap((r) => (r.waitedGapMs === undefined ? [] : [r.waitedGapMs])))),
+    ...spreadField('firstTotal', spreadOf(runs.flatMap((r) => (wdaOk(r.launch) && wdaOk(r.firstCold) ? [r.launch.ms + r.firstCold.ms] : [])))),
+    ...spreadField('waitedLaunch', okMs(runs.map((r) => r.waitedLaunch))),
+    waitedLaunches: runs.flatMap((r) => (r.waitedLaunch?.ok === true ? [{ repeat: r.repeat, ms: r.waitedLaunch.ms }] : [])),
     firstTaps: tapsOk(runs.map((r) => r.firstCold)),
     waitedTaps: tapsOk(runs.map((r) => r.firstWaited)),
     foreground: foregroundOf(runs),
