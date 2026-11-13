@@ -65,7 +65,6 @@ const config = (over: { udid?: string } = { udid: LAB_UDID }) => ({ out: join(di
 const steps: string[] = [];
 const needCtx = (run: Run = runOf(world), udid: string | null = LAB_UDID): NeedCtx => ({ bounded: run, labDir: join(dir, 'lab'), config: config(udid === null ? {} : { udid }), fs: nodeFs, step: (w, t) => void steps.push(`${w} ${t}`) });
 beforeEach(() => void (steps.length = 0));
-/** The words of the calls made, from the `n`th on. */
 const words = (from = 0) => world.calls.slice(from);
 /** A build need that was met with `app`, counting how often it is asked. */
 const builtRef = (app: string) => {
@@ -303,7 +302,7 @@ describe('the ios need (batch-11.sh:383–410): guard, reset, the finportal key\
     const r = await (iosLab({ wait, reset: false, build: ref }).need as { check(c: NeedCtx): Promise<unknown> }).check(needCtx());
     expect(r).toEqual({ ok: true, how: "averi-lab iPhone 17 simulator, iOS 27.0; this run's build installed; the installed cells.json is main's" });
     expect(words()).toContain(`xcrun simctl install ${LAB_UDID} ${app}`);
-    // The need asks its build itself (review round 1, MAJOR 2): the build need's order in a block no longer matters.
+    // The need asks its build itself (review round 1, MAJOR 2): the build need's order in a block does not matter.
     expect(ref.asked).toBe(1);
   });
 

@@ -1,10 +1,9 @@
 import type { ChildProcess } from 'node:child_process';
 
-// The real-child tests' cleanup (bounded-proc.test.ts, abort-proc.test.ts): whatever a test did, its children end
-// and hold nothing of vitest open. Under parallel load a kill was refused with EPERM once (review round 3), and a
-// child left with its pipes open kept the worker alive: so each kill is tried again, every pipe is destroyed and
-// every child unref'd. The fixtures bound their own lives too (proc-child.mjs, abort-child.ts), so a child no kill
-// reached still ends.
+// The real-child tests' cleanup: whatever a test did, its children end and hold nothing of vitest open. Under parallel
+// load a kill was refused with EPERM once (review round 3), and a child left with its pipes open kept the worker alive:
+// so each kill is tried again, every pipe is destroyed and every child unref'd. The fixtures bound their own lives too
+// (proc-child.mjs, abort-child.ts), so a child no kill reached still ends.
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

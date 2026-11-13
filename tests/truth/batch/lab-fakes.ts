@@ -8,15 +8,14 @@ import { nodeFs } from '../../../scripts/truth/batch/io.js';
 import type { Ended, Handlers, KillResult, ProcessSeam, StartOptions, Started } from '../../../scripts/truth/batch/proc.js';
 import { DOMAINS, PROTECTED, type KeyVal } from '../../../scripts/truth/batch/ios-defaults.js';
 
-// The lab devices as fakes, shared by the S6b tests (ios-lab, android-lab, lab-build, and lab-batch through runBatch):
-// a simulator (its domains in memory, `defaults export` writing the typed map to the host file, plistlib reading it
-// back; the lab's WebDriverAgent whose exit flips com.apple.Accessibility from bool to int as batch-10 measured; port
-// 8120's listeners; the Open-in alert; the installed app's container), an emulator (its AVD, the installed APK, the
-// handlers, the role holders and clipboard reads of API 33), and the host's tools (pkill, lsof, kill, unzip, the
-// builds). Every call is checked for what b11-dry's shims flagged as a VIOLATION, made exact: device-check's simulator
-// or WDA ports named; a write to the schemeapproval domain; a pkill by any pattern but the lab's; a kill of a pid
-// port 8120 did not list; an adb call naming no serial or another one; any `input tap`; an idb tap anywhere but the
-// alert's Cancel. No device and no process is touched.
+// The lab devices as fakes: a simulator (its domains in memory, `defaults export` writing the typed map to the host
+// file, plistlib reading it back; the lab's WebDriverAgent whose exit flips com.apple.Accessibility from bool to int as
+// batch-10 measured; port 8120's listeners; the Open-in alert; the installed app's container), an emulator (its AVD,
+// the installed APK, the handlers, the role holders and clipboard reads of API 33), and the host's tools (pkill, lsof,
+// kill, unzip, the builds). Every call is checked for what b11-dry's shims flagged as a VIOLATION, made exact:
+// device-check's simulator or WDA ports named; a write to the schemeapproval domain; a pkill by any pattern but the
+// lab's; a kill of a pid port 8120 did not list; an adb call naming no serial or another one; any `input tap`; an idb
+// tap anywhere but the alert's Cancel. No device and no process is touched.
 
 export const LAB_UDID = 'LAB-SIMULATOR-UDID';
 export const LAB_SERIAL = 'LAB-SERIAL';
@@ -372,9 +371,9 @@ export interface Answer {
 }
 
 /**
- * The standing batches' fake process seam (lab-run.test.ts, lab-run-ios.test.ts): every call's words kept, answered by
- * the subclass's `answer`; git answered for a clean main at `head`; one call matching `hang` runs until its group is
- * signalled; the exits and the signal handlers kept.
+ * The standing batches' fake process seam: every call's words kept, answered by the subclass's `answer`; git answered
+ * for a clean main at `head`; one call matching `hang` runs until its group is signalled; the exits and the signal
+ * handlers kept.
  */
 export abstract class FakeSeam implements ProcessSeam {
   readonly words: string[] = [];
