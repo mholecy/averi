@@ -127,7 +127,7 @@ describe('the cell catalog', () => {
     expect(selectCells(c, { families: ['presented', 'base'], cells: ['open', 'form-picker', 'alert-dim'] }).map((x) => x.id)).toEqual(['open', 'alert-dim']);
     expect(() => selectCells(c, { families: ['edgez'] })).toThrow('no family edgez');
     expect(() => selectCells(c, { cells: ['nope'] })).toThrow('no cell nope');
-    // A family with no cell yet (here: edges with its cells left out — every family gains cells in phase 3).
+    // A family with no cell yet (here: edges with its cells left out).
     expect(() => selectCells({ ...c, cells: c.cells.filter((x) => x.family !== 'edges') }, { families: ['edges'] })).toThrow('no cell selected: families edges, cells any');
   });
 });

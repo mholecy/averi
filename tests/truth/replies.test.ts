@@ -40,7 +40,7 @@ const src = (file: string) =>
 
 // The two "close it first" the harness reads apart (scripts/truth/replies.ts): the presented remedy, driven here by
 // src's own builders (ui-tree/remedy-text.ts#presentedRemedy, #presentedStop) over every layer they word, and the
-// active-window hint (#ACTIVE_WINDOW_HINT), which is no presented remedy.
+// active-window hint (ui-tree/miss.ts#ACTIVE_WINDOW_HINT), which is no presented remedy.
 
 /** Every presentation kind — the type check below fails when src adds one this list lacks. */
 const KINDS = ['alert', 'actionSheet', 'popover', 'dialog', 'screen', 'backdrop'] as const satisfies readonly PresentationKind[];

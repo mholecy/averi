@@ -595,8 +595,8 @@ describe('holds and holdsShown: the class and the kind of a fill verdict', () =>
 
 /**
  * p7 (D43a, ADR 0037): a no-clear fill of `Š` into form-prefilled's name — refused before anything was sent, the
- * prefill kept. No device has run it yet: pinned over D40's p1 (the same cell and field, its launch the prefill), its
- * final state set to what each reply would leave.
+ * prefill kept. Pinned over D40's p1 (the same cell and field, its launch the prefill), its final state set to what
+ * each reply would leave.
  */
 describe('refusedKept: p7, a character averi cannot type into a prefilled field', () => {
   const REFUSAL = "ERROR cannot type U+0160 'Š': on Android averi types only printable ASCII (U+0020–U+007E): `input text` crashes on another character after typing the ones before it. Refused before anything was sent — nothing tapped, cleared or typed.";
@@ -628,7 +628,7 @@ describe('refusedKept: p7, a character averi cannot type into a prefilled field'
 /**
  * D43 (ADR 0037's D43 amendment): under WDA averi types `Š` through `/wda/keys`, so p7 — the refusal with the prefill kept
  * — runs under idb and uiautomator only, and p7w under WDA holds the prefill with `Š` appended (no clear). b1d and b7
- * under WDA are held to `holds` with no KNOWN entry (live-known.ts): ok expected, a LOUD there is no longer known.
+ * under WDA are held to `holds` with no KNOWN entry (live-known.ts): ok expected, a LOUD there is not known.
  */
 describe('p7 and p7w (D43): refused under idb and uiautomator, typed under WDA', () => {
   const p1 = recordedCase(readLiveRecord('ios-forms-d40-1.json'), 'wda', 'p1');
@@ -666,7 +666,7 @@ describe('p7 and p7w (D43): refused under idb and uiautomator, typed under WDA',
 
 /**
  * f11–f14 (D37): form-format's `date` (schema.ts#FieldFormat, placeholder `__.__.____`) and `phone` (no format,
- * placeholder `+421`) — at D37, ADR 0034's dotted date (a false mismatch until D51) and its D29 gaps. Judged here over D40's f1 record (iOS WDA), its
+ * placeholder `+421`) — at D37, ADR 0034's dotted date and its D29 gaps. Judged here over D40's f1 record (iOS WDA), its
  * final state set to what each fill would leave; batch-3's device records are rejudged in live-rejudge.test.ts.
  */
 describe('f11–f14 (D37): a dotted date and a `+421` phone in form-format', () => {
@@ -759,8 +759,8 @@ describe('f11–f14 (D37): a dotted date and a `+421` phone in form-format', () 
 /**
  * f15 (D63): form-format's `date` keeps 8 digits, so `2026` typed without clear after a full `31.12.2026` changes
  * nothing, though the field's text holds it — the reading is unchanged since typing began, and averi must say the field
- * did not change (live-forms.ts#refusedUnchanged). Not yet run on a device; judged over D40's f1 record (iOS WDA), its
- * final state set to what the fills would leave.
+ * did not change (live-forms.ts#refusedUnchanged). Judged over D40's f1 record (iOS WDA), its final state set to what
+ * the fills would leave.
  */
 describe('f15 (D63): digits the full date field refuses, though its text holds them', () => {
   const f1 = recordedCase(readLiveRecord('ios-forms-d40-1.json'), 'wda', 'f1');
@@ -823,9 +823,9 @@ describe('refusedHolding: a failed first fill, its kind not the last reply\'s', 
 
 /**
  * f16 (D64): form-format's `date` keeps 8 digits, so `12` typed without clear after `31.12.202` keeps only the `1` — the
- * app holds `31.12.2021`, a reading that holds `12` only inside `31.12`, none of it past the earlier text. Before D64
- * averi passed it by containment; it must now fail (live-forms.ts#refusedCapped). Not yet run on a device; judged over
- * D40's f1 record (iOS WDA), its final state set to what the fills would leave.
+ * app holds `31.12.2021`, a reading that holds `12` only inside `31.12`, none of it past the earlier text. Containment
+ * would pass it; it must fail (live-forms.ts#refusedCapped). Judged over D40's f1 record (iOS WDA), its final state
+ * set to what the fills would leave.
  */
 describe('f16 (D64): digits the date field at its cap keeps only the head of, though its text holds them', () => {
   const f1 = recordedCase(readLiveRecord('ios-forms-d40-1.json'), 'wda', 'f1');
@@ -1144,7 +1144,7 @@ describe('fp1 and fp2 (D64b): a dial code inserted on focus, the keys taken or r
     expect(knownLive('android', 'uiautomator', 'fp2', v.cls, v.kind)).toBeUndefined();
     const missing: LabState = { ...SYNTHETIC_LAUNCHED, fields: { dialLands: SYNTHETIC_LAUNCHED.fields!.dialLands } };
     expect(judge(syntheticUnfocused(missing), [filled], 'uiautomator', SYNTHETIC_LAUNCHED)).toEqual({ outcome: 'MISMATCH', cls: 'fill-claim-unfocused', kind: 'other', why: `averi says Filled but its tap never focused the field (no focus event for dialRefuses), which is missing from the app's state; averi: ${filled}` });
-    // No claim, no focus: LOUD loud-untouched as before; a NOT verified Filled claims nothing.
+    // No claim, no focus: LOUD loud-untouched; a NOT verified Filled claims nothing.
     expect(judge(syntheticUnfocused(syntheticLeft('dialRefuses', '')), ['ERROR fill: id:"lab.form-focus-prefix.dialRefuses" was not tapped'], 'idb', SYNTHETIC_LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'loud-untouched' });
     expect(judge(syntheticUnfocused(syntheticLeft('dialRefuses', '')), [`${filled} — NOT verified: the field could not be read`], 'idb', SYNTHETIC_LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'loud-untouched' });
   });

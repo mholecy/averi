@@ -50,17 +50,14 @@ const LIVE_ONLY: Readonly<Record<string, string>> = {
  * record is an older src's, whose replies `--rejudge` reads as they were, so these cases still fail there by their
  * rule; struck off — with their line here — once a live record at the fix reads them ok (live.ts then exits 1 on each,
  * as for any fixed case). Keyed by CASE, not by note: an entry filed under one of these notes later, for a case not
- * listed here, is held to the note being open like any other. Empty since round 5's device check (ios-vis-2725e76.json at
- * b71cbbb's src): LE4's and L3's cases read ok there and were struck off, but LE4's two cases of F, refiled as LV4 and
- * LV5 (LIVE_ONLY, above).
+ * listed here, is held to the note being open like any other.
  */
 const AWAITING_LIVE: Readonly<Record<string, { note: string; why: string }>> = {};
 
 /**
  * Notes calibration.json lists that are not committed on this branch: fixed notes (calibrated, or a residual, or
- * excluded). Empty since the 31 notes that sat untracked in the main checkout were committed (83059cb,
- * docs/device-checks-r5-r20, merged here). calibrate.ts reads no note's text, only its rows; a note listed here may not
- * be open or be named by a KNOWN row (checked below), and a note that lands here must be struck off this list.
+ * excluded). calibrate.ts reads no note's text, only its rows; a note listed here may not be open or be named by a
+ * KNOWN row (checked below), and a note that lands here must be struck off this list.
  */
 const NOT_ON_THIS_BRANCH: readonly string[] = [];
 
@@ -68,20 +65,16 @@ const NOT_ON_THIS_BRANCH: readonly string[] = [];
  * A KNOWN row or entry (`key`) may stay filed as a note calibrated PARTIALLY — calibration.json `calibrate` with a
  * `partial` saying what of the note its fix covers — only when that note's list for its ratchet (`field`, OPEN_FIELD:
  * `open` for a static row, `openLive` for a live entry) names it: the part `partial` leaves open, red until a fix or a
- * decision of the owner's (L1's six form-picker rows were so, round 6's code review P1, until the owner accepted ADR
- * 0018's residual 18 on 2026-10-18; none is listed today). Keyed by ROW, as AWAITING_LIVE is by case: a row filed as a
- * partial note that its `open` does not list is held to the note being open like any other. Round 6 extended the rule
- * for it: an open note expects every row red (OPEN-RED), a calibrated one every row green after its fix, and neither
- * says "calibrated, some rows still open".
+ * decision of the owner's. Keyed by ROW, as AWAITING_LIVE is by case: a row filed as a partial note that its `open`
+ * does not list is held to the note being open like any other. An open note expects every row red (OPEN-RED), a
+ * calibrated one every row green after its fix, and neither says "calibrated, some rows still open".
  */
 const partiallyOpen = (field: 'open' | 'openLive', note: string, key: string, tbl: Calibration = table): boolean =>
   tbl.notes.some((e) => e.note === note && e.status === 'calibrate' && e.partial !== undefined && (e[field] ?? []).includes(key));
 
 /**
  * Which list of a partial note names a KNOWN place, by its ratchet: a static row its `open`, a live entry (`<platform>
- * <source> <case id>`) its `openLive` (#10 listed the live case `turn:scroll-collapsing.A` while ADR 0021 left the turn
- * on uiautomator to the owner; closed by the owner's decision of 2026-10-18 — no turn there, the case ok by
- * live-visibility.ts#judgeAndroidTurn — none is listed today).
+ * <source> <case id>`) its `openLive`.
  */
 const OPEN_FIELD = { static: 'open', live: 'openLive' } as const;
 
