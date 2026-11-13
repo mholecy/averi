@@ -985,9 +985,13 @@ disagree are still no answer, since one display prints one. Only their labels ch
     focus, so nothing is guessed from it.
 - A window block that names no display is read as display 0's, and so is a dump that names none: the rule for dumps
   of one display, unproven on a second Android's format.
+- The focused-window read takes each focus line and the lines after it up to the next as one display's, so it needs
+  each display's `mCurrentFocus` line before its own `DisplayFrames` line, on one display too (a size line before the
+  focus line is not read: `unknown`). That order is measured on API 33 only (A35's capture and every lab capture).
 - UT4 (one tree-dialect reader of the root marks), named in the A35 row, is not done here: its readers span about 18
   core modules (ui-tree, interact, flow, mcp, the iOS tree sources) and have nothing to do with displays. It is left to
   a row of its own.
-- Mutation: the `android` group cold, android-wm.ts 96.59 % (floor 94 → 95), 21 survivors as A27 left 21. Three are
-  new and equivalent (scripts/mutation/scope.json); the first run's `\d+` → `\d` survivor was not (a two-digit display
+- Mutation: the `android` group cold, android-wm.ts 96.59 % (floor 94 → 95), 21 survivors, as many as A27 left: 3 of
+  A27's survivors are now killed (the `focus === undefined || w === undefined` group, gone with the reader) and 3 new
+  ones are equivalent (scripts/mutation/scope.json); the first run's `\d+` → `\d` survivor was not (a two-digit display
   id read as none, so as display 0's) and is killed by a window on display 12.

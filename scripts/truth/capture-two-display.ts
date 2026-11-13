@@ -179,10 +179,18 @@ export async function main(argv: readonly string[]): Promise<number> {
       log(`after: ${SETTING}=${after} ${after === before ? '(as before)' : `(WAS ${before})`}`);
       if (after !== before) throw new Error(`reads ${after} — put ${SETTING} back to ${before} by hand`);
     });
+    if (!clockRan) {
+      await step(`am kill ${CLOCK_PACKAGE}`, async () => {
+        log(`restore: am kill ${CLOCK_PACKAGE} (not running before)`);
+        await shell(`am kill ${CLOCK_PACKAGE}`);
+      });
+    }
+    /** Display 0's focus after the overlay is gone, refocused through Settings when it lost mFocusedApp. */
+    let focusAfter: string | undefined;
     await step('display 0 as before', async () => {
       await waitFor('one display again', async () => ((displayIds(await shell('dumpsys window displays')).length === 1) ? true : undefined));
       await pause(1000);
-      let focusAfter = display0Focus(await shell(CHOOSER_FOCUS_COMMAND));
+      focusAfter = display0Focus(await shell(CHOOSER_FOCUS_COMMAND));
       if (
         focusAfter !== focusBefore &&
         focusAfter.includes('mFocusedApp=null') &&
@@ -201,15 +209,14 @@ export async function main(argv: readonly string[]): Promise<number> {
         await pause(1000);
         focusAfter = display0Focus(await shell(CHOOSER_FOCUS_COMMAND));
       }
-      if (!clockRan) {
-        log(`restore: am kill ${CLOCK_PACKAGE} (not running before)`);
-        await shell(`am kill ${CLOCK_PACKAGE}`);
-      }
+    });
+    await step('the readback: display 0 focus and root tasks', async () => {
+      const focusNow = focusAfter ?? display0Focus(await shell(CHOOSER_FOCUS_COMMAND));
       const tasksAfter = new Set(rootTasks(await shell('am stack list')).map((t) => t.id));
       const sameTasks = tasksAfter.size === tasksBefore.size && [...tasksAfter].every((id) => tasksBefore.has(id));
-      log(`after: display 0 focus: ${focusAfter} ${focusAfter === focusBefore ? '(as before)' : '(CHANGED)'}`);
+      log(`after: display 0 focus: ${focusNow} ${focusNow === focusBefore ? '(as before)' : '(CHANGED)'}`);
       log(`after: root tasks ${sameTasks ? '(as before)' : '(CHANGED)'}:\n${await stacks()}`);
-      if (focusAfter !== focusBefore || !sameTasks) ok = false;
+      if (focusNow !== focusBefore || !sameTasks) ok = false;
     });
     log(ok ? 'done' : 'FAILED');
     await writeFile(join(out, 'capture.log.txt'), `${lines.join('\n')}\n`);

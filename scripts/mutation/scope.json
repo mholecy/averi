@@ -147,7 +147,7 @@
     "group": "android",
     "tests": ["tests/adapters/android-wm.test.ts", "tests/adapters/android-focused-window.test.ts", "tests/adapters/android-chooser.test.ts"],
     "floor": 95,
-    "baseline": "96.59 % on 2026-11-13 (A35 review round 1, the default display's two readers, defaultDisplayBlock and defaultDisplayFocusRead; `npm run mutate -- --group android --force --tempDirName reports/mutation/stryker-tmp-a35e`, cold, the group 24 s at load 7–15): 616 mutants, 595 killed, 21 survived; floor 94 → 95. Three survivors are new and equivalent: parseFocusedWindow's `w === undefined` as false (a NaN size clips every frame to none: unknown), defaultDisplayFocus's `?? ''` as any other string (no line in it reads), WINDOW_DISPLAY_RE's `^` (a block's own `mDisplayId=` line is its first); `\\d+` as `\\d` is killed by a display 12. The other 18 as A27 left them"
+    "baseline": "96.59 % on 2026-11-13 (A35 review round 1, the default display's two readers, defaultDisplayBlock and defaultDisplayFocusRead; `npm run mutate -- --group android --force --tempDirName reports/mutation/stryker-tmp-a35e`, cold, the group 24 s at load 7–15): 616 mutants, 595 killed, 21 survived; floor 94 → 95. Three survivors are new and equivalent: parseFocusedWindow's `w === undefined` as false (a NaN size clips every frame to none: unknown), defaultDisplayFocus's `?? ''` as any other string (no line in it reads), WINDOW_DISPLAY_RE's `^` (a block's own `mDisplayId=` line is its first); `\\d+` as `\\d` is killed by a display 12. 3 of A27's 21 are now killed (the `focus === undefined || w === undefined` group, gone with the reader); the other 18 as A27 left them"
   },
   "src/adapters/android-tree-dialect.ts": {
     "group": "android",
