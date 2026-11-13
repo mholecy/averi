@@ -21,7 +21,7 @@ import {
   type LabEntry,
   type PreferredRead,
 } from '../chooser-readers.js';
-// Moved to the leaf module (T20a) and re-exported, so a batch that imports them from here still does.
+// Re-exported from the leaf module (T20a), so a batch that imports them from here still does.
 export {
   adbLine,
   checkHand,
@@ -42,35 +42,34 @@ import { exitText, failedCall, firstLineOf, messageOf, nameInLine, verdictLine, 
 
 /**
  * The lab emulator's "Open with" chooser as values and words, pure (no Run, no file): what lab-emu.ts reads, decides
- * and says around a block that may leave the chooser up or a preferred activity behind (batch-9's D55 to batch-12's
- * E5). The preferred-activities read, only its `Preferred Activities User N:` block (API 33 prints the whole `dumpsys
- * package` for `preferred-activities`: batch-9's INCONCLUSIVE was that); a lab default (`mAlways=true`, a leak) told
- * from the last-chosen entry "Just once" writes (`mAlways=false`, which no reinstall clears: batch-11); --check's exit;
- * safeTap, the one point a batch may tap on the chooser, never "Always"; the reads that can come back unread (the role
- * holder, the clipboard, the install); and every line a batch prints of them.
+ * and says around a block that may leave the chooser up or a preferred activity behind. The preferred-activities
+ * read, only its `Preferred Activities User N:` block (API 33 prints the whole `dumpsys package` for
+ * `preferred-activities`: batch-9's INCONCLUSIVE was that); a lab default (`mAlways=true`, a leak) told from the
+ * last-chosen entry "Just once" writes (`mAlways=false`, which no reinstall clears: batch-11); --check's exit; safeTap,
+ * the one point a batch may tap on the chooser, never "Always"; the reads that can come back unread (the role holder,
+ * the clipboard, the install); and every line a batch prints of them.
  *
  * The readers the live golden's chooser premise reads too (T20a) live in ../chooser-readers.ts, a leaf outside the
  * batch layer: the preferred block's parse, the leak rule, the handler count, the default's and the check's hand
  * lines; re-exported here. Here they are wrapped over a CallResult (preferredOf, handlersOf: a failed call is unread).
  *
- * The focus is judged by the harness's own reader (chooser-readers.ts#focusedChooserOf, the chooser group's reader,
- * live-chooser.ts's), never by src's android-chooser.ts#chooserInFocus: a lab check does not judge with the code under
- * test (ADR 0020; TL5, A22). What is src's and no judge is reused, not copied: the read's command
- * (CHOOSER_FOCUS_COMMAND), the tree src's own uiautomator parser's (D66's UiNode.disabled), the fresh sheet
- * android-chooser.ts#chooserSheet's, an adb word's quoting
+ * The focus is judged by the harness's own reader (chooser-readers.ts#focusedChooserOf), never by src's
+ * android-chooser.ts#chooserInFocus: a lab check does not judge with the code under test (ADR 0020; TL5, A22). What is
+ * src's and no judge is reused, not copied: the read's command (CHOOSER_FOCUS_COMMAND), the tree src's own uiautomator
+ * parser's (D66's UiNode.disabled), the fresh sheet android-chooser.ts#chooserSheet's, an adb word's quoting
  * adb-shell.ts#shellQuote's (through chooser-readers.ts#adbLine). A host path in a hand line is quoted by shell.ts, the
  * batches' one host-shell quoter.
  */
 
 /** --check's verdict label. */
 export const CHECK_LABEL = 'D55 check';
-/** The cleanup's verdict label (batch-11's `D55 cleanup:` line; batch-12 wrote `E5 cleanup:`). */
+/** The cleanup's verdict label. */
 export const CLEANUP_LABEL = 'D55 cleanup';
 /** The browser role holder read: API 33 has no such command — unread, never unchanged. */
 export const ROLE_HOLDERS_ARGV = ['cmd', 'role', 'get-role-holders', 'android.app.role.BROWSER'] as const;
 /** The clipboard read (batch-9's D43 probe asked its help first): API 33 has no shell implementation — unread. */
 export const CLIPBOARD_ARGV = ['cmd', 'clipboard', 'help'] as const;
-/** How far a given tap point may lie from its target's centre (batch-12's guardRow1: ±2 px). */
+/** How far a given tap point may lie from its target's centre (±2 px). */
 export const CENTRE_SLACK_PX = 2;
 
 // --------------------------------------------------------------------------------------- the preferred activities
@@ -85,7 +84,7 @@ export function preferredOf(r: CallResult): PreferredRead {
   return failedCall(r) ? preferredUnread(exitText(r)) : preferredIn(r.out);
 }
 
-/** A last-chosen entry a batch accepts as the lab's known state (batch-12's README), by Authority and component. */
+/** A last-chosen entry a batch accepts as the lab's known state, by Authority and component. */
 export interface AcceptedEntry {
   authority: string;
   component: RegExp;
@@ -114,16 +113,16 @@ export function focusOf(r: CallResult): FocusRead {
 // ---------------------------------------------------------------------------------------------------- --check
 
 /**
- * --check's exits (batch-12's final checkExit): 0 no lab entry, no chooser; 1 a lab
- * default (a leak: "Always" is never tapped, so it predates the batch or is a defect); 3 not proven (a read failed, no
- * Preferred Activities block, or a lab entry with no mAlways line — one that cannot be compared never triggers a
- * reinstall: code review); 4 a chooser in front; 5 only last-chosen entries, every
- * one accepted; 6 a last-chosen entry not accepted (no default — a WARN, never a RESTORE: no reinstall clears it).
+ * --check's exits: 0 no lab entry, no chooser; 1 a lab default (a leak: "Always" is never tapped, so it predates the
+ * batch or is a defect); 3 not proven (a read failed, no Preferred Activities block, or a lab entry with no mAlways
+ * line — one that cannot be compared never triggers a reinstall: code review); 4 a chooser in front; 5 only
+ * last-chosen entries, every one accepted; 6 a last-chosen entry not accepted (no default — a WARN, never a RESTORE:
+ * no reinstall clears it).
  */
 export const CHECK_EXIT = { clean: 0, leak: 1, unproven: 3, chooser: 4, accepted: 5, lastChosen: 6 } as const;
 export type CheckExit = (typeof CHECK_EXIT)[keyof typeof CHECK_EXIT];
 
-/** The exit, batch-12's order: a leak first, then a chooser in front, then a read not proven, then the last-chosen. */
+/** The exit, in this order: a leak first, then a chooser in front, then a read not proven, then the last-chosen. */
 export function checkExit(focus: FocusRead, preferred: PreferredRead, accepted: readonly AcceptedEntry[]): CheckExit {
   if (preferred.state === 'read' && leaksOf(preferred).length > 0) return CHECK_EXIT.leak;
   if (chooserOf(focus) !== undefined) return CHECK_EXIT.chooser;
@@ -166,7 +165,8 @@ const focusText = (f: FocusRead): string =>
 
 /**
  * What --check read, in words: `chooser no|yes (<component>)|unread (<why>); preferred read (<n> user[s]); lab entries
- * <n> (defaults <d>, last-chosen <l>[, accepted <a>])[; first: <its text>]`, or `…; preferred unread (<why>)`.
+ * <n> (defaults <d>, last-chosen <l>[, accepted <a>][, no mAlways <n>])[; first: <its text>]`, or `…; preferred unread
+ * (<why>)`.
  */
 export function checkWhy(focus: FocusRead, preferred: PreferredRead, accepted: readonly AcceptedEntry[]): string {
   if (preferred.state === 'unread') return `${focusText(focus)}; preferred unread (${preferred.why})`;
@@ -238,8 +238,8 @@ export function unreachableOf(getState: CallResult): string | undefined {
 export type Installed = { state: 'installed'; path: string } | { state: 'missing' } | { state: 'unknown'; why: string };
 
 /**
- * `pm path <lab>`, asked only once `adb get-state` said `device` (batch-12.sh's e5_installed; lab-emu.ts#labInstalled
- * asks that first): `package:<path>` with exit 0 installed, exit 1 with nothing said missing, anything else unknown.
+ * `pm path <lab>`, asked only once `adb get-state` said `device` (lab-emu.ts#labInstalled asks that first):
+ * `package:<path>` with exit 0 installed, exit 1 with nothing said missing, anything else unknown.
  */
 export function installedOf(pmPath: CallResult): Installed {
   if (pmPath.timedOut) return { state: 'unknown', why: `pm path: ${exitText(pmPath)}` };
@@ -375,14 +375,14 @@ function targetOf(nodes: readonly UiNode[], target: TapTarget): { node: UiNode; 
 }
 
 /**
- * The one point a batch may tap on the chooser (batch-12's guardRow1 and guardOnce): the target's
- * centre, or `at` when given (a reply's quoted centre) within CENTRE_SLACK_PX of it. Refused, by name: no such target,
- * or more than one; a tree that is not the chooser's fresh sheet (android-chooser.ts#chooserSheet reads none: AOSP's
- * with_default layout, no chooser); a target that reads as "Always" itself; a disabled one ("Just once" until a row is
- * selected: batch-10); a point outside it or off its centre; any "Always" node — by id or text, anywhere — holding the
- * point or overlapping the target; and any other node holding the point that is not the target, inside it, nor above
- * it (a scrim, a sibling laid there). src's tree carries no `clickable`, so "another node" is any node there, which is
- * every clickable one and more: rows are not clickable in uiautomator (batch-10), the list above takes the click.
+ * The one point a batch may tap on the chooser: the target's centre, or `at` when given (a reply's quoted centre)
+ * within CENTRE_SLACK_PX of it. Refused, by name: no such target, or more than one; a tree that is not the chooser's
+ * fresh sheet (android-chooser.ts#chooserSheet reads none: AOSP's with_default layout, no chooser); a target that
+ * reads as "Always" itself; a disabled one ("Just once" until a row is selected: batch-10); a point outside it or off
+ * its centre; any "Always" node — by id or text, anywhere — holding the point or overlapping the target; and any other
+ * node holding the point that is not the target, inside it, nor above it (a scrim, a sibling laid there). src's tree
+ * carries no `clickable`, so "another node" is any node there, which is every clickable one and more: rows are not
+ * clickable in uiautomator (batch-10), the list above takes the click.
  */
 export function safeTap(dump: Dump, target: TapTarget, at?: Point): SafeTap {
   const tree = dump.root;

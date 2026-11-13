@@ -7,20 +7,20 @@ import { exitText, messageOf } from './words.js';
 
 /**
  * Every call a batch makes is bounded: a wedged device call cannot hold the batch longer than its bound (batch-7's
- * `perl -e 'alarm …; exec …'`, kept to batch-12). A call past its bound is a failed call like any other, exit 142 —
+ * `perl -e 'alarm …; exec …'`). A call past its bound is a failed call like any other, exit 142 —
  * but here its whole process group goes, not the direct child alone: live.ts or a Gradle build left grandchildren
  * that perl's alarm and src/adapters/exec.ts never reached.
  *
  * Two kinds of call, both in a group of their own (proc.ts): `bounded`, a probe, which the abort stops before it puts
  * anything back (a probe no longer gets the terminal's Ctrl-C, so the runner must stop it); and `detached`, a restore
- * or a check, which nothing but its own bound stops (batch-11's `detached`: a second Ctrl-C killed the restore) — or
+ * or a check, which nothing but its own bound stops (a second Ctrl-C must not kill the restore) — or
  * its `scope`'s stop, when the restore that started it passed its own bound.
  *
  * Once a call's leader has ended, its group gets SIGKILL: nothing it started outlives it, unless the call keeps its
  * group (`keepGroup`, by default per tool: `KEEPS_GROUP`): stopAll leaves it, and stopKept ends it — at the abort,
- * after the restores and the judging, which may need it (batch-11 pkilled idb_companion only at the end of on_abort),
- * and at the normal end; a block done with its companion ends its own with stopKept(owner), the owner recorded when the
- * group is kept (Call.owner) — no seam query tells owners apart.
+ * after the restores and the judging, which may need it, and at the normal end; a block done with its companion ends
+ * its own with stopKept(owner), the owner recorded when the group is kept (Call.owner) — no seam query tells owners
+ * apart.
  * Its result comes once its pipes have closed, or `CLOSE_GRACE_MS` after its leader's end if a grandchild in another
  * group holds them; what a grandchild writes after that is dropped on purpose — the result is the leader's, and a
  * daemon's output is no part of it. Its code is its leader's: a leader that ended before the bound is never 142,
@@ -76,9 +76,9 @@ export const keepsGroup = (cmd: string): boolean => KEEPS_GROUP[basename(cmd)]?.
 /**
  * A device tool's own bound, in seconds: xcrun simctl boot and bootstatus 300,
  * simctl install the install bound, any other xcrun 120; idb 60; adb install or uninstall the install bound, any other
- * adb 120. The install bound is 600 s (batch-11), or batch-12's B_INSTALL. git 30, for reads (T2 S3's preconditions:
- * the local checkout, never the network; batch-11 ran its git unbounded) — a slow git operation (batch-12's `worktree
- * add`) passes its own secs. Any other command has none: its caller names it (batch-12's B_LIVE, B_E5, …).
+ * adb 120. The install bound is 600 s unless `installSecs` is given. git 30, for reads (T2 S3's preconditions: the
+ * local checkout, never the network) — a slow git operation (`worktree add`) passes its own secs. Any other command has
+ * none: its caller names it.
  */
 export function boundFor(cmd: string, args: readonly string[], installSecs = 600): number | undefined {
   switch (basename(cmd)) {
@@ -131,7 +131,6 @@ export interface CallResult {
   err: string;
 }
 
-/** Run a command, bounded. */
 export type Run = (cmd: string, args: readonly string[], call?: Call) => Promise<CallResult>;
 
 /**
@@ -177,7 +176,6 @@ export interface Undelivered {
   owner?: string;
 }
 
-/** `<signal> to group <id>: <why>`. */
 export const undeliveredText = (u: Undelivered): string => `${u.signal} to group ${u.pid}: ${u.why}`;
 
 /** What a stop did: how many groups it ended, and each signal not proven delivered. */

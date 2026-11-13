@@ -51,11 +51,11 @@ import { exitText, failedCall, firstLineOf, messageOf, nameInLine, verdictLine, 
 import type { Point } from '../../../src/adapters/types.js';
 
 /**
- * The lab emulator around a block that may leave the chooser up or a preferred activity behind (batch-9's D55 to
- * batch-12's E5), over the emulator: --check's reads, the chooser dismissed, the one guarded tap, the install read
- * (`adb get-state` first), the abort-safe reinstall that clears a lab default, the cleanup that branches on --check's
- * exit, and the chooser's dirty window for the abort. What is decided and said is lab-chooser.ts's; here are the calls,
- * through the injected Run, and the files, through io.ts.
+ * The lab emulator around a block that may leave the chooser up or a preferred activity behind, over the emulator:
+ * --check's reads, the chooser dismissed, the one guarded tap, the install read (`adb get-state` first), the abort-safe
+ * reinstall that clears a lab default, the cleanup that branches on --check's exit, and the chooser's dirty window for
+ * the abort. What is decided and said is lab-chooser.ts's; here are the calls, through the injected Run, and the files,
+ * through io.ts.
  *
  * Every call goes to the lab AVD only: a `LabEmu` is had only through lab-device.ts's Android guard (`adb -s <serial>
  * emu avd name` says `averi_lab`), and every adb call names its serial first. Nothing here taps but `tapSafely`, at the
@@ -148,7 +148,7 @@ export async function readCheck(emu: LabEmu, accepted: readonly AcceptedEntry[])
   return { exit: checkExit(focus, preferred, accepted), focus, preferred, line: checkLine(focus, preferred, accepted) };
 }
 
-/** --check, and when a chooser is in front, BACK and HOME and --check once more (batch-11's and batch-12's cleanup). */
+/** --check, and when a chooser is in front, BACK and HOME and --check once more. */
 async function checkAfterDismissal(emu: LabEmu, accepted: readonly AcceptedEntry[]): Promise<Check> {
   const first = await readCheck(emu, accepted);
   if (first.exit !== CHECK_EXIT.chooser) return first;
@@ -221,7 +221,7 @@ export async function tapSafely(emu: LabEmu, target: TapTarget, at?: Point): Pro
 
 // ------------------------------------------------------------------------------------------- the reinstall
 
-/** How far a reinstall got, for the abort (batch-11's REINSTALLING/REINSTALLED): from its uninstall until its proof. */
+/** How far a reinstall got, for the abort: from its uninstall until its proof. */
 export interface ReinstallProgress {
   step: 'not started' | 'started' | 'proven';
 }
@@ -229,8 +229,8 @@ export const reinstallProgress = (): ReinstallProgress => ({ step: 'not started'
 
 /**
  * The probe's own state put back onto the lab (its `--restore`: the reinstall wipes the lab's data), through the Run
- * it is given; it writes its state file clean only once it has read the state back. `command` is how a person runs it
- * by hand: a RESTORE line names it when the restore fails with no hand line of its own.
+ * it is given; when it succeeds it leaves its state file clean. `command` is how a person runs it by hand: a RESTORE
+ * line names it when the restore fails with no hand line of its own.
  */
 export interface StateRestore {
   restore(run: Run): Promise<Putback>;
@@ -241,7 +241,7 @@ export interface StateRestore {
 
 /** What the reinstall and the chooser's window share. */
 export interface LabOptions {
-  /** The APK pulled at the lab check (batch-11's `lab/installed.apk`): the one reinstalled. */
+  /** The APK pulled at the lab check (`lab/installed.apk`): the one reinstalled. */
   apk: string;
   /** main's catalog (fixtures/apps/cells.json): an installed APK's `assets/cells.json` must equal it byte for byte. */
   catalog: string;
@@ -277,15 +277,15 @@ export function freshApkOf(fs: BatchFs, dir: string): string {
 }
 
 /**
- * Clear a lab default by reinstalling the pulled APK (batch-11's d55_reinstall): the probe's state file marked dirty
- * first — none there, or one that cannot be marked, and nothing is uninstalled (code review: the protocol needs its
- * dirty mark) — the chooser dismissed, then uninstall and install (`progress` started — an abort from here asks `adb
- * get-state` and `pm path` before anything else); proven by `pm path`, the reinstalled APK's cells.json equal to main's
- * catalog and --check after with an exit that proves the lab put back (CHECK_OUTCOME: 0, 5 or 6 — a chooser up or a
- * read that failed proves nothing: review round 1), only then `progress` proven and the probe's state put back
- * (`putBack`), so its state is written clean only after the proof. Refused, nothing done, with no pulled APK or no
- * catalog to compare with too. Each step that fails gets its own hand line. A last-chosen entry is never reinstalled
- * for: no reinstall clears it (batch-11 measured).
+ * Clear a lab default by reinstalling the pulled APK: the probe's state file marked dirty first — none there, or one
+ * that cannot be marked, and nothing is uninstalled (code review: the protocol needs its dirty mark) — the chooser
+ * dismissed, then uninstall and install (`progress` started — an abort from here asks `adb get-state` and `pm path`
+ * before anything else); proven by `pm path`, the reinstalled APK's cells.json equal to main's catalog and --check
+ * after with an exit that proves the lab put back (CHECK_OUTCOME: 0, 5 or 6 — a chooser up or a read that failed
+ * proves nothing: review round 1), only then `progress` proven and the probe's state put back (`putBack`), so its state
+ * is written clean only after the proof. Refused, nothing done, with no pulled APK or no catalog to compare with too.
+ * Each step that fails gets its own hand line. A last-chosen entry is never reinstalled for: no reinstall clears it
+ * (batch-11 measured).
  */
 export async function clearLabEntry(emu: LabEmu, o: ReinstallOptions): Promise<Reinstalled> {
   const { fs } = emu;
@@ -354,12 +354,11 @@ export interface Cleanup {
 }
 
 /**
- * The block's cleanup (batch-12's e5_check): --check, BACK and HOME and --check again when
- * a chooser is in front; then by its exit, CHECK_OUTCOME's word, words and hand lines — 0 and 5 OK; 6 a WARN, no
- * RESTORE (no reinstall clears a last-chosen entry, so none is tried: batch-12 fixed batch-11's); 3 and 4 ERROR; 1, a
- * lab default, FAIL even when the reinstall clears it ("Always" is never tapped, so a default predates the batch or is
- * a defect), the reinstall's hand lines when it does not. Its line's label `o.label`, CLEANUP_LABEL unless given
- * (T2b, batch-13 gap 2: batch-13's E5 said `D55 cleanup`).
+ * The block's cleanup: --check, BACK and HOME and --check again when a chooser is in front; then by its exit,
+ * CHECK_OUTCOME's word, words and hand lines — 0 and 5 OK; 6 a WARN, no RESTORE (no reinstall clears a last-chosen
+ * entry, so none is tried); 3 and 4 ERROR; 1, a lab default, FAIL even when the reinstall clears it ("Always" is never
+ * tapped, so a default predates the batch or is a defect), the reinstall's hand lines when it does not. Its line's
+ * label `o.label`, CLEANUP_LABEL unless given (T2b, batch-13 gap 2).
  */
 export async function cleanUp(emu: LabEmu, o: ReinstallOptions & { label?: string }): Promise<Cleanup> {
   const check = await checkAfterDismissal(emu, o.accepted);
@@ -386,12 +385,13 @@ const unknownDuringReinstall = (b: HandBase, why: string): Putback => ({ ok: fal
 
 /**
  * The chooser's dirty window (abort.ts): its restore this module's, over the abort's detached runner — `adb get-state`
- * first (unreachable: unknown at once, nothing pressed, never "missing" and never "put back"; review round 1); BACK and
- * HOME; when interrupted inside the reinstall, the install read: missing is installed again from the pulled APK, and
- * the lab installed — again or found so — is proven by its cells.json as the reinstall proves it, or not put back; the
- * probe's state put back (`putBack`) whenever its state file is not clean (review round 4); then
- * --check (BACK and HOME again on a chooser), judged by CHECK_OUTCOME: the cleanup's word and words, exit by exit, a
- * WARN put back for 6. Its hand lines name the exact step, and an uninstall only for a default measured.
+ * first (unreachable: nothing pressed; once the reinstall had started, the install is unknown, never "missing" and
+ * never "put back", else nothing could be read or put back, with the check hand line; review round 1); BACK and HOME;
+ * when interrupted inside the reinstall, the install read: missing is installed again from the pulled APK, and the lab
+ * installed — again or found so — is proven by its cells.json as the reinstall proves it, or not put back; the probe's
+ * state put back (`putBack`) whenever its state file is not clean (review round 4); then --check (BACK and HOME again
+ * on a chooser), judged by CHECK_OUTCOME: the cleanup's word and words, exit by exit, a WARN put back for 6. Its hand
+ * lines name the exact step, and an uninstall only for a default measured.
  */
 export function chooserWindow(emu: LabEmu, o: ChooserWindowOptions): WindowSpec {
   const base = handBaseOf(emu, o);
@@ -406,8 +406,8 @@ export function chooserWindow(emu: LabEmu, o: ChooserWindowOptions): WindowSpec 
         if (proof !== undefined) return proof;
       }
       // The probe's restore whenever its state file is not clean: it also undoes what the probe changed itself (it
-      // force-stops the lab, puts its state file back), whatever the reinstall did (review round 4, as batch-11 and
-      // batch-12 ran it); a note, after it verified, when no reinstall started: nothing was wiped, the state put back.
+      // force-stops the lab, puts its state file back), whatever the reinstall did (review round 4); a note, after it
+      // verified, when no reinstall started: nothing was wiped, the state put back.
       let kept = '';
       if (o.putBack !== undefined) {
         if (o.stateFile !== undefined && stateOf(lab.fs, o.stateFile) === 'clean') kept = "; the probe's state file is clean: nothing to put back";

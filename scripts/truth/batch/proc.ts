@@ -9,12 +9,11 @@ import { messageOf } from './words.js';
  * reports what happened, and is tested with real children
  * (tests/truth/batch/bounded-proc.test.ts, abort-proc.test.ts).
  *
- * Every child starts in a process group of its own (`detached`, setsid: batch-11's `perl -e 'setpgrp(0, 0)'`), stdin
- * from /dev/null, its output to pipes or to the fd of its log (opened through io.ts, the one fs seam: nothing here
- * opens a file), never to the terminal. So the terminal's Ctrl-C reaches the
- * runner alone: a probe is stopped by the runner (abort.ts), a restore is not stopped at all — a second Ctrl-C cannot
- * kill it (batch-11's restore child ran in the batch's foreground group and died of one). And a group can be ended
- * whole, grandchildren too: src/adapters/exec.ts kills only the direct child.
+ * Every child starts in a process group of its own (`detached`, setsid), stdin from /dev/null, its output to pipes or
+ * to the fd of its log (opened through io.ts, the one fs seam: nothing here opens a file), never to the terminal. So the
+ * terminal's Ctrl-C reaches the runner alone: a probe is stopped by the runner (abort.ts), a restore is not stopped at
+ * all — a second Ctrl-C cannot kill it (batch-11's restore child ran in the batch's foreground group and died of one).
+ * And a group can be ended whole, grandchildren too: src/adapters/exec.ts kills only the direct child.
  */
 
 export interface StartOptions {

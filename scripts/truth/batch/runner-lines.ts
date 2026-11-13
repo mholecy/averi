@@ -81,12 +81,12 @@ export function configOf(argv: readonly string[], env: Env, repo = MODULE_REPO, 
   return { ok: true, config: { out: out as string, repo: theRepo, ...(udid === undefined ? {} : { udid }), ...(serial === undefined ? {} : { serial }), env, androidHome } };
 }
 
-/** The lab folder: made on every run (batch-11's O_lab), for what the lab checks keep: a pulled APK, a log. */
+/** The lab folder: made on every run, for what the lab checks keep: a pulled APK, a log. */
 export const LAB = 'lab';
 
 /**
- * The SUMMARY's checkout line (batch-11's CHECKOUT_LINE): `OK checkout: main's HEAD <sha>, clean`, or ERROR with S3's
- * why and what it means — no block runs, each is INCONCLUSIVE naming the why, and the SUMMARY is still written.
+ * The SUMMARY's checkout line: `OK checkout: main's HEAD <sha>, clean`, or ERROR with S3's why and what it means — no
+ * block runs, each is INCONCLUSIVE naming the why, and the SUMMARY is still written.
  */
 export function checkoutLine(r: CheckoutPrecondition): string {
   return r.ok ? `OK checkout: main's HEAD ${shortSha(r.head)}, clean` : `ERROR checkout: ${r.why} — every block INCONCLUSIVE, none run`;
@@ -95,7 +95,6 @@ export function checkoutLine(r: CheckoutPrecondition): string {
 /** The abort's checkout line when the checkout had not been read yet. */
 export const NOT_READ_CHECKOUT = 'NOTE checkout: not read before the interrupt';
 
-/** A need's answer (S6b supplies the checks): met, and how; or not, and why. */
 export type NeedResult = { ok: true; how: string; warning?: string } | { ok: false; why: string };
 
 /**
@@ -186,7 +185,7 @@ export function backstopLine(label: string, runs: readonly AskedRun[]): string {
   return incompleteLine(label, runs, NOT_RUN) ?? verdictLine(label, 'INCONCLUSIVE', `its ${runs.length} run(s) are complete, but no verdict line was written (see the ERROR lines)`);
 }
 
-/** Whether `lines` hold one of the block's own label (`<label>:` at the start, whatever follows): batch-11's grep. */
+/** Whether `lines` hold one of the block's own label (`<label>:` at the start, whatever follows). */
 export const hasVerdictOf = (lines: readonly string[], label: string): boolean => lines.some((l) => l.startsWith(`${label}:`));
 
 /**
@@ -198,7 +197,7 @@ export const linesOf = (text: string): string[] => text.split(/\r\n|\n|\r/);
 /** `texts` as lines (linesOf), empty ones dropped: what a judge or an analyzer hands in. */
 export const linesIn = (texts: readonly string[]): string[] => texts.flatMap(linesOf).filter((l) => l !== '');
 
-/** The lines of a log or an analyze.txt that start with ERROR (a step line's word; batch-12's `grep -h '^ERROR'`). */
+/** The lines of a log or an analyze.txt that start with ERROR (a step line's word). */
 export const errorLinesIn = (text: string): string[] => linesOf(text).filter((l) => l.startsWith('ERROR'));
 
 /**
@@ -353,7 +352,7 @@ const groupsOf = (asked: Asked): string => (asked.groups ?? DEFAULT_GROUPS).join
 const liveTs = (repo: string): string[] => ['--import', 'tsx', join(repo, LIVE_TS)];
 
 /**
- * live.ts's argv for a run (batch-11's live_run): the device, the app unless native, the groups (forms by default), the
+ * live.ts's argv for a run: the device, the app unless native, the groups (forms by default), the
  * cases asked (none: all of the groups), the record.
  */
 export const liveArgs = ({ repo, asked, device, record }: LiveRunSpec & { device: readonly string[] }): string[] => [
@@ -367,7 +366,7 @@ export const liveArgs = ({ repo, asked, device, record }: LiveRunSpec & { device
   record,
 ];
 
-/** A live rejudge's bound when none is given: it only judges a record, device-free (batch-11 ran it unbounded). */
+/** A live rejudge's bound when none is given: it only judges a record, device-free. */
 export const REJUDGE_SECS = 120;
 
 /** live.ts's and its rejudge's calls: bounded (secs; rejudgeSecs, else REJUDGE_SECS), from the checkout, logged. */

@@ -45,12 +45,12 @@ import { verdictLine, type Verdict } from './words.js';
  *     npm run truth:lab -- --out <dir outside the checkout> --serial emulator-5554 [--groups chooser|forms|…]
  *
  * `--groups` is a selection, as ONLY= is (both together: the blocks both name): every block stays the batch's, so
- * every block's state file is checked before a run starts. A release gate (docs/release.md's Gate B, backlog T24, which
- * replaced the schedule T20c): run before every release, by the agent on emulator-5554 or by the owner — the cleanup may
- * uninstall and reinstall the lab app (lab-emu.ts#clearLabEntry), a lab APK install the release allows. Everything it
- * writes is under `--out`, apart from the git-ignored Gradle build products in the checkout. A run with no serial is
- * refused before anything is done; a serial that is not the lab AVD is refused by the lab guard (lab-device.ts,
- * through the android need, before anything is built: every block INCONCLUSIVE, nothing done to the device).
+ * every block's state file is checked before a run starts. A release gate (docs/release.md's Gate B, backlog T24): run
+ * before every release, by the agent on emulator-5554 or by the owner — the cleanup may uninstall and reinstall the lab
+ * app (lab-emu.ts#clearLabEntry), a lab APK install the release allows. Everything it writes is under `--out`, apart
+ * from the git-ignored Gradle build products in the checkout. A run with no serial is refused before anything is done;
+ * a serial that is not the lab AVD is refused by the lab guard (lab-device.ts, through the android need, before
+ * anything is built: every block INCONCLUSIVE, nothing done to the device).
  *
  * The --check before speaks in its own words (it presses nothing). A lab default it finds is a FAIL with its hand
  * lines in RESTORE; a chooser in front or a read that failed is an ERROR with none (the run touched nothing); either
@@ -60,19 +60,18 @@ import { verdictLine, type Verdict } from './words.js';
  * summary (the stale chooser premise, each unknown MISMATCH, the tallies and the hedged ceiling that fail a run),
  * judged from the block's folder once its run is complete (runner.ts's assess; standing.ts#liveJudge).
  *
- * The selection, the knobs, the live runs and their judge, and the run come from standing.ts, which lab-run-ios.ts
- * shares. The exit code (standing.ts#STANDING_EXIT) is the standing net's, stricter than a numbered batch's, read from
- * the SUMMARY runBatch returns: 0 only when every wanted block's verdict is PASS, no line is INCONCLUSIVE or ERROR and
- * the ERROR section is empty; 1 a FAIL or a RESTORE; 2 refused or nothing ran; 3 unproven; 130 interrupted.
+ * The selection, the knobs, the live runs and their judge, and the run come from standing.ts. The exit code
+ * (standing.ts#STANDING_EXIT) is the standing net's, stricter than a numbered batch's, read from the SUMMARY runBatch
+ * returns: 0 only when every wanted block's verdict is PASS, no line is INCONCLUSIVE or ERROR and the ERROR section is
+ * empty; 1 a FAIL or a RESTORE; 2 refused or nothing ran; 3 unproven; 130 interrupted.
  */
 
 /**
  * The live groups the batch runs, in its order: the chooser group, then live.ts's other Android groups (dismissal is
- * iOS only: lab-run-ios.ts runs it).
+ * iOS only).
  */
 export const LAB_RUN_GROUPS = ['chooser', 'forms', 'visibility', 'ensure', 'carousel'] as const;
 export type LabRunGroup = (typeof LAB_RUN_GROUPS)[number];
-/** The batch's blocks, in its order. */
 const BLOCK_IDS = ['lab', ...LAB_RUN_GROUPS] as const;
 
 /** lab-run's: one block per group, named by it. */
@@ -94,7 +93,7 @@ export const LAB_RUN_STANDING: Standing<LabRunGroup> = {
  */
 export const LIVE_SECS: Readonly<Partial<Record<LabRunGroup, number>>> = { visibility: 3000 };
 
-/** The need on the handler counts the chooser group rests on (batch-11's D55: shared 2, cell 1). */
+/** The need on the handler counts the chooser group rests on (D55: shared 2, cell 1). */
 export const HANDLERS_NEED = 'handlers';
 /** The counts it expects, by URL (android-lab.ts#HANDLER_URLS, in its order). */
 export const EXPECTED_HANDLERS: Readonly<Record<string, number>> = { [HANDLER_URLS[0]]: 2, [HANDLER_URLS[1]]: 1 };
@@ -119,7 +118,6 @@ export const askedOf = (group: LabRunGroup): Asked => ({
 /** A live block's run, by its group: its `.cases`, record, log, rejudge summary and outcome are named so. */
 const runName = (group: LabRunGroup): string => `android-${group}`;
 
-/** A live block's id, label and judge, from its group alone. */
 const liveBlock = (group: LabRunGroup): Pick<Block<StandingKnobs>, 'id' | 'label' | 'judge'> => {
   const label = `${group} verdict`;
   return { id: group, label, judge: liveJudge(label, runName(group)) };
@@ -127,8 +125,6 @@ const liveBlock = (group: LabRunGroup): Pick<Block<StandingKnobs>, 'id' | 'label
 
 /**
  * The batch's state file, written clean: no probe keeps lab data here, so putting the state back is writing the file.
- * Asked by the run's own end once the cleanup proved the lab, by a proven reinstall (lab-emu.ts#clearLabEntry), and by
- * the chooser window's restore, which writes it before its own --check (a check that fails there still leaves RESTORE).
  */
 export function cleanState(fs: BatchFs, file: string): StateRestore {
   return {

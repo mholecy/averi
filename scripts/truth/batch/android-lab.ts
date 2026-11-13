@@ -13,17 +13,15 @@ import { stateOf } from './run-dir.js';
 import { exitText, failedCall, nameInLine } from './words.js';
 
 /**
- * The lab emulator's plumbing around a batch's Android blocks (T2 S6b; batch-12.sh:377–400): the
- * `android` need — the lab guard, this run's build installed (`install -r`, batch-11's lab install), the installed APK
- * pulled and its cells.json byte-equal to main's catalog, the handler counts read — and its cheap recheck (`adb
- * get-state`, `pm path`); a need on the handler counts a block expects (batch-11's D55: shared 2, cell 1); the
- * tri-state reads around a block (the role holders, the clipboard: unread is never unchanged); a tree kept with its
- * fitness as a fixture said; the probe's own state restore (S5's StateRestore) as a bounded child; and the chooser's
- * stretch: the window opened, the work, the cleanup's line and hand lines. What is decided and said is
- * lab-chooser.ts's and lab-lines.ts's; the calls go through lab-emu.ts's guarded LabEmu.
+ * The lab emulator's plumbing around a batch's Android blocks (T2 S6b): the `android` need — the lab guard, this run's
+ * build installed (`install -r`), the installed APK pulled and its cells.json byte-equal to main's catalog, the handler
+ * counts read — and its cheap recheck (`adb get-state`, `pm path`); a need on the handler counts a block expects (D55:
+ * shared 2, cell 1); the tri-state reads around a block (the role holders, the clipboard: unread is never unchanged); a
+ * tree kept with its fitness as a fixture said; the probe's own state restore (S5's StateRestore) as a bounded child;
+ * and the chooser's stretch: the window opened, the work, the cleanup's line and hand lines. What is decided and said
+ * is lab-chooser.ts's and lab-lines.ts's; the calls go through lab-emu.ts's guarded LabEmu.
  */
 
-/** The need's name in a batch's `needs`. */
 export const ANDROID_NEED = 'android';
 /** The URLs whose handlers the check counts (shared 2, cell 1 on main's lab). */
 export const HANDLER_URLS: readonly string[] = ['averilab://shared/open', 'averilab://cell/open'];
@@ -32,13 +30,12 @@ export const CHOOSER_WINDOW = 'D55 chooser';
 /** The lab emulator as the how names it (lab-device.ts#LAB_AVD). */
 const LAB_EMULATOR = `${LAB_AVD} emulator`;
 
-/** A count read or why not, as words. */
 const countText = (n: number | { why: string }): string => (typeof n === 'number' ? `${n}` : `not read (${n.why})`);
 
 export interface AndroidLabOptions {
   /** This run's build (lab-build.ts's `kit.android`): asked by the need itself, installed `-r` before the check when met. */
   build?: BuildRef;
-  /** A build that failed makes the need not met (default: the APK already installed is used, as batch-11). */
+  /** A build that failed makes the need not met (default: the APK already installed is used). */
   requireBuild?: boolean;
   /** The URLs whose handlers are counted (HANDLER_URLS unless given). */
   handlers?: readonly string[];
@@ -48,7 +45,7 @@ export interface AndroidLabOptions {
 
 export interface AndroidLab {
   need: NeedSpec;
-  /** The APK pulled at the check (batch-11's lab/installed.apk): the one a reinstall puts back. */
+  /** The APK pulled at the check: the one a reinstall puts back. */
   pulled(): string | undefined;
   /** The handler counts read at the check, by URL. */
   counts(): Readonly<Record<string, number | { why: string }>>;
@@ -173,12 +170,12 @@ export function keepTree(ctx: Pick<BlockCtx, 'dir' | 'fs' | 'step'>, name: strin
 export interface ProbeRestoreOptions {
   /** The checkout the probe imports from: its cwd, where `--import tsx` resolves. */
   repo: string;
-  /** The probe's file (a scratch probe, outside the repo: e5-b12.ts). */
+  /** The probe's file (a scratch probe, outside the repo). */
   probe: string;
   /** Its device flags (`--serial <emu>`, `--apk <file>`): before `--state <file>`. */
   args: readonly string[];
   stateFile: string;
-  /** Its bound (batch-12's B_RESTORE). */
+  /** Its bound. */
   secs: number;
   fs: BatchFs;
   /** The probe's run that writes its state file, for a hand line (lab-emu.ts#StateRestore). */
@@ -208,7 +205,7 @@ export function probeRestore(o: ProbeRestoreOptions): StateRestore {
 // ---------------------------------------------------------------------------------------- the chooser's stretch
 
 /**
- * The chooser's stretch (batch-11's D55, batch-12's E5): its dirty window opened (lab-emu.ts#chooserWindow, its
+ * The chooser's stretch (D55, E5): its dirty window opened (lab-emu.ts#chooserWindow, its
  * cleanup label the abort writes), the work, then the cleanup (lab-emu.ts#cleanUp) — its line one of the block's
  * verdict lines and its hand lines to RESTORE at once — and the window closed: what is left is in RESTORE. One cleanup
  * label for both paths, `D55 cleanup` unless `o.cleanup` (T2b, batch-13 gap 2).
