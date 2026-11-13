@@ -1,0 +1,66 @@
+2026-11-13T07:36:36.097Z serial emulator-5554 sdk 33
+before: overlay_display_devices=null
+before: display 0 focus: mCurrentFocus=Window{f3b8bae u0 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} | mFocusedApp=ActivityRecord{72b88fc u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity} t6107}
+before: HOME com.google.android.apps.nexuslauncher/.NexusLauncherActivity; root tasks:
+RootTask id=1 bounds=[0,0][1080,2220] displayId=0 userId=0
+  taskId=6107: com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity bounds=[0,0][1080,2220] userId=0 visible=true topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity}
+RootTask id=3 bounds=[0,0][1080,2220] displayId=0 userId=0
+  taskId=4: unknown bounds=[0,0][1080,2220] userId=0 visible=false
+  taskId=5: unknown bounds=[0,2220][1080,3330] userId=0 visible=false
+overlay 720x1280/320 up as display 4
+a: display 0 as found, nothing started
+  a dumpsys-window-displays: 21739 bytes
+  a focused-window: 38857 bytes
+  a chooser-focus: 354 bytes
+  a touchable: 122 bytes
+  a dumpsys-display: 26458 bytes
+b: Settings on display 0
+am start -W --display 0 -n com.android.settings/.Settings
+Starting: Intent { cmp=com.android.settings/.Settings }
+Status: ok
+LaunchState: COLD
+Activity: com.android.settings/.homepage.SettingsHomepageActivity
+TotalTime: 145
+WaitTime: 147
+Complete
+  b dumpsys-window-displays: 21430 bytes
+  b focused-window: 43912 bytes
+  b chooser-focus: 276 bytes
+  b touchable: 122 bytes
+  b dumpsys-display: 26507 bytes
+c: Settings on display 0, the clock on display 4
+am start -W --display 4 -n com.google.android.deskclock/com.android.deskclock.DeskClock
+Starting: Intent { cmp=com.google.android.deskclock/com.android.deskclock.DeskClock }
+Status: ok
+LaunchState: COLD
+Activity: com.google.android.deskclock/com.android.deskclock.DeskClock
+TotalTime: 185
+WaitTime: 187
+Complete
+c: root tasks:
+RootTask id=6386 bounds=[0,0][720,1280] displayId=4 userId=0
+  taskId=6386: com.google.android.deskclock/com.android.deskclock.DeskClock bounds=[0,0][720,1280] userId=0 visible=true topActivity=ComponentInfo{com.google.android.deskclock/com.android.deskclock.DeskClock}
+RootTask id=6385 bounds=[0,0][1080,2220] displayId=0 userId=0
+  taskId=6385: com.android.settings/com.android.settings.Settings bounds=[0,0][1080,2220] userId=0 visible=true topActivity=ComponentInfo{com.android.settings/com.android.settings.Settings}
+RootTask id=1 bounds=[0,0][1080,2220] displayId=0 userId=0
+  taskId=6107: com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity bounds=[0,0][1080,2220] userId=0 visible=false topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity}
+RootTask id=3 bounds=[0,0][1080,2220] displayId=0 userId=0
+  taskId=4: unknown bounds=[0,0][1080,2220] userId=0 visible=false
+  taskId=5: unknown bounds=[0,2220][1080,3330] userId=0 visible=false
+  c dumpsys-window-displays: 22489 bytes
+  c focused-window: 49938 bytes
+  c chooser-focus: 376 bytes
+  c touchable: 122 bytes
+  c dumpsys-display: 26552 bytes
+restore: am stack remove 6386 (display 4)
+restore: am stack remove 6385 (display 0)
+restore: am kill com.google.android.deskclock (not running before)
+after: overlay_display_devices=null (as before)
+after: display 0 focus: mCurrentFocus=Window{f3b8bae u0 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} | mFocusedApp=ActivityRecord{72b88fc u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity} t6107} (as before)
+after: root tasks (as before):
+RootTask id=1 bounds=[0,0][1080,2220] displayId=0 userId=0
+  taskId=6107: com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity bounds=[0,0][1080,2220] userId=0 visible=true topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity}
+RootTask id=3 bounds=[0,0][1080,2220] displayId=0 userId=0
+  taskId=4: unknown bounds=[0,0][1080,2220] userId=0 visible=false
+  taskId=5: unknown bounds=[0,2220][1080,3330] userId=0 visible=false
+done

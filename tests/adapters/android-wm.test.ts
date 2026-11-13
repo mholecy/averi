@@ -67,13 +67,16 @@ describe('the focus line, read once: the window\'s hash for parseFocusedWindow, 
 // Merging them needs a dump that tells them apart, and every captured one holds ONE display (the census below): on
 // each, display 0's block is the whole dump, so the three read the same lines. Which rule is right for a second display
 // is a device question (a multi-display AVD's dump), left to a follow-up; the synthetic dumps after the census pin
-// where the three differ today.
+// where the three differ today. A35 captured that dump (an overlay display on emulator-5554): its fixtures are kept
+// out of the census and pinned as the three rules read them today, for the follow-up that makes them one.
 
 const fixtures = new URL('../fixtures/', import.meta.url);
 const truth = new URL('../fixtures/truth/', import.meta.url);
-/** Every captured `dumpsys window displays`: the keyboard fixtures and each lab cell's (`<cell>.displays.txt`). */
+/** A35's captures of two displays (docs/truth/live-records/a35-two-display/), out of the one-display census: pinned below. */
+const TWO_DISPLAY = '-api33-two-display-';
+/** Every captured `dumpsys window displays` of one display: the keyboard fixtures and each lab cell's (`<cell>.displays.txt`). */
 const DISPLAYS: readonly [string, string][] = [
-  ...readdirSync(fixtures).filter((f) => f.startsWith('dumpsys-window-displays-')).map((f) => [f, readFileSync(new URL(f, fixtures), 'utf8')] as [string, string]),
+  ...readdirSync(fixtures).filter((f) => f.startsWith('dumpsys-window-displays-') && !f.includes(TWO_DISPLAY)).map((f) => [f, readFileSync(new URL(f, fixtures), 'utf8')] as [string, string]),
   ...readdirSync(truth).filter((d) => d.startsWith('android-')).flatMap((d) =>
     readdirSync(new URL(`${d}/`, truth))
       .filter((f) => f.endsWith('.displays.txt'))
@@ -115,6 +118,42 @@ describe('the census: every captured dump holds one display, so no fixture tells
   it.each(WINDOWS)('%s: one focus line, one DisplayFrames line — the first found is the only one', (_name, dump) => {
     expect(count(dump, /mCurrentFocus=/g)).toBe(1);
     expect(count(dump, /DisplayFrames w=/g)).toBe(1);
+  });
+});
+
+describe('A35: the captured two-display dumps (emulator-5554 + a 720x1280 overlay display 4), as the three rules read them today', () => {
+  const read = (kind: string, state: string): string => readFileSync(new URL(`dumpsys-window-${kind}${TWO_DISPLAY}${state}.txt`, fixtures), 'utf8');
+  const STATES = ['a-launcher-d0', 'b-settings-d0', 'c-settings-d0-clock-d4'] as const;
+
+  it.each(STATES)('%s: two displays, each with its own IME entry and DisplayFrames line; the status and navigation bars display 0\'s alone', (state) => {
+    const dump = read('displays', state);
+    expect(count(dump, /Display: mDisplayId=/g)).toBe(2);
+    expect(count(dump, /^[ \t]*DisplayFrames w=/gm)).toBe(2);
+    expect(count(dump, /^[ \t]*InsetsSource type=ITYPE_IME /gm)).toBe(2);
+    expect(count(dump, /^[ \t]*InsetsSource type=ITYPE_STATUS_BAR /gm)).toBe(1);
+    expect(count(dump, /^[ \t]*InsetsSource type=ITYPE_NAVIGATION_BAR /gm)).toBe(1);
+    // every display must agree: the IME hidden on both, one status band; no navigation band (the sizes differ)
+    expect(parseImeInsets(dump)).toEqual({ state: 'hidden' });
+    expect(parseStatusBand(dump)).toBe(66);
+    expect(parseNavigationBand(dump)).toBeUndefined();
+    expect(parseNavigationBand(displayZero(dump))).toBe(2154);
+  });
+
+  it('the first found: no display headers, each display\'s focus line before its size line, the top-focused display last; b pairs display 0\'s window with display 4\'s size', () => {
+    const lines = (state: string) => read('focused-window', state).split('\n').filter((l) => /mCurrentFocus=|DisplayFrames w=/.test(l)).map((l) => l.trim().replace(/\{[0-9a-f]+ /, '{… '));
+    expect(lines('b-settings-d0')).toEqual(['mCurrentFocus=null', 'DisplayFrames w=720 h=1280 r=0', 'mCurrentFocus=Window{… u0 com.android.settings/com.android.settings.Settings}', 'DisplayFrames w=1080 h=2220 r=0']);
+    expect(lines('c-settings-d0-clock-d4')).toEqual(['mCurrentFocus=null', 'DisplayFrames w=1080 h=2220 r=0', 'mCurrentFocus=Window{… u0 com.google.android.deskclock/com.android.deskclock.DeskClock}', 'DisplayFrames w=720 h=1280 r=0']);
+    expect(read('focused-window', 'b-settings-d0')).not.toMatch(/Display: mDisplayId=/);
+    // Settings' frame is [0,0][1080,2220] on display 0 (its block's `mDisplayId=0`), read clipped to display 4's size
+    expect(parseFocusedWindow(read('focused-window', 'b-settings-d0'))).toEqual({ of: 'screenAlone', frame: { x: 0, y: 0, width: 720, height: 1280 } });
+    expect(parseFocusedWindow(read('focused-window', 'a-launcher-d0'))).toEqual({ of: 'unknown' });
+    expect(parseFocusedWindow(read('focused-window', 'c-settings-d0-clock-d4'))).toEqual({ of: 'unknown' });
+  });
+
+  it("display 0's block: the chooser's read; c keeps display 0's focused app but no window (only the top-focused display has one)", () => {
+    expect(defaultDisplayFocus(read('focus', 'a-launcher-d0'))).toEqual({ app: 'com.google.android.apps.nexuslauncher/.NexusLauncherActivity', window: 'com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity' });
+    expect(defaultDisplayFocus(read('focus', 'b-settings-d0'))).toEqual({ app: 'com.android.settings/.Settings', window: 'com.android.settings/com.android.settings.Settings' });
+    expect(defaultDisplayFocus(read('focus', 'c-settings-d0-clock-d4'))).toEqual({ app: 'com.android.settings/.Settings' });
   });
 });
 
