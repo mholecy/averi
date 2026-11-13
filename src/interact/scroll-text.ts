@@ -219,10 +219,8 @@ const marginBandText = (target: Rect, text: Rect): string => {
 const seenClearText = ({ by, edge, depth }: NonNullable<ScrollUntilResult['seenClear']>[number]): string =>
   `${nodeText(by)}, drawn after it, overlaps its ${edge} ${depth} px with nothing a screenshot shows (Android dumps a control's touch target, past what it draws)`;
 
-/** When a stop that sends no swipe came: `before any swipe`, or `after N swipes, without swiping further`. */
 const stoppedWhen = (swipes: number): string => (swipes === 0 ? 'before any swipe' : `after ${swipesText(swipes)}, without swiping further`);
 
-/** The soft keyboard a match was judged under (`Judged.under`), as a cut-by remedy names it (touch-remedy.ts#touchRemedyText). */
 const keyboardUp = ({ under }: Judged): KeyboardUp | undefined => (under === undefined ? undefined : { lineY: under.line.y, remedy: under.remedy });
 
 /** A plain stop's sliver (InFrameShort's `sliver`, or the `overlapped` stop's cut), in the tap's refusal's own words (target-text.ts#cutSliverText). */
@@ -244,7 +242,7 @@ function describeClip({ clipped, visible, unknownPast }: ClipFacts, topCover?: R
   return `CLIPPED at ${clipped.join('/')}, ${shareText(visible, unknownPast)} of it is in ${where}${unknownPastText(unknownPast)}`;
 }
 
-/** What a clip sentence quotes of a judged element: the edges clipping it, its share in the frame, and the sides it runs past an unknown distance — a standing's facts or a result alike. */
+/** What a clip sentence quotes of a judged element — a standing's facts or a result alike. */
 type ClipFacts = { readonly clipped: readonly Edge[]; readonly visible: number; readonly unknownPast?: readonly Edge[] };
 
 /** The share is only an upper bound: the element runs past some side an unknown distance (`ScrollUntilResult.unknownPast`). */
@@ -294,7 +292,7 @@ const flushHedged = (flush: ScrollUntilResult['flush']): flush is Flush & { chec
  * What a `fully: true` stop could not confirm (T17), or undefined for a stop that claims it all, or none: a stop whose
  * reply would otherwise open `fully visible` — nothing clipped or covered, no surface the eyes saw — with a flush edge no
  * probe checked (`WHOLE`), a keyboard the window state gives no area (`UNCOVERED`), or both. Its reply opens
- * `visible after N swipes, NOT CONFIRMED <it>:` (`describeScrollResult`), and a flow logs it ⚠ (flow/engine.ts).
+ * `visible after N swipes, NOT CONFIRMED <it>:` (`describeScrollResult`).
  */
 export function stopHedges(r: ScrollUntilResult): HedgeWhat | undefined {
   if (!fullyClaimed({ clipped: r.clipped, covered: r.covered !== undefined }) || r.eyes?.sees === 'surface') return undefined;
@@ -304,7 +302,7 @@ export function stopHedges(r: ScrollUntilResult): HedgeWhat | undefined {
   return keyboard ? UNCOVERED : undefined;
 }
 
-/** The honest one-line summary both call sites print. */
+/** The honest one-line summary. */
 export function describeScrollResult(r: ScrollUntilResult): string {
   const n = swipesText(r.swipes);
   // `shown` comes where the band changed the stop — a clip at its edge, or a
@@ -406,8 +404,7 @@ const endText = ({ way, scrollView }: EndProof): string => `the tree lists the c
  * The end turn's clause (course.ts#EndTurn), before the detent's in every reply and failure that made one —
  * `; 1 swipe up did not move it — the tree lists the content of scrollable (0,380 402x180) ending at its top — so
  * averi turned down, as the tree places the element below it`: the swipes the caller's way, why they proved the end
- * (`endText`), and that averi, not the caller, chose the way after. Empty when no end turn was made. Exported for the
- * troubleshooting reference, which quotes one rendering (tests/mcp/tool-descriptions.test.ts pins it).
+ * (`endText`), and that averi, not the caller, chose the way after. Empty when no end turn was made.
  */
 export const endTurnText = (turn: EndTurn | undefined): string =>
   turn === undefined ? '' : `; ${unmovedText(turn)} — ${endText(turn)} — so averi turned ${turn.to}, as the tree places the element ${SIDES[EDGE_TOWARD[turn.to]].past} it`;
@@ -420,12 +417,9 @@ export const endTurnText = (turn: EndTurn | undefined): string =>
 const detentText = (detent: DetentMove | undefined): string => (detent === undefined ? '' : `; the sheet moved from its ${detent.from} detent to ${detent.to}`);
 
 /**
- * The flush clause (flush-check.ts), with no separator: what the stop's edge on
- * its scroll container means — checked by a probe (after `fully visible after N swipes; `), or not checked (the
- * hedge a `NOT CONFIRMED WHOLE` lead opens with, T17: `flushHedged`). The
- * container is quoted as a node's rect (`rectText`): it is one. Exported for
- * the troubleshooting reference (tests/mcp/tool-descriptions.test.ts pins
- * its `axis` rendering).
+ * The flush clause (flush-check.ts), with no separator: what the stop's edge on its scroll container means — checked by
+ * a probe (after `fully visible after N swipes; `), or not checked (the hedge a `NOT CONFIRMED WHOLE` lead opens with,
+ * T17: `flushHedged`). The container is quoted as a node's rect (`rectText`): it is one.
  */
 export function flushText(flush: Flush): string {
   const cut = "it may be cut there, a rect assert or screenshot may measure part of it";
@@ -465,10 +459,10 @@ export function flushText(flush: Flush): string {
 
 /**
  * Where a flush edge lies (flush-check.ts#Flush, #FlushCut) and what Android cuts there, in one dialect for the
- * stop's clause and the bound's (the truth reader, scripts/truth/replies.ts, reads its probed side): `its bottom edge
- * lies on its scroll container's (0,1046 1080x495)`, `where Android cuts a node's bounds to the container`. A pinned
- * node's edge (`pinned`): where the container's content ends as it shows, and the cut it may make is Compose's at a
- * node drawn after the match, not the container's. `lies`: `still lies` for a cut a probe proved (flush-check.ts#FlushCut).
+ * stop's clause and the bound's: `its bottom edge lies on its scroll container's (0,1046 1080x495)`, `where Android
+ * cuts a node's bounds to the container`. A pinned node's edge (`pinned`): where the container's content ends as it
+ * shows, and the cut it may make is Compose's at a node drawn after the match, not the container's. `lies`: `still
+ * lies` for a cut a probe proved (flush-check.ts#FlushCut).
  */
 function flushEdgeText({ edge, container, pinned }: FlushPlace, lies: 'lies' | 'still lies'): { where: string; cuts: string } {
   const box = rectText(container);
@@ -512,7 +506,6 @@ function hideToJudgeWholeScreen(remedy: KeyboardRemedy): string {
   return hideClause(remedy, `to reach it with the keyboard down, hide it first (${hideKeyboardHow(remedy)}) and scroll again`);
 }
 
-/** What the stop judged against, for "never intersected …". */
 const frameWords = (viewport: DeviceScreen, cover: AppliedKeyboard | undefined): string =>
   cover?.above === undefined
     ? `${viewport.width}x${viewport.height} viewport`
@@ -535,7 +528,6 @@ const systemBarText = ({ judged, bar, band }: Extract<Shortfall, { of: 'systemBa
 const centreClear = ({ judged }: Extract<Shortfall, { of: 'systemBar' }>): string =>
   judged.standing.facts.centreCover === undefined ? 'its centre is clear: a plain scroll_until stops on it, and a tap lands' : 'its centre is clear of the bar';
 
-/** "after swipe 2", "before the first swipe" — when the target was last in the frame. */
 const whenInFrame = (swipes: number): string => (swipes === 0 ? 'before the first swipe' : `after swipe ${swipes}`);
 
 /**
@@ -557,8 +549,7 @@ const otherWayText = (otherWay: Extract<ScrollOutcome, { kind: 'stuck' }>['other
  * would have landed (`next`); empty when it was judged in the frame. A touch-down outside where the surface reaches is
  * said to land on the dim outside it: Android's dialog window, listed alone, reaches only its own rect, and a touch
  * beside it lands on the dim the dialog lays around it (which dismisses it) —
- * docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md. Exported for the
- * troubleshooting reference (tests/mcp/tool-descriptions.test.ts pins the dim's rendering).
+ * docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md.
  */
 export const touchDownText = (next: PresentedTouchDown | undefined): string =>
   next === undefined
@@ -830,13 +821,11 @@ export const withinRect = ({ x, y, width, height }: Rect): string => JSON.string
  */
 const withinSaid = (within: Within): string => (isRect(within) ? withinRect(within) : describeTarget(within));
 
-/** The other axis' two directions, as a sentence offers them. */
 const DIRECTIONS_ON: Readonly<Record<ScrollAxis, string>> = { vertical: 'up or down', horizontal: 'left or right' };
 
-/** The axis across `axis` — `withinText`'s and `acrossText`'s one flip. */
 const OTHER_AXIS: Readonly<Record<ScrollAxis, ScrollAxis>> = { vertical: 'horizontal', horizontal: 'vertical' };
 
-/** A scroll view named with its rect as `within` takes it — `<node> as within: {…}`: the stale refusal's offers and D76's several beside. */
+/** A scroll view named with its rect as `within` takes it — `<node> as within: {…}`. */
 const asWithin = (n: QuotedNode): string => `${nodeText(n)} as within: ${withinRect(n.rect)}`;
 
 /**
@@ -959,7 +948,6 @@ function noRoomText({ rect, toward, room, keyboard }: Extract<WithinRefusal, { o
   return `names the scroll view ${rectText(rect)}, which has no room for a swipe ${toward}: ${short} — ${way}`;
 }
 
-/** The words of an axis for `unfitText`: how a target's size along it is said. */
 const SIZE_WORDS: Readonly<Record<Unfit['along'], { readonly as: string; readonly more: string; readonly moved: string }>> = {
   vertical: { as: 'tall', more: 'taller', moved: 'up and down' },
   horizontal: { as: 'wide', more: 'wider', moved: 'sideways' },
@@ -1040,7 +1028,6 @@ function changedText(o: Extract<ScrollOutcome, { kind: 'changed' }>, describe: s
   );
 }
 
-/** How many of the ids gone the `changed` stop quotes. */
 const CHANGED_IDS_QUOTED = 3;
 
 /**
@@ -1081,7 +1068,7 @@ function shortClause(judged: Judged): string {
   }
 }
 
-/** Which bound ended it, as the failure's cause. Exported for the troubleshooting reference (tests/mcp/tool-descriptions.test.ts pins the proven end's rendering). */
+/** Which bound ended it, as the failure's cause. */
 export function boundText(by: BoundBy, swipes: number, remedy: WithinRemedy = WITHIN_REMEDY.rect): string {
   switch (by.of) {
     case 'exhausted': {
@@ -1101,7 +1088,7 @@ export function boundText(by: BoundBy, swipes: number, remedy: WithinRemedy = WI
       // `across` (D59b): the strokes went across the scroll view they were drawn over, for want of one along them —
       // said first, with the way out, after a node named under the touch-down. `beside` (D76): the scroll views along
       // the stroke they never went over, the target not read yet — said the same way, after both: after a node named
-      // under the touch-down too, inside its "else" (review round 1: the order is the sentence's, not a precedence).
+      // under the touch-down too, inside its "else" (the order is the sentence's, not a precedence).
       const untaken = `${others}, or the swipes were not taken${by.unlisted !== undefined ? ` — ${TOP_LAYER_ONLY_HINT[by.unlisted]}` : ''}`;
       const why =
         by.touched !== undefined
@@ -1127,8 +1114,7 @@ export function boundText(by: BoundBy, swipes: number, remedy: WithinRemedy = WI
  * The timeout bound's words: the time spent, then the budget it ran past, the swipes sent and what the tree reads took
  * — `after 38204ms (timeout 15000ms; no swipe was sent; 1 tree read took 38204ms)`, `after 18000ms (timeout 15000ms;
  * 2 swipes sent; 3 tree reads took 18000ms, the last 6000ms)` — so a budget the reads spent (a tree source slow or
- * restarting under the scroll) does not read as content that never came into view. Exported for the troubleshooting
- * reference, which quotes one rendering (tests/mcp/tool-descriptions.test.ts pins it).
+ * restarting under the scroll) does not read as content that never came into view.
  */
 export function timeoutText(by: Extract<BoundBy, { of: 'timeout' }>, swipes: number, remedy: WithinRemedy = WITHIN_REMEDY.rect): string {
   const sent = swipes === 0 ? 'no swipe was sent' : `${swipesText(swipes)} sent`;
@@ -1138,26 +1124,24 @@ export function timeoutText(by: Extract<BoundBy, { of: 'timeout' }>, swipes: num
 }
 
 /**
- * The scroll views beside at a budget's bound (maxSwipes, the timeout; scroll-rounds.ts#BoundBy's `beside`, D76 review
- * round 1): `<lead><besideText>; else: raise maxSwipes or timeoutMs` — the bound's own way out kept after them, since
- * the element may lie further along the list swiped; `lead` the separator from the bound's own words (`: ` after
- * `maxSwipes`, `; ` after the timeout's reads, a clause of their own). Empty without them.
+ * The scroll views beside at a budget's bound (maxSwipes, the timeout; scroll-rounds.ts#BoundBy's `beside`, D76):
+ * `<lead><besideText>; else: raise maxSwipes or timeoutMs` — the bound's own way out kept after them, since the element
+ * may lie further along the list swiped; `lead` the separator from the bound's own words (`: ` after `maxSwipes`, `; `
+ * after the timeout's reads, a clause of their own). Empty without them.
  */
 function boundBeside(beside: StrokedBeside | undefined, lead: ': ' | '; ', remedy: WithinRemedy): string {
   return beside === undefined ? '' : `${lead}${besideText(beside, remedy)}; else: raise maxSwipes or timeoutMs`;
 }
 
 /**
- * The strokes went across the scroll view they were drawn over (scroll-rounds.ts#BoundBy's `across`): `each went
- * across the scroll view it was drawn over, <rect>, which scrolls vertically, and` then what the whole tree shows the
- * other way. A scroll view told to scroll horizontally is named (`<node>, which scrolls horizontally, and which the
- * swipes did not go over`, or `…, but which had no room for a swipe` when the plan judged it without room), with
- * `scroll_until it again with within: <its rect>` (D78; `swipe inside it (swipe, its coordinates), then scroll_until it`
- * where it had no room, or a read had found the target — its own scroll views are the candidates then, and `within` is
- * ignored). Else `the tree shows no scroll view that may
- * scroll horizontally — if the element lies in a horizontal list the tree does not show as one, swipe inside that
- * list (swipe, its coordinates), then scroll_until it`. `boundText`'s; the troubleshooting reference pins it through
- * `boundText` (tests/mcp/tool-descriptions.test.ts).
+ * The strokes went across the scroll view they were drawn over (scroll-rounds.ts#BoundBy's `across`): `each went across
+ * the scroll view it was drawn over, <rect>, which scrolls vertically, and` then what the whole tree shows the other
+ * way. A scroll view told to scroll horizontally is named (`<node>, which scrolls horizontally, and which the swipes
+ * did not go over`, or `…, but which had no room for a swipe` when the plan judged it without room), with `scroll_until
+ * it again with within: <its rect>` (D78; `swipe inside it (swipe, its coordinates), then scroll_until it` where it had
+ * no room, or a read had found the target — its own scroll views are the candidates then, and `within` is ignored).
+ * Else `the tree shows no scroll view that may scroll horizontally — if the element lies in a horizontal list the tree
+ * does not show as one, swipe inside that list (swipe, its coordinates), then scroll_until it`.
  */
 function acrossText({ rect, axis, along }: StrokedAcross, remedy: WithinRemedy): string {
   const way = OTHER_AXIS[axis];
@@ -1182,9 +1166,8 @@ function acrossText({ rect, axis, along }: StrokedAcross, remedy: WithinRemedy):
  * swipes did not go over: <node>` — several counted, the BESIDE_NAMED largest named and the rest counted (`and 2 more`)
  * — with `if the element lies in it, scroll_until it again with within: {"x":…,"y":…,"width":…,"height":…}` (D78: its
  * rect as `within` takes it, `withinRect`; several: each named `<node> as within: {…}`, then `… in one of them,
- * scroll_until it again with that one's within`). "Did not go over": no swipe touched down in it. The remedy is the caller's: the swipes are not tried there
- * (D76's decision, ADR 0010's D76 amendment). `boundText`'s and `boundBeside`'s; the troubleshooting
- * reference quotes it.
+ * scroll_until it again with that one's within`). "Did not go over": no swipe touched down in it. The remedy is the
+ * caller's: the swipes are not tried there (D76's decision, ADR 0010's D76 amendment).
  */
 function besideText({ strokedOver, at, landed, axis, others }: StrokedBeside, remedy: WithinRemedy): string {
   const where = at === undefined ? '' : `, touching down at ${at.x},${at.y}${landed === undefined ? '' : ` inside the scroll view ${rectText(landed)}`}`;
@@ -1205,7 +1188,7 @@ function besideText({ strokedOver, at, landed, axis, others }: StrokedBeside, re
 export const UNTRIED_LEAD = 'which the swipes did not go over: ';
 export const UNTRIED_END = ' — if the element lies in ';
 
-/** The most scroll views `besideText` names, the largest; the rest are counted (review round 1). */
+/** The most scroll views `besideText` names, the largest; the rest are counted. */
 const BESIDE_NAMED = 3;
 
 /** The node the strokes touched down on, drawn over their list: `they touched down at x,y on <role> "<label>" (id <id>) at <rect>, drawn over the list <rect>, which may have taken them`. */
@@ -1234,7 +1217,6 @@ function unseenText({ strokes, within, toward }: UnseenStrokes): string {
 
 /**
  * A failure's words when the device's tree read failed (`readFailed`, `neverRead`): the device's fault, not a reading.
- * Exported for the live golden's kf judge (scripts/truth/live-forms.ts), which tells it from averi's own refusals.
  */
 export const TREE_READ_FAILED = 'last UI tree read failed';
 

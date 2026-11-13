@@ -137,8 +137,8 @@ export interface RoundRules {
   target?: Target;
   /**
    * The scroll view the caller named for the strokes until the target is read (`scroll_until`'s `within`, D78;
-   * interact/within.ts): resolved at the scroll's first read that reads, before anything of it is judged, or the
-   * scroll stops there (`within`). Absent: the screen's largest scroller, as before.
+   * interact/within.ts): resolved on the scroll's first read that reads, before any swipe is sent, or the scroll stops
+   * there (`within`). Absent: the screen's largest scroller.
    */
   within?: Within;
 }
@@ -386,7 +386,7 @@ export interface DetentMove {
  * `beside`: before any read found the target, the scroll views the tree tells scroll along the stroke that the
  * strokes did not go over (stroke-plan.ts#strokedBeside: the plan's candidates hold no sibling of the largest
  * scroller) — said after `touched` and `across`, where no end is proven, D76 — and at `maxSwipes` and `timeout` too,
- * before their way out (review round 1); no device call.
+ * before their way out; no device call.
  */
 export type BoundBy =
   | { of: 'exhausted'; lastStroke: Direction; unchanged: 'matches' | 'tree'; touched?: TouchedOn; ends?: EndProof; unlisted?: TopLayerOnlySource; across?: StrokedAcross; beside?: StrokedBeside }
@@ -511,26 +511,18 @@ export type Shortfall =
 export const SETTLE_CONFIRM_READS = 3;
 
 /**
- * How many strokes in a row — the same stroke each time — must leave every
- * match where it was before a target in the tree but off the frame is
- * called "content exhausted". Measured on Android: the form's
- * last field, wholly under an IME its container does not resize for,
- * swiped for the whole 15 s. Two, not one: a single
- * stroke that moves nothing can be a transient — the first touch
- * dismissing a snackbar, a stale tree read, a stroke drawn whole-screen
- * onto an IME that was still coming up while the witness denied the stale
- * window — after which the next stroke scrolls. ONE suffices where the
- * tree itself proves the end (`Observed.ends`, the owner's decision of
- * 2026-10-17 with the end turn, `EndTurn`): the read after it unmoved, and
- * the scroll view it went over listing its content ending the way it went
- * (WDA's unclipped frames; never Android's or idb's) — a transient can
- * leave a stroke untaken, not make the content end there. Only the same stroke
- * counts twice: a stroke drawn differently (a band applied, the stroke
- * turned round) is a new attempt. The `fully: true` clipped stop's stuck
- * test takes the same two, watching the judged match
- * alone — a visible clipped match that does not move is the defect it
- * reports. For both, only strokes count: a confirming read sent none — but a rebound's settled read (below) answers for
- * the stroke it followed, in that stroke's place.
+ * How many strokes in a row — the same stroke each time — must leave every match where it was before a target in the
+ * tree but off the frame is called "content exhausted". Measured on Android: the form's last field, wholly under an IME
+ * its container does not resize for, swiped for the whole 15 s. Two, not one: a single stroke that moves nothing can be
+ * a transient — the first touch dismissing a snackbar, a stale tree read, a stroke drawn whole-screen onto an IME that
+ * was still coming up while the witness denied the stale window — after which the next stroke scrolls. ONE suffices
+ * where the tree itself proves the end (`Observed.ends`, the owner's decision with the end turn, `EndTurn`): the read
+ * after it unmoved, and the scroll view it went over listing its content ending the way it went (WDA's unclipped
+ * frames; never Android's or idb's) — a transient can leave a stroke untaken, not make the content end there. Only the
+ * same stroke counts twice: a stroke drawn differently (a band applied, the stroke turned round) is a new attempt. The
+ * `fully: true` clipped stop's stuck test takes the same two, watching the judged match alone — a visible clipped match
+ * that does not move is the defect it reports. For both, only strokes count: a confirming read sent none — but a
+ * rebound's settled read (below) answers for the stroke it followed, in that stroke's place.
  *
  * And a target NOT in the tree (the note below): the same stroke twice after
  * which the WHOLE tree is unchanged (`TreeFacts.fingerprint`; where strokes fling, within a pixel: below) — content at
@@ -569,20 +561,20 @@ export const SETTLE_CONFIRM_READS = 3;
  * content (a sticky header child) reads as content shown, so a blank stretch under it still reads exhausted after the
  * two.
  *
- * A REBOUND is read settled (ADR 0021 decision 6): where the platform flings every stroke
- * (`RoundRules.strokes` `fling`, iOS), a stroke into a list's end rubber-bands the content back over ~0.75 s, and the read after
- * it lands inside the bounce at another offset each time — measured under idb on Settings › General, a target not there
- * cost all six strokes, "failed after 6 swipes (maxSwipes)". A read after a stroke with the target nowhere that found
- * the content carried less far than the finger drew (motion-ledger.ts#Moved `rebounding`) counts nothing; one more
- * read after a settle answers for the stroke against the read before it (every node
- * within a pixel). Now "the last 2 … did not change the screen" after the two strokes. The settled read is the stroke's
- * first confirming read (SETTLE_CONFIRM_READS), so the round's BOUND holds. And where strokes fling the whole tree
- * unchanged is within a pixel, as every match's is: measured under idb, a page at its end read a point off after the
- * first stroke (its rest rounded the other way), and the exact fingerprint called it motion — a third stroke, and a
- * side never stroked named (ui-tree/read-tree.ts#sameTreeWithinPixel); where strokes drag (Android) it stays exact.
- * Residuals: a settled read still inside the bounce (400 ms and a read are not always past it) reads the list moved —
- * the strokes run on as before, and a list that never moved may name the side never stroked; a screen whose content
- * moves on its own by less than a stroke between reads takes the extra read too.
+ * A REBOUND is read settled (ADR 0021 decision 6): where the platform flings every stroke (`RoundRules.strokes`
+ * `fling`, iOS), a stroke into a list's end rubber-bands the content back over ~0.75 s, and the read after it lands
+ * inside the bounce at another offset each time — measured under idb on Settings › General, a target not there cost all
+ * six strokes, "failed after 6 swipes (maxSwipes)". A read after a stroke with the target nowhere that found the
+ * content carried less far than the finger drew (motion-ledger.ts#Moved `rebounding`) counts nothing; one more read
+ * after a settle answers for the stroke against the read before it (every node within a pixel). So "the last 2 … did
+ * not change the screen" after the two strokes. The settled read is the stroke's first confirming read
+ * (SETTLE_CONFIRM_READS), so the round's BOUND holds. And where strokes fling the whole tree unchanged is within a
+ * pixel, as every match's is: measured under idb, a page at its end read a point off after the first stroke (its rest
+ * rounded the other way), and the exact fingerprint called it motion — a third stroke, and a side never stroked named
+ * (ui-tree/read-tree.ts#sameTreeWithinPixel); where strokes drag (Android) it stays exact. Residuals: a settled read
+ * still inside the bounce (400 ms and a read are not always past it) reads the list moved — the strokes run on as
+ * before, and a list that never moved may name the side never stroked; a screen whose content moves on its own by less
+ * than a stroke between reads takes the extra read too.
  * docs/bugs/2026-10-12-ios-scroll-until-never-reads-a-bouncing-list-end-as-exhausted.md
  */
 export const UNMOVED_STROKES_EXHAUST = 2;
@@ -594,7 +586,6 @@ export interface Rounds {
   readonly [opaque]: 'scroll-rounds';
 }
 
-/** The screen a round judges in: the usable screen (ui-tree/usable-screen.ts#UsableScreen) — the device as built until a round had one (`startRounds`). */
 type Frame = UsableScreen;
 
 /**
@@ -797,7 +788,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
   // tests/interact/scroll-end-turn.test.ts).
   const unmovedNow = (offFrame && unmoved.all && !loading) || (found.length === 0 && unmoved.tree);
   // Nor of a stroke that touched down on a node drawn over its scroll view (`touchedOn`): that node may have taken it,
-  // and the fast fail names it first — the two-stroke rule's sentence, as before the proof.
+  // and the fast fail names it first — the two-stroke rule's sentence.
   const proof =
     strokeRead && unmovedNow && lastSent(s.course) !== undefined && touchedOn(s.strokes, facts, lastDrawn(s.motion)) === undefined
       ? listed()
@@ -855,7 +846,6 @@ function probeMeans(s: State, seen: RoundSeen, cover: AppliedKeyboard | undefine
   return { screen: s.frame.box, gesture: seen.screen?.oriented, strokes: s.strokes, cover, offered, corroborated: seen.corroborated, budget };
 }
 
-/** Another confirming read is within the stroke's budget and the deadline. */
 const mayConfirm = (s: State, elapsedMs: number): boolean => s.confirmReads < SETTLE_CONFIRM_READS && elapsedMs < s.rules.timeoutMs;
 
 /**
@@ -908,9 +898,9 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   let judged = read === undefined ? undefined : judgeRead(read, s.frame, fully, seen.corroborated);
   if (judged !== undefined && 'ask' in judged) return ask(judged.ask);
   // THE NAMED SCROLL VIEW (`RoundRules.within`, D78): resolved on the scroll's first read that reads — no read before
-  // it strokes anything — and before anything of it is judged, so a `within` that names no scroll view stops the scroll
-  // there, whatever the read holds of the target (interact/within.ts); else the plan strokes it until a read finds the
-  // target (stroke-plan.ts#nameScrollView).
+  // it strokes anything — so a `within` that names no scroll view stops the scroll there, before any swipe, whatever
+  // the read holds of the target (interact/within.ts); else the plan strokes it until a read finds the target
+  // (stroke-plan.ts#nameScrollView).
   if (judged !== undefined && s.rules.within !== undefined && s.treesRead === 1) {
     const named = resolveWithin(judged.facts, s.rules.within, s.rules.direction, clearOfSystemBands(s.frame.box, s.frame));
     if ('refused' in named) return stop(s, { kind: 'within', swipes: 0, within: s.rules.within, refused: named.refused });
@@ -982,9 +972,9 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   let flushCut: FlushCut | undefined;
   // The judged match in the frame, on a read that read: what a stop is judged on.
   const inFrame = best !== undefined && best.standing.facts.visible > 0 && observed !== undefined && now !== undefined;
-  // The question a `fully visible` claim on it would ask the eyes (THE EYES, below), when the trigger applies.
-  // Covered: by a cover the draw order found (cover.ts#drawOrderFound), as before the overlaid edge was a cover —
-  // neutral either way today: an overlaid cover lies over a node in no scroll view, which has no flush neighbour to ask of.
+  // The question a `fully visible` claim on it would ask the eyes (THE EYES, below), when the trigger applies. Covered:
+  // by a cover the draw order found (cover.ts#drawOrderFound), not an overlaid edge's — neutral either way: an overlaid
+  // cover lies over a node in no scroll view, which has no flush neighbour to ask of.
   const question = inFrame && fullyClaimed({ clipped: best.standing.facts.clipped, covered: best.standing.facts.covers.some(drawOrderFound) }) ? eyesQuestion(now.facts.scene, now.read.tree, best.node, s.frame, fully ? 'fully' : 'stop') : undefined;
   // Refused again (`State.eyesRefused`): the read after a stroke finds the target and its neighbours where the eyes
   // last refused them — no confirm, no screenshot; this stroke's read, short as before.
@@ -1209,10 +1199,10 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     const course = courseFacts(s.course);
     const usable = clearOfSystemBands(s.frame.box, s.frame);
     const across = exhausted === undefined || now === undefined ? undefined : strokedAcross(s.strokes, now.facts, course.lastStroke, usable);
-    // D76: the scroll views along the stroke the strokes never went over, while no read has found the target (none
-    // when the strokes went across their scroll view: `across` says that) — at every bound (`movesWith` has found a
-    // match, so it gets none), once a swipe was sent and this round's tree read: a caller told only to raise
-    // maxSwipes or timeoutMs strokes the same list again (review round 1).
+    // D76: the scroll views along the stroke the strokes never went over, while no read has found the target (none when
+    // the strokes went across their scroll view: `across` says that) — at every bound (`movesWith` has found a match,
+    // so it gets none), once a swipe was sent and this round's tree read: a caller told only to raise maxSwipes or
+    // timeoutMs strokes the same list again.
     const beside = now === undefined || s.swipes === 0 ? undefined : strokedBeside(s.strokes, now.facts, course.lastStroke, usable);
     const besideSaid = beside === undefined ? {} : { beside };
     // Where the swipe the bound held back would have touched down, when that is a presented screen's surface: said,
@@ -1269,9 +1259,9 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // may touch down on another scroll view, and the reply would read as the named one's. Stopped, the stroke not sent;
   // judged every round where the plan judges room, so a keyboard up after a swipe stops the next. A bound above wins:
   // no stroke would be sent then either.
-  // A round whose tree did not read holds for one read rather than stop on the last read's keyboard line (review
-  // round 1, the coordinator's decision): a terminal stop rests on a read that read, as the presented stop's does;
-  // with no confirming read left it stops on the last read that read — never the stroke over the gesture box whole.
+  // A round whose tree did not read holds for one read rather than stop on the last read's keyboard line: a terminal
+  // stop rests on a read that read, as the presented stop's does; with no confirming read left it stops on the last
+  // read that read — never the stroke over the gesture box whole.
   // Said before the presented hold: no stroke is sent either way. The keyboard's remedy is the applied cover's
   // (`lastCover`, set at the read whose line the plan kept).
   if (plan.noRoom !== undefined && s.rules.within !== undefined) {
@@ -1300,10 +1290,8 @@ function send(s: Mutable<State>, next: NextStroke, plan: StrokePlan): Next {
   return { state: s as unknown as Rounds, step: { do: 'stroke', ...plan.stroke } };
 }
 
-/** One round's step, as `round` returns it. */
 type Next = { state: Rounds; step: RoundStep };
 
-/** A `visible` stop, as `round` makes it. */
 type VisibleStop = Extract<ScrollOutcome, { kind: 'visible' }>;
 
 /**
@@ -1462,7 +1450,6 @@ function strokeKind(evidence: CallEvidence, toward: Direction): StrokeKind {
 interface BoundRound {
   /** Why this round's tree did not read, if it did not. */
   readonly readError: Error | undefined;
-  /** The target's matches in this round's tree. */
   readonly found: readonly UiNode[];
   /** The best of them as judged (scroll-read.ts#judge), if any. */
   readonly best: Judged | undefined;

@@ -5,17 +5,16 @@ import { SIDES } from '../ui-tree/sides.js';
 import { EDGE_TOWARD, OPPOSITE, swipeVector, type Direction } from './swipe.js';
 
 /**
- * THE SCROLL VIEW THE MOTION SHOWS, on a tree that tells none — idb's flat list (ui-tree/geometry.ts#DrawnUntold): where
- * the target's content was seen moving between reads (`MotionShown`), which strokes go over it (`goesOver`), and which
- * stops it holds back (`carriedUnder`). Lab note LV3,
+ * THE SCROLL VIEW THE MOTION SHOWS, on a tree that tells none — idb's flat list (ui-tree/geometry.ts#DrawnUntold):
+ * where the target's content was seen moving between reads (`MotionShown`), which strokes go over it (`goesOver`), and
+ * which stops it holds back (`carriedUnder`). Lab note LV3,
  * docs/bugs/2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md; the rule
  * and its cost, docs/adr/0010-pixel-assert-keyboard-first.md residual 6. THE MOTION LEDGER's internal module
- * (interact/motion-ledger.ts, which alone calls it and keeps its memory; tested through the ledger's interface):
+ * (interact/motion-ledger.ts, which keeps its memory; tested through the ledger's interface):
  * - `seeRegion(memory, tree, target, gesture)` — what the ledger keeps of the region after one read that found the
  *   target (`RegionMemory`): the region so far (`MotionShown`), and the read the next is measured against; one walk.
  * - `goesOver(shown, toward)` — whether a stroke toward `toward` goes over the region (else the screen box).
- * - `carriedUnder(shown, target, of, drawn)` — whether the region holds back a stop on `target` (`CarriedUnder`), asked
- *   through interact/motion-ledger.ts#heldBack; what the stuck and bound failures say (interact/scroll-text.ts).
+ * - `carriedUnder(shown, target, of, drawn)` — whether the region holds back a stop on `target` (`CarriedUnder`).
  * Judged per read from the region and the last stroke drawn (the ledger's `lastDrawn`): no device call, no I/O.
  */
 
@@ -79,10 +78,10 @@ export interface HeldStill extends HeldStop {
 
 /**
  * Whether a stroke toward `toward` (where the content lies) goes over the region `shown`: when it moves content the
- * other way from `way`, back over where it was seen moving. One that moves it `way` keeps the screen box — the stroke
- * that made the region, so the forward side stays as before. Why (lab note LV3): the turned stroke for
- * `tabbar-floating`'s R touched down at the screen's 0.2, y 175, in the header, and moved nothing; over the region, at
- * 391, it moves the list. Forward over the region too: 94 new false stops on a physics replay (ADR 0010 residual 6).
+ * other way from `way`, back over where it was seen moving. One that moves it `way` keeps the screen box, as the stroke
+ * that made the region did. Why (lab note LV3): the turned stroke for `tabbar-floating`'s R touched down at the
+ * screen's 0.2, y 175, in the header, and moved nothing; over the region, at 391, it moves the list. Forward over the
+ * region too: 94 new false stops on a physics replay (ADR 0010 residual 6).
  */
 export const goesOver = (shown: MotionShown, toward: Direction): boolean => EDGE_TOWARD[OPPOSITE[toward]] !== shown.way;
 
@@ -146,7 +145,6 @@ export interface RegionMemory {
   readonly listing: Listing | undefined;
 }
 
-/** The region memory before any read: no region, nothing to measure against. */
 export const NO_REGION: RegionMemory = { shown: undefined, listing: undefined };
 
 /**
@@ -167,7 +165,6 @@ interface Listing {
   readonly gesture: Rect | undefined;
 }
 
-/** `tree`'s listing for `motionShown` (`Listing`): the target's identity, each identity listed once, the gesture box. One walk. */
 function listingOf(tree: UiNode, target: UiNode, gesture: Rect | undefined): Listing {
   const nodes = new Map([...listedOnce(tree)].map(([key, n]) => [key, quoted(n)] as const));
   return { target: nodeIdentity(target), nodes, gesture: gesture === undefined ? undefined : { ...gesture } };

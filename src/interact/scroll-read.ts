@@ -61,17 +61,17 @@ export type Since = 'start' | 'stroke' | 'settle';
 /**
  * A tree that read, as the round needs it: the TREE itself — the round
  * derives what it asks of it (`TreeFacts`) — the matches the driver found
- * in it, the judged screen, and the SYNCHRONOUS facts of the round's
- * keyboard reading (ui-tree/keyboard-cover.ts#readKeyboard), never the
- * reading itself: its two async questions reach the round only as answers
- * to an `ask`, and a reading is never held across rounds (the
- * keyboard-cover.ts doc's rule) — the driver builds one per round.
+ * in it, and the SYNCHRONOUS facts of the round's keyboard reading
+ * (ui-tree/keyboard-cover.ts#readKeyboard), never the reading itself: its
+ * two async questions reach the round only as answers to an `ask`, and a
+ * reading is never held across rounds (the keyboard-cover.ts doc's rule) —
+ * the driver builds one per round.
  *
- * Five fields. The facts derived from the tree — the matches' clipping
- * ancestors, the largest clipping container, the tree's fingerprint and
- * whether it showed progress — are pure functions of the tree, so the read's
- * judgement derives them (`factsOf`): a driver cannot omit one and silently
- * disable a rule.
+ * The facts derived from the tree — the matches' clipping ancestors, the
+ * largest clipping container, the tree's fingerprint and whether it showed
+ * progress — are pure functions of the tree, so the read's judgement
+ * derives them (`factsOf`): a driver cannot omit one and silently disable a
+ * rule.
  */
 export interface RoundRead {
   /**
@@ -126,17 +126,17 @@ export interface TreeFacts extends Look<Pick<RoundRead, 'ofKeyboard'>> {
   mainScroller: Rect | undefined;
   /**
    * A cheap fingerprint of the WHOLE tree (ui-tree/read-tree.ts
-   * #treeFingerprint) — every node's role, text, id and rect — for "the
-   * strokes changed nothing at all" when the target is not in the tree
-   * (UNMOVED_STROKES_EXHAUST).
+   * #treeFingerprint) — every node's role, label, identifier, value and
+   * rect — for "the strokes changed nothing at all" when the target is not
+   * in the tree (UNMOVED_STROKES_EXHAUST).
    */
   fingerprint: string;
   /**
    * The tree shows a progress indicator (ui-tree/read-tree.ts#showsProgress:
    * a `progress` node with area — Android's ProgressBar, which a Compose
-   * progress indicator also dumps as; through WDA an iOS ActivityIndicator
-   * since D27, 2026-10-31) — the screen may be loading, so an
-   * unchanged fingerprint does not say the content is exhausted.
+   * progress indicator also dumps as; through WDA an iOS ActivityIndicator)
+   * — the screen may be loading, so an unchanged fingerprint does not say
+   * the content is exhausted.
    */
   loading: boolean;
   /**
@@ -233,13 +233,8 @@ export interface Judged {
   standing: Standing;
 }
 
-/** The stop's purpose (ui-tree/standing.ts#TouchPurpose): the plain stop, or `fully` — `RoundRules.fully`, mapped once a read. */
 type StopOf = Exclude<TouchPurpose['of'], 'tap'>;
 
-/**
- * One read's judgement (`judgeRead`) — every fact of the read the round's
- * cross-read steps read.
- */
 export interface ReadJudgement {
   /** The tree's facts, derived once (`factsOf`). */
   readonly facts: TreeFacts;
@@ -272,7 +267,6 @@ export interface ReadJudgement {
 export function judgeRead(read: RoundRead, screen: UsableScreen, fully: boolean, corroborated?: boolean): { ask: 'witness' } | ReadJudgement {
   const viewport = screen.box;
   const { found } = read;
-  // The stop's purpose, mapped from the tool's flag once (ui-tree/standing.ts#TouchPurpose).
   const stop: StopOf = fully ? 'fully' : 'stop';
   // The round judged twice when a keyboard is up: over the whole screen,
   // and over the screen ABOVE the cover (`offeredKeyboard`) — the covered judgement
@@ -316,9 +310,9 @@ export function judgeRead(read: RoundRead, screen: UsableScreen, fully: boolean,
   }
   // The frames this read was judged in — the screen above an applied
   // keyboard, else every box that counts — for where the target stands
-  // against the far edge (course.ts#seeTarget, #beyondFarEdge), cut by
-  // standing's own band cut (ui-tree/standing.ts#farEdgeFrames), which reads
-  // the best standing's band for the navigation cut.
+  // against the far edge, cut by standing's own band cut
+  // (ui-tree/standing.ts#farEdgeFrames), which reads the best standing's
+  // band for the navigation cut.
   const { frames, uncutFrames } = farEdgeFrames(screen, best?.standing, cover?.above);
   // The line this read's strokes stay above — its cover's and idb's band,
   // whether or not the read applied the band (`strokeLine`).
@@ -354,7 +348,6 @@ function bandKeyboardOf(line: KeyboardLine | undefined, viewport: DeviceScreen &
   return { topCover, above: aboveTop(line.y, viewport), remedy, line };
 }
 
-/** A cover's `above` (`AppliedKeyboard`): the viewport's width down to the cover's top `y`, or none when the top lies at or above y 0. */
 const aboveTop = (y: number, viewport: DeviceScreen): DeviceScreen | undefined => (y <= 0 ? undefined : { width: viewport.width, height: y });
 
 /**
@@ -489,7 +482,7 @@ export interface Unfit {
 }
 
 
-/** The coordinate and the extent of a rect along an axis (also the motion ledger's, motion-ledger.ts#cardMoved). */
+/** The coordinate and the extent of a rect along an axis. */
 export const SPAN: Readonly<Record<ScrollAxis, { readonly at: 'x' | 'y'; readonly extent: 'width' | 'height' }>> = {
   vertical: { at: 'y', extent: 'height' },
   horizontal: { at: 'x', extent: 'width' },

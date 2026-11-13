@@ -7,16 +7,10 @@ import type { StillNeeds } from './course.js';
 import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION, swipeVector, swipeVectorAbove, TOUCH_SLOP, type Direction } from './swipe.js';
 
 /**
- * `scroll_until`'s STROKE PLAN: of one round, which scroll view the stroke goes over, the box it is drawn in, the
- * cover it keeps clear of, the points the driver sends — and what lies at its touch-down — decided in one place.
- * Until the round-21 architecture pass (A1) that answer was put together in five: scroll-rounds.ts chose the
- * candidates (`strokeCandidates`, `targetScrollers`), decided the step (`plannedStroke`), turned the step into points a
- * second time to ask the scene what lay at the touch-down (`presentedTouchDown`) and asked the draw order again at the
- * fast fail (`touchedOn`); swipe.ts judged the room (`strokeRoom`, `strokeBox`) and made the points
- * (`scrollStroke`); and the driver (interact/scroll.ts) made the same points a third time from the step it was handed.
- * Now the round asks the plan once a round and the driver sends the points the plan made — the points the
- * touch-down question was asked at ARE the points sent, by construction, not by two calls of one pure function that
- * had to be kept in step.
+ * `scroll_until`'s STROKE PLAN: of one round, which scroll view the stroke goes over, the box it is drawn in, the cover
+ * it keeps clear of, the points the driver sends — and what lies at its touch-down — decided in one place. The round
+ * asks the plan once a round and the driver sends the points the plan made — the points the touch-down question was
+ * asked at ARE the points sent, by construction, not by two calls of one pure function that had to be kept in step.
  *
  * The interface, which is also the test surface (tests/interact/stroke-plan.test.ts):
  * - `startStrokes()` — the plan's memory before any read; `seeRead(memory, read)` — what one read that read leaves
@@ -49,38 +43,37 @@ import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION,
  * largest first, text inputs left out (`candidatesOf`, D59b: the axis rule below takes a nested one only when the
  * largest scrolls across the stroke — a carousel in a vertical page, stroked `right` for a card not laid out yet, is
  * stroked inside, not across the page's centre row, ADR 0010's D59b amendment); none (the screen box) when the target
- * was found in none. Once a read has found the target the named scroll view counts no more. Each is remembered with its AXIS and its nested scroll views' (`ScrollView.axes`, asked of the read's tree:
- * ui-tree/geometry.ts#Clips.axesOf, per source ui-tree/scroll-containers.ts#scrollAxis — Android's class, WDA's
- * `Table`, else on WDA the content's extent past the frame; unknown for a Compose lazy list, a RecyclerView and on idb,
- * which lists no scroll view). The stroke box (`strokeRoom`) takes the first with room for the stroke as drawn
- * (`toward`) above the keyboard and what is drawn over it, among those that scroll ALONG the stroke or whose axis the
- * tree cannot tell — a card of a horizontal carousel nested in a vertical page, scrolled for `down`, is stroked over
- * the page, not vertically inside the carousel; and inside the one taken, the stroke's path keeps off every nested
- * scroll view that scrolls only ACROSS it (`clearLane`: the page's content-down touch-down on a carousel is moved to
- * the longest stretch of the page clear of it — at a cost: the stroke is the stretch's 60 %, not the page's, 312 pt of
- * travel for 416 on the note's geometry, so more rounds against the swipe and time budget). The fallbacks, stated: no
- * candidate along the stroke with room — the pick as before the axis (the nearest with room, whatever its axis: a card
- * of a carousel no vertical list holds, scrolled for `down`, is still stroked inside the carousel, mp-native's Account
- * Detail as captured); no stretch clear of a cross-axis scroll view with room, or none the cut for what is drawn over
- * it leaves room in — the stroke as before, over it (`roomAmong`); the probe (`planProbe`) never goes over a scroll
- * view that scrolls only across it (none sent, rather than a probe that moves nothing and is read as checked; a chain
- * of such scroll views alone is unchecked for its own reason, `probeAcrossOnly`, `flush.why: 'axis'`). Why: a gesture
- * belongs to the view the finger first touches, and a carousel touched down on by a vertical drag hands the outer list
- * part of it at most (~51 pt a stroke on iOS, inferred; the stroke keeps off it, so still unmeasured) —
+ * was found in none. Once a read has found the target the named scroll view counts no more. Each is remembered with its
+ * AXIS and its nested scroll views' (`ScrollView.axes`, asked of the read's tree: ui-tree/geometry.ts#Clips.axesOf, per
+ * source ui-tree/scroll-containers.ts#scrollAxis — Android's class, WDA's `Table`, else on WDA the content's extent
+ * past the frame; unknown for a Compose lazy list, a RecyclerView and on idb, which lists no scroll view). The stroke
+ * box (`strokeRoom`) takes the first with room for the stroke as drawn (`toward`) above the keyboard and what is drawn
+ * over it, among those that scroll ALONG the stroke or whose axis the tree cannot tell — a card of a horizontal
+ * carousel nested in a vertical page, scrolled for `down`, is stroked over the page, not vertically inside the
+ * carousel; and inside the one taken, the stroke's path keeps off every nested scroll view that scrolls only ACROSS it
+ * (`clearLane`: the page's content-down touch-down on a carousel is moved to the longest stretch of the page clear of
+ * it — at a cost: the stroke is the stretch's 60 %, not the page's, 312 pt of travel for 416 on the note's geometry, so
+ * more rounds against the swipe and time budget). The fallbacks, stated: no candidate along the stroke with room — the
+ * nearest with room, whatever its axis (a card of a carousel no vertical list holds, scrolled for `down`, is still
+ * stroked inside the carousel, mp-native's Account Detail as captured); no stretch clear of a cross-axis scroll view
+ * with room, or none the cut for what is drawn over it leaves room in — the stroke over it (`roomAmong`); the probe
+ * (`planProbe`) never goes over a scroll view that scrolls only across it (none sent, rather than a probe that moves
+ * nothing and is read as checked; a chain of such scroll views alone is unchecked for its own reason,
+ * `probeAcrossOnly`, `flush.why: 'axis'`). Why: a gesture belongs to the view the finger first touches, and a carousel
+ * touched down on by a vertical drag hands the outer list part of it at most (~51 pt a stroke on iOS, inferred; the
+ * stroke keeps off it, so still unmeasured) —
  * docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md, its residual. The lab's
- * `carousel-in-list`: on Android the carousel is a `HorizontalScrollView`, its
- * axis known from its class, and the page's strokes for B (below) and U (above) now keep off it — over the stretch
- * below it (B's `540 1899 → 935`, U's the reverse), where U's content-up stroke over the whole page touched down on it
- * on an earlier replay (y 444, inside `66,380 948x234` — inferred from its touch-down at the page's 0.2, not
- * recorded); C, the card past the carousel's right clip, which uiautomator dumps as a strip at the screen's edge, is
- * judged by the carousel's drawn frame — nothing of it drawn — and stroked for inside the carousel, along its axis
- * (lab note LE1, docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md).
- * Captured on iOS (tests/fixtures/wda-capture-lab-carousel-in-list.json): under WDA the stroke for C (`right`) goes
- * INSIDE the carousel (24,138 354x85), along its axis — the full stroke `307 181 → 95 181`, the first one cut by the
- * carry model to `307 181 → 181 181` (UNMEASURED_CARRY). ADR 0010
- * (docs/adr/0010-pixel-assert-keyboard-first.md) records both stroke rules: the candidates — the target's own scroll
- * views, nearest first (round 21's step 0a) — and their axis (round 22). What else this module holds is A1's move of
- * the round's five pieces into one, which changed no stroke.
+ * `carousel-in-list`: on Android the carousel is a `HorizontalScrollView`, its axis known from its class, and the
+ * page's strokes for B (below) and U (above) keep off it — over the stretch below it (B's `540 1899 → 935`, U's the
+ * reverse), where U's content-up stroke over the whole page touched down on it on an earlier replay (y 444, inside
+ * `66,380 948x234` — inferred from its touch-down at the page's 0.2, not recorded); C, the card past the carousel's
+ * right clip, which uiautomator dumps as a strip at the screen's edge, is judged by the carousel's drawn frame —
+ * nothing of it drawn — and stroked for inside the carousel, along its axis (lab note LE1,
+ * docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md). Captured on iOS
+ * (tests/fixtures/wda-capture-lab-carousel-in-list.json): under WDA the stroke for C (`right`) goes INSIDE the carousel
+ * (24,138 354x85), along its axis — the full stroke `307 181 → 95 181`, the first one cut by the carry model to
+ * `307 181 → 181 181` (UNMEASURED_CARRY). ADR 0010 (docs/adr/0010-pixel-assert-keyboard-first.md) records both stroke
+ * rules: the candidates — the target's own scroll views, nearest first — and their axis.
  *
  * A THIRD DIALECT, MOTION: idb's flat list tells no scroll view at all (ui-tree/geometry.ts#DrawnUntold), so its
  * strokes went over the screen box, and a content-up stroke touched down at the screen's 0.2 — on
@@ -185,7 +178,6 @@ const untoldView = (rect: Rect, axis: ScrollAxis): ScrollView => ({ rect: { ...r
 const open = (m: StrokeMemory): Memory => m as unknown as Memory;
 const close = (m: Memory): StrokeMemory => m as unknown as StrokeMemory;
 
-/** The memory before any read: no scroll view known, no keyboard line, no stroke sent. */
 export function startStrokes(): StrokeMemory {
   return close({ target: undefined, named: undefined, row: undefined, last: [], line: undefined, strokedOver: undefined, chosen: undefined, chosenAt: undefined, touchDowns: [], roomless: [], carry: undefined });
 }
@@ -302,13 +294,13 @@ export const PACED = { ptPerS: 349, minDurationMs: 300 } as const;
 const pacedMs = (travel: number): number => Math.max(PACED.minDurationMs, Math.ceil((travel / PACED.ptPerS) * 1000));
 
 /**
- * A stroke as planned, the driver's to send as `points` over `durationMs` — the two fields production reads
- * (interact/scroll.ts sends them and hands the points back as `drawn`). The others are the plan's ACCOUNT of those points, read by no production code
- * and in no reply: what tests pin of a decision (tests/helpers/rounds.ts#decided) and what a reader of a step sees
- * when debugging it. Toward `toward` (where the content lies), its reach scaled by
- * `reach`, over `box` — the scroll view met with the gesture box, above the keyboard and what is drawn over the
- * scroll view, or the gesture box whole — kept clear of a cover whose top edge is `coverTop`, its finger travel capped
- * at `maxTravel` (a probe's, a feeler's). `box` and `points` are absent only when the round had no gesture box.
+ * A stroke as planned, the driver's to send as `points` over `durationMs` — the two fields production reads. The others
+ * are the plan's ACCOUNT of those points, read by no production code and in no reply: what tests pin of a decision
+ * (tests/helpers/rounds.ts#decided) and what a reader of a step sees when debugging it. Toward `toward` (where the
+ * content lies), its reach scaled by `reach`, over `box` — the scroll view met with the gesture box, above the keyboard
+ * and what is drawn over the scroll view, or the gesture box whole — kept clear of a cover whose top edge is
+ * `coverTop`, its finger travel capped at `maxTravel` (a probe's, a feeler's). `box` and `points` are absent only when
+ * the round had no gesture box.
  */
 export interface PlannedStroke {
   toward: Direction;
@@ -326,13 +318,12 @@ export interface PlannedStroke {
 /**
  * Where a stroke would touch down (`touchDown`, the driver's own point) on the surface of a presented screen, with
  * that surface as a sentence quotes it — its reach and the marked layer it is the element of
- * (ui-tree/presentation.ts#PresentedPress): scroll-rounds.ts's `presented` stop's `next`, a bound's `presented`.
+ * (ui-tree/presentation.ts#PresentedPress).
  */
 export interface PresentedTouchDown extends PresentedPress {
   readonly touchDown: Point;
 }
 
-/** What `planStroke` answers. */
 export interface StrokePlan {
   readonly stroke: PlannedStroke;
   /** The presented surface its touch-down lies on (`Scene.presentedAt`), when this round read and the stroke has points. */
@@ -570,16 +561,15 @@ export interface StrokedAcross {
 }
 
 /**
- * The scroll view the last stroke SENT went over (`strokedOver`) when THIS read's tree tells its axis and it is the other
- * one than `toward`'s — the stroke went across it, which `strokeRoom` does only when no candidate along the stroke (or
- * of unknown axis) had room — with the largest scroll view of the WHOLE tree told to scroll that way, when there is
- * one (ui-tree/geometry.ts#Clips.toldOn; review round 1: a chips row beside the page is no candidate, and "the tree
- * shows none" would be false of it) — of those meeting `screen`, the usable screen less its system bands, and none of
- * the keyboard's own (review round 2). For the exhausted stop's sentence
- * (scroll-text.ts#boundText): what the strokes did is said, not only "content exhausted" — batch-11's carousel the
- * dump marked as nothing that scrolls would read so. Undefined when the stroke went over the gesture box whole, over a
- * scroll view of unknown axis or along it, or when this tree holds no scroll view of that rect (idb's region is none).
- * One walk of the tree, at the stop only.
+ * The scroll view the last stroke SENT went over (`strokedOver`) when THIS read's tree tells its axis and it is the
+ * other one than `toward`'s — the stroke went across it, which `strokeRoom` does only when no candidate along the
+ * stroke (or of unknown axis) had room — with the largest scroll view of the WHOLE tree told to scroll that way, when
+ * there is one (ui-tree/geometry.ts#Clips.toldOn: a chips row beside the page is no candidate, and "the tree shows
+ * none" would be false of it) — of those meeting `screen`, the usable screen less its system bands, and none of the
+ * keyboard's own. For the exhausted stop's sentence (scroll-text.ts#boundText): what the strokes did is said, not only
+ * "content exhausted" — batch-11's carousel the dump marked as nothing that scrolls would read so. Undefined when the
+ * stroke went over the gesture box whole, over a scroll view of unknown axis or along it, or when this tree holds no
+ * scroll view of that rect (idb's region is none). One walk of the tree, at the stop only.
  */
 export function strokedAcross(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene' | 'reading'>, toward: Direction, screen: Rect): StrokedAcross | undefined {
   const { strokedOver, roomless, target } = open(memory);
@@ -610,7 +600,7 @@ export interface StrokedBeside {
   readonly others: readonly QuotedNode[];
 }
 
-/** Every scroll view of the tree told to scroll on `way` (ui-tree/geometry.ts#Clips.toldOn: meeting `screen`, none of the keyboard's own), largest first — what `strokedAcross` and `strokedBeside` name. */
+/** Every scroll view of the tree told to scroll on `way` (ui-tree/geometry.ts#Clips.toldOn: meeting `screen`, none of the keyboard's own), largest first. */
 const toldLargestFirst = (facts: Pick<TreeFacts, 'scene' | 'reading'>, way: ScrollAxis, screen: Rect): UiNode[] =>
   [...facts.scene.clips.toldOn(way, screen, facts.reading.ofKeyboard)].sort((a, b) => rectArea(b.rect) - rectArea(a.rect));
 
@@ -790,25 +780,24 @@ export function targetScrollers(facts: Pick<TreeFacts, 'scene'>, node: UiNode): 
 }
 
 /**
- * The scroll views a round's stroke toward the target may go over, nearest first (`planStroke` judges their room):
- * with no read this round (`facts` undefined), the last plan's; once a read found the target, its scroll views — each
- * cut by what this read draws over it, or by what it carried, when this read has lost its rect — none when it was
- * found in none (the screen box); else the scroll view the caller named (`Memory.named`, D78) or, none named, the
- * screen's largest scroller, then the scroll views nested in it — those the
- * tree tells scroll along `toward` first, then the rest, each largest first (its `ScrollAxes.nested`, text inputs left
- * out: ui-tree/geometry.ts#Clips.axesOf) — or none. Told along before unknown (review round 1): a chips row (a
- * HorizontalScrollView) above a larger feed of unknown axis (a RecyclerView, most likely vertical) is the one a
- * sideways stroke is for.
+ * The scroll views a round's stroke toward the target may go over, nearest first (`planStroke` judges their room): with
+ * no read this round (`facts` undefined), the last plan's; once a read found the target, its scroll views — each cut by
+ * what this read draws over it, or by what it carried, when this read has lost its rect — none when it was found in
+ * none (the screen box); else the scroll view the caller named (`Memory.named`, D78) or, none named, the screen's
+ * largest scroller, then the scroll views nested in it — those the tree tells scroll along `toward` first, then the
+ * rest, each largest first (its `ScrollAxes.nested`, text inputs left out: ui-tree/geometry.ts#Clips.axesOf) — or none.
+ * Told along before unknown: a chips row (a HorizontalScrollView) above a larger feed of unknown axis (a RecyclerView,
+ * most likely vertical) is the one a sideways stroke is for.
  *
  * Why the nested ones (D59b): before a read finds the target the largest scroller alone was the candidate, so a
  * sideways stroke for a card of a carousel nested in a vertical page — C not laid out at launch, so no read finds it —
  * went over the page, which scrolls across it (`strokeRoom`'s fallback), on its centre row: batch-11 measured every
  * stroke at (864,1110)→(216,1110), 496 px below the carousel's band (y 380–614), the carousel never moved, while a raw
- * stroke inside the band moved it. The page stays FIRST, so `strokeRoom`'s axis rule takes a nested one only when
- * the page scrolls across the stroke: every stroke along the page, a page of unknown axis and the all-across fallback
- * are as before; the lab's carousel is now stroked inside, (824,497)→(256,497). Residuals (ADR 0010, the D59b
- * amendment): a nested scroll view of unknown axis that is really vertical is stroked sideways; of two carousels the
- * larger is stroked, which may not hold the target.
+ * stroke inside the band moved it. The page stays FIRST, so `strokeRoom`'s axis rule takes a nested one only when the
+ * page scrolls across the stroke: every stroke along the page, a page of unknown axis and the all-across fallback are
+ * as before; the lab's carousel is stroked inside, (824,497)→(256,497). Residuals (ADR 0010, the D59b amendment): a
+ * nested scroll view of unknown axis that is really vertical is stroked sideways; of two carousels the larger is
+ * stroked, which may not hold the target.
  */
 function candidatesOf(m: Memory, facts: Pick<TreeFacts, 'scene' | 'mainScroller'> | undefined, toward: Direction): readonly ScrollView[] {
   if (facts === undefined) return m.last;
@@ -910,9 +899,9 @@ interface StrokeRoom {
  * (screenBox threw): no room.
  *
  * THE AXIS (the module doc's): a candidate that scrolls only ACROSS the stroke (`acrossOnly`) is judged only when no
- * other has room, and then only for a stroke toward the target (`otherwise: 'any axis'`, the pick as before the axis
- * — the probe's is `'none'`: no room); in the candidate taken the stroke is drawn in its clear lane (`clearLane`),
- * off the nested scroll views that scroll only across it, before the cut for what is drawn over it.
+ * other has room, and then only for a stroke toward the target (`otherwise: 'any axis'` — the probe's is `'none'`: no
+ * room); in the candidate taken the stroke is drawn in its clear lane (`clearLane`), off the nested scroll views that
+ * scroll only across it, before the cut for what is drawn over it.
  *
  * Each candidate's `over` are the rects drawn over it (ui-tree/draw-order.ts#drawnOver, or as a remembered scroll
  * view carries them, `ScrollView`) — the floating tab bar of the note below: the list `0,825 1080x1395` ran under the
@@ -933,9 +922,9 @@ function strokeRoom(box: Rect | undefined, candidates: readonly ScrollView[], to
 /**
  * `strokeRoom`'s judgement over `candidates`, nearest first: the first with room, in its clear lane (`clearLane`),
  * above the keyboard and what is drawn over it. A lane the cut for what is drawn over it leaves without room is the
- * fallback's as much as no lane at all: the candidate is then judged whole, as before the rule (`met`) — never
- * dropped for a lane, which would hand the stroke to an outer scroll view or the screen box (a bar over the stretch
- * above a carousel filling the page below: the lane 180–280 cut at the bar's 240 to 60).
+ * fallback's as much as no lane at all: the candidate is then judged whole (`met`) — never dropped for a lane, which
+ * would hand the stroke to an outer scroll view or the screen box (a bar over the stretch above a carousel filling the
+ * page below: the lane 180–280 cut at the bar's 240 to 60).
  */
 function roomAmong(box: Rect, candidates: readonly ScrollView[], toward: Direction, coverTop: number | undefined): StrokeRoom | undefined {
   for (const { rect: scrollView, over, axes } of candidates) {
@@ -963,16 +952,16 @@ const acrossOnly = ({ axes }: ScrollView, toward: Direction): boolean => axes?.a
  * The part of `met` — a candidate scroll view met with the gesture box — the stroke is drawn in so that its path,
  * touch-down to lift-off, keeps off every scroll view NESTED in the candidate that scrolls only on the other axis (a
  * card carousel in a vertical list, for a `down` stroke; a vertical list in a pager, for a `right` one): `met` itself
- * when the stroke as drawn over it (`fullStroke`, above a keyboard whose top edge is `coverTop`) crosses none, else
- * the longest stretch of it along the stroke, on the stroke's line (a vertical stroke's x, a sideways stroke's y),
- * clear of every such scroll view on that line and above the keyboard — when that stretch has room (MIN_STROKE_BOX).
- * The stroke over the stretch keeps the line (its centre across is `met`'s, the box is cut along the stroke only), so
- * its whole path lies in the stretch — and is the STRETCH's 60 %, shorter than `met`'s: a carousel `24,700 354x85` in
- * the page `0,180 402x694` gives 596 → 284 (312 pt of travel) for the page's 735 → 319 (416), more rounds for one
- * scroll — the price of a touch-down the page takes whole rather than one the carousel may keep. When no stretch has
- * room, `met`: the stroke is drawn as before the rule, its touch-down perhaps on the nested scroll view — the fallback,
- * stated (the round still strokes the target's scroll view; what a cross-axis scroll view hands its outer one of such a
- * drag is unmeasured).
+ * when the stroke as drawn over it (`fullStroke`, above a keyboard whose top edge is `coverTop`) crosses none, else the
+ * longest stretch of it along the stroke, on the stroke's line (a vertical stroke's x, a sideways stroke's y), clear of
+ * every such scroll view on that line and above the keyboard — when that stretch has room (MIN_STROKE_BOX). The stroke
+ * over the stretch keeps the line (its centre across is `met`'s, the box is cut along the stroke only), so its whole
+ * path lies in the stretch — and is the STRETCH's 60 %, shorter than `met`'s: a carousel `24,700 354x85` in the page
+ * `0,180 402x694` gives 596 → 284 (312 pt of travel) for the page's 735 → 319 (416), more rounds for one scroll — the
+ * price of a touch-down the page takes whole rather than one the carousel may keep. When no stretch has room, `met`:
+ * the stroke is drawn over it whole, its touch-down perhaps on the nested scroll view — the fallback, stated (the round
+ * still strokes the target's scroll view; what a cross-axis scroll view hands its outer one of such a drag is
+ * unmeasured).
  *
  * Why: a gesture belongs to the view the finger first touches (swipe.ts#swipeVectorAbove), and a horizontal carousel
  * touched down on by a vertical drag hands the outer list only part of it, if any — on iOS ~51 pt a stroke inferred,
@@ -1033,17 +1022,17 @@ function clearLane(met: Rect, axes: ScrollAxes | undefined, toward: Direction, c
  *
  * And then a node over the TOUCH-DOWN, wherever its top lies: the stroke's would-be touch-down under the cut so far
  * (`fullStroke`, `scrollStroke`'s own) inside a node of `over` is cut above the highest such node, and the touch-down
- * placed again, until it lies on none: a short list `0,1550 1080x670` under the measured bar's host `66,1840
- * 948x248` — the host's top above the list's centre, 1885 — touched down at 2086, on the host, and is cut to 1840,
- * touching down at 1782. All or nothing: when a cut would leave less than TOUCH_DOWN_CUT_FLOOR of the box (part
- * above the keyboard) or MIN_STROKE_BOX, none of this rule's cuts is made and the lower-half rule's stands — a partial
- * cut would only shorten a stroke that still lands on a node. Such a node covers most of the box: a transparent
- * wrapper, where the uncut stroke scrolls, or a sheet over the content, where the target the stroke is for lies under
- * it anyway; the stroke is drawn uncut, and a fast fail names the node (`touchedOn` names a node over the stroked
- * scroll view — a cut to no room would hand the stroke to an outer scroll view or the screen box and lose that
- * sentence). The lower-half rule stays first, so every cut it made is made as it was; this one only cuts higher, and
- * only when the finger would land on a node. The loop ends: the touch-down lies above the cut so far
- * (`swipeVectorAbove`'s clearance), so each cut is a node's top strictly higher than the last.
+ * placed again, until it lies on none: a short list `0,1550 1080x670` under the measured bar's host `66,1840 948x248` —
+ * the host's top above the list's centre, 1885 — touched down at 2086, on the host, and is cut to 1840, touching down
+ * at 1782. All or nothing: when a cut would leave less than TOUCH_DOWN_CUT_FLOOR of the box (part above the keyboard)
+ * or MIN_STROKE_BOX, none of this rule's cuts is made and the lower-half rule's stands — a partial cut would only
+ * shorten a stroke that still lands on a node. Such a node covers most of the box: a transparent wrapper, where the
+ * uncut stroke scrolls, or a sheet over the content, where the target the stroke is for lies under it anyway; the
+ * stroke is drawn uncut, and a fast fail names the node (`touchedOn` names a node over the stroked scroll view — a cut
+ * to no room would hand the stroke to an outer scroll view or the screen box and lose that sentence). The lower-half
+ * rule stays first, so every cut it makes stands; this one only cuts higher, and only when the finger would land on a
+ * node. The loop ends: the touch-down lies above the cut so far (`swipeVectorAbove`'s clearance), so each cut is a
+ * node's top strictly higher than the last.
  *
  * Not cut, stated: a node drawn over the box's UPPER half (a floating header) clear of the touch-down, where a
  * content-up stroke touches down at 0.2 of the box — the cut models a cover from below only, as the keyboard's does;

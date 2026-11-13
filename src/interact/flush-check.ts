@@ -16,7 +16,7 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  * its way, reach and travel the course's (interact/course.ts#probeOf); whether a read may settle otherwise, the
  * round's and the motion ledger's.
  * docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md
- * docs/adr/0013-refuse-a-tap-on-a-sliver-cut-by-its-scroll-container.md (refined 2026-10-20, 2026-10-23; D62 amendment)
+ * docs/adr/0013-refuse-a-tap-on-a-sliver-cut-by-its-scroll-container.md (D62 amendment)
  *
  * The interface, which is also the test surface (tests/interact/flush-check.test.ts; the wiring in the round's play
  * tables, tests/interact/scroll-flush-reveal.test.ts, scroll-rounds.test.ts — all of it but two guards no play reaches:
@@ -39,14 +39,14 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  * not in the tree, so it is asked of the device: a stroke TOWARD revealing that edge (content that lies up, for a top
  * edge — the finger moves down), drawn inside the container. Moves nothing, twice: the content is at its end that way,
  * nothing lies beyond the edge, the stop is accepted as it stood (the first row of a list at rest is flush with its
- * container's top and is not cut) — once is not enough (T12, below). Moves it, and it lies flush on the same edge with more of it showing
- * (`revealedBy`): the cut is PROVED — content lay past that edge, and part of the match with it — so that read claims
- * no stop and confirms none (`FlushSeen.waits`): the next stroke is a REVEAL (course.ts#Revealing: the whole stroke,
- * its travel half the room the match leaves in that container, `roomPast`), a probe in every other respect. The proof
- * is kept while the match lies flush on that edge of that container (`ProvenCut`, `stillProven`), so no later read
- * calls it uncut there; with no reveal to send (no swipe or time left, or a tree changed since the
- * probe with no room or only a scroll view across the axis) the read is short of the cut (`FlushCut`), which the bound
- * or a stuck stop names — never "fully visible". Measured on the lab's bounded list
+ * container's top and is not cut) — once is not enough (T12, below). Moves it, and it lies flush on the same edge with
+ * more of it showing (`revealedBy`): the cut is PROVED — content lay past that edge, and part of the match with it — so
+ * that read claims no stop and confirms none (`FlushSeen.waits`): the next stroke is a REVEAL (course.ts#Revealing: the
+ * whole stroke, its travel half the room the match leaves in that container, `roomPast`), a probe in every other
+ * respect. The proof is kept while the match lies flush on that edge of that container (`ProvenCut`, `stillProven`), so
+ * no later read calls it uncut there; with no reveal to send (no swipe or time left, no room, or only a scroll view
+ * across the axis) the read is short of the cut (`FlushCut`), which the bound or a stuck stop names — never "fully
+ * visible". Measured on the lab's bounded list
  * (docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md): a
  * 74-px probe moved S 57–61 px of its 154-px cut (21 or 38 on a loaded host), and quarter-strokes with a confirming
  * read each — ~5.1 s a round — ended cut at the deadline in 2 of the runs recorded. Moves it otherwise: the round
@@ -156,7 +156,7 @@ export type Flush =
 /**
  * Where a match lies flush: on that `edge` of that clipping `container`, or on the inner edge of a node `pinned` in it
  * there (`Flush`). The one location a flush stop, a proven cut (`FlushCut`) and a withheld reveal (`FlushAim`) are told
- * by, and scroll-text.ts#flushEdgeText says.
+ * by.
  */
 export interface FlushPlace {
   edge: Edge;
@@ -169,11 +169,10 @@ export interface FlushPlace {
  * read: it lies flush on that `edge` of that `container` (or `pinned` node), and the probe had shown `revealed` px more
  * of it — content lay past that edge, and part of the match with it. `why` no reveal showed the rest: no swipe or time
  * left (`budget`), no scroll container around it with room for one (`room`), or every one from that edge outward
- * scrolling only across it (`axis`) — those two only when the tree changed since the probe — or a reveal that moved
- * nothing drawn too short to tell from a tap (`tap`: the driver drew it under twice the slop). Never a stop: it is
- * what the target was short of, at the bound or a stuck stop, never "fully visible" with a hedge (a reveal WAS left to send;
- * `Flush` `held` is the stop whose reveals were sent and held, ADR 0013's T11 amendment). The flush check's,
- * never scroll-read.ts#shortOf's: the tree alone reads it whole.
+ * scrolling only across it (`axis`), or a reveal that moved nothing drawn too short to tell from a tap (`tap`: the
+ * driver drew it under twice the slop). Never a stop: it is what the target was short of, at the bound or a stuck stop,
+ * never "fully visible" with a hedge (a reveal WAS left to send; `Flush` `held` is the stop whose reveals were sent and
+ * held, ADR 0013's T11 amendment). The flush check's, never scroll-read.ts#shortOf's: the tree alone reads it whole.
  * docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md
  */
 export interface FlushCut extends FlushPlace {
@@ -218,9 +217,8 @@ interface ProvenCut {
 
 /**
  * How many probes from one rect toward one edge must hold, with no proof, before the stop is `checked` (T12): the first
- * may be a stroke the app did not take, and the tree reads that the same as content that ended there. scroll-text.ts
- * says the count. Not tunable: `Memory.heldFirst` is one slot, so the rule is two holds by construction; this names the
- * count for the reply.
+ * may be a stroke the app did not take, and the tree reads that the same as content that ended there. Not tunable:
+ * `Memory.heldFirst` is one slot, so the rule is two holds by construction; this names the count for the reply.
  */
 export const CHECKED_AFTER_HOLDS = 2;
 
@@ -271,7 +269,6 @@ interface MeasuredStroke extends StrokeCarry {
 const open = (check: FlushCheck): Memory => check as unknown as Memory;
 const close = (m: Memory): FlushCheck => m as unknown as FlushCheck;
 
-/** The check before the first read, for a scroll toward `direction`: no probe in flight, no cut proven. */
 export function startFlush(direction: Direction): FlushCheck {
   return close({ probe: undefined, proven: undefined, direction, measured: [], heldFirst: undefined });
 }
@@ -279,7 +276,6 @@ export function startFlush(direction: Direction): FlushCheck {
 /** A probe is in flight: sent, and no read that read since — the read after it is the probe's (the round reads a failed one again, and offers no carry sample of it). */
 export const probing = (check: FlushCheck): boolean => open(check).probe !== undefined;
 
-/** What the flush check is shown of a read that judges a `fully: true` stop (`seeFlush`). */
 export interface FlushStop {
   /** The judged match, a stop in the frame. */
   readonly judged: Judged;
@@ -291,7 +287,6 @@ export interface FlushStop {
   readonly means: ProbeMeans;
 }
 
-/** What the round can send a probe with this read. */
 export interface ProbeMeans {
   /** The screen the round judges in (scroll-rounds.ts#State.frame's `box`): the probe's travel cap (course.ts#probeOf). */
   readonly screen: Rect;
@@ -388,7 +383,6 @@ export function seeFlush(check: FlushCheck, stop: FlushStop | undefined): FlushS
  */
 type Came = 'moved' | 'held' | 'tap' | 'doubted';
 
-/** `probed` was sent from where an earlier first probe held (`Memory.heldFirst`): the same rect, within a pixel, and the same edge. */
 function heldBefore(first: SentProbe | undefined, probed: SentProbe | undefined): boolean {
   return first !== undefined && probed !== undefined && first.edge === probed.edge && sameRectWithinPixel(first.rect, probed.rect);
 }
