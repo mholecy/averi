@@ -3,21 +3,15 @@
  *
  * interact/fill.ts measures (`FillResult`: what the clear deleted, how the
  * read-back went, what the node is, what the masked field held). Two media
- * report it: the MCP type_text reply and the flow's `fill` trace line. Until
- * 2026-10-09 each of them asked the facts its own questions — "is it
- * verified" was `fillUnverifiedText(...) === undefined` in both, "what did
- * the clear send" was `fillClearedText`, whose answer depended on the first
- * question, and the reply alone had a third branch (`clearAloneHead`) for a
- * clear with nothing typed. The two media drifted on exactly that seam: a
- * clear alone that was not verified read `(N deletes sent)` on one and
- * `cleared N characters first` on the other until df8a91a
+ * report it: the MCP type_text reply and the flow's `fill` trace line. Each
+ * asking the facts its own questions, the two drifted: a clear alone that
+ * was not verified read `(N deletes sent)` on one and `cleared N characters
+ * first` on the other
  * (docs/bugs/2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md).
  *
- * Now the split is three-way, each part with one owner:
+ * The split is three-way, each part with one owner:
  * - facts — interact/fill-facts.ts#FillResult, measured by fill.ts, never
- *   worded (the masked-append warning was a sentence on the result until
- *   2026-10-09; it is `maskedAppend: { held }` now, and its sentence a row
- *   in fill-text.ts);
+ *   worded;
  * - judgement — `judgeFill` here: the head verb (`did`), what the clear
  *   sent and how to count it (`sent`), WHY the fill is not verified
  *   (`reasons`, codes) and what else the caller must hear (`caveats`,
@@ -28,8 +22,7 @@
  *   not compile) and the layout of both media beside them. The same rule as
  *   scroll_until's (interact/scroll-rounds.ts judges into typed outcomes,
  *   interact/scroll-text.ts says every sentence): the judge emits codes, the
- *   renderer owns the words. Until 2026-10-09 (code review S1) the tables
- *   sat here and only the layout was fill-text.ts's.
+ *   renderer owns the words.
  *
  * The verdict's invariants (pinned in tests/interact/fill-verdict.test.ts):
  * - `did === 'filled'` ⇔ `reasons.length === 0` — "Filled" is the only
@@ -39,17 +32,18 @@
  * - `sent` is present ⇔ there is something true to say: characters the
  *   clear was seen to delete (`cleared` > 0), or — for a clear alone that
  *   is not verified — deletes that went out (`clearUnchanged.deletes`, all
- *   rounds, else `cleared`); it counts `deletes` ⇔ `did === 'cleared'` (nothing typed
- *   after it and nothing seen empty, so "cleared … first" would claim both a
- *   result and a sequel that never came — code review of round 2,
- *   2026-10-08), `characters` otherwise.
+ *   rounds, else `cleared`); it counts `deletes` ⇔ `did === 'cleared'`
+ *   (nothing typed after it and nothing seen empty, so "cleared … first"
+ *   would claim both a result and a sequel that never came), `characters`
+ *   otherwise.
  * - `reasons` order is render order: the read-back's reason (`no-value`,
  *   `not-taken`, `lost`, `placeholder`) first, then the clear's
- *   (`clear-unmeasured`, `clear-unchanged`, `clear-no-length` — at most one), never when the
- *   read-back `landed` — with clear, `landed` is "the field shows exactly
- *   the value", which is what the clear was for. A clear ALONE (nothing
- *   typed, read-back `nothing-typed`) that stopped on unchanged deletes is
- *   therefore unverified: `cleared` in deletes, its reason the only one.
+ *   (`clear-unmeasured`, `clear-unchanged`, `clear-no-length` — at most
+ *   one), never when the read-back `landed` — with clear, `landed` is "the
+ *   field shows exactly the value", which is what the clear was for. A clear
+ *   ALONE (nothing typed, read-back `nothing-typed`) that stopped on
+ *   unchanged deletes is therefore unverified: `cleared` in deletes, its
+ *   reason the only one.
  * - `caveats` order: the not-an-input finding, then the masked-append
  *   warning, then a reformat's added point, then text around the value
  *   unread. fill.ts never produces two of them together: a not-input finding
@@ -60,8 +54,7 @@
  *
  * It judges facts, never a reading: what a read-back that missed the value
  * differs by (`Difference`) is interact/fill-landing.ts#readingOf's,
- * carried in the mismatch FillFailure (A2, 2026-11-01; until then
- * its classification lived here).
+ * carried in the mismatch FillFailure.
  *
  * Its one import is the facts (interact/fill-facts.ts, a leaf). It imports
  * neither fill.ts, which measures, nor fill-text.ts, which reads the
@@ -88,9 +81,6 @@ import { hasPoint, type FillResult, type LostWhy, type NearbyInput, type Pointed
  *   or holding that very text: the read-back after typing (ReadBack
  *   `placeholder`), or a clear alone that ended on it without seeing the
  *   field empty (`clearPlaceholder` `shown` or `prefix`; never `other`).
- *   Decided here since 2026-10-09 (the fill-clear deepening): until then
- *   fill.ts folded seven conditions into a `placeholder` read-back of its
- *   own for the clear alone.
  * - `clear-unchanged`: the clear's last deletes left the field showing the
  *   same `shows` characters (`clearUnchanged`) — its hint or placeholder
  *   on an empty field, or a field ignoring deletes; nothing saw it empty.
@@ -104,7 +94,7 @@ export type Reason =
   | { code: 'clear-no-length' }
   | { code: 'clear-unchanged'; shows: number };
 
-/** What the clear SENT — never what was asked (2026-10-08) — and in which unit it is said (see the module header's invariants). */
+/** What the clear SENT — never what was asked — and in which unit it is said (see the module header's invariants). */
 export interface Sent {
   what: 'characters' | 'deletes';
   n: number;

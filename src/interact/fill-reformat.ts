@@ -1,12 +1,11 @@
 /**
- * The character rules of a field that reformats as it is typed — a pure leaf (D28 review, MINOR-2): whether a reading
- * is a typing with separators of the field's own added (`reformatOf`; D18,
+ * The character rules of a field that reformats as it is typed — a pure leaf: whether a reading is a typing with
+ * separators of the field's own added (`reformatOf`; D18,
  * docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md), whether it is a strict prefix of a typing,
  * exact or reformatted (`prefixOf`; D28 and D60, that ADR's amendments), whether it is a typing with separators added
  * that those rules refuse (`separatedOf`; D53), and a text's letters and digits (`skeleton`). It knows texts, not
  * fields: which text a reading is judged against — the earlier text, the placeholder, clear — is
- * interact/fill-landing.ts's, its one caller. It imports only the facts (fill-facts.ts); nothing here types, reads a
- * device or words a sentence.
+ * interact/fill-landing.ts's. Nothing here types, reads a device or words a sentence.
  */
 
 import { isPoint, type Point, type Reformat } from './fill-facts.js';
@@ -14,8 +13,8 @@ import { isPoint, type Point, type Reformat } from './fill-facts.js';
 /** The spaces a field may show for one another: a space, a no-break (U+00A0) and a narrow no-break (U+202F) space. */
 const SPACES = new Set([' ', '\u00A0', '\u202F']);
 /**
- * What a formatting field may add between typed characters: the spaces, and `.` `,` `-` `/`. Exported for one test:
- * fill-text.ts's `separated` sentence lists them, and the test pins that the two agree (D53).
+ * What a formatting field may add between typed characters: the spaces, and `.` `,` `-` `/`. Exported: fill-text.ts's
+ * `separated` sentence lists them, and a test pins that the two agree (D53).
  */
 export const SEPARATORS: ReadonlySet<string> = new Set([...SPACES, '.', ',', '-', '/']);
 const ALNUM = /^[\p{L}\p{N}]$/u;
@@ -68,7 +67,6 @@ export function reformatOf(observed: string, expected: string, typing: string = 
   const added = new Set(chars.filter((_, k) => tokens[k] === -1));
   if (added.size > 1) return undefined;
   const sep = [...added][0];
-  // Each added separator between two typed letters or digits; the groups between them.
   const groups: number[] = [0];
   for (let k = 0; k < tokens.length; k++) {
     if (tokens[k] !== -1) {
@@ -79,8 +77,8 @@ export function reformatOf(observed: string, expected: string, typing: string = 
     // one (-1), none after typed punctuation.
     const typedAlnum = (t: number | undefined) => t !== undefined && t !== -1 && ALNUM.test(expectedChars[t]);
     if (!typedAlnum(tokens[k - 1]) || !typedAlnum(tokens[k + 1])) return undefined;
-    // Between two LETTERS only in a code (round 2, MAJOR-A): in prose a space or `-` added there is autocorrect
-    // splitting a word (`a lot` for `alot`, `jo-hn@x.com`), not a format; an IBAN's `MALT MTLC` is.
+    // Between two LETTERS only in a code: in prose a space or `-` added there is autocorrect splitting a word (`a lot`
+    // for `alot`, `jo-hn@x.com`), not a format; an IBAN's `MALT MTLC` is.
     const letter = (t: number) => LETTER.test(expectedChars[t]);
     if (!code && letter(tokens[k - 1]) && letter(tokens[k + 1])) return undefined;
     groups.push(0);
@@ -114,8 +112,7 @@ function markKind(
  * The reading walked against `expectedChars`, greedily (see `reformatOf`): each reading character the next expected one
  * (or a space shown for a typed space — `respaced`), else an added separator (-1 in `tokens`, an expected character's
  * index otherwise); undefined at the first character that is neither. `matched`: how many expected characters it
- * showed — all of them for `reformatOf` and `separatedOf` (`walkWhole`), fewer for a prefix (`prefixOf`, which also
- * reads whether the last token is an added separator: an eager trailing mark, D60). The one walk all three ask.
+ * showed — all of them for a whole reading, fewer for a prefix. The one walk every rule here asks.
  */
 function walk(observed: string, expectedChars: readonly string[]): { tokens: number[]; matched: number; respaced: number } | undefined {
   const tokens: number[] = [];
@@ -138,8 +135,7 @@ function walk(observed: string, expectedChars: readonly string[]): { tokens: num
  * space) — with at least one SEPARATORS character added and nothing else: how many were added (every one, not the
  * groups), else undefined. `reformatOf`'s walk, without its grouping rules: what those rules refuse (a cents mask's
  * `12.34` for `1234`, a sign, mixed or trailing marks, groups of one, autocorrect's `a lot` for `alot`) is a separated
- * reading — and so is what they pass, so ask only of a reading that did not land (fill-landing.ts#differenceOf, its
- * one caller, which only readingOf asks). Pure, O(reading).
+ * reading — and so is what they pass, so ask only of a reading that did not land. Pure, O(reading).
  */
 export function separatedOf(observed: string, expected: string): number | undefined {
   const walked = walkWhole(observed, [...expected]);
@@ -148,7 +144,6 @@ export function separatedOf(observed: string, expected: string): number | undefi
   return added > 0 ? added : undefined;
 }
 
-/** `walk`, when it showed every expected character (`reformatOf`, `separatedOf`); else undefined. */
 function walkWhole(observed: string, expectedChars: readonly string[]): ReturnType<typeof walk> {
   const walked = walk(observed, expectedChars);
   return walked !== undefined && walked.matched === expectedChars.length ? walked : undefined;
@@ -161,7 +156,7 @@ function thousands(chars: string[], tokens: number[], typing: string, point: str
   const marks = tokens.flatMap((t, k) => (t === -1 ? [k] : []));
   let start = marks[0] - 1;
   while (start >= 0 && DIGIT.test(chars[start])) start--;
-  // The digits before the first mark are a whole part, not a fraction after a typed point (`0,12.345`; round 2).
+  // The digits before the first mark are a whole part, not a fraction after a typed point (`0,12.345`).
   if (start >= 0 && isPoint(chars[start])) return false;
   const lead = chars.slice(start + 1, marks[0]).join('');
   if (!DIGITS.test(lead) || lead.length > 3 || lead === '0') return false;
@@ -217,7 +212,7 @@ export function prefixOf(held: string, whole: string): { prefix: string; reforma
   // D60: an eager trailing mark, judged with the next typed character after it (one the strict prefix leaves).
   const mark = walked.tokens.at(-1) === -1 ? [...held].at(-1) : undefined;
   const next = mark !== undefined && !holdsMark(wholeChars, mark) ? wholeChars[walked.matched] : '';
-  // With `next === ''` the call is exactly the pre-D60 judgment: why the change is additive.
+  // With `next === ''` the call is the prefix's plain reformat judgment: the trailing-mark rule only adds to it.
   const reformatted = reformatOf(held + next, prefix + next, whole);
   return reformatted === undefined ? undefined : { prefix, reformatted };
 }

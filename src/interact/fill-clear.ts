@@ -2,21 +2,16 @@ import { isMaskedValue } from '../ui-tree/masked-value.js';
 import { heldText, type ClearPlaceholder, type FillFailure, type LostWhy } from './fill-facts.js';
 
 /**
- * `fill`'s CLEAR as one pure function (2026-10-09, the fill-clear
- * deepening): `clearStep(state, seen) → { state, step }` — what one reading
- * of the field means for the clear, and what to send next. Every rule that
- * compares a reading with the one before the deletes, and every count the
- * clear carries from round to round, lives here and nowhere else: what the
- * field HOLDS (`heldText`: a named placeholder is no content), the
- * unchanged-reading stop and its masked guard (`deletesChangedNothing`),
- * the late re-read, the clear-twice failure and its non-prefix extra round,
- * the placeholder a clear ends on, `cleared` (0 when the FIRST round changed
- * nothing) and the deletes summed over every round. Until that date they
- * were five mutable variables of the loop in interact/fill.ts#fillField,
- * recombined after it, so a rule could be reached only through a
- * monkeypatched `clearText`/`uiTree` on a FakeAdapter and a regex over the
- * reply; three review rounds of the hint-aware clear (probes A–K) were each
- * a diff against those variables.
+ * `fill`'s CLEAR as one pure function: `clearStep(state, seen) → { state,
+ * step }` — what one reading of the field means for the clear, and what to
+ * send next. Every rule that compares a reading with the one before the
+ * deletes, and every count the clear carries from round to round, lives here
+ * and nowhere else: what the field HOLDS (`heldText`: a named placeholder is
+ * no content), the unchanged-reading stop and its masked guard
+ * (`deletesChangedNothing`), the late re-read, the clear-twice failure and
+ * its non-prefix extra round, the placeholder a clear ends on, `cleared` (0
+ * when the FIRST round changed nothing) and the deletes summed over every
+ * round.
  *
  * Pure: no adapter, no clock, no I/O, no exceptions but the protocol's own
  * (below). The same shape as scroll_until's round (interact/scroll-rounds.ts)
@@ -48,10 +43,8 @@ import { heldText, type ClearPlaceholder, type FillFailure, type LostWhy } from 
  * have reached, is not verified there.
  */
 
-/** One reading of the field the clear works on: its value, or why the read found no field. */
 export type ClearSeen = { value: string | null } | { lost: LostWhy };
 
-/** What the driver does next. */
 export type ClearStep =
   | { do: 'delete'; count: number }
   | { do: 'reread' }
@@ -77,8 +70,8 @@ export type ClearStep =
  *     read twice a poll cadence apart — an empty field showing its hint, or
  *     one that ignores deletes. `shows` its held length, `deletes` every
  *     delete sent, all rounds. FillResult.clearUnchanged.
- *   - `lost`: a read after deletes did not find the field (review
- *     2026-10-08, m-1): nothing saw it empty.
+ *   - `lost`: a read after deletes did not find the field: nothing saw it
+ *     empty.
  */
 export interface ClearFacts {
   cleared: number;
@@ -105,7 +98,6 @@ export interface ClearState {
   readonly over: boolean;
 }
 
-/** The clear before its first reading. */
 export function startClear(placeholder: string | undefined): ClearState {
   return { placeholder, rounds: 0, deletes: 0, held: 0, before: null, waited: false, over: false };
 }
@@ -115,10 +107,9 @@ export function startClear(placeholder: string | undefined): ClearState {
  *
  * 1. Before any delete, a reading that holds nothing ends the clear: no
  *    delete at all (a named placeholder is no content, `heldText`).
- * 2. A read that found no field ends it `lost` — not empty: until
- *    2026-10-08 it read as `left = 0`, and a clear alone was "Filled …
- *    (cleared 7 characters first)" on a field the keyboard had moved and
- *    that still held `XX`.
+ * 2. A read that found no field ends it `lost` — not empty: read as
+ *    `left = 0`, a clear alone was "Filled … (cleared 7 characters first)"
+ *    on a field the keyboard had moved and that still held `XX`.
  * 3. An UNCHANGED reading may be a LATE one: synthetic input is droppable
  *    and slow end to end (Compose async state, an IME queue — 3 of 11
  *    characters landed at first, measured 2026-08-05), and one read right
@@ -152,12 +143,12 @@ export function startClear(placeholder: string | undefined): ClearState {
  *    editor. Where the source names the placeholder, rule 4 stops after the
  *    first round.
  * 6. Two rounds that each SHORTENED the field and did not empty it: the
- *    deletes are landing short — the clear-twice failure, as always. A
- *    reading that is not a prefix of the one before the deletes was not
- *    produced by deleting from the end (where clearText deletes from): a
- *    field that held `Probe`, kept `Pro` after a short round, and showed its
- *    hint after the next (probe E). It gets ONE more round, and rule 5
- *    decides; a third round that still changes the field fails.
+ *    deletes are landing short — the clear-twice failure. A reading that is
+ *    not a prefix of the one before the deletes was not produced by deleting
+ *    from the end (where clearText deletes from): a field that held `Probe`,
+ *    kept `Pro` after a short round, and showed its hint after the next
+ *    (probe E). It gets ONE more round, and rule 5 decides; a third round
+ *    that still changes the field fails.
  * 7. Otherwise: delete what the field still holds.
  */
 export function clearStep(state: ClearState, seen: ClearSeen): { state: ClearState; step: ClearStep } {
@@ -203,14 +194,13 @@ export function clearStep(state: ClearState, seen: ClearSeen): { state: ClearSta
 
 /**
  * A delete round left the reading exactly as it was, and it is text a hint
- * could be — named for what it tests, not for the hint it may be (review
- * 2026-10-09: it was `isHint`; a field that ignores deletes reads the same,
- * rule 5). BULLETS never are: an unchanged masked reading is a field the
- * deletes did not reach (a focus tap that missed), and stopping there let
- * the typing go nowhere too and a masked read-back — compared by length —
- * pass with the old password still in place (review of the hint-aware
- * clear, probe A: the finportal `invalid_grant` class). Such a field fails
- * as clear-twice, as it always did.
+ * could be — named for what it tests, not for the hint it may be (a field
+ * that ignores deletes reads the same, rule 5). BULLETS never are: an
+ * unchanged masked reading is a field the deletes did not reach (a focus tap
+ * that missed), and stopping there let the typing go nowhere too and a
+ * masked read-back — compared by length — pass with the old password still
+ * in place (review of the hint-aware clear, probe A: the finportal
+ * `invalid_grant` class). Such a field fails as clear-twice.
  */
 function deletesChangedNothing(before: string | null, after: string | null, placeholder: string | undefined): boolean {
   return heldText(after, placeholder) !== '' && after === before && !isMaskedValue(after ?? '');

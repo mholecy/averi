@@ -6,19 +6,17 @@
  * together.
  *
  * Why one module for two media: they say the same thing in two layouts, and
- * when each caller laid out its own they drifted — until df8a91a a clear
- * alone that was not verified read `(N deletes sent)` in the reply and
- * `(cleared N characters first)` on the flow line
+ * when each caller laid out its own they drifted — a clear alone that was
+ * not verified read `(N deletes sent)` in the reply and `(cleared N
+ * characters first)` on the flow line
  * (docs/bugs/2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md).
  * The judgement is interact/fill-verdict.ts's (`judgeFill`: codes, never a
  * sentence); the words are this module's, all of them — the per-code
  * sentence tables (`REASON_SENTENCE`, `CAVEAT_SENTENCE`, `SENT_SENTENCE`,
  * exhaustive, so a new code without its sentence does not compile), the
- * wording they make (`wordingOf`, `caveatText`) and where it goes. Until
- * 2026-10-09 (code review S1) the tables sat in fill-verdict.ts and only the
- * layout was here, so the fill split judge from words one module later than
- * scroll_until did; now both follow one rule — the judge emits typed codes,
- * the renderer owns every sentence.
+ * wording they make (`wordingOf`, `caveatText`) and where it goes. The fill
+ * and scroll_until follow one rule — the judge emits typed codes, the
+ * renderer owns every sentence.
  *
  * Why in interact/ rather than mcp/tool-text.ts with the other replies: the
  * flow engine may not import mcp/ (ARCHITECTURE.md §2: `mcp → run → flow →
@@ -89,16 +87,13 @@ export interface FillStepText {
  *
  * It takes the facts and judges them itself (judgeFill, once), as
  * fillStepText does: a caller has one call to make, and no way to hand
- * either medium a verdict of its own making. Until 2026-10-09 (code review
- * S2/S3) one overloaded `fillText(verdict, {reply} | {step, shown})` served
- * both, and each caller judged first — `fillText(judgeFill(fill), …)`.
+ * either medium a verdict of its own making.
  */
 export function fillReply(fill: FillResult, selector: string): string {
   const v = judgeFill(fill);
   const { w, aside, unverified } = clausesOf(v);
-  // One row per head verb: a new `did` without its row does not compile
-  // (until review round 1 of 2026-10-09 the last branch was a catch-all,
-  // so a new verb would have rendered silently as "Focused").
+  // One row per head verb: a new `did` without its row does not compile (a
+  // catch-all branch would render a new verb silently as "Focused").
   const head: Record<FillVerdict['did'], () => string> = {
     filled: () => `Filled ${selector} (${w.typed}${aside(', ', '')})`,
     typed: () => `Typed ${w.typed} into ${selector}${aside(' (', ')')}${unverified}`,
@@ -112,8 +107,7 @@ export function fillReply(fill: FillResult, selector: string): string {
  * The fill's note: what resolving the field said (`Resolved.note`), then —
  * when the focus tap went off the field's centre, a node of the app being
  * drawn over it (interact/tap-judgement.ts#TapJudge.aim, `Aim.moved`) —
- * `focus tap <moved>`, after it. Its words here with every fill sentence
- * (code review S6; until then spelled in fill.ts).
+ * `focus tap <moved>`, after it. Its words here with every fill sentence.
  */
 export function focusTapNote(resolved: string | undefined, moved: string | undefined): string | undefined {
   const focus = moved === undefined ? undefined : `focus tap ${moved}`;
@@ -181,7 +175,7 @@ export interface FillWording {
   caveats: string[];
 }
 
-/** The verdict in words. Pure; with `caveatText`, the only producer of fill sentences. */
+/** The verdict in words. Pure. */
 export function wordingOf(v: FillVerdict): FillWording {
   return {
     typed: charactersText(v.typed),
@@ -193,11 +187,7 @@ export function wordingOf(v: FillVerdict): FillWording {
   };
 }
 
-/**
- * How the field reformatted the typing (FillResult.reformatted, D18), by
- * count: `the field shows them reformatted: 2 separators added`, `, 1 typed
- * space shown as another space` when it respaced one. Never which characters.
- */
+/** How the field reformatted the typing (FillResult.reformatted, D18), by count. Never which characters. */
 export function reformattedText(r: Reformat): string {
   const parts = [
     r.added > 0 ? `${countOf(r.added, 'separator')} added` : undefined,
@@ -206,18 +196,13 @@ export function reformattedText(r: Reformat): string {
   return `the field shows them reformatted: ${parts.join(', ')}`;
 }
 
-/**
- * The dropped tails typed again (FillResult.retyped), by length: `the last 6
- * characters typed again after the field dropped them`, `, then the last 2`
- * for a second retype. Lengths only, never which characters.
- */
+/** The dropped tails typed again (FillResult.retyped), by length. Lengths only, never which characters. */
 export function retypedText(lengths: readonly number[]): string {
   const last = (n: number) => (n === 1 ? 'the last character' : `the last ${n} characters`);
   const [first, ...then] = lengths;
   return `${last(first)} typed again after the field dropped ${first === 1 ? 'it' : 'them'}${then.map((n) => `, then ${last(n)}`).join('')}`;
 }
 
-/** One caveat's sentence. */
 export function caveatText(c: Caveat): string {
   return (CAVEAT_SENTENCE[c.code] as (c: Caveat) => string)(c);
 }
@@ -249,7 +234,7 @@ const REASON_SENTENCE: SentenceTable<Reason> = {
     'its hint or placeholder (shown while empty), or a field that ignores deletes',
 };
 
-/** ` (why)` for a `lost` read-back, chosen per reason (review 2026-10-08, n-3: it read as "the selector no longer matches it" whatever the reason). */
+/** ` (why)` for a `lost` read-back, chosen per reason. */
 const LOST_WHY_TEXT: Record<LostWhy, string> = {
   'screen-changed': ' (the screen changed while typing)',
   unmatched: ' (the selector no longer matches it)',
@@ -283,9 +268,11 @@ const CAVEAT_SENTENCE: SentenceTable<Caveat> = {
 };
 
 /**
- * The message of an error fillField throws — every one of them, worded here
- * with the rest (fill-facts.ts#FillFailure). Lengths and counts only: no
- * row is handed the typed value or the field's text.
+ * The message of each did-not-land error fillField throws (a refused value
+ * keeps type-text.ts's words), worded here with the rest
+ * (fill-facts.ts#FillFailure). Lengths and counts only: no row is handed the
+ * typed value or the field's text — the reread-failed row echoes the
+ * caller's selector as written.
  */
 export function fillFailureText(f: FillFailure): string {
   return (FAILURE_SENTENCE[f.code] as (f: FillFailure) => string)(f);
@@ -321,7 +308,7 @@ const EQUAL_COUNT_TEXT: { [W in EqualCount['why']]: (e: Extract<EqualCount, { wh
   // D71's refusal: the field's count is the typed one; what an append would have shown instead
   'value-itself': ({ appendWouldShow }) => `only the typed text, where an append would show ${appendWouldShow}`,
   padded: ({ typedPart }, shows) => `${shows}, only ${typedPart} of them past its earlier text`,
-  // review round 2: an empty field or typing turned into that text — never which
+  // an empty field or typing turned into that text — never which
   placeholder: (_, shows) => `${shows}, exactly its placeholder: empty, or the typing turned into that text — the tree cannot tell which`,
   'partly-masked': (_, shows) => `${shows}, some of them bullets: the typing cannot be compared with them`,
 };
@@ -351,10 +338,9 @@ function againText(again: readonly SentAgain[]): string {
 }
 
 /**
- * What the mismatch error adds after the two lengths. Until 2026-10-09 a
- * same-length mismatch read `typed 5 characters but the field shows 5
- * (content withheld from this error)` — equal counts and no hint of what
- * differs, which reads as a bug in the comparison
+ * What the mismatch error adds after the two lengths: `typed 5 characters
+ * but the field shows 5 (content withheld from this error)` alone — equal
+ * counts and no hint of what differs — reads as a bug in the comparison
  * (docs/bugs/2026-10-09-fill-mismatch-error-says-equal-counts-when-app-
  * transforms-text.md). It names the kind of difference and a count, never
  * which characters or where.
@@ -373,7 +359,7 @@ const DIFFERENCE_TEXT: { [K in Difference['kind']]: (d: Extract<Difference, { ki
     ` — the first ${landed === 1 ? '1 typed character is' : `${landed} typed characters are`} there, ` +
     (grouped ? 'grouped by the field (separators of its own added)' : 'its spaces shown as another kind of space') +
     `, the last ${dropped} did not land: dropped, or refused by the field (a length cap, a character it does not take) — ` +
-    // D64 review round 2: the reading is a whole landing too (fill-landing.ts#wholeLandingToo), nothing typed again
+    // D64: the reading is a whole landing too (fill-landing.ts#wholeLandingToo), nothing typed again
     (wholeToo ? 'or the field replaced its text (select-all): fill with `clear: true` — ' : '') +
     'not a transformed input; content withheld from this error',
   // D53: the marks as fill-reformat.ts#SEPARATORS holds them (a test pins the two agree); the check before the remedy —
@@ -384,6 +370,6 @@ const DIFFERENCE_TEXT: { [K in Difference['kind']]: (d: Extract<Difference, { ki
     'check the field holds the value you meant — a cents mask shows a typed 1234 as 12.34 — and if it does, type the value as the field shows it; ' +
     'content withheld from this error',
   unchanged: () => ' — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)',
-  // D64 code review: a length that is a whole landing too (fill-landing.ts#wholeLandingToo), nothing typed again
+  // D64: a length that is a whole landing too (fill-landing.ts#wholeLandingToo), nothing typed again
   length: ({ wholeToo }) => `${wholeToo ? ' — the field may have replaced its text (select-all): fill with `clear: true`' : ''} (content withheld from this error)`,
 };

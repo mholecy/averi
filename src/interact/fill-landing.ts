@@ -1,8 +1,6 @@
 /**
- * Did the fill land? — the one module that judges a field's reading against what it should hold (A2, 2026-11-01).
- * Until then that was judged in four modules by three rules of the earlier text, and D28 and D29 were both bugs of
- * the typing and the verdict judging the same reading differently. One reading, one answer (A9, 2026-11-05: until then
- * fill-type.ts asked five questions of one reading, in an order it had to know):
+ * Did the fill land? — the one module that judges a field's reading against what it should hold: D28 and D29 were
+ * both bugs of the typing and the verdict judging the same reading differently. One reading, one answer:
  * - `readingOf`: the whole answer, for any reading — a landing, or a miss (`not-taken` or `missed`) with what can be
  *   said of it (`NotLanded`): the tail it proves dropped and whether that may be typed again, and the difference,
  *   without content.
@@ -13,13 +11,10 @@
  *   D63). A landing carries how it was reformatted, or that text around the value went unread with the re-read skipped
  *   (`focusUnread`, D64b-3).
  * - `withoutWholeToo`: a difference without its whole-landing hedge, for keys proven typed elsewhere.
- * interact/fill-type.ts polls on the second and goes by the first, and fill.ts throws the difference that comes back.
- * fill.ts asks two more, of the field before its typing, not of a reading — what the masked rule counts from (A28,
- * finishing A2): `postFocusReadOf`, the one read after the focus tap as a table (ADR 0028's gate a row of it, asking
+ * Two more are asked of the field before its typing, not of a reading — what the masked rule counts from:
+ * `postFocusReadOf`, the one read after the focus tap as a table (ADR 0028's gate a row of it, asking
  * `needsHeldCount`: whether the field can hold bullets), and `heldCountOf`, the count that read gives the typing
- * (Expectation.held) and the masked-append warning. Pure: no device, no wait, no sentence. Its imports are the
- * facts (fill-facts.ts), the character rules of a reformatting field (fill-reformat.ts), the mask characters and the
- * input role.
+ * (Expectation.held) and the masked-append warning. Pure: no device, no wait, no sentence.
  */
 
 import { INPUT_ROLE, type UiNode } from '../adapters/types.js';
@@ -51,7 +46,6 @@ export interface Expectation {
   held: number | 'unread';
 }
 
-/** What the text rules ask of an Expectation: the value, and the earlier text it is typed after. */
 type TextExpectation = Pick<Expectation, 'value' | 'clear' | 'before' | 'placeholder'>;
 
 /**
@@ -66,7 +60,7 @@ type TextExpectation = Pick<Expectation, 'value' | 'clear' | 'before' | 'placeho
  *   is plain shows bullets after all, and no length of it proves anything but the typed one (two dropped keys under
  *   five autofilled bullets would pass `held + typed` with a `held` of 0). Final: the poll stops on it, as on a landed
  *   reading, but no landing: the fill fails with `differs`. A SHORTER masked reading has not landed and the poll goes
- *   on — its keys may still arrive; the timing of both is as it was when fill.ts overrode a landed reading.
+ *   on — its keys may still arrive.
  */
 export type Landing = { kind: 'landed'; reformatted?: Reformat; focusUnread?: FocusUnread } | { kind: 'placeholder' } | { kind: 'said-plain'; differs: { kind: 'masked-said-plain' } };
 
@@ -125,15 +119,14 @@ export function readingOf(observed: string, e: Expectation): Reading {
   return { kind: tookText(observed, e) ? 'missed' : 'not-taken', ...notLandedOf(observed, e) };
 }
 
-/** What can be said of a reading that did not land (`NotLanded`); whether it is a whole landing too is asked here. */
 function notLandedOf(observed: string, e: Expectation): NotLanded {
   const tail = tailOf(observed, e);
   const held = heldText(observed, e.placeholder);
   const heldWhole = wholeLandingToo(held, e); // the raw fact: what keeps a tail from being typed again
-  // The hedge is of a reading that took the text: a `not-taken` is never marked (D71 review round 1, n1). D71: the
-  // value itself, refused by `showsExactly`, is a whole landing too though no tail of the typing is proven (`-5` after
-  // `-`, `1 ` after `1`). `held`, not `observed`: the same here, as a reading that is the named placeholder and the
-  // value landed (`showsExactly` compares `observed` with the raw `before` and placeholder, residual 7).
+  // The hedge is of a reading that took the text: a `not-taken` is never marked (D71). D71: the value itself, refused
+  // by `showsExactly`, is a whole landing too though no tail of the typing is proven (`-5` after `-`, `1 ` after `1`).
+  // `held`, not `observed`: the same here, as a reading that is the named placeholder and the value landed
+  // (`showsExactly` compares `observed` with the raw `before` and placeholder, residual 7).
   const wholeToo = tookText(observed, e) && (landedSome(tail) || held === e.value) && heldWhole;
   return {
     ...(tail !== undefined && { tail: { missing: tail.missing, retypable: landedSome(tail) && !heldWhole } }),
@@ -154,10 +147,10 @@ export function withoutWholeToo(d: Difference): Difference {
 /**
  * A non-input proves it took the text only by CHANGING to show it: a WDA StaticText exposes its label as its value,
  * and "Meno".includes("e") is no fill; a label that changes on focus (`Name` → `Name*`) is no fill either, and the
- * clear's wipe and retype would delete ITS length into the focused field (review 2026-10-08, rounds 1 and 2). An
- * input-like node of another role (an iOS search field reads `other`) shows the typed text, so it still gets the
- * retry. Masked values cannot show it: for them the change alone is the proof, as their length is for inputs. A
- * reformatted reading (the value split by separators) never contains the value, so a non-input never lands one.
+ * clear's wipe and retype would delete ITS length into the focused field. An input-like node of another role (an iOS
+ * search field reads `other`) shows the typed text, so it still gets the retry. Masked values cannot show it: for
+ * them the change alone is the proof, as their length is for inputs. A reformatted reading (the value split by
+ * separators) never contains the value, so a non-input never lands one.
  */
 const tookText = (observed: string, e: Pick<Expectation, 'value' | 'isInput' | 'resolvedValue'>): boolean =>
   e.isInput || (observed !== e.resolvedValue && (isMaskedValue(observed) || observed.includes(e.value)));
@@ -179,27 +172,26 @@ const tookText = (observed: string, e: Pick<Expectation, 'value' | 'isInput' | '
  * `placeholder`; fill-facts.ts#heldText).
  *
  * D64: without clear, the value must be in what was typed past the earlier text (`typedPartOf`, `differenceOf`'s own
- * notion of the typing), not anywhere in the reading. The whole reading was searched until then, so one that moved but
- * held none of the typing passed whenever the earlier text held the value: a length cap (the lab's date `31.12.202`
- * typed `12` keeps `31.12.2021`), an iOS React Native burst that kept a prefix (`Note: hellohe`), keys that went into
- * another input. Such a reading is now a dropped tail — typed again on iOS — or a miss that names where the keys went.
- * A reading that no longer starts with the earlier text literally is judged whole, as before: an earlier text that
- * vanished (D29), was replaced (select-all), autocorrected, or a caret not at the end. The earlier texts are
- * `priorsOf`'s, as for a reformat (review round 1, M-1): a reading whose letters and digits are exactly the value's and
- * no start of the earlier text's plus the value's is judged as the value alone too (D61) — a field that adds a leading
- * `+` under idb's unnamed `+421` (`+421903123456`), a select-all field that adds a mark (`SK31 ` after `SK3`, `50%`
- * after `5`). D63's rule is this one at its limit (`landingOf`). The value itself is excepted only where it is the
- * earlier text or the named placeholder too: such a reading cannot be told from a select-all field that retyped it, or
- * a placeholder equal to it — it still lands (ADR 0034's D63 amendment, residual 7). D71: any other reading equal to
- * the value is judged as every reading is. Until then it landed however it was reached, so `55` typed after `5` with
- * the second key dropped replied Filled where an append should have left `555` (`1212` after `12` too). A select-all
- * reading whose earlier text is not in it still lands, as the value alone (`priorsOf`); refused are the readings whose
- * letters and digits repeat the earlier text's (`55`/`5`, `1212`/`12`, `1 `/`1`) or whose earlier text has none
- * (`-5`/`-`), a length that is a whole landing too (`notLandedOf`): nothing typed again, the reply naming `clear:
- * true`. Left open: `12` after `1` (the head key dropped) lands as D61's value alone, which idb's unnamed placeholders
- * need (ADR 0034's D71 amendment, residual 11). The limit, on the safe side: a caret not at the end whose typing leaves
- * the reading starting with the earlier text (`aba` for `ab` after `a`) is refused (ADR 0034's D64 amendment, residual
- * 9).
+ * notion of the typing), not anywhere in the reading: searched whole, one that moved but held none of the typing would
+ * pass whenever the earlier text held the value: a length cap (the lab's date `31.12.202` typed `12` keeps
+ * `31.12.2021`), an iOS React Native burst that kept a prefix (`Note: hellohe`), keys that went into another input.
+ * Such a reading is a dropped tail — typed again on iOS — or a miss that names where the keys went. A reading that no
+ * longer starts with the earlier text literally is judged whole: an earlier text that vanished (D29), was replaced
+ * (select-all), autocorrected, or a caret not at the end. The earlier texts are `priorsOf`'s, as for a reformat: a
+ * reading whose letters and digits are exactly the value's and no start of the earlier text's plus the value's is
+ * judged as the value alone too (D61) — a field that adds a leading `+` under idb's unnamed `+421` (`+421903123456`), a
+ * select-all field that adds a mark (`SK31 ` after `SK3`, `50%` after `5`). D63's rule is this one at its limit
+ * (`landingOf`). The value itself is excepted only where it is the earlier text or the named placeholder too: such a
+ * reading cannot be told from a select-all field that retyped it, or a placeholder equal to it — it still lands (ADR
+ * 0034's D63 amendment, residual 7). D71: any other reading equal to the value is judged as every reading is: landing
+ * however it was reached, `55` typed after `5` with the second key dropped would reply Filled where an append should
+ * have left `555` (`1212` after `12` too). A select-all reading whose earlier text is not in it still lands, as the
+ * value alone (`priorsOf`); refused are the readings whose letters and digits repeat the earlier text's (`55`/`5`,
+ * `1212`/`12`, `1 `/`1`) or whose earlier text has none (`-5`/`-`), a length that is a whole landing too
+ * (`notLandedOf`): nothing typed again, the reply naming `clear: true`. Left open: `12` after `1` (the head key
+ * dropped) lands as D61's value alone, which idb's unnamed placeholders need (ADR 0034's D71 amendment, residual 11).
+ * The limit, on the safe side: a caret not at the end whose typing leaves the reading starting with the earlier text
+ * (`aba` for `ab` after `a`) is refused (ADR 0034's D64 amendment, residual 9).
  */
 function showsExactly(observed: string, e: Expectation): boolean {
   const { value, clear } = e;
@@ -209,7 +201,6 @@ function showsExactly(observed: string, e: Expectation): boolean {
   return (observed === value && (observed === e.before || observed === e.placeholder)) || priorsOf(held, e).some((prior) => typedPartOf(held, prior).includes(value));
 }
 
-/** The bullets the field held after focus, an unread count as none. */
 const heldCount = (e: Pick<Expectation, 'held'>): number => (e.held === 'unread' ? 0 : e.held);
 
 /**
@@ -234,8 +225,8 @@ const priorText = (e: Pick<Expectation, 'clear' | 'before' | 'placeholder'>): st
  * The texts a reading (`held`, its named placeholder aside) is judged after: the earlier text (`priorText`) — and,
  * without clear, when the reading's letters and digits do not START with the earlier text's (`skeleton`), no earlier
  * text as well, tried second: the earlier text VANISHED. Letters and digits, not the text as typed: a field that
- * regroups as it is typed shows an earlier `1,000` as `10,00…` once typed into, and that text is still there (D29
- * review round 1, MAJOR-1) — judged as the value alone, `10,001,000` would pass for a typed `10001000`.
+ * regroups as it is typed shows an earlier `1,000` as `10,00…` once typed into, and that text is still there (D29) —
+ * judged as the value alone, `10,001,000` would pass for a typed `10001000`.
  *
  * D29, measured on the owner's iOS run (SwiftUI lab, form-format's iban, f1 and f7): idb names no placeholder
  * (adapters/types.ts, UiNode.placeholder), so the UIKit field's placeholder `SK00 0000 0000 …` was read as the empty
@@ -248,9 +239,9 @@ const priorText = (e: Pick<Expectation, 'clear' | 'before' | 'placeholder'>): st
  *
  * What it adds: a reading whose letters and digits do not start with the earlier text's may pass, or be retyped, as
  * the value alone, under `reformatOf`'s and `prefixOf`'s rules unchanged. A reading that starts with them is judged
- * after the earlier text, never without it. An earlier text with no letters or digits (a `—`, a `-`) keeps the
- * pre-D29 judgment — every reading starts with its empty skeleton — failing safe, as a false mismatch and never a
- * wrong pass: deliberately not loosened (D29 review round 2, MINOR-A).
+ * after the earlier text, never without it. An earlier text with no letters or digits (a `—`, a `-`) gets no such
+ * fallback — every reading starts with its empty skeleton — failing safe, as a false mismatch and never a wrong
+ * pass: deliberately not loosened (D29 review round 2, MINOR-A).
  *
  * D61: an unnamed placeholder whose letters and digits START the typed value's (idb's `+421`, `421903123456` typed)
  * starts the reading too. No earlier text is tried as well, second, when the reading's letters and digits are EXACTLY
@@ -332,10 +323,9 @@ function tailOf(observed: string, e: TextExpectation): Tail | undefined {
 }
 
 /**
- * D64 review round 1, m-2: a held reading that has not landed but is explained as a whole landing as well as a dropped
- * tail — its "tail" is not typed again. Typed again, it could leave the field holding content the retype made wrong
- * and the fill end Filled over it (until D64 such readings passed by containment, over the right content). So nothing
- * is typed again and the fill fails — the safe side. Two shapes:
+ * D64: a held reading that has not landed but is explained as a whole landing as well as a dropped tail — its "tail"
+ * is not typed again. Typed again, it could leave the field holding content the retype made wrong and the fill end
+ * Filled over it. So nothing is typed again and the fill fails — the safe side. Two shapes:
  * - the value at an occurrence that ends past the earlier text, not wholly inside it: `11 ` for `11` after `1` (a
  *   select-all field's `11` with an eager trailing mark, or `1` landed with the mark and `1` dropped — typed again,
  *   `111`); `a1 1` for `1 ` after `a1` (the typing at a caret inside the text);
@@ -358,12 +348,10 @@ function wholeLandingToo(held: string, e: TextExpectation): boolean {
 
 /**
  * What can be said of a reading that missed the value — the classification of the kinds (fill-facts.ts#Difference),
- * first match wins (2026-10-09, the fill-clear deepening; until then fill.ts chose `unchanged`, `masked` and the partly
- * masked `length` in a ternary at the throw, and a helper of its own the rest):
+ * first match wins:
  * 0. `masked-said-plain`: a masked reading that did not land where the held count is `'unread'` (`landingOf`'s
  *    `said-plain`, a longer one without clear, carries this Difference itself and never gets here; one of the typed
- *    length lands). Before `unchanged`: no reading of a field whose count was never read says more than that
- *    (A2, 2026-11-01; until then fill.ts built this Difference itself).
+ *    length lands). Before `unchanged`: no reading of a field whose count was never read says more than that.
  * 1. `unchanged`: the reading is exactly what the field showed when typing began — whatever it is, bullets included
  *    (probes D and D2 were told "the app transformed the input").
  * 2. `masked`: bullets only, compared by length; `held` without clear.
@@ -383,8 +371,8 @@ function wholeLandingToo(held: string, e: TextExpectation): boolean {
  *    is a length difference. Letter case by toLowerCase/toUpperCase of each UTF-16 unit — enough for the measured
  *    auto-capitalisation; a case pair whose forms differ in length (`ß`/`SS`) reads as a plain difference, never as a
  *    pass.
- * `tail` and `wholeToo` are `notLandedOf`'s, asked once for the two answers of a `NotLanded`. Only `readingOf` asks, of
- * a reading that did not land: one `reformatOf` passes (`1 234` for `1234`) would read `separated` here. Pure, O(observed ×
+ * `tail` and `wholeToo` are `notLandedOf`'s, asked once for the two answers of a `NotLanded`. Asked only of a reading
+ * that did not land: one `reformatOf` passes (`1 234` for `1234`) would read `separated` here. Pure, O(observed ×
  * value).
  */
 function differenceOf(observed: string, e: Pick<Expectation, keyof TextExpectation | 'held'>, tail: Tail | undefined, wholeToo: boolean): Difference {
@@ -491,8 +479,7 @@ export interface FocusFacts {
 export type HeldFrom = 'after-focus' | 'before-tap' | 'unread';
 
 /**
- * The fill's one read after the focus tap, and the count it gives the typing (A28: one table where fill.ts had four
- * conditions):
+ * The fill's one read after the focus tap, and the count it gives the typing:
  * - `reads`: the field is read after the tap — for the count (`after-focus`: the pre-tap read is stale for exactly
  *   these fields, an autofill populating a password field on focus, a re-entry screen clearing one), or for what a
  *   clear ALONE deletes (an autofill on focus would otherwise be kept, the one fill shape whose whole point is an empty
@@ -537,8 +524,7 @@ export function postFocusReadOf(f: FocusFacts): PostFocusRead {
  *
  * `maskedAppend`: bullets SEEN after focus (`after-focus`) — the length rule cannot see content, so a password typed
  * onto an autofilled one reads as a perfect append (finportal 2026-09-17: backend `invalid_grant`); fill.ts says so
- * where the trace is read (FillResult.maskedAppend). (A28: until then fill.ts derived both; A2 had left them there.)
- * Pure.
+ * where the trace is read (FillResult.maskedAppend). Pure.
  */
 export function heldCountOf(from: HeldFrom, held: string): { held: number | 'unread'; maskedAppend?: { held: number } } {
   if (from === 'unread') return { held: 'unread' };

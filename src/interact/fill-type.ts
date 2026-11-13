@@ -5,10 +5,9 @@
  * tap and the clear; nothing else types into a field it then reads back.
  *
  * Interface: `typeAndConfirm(io, intent) → Typed`. `io` is the device as the
- * field sees it (type, delete, read the field — its node, or why it was lost —
- * and the newest tree read);
- * `intent` is what the
- * field should end up holding and how to compare. The outcome is facts:
+ * field sees it (type, delete, read the field — its node, or why it was lost
+ * — and the newest tree read); `intent` is what the field should end up
+ * holding and how to compare. The outcome is facts:
  * landed or not, the last reading, what was typed again, and for a typing that
  * missed what can be said of the difference. Whether a reading landed, what
  * tail it proves dropped and the difference are interact/fill-landing.ts's
@@ -20,47 +19,48 @@
  * - the poll: READ_BACK_POLLS (five) reads at `pollMs` until the reading lands, never stopping
  *   early on an unchanged mismatch (`pollValue`).
  * - what is sent again, bounded, in this order:
- *   1. A DROPPED TAIL (2026-10-19, docs/bugs/2026-10-19-ios-fill-loses-the-
- *      tail-of-its-text-in-a-react-native-single-line-field.md, docs/adr/0023-fill-types-a-dropped-tail-again.md):
- *      the field holds a strict prefix of what it should hold — some of the
- *      typed characters landed, the end did not — the reading held still
- *      over the poll's last two reads, the adapter retypes a tail
- *      (`retypesTail`), and the typing provably stayed
- *      in the field (`whereTyped`: every other input the screen showed before
- *      the typing is there with its value — an auto-advancing code box that
- *      moved the focus would get the tail too; a sibling the app recomputed
- *      proves nothing either way, and stops the tail too). Since D28 the
- *      prefix may be REFORMATTED (fill-landing.ts#NotLanded): a field that groups as it is
- *      typed shows `1 234 567,` for a typed `1234567,89` that lost `89` —
- *      exact by typed characters, only grouping added, `reformatOf`'s rules
- *      judged over the whole typing (iOS React Native, rf2, 2026-10-31: the
- *      wipe and retype it got instead dropped the tail again). Since D60 the
- *      prefix may end in a mark an EAGER field added once a group was
- *      complete (`SK31 1200 ` for `SK3112000000`), judged as if the next
- *      typed character followed it (fill-reformat.ts#prefixOf). The tail is
- *      typed at the caret, which the field keeps at the end as it regroups
- *      (React Native's controlled TextInput, ADR 0034; rf3's typing on after
- *      a reformatting fill landed in order on iOS). Only the missing tail is typed, up to
+ *   1. A DROPPED TAIL (docs/bugs/2026-10-19-ios-fill-loses-the-tail-of-its-
+ *      text-in-a-react-native-single-line-field.md,
+ *      docs/adr/0023-fill-types-a-dropped-tail-again.md): the field holds a
+ *      strict prefix of what it should hold — some of the typed characters
+ *      landed, the end did not — the reading held still over the poll's last
+ *      two reads, the adapter retypes a tail (`retypesTail`), and the typing
+ *      provably stayed in the field (`whereTyped`: every other input the
+ *      screen showed before the typing is there with its value — an
+ *      auto-advancing code box that moved the focus would get the tail too; a
+ *      sibling the app recomputed proves nothing either way, and stops the
+ *      tail too). The prefix may be REFORMATTED (D28,
+ *      fill-landing.ts#NotLanded): a field that groups as it is typed shows
+ *      `1 234 567,` for a typed `1234567,89` that lost `89` — exact by typed
+ *      characters, only grouping added, `reformatOf`'s rules judged over the
+ *      whole typing (iOS React Native, rf2, 2026-10-31: the wipe and retype it
+ *      got instead dropped the tail again). It may also end in a mark an
+ *      EAGER field added once a group was complete (D60: `SK31 1200 ` for
+ *      `SK3112000000`), judged as if the next typed character followed it
+ *      (fill-reformat.ts#prefixOf). The tail is typed at the caret, which the
+ *      field keeps at the end as it regroups (React Native's controlled
+ *      TextInput, ADR 0034; rf3's typing on after a reformatting fill landed
+ *      in order on iOS). Only the missing tail is typed, up to
  *      `MAX_TAIL_RETYPES` times, and again only while each retype moved the
  *      field. Which reading proves a dropped tail — a strict prefix with some
  *      of the typing in it, no bullet, the earlier text unchanged — is
- *      fill-landing.ts's (`NotLanded.tail`, `retypable`): only a strict prefix proves which
- *      characters are missing, so a retype can never duplicate one that is
- *      there. Measured on React Native 0.88's
- *      controlled single-line TextInput under `idb ui text`: 6 of 12 fills
- *      kept a prefix (up to 6 of 9 characters lost), the field itself holding
- *      the short value; the measurements that chose this remedy over chunked typing are the ADR's.
- *      A typing that LANDED through a tail typed again is reported
+ *      fill-landing.ts's (`NotLanded.tail`, `retypable`): only a strict prefix
+ *      proves which characters are missing, so a retype can never duplicate
+ *      one that is there. Measured on React Native 0.88's controlled
+ *      single-line TextInput under `idb ui text`: 6 of 12 fills kept a prefix
+ *      (up to 6 of 9 characters lost), the field itself holding the short
+ *      value; the measurements that chose this remedy over chunked typing are
+ *      the ADR's. A typing that LANDED through a tail typed again is reported
  *      (`FieldIo.reportDroppedTail`; a capped field whose retype moves
  *      nothing, never), so the adapter can type into that app differently
  *      from then on — on iOS the first key alone, a wait of
  *      adapters/ios.ts#FIRST_KEY_ALONE_MS, then the rest (D24, the ADR's
- *      amendment of 2026-10-31); this retype stays the safety net, unchanged.
+ *      amendment of 2026-10-31); this retype stays the safety net.
  *   2. With clear only: one wipe of what the field holds and a retype of the
- *      whole value — the content is ours (since 2026-08-05: Compose async
- *      state swallowing synthetic input). Not when another input provably
- *      took part of the typing (2026-10-19, `elsewhere`): its deletes and its
- *      typing would go there; a sibling the app recomputed does not stop it.
+ *      whole value — the content is ours (Compose async state swallows
+ *      synthetic input, measured 2026-08-05). Not when another input provably
+ *      took part of the typing (`elsewhere`): its deletes and its typing
+ *      would go there; a sibling the app recomputed does not stop it.
  *   Without clear and without a prefix nothing is sent again: the field came
  *   with content that is not ours to delete.
  */
@@ -126,14 +126,12 @@ export type Typed =
 /**
  * Whether a dropped tail is typed again on this adapter (docs/adr/0023-fill-types-a-dropped-tail-again.md): only when
  * its typing has arrived when its call returns (`on-return`: iOS) — on Android a key still arriving would be doubled.
- * Asked here and by fill.ts's post-focus re-read gate, whose proof (`whereTyped`) only a retype needs.
  */
 export const retypesTail = (delivery: TypingDelivery): boolean => delivery === 'on-return';
 
 /** How many times a dropped tail is typed again (docs/adr/0023-fill-types-a-dropped-tail-again.md): the second covers a tail the first retype lost a part of. */
 export const MAX_TAIL_RETYPES = 2;
 
-/** Type the value and confirm it landed; send again what the rules above allow. */
 export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise<Typed> {
   const { value, clear } = intent;
   // Whether a reading landed, and how — the poll's question, of every read; `readingOf` asks it again of the reading a
@@ -158,7 +156,7 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
     switch (answer.kind) {
       case 'not-taken':
         // A non-input that never took the text is not the field: never wiped (its length is not the field's), never
-        // retyped. Asked of the first reading only, as it always was: after a retry the last reading is a mismatch.
+        // retyped. Asked of the first reading only: after a retry the last reading is a mismatch.
         if (again.length === 0) return { kind: 'not-taken', observed };
         break;
       case 'said-plain':
@@ -171,7 +169,7 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
         // A drop is proven only by its repair: the typing landed whole through a tail typed again. A capped or
         // trimming field (maxLength, an IBAN or phone mask) keeps its strict prefix for good — its retype moves nothing
         // and the fill fails — and is no drop: reported, it would make every later typing into that app pay the split
-        // (D24 review).
+        // (D24).
         if (tails() > 0) io.reportDroppedTail();
         if (answer.kind === 'placeholder') return { kind: 'landed', observed, again, placeholder: true };
         return {
@@ -230,8 +228,8 @@ function inputsOf(tree: UiNode, except?: string): OtherInputs {
 }
 
 /**
- * Where the typing went, as far as the screen proves (2026-10-19, docs/adr/0023-fill-types-a-dropped-tail-again.md:
- * an auto-advancing code box moved the focus to the next box, and a tail typed again went into the note below — `34234`):
+ * Where the typing went, as far as the screen proves (docs/adr/0023-fill-types-a-dropped-tail-again.md: an
+ * auto-advancing code box moved the focus to the next box, and a tail typed again went into the note below — `34234`):
  * - `field`: every input the screen had when typing began is there with the value it had — nothing else took it;
  * - `elsewhere`: one of them GAINED typed text — its old value is a prefix of its new one, and what was appended is
  *   part of what the field is missing of the typing (`missing`): the typing provably went there (the code boxes:
@@ -286,17 +284,17 @@ const READ_BACK_POLLS = 5;
 /**
  * Poll the field until its exposed value lands (`ok`: how it landed, else undefined); returns the last observation.
  *
- * It does NOT stop early on a stable mismatch (considered 2026-10-09: the
- * auto-capitalised fill in docs/bugs/2026-10-09-fill-mismatch-error-says-
- * equal-counts-when-app-transforms-text.md ran its whole budget, 36 s on a
- * WDA tree that reads in ~4 s). Two equal reads 400 ms apart are what a field
- * still waiting on its input looks like too: the reason this poll exists is
- * synthetic input arriving late (Compose async state, an IME queue on a
- * loaded emulator — 3 of 11 characters measured landed at first, 2026-08-05),
- * and a stop on "unchanged" would fail exactly those fills, or with clear
- * wipe and retype them — or, since 2026-10-19, type their tail twice. The
- * cost of a transformed value is paid on a fill that fails anyway; the price
- * of stopping early would be paid by ones that pass.
+ * It does NOT stop early on a stable mismatch (the auto-capitalised fill in
+ * docs/bugs/2026-10-09-fill-mismatch-error-says-equal-counts-when-app-
+ * transforms-text.md ran its whole budget, 36 s on a WDA tree that reads in
+ * ~4 s). Two equal reads 400 ms apart are what a field still waiting on its
+ * input looks like too: the reason this poll exists is synthetic input
+ * arriving late (Compose async state, an IME queue on a loaded emulator — 3
+ * of 11 characters measured landed at first, 2026-08-05), and a stop on
+ * "unchanged" would fail exactly those fills, or with clear wipe and retype
+ * them — or type their tail twice. The cost of a transformed value is paid on
+ * a fill that fails anyway; the price of stopping early would be paid by ones
+ * that pass.
  */
 async function pollValue(
   read: () => Promise<FieldRead>,
