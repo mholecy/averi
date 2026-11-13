@@ -17,10 +17,9 @@ import { normalizeText } from './text-parity.js';
  *
  * `match` (regex, unanchored) is the portable form, so the hint names it.
  *
- * In verify/ since 2026-10-04 (it was ui-tree/text-hint.ts): its one consumer
- * is the element assert, and its user-facing text recommends `match:` —
+ * In verify/, not ui-tree/: its user-facing text recommends `match:` —
  * assert-spec vocabulary that the tree layer, which "knows no averi.yaml"
- * (ARCHITECTURE.md §2), had no business speaking.
+ * (ARCHITECTURE.md §2), has no business speaking.
  */
 
 /**
