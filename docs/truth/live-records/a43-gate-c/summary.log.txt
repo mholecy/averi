@@ -1,0 +1,17 @@
+======== SUMMARY
+OK checkout: main's HEAD 47082e8c, clean
+LAB ios: OK — averi-lab iPhone 17 simulator, iOS 27.0, reset; this run's build installed; the installed cells.json is main's
+lab check: PASS — every lab need met: ios (each one's LAB line above)
+ios idb forms verdict: PASS — ios-idb-forms: main's rejudge exit 0 (# Live golden: 48 cases, 44 ok, 3 loud, 1 mismatches (0 not known), 0 skipped)
+ios idb visibility verdict: PASS — ios-idb-visibility: main's rejudge exit 0 (# Live golden: 188 cases, 144 ok, 4 loud, 40 mismatches (0 not known), 0 skipped)
+ios idb dismissal verdict: PASS — ios-idb-dismissal: main's rejudge exit 0 (# Live golden: 12 cases, 12 ok, 0 loud, 0 mismatches (0 not known), 0 skipped)
+ios idb ensure verdict: PASS — ios-idb-ensure: main's rejudge exit 0 (# Live golden: 3 cases, 3 ok, 0 loud, 0 mismatches (0 not known), 0 skipped)
+D43 WDA-window restore: OK — com.apple.keyboard.preferences equal, com.apple.Preferences equal, com.apple.Accessibility put back (wrote back AccessibilityEnabled, ApplicationAccessibilityEnabled, AutomationEnabled in com.apple.Accessibility); port 8120 free
+D43 WDA-window compare: OK — every domain still equals its backup after the end check
+ios wda forms verdict: PASS — ios-wda-forms: main's rejudge exit 0 (# Live golden: 48 cases, 46 ok, 1 loud, 1 mismatches (0 not known), 0 skipped)
+ios wda visibility verdict: PASS — ios-wda-visibility: main's rejudge exit 0 (# Live golden: 189 cases, 183 ok, 0 loud, 6 mismatches (0 not known), 0 skipped)
+ios wda dismissal verdict: PASS — ios-wda-dismissal: main's rejudge exit 0 (# Live golden: 12 cases, 12 ok, 0 loud, 0 mismatches (0 not known), 0 skipped)
+ios wda ensure verdict: PASS — ios-wda-ensure: main's rejudge exit 0 (# Live golden: 3 cases, 3 ok, 0 loud, 0 mismatches (0 not known), 0 skipped)
+OK   com.apple.launchservices.schemeapproval's -->sk.finportal.myport unchanged (sk.finportal.myport; read only)
+RESTORE: none — everything dirty was put back and verified
+======== SUMMARY end (run 20261113-150109-57545)
