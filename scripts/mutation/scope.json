@@ -146,8 +146,8 @@
   "src/adapters/android-wm.ts": {
     "group": "android",
     "tests": ["tests/adapters/android-wm.test.ts", "tests/adapters/android-focused-window.test.ts", "tests/adapters/android-chooser.test.ts"],
-    "floor": 94,
-    "baseline": "95.93 % on 2026-11-13 (A35, the one display rule: onDefaultDisplay; `npm run mutate -- --group android --force --tempDirName reports/mutation/stryker-tmp-a35b`, cold, the group 23 s at load 3–11): 615 mutants, 590 killed, 25 survived. The 4 new survivors are equivalent: `?? ''` and the focus-less `''` as any other string (no line in it reads), WINDOW_DISPLAY_RE's `^` and `\\d+` as `\\d` (a block's own `mDisplayId=` line is its first, and only \"is it 0\" is asked); the other 21 as A27 left them"
+    "floor": 95,
+    "baseline": "96.59 % on 2026-11-13 (A35 review round 1, the default display's two readers, defaultDisplayBlock and defaultDisplayFocusRead; `npm run mutate -- --group android --force --tempDirName reports/mutation/stryker-tmp-a35e`, cold, the group 24 s at load 7–15): 616 mutants, 595 killed, 21 survived; floor 94 → 95. Three survivors are new and equivalent: parseFocusedWindow's `w === undefined` as false (a NaN size clips every frame to none: unknown), defaultDisplayFocus's `?? ''` as any other string (no line in it reads), WINDOW_DISPLAY_RE's `^` (a block's own `mDisplayId=` line is its first); `\\d+` as `\\d` is killed by a display 12. The other 18 as A27 left them"
   },
   "src/adapters/android-tree-dialect.ts": {
     "group": "android",

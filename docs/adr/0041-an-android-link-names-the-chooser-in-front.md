@@ -19,7 +19,7 @@ Amended 2026-11-11 (A27: the focus read moves to `adapters/android-wm.ts`, one `
 stays here, byte for byte; implemented on `refactor/a27-android-split`).
 Amended 2026-11-11 (A34: each live block of the standing lab batch a bound that fits it, the visibility group's own
 3000 s; implemented on `fix/a34-live-block-bounds`).
-Amended 2026-11-13 (A35: this ADR's display rule, display 0's block, becomes every window manager read's, proven on a
+Amended 2026-11-13 (A35: this ADR's display rule, display 0's block, becomes every `dumpsys window` read's, proven on a
 real two-display capture; a dump with no display 0 now reads nothing; implemented on `feat/a35-two-display`).
 
 ## Context
@@ -912,7 +912,7 @@ loaded machine the visibility group can pass even its own bound, and the emulato
 when the machine is not loaded. The lab mutation baseline A34 recorded, 548 s at load 53–57
 (scripts/mutation/scope.json), is load-inflated, as A22's first 562 s at load 45–38 was; a cold rerun on main replaces it.
 
-## Amendment: one display rule, the default display's, for every window manager read (2026-11-13, A35)
+## Amendment: one display rule, the default display's, for the window manager's dumps (2026-11-13, A35)
 
 **Context.** A27 left three multi-display rules in `adapters/android-wm.ts` (ADR 0038's A27 amendment): every display
 must agree (the IME, status and navigation reads), the first one found (`parseFocusedWindow`, whose
@@ -932,15 +932,18 @@ The three rules read them differently, and two were wrong. In b, the first found
 overlay's size: `screenAlone` with a 720x1280 frame, where the window is [0,0][1080,2220]. In every state, every
 display must agree lost the navigation band (the two `DisplayFrames` sizes differ), which display 0 alone reads as 2154.
 
-**Decision.** Every read answers for the default display, id 0, and no other display's line is read. Display 0 is where
-`am start` with no `--display` starts the app and the link (this ADR's reason), and what `input tap`/`swipe` and
-`screencap` with no `-d` act on: the display averi verifies. One reader holds the rule,
-`android-wm.ts#onDefaultDisplay`, and every parser reads what it hands back (`parseImeInsets`, `parseStatusBand`,
-`parseNavigationBand`, `parseFocusedWindow`, `defaultDisplayFocus`). Where the dump says which display a line is, that
-decides:
+**Decision.** The five reads of `dumpsys window displays` and `dumpsys window windows` (`parseImeInsets`,
+`parseStatusBand`, `parseNavigationBand`, `parseFocusedWindow`, `defaultDisplayFocus`) answer for the default display,
+id 0, and no other display's line is read. Display 0 is where `am start` with no `--display` starts the app and the link
+(this ADR's reason), and what `input tap`/`swipe` and `screencap` with no `-d` act on: the display averi verifies. The
+input method's reads (`parseInputShown`, `parseTouchableRegion`) print no display and have no display scope: they are
+read whole, as before. Two readers in `android-wm.ts` hold the rule, one per dump shape, each answering `undefined` when
+the default display's part is not there: `defaultDisplayBlock` (headered dumps; the insets reads and the chooser's) and
+`defaultDisplayFocusRead` (FOCUSED_WINDOW_COMMAND's answer). Where the dump says which display a line is, that decides:
 
-- a dump with display headers: display 0's block. No block is display 0's: nothing, so no answer. Before A35 the
-  chooser read the first display's block then. `Display.DEFAULT_DISPLAY` always exists, so no device prints that dump;
+- a dump with display headers: display 0's block. No block is display 0's: no answer (`unknown`, no band, no
+  chooser). A deliberate choice: before A35 the chooser read the first display's block then, a guess at whose link it
+  was; `Display.DEFAULT_DISPLAY` always exists, so no device prints that dump;
 - FOCUSED_WINDOW_COMMAND's answer: the focus line whose window's block says display 0, the lines after it up to the
   next focus line (its `DisplayFrames`), then display 0's window blocks only. A `null` focus, or one whose window the
   windows dump does not list, is no display that can be told; two focus lines that both name a display 0 window are no
@@ -969,11 +972,22 @@ disagree are still no answer, since one display prints one. Only their labels ch
 
 **Residuals.**
 
-- Not measured on the capture: a keyboard shown on either display, and what `uiautomator dump` and `input keyevent`
-  (no `-d`) act on with two displays. AOSP sends a key with no display to the focused display, and uiautomator's root is
-  the active window, so with another display top-focused (state c) averi's `back` and tree may be that display's. The
-  focus read then answers `unknown`, display 0 having no window focus, so nothing is guessed from it.
+- Not measured on the capture:
+  - a keyboard shown on either display. The IME read's change, display 0's entry and witness alone, is proven on
+    synthetic dumps only; on the capture both displays' IME entries were hidden. `parseInputShown` and
+    `parseTouchableRegion` read the input method's dumps, which name no display: with two displays they answer for
+    wherever the keyboard is;
+  - `am start` with no `--display`: the capture always passed `--display 0` (and `--display 4` for the clock), so that
+    it lands on display 0 is AOSP's documented default, not a measurement;
+  - what `uiautomator dump` and `input keyevent` (no `-d`) act on with two displays. AOSP sends a key with no display to
+    the focused display, and uiautomator's root is the active window, so with another display top-focused (state c)
+    averi's `back` and tree may be that display's. The focus read then answers `unknown`, display 0 having no window
+    focus, so nothing is guessed from it.
 - A window block that names no display is read as display 0's, and so is a dump that names none: the rule for dumps
   of one display, unproven on a second Android's format.
-- Mutation: the `android` group cold, android-wm.ts 95.93 % (floor 94), 4 new survivors, all equivalent
-  (scripts/mutation/scope.json).
+- UT4 (one tree-dialect reader of the root marks), named in the A35 row, is not done here: its readers span about 18
+  core modules (ui-tree, interact, flow, mcp, the iOS tree sources) and have nothing to do with displays. It is left to
+  a row of its own.
+- Mutation: the `android` group cold, android-wm.ts 96.59 % (floor 94 → 95), 21 survivors as A27 left 21. Three are
+  new and equivalent (scripts/mutation/scope.json); the first run's `\d+` → `\d` survivor was not (a two-digit display
+  id read as none, so as display 0's) and is killed by a window on display 12.

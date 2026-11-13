@@ -66,11 +66,12 @@ this decision:
 - A scroll view's content taller than the room between the bands but not screen-sized (a tall narrow node) never stops
   `fully`: it ends stuck naming the bar.
 - The band is portrait only. In landscape the navigation bar moves to a side, and nothing reads it there.
-- The band fails open, judged as if no band were read, in three cases:
-  - a `dumpsys window displays` that lists a second display of a different size (until A35: display 0's lines alone
-    are read now, ADR 0041's A35 amendment);
+- The band fails open, judged as if no band were read, in two cases:
   - a display not in its natural rotation (r≠0);
   - a display whose natural rotation is landscape, such as a tablet held portrait.
+
+  Until A35 there was a third: a `dumpsys window displays` that lists a second display of a different size. Since A35
+  only the default display's lines are read (ADR 0041's A35 amendment).
 - The flush cut is read by shape. A whole last row resting flush with the bar fails an ocr assert closed too.
 - The band is kept until a launch or a fresh read, as the status band is.
 - The in-tree keyboard dismissal picker inherits the band's point rule: it asks the tap's standing

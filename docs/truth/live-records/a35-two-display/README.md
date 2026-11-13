@@ -20,7 +20,8 @@ parseNavigationBand), `dumpsys-window-focused-window-…` (FOCUSED_WINDOW_COMMAN
 `dumpsys-window-focus-…` (CHOOSER_FOCUS_COMMAND: defaultDisplayFocus), `touchable-…` (TOUCHABLE_COMMAND). No host path
 was in them (scripts/release/clean-log.ts changed nothing).
 
-What the dumps show, and what today's readers make of them:
+What the dumps show, and what the readers before A35 made of them (the capture's commit, e90d0fb7; what HEAD reads,
+one rule for the default display: ADR 0041's A35 amendment):
 
 - Display order: the top-focused display's block is printed LAST (a, b: display 4 then 0; c: 0 then 4). Only that
   display has a window focus: every other display prints `mCurrentFocus=null` (c: display 0 still holds Settings as
@@ -42,5 +43,9 @@ What the dumps show, and what today's readers make of them:
 
 Emulator before and after: `overlay_display_devices` `null` → `null` (deleted), display 0's focus the launcher, the same
 root tasks, the clock not running. An earlier run of the script (two states) left display 0's `mFocusedApp=null`
-after the overlay's removal (HOME did not reset it; Settings started and HOME pressed did); the script now does that
-itself when it happens. Nothing was wiped, cleared, rebooted or force-stopped.
+after the overlay's removal (HOME did not reset it; Settings started and HOME pressed did). That recovery was done by
+hand then; the script now does it when display 0's `mFocusedApp` reads null after the removal, but the recorded run did
+not need it, so the script's own recovery has not been exercised. A Settings task that was there before is reused by
+states b and c and kept: the script restores root tasks by id (removes those it did not find), not each task's state.
+
+Nothing was wiped, cleared, rebooted or force-stopped.

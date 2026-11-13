@@ -205,6 +205,7 @@ describe('the one rule on synthetic two-display dumps (what the capture did not 
     expect(chooserInFocus(header(1) + focus(chooser))).toBeUndefined();
     expect(parseImeInsets(one)).toEqual({ state: 'unknown' });
     expect(parseStatusBand(one)).toBeUndefined();
+    expect(parseNavigationBand(one)).toBeUndefined();
   });
 
   it('display 0\'s block: the chooser on display 1 is not display 0\'s focus, whichever display the dump lists first', () => {
@@ -246,6 +247,18 @@ describe('the one rule on synthetic two-display dumps (what the capture did not 
     expect(parseFocusedWindow(open.slice(0, at) + other + open.slice(at))).toEqual({ of: 'screenAlone', frame: { x: 0, y: 0, width: 1080, height: 2220 } });
     // the same window on display 0 is beside it
     expect(parseFocusedWindow(open.slice(0, at) + other.replace('mDisplayId=4', 'mDisplayId=0') + open.slice(at))).toEqual({ of: 'unknown' });
+  });
+
+  it('a display id of two digits is that display, not display 0', () => {
+    const open = dumpOf('open');
+    const ALONE = { of: 'screenAlone', frame: { x: 0, y: 0, width: 1080, height: 2220 } };
+    const other = '  Window #99 Window{3333333 u0 other.app/other.app.Main}:\n    mDisplayId=12 rootTaskId=9 mSession=x\n    mAttrs={(0,0)(fillxfill) ty=BASE_APPLICATION\n    Frames: parent=[0,0][720,1280] display=[0,0][720,1280] frame=[0,0][720,1280] last=x\n    isVisible=true\n';
+    const at = open.indexOf('  Window #');
+    // a visible app window on display 12 is not beside display 0's focus
+    expect(parseFocusedWindow(open.slice(0, at) + other + open.slice(at))).toEqual(ALONE);
+    // a focus line naming display 12's window, listed first, is not display 0's: display 0's own still answers
+    const withFocus = open.slice(0, at) + other + open.slice(at);
+    expect(parseFocusedWindow(withFocus.replace('  mCurrentFocus=', '  mCurrentFocus=Window{3333333 u0 other.app/other.app.Main}\n  DisplayFrames w=720 h=1280 r=0\n  mCurrentFocus='))).toEqual(ALONE);
   });
 });
 

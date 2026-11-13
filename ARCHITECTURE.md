@@ -392,8 +392,9 @@ error and trace line says the same, host paths stripped; the error's fields keep
 - `android.ts` is the adapter (the adb calls, their bounds and memos). What it reads is parsed in pure modules beside
   it: `android-tree-dialect.ts` (the uiautomator XML as a normalized tree, its roles, axes and root marks, the
   presented-window recognizers), `android-wm.ts` (the window manager's and input method's dumps: IME insets, status and
-  navigation bands, touchable region, `mInputShown`, the focused window; every read answers for the default display,
-  id 0, through one reader, `onDefaultDisplay`, ADR 0041's A35 amendment), `android-bounds.ts` (`[l,t][r,b]`),
+  navigation bands, touchable region, `mInputShown`, the focused window; the `dumpsys window displays`/`windows` reads
+  answer for the default display, id 0, through `defaultDisplayBlock` and `defaultDisplayFocusRead`, ADR 0041's A35
+  amendment; the input method's reads have no display scope), `android-bounds.ts` (`[l,t][r,b]`),
   `android-accessibility-order.ts` (AOSP's accessibility order of a ViewGroup's children, ADR 0015).
 - What the device's shell receives has one owner, `adapters/adb-shell.ts`: every word quoted (`shellQuote`), `exec-out`
   left to the adb client, a raw line only by name. Whether a start started anything:
