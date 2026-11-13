@@ -9,13 +9,12 @@ import { everyNode, INPUT_ROLE, rectArea, rectCentre, rectIntersection, rectsOve
  * These live here rather than in verify/ because they walk a `UiNode` and know
  * nothing about contracts, tolerances or findings. The viewport predicates
  * (intersectsViewport, absentFromViewport, visibleFractionInViewport,
- * clippedEdges) are here too, at the end of the file: they are rect
- * arithmetic, not selection. tapPoint stays in selectors.ts on purpose: it
- * is the tap-target rule (where a resolved node is pressed), and its
- * importers include the interact/keyboard*.ts modules. The point-in-rect
- * test (`containsPoint`) is here too, one spelling for every caller. What is
- * drawn over what — a walk of the tree read as paint order, not rect
- * arithmetic — is ui-tree/draw-order.ts's, which asks these predicates.
+ * clippedEdges) are here too: they are rect arithmetic, not selection.
+ * tapPoint stays in selectors.ts on purpose: it is the tap-target rule (where
+ * a resolved node is pressed). The point-in-rect test (`containsPoint`) is
+ * here too, one spelling for every caller. What is drawn over what — a walk
+ * of the tree read as paint order, not rect arithmetic — is
+ * ui-tree/draw-order.ts's, which asks these predicates.
  */
 
 interface ScreenWidth {
@@ -33,10 +32,7 @@ interface ScreenWidth {
    * compare them (verify/scale.ts) rather than read this as certainty.
    *
    * Deciding what a `false` COSTS is not this file's business: verify/scale.ts
-   * is the one reader that turns it into a refusal, for the png scale and
-   * the rect denominator alike. `inferScreenWidth`, the width-only view the
-   * rect table and the `rect` assert read directly — and so kept `false` as a
-   * remark — is gone for that reason.
+   * turns it into a refusal, for the png scale and the rect denominator alike.
    */
   reliable: boolean;
 }
@@ -47,9 +43,8 @@ export interface ScreenSize extends ScreenWidth {
    * the window by construction) or a screen-shaped child of a rectless root
    * (`child`: a guessed window, which may be an oversized node crowned as
    * one) — reliable or not; absent when the walk answered, whose height is
-   * a content maximum. Read by ui-tree/usable-screen.ts#usableScreenOf: only a
-   * window's own sides may suggest that the screen is turned, never a walked
-   * extent.
+   * a content maximum. Only a window's own sides may suggest that the screen
+   * is turned, never a walked extent.
    */
   windowLeg?: 'root' | 'child';
   /**
@@ -220,7 +215,7 @@ function walkExtent(tree: UiNode): Extent {
   // silence. So a screen-shaped rect must corroborate the maximum when the
   // tree has one at all — a real status bar is corroborated by the window
   // below it, junk is not. A tree with nothing screen-shaped in it (a filtered
-  // list of rows) keeps the old, weaker answer rather than losing the width.
+  // list of rows) keeps the weaker answer rather than losing the width.
   const corroborated = !sawScreenShaped || screenShaped * MAX_OVERHANG >= width;
   return {
     width,
@@ -267,8 +262,9 @@ function overhangs(tree: UiNode, window: Rect): boolean {
 /**
  * The window rect, or undefined when no node is even a candidate.
  *
- * The root is it when the root has one. When the root has NO usable rect the
- * window is one level down: idb's flat `describe-all` and uiautomator's
+ * The root is it when the root is origin-anchored with area; a root with area
+ * elsewhere yields undefined here (`insetWindowRect` reads it). When the root
+ * has NO usable rect the window is one level down: idb's flat `describe-all` and uiautomator's
  * multi-root dump are normalized under a synthetic 0x0 root (adapters/ios-tree-source.ts,
  * adapters/android-tree-dialect.ts), and WDA's live /source roots a sheet tree in a node
  * carrying no `rect` at all, which the parser zero-fills — in all three the
@@ -325,7 +321,6 @@ function insetWindowRect(tree: UiNode): Rect | undefined {
   return contradicted ? undefined : best;
 }
 
-/** {id → rect} for the FIRST occurrence of each identifier (pre-order). */
 export function collectRects(tree: UiNode): Map<string, Rect> {
   const out = new Map<string, Rect>();
   const walk = (n: UiNode): void => {
@@ -345,10 +340,8 @@ export function collectRects(tree: UiNode): Map<string, Rect> {
  * may sit apart and still be the same side. Whole-point rects and a rounded
  * screen size move it by well under a percent; 2% is comfortably above that
  * and well below the signatures that matter (a system-bar inset, a
- * half-width split view). verify/scale.ts reads it for when a tree width's
- * mismatch with the device is worth saying out loud; `FIT_SLACK` below is
- * the same allowance for a window's reach. Here beside `windowTurnsScreen`,
- * which reads it.
+ * half-width split view). `FIT_SLACK` below is the same allowance for a
+ * window's reach.
  */
 export const SCREEN_AGREEMENT_PCT = 2;
 
@@ -468,9 +461,7 @@ export function intersectsViewport(
  * off-screen nodes, iOS keeps them with off-viewport rects — and a state
  * detect (`absent: true`) and an absent assert must read the same tree the
  * same way, or a state the flow says it reached could fail the assert that
- * checks it. The one owner, for the engine and verify/assert.ts: the two
- * layers cannot share it anywhere higher (verify sits below the interaction
- * module).
+ * checks it.
  */
 export function absentFromViewport(
   found: readonly UiNode[],
@@ -520,9 +511,7 @@ export { rectArea, rectCentre, rectIntersection, rectsOverlap, sameRect, sameRec
  * Is the point inside the rect — left and top inclusive, right and bottom
  * exclusive, like the Android frame test. The point-in-rect companion of
  * `rectsOverlap` (two rects sharing area: a different question), and the
- * ONE spelling of it: the tap guard asks it of the keyboard's frame and the
- * tap point (ui-tree/keyboard-cover.ts#readKeyboard, its `over` and `frameOver`), the dismissal picker of the
- * root's rect, and ui-tree/draw-order.ts of every candidate.
+ * ONE spelling of it.
  */
 export function containsPoint(rect: Rect, point: Point): boolean {
   return point.x >= rect.x && point.x < rect.x + rect.width && point.y >= rect.y && point.y < rect.y + rect.height;
@@ -542,9 +531,8 @@ export function rectWithin(inner: Rect, outer: Rect): boolean {
  * `from` less `cut`: the pieces of `from` outside `cut`, at most four and
  * disjoint — the band above the cut and the band below it, full width, and
  * the parts left and right of it between them. `from` whole when they share
- * no area. ui-tree/draw-order.ts#exposure cuts a target by its covers with
- * it; here as rect arithmetic, beside `rectIntersection`, which it is built
- * on.
+ * no area. Here as rect arithmetic, beside `rectIntersection`, which it is
+ * built on.
  */
 export function subtract(from: Rect, cut: Rect): Rect[] {
   const shared = rectIntersection(from, cut);
@@ -562,7 +550,6 @@ export function subtract(from: Rect, cut: Rect): Rect[] {
   return pieces.filter((r) => rectArea(r) > 0);
 }
 
-/** The largest of `rects` by area — the first of equals; undefined for none. */
 export const largestRect = (rects: readonly Rect[]): Rect | undefined =>
   rects.reduce<Rect | undefined>((best, r) => (best === undefined || rectArea(r) > rectArea(best) ? r : best), undefined);
 
@@ -576,8 +563,7 @@ export const largestRect = (rects: readonly Rect[]): Rect | undefined =>
  *
  * Portrait only is iOS's rule (an iPhone hides its status bar in
  * landscape); Android's landscape status bar is the standing's residual
- * (ui-tree/standing.ts#Scene). Here as rect arithmetic, below interact/,
- * so ui-tree/standing.ts reads it for every verb.
+ * (ui-tree/standing.ts#Scene). Here as rect arithmetic, below interact/.
  */
 export function belowStatusBand(box: Rect, screen: { statusBand?: number } | undefined, shape: { width: number; height: number } = box): Rect {
   const band = screen?.statusBand ?? 0;
@@ -588,8 +574,7 @@ export function belowStatusBand(box: Rect, screen: { statusBand?: number } | und
 
 /**
  * `box` less both system bands — `belowStatusBand`, then `aboveNavigationBand`, `shape` as there: the part of the
- * screen a swipe can reach and a reader sees (`scroll_until`'s across clause, interact/scroll-rounds.ts;
- * ui-tree/standing.ts#systemBands' `clear`). A navigation band reaching above the status band's bottom fails open, as
+ * screen a swipe can reach and a reader sees. A navigation band reaching above the status band's bottom fails open, as
  * `aboveNavigationBand` says.
  */
 export function clearOfSystemBands(box: Rect, screen: { statusBand?: number; navigationBand?: number } | undefined, shape: { width: number; height: number } = box): Rect {
@@ -622,7 +607,7 @@ export function aboveNavigationBand(box: Rect, screen: { navigationBand?: number
  */
 export const PIXEL_OVERLAP_SLACK = 2;
 
-/** `a` and `b` share area thicker than PIXEL_OVERLAP_SLACK on its thin side — what a pixel assert counts as one hiding the other (ui-tree/draw-order.ts#paintsOver, and the system bands, ui-tree/standing.ts#Scene). */
+/** `a` and `b` share area thicker than PIXEL_OVERLAP_SLACK on its thin side — what a pixel assert counts as one hiding the other. */
 export const overlapsPastSlack = (a: Rect, b: Rect): boolean => {
   const shared = rectIntersection(a, b);
   return shared !== undefined && Math.min(shared.width, shared.height) > PIXEL_OVERLAP_SLACK;
@@ -639,7 +624,7 @@ export type { Edge };
 /** A rect's four sides, in the order every reader asks them: top, bottom, left, right. */
 export const EDGES: readonly Edge[] = ['top', 'bottom', 'left', 'right'];
 
-/** The side across a rect from each edge: a cut edge's uncut side (interact/scroll-text.ts's `unaimable` reply). */
+/** The side across a rect from each edge: a cut edge's uncut side. */
 export const OPPOSITE_EDGE: Readonly<Record<Edge, Edge>> = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
 
 /**
@@ -678,18 +663,18 @@ export function wholePast(rect: Rect, viewport: Rect): Edge | undefined {
   return undefined;
 }
 
-/**
- * What a tree's CLIPPING says of its nodes (`clipsOf`), from one walk: each
- * node's clipping chain (`scrollersOf`) and its sliver cut (`cutSliver`).
- * Asked of nodes of THIS tree (a node of another read has no clipping
- * ancestor here: an empty chain, no cut).
- */
 /** A scroll view as `Clips.scrollViewsOn` lists it: the node, and the one axis the tree tells it scrolls on (undefined: not told). */
 export interface ListedScrollView {
   readonly node: UiNode;
   readonly axis: ScrollAxis | undefined;
 }
 
+/**
+ * What a tree's CLIPPING says of its nodes (`clipsOf`), from one walk: each
+ * node's clipping chain (`scrollersOf`) and its sliver cut (`cutSliver`).
+ * Asked of nodes of THIS tree (a node of another read has no clipping
+ * ancestor here: an empty chain, no cut).
+ */
 export interface Clips {
   /**
    * The node's ancestors that CLIP it — every node marked
@@ -713,10 +698,9 @@ export interface Clips {
    * `evidentCut` when what shows of the node across that edge is under
    * `minPiece` (draw-order.ts#MIN_TAP_PIECE_FRACTION, `Exposure.minPiece`)
    * — a sliver a tap is refused on and `scroll_until`'s plain stop does
-   * not stop on; undefined otherwise. Asked only by
-   * ui-tree/standing.ts#Scene.standing, which orders it against the rest,
-   * and asks the rule's other evidence after it — a cut by a node drawn
-   * after it (standing.ts#cutByLater, `Cut.by`), which needs the draw order.
+   * not stop on; undefined otherwise. The rule's other evidence — a cut by
+   * a node drawn after it (standing.ts#cutByLater, `Cut.by`) — is asked
+   * after it, not here: it needs the draw order.
    *
    * Or INHERITED (the owner's decision, the bug note below): a node flush within a pixel with an
    * edge whose ancestor — below the container of that edge — is itself a
@@ -778,7 +762,7 @@ export interface Clips {
    * whether a scroll view cuts a node, nor where: not "nothing cuts it". Measured: the lab app's `scroll-bounded` (iOS
    * 27) lists `O` flat at `51,620 300x64`, wholly below `lower` (`0,380 402x180`, which WDA's twin lists and idb does
    * not); a tap at its centre was reported done on the background, and its colour passed on it. The standing judges an
-   * untold node on the screen alone, as before (the tap, the stops: ADR 0010's residual 5); the eyes ask what the
+   * untold node on the screen alone (the tap, the stops: ADR 0010's residual 5); the eyes ask what the
    * screenshot shows of it where a claim rests on it — the colour assert's region (verify/eyes.ts#apartOfFrame) and a
    * `fully: true` claim's edges (ui-tree/eyes.ts#eyesQuestion's clip lines).
    * docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md
@@ -925,7 +909,6 @@ export interface DrawnUntold {
   readonly told: false;
 }
 
-/** The answer of every node of a tree that lists no ancestry (`DrawnUntold`). */
 const UNTOLD: DrawnUntold = { told: false };
 
 /** Where a node can be drawn, as its scrolling ancestors cut it (`Clips.drawnIn`). */
@@ -974,7 +957,7 @@ export function cutAtScreenEdges(rect: Rect, frame: Rect, screen: Rect): Edge[] 
 
 /**
  * How far `rect`'s `edge` side lies INSIDE `outer`'s same side, toward `outer`'s middle: positive inside, 0 on it,
- * negative past it. For `cutAtScreenEdges` and interact/course.ts#unknownCentreNeeds.
+ * negative past it.
  */
 export function distanceInside(rect: Rect, outer: Rect, edge: Edge): number {
   switch (edge) {
@@ -989,7 +972,6 @@ export function distanceInside(rect: Rect, outer: Rect, edge: Edge): number {
   }
 }
 
-/** `Clips.contentToward`'s answer for content listed, not ending at the edge asked. */
 const LISTED: ListedContent = { kind: 'listed' };
 
 /**
@@ -1034,13 +1016,11 @@ function stackedAcross(nodes: readonly UiNode[], axis: ScrollAxis): boolean {
  * A tree's `Clips`: one pre-order walk recording each node's parent and its
  * clipping chain (shared along a branch), for nodes under a clip only;
  * the sliver cuts are judged when asked, and kept. `ancestry`: whether the
- * tree's nesting is its nodes' ancestry (dialect.ts#TreeDialect.ancestry), which
- * `inScroller` and `drawnIn` ask; `unclipped`: whether its source reports
- * frames unclipped (dialect.ts#TreeDialect.framesUnclipped), which `axesOf` and
- * `contentToward` ask; `cutAtScreen`: whether its source cuts a node's bounds at
- * the screen's edge (dialect.ts#TreeDialect.cutsAtScreen), which `drawnIn`'s
- * `unknownPast` asks — three fields of the tree's dialect, handed in by the caller
- * (standing.ts#sceneOf asks dialect.ts#dialectOf).
+ * tree's nesting is its nodes' ancestry (dialect.ts#TreeDialect.ancestry);
+ * `unclipped`: whether its source reports frames unclipped
+ * (dialect.ts#TreeDialect.framesUnclipped); `cutAtScreen`: whether its source
+ * cuts a node's bounds at the screen's edge (dialect.ts#TreeDialect.cutsAtScreen)
+ * — three fields of the tree's dialect, handed in by the caller.
  */
 export function clipsOf(tree: UiNode, { ancestry, unclipped = false, cutAtScreen = false }: { readonly ancestry: boolean; readonly unclipped?: boolean; readonly cutAtScreen?: boolean }): Clips {
   const chains = new Map<UiNode, readonly Rect[]>();
@@ -1196,15 +1176,13 @@ function overhangAsFlush(rect: Rect, frame: Rect): Rect {
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
-/** A rect's extent across `edge` — its height at the top or bottom, its width at a side (`Cut.depth`). */
 export function across(rect: Rect, edge: Edge): number {
   return axisOfEdge(edge) === 'vertical' ? rect.height : rect.width;
 }
 
 /**
  * The axis along which content comes in through `edge`: `vertical` for the top or bottom, `horizontal` for a side —
- * the one edge → axis mapping, read by `Clips.contentToward` and scroll_until's sentences (interact/scroll-text.ts), and by
- * interact/swipe.ts#axisOf for a direction (through its EDGE_TOWARD), so ui-tree imports nothing of interact.
+ * the one edge → axis mapping, here so that ui-tree imports nothing of interact.
  */
 export function axisOfEdge(edge: Edge): ScrollAxis {
   return edge === 'top' || edge === 'bottom' ? 'vertical' : 'horizontal';
@@ -1214,9 +1192,6 @@ export function axisOfEdge(edge: Edge): ScrollAxis {
  * The edges of `rect` that lie on `container`'s, within a pixel — along
  * `axis` only when given (top and bottom are the vertical's), else both —
  * in `clippedEdges`' order; none when the container has no area.
- * `scroll_until`'s `fully: true` stop asks it along the scroll
- * (flush-check.ts), and the cut-sliver rule (`evidentCut`)
- * asks the same question, not a copy of it.
  */
 export function flushEdges(rect: Rect, container: Rect, axis?: 'vertical' | 'horizontal'): Edge[] {
   if (rectArea(container) === 0) return [];
@@ -1269,9 +1244,7 @@ export interface Cut {
  * past it, the shallowest (`Cut.depth`; the first of equals, nearest
  * ancestor first); undefined when none (the bug note is `Clips.cutSliver`'s).
  * The shallowest, not the first found: a card cut to 50 px at a carousel's right edge is
- * a 50-px sliver whatever its top says. Asked through `Clips.cutSliver`
- * only (ui-tree/standing.ts#Scene.standing, for the tap and `scroll_until`'s
- * plain stop).
+ * a 50-px sliver whatever its top says.
  *
  * What a descendant must show, along the edge's axis:
  * - At ANY edge: it lies more than a pixel PAST the edge. Compose's nodes
@@ -1419,10 +1392,9 @@ export const quoted = ({ role, label, identifier, rect }: QuotedNode): QuotedNod
 /**
  * How a sentence names the scroll view a node lies outside of — `outside its scroll view scrollable id:form (0,0
  * 402x780)` — or past one edge of (`where`: `below its scroll view …`, interact/target-text.ts#pastSideText), when
- * nothing of the node, or not its centre, is drawn there (ui-tree/standing.ts, the drawn frame, `Clips.drawnIn`). One
- * spelling for the tap's refusal, `scroll_until`'s sentences and the dismissal picker's skip line; the pixel assert's
- * miss heads (verify/pixel-text.ts#OUTSIDE_ITS_SCROLL_VIEW, #TOO_THIN_IN_ITS_SCROLL_VIEW), quoted whole by the tool
- * description, end with the same words.
+ * nothing of the node, or not its centre, is drawn there (ui-tree/standing.ts, the drawn frame, `Clips.drawnIn`). The
+ * pixel assert's miss heads (verify/pixel-text.ts#OUTSIDE_ITS_SCROLL_VIEW, #TOO_THIN_IN_ITS_SCROLL_VIEW), quoted whole
+ * by the tool description, end with the same words.
  */
 export const outsideScrollViewText = (scroller: QuotedNode, where = 'outside'): string =>
   `${where} its scroll view ${nodeText(scroller)}`;
@@ -1430,10 +1402,8 @@ export const outsideScrollViewText = (scroller: QuotedNode, where = 'outside'): 
 /**
  * How a sentence names a NODE drawn over another — `button "Continue to
  * summary" (24,780 354x44)`: its role, its label quoted (else its id), its
- * rect (`rectText`). The tap's chrome refusal and move
- * (interact/tap-judgement.ts#TapJudge.aim) and `scroll_until`'s covered
- * sentences (interact/scroll-text.ts) share it. The dismissal picker's skip
- * line names a cover shorter, on purpose (interact/target-text.ts#coverName).
+ * rect (`rectText`). The dismissal picker's skip line names a cover
+ * shorter, on purpose (interact/target-text.ts#coverName).
  */
 export const nodeText = (n: QuotedNode): string =>
   `${n.role}${n.label ? ` ${JSON.stringify(n.label)}` : n.identifier ? ` id:${n.identifier}` : ''} (${rectText(n.rect)})`;
@@ -1442,7 +1412,7 @@ export const nodeText = (n: QuotedNode): string =>
  * A cover as a sentence names it, with where it presses when that is not its rect (cover.ts#Cover.reach: a
  * pinned bar run down to the screen's bottom, a tab bar's item raised by its lift, an alert over the whole screen):
  * `container "Exit confirmation" (41,365 320x172, reaching 0,0 402x874)` — so a point the sentence names off the
- * cover's own rect still lies on what it names. One spelling for the tap, `scroll_until` and the pixel assert.
+ * cover's own rect still lies on what it names.
  */
 export const coverText = (cover: QuotedNode, reach?: Rect): string =>
   reach === undefined || sameRect(reach, cover.rect) ? nodeText(cover) : `${nodeText(cover).slice(0, -1)}, reaching ${rectText(reach)})`;
@@ -1463,8 +1433,8 @@ export const frameText = ({ x, y, width, height }: Rect): string => `[${x},${y}]
  * (`firstContent`'s misses, stated there). Here, not in draw-order.ts:
  * idb's keyboard band starts below it too
  * (ui-tree/soft-keyboard.ts#flatListKeyboardBand's `barLine`, which
- * draw-order.ts passes it as, `flatListBarLine`; draw-order.ts is its one
- * reader, and the band's top is `DrawOrder.keyboardBandTop`).
+ * draw-order.ts passes it as, `flatListBarLine`; the band's top is
+ * `DrawOrder.keyboardBandTop`).
  */
 export const FLAT_LIST_TOP_BAR_FRACTION = 0.2;
 
