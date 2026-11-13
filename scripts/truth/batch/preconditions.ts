@@ -11,8 +11,8 @@ import { firstLineOf, messageOf, nameInLine, verdictLine } from './words.js';
  * ancestry instead; runner.ts (T2 S6a) makes the blocks INCONCLUSIVE, batch-11's way; the result is the same.
  *
  * Every answer is git's, read through a bounded call (bounded.ts, git's own 30 s bound): never a grep of a symbol in
- * the sources (batch-11-README:101), and never git run unbounded, as batch-11's was. The cases and cells are read from
- * main's own live-cases.ts table and catalog (live-table.ts#liveTableOf), never grepped (batch-11.sh:228).
+ * the sources, and never git run unbounded, as batch-11's was. The cases and cells are read from
+ * main's own live-cases.ts table and catalog (live-table.ts#liveTableOf), never grepped.
  *
  * A why is one short line an agent can act on: it names the sha, the file or the case id, and git's own first line of
  * stderr when git said something. A name holding a line break is JSON-quoted in it (words.ts#nameInLine): the block's
@@ -25,7 +25,7 @@ export type Precondition = { ok: true } | { ok: false; why: string };
 /** The checkout's: shown with the commit HEAD is (the SUMMARY's checkout line names it), or why not. */
 export type CheckoutPrecondition = { ok: true; head: string } | { ok: false; why: string };
 
-/** A commit sha as a batch's knob takes it (batch-11.sh:80, M_D43): 7 to 40 lowercase hex digits. */
+/** A commit sha as a batch's knob takes it (`M_D43`, say): 7 to 40 lowercase hex digits. */
 export const SHA_FORMAT = /^[0-9a-f]{7,40}$/;
 
 /** How many modified paths a why names before it says how many more. */
@@ -149,7 +149,7 @@ export async function checkout(g: Git): Promise<CheckoutPrecondition> {
     const mainSha = main.out.trim();
     if (mainSha !== headSha) whys.push(`the checkout's HEAD (${shortSha(headSha)}) is not main's (${shortSha(mainSha)}) — git switch main, then rerun`);
   }
-  // --no-optional-locks: a read of the status never takes the index lock (batch-11.sh:211).
+  // --no-optional-locks: a read of the status never takes the index lock.
   const status = await git(g, ['--no-optional-locks', 'status', '--porcelain', '-z', '--untracked-files=no']);
   if (status.code !== 0) whys.push(failed(g, 'status', status));
   else {

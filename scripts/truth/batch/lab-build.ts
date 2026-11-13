@@ -9,7 +9,7 @@ import { NO_UDID, type NeedResult } from './runner-lines.js';
 import { exitText, failedCall, nameInLine } from './words.js';
 
 /**
- * The lab apps built from the checkout under test (T2 S6b; batch-11.sh:295–320, batch-12.sh:350–375), as two needs a
+ * The lab apps built from the checkout under test (T2 S6b; batch-12.sh:350–375), as two needs a
  * block names — `ios-build`, `android-build` — so a build that fails makes every block needing it INCONCLUSIVE naming
  * why (the runner's need rule), and a block that does not need it runs on the app already installed: main's catalog
  * `--check`ed first, once for both (S3's not-ported row: a stale cells.json builds nothing); the iOS build (xcodegen,
@@ -31,9 +31,9 @@ export const JAVA_HOME_SECS = 10;
 export const GRADLE_STOP_SECS = 120;
 /** macOS's JDK finder (batch-11's JAVA_HOME_CMD). */
 export const JAVA_HOME = '/usr/libexec/java_home';
-/** The built lab app in the checkout under test (batch-11.sh:47). */
+/** The built lab app in the checkout under test. */
 export const IOS_APP_PATH = 'fixtures/apps/ios/build/Build/Products/Debug-iphonesimulator/AveriLab.app';
-/** The built lab APK (batch-11.sh:48): lab-device.ts's since T20a (the live premise's hand line installs it too). */
+/** The built lab APK: lab-device.ts's since T20a (the live premise's hand line installs it too). */
 export { APK_PATH } from '../lab-device.js';
 /** The needs' names in a batch's `needs`. */
 export const IOS_BUILD_NEED = 'ios-build';

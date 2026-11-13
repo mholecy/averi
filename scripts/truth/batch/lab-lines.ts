@@ -31,13 +31,13 @@ function labUdid(udid: string): string {
 }
 
 /**
- * The lab's WebDriverAgent by its exact patterns (batch-11.sh:321–325 kill_lab_wda): its own derived data
+ * The lab's WebDriverAgent by its exact patterns: its own derived data
  * (lab-device.ts#LAB_WDA_DERIVED_DATA, never device-check's `averi-wda`) and the runner under the lab simulator's
  * folder.
  */
 export const wdaKillPatterns = (udid: string): string[] => ['DerivedData/averi-wda-lab([/ ]|$)', `Devices/${labUdid(udid)}/.*WebDriverAgentRunner`];
 
-/** The lab simulator's idb_companion (batch-11.sh:327, 660). */
+/** The lab simulator's idb_companion. */
 export const companionPattern = (udid: string): string => `idb_companion --udid ${labUdid(udid)}`;
 
 /**
@@ -67,7 +67,7 @@ export function pkillOf(r: CallResult): { ended: boolean } | { why: string } {
 
 // --------------------------------------------------------------------------------------------- port 8120
 
-/** lsof's argv for the lab port's listeners (d43-gate.ts's listeners): the lab's 8120 only, never 8100 or 8101. */
+/** lsof's argv for the lab port's listeners: the lab's 8120 only, never 8100 or 8101. */
 export const LSOF_ARGV: readonly string[] = ['-t', '-n', '-P', '-sTCP:LISTEN', '-i', `tcp:${LAB_WDA_PORT}`];
 
 /** Port 8120 as lsof read it: free, listened on by these pids, or unread — never free unread. */
@@ -83,7 +83,7 @@ export function portOf(r: CallResult): PortRead {
 }
 
 /**
- * The restore line's port part (d43-gate.ts's restoreLine): free, free after a kill, still listened on, or not read.
+ * The restore line's port part: free, free after a kill, still listened on, or not read.
  */
 export function portPart(p: PortRead, killed: boolean): string {
   if (p.state === 'free') return `port ${LAB_WDA_PORT} free${killed ? ' (a listener killed)' : ''}`;
@@ -91,7 +91,7 @@ export function portPart(p: PortRead, killed: boolean): string {
   return `port ${LAB_WDA_PORT} not read (${p.why})`;
 }
 
-/** The lab's WebDriverAgent ended by hand, first: d43-gate.ts's hand line, the patterns quoted. */
+/** The lab's WebDriverAgent ended by hand, first: the patterns quoted. */
 export const portHand = (udid: string): string =>
   `${HAND_PREFIX}first end the lab's WebDriverAgent (a runner still running undoes a restore at its exit): ${wdaKillPatterns(udid)
     .map((p) => `pkill -f ${shellQuote(p)}`)
@@ -237,7 +237,7 @@ const notJdk17 = (home: string, p: JdkProbes): string | undefined => {
 };
 
 /**
- * The JDK 17 for the Android build (batch-11.sh:309–310; T23): JAVA_HOME when it is a JDK 17; else
+ * The JDK 17 for the Android build (T23): JAVA_HOME when it is a JDK 17; else
  * `java_home -v 17`'s home, checked the same; else the first `*.jdk` in each JVM folder in turn, sorted, whose
  * `Contents/Home` is one — `java_home` finds nothing inside the agent's sandbox although the JDK is installed.
  * A JDK 17: its release says 17 and it has bin/javac. Each source asked only when the ones before it failed. The

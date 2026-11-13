@@ -8,19 +8,19 @@ import { exitText, nameInLine, stepLine, verdictLine } from './words.js';
  * The lab simulator's settings as values and words, pure (no Run, no file): what ios-domains.ts reads, decides and
  * says around the WDA window. The three domains a WebDriverAgent runner's exit changes, read typed (plistlib, per
  * top-level key its type and canonical value), so bool false is never int 0 (batch-10 measured the runner's exit flip
- * com.apple.Accessibility's keys from bool to int); d43-gate.ts's restore rule (`decideRestore`) and the one table of
+ * com.apple.Accessibility's keys from bool to int); the restore rule (`decideRestore`) and the one table of
  * what each restore action runs and records; the one `defaults` argv builder, an allowlist; the read-only
  * schemeapproval key and what its read means; the state file's shape; and every line a batch prints of them.
  */
 
-/** The three domains the WDA window backs up and puts back (d43-gate.ts's DOMAINS, its order). */
+/** The three domains the WDA window backs up and puts back. */
 export const DOMAINS = ['com.apple.keyboard.preferences', 'com.apple.Preferences', 'com.apple.Accessibility'] as const;
 
-/** The lab's WebDriverAgent port, as the state file records it (d43-gate.ts's PORT): read by d43-gate.ts --restore. */
+/** The lab's WebDriverAgent port, as the state file records it. */
 export const LAB_WDA_PORT = 8120;
 
 /**
- * The read-only key (batch-11.sh:54–55): the remembered "Open in" answer for finportal's scheme. No batch writes its
+ * The read-only key: the remembered "Open in" answer for finportal's scheme. No batch writes its
  * domain at all since batch-11; batch-5's one backup of it stays unopened.
  */
 export const PROTECTED = { domain: 'com.apple.launchservices.schemeapproval', key: 'com.apple.CoreSimulator.CoreSimulatorBridge-->sk.finportal.myport' } as const;
@@ -250,7 +250,7 @@ interface PlanParts {
 export type RestorePlan = (PlanParts & { verdict: 'equal' }) | (PlanParts & { verdict: 'act'; stage: 'per-key' | 'import' | 'fallback' }) | (PlanParts & { verdict: 'NOT VERIFIED'; why: string });
 
 /**
- * The restore rule (pure; d43-gate.ts's, unchanged). Equal → done. Else, in order:
+ * The restore rule (pure). Equal → done. Else, in order:
  *  per-key: each changed/missing scalar written back typed, each extra key deleted (a key, never the domain);
  *  import: still differing and a backup exists → `defaults import` of the whole backup;
  *  fallback: after the import, only when it exited 0 and the read-back holds every backup key with its value plus
@@ -340,7 +340,7 @@ export interface DomainEntry {
   backup: string | null;
 }
 
-/** The state file (d43-gate.ts's StateFile): which domains were backed up, each backup's path (null: absent). */
+/** The state file: which domains were backed up, each backup's path (null: absent). */
 export interface DomainsState {
   dirty: boolean;
   udid: string;
@@ -348,10 +348,10 @@ export interface DomainsState {
   domains: DomainEntry[];
 }
 
-/** `<state dir>/<state stem>.<domain>` — the base of d43-gate.ts's pathsOf, so its --restore reads the same files. */
+/** `<state dir>/<state stem>.<domain>` — the base of a domain's files beside the state file. */
 export const baseOf = (stateFile: string, domain: string): string => join(dirname(stateFile), `${basename(stateFile).replace(/\.json$/, '')}.${domain}`);
 
-/** The backup's path beside the state file (d43-gate.ts's, sim-domains.ts's). */
+/** The backup's path beside the state file (sim-domains.ts's). */
 export const backupPathOf = (stateFile: string, domain: string): string => `${baseOf(stateFile, domain)}.backup.plist`;
 
 /** The state file's text as a DomainsState, or why not. */
@@ -411,7 +411,7 @@ export type ProtectedRead = { state: 'value'; value: string } | { state: 'absent
 const ABSENT_KEY = new RegExp(`Could not find key '${escapeRegExp(PROTECTED.key)}' in domain '${escapeRegExp(PROTECTED.domain)}'`);
 
 /**
- * What `defaults read <schemeapproval> <finportal key>` (batch-11.sh:337–340) gave: exit 0, its value (the output's
+ * What `defaults read <schemeapproval> <finportal key>` gave: exit 0, its value (the output's
  * trailing line breaks dropped, as `$(…)` did); exit 1, not past its bound, with "Could not find key '<this key>' in
  * domain '<it>'" or "Domain '<it>' not found.", absent — never unreadable (batch-8's first run read an absent key as
  * unreadable and was VOID); anything else — a timeout, those words about another key or domain — unreadable, why.
@@ -429,7 +429,7 @@ const valueOf = (p: ProtectedRead): string | undefined => (p.state === 'value' ?
 const shown = (p: ProtectedRead): string => (p.state === 'value' ? nameInLine(p.value) : p.state === 'absent' ? 'absent' : `unreadable (${p.why})`);
 
 /**
- * The SUMMARY's protected-key line (batch-11.sh:584–585), from the reads at the iOS stretch's start and end:
+ * The SUMMARY's protected-key line, from the reads at the iOS stretch's start and end:
  * `OK … unchanged` only when both were read (a value, or absent) and are the same; CHANGED a FAIL — the run exits 1
  * (words.ts#exitCodeOf: a FAIL step line; T2b, batch-13 gap 4: an ERROR before, and a changed key exited 0); unread an
  * ERROR — never unchanged, and not the batch's failure: the SUMMARY says it, exit 0 alone.
@@ -447,7 +447,7 @@ export function protectedLine(start: ProtectedRead, end: ProtectedRead): string 
 /** The commands as RESTORE lines: `<prefix>xcrun simctl spawn <udid> <cmd>`. */
 export const restoreFileLines = (prefix: string, udid: string, cmds: readonly string[]): string[] => cmds.map((c) => `${prefix}xcrun simctl spawn ${shellQuote(udid)} ${c}`);
 
-/** The hand commands for a domain not put back: its plan's, or by its backup (d43-gate.ts's restoreLine's rule). */
+/** The hand commands for a domain not put back: its plan's, or by its backup. */
 export function domainHand(name: string, backupPath: string | null, planned: readonly string[]): string[] {
   if (planned.length > 0) return [...planned];
   if (backupPath === null) return [`defaults read ${name} (then defaults delete ${name} <key> for each key it holds; never the whole domain)`];
@@ -464,7 +464,7 @@ export type DomainRestore = { name: string; backup: string | null; performed: Pe
   | { readBackEqual: false; differ: KeyDiff[]; why: string; hand: string[] }
 );
 
-/** One domain in the restore line (a part of d43-gate.ts's restoreLine, without the port: S6 owns the WDA). */
+/** One domain in the restore line (without the port: S6 owns the WDA). */
 export function domainPart(d: DomainRestore): string {
   const did = performedText(d.name, d.performed);
   // Put back means something was done: a domain that differed after the run got at least one action.

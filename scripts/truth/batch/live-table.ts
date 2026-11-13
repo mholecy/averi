@@ -4,8 +4,8 @@ import { firstLineOf, messageOf } from './words.js';
 
 /**
  * Main's live-cases table, as preconditions.ts and cases.ts read it: selectCases (the cases a run takes) and catalogOf
- * (the lab's cells). Loaded from the checkout's own scripts/truth/live-cases.ts by a dynamic import, as b11-analyze.ts
- * did — never a grep, and never a static import: the mutation run's sandbox holds scripts/truth/batch/ alone (ADR
+ * (the lab's cells). Loaded from the checkout's own scripts/truth/live-cases.ts by a dynamic import —
+ * never a grep, and never a static import: the mutation run's sandbox holds scripts/truth/batch/ alone (ADR
  * 0038's T2 amendment). A load that fails (a missing file, a syntax error) is named by its callers, never thrown.
  */
 

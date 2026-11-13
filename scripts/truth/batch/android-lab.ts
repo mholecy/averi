@@ -13,7 +13,7 @@ import { stateOf } from './run-dir.js';
 import { exitText, failedCall, nameInLine } from './words.js';
 
 /**
- * The lab emulator's plumbing around a batch's Android blocks (T2 S6b; batch-11.sh:413–450, batch-12.sh:377–400): the
+ * The lab emulator's plumbing around a batch's Android blocks (T2 S6b; batch-12.sh:377–400): the
  * `android` need — the lab guard, this run's build installed (`install -r`, batch-11's lab install), the installed APK
  * pulled and its cells.json byte-equal to main's catalog, the handler counts read — and its cheap recheck (`adb
  * get-state`, `pm path`); a need on the handler counts a block expects (batch-11's D55: shared 2, cell 1); the
@@ -25,7 +25,7 @@ import { exitText, failedCall, nameInLine } from './words.js';
 
 /** The need's name in a batch's `needs`. */
 export const ANDROID_NEED = 'android';
-/** The URLs whose handlers the check counts (batch-11.sh:443: shared 2, cell 1 on main's lab). */
+/** The URLs whose handlers the check counts (shared 2, cell 1 on main's lab). */
 export const HANDLER_URLS: readonly string[] = ['averilab://shared/open', 'averilab://cell/open'];
 /** The chooser's dirty window's name. */
 export const CHOOSER_WINDOW = 'D55 chooser';
@@ -59,7 +59,7 @@ export interface AndroidLab {
 }
 
 /**
- * The lab emulator kit. The need's check (batch-11.sh:427–450): the serial given and guarded; this run's build
+ * The lab emulator kit. The need's check: the serial given and guarded; this run's build
  * installed (`adb install -r`, the install bound); the lab installed (`get-state` first, then `pm path`); its APK
  * pulled into the lab folder (a fresh file) and its assets/cells.json main's catalog byte for byte, a copy kept; the
  * handler counts read and kept (android-handlers.txt). Its `alive`: the guard, `get-state` and `pm path`.
@@ -173,7 +173,7 @@ export function keepTree(ctx: Pick<BlockCtx, 'dir' | 'fs' | 'step'>, name: strin
 export interface ProbeRestoreOptions {
   /** The checkout the probe imports from: its cwd, where `--import tsx` resolves. */
   repo: string;
-  /** The probe's file (a scratch probe, outside the repo: d55-b11.ts, e5-b12.ts). */
+  /** The probe's file (a scratch probe, outside the repo: e5-b12.ts). */
   probe: string;
   /** Its device flags (`--serial <emu>`, `--apk <file>`): before `--state <file>`. */
   args: readonly string[];
@@ -186,7 +186,7 @@ export interface ProbeRestoreOptions {
 }
 
 /**
- * The probe's own state put back (S5's StateRestore; batch-11's `d55-b11.ts --restore`): `node --import tsx <probe>
+ * The probe's own state put back (S5's StateRestore): `node --import tsx <probe>
  * --restore <args> --state <file>` from the checkout, bounded, through the Run it is given; put back only when it exits
  * 0 and its state file then reads clean. Its command, every word shell-quoted, for a hand line.
  */

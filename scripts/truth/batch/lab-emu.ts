@@ -69,11 +69,11 @@ import type { Point } from '../../../src/adapters/types.js';
 
 /** `unzip -p`'s bound (a host read of the pulled APK, no device call). */
 export const UNZIP_SECS = 30;
-/** The wait after a key event before the next read (batch-11's `sleep 1`, d55-b11.ts's 1000 ms). */
+/** The wait after a key event before the next read. */
 export const SETTLE_MS = 1000;
-/** How many BACKs a dismissal presses at most while a chooser is in front (d55-b11.ts's restore: 3). */
+/** How many BACKs a dismissal presses at most while a chooser is in front. */
 export const MAX_BACKS = 3;
-/** The catalog's copy inside the lab APK (batch-11.sh: `unzip -p … assets/cells.json`). */
+/** The catalog's copy inside the lab APK, read by `unzip -p`. */
 export const CELLS_ENTRY = 'assets/cells.json';
 
 // ----------------------------------------------------------------------------------------- the lab emulator
@@ -141,7 +141,7 @@ export interface Check {
   line: string;
 }
 
-/** --check (d55-b11.ts --check): the focus (CHOOSER_FOCUS_COMMAND) and the preferred block, read only. */
+/** --check: the focus (CHOOSER_FOCUS_COMMAND) and the preferred block, read only. */
 export async function readCheck(emu: LabEmu, accepted: readonly AcceptedEntry[]): Promise<Check> {
   const focus = focusOf(await emu.rawShell(CHOOSER_FOCUS_COMMAND));
   const preferred = preferredOf(await emu.shell(PREFERRED_ARGV));
@@ -156,7 +156,7 @@ async function checkAfterDismissal(emu: LabEmu, accepted: readonly AcceptedEntry
   return readCheck(emu, accepted);
 }
 
-/** BACK while a chooser is in front (MAX_BACKS at most), then HOME (d55-b11.ts's restore): how many BACKs it took. */
+/** BACK while a chooser is in front (MAX_BACKS at most), then HOME: how many BACKs it took. */
 export async function dismissChooser(emu: LabEmu): Promise<{ backs: number }> {
   let backs = 0;
   const chooserUp = async () => chooserOf(focusOf(await emu.rawShell(CHOOSER_FOCUS_COMMAND))) !== undefined;
@@ -194,7 +194,7 @@ export async function readClipboard(emu: LabEmu): Promise<ShellRead> {
   return shellReadOf(await emu.shell(CLIPBOARD_ARGV));
 }
 
-/** The activities handling `url` (batch-11.sh's handlers: shared 2, cell 1), or why not. */
+/** The activities handling `url` (on main's lab: shared 2, cell 1), or why not. */
 export async function handlers(emu: LabEmu, url: string): Promise<number | { why: string }> {
   return handlersOf(await emu.shell(handlersArgv(url)));
 }
@@ -354,7 +354,7 @@ export interface Cleanup {
 }
 
 /**
- * The block's cleanup (batch-11.sh's D55 cleanup, batch-12's e5_check): --check, BACK and HOME and --check again when
+ * The block's cleanup (batch-12's e5_check): --check, BACK and HOME and --check again when
  * a chooser is in front; then by its exit, CHECK_OUTCOME's word, words and hand lines — 0 and 5 OK; 6 a WARN, no
  * RESTORE (no reinstall clears a last-chosen entry, so none is tried: batch-12 fixed batch-11's); 3 and 4 ERROR; 1, a
  * lab default, FAIL even when the reinstall clears it ("Always" is never tapped, so a default predates the batch or is

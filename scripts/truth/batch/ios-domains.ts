@@ -45,7 +45,7 @@ import { exitText, firstLineOf, messageOf, nameInLine, stepLine, verdictLine } f
  * only read. What is decided and said is ios-defaults.ts's; here are the calls, through the injected Run, and the
  * files, through io.ts.
  *
- * The state-file protocol (d43-gate.ts's `--state`): `backup` writes `{dirty: true, udid, port, domains}` before the
+ * The state-file protocol: `backup` writes `{dirty: true, udid, port, domains}` before the
  * window's first change, the backups beside it; `restore` clears `dirty` only after every domain's read-back equals
  * its backup; `compare`, after the window's end check, marks it dirty again (abort.ts#markDirty) when a domain changed
  * since (a late writer) or could not be read. A plist that cannot be read is never an empty map: it is unread, and
@@ -60,7 +60,7 @@ import { exitText, firstLineOf, messageOf, nameInLine, stepLine, verdictLine } f
  * What S6 adds around it: the WDA kill and the 4 s wait before the restore, the steps, the SUMMARY assembly.
  */
 
-/** The typed read's bound (python3's plistlib on a host file, never a device call): d43-gate.ts's 15 s. */
+/** The typed read's bound (python3's plistlib on a host file, never a device call). */
 export const PLIST_SECS = 15;
 
 // ----------------------------------------------------------------------------------------- the lab simulator
@@ -329,7 +329,7 @@ function comparison(sim: LabSim, stateFile: string, domains: Compared[], labels:
 
 // ---------------------------------------------------------------------------------------- the read-only key
 
-/** `defaults read <schemeapproval> <finportal key>` (batch-11.sh:337–340), read by protectedReadOf. */
+/** `defaults read <schemeapproval> <finportal key>`, read by protectedReadOf. */
 export async function readProtected(sim: LabSim): Promise<ProtectedRead> {
   return protectedReadOf(await sim.defaults(['read', PROTECTED.domain, PROTECTED.key]));
 }
@@ -349,7 +349,7 @@ export function domainsWindow(sim: LabSim, stateFile: string, opts: { block?: st
       return r.ok ? { ok: true, how: r.line } : { ok: false, why: r.line, hand: r.hand };
     },
     // Read when asked (the abort writes it): per domain from the state file — an import of its backup, or for one
-    // absent before key deletes, never an import (d43-gate.ts's rule); no state yet, one line saying both.
+    // absent before key deletes, never an import; no state yet, one line saying both.
     get hand() {
       const st = stateIn(sim.fs.read(stateFile));
       if (typeof st !== 'string') return st.domains.flatMap((d) => restoreFileLines(labels.hand, sim.udid, domainHand(d.name, d.backup, [])));

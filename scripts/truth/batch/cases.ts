@@ -15,7 +15,7 @@ import { nameInLine, verdictLine } from './words.js';
  * `--rejudge` summary, live-cases.ts#summarize) and `<name>.rejudge.json` (that summary's failure reasons, as data:
  * ../rejudge-failures.ts, written by the rejudge's `--failures`).
  *
- * A run counts only when complete (b11-analyze.ts:1–23): its `.cases`, a record, live.ts's `# Live golden:` line in
+ * A run counts only when complete: its `.cases`, a record, live.ts's `# Live golden:` line in
  * both its log and its summary (printed only once live.ts has judged), and every case main's selectCases picks for
  * what was asked present in the summary under each source asked — and something to prove: every id asked is one main
  * runs under a source asked, and main picks one case at least. What it found is the batch's analyzer's to judge; this
@@ -97,7 +97,7 @@ export function stepOutcome(code: number, log: string): { word: 'OK' | 'DONE' | 
 export type Selector = (asked: Asked, source: string) => Promise<readonly string[]>;
 
 /**
- * main's selectCases as a Selector (b11-analyze.ts's selectorOf): the cases of the run's platform, app and groups
+ * main's selectCases as a Selector: the cases of the run's platform, app and groups
  * (forms when the .cases names none), only those asked when any were, and of them those whose sources hold this one or
  * name none (Case.sources). The table is loaded at each call (Node caches the module); a load or a read that fails
  * rejects the call, and completeness names either with live-table.ts's unreadLive, the same words casesOnMain says.
@@ -175,7 +175,7 @@ async function selectionGaps(asked: Asked, select: Selector, summary: string | u
 }
 
 /**
- * Whether the run `name` in `dir` is complete (b11-analyze.ts's readRun's rule): its `.cases` read as what a live run
+ * Whether the run `name` in `dir` is complete: its `.cases` read as what a live run
  * is asked; its record JSON; `# Live golden:` in its log and in its summary; every id `select` picks for each source
  * asked listed in the summary under that source; and something to prove (selectionGaps). A `.cases` with nothing beside
  * it was asked but never ran. Every gap is said, in that order, `; ` between them: the whole why at once, so one rerun
