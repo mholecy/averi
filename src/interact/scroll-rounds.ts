@@ -6,7 +6,8 @@ import { drawOrderFound, type Cover } from '../ui-tree/cover.js';
 import { askedOf, eyesQuestion, pairQuestion, reachesPoint, sameQuestion, type EyesAnswer, type EyesAsked, type EyesFinding, type EyesQuestion, type PairQuestion } from '../ui-tree/eyes.js';
 import { seenOrderOf, type OrderSeen, type PairSeen } from '../ui-tree/seen-order.js';
 import { hasArea, tapPoint } from '../ui-tree/selectors.js';
-import { missOf, saysTopLayerOnly, topLayerOnlySource, type Miss, type TopLayerOnlySource } from '../ui-tree/miss.js';
+import { dialectOf, type TopLayerOnlySource } from '../ui-tree/dialect.js';
+import { missOf, saysTopLayerOnly, type Miss } from '../ui-tree/miss.js';
 import { noScrollStanding, outsideItsScrollView, type NoScrollStanding } from '../ui-tree/standing.js';
 import { SIDES } from '../ui-tree/sides.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
@@ -369,7 +370,7 @@ export interface DetentMove {
  * that way (`EndProof`, its `way` the `lastStroke`) — after its
  * `unmoved` strokes (one, where UNMOVED_STROKES_EXHAUST's two are the proof otherwise). `unlisted`: why strokes for a
  * target never seen may have moved nothing, beside the content's end — the tree source lists only the top layer
- * (ui-tree/miss.ts#TopLayerOnlySource), so they may have landed on a sheet, alert or cover it does not list; carried by
+ * (ui-tree/dialect.ts#TopLayerOnlySource), so they may have landed on a sheet, alert or cover it does not list; carried by
  * the unmoved stop of a call whose strokes are `unfelt` (`CallEvidence`) and said where that stop names no other cause
  * (scroll-text.ts#boundText: no end proven, nothing named under the touch-down) — a possibility, never the cause
  * (ui-tree/miss.ts#TOP_LAYER_ONLY_HINT); not carried when the call's miss says it already (ui-tree/miss.ts
@@ -1307,7 +1308,7 @@ type VisibleStop = Extract<ScrollOutcome, { kind: 'visible' }>;
 
 /**
  * THE UNKNOWN CENTRE (D17): the plain stop `visible` made — or, first, ONE more stroke. uiautomator cuts a node's bounds
- * at the screen's edge whatever scroll view it lies past (adapters/types.ts#UiNode.boundsCutAtScreen), so a carousel's
+ * at the screen's edge whatever scroll view it lies past (ui-tree/dialect.ts#TreeDialect.cutsAtScreen), so a carousel's
  * card running past its carousel's edge is listed ending at the screen's: its centre, which the stop judges, is
  * unknown — measured, C laid at x 586 948 wide was dumped `[586,380][1080,614]`, its listed centre 833 inside the
  * carousel ending at 1014, its true one 1060 past it, and the stop said "visible". A vertical list's row dumped ending at
@@ -1419,7 +1420,7 @@ function detentMove({ detents }: State): DetentMove | undefined {
  * unmoved stop's note (BoundBy's `unlisted`), the rule that no stroke is drawn blind (`round`) and a bound's `neverRead`:
  * - `unread`: no tree read of the call has read — nothing shows what the screen is, and nothing is there to tell a
  *   stroke changed it (`screenBefore`): no stroke;
- * - `unfelt`: the last read that read is of a source that lists only the top layer (ui-tree/miss.ts#topLayerOnlySource:
+ * - `unfelt`: the last read that read is of a source that lists only the top layer (ui-tree/dialect.ts#TreeDialect's `topLayerOnly`:
  *   idb's flat list, which shows no sign of a large sheet, an alert or a cover over the screen — ADR 0018, "idb's
  *   presented layer"), the target never seen and no stroke of the call has moved the tree (motion-ledger.ts#treeMoved):
  *   the strokes may land on such a layer — `source`, the tree source the stop's note speaks of. THE FEELER's trigger:
@@ -1434,7 +1435,7 @@ type CallEvidence = { of: 'unread' } | { of: 'unfelt'; source: TopLayerOnlySourc
 function callEvidence(s: State): CallEvidence {
   const last = s.screenBefore?.tree;
   if (last === undefined) return { of: 'unread' };
-  const source = topLayerOnlySource(last);
+  const source = dialectOf(last).topLayerOnly;
   if (source === undefined) return { of: 'felt' };
   return !s.everFound && !treeMoved(s.motion) ? { of: 'unfelt', source } : { of: 'felt', source };
 }

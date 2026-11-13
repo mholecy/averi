@@ -1,6 +1,7 @@
 import { everyNode, type UiNode } from '../adapters/types.js';
 import type { Edge } from './geometry.js';
 import { presentationOf, type MarkedLayer } from './presentation.js';
+import { dialectOf, type TopLayerOnlySource } from './dialect.js';
 import { clips } from './scroll-containers.js';
 import { findTarget, hasArea, soleIdOf, type Target } from './selectors.js';
 import { clippedOutText, revealText } from './sides.js';
@@ -41,13 +42,13 @@ import { isBareTreeMemo } from './verdict.js';
  *   never "no scroll moves it out", which would send an agent to dismiss the very window it needs. Not where the
  *   reader has already stroked that list (`scrolled`: `scroll_until`'s own stop, ADR 0018 decision 3), nor on idb's
  *   flat list, which lists no scroll view (the remedy stays as it was: ADR 0018, residual 18);
- * - `activeWindow`: the source lists the active window only (`UiNode.activeWindowOnly`, uiautomator) and marks no
+ * - `activeWindow`: the source lists the active window only (dialect.ts#TreeDialect.activeWindow, uiautomator) and marks no
  *   presented window — a sheet or a dialog it does not mark (a fully expanded bottom sheet with no scrim, form-picker;
  *   a full-screen dialog; a window against the screen's edge: ADR 0018's residuals 18 and 19) still hides the screen
  *   beneath, and nothing in the dump tells it from no window at all: ACTIVE_WINDOW_HINT, a possibility, never the cause.
  *   Where the window manager typed the window after the read (ui-tree/window-mark.ts, on a miss only), its word is in
- *   the root's marks: a Dialog's window is `presented` (above), and the activity's own window alone (`UiNode
- *   .windowAlone`) is `none` — no hint; with no word (the call failed, the frames disagree) the hint stays;
+ *   the root's marks: a Dialog's window is `presented` (above), and the activity's own window alone (`activeWindow`
+ *   `screenAlone`) is `none` — no hint; with no word (the call failed, the frames disagree) the hint stays;
  * - `noIdListed`: the tree is idb's flat list (its own mark, below), the target named an id ALONE, nothing matched, the
  *   read is not bare (ui-tree/verdict.ts#isBareTreeMemo: a launch-transition read lists nothing of the app's, so its
  *   ids say nothing of the screen), and no element of the read carries an identifier at all — a fact the read states,
@@ -57,7 +58,7 @@ import { isBareTreeMemo } from './verdict.js';
  *   UIKit table whose cells' labels carry ids WDA reads from the same process (docs/bugs/2026-10-16-lab-ios-idb-lists-
  *   uikit-table-rows-without-their-identifier.md) and on an alert whose read is the alert alone (alert-dim);
  * - `idUnlisted`: the same, on a read that lists other identifiers — the tree is idb's flat list (its own mark,
- *   `UiNode.flatList` — the tree's, not averi.yaml's nor the adapter's: the mark is on every tree idb's parser gives,
+ *   dialect.ts#TreeDialect.topLayerOnly — the tree's, not averi.yaml's nor the adapter's: the mark is on every tree idb's parser gives,
  *   adapters/ios-tree-source.ts#markIdbDialect, and on no other), the target named an id ALONE (selectors.ts
  *   #soleIdOf), no read held it, and the read is not bare. idb returns the accessibility elements of the top layer
  *   only, so an id can be in no read for any of idb's reasons (`IDB_UNLISTS`): set on a CONTAINER (SwiftUI
@@ -82,23 +83,6 @@ export type Miss =
   | { readonly of: 'none' };
 
 /**
- * A tree source that lists only what a presented layer leaves to accessibility and shows no sign of a layer it does
- * not mark: idb's flat list — a large-detent sheet, an alert, a transparent cover over the screen leave only their own
- * controls listed, or none (ADR 0018, "idb's presented layer", residuals).
- */
-export type TopLayerOnlySource = 'idb';
-
-/**
- * The tree's source when it lists only the top layer (`TopLayerOnlySource`), read from the tree: idb's own mark,
- * `UiNode.flatList` — the mark `noIdListed` and `idUnlisted` read, and draw-order.ts#listsAncestry the same mark as the tree's
- * nesting. For the reader that must act before a miss is judged: `scroll_until`'s strokes for a target never seen
- * (interact/scroll-rounds.ts#CallEvidence). Undefined for a tree that lists its presented layers or its scroll views.
- */
-export function topLayerOnlySource(tree: UiNode): TopLayerOnlySource | undefined {
-  return tree.flatList === true ? 'idb' : undefined;
-}
-
-/**
  * THE hint of strokes that moved nothing on a tree whose source lists only the top layer (`TopLayerOnlySource`), as
  * `scroll_until`'s unmoved stop says it (interact/scroll-text.ts#boundText) — a possibility, never the cause, as
  * `ACTIVE_WINDOW_HINT` is.
@@ -118,7 +102,7 @@ export const ACTIVE_WINDOW_HINT = 'the tree lists only the active window: if a s
 
 /**
  * What a tree that lists a presented layer ALONE lists it as (`Miss`'s `presented`), which its sentences name: the
- * active `window` (uiautomator's root, `UiNode.activeWindowOnly`), or the `layer` on top (idb's flat list — what a
+ * active `window` (uiautomator's root, dialect.ts#TreeDialect.activeWindow), or the `layer` on top (idb's flat list — what a
  * presentation leaves to accessibility).
  */
 export type ListedAs = 'window' | 'layer';
@@ -146,18 +130,19 @@ export function missOf({ tree, readError, target, scrolled }: { tree?: UiNode; r
   if (readError !== undefined || tree === undefined) return { of: 'unread' };
   const matched = target === undefined ? [] : findTarget(tree, target);
   if (matched.length > 0 && !matched.some(hasArea)) return { of: 'zeroArea', clippedOut: clippedOutOf(matched) };
+  const dialect = dialectOf(tree);
   // The root-mark tests are a cost guard too: only a tree whose root is marked presented pays the presentation's walk.
   const alone = tree.presentation === undefined ? undefined : presentationOf(tree).alone;
   if (alone !== undefined) {
-    const listed: ListedAs = tree.activeWindowOnly === true ? 'window' : 'layer';
+    const listed: ListedAs = dialect.activeWindow !== undefined ? 'window' : 'layer';
     // The window listed alone IS the tree: a scroll view anywhere in it is the window's own. One that scrolls NOW
     // (uiautomator's scrollable="true", scroll-containers.ts#clips): a lazy list with rows not laid out has a range to
     // scroll, while a ScrollView-classed node that fits (an AlertDialog's message) is no list to look in.
     const ownList = listed === 'window' && scrolled !== true && [...everyNode(tree)].some(clips);
     return { of: 'presented', layer: alone, listed, ...(ownList && { mayLieIn: 'itsScrollView' as const }) };
   }
-  if (tree.activeWindowOnly === true && tree.windowAlone !== true) return { of: 'activeWindow' };
-  const id = tree.flatList === true && target !== undefined && matched.length === 0 ? soleIdOf(target) : undefined;
+  if (dialect.activeWindow === 'mayHide') return { of: 'activeWindow' };
+  const id = dialect.topLayerOnly === 'idb' && target !== undefined && matched.length === 0 ? soleIdOf(target) : undefined;
   if (id === undefined || isBareTreeMemo(tree)) return { of: 'none' };
   return listsNoId(tree) ? { of: 'noIdListed', id } : { of: 'idUnlisted', id };
 }

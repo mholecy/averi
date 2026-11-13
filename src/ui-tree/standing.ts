@@ -1,12 +1,6 @@
 import { rectArea, rectIntersection, rectsOverlap, SCREEN_SIZED_FRACTION, type DeviceScreen, type Point, type Rect, type UiNode } from '../adapters/types.js';
-import {
-  drawOrder,
-  listsAncestry,
-  listsBoundsCutAtScreen,
-  listsUnclippedFrames,
-  type DrawOrder,
-  type Exposure,
-} from './draw-order.js';
+import { dialectOf } from './dialect.js';
+import { drawOrder, type DrawOrder, type Exposure } from './draw-order.js';
 import { coverAtPoint, lastPresented, overlaidCover, type Cover } from './cover.js';
 import { laterEdgesIn, type FlushNeighbour, type LaterEdges, type PinnedEdge } from './later-edges.js';
 import type { MarkedLayer, PresentedPress } from './presentation.js';
@@ -152,7 +146,7 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *     meeting what it reads below the status band, any of them, not only
  *     one over the centre: the one on top at its centre, else the last
  *     drawn, with its `reach` — and `overRoot` when the node is a flat
- *     list's screen-sized root (draw-order.ts#listsAncestry, read here so
+ *     list's screen-sized root (dialect.ts#TreeDialect.ancestry, read here so
  *     the pixel assert does not); with no pixel cover, the node at its
  *     overlaid edge (`later-edges.ts#OverlaidEdge`: one the tree shows only by the cut,
  *     cover.ts#overlaidCover), its rect the reach.
@@ -307,7 +301,7 @@ export interface Scene {
    * draw order was told (`sceneOf`'s `seen`); absent when no one looked. The remedy reads it for why a pair stayed untold.
    */
   readonly orderSeen?: SeenOrder;
-  /** The tree's clip facts (geometry.ts#clipsOf), its dialect as draw order reads it (draw-order.ts#listsAncestry, #listsUnclippedFrames). */
+  /** The tree's clip facts (geometry.ts#clipsOf), its dialect as dialect.ts#TreeDialect says it (`ancestry`, `framesUnclipped`, `cutsAtScreen`). */
   readonly clips: Clips;
   /** The pixel assert's standing: its own union (`PixelStanding`), on the usable screen's `oriented` box, picked here. */
   standing(node: UiNode, screen: UsableScreen | undefined, purpose: PixelPurpose): PixelStanding;
@@ -709,13 +703,14 @@ type Unreached<J> = Exclude<J, { readonly kind: 'reachable' }>;
 export function sceneOf(tree: UiNode, seen?: SeenOrder): Scene {
   let order: DrawOrder | undefined;
   let clips: Clips | undefined;
+  const dialect = dialectOf(tree);
   const scene: Scene = {
     get order() {
       return (order ??= drawOrder(tree, seen));
     },
     ...(seen !== undefined && { orderSeen: seen }),
     get clips() {
-      return (clips ??= clipsOf(tree, { ancestry: listsAncestry(tree), unclipped: listsUnclippedFrames(tree), cutAtScreen: listsBoundsCutAtScreen(tree) }));
+      return (clips ??= clipsOf(tree, { ancestry: dialect.ancestry, unclipped: dialect.framesUnclipped, cutAtScreen: dialect.cutsAtScreen }));
     },
     standing,
     pixelRegion: (node, screen) => pixelDrawn(node, pixelScreen(screen)).rect,
@@ -752,7 +747,7 @@ export function sceneOf(tree: UiNode, seen?: SeenOrder): Scene {
       // What it reads is asked of THE region (`pixelRegion`): what is judged over it is what its sampler reads.
       const { drawn, rect } = pixelDrawn(node, usable);
       const read: PixelRead = { ...purpose, reads: purpose.reads(rect, failsOpen ? rect : single.box) };
-      const pixel = pixelStanding(judged, regionPlace(node.rect, read, single.box, single, failsOpen, toldFrame(drawn)), single.box, single, read, !listsAncestry(tree));
+      const pixel = pixelStanding(judged, regionPlace(node.rect, read, single.box, single, failsOpen, toldFrame(drawn)), single.box, single, read, !dialect.ancestry);
       return pixel.kind === 'reachable' ? pixel : remedied({ pixel, box: single.box, bands: single }, judged);
     }
     const touch = touchScreen(screen, tree);
@@ -1414,7 +1409,7 @@ function tapStanding(judged: Judged, place: PointPlace, chosen: Rect, boxes: rea
  * (draw-order.ts#paintsOver) — the one on top at its centre, else the last
  * drawn; with none, the node at its overlaid edge (`later-edges.ts#OverlaidEdge`, appended to
  * `facts.covers` as its cover, cover.ts#overlaidCover), its rect the reach. `flat`: the tree lists no ancestry
- * (draw-order.ts#listsAncestry).
+ * (dialect.ts#TreeDialect.ancestry).
  */
 function pixelStanding(judged: Judged, place: RegionPlace, box: Rect, bands: JudgedBoxes | undefined, purpose: PixelRead, flat: boolean): PixelJudgement {
   const { scene, node } = judged;

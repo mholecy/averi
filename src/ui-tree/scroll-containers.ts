@@ -12,7 +12,7 @@ import { rectArea, sameRect, type Rect, type ScrollAxis, type UiNode } from '../
  *   Only Android supplies it; iOS
  *   frames are unclipped, so no iOS node clips and no iOS clip chain is
  *   invented. Not what marks a tree's frames unclipped: the source says
- *   that on the root (UiNode.unclippedFrames, geometry.ts#Clips.axesOf) —
+ *   that on the root (dialect.ts#TreeDialect.framesUnclipped, geometry.ts#Clips.axesOf) —
  *   an Android tree with no scroller flagged is cut all the same.
  * - `scrolls` — this node's content moves under its frame. A fact about
  *   REACHABILITY and DRAW ORDER: whether `scroll_until` can move a node
@@ -73,7 +73,7 @@ export function isScrollViewOf(n: UiNode, container: Rect): boolean {
 /**
  * The ONE axis a scroll view scrolls on, or undefined when the tree cannot tell — per source:
  * - its type, where the source says it (`UiNode.scrollAxis`: Android's class, WDA's `Table`);
- * - else, on a tree of UNCLIPPED frames (`unclipped`: WDA's, adapters/types.ts#UiNode.unclippedFrames), its content's
+ * - else, on a tree of UNCLIPPED frames (`unclipped`: WDA's, dialect.ts#TreeDialect.framesUnclipped), its content's
  *   extent past its frame: WDA lists a scroll view's content at its laid-out rect, so content that RUNS ON past the
  *   frame on one axis alone scrolls on that axis — a node straddling the frame's edge by a quarter of its side, or one
  *   wholly past it continuing a same-sized sibling inside it (`contentAxis`), never any node past it. Measured on

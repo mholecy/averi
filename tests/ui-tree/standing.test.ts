@@ -1138,7 +1138,7 @@ describe('sceneOf(tree).clips.inScroller over every fixture — known on every n
   });
 });
 
-describe('sceneOf(tree).clips.inScroller — the dialect asked of draw order (draw-order.ts#listsAncestry)', () => {
+describe('sceneOf(tree).clips.inScroller — the dialect asked of draw order (dialect.ts#TreeDialect.ancestry)', () => {
   it("idb's flat list cannot say; a nested tree can", async () => {
     const flat = await swiftIdb();
     expect(sceneOf(flat).clips.inScroller(byId(flat, 'swift_payment.form.priority_select'))).toBeUndefined();

@@ -1,7 +1,8 @@
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
 import { describeElementSpec } from '../ui-tree/element-spec.js';
 import { lookOn } from '../ui-tree/look.js';
-import { KEYBOARD_UNLISTED, MissedError, missNote, missOf, presentedAloneHeadline, topLayerOnlySource, type Miss } from '../ui-tree/miss.js';
+import { dialectOf } from '../ui-tree/dialect.js';
+import { KEYBOARD_UNLISTED, MissedError, missNote, missOf, presentedAloneHeadline, type Miss } from '../ui-tree/miss.js';
 import { pollTimeoutMessage, pollTree, readTreeOrMiss, type FirstSample } from '../ui-tree/read-tree.js';
 import { findTarget, hasArea, preferInteractive, type Target } from '../ui-tree/selectors.js';
 import { markedForMiss } from '../ui-tree/window-mark.js';
@@ -415,7 +416,7 @@ async function notFound(
 
 /**
  * The soft keyboard, when it may be why a wait found nothing (D32 K1): the tree's source lists nothing beneath the
- * keyboard (`topLayerOnlySource`: idb's flat list; ADR 0018), and its keys are read up by their shape — the band's
+ * keyboard (ui-tree/dialect.ts#TreeDialect's `topLayerOnly`: idb's flat list; ADR 0018), and its keys are read up by their shape — the band's
  * line (ui-tree/keyboard-position.ts#KeyboardPosition.line, over draw-order.ts#keyboardBandTop: a position, never a
  * reading of the keyboard shown, K5d). Then `keyboardMayCoverText`, with the adapter's own remedy, short
  * (ui-tree/keyboard-cover.ts#readKeyboard: how it hides it, said briefly). Undefined on any other tree — WDA and
@@ -425,7 +426,7 @@ async function notFound(
  * the last read only, on a miss only: one draw-order walk.
  */
 function keyboardMissNote(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdvice'>, tree: UiNode): string | undefined {
-  const source = topLayerOnlySource(tree);
+  const source = dialectOf(tree).topLayerOnly;
   if (source === undefined) return undefined;
   const look = lookOn(adapter, tree);
   const line = look.keyboard.line();

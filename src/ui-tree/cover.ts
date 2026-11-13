@@ -1,4 +1,5 @@
 import type { Point, Rect, UiNode } from '../adapters/types.js';
+import { dialectOf } from './dialect.js';
 import { containsPoint, coverText, nodeText, type Edge, type QuotedNode } from './geometry.js';
 import { isInteractive, tapPoint } from './selectors.js';
 
@@ -74,7 +75,7 @@ export const lastPresented = (covers: readonly Cover[]): Cover | undefined => co
  * TextField's indicator line, whose dump is not padded; the 48-dp height needs the density ADR 0014 refused the draw
  * order). The eyes decide (ui-tree/eyes.ts#pairQuestion's `clear` pair, verify/eyes.ts#judgeClear); this only says
  * when to ask. All of:
- * 1. the tree's source pads touch targets (`UiNode.paddedTouchTargets` on `tree`, Compose's dialect) — the one reason a
+ * 1. the tree's source pads touch targets (dialect.ts#TreeDialect.padsTouchTargets of `tree`, Compose's dialect) — the one reason a
  *    dumped rect holds an undrawn margin;
  * 2. `target` is a control, and the cover a `text` leaf (a role no control has): glyphs only, no touch;
  * 3. the cover crosses exactly one of the target's horizontal edges, its far end outside the target, and does not hold
@@ -90,7 +91,7 @@ export const lastPresented = (covers: readonly Cover[]): Cover | undefined => co
 export function marginText(cover: Cover, target: UiNode, tree: UiNode): boolean {
   const c = cover.node.rect;
   const t = target.rect;
-  if (tree.paddedTouchTargets !== true || cover.order.kind !== 'drawn' || cover.presented) return false;
+  if (!dialectOf(tree).padsTouchTargets || cover.order.kind !== 'drawn' || cover.presented) return false;
   if (!isInteractive(target) || cover.node.role !== 'text' || cover.node.children.length > 0) return false;
   const [cBottom, tBottom] = [c.y + c.height, t.y + t.height];
   const overTop = c.y < t.y && cBottom > t.y && cBottom < tBottom;

@@ -50,7 +50,7 @@ was reported done at (201,827), 3 pt below CONTINUE.
 - **The drawn frame** (`ui-tree/geometry.ts#Clips.drawnIn`): the intersection of the frames of every ancestor that
   scrolls (an ancestor of no area cuts nothing: it fails open), on a tree whose SOURCE says its frames are unclipped:
   the WDA parser marks its root (`UiNode.unclippedFrames`), as idb's marks `flatList` and uiautomator's
-  `paddedTouchTargets`, and `draw-order.ts#listsUnclippedFrames` reads it. Android's rects are already cut to their
+  `paddedTouchTargets`, and `dialect.ts#TreeDialect.framesUnclipped` reads it. Android's rects are already cut to their
   ancestors and carry no mark — whatever they flag: a web view or a `scrollable="false"` list with no scroller flagged
   is unchanged — and idb lists no scroll view: both are unchanged by construction. **Superseded for Android
   2026-10-20** (below, "the drawn frame on Android"): uiautomator does not always cut. A normalized WDA tree saved before
@@ -111,7 +111,7 @@ above its scroll view's top too.
   pixel, the `fully` stop read it `clipped` where its flush probe is the rule (ADR 0013). `flushEdges` and `contentToward`
   read "past" as more than a pixel already.
 - **The carry model stays WDA's** (`ui-tree/geometry.ts#DrawnFrame.listedWhereItLies`, true only where
-  `draw-order.ts#listsUnclippedFrames`; the standing hands it on as `StandingFacts.listedWhereItLies`, which
+  `dialect.ts#TreeDialect.framesUnclipped`; the standing hands it on as `StandingFacts.listedWhereItLies`, which
   `interact/course.ts#stillNeeds` asks): the drawn frame no longer tells the dialect, and on Android a row's
   rect as it comes in is mostly cut to its scroll view, so its motion is no measure of the content's. The dialect is
   read in ui-tree, by the drawn frame's owner, not again by `scroll_until`.

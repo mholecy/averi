@@ -1891,7 +1891,7 @@ const missedElement = (cond: Condition): ElementSpec | undefined => (cond.absent
  * target's story): why the last tree read did not hold the element (ui-tree/miss.ts#missOf, asked with the
  * element: it decides every not-found reply), its note (`missNote`) — and after idb's `idUnlisted` note, the
  * flow-step advice (`WAIT_ON_A_LISTED_ID`). The miss reads the tree source from the tree's own mark
- * (`UiNode.flatList`), not from the adapter or averi.yaml: idb's parser marks every tree it gives
+ * (ui-tree/dialect.ts#TreeDialect.topLayerOnly), not from the adapter or averi.yaml: idb's parser marks every tree it gives
  * (adapters/ios-tree-source.ts#markIdbDialect) and no other source does, and a read that failed has no tree to say
  * anything of — its error is the story (pollTimeoutMessage drops the hint beneath a failed last read).
  *

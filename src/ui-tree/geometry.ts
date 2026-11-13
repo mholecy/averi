@@ -762,7 +762,7 @@ export interface Clips {
    * scroll view draws none of its content outside its own frame, on either platform (UIKit's `UIScrollView` clips to
    * its bounds, so do a table, a collection view and SwiftUI's `ScrollView`; so do Android's scroll containers), while
    * a source may list that content past it:
-   * - WDA always (adapters/types.ts#UiNode.unclippedFrames): the at-rest SWIFT form lists `payee_name_input` at
+   * - WDA always (dialect.ts#TreeDialect.framesUnclipped): the at-rest SWIFT form lists `payee_name_input` at
    *   `24,801 354x52`, below its `ScrollView 0,0 402x780`; the capture shows the bare background from CONTINUE's
    *   bottom (824) down, and a tap at its centre was reported done on it.
    * - uiautomator sometimes: it cuts most rects to their scroll container (a no-op here), but Compose's
@@ -936,7 +936,7 @@ export interface DrawnFrame {
   /** The ancestors that scroll, nearest first: the scroll view a sentence names is one of them. */
   readonly scrollers: readonly UiNode[];
   /**
-   * Whether the tree's source lists the node WHERE IT LIES (`clipsOf`'s `unclipped`, draw-order.ts#listsUnclippedFrames:
+   * Whether the tree's source lists the node WHERE IT LIES (`clipsOf`'s `unclipped`, dialect.ts#TreeDialect.framesUnclipped:
    * WDA's): then `frame` is the window the content moves through, and a row's motion as it comes in is the content's —
    * what `scroll_until`'s carry model measures (interact/course.ts#stillNeeds), through
    * ui-tree/standing.ts#StandingFacts.listedWhereItLies. Not on uiautomator's trees, which cut most rows to their
@@ -946,8 +946,8 @@ export interface DrawnFrame {
   /**
    * The sides along which the node runs on an UNKNOWN distance past its listed rect (`cutAtScreenEdges`): each lies on
    * the screen's edge while the frame's side lies inside the screen, on a tree whose source cuts a node's bounds at the
-   * screen whatever scroll view it lies past (`clipsOf`'s `cutAtScreen`, draw-order.ts#listsBoundsCutAtScreen:
-   * uiautomator's, adapters/types.ts#UiNode.boundsCutAtScreen). There the listed rect is the screen's cut, not the
+   * screen whatever scroll view it lies past (`clipsOf`'s `cutAtScreen`, dialect.ts#TreeDialect.cutsAtScreen:
+   * uiautomator's). There the listed rect is the screen's cut, not the
    * node's: its visible fraction is an upper bound and its centre along that axis unknown
    * (ui-tree/standing.ts#StandingFacts.unknownPast). Absent when none.
    */
@@ -1034,12 +1034,13 @@ function stackedAcross(nodes: readonly UiNode[], axis: ScrollAxis): boolean {
  * A tree's `Clips`: one pre-order walk recording each node's parent and its
  * clipping chain (shared along a branch), for nodes under a clip only;
  * the sliver cuts are judged when asked, and kept. `ancestry`: whether the
- * tree's nesting is its nodes' ancestry (draw-order.ts#listsAncestry), which
+ * tree's nesting is its nodes' ancestry (dialect.ts#TreeDialect.ancestry), which
  * `inScroller` and `drawnIn` ask; `unclipped`: whether its source reports
- * frames unclipped (draw-order.ts#listsUnclippedFrames), which `axesOf` and
+ * frames unclipped (dialect.ts#TreeDialect.framesUnclipped), which `axesOf` and
  * `contentToward` ask; `cutAtScreen`: whether its source cuts a node's bounds at
- * the screen's edge (draw-order.ts#listsBoundsCutAtScreen), which `drawnIn`'s
- * `unknownPast` asks — the three readers of the tree's dialect, all in draw order.
+ * the screen's edge (dialect.ts#TreeDialect.cutsAtScreen), which `drawnIn`'s
+ * `unknownPast` asks — three fields of the tree's dialect, handed in by the caller
+ * (standing.ts#sceneOf asks dialect.ts#dialectOf).
  */
 export function clipsOf(tree: UiNode, { ancestry, unclipped = false, cutAtScreen = false }: { readonly ancestry: boolean; readonly unclipped?: boolean; readonly cutAtScreen?: boolean }): Clips {
   const chains = new Map<UiNode, readonly Rect[]>();

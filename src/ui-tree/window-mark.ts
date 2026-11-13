@@ -1,4 +1,5 @@
 import { sameRectWithinPixel, type DeviceAdapter, type FocusedWindow, type Rect, type UiNode } from '../adapters/types.js';
+import { dialectOf } from './dialect.js';
 import { findTarget, type Target } from './selectors.js';
 
 /**
@@ -18,7 +19,8 @@ import { findTarget, type Target } from './selectors.js';
  *   when the window spans the screen's width ("a sheet or modal"), `dialog` when it is narrower (a popup against an
  *   edge — one floating off both edges the parser has marked already). Decisions 3 and 4 then read it as they read the
  *   parser's: the wait names the layer, `scroll_until` sends no stroke but on the window's own scroll view;
- * - `screenAlone` marks the root `windowAlone`: the active-window hint is not said (ui-tree/miss.ts#missOf);
+ * - `screenAlone` marks the root `windowAlone`: the window is the app's screen alone (read through
+ *   dialect.ts#TreeDialect.activeWindow);
  * - `unknown` leaves the tree as it was: the miss says the active-window hint.
  * The parser's own mark comes first: a marked tree is never asked. A departure from "the parser reads what ui-tree
  * never sees": this mark is set after the read, from a second call, because the dump holds no such fact.
@@ -37,7 +39,7 @@ import { findTarget, type Target } from './selectors.js';
  */
 
 /** A tree whose window the window manager may still type: it lists the active window only, and its parser marked none. */
-const windowMayBeTyped = (tree: UiNode): boolean => tree.activeWindowOnly === true && tree.presentation === undefined && tree.windowAlone !== true;
+const windowMayBeTyped = (tree: UiNode): boolean => dialectOf(tree).activeWindow === 'mayHide' && tree.presentation === undefined;
 
 /** THE decision: `tree` marked by the window manager's word on its window (the module doc), or `tree` itself. Pure. */
 export function markByWindow(tree: UiNode, window: FocusedWindow): UiNode {

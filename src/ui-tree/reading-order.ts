@@ -28,13 +28,13 @@ import type { SeenOrder } from './seen-order.js';
 
 /**
  * What a target's reading order is judged against: the target at its first place in the walk, whether the tree is a
- * flat list (`UiNode.flatList` on its root), where a flat list's content starts (`contentFrom`: the nodes before it
+ * flat list (`ancestry`, dialect.ts#TreeDialect: false on one), where a flat list's content starts (`contentFrom`: the nodes before it
  * are its top bar, ADR 0004) and its bottom chrome (`bottomChrome`: the nodes pinned at its bottom, idb's keyboard and
  * a floating tab bar's items) — draw-order.ts's facts of the tree, handed in.
  */
 export interface ReadingOrderAbout {
   readonly target: Placed;
-  readonly flatList: boolean;
+  readonly ancestry: boolean;
   readonly contentFrom: number;
   readonly bottomChrome: ReadonlySet<Placed>;
   /**
@@ -48,8 +48,8 @@ export interface ReadingOrderAbout {
 
 /**
  * Whether the tree's source lists `parent`'s children in READING order (`UiNode.readingOrder`: idb's flat list, a WDA
- * run sorted by top), not in draw order — the third reader of the tree's dialect (draw-order.ts#listsAncestry's doc), and the one outside draw order, asked by
- * `readingOrderOf` alone.
+ * run sorted by top), not in draw order — a mark of the node, not of the tree's root (those are ui-tree/dialect.ts's),
+ * asked in this module alone.
  */
 function listsInReadingOrder(parent: UiNode): boolean {
   return parent.readingOrder === true;
@@ -59,10 +59,11 @@ function listsInReadingOrder(parent: UiNode): boolean {
  * Whether `parent` lists its children in reading order in a NESTED tree (`listsInReadingOrder`, and no flat list): WDA's
  * run sorted by top, or uiautomator's classic run in AOSP's location order (lab note LR4) — where a sibling listed before a target may be drawn over it whatever it is (`peersOf`), and a
  * childless node the app named is drawn unless it wraps a sibling (placed.ts#FRAME_EXCUSES `structural`: React
- * Native's flattened views). Not idb's flat list (`UiNode.flatList`), whose listing is its own (ADR 0015).
+ * Native's flattened views). Only on a tree with `ancestry` (the caller's, dialect.ts#TreeDialect): not idb's flat
+ * list, whose listing is its own (ADR 0015).
  */
-export function listsNestedReadingOrder(parent: Placed): boolean {
-  return listsInReadingOrder(parent.node) && parent.node.flatList !== true;
+export function listsNestedReadingOrder(parent: Placed, ancestry: boolean): boolean {
+  return ancestry && listsInReadingOrder(parent.node);
 }
 
 /**
@@ -198,9 +199,9 @@ function peersOf(
   seen: SeenOrder | undefined,
   headings: ReadonlySet<Placed>,
 ): ReadingOrder {
-  const { target, flatList, contentFrom, bottomChrome, drawn } = about;
+  const { target, ancestry, contentFrom, bottomChrome, drawn } = about;
   const t = target.node;
-  if (flatList && (target.at < contentFrom || bottomChrome.has(target))) return NO_READING_ORDER;
+  if (!ancestry && (target.at < contentFrom || bottomChrome.has(target))) return NO_READING_ORDER;
   // A control's peers are controls, either side of it. In a NESTED run in reading order (`listsNestedReadingOrder`:
   // WDA's run sorted by top, SwiftUI's, UIKit's and React Native's alike, uiautomator's classic run in location order —
   // not idb's flat list) a sibling that draws over the target (`drawn`: the draw order's `target` column but its
@@ -213,14 +214,14 @@ function peersOf(
   // residual (a non-drawing touch layer lifted: ADR 0024's residual 2 widened): ADR 0015's D84 amendment.
   // Not idb's flat list: there a modal is listed before the screen beneath it and its frame (mp-native's value date
   // picker `Value date 56,291 298x375`) over form rows measured clear (tests/verify/assert.test.ts).
-  const nested = target.parent !== undefined && listsNestedReadingOrder(target.parent);
+  const nested = target.parent !== undefined && listsNestedReadingOrder(target.parent, ancestry);
   const peerOf = (p: Placed): boolean => (isInteractive(t) && isInteractive(p.node)) || (nested && drawn(p));
   const peers = order.filter(
     (p) =>
       p !== target &&
       p.parent === target.parent &&
       !headings.has(p) &&
-      (flatList ? p.at >= contentFrom && !bottomChrome.has(p) : !pinnedTargets().has(p)) &&
+      (ancestry ? !pinnedTargets().has(p) : p.at >= contentFrom && !bottomChrome.has(p)) &&
       overlapsApart(p, target) &&
       peerOf(p),
   );
