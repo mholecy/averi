@@ -44,7 +44,6 @@ export function codeRoot(repo: string, spec: string, role: string, worktrees: st
   return { root, cleanup: () => execFileSync('git', ['-C', repo, 'worktree', 'remove', '--force', root], { stdio: 'ignore' }) };
 }
 
-/** Why a git command failed: the last lines of its stderr, or the error's first line when it printed none. */
 export function gitReason(err: { stderr?: string | Buffer; message: string }): string {
   const tail = String(err.stderr ?? '')
     .split('\n')

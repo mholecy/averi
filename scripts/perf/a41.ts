@@ -477,9 +477,8 @@ export interface ColdRun {
 
 /**
  * How long after launch_app's reply the waited leg's first tap starts — WDA's cold start (3.1–3.6 s on the lab) and a
- * margin. From the reply, not the call. Set for A41b's pre-warm, which started WDA once `simctl launch` returned; since
- * A41d the launch brings WDA up before `simctl launch` (ADR 0046's A41d amendment), so WDA is up at the reply and the
- * leg is kept unchanged, comparable with probes 2 and 3.
+ * margin. From the reply, not the call. The launch brings WDA up before `simctl launch` (ADR 0046's A41d amendment), so
+ * WDA is up at the reply; the gap stays at its A41b value, so the leg is comparable with probes 2 and 3.
  */
 export const WAITED_GAP_MS = 4000;
 /** The least gap after launch_app's reply leg (b) is judged on: a tap that started earlier is unproven. */
@@ -495,8 +494,8 @@ export const LEG_A_BEFORE_A41D_MS = 7173;
 /**
  * A fresh `auto` session (A41b review r1): launch_app (WDA stopped; a `clearState` one on the first repeat), then the
  * first tree read at once (ui_snapshot) — which app it read: its root's label, and the bundle WDA's activeAppInfo names
- * after it. `expected`: the lab app's. Whether the app is in front after the launch (A41b: WDA's start ran beside the
- * launch's foreground wait; since A41d it is done before `simctl launch`).
+ * after it. `expected`: the lab app's. Whether the app is in front after the launch (WDA's bring-up is done before
+ * `simctl launch`, ADR 0046's A41d amendment).
  */
 export interface ForegroundRun {
   clearState: boolean;
@@ -575,8 +574,8 @@ export interface A41Report {
   /** The parts not found or not readable (their files), each said in the summary. */
   missing: string[];
   /**
-   * The required parts read but not proven (unprovenOf, A44): the cadence judgement, leg (b) of the first tap and the
-   * foreground leg. The batch's report block is INCONCLUSIVE on any, as on a missing file.
+   * The required parts read but not proven (unprovenOf, A44): the cadence judgement, legs (a) and (b) of the first tap
+   * and the foreground leg. The batch's report block is INCONCLUSIVE on any, as on a missing file.
    */
   unproven: string[];
   /** Whether a WebDriverAgent build ran (WDA_BUILD_LINE in a WDA child's log); undefined: no log read. */
@@ -590,12 +589,12 @@ export interface A41Report {
     firstWdaUp?: CountedSpread;
     warmCatalog?: CountedSpread;
     warm?: CountedSpread;
-    /** The waited leg's first tap (WDA's own), and the gap it had from the adapter's creation. */
+    /** The waited leg's first tap (WDA's own), and the gap it had from launch_app's reply. */
     firstWaited?: CountedSpread;
     waitedGap?: CountedSpread;
     /** Leg (a), per session: launch_app (WDA stopped) + the first tap after it, both ok and WDA's (A41d). */
     firstTotal?: CountedSpread;
-    /** The waited leg's launch_app (WDA stopped; since A41d WDA's bring-up is inside it): its spread, and per repeat. */
+    /** The waited leg's launch_app (WDA stopped; WDA's bring-up is inside it): its spread, and per repeat. */
     waitedLaunch?: CountedSpread;
     waitedLaunches: { repeat: number; ms: number }[];
     /** The first taps that claimed the catalog's `open` (the app in front), of those made: each leg. */

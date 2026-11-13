@@ -27,7 +27,7 @@ import { exitCode, judgeThenPin, PINS_FILE, ratchetLines, readPins, type Ratchet
  *
  * The side defaults to this checkout; an older commit's src is loaded by this checkout's harness (side.ts). `--only`
  * keeps the captures a token names (selectRecordings); `--json` prints the results as data (GoldenJson) in place of the
- * report — scripts/truth/calibrate.ts reads it; `--against` a `--json` file of an earlier run prints, in place of the
+ * report; `--against` a `--json` file of an earlier run prints, in place of the
  * report, what changed since (golden-diff.ts: changed checks, the KNOWN rows to strike, the COUNTS to write, the known
  * rows to re-pin); `--pin` writes the known mismatches' replies to a pins file (ratchet.ts#repinned: the pin of a row
  * skipped here, or of a capture not replayed, held), beside any of them. A check whose reply is a harness or JavaScript

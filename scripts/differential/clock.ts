@@ -5,17 +5,17 @@
  * only the code under test's own sleeps move.
  *
  * Which timers are the code's: averi has one sleep owner, `util/sleep.ts`
- * (its doc: "one owner so waits, not sleeps stays a design rule"), and
- * every wait goes through it. The other `setTimeout`s in src/ are no waits
- * and stay real: the shutdown budget (mcp/lifecycle.ts) and the idb
- * helper's readiness and deadline timers (adapters/idb-helper.ts). A timer set
- * from that file (read off the stack — the frame right above this function)
- * is virtual: the clock moves by its length and it fires on the next turn.
- * Every other timer — the MCP SDK's request timeout, node's own — stays
- * real, so the transport between the harness and the server is untouched.
- * This is the one place the harness knows a path inside the code it runs;
- * if the sleep owner ever moves, every call's elapsed time reads 0 and the
- * run says so (`virtualSleeps` stays 0 — run.ts reports it).
+ * (its doc: "One owner so \"waits, not sleeps\" stays a design rule, not a
+ * habit"), and every wait goes through it. The other `setTimeout`s in src/
+ * are no waits and stay real: the shutdown budget (mcp/lifecycle.ts) and the
+ * idb helper's readiness and deadline timers (adapters/idb-helper.ts). A
+ * timer set from that file (read off the stack — the frame right above this
+ * function) is virtual: the clock moves by its length and it fires on the
+ * next turn. Every other timer — the MCP SDK's request timeout, node's own —
+ * stays real, so the transport between the harness and the server is
+ * untouched. This is the one place the harness knows a path inside the code
+ * it runs; if the sleep owner ever moves, every call's elapsed time reads 0
+ * and the run says so (`virtualSleeps` stays 0 — run.ts reports it).
  */
 
 const realSetTimeout = globalThis.setTimeout;

@@ -5,9 +5,9 @@ import { isMain } from '../is-main.js';
 
 /**
  * D26's stall summary recomputed from D0 results JSON (baseline.ts `--out`) — for files written before the report
- * carried it, from each run's recorded window: per scenario its screenshot calls/stalls (`simctl io screenshot` and,
- * since D26b, `idb screenshot` — stats.ts#SCREENSHOT_LABELS), its wall median and
- * its stall-free one, then the overall line per capture; with several files, the pooled lines last.
+ * carried it, from each run's recorded window: per scenario its screenshot calls/stalls (`simctl io screenshot` and
+ * `idb screenshot`, D26b — stats.ts#SCREENSHOT_LABELS), its wall median and its stall-free one, then the overall line
+ * per capture; with several files, the pooled lines last.
  *
  *   node --import tsx scripts/perf/stalls.ts <result.json> [<result.json> …]
  */

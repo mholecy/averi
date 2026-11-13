@@ -24,9 +24,9 @@ import { BUDGET_MS, classed, first, notTapped, passed, passes, pointsText, reach
  * `absent` (target-contract.ts#askedUnlistedBy, the target as the tap and the stop ask it) and `nodeAbsent` (#unlistedBy,
  * the colour's identifier): why the replayed source's capture did not list the target — the lab's UIKit table row under
  * idb, which lists no identifier on any element (docs/bugs/2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-
- * identifier.md). The truth that the source does not list it outranks "open → Tapped" (ADR 0020): no reply of that
- * source can find it, so the honest one says the source's limit (replies.ts#noIdListedSaid) — a not-found that says
- * nothing of why is a mismatch, as the bare timeout was.
+ * identifier.md). The truth that the source does not list it outranks "open → Tapped" (proposed ADR 0020): no reply of
+ * that source can find it, so the honest one says the source's limit (replies.ts#noIdListedSaid) — a not-found that
+ * says nothing of why is a mismatch.
  */
 export function openRows(
   platform: Platform,

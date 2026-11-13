@@ -68,11 +68,11 @@ export class RecordedTreeSource implements IosTreeSource {
 
   /**
    * WDA: as the side's WdaTreeSource answers once its WebDriverAgent is up —
-   * since D48 the app the replay launched (fake-device.ts's
-   * REPLAYED_APP), so the launch's foreground wait takes its match path
-   * with no device call and no read (`onRead` is not told); before D48
-   * (`asksWdaBundle` false) `declined`. Either way the reply carries no
-   * note. idb: a normalized tree keeps no element types to answer from.
+   * the app the replay launched (fake-device.ts's REPLAYED_APP, D48) when
+   * `asksWdaBundle`, so the launch's foreground wait takes its match path
+   * with no device call and no read (`onRead` is not told); else
+   * `declined`. Either way the reply carries no note. idb: a normalized tree
+   * keeps no element types to answer from.
    */
   async applicationLabel(): Promise<ApplicationLabel> {
     if (this.kind === 'idb') return { kind: 'unlabelled' };

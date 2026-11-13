@@ -13,14 +13,13 @@ import { decodePng } from '../../src/verify/png.js';
 /**
  * The fake device of the differential harness: the PROCESS boundary, faked
  * once for the whole process. averi's device commands go through
- * `child_process.execFile` (adapters/exec.ts is its one caller; WDA's
- * xcodebuild and the idb helper spawn instead, and the spawn throws here),
- * so that is the one place a device can be answered without reaching into
- * either side's modules: `idb`, `xcrun simctl`, `adb` and the OCR
- * recognizer's `swiftc` are answered here from the recording and a small
- * device profile, and each command is written to the call log — what the
- * tool would have SENT. Both sides of a run share it; the harness runs one
- * call at a time and resets the device between calls.
+ * `child_process.execFile` (WDA's xcodebuild and the idb helper spawn
+ * instead, and the spawn throws here), so that is the one place a device can
+ * be answered without reaching into either side's modules: `idb`, `xcrun
+ * simctl`, `adb` and the OCR recognizer's `swiftc` are answered here from the
+ * recording and a small device profile, and each command is written to the
+ * call log — what the tool would have SENT. Both sides of a run share it; the
+ * harness runs one call at a time and resets the device between calls.
  *
  * It is also the guarantee that a differential run touches no device: every
  * other way to start a process (`spawn`, `exec`, the sync forms, `fork`) and
@@ -58,7 +57,7 @@ import { decodePng } from '../../src/verify/png.js';
  *    a ground-truth capture (golden.ts), the screenshot the device showed.
  *  - `swiftc` compiles nothing (an empty file where the binary goes), and
  *    the "recognizer" reads no text in any region — unless the real one is
- *    asked for (useRecognizer('vision'), the golden mode's OCR rows, phase 4):
+ *    asked for (useRecognizer('vision'), the golden mode's OCR rows):
  *    then `swiftc` and the compiled recognizer (averi's own, under
  *    `averi-ocr-bin`) are the host's, run as they are — macOS Vision reading
  *    the screenshot the fake serves. Nothing else reaches a process.
@@ -148,7 +147,6 @@ export function useRecognizer(r: Recognizer): void {
  * a path prefix, so no other command whose name merely mentions it is taken for the recognizer.
  */
 const RECOGNIZER_DIR = join(tmpdir(), 'averi-ocr-bin') + sep;
-/** The averi OCR recognizer binary (RECOGNIZER_DIR). */
 export const isRecognizerBinary = (cmd: string) => cmd.startsWith(RECOGNIZER_DIR);
 /** The OCR recognizer's commands: its compiler, and the binary averi caches (isRecognizerBinary). */
 const isRecognizer = (cmd: string) => cmd === 'swiftc' || isRecognizerBinary(cmd);
@@ -229,7 +227,7 @@ function frame(screen: Screen, paint: Paint | undefined, screenshot?: Buffer): B
 }
 
 /**
- * The frame as Android's capture answers it since D19 (android.ts#RAW_SCREENCAP): the API 28+ raw header — width, height,
+ * The frame as Android's capture answers it (D19, android.ts#RAW_SCREENCAP): the API 28+ raw header — width, height,
  * RGBA_8888, sRGB — and the PNG's pixels, gzipped. Built once per PNG.
  */
 function rawFrame(png: Buffer): Buffer {
@@ -328,7 +326,7 @@ function answer(cmd: string, args: string[], stdin: string | undefined): Answer 
   }
   if (cmd === 'idb') {
     // runIdb's `--udid U` out, and the `--` a typing's text follows (D74, `ui text --udid U -- <text>`): the call is
-    // recorded as before D74, `idb ui text <text>`, so a replay's calls read alike.
+    // recorded as `idb ui text <text>`, so a replay's calls read alike.
     const at = args.indexOf('--udid');
     const rest = at === -1 ? [] : args.slice(at + 2);
     const argv = at === -1 ? args : [...args.slice(0, at), ...(rest[0] === '--' ? rest.slice(1) : rest)];
@@ -493,6 +491,6 @@ export function installFakeDevice(): void {
   globalThis.fetch = refuse('fetch') as unknown as typeof fetch;
   process.env.DEVELOPER_DIR = '/differential/fake/Developer';
   // No idb helper (D7a, src/adapters/idb-helper.ts): it is a spawned Python, not an execFile, so this fake could not
-  // answer it — and the call log pins the CLI's argv per call. Every idb call stays the CLI, as before D7.
+  // answer it — and the call log pins the CLI's argv per call. Every idb call stays the CLI.
   process.env.AVERI_IDB_HELPER = 'off';
 }

@@ -11,9 +11,9 @@ import type { DeviceCall, Sleep, Window } from './stats.js';
  * the device through three doors, and the harness stands in each for the length of one tool call — and a fourth, the
  * idb helper, publishes its calls itself.
  *
- * - Processes: every adb, simctl, idb (and the OCR recognizer, swiftc, lsof) goes through `child_process.execFile` —
- *   src/adapters/exec.ts is its one caller. `recordingExecFile` wraps it, and `installRecorder` puts the wrapper into the
- *   builtin module and `syncBuiltinESMExports()` into every ESM `import { execFile }` of it — the technique
+ * - Processes: every adb, simctl, idb (and the OCR recognizer, swiftc, lsof) goes through `child_process.execFile`.
+ *   `recordingExecFile` wraps it, and `installRecorder` puts the wrapper into the builtin module and
+ *   `syncBuiltinESMExports()` into every ESM `import { execFile }` of it — the technique
  *   scripts/differential/fake-device.ts uses to replace the device; here the real one is kept and only timed.
  * - WebDriverAgent: its HTTP goes through the global `fetch` (src/adapters/wda.ts#defaultFetch reads it per call);
  *   `recordingFetch` wraps that. The xcodebuild that serves WDA is a long-running `spawn`, a server and not a call, and
@@ -80,7 +80,6 @@ export class Recorder {
     };
   }
 
-  /** A sleep begins; the returned function is called when it fires. */
   sleep(ms: number, caller: string): () => void {
     if (!this.open) return () => undefined;
     const entry: OpenSleep = { ms, caller, startMs: this.now() };
@@ -201,7 +200,6 @@ function sleepCaller(stack: string): string | undefined {
   return 'unknown';
 }
 
-/** setTimeout with averi's sleeps recorded; every other timer passed through untouched. */
 export function recordingSetTimeout(original: typeof setTimeout, rec: Recorder, stackOf: () => string = () => new Error().stack ?? ''): typeof setTimeout {
   return function (this: unknown, fn: (...a: unknown[]) => void, ms?: number, ...args: unknown[]) {
     const caller = sleepCaller(stackOf());
