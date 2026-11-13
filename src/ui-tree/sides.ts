@@ -3,9 +3,7 @@ import type { Edge } from './geometry.js';
 /**
  * The words of a rect's four sides, spelled once: where a node past a side lies, and the `scroll_until` direction that
  * brings it back. Here, in ui-tree, because a miss words them (miss.ts: a target matched only by nodes clipped out of
- * their scroll container) and ui-tree imports no verb; interact/'s stroke and sentences read the same table
- * from here (interact/swipe.ts re-exports `Direction` alone, the verb's way; interact/target-text.ts says its phrases with
- * the table).
+ * their scroll container) and ui-tree imports no verb.
  */
 
 /**
@@ -18,11 +16,7 @@ export type Direction = 'up' | 'down' | 'left' | 'right';
 export interface SideWords {
   /**
    * The `scroll_until` direction (where the content lies) that reveals what
-   * lies past this edge: content beyond the top lies up, and so on — read by
-   * `scroll_until`'s probe and its stroke toward a cut edge
-   * (interact/scroll-rounds.ts), by the tap's cut-sliver remedy (interact/target-text.ts#cutRemedy,
-   * which `scroll_until`'s sliver failures quote) and by the hints for a node
-   * past a side (`revealText`, interact/target-text.ts#untriedSideText).
+   * lies past this edge: content beyond the top lies up, and so on.
    */
   readonly reveals: Direction;
   /** Where a node past this edge lies, before what it lies past: `clipped out above its scroll container` (`clippedOutText`), `left of the viewport` (interact/target-text.ts#pastSideText). */
@@ -33,7 +27,7 @@ export interface SideWords {
 
 /**
  * Each EDGE of a rect's words — one table, a field per use, so the four
- * sides are spelled once (interact/target-text.ts's sentences and miss.ts's zero-area note read it too).
+ * sides are spelled once.
  */
 export const SIDES: Readonly<Record<Edge, SideWords>> = {
   top: { reveals: 'up', past: 'above', lies: 'above' },

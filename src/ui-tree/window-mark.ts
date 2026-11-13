@@ -27,15 +27,12 @@ import { findTarget, type Target } from './selectors.js';
  *
  * Asked on a MISS only, never per poll — the call is one adb round trip, about 26 ms (adapters/android.ts
  * #focusedWindow) — and the rule of when is here, in its two doors: `markedForMiss`, the last read of a wait that gave
- * up with its target in no read it can still type (interact/resolve.ts#notFound: the tap's, fill's and the presence
- * check's; verify/assert.ts#Verifier.treePoll and verify/pixel-poll.ts: every assert's not-found; the flow's `wait:`,
- * flow/engine.ts#pollUntil) — never for a wait whose reply words no not-found (an `absent` check still visible, an
- * element found with the wrong content, a condition of no element, a flow's wait whose last read was bare: those
- * callers hand no target), a failed read, or a
- * read that matched the target; and `CallWindow`, `scroll_until`'s before a stroke for a target its read does not hold
- * (interact/scroll.ts). A flow's detect probe does not ask: it words no miss. What a mark changes is asked only for a
- * target the tree does not hold, so a misreading costs a refusal or a stop, never a false `Tapped` (ADR 0018's
- * invariant).
+ * up with its target in no read it can still type — never for a wait whose reply words no not-found (an `absent` check
+ * still visible, an element found with the wrong content, a condition of no element, a flow's wait whose last read was
+ * bare: those callers hand no target), a failed read, or a read that matched the target; and `CallWindow`,
+ * `scroll_until`'s before a stroke for a target its read does not hold. A flow's detect probe does not ask: it words no
+ * miss. What a mark changes is asked only for a target the tree does not hold, so a misreading costs a refusal or a
+ * stop, never a false `Tapped` (ADR 0018's invariant).
  */
 
 /** A tree whose window the window manager may still type: it lists the active window only, and its parser marked none. */

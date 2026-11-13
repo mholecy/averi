@@ -9,11 +9,7 @@ import { sceneOf, type Scene } from './standing.js';
  * ui-tree/standing.ts#Scene), the keyboard reading taken off it (ui-tree/keyboard-cover.ts#readKeyboard) and where the
  * soft keyboard lies on it (ui-tree/keyboard-position.ts#KeyboardPosition: the line for a subject, `owns`, the
  * reading's line). Built ONCE per read, by `lookAt` (`lookOn` with the adapter's reading), and handed whole to the
- * verbs that judge the read: the tap (interact/tap-judgement.ts#judgeTap, through the guard's looks,
- * interact/keyboard-model.ts#SeenLook), the dismissal picker (interact/keyboard-dismissal.ts#configuredStrategy), the pixel
- * poll (verify/pixel-poll.ts#overElement, one look a round) and `scroll_until`'s read (interact/scroll-read.ts
- * #TreeFacts, over a look with the round's synchronous reading facts). None of them derives a scene or builds a
- * keyboard position of its own.
+ * verbs that judge the read; none of them derives a scene or builds a keyboard position of its own.
  *
  * Contract:
  * - `scene` is derived on first use and kept: a look is at most one draw-order walk, whoever asks (the walk is
@@ -21,10 +17,10 @@ import { sceneOf, type Scene } from './standing.js';
  *   after their scene is built; a look is threaded to whoever judges it instead.
  * - `keyboard` is THE position of this look — over the scene's draw order and the look's reading — built on first use;
  *   asks nothing until a member is asked, and `readingLine` asks the reading once. ADR 0017's asymmetry is the
- *   position's members, not who built it: `line(subject)` exempts only a node of idb's band (the tap, the picker, the
- *   pixel poll and the scroll read's band all ask it), `owns` — the reading's `ofKeyboard` or idb's band — is asked by
- *   the scroll read alone. The line never depends on the reading (tests/ui-tree/keyboard-position.test.ts), so a verb
- *   that asks only `line` reads the same line whatever reading its look holds.
+ *   position's members, not who built it: `line(subject)` exempts only a node of idb's band, `owns` — the reading's
+ *   `ofKeyboard` or idb's band — is asked by the scroll read alone. The line never depends on the reading
+ *   (tests/ui-tree/keyboard-position.test.ts), so a verb that asks only `line` reads the same line whatever reading its
+ *   look holds.
  * - `reading` is the reading this look was built with, never one of another tree's: its band and its `ofKeyboard` set
  *   are this tree's. `lookOn` takes the adapter's whole reading (the tap, the picker, the pixel poll ask it `over`,
  *   `frameOver`, `overlapping` and its `remedy`); `scroll_until`'s pure read holds only the synchronous facts its round
@@ -43,7 +39,6 @@ import { sceneOf, type Scene } from './standing.js';
  * verb did not derive a second scene of a look's tree, only a count of the walks can.
  */
 export interface Look<R extends LookReading = KeyboardReading> {
-  /** The tree read. */
   readonly tree: UiNode;
   /** The reading taken off `tree` (the contract's `reading`). */
   readonly reading: R;
@@ -64,8 +59,7 @@ export function lookAt<R extends LookReading>(tree: UiNode, reading: R): Look<R>
 /**
  * `look` TOLD the order a screenshot saw (`seen`, ui-tree/seen-order.ts) of controls its tree lists in reading order: a
  * look of the same tree and reading whose scene's draw order takes it (`sceneOf`) — what a verb that asked the eyes
- * judges again (ui-tree/eyes.ts#judgedWithOrder; `scroll_until`'s read, interact/scroll-read.ts#factsOf). The reading
- * memoises what it asked, so nothing is asked twice.
+ * judges again. The reading memoises what it asked, so nothing is asked twice.
  */
 export function lookTold<R extends LookReading>(look: Pick<Look<R>, 'tree' | 'reading'>, seen: SeenOrder): Look<R> {
   return lookOf(look.tree, look.reading, seen);
