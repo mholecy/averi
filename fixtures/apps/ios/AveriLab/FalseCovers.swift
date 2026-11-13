@@ -52,7 +52,7 @@ struct TapCatcherScreen: View {
     @EnvironmentObject var lab: Lab
     let cell: Cell
 
-    /// The layers this screen builds; FalseCoversScreen routes these alone here.
+    /// The layers this screen builds.
     static let layers: Set<String> = ["tap-catcher-beneath", "tap-catcher-stacked", "tap-catcher-beneath-flat"]
 
     var body: some View {

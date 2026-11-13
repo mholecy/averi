@@ -10,7 +10,8 @@ import SwiftUI
 //   beneath) between the bare phase and Welcome.
 //
 // Each element is identified lab.<cell>.<tag> (welcome, continue, home). Every phase change is logged (`phase`, `bare`
-// / `spinner` / `welcome` / `home`) before it is drawn, Continue's press as the `tap` `continue` — the judges' clock.
+// / `spinner` / `welcome` / `home`, or `unconfigured`) before it is drawn, Continue's press as the `tap` `continue` —
+// the judges' clock.
 
 /// What a held cell draws, its raw value the tag its `phase` event logs. `unconfigured`: the catalog gave the cell no
 /// `held` (a stale catalog, an old build) — it stays bare, and says so (live-ensure.ts SKIPs on it).

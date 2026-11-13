@@ -30,7 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
-// The Android lab app (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 2): the iOS app's cells
+// The Android lab app (docs/plans/2026-10-15-ground-truth-lab-app.md): the iOS app's cells
 // (fixtures/apps/ios/AveriLab) in Compose. One cell per launch — the intent extra `cell` or averilab://cell/<id>; with
 // neither, the catalog as a list, for a person poking at the app. One file per cell family
 // (fixtures/apps/cells/<family>.json): Base.kt, Presented.kt, Forms.kt, Edges.kt, Bars.kt, FalseCovers.kt, Text.kt, Held.kt; CellRouter
@@ -142,9 +142,9 @@ private fun Unsupported(cell: Cell) {
 
 /**
  * A cell's screen, by its family (the catalog stamps each cell with it, scripts/truth/catalog.ts). A family adds its
- * cells in its own file; this `when` names every family of scripts/truth/schema.ts#FAMILIES once, so no batch of phase
- * 3 edits it. A family it does not name (or none) shows an UnbuiltCell, never ready: a capture of it times out naming
- * the cell.
+ * cells in its own file; this `when` names every family of scripts/truth/schema.ts#FAMILIES the native apps build (all
+ * but react-native) once. A family it does not name (or none) shows an UnbuiltCell, never ready: a capture of it times
+ * out naming the cell.
  */
 @Composable
 private fun CellRouter(cell: Cell, lab: Lab) {

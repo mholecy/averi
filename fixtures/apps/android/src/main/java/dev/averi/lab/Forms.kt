@@ -2,11 +2,11 @@
 
 package dev.averi.lab
 
-// The forms family (fixtures/apps/cells/forms.json) on Android — phase 2b of docs/plans/2026-10-15-ground-truth-lab-
-// app.md, the iOS app's Forms.swift in Compose: the fields of a payment form, a submit, maybe a country picker sheet,
-// laid out as a banking app lays them out (a top bar, a scroll column, titles above the fields, errors under them),
-// every one reporting to the oracle (Lab.kt#field): the value the MODEL holds, the focus, the error it shows and the
-// identifier it shows it under. A fill is judged by that, never by a tree.
+// The forms family (fixtures/apps/cells/forms.json) on Android — the iOS app's Forms.swift in Compose: the fields of a
+// payment form, a submit, maybe a country picker sheet, laid out as a banking app lays them out (a top bar, a scroll
+// column, titles above the fields, errors under them), every one reporting to the oracle (Lab.kt#field): the value the
+// MODEL holds, the focus, the error it shows and the identifier it shows it under. A fill is judged by that, never by
+// a tree.
 //
 // Nothing here transforms what is typed (no capitalisation, no autocorrection, no mask): a value that does not land as
 // typed is averi's or adb's doing, not the app's — but for a field with a `format` (form-format, D18), which reformats
@@ -162,7 +162,8 @@ internal fun formOf(o: JSONObject): FormSpec {
     )
 }
 
-// --- the formats (schema.ts#FieldFormat; the same rules as Forms.swift's and the React Native app's src/format.ts) ---
+// --- the formats (schema.ts#FieldFormat; the same rules as Forms.swift's and the React Native app's src/format.ts,
+// `date` aside: only the native apps have it) ---
 
 private fun isGap(c: Char) = c == ' ' || c == '\u00A0' || c == '\u202F'
 
@@ -274,7 +275,6 @@ private fun FormScreen(cell: Cell, form: FormSpec, lab: Lab) {
         onDispose { if (before != null) window.setSoftInputMode(before) }
     }
 
-    // The oracle: every field as the model holds it, after each change.
     form.fields.forEach { f ->
         val value = values[f.tag] ?: ""
         val focused = focus == f.tag

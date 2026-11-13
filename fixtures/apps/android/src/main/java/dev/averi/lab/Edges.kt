@@ -211,7 +211,6 @@ internal fun EdgesScreen(cell: Cell, lab: Lab) {
         } else if (cell.id == "scroll-collapsing") {
             CollapsingList(cell, lab)
         } else {
-            // Laid out down a column (not offset): each container's clip is where the layout puts it.
             val screenHeight = maxHeight
             Column(Modifier.fillMaxWidth()) {
                 var bottom = 0.dp
@@ -261,7 +260,6 @@ private fun StickyList(cell: Cell, lab: Lab) {
     val density = LocalDensity.current
     val initial = with(density) { stickyOffset(cell).roundToPx() }
     val state = rememberLazyListState(0, initial)
-    // The list's offset in pixels down its content: the header item (index 0) then rows of ROW_HEIGHT.
     val header = with(density) { STICKY_HEADER.roundToPx() }
     val row = with(density) { ROW_HEIGHT.roundToPx() }
     ReportScroll(lab, "list", { state.isScrollInProgress }) {

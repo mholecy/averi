@@ -48,7 +48,6 @@ internal enum class HeldPhase(val tag: String) { Bare("bare"), Unconfigured("unc
 @Composable
 internal fun HeldScreen(cell: Cell, lab: Lab) {
     var phase by remember { mutableStateOf(HeldPhase.Bare) }
-    /** The next phase, logged before it is drawn. */
     fun show(next: HeldPhase) {
         lab.event("phase", next.tag)
         phase = next
