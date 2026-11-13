@@ -85,11 +85,10 @@ export interface OcrEngine {
  * A missing or refusing `swiftc` goes further: the probe is memoized per
  * process (`swiftToolchain`), so it is every later engine's answer too, until
  * averi restarts. A class rather than a message match so the `ocr`
- * assert can tell "this engine will never read" from "this read failed":
- * until then the assert's catch swallowed both and polled a missing
- * compiler for the whole 12 s budget. Not a SetupError (flow/errors): the
- * assert fails closed with it as a reason and `assertAll` goes on; it never
- * ends a flow by itself.
+ * assert can tell "this engine will never read" from "this read failed": a
+ * catch that swallowed both would poll a missing compiler for the whole 12 s
+ * budget. Not a SetupError (flow/config.ts): the assert fails closed with it
+ * as a reason and `assertAll` goes on; it never ends a flow by itself.
  */
 export class OcrUnavailableError extends Error {}
 
@@ -119,13 +118,11 @@ export type OcrEngineChoice =
   | { engine?: undefined; unavailable: string };
 
 /**
- * THE engine-selection rule (2026-10-04): a supplied engine (the test seam —
- * the real one needs swiftc on macOS) is used as given; otherwise the host is
- * asked whether Vision can run here, and a `VisionOcr` is built only when it
- * can. Until now the `ocr` assert and the verify run's text table each wrote
- * this rule themselves — "ask the reason, then construct" — two copies a
- * third caller would have made three. Callers turn `unavailable` into a
- * failed assert or a SKIPPED note, never a pass (see ocrUnavailableReason).
+ * THE engine-selection rule: a supplied engine (the test seam — the real one
+ * needs swiftc on macOS) is used as given; otherwise the host is asked whether
+ * Vision can run here, and a `VisionOcr` is built only when it can. Callers
+ * turn `unavailable` into a failed assert or a SKIPPED note, never a pass (see
+ * ocrUnavailableReason).
  */
 export function ocrEngineFor(override?: OcrEngine): OcrEngineChoice {
   if (override !== undefined) return { engine: override };
@@ -134,8 +131,8 @@ export function ocrEngineFor(override?: OcrEngine): OcrEngineChoice {
 }
 
 /**
- * The recognizer, embedded rather than shipped as a .swift file so it survives
- * packaging (`files: [dist]`) with no build-step change.
+ * The recognizer, embedded rather than shipped as a .swift file so it ships
+ * inside dist/ (package.json `files`) with no build-step change.
  *
  * Contract: one JSON request on stdin, one JSON response on stdout. Boxes are
  * converted out of Vision's normalized bottom-left space into PNG pixels with a
@@ -224,9 +221,9 @@ const probeDidNotAnswer = (e: unknown): boolean =>
 /**
  * The compiler's answer to `swiftc --version`, memoized per ExecFn (as in
  * adapters/xcode-env.ts): every Verifier builds its own VisionOcr, and every
- * flow step and verify leg its own Verifier, so a per-engine probe paid 0.1–0.5 s
- * per Verifier. Production engines all share the real exec, so the probe runs
- * once per process; a test's fake exec is a cache of its own.
+ * flow step and verify leg its own Verifier, so a per-engine probe would pay
+ * 0.1–0.5 s per Verifier. Production engines all share the real exec, so the
+ * probe runs once per process; a test's fake exec is a cache of its own.
  *
  * Which outcomes the process keeps:
  * - the version string — the binary cache key below is derived from it, and

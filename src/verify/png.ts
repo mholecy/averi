@@ -6,12 +6,12 @@ import { PNG } from 'pngjs';
 import type { RawImage } from '../adapters/types.js';
 
 /**
- * THE ONE PNG DECODER of the pixel readers (capture's frame and stability wait,
- * the eyes, the screenshot diff). Its answer is pngjs's `PNG.sync.read` answer,
- * byte for byte — width, height and an 8-bit RGBA buffer, row-major: the fast
- * path takes only inputs pngjs decodes, to the same bytes, and every other input
- * is decoded by pngjs itself, so a PNG that does not decode throws pngjs's own
- * error and every caller's wording of a damaged capture is unchanged.
+ * THE ONE PNG DECODER of the pixel readers. Its answer is pngjs's
+ * `PNG.sync.read` answer, byte for byte — width, height and an 8-bit RGBA
+ * buffer, row-major: the fast path takes only inputs pngjs decodes, to the same
+ * bytes, and every other input is decoded by pngjs itself, so a PNG that does
+ * not decode throws pngjs's own error and every caller's wording of a damaged
+ * capture is unchanged.
  *
  * Why not pngjs alone: on a full-screen capture (iOS 1206×2622, Android
  * 1080×2220) pngjs spends ~90 % of its 20–30 ms in its JavaScript unfilter and
