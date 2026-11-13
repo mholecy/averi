@@ -16,10 +16,8 @@ import type { SeenOrder } from './seen-order.js';
  * (`listsNestedReadingOrder`: WDA's, uiautomator's classic run), any sibling listed before or after it that draws
  * there, whose order is not told either (React Native's covers, lab note LR3; a sibling listed after, D84) — which
  * covers' order is not told, which siblings a moved tap must keep clear of, and which controls listed AFTER it stay
- * covers past the draw order's reading-order break (`coversAfter`). draw-order.ts#drawOrder's `asTarget` asks it once
- * for every question of a target (`SeenFor.readingOrder`): `exposure` joins its covers to the draw order's own, the
- * break's row (`NOT_DRAWN.flatListReadingOrder`) reads `coversAfter`; it knows nothing of rows, presented layers or
- * reaches.
+ * covers past the draw order's reading-order break (`coversAfter`). It knows nothing of the draw order's rows,
+ * presented layers or reaches.
  * docs/adr/0015-flat-list-reading-order-break.md (its amendments, "covers listed before the target", "a heading
  * listed before", "a control past the break that holds the centre", "React Native's covers listed before the
  * target" and "D84 — a sibling listed after the target, of any kind")
@@ -48,8 +46,7 @@ export interface ReadingOrderAbout {
 
 /**
  * Whether the tree's source lists `parent`'s children in READING order (`UiNode.readingOrder`: idb's flat list, a WDA
- * run sorted by top), not in draw order — a mark of the node, not of the tree's root (those are ui-tree/dialect.ts's),
- * asked in this module alone.
+ * run sorted by top), not in draw order — a mark of the node, not of the tree's root (those are ui-tree/dialect.ts's).
  */
 function listsInReadingOrder(parent: UiNode): boolean {
   return parent.readingOrder === true;
@@ -71,8 +68,9 @@ export function listsNestedReadingOrder(parent: Placed, ancestry: boolean): bool
  * - `before`: the siblings listed BEFORE it that are drawn over it — covers the draw order alone would not give: the
  *   headings over it (`headingsOver`, their order `drawn`) and the controls whose order is not told (`peersOf`'s
  *   `before`); in the walk's order;
- * - `unordered`, `seenOver`, `seenUnder`, `listedBefore`, `coversAfter`: of the controls whose order is not told
- *   (`peersOf`, its doc says each) — a heading is none of them.
+ * - `unordered`, `listedBefore`, `coversAfter`: of the controls whose order the listing does not tell; `seenOver`,
+ *   `seenUnder`: of those, the ones whose order a screenshot told (`peersOf`, its doc says each) — a heading is none
+ *   of them.
  */
 export interface ReadingOrder {
   readonly before: readonly Placed[];
@@ -83,8 +81,8 @@ export interface ReadingOrder {
   readonly listedBefore: readonly Placed[];
   /**
    * The controls listed AFTER the target that hold its centre and are not seen under it — the part of `unordered` ∪
-   * `seenOver` listed after it, named for the one reader that needs them apart: covers whatever the draw order's reading-order break says of them (draw-order.ts#NOT_DRAWN's `flatListReadingOrder`
-   * excuses none of these).
+   * `seenOver` listed after it: covers whatever the draw order's reading-order break says of them
+   * (draw-order.ts#NOT_DRAWN's `flatListReadingOrder` excuses none of these).
    */
   readonly coversAfter: ReadonlySet<Placed>;
 }
@@ -240,8 +238,8 @@ function peersOf(
   const after = kept.filter((p) => p.at > target.at && holdsCentre(p));
   const overlapping = [...before, ...after];
   // Dropped by what was seen: only a peer in play as a cover — listed before when one listed before holds the centre,
-  // listed after when it holds it itself (D84's review: a peer clear of the centre stays the draw order's to judge,
-  // whatever a seen order says of it; no question of the target asks about it).
+  // listed after when it holds it itself (a peer clear of the centre stays the draw order's to judge, whatever a seen
+  // order says of it; no question of the target asks about it).
   const listedBeforeAll = peers.filter((p) => p.at < target.at);
   const beforeInPlay = listedBeforeAll.some(holdsCentre) ? listedBeforeAll : [];
   const inPlay = [...beforeInPlay, ...peers.filter((p) => p.at > target.at && holdsCentre(p))];

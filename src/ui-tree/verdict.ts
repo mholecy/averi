@@ -3,23 +3,21 @@ import { BARE_TREE_CONTENTS, isBareTree, treeShape } from './bare-tree.js';
 import { absentFromViewport } from './geometry.js';
 
 /**
- * What one tree says about one element question, in three values
- * (2026-10-08, flow-engine review candidate 2): `yes`, `no`, or `unknown` —
- * the tree is BARE (bare-tree.ts: only wrappers, unlabeled decoration, or iOS's status bar and launch icon, a
- * cold launch's Android decor for ~9 s, WDA's 7-node splash, iOS 27's
- * SpringBoard status bar and launch icon for ~2 s) and the answer
- * it would give is the one a bare tree gives for ANY selector, so it says
- * nothing about the screen.
+ * What one tree says about one element question, in three values: `yes`,
+ * `no`, or `unknown` — the tree is BARE (bare-tree.ts: only wrappers,
+ * unlabeled decoration, or iOS's status bar and launch icon, a cold
+ * launch's Android decor for ~9 s, WDA's 7-node splash, iOS 27's SpringBoard
+ * status bar and launch icon for ~2 s) and the answer it would give is the
+ * one a bare tree gives for ANY selector, so it says nothing about the
+ * screen.
  *
- * Until then the question was a boolean in two places — the flow engine's
- * `matches` and the verifier's absent assert — and `absent` was
- * `absentFromViewport` alone: nothing in a bare tree matches, so on the decor
- * an `absent: true` detect said "already active", a `branch:` arm on it was
- * taken, a `wait:` on a state detected by it passed at once, and the absent
- * assert PASSED, all before the app had drawn a pixel. The flow engine's
- * detect probe already refused to call a MISS on a bare tree knowledge
- * (2026-10-07); a HIT on absence is the same miss read the other way round,
- * and is now refused the same way.
+ * A boolean cannot say it: were `absent` `absentFromViewport` alone, nothing
+ * in a bare tree would match, so on the decor an `absent: true` detect would
+ * say "already active", a `branch:` arm on it would be taken, a `wait:` on a
+ * state detected by it would pass at once, and the absent assert would PASS,
+ * all before the app had drawn a pixel. The flow engine's detect probe refuses to call a MISS
+ * on a bare tree knowledge; a HIT on absence is the same miss read the other
+ * way round, and is refused the same way.
  *
  * The rule, per leaf:
  * - present: a match is `yes` whatever else the tree holds (a selector that
@@ -28,10 +26,10 @@ import { absentFromViewport } from './geometry.js';
  * - absent: a match visible in the viewport is `no` whatever the tree holds
  *   (the thing is there — the decor's own `content` is, for one); otherwise
  *   `yes` on a rendered tree and `unknown` on a bare one. "Gone or off
- *   viewport" is absentFromViewport's meaning, unchanged.
+ *   viewport" is absentFromViewport's meaning.
  * So a bare tree is asked only when the selector's answer is the one a bare
  * tree would give anyway — and a rendered tree never yields `unknown`: on
- * every screen an app has drawn, both questions answer exactly as before.
+ * every screen an app has drawn, both questions answer as a boolean would.
  *
  * Here, in ui-tree/, rather than in flow/condition.ts beside the rest of
  * Condition's evaluation, because the verifier asks the absent half too and
@@ -57,7 +55,6 @@ export const isBareTreeMemo = (tree: UiNode): boolean => {
   return known;
 };
 
-/** Is the element there? `found` is what the selector matched in `tree`. */
 export const presenceVerdict = (found: readonly UiNode[], tree: UiNode): Verdict =>
   found.length > 0 ? 'yes'
   : isBareTreeMemo(tree) ? 'unknown'

@@ -13,7 +13,8 @@ import type { NoScrollRemedy, Remedy, RemedyCase } from './standing.js';
  * verbs' one sentence of a `cut` or `covered` remedy, which composes these with the keyboard's and the cut's words, is
  * interact/touch-remedy.ts's; the pixel verb's is verify/pixel-text.ts's.
  *
- * A leaf: types from standing.ts only, so the decision and its words are two modules, and either changes alone.
+ * A leaf of the UI-tree layer: it imports standing.ts's types (and presentation.ts's `MarkedLayer`, adapters/types.ts's
+ * `isTyped`), no verb, so the decision and its words are two modules, and either changes alone.
  *
  * One `purpose` names whose sentence a clause sits in — `touch` (the tap, `scroll_until`) or `pixel` (the pixel assert)
  * — and the node's pronoun follows from it (`pronoun`): `it` in a touch's sentence, `the element` in the pixel
@@ -23,14 +24,12 @@ import type { NoScrollRemedy, Remedy, RemedyCase } from './standing.js';
 /** Whose sentence a clause sits in: a touch verb's (the tap, `scroll_until`) or the pixel assert's. */
 export type RemedyPurpose = 'touch' | 'pixel';
 
-/** The node as `purpose`'s sentence names it: `it` for a touch, `the element` for the pixel assert. */
 const pronoun = (purpose: RemedyPurpose): 'it' | 'the element' => (purpose === 'touch' ? 'it' : 'the element');
 
 /**
  * The advice for a standing's remedy, in any verb: beneath a presented screen, that screen's (`presentedRemedy`, in
- * `purpose`'s words), whatever the kind; else `otherwise`, told
- * the remedy's other case — what each verb and kind words (a scroll, the system bar's three, the keyboard's hiding).
- * The one test of `presented` before a verb's own words: the tap's, `scroll_until`'s and the pixel assert's.
+ * `purpose`'s words), whatever the kind; else `otherwise`, told the remedy's other case — what each verb and kind words
+ * (a scroll, the system bar's three, the keyboard's hiding). The one test of `presented` before a verb's own words.
  */
 export function presentedOr<R extends Exclude<Remedy, { readonly of: 'presented' }>>(
   remedy: RemedyCase<'presented'> | R,
@@ -45,7 +44,6 @@ interface TypedWords {
   readonly article: string;
   readonly noun: string;
 }
-/** The words for each typed kind (`TypedWords`). */
 const TYPED_WORDS: Readonly<Record<TypedPresentationKind, TypedWords>> = {
   alert: { article: 'an', noun: 'alert' },
   actionSheet: { article: 'an', noun: 'action sheet' },

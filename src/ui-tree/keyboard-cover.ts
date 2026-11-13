@@ -3,14 +3,10 @@ import { containsPoint, rectsOverlap, rectText } from './geometry.js';
 import { keyboardInTree, keyboardSideNodes, type KeyboardRemedy } from './soft-keyboard.js';
 
 /**
- * ONE reading of the soft keyboard: every reader of the keyboard — the tap guard's every look
- * and its re-check rounds (interact/keyboard.ts, keyboard-model.ts,
- * keyboard-window.ts), the in-tree model's picker and dismissal
- * (keyboard-in-tree.ts), the window model's post-fill dismissal, the pixel
- * poll's round (verify/pixel-poll.ts) and `scroll_until`'s round
- * (interact/scroll.ts) — asks its question of a `KeyboardReading` built by
- * `readKeyboard` off the tree it already holds, and none of them composes
- * oracle calls, tests rects or applies the veto itself. Here, in ui-tree/,
+ * ONE reading of the soft keyboard: every reader of the keyboard asks its
+ * question of a `KeyboardReading` built by `readKeyboard` off the tree it
+ * already holds, and none of them composes oracle calls, tests rects or
+ * applies the veto itself. Here, in ui-tree/,
  * because the pixel poll (verify/) reads the keyboard too and may not
  * import interact/ (ARCHITECTURE.md §2); the ACTING half — what to do about
  * a covering keyboard — stays interact/keyboard.ts#keyboardModel's, the
@@ -39,15 +35,15 @@ import { keyboardInTree, keyboardSideNodes, type KeyboardRemedy } from './soft-k
  * Position — the line nothing may be aimed, stroked or measured under, and
  * which nodes are the keyboard's own, under no line — is
  * keyboard-position.ts's (`KeyboardPosition`, one per look): a corroborated
- * reading's line and idb's band merged in one place, read by the tap, the
- * dismissal picker, `scroll_until`'s read and the pixel poll. A reading is
- * one of its inputs; this module imports nothing from it.
+ * reading's line and idb's band merged in one place. A reading is one of its
+ * inputs; this module imports nothing from it.
  *
- * Its interface, eight exports: `readKeyboard` and the `KeyboardReading` it
- * builds; the reading's cover (`KeyboardCover`, with the strip below its
- * panels that none of it covers, `gap`) and `UNLOCATED_KEYBOARD`; and the
- * verdicts its point questions answer (`FrameVerdict`, `Uncovered`,
- * `KeyboardVerdict`, `Covering`) — answers to a question, not positions.
+ * Its interface: `readKeyboard` and the `KeyboardReading` it builds; the
+ * reading's cover (`KeyboardCover`, with the strip below its panels that
+ * none of it covers, `gap`) and `UNLOCATED_KEYBOARD`; the verdicts its point
+ * questions answer (`FrameVerdict`, `Uncovered`, `KeyboardVerdict`,
+ * `Covering`) — answers to a question, not positions; and the rules that
+ * admit a floating panel (`panelsBeyond`, with its `RegionRefusal`).
  *
  * WHAT A READING ASKS, AND WHEN — stated once, here. Three oracle calls, each at most
  * ONCE per reading, each memoised on first need, in this order:
@@ -86,9 +82,10 @@ import { keyboardInTree, keyboardSideNodes, type KeyboardRemedy } from './soft-k
  * `scroll_until` confirming read (scroll-rounds.ts#SETTLE_CONFIRM_READS, up
  * to 3 after a stroke, besides a slowing fling's reads, bounded by the
  * deadline) is a round like any other and pays the same; how many rounds
- * there are is scroll.ts's (its bound, 25 at the defaults, and the deadline). The per-round counts are pinned at the driver, through a
- * fake oracle, in tests/interact/scroll.test.ts, and as asks in
- * scroll-rounds.test.ts.
+ * there are is scroll.ts's (its bound, 25 at the defaults, and the
+ * deadline). The per-round counts are pinned at the driver, through a fake
+ * oracle, in tests/interact/scroll.test.ts, and as asks in
+ * tests/interact/scroll-rounds.test.ts.
  *
  * A reading is of ONE moment: build one per look, per round, per tree, and
  * never hold one across them — it remembers what the oracle answered, and a
@@ -118,8 +115,7 @@ export type Uncovered = Extract<FrameVerdict, { kind: 'clear' | 'unknown' }>;
  * the frame covers it (`over`):
  * - `covered`: covered, and the input method did not deny it — `confirmed`
  *   when it said shown, not when it could not be asked (only the wording
- *   differs: the window state alone then stands, as before the veto
- *   existed);
+ *   differs: the window state alone then stands);
  * - `denied`: the window state covers the point but the input method says
  *   no keyboard is shown — stale, measured for seconds after a navigating
  *   tap; act on neither guess (the window guard's re-check starts here).
@@ -145,10 +141,7 @@ export interface KeyboardCover {
 
 /**
  * The `unlocated` row's sentence (`KeyboardReading.unlocated`) — the one
- * wording, for the window model's post-fill dismissal warning
- * (interact/keyboard-window.ts) and for `scroll_until`'s report
- * (interact/scroll-text.ts), which asks the same question at its stop.
- * Here, beside the question: the reading owns the row.
+ * wording. Here, beside the question: the reading owns the row.
  * The cause is said as a question, not "a floating keyboard?": measured on
  * API 33, a floating Gboard does NOT read this way (a 132-px band plus its panel, read as `panels` —
  * `panelsBeyond` below), and the one window-hidden read seen beside an IME
@@ -174,15 +167,14 @@ export interface KeyboardReading {
   /**
    * `over` without the input method: the frame decides. For a look taken
    * AFTER the one side effect (the window model's `back` is already
-   * pressed; the in-tree model has no witness) and the in-tree picker.
+   * pressed; the in-tree model has no witness).
    */
   frameOver(point: Point, subject?: UiNode): Promise<FrameVerdict>;
   /**
    * The covered rect that overlaps `rect` by positive area (`rectsOverlap`:
    * an edge-touching one does not), else undefined — for a reader that
-   * MEASURES, never acts, and must fail closed on the window alone (the
-   * pixel poll). Never asks the witness: it exists to veto a key, and
-   * nothing is pressed here.
+   * MEASURES, never acts, and must fail closed on the window alone. Never
+   * asks the witness: it exists to veto a key, and nothing is pressed here.
    */
   overlapping(rect: Rect, subject?: UiNode): Promise<Rect | undefined>;
   /** Everything a `shown` keyboard covers; undefined when hidden or unknown. No witness. */
@@ -192,8 +184,7 @@ export interface KeyboardReading {
    * (`witnessDenies`)? False for a reading that is not shown, asking
    * nothing; true without a query on the in-tree model, whose band is read
    * off the tree being judged. For a caller that lets a band change what it
-   * reports or does without having a point (`scroll_until`'s round, the
-   * post-fill dismissal).
+   * reports or does without having a point.
    */
   corroborated(): Promise<boolean>;
   /**
@@ -205,7 +196,7 @@ export interface KeyboardReading {
    * on the in-tree model, which has no second source.
    */
   unlocated(): Promise<boolean>;
-  /** Shown anywhere, hidden, or unknown — the state only, no region: for the one reader with no point (the post-fill dismissal). */
+  /** Shown anywhere, hidden, or unknown — the state only, no region. */
   anywhere(): Promise<SoftKeyboard['state']>;
   /**
    * Is `node` the keyboard's own UI — a key, the AutoFill bar, the
@@ -225,10 +216,8 @@ export interface KeyboardReading {
  * DENIES a window state that reports one — that state was measured stale
  * for seconds after a navigating tap (AndroidAdapter's keyboardWitness has
  * the measurement). `unknown` denies nothing: a witness that cannot be asked
- * leaves the window state standing. Read by `over` (the guard's first look
- * and its re-check rounds) and `corroborated` (the post-fill dismissal's
- * `covering` row, `scroll_until` before a band may change its judgement or
- * its stroke) — no reader applies it itself.
+ * leaves the window state standing. Read by `over` and `corroborated` — no
+ * reader applies it itself.
  */
 const witnessDenies = (witness: KeyboardWitness): boolean => witness === 'hidden';
 
@@ -236,8 +225,8 @@ const witnessDenies = (witness: KeyboardWitness): boolean => witness === 'hidden
  * Why `panelsBeyond` refused a region, or part of one — a closed set, one
  * case per rule it applies (not a free string, so a test or a caller need
  * not match its wording):
- * - `unreadable`: the input method answered (the call ran) and the region
- *   line was missing or could not be read whole;
+ * - `unreadable`: the input method said `shown` in the same call and the
+ *   region line was missing or could not be read whole;
  * - `witness-not-shown`: the region held rects beside the band, but the
  *   input method said `hidden` or `unknown` in the same call;
  * - `no-band-rect`: no rect of the region is the band, byte for byte;
@@ -269,7 +258,7 @@ function refusalText(refusal: RegionRefusal): string {
  * Which rects of the keyboard window's touchable region count as covered
  * BESIDE the inset band (the floating-Gboard device check, the bug note
  * below), and — when the region held something it did NOT admit, or could
- * not be read although the input method answered — why (`refused`, for the
+ * not be read although the input method said shown — why (`refused`, for the
  * one-line notice `withPanels` writes: a device check must be able to tell
  * "no panel" from "a panel refused, and for which reason"). `refused`
  * is absent for a region that is just the band (docked) and for a call that
@@ -316,7 +305,8 @@ function refusalText(refusal: RegionRefusal): string {
 export function panelsBeyond(band: Rect, touchable: KeyboardTouchable): { panels: readonly Rect[]; refused?: RegionRefusal } {
   const { witness, region } = touchable;
   if (region === undefined) {
-    // Said only when the input method answered: then the call ran, and the region line was missing or unreadable.
+    // Said only when the input method said shown in the same call: the call ran, and the region line was missing or
+    // unreadable.
     return witness === 'shown' ? { panels: [], refused: { kind: 'unreadable' } } : { panels: [] };
   }
   const beyond = region.filter((r) => !sameRect(r, band));
@@ -418,7 +408,6 @@ function panelGap(band: Rect, panels: readonly Rect[]): Rect | undefined {
   return top < band.y ? { x: band.x, y: top, width: band.width, height: band.y - top } : undefined;
 }
 
-/** Memoise one async call: asked on the first need, never again for this reading. */
 function once<T>(ask: () => Promise<T>): () => Promise<T> {
   let asked: Promise<T> | undefined;
   return () => (asked ??= ask());
@@ -426,18 +415,15 @@ function once<T>(ask: () => Promise<T>): () => Promise<T> {
 
 /**
  * A reading of the soft keyboard off `tree` — the tree the caller already
- * holds (a resolution's, a round's). Optional for the two readers on the
- * window model that hold none and judge no subject: the guard's re-check
- * round (keyboard-window.ts) and the post-fill dismissal; without the oracle
- * and without a tree, every question reads `unknown` and nothing is asked.
+ * holds (a resolution's, a round's). Optional for a reader on the window
+ * model that holds none and judges no subject; without the oracle and
+ * without a tree, every question reads `unknown` and nothing is asked.
  * Synchronous, asks nothing until a question is put (the module doc).
  */
 export function readKeyboard(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdvice'>, tree?: UiNode): KeyboardReading {
   const oracle = adapter.keyboard;
   const remedy: KeyboardRemedy = oracle === undefined ? { dismissal: 'none', advice: adapter.keyboardAdvice } : { dismissal: 'back', advice: undefined };
   const inTree: SoftKeyboard = { state: 'unknown' };
-  // The three oracle calls, each once (the module doc's order); on the
-  // in-tree model the band, read off the tree on first need.
   const state = once(async (): Promise<SoftKeyboard> => (oracle === undefined ? (tree === undefined ? inTree : keyboardInTree(tree)) : oracle.state()));
   const whole = once(async (): Promise<Exclude<SoftKeyboard, { state: 'shown' }> | WholeShown> => {
     const keyboard = await state();
@@ -447,7 +433,6 @@ export function readKeyboard(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboard
   let sideNodes: ReadonlySet<UiNode> | undefined;
   const ofKeyboard = (node: UiNode): boolean => tree !== undefined && (sideNodes ??= keyboardSideNodes(tree)).has(node);
 
-  /** The first covered rect that `hits`, for a subject that is not the keyboard's own UI; `unknown` when the state could not be read. */
   const covering = async (hits: (covered: Rect) => boolean, subject: UiNode | undefined): Promise<Rect | 'clear' | 'unknown'> => {
     if (subject !== undefined && ofKeyboard(subject)) return 'unknown';
     const keyboard = await whole();

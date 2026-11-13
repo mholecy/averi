@@ -72,7 +72,7 @@ function unquotedSpaceHint(parsed: Condition[], rest: string): string {
   const whole = `${last.value} ${words.join(' ')}`;
   // The grammar has no escape inside "…" (CONDITION_RE: "([^"]*)"), so a value
   // with a double quote cannot be written at all — say that instead of
-  // suggesting a string the parser would reject (review 2026-09-18).
+  // suggesting a string the parser would reject.
   if (whole.includes('"')) {
     return `${rule} — the value contains a double quote, which this grammar cannot express; match a distinctive part of it with ${last.field}~"…" instead`;
   }
@@ -103,7 +103,6 @@ function matches(node: UiNode, conditions: Condition[]): boolean {
   });
 }
 
-/** Every node under `root` (pre-order) that satisfies all `conditions`. The one walk both lookups share. */
 function findMatching(root: UiNode, conditions: Condition[]): UiNode[] {
   const found: UiNode[] = [];
   const walk = (node: UiNode) => {
@@ -127,7 +126,7 @@ export function findAll(root: UiNode, selector: Selector): UiNode[] {
  * the grammar has no escape inside `"…"`, so a value containing a double
  * quote could not be written at all (a 2026-10-04 probe: 120 of 512 specs).
  * Iterating SELECTOR_FIELDS means a payload carrying non-selector keys
- * (`value`, `timeout` on a fill/tap step) is ignored, as before, and a field
+ * (`value`, `timeout` on a fill/tap step) is ignored, and a field
  * added to the spec schema is matched here with no edit.
  */
 function conditionsOf(spec: ElementSpec): Condition[] {
@@ -141,16 +140,11 @@ function conditionsOf(spec: ElementSpec): Condition[] {
 
 /**
  * Exact-match element lookup; `text` matches label or value (selector
- * semantics). Since 2026-10-04 this IS the selector matcher over
- * `conditionsOf(spec)`; before it was a second, hand-written matcher over the
- * same fields — identical on every probed input, and one edit away from not
- * being. Proved by a frozen copy of that matcher run as an oracle (zero
- * differences over 864 specs × 217 nodes); since 2026-10-05 pinned against
- * the definition itself in tests/ui-tree/selectors.test.ts — the oracle
- * hard-coded four fields and could not pin "a new field needs no edit".
- * One difference at the type's edge: a runtime `null` field now matches
- * nothing (the old `===` matched nodes whose field was null); the zod string
- * schemas make such a spec unreachable, so no behaviour changes.
+ * semantics). This IS the selector matcher over `conditionsOf(spec)`, not a
+ * second matcher over the same fields that is one edit away from disagreeing,
+ * pinned against the definition itself in tests/ui-tree/selectors.test.ts. At
+ * the type's edge, a runtime `null` field matches nothing; the zod string
+ * schemas make such a spec unreachable.
  */
 export function findBySpec(root: UiNode, spec: ElementSpec): UiNode[] {
   return findMatching(root, conditionsOf(spec));
@@ -164,11 +158,11 @@ export function findBySpec(root: UiNode, spec: ElementSpec): UiNode[] {
  */
 export type Target = Selector | ElementSpec;
 
-/** Every match, unfiltered — interact/resolve.ts#preferred is the policy over them, and a miss (miss.ts) asks of them. */
+/** Every match, unfiltered — interact/resolve.ts#preferred is the policy over them. */
 export const findTarget = (tree: UiNode, target: Target): UiNode[] =>
   typeof target === 'string' ? findAll(tree, target) : findBySpec(tree, target);
 
-/** A node with area — one a tap may act on: interact/resolve.ts#preferred keeps only these, and a miss whose matches have none says so (miss.ts, `zeroArea`). */
+/** A node with area — one a tap may act on. */
 export const hasArea = (node: UiNode): boolean => node.rect.width > 0 && node.rect.height > 0;
 
 /**
@@ -212,14 +206,6 @@ export function preferInteractive(nodes: UiNode[]): { node: UiNode; note: string
     note: `${nodes.length} matches; picked the only interactive one (${chosen.role})`,
   };
 }
-
-// `resolveOne` / `findOne` lived here until 2026-10-03: a second resolution
-// policy (no zero-area filter, throw on ambiguity) used only by the MCP tap
-// and type_text tools. The one policy is interact/resolve.ts#resolveNow.
-
-// The viewport predicates (intersectsViewport, absentFromViewport,
-// visibleFractionInViewport, clippedEdges) lived here until 2026-10-04; they
-// are geometry, not selection, and sit in geometry.ts with the rest of it.
 
 /** Center of the node's rect — where taps land (geometry.ts#rectCentre, rounded as a tap is sent). */
 export function tapPoint(node: UiNode): Point {

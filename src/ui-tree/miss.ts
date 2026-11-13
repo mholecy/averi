@@ -9,15 +9,11 @@ import { presentedLayerName, presentedRemedy } from './remedy-text.js';
 import { isBareTreeMemo } from './verdict.js';
 
 /**
- * WHY A TARGET IS NOT IN THE TREE: the one decision behind every reply that says a target is not in the tree — the
- * tap's and fill's wait and the presence check (interact/resolve.ts), `scroll_until`'s "never appeared in the tree"
- * (interact/scroll-text.ts: the `absent` shortfall and the `covered` stop), every assert's "not found within …"
- * (verify/poll-verdict.ts#notFound), a flow's `wait:` on an element (flow/engine.ts#waitTimeoutHint), and the skip line
- * of an optional step that threw one (flow/engine.ts#runOptionalSteps, which reads the `Miss` the error carries,
- * `missCarried`). Asked once, of the target and the LAST read the miss made (`missOf`), and worded once (`missNote`,
- * and `presentedAloneHeadline` for the one reply whose headline it is); each reply only picks the layout — beneath a
- * thrown poll timeout's headline (ui-tree/read-tree.ts#pollTimeoutMessage), or after a one-line not-found in a
- * parenthesis (`withMissNote`) — and adds its own headline and flow-step advice.
+ * WHY A TARGET IS NOT IN THE TREE: the one decision behind every reply that says a target is not in the tree. Asked
+ * once, of the target and the LAST read the miss made (`missOf`), and worded once (`missNote`, and
+ * `presentedAloneHeadline` for the one reply whose headline it is); each reply only picks the layout — beneath a thrown
+ * poll timeout's headline (ui-tree/read-tree.ts#pollTimeoutMessage), or after a one-line not-found in a parenthesis
+ * (`withMissNote`) — and adds its own headline and flow-step advice.
  *
  * The facts, in the one precedence (ADR 0018 decision 5):
  * - `unread`: the last read failed — its error is the story, which each reply already words where it puts it (a
@@ -40,8 +36,9 @@ import { isBareTreeMemo } from './verdict.js';
  *   — a lazy list composes only what shows (form-picker's country sheet, whose far rows `scroll_until` reaches on the
  *   sheet's own list): the words then say that first, scroll_until it in that list, and close it first only if not —
  *   never "no scroll moves it out", which would send an agent to dismiss the very window it needs. Not where the
- *   reader has already stroked that list (`scrolled`: `scroll_until`'s own stop, ADR 0018 decision 3), nor on idb's
- *   flat list, which lists no scroll view (the remedy stays as it was: ADR 0018, residual 18);
+ *   reader has already stroked that list (`scrolled`: `scroll_until`'s own stop, ADR 0018's amendment "Android's
+ *   window by the window manager's word", decision 4), nor on idb's flat list, which lists no scroll view (the remedy
+ *   stays as it was: ADR 0018, residual 18);
  * - `activeWindow`: the source lists the active window only (dialect.ts#TreeDialect.activeWindow, uiautomator) and marks no
  *   presented window — a sheet or a dialog it does not mark (a fully expanded bottom sheet with no scrim, form-picker;
  *   a full-screen dialog; a window against the screen's edge: ADR 0018's residuals 18 and 19) still hides the screen
@@ -153,7 +150,6 @@ function listsNoId(tree: UiNode): boolean {
   return true;
 }
 
-/** The sides every match was dumped clipped out past (UiNode.clippedOut), in first-seen order — none when any match was not. */
 function clippedOutOf(matched: readonly UiNode[]): Edge[] {
   const sides = new Set(matched.map((n) => n.clippedOut));
   return sides.has(undefined) ? [] : ([...sides] as Edge[]);
@@ -187,8 +183,8 @@ export const IDB_UNLISTS =
   "any set on a container and a UIKit table cell label's among them";
 
 /**
- * The remedies both notes open with: close what lies over the element; else, if it shows, what each read leaves. The
- * phrase a judge of the reply reads (scripts/truth/replies.ts).
+ * The phrase both notes' remedies open with, after their fact and idb's reasons: close what lies over the element;
+ * else, if it shows, what each read leaves. The phrase a judge of the reply reads (scripts/truth/replies.ts).
  */
 export const COVERED_FIRST = 'If something covers it, close that first; if it is showing,';
 
@@ -249,16 +245,12 @@ export const presentedAloneHeadline = (subject: string, { layer, listed, mayLieI
   `${subject} is not in the tree, which ${PRESENTED_ALONE[listed]} — ` +
   (mayLieIn === undefined ? presentedRemedy('touch', layer) : scrollFirst(layer));
 
-/** A one-line not-found `what`, the miss's note after it in a parenthesis when it has one. */
 export const withMissNote = (what: string, miss: Miss | undefined): string => {
   const note = miss === undefined ? undefined : missNote(miss);
   return note === undefined ? what : `${what} (${note})`;
 };
 
-/**
- * An error whose message says a target was not in the tree, carrying what that miss saw for a one-line reader (the
- * optional step's skip, flow/engine.ts): interact's ElementNotFoundError and the engine's `wait:` timeout extend it.
- */
+/** An error whose message says a target was not in the tree, carrying what that miss saw for a one-line reader. */
 export class MissedError extends Error {
   constructor(
     message: string,
@@ -268,5 +260,4 @@ export class MissedError extends Error {
   }
 }
 
-/** The `Miss` an error carries (a `MissedError`), if it carries one. */
 export const missCarried = (e: unknown): Miss | undefined => (e instanceof MissedError ? e.miss : undefined);

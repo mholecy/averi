@@ -203,10 +203,10 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *
  * Why so:
  * - The plain stop is the next tap's point: its centre on the screen and
- *   under nothing, so `scroll_until X` then `tap X` agree. A stop that was
- *   any intersection reported a row under a pinned CONTINUE bar "fully
+ *   under nothing, so `scroll_until X` then `tap X` agree. A stop at any
+ *   intersection would report a row under a pinned CONTINUE bar "fully
  *   visible after 0 swipes"; one with its centre past the screen's edge
- *   ("visible … CLIPPED 40%") handed the tap an off-screen refusal.
+ *   ("visible … CLIPPED 40%") would hand the tap an off-screen refusal.
  * - On the SCREEN, not the frame cut above a keyboard: a centre under a
  *   witnessed keyboard stops, and the tap's keyboard guard hides the
  *   keyboard. Under idb's band no guard acts, so a centre there is
@@ -231,7 +231,7 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *   clear), and the agent looped. A node pinned in a band ends stuck naming
  *   the bar. Not for content no scroll lifts out of a band
  *   (`pinnedSurface`: in no scroll view, a full-bleed header or footer or a
- *   screen-sized node): the `fully` stop stops on it as before, so a rect
+ *   screen-sized node): the `fully` stop stops on it, so a rect
  *   assert after it works — no strokes over a modal sheet — and a pixel
  *   assert on it fails closed with its own advice (assert something in it
  *   clear of the bar). A scroll view's content is lifted, whatever its
@@ -327,20 +327,18 @@ export interface Scene {
    * a popover's element, what of a `screen` layer draws there; a screen presented by shape alone is not asked of no
    * target), quoted by the presentation (presentation.ts#Presentation.press). Undefined when none. The point is
    * kept: a surface judged by shape only where it lies is not one at every touch-down (a dismissed sheet parked off
-   * screen is no stop). One reader: `scroll_until`'s stroke (interact/stroke-plan.ts#planStroke, its `presented`).
+   * screen is no stop).
    */
   presentedAt(point: Point, target?: UiNode): PresentedPress | undefined;
   /**
    * THE FLUSH NEIGHBOURS of the node (later-edges.ts#FlushNeighbour, the classification's `outsideScrollView`), one per edge that has one (top, bottom, left, right), empty
-   * when none: what makes a `fully visible` claim on it worth a screenshot (ui-tree/eyes.ts). One reader:
-   * `scroll_until`'s stop, through ui-tree/eyes.ts#eyesQuestion.
+   * when none: what makes a `fully visible` claim on it worth a screenshot (ui-tree/eyes.ts).
    */
   flushNeighbours(node: UiNode): readonly FlushNeighbour[];
   /**
    * THE PINNED EDGES of the node (later-edges.ts#PinnedEdge, the classification's `pinnedInScrollView`), top before
    * left, empty when none: an edge laid flush under a node pinned in the node's own scroll view (a merged sticky
-   * header), where Compose may have cut it — the twin of `flushNeighbours` inside the scroll view. One reader:
-   * `scroll_until`'s `fully: true` flush probe (interact/flush-check.ts).
+   * header), where Compose may have cut it — the twin of `flushNeighbours` inside the scroll view.
    */
   pinnedEdges(node: UiNode): readonly PinnedEdge[];
 }
@@ -406,10 +404,8 @@ type JudgedBoxes = Pick<UsableScreen, 'box' | 'boxes' | 'statusBand' | 'navigati
  */
 export type SystemBar = { readonly edge: 'top'; readonly bottom: number } | { readonly edge: 'bottom'; readonly top: number };
 
-/** The navigation bar: the system bar at the screen's bottom. */
 export type NavigationBar = Extract<SystemBar, { readonly edge: 'bottom' }>;
 
-/** The status bar: the system bar at the screen's top. */
 type StatusBar = Extract<SystemBar, { readonly edge: 'top' }>;
 
 /** What a standing was judged from — every kind carries them. */
@@ -472,10 +468,8 @@ export interface StandingFacts {
 
 /**
  * THE REMEDY for a node that does not stand `reachable`: what would bring it within reach, as one closed set of cases
- * decided once, here (`remedied`), for every purpose — the verbs only render a case in their own words (the tap's
- * refusal, interact/tap-judgement.ts; the pixel assert's miss, verify/pixel-text.ts#coverRemedy; `scroll_until`'s
- * `presented` stop, interact/scroll-rounds.ts). Every non-reachable standing carries one (`Standing`'s and
- * `PixelStanding`'s `remedy`).
+ * decided once, here (`remedied`), for every purpose — the verbs only render a case in their own words. Every
+ * non-reachable standing carries one (`Standing`'s and `PixelStanding`'s `remedy`).
  *
  * The cases, in THE PRECEDENCE, one for every purpose — the first that holds is the remedy:
  * 1. `presented` — a screen is presented over the node's own (a modal's dimming leaf, a sheet's form), judged of the
@@ -511,10 +505,9 @@ export interface StandingFacts {
  * 5. `bothPinned` — `covered` by a cover the tree orders over it (`drawn`, or `overlaid`), where NEITHER lies in a
  *    scroll view as the tree says (geometry.ts#Clips.inScroller false for the node and for its cover — the lab's
  *    pinned-bar P and text-under-bar P under Continue, on WDA and Compose; rn-banner's "Saved"): no scroll moves either
- *    (D87; the shape views-drawn-over's A had before D84, when it swiped 3 times, then "a layout defect" — since D84 A's
- *    cover is an untold peer, 2.). Not where either lies in one, though nothing scrolls between the two: a
- *    pinned section header lies in its scroll view's one content container beside its rows (scroll-sticky.wda), and a
- *    stroke moves the rows from under it. Not where the tree cannot say (idb's flat list).
+ *    (D87). Not where either lies in one, though nothing scrolls between the two: a pinned section header lies in its
+ *    scroll view's one content container beside its rows (scroll-sticky.wda), and a stroke moves the rows from under
+ *    it. Not where the tree cannot say (idb's flat list).
  *    remedy-text.ts#bothPinnedRemedyText. `under`: the node it is pinned under — its cover's node, or (below) the node
  *    it is cut by (A26).
  *    And (D88) a touch's `cut` by a node drawn after it (geometry.ts#Cut.by), on the same two facts of the node and that
@@ -524,7 +517,7 @@ export interface StandingFacts {
  *    `scroll`.
  *    docs/adr/0015-flat-list-reading-order-break.md (its D87 and D88 amendments)
  * 6. `pinned` — under a system bar or (the pixel assert) a cover, in no scroll view as the tree says
- *    (geometry.ts#Clips.inScroller false): no scroll moves it out. Under a cover it now arises only for a cover in a
+ *    (geometry.ts#Clips.inScroller false): no scroll moves it out. Under a cover it arises only for a cover in a
  *    scroll view over a node in none, which the draw order excuses (draw-order.ts's `scrolledContent` row) save in a
  *    later screen, `presented` first — defence in depth: 5.'s `over` half (`bothPinned`) survives the mutation run, an
  *    equivalent mutant there (ADR 0015's D87 amendment; ADR 0038's A25 amendment, which lists this module's others).
@@ -564,18 +557,15 @@ export type Remedy =
   | { readonly of: 'stuck' }
   | { readonly of: 'scroll' };
 
-/** One case of `Remedy`. */
 export type RemedyCase<O extends Remedy['of']> = Extract<Remedy, { readonly of: O }>;
 
 /**
  * The remedies under which NO SCROLL HELPS a `covered` node, or a `cut` one (`Remedy`'s `unordered`, `seenOver`,
  * `bothPinned` — a cut takes only the last): the tap advises none, `scroll_until` stops before any swipe
- * (interact/scroll-rounds.ts's `overlapped`), the pixel assert names none. One set, asked by `noScrollHelps` (of a
- * touch standing, `noScrollStanding`) and said by remedy-text.ts#noScrollRemedyText.
+ * (interact/scroll-rounds.ts's `overlapped`), the pixel assert names none.
  */
 export type NoScrollRemedy = RemedyCase<'unordered' | 'seenOver' | 'bothPinned'>;
 
-/** Whether `remedy` is one under which no scroll helps (`NoScrollRemedy`). */
 export const noScrollHelps = (remedy: Remedy): remedy is NoScrollRemedy => remedy.of === 'unordered' || remedy.of === 'seenOver' || remedy.of === 'bothPinned';
 
 /** 6.–8. of THE PRECEDENCE: what a scroll may do for a node under a bar or (the pixel assert's) a cover (`scrollable`). */
@@ -591,7 +581,6 @@ interface TouchRemedies {
   readonly underKeyboard: RemedyCase<'presented' | 'keyboard'>;
 }
 
-/** The remedies each pixel kind can carry. */
 interface PixelRemedies {
   readonly offScreen: RemedyCase<'presented' | 'scroll'>;
   readonly systemBar: RemedyCase<'presented' | 'fixed'> | ScrollableRemedy;
@@ -658,7 +647,6 @@ export type TouchRemedied = Extract<Standing, { readonly kind: 'cut' | 'covered'
  */
 export type NoScrollStanding = TouchRemedied & { readonly remedy: NoScrollRemedy };
 
-/** Whether no scroll helps the touch standing `s` (`NoScrollStanding`) — the one question `scroll_until`'s stop asks of a `covered` and a `cut` target alike (interact/scroll-rounds.ts's `overlapped`). */
 export const noScrollStanding = (s: Standing): s is NoScrollStanding => (s.kind === 'covered' || s.kind === 'cut') && noScrollHelps(s.remedy);
 
 /** The pixel assert's kinds, before the remedy is decided (`remedied`). */
@@ -699,7 +687,6 @@ type PixelJudgement = { readonly facts: StandingFacts } & PixelKind;
 /** A judgement of any kind but `reachable` — the ones a remedy is decided for. */
 type Unreached<J> = Exclude<J, { readonly kind: 'reachable' }>;
 
-/** The scene of `tree`: its draw order and clip facts, each derived on first use and kept. */
 export function sceneOf(tree: UiNode, seen?: SeenOrder): Scene {
   let order: DrawOrder | undefined;
   let clips: Clips | undefined;
@@ -723,7 +710,6 @@ export function sceneOf(tree: UiNode, seen?: SeenOrder): Scene {
   };
   // The flush later node at each of a node's edges, classified once (later-edges.ts): the cut's, the overlay's and the flush neighbour's evidence.
   const laterOf = laterEdgesIn(tree, scene);
-  /** The usable screen the pixel purpose judges on: `screen`, else the tree's own. */
   function pixelScreen(screen: UsableScreen | undefined): UsableScreen & { readonly failsOpen?: boolean } {
     return screen ?? treeScreen(tree);
   }
@@ -739,7 +725,6 @@ export function sceneOf(tree: UiNode, seen?: SeenOrder): Scene {
   function standing(node: UiNode, screen: UsableScreen | undefined, purpose: Purpose): Standing | PixelStanding {
     const judged: Judged = { scene, node, centre: tapPoint(node), later: laterOf(node) };
     if (purpose.of === 'pixel') {
-      // The pixel purpose picks its own box of the usable screen, `oriented` (`singleBox`).
       const usable = pixelScreen(screen);
       const single = singleBox(usable);
       // On a root of no area (treeScreen's `failsOpen`) the box is only the largest node: nothing is judged off it.
@@ -1062,7 +1047,6 @@ function systemBandOver(rect: Rect, box: Rect, bands: Bands): SystemBand | undef
   return undefined;
 }
 
-/** The screen's system bands, as `JudgedBoxes` carries them. */
 type Bands = Pick<JudgedBoxes, 'statusBand' | 'navigationBand'> | undefined;
 
 /**
@@ -1148,7 +1132,6 @@ function pointPlaced(facts: StandingFacts, place: PointPlace, offScreenVisible: 
   return { facts, kind: 'systemBar', at: facts.centre, bar: place.bar, ...(place.band !== undefined && { band: place.band }) };
 }
 
-/** A touch's cut to a sliver as its answer, when the frame left a minimum to judge it by. */
 const sliverCut = (facts: StandingFacts, cut: Cut | undefined): TapJudgement | undefined =>
   cut !== undefined && facts.minPiece !== undefined ? { facts, kind: 'cut', cut, minPiece: facts.minPiece } : undefined;
 
@@ -1156,7 +1139,6 @@ const sliverCut = (facts: StandingFacts, cut: Cut | undefined): TapJudgement | u
 const underLine = (facts: StandingFacts, line: KeyboardLine | undefined): TapJudgement | undefined =>
   line !== undefined && facts.centre.y >= line.y ? { facts, kind: 'underKeyboard', line } : undefined;
 
-/** `box` cut above a keyboard line — the box's width, from its top down to the line (no height for a line at or above its top); `box` itself with no line or one at or below its bottom. */
 const aboveLine = (box: Rect, line: KeyboardLine | undefined): Rect =>
   line === undefined || line.y >= box.y + box.height ? box : { ...box, height: Math.max(0, line.y - box.y) };
 
@@ -1182,7 +1164,7 @@ const aboveLine = (box: Rect, line: KeyboardLine | undefined): Rect =>
  * as often as on it (draw-order.ts#MIN_TAP_PIECE_FRACTION) — its sentences say the rest "may" lie under that node and
  * give that case its way past, a coordinate tap (interact/target-text.ts#wholeThinWayPast), as the container's cut
  * gives its own (`OWN_CUT_WAY_PAST`); a text that is no control (a field's title cut to 14 px at the same bar) is
- * tapped as before; and, the second residual, a clickable with no role — Compose's `Modifier.clickable` without one
+ * tapped; and, the second residual, a clickable with no role — Compose's `Modifier.clickable` without one
  * dumps as `android.view.View`, read as a `container` or `other` — cut to such a strip is refused only on an OVERLAY's
  * evidence (`later-edges.ts#OverlaidEdge`: the node that cut it reaches past it at both ends of its top or bottom edge, as the lab's
  * pinned `Continue` does past text-under-bar's `P`), which a layout wrapper laid beside its siblings does not have; cut
@@ -1203,7 +1185,7 @@ function cutByLater({ node, later }: Judged, minPiece: number): Cut | undefined 
   const r = node.rect;
   if (!isInteractive(node)) {
     // No control role: a sliver only on an OVERLAY's evidence (later-edges.ts#OverlaidEdge), which a wrapper laid beside
-    // its siblings does not have — never a text, which is tapped as before.
+    // its siblings does not have — never a text, which is tapped.
     if (node.role === 'text' || r.height >= minPiece) return undefined;
     const overlaid = later.overlaid();
     return overlaid === undefined ? undefined : { edge: overlaid.edge, container: { ...overlaid.by.rect }, depth: overlaid.depth, by: overlaid.by };
@@ -1229,7 +1211,6 @@ function marginSeenOf({ orderSeen }: Scene, node: UiNode, seen: Exposure): { mar
   return marginSeen.length === 0 ? {} : { marginSeen };
 }
 
-/** The facts of a node judged in `frame`, from its exposure there. */
 function factsIn(judged: Judged, frame: Rect, exposed: Rect = frame, { sliver: judgeSliver = true } = {}): { facts: StandingFacts; seen: Exposure } {
   const { scene, node, centre } = judged;
   const seen = scene.order.exposure(node, exposed);
@@ -1273,7 +1254,6 @@ function inStopFrame(judged: Judged, box: Rect, bands: JudgedBoxes | undefined, 
     return { facts, outside: { facts, kind: 'underKeyboard', line } };
   }
   const above = line === undefined ? { ...box } : { ...box, height: line.y - box.y };
-  // Only what its scroll views draw (the drawn frame).
   const frame = drawnFrame(judged, above);
   // Its covers below the status band; what shows keeps the node's own part in the band (`bandShows`).
   // docs/adr/0008-scroll-until-exposure-box-below-status-band.md
@@ -1326,7 +1306,7 @@ function fullyStanding(judged: Judged, place: PointPlace, box: Rect, bands: Judg
   }
   // The system bands as a region, as the pixel assert judges them — any of the node past the slack.
   // docs/adr/0009-android-navigation-band.md
-  // Not for content no scroll lifts out of a band (`pinnedSurface`): it stops as before.
+  // Not for content no scroll lifts out of a band (`pinnedSurface`): its centre's place stands.
   const placed = place === 'on' && pinnedSurface(judged.node, box, bands, judged.scene.clips) === undefined ? (systemBandOver(judged.node.rect, box, bands) ?? place) : place;
   // A cut by a node drawn after it, which no flush probe sees: its rest lies under that node (`cutByLater`).
   const cutBy = facts.sliver?.by === undefined ? undefined : sliverCut(facts, facts.sliver);
@@ -1380,7 +1360,6 @@ function bandShows(judged: Judged, frame: Rect, exposed: Rect, cut: StandingFact
 /** The tap's standing (`Scene`'s contract): judged in `chosen` less the system bands — cut above a line no guard acts on — the piece above any line. */
 function tapStanding(judged: Judged, place: PointPlace, chosen: Rect, boxes: readonly Rect[], bands: JudgedBoxes | undefined, line: KeyboardLine | undefined): TapJudgement {
   const { scene, node } = judged;
-  // Less the system bands, and only what its scroll views draw (the drawn frame).
   const clear = systemBands(chosen, bands).clear;
   const box = drawnFrame(judged, clear);
   const within = aboveLine(box, line);

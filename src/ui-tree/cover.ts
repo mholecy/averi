@@ -9,8 +9,7 @@ import { isInteractive, tapPoint } from './selectors.js';
  * record every reader of a target's covers asks, instead of a list per tag joined by membership. draw-order.ts builds
  * the found ones, standing.ts the overlaid one; the standing carries them (standing.ts#StandingFacts.covers) and names
  * the one it judged the target under by its record (standing.ts#Standing's and #PixelStanding's `covered`, the tap's
- * `moved`); the tap, `scroll_until` and the pixel assert read them. This module owns the record, its few queries and
- * how a sentence says it (`coverClause`).
+ * `moved`). This module owns the record, its few queries and how a sentence says it (`coverClause`).
  *
  * - `reach`: where it presses over the target — its rect, a pinned bar's reach run down to the screen's bottom, a
  *   floating tab bar's item raised by its bar's lift, or the whole screen for a presented layer's cover
@@ -62,7 +61,6 @@ export const drawOrderFound = (cover: Cover): boolean => cover.order.kind !== 'o
 /** The cover drawn on top at `point` — the last of `covers` whose reach contains it — or undefined. */
 export const coverAtPoint = (covers: readonly Cover[], point: Point): Cover | undefined => covers.filter((c) => containsPoint(c.reach, point)).at(-1);
 
-/** The last of `covers` that is the surface of a screen presented over the target (`Cover.presented`), or undefined. */
 export const lastPresented = (covers: readonly Cover[]): Cover | undefined => covers.filter((c) => c.presented).at(-1);
 
 /**
@@ -131,10 +129,9 @@ export type CoverGrammar = { readonly of: 'touch'; readonly centre?: Point } | {
  * - `untold`: overlapping it, which is drawn on top not told (`ORDER_UNTOLD`);
  * - `seenOver`: drawn over it, as a screenshot shows (`SEEN_OVER`);
  * - `drawn`: drawn over it — `under <cover> at its centre (x,y), drawn over it` in the touch's.
- * A cover has one order, so the precedence the separate lists once needed (overlaid, then untold, then seen over,
- * then drawn) is each judgement's rule, not this switch's: found first, else overlaid — the `fully` stop names the overlaid cover
- * only where the exposure found none, the pixel assert only where no cover paints a pixel (standing.ts#fullyStanding,
- * #pixelStanding).
+ * A cover has one order, so the precedence among the orders is each judgement's rule, not this switch's: found first,
+ * else overlaid — the `fully` stop names the overlaid cover only where the exposure found none, the pixel assert only
+ * where no cover paints a pixel (standing.ts#fullyStanding, #pixelStanding).
  */
 export function coverClause(cover: Cover, grammar: CoverGrammar): string {
   const { node, reach, order } = cover;
@@ -161,8 +158,7 @@ export function coverClause(cover: Cover, grammar: CoverGrammar): string {
 /**
  * How a sentence says a node was cut at `edge` by `by`, drawn after it (`mayRunOnUnderText`): `cut at its bottom edge by
  * button id:lab.pinned-bar.continue (66,1956 948x154), drawn after it — the dump (Compose's, on Android) leaves out of a
- * node's bounds what a later node covers, so the rest of it may lie under that button`. The head of the sliver's
- * sentence (interact/target-text.ts#cutSliverText) and the touch grammar's clause for an overlaid cover (`coverClause`).
+ * node's bounds what a later node covers, so the rest of it may lie under that button`.
  */
 export const cutAtLaterText = (edge: Edge, by: QuotedNode): string => `cut at its ${edge} edge by ${nodeText(by)}, drawn after it — ${mayRunOnUnderText(by, 'it')}`;
 
@@ -171,7 +167,7 @@ export const cutAtLaterText = (edge: Edge, by: QuotedNode): string => `cut at it
  * on Android) leaves out of a node's bounds what a later node covers, so the rest of it may lie under that button` —
  * `what` the node as its sentence names it (`it`, or `the element` in the pixel grammar, whose subject is the cover).
  * "May": the dump cannot say how far, nor tell a cut from a node that ends there. Said wherever that cut is the
- * evidence: a sliver cut by a later node (`cutAtLaterText`), and an overlaid cover (`coverClause`).
+ * evidence.
  */
 const mayRunOnUnderText = (by: QuotedNode, what: 'it' | 'the element'): string =>
   `the dump (Compose's, on Android) leaves out of a node's bounds what a later node covers, so the rest of ${what} may lie under that ${by.role}`;

@@ -49,12 +49,12 @@ export const hasSelector = (spec: ElementSpec): boolean =>
  * The selector fields, DERIVED from the schema — the one list a field must be
  * on to arrive from averi.yaml at all. Every place that needs "just the
  * selector half" of an extended step payload (`fill` with its `value`, `tap`
- * with its `timeout`) goes through `selectorOnly` instead of destructuring the
- * four names again. Adding a field to `elementSpecObject` without adding it to
- * `ElementSpec` fails to compile (the indexed access below), and vice versa
- * `hasSelector` and every trace line pick the new field up with no edit —
- * a `satisfies` on a literal list only checked the listed names were keys, not
- * that every key was listed (architecture review 2026-09-18).
+ * with its `timeout`) goes through this list, or `selectorOnly` over it,
+ * instead of destructuring the four names again. Adding a field to
+ * `elementSpecObject` without adding it to `ElementSpec` fails to compile (the
+ * indexed access below), and vice versa `hasSelector` and every trace line pick
+ * the new field up with no edit — a `satisfies` on a literal list would check
+ * only that the listed names are keys, not that every key is listed.
  */
 export const SELECTOR_FIELDS = Object.keys(elementSpecObject.shape) as (keyof typeof elementSpecObject.shape)[];
 

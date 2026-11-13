@@ -43,44 +43,33 @@ import { dialectOf } from './dialect.js';
  * (`UiNode.heading`: SwiftUI's pinned section header, listed before the rows scrolled under it) is drawn over it, its
  * order told (reading-order.ts#headingsOver).
  *
- * Seven questions, one per caller, read from two columns of `NOT_DRAWN`
- * (`drawnOverAt` reads `drawnOver`'s, `paintsOver` filters `exposure`'s,
- * `coversOf`, `presentedAt` and `presentedOver` read `exposure`'s):
- * - `drawnOver(container)` — `scroll_until`'s stroke box
- *   (interact/scroll-read.ts#TreeFacts, interact/stroke-plan.ts#strokeRoom): what is
- *   drawn over the clipping container a stroke goes over?
- * - `drawnOverAt(container, point)` — the exhausted stop's sentence
- *   (interact/stroke-plan.ts#touchedOn): which of those a stroke's touch-down hit
- *   (`drawnOver`'s column).
- * - `exposure(node, within)` — a TARGET's chrome: what is
- *   drawn over a node about to be tapped or scrolled to — a pinned CTA bar,
- *   a floating tab bar, a top bar laid after the form — what of it still
- *   shows, and where a tap on it should go (interact/tap-judgement.ts#
- *   TapJudge.aim for the tap and the fill's focus tap,
- *   standing.ts#Scene.standing for `scroll_until`'s stop, and the tap's
- *   standing again for the in-tree keyboard dismissal picker,
- *   interact/keyboard-dismissal.ts#configuredStrategy).
+ * Seven questions, read from two columns of `NOT_DRAWN` (`drawnOverAt`
+ * reads `drawnOver`'s, `paintsOver` filters `exposure`'s covers, `coversOf`,
+ * `presentedAt` and `presentedOver` read the `target` column, the one
+ * `exposure` reads):
+ * - `drawnOver(container)` — what is drawn over the clipping container a
+ *   stroke goes over?
+ * - `drawnOverAt(container, point)` — which of those a stroke's touch-down
+ *   hit (`drawnOver`'s column).
+ * - `exposure(node, within)` — a TARGET's chrome: what is drawn over a node
+ *   about to be tapped or scrolled to — a pinned CTA bar, a floating tab
+ *   bar, a top bar laid after the form — what of it still shows, and where a
+ *   tap on it should go.
  *   docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md
- * - `paintsOver(node, within)` — a pixel assert's chrome
- *   (ui-tree/standing.ts#Scene.standing's pixel purpose): which of
+ * - `paintsOver(node, within)` — a pixel assert's chrome: which of
  *   `exposure`'s covers hide PIXELS of the node, not only the touch —
  *   `exposure` less the node's own content listed beside it, a clickable
  *   layer with nothing drawn, and an overlap no thicker than an edge
  *   (`paintsOver`'s doc has the rules and the measured shapes).
- * - `coversOf(node, region)` — the uiautomator parser's widening, through
- *   the port it is handed (adapters/types.ts#DrawnOverStrip): is anything
- *   drawn over the strip a node cut short of its own content would gain?
- *   And the sliver rule's cut by a later node (standing.ts#cutByLater): what
- *   is drawn over the pixel row just past a thin control's edge?
- * - `presentedAt(node, point)` — `scroll_until`'s stroke
- *   (standing.ts#Scene.presentedAt): is the touch-down of a
- *   stroke for a target not judged in the viewport on a surface of a screen
- *   presented over the target's own (`exposure`'s column, then the
- *   presentation module's surface: presentation.ts#PresentedOver)?
- * - `presentedOver(node)` — the standing's remedy
- *   (ui-tree/standing.ts#remedied): is a screen presented over the
- *   target's own at all, wherever the target lies — `presentedAt` less the
- *   point?
+ * - `coversOf(node, region)` — what is drawn over a region of a node, as a
+ *   target: the strip a node cut short of its own content would gain, or
+ *   the pixel row just past a thin control's edge?
+ * - `presentedAt(node, point)` — is the touch-down of a stroke for a target
+ *   not judged in the viewport on a surface of a screen presented over the
+ *   target's own (the `target` column, then the presentation module's
+ *   surface: presentation.ts#PresentedOver)?
+ * - `presentedOver(node)` — is a screen presented over the target's own at
+ *   all, wherever the target lies — `presentedAt` less the point?
  *
  * What is PRESENTED over what is not judged here but asked of the presentation module (presentation.ts#Presentation,
  * built over this walk: `presentation`), as the keyboard band is asked of its owner: for a target, which later nodes a
@@ -160,14 +149,13 @@ export interface DrawOrder {
    * top there), and one that draws for it as a target (`NOT_DRAWN`'s `target` column, as `exposure` asks before it
    * asks for a surface); undefined when none, or for a node not in this tree.
    * `exposure` cannot answer it for a node outside the box: it judges only what of the node shows, so a target below
-   * the fold has no covers and no presented surface (`presentedOver` asks the same less the point). One reader:
-   * `scroll_until`'s stroke (interact/scroll-rounds.ts#round, through standing.ts#Scene.presentedAt), which asks it at
-   * the stroke's touch-down for a target it has not judged in the viewport — a stroke that would touch down on such a
-   * screen is not sent (it may dismiss the screen, as one closed
-   * Contacts' discard popover and then read the cell beneath "fully visible"). A surface of the node's OWN screen is
-   * not one: a row of a sheet below the sheet's fold is stroked for on the sheet's form, as before. A layer the tree
-   * source marks as presented (presentation.ts#PresentedOver.wholeScreen) holds every point of the screen: with one up, every touch-down for a
-   * target beneath it lies on it — so `scroll_until` stops wherever `presentedOver` names it.
+   * the fold has no covers and no presented surface (`presentedOver` asks the same less the point). A stroke for a
+   * target not judged in the viewport that would touch down on such a screen is not sent (it may dismiss the screen, as
+   * one closed Contacts' discard popover and then read the cell beneath "fully visible"). A surface of the node's OWN
+   * screen is not one: a row of a sheet below the sheet's fold is stroked for on the sheet's form. A layer the tree
+   * source marks as presented (presentation.ts#PresentedOver.wholeScreen) holds every point of the screen: with one
+   * up, every touch-down for a target beneath it lies on it — so `scroll_until` stops wherever `presentedOver` names
+   * it.
    */
   presentedAt(node: UiNode, point: Point): UiNode | undefined;
   /**
@@ -177,13 +165,12 @@ export interface DrawOrder {
    * wholly inside the status band, cut, covered. Undefined when none, or for a node not in this tree. Being presented
    * over is a fact of the two layers (a mark, or the shape fallback's stacked screens), not of where the
    * node shows, so `exposure`'s `presented`, which judges only what of it shows inside the box, is its in-frame part:
-   * a node with nothing in the box has none there. One reader: the standing's remedy (ui-tree/standing.ts#remedied),
-   * which asks it when the frame named no presented surface — so the tap and the pixel assert tell a target wholly
-   * off screen, or wholly under the status bar, beneath a sheet "close that screen first". `scroll_until` stops on it
-   * only where `presentedAt` holds at its stroke's touch-down (or the surface lies over the target in its read's
-   * frame): beneath a dim filling the screen it does, as the others say — and beneath a marked presented layer, which
-   * reaches the whole screen; beneath an UNDIMMED partial sheet the touch-down misses, on a
-   * tree whose source did not judge presented layers, it strokes while they say close it first.
+   * a node with nothing in the box has none there. Asked when the frame named no presented surface, so the tap and
+   * the pixel assert tell a target wholly off screen, or wholly under the status bar, beneath a sheet "close that
+   * screen first". `scroll_until` stops on it only where `presentedAt` holds at its stroke's touch-down (or the surface
+   * lies over the target in its read's frame): beneath a dim filling the screen it does, as the others say — and
+   * beneath a marked presented layer, which reaches the whole screen; beneath an UNDIMMED partial sheet the touch-down
+   * misses, on a tree whose source did not judge presented layers, it strokes while they say close it first.
    * docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
    */
   presentedOver(node: UiNode): UiNode | undefined;
@@ -203,8 +190,7 @@ export interface DrawOrder {
    * popover); for a `screen` layer, the last node of it at the point that draws by the column that needs no target
    * (`drawnOver`'s), else the layer itself. A node the source says is not shown (`UiNode.hidden`) is neither such a
    * scroll view nor named, as the `target` column's `hidden` row judges it. A screen presented by shape alone is not
-   * asked here. Undefined when none. One reader: `scroll_until`'s stroke (interact/scroll-rounds.ts#round, through
-   * standing.ts#Scene.presentedAt), which sends no stroke that would land on it.
+   * asked here. Undefined when none.
    */
   markedAt(point: Point): UiNode | undefined;
   /**
@@ -232,13 +218,11 @@ export interface DrawOrder {
    * (soft-keyboard.ts#keyboardInTree stays `unknown` on an idb tree, and
    * with it every `shown`/`hidden` question of keyboard-cover.ts#readKeyboard
    * and the in-tree dismissal — a blind key there was measured to submit,
-   * K5d). One reader: ui-tree/keyboard-position.ts#KeyboardPosition.line, the one
-   * merge of every keyboard source into the line the tap, `scroll_until` and
-   * the pixel assert judge and stroke against. Only a FLAT LIST
-   * (dialect.ts#TreeDialect.ancestry false, idb's mark) is read: WDA marks its band itself
-   * (`KEYBOARD_ROLE`) and Android's keyboard is never in the tree — both
-   * always undefined here. Read off the band this draw order already found
-   * for its own rows, not by a second walk of the tree.
+   * K5d). Only a FLAT LIST (dialect.ts#TreeDialect.ancestry false, idb's
+   * mark) is read: WDA marks its band itself (`KEYBOARD_ROLE`) and Android's
+   * keyboard is never in the tree — both always undefined here. Read off the
+   * band this draw order already found for its own rows, not by a second
+   * walk of the tree.
    * docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-soft-keyboard.md
    */
   readonly keyboardBandTop: number | undefined;
@@ -322,7 +306,6 @@ export interface DrawOrder {
  */
 export const MIN_TAP_PIECE_FRACTION = 0.06;
 
-/** The least piece a tap may be aimed at on `screen`: MIN_TAP_PIECE_FRACTION of its shorter side, rounded (the one formula, `DrawOrder.minPiece`'s). */
 export const minTapPiece = (screen: { readonly width: number; readonly height: number }): number => Math.round(MIN_TAP_PIECE_FRACTION * Math.min(screen.width, screen.height));
 
 /** What `exposure` found: the target against what is drawn over it inside the judged box. */
@@ -378,9 +361,9 @@ export interface Exposure {
    * PRESS: a labelled control of exactly the node's frame (`sameFrame`), its
    * own unlabelled control (`ownControl`), a row of a scroll view it is not
    * in (`scrolledContent`) are excused for where a touch lands on the node,
-   * not for what else the touch triggers. One reader: the in-tree dismissal
-   * picker (interact/keyboard-dismissal.ts#configuredStrategy), which refuses a
-   * candidate whose centre an interactive one of them holds (ADR 0016).
+   * not for what else the touch triggers. The in-tree dismissal picker
+   * refuses a candidate whose centre an interactive one of them holds (ADR
+   * 0016).
    * Judged in the same pass as `covers`, no second walk.
    */
   readonly centreExcused: readonly UiNode[];
@@ -460,7 +443,6 @@ const repeats = (node: UiNode, target: UiNode): boolean => {
   return [node.label, node.value].some((t) => t !== null && own.includes(t));
 };
 
-/** `placed` is a sibling of `target`: both have the same parent. */
 const siblingOf = (placed: Placed, target: Placed): placed is Placed & { readonly parent: Placed } => placed.parent !== undefined && placed.parent === target.parent;
 
 /** The `onTarget` row's sibling: see the row. */
@@ -602,7 +584,7 @@ const ownField = (placed: Placed, { target, labelOverhang: overhang }: SeenFor):
  * `label` is the floating label of `field`, the target — ADR 0014's relation (`ownField`) seen from the field: a text
  * spanning the height of the text input the target is (`inputOf`: it, or the one it is nothing but), each edge within
  * the label overhang (`spansHeight`). Asked of a sibling listed either side of a field in a nested run in reading
- * order (`asTarget`'s `drawn`, reading-order.ts#peersOf; listed after since D84, ADR 0015's D84 amendment): React
+ * order (`asTarget`'s `drawn`, reading-order.ts#peersOf; a label listed after: ADR 0015's D84 amendment): React
  * Native lays a field after its label and draws it over it, transparent — rn-field's M label `69,491 175x23` before
  * its field's wrapper `69,492 264x20`. A label listed after its field is the same relation, excused as a peer too (it
  * is then judged a cover, or not, by the draw order's own rows). A text a field merely lies over (a header title under
@@ -613,7 +595,6 @@ const ownLabelOf = (label: Placed, field: Placed, overhang: number): boolean => 
   return label.node.role === 'text' && input !== undefined && spansHeight(label.node.rect, input.rect, overhang);
 };
 
-/** `label` spans `field`'s height: its top and its bottom each within `overhang` of the field's (`ownField`). */
 const spansHeight = (label: Rect, field: Rect, overhang: number): boolean =>
   Math.abs(label.y - field.y) <= overhang && Math.abs(label.y + label.height - (field.y + field.height)) <= overhang;
 
@@ -689,7 +670,7 @@ const NOT_DRAWN = {
    * whose only content is empty frames (a card's background drawn by a
    * bare `Other` over a row it was laid after), or an icon WDA gives as
    * nested empty frames (an RN SVG: the myport login's flag icons, whose
-   * unlabelled frames no longer cover the switcher they lie in), reads as
+   * unlabelled frames do not cover the switcher they lie in), reads as
    * drawing nothing — a false "clear"; WDA gives such a node no trait that
    * tells it from the cell's background.
    * Except over ANOTHER SCREEN (presentation.ts#byShape's `givesWay`): a structural
@@ -843,7 +824,7 @@ const NOT_DRAWN = {
    * non-scrolling node of the sheet, can cover. The
    * container question never asks it. The in-tree keyboard dismissal's
    * title IS such a target: the picker asks the tap's standing, so a row
-   * scrolled under the title no longer refuses it — unless the row is
+   * scrolled under the title does not refuse it — unless the row is
    * interactive and holds the title's centre, which the picker refuses on
    * its own (`Exposure.centreExcused`): the tap would press the row.
    * docs/adr/0016-the-dismissal-picker-asks-the-tap-standing.md
@@ -1010,7 +991,7 @@ const NOT_DRAWN = {
    * is excused there, as an outlined field's floating label is. So is a
    * bare footer text beside a CONTAINER target (a FrameLayout holding a
    * RecyclerView and a TextView, a Scaffold whose bottom bar is a bare
-   * Text, `fully` asked of the list): same shape, same answer as before.
+   * Text, `fully` asked of the list): the same shape, so the same answer.
    *
    * And what such a sibling holds (`ownContent`; the bug note below): a
    * NON-INTERACTIVE node lying WHOLLY inside a CHILDLESS target, whose
@@ -1030,7 +1011,7 @@ const NOT_DRAWN = {
    * `scroll_until … fully: true` never stopped on a row wholly on screen.
    * Under WDA the same reach: `login_support` (a childless RN view) and
    * its sibling `other login_support_email` drawn on it, whose text
-   * `podpora@finportal.sk` no longer covers it (wda-source-myport-login-
+   * `podpora@finportal.sk` does not cover it (wda-source-myport-login-
    * keyboard.json). Still covers: an interactive descendant, one reaching
    * outside the target, anything under a sibling that is not drawn on it
    * (a full-width header's text). A flat list has no nesting, so idb never
@@ -1052,7 +1033,7 @@ const NOT_DRAWN = {
    * sibling (`ownField`, below);
    * the parent of the first two not the screen's size (`screenSized`), and
    * no control filling the screen. `target` only (the bug note above,
-   * `onTarget`'s, a regression of this column's first form):
+   * `onTarget`'s):
    * a Compose `Button` reaches uiautomator as a wrapper holding its label
    * text and, AFTER it, an unlabelled clickable `button` — mp-native's
    * `container 44,1397 992x132` → `text 'LOGIN' 481,1438 118x49`, `button
@@ -1304,10 +1285,10 @@ const NOT_DRAWN = {
    *
    * Except, on a tree whose source did not judge presented layers, the SURFACE of a screen presented over the target's
    * by shape (presentation.ts#PresentedOver.surface `inferred`: the shape adapter's `presentedSurface`, the mirror of
-   * `givesWay`), which covers as before and stays `presented` (cover.ts#Cover.presented): a sheet layer WDA reports `0/0` whole, over a list with no second dim,
-   * would otherwise let a tap through to the list. On a tree whose source judged, no shape is asked and the guard holds
-   * of no node: a layer it marks covers through its cover, which no row excuses, and a hidden node of a marked `screen`
-   * layer stays excused (Contacts' discard popover over the New Contact sheet, whose form `Table 0,62 402x812` and
+   * `givesWay`), which covers and stays `presented` (cover.ts#Cover.presented): a sheet layer WDA reports `0/0` whole,
+   * over a list with no second dim, would otherwise let a tap through to the list. On a tree whose source judged, no
+   * shape is asked and the guard holds of no node: a layer it marks covers through its cover, which no row excuses, and
+   * a hidden node of a marked `screen` layer stays excused (Contacts' discard popover over the New Contact sheet, whose form `Table 0,62 402x812` and
    * photo buttons WDA reads `0/0`: tests/fixtures/wda-capture-contacts-discard-popover.json). The TARGET's own flag is
    * never read: a target under a modal is `isVisible="0"` too.
    *
@@ -1341,12 +1322,12 @@ const ROWS: readonly Row[] = Object.values(NOT_DRAWN);
 
 /**
  * The rows a sibling listed either side of the target is judged by as a peer (reading-order.ts#peersOf, `asTarget`'s
- * `drawn`; listed after since D84): every row but `onTarget`, whose own-content rule reads a narrower sibling with its
- * centre on the target as drawn on it — true of what the target carries, listed after it; a peer listed before it
- * overlaps it apart (reading-order.ts#overlapsApart: never held whole), so it is none of the target's content — a
- * toast narrower than the row it lies over stays a cover (tests/ui-tree/draw-order-rn-covers.test.ts, rn-banner
- * edited). A peer listed after it is judged by every row, `onTarget` included, when `exposure` takes the covers
- * (`drawsOverTarget`): what the target carries stays excused there.
+ * `drawn`): every row but `onTarget`, whose own-content rule reads a narrower sibling with its centre on the target as
+ * drawn on it — true of what the target carries, listed after it; a peer listed before it overlaps it apart
+ * (reading-order.ts#overlapsApart: never held whole), so it is none of the target's content — a toast narrower than
+ * the row it lies over stays a cover (tests/ui-tree/draw-order-rn-covers.test.ts, rn-banner edited). A peer listed
+ * after it is judged by every row, `onTarget` included, when `exposure` takes the covers (`drawsOverTarget`): what the
+ * target carries stays excused there.
  */
 const PEER_ROWS: readonly Row[] = ROWS.filter((row) => row !== NOT_DRAWN.onTarget);
 
@@ -1452,7 +1433,7 @@ const sharesRow = (node: UiNode, run: readonly UiNode[]): boolean =>
  * form and before the keys — the SHAPE; its reach down to the keyboard's
  * top is INFERRED, not measured by a tap (kept by the owner): checked on the screenshot `run2-ios/img-253-0.png`, the
  * lifted bar's background between it and the keys; no tap below a lifted
- * bar's frame has been sent. Residual, stated (as before this rule): the
+ * bar's frame has been sent. Residual, stated: the
  * last row of a list that ends inside the band, with nothing listed after
  * it, reads as pinned — it reaches down over what lies below it in its
  * column (on screen, only content listed before it: a false refusal, the
@@ -1460,8 +1441,7 @@ const sharesRow = (node: UiNode, run: readonly UiNode[]): boolean =>
  * nested tree only for reading-order.ts#readingOrderOf's guard (`pinnedTargets`: the same
  * shape, read in pre-order — a pinned target keeps its place on top), never
  * for a reach there. Exported for the tests (tests/ui-tree/bottom-pinned.test.ts),
- * which pin it against the plain definition; no production importer outside
- * this module.
+ * which pin it against the plain definition.
  */
 export function bottomPinned(order: readonly Placed[], screen: Rect, keyboard: Pick<KeyboardBand, 'top' | 'keys'> | undefined): ReadonlyMap<Placed, number> {
   const band = screen.height * FLAT_LIST_BOTTOM_BAR_FRACTION;
@@ -1523,10 +1503,8 @@ export const TAB_BAR_WIDTH_FRACTION = 0.6;
  */
 export const TAB_BAR_BOTTOM_FRACTION = 0.1;
 
-/** The fewest items a tab bar has (`tabBarsOf`). */
 const TAB_BAR_MIN_ITEMS = 3;
 
-/** A floating tab bar (`tabBarsOf`): its items, the box they span, and how far above them it reaches. */
 interface TabBar {
   readonly items: ReadonlySet<Placed>;
   /** The items' bounding box: a target lying wholly in it is the bar's own (a tab, its label), and the bar is no cover of it. */
@@ -1624,10 +1602,6 @@ function readingBreak(order: readonly Placed[], target: Placed, contentFrom: num
 }
 
 /**
- * The draw order of `tree`: one pre-order walk when called; each answer a
- * scan of it. The tree must not change while the answer is in use.
- */
-/**
  * The largest share of the screen's area the branch a node and a cover of
  * it share may have for the cover to be the node's own content or layer
  * (`DrawOrder.paintsOver`, `ownBranch`): one component — a row, a card, a
@@ -1643,7 +1617,8 @@ const wordsOf = (n: UiNode): ReadonlySet<string> =>
   new Set([n.label ?? '', n.value ?? ''].flatMap((t) => t.toLowerCase().split(/[^\p{L}\p{N}]+/u)).filter((w) => w.length > 0));
 
 /**
- * The draw order of `tree` — `orderSeen`: the order a screenshot saw of controls the tree lists in reading order
+ * The draw order of `tree`: one pre-order walk when called; each answer a scan of it. The tree must not change while
+ * the answer is in use. `orderSeen`: the order a screenshot saw of controls the tree lists in reading order
  * (ui-tree/seen-order.ts; reading-order.ts#readingOrderOf), when the caller looked; absent, the listing alone.
  */
 export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
@@ -1654,15 +1629,12 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
   const minPiece = minTapPiece(screen);
   const overhang = labelOverhang(screen);
   const order = walkOf(tree);
-  /** Every place of each node in the walk (placed.ts#placesBy), shared with the presentation. */
   const places = placesBy(order);
-  /** What is presented over what (presentation.ts#presentationOf), over this walk. */
   const presentation = presentationOf(tree, order, places);
   const barLine = flatListBarLine(screen);
   const contentFrom = ancestry ? order.length : firstContent(order, screen, seen.screenArea, barLine);
   const keyboard = ancestry ? undefined : keyboardOf(order, screen, barLine);
   const pinned = ancestry ? new Map<Placed, number>() : bottomPinned(order, screen, keyboard);
-  /** Each floating tab bar's item, with its bar (`tabBarsOf`). */
   const tabItems = new Map(tabBarsOf(order, screen, keyboard?.keys ?? new Set()).flatMap((bar) => [...bar.items].map((item) => [item, bar] as const)));
   /** The bottom chrome of a flat list: never a reading-order break, never past one (`flatListReadingOrder`) — a floating tab bar's items included. */
   const bottomChrome: ReadonlySet<Placed> = new Set([...pinned.keys(), ...(keyboard?.keys ?? []), ...tabItems.keys()]);
@@ -1724,9 +1696,9 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
       orderSeen,
     };
     // Whether a sibling listed either side of the target draws over it, for the listing's untold peers
-    // (reading-order.ts#peersOf; listed after since D84): the `target` column's rows but `onTarget` (`PEER_ROWS`),
-    // judged with no reading order of its own — the order is what is being asked — and the target field's own floating
-    // label excused (`ownLabelOf`, ADR 0014's relation the other way round).
+    // (reading-order.ts#peersOf): the `target` column's rows but `onTarget` (`PEER_ROWS`), judged with no reading order
+    // of its own — the order is what is being asked — and the target field's own floating label excused (`ownLabelOf`,
+    // ADR 0014's relation the other way round).
     const unordered: SeenFor = { ...base, readingOrder: NO_READING_ORDER };
     const drawn = (p: Placed): boolean => !ownLabelOf(p, target, overhang) && drawsAsPeer(p, unordered);
     return {
@@ -1741,7 +1713,6 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
   /** What is drawn after `node` — after its first place, outside every one of its places' subtrees — that `keep` keeps. */
   const laterThan = (places: readonly Placed[], keep: (p: Placed) => boolean): Placed[] =>
     after(places[0]).filter((p) => !places.some((place) => within(p, place)) && keep(p));
-  /** Everything drawn after `placed`'s subtree. */
   const after = (placed: Placed): readonly Placed[] => order.slice(placed.end);
 
   /** The keyboard row read as SCOPE, not as a cover: the container is never one of the keyboard's own nodes. */
@@ -1766,7 +1737,6 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
     const says = wordsOf(target.node);
     return said.size > 0 && [...said].every((w) => says.has(w));
   };
-  /** `paintsOver`'s clickable layer: unlabelled, unvalued, interactive, holding the node whole, on its own branch — never in a flat list. */
   const clickableLayer = (target: Placed, cover: Placed): boolean => {
     const n = cover.node;
     return ancestry && isInteractive(n) && !n.label && !n.value && rectWithin(target.node.rect, n.rect) && ownBranch(target, cover);

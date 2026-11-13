@@ -6,7 +6,7 @@ import type { UiNode } from '../adapters/types.js';
  * platform, and a shape (a rectless root over leaves) would also match a test's or a future source's tree. A tree no
  * source marked (a hand-built tree, a normalized snapshot) reads as a nested tree that says nothing more.
  *
- * The WRITERS — each mark is set there and nowhere else (adapters/types.ts#UiNode says what each mark means):
+ * The WRITERS — each mark is set there and nowhere else in src/ (adapters/types.ts#UiNode says what each mark means):
  * - adapters/ios-tree-source.ts#markIdbDialect: `flatList` (idb's describe-all; scripts/differential/recorded-source.ts
  *   gives an older idb capture the same marks with it);
  * - adapters/wda-source.ts#markWdaDialect: `unclippedFrames`; adapters/wda-source.ts#parseWdaSourceValue:

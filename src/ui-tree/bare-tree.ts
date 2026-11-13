@@ -5,20 +5,14 @@ import { countOf } from '../util/count.js';
 /**
  * Does the tree hold anything a user could read or act on? If not it is
  * BARE — the accessibility tree is empty or unrendered, and a selector that
- * matches nothing in it says nothing about the screen. Asked by ui_snapshot's
- * second text block (mcp/tool-text.ts `snapshotNote`) and, since 2026-10-07,
- * by the flow engine's detect probe (flow/engine.ts `detects`: a probe whose
+ * matches nothing in it says nothing about the screen: a detect probe whose
  * every tree was bare answers `bare`, not `no`, and the ladder will not run
- * a DESTRUCTIVE rung on it — docs/bugs/2026-10-06-second-look-reads-android-
- * decor-as-not-in-state.md) — and, since 2026-10-08, by every element
- * condition and the absent assert (ui-tree/verdict.ts: a selector's miss,
- * or an absence, on a bare tree is `unknown`, never `yes`). The question
- * lives here, with the rest of what is asked OF a tree, and so does the
- * tree's shape (`treeShape`, `nodeCount` at the end of this file) — a fact
- * about the tree every asker quotes. The sentence around it: ui_snapshot's
- * note and the ladder's "every UI tree read was bare, the last one …" keep
- * their own; the conditions' timeouts and the absent assert share ONE,
- * verdict.ts#bareTimeoutNote.
+ * a DESTRUCTIVE rung on it
+ * (docs/bugs/2026-10-06-second-look-reads-android-decor-as-not-in-state.md);
+ * a selector's miss, or an absence, on a bare tree is `unknown`, never `yes`
+ * (ui-tree/verdict.ts). The question lives here, with the rest of what is
+ * asked OF a tree, and so does the tree's shape (`treeShape`, `nodeCount` at
+ * the end of this file) — a fact about the tree every asker quotes.
  *
  * Measured (docs/bugs/2026-10-06-ui-snapshot-empty-right-after-launch.md,
  * and its addendum the same day): `role:button` → `[]` two seconds after
@@ -27,8 +21,7 @@ import { countOf } from '../util/count.js';
  * `{"type":"Application","AXFrame":"{{0, 0}, {0, 0}}"}` for 4+ minutes —
  * normalized, a 0×0 root with one empty `other` child.
  *
- * The rule, shaped by two review rounds (2026-10-06) against the real
- * parsers and fixtures:
+ * The rule, shaped against the real parsers and fixtures:
  *
  * - NOT "no node has a label/identifier/value": the wrappers every source
  *   emits before an app has rendered are all named by their framework. WDA's
@@ -55,21 +48,21 @@ import { countOf } from '../util/count.js';
  * `{ role: image, label: null, identifier: "SplashScreenLogo" }`
  * (expo-splash-screen's id); the Android 12+ system splash icon is
  * likewise expected to carry a resource-id (not yet measured). A spinner is
- * `progress` only where its source names it so (idb's since D50:
- * adapters/ios-tree-source.ts#idbSpinner). A "Bank
- * logo" with a label is something to select and counts. A
- * `container`/`other` counts when it has a LABEL or VALUE (an identifier
- * alone does not: that is the Android decor shape) AND is not a wrapper by
+ * `progress` only where its source names it so (idb's,
+ * adapters/ios-tree-source.ts#idbSpinner). A "Bank logo" with a label is
+ * something to select and counts. A `container`/`other` counts when it has
+ * a LABEL or VALUE (an identifier alone does not: that is the Android
+ * decor shape) AND is not a wrapper by
  * size — its area is under SCREEN_SIZED_FRACTION of the largest rect in the
  * tree, which excludes the labelled full-screen Application of both iOS
  * sources. A tree with NO geometry at all (every rect zero-area) has no
  * screen to judge size against, so there a structural node is a wrapper
  * whatever it says — an app name on a 0×0 root must not read as content.
- * The measured case was idb's stuck 0×0 Application; since 2026-10-06 the
- * idb source throws that shape as a read error (IdbEmptyTreeError) before
- * it reaches this rule, and the clause stays for every other tree with no
- * geometry — a source or fixture that sends no rects, a synthetic root
- * alone (WDA always sends rects, every fixture). Only a status bar is
+ * The measured case was idb's stuck 0×0 Application, which the idb source
+ * throws as a read error (IdbEmptyTreeError) before it reaches this rule;
+ * the clause stays for every other tree with no geometry — a source or
+ * fixture that sends no rects, a synthetic root alone (WDA always sends
+ * rects, every fixture). Only a status bar is
  * skipped by position (below); the root counts like any node. Sizes are
  * judged against the tree's OWN largest rect, which assumes every source
  * wraps the screen in a full-size root (idb's Application, WDA's Application/Window, Android's
@@ -80,10 +73,10 @@ import { countOf } from '../util/count.js';
  * cannot be checked from the tree anyway and the note says to compare with
  * a screenshot before reading anything into it; and, on the safe side, a
  * small labelled overlay during load (LogBox, a Metro banner) makes a
- * loading tree non-bare — safe for a presence check, but since 2026-10-08
- * (verdict.ts) the unsafe direction for `absent:`, which such a tree now
- * decides: measured on the iOS dev-client build, expo's "Downloading 100%…"
- * banner over the splash let an absent-`login_username` wait pass ~1.6 s
+ * loading tree non-bare — safe for a presence check, but the unsafe
+ * direction for `absent:` (verdict.ts), which such a tree decides:
+ * measured on the iOS dev-client build, expo's "Downloading 100%…" banner
+ * over the splash let an absent-`login_username` wait pass ~1.6 s
  * after a cold launch in 3 of 5 launches (docs/plans/
  * 2026-10-08-round3-phase1-device-check.md); a development-build artefact,
  * no release build shows it; and a LOADED screen whose only non-wrapper nodes
@@ -93,13 +86,13 @@ import { countOf } from '../util/count.js';
  * bare — rare, since nearly every loaded screen has a text, button, field,
  * scrollable or labelled node. For ui_snapshot that miss is cheap: a wrong
  * ⚠ sends the agent to a screenshot, never to a conclusion. Since the ladder
- * asks too (2026-10-07) it has a second cost: on such an icon-only loaded
+ * asks too, it has a second cost: on such an icon-only loaded
  * screen `ensure_state` cannot reach a DESTRUCTIVE rung — the probe reads
  * `bare` for the whole second look and the rung is refused (⛔) rather than
  * run. That is the safe direction (a refusal, never a wipe), and `run_flow`
  * of the rung still runs it deliberately. Device-confirmed 2026-10-06: the
  * WDA and uiautomator splash shapes and idb's stuck 0×0 Application (the
- * last now a read error at the idb source, see above); the uiautomator decor
+ * last a read error at the idb source, see above); the uiautomator decor
  * shape is also what the ladder's second look read for +5.3…+13.8 s of a
  * measured Android cold launch before `login_screen` rendered at +18.3 s.
  *
@@ -131,7 +124,7 @@ import { countOf } from '../util/count.js';
  *   not measured and need not do either), because a miss here is the bug
  *   and a wrong "bare" costs only a delay or a refusal.
  *
- * Why so much is asked of the status bar (review of 2026-10-08): a clock
+ * Why so much is asked of the status bar: a clock
  * found ANYWHERE in a label, in the 8 % band, made app content a status
  * bar — an iPad navigation bar "Departs 10:30" + Back + Share beside one
  * "Check in" button read bare, as did "Total €12.50", "$4.99", an iPhone
@@ -147,14 +140,14 @@ import { countOf } from '../util/count.js';
  *
  * INFERRED, not measured: that the clock reads as a time in every locale
  * (CLOCK; a status bar with no readable time — a call pill, "18 h 29" — is
- * missed, i.e. read as before); that a status item always stands beside it;
- * the band's cap on other devices (CLOCK_BAND_FRACTION); and that an APP's
- * tree carries no status bar — the one whole app read the note recorded on
- * iOS 27 (bare, 2 nodes, at +3.0 s) had none, no WDA fixture holds a
- * StatusBar, and uiautomator dumps only the app's window (its decor's
- * `statusBarBackground` is identifier-only, bare by the clause above, and
- * holds no clock, so Android's decor is unchanged). A loaded screen with one
- * button and no status bar in its tree is not bare, as before.
+ * missed, its nodes read as content); that a status item always stands
+ * beside it; the band's cap on other devices (CLOCK_BAND_FRACTION); and that
+ * an APP's tree carries no status bar — the one whole app read the note
+ * recorded on iOS 27 (bare, 2 nodes, at +3.0 s) had none, no WDA fixture
+ * holds a StatusBar, and uiautomator dumps only the app's window (its
+ * decor's `statusBarBackground` is identifier-only, bare by the clause
+ * above, and holds no clock, so these clauses leave Android's decor alone).
+ * A loaded screen with one button and no status bar in its tree is not bare.
  */
 export function isBareTree(tree: UiNode): boolean {
   const nodes = [...everyNode(tree)];
@@ -187,14 +180,13 @@ const largestRect = (nodes: readonly UiNode[]): Rect | undefined => {
   return best;
 };
 
-/** A rect with area lying wholly between the screen's top and `bottom`. */
 const within = (r: Rect, screen: Rect, bottom: number): boolean => rectArea(r) > 0 && r.y >= screen.y && r.y + r.height <= bottom;
 
 /**
  * The status bar's bottom line, or undefined when the tree shows none: the
  * first CLOCK `text` wholly inside the top CLOCK_BAND_FRACTION whose line —
  * its bottom plus CLOCK_SLACK_FRACTION of the screen, capped at the band —
- * holds a labelled or valued `container`/`other` other than a wrapper.
+ * holds a labelled or valued `container`/`other`.
  */
 const statusBarBottom = (nodes: readonly UiNode[], screen: Rect): number | undefined => {
   const cap = screen.y + screen.height * CLOCK_BAND_FRACTION;
@@ -217,16 +209,13 @@ const statusBarBottom = (nodes: readonly UiNode[], screen: Rect): number | undef
  */
 const CLOCK = /^(?:[\p{L}\p{M}]{1,3}\s?)?\p{Nd}{1,2}[:.]\p{Nd}{2}(?:\s?[\p{L}\p{M}]{1,8}\.?){0,2}$/u;
 
-// STRUCTURAL_ROLES, the wrapper roles this rule reads, is defined beside
-// KEYBOARD_ROLE in adapters/types.ts since 2026-10-07 (the draw order,
-// ui-tree/draw-order.ts, reads it too).
 /** Roles that are decoration unless LABELLED: a splash image (identified or not), a spinner. */
 export const DECORATION_ROLES: ReadonlySet<string> = new Set(['image', 'progress']);
 /**
- * The CLOCK BAND, the cap on the status bar (2026-10-08): its clock must lie wholly inside
- * the top fraction of the screen (the tree's largest rect), and nothing below
- * the cap is ever skipped. A fraction, not points, because iOS rects are
- * points and Android's are pixels. Measured on iOS 27 (iPhone 17, 874 pt):
+ * The CLOCK BAND, the cap on the status bar: its clock must lie wholly
+ * inside the top fraction of the screen (the tree's largest rect), and
+ * nothing below the cap is ever skipped. A fraction, not points, because
+ * iOS rects are points and Android's are pixels. Measured on iOS 27 (iPhone 17, 874 pt):
  * the clock ends at y 44, 5.0 %. Inferred from published top insets: a
  * Dynamic Island iPhone's 62 pt of 874 is 7.1 %, an iPhone SE's 20 of 667 is
  * 3.0 %, an iPad's 24 of 1024 is 2.3 %. 8 % holds them all with room for
@@ -245,9 +234,9 @@ export const CLOCK_SLACK_FRACTION = 0.01;
 
 /**
  * `button ×3, container ×1, text ×1` — by count, then name; the normalized
- * role vocabulary is small, so nothing is cut. Here, beside the rule, since
- * 2026-10-07 (it was private to mcp/tool-text.ts): the flow engine names a
- * bare tree by its shape too, and flow/ may not import mcp/.
+ * role vocabulary is small, so nothing is cut. Here, beside the rule: the
+ * flow engine names a bare tree by its shape too, and flow/ may not import
+ * mcp/.
  */
 const rolesPresent = (nodes: readonly UiNode[]): string => {
   const counts = new Map<string, number>();
@@ -258,19 +247,12 @@ const rolesPresent = (nodes: readonly UiNode[]): string => {
     .join(', ');
 };
 
-/**
- * `7 nodes`, `1 node` — the pluralisation spelled once, for treeShape and
- * ui_snapshot's bare note (mcp/tool-text.ts `snapshotNote`, which counts
- * without the roles); until the 2026-10-07 review each spelled its own.
- */
+/** `7 nodes`, `1 node` — the pluralisation spelled once. */
 export const nodeCount = (nodes: readonly UiNode[]): string => countOf(nodes.length, 'node');
 
 /**
- * What a bare tree holds, as every sentence that reports one says it
- * (2026-10-08, code review: hand-copied in four places until then) — the
- * flow's unread-tree failure, the verdict's undecided wait, ui_snapshot's
- * bare note and the ui_snapshot tool description. isBareTree is what it
- * describes.
+ * What a bare tree holds, as every sentence that reports one says it.
+ * isBareTree is what it describes.
  */
 export const BARE_TREE_CONTENTS = "nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon)";
 

@@ -20,10 +20,8 @@ import type { Verdict } from './verdict.js';
  * Two primitives live here: the read seam — `readTreeOrMiss`, the one-shot
  * read that reports a failure that heals as a value, and `readTreeOrThrow`, the
  * same read for a caller that wraps such a failure in its own error — and
- * `pollTree`, the deadline loop over it that the flow engine's waits and
- * detect probe, the verifier's asserts and the interaction module's settle
- * wait are built on. The seam is the one place a read failure is classified
- * (A1, docs/adr/0036-a-read-failure-no-wait-cures-is-thrown-by-the-read-seam.md):
+ * `pollTree`, the deadline loop over it. The seam is the one place a read
+ * failure is classified (A1, docs/adr/0036-a-read-failure-no-wait-cures-is-thrown-by-the-read-seam.md):
  * a miss is returned or wrapped, a failure no wait cures (PersistentReadError)
  * is THROWN, so no reader recognises it again. Two loops are deliberately
  * NOT built on pollTree: the fill's value poll (interact/fill-type.ts#pollValue) is
@@ -36,7 +34,7 @@ import type { Verdict } from './verdict.js';
  * usually needs the other.
  *
  * Two ONE-SHOT read policies exist beside these and are deliberately left
- * where they are (assessed 2026-10-03, not changed):
+ * where they are:
  *
  * - `verify/capture.ts#readTreeWithRetry` — five attempts 300 ms apart, for
  *   the tree half of a captured frame. It is a bounded retry around
@@ -51,13 +49,12 @@ import type { Verdict } from './verdict.js';
  *   behaviour change with no measured incident behind it.
  * - `uiTree({ settle: true })` — one bounded retry inside the adapter when
  *   the device answers "no window yet": uiautomator's "null root node" on
- *   Android, and since 2026-10-08 idb's empty tree (IdbEmptyTreeError) on
- *   iOS, which a healthy idb was measured returning 0.4 s after a launch
- *   (adapters/ios.ts). Opted into by the one-shot MCP tools only. Pollers
- *   leave it off because their interval already is the retry
- *   (adapters/android.ts). It is below this layer and stays there: the
- *   adapter is the only thing that can tell "no window yet" from "no XML at
- *   all".
+ *   Android, and idb's empty tree (IdbEmptyTreeError) on iOS, which a
+ *   healthy idb was measured returning 0.4 s after a launch
+ *   (adapters/ios.ts). Pollers leave it off because their interval already
+ *   is the retry (adapters/android.ts). It is below this layer and stays
+ *   there: the adapter is the only thing that can tell "no window yet" from
+ *   "no XML at all".
  *
  * Three read policies is one more than the ideal, but each has a different
  * caller shape (poll, bounded one-shot, adapter-internal) and folding them
@@ -67,16 +64,13 @@ import type { Verdict } from './verdict.js';
  * screen (`ScreenIdentity`, `sameScreen`, `anotherScreen`), which of their
  * nodes are one node (`nodeIdentity`), and whether the
  * strokes between them changed it (`screenChangedUnder`, `ScreenChange`) —
- * the one notion of which screen a read is, asked by fill's read-back and by
- * `scroll_until`'s round (interact/scroll-rounds.ts#round), which only calls
- * it and stops on what it returns.
+ * the one notion of which screen a read is.
  */
 
 /**
  * What one tree read gave the caller: the tree, or the failure that heals (a
  * miss) that stood in for it — `readTreeOrMiss`'s result. Named so
- * a caller that hands a read on (interact/swipe.ts#screenBox, whose note
- * quotes the cause) does not respell it.
+ * a caller that hands a read on does not respell it.
  */
 export type TreeRead = { tree: UiNode; error?: undefined } | { tree?: undefined; error: Error };
 
@@ -100,15 +94,13 @@ export type TreeRead = { tree: UiNode; error?: undefined } | { tree?: undefined;
  * Throws only a failure no wait cures (adapters/types.ts#PersistentReadError,
  * D21 — idb's wedged accessibility service): polled like a miss it only spends
  * the budget, and its message, not a timeout's, is what the reader needs. So
- * every reader through this seam — pollTree, the scroll loop, the frame
- * capture's retry — stops on it without knowing it exists. The one reader
- * that opts out catches it itself (interact/swipe.ts#swipeScreen).
+ * every reader through this seam stops on it without knowing it exists. One
+ * reader opts out and catches it itself (interact/swipe.ts#swipeScreen).
  *
- * A free function rather than a method on each poller: the rule was written
- * out three times (pollUntil, scrollUntilVisible, Verifier.tryReadTree), which
- * is one owner too few for the behaviour the tool's reliability rests on.
- * `Pick<…, 'uiTree'>` keeps it callable from anything that can read a tree,
- * fakes included, without dragging in the rest of the adapter surface.
+ * A free function rather than a method on each poller, so the behaviour the
+ * tool's reliability rests on has one owner. `Pick<…, 'uiTree'>` keeps it
+ * callable from anything that can read a tree, fakes included, without
+ * dragging in the rest of the adapter surface.
  */
 export async function readTreeOrMiss(adapter: Pick<DeviceAdapter, 'uiTree'>): Promise<TreeRead> {
   try {
@@ -122,8 +114,7 @@ export async function readTreeOrMiss(adapter: Pick<DeviceAdapter, 'uiTree'>): Pr
 /**
  * Read the UI tree for a caller that has no use for a miss: a tree, or
  * `wrap(e)` of a failure that heals thrown in its place — the caller's own
- * wording (fill's `reread-failed`, the keyboard dismissal's AfterDismissalTap).
- * `wrap` receives a normalised Error: a non-Error rejection arrives as
+ * wording. `wrap` receives a normalised Error: a non-Error rejection arrives as
  * `new Error(String(e))`.
  * A failure no wait cures passes through unwrapped (`wrap` is never called):
  * its class is what the read loops and the flow engine's isTerminal stop on.
@@ -140,32 +131,23 @@ export async function readTreeOrThrow(adapter: Pick<DeviceAdapter, 'uiTree'>, wr
  * detail for the timeout report ("element found but content was: …" must
  * survive the element vanishing again before the deadline). A class rather
  * than a tagged union so the predicate's success value needs no wrapping: a
- * poller that only ever hits or misses returns `T | undefined`, exactly as it
- * did before this primitive existed.
+ * poller that only ever hits or misses returns `T | undefined`.
  */
 export class PollMiss {
   constructor(readonly detail: string) {}
 }
 
 /**
- * A poll round whose tree could not DECIDE the question (2026-10-08,
- * ui-tree/verdict.ts: the tree is bare, and a selector's miss or an absence
- * on it says nothing). Returned by a predicate in place of `undefined`: the
- * poll goes on exactly as on a miss, and the outcome of a timeout carries
+ * A poll round whose tree could not DECIDE the question (ui-tree/verdict.ts:
+ * the tree is bare, and a selector's miss or an absence on it says
+ * nothing). Returned by a predicate in place of `undefined`: the poll goes
+ * on exactly as on a miss, and the outcome of a timeout carries
  * the tree (`undecidedTree`) when it was the LAST tree read, so the caller
  * can say the screen had not rendered rather than that the condition did
- * not hold. One owner for that bookkeeping, shared by the flow engine's
- * `wait:` and `branch:` and the verifier's absent assert since 2026-10-08.
+ * not hold. One owner for that bookkeeping.
  */
 export const Undecided: unique symbol = Symbol('Undecided');
 
-/**
- * A Verdict (ui-tree/verdict.ts) as a poll round's result: `yes` is `value`
- * (the round decides), `no` is `undefined` (a miss) and `unknown` is
- * `Undecided` (a bare tree, the poll goes on and the timeout can say so).
- * The one spelling of that mapping — the flow engine's `wait:` and `branch:`
- * and the verifier's absent assert all poll on a verdict.
- */
 export const pollOnVerdict = <T>(verdict: Verdict, value: T): T | typeof Undecided | undefined =>
   verdict === 'yes' ? value
   : verdict === 'unknown' ? Undecided
@@ -175,7 +157,7 @@ export interface PollOptions {
   timeoutMs: number;
   /**
    * The cadence: consecutive reads start about this far apart — the pause after a round is `pauseAfterRead`.
-   * Owned by the caller: the engine and the verifier each have their own cadence.
+   * Owned by the caller.
    */
   pollMs: number;
   /**
@@ -231,7 +213,7 @@ export type PollOutcome<T> =
       /**
        * How many rounds READ a tree, whatever the predicate said of it. 0 means
        * the poll never saw the device — every read failed — so the timeout
-       * says nothing about the screen (2026-10-06: the flow's detect probe
+       * says nothing about the screen (the flow's detect probe
        * answers "unknown" there, and the ladder refuses a destructive rung on
        * it). `readError` cannot say this: it reports only the last round.
        */
@@ -255,14 +237,11 @@ export type PollOutcome<T> =
 
 /**
  * The wording a THROWN poll timeout shares — what was waited for, for how
- * long, and the last read error beneath it when there was one. One owner
- * because two layers throw it: the flow engine for its waits, and the
- * interaction module for an element that never appeared or never held still.
- * The verifier does not use it: its timeouts are failing results, worded per
- * assert.
+ * long, and the last read error beneath it when there was one. The verifier
+ * does not use it: its timeouts are failing results, worded per assert.
  *
  * `hints`, when a caller has any, are probable causes the caller knows and
- * this layer cannot (2026-10-06: the flow's wait on an id the iOS idb tree
+ * this layer cannot (the flow's wait on an id the iOS idb tree
  * never carries). Each takes the same indented-parenthesis line as the read
  * error, so a reader finds every "why" beneath the headline in one shape —
  * but they are DROPPED when the last read failed: then the reads, not the
@@ -290,7 +269,7 @@ const READ_ERROR_CONTINUATION = '   ';
 
 /**
  * The read-error parenthesis of a pollTimeoutMessage, as ONE line — or
- * `undefined` when the message carries none (2026-10-08). For a caller that
+ * `undefined` when the message carries none. For a caller that
  * must keep a timeout on one line yet must not lose the read error: the flow
  * engine's `optional:` skip, where "Timed out … to appear" alone reads
  * exactly like a slow screen when the device was in fact unreadable. The
@@ -320,10 +299,10 @@ export const SETTLE_FLOOR_MS = 150;
 
 /**
  * The pause `pollTree` sleeps after a round whose read took `readMs`:
- * `min(pollMs, max(SETTLE_FLOOR_MS, pollMs − readMs))` (docs/adr/0029-poll-cadence-counts-the-read.md, 2026-10-31).
- * Reads START about pollMs apart, rather than pollMs after the previous read ENDS. Before, a read's own cost was added
- * on top of every pause — idb's ~167 ms read made a 500 ms poll a ~667 ms one, and Android's 2.2–2.5 s
- * `uiautomator dump` made it ~3 s.
+ * `min(pollMs, max(SETTLE_FLOOR_MS, pollMs − readMs))` (docs/adr/0029-poll-cadence-counts-the-read.md).
+ * Reads START about pollMs apart, rather than pollMs after the previous read ENDS: a read's own cost added on top of
+ * every pause would make idb's ~167 ms read turn a 500 ms poll into a ~667 ms one, and Android's 2.2–2.5 s
+ * `uiautomator dump` turn it into ~3 s.
  *
  * `readMs` is the READ alone — the `uiTree` call, a failed one included — never the predicate's time: a color or
  * ocr predicate captures its own settled frame, up to 1.5 s, and letting that eat the pause would shrink the gap
@@ -367,10 +346,8 @@ export interface PollRound {
 /**
  * Poll the UI tree until the predicate returns a value, or the deadline
  * passes. The one owner of the deadline loop (ARCHITECTURE.md §8, "waits,
- * not sleeps"): before 2026-10-03 it was written out in `Verifier.treePoll`,
- * `FlowEngine.pollUntil` and `FlowEngine.detects`, and the third copy had
- * quietly dropped the read error — an adb that was gone showed up as
- * "not in state" with no trace of why.
+ * not sleeps"): a copy of it that quietly drops the read error turns an adb
+ * that is gone into "not in state" with no trace of why.
  *
  * The loop's shape is load-bearing and pinned by tests:
  * - Every round reads the tree ONCE, through readTreeOrMiss: a failed read
@@ -392,7 +369,7 @@ export interface PollRound {
  *   seam throws it (readTreeOrMiss), so it leaves the poll from the round that
  *   read it, whatever was read before. The callers let it propagate (the flow
  *   engine treats it as terminal: engine.ts#isTerminal).
- * - The predicate is handed the poll's `deadline` (since 2026-10-05), for a
+ * - The predicate is handed the poll's `deadline`, for a
  *   predicate that itself waits — the color and ocr asserts capture a
  *   settled frame per round, up to 1.5 s — so it bounds ITS OWN wait: the
  *   loop's deadline rule is unchanged. The deadline is checked after each
@@ -400,8 +377,8 @@ export interface PollRound {
  *   pause past the deadline and end one read after it. That slack is kept
  *   on purpose: it is the read that finds a late element (a `wait:` that
  *   lands at 8.5 s of 10 under 1.5 s dumps; a static element a slow dump
- *   needs two reads to prove still). Two tightenings were tried on
- *   2026-10-05 and withdrawn against the reviewer's own measurements:
+ *   needs two reads to prove still). Two tightenings were tried and
+ *   withdrawn against the reviewer's own measurements:
  *   projecting the previous round's cost (it shortened every caller's
  *   timeout — a static element threw after one read at 615 ms of 1500) and
  *   refusing a round after a pause that crossed the deadline (it turned two
@@ -415,7 +392,7 @@ export interface PollRound {
  *   where the last read starts relative to it (ADR 0029's R2, the accepted
  *   residual pinned in read-tree.test.ts).
  *
- * - A handed-on read (`opts.first`, since 2026-10-31: docs/adr/0030-a-read-
+ * - A handed-on read (`opts.first`, docs/adr/0030-a-read-
  *   is-handed-on-only-as-a-first-sample-or-a-positive-verdict.md) is round
  *   zero, asked before any device read. It may only END the poll: a value
  *   returns it; anything else — a miss, a PollMiss (its detail is not kept),
@@ -492,7 +469,7 @@ export async function pollTree<T>(
  * moved, appeared, vanished or changed its text a different one (bar a
  * hash collision, one in 4·10⁹). For `scroll_until`'s "the same stroke
  * twice changed nothing at all" when the target is not in the tree
- * (2026-10-09, interact/scroll-rounds.ts#UNMOVED_STROKES_EXHAUST). Cheap:
+ * (interact/scroll-rounds.ts#UNMOVED_STROKES_EXHAUST). Cheap:
  * one walk, no copy — a round's tree is a few hundred nodes; kept as 8
  * characters, not the tree. Here because it is a question about a READ,
  * asked of two of them. An unchanged fingerprint says the content did not move only where the stroked scroll view
@@ -513,7 +490,6 @@ export function treeFingerprint(tree: UiNode): string {
   return h.toString(16).padStart(8, '0');
 }
 
-/** What a node says, as `treeFingerprint` and `sameTreeWithinPixel` both read it: its role, label, identifier and value — everything of it but its rect. */
 const saysOf = (n: UiNode): string => `${n.role}\u0000${n.label ?? ''}\u0000${n.identifier ?? ''}\u0000${n.value ?? ''}`;
 
 /**
@@ -534,15 +510,13 @@ export function sameTreeWithinPixel(a: UiNode, b: UiNode): boolean {
  * CircularProgressIndicator / LinearProgressIndicator also dumps as (its
  * progress-range semantics give the node that class name); iOS's
  * ProgressIndicator; through WDA an ActivityIndicator — React Native's
- * <ActivityIndicator> — since D27 (2026-10-31); through idb SwiftUI's
- * ProgressView since D50 (adapters/ios-tree-source.ts#idbSpinner). A spinner keeps
- * a fixed rect and no text, so `treeFingerprint` reads a loading screen as
- * unchanged. Two callers: `scroll_until` (interact/scroll-read.ts's
- * `loading`) asks this so a list still loading its next page is not called
- * exhausted (code review of fix/r3-scroll, 2026-10-09); D2's hold
- * (flow/hold-tracker.ts, ADR 0033) so a screen still loading never holds.
- * Every progress node with area counts, hidden or off-screen too (D27's
- * stated residual: the safe direction, both callers' windows bounded).
+ * <ActivityIndicator>; through idb SwiftUI's ProgressView
+ * (adapters/ios-tree-source.ts#idbSpinner). A spinner keeps a fixed rect and
+ * no text, so `treeFingerprint` reads a loading screen as unchanged. Asked
+ * so a list still loading its next page is not called exhausted, and so a
+ * screen still loading never holds (ADR 0033). Every progress node with area
+ * counts, hidden or off-screen too (D27's stated residual: the safe
+ * direction, every wait that asks it bounded).
  * One walk.
  */
 export function showsProgress(tree: UiNode): boolean {
@@ -554,14 +528,14 @@ export function showsProgress(tree: UiNode): boolean {
  * THE SCREEN'S IDENTITY: the `role:identifier` pair of every node that carries an identifier — what of a read says WHICH
  * screen it is, as opposed to where its content lies. Values, labels and rects are left out: typing changes the one,
  * a scroll or the keyboard the others, while an identified node keeps its id wherever it is moved. Two questions are
- * asked of two reads' identities, by the two verbs that act between them:
- * - `sameScreen` (fill's read-back, interact/fill-refetch.ts#sameField): every id of the one is the other's and back — a
- *   node appearing with an id of its own (an inline error label) changes it, so the identity fallback refuses rather
- *   than read a next screen's twin field;
- * - `anotherScreen` (`scroll_until`'s stroke, `screenChangedUnder` below, which interact/scroll-rounds.ts#round calls): each read lists ids and
- *   NONE of the one is the other's — not the content moved, which keeps the ids of what still shows (and on idb's
- *   SwiftUI lists, of what lies off the screen too), but the screen replaced: a sheet or a modal dismissed, the app
- *   gone to another screen. A read with no id at all says nothing either way.
+ * asked of two reads' identities, by an action between them:
+ * - `sameScreen` (a field read back after typing): every id of the one is the other's and back — a node appearing with
+ *   an id of its own (an inline error label) changes it, so the identity fallback refuses rather than read a next
+ *   screen's twin field;
+ * - `anotherScreen` (whether a stroke replaced the screen, `screenChangedUnder` below): each read lists ids and NONE of
+ *   the one is the other's — not the content moved, which keeps the ids of what still shows (and on idb's SwiftUI
+ *   lists, of what lies off the screen too), but the screen replaced: a sheet or a modal dismissed, the app gone to
+ *   another screen. A read with no id at all says nothing either way.
  * One walk.
  */
 export interface ScreenIdentity {
@@ -585,14 +559,11 @@ export function screenIdentity(tree: UiNode): ScreenIdentity {
 
 /**
  * THE SAME NODE ACROSS READS: a node's identity — its role, id and label; its rect is what moves. Two reads' nodes of
- * one identity are taken for one node: by interact/motion-ledger.ts#seeMotion, for the judged match's motion and the
- * carry model's samples, and by interact/motion-shown.ts#listingOf, for the nodes carried with an idb target. It
- * cannot tell apart duplicates of one label (two rows labelled alike): a caller that needs one node per identity drops
- * those.
+ * one identity are taken for one node. It cannot tell apart duplicates of one label (two rows labelled alike): a
+ * caller that needs one node per identity drops those.
  */
 export const nodeIdentity = (n: UiNode): string => JSON.stringify([n.role, n.identifier, n.label]);
 
-/** Every node of `tree` whose identity (`nodeIdentity`) it lists once, by that identity — duplicates of one identity dropped, as `nodeIdentity`'s callers that need one node per identity do. */
 export function listedOnce(tree: UiNode): Map<string, UiNode> {
   const nodes = new Map<string, UiNode>();
   const twice = new Set<string>();
@@ -605,10 +576,8 @@ export function listedOnce(tree: UiNode): Map<string, UiNode> {
   return nodes;
 }
 
-/** `a` and `b` are the same screen by identity: the very same ids (`ScreenIdentity`). */
 export const sameScreen = (a: ScreenIdentity, b: ScreenIdentity): boolean => a.ids.size === b.ids.size && [...a.ids].every((id) => b.ids.has(id));
 
-/** `after` is ANOTHER screen than `before` by identity: both list ids, and none of `before`'s is `after`'s (`ScreenIdentity`). */
 export const anotherScreen = (before: ScreenIdentity, after: ScreenIdentity): boolean =>
   before.ids.size > 0 && after.ids.size > 0 && ![...before.ids].some((id) => after.ids.has(id));
 
@@ -622,7 +591,7 @@ export const anotherScreen = (before: ScreenIdentity, after: ScreenIdentity): bo
  * elsewhere — and a target found now is found on that other screen, not brought into view. Measured under idb: beneath
  * the lab's large sheet (sheet-background), whose tree lists the sheet's button alone and no sign of the sheet,
  * `scroll_until` for A stroked from (201,175) on the sheet's bare surface, the stroke DISMISSED it, and the next read
- * listed the host's A–D: "fully visible after 1 swipe". Now it stops there, saying so, and sends nothing more onto the
+ * listed the host's A–D: "fully visible after 1 swipe". It stops there, saying so, and sends nothing more onto the
  * new screen. averi never claims a stop after its own stroke changed the presented layer; where the tree shows the
  * layer, no stroke is sent at all (the marks: an idb list holding UIKit's dismiss region,
  * adapters/ios-tree-source.ts#listsPresentedLayer).
@@ -641,14 +610,14 @@ export const anotherScreen = (before: ScreenIdentity, after: ScreenIdentity): bo
  * - RECYCLED ROWS give a loud stop: under idb, which lists no scroll view, a fling that replaces every identified row
  *   it lists — touching down on a row or a gap — reads `changed` (the stop where the scroll could have gone on: the
  *   failure the decision prefers to a claimed stop); a list that also lists a node the read after keeps under the
- *   touch-down (a labelled header, a scroll view) is a scroll. Met on the first real list (D20, 2026-10-31: a full
- *   300 ms stroke flung the lab's 45-row SwiftUI picker ~1 040 pt, past all 15 rows the read before listed; every D0
- *   repeat stopped so): idb's full strokes are now paced (interact/stroke-plan.ts#PACED; ADR 0018, "idb's presented
- *   layer", Decision 4), 524 pt in 1.5 s carrying it ~570 pt and keeping two rows. Narrowed, not closed: a list whose
+ *   touch-down (a labelled header, a scroll view) is a scroll. Met on the first real list (a full 300 ms stroke flung
+ *   the lab's 45-row SwiftUI picker ~1 040 pt, past all 15 rows the read before listed; every D0 repeat stopped so):
+ *   idb's full strokes are paced (interact/stroke-plan.ts#PACED; ADR 0018, "idb's presented layer", Decision 4),
+ *   524 pt in 1.5 s carrying it ~570 pt and keeping two rows. Narrowed, not closed: a list whose
  *   rows are taller than a stroke's overlap, or one that flings further at that pace, still reads `changed`;
  * - a stroke whose touched node PERSISTS while the sheet goes — a row label the host repeats by role and label (a
  *   picker sheet over a list of the same items), a title, a scroll view at the very rect of one the host lists — keeps
- *   it unchanged, the stop claimed as before;
+ *   it unchanged, the stop claimed;
  * - a presented layer that shares an id with the screen beneath, or a keyboard's ids listed at both reads, keeps it
  *   unchanged.
  * Source-agnostic: on WDA and uiautomator trees a fling keeps its scroll view's rect, so it is excused; a dismissal
