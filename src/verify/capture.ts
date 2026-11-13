@@ -627,9 +627,9 @@ export const witnessScreen = (adapter: Pick<DeviceAdapter, 'viewport'>): Promise
  * re-read FRESH at most once — when a window reads wider than the side it
  * faces (`WindowWidth.widerThanScreen`), the one refusal a stale screen can
  * cause — and the window judged again against what the device says now.
- * The parity code review's A3: were the screen memoized for the adapter's
- * life, a `wm size` or an unfold after the first read would keep refusing
- * until the MCP server restarted (the device check, row 18c).
+ * The parity code review's A3: with the screen memoized and no re-read, a
+ * `wm size` or an unfold after the first read would keep refusing until the
+ * MCP server restarted (the device check, row 18c).
  *
  * The refusal that survives says which: the screen was read again and
  * still says so (the tree, not a stale size), or the re-read failed (a

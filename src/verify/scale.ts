@@ -442,9 +442,9 @@ const MAX_ROTATION_DISAGREEMENT = 1.05;
  * trusted to say. The tree gets no vote, though a wide short png is also what
  * a band-shaped partial capture looks like: the tree's orientation comes from
  * a walked height, the one number geometry.ts documents as inflated without
- * limit, and on a landscape iPhone whose scroll container made the tree read
- * "portrait" a tree vote would refuse the swap and the crop would scale by
- * 6.52 instead of 3.0, in the ACROSS direction that the one-sided check
+ * limit; measured on a landscape iPhone whose scroll container made the tree
+ * read "portrait": a tree vote would refuse the swap and the crop would scale
+ * by 6.52 instead of 3.0, in the ACROSS direction that the one-sided check
  * below cannot see. Aspect agreement needs no witness: a rotation agrees in
  * the swapped orientation, a band capture agrees in neither and is left
  * alone.
