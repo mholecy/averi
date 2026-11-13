@@ -8,9 +8,9 @@ import type { ReplyKind } from './replies.js';
  * replayed row's class and kind (ADR 0020 §4): a known case failing by another rule, or by the same rule on another
  * kind of reply (a stop claimed turned into a timeout, a refusal into a tap), is not known. The notes are docs/bugs
  * file names (`bug:`) or a residual of a decision (`residual:`), the static KNOWN's own wording; tests/truth/
- * lab-notes.test.ts ties them to docs/bugs and calibration.json. A forms case is filed alike since D31: a fill verdict
+ * lab-notes.test.ts ties them to docs/bugs and calibration.json. A forms case is filed alike (D31): a fill verdict
  * names its rule (live-forms.ts#holds — `loud-untouched`, `loud-changed`, `fill-claim`, `failed-holds`) and rests on
- * the case's last reply; an ensure case since batch-3 (live-ensure.ts's classes — `held-early`, `held-late`, …) on its one
+ * the case's last reply; an ensure case (batch-3; live-ensure.ts's classes — `held-early`, `held-late`, …) on its one
  * reply. A LOUD fails no run, so a known LOUD that reads another rule or kind is marked NOT known and
  * no more; tests/truth/live-rejudge.test.ts holds the committed records to their marks.
  *
@@ -22,16 +22,13 @@ import type { ReplyKind } from './replies.js';
  * case ok is fixed and must be struck off, as the static ratchet asks; an intermittent one ok is printed as such. A
  * `--side` run (a calibration of an older commit) is held to neither: this KNOWN is HEAD's.
  *
- * The kind is pinned since round 5 (it was not before: "a device's timing moves it" was assumed, not measured). The
- * committed records measured it (docs/truth/live-records, rejudged by tests/truth/live-rejudge.test.ts): every entry's
- * kind below is what its case's record reads; and the cases with
+ * The kind is pinned (round 5). The committed records measured it (docs/truth/live-records, rejudged by
+ * tests/truth/live-rejudge.test.ts): every entry's kind below is what its case's record reads; and the cases with
  * several records, LV2's two flush cases (android-vis.json, cal12-*.json: three runs at 9c7885e, two at d043e65), read
- * `visible` in all six — ok in four, a stop-claim in two: the timing moved the outcome, not the kind (struck off since);
+ * `visible` in all six — ok in four, a stop-claim in two: the timing moved the outcome, not the kind;
  * LV5's case likewise (ios-vis-2725e76.json and ios-scroll-bounded-wda-2725e76-*.json, three runs at
  * b71cbbb's src): `refused` where it is not reached, ok in two.
- * A run that reads another kind for a known case fails as NOT known, naming both: refile it. (An entry could once list
- * other rules and kinds its runs read, `also`, each with its record — LV4's turn spending its budget, the only one; it
- * left with LV4's entry at round 7's A1, and the mechanism with it at round 7's integration 3.)
+ * A run that reads another kind for a known case fails as NOT known, naming both: refile it.
  */
 
 /** LE2's rest, accepted — the static KNOWN's own wording (tests/differential/golden/edges.known.ts). */

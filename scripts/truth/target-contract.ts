@@ -108,7 +108,7 @@ export function judgedContext(platform: Platform, s: JudgedScreen, view: string 
  * geometry naming no navigation band is the judged one as measured, and one naming it on iOS is measured again in the
  * judged context. tests/truth/target-contract.test.ts holds this over the committed truth (every target's geometry in
  * the judged context equals this; it differs from the measured one for bands' N and Q on iOS only). A target measured
- * nothing (`geometry` undefined, every capture before phase 3) has none to judge.
+ * nothing (`geometry` undefined) has none to judge.
  */
 export function judgedGeometry(platform: Platform, t: Pick<TargetTruth, 'geometry' | 'frame' | 'scrollView'>, cell: JudgedScreen): Geometry | undefined {
   if (t.geometry === undefined) return undefined;
@@ -174,9 +174,7 @@ export type TapAsk =
 
 /**
  * A target's tap clause, from its truth and its judged geometry (judgedGeometry); undefined for a target the truth contradicts itself on (consistency breaks it:
- * an open whole target not reached or not drawn, a presented-over one reached) — neither golden asks it. The rows
- * that cite each rule: golden-spec/rows.ts's table (R-off, R-outside-sv, R-sliver, R-land, R-band), presented.ts,
- * base.ts.
+ * an open whole target not reached or not drawn, a presented-over one reached) — neither golden asks it.
  */
 export function tapAsk(t: TargetTruth, judged: Geometry | undefined): TapAsk | undefined {
   if (t.declared === 'presented-over') return t.reached ? undefined : { must: 'refuse', remedy: 'close it first' };

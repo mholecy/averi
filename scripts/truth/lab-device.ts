@@ -55,7 +55,7 @@ export function otherApp(cell: Pick<CatalogCell, 'family'>, app: LabApp): string
   const builder = appOf(cell.family);
   return builder === app ? undefined : `a cell of the ${builder} lab app (${LAB_APP[builder].name}), not of ${LAB_APP[app].name}`;
 }
-/** The harness's one wait: the lab drivers', run-case.ts's, and the capture's probe (capture-run.ts#probe). */
+/** The harness's one wait. */
 export const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** One raw tree of the screen as it is now: a capture of the run, its file `<cell><suffix>`. */
@@ -113,8 +113,8 @@ export interface LabDevice {
    */
   windows?(): Promise<string>;
   /**
-   * Android: hide the IME as averi's tap guard does (one `input keyevent 4`, src/mcp/tools.ts tap: "the keyboard is
-   * hidden (back) and the element found again first") and give it time to go. Absent on iOS.
+   * Android: hide the IME as averi's tap guard does (one `input keyevent 4`; src/interact/tap.ts hides the keyboard
+   * and resolves the target again first) and give it time to go. Absent on iOS.
    */
   hideKeyboard?(): Promise<void>;
 }
@@ -150,13 +150,13 @@ export const APK_PATH = 'fixtures/apps/android/build/outputs/apk/debug/AveriLab-
 /** The device-check simulator's WebDriverAgent ports (averi gives the first simulator 8100, the next 8101): refused. */
 export const DEVICE_CHECK_WDA_PORTS: readonly number[] = [8100, 8101];
 
+/** The lab's WebDriverAgent port: never device-check's 8100/8101. */
+export const LAB_WDA_PORT = 8120;
+
 /**
  * The lab's own WebDriverAgent build: never the default `averi-wda` derived data, which device-check builds use — a
  * lab capture must not rebuild or replace theirs.
  */
-/** The lab's WebDriverAgent port: never device-check's 8100/8101. capture.ts, live.ts, baseline.ts and a41-probe.ts use it. */
-export const LAB_WDA_PORT = 8120;
-
 export const LAB_WDA_DERIVED_DATA = join(homedir(), 'Library', 'Developer', 'Xcode', 'DerivedData', 'averi-wda-lab');
 
 export class IosLab implements LabDevice {

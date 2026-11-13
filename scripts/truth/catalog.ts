@@ -9,9 +9,8 @@ import { isMain } from '../is-main.js';
 /**
  * The cell catalog, one file per family (fixtures/apps/cells/<family>.json, schema.ts#FAMILIES), and the one catalog
  * both lab apps bundle (fixtures/apps/cells.json) GENERATED from them: the families in FAMILIES's order, each cell
- * stamped with its `family` (the apps route a cell to their family's file by it). Families are written apart — phase
- * 3's batches each own one file — and the generated file is never edited by hand: tests/truth/catalog.test.ts fails
- * while the committed cells.json is not what the family files generate.
+ * stamped with its `family` (the apps route a cell to their family's file by it). The generated file is never edited by
+ * hand: tests/truth/catalog.test.ts fails while the committed cells.json is not what the family files generate.
  *
  *   node --import tsx scripts/truth/catalog.ts           # rewrite fixtures/apps/cells.json
  *   node --import tsx scripts/truth/catalog.ts --check   # exit 1 when it is stale

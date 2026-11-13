@@ -29,7 +29,7 @@ export function verdictCell(r: NoteResult): string {
 
 /**
  * docs/truth/calibration.md: the summary table, then per note its rows at both sides — a red row's mismatch, a green
- * row's reply.
+ * row's recorded read, or its reply's first line when it has none.
  */
 export function calibrationReport(rs: readonly NoteResult[]): string {
   const lines = [

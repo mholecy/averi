@@ -9,7 +9,7 @@ import { askedUnlistedBy, contractOf, CUT_GEOMETRIES, judgedContext, stopHolds, 
 import { axisOf, bandsOf, directionOf, geometryOf, intersect, selectorOf, type Direction, type GeometryContext } from './truth.js';
 
 /**
- * The live golden's visibility cases (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 5; run by live.ts): averi's
+ * The live golden's visibility cases (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 5): averi's
  * `tap` and `scroll_until` against the REAL lab app on the coloured-target cells, the app's own log the oracle — its
  * tap log (LabState.events: the target's action fired, nothing else), each scroll view's offset and the strokes it took
  * (LabState.offsets, LabState.strokes), and the targets' frames as the app lays them out after the call. What a
@@ -134,20 +134,22 @@ export interface LiveVerdict {
 
 /**
  * Whether a verdict was reached by a judge: not a SKIP, and not a case with no first state (T10, `no-state`), which no
- * judge was asked about. Every count a pass is claimed on asks this (live-carousel.ts#hedgedCeiling, the residual tally
- * in live-cases.ts#summarize), so a run nothing judged never makes one claim a pass; hedgedStops does not.
+ * judge was asked about. Every count a pass is claimed on asks this, so a run nothing judged never makes one claim a
+ * pass; hedgedStops does not.
  */
 export const isJudged = (v: Pick<LiveVerdict, 'outcome' | 'cls'>): boolean => v.outcome !== 'SKIP' && !isStateless(v);
 
 /** Whether a verdict is a case's with no first state (T10, live-cases.ts#noFirstState): no judge was asked. */
 export const isStateless = (v: Pick<LiveVerdict, 'cls'>): boolean => v.cls === 'no-state';
 
-/** What a tap or a stroke made the app log: every event but the touches and focus changes (tap, dismissed, button, tab, select, submit). */
+/**
+ * What a tap or a stroke made the app log: every event but the touches and focus changes (tap, dismissed, button, tab,
+ * select, submit, phase).
+ */
 export function firedSince(state: Pick<LabState, 'events'>, launched: Pick<LabState, 'events'>): ProbeEvent[] {
   return state.events.slice(launched.events.length).filter((e) => e.kind !== 'touch' && e.kind !== 'focus').map(({ kind, tag }) => ({ kind, tag }));
 }
 
-/** The strokes the app logged since the launch. */
 export function strokesSince(state: Pick<LabState, 'strokes'>, launched: Pick<LabState, 'strokes'>): Stroke[] {
   return (state.strokes ?? []).slice((launched.strokes ?? []).length);
 }
@@ -404,7 +406,7 @@ export function judgeScroll(
   return { outcome: 'ok', kind, why: `${short(scroll)}; then ${short(tap)}`, app };
 }
 
-/** A judged case as the summary holds it (live-cases.ts#Result): what hedgedStops reads. */
+/** A judged case as the summary holds it (live-cases.ts#Result). */
 export interface JudgedStop {
   source: string;
   c: Pick<Case, 'id' | 'group'>;
@@ -468,7 +470,7 @@ export function hedgedStops<R extends JudgedStop>(results: readonly R[]): Hedged
 
 /**
  * The summary's line for `hedgedStops` (live-cases.ts#summarize), undefined when the visibility group stopped on no
- * target, so such a summary reads as before T15 — its format, ADR 0013's T15 paragraph.
+ * target, so such a summary carries no line for it — its format, ADR 0013's T15 paragraph.
  */
 export function hedgedStopsLine({ visible, all }: HedgedStops): string | undefined {
   if (visible === 0) return undefined;
@@ -802,7 +804,7 @@ export function judgeBlankStretch(tag: string, view: string, replies: readonly s
  * The within cases (D78, ADR 0010's D78 amendment): a row of a list beside the screen's largest scroller — android
  * scroll-bounded's O and F, rows of `lower`, which uiautomator does not list at launch — reached by `scroll_until` with
  * `within` naming that list: O by its rect (the capture's `scrollViews`, in px as uiautomator dumps it), F by a selector
- * of S, a row of it (its nearest scroll view). Without `within` every stroke went over `upper` (D76). F lies ~2300 px
+ * of S, a row of it (its nearest scroll view). Without `within` every stroke would go over `upper` (D76). F lies ~2300 px
  * down a 495-px list — about 8 strokes at 60 % of it — so the call is given 12 swipes and 30 s. Judged by
  * `judgeWithin`: every stroke on the list bringing the target closer, the stop, then the tap. Android only: on iOS the
  * WDA capture's rect is in points and idb lists no scroll view (refused there by design).

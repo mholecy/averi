@@ -103,8 +103,8 @@ export interface CaseRecord {
 }
 
 /**
- * What a judge reads beyond the app's states: the strokes averi drew (RunRecord `swipes`, a carousel case's), the device's
- * focus reads (RunRecord `focus`, a chooser case's: live-chooser.ts).
+ * What a judge reads beyond the app's states: the strokes averi drew (CaseRecord `swipes`, a carousel case's), the device's
+ * focus reads (CaseRecord `focus`, a chooser case's: live-chooser.ts).
  */
 export interface DeviceLog {
   swipes?: readonly SwipeEntry[];
@@ -127,7 +127,7 @@ export interface CaseReads {
   /** The app read after every call but the last (`after`): a stop is judged as scroll_until left it. */
   betweenCalls?: true;
   /**
-   * The strokes averi draws during the calls, logged by the SwipeHook (RunRecord `swipes`, the judge's `log`); `{}` logs
+   * The strokes averi draws during the calls, logged by the SwipeHook (CaseRecord `swipes`, the judge's `log`); `{}` logs
    * them. `drop`: each stroke listed (1-based) is not sent (live-carousel.ts#SwipeHook), which needs the log, so it lives inside this field.
    * `shorten`: stroke `stroke` is sent only its first `px` px, averi handed back the stroke it asked for, the short carry
    * of a device whose frames run long, drawn whatever the device does (T11; both device states seen).
@@ -137,7 +137,7 @@ export interface CaseReads {
   late?: false;
   /**
    * Android: the device's word on what is in front and on the activity stack (AndroidLab.focus, live-chooser.ts#FocusRead),
-   * read before the calls, between them and after them (RunRecord `focus`, the judge's `log.focus`); a chooser left in
+   * read before the calls, between them and after them (CaseRecord `focus`, the judge's `log.focus`); a chooser left in
    * front after them is dropped with one BACK and read again (`focus.teardown`), so the next case does not start over it.
    */
   focus?: true;
@@ -166,7 +166,7 @@ export interface Case extends RunsUnder {
   measuresPanel?: true;
   /**
    * Bind the case's tree source before its launch — one `ui_snapshot` under its config, the reply kept only when it
-   * failed (RunRecord `warmUpError`): a case timed from the launch (live-ensure.ts) must not lose its first seconds to
+   * failed (CaseRecord `warmUpError`): a case timed from the launch (live-ensure.ts) must not lose its first seconds to
    * WDA starting or idb's companion coming up.
    */
   warmUp?: true;
@@ -189,7 +189,7 @@ export interface Case extends RunsUnder {
   /**
    * `launched`: the model as the launch left it, before any call — what a LOUD case's field held. `after[i]`: the state
    * read right after call i, for a case that declares `reads.betweenCalls` (its stop judged before the tap after it ran); else empty. `log`: the
-   * strokes averi drew during the calls (a case that declares `reads.swipes`; RunRecord `swipes`).
+   * strokes averi drew during the calls (a case that declares `reads.swipes`; CaseRecord `swipes`).
    */
   judge(state: LabState, replies: string[], source: Source, launched: LabState, after: readonly (LabState | undefined)[], log?: DeviceLog): LiveVerdict;
 }
@@ -368,8 +368,8 @@ const FORMS: Omit<Case, 'group'>[] = [
     judge: judgeFloatingGap('kf3'),
   },
   { id: 'b1', cell: B, says: 'fill, no clear, a name', calls: [fill(B, 'name', 'Jan Novak')], judge: holds('name', 'Jan Novak') },
-  // D72: a value with an outer space. Before D72 the Android dump's parser trimmed it, so `Jan ` read back `Jan` (a false
-  // failure) and a clear over it deleted one short. Android only: D72 is the Android reading's (iOS kept the spaces).
+  // D72: a value with an outer space. A dump parser that trimmed it would read `Jan ` back as `Jan` (a false failure)
+  // and a clear over it would delete one short. Android only: D72 is the Android reading's (iOS kept the spaces).
   { id: 'os1', cell: B, platforms: ['android'], says: 'fill, no clear, a name ending in a space (D72)', calls: [fill(B, 'name', 'Jan ')], judge: holds('name', 'Jan ') },
   {
     id: 'os2',
@@ -565,8 +565,8 @@ const FORMS: Omit<Case, 'group'>[] = [
   // the device by batch-9 and batch-10 (docs/truth/live-records/*-forms-l7-1.json, *-forms-d61-*.json). g2 ends on a
   // complete group: the field shows the eager space after it, a reading that does not land (fill-landing.ts) and reads
   // D53's `separated` — averi refuses it by design while the app holds the value: an EXPECTED MISMATCH failed-holds
-  // under every source, said in its `says` and filed in live-known.ts (ADR 0034 residual 10) — on Android since D72,
-  // whose reading keeps the trailing space (ok there before, the dump's parser trimming it).
+  // under every source, said in its `says` and filed in live-known.ts (ADR 0034 residual 10) — on Android too,
+  // whose reading keeps the trailing space (D72).
   { id: 'g1', cell: G, says: 'fill, clear, an IBAN into the field that spaces each group as it ends', calls: [fill(G, 'ibanEager', 'SK3112000000123', true), shows(G, 'ibanEager', 'SK31 1200 0000 123')], judge: holdsShown('ibanEager', 'SK31 1200 0000 123') },
   { id: 'g2', cell: G, says: 'fill, no clear, an IBAN ending on a complete group: the field shows the eager space after it — expected MISMATCH failed-holds by design under every source (D53 `separated`: averi refuses the trailing mark, the app holds the value; on Android since D72, whose reading keeps the trailing space — ok there before, the space trimmed)', calls: [fill(G, 'ibanEager', 'SK3112000000')], judge: holds('ibanEager', 'SK31 1200 0000 ') },
   { id: 'g3', cell: G, says: 'fill, no clear, a phone number the field groups in threes under a `+421` placeholder', calls: [fill(G, 'phoneGrouped', '421903123456')], judge: holds('phoneGrouped', '421 903 123 456') },
@@ -672,7 +672,6 @@ export interface Selection {
   onlyCells?: readonly string[];
 }
 
-/** The cases of a run, in the order it runs them: the forms, the ensure group's, the carousel group's, the chooser group's, then the visibility cells', then the dismissal's. */
 export async function selectCases({ platform, app, groups, only, onlyCells }: Selection): Promise<Case[]> {
   const catalog = await catalogOf();
   const heldOf = (cell: string): HeldSpec => {
@@ -733,7 +732,6 @@ export type RejudgeSelection = Omit<Selection, 'platform' | 'app'> & { app?: Lab
 /** How long after the first read the late one is taken. */
 export const LATE_READ_MS = 3_000;
 
-/** What a case's judges weigh: a record's fields, with a state to judge. */
 export type CaseEvidence = Pick<CaseRecord, 'source' | 'replies' | 'launched' | 'after' | 'late' | 'swipes' | 'focus'> & { state: LabState };
 
 /** The case's judge on one state, over this evidence. */

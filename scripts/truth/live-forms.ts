@@ -115,16 +115,16 @@ export const refusedHolding =
 
 /**
  * f15 (D63): a field that refuses the keys while its text already holds the value — form-format's `date` at its 8-digit
- * cap, `31.12.2026` after a first fill, typed `2026` without clear. Before D63 averi passed that unchanged reading by
- * containment. The error must say the field did not change (`refusedHolding`).
+ * cap, `31.12.2026` after a first fill, typed `2026` without clear. A containment check would pass that unchanged
+ * reading. The error must say the field did not change (`refusedHolding`).
  */
 export const refusedUnchanged = (tag: string, kept: string) => refusedHolding(tag, kept, UNCHANGED_SAID);
 
 /**
  * f16 (D64): a field at its length cap that keeps only the head of the typing while its earlier text holds the value —
  * form-format's `date` holding `31.12.202` after a first fill, typed `12` without clear, keeps the `1`: `31.12.2021`.
- * Before D64 averi passed that reading by containment (the `12` inside `31.12`). The error's wording is not judged: a
- * tail typed again on iOS and the poll on Android word it alike, by length (`refusedHolding`).
+ * A containment check would pass that reading (the `12` inside `31.12`). The error's wording is not judged: a tail
+ * typed again on iOS and the poll on Android word it alike, by length (`refusedHolding`).
  */
 export const refusedCapped = (tag: string, kept: string) => refusedHolding(tag, kept);
 
@@ -236,7 +236,7 @@ export function judgeNoteFill(s: LabState, replies: string[], source: Source, la
  * bar's top padding still covers part of it, by the app's frames, the reply must say so: "PARTLY UNDER a surface the
  * tree does not list" (src/ui-tree/eyes.ts's band, read from one screenshot: round 7's A6, ADR 0013 refined). A stop
  * that leaves the band unsaid — "fully visible", or a plain "visible" — is a MISMATCH: the tree has no node for the
- * padding, so the claim overstates by what it covers (ADR 0013's residual until the eyes, no allowance since).
+ * padding, so the claim overstates by what it covers.
  */
 export function judgePhoneScroll(s: LabState, [reply]: string[], _source: string, launched: LabState): LiveVerdict {
   const submits = (s.submits ?? []).length;

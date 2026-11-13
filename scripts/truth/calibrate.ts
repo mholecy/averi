@@ -345,14 +345,12 @@ export function verdictOf(e: CalibrationEntry, before: SideRun, after?: SideRun)
   return rows.every((k) => at(after, k)!.mismatch === undefined) ? 'CALIBRATED' : 'CALIBRATED-ON-DEFECT';
 }
 
-/** The rows of the corpus, other than the note's own, green before and red after: what the fix broke elsewhere. */
 export function regressedElsewhere(e: CalibrationEntry, before: SideRun, after: SideRun): string[] {
   if ('error' in before || 'error' in after) return [];
   const own = new Set(e.checks ?? []);
   return [...after.checks].filter(([k, c]) => !own.has(k) && c.mismatch !== undefined && before.checks.get(k)?.mismatch === undefined && before.checks.has(k)).map(([k]) => k);
 }
 
-/** Of `rows` regressed at the note's after commit, those its `regressions` does not record. */
 export const unrecorded = (e: CalibrationEntry, rows: readonly string[]): string[] =>
   rows.filter((k) => !(e.regressions ?? []).some((r) => r.broke === e.after && r.rows.includes(k)));
 
@@ -417,7 +415,6 @@ export function disposition(rs: readonly NoteResult[], out?: string, partial = f
   return { path: out, stale: `${out}.failed`, code };
 }
 
-/** The notes `--note` names (all without it), in the table's order; a name that is no note of the table is an error. */
 export function notesOf(table: Pick<Calibration, 'notes'>, only: readonly string[] | undefined): CalibrationEntry[] {
   const notes = table.notes.filter((e) => only === undefined || only.includes(e.n));
   const unknown = (only ?? []).filter((n) => !table.notes.some((e) => e.n === n));

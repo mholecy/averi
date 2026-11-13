@@ -109,10 +109,6 @@ export async function runSide(side: string, repo: string, deps: SideDeps): Promi
   return { run: (await once()).run, cleanup: code.cleanup, retried: first.failed };
 }
 
-/**
- * The console line for a side: ran, from the cache, or DID NOT LOAD with why; why it was run twice; and that a run was
- * not kept.
- */
 export const sideLine = (side: string, o: SideOutcome, seconds: number): string =>
   o.cached === true
     ? `calibrate: ${side} from the cache`

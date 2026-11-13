@@ -1,9 +1,9 @@
 import type { GoldenCheck, GoldenJson } from '../differential/golden.js';
 
 /**
- * One side of the calibration as calibrate reads it (calibrate.ts judges the notes by it, calibrate-run.ts makes it
- * from a golden process, side-cache.ts keeps it): the sides' names, a row's key, and a side's run — its checks by key,
- * or why it does not count as loaded (the canary, sideRunOf). Below the three, so none of them imports another for it.
+ * One side of the calibration as calibrate reads it: the sides' names, a row's key, and a side's run — its checks by
+ * key, or why it does not count as loaded (the canary, sideRunOf). Below calibrate.ts, calibrate-run.ts and
+ * side-cache.ts, so none of them imports another for it.
  */
 
 /** The side an open note is judged on: this checkout as it is on disk, not its committed HEAD. */
@@ -11,8 +11,8 @@ export const WORKING_TREE = 'working tree';
 
 /**
  * A row's key, as the calibration table and the family's KNOWN (tests/differential/golden/<family>.known.ts) name it —
- * its one owner: golden's ratchet (tests/differential/golden.test.ts) and `--against` (golden-diff.ts) key by it too.
- * Here, not beside GoldenCheck in golden.ts, so the calibration's modules need not load the harness to name a row.
+ * its one owner. Here, not beside GoldenCheck in golden.ts, so the calibration's modules need not load the harness to
+ * name a row.
  */
 export const keyOf = (c: Pick<GoldenCheck, 'recording' | 'target' | 'verb'>) => `${c.recording} ${c.target} ${c.verb}`;
 /** The capture a row key names (`<run>/<file>`). */

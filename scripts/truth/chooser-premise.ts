@@ -168,7 +168,7 @@ function homeFact(resolved: string | { why: string }, b: HandBase): PremiseFact 
 /**
  * The premise's lines: one naming every fact — `CHOOSER PREMISE: stale — … — the run fails` and the owner's hand line
  * for each stale fact, `Chooser premise: unread — …`, or `Chooser premise: fresh — …` — and a WARN when the lab has a
- * last-chosen entry (`mAlways=false`: no default, so no fact fails on it; no reinstall clears it, batch-11).
+ * last-chosen entry (`mAlways=false`: no default, so no fact fails on it; no reinstall clears it).
  */
 function premiseLines(state: PremiseState, facts: readonly PremiseFact[], last: readonly LabEntry[]): string[] {
   const whys = facts.map((f) => f.why).join('; ');

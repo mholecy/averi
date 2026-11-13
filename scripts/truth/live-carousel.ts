@@ -17,13 +17,13 @@ import { TOUCH_SLACK } from './truth.js';
  * The harness additions, each small: a raw pre-drag before the call (`Case.preDrag`: the probes' 440-px, 1-s drag left
  * on the carousel, `preDrag`), a per-case "drop swipe N" hook on the Android adapter the registry builds
  * (`CaseReads.swipes`, `SwipeHook`, `hookSwipes`: the stroke never sent, resolved as drawn — batch-9's untaken reveal on
- * purpose), averi's every stroke logged into the record (RunRecord `swipes`), and the reply's kind
+ * purpose), averi's every stroke logged into the record (CaseRecord `swipes`), and the reply's kind
  * (replies.ts#carouselReply). The hard verdict on every `fully: true` case: never "fully visible" while C is still cut.
  */
 
 /**
  * The cut the oracle forgives, in px: truth.ts's TOUCH_SLACK, the lab's one slack — a View's rect and the app's frame
- * may differ by a pixel or two (batch-12's CUT_TOL), far under the cuts the lab's carousels leave (17–44 px short at the
+ * may differ by a pixel or two, far under the cuts the lab's carousels leave (17–44 px short at the
  * bound on carousel-recycler-free, 372 px in batch-9's false pass).
  */
 export const CUT_TOLERANCE_PX = TOUCH_SLACK;
@@ -120,7 +120,7 @@ export function hookSwipes<A extends Swiper>(adapter: A, hook: SwipeHook, wait: 
 
 // --- the pre-drag ---
 
-/** The raw stroke a case's pre-drag drew (RunRecord `preDrag`), with the state the launch left before it. */
+/** The raw stroke a case's pre-drag drew (CaseRecord `preDrag`), with the state the launch left before it. */
 export interface PreDragged {
   from: Point;
   to: Point;
@@ -144,7 +144,6 @@ export function preDragStroke(clip: Rect, px: number): { from: Point; to: Point;
   return { from, to: { x: from.x - px, y: from.y }, durationMs: PRE_DRAG_MS };
 }
 
-/** What the pre-drag needs of the lab: a raw stroke (lab-device.ts#AndroidLab.swipe) and the app's state. */
 export interface PreDragLab {
   swipe(from: Point, to: Point, durationMs: number): Promise<void>;
   state(): Promise<LabState | undefined>;
@@ -454,8 +453,8 @@ export const CAROUSEL_CASES: readonly CarouselCase[] = [
     calls: [fullyC(RECYCLER_FREE, 'left'), fullyC(RECYCLER_FREE, 'left')],
     judge: judgeDropTwo,
   },
-  // T12: the first probe after the pre-drag dropped, resolved as drawn — a held first probe with no proof, which read
-  // `checked` with C cut before T12 (T11's final A/B, short-fix-12). The same first probe goes again (the `no-retry` check
+  // T12: the first probe after the pre-drag dropped, resolved as drawn — a held first probe with no proof, which must not
+  // read `checked` with C cut (T11's final A/B, short-fix-12). The same first probe goes again (the `no-retry` check
   // reads it), carries C and proves the cut: then as lv-d62-control.
   {
     id: 'lv-t12-drop-first',

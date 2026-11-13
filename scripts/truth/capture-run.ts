@@ -20,13 +20,12 @@ import { consistency, controlConsistency, controlPiece, imePanels, listedIn, mea
  * the app at all? — and, for a target, measure from the screenshot how much of it is drawn as itself. Writes a
  * differential corpus run: one capture per tree, sharing the cell's screenshot and truth.
  *
- * When the state reports the screen's bands, scroll views or chrome (phase 3's cells), each target also carries its
- * measured geometry (truth.ts#geometryOf): an off-screen target is not probed, and a target whose tappable piece is not
- * centred where its frame is gets a second probe at the piece's centre (`reachedAtPiece`). A state reporting none of it
- * — every cell before phase 3 — captures as before. On any cell, a target whose probe point (probePoint, its rounded
- * centre) lies off the screen is not tapped there — a raw tap off the screen reaches no window of the app and would log
- * no touch — and records why (`unprobed`), `reached` false (unmeasured, a declared-open one is then broken, as before
- * phase 3: truth.ts#consistency). A centre in a system band is probed: measured, the tap there is the app's or the
+ * When the state reports the screen's bands, scroll views or chrome, each target also carries its measured geometry
+ * (truth.ts#geometryOf): an off-screen target is not probed, and a target whose tappable piece is not centred where
+ * its frame is gets a second probe at the piece's centre (`reachedAtPiece`). On any cell, a target whose probe point
+ * (probePoint, its rounded centre) lies off the screen is not tapped there — a raw tap off the screen reaches no window
+ * of the app and would log no touch — and records why (`unprobed`), `reached` false (unmeasured, a declared-open one is
+ * then broken: truth.ts#consistency). A centre in a system band is probed: measured, the tap there is the app's or the
  * bar's (truth.ts#systemBarSwallows, #statusBarMaySwallow, #navigationBandTakes — the last by the navigation mode an
  * Android capture records, LabDevice.navigation). One rule decides what is never tapped, for the capture and
  * consistency both: truth.ts#unprobedReason.

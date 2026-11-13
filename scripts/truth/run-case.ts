@@ -17,11 +17,11 @@ import { labSelector, type LabState } from './schema.js';
  * field there, a field on the record (CaseRecord, caseRecord), and its read in the cycle below; one the judge must see
  * also goes through CaseEvidence, judgeOn and the judge's parameters or DeviceLog.
  *
- * It knows nothing of argv, of which cases run, or of printing: live.ts is the CLI around it, and tests/truth/run-case.test.ts
- * runs the cycle over tests/helpers/fake-lab.ts. A failure of the harness itself (a call that throws, a guard that
- * refuses) throws out of here and stops the run, as it always did; a pre-drag that fails is the case's SKIP. A first
- * state that is undefined (the app wrote none after the calls) is the case's named LOUD failure, judged by no judge,
- * and fails the run (T10, live-cases.ts#noFirstState); the run goes on to the next case.
+ * It knows nothing of argv, of which cases run, or of printing: live.ts is the CLI around it. A failure of the
+ * harness itself (a call that throws, a guard that refuses) throws out of here and stops the run; a pre-drag that
+ * fails is the case's SKIP. A first state that is undefined (the app wrote none after the calls) is the case's named
+ * LOUD failure, judged by no judge, and fails the run (T10, live-cases.ts#noFirstState); the run goes on to the next
+ * case.
  */
 
 /** A lab a case runs on: Android's adds the raw stroke and the IME region; its `platform` tells them apart. */
@@ -57,7 +57,6 @@ export interface CaseRun {
   verdict: LiveVerdict;
 }
 
-/** How long the app is given to write once the calls are done. */
 const WRITE_SETTLE_MS = 800;
 
 /** The one place a record is shaped: a skip's and a run's, in the order a recorded file keeps its keys. */

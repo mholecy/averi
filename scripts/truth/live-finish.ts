@@ -7,7 +7,7 @@ import type { RunRecord } from './live-cases.js';
  * live.ts's finish, after the cases (or after one threw): the record first, then the closes (D82). T16's first live
  * smoke (2026-11-10, `--groups carousel --cases lv-d62-control`) lost its record: the emulator went offline during the
  * after read (T16 caught that as the label's error), then `am force-stop` in AndroidLab's close (lab-device.ts) threw
- * `adb: device offline`, and the write came after the closes. Now:
+ * `adb: device offline`, and the write came after the closes. So:
  *
  *  1. the carousel group's device label (T16) goes into the record;
  *  2. the record is written (`--record`), before anything closes: what the cases read and how they were judged does not

@@ -7,8 +7,7 @@ import { DRAWN, pct, type CatalogField, type CatalogForm, type CellTruth, type D
 /**
  * The truth's arithmetic, free of any device (docs/plans/2026-10-15-ground-truth-lab-app.md): where a form control
  * lies from the app's frames, what a probe tap's events say (reached, delivered, another control fired), and whether a
- * capture's sources tell one story. The capture (capture-run.ts) and the golden mode (scripts/differential/golden.ts)
- * both read it; tests/truth/truth.test.ts pins it.
+ * capture's sources tell one story.
  *
  * What it takes from averi's code (src) and what it restates. A RULE the truth judges averi by is restated here, never
  * imported, so a change to averi's rule cannot move the truth with it: the sliver's fraction (SLIVER_FRACTION), WDA's
@@ -37,7 +36,6 @@ export function probePoint(frame: Rect): { x: number; y: number } {
  */
 export const within = (p: { x: number; y: number }, r: Rect) => p.x >= r.x && p.x < r.x + r.width && p.y >= r.y && p.y < r.y + r.height;
 
-/** Whether two points lie within TOUCH_SLACK of each other on each axis — a touch counts as the tap's (touchesAt). */
 export const nearPoint = (p: { x: number; y: number }, q: { x: number; y: number }) => Math.abs(p.x - q.x) <= TOUCH_SLACK && Math.abs(p.y - q.y) <= TOUCH_SLACK;
 
 /**
@@ -46,8 +44,7 @@ export const nearPoint = (p: { x: number; y: number }, q: { x: number; y: number
  * submit rides in, its padding and background included) — covers what is laid under it; a control straddling the
  * keyboard's top, or with its centre under the bar, is `covered` — partly hidden. A pinned submit whose state reports
  * no bar covers nothing here — the capture refuses such a state (capture-run.ts#formTruth). Every committed state of
- * a pinned submit holds its bar: iOS's form-keyboard, first measured with it guessed as the submit's frame and 10 pt
- * above and below it, was recaptured with the bar Forms.swift reports (phase 3, round-3 review: situations unchanged).
+ * a pinned submit holds its bar.
  */
 export function situationOf(frame: Rect | undefined, s: LabState, form: CatalogForm, own: { tag: string; inSheet: boolean }, panels: readonly Rect[] = []): Situation {
   if (frame === undefined) return 'not-rendered';
@@ -82,7 +79,6 @@ export const selectorOf = (t: Pick<TargetTruth, 'id' | 'text' | 'label'>) => {
   return 'text' in e ? `text:"${e.text}"` : 'label' in e ? `label:"${e.label}"` : `id:"${e.id}"`;
 };
 
-/** XML's character references and the five named entities, decoded. */
 const decodeXml = (v: string) =>
   v.replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (_, e: string) =>
     e[0] === '#' ? String.fromCodePoint(e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : Number(e.slice(1))) : ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" } as Record<string, string>)[e.toLowerCase()],
@@ -93,9 +89,9 @@ const spaced = (v: string) => v.replace(/\s+/g, ' ').trim();
 /**
  * Every node of a raw tree's payload, as its own fields: a uiautomator dump's `<node>` elements, each attribute's value
  * decoded (decodeXml: the named entities and the numeric character references uiautomator writes for non-ASCII); WDA's
- * JSON (`value`, nested `children`) or idb's JSON list, each object of it. The harness's one reader of a raw tree
- * (listedIn, nodeFramesIn, textListedIn), no averi code. A payload that is not what its source writes is an error, not an empty
- * tree: a harness misreading its own capture would otherwise judge or record "not listed".
+ * JSON (`value`, nested `children`) or idb's JSON list, each object of it. The harness's one reader of a raw tree, no
+ * averi code. A payload that is not what its source writes is an error, not an empty tree: a harness misreading its own
+ * capture would otherwise judge or record "not listed".
  */
 function rawNodes(payload: string, source: SourceKind): Record<string, unknown>[] {
   if (source === 'uiautomator') {
@@ -208,7 +204,7 @@ function atClip(o: Record<string, unknown>, source: SourceKind, clip: Rect): boo
  * src/adapters/android-tree-dialect.ts#AXIS_BY_CLASS, so the row asks `unfit` exactly where averi reads a told axis (a
  * Compose `horizontalScroll` dumps as `android.widget.HorizontalScrollView`; a LazyRow or a RecyclerView tells none).
  * Uiautomator only: WDA's axis comes from a node's type or its content's extent (src/adapters/wda-source.ts), which
- * the harness does not read, and idb lists no scroller (ADR 0010 residual 5). golden-spec/rows.ts#unfitSide asks it.
+ * the harness does not read, and idb lists no scroller (ADR 0010 residual 5).
  */
 export function scrollAxisToldIn(payload: string, source: SourceKind, clip: Rect): ScrollAxis | undefined {
   if (source !== 'uiautomator') return undefined;
@@ -295,7 +291,6 @@ export function otherControlsFired(probe: readonly ProbeEvent[], tag: string): P
  * Whether the point the probe taps (probePoint) lies on the screen — else the capture never taps it (unprobedReason).
  */
 export const centreOnScreen = (frame: Rect, screen: { width: number; height: number }) => within(probePoint(frame), { x: 0, y: 0, width: screen.width, height: screen.height });
-/** A point as the truth's reasons and golden's mismatches spell it: `(x,y)`. */
 export const pointText = (p: { x: number; y: number }) => `(${p.x},${p.y})`;
 
 /**
@@ -658,8 +653,7 @@ export function geometryOf(frame: Rect, ctx: GeometryContext): Geometry {
 }
 
 /**
- * Whether a state reports anything a geometry is measured from — else the targets carry none (every capture before
- * phase 3).
+ * Whether a state reports anything a geometry is measured from — else the targets carry none.
  */
 export const measuresGeometry = (s: Pick<LabState, 'safeArea' | 'scrollViews' | 'chrome'>) => s.safeArea !== undefined || s.scrollViews !== undefined || s.chrome !== undefined;
 
