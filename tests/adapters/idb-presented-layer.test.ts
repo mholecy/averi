@@ -171,7 +171,7 @@ describe('the idb parser marks an unlabelled, id-less element over the whole scr
 
   it('specific: no other committed idb list holds one — the lab\'s other captures and the device dumps under tests/fixtures', () => {
     const lists = everyIdbList();
-    expect(lists.length).toBe(53);
+    expect(lists.length).toBe(54);
     expect(lists.filter(({ elements: list }) => backdrops(list).length > 0).map(({ file }) => file)).toEqual(['blur-menu-unhidden.idb.json']);
   });
 

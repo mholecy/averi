@@ -819,6 +819,28 @@
       "truth": "tap-catcher-stacked.truth.json"
     },
     {
+      "file": "tap-catcher-beneath-flat.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "tap-catcher-beneath-flat.png",
+      "truth": "tap-catcher-beneath-flat.truth.json"
+    },
+    {
+      "file": "tap-catcher-beneath-flat.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "tap-catcher-beneath-flat.png",
+      "truth": "tap-catcher-beneath-flat.truth.json"
+    },
+    {
       "file": "text-sample.wda.json",
       "source": "wda",
       "form": "raw",
