@@ -9,7 +9,7 @@ import { askedUnlistedBy, contractOf, CUT_GEOMETRIES, judgedContext, stopHolds, 
 import { axisOf, bandsOf, directionOf, geometryOf, intersect, selectorOf, type Direction, type GeometryContext } from './truth.js';
 
 /**
- * The live golden's visibility cases (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 5): averi's `tap` and
+ * The live golden's visibility cases (docs/plans/2026-10-15-ground-truth-lab-app.md): averi's `tap` and
  * `scroll_until` against the REAL lab app on the coloured-target cells, the app's own log the oracle — its tap log
  * (LabState.events: the target's action fired, nothing else), each scroll view's offset and the strokes it took
  * (LabState.offsets, LabState.strokes), and the targets' frames as the app lays them out after the call. What a
@@ -887,8 +887,8 @@ export function judgeAtRest(tag: string, view: string, replies: readonly string[
  * the ADR asks the device check to judge that the cut stroke lands the row in its window without an extra stroke or
  * turn. L lies at content y 1920: whole over the offsets 1172–1920 (812 pt shown), past one stroke's carry from the top
  * (≈ 1040 pt under WDA), and wholly before the table's end (offset 2772) — so a full final stroke (≈ 2080 from the
- * top) carries it past its window, and the case fails on a missing cut (the round-7 table; round 6's 40 rows ended at
- * 1748, inside the window of its far row, which no full stroke could then overshoot). The turn and the overshoot are
+ * top) carries it past its window, and the case fails on a missing cut (a table of 40 rows would end at 1748, inside
+ * the window of its far row, which no full stroke could then overshoot). The turn and the overshoot are
  * what is judged on top of judgeScroll's stop, and the strokes the app logged (the summary's `app:` line) show where
  * the final one came to rest.
  */
@@ -920,7 +920,7 @@ export function judgeCarry(reply: string, state: LabState, start: LabState): Liv
   if (verdict.outcome === 'MISMATCH' || f0 === undefined || region === undefined) return verdict;
   const o0 = start.offsets?.[CARRY.view] ?? 0;
   const top = (o: number) => f0.y - (o - o0);
-  // The view filter is kept for intent: equivalent since D83 (another view's stroke that moves is judgeScroll's first).
+  // The view filter states the intent: judgeScroll's first check already fails another view's stroke that moves.
   const strokes = strokesSince(state, start).filter((s) => s.view === CARRY.view);
   const turned = strokes.filter((s) => s.to < s.from - MOVE_SLACK);
   // A move as well as the window test (D83). The window test alone implies a move of more than region.height −

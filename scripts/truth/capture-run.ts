@@ -171,8 +171,8 @@ async function captureCell(lab: LabDevice, cell: CatalogCell, ctx: { device: str
     for (const t of trees) put(`${cell.id}${t.suffix}`, t.payload);
     put(`${cell.id}.state.json`, JSON.stringify(s, null, 2) + '\n');
     // Android: the device's own system bands with the IME down (CellTruth.displays) — read here, before the probes, when
-    // the launch shows no IME: a probe that focuses a field raises it, and the last probe leaves it up (rn-field's M,
-    // round 7: its dump held the IME, and golden's colour and ocr rows read the keyboard over M). A cell launched with
+    // the launch shows no IME: a probe that focuses a field raises it, and the last probe leaves it up (rn-field's M:
+    // its dump held the IME, and golden's colour and ocr rows read the keyboard over M). A cell launched with
     // the IME up is read after ime()'s back hid it, below.
     let displays = lab.displays !== undefined && s.keyboard?.visible !== true ? await lab.displays() : undefined;
 

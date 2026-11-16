@@ -519,7 +519,7 @@ export const CAROUSEL_CASES: readonly CarouselCase[] = [
   })),
 ];
 
-// --- the hedged ceiling (review round 1, the owner's) ---
+// --- the hedged ceiling ---
 
 /** The legs that expect `unaimable` and accept the hedged bound (D68_SPREAD): the ceiling's samples, one a run each. */
 export const UNAIMABLE_LEGS: readonly string[] = ['lv-d62-control', 'lv-d68-launch', 'lv-d59b-recycler'];

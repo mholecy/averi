@@ -239,7 +239,7 @@ export class IosLab implements LabDevice {
   async launch(cell: string): Promise<LabState> {
     await this.guard();
     await this.simctl('terminate', this.udid, this.bundle).catch(() => undefined);
-    // As averi's own launch does (src/adapters/ios.ts#enableAccessibilityAutomation): after a WebDriverAgent session
+    // As averi's own launch does (src/adapters/ios.ts#prepareForOpen): after a WebDriverAgent session
     // on the simulator, an app launched without these reads as an empty idb tree (docs/bugs/2026-10-07-one-wda-session-
     // makes-idb-stick-until-reboot.md) — the capture's WDA would leave every later launch stuck for idb.
     for (const key of ['AutomationEnabled', 'ApplicationAccessibilityEnabled']) {

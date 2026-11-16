@@ -94,7 +94,10 @@ export interface Regression {
 }
 
 export interface CalibrationEntry {
-  /** The analysis' number (1–36), FE1/FE2 (field errors), L1/L2 (lab findings). */
+  /**
+   * The note's id in calibration.json: the analysis' number (1–36), or a prefixed one such as FE1 (field errors) or L1
+   * (lab findings); calibration.json holds the full set.
+   */
   n: string;
   /** The note's file name in docs/bugs. */
   note: string;

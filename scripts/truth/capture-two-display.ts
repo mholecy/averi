@@ -9,9 +9,10 @@ import { HOME_COMMAND, pause } from './lab-device.js';
 
 /**
  * A35's two-display capture (docs/plans/2026-10-30-performance-backlog.md, row A35; owner's grant 2026-11-13): the
- * window manager's dumps the Android adapter reads, on a device with a second display, so the three multi-display rules
- * of src/adapters/android-wm.ts can be made one on real text. The second display is an overlay display
- * (`settings put global overlay_display_devices …`), set for the capture only and put back in a `finally`:
+ * window manager's dumps the Android adapter reads, on a device with a second display: the real text that
+ * src/adapters/android-wm.ts's one display-0 rule (ADR 0041's A35 amendment) is checked against. The second display is
+ * an overlay display (`settings put global overlay_display_devices …`), set for the capture only and put back in a
+ * `finally`:
  *
  *   node --import tsx scripts/truth/capture-two-display.ts --serial emulator-5554 --out <dir>
  *

@@ -130,7 +130,7 @@ export const refusedCapped = (tag: string, kept: string) => refusedHolding(tag, 
 
 /**
  * refusedOnFocus's lab fault, worded by what the field holds: missing from the state or empty, it did not insert its
- * prefix; the prefix and more, it took the keys; anything else, neither (D64b-1's reviews).
+ * prefix; the prefix and more, it took the keys; anything else, neither.
  */
 const labFaultWhy = (got: string | undefined, inserted: string): string =>
   got === undefined ? "lab fault: the field did not insert its prefix (is missing from the app's state)"
@@ -150,7 +150,7 @@ export const FOCUS_UNREAD_HEDGE = {
  * premise its own, checked first: the field missing or empty means the prefix was never inserted — the lab's fault, a
  * SKIP whatever averi replied, where the app logged a `focus` event for the field; with none, averi's tap never focused
  * it — LOUD `loud-untouched`, said so, or a MISMATCH `fill-claim-unfocused` over a Filled (averi's false claim, a class
- * of its own: a failure other than a claim over the prefix; D64b-1's reviews); a claim of done over anything but
+ * of its own: a failure other than a claim over the prefix); a claim of done over anything but
  * `inserted` means the field took the keys it must refuse — a SKIP too (labFaultWhy), averi's Filled maybe true. No
  * KNOWN entry matches a SKIP.
  * Then, D64b-3: under uiautomator, the one source that skips that re-read, a Filled over `inserted` whose ⚠ line says
@@ -185,10 +185,10 @@ export const refusedOnFocus =
   };
 
 /**
- * D18 review round 1 (MINOR-4): the model holds `want` after the fill (holds, over the fill's reply), AND the tree shows
- * the same text (the `shows` assert after it) — a format applied to the model alone, or to the screen alone (SwiftUI's
- * binding setter may leave the TextField showing what was typed), is a MISMATCH here even when the fill passed:
- * `failed-holds` on the assert's kind (the model holds it, averi's read of the screen failed).
+ * The model holds `want` after the fill (holds, over the fill's reply), AND the tree shows the same text (the `shows`
+ * assert after it) — a format applied to the model alone, or to the screen alone (SwiftUI's binding setter may leave
+ * the TextField showing what was typed), is a MISMATCH here even when the fill passed: `failed-holds` on the assert's
+ * kind (the model holds it, averi's read of the screen failed).
  */
 export const holdsShown =
   (tag: string, want: string) =>
@@ -234,7 +234,7 @@ export function judgeNoteFill(s: LabState, replies: string[], source: Source, la
  * k7: scroll_until phone, under the bar riding on the IME. Where the app lays phone out when scroll_until returns: its
  * centre under the bar (the surface with no node) or the IME is no stop; clear of both, a stop is right — and where the
  * bar's top padding still covers part of it, by the app's frames, the reply must say so: "PARTLY UNDER a surface the
- * tree does not list" (src/ui-tree/eyes.ts's band, read from one screenshot: round 7's A6, ADR 0013 refined). A stop
+ * tree does not list" (src/ui-tree/eyes.ts's band, read from one screenshot; ADR 0013 refined). A stop
  * that leaves the band unsaid — "fully visible", or a plain "visible" — is a MISMATCH: the tree has no node for the
  * padding, so the claim overstates by what it covers.
  */
@@ -332,7 +332,7 @@ export const judgeUnderSheet =
 
 /**
  * c5–c7: an element assert, a colour assert and a flow's `wait:` on name beneath form-picker's sheet, open at launch
- * and fully expanded (the not-founds round 7's A3 asked by a scratch driver:
+ * and fully expanded (the not-founds a scratch driver asked:
  * docs/truth/live-android-2026-10-19-hint-everywhere.md). name lies beneath the sheet, so the call must fail on not
  * finding it (replies.ts#missedTarget: the assert's `not found within …`, the flow's `Timed out … waiting for element`),
  * nothing may fire, and the not-found says the sheet's remedy exactly once (`remedyUnderSheet`): none, or "close it

@@ -457,8 +457,8 @@ const FORMS: Omit<Case, 'group'>[] = [
       return claimsTap(tap) ? { outcome: 'MISMATCH', why: `averi says ${short(tap)} — the app chose ${JSON.stringify(valueOf(s, 'country'))}` } : { outcome: 'LOUD', why: `${short(scroll)} / ${short(tap)}` };
     },
   },
-  // The form beneath the picker sheet (round 6's closing review: the active-window hint run live): each field and the
-  // submit asked by a tap, the sheet open at launch — live-forms.ts#judgeUnderSheet.
+  // The form beneath the picker sheet (the active-window hint run live): each field and the submit asked by a tap, the
+  // sheet open at launch — live-forms.ts#judgeUnderSheet.
   ...(['name', 'country', 'submit'] as const).map((tag, i) => ({
     id: `c${i + 2}`,
     cell: 'form-picker',
@@ -466,9 +466,8 @@ const FORMS: Omit<Case, 'group'>[] = [
     calls: [{ tool: 'tap' as const, args: { selector: id('form-picker', tag) } }],
     judge: judgeUnderSheet(tag),
   })),
-  // …and name beneath it asked by an assert and a flow's wait: (round 7's code review, A3's harness cases): each fails,
-  // its not-found saying the sheet's remedy once — live-forms.ts#judgeMissUnderSheet. Android: the hint is
-  // uiautomator's; an iOS run of them is unmeasured.
+  // …and name beneath it asked by an assert and a flow's wait: each fails, its not-found saying the sheet's remedy once
+  // — live-forms.ts#judgeMissUnderSheet. Android: the hint is uiautomator's; an iOS run of them is unmeasured.
   ...[
     { asks: 'an assert on', call: { tool: 'assert' as const, args: { asserts: [{ element: { id: 'lab.form-picker.name' }, timeout: 3_000 }] } } },
     { asks: 'a colour assert on', call: { tool: 'assert' as const, args: { asserts: [{ element: { id: 'lab.form-picker.name' }, color: { expected: '#FFFFFF' }, timeout: 5_000 }] } } },
@@ -482,7 +481,7 @@ const FORMS: Omit<Case, 'group'>[] = [
     calls: [call],
     judge: judgeMissUnderSheet('name'),
   })),
-  // The React Native lab app's fields (`--app react-native`; fixtures/apps/rn, src/ReactNative.tsx): rn-field's three
+  // The React Native lab app's fields (`--app react-native`; fixtures/apps/rn/src/ReactNative.tsx): rn-field's three
   // TextInputs, each reporting its value and focus by its target's tag — N a single-line field under its floating label,
   // I the field with a trailing icon button labelled Clear, M a multiline field.
   { id: 'rn1', cell: RN, says: 'fill, no clear, the single-line RN field', calls: [fill(RN, 'N.field', 'Jan Novak')], judge: holds('N', 'Jan Novak') },
@@ -554,13 +553,12 @@ const FORMS: Omit<Case, 'group'>[] = [
   { id: 'f13', cell: F, says: 'fill, no clear, a phone number under a `+421` placeholder', calls: [fill(F, 'phone', '421903123456')], judge: holds('phone', '421903123456') },
   { id: 'f14', cell: F, says: 'fill, clear, a phone number with its `+421` under a `+421` placeholder', calls: [fill(F, 'phone', '+421903123456', true)], judge: holds('phone', '+421903123456') },
   // D63: the date field keeps 8 digits, so a no-clear `2026` after a full date changes nothing, though the field's text
-  // holds it; averi must say the field did not change, not Filled (live-forms.ts#refusedUnchanged). Not yet run on a device.
-  // A `loud-changed` here points to the caret landing inside the text (the cap then keeps other digits), not to D63.
+  // holds it; averi must say the field did not change, not Filled (live-forms.ts#refusedUnchanged). A `loud-changed`
+  // here points to the caret landing inside the text (the cap then keeps other digits), not to D63.
   { id: 'f15', cell: F, says: 'fill, clear, a full date; then, no clear, digits the full field refuses though its text holds them: did not change', calls: [fill(F, 'date', '31122026', true), fill(F, 'date', '2026')], judge: refusedUnchanged('date', '31.12.2026') },
   // D64: the date field keeps 8 digits, so a no-clear `12` after `31.12.202` keeps the `1` alone — `31.12.2021`, a reading
-  // that holds `12` only inside the earlier text; averi must fail it, not say Filled (live-forms.ts#refusedCapped). Not
-  // yet run on a device. A `loud-changed` here points to the caret landing inside the text (the cap then keeps other
-  // digits), not to D64.
+  // that holds `12` only inside the earlier text; averi must fail it, not say Filled (live-forms.ts#refusedCapped). A
+  // `loud-changed` here points to the caret landing inside the text (the cap then keeps other digits), not to D64.
   { id: 'f16', cell: F, says: 'fill, clear, a date one digit short; then, no clear, two digits the field keeps only the first of, though its text holds them: refused', calls: [fill(F, 'date', '3112202', true), fill(F, 'date', '12')], judge: refusedCapped('date', '31.12.2021') },
   // L7: form-grouped (D60, D37's `+421`) — ibanEager adds a space as soon as a group of four is complete (group4eager:
   // `SK31` shows `SK31 `), phoneGrouped groups a phone number in threes under a `+421` placeholder (phone3). Read on
@@ -586,7 +584,8 @@ const FORMS: Omit<Case, 'group'>[] = [
   // model alone, so the line changes nothing here.
   { id: 'fp1', cell: FP, says: 'fill, no clear, digits into a field that inserted a `+421 ` dial code on focus: the keys land after it', calls: [fill(FP, 'dialLands', '421')], judge: holds('dialLands', '+421 421') },
   { id: 'fp2', cell: FP, says: 'fill, no clear, digits into a field that inserted a `+421 ` dial code on focus and refuses every key: did not change on iOS (idb, wda: the re-read runs); on Android (uiautomator: the re-read skipped, the inserted `+421 ` holds `421`) a Filled hedged on its ⚠ line, ok and counted under ADR 0028 residual 3, and without the line a MISMATCH fill-claim', calls: [fill(FP, 'dialRefuses', '421')], judge: refusedOnFocus('dialRefuses', '+421 ') },
-  // The same on React Native (`--app react-native`): rn-format's fields, onChangeText reformatting (src/format.ts).
+  // The same on React Native (`--app react-native`): rn-format's fields, onChangeText reformatting
+  // (fixtures/apps/rn/src/format.ts).
   { id: 'rf1', cell: RF, says: 'fill, no clear, the RN field that groups an IBAN in fours', calls: [fill(RF, 'G.field', 'SK3112000000')], judge: holds('G', 'SK31 1200 0000') },
   { id: 'rf2', cell: RF, says: 'fill, clear, the RN field that groups an amount by thousands', calls: [fill(RF, 'A.field', '1234567,89', true)], judge: holds('A', `1${NBSP}234${NBSP}567,89`) },
   {
@@ -646,7 +645,7 @@ export function caseConfig(source: Source, c: Pick<Case, 'dismiss' | 'flows' | '
   return { app: { android: { package: LAB_APP[app].package }, ...ios }, ...(states !== undefined && { states }), ...(flows !== undefined && { flows }) };
 }
 
-// --- phase 5: the visibility cells, from their static truth ---
+// --- the visibility cells, from their static truth ---
 
 let catalogRead: Promise<Catalog> | undefined;
 /** The lab's catalog (fixtures/apps/cells.json), read once. */

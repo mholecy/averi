@@ -145,11 +145,12 @@ export interface ReadOptions {
 const hostLoadavg = (): string => loadavg().map((l) => l.toFixed(2)).join(' ');
 
 /**
- * One read, as raw-strokes.mjs read a round, `rounds` times (one or more): a fresh launch of RECYCLER_FREE
- * (AndroidLab.launch, settled on the app's ready) and LAUNCH_SETTLE_MS, the carousel's offset then (0 when the state
- * file has none, as the script's `off()??0`; an unreadable file throws, as the script's `st()` did), gfxinfo reset, the probes' 440-px pre-drag (live-carousel.ts's), then
- * STROKES_PER_ROUND raw strokes, each carry the carousel offset's change in the state file, and the device's loadavg.
- * Then the frames of the last round (its pre-drag and strokes), the framework's start count first, and the lab app
+ * The framework's start count, read once before the rounds; then one read, as raw-strokes.mjs read a round, `rounds`
+ * times (one or more): a fresh launch of RECYCLER_FREE (AndroidLab.launch, settled on the app's ready) and
+ * LAUNCH_SETTLE_MS, the carousel's offset then (0 when the state file has none, as the script's `off()??0`; an
+ * unreadable file throws, as the script's `st()` did), gfxinfo reset, the probes' 440-px pre-drag
+ * (live-carousel.ts's), then STROKES_PER_ROUND raw strokes, each carry the carousel offset's change in the state file,
+ * and the device's loadavg. Then the frames of the last round (its pre-drag and strokes), and the lab app
  * force-stopped, as the script ends. Throws on a state file with no carousel offset after a stroke: no carry, no label.
  */
 export async function readDevice(lab: DeviceLab, { rounds = DEFAULT_ROUNDS, wait = pause, now = Date.now, hostLoad = hostLoadavg }: ReadOptions = {}): Promise<DeviceRead> {

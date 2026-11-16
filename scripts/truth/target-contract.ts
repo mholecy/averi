@@ -7,9 +7,9 @@ import { geometryOf, isOverlap, parseGeometry, type GeometryContext } from './tr
  * from the target's TargetTruth (declared, reached, drawn, its frame and measured geometry, listed, its scroll view),
  * its capture's screen, its platform and the tree source replayed or run (contractOf; unlistedBy, stringUnlistedBy per
  * source). Both goldens are its consumers, never its authors:
- *  - the replayed golden (scripts/differential/golden-spec.ts, its façade, and the rows of golden-spec/: base, edges,
- *    bars, text, presented) hands each clause to the row that judges it — a call, a judge over the replayed tree's reply
- *    and the fake device's log — the row recording the clause that chose it (Expectation.asks);
+ *  - the replayed golden (scripts/differential/golden-spec.ts, its façade, and the rows of golden-spec/) hands each
+ *    clause to the row that judges it — a call, a judge over the replayed tree's reply and the fake device's log — the
+ *    row recording the clause that chose it (Expectation.asks);
  *  - the live golden (live-visibility.ts#visibilityCases) turns it into a case — calls on the real lab app, a judge over
  *    the app's own log — recording it too (VisibilityCase.asks); it judges the app's state at the stop in the same
  *    judged context (judgedContext).
@@ -104,11 +104,12 @@ export function judgedContext(platform: Platform, s: JudgedScreen, view: string 
  * (judgedContext) of its capture's screen — the live golden judges the app's state in that same context
  * (live-visibility.ts#liveGeometry). The capture measured its geometry in the full context (every band); the judged one
  * drops only iOS's home-indicator band, and geometryOf reads that band only where it names it (`nav-band` for a centre
- * in it, `band-overlap:nav` from regionOverlap, which tries the status band first and the chrome after): so a measured
- * geometry naming no navigation band is the judged one as measured, and one naming it on iOS is measured again in the
- * judged context. tests/truth/target-contract.test.ts holds this over the committed truth (every target's geometry in
- * the judged context equals this; it differs from the measured one for bands' N and Q on iOS only). A target measured
- * nothing (`geometry` undefined: the committed captures of the plan's phase-1/2 cells) has none to judge.
+ * in it, `band-overlap:nav` from regionOverlap, which tries the status band, then the navigation band, then the
+ * chrome): so a measured geometry naming no navigation band is the judged one as measured, and one naming it on iOS is
+ * measured again in the judged context. tests/truth/target-contract.test.ts holds this over the committed truth (every
+ * target's geometry in the judged context equals this; it differs from the measured one for bands' N and Q on iOS
+ * only). A target measured nothing (`geometry` undefined: a committed capture of a cell whose app wrote none) has none
+ * to judge.
  */
 export function judgedGeometry(platform: Platform, t: Pick<TargetTruth, 'geometry' | 'frame' | 'scrollView'>, cell: JudgedScreen): Geometry | undefined {
   if (t.geometry === undefined) return undefined;
@@ -138,8 +139,8 @@ export function unlistedBy(t: Pick<TargetTruth, 'listed'>, source: string): stri
  * target's node): its capture's tree of that source lists no node carrying it (TargetTruth.textListed, measured from
  * the tree: uiautomator dumps no node the user cannot see — text-under-bar's P, its box listed by its uncovered strip
  * above the button, its string not at all). Only then is a covered `ocr` row's "not found" right (golden-spec/text.ts);
- * where the tree lists the string (S in the status band) it is no evidence, as everywhere. No live case asks a string
- * yet (the live golden's visibility cases tap and scroll; it reads no text).
+ * where the tree lists the string (S in the status band) it is no evidence, as everywhere. The live golden reaches it
+ * through askedUnlistedBy (a tap or a scroll_until by a `text:` selector), never as a text read.
  */
 export function stringUnlistedBy(t: Pick<TargetTruth, 'textListed'>, source: string): string | undefined {
   return t.textListed?.[source as SourceKind] === false ? `the ${source} capture lists no node carrying the string (TargetTruth.textListed): it is wholly under what is drawn over it` : undefined;

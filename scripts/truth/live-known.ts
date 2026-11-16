@@ -2,7 +2,7 @@ import type { VerdictClass } from './live-visibility.js';
 import type { ReplyKind } from './replies.js';
 
 /**
- * The live golden's KNOWN (phase 5): the live cases not ok at HEAD that an existing note or residual explains, keyed
+ * The live golden's KNOWN: the live cases not ok at HEAD that an existing note or residual explains, keyed
  * `<platform> <source> <case id>`, each with the rule it fails by (its verdict's class) and the kind of reply that
  * verdict rests on (LiveVerdict.kind, replies.ts#replyKind) — as tests/differential/golden/<family>.known.ts pins a
  * replayed row's class and kind (ADR 0020 §4): a known case failing by another rule, or by the same rule on another
@@ -27,8 +27,8 @@ import type { ReplyKind } from './replies.js';
  * several records, LV2's two flush cases (android-vis.json, cal12-*.json: three runs at 9c7885e, two at d043e65), read
  * `visible` in all six — ok in four, a stop-claim in two: the timing moved the outcome, not the kind (its entry since
  * struck off); LV5's case likewise (ios-vis-2725e76.json and ios-scroll-bounded-wda-2725e76-*.json, three runs at
- * b71cbbb's src): `refused` where it is not reached, ok in two. A run that reads another kind for a known case fails as
- * NOT known, naming both: refile it.
+ * b71cbbb's src): `refused` where it is not reached, ok in two. A run that reads another kind for a known case marks it
+ * NOT known, naming both: refile it. It fails the run only when that case is a MISMATCH (a LOUD fails none).
  */
 
 /** LE2's rest, accepted — the static KNOWN's own wording (tests/differential/golden/edges.known.ts). */
@@ -67,9 +67,9 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // Android
   // LE1 (scroll-bounded's P.fully, S, S.fully and tap S; carousel-in-list's tap C and scroll C): fixed on round 14's
   // bugs/r14-le1 (the drawn frame on Android), all six ok live (android-vis-r14-le1.json), struck off.
-  // (#10's turn:scroll-collapsing.A, filed here until 2026-10-18: ok since the owner decided no turn on uiautomator —
-  // ADR 0021 — and its judge became live-visibility.ts#judgeAndroidTurn: a loud failure naming `up` after the
-  // two-stroke stop, which the record reads.)
+  // (#10's turn:scroll-collapsing.A, struck off 2026-10-18: ADR 0021 decides no turn on uiautomator, and the case's
+  // judge is live-visibility.ts#judgeAndroidTurn: a loud failure naming `up` after the two-stroke stop, which the
+  // record reads.)
   // VA1 (scroll-sticky-cut's R.fully; docs/bugs/2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md):
   // fixed by the flush probe toward a sticky header pinned in the row's list, ok live twice (android-vis-r14-va1*.json:
   // 2 swipes, list 66→0, 0→0, Tapped), struck off.
@@ -100,8 +100,8 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   ...each('ios idb', ['scroll:scroll-bounded.P.fully'], IDB_NO_SCROLL_VIEW, 'R-direction', 'refused'),
   ...each('ios idb', ['scroll:scroll-bounded.S', 'scroll:scroll-bounded.O'], IDB_NO_SCROLL_VIEW, 'stop-claim', 'visible'),
   ...each('ios idb', ['tap:scroll-bounded.S', 'tap:scroll-bounded.O', 'scroll:scroll-bounded.S.fully'], IDB_NO_SCROLL_VIEW, 'tap-claim', 'Tapped'),
-  // LE2's rest, scroll-bounded-footer (round 16; the Continue under the clip listed after O, holding its centre): the tap no
-  // longer fires Continue — it is moved clear to (201,670) and the plain stop refuses before any swipe — but the row
+  // LE2's rest, scroll-bounded-footer (round 16; the Continue under the clip listed after O, holding its centre): the
+  // tap is moved clear to (201,670), so it fires nothing, and the plain stop refuses before any swipe — but the row
   // past the clip is still Tapped, on the background: by the tap case, and by the scroll case's own tap after its
   // refused stop (ios-vis-r16-le2-1.json): the residual, a tap-claim on Tapped in both.
   ...each('ios idb', ['tap:scroll-bounded-footer.O', 'scroll:scroll-bounded-footer.O'], IDB_NO_SCROLL_VIEW, 'tap-claim', 'Tapped'),
@@ -132,10 +132,7 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // stroked for (residual 6) — two strokes on the layer, the backgrounded sheet dismissed by the first or not.
   // Round 7's A5 (a1261499; ios-idb-sheet-a5-1.json, -2.json, ios-idb-vis-a5.json): a list holding UIKit's dismiss
   // region marks the layer presented, so sheet-medium's A–D and sheet-medium-edges' H and G stop before any swipe —
-  // their six entries struck off (ok in three runs of three). Beneath the large sheet idb's list shows no sign of it:
-  // A's and B's stroke still dismisses it, but scroll_until's changed stop says so and claims nothing — LOUD
-  // (`presented-changed`) on `refused`, no longer a stop claimed on `visible`: known still, the sheet's loss
-  // residual 6's cost; C and D, never dismissed, two strokes as before.
+  // their six entries struck off (ok in three runs of three).
   // Round 16 (bugs/r16-r6, ADR 0018 "idb's presented layer" Decision 3; ios-vis-r16-r6-1.json, -2.json): A's and B's
   // strokes are feelers (160 pt in 600 ms from (201,175)) — the sheet springs back, nothing dismissed, the unmoved
   // stop saying idb lists only what a presented sheet, alert or cover leaves: `presented-stroke` on `not found`, as C,
@@ -150,8 +147,8 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // runs of two (ios-vis-r8-l4-3.json, -4.json).
   // iOS, WDA
   // Round 5's device check (ios-vis-2725e76.json, src b71cbbb): LE4's and L3's entries (fixed in fecb0b3, 468dc1b: round 5's
-  // 0a and 0b) and LV3's WDA one struck off, their cases ok — but LE4's two cases of F, whose strokes now go inside
-  // `lower` and still do not reach it, refiled as what they measured:
+  // 0a and 0b) and LV3's WDA one struck off, their cases ok — but LE4's two cases of F, whose strokes went inside
+  // `lower` and still did not reach it, were refiled as what they measured: LV4 and LV5, below.
   // Round 6's device check (11683c3, ADR 0021): averi now turns and says so — but not after one unmoved stroke: 2
   // strokes up moving nothing before the turn in three runs of four (F then reached, `visible`: ios-vis.json,
   // ios-wda-bounded-long-list-11683c3-2.json, -3.json), 4 in the other (the budget spent, `refused`: -1.json). Each a
@@ -206,9 +203,10 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
     // simulator, a wait that timed out with no tree — nothing tapped, vacuous; Tapped and the menu dismissed in -4.json.)
     // blur-menu-grouped's A, B, D under WDA struck off by round 16 (7fd1ee57): the backdrop listed after the screen
     // beneath is a presented screen — each tap refused "close it first", nothing fired, in two runs of two
-    // (ios-vis-r16-blur-1.json, -2.json); under idb, which lists no trace of the backdrop, they stand — and so do
-    // blur-menu-stacked's and blur-menu-unhidden's (the round-16 probes, first run under idb at the merge 4f48c642: each
-    // tap Tapped, the menu dismissed, in two runs of two: ios-vis-r16-merge-1.json, -2.json; golden-known alike).
+    // (ios-vis-r16-blur-1.json, -2.json); under idb, which lists no trace of the backdrop, they stand, and so do
+    // blur-menu-stacked's. The round-16 probes blur-menu-stacked and blur-menu-unhidden were first run under idb at the
+    // merge 4f48c642: each tap Tapped, the menu dismissed, in two runs of two (ios-vis-r16-merge-1.json, -2.json;
+    // golden-known alike).
     // blur-menu-unhidden's under idb struck off by A38a (ADR 0018, the amendment "idb's backdrop"): idb lists its
     // backdrop as an unlabelled, id-less element over the whole screen before A–D, now a presented `backdrop` — each
     // tap refused "close it first" on the replay (golden); the next Gate C proves it on the device.
