@@ -32,8 +32,7 @@ import { keyboardMayCoverText } from './target-text.js';
  * MCP schema. Options are plain milliseconds.
  */
 
-// What a caller points at, and every match of it: ui-tree/selectors.ts's (a miss asks of the target too, ui-tree/miss.ts);
-// interact's verbs import them from here.
+// What a caller points at, and every match of it: ui-tree/selectors.ts's (a miss asks of the target too, ui-tree/miss.ts).
 export { findTarget, type Target } from '../ui-tree/selectors.js';
 
 export const describeTarget = (target: Target): string =>
@@ -54,7 +53,7 @@ export function preferred(found: readonly UiNode[]): { chosen: UiNode; note?: st
 }
 
 /**
- * The matches `scroll_until` judges (interact/scroll.ts): the one a tap
+ * The matches `scroll_until` judges: the one a tap
  * would act on when the preference picks one (`preferred`) — so the stop and
  * the next tap judge the SAME node by construction — else every match, as
  * found. Judging every match and stopping on the one more of which shows
@@ -79,10 +78,9 @@ export interface Resolved {
 }
 
 /**
- * The default budget for "appear and hold still": the flow engine's tap
- * budget (config.ts documents it as 5 s on a `tap:` step), and the MCP
- * tap/type_text tools' too. Named once, here, because the
- * wait is this module's.
+ * The default budget for "appear and hold still" (flow/config.ts documents
+ * it as 5 s on a `tap:` step). Named once, here, because the wait is this
+ * module's.
  */
 export const DEFAULT_SETTLE_TIMEOUT_MS = 5_000;
 
@@ -197,8 +195,8 @@ export interface SettleOptions extends ResolveOptions {
  * at once, since ambiguity is a selector problem, never a screen settling.
  * `undefined` means nothing actionable is in this tree yet.
  *
- * One-shot and pure: the fill's value poller re-reads the field through this
- * between keystrokes and must not wait for anything.
+ * One-shot and pure: a re-read of a field between keystrokes must not wait
+ * for anything.
  */
 export function resolveNow(tree: UiNode, target: Target, opts: ResolveOptions): Resolved | undefined {
   const pick = preferred(findTarget(tree, target));

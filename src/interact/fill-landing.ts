@@ -55,7 +55,7 @@ type TextExpectation = Pick<Expectation, 'value' | 'clear' | 'before' | 'placeho
  *   value among other text, which may not all come from these keys (`textAroundUnread`). Never with `reformatted`: such
  *   a reading holds the typed characters and separators alone, and says so already;
  * - `placeholder`: it is exactly the field's named placeholder, which is the value too — typed, or an empty field
- *   with the typing dropped; the tree cannot tell (review of the read-back, probe B). Not verified;
+ *   with the typing dropped; the tree cannot tell. Not verified;
  * - `said-plain`: the held count is `'unread'` and the reading is masked, longer than typed — the field its source said
  *   is plain shows bullets after all, and no length of it proves anything but the typed one (two dropped keys under
  *   five autofilled bullets would pass `held + typed` with a `held` of 0). Final: the poll stops on it, as on a landed

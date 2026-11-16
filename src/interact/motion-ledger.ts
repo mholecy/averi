@@ -30,8 +30,8 @@ export type { CarriedUnder, MotionShown } from './motion-shown.js';
  *   infers an untold scroll view's axis from (D59, interact/unfit-axis.ts#inferredAlong).
  *
  * EACH QUESTION KEEPS ITS OWN "same". Every question here is within a pixel (a unit of the source's frames); the
- * exact-rect side of docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md d2 — the scroll view a proof or a carry
- * was measured over (geometry.ts#Clips.contentToward, stroke-plan.ts#carryOver) — is not the ledger's. What differs
+ * exact-rect side of docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md Decision 2 — the scroll view a proof or a
+ * carry was measured over (geometry.ts#Clips.contentToward, stroke-plan.ts#carryOver) — is not the ledger's. What differs
  * here is identity, and one definition of "the same node" for every question is a behaviour change (owner decision
  * D5), not this module's:
  * - the JUDGED match unmoved: its rect within a pixel of the last judged match's — no identity (the stuck test, the

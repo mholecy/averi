@@ -89,7 +89,7 @@ export interface ScrollUntilResult {
    * interact/flush-check.ts) — where uiautomator cuts a
    * node's bounds, so the rect cannot say whether more of it lies beyond.
    * `checked`: two probe swipes toward that edge moved nothing, with no proof
-   * of a cut, so nothing does (T12: one may be a stroke the app did not
+   * of a cut, so nothing does (one may be a stroke the app did not
    * take; both are among `swipes`). Not checked (`why`, flush-check.ts
    * #Flush): no swipe or time left, no container with room for a probe, a
    * probe short enough to be a tap, a cut a swipe proved and two swipes after
@@ -268,9 +268,9 @@ const swipesText = (n: number): string => countOf(n, 'swipe');
 const UNLOCATED_TEXT = `${UNLOCATED_KEYBOARD} — it was not judged and may cover the element`;
 
 /**
- * The words a hedged `fully: true` stop opens with after `visible after N swipes, ` (T17, ADR 0013's T17 amendment):
- * `NOT CONFIRMED <what>:`, `<what>` one of `HEDGE_WHATS`. The truth reader builds its pattern from both
- * (`hedgedLead` in scripts/truth/replies.ts).
+ * The words a hedged `fully: true` stop opens with after `visible after N swipes, ` (ADR 0013's T17 amendment):
+ * `NOT CONFIRMED <what>:`, `<what>` one of `HEDGE_WHATS`. Exported, as they are, so that the truth reader builds
+ * its pattern from the same spelling.
  */
 export const HEDGED_LEAD = 'NOT CONFIRMED';
 
@@ -282,11 +282,11 @@ export const HEDGE_WHATS = ['WHOLE', 'UNCOVERED', 'WHOLE OR UNCOVERED'] as const
 export type HedgeWhat = (typeof HEDGE_WHATS)[number];
 const [WHOLE, UNCOVERED, WHOLE_OR_UNCOVERED] = HEDGE_WHATS;
 
-/** A flush stop no probe checked (flush-check.ts#Flush, every `why`): the reply hedges it, and its lead says so (T17). */
+/** A flush stop no probe checked (flush-check.ts#Flush, every `why`): the reply hedges it, and its lead says so. */
 const flushHedged = (flush: ScrollUntilResult['flush']): flush is Flush & { checked: false } => flush !== undefined && !flush.checked;
 
 /**
- * What a `fully: true` stop could not confirm (T17), or undefined for a stop that claims it all, or none: a stop whose
+ * What a `fully: true` stop could not confirm, or undefined for a stop that claims it all, or none: a stop whose
  * reply would otherwise open `fully visible` — nothing clipped or covered, no surface the eyes saw — with a flush edge no
  * probe checked (`WHOLE`), a keyboard the window state gives no area (`UNCOVERED`), or both. Its reply opens
  * `visible after N swipes, NOT CONFIRMED <it>:` (`describeScrollResult`).
@@ -315,7 +315,7 @@ export function describeScrollResult(r: ScrollUntilResult): string {
     const eyes = unjudged === undefined ? '' : `; ${unjudgedText(unjudged)}`;
     const clear = r.seenClear === undefined ? '' : ` — ${r.seenClear.map(seenClearText).join('; ')}`;
     const tail = `${clear}${eyes}${moving}${endTurnText(r.endTurn)}${detentText(r.detent)}`;
-    // T17 (ADR 0013's T17 amendment): a stop the reply hedges — a flush edge no probe checked, a keyboard nothing
+    // ADR 0013's T17 amendment: a stop the reply hedges — a flush edge no probe checked, a keyboard nothing
     // could place — opens with what is not confirmed, never `fully visible`: the hedge is the lead, not a `; but`.
     const what = stopHedges(r);
     if (what !== undefined) {
@@ -402,7 +402,7 @@ const endText = ({ way, scrollView }: EndProof): string => `the tree lists the c
  * up did not move it — the tree lists the content of scrollable (0,380 402x180) ending at its top — so averi turned
  * down, as the tree places the element below it`: the swipes the caller's way, why they proved the end (`endText`), and
  * that averi, not the caller, chose the way after. Empty when no end turn was made. Exported because the
- * troubleshooting reference quotes its rendering (tests/mcp/tool-descriptions.test.ts pins it).
+ * troubleshooting reference quotes its rendering.
  */
 export const endTurnText = (turn: EndTurn | undefined): string =>
   turn === undefined ? '' : `; ${unmovedText(turn)} — ${endText(turn)} — so averi turned ${turn.to}, as the tree places the element ${SIDES[EDGE_TOWARD[turn.to]].past} it`;
@@ -417,8 +417,8 @@ const detentText = (detent: DetentMove | undefined): string => (detent === undef
 /**
  * The flush clause (flush-check.ts), with no separator: what the stop's edge on its scroll container means — checked by
  * a probe (after `fully visible after N swipes; `), or not checked (the hedge a `NOT CONFIRMED WHOLE` lead opens with,
- * T17: `flushHedged`). The container is quoted as a node's rect (`rectText`): it is one. Exported because the
- * troubleshooting reference quotes its rendering (tests/mcp/tool-descriptions.test.ts pins its `axis` rendering).
+ * `flushHedged`). The container is quoted as a node's rect (`rectText`): it is one. Exported because the
+ * troubleshooting reference quotes its `axis` rendering.
  */
 export function flushText(flush: Flush): string {
   const cut = "it may be cut there, a rect assert or screenshot may measure part of it";
@@ -458,7 +458,7 @@ export function flushText(flush: Flush): string {
 
 /**
  * Where a flush edge lies (flush-check.ts#Flush, #FlushCut) and what Android cuts there, in one dialect for the stop's
- * clause and the bound's (`flushProbedSide` in scripts/truth/replies.ts parses these words): `its bottom edge lies on
+ * clause and the bound's (the truth reader parses these words): `its bottom edge lies on
  * its scroll container's (0,1046 1080x495)`, `where Android cuts a node's bounds to the container`. A pinned node's
  * edge (`pinned`): where the container's content ends as it shows, and the cut it may make is Compose's at a node drawn
  * after the match, not the container's. `lies`: `still lies` for a cut a probe proved (flush-check.ts#FlushCut).
@@ -478,7 +478,7 @@ function flushEdgeText({ edge, container, pinned }: FlushPlace, lies: 'lies' | '
  * A cut a probe proved and no reveal was sent for (flush-check.ts#FlushCut), for the bound's and the stuck stop's
  * sentences: where the flush edge still lies, what the probe showed, and why no reveal followed when that was not the
  * budget. Never "… toward it moved nothing", after "a probe swipe" or "n probe swipes": that is the checked stop's
- * clause, which the truth reader takes for a probed side (scripts/truth/replies.ts, flushProbedSide).
+ * clause, which the truth reader takes for a probed side.
  */
 function flushCutText(cut: FlushCut): string {
   const { where, cuts } = flushEdgeText(cut, 'still lies');
@@ -549,7 +549,7 @@ const otherWayText = (otherWay: Extract<ScrollOutcome, { kind: 'stuck' }>['other
  * said to land on the dim outside it: Android's dialog window, listed alone, reaches only its own rect, and a touch
  * beside it lands on the dim the dialog lays around it (which dismisses it) —
  * docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md. Exported because the
- * troubleshooting reference quotes its rendering (tests/mcp/tool-descriptions.test.ts pins the dim's).
+ * troubleshooting reference quotes its rendering of the dim.
  */
 export const touchDownText = (next: PresentedTouchDown | undefined): string =>
   next === undefined
@@ -1069,8 +1069,7 @@ function shortClause(judged: Judged): string {
 }
 
 /**
- * Which bound ended it, as the failure's cause. The troubleshooting reference quotes its rendering
- * (tests/mcp/tool-descriptions.test.ts pins the proven end's).
+ * Which bound ended it, as the failure's cause. The troubleshooting reference quotes its rendering of a proven end.
  */
 export function boundText(by: BoundBy, swipes: number, remedy: WithinRemedy = WITHIN_REMEDY.rect): string {
   switch (by.of) {
@@ -1118,7 +1117,7 @@ export function boundText(by: BoundBy, swipes: number, remedy: WithinRemedy = WI
  * — `after 38204ms (timeout 15000ms; no swipe was sent; 1 tree read took 38204ms)`, `after 18000ms (timeout 15000ms; 2
  * swipes sent; 3 tree reads took 18000ms, the last 6000ms)` — so a budget the reads spent (a tree source slow or
  * restarting under the scroll) does not read as content that never came into view. Exported because the troubleshooting
- * reference quotes its rendering (tests/mcp/tool-descriptions.test.ts pins it).
+ * reference quotes its rendering.
  */
 export function timeoutText(by: Extract<BoundBy, { of: 'timeout' }>, swipes: number, remedy: WithinRemedy = WITHIN_REMEDY.rect): string {
   const sent = swipes === 0 ? 'no swipe was sent' : `${swipesText(swipes)} sent`;
@@ -1188,7 +1187,7 @@ function besideText({ strokedOver, at, landed, axis, others }: StrokedBeside, re
   return `${went}; the tree shows ${some} ${axis}ly, ${UNTRIED_LEAD}${names}${UNTRIED_END}${way}`;
 }
 
-/** `besideText`'s words around the scroll views it names — exported for `namesUntried` in scripts/truth/replies.ts, which reads the names between them. */
+/** `besideText`'s words around the scroll views it names — exported so the truth reader finds the names between them. */
 export const UNTRIED_LEAD = 'which the swipes did not go over: ';
 export const UNTRIED_END = ' — if the element lies in ';
 
@@ -1221,8 +1220,7 @@ function unseenText({ strokes, within, toward }: UnseenStrokes): string {
 
 /**
  * A failure's words when the device's tree read failed (`readFailed`, `neverRead`): the device's fault, not a reading.
- * Exported for `scrollVerdictSaid` in scripts/truth/replies.ts, which the live golden's kf judge uses to tell it from
- * averi's own refusals.
+ * Exported so the truth reader can tell it from averi's own refusals.
  */
 export const TREE_READ_FAILED = 'last UI tree read failed';
 

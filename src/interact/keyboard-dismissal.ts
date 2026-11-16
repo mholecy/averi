@@ -16,8 +16,8 @@ import { coverName, cutSliverText } from './target-text.js';
 
 /**
  * HOW the in-tree model hides a soft keyboard: ORDERED LISTS OF NAMED STRATEGIES, each judged on one look and either
- * choosing ONE move — a tap at a point, or a drag — or saying why it passes. The in-tree model
- * (interact/keyboard-in-tree.ts) walks them: the first strategy that chooses a move is performed, the keyboard read
+ * choosing ONE move — a tap at a point, or a drag — or saying why it passes. The in-tree model walks them: the first
+ * strategy that chooses a move is performed, the keyboard read
  * again, and only when it is still up is the next strategy judged — on the look that found it still up, never the
  * one before the move. Two named lists:
  *

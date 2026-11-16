@@ -209,8 +209,7 @@ function clearOf(r: ClearedLook, { point, moved }: Aim): ResolvedClear {
  * Close the on-screen keyboard after a fill. Called AFTER a fill has
  * returned, never before (dismissing first closes the keyboard the typing
  * needs), and as its own call so the fill's warning is already in the
- * caller's hands if this throws. Here because this is where the one `back`
- * lives: the `unknown → back` rule has one copy. The protocol is the model's
+ * caller's hands if this throws. The protocol is the model's
  * (`KeyboardModel.dismiss`, with the reasons): the window model presses
  * `back` unless the state is hidden or the witness denies the keyboard, and
  * confirms nothing; the in-tree model reads one tree, taps the first

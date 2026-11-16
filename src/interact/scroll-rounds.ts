@@ -59,10 +59,9 @@ import { resolveWithin, type Within, type WithinRefusal } from './within.js';
  * Pure: no adapter, no clock, no I/O, no exceptions but the protocol's own
  * (below). Deterministic: the same state and seen give the same step, so a
  * round can be replayed from what was seen. TWO adapters drive it — the
- * production one, interact/scroll.ts#scrollUntilVisible, which gathers a
- * `RoundSeen` from the device and performs the step; and the test one,
- * tests/helpers/rounds.ts#play, which feeds a table of seens — so this is a
- * real seam, not a hypothetical one.
+ * device loop, which gathers a `RoundSeen` from the device and performs the
+ * step, and the tests' tables of seens — so this is a real seam, not a
+ * hypothetical one.
  *
  * THE PROTOCOL, which the driver honours and `round` checks:
  * - Each round the driver reads the tree once and calls `round` with what it
@@ -1009,7 +1008,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       if (!settled && flush.waits && observed.slowing && seen.elapsedMs < s.rules.timeoutMs) return waitOut(s);
       if (!settled && flush.waits && mayConfirm(s, seen.elapsedMs)) return confirm(s);
       // `fully: true`, an edge flush with the clipping container: possibly cut there — probe toward it (and once more
-      // when that probe holds, T12), reveal what a probe proved cut, or say it could not be checked (`FlushVerdict`).
+      // when that probe holds), reveal what a probe proved cut, or say it could not be checked (`FlushVerdict`).
       const { verdict } = flush;
       if (verdict.of === 'witness') return ask('witness');
       if (verdict.of === 'probe') return probe(s, verdict);

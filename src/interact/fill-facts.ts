@@ -101,9 +101,9 @@ export interface FillResult {
    * deletes fails there); judgeFill makes it a reason only when the read-back
    * did not land. `deletes`: every delete the clear sent, all rounds — the
    * unchanged one included, which deleted nothing anyone saw (so when it was
-   * the FIRST round, `cleared` is 0: probe J — "cleared 9 characters first"
-   * of an empty hinted field). Never set on a MASKED reading: bullets are no
-   * hint, and an unchanged masked field fails as clear-twice
+   * the FIRST round, `cleared` is 0 — else "cleared 9 characters first"
+   * would be said of an empty hinted field). Never set on a MASKED reading:
+   * bullets are no hint, and an unchanged masked field fails as clear-twice
    * (fill-clear.ts, `deletesChangedNothing`).
    */
   clearUnchanged?: { shows: number; deletes: number };
@@ -113,9 +113,9 @@ export interface FillResult {
    * `heldText`, or text the deletes did not reach; the tree cannot tell.
    * Which reading led there (fill-clear.ts#ClearFacts):
    * - `shown`: the field read the placeholder before any delete — none was
-   *   sent (review of the hint-aware clear, probe C);
+   *   sent;
    * - `prefix`: the last deletes went into a reading that STARTED with the
-   *   placeholder's text, so what they left may be held (probe K);
+   *   placeholder's text, so what they left may be held;
    * - `other`: they went into one that did not — only an empty field
    *   shows the placeholder then.
    * A fact, not a verdict: judgeFill makes `shown` and `prefix` the
@@ -259,7 +259,7 @@ export const shownText = (n: Pick<UiNode, 'value'>, isInput: boolean): string | 
  * - `placeholder`: the read-back's reading is EXACTLY the field's named
  *   placeholder (UiNode.placeholder) and nothing shows more — the value
  *   typed was that very text. Empty, or holding the text: the tree cannot
- *   tell (review of the hint-aware clear, probe B), so it is not verified.
+ *   tell, so it is not verified.
  *   Typed fills only: a clear alone that ends on the placeholder is
  *   `nothing-typed` with the fact `clearPlaceholder`, and judgeFill decides
  *   whether that is the `placeholder` reason (probes C and K).

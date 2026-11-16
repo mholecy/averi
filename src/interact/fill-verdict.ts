@@ -116,7 +116,7 @@ export interface Sent {
  * - `masked-append`: a masked field held `held` characters after focus and
  *   clear was off — the length rule cannot tell the append from a correct
  *   fill (finportal 2026-09-17: backend `invalid_grant`).
- * - `reformatted-point` (D18, the orchestrator's decision):
+ * - `reformatted-point` (D18):
  *   the field showed the typing reformatted with an added `.` or `,` — a
  *   thousands separator by its place, but the reading cannot tell it from a
  *   decimal point (`1.234` for `1234`: de-DE, or a three-decimal mask). The
@@ -211,7 +211,7 @@ export function judgeFill(r: FillResult): FillVerdict {
  * empty when the placeholder was there before any delete (`shown`: nothing
  * was deleted, so nothing was seen go) or the last deletes went into a
  * reading that started with its text (`prefix`: deletes go from the end, so
- * `Companyabc` with 3 of 10 landing leaves `Company` — probe K). From any
+ * `Companyabc` with 3 of 10 landing leaves `Company`). From any
  * other reading (`other`) the placeholder can only be the field showing
  * empty, and the clear is verified. Only a clear alone asks (read-back
  * `nothing-typed`): with a value, the exact read-back decides.

@@ -55,15 +55,15 @@ export type ClearStep =
  * What the clear MEASURED, for FillResult — facts, never a verdict:
  * - `cleared`: what the first round was SEEN to delete — what the field
  *   held when the clear began, or 0 when it held nothing or that round
- *   changed nothing (review of the hint-aware clear, probe J: "cleared 9
- *   characters first" of an empty hinted field). FillResult.cleared.
+ *   changed nothing (else "cleared 9 characters first" would be said of an
+ *   empty hinted field). FillResult.cleared.
  * - `end`, how it stopped:
  *   - `empty`: the last reading holds nothing. `placeholder` is set when
  *     that reading was EXACTLY the named placeholder — `shown`: before any
  *     delete went out; `prefix`: the last deletes went into a reading that
  *     STARTED with the placeholder's text, so what they left may be held
- *     text (deletes go from the end; probe K: `Companyabc` with 3 of 10
- *     landing leaves `Company`); `other`: they went into one that did not,
+ *     text (deletes go from the end: `Companyabc` with 3 of 10 landing
+ *     leaves `Company`); `other`: they went into one that did not,
  *     so it can only be the field showing empty.
  *   - `unchanged`: a round's deletes left the reading exactly as it was,
  *     read twice a poll cadence apart — an empty field showing its hint, or
@@ -113,7 +113,7 @@ export function startClear(placeholder: string | undefined): ClearState {
  *    and slow end to end (Compose async state, an IME queue — 3 of 11
  *    characters landed at first, measured 2026-08-05), and one read right
  *    after the deletes turned a clear that worked into "the deletes did not
- *    change it" (review of the hint-aware clear, probe I). So it is read
+ *    change it". So it is read
  *    once more after the poll cadence (`reread`), and only that second
  *    reading is asked again; otherwise the first answer stands. The cost:
  *    one pollMs and one tree read on every clear that ends on an unchanged
@@ -141,13 +141,14 @@ export function startClear(placeholder: string | undefined): ClearState {
  *    and finds it unchanged — measured as 1 + 9 deletes on the Contacts
  *    editor. Where the source names the placeholder, rule 4 stops after the
  *    first round.
- * 6. Two rounds that each SHORTENED the field and did not empty it: the
- *    deletes are landing short — the clear-twice failure. A reading that is
- *    not a prefix of the one before the deletes was not produced by deleting
- *    from the end (where clearText deletes from): a field that held `Probe`,
- *    kept `Pro` after a short round, and showed its hint after the next
- *    (probe E). It gets ONE more round, and rule 5 decides; a third round
- *    that still changes the field fails.
+ * 6. A second round that SHORTENED the field (its reading a prefix of the one
+ *    before its deletes) and did not empty it: the deletes are landing short
+ *    — the clear-twice failure. A reading that is not a prefix of the one
+ *    before the deletes was not produced by deleting from the end (where
+ *    clearText deletes from): a field that held `Probe`, kept `Pro` after a
+ *    short round, and showed its hint after the next. It gets ONE more
+ *    round, and rule 5 decides; a third round that still changes the field
+ *    fails.
  * 7. Otherwise: delete what the field still holds.
  */
 export function clearStep(state: ClearState, seen: ClearSeen): { state: ClearState; step: ClearStep } {
@@ -198,8 +199,8 @@ export function clearStep(state: ClearState, seen: ClearSeen): { state: ClearSta
  * unchanged masked reading is a field the deletes did not reach (a focus tap
  * that missed), and stopping there let the typing go nowhere too and a
  * masked read-back — compared by length — pass with the old password still
- * in place (review of the hint-aware clear, probe A: the finportal
- * `invalid_grant` class). Such a field fails as clear-twice.
+ * in place (the finportal `invalid_grant` class). Such a field fails as
+ * clear-twice.
  */
 function deletesChangedNothing(before: string | null, after: string | null, placeholder: string | undefined): boolean {
   return heldText(after, placeholder) !== '' && after === before && !isMaskedValue(after ?? '');

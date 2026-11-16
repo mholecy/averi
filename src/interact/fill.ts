@@ -367,7 +367,7 @@ export async function fillField(
 
 /**
  * A fill that failed on its VALUE — the marker the flow engine's `optional:`
- * reads (flow/engine.ts, OptionalNotSkipped; the owner's decision):
+ * reads (flow/engine.ts, OptionalNotSkipped):
  * - `did-not-land`: the three FillFailures (a read-back mismatch, a clear
  *   that left text twice, a re-read that failed mid-fill). The field was
  *   tapped and may hold partial text, so the step after it would run on a
@@ -380,8 +380,8 @@ export async function fillField(
  * step's own refusal (typeIntoFocused) is not marked.
  * Errors from the resolution and the keyboard guard before the focus tap
  * (absent field, refusals on a present one) keep their own classes. NOT
- * marked either, so an `optional:` still skips them — the owner approved
- * exactly the three `did-not-land` failures and the `refused` one: an error
+ * marked either, so an `optional:` still skips them — the marker is the three
+ * `did-not-land` failures and the `refused` one alone. Also unmarked: an error
  * thrown by the focus tap's `adapter.tap`, or by `adapter.typeText` or
  * `adapter.clearText` (a device error while typing — the known gap: the
  * field may hold partial text), and an AmbiguityRefusal from a re-read's
