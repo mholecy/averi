@@ -25,10 +25,10 @@ where a `tap` would count a cover.
 ## Decision
 
 The picker keeps its two keyboard checks first (`ofKeyboard`, then `frameOver`). It then asks the tap's standing of the
-candidate, with one scene per call (one draw-order walk) and the tap's own lazy keyboard line
-(`tapStandings(scene, node, screen, position).full()`, `interact/tap-judgement.ts#tapStandings`, the expression the
-tap's `judgeTap` asks too). It picks the candidate only when the standing is
-`reachable` with no `moved` point and no interactive node there that the tap would press.
+candidate, with one scene per call (one draw-order walk) and the tap's own lazy keyboard line (`tapStandings(scene,
+node, screen, position).full()` — today `tapStandings(look, node, screen)`, the look carrying both —
+`interact/tap-judgement.ts#tapStandings`, the expression the tap's `judgeTap` asks too). It picks the candidate only
+when the standing is `reachable` with no `moved` point and no interactive node there that the tap would press.
 
 **The explicit refusal (owner decision, 2026-10-13).** The `target` column excuses a node for where a touch lands on
 the target — its own content, a node of its frame, its own unlabelled control, a row of a scroll view it is not in —

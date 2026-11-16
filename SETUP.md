@@ -33,10 +33,11 @@ Ask the user which platforms they need if the repo doesn't make it obvious.
 - If `xcode-select -p` points at CommandLineTools, that's fine — averi injects `DEVELOPER_DIR`
   itself when Xcode is at `/Applications/Xcode.app` (anywhere else, set `DEVELOPER_DIR` in
   `.mcp.json`'s `env`), no sudo needed.
-- Only for `app.ios.treeSource: wda` (step 4): averi builds WebDriverAgent with `xcodebuild`
-  from the `appium-webdriveragent` package — an optional dependency installed with averi
-  (`npx -y averi` included). If that optional install was skipped or failed (e.g.
-  `--omit=optional`), `treeSource: wda` fails with a message naming the package.
+- For the default `app.ios.treeSource: auto` and for `wda` (step 4): averi builds WebDriverAgent
+  with `xcodebuild` from the `appium-webdriveragent` package — an optional dependency installed
+  with averi (`npx -y averi` included). If that optional install was skipped or failed (e.g.
+  `--omit=optional`), `auto` reads the tree through idb with a `⚠` line naming the reason, and
+  `treeSource: wda` fails with a message naming the package.
 
 **Check:**
 
@@ -227,13 +228,15 @@ per-platform steps (`android:`/`ios:` on one step), keypads whose digits have no
 in), and `branch:` for state-dependent paths (e.g. Keychain-surviving PIN login on iOS). Full
 step reference is in the skill you installed in step 3.
 
-> **React Native app on iOS:** if `id:` selectors miss static text and containers under the
-> default tree source, that's expected — add `app.ios.treeSource: wda` to `averi.yaml` (one
+> **React Native app on iOS:** if `id:` selectors miss static text and containers, the tree was
+> read through idb, which drops container ids: under the default `auto` that means WebDriverAgent
+> could not come up (the replies carry a `⚠` line naming the reason). Fix what it names, or add
+> `app.ios.treeSource: wda` to `averi.yaml` to pin WebDriverAgent and fail loudly instead (one
 > line; taps/typing stay on idb, only the tree read routes through WebDriverAgent; first WDA
 > build per Xcode version takes minutes; it needs the optional `appium-webdriveragent` package,
 > see step 0). Details: https://github.com/mholecy/averi/blob/main/docs/plans/ios-wda-tree-source.md.
-> With `wda` averi also sees the iOS soft keyboard: a tap on an element it covers is refused
-> rather than sent into the keys — unless `app.ios.keyboardDismiss` names what hides it, e.g.
+> Through WebDriverAgent averi also sees the iOS soft keyboard: a tap on an element it covers is
+> refused rather than sent into the keys — unless `app.ios.keyboardDismiss` names what hides it, e.g.
 > `[{ tap: { id: login_title } }, { accessory: true }]` (a neutral element whose tap does not
 > submit — a title or label, never a button — or the Done toolbar above a number pad); then
 > averi taps that first. No key hides the iOS keyboard without submitting, so there is no
@@ -307,8 +310,11 @@ Then report to the user:
 - [ ] Skill installed at `.claude/skills/averi/` (`SKILL.md` + `references/`)
 - [ ] `averi.yaml` committed-ready: which states and flows it defines
 - [ ] Cold + warm `ensure_state` both passed (include the timings)
-- [ ] If `treeSource: wda` is enabled: `ui_snapshot` on iOS returned a tree (proves WDA built and started)
-- [ ] Anything flagged: missing test ids, `treeSource: wda` enabled, platforms skipped and why
+- [ ] iOS (skip with `treeSource: idb`): the `ensure_state` and `assert` replies carry no
+  `⚠ read through idb` line (proves WDA built and started; `ui_snapshot` never carries that line,
+  so it does not tell)
+- [ ] Anything flagged: missing test ids, the iOS tree source (`auto` default, or pinned) and
+  whether WDA came up, platforms skipped and why
 
 If any box is unchecked, setup is **not done** — say so plainly and list what's missing.
 
@@ -379,15 +385,17 @@ one happens by itself.
 - **iOS: `idb returned an empty accessibility tree`, or `ensure_state` stops with `Refused to run reach flow …` and a
   `⛔ reach` line** — idb returns a 0×0 tree on a rendered screen (measured 2026-10-06/07). averi treats it as an
   unread device: waits and asserts fail instead of reading "absent", and the reach ladder will not run a destructive
-  rung (`clearState`, `destructive: true`) on it, so nothing was wiped. The measured trigger is an earlier WebDriverAgent session on that simulator
-  (`treeSource: wda` in any project, or another XCTest driver): every app process launched after it starts stuck, and
-  waiting does not end it (18+ min measured). The same 0×0 shape is also a healthy app's first read right after a
-  launch (0.4 s after `launch_app`, measured 2026-10-08): `ui_snapshot` reads once more a second later before failing,
-  and its error then says `The read was retried once after 1 s and was still empty` (a healthy launch had a tree by
-  then); waits and asserts poll past it. averi re-enables the simulator's accessibility automation before each
-  launch it makes, but a process that is ALREADY stuck stays stuck: `terminate_app`, then `launch_app` (a `launch_app`
-  on the running app keeps the same process). If that does not clear it, reboot the simulator (`xcrun simctl shutdown
-  <udid> && xcrun simctl boot <udid>` — the error spells it with the simulator's UDID), or set `app.ios.treeSource: wda` (step 4) to read through WebDriverAgent.
+  rung (`clearState`, `destructive: true`) on it, so nothing was wiped. The measured trigger is an earlier
+  WebDriverAgent session on that simulator (the default `auto` once WebDriverAgent came up, or `treeSource: wda`, in
+  any project, or another XCTest driver): every app process launched after it starts stuck, and waiting does not end
+  it (18+ min measured). The same 0×0 shape is also a healthy app's first read right after a launch (0.4 s after
+  `launch_app`, measured 2026-10-08): `ui_snapshot` reads once more a second later before failing, and its error then
+  says `The read was retried once after 1 s and was still empty` (a healthy launch had a tree by then); waits and
+  asserts poll past it. averi re-enables the simulator's accessibility automation before each launch it makes, but a
+  process that is ALREADY stuck stays stuck: `terminate_app`, then `launch_app` (a `launch_app` on the running app
+  keeps the same process). If that does not clear it, reboot the simulator (`xcrun simctl shutdown <udid> && xcrun
+  simctl boot <udid>` — the error spells it with the simulator's UDID), or set `app.ios.treeSource: wda` (step 4) to
+  read through WebDriverAgent.
 - **iOS: `idb cannot read the UI tree: the simulator's accessibility service named no frontmost application`** — every
   tree read fails this way from the first call after a simulator boot. An accessibility query made too soon after the
   boot wedges the simulator's accessibility service until the next reboot (measured 2026-10-31 on nine reboots: a

@@ -64,7 +64,8 @@ them in the background.
    - each run exits 0. Exit 1 means a mismatch not in KNOWN, a known one that drifted from its class, reply kind,
      calls or pin, a harness fault, or a broken target;
    - the report's first line reads `# Golden: N checks, M mismatches (M known, 0 new), 0 broken targets`. "New" is the
-     report's word for a mismatch KNOWN does not list. There is no `, … with a harness fault` part;
+     report's word for a mismatch KNOWN does not list. A harness fault adds `, K with a harness fault` to that line and
+     exits 1, so a passing report has no such part;
    - the report has no `## Ratchet:` section. That section also appears at exit 0 when a known row is fixed (`N to
      strike`) or a pin is stale;
    - the `--against` report (the run judged against a `--json` of itself, so `## Changed: 0 checks`) reads

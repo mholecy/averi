@@ -63,6 +63,9 @@ control-character check and before any device call.**
 - **Android's `typeText`** checks the same declaration again, defensively, before its first `input text`. A caller that
   bypasses interact/ cannot half-type. It already did this for a control character. iOS's `typeText` has no check of its
   own: idb fails all or nothing per call (it maps the whole string before it sends a key), so nothing is half-typed.
+  (Superseded in part by A41a, ADR 0046's Decision, the typing bullet on `IosAdapter.typeText`, the backstop: iOS's
+  `typeText` now has one check of its own — a text only WebDriverAgent types, after `treeSource: auto` fell back to
+  idb, is refused with nothing sent.)
   (Only the split typing of an app seen dropping a tail, ADR 0023's D24 amendment, sends its first character in a call
   of its own; a direct caller there could leave that one, and interact/ refuses before it.)
 - **The message** names the first refused character by code point, and shows it where it is visible: `U+0160 'Š'`. A

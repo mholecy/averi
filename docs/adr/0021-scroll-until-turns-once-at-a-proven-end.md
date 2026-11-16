@@ -548,16 +548,16 @@ swipes, with the wall time against batch-3's.
 ## Amendment: an untold scroll view's axis from the call's own evidence (2026-11-05, performance backlog D59)
 
 **Context.** D52's `unfit` stop needs the room-giving scroll view to scroll on the axis the match is judged along "as
-the tree tells it". On Android the tree tells an axis by class only (adapters/android.ts's AXIS_BY_CLASS:
-ScrollView, ListView, GridView vertical; HorizontalScrollView, ViewPager horizontal). A Compose LazyRow dumps as a
-plain `android.view.View`, a RecyclerView or a ViewPager2 by its own class, and none of them carries an axis. Measured
-on batch-9 (Android API 33, main e734fedf, the lab's `carousel-lazy-free`, `left fully: true` after a 440-px pre-drag,
-3 runs): C is 948 px wide in the 948-px LazyRow (66–1014), the case D52 stops on. Run 0 ran 6 strokes and 3 turns to
-maxSwipes in 16.5 s and ended "stayed CLIPPED at left, 99 % … turned round 3 times", with C at 64 and both its sides
-known. The round's own log said "room-giver container 66,380 948x234 axis UNTOLD → unfitAlong's axis gate FAILS".
-Runs 1–2 landed within a pixel of 66, the `fills` hedge. The derived record is
-tests/fixtures/d59-b9-lazy-predrag.json. Batch-9 also measured three of the conditions below on both free carousels
-(6 pre-drag reads): no axis told, the carousel C's nearest scroll view, and C cut at the carousel's own edges.
+the tree tells it". On Android the tree tells an axis by class only (AXIS_BY_CLASS, adapters/android-tree-dialect.ts
+today: ScrollView, NestedScrollView, ListView, GridView vertical; HorizontalScrollView, ViewPager horizontal). A Compose
+LazyRow dumps as a plain `android.view.View`, a RecyclerView or a ViewPager2 by its own class, and none of them carries
+an axis. Measured on batch-9 (Android API 33, main e734fedf, the lab's `carousel-lazy-free`, `left fully: true` after a
+440-px pre-drag, 3 runs): C is 948 px wide in the 948-px LazyRow (66–1014), the case D52 stops on. Run 0 ran 6 strokes
+and 3 turns to maxSwipes in 16.5 s and ended "stayed CLIPPED at left, 99 % … turned round 3 times", with C at 64 and
+both its sides known. The round's own log said "room-giver container 66,380 948x234 axis UNTOLD → unfitAlong's axis gate
+FAILS". Runs 1–2 landed within a pixel of 66, the `fills` hedge. The derived record is
+tests/fixtures/d59-b9-lazy-predrag.json. Batch-9 also measured three of the conditions below on both free carousels (6
+pre-drag reads): no axis told, the carousel C's nearest scroll view, and C cut at the carousel's own edges.
 
 **Decision.**
 1. *The inference* (`interact/unfit-axis.ts#inferredAlong`, pure, a new module). Where the room-giver's axis is

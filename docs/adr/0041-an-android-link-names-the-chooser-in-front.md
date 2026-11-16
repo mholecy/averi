@@ -3,7 +3,7 @@
 Status: accepted 2026-11-03 (performance backlog row D55, docs/plans/2026-10-30-performance-backlog.md). One reply
 changes on purpose: `open_deep_link` on Android, when the platform's chooser is in front after the start. Every other
 reply is byte-identical, D54's iOS alert text included. The `DeviceAdapter` contract gains one optional field,
-`DeepLinkOutcome.chooser`.
+`DeepLinkOutcome.chooser` (replaced by `AppHolder`'s `{ holder: 'chooser', chooser }`: the A10 amendment).
 Amended 2026-11-03 (D55r: `mFocusedApp` is read in API 33's shape, `<component>} t<task>}`, which the first regex
 never matched; implemented on `fix/d55r-focused-app-api33`).
 Amended 2026-11-03 (batch-11: D55 device-verified with D55r's fix — the last paragraph of the D55r amendment).
@@ -92,7 +92,8 @@ the platform's chooser, the outcome is `{ chooser: { component } }` and the repl
   The next batch's E1 control measures it. The worst case is a hung adb: the read then adds up to its 2 s bound to a
   link that has already started, and the reply falls back to `Opened`.
 - The `-p` start of `launch_app` (an intent with no activity) is unchanged and unchecked, and so is the `-n` start.
-  The monkey start is unchanged too, and neither `-n` nor monkey can raise the chooser. See the D55b amendment below.
+  The monkey start is unchanged too, and neither `-n` nor monkey can raise the chooser. Superseded for the `-p` start
+  by the D55b amendment below: it reads the focus once after it and can name the chooser.
 
 Residuals, stated:
 - Measured on API 33 only, one emulator. The focus lines are expected in `dumpsys window displays` on API 29 and
@@ -101,8 +102,8 @@ Residuals, stated:
   read found both lines naming it. The next batch's E1 runs it 20 times, with a one-handler control.
   Batch-10's E1 ran it: see the D55r amendment below.
 - The reply names the chooser by its component only. Its title, its apps' labels and their centres come from the ui
-  tree in a later change (backlog D55c), once the next batch's E2 has captured the chooser's real tree. See the D55c
-  amendment below.
+  tree in a later change (backlog D55c), once the next batch's E2 has captured the chooser's real tree. Done since:
+  the D55c amendment below quotes the sheet.
 - `launch_app` with `intent:` and no `activity` (`am start -p`) can raise the same chooser when the app itself
   declares two handlers, as the lab does (inference, unmeasured). It still answers `Launched` (backlog D55b).
 - An OEM's own chooser component, outside the list, is not named. The reply is then `Opened`, as before.
@@ -747,7 +748,8 @@ parts (`adbLine`, `defaultHand`, `checkHand`, `HAND_PREFIX`, `LAB_PACKAGE`, `PRE
 re-exports what it exported before and keeps its CallResult wrappers (`preferredOf`, `handlersOf`: a failed call
 unread), behaviour unchanged. The
 premise itself (its facts, lines and new hand lines) is live-side, in `chooser-premise.ts`, which no batch imports; it
-reads the stack and HOME with `frontOf`, `homeOf` and `isChooser` in `live-chooser.ts`, the judges' own readers.
+reads the stack and HOME with `frontOf` and `homeOf` in `live-chooser.ts`, the judges' own readers (`isChooser`, which
+they ask, is `chooser-readers.ts`'s since A22).
 
 **Consequences.** A stale lab is now a named failure with its remedy, not a quiet SKIP. Not done here: nothing clears
 the state (no reinstall, no key, no setting — the owner's hand lines do that), and no recurring run includes the group
@@ -756,7 +758,7 @@ device: the emulator was down when this was built, so the premise's lines are pi
 T7b's recorded launcher reads, through a fake adb (tests/truth/chooser-premise.test.ts). What the tests pin is
 `readPremiseInto` (read, record, echo) and `summarizeRecord` (the record's labels into the summary, shared with
 `--rejudge`); live.ts's own two call lines are not pinned — its `readPremiseInto` call and the record it hands
-`summarizeRecord` (live.ts:264 and :288). Pinning them would take a test that runs live.ts in its run mode. T16's device
+`summarizeRecord` (live.ts:264 and :300). Pinning them would take a test that runs live.ts in its run mode. T16's device
 reads are in the same place: ADR 0044's T16 amendment pins device-state.ts's read over a fake exec, not live.ts's calls
 of it.
 

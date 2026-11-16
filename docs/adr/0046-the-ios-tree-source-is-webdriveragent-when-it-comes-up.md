@@ -36,6 +36,9 @@ read is idb's for the adapter's life, and every reply that claims what it read c
 - "Can be brought up" is `WdaTreeSource.bringUp`, which is `WdaServer.ensureRunning` within its own bounds: the
   package is present, the first build succeeds, and /status answers within its readiness bound. It is decided once,
   lazily, at the first tree read, and kept. There is no probe at startup or at `launch_app`. Pre-warming is A41b.
+  (Superseded at `launch_app` by A41d, the last section: a launch with WDA's build cached makes the choice before it
+  launches. Nothing starts WDA at startup or at `select_device`. A41b's pre-warm (`IosTreeSource.prewarm`,
+  `adapters/prewarm.ts`) is removed.)
 - The fallback is said twice. averi's stderr gets one line with WDA's whole error. Each claiming reply gets
   `⚠ read through idb: WebDriverAgent did not come up (<reason>; select_device again to retry) and idb lists no
   presented layer or scroll clip — a layer over the target or a clip cutting it was not judged`
@@ -59,7 +62,9 @@ read is idb's for the adapter's life, and every reply that claims what it read c
 - Before the choice, what is asked without a tree read is idb's. The launch's application label comes from idb, as
   it did under the old default; WDA would answer `declined`, since it is not up. `kind` reads `idb` for the label's
   wording, and there is no settle cadence (the default 500). After the choice, `kind`, the settle cadence
-  (ADR 0040), the system alert and the label are the chosen source's.
+  (ADR 0040), the system alert and the label are the chosen source's. (Superseded for a launch by A41d, the last
+  section: with WDA's build cached the launch makes the choice before its foreground wait, so under `auto` that wait
+  asks WDA's active app from the first launch on.)
 - Typing follows the choice (ADR 0037). `IosAdapter.typeable` is asked of the source per call. It is WDA_TYPEABLE
   until a fallback, and IDB_TYPEABLE after one, so a later value idb cannot type is refused before anything is sent.
   - A fill checks the value twice: before resolving the field, as always, and again after the resolution's read,
@@ -79,7 +84,8 @@ read is idb's for the adapter's life, and every reply that claims what it read c
 - `treeSource: idb` behaves as before, byte for byte. So does `treeSource: wda`, with one exception: a missing
   `appium-webdriveragent` package is now said before the first-build line, and its refusal opens `WebDriverAgent
   requires …` instead of `treeSource: wda requires …` (above). The registry caches per setting, so `auto`, `idb` and
-  `wda` are three adapters.
+  `wda` are three adapters. (A41d, the last section, adds a second exception: under `wda`, and under `auto` once WDA
+  was chosen, a WDA that cannot come up fails `launch_app` before anything is wiped or launched.)
 - `app.ios.keyboardDismiss`'s load-time note (`flow/config.ts#inertKeyboardDismissNote`) is printed only for a
   project that pins `idb`. Under `auto` the list applies whenever WDA comes up.
 
@@ -90,7 +96,9 @@ read is idb's for the adapter's life, and every reply that claims what it read c
 2. The first read of an `auto` adapter pays WDA's cold start: 3–23 s warm-built, minutes for the first build per
    Xcode. The worst case is a fresh machine. There the first read can block for more than 10 minutes before it
    either reads through WDA or falls back: the build's bound is 600 s, and the readiness bound (60 s for /status)
-   comes after it. Pre-warming WDA at `select_device` / `launch_app` is A41b's.
+   comes after it. Pre-warming WDA at `select_device` / `launch_app` is A41b's. (Superseded by A41d, the last
+   section: a launch with WDA's build cached awaits WDA's start before it launches; nothing starts WDA at
+   `select_device`.)
 3. A fallback leaves `app.ios.keyboardDismiss` inert without a load-time note, because the config cannot know the
    choice. The claim note does not name the keyboard.
 4. After a fallback, a value only WDA types is refused before anything is sent: by the fill's second check, or by

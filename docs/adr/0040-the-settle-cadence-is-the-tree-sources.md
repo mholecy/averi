@@ -37,9 +37,9 @@ an element holds still. `settleCadence(adapter, opts) = opts.pollMs ?? adapter.s
 
 - A caller's explicit `pollMs` wins. Tests and any caller that pins a cadence stay deterministic.
 - The fact belongs to the source. `IosTreeSource.settleCadenceMs` is optional. `IdbTreeSource` declares
-  `IDB_SETTLE_CADENCE_MS` = 300. `WdaTreeSource` declares none, and neither does the differential harness's
-  `RecordedTreeSource`. `IosAdapter` forwards its source's value through a getter and does not dispatch on `kind`.
-  `AndroidAdapter` declares none.
+  `IDB_SETTLE_CADENCE_MS` = 300. `WdaTreeSource` declares none (superseded by A41b, below: it declares
+  `WDA_SETTLE_CADENCE_MS` = 300), and neither does the differential harness's `RecordedTreeSource`. `IosAdapter`
+  forwards its source's value through a getter and does not dispatch on `kind`. `AndroidAdapter` declares none.
 - `ui-tree/read-handoff.ts#ADAPTER_SURFACE.settleCadenceMs = 'fact'`. The proxy returns a non-function as it is, so
   the value reaches the settle through `ReadHandOff.watch`. Classing it `'reads'` would be equivalent for the same
   reason.
@@ -83,7 +83,7 @@ when a later read in the window moves the rect.
 
 - **idb**: 300, measured (above).
 - **WDA**: none, so 500. It is unmeasured. At most 200 ms is left to gain, because the floor binds for r ≥ 350
-  (follow-up D35b).
+  (follow-up D35b). Superseded by A41b, below: 300, measured (`wda-tree-source.ts#WDA_SETTLE_CADENCE_MS`).
 - **Android**: none, and moot. A 2.2–2.5 s dump makes `pauseAfterRead(p, r)` the 150 ms floor for any p ≤ r + 150.
 
 ## Consequences
@@ -92,8 +92,8 @@ when a later read in the window moves the rect.
   only for r > 150. That pause comes once per settle that needs a second read: once per tap, once per fill plus each
   keyboard re-look, and once per flow tap or fill. Everything else sleeps as before.
 - Expected saving: about 200 ms a settle on idb (the measured median, 205 ms). WDA and Android sleep exactly as
-  before, and so does every poll that is not a settle: `wait:`, detect, `optional:`, the Verifier, the pixel poll, the
-  fill's value poll and `scroll_until`.
+  before (for WDA superseded by A41b, below: its pause drops to 300 − r too), and so does every poll that is not a
+  settle: `wait:`, detect, `optional:`, the Verifier, the pixel poll, the fill's value poll and `scroll_until`.
 - Replies are unchanged. They quote budgets, not cadences. The differential main → L5 shows 0 diffs.
 - A test or caller that pins `pollMs` is unaffected. A new tree source that declares no value settles at 500.
 

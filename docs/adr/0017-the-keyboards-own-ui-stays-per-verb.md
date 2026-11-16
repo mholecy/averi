@@ -23,9 +23,10 @@ UI from the same things:
 
 ## Decision
 
-Keep each verb's answer as it is. The position module offers both: `line(subject, reading)` exempts only a node of
-idb's band from the band line, and `owns(node)`, the union, is asked by the scroll read alone. The module header states
-the asymmetry as a residual, so a later unification is a decision and not an accident.
+Keep each verb's answer as it is. The position module offers both: `line(subject, reading)` (today `line(subject,
+line)`, the line `readingLine()`'s, asked once) exempts only a node of idb's band from the band line, and `owns(node)`,
+the union, is asked by the scroll read alone. The module header states the asymmetry as a residual, so a later
+unification is a decision and not an accident.
 
 Unifying every verb on `owns` is a behaviour change, in cases no device has measured:
 
