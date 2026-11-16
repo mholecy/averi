@@ -122,7 +122,7 @@ export const newRunId = (now: Date, pid: number): string =>
   `${now.getFullYear()}${twoDigits(now.getMonth() + 1)}${twoDigits(now.getDate())}-${twoDigits(now.getHours())}${twoDigits(now.getMinutes())}${twoDigits(now.getSeconds())}-${pid}`;
 
 /**
- * A RUN_ID, a block name or a run's name (cases.ts): one plain path segment, so its files cannot leave their folder.
+ * A RUN_ID, a block name or a run's name: one plain path segment, so its files cannot leave their folder.
  */
 export const PLAIN_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 
@@ -170,8 +170,8 @@ export function openRun(fs: BatchFs, { out, runId, blocks, wanted }: { out: stri
       fs.mkdirExclusive(dirOf(b));
     } catch (e) {
       if (isEexist(e)) return refused(dirOf(b));
-      // Any other reason (EPERM from a sandbox, EACCES): a refusal too, never a stack trace (T2b, batch-13 gap 7); the
-      // folders made before it are named, as they stay (empty: nothing is ever removed).
+      // Any other reason (EPERM from a sandbox, EACCES): a refusal too, never a stack trace; the folders made before it
+      // are named, as they stay (empty: nothing is ever removed).
       const made = Object.values(dirs);
       const why = (e as NodeJS.ErrnoException).code ?? firstLineOf(messageOf(e));
       return { ok: false, error: refusedLine(`the run folder ${dirOf(b)} cannot be made (${why}); made before it: ${made.length === 0 ? 'none' : made.join(', ')}`) };

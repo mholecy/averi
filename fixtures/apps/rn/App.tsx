@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { CELLS, Lab } from './src/lab';
 import { fieldsOf, ReactNativeScreen } from './src/ReactNative';
 
-// The React Native lab app (README.md; docs/plans/2026-10-15-ground-truth-lab-app.md, round 7): one cell of
+// The React Native lab app (README.md; docs/plans/2026-10-15-ground-truth-lab-app.md): one cell of
 // fixtures/apps/cells.json per launch, chosen by the launch argument `-cell <id>` (iOS) or the intent extra `cell`
 // (Android), handed in as the root's initial property `cell`. It builds the react-native family alone
 // (src/ReactNative.tsx); any other cell is said on screen and never ready — a capture of it times out naming the cell.

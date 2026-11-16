@@ -15,11 +15,11 @@ import java.util.Locale
 
 /**
  * The lab's state file (scripts/truth/schema.ts#LabState), `files/lab-state.json` in the app's data directory — read by
- * `adb exec-out run-as dev.averi.lab.rn cat files/lab-state.json` (scripts/truth/lab-device.ts#AndroidLab.state), as the
- * Compose lab app's (fixtures/apps/android/…/Lab.kt). The JS model (src/lab.ts) hands its whole state over on every
- * change (`write`); this side keeps the touch log — every touch the activity's window receives, before anything
- * handles it (MainActivity.dispatchTouchEvent), in screen pixels — and writes the two merged, the events in time order,
- * whole and renamed into place, so a reader never sees half a file.
+ * `adb exec-out run-as dev.averi.lab.rn cat files/lab-state.json`, as the Compose lab app's
+ * (fixtures/apps/android/…/Lab.kt). The JS model (src/lab.ts) hands its whole state over on every change (`write`);
+ * this side keeps the touch log — every touch the activity's window receives, before anything handles it
+ * (MainActivity.dispatchTouchEvent), in screen pixels — and writes the two merged, the events in time order, whole and
+ * renamed into place, so a reader never sees half a file.
  */
 object LabStateFile {
     private var file: File? = null

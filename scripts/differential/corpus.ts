@@ -60,7 +60,7 @@ export interface RunManifest {
   /**
    * The truth capture's cells whose last attempt threw (scripts/truth/capture-run.ts), each with why — none of its
    * files written by that run (unless the why says a rename failed midway), so a capture of it listed above is an
-   * earlier one. Read by no replay (golden says them, failedCaptureLines); absent when none.
+   * earlier one. No replay reads it: golden only prints it. Absent when none.
    */
   failed?: CellFailure[];
 }
@@ -189,7 +189,6 @@ async function readManifest(dir: string, run: string): Promise<RunManifest> {
   }
 }
 
-/** Every run of the corpus (each directory, in name order) with its manifest (readManifest). */
 async function readManifests(dir: string): Promise<{ run: string; manifest: RunManifest }[]> {
   const runs: { run: string; manifest: RunManifest }[] = [];
   for (const run of (await readdir(dir)).sort()) {

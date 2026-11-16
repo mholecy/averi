@@ -6,8 +6,8 @@ import { dismissRow } from './rows.js';
 import { classed, type Expectation } from './judges.js';
 
 /**
- * The false-covers family's rows (fixtures/apps/cells/false-covers.json, phase 3 B5): what lies over a target in a
- * tree yet is no cover.
+ * The false-covers family's rows (fixtures/apps/cells/false-covers.json): what lies over a target in a tree yet is no
+ * cover.
  *
  * | truth | verb | expected | decided by |
  * |---|---|---|---|
@@ -17,9 +17,9 @@ import { classed, type Expectation } from './judges.js';
  * | a form field under the keyboard, the cell's `config.ios.keyboardDismiss` tapping its principal title (FormTruth.title, whose probe ended the editing), a toolbar laid over that title in the tree | tap (WDA) | R-dismiss (rows.ts#dismissRow): the title tapped, not refused for the toolbar, nothing else tapped (no tap inside the keyboard, no `Tapped`: in a replayed tree the keyboard stays) — in place of the form's "refused naming the keyboard, nothing tapped" row | docs/bugs/2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar.md, docs/bugs/2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal.md; ADR 0016 |
  *
  * A text target's colour is not asked: what the assert samples of a text is its glyphs on the control, not one colour.
- * R-dismiss is asked of the WDA capture only: the keyboardDismiss list is inert under idb (flow/config.ts — idb marks no
- * node as the keyboard), so there the form's own under-keyboard row stands. What a replayed tree cannot show — the
- * keyboard going after the dismissal, and the field then tapped — is the live golden's (phase 5).
+ * R-dismiss is asked of the WDA capture only: the keyboardDismiss list is inert under idb (src/flow/config.ts — idb
+ * marks no node as the keyboard), so there the form's own under-keyboard row stands. What a replayed tree cannot show —
+ * the keyboard going after the dismissal, and the field then tapped — is the live golden's (scripts/truth/live.ts).
  */
 
 /**

@@ -26,8 +26,7 @@ import { isMain } from '../is-main.js';
  *    the raw WDA sources and captures, the raw idb element lists (whole files
  *    and the per-screen lists inside the documented ones), the normalized
  *    ui_snapshot fixtures, the uiautomator dumps of tests/helpers.
- *  - SYNTHETIC (synthetic.ts): the hand-made raw trees the scratch harness
- *    covered.
+ *  - SYNTHETIC (synthetic.ts): the hand-made raw trees.
  *
  * Usage: node --import tsx scripts/differential/convert.ts --runs <dir> --repo <checkout> --out <corpus dir>
  */
@@ -267,7 +266,7 @@ async function fixtureRuns(repo: string): Promise<{ ios: Built; android: Built }
   for (const [k, v] of Object.entries((await j('ios-ui-snapshot-swift-iban-error.json')).screens as Json)) add(ios, `ios-ui-snapshot-swift-iban-error.${k}.json`, JSON.stringify(v), { source: k === 'idb' ? 'idb' : 'wda', form: 'normalized' });
   for (const [k, v] of Object.entries((await j('wda-ui-snapshot-stacked-layers.json')).screens as Json)) add(ios, `wda-ui-snapshot-stacked-layers.${k}.json`, JSON.stringify(v), { source: 'wda', form: 'normalized' });
   // The fixture's root lacks `paddedTouchTargets` and `activeWindowOnly`, which AndroidAdapter marks on every root it
-  // reads — added, as the scratch harness did.
+  // reads — added here.
   for (const [k, v] of Object.entries((await j('android-ui-snapshot-compose.json')).screens as Json)) {
     add(android, `android-ui-snapshot-compose.${k}.json`, JSON.stringify({ ...(v as Json), paddedTouchTargets: true, activeWindowOnly: true }), { source: 'uiautomator', form: 'normalized', note: "paddedTouchTargets and activeWindowOnly added to the root: the fixture's root lacks them" });
   }

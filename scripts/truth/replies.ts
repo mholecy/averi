@@ -11,12 +11,11 @@ import type { Direction } from '../../src/ui-tree/sides.js';
 import { escapeRegExp } from '../../src/util/regex.js';
 
 /**
- * averi's reply wording, read in ONE place: every judge that reads what averi said — the replayed golden
- * (scripts/differential/golden-spec, golden.ts) and the live one (live.ts, live-visibility.ts, live-forms.ts) — reads
- * it through these, and nothing else in those judges tests a reply's words but the reads live-forms.ts's header names
- * (ADR 0020's A14 amendment). A rewording of averi's replies is fixed here, beside the src line that writes each one.
- * What a reply DID (the taps and swipes the device was sent) is not a reply's wording: golden-spec/judges.ts reads
- * that from the fake device's log, live-visibility.ts from the app's.
+ * averi's reply wording, read in ONE place: every judge that reads what averi said, the replayed golden's and the live
+ * one's, reads it through these, and nothing else in those judges tests a reply's words but the reads live-forms.ts's
+ * header names (ADR 0020's A14 amendment). A rewording of averi's replies is fixed here, beside the src line that
+ * writes each one. What a reply DID (the taps and swipes the device was sent) is not a reply's wording:
+ * golden-spec/judges.ts reads that from the fake device's log, live-visibility.ts from the app's.
  *
  * Everything here takes the reply as averi returned it: its text, `ERROR ` prefixed when the tool call was an error
  * (differential.ts and live.ts#callTool both spell it so).
@@ -74,7 +73,7 @@ export interface HedgedLead {
   readonly preT17: boolean;
 }
 // Longest first, so no alternative is read as a shorter one's prefix: belt and braces, since the `): ` after the group
-// makes the regex backtrack to the longest anyway (T13: the sort's mutants survive, equivalent).
+// makes the regex backtrack to the longest anyway (so the sort's mutants survive, equivalent).
 const HEDGE_WHAT_PATTERN = [...HEDGE_WHATS].sort((a, b) => b.length - a.length).join('|');
 const HEDGED_STOP = new RegExp(`^Element .* visible (?:by the tree )?after \\d+ swipes?, ${HEDGED_LEAD} (${HEDGE_WHAT_PATTERN}): `);
 const OLD_HEDGED_STOP = /^Element .* fully visible (?:by the tree )?after \d+ swipes?[^;]*; but /;
@@ -256,9 +255,9 @@ export const noIdListedSaid = (reply: string) => reply.includes(NO_ID_LISTED);
 export const idbReasonsSaid = (reply: string) => reply.includes(IDB_UNLISTS) && reply.includes(COVERED_FIRST);
 
 /**
- * scroll_until's changed stop (src/interact/scroll-text.ts#changedText, scroll-rounds.ts#ScreenChange): its swipe
- * replaced the screen — "stopped after N swipe(s) — the swipe CHANGED THE SCREEN: …" — and nothing found after it is
- * claimed. In its own words, not in a selector it echoes.
+ * scroll_until's changed stop (src/interact/scroll-text.ts#changedText, src/ui-tree/read-tree.ts#ScreenChange): its
+ * swipe replaced the screen — "stopped after N swipe(s) — the swipe CHANGED THE SCREEN: …" — and nothing found after it
+ * is claimed. In its own words, not in a selector it echoes.
  */
 export const screenChangedSaid = (reply: string) => /stopped after \d+ swipes? — the swipe CHANGED THE SCREEN: /.test(ownWords(reply));
 
@@ -538,7 +537,7 @@ export function snapshotNodes(reply: string): SnapshotNode[] | undefined {
  */
 export const OCR_FAILED_CLOSED = /OCR needs the macOS Vision framework|OCR needs the Swift compiler|the OCR recognizer did not compile|recognizer failed: /;
 
-// --- T7b: launch_app's and open_deep_link's replies, read by the chooser group (live-chooser.ts) ---
+// --- T7b: launch_app's and open_deep_link's replies ---
 
 /**
  * The app launch_app's headline names: `Launched <app>[/<Activity>] on <platform>[ (state cleared)]` on the reply's first

@@ -7,8 +7,8 @@ import { askedUnlistedBy, bandNamed } from '../../truth/target-contract.js';
 import { BUDGET_MS, classed, first, passed, passes, said, type Expectation } from './judges.js';
 
 /**
- * The text family's rows (fixtures/apps/cells/text.json, phase 4) — asked of a text target (CatalogTarget.text) of ANY
- * family, by its truth: the app's own string, drawn as the app laid it out, read back from the tree and, by the host's
+ * The text family's rows (fixtures/apps/cells/text.json) — asked of a text target (CatalogTarget.text) of ANY family,
+ * by its truth: the app's own string, drawn as the app laid it out, read back from the tree and, by the host's
  * recognizer, from the captured screenshot (golden.ts#ocrAvailability: skipped where there is none). P5's sample
  * (docs/plans/2026-10-15-proposal-find-bugs-in-batches.md: typographic quotes and apostrophes, NBSP, dashes, an
  * ellipsis, Slovak and Czech diacritics, amounts with NBSP thousands separators, IBAN groups) are the strings.

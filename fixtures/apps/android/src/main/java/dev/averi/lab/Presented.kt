@@ -2,11 +2,12 @@
 
 package dev.averi.lab
 
-// The presented family (fixtures/apps/cells/presented.json): a layer presented over the coloured-target host
-// (Base.kt) — a ModalBottomSheet partially expanded with its own target, an AlertDialog; round 7 (ADR 0018's residual
-// 19, the windows the uiautomator parser does not mark): a full-screen Compose Dialog and a Views BottomSheetDialog,
-// each with its own target; round 1023b (residual 19, the window manager's word): a Views Dialog laid full screen. RecordWindowTouches is every Compose dialog's or sheet's touch log (a window of its own),
-// for any family; recordTouches a Views dialog's.
+// The presented family (fixtures/apps/cells/presented.json): a layer presented over the coloured-target host (Base.kt)
+// — a ModalBottomSheet partially expanded with its own target, an AlertDialog; for ADR 0018's residual 19 (the windows
+// the uiautomator parser does not mark), a full-screen Compose Dialog and a Views BottomSheetDialog, each with its own
+// target; and, for residual 19's amendment (the window manager's word), a Views Dialog laid full screen.
+// RecordWindowTouches is every Compose dialog's or sheet's touch log (a window of its own), for any family;
+// recordTouches a Views dialog's.
 
 import android.graphics.drawable.ColorDrawable
 import android.view.MotionEvent

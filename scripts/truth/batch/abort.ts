@@ -486,8 +486,8 @@ export class AbortGuard {
   }
 
   /**
-   * Whether a block is complete, read within `left` seconds of the judges' budget (T2 S6a review round 6): true; or not,
-   * and why when known — its own why, `completeness not read in time`, or a throw's first line.
+   * Whether a block is complete, read within `left` seconds of the judges' budget: true; or not, and why when known —
+   * its own why, `completeness not read in time`, or a throw's first line.
    */
   private async completeOf(b: AbortBlock, left: number): Promise<true | { why?: string }> {
     let r: Awaited<ReturnType<typeof within<boolean | string>>>;

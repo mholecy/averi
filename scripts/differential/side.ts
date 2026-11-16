@@ -14,8 +14,8 @@ import { RecordedTreeSource } from './recorded-source.js';
 /**
  * One side of a differential run: a code root (a checkout of averi) and the
  * few things the harness takes from it. Deliberately only the TOOL interface
- * and the adapter SEAM — what tests/mcp/tools.test.ts builds a server from,
- * plus the iOS adapter and its WDA parser to put a recorded source behind:
+ * and the adapter SEAM (createAveriServer and the adapters), plus the iOS
+ * adapter and its WDA parser to put a recorded source behind:
  *
  *   src/mcp/tools.ts            createAveriServer (the tool handlers)
  *   src/mcp/registry.ts         AdapterRegistry, defaultFactory (the live wiring) — the registry built through

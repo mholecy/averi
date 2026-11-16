@@ -14,8 +14,8 @@ import type { StopAsk, TapAsk } from '../../truth/target-contract.js';
 /**
  * `fully` is scroll_until with `fully: true` (rows.ts#fullyRow): a verb of its own, so that a target asked both stops
  * (a sliver, an overlapped row: the plain stop and the `fully` one) keys two rows (`<file> <tag> scroll_until`,
- * `<file> <tag> fully`), not one. `ocr` is the `ocr` assert, judged against the real pixels (phase 4: the host's
- * recognizer reading the captured screenshot) — skipped, and said so, where the host has none (golden.ts#ocrAvailability).
+ * `<file> <tag> fully`), not one. `ocr` is the `ocr` assert, judged against the real pixels (the host's recognizer
+ * reading the captured screenshot) — skipped, and said so, where the host has none (golden.ts#ocrAvailability).
  * `snapshot` is ui_snapshot read for what it says of one field (golden-spec/forms.ts#snapshotRow: its `error` column).
  */
 export const VERBS = ['tap', 'colour', 'scroll_until', 'fully', 'error', 'text', 'ocr', 'snapshot'] as const;
@@ -34,9 +34,9 @@ export interface Expectation {
    */
   absent?: string;
   /**
-   * Why only the live golden (scripts/truth/live.ts, phase 5) can judge it — a dynamic a replayed tree cannot show (a
-   * stroke's effect, a turn back). Set, the golden mode never asks the row (golden.ts); it is declared here so the
-   * table is whole.
+   * Why only the live golden (scripts/truth/live.ts) can judge it — a dynamic a replayed tree cannot show (a stroke's
+   * effect, a turn back). Set, the golden mode never asks the row (golden.ts); it is declared here so the table is
+   * whole.
    */
   live?: string;
   /**
@@ -188,7 +188,7 @@ export const reachedWithNoSwipe = (o: Outcome) => (isError(o.reply) ? `stopped: 
 /** An assert that must pass. */
 export const passes = (o: Outcome) => (passed(o) ? undefined : `failed: ${first(o)}`);
 
-// --- points and regions (phase 3's rows) ---
+// --- points and regions ---
 
 export type Point = { x: number; y: number };
 /** truth.ts#within, the one point-in-rect test the truth and the judges share. */

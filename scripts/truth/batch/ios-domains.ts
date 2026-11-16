@@ -40,9 +40,10 @@ import { exitText, firstLineOf, messageOf, nameInLine, stepLine, verdictLine } f
 
 /**
  * The lab simulator's settings around the WDA window (batch-10's D43 gate), over the simulator: the three domains a
- * WebDriverAgent runner's exit changes, backed up before the window's first change and put back KEY BY KEY after,
- * verified; and the schemeapproval domain, which no batch writes, its finportal key only read. What is decided and
- * said is ios-defaults.ts's; here are the calls, through the injected Run, and the files, through io.ts.
+ * WebDriverAgent runner's exit changes, backed up before the window's first change and put back key by key after (by a
+ * whole-domain `defaults import` where a key is no scalar), verified; and the schemeapproval domain, which no batch
+ * writes, its finportal key only read. What is decided and said is ios-defaults.ts's; here are the calls, through the
+ * injected Run, and the files, through io.ts.
  *
  * The state-file protocol: `backup` writes `{dirty: true, udid, port, domains}` before the
  * window's first change, the backups beside it; `restore` clears `dirty` only after every domain's read-back equals
@@ -277,12 +278,11 @@ function notCompared(why: string, labels: DomainLabels): Comparison {
 }
 
 /**
- * After the window's end check (the runner's exit can write after the restore verified): each domain read again,
- * typed, against its backup — only once the restore has verified (the state clean) and for this simulator; else
- * nothing is compared and nothing is called a late writer. Changed or unread, the state file is marked dirty again
- * (the device is not proven put back; confirmed in review: the next run must refuse until a restore verifies) and the
- * hand lines name what to do; unread is never unchanged. Its lines' labels the window's (`labels`: the WDA window's
- * unless given; T2b).
+ * After the window's end check (the runner's exit can write after the restore verified): each domain read again, typed,
+ * against its backup — only once the restore has verified (the state clean) and for this simulator; else nothing is
+ * compared and nothing is called a late writer. Changed or unread, the state file is marked dirty again (the device is
+ * not proven put back: the next run must refuse until a restore verifies) and the hand lines name what to do; unread is
+ * never unchanged. Its lines' labels the window's (`labels`: the WDA window's unless given; T2b).
  */
 export async function compare(sim: LabSim, stateFile: string, labels: DomainLabels = D43_LABELS): Promise<Comparison> {
   const st = stateIn(sim.fs.read(stateFile));

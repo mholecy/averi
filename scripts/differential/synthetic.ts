@@ -1,11 +1,9 @@
 /**
- * The synthetic trees the scratch harness built inline over the device
- * trees, kept so the corpus covers what it covered: raw payloads made by
- * hand (idb element lists, uiautomator XML) for shapes no device check
- * caught — an idb keyboard band under a field, covered slivers at a scroll
- * container's edge, a pinned bottom bar, a flush last row, a screen with no
- * size. Each is a RAW payload, so it goes through the parser like a capture.
- * Keyed by file name.
+ * The synthetic trees: raw payloads made by hand (idb element lists,
+ * uiautomator XML) for shapes no device check caught — an idb keyboard band
+ * under a field, covered slivers at a scroll container's edge, a pinned
+ * bottom bar, a flush last row, a screen with no size. Each is a RAW
+ * payload, so it goes through the parser like a capture. Keyed by file name.
  */
 
 type IdbEl = { type: string; AXLabel: string | null; AXUniqueId: string | null; frame: { x: number; y: number; width: number; height: number } };
@@ -73,7 +71,7 @@ export function syntheticUiautomator(): Record<string, string> {
   return out;
 }
 
-/** WDA: a copy of a raw capture whose root says the screen is 0x0 (the scratch harness's "no device screen" tree). */
+/** WDA: a copy of a raw capture whose root says the screen is 0x0 (a tree with no device screen). */
 export function zeroRootWda(raw: string): string {
   const doc = JSON.parse(raw) as { value: { rect?: unknown; frame?: string } };
   doc.value.rect = { x: 0, y: 0, width: 0, height: 0 };

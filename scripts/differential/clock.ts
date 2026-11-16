@@ -26,8 +26,8 @@ let clock = START;
 let sleeps = 0;
 
 /**
- * A stack frame in averi's one sleep owner, src/util/sleep.ts — shared with the performance baseline
- * (scripts/perf/instrument.ts), which times the same timers: if the owner moves, this is the one line to change.
+ * A stack frame in averi's one sleep owner, src/util/sleep.ts — the one frame pattern every script that fakes or times
+ * these timers matches, so if the owner moves, this is the one line to change.
  */
 export const SLEEP_OWNER = /[/\\]src[/\\]util[/\\]sleep\.[jt]s:/;
 

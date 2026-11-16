@@ -50,11 +50,11 @@ import { averiServer, commitOf } from './session.js';
 /**
  * The A41b/A41c device probe (docs/plans/2026-10-30-performance-backlog.md): one mode per run, each writing its JSON to
  * `--out`, on the lab simulator only (lab-device.ts's guard: device-check's udid and any simulator not named
- * `averi-lab …` refused before any call). Run by scripts/truth/batch/lab-a41-ios.ts inside Gate C's harness — the idb
- * modes before any WebDriverAgent, the WDA modes inside a D43 window — never by hand on another simulator. The A41b
- * table's tree/tap/fill/scroll_until/ensure rows are scripts/perf/baseline.ts's own, run by the same batch; this file
- * measures what baseline.ts does not. Its records are a41.ts's types, its arithmetic a41.ts's, unit-tested;
- * a41-report.ts sums the files. `--repeat` defaults to a41.ts#A41_CHILDREN's.
+ * `averi-lab …` refused before any call). Run only by the batch, inside Gate C's harness — the idb modes before any
+ * WebDriverAgent, the WDA modes inside a D43 window — never by hand on another simulator. The A41b table's
+ * tree/tap/fill/scroll_until/ensure rows are scripts/perf/baseline.ts's own, run by the same batch; this file measures
+ * what baseline.ts does not. Its records are a41.ts's types, its arithmetic a41.ts's, unit-tested; a41-report.ts sums
+ * the files. `--repeat` defaults to a41.ts#A41_CHILDREN's.
  *
  *   node --import tsx scripts/perf/a41-probe.ts --mode hit-test --device <udid> --golden <golden --json> --out <file>
  *   node --import tsx scripts/perf/a41-probe.ts --mode wda-cold|auto-tap|cadence --device <udid> --out <file> [--repeat N]
@@ -441,7 +441,6 @@ async function hitTest(device: string, golden: { results: GoldenResultLike[] }, 
 
 const USAGE = `usage: a41-probe.ts --mode ${PROBE_MODES.join('|')} --device <lab simulator udid> --out <file.json> [--repeat N] [--golden <golden --json file>]`;
 
-/** A mode's child in a41.ts#A41_CHILDREN: its default `--repeat`. */
 const childOf = (mode: ProbeMode) => Object.values(A41_CHILDREN).find((c) => 'mode' in c && c.mode === mode)!;
 
 export async function main(argv: readonly string[]): Promise<number> {

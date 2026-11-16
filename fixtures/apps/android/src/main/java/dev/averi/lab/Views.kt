@@ -1,10 +1,10 @@
 package dev.averi.lab
 
 // The views family (fixtures/apps/cells/views.json, backlog D77): classic Android Views, the native twin of the React
-// Native app's rn-banner (lab note LR4) and a target drawn over a later-listed control (D75's review round 1). AOSP
-// sorts a classic ViewGroup's accessibility children by LOCATION (ViewGroup.ChildListForAccessibility's stripe
-// comparator), so uiautomator lists each run below by where its children lie, never by the order they are drawn in:
-// what averi's reading-order mark reads (src/adapters/android-accessibility-order.ts; docs/adr/0015-flat-list-reading-
+// Native app's rn-banner (lab note LR4) and a target drawn over a later-listed control (D75). AOSP sorts a classic
+// ViewGroup's accessibility children by LOCATION (ViewGroup.ChildListForAccessibility's stripe comparator), so
+// uiautomator lists each run below by where its children lie, never by the order they are drawn in: what averi's
+// reading-order mark reads (src/adapters/android-accessibility-order.ts; docs/adr/0015-flat-list-reading-
 // order-break.md, its amendment "Android Views list children by location").
 //
 // HOSTED BY THE ACTIVITY'S setContentView (MainActivity#host), NOT in Compose: an AndroidView sits under the node
@@ -29,7 +29,7 @@ import kotlin.math.roundToInt
 private object ViewsLayout {
     /**
      * views-banner's cover: 340x52, its offset from its target's top-left corner — 20 dp LEFT (listed first), and
-     * 10 dp above its top (T, U) or below it (C), as rn-banner's COVERS (ReactNative.tsx).
+     * 10 dp above its top (T, U) or below it (C), as rn-banner's COVERS (fixtures/apps/rn/src/ReactNative.tsx).
      */
     const val COVER_WIDTH = 340
     const val COVER_HEIGHT = 52

@@ -83,11 +83,11 @@ export function probeDelivered(t: Pick<TargetTruth, 'frame' | 'probe'>): Point {
 }
 
 /**
- * How far from the centre of the target's node in the recorded tree an open target's tap may land, per axis: the
- * tools' rounding (a uiautomator centre falls on a half pixel, idb's frames carry thirds of a point). averi's tap on an
- * open target is centre-based (ADR 0009 N-a), the centre of the target's node in the tree it reads — the tree the
- * harness replays, so the point is known exactly: a tap moved off it by a cover averi imagines, however small, is
- * caught whether or not the reply says it moved (the plan's phase 3 follow-up).
+ * How far from the centre of the target's node in the recorded tree an open target's tap may land, per axis: the tools'
+ * rounding (a uiautomator centre falls on a half pixel, idb's frames carry thirds of a point). averi's tap on an open
+ * target is centre-based (ADR 0009 N-a), the centre of the target's node in the tree it reads — the tree the harness
+ * replays, so the point is known exactly: a tap moved off it by a cover averi imagines, however small, is caught
+ * whether or not the reply says it moved.
  */
 export const NODE_CENTRE_SLACK = 1;
 

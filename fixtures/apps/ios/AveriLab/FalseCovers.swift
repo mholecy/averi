@@ -22,11 +22,11 @@ import UIKit
 //   SwiftUI runs the scroll view on under the keyboard to the screen's foot: measured 0,0 402x874) — #7's second fix,
 //   c3ebc62; mp-native's 0,0 402x512. No toolbar draws anything or takes a touch: a tap on the title still ends the
 //   editing (FormTruth.title).
-// - `tap-catcher-beneath` (ADR 0018 residual 9's false-positive probe, round 16): the four slot targets in a
-//   screen-sized accessibility container, a screen-wide `.accessibilityHidden` tap-to-dismiss background drawn BENEATH
-//   it (`.background`, the common "tap outside to end editing" shape) — the blur menu's backdrop's shape in the tree,
-//   but under the content, not over it; `tap-catcher-stacked` the same, the tap-catcher declared first in a ZStack
-//   with the content. A touch on it logs `dismissed background`; a tap on a target fires it.
+// - `tap-catcher-beneath` (ADR 0018 residual 9's false-positive probe): the four slot targets in a screen-sized
+//   accessibility container, a screen-wide `.accessibilityHidden` tap-to-dismiss background drawn BENEATH it
+//   (`.background`, the common "tap outside to end editing" shape) — the blur menu's backdrop's shape in the tree, but
+//   under the content, not over it; `tap-catcher-stacked` the same, the tap-catcher declared first in a ZStack with the
+//   content. A touch on it logs `dismissed background`; a tap on a target fires it.
 // - `tap-catcher-beneath-flat` (backlog A43): the same catcher beneath the four targets laid UNGROUPED, its siblings —
 //   the ungrouped blur-menu's run with the catcher drawn under the targets. Why, what it predicts and what its capture
 //   settles: ADR 0018, the A43 amendment.

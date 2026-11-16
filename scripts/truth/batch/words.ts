@@ -33,8 +33,8 @@ export const SUMMARY_MARKER = '======== SUMMARY';
 
 /**
  * A batch's exit codes: 1 a FAIL or a RESTORE; 2 nothing done — either refused to start (no SUMMARY), or no wanted
- * block ran (a failed checkout, every need or precondition failed: the SUMMARY, with NONE_RAN_LINE after each block's
- * why); 130 interrupted (the abort SUMMARY printed).
+ * block ran (a failed checkout, every need or precondition failed: the SUMMARY, with NONE_RAN_LINE after the blocks'
+ * lines); 130 interrupted (the abort SUMMARY printed).
  */
 export const EXIT = { ok: 0, failed: 1, nothingDone: 2, interrupted: 130 } as const;
 
@@ -70,7 +70,6 @@ export const nameInLine = (name: string): string => (name === '' || LINE_BREAK.t
 /** A tool's or an error's first line, trimmed: up to the first \n or \r, so what a why quotes of it is one line. */
 export const firstLineOf = (text: string): string => text.split(LINE_BREAK, 1)[0].trim();
 
-/** What a thrown value says: an Error's message, anything else as a string. */
 export const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 /** Whether a call failed: any exit but 0, or past its bound (one predicate for every reader of a CallResult). */
@@ -139,7 +138,7 @@ export interface Summary {
   errors: readonly string[];
   /** Set when the run was interrupted: the time of the interrupt (HH:MM:SS). */
   interrupted?: { at: string };
-  /** No wanted block ran (runner.ts, T2 S6a review round 1): the exit is 2, never success. */
+  /** No wanted block ran: the exit is 2, never success. */
   noneRan?: boolean;
 }
 
@@ -153,8 +152,8 @@ export const interruptedBlock = (block: string, linesSoFar: readonly string[], w
 ];
 
 /**
- * The SUMMARY's line, after the blocks', whenever no wanted block ran (T2 S6a review rounds 2, 3): it names no exit
- * code, which is exitCodeOf's — 2, or 1 when a RESTORE was written.
+ * The SUMMARY's line, after the blocks', whenever no wanted block ran: it names no exit code, which is exitCodeOf's —
+ * 2, or 1 when a RESTORE was written.
  */
 export const NONE_RAN_LINE = "NOTE no wanted block ran (each one's why above)";
 
@@ -197,9 +196,9 @@ export function exitCodeOf(s: Summary): 0 | 1 | 2 | 130 {
 }
 
 /**
- * A JSON value as one key (T2 S6b review round 1, NIT 8: a run's identity, asked and done; it lives here so the pure
- * halves need no io): every object's fields sorted, at every depth, so two equal values built in another field order
- * give the same text; arrays keep their order.
+ * A JSON value as one key (a run's identity, asked and done; it lives here so the pure halves need no io): every
+ * object's fields sorted, at every depth, so two equal values built in another field order give the same text; arrays
+ * keep their order.
  */
 export function canonicalJson(v: unknown): string {
   if (Array.isArray(v)) return `[${v.map(canonicalJson).join(',')}]`;

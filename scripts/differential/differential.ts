@@ -20,15 +20,14 @@ import type { CellConfig } from '../truth/schema.js';
  *     in averi.yaml; `variantsOf` below), one MCP server
  *     per side, built by the side's own `createAveriServer` over a registry
  *     whose factory hands out the side's adapter over the recording
- *     (side.ts#recordedAdapter) — as tests/mcp/tools.test.ts builds one,
- *     opened and closed by connection.ts;
+ *     (side.ts#recordedAdapter), opened and closed by connection.ts;
  *  2. `ui_snapshot` on both sides; its trees name the TARGETS — every node a
  *     selector can address on either side: a unique identifier (`id:`), else
- *     a unique text (`text:`, label or value), else a unique `label:` or
- *     `value:`, else the role with text or id (`role:… text:` / `role:…
- *     id:`); no value holding `"` — the grammar has no escape for it. A
- *     text more than one node carries is asked once too (`tap text:`), for
- *     the tools' many-matches path;
+ *     a unique text (`text:`, a label no other node's label or value reads
+ *     the same), else a unique `label:` or `value:`, else the role with text
+ *     or id (`role:… text:` / `role:… id:`); no value holding `"` — the
+ *     grammar has no escape for it. A text more than one node carries is
+ *     asked once too (`tap text:`), for the tools' many-matches path;
  *  3. the variant's calls (`plan` below) with the same arguments on each side,
  *     one at a time — the virtual clock and the fake device reset before
  *     each, a colour assert's target painted its own colour in the frame —

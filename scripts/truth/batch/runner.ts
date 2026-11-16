@@ -146,13 +146,13 @@ export const NEED_END_SECS = 60;
  * naming it, `alive` — a cheap one (the emulator still answers) — or, with none, `check` again: a need met once is
  * never trusted blindly for a later block. A bare NeedCheck is `{ check }`. Its `end` (T2b, batch-13 gap 4: the ios
  * need's second read of the finportal key, which no block need remember): once the last block is done, before the
- * windows still open go to RESTORE, once per need met at least once in the run — a need down later too (review round
- * 1, MAJOR); never one never met or never asked — within `endSecs` (NEED_END_SECS unless given; a need whose end makes
- * bounded calls derives it from their bounds, so it cannot pass it first). A throw or its bound passed is an ERROR line
- * and, with `endUnread`, the protected-key line that says its key unread and why; an end past its bound that settles
- * before the SUMMARY is assembled has its lines taken in place of that one (a late FAIL exits 1: review round 1,
- * BLOCKER). Not at the abort: it exits 130 whatever a read says; its SUMMARY gets `endUnread`'s line for each need met
- * whose end had not had its say, so the slot is never silent about a key not read.
+ * windows still open go to RESTORE, once per need met at least once in the run — a need down later too; never one never
+ * met or never asked — within `endSecs` (NEED_END_SECS unless given; a need whose end makes bounded calls derives it
+ * from their bounds, so it cannot pass it first). A throw or its bound passed is an ERROR line and, with `endUnread`,
+ * the protected-key line that says its key unread and why; an end past its bound that settles before the SUMMARY is
+ * assembled has its lines taken in place of that one (a late FAIL exits 1). Not at the abort: it exits 130 whatever a
+ * read says; its SUMMARY gets `endUnread`'s line for each need met whose end had not had its say, so the slot is never
+ * silent about a key not read.
  */
 export type NeedSpec = NeedCheck | ({ check: NeedCheck; alive?: NeedCheck } & NeedEnding);
 /** A need's end, its bound and the line for a key it could not say (NeedSpec). */
@@ -763,15 +763,15 @@ class BatchRun<K> {
   }
 
   /**
-   * The one completeness rule, both paths (code review, review rounds 5, 6): S3's completeness over every live run and
-   * records.ts's gap of every record — complete only when incompleteLine has nothing to say (else `gap`, its line),
-   * never by its files being there; a block's own `complete()`, when it gives one, only adds a requirement (false or a
-   * throw: not complete); a `noRecords` block, its run returned before any abort, and its complete() if given. Nothing
-   * asked: complete only when its own complete() says so.
+   * The one completeness rule, both paths: S3's completeness over every live run and records.ts's gap of every record —
+   * complete only when incompleteLine has nothing to say (else `gap`, its line), never by its files being there; a
+   * block's own `complete()`, when it gives one, only adds a requirement (false or a throw: not complete); a
+   * `noRecords` block, its run returned before any abort, and its complete() if given. Nothing asked: complete only
+   * when its own complete() says so.
    */
   private async assess(b: Block<K>): Promise<{ complete: boolean; gap: string | undefined }> {
     const dir = this.dirs[b.id];
-    // A block's own complete() only adds a requirement (review round 6): it never hides a run's gap.
+    // A block's own complete() only adds a requirement: it never hides a run's gap.
     let own = true;
     if (b.complete !== undefined) {
       try {
@@ -900,7 +900,10 @@ class BatchRun<K> {
   }
 }
 
-/** A precondition check's answer, its why one line; a check that throws is not shown, never the run's error. */
+/**
+ * A precondition check's answer, its why one line; a check that throws is a failed precondition (its why `its check
+ * threw: …`), never the run's error.
+ */
 async function shown(check: PreconditionCheck, kit: PreconditionKit): Promise<Precondition> {
   try {
     const r = await check(kit);

@@ -101,8 +101,8 @@ export const compareHand = (stateFile: string): string =>
   `${HAND_PREFIX}then read each domain back (defaults export) and compare it with its backup beside ${shellQuote(stateFile)}; only when every one is equal, set the state file's dirty to false`;
 
 /**
- * The WDA window's hand lines, the one builder for every end (code review, MAJOR 1): the WebDriverAgent's kill first,
- * then each domain's (S4's), then the compare.
+ * The WDA window's hand lines, the one builder for every end: the WebDriverAgent's kill first, then each domain's
+ * (S4's), then the compare.
  */
 export const wdaHandOf = (udid: string, domainsHand: readonly string[], stateFile: string): string[] => [portHand(udid), ...domainsHand, compareHand(stateFile)];
 
@@ -115,9 +115,8 @@ export function wdaRestoredOf(r: { ok: boolean; line: string }, killed: boolean,
 }
 
 /**
- * The WDA window while port 8120 is not proven free (T2 S6b review round 1, BLOCKER): nothing restored — a runner still
- * running undoes a restore at its exit — so the state file stays dirty and the window is not put back; its hand lines
- * the window's (wdaHandOf).
+ * The WDA window while port 8120 is not proven free: nothing restored — a runner still running undoes a restore at its
+ * exit — so the state file stays dirty and the window is not put back; its hand lines the window's (wdaHandOf).
  */
 export function wdaBlockedOf(port: PortRead, killed: boolean, hand: readonly string[]): { ok: false; line: string; hand: string[] } {
   const why = `NOT VERIFIED — ${portPart(port, killed)}: the domains not put back (a WebDriverAgent still running undoes a restore at its exit); the state file left dirty`;

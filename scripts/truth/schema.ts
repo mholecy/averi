@@ -77,18 +77,18 @@ export interface CatalogTarget {
 }
 
 /**
- * The cell families (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 3): one catalog file
- * (fixtures/apps/cells/<family>.json), one app file per platform, one golden-spec file and one KNOWN file each, so
- * cells of different families are written apart. `base` the open control; `presented` a layer presented over the
- * targets (sheet, alert, dim, blur); `forms` the form cells (phase 1b); `edges` targets at a scroll view's or the
- * screen's edge; `bars` system bands and app chrome (tab bars, a FAB); `false-covers` a target's own parts or a bar
- * that is no cover; `text` text targets carrying P5's sample strings, open and under the bands and chrome (phase 4: the
- * tree's text and OCR on the real pixels); `react-native` React Native's own controls (round 7: its text fields), which
- * only the React Native lab app builds (appOf); `held` screens that render late (backlog D30: bare for seconds, then a
- * screen outside a state — the live golden's `ensure` group, ADR 0033's held "no"), no targets, no truth captured;
- * `views` classic Android Views hosted outside Compose (backlog D77: rn-banner's native twin, a target drawn over a
- * later-listed control), which only the Android lab app builds (Views.kt). In this order in the generated catalog
- * (scripts/truth/catalog.ts).
+ * The cell families (docs/plans/2026-10-15-ground-truth-lab-app.md): one catalog file
+ * (fixtures/apps/cells/<family>.json), one app file per platform and one KNOWN file each, and one golden-spec file for
+ * each family that has rows (golden-spec.ts), so cells of different families are written apart. `base` the open
+ * control; `presented` a layer presented over the targets (sheet, alert, dim, blur); `forms` the form cells; `edges`
+ * targets at a scroll view's or the screen's edge; `bars` system bands and app chrome (tab bars, a FAB); `false-covers`
+ * a target's own parts or a bar that is no cover; `text` text targets carrying P5's sample strings, open and under the
+ * bands and chrome (the tree's text and OCR on the real pixels); `react-native` React Native's own controls (its text
+ * fields), which only the React Native lab app builds (appOf); `held` screens that render late (backlog D30: bare for
+ * seconds, then a screen outside a state — the live golden's `ensure` group, ADR 0033's held "no"), no targets, no
+ * truth captured; `views` classic Android Views hosted outside Compose (backlog D77: rn-banner's native twin, a target
+ * drawn over a later-listed control), which only the Android lab app builds (Views.kt). In this order in the generated
+ * catalog (scripts/truth/catalog.ts).
  */
 export const FAMILIES = ['base', 'presented', 'forms', 'edges', 'bars', 'false-covers', 'text', 'react-native', 'held', 'views'] as const;
 export type Family = (typeof FAMILIES)[number];
@@ -124,11 +124,11 @@ export interface CatalogCell {
   family?: Family;
   /**
    * `none`, `sheet-medium`, `alert`; a form cell's own picker sheet, `sheet-large`; Android's `dialog-fullscreen` and
-   * `bottom-sheet-dialog`, `dialog-views-fullscreen`; the iOS app's own layers of phase 3.
+   * `bottom-sheet-dialog`, `dialog-views-fullscreen`; the iOS app's own layers.
    */
   layer: string;
   targets: CatalogTarget[];
-  /** A form cell (phase 1b): fields, a submit, maybe a picker — no coloured targets. */
+  /** A form cell: fields, a submit, maybe a picker — no coloured targets. */
   form?: CatalogForm;
   /**
    * The averi.yaml the golden mode replays the cell under (differential.ts#configFor): merged into its `app.ios` /
@@ -186,8 +186,9 @@ export type FieldKind = 'text' | 'email' | 'iban' | 'amount' | 'pin' | 'country'
  * `SK3112000000` → `SK31 1200 0000 `, 24 characters: six groups, no trailing space); `phone3` a phone number's (L7,
  * D37's `+421`) — a leading `+` kept, every other character but a digit dropped, the digits in threes from the left
  * joined by a space (`+421903123456` → `+421 903 123 456`, `421903123456` → `421 903 123 456`). The lab apps each spell
- * the same rules (Forms.kt, Forms.swift, the React Native app's src/format.ts — `date` the native apps' only: no React
- * Native cell asks it); tests/truth/lab-format.test.ts pins group4eager's and phone3's table on src/format.ts.
+ * the same rules (Forms.kt, Forms.swift, fixtures/apps/rn/src/format.ts — `date` the native apps' only: no React
+ * Native cell asks it); tests/truth/lab-format.test.ts pins group4eager's and phone3's table on
+ * fixtures/apps/rn/src/format.ts.
  */
 export type FieldFormat = 'group4' | 'thousands' | 'date' | 'group4eager' | 'phone3';
 
@@ -304,7 +305,7 @@ export interface LabState {
   scale: number;
   /**
    * Android: pixels per dp (2.75 on averi_lab) — what the 48-dp minimum touch target a Compose control is given is in
-   * the state's units (truth.ts#touchTargetOf). Absent on iOS and on captures before phase 2b's review round 2.
+   * the state's units (truth.ts#touchTargetOf). Absent on iOS and on captures that predate it.
    */
   density?: number;
   frames: Record<string, Rect>;
@@ -315,15 +316,15 @@ export interface LabState {
    * screen coordinates in the state's units) — the probe's positive control.
    */
   events: (ProbeEvent & { at: number })[];
-  /** A form cell's oracle — absent on the coloured-target cells (and in their phase-1 captures). */
+  /** A form cell's oracle — absent on the coloured-target cells. */
   fields?: Record<string, FieldState>;
   /** The field holding the focus, or null. */
   focus?: string | null;
   /** The last `keyboardWillChangeFrame`, its end frame in screen coordinates; null before any. */
   keyboard?: KeyboardState | null;
   submits?: { at: number; valid: boolean; values: Record<string, string> }[];
-  // Phase 3's geometry (truth.ts#geometryOf) — optional: an app that writes none (every phase-1/1b/2 capture) has no
-  // measured geometry, and its targets are judged by `declared` alone.
+  // The geometry (truth.ts#geometryOf) — optional: a capture of an app that writes none has no measured geometry, and
+  // its targets are judged by `declared` alone.
   /** The window's safe-area insets — the system bands: iOS's status bar and home indicator, Android's system bars. */
   safeArea?: Insets;
   /**
@@ -336,8 +337,8 @@ export interface LabState {
    * drawn over content.
    */
   chrome?: Record<string, Rect>;
-  // Phase 5's live oracle (scripts/truth/live.ts, live-visibility.ts) — optional: written by the scroll views of the
-  // coloured-target cells from the round-4 apps on; no capture reads them.
+  // The live oracle (scripts/truth/live.ts, live-visibility.ts) — optional: written by the scroll views of the
+  // coloured-target cells; no capture reads them.
   /**
    * Each scroll view's content offset now, by id (CatalogTarget.scrollView): down its content from its top — across it
    * from its leading edge for a horizontal one (carousel-in-list's `carousel`), which live-visibility.ts#judgeScroll
@@ -394,7 +395,7 @@ export interface KeyboardState {
 }
 
 /**
- * `tab` a tab bar's item was chosen (`tag` its name) — app chrome firing, phase 3's bars. A chrome's own button (a
+ * `tab` a tab bar's item was chosen (`tag` its name) — app chrome firing, the bars family's. A chrome's own button (a
  * toolbar's, a FAB) logs `button`, `tag` `<chrome>.<name>` (the chrome's name in LabState.chrome). `phase` a held cell
  * changed what it draws (`tag` `bare`, `spinner`, `welcome`, `home`; `unconfigured` when its catalog entry has no
  * `held`; Held.swift, Held.kt) — the live ensure group's
@@ -435,7 +436,7 @@ export interface TargetTruth {
   /** The colour most of the frame shows in the screenshot, `#RRGGBB` — what the user sees there. */
   seen: string;
   // Measured from the app's frames when the state reports the screen's bands, scroll views or chrome
-  // (truth.ts#geometryOf); absent on every capture before phase 3, whose targets are judged by `declared` alone.
+  // (truth.ts#geometryOf); absent on a capture that predates it, whose targets are judged by `declared` alone.
   /** Where the frame lies against the screen, its scroll view's clip, the system bands and the app's chrome. */
   geometry?: Geometry;
   /** The frame clipped by the screen and its scroll view's clip — what of it can be drawn; null when nothing. */
@@ -450,14 +451,14 @@ export interface TargetTruth {
   /**
    * Whether each raw tree the capture read lists a node identified as the target (truth.ts#listedIn): `{wda: true,
    * idb: true}`, `{uiautomator: false}` — uiautomator dumps no node not visible to the user. Recorded with a measured
-   * geometry only (absent before B2's review too): a target without it is held to be listed.
+   * geometry only (absent on captures that predate the field too): a target without it is held to be listed.
    */
   listed?: Partial<Record<SourceKind, boolean>>;
   /**
    * A text target (`text`): whether each raw tree the capture read lists a node carrying its string
    * (truth.ts#textListedIn) — uiautomator dumps no node the user cannot see, so a string wholly under the chrome may be
    * missing though its box is listed. golden-spec/text.ts accepts a covered `ocr` row's "not found" only where it is
-   * false. Absent on captures before phase 4's review (backfilled from their committed trees).
+   * false. Absent on captures that predate the field (backfilled from their committed trees).
    */
   textListed?: Partial<Record<SourceKind, boolean>>;
   /**
@@ -528,7 +529,10 @@ export interface CellTruth {
   absent?: AbsentTarget[];
   /** A form cell's truth (its `targets` empty). */
   form?: FormTruth;
-  /** As the state reported them (LabState): what the targets' geometry was measured against. Absent before phase 3. */
+  /**
+   * As the state reported them (LabState): what the targets' geometry was measured against. Absent on captures that
+   * predate it.
+   */
   safeArea?: Insets;
   scrollViews?: Record<string, Rect>;
   chrome?: Record<string, Rect>;
@@ -552,7 +556,7 @@ export interface CellTruth {
    * navigation bar's top differs by navigation mode: [0,2154] under gestures, [0,2088] under three buttons on the lab
    * AVD), served by the golden mode's fake device in place of its stock gesture-mode dump while the keyboard is hidden
    * (fake-device.ts#DeviceProfile.windowDisplays). The one source of that dump: `ime` holds only the IME-up one. Absent
-   * on iOS and on captures before round 3 (served the stock dump).
+   * on iOS and on captures that predate the field (served the stock dump).
    */
   displays?: string;
   /**
@@ -626,7 +630,7 @@ export interface ControlTruth {
   probe: ProbeEvent[];
   /**
    * An `under-keyboard` control: the colour most of its frame shows in the screenshot — the keyboard's, what a colour
-   * assert on it would measure (golden-spec/forms.ts#controlRows). Absent elsewhere, and on captures before phase 2b.
+   * assert on it would measure (golden-spec/forms.ts#controlRows). Absent elsewhere, and on captures that predate it.
    */
   seen?: string;
   /**

@@ -44,10 +44,8 @@ export interface Point {
 
 // ------------------------------------------------------------------------------------------------- the medians
 
-/** stats.ts's median and range, with how many numbers they are of. */
 export type CountedSpread = Spread & { n: number };
 
-/** n, the median and the range of the numbers; undefined for none. */
 export const spreadOf = (xs: readonly number[]): CountedSpread | undefined =>
   xs.length === 0 ? undefined : { n: xs.length, median: median(xs), min: Math.min(...xs), max: Math.max(...xs) };
 
@@ -492,7 +490,7 @@ export const WAITED_GAP_MIN_MS = 3500;
 export const LEG_A_BEFORE_A41D_MS = 7173;
 
 /**
- * A fresh `auto` session (A41b): launch_app (WDA stopped; a `clearState` one on the first repeat), then the first tree
+ * A fresh `auto` session (A41b): launch_app (WDA stopped; a `clearState` one on the last repeat), then the first tree
  * read at once (ui_snapshot) — which app it read: its root's label, and the bundle WDA's activeAppInfo names after it.
  * `expected`: the lab app's. Whether the app is in front after the launch: the leg was set because WDA's start beside
  * the launch's foreground wait could leave the app behind (ADR 0046); under the A41d amendment WDA's bring-up is done
@@ -576,7 +574,7 @@ export interface A41Report {
   missing: string[];
   /**
    * The required parts read but not proven (unprovenOf, A44): the cadence judgement, legs (a) and (b) of the first tap
-   * and the foreground leg. The batch's report block is INCONCLUSIVE on any, as on a missing file.
+   * and the foreground leg. Any of them unproven is INCONCLUSIVE to whoever judges the report, as a missing file is.
    */
   unproven: string[];
   /** Whether a WebDriverAgent build ran (WDA_BUILD_LINE in a WDA child's log); undefined: no log read. */

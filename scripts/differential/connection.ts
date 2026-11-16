@@ -4,10 +4,9 @@ import type { AdapterRegistry } from '../../src/mcp/registry.js';
 import type { Side } from './side.js';
 
 /**
- * One averi server and its client in this process (A33, review card 5's TL6): the server a side's (or this
- * checkout's) `createAveriServer` builds over the registry handed in, a real MCP client over the SDK's in-memory
- * transport — what tests/mcp/tools.test.ts builds. Each caller calls through `client` in its own reply encoding and
- * keeps its own registry.
+ * One averi server and its client in this process: the server a side's (or this checkout's) `createAveriServer` builds
+ * over the registry handed in, a real MCP client over the SDK's in-memory transport. Each caller calls through `client`
+ * in its own reply encoding and keeps its own registry.
  *
  * The connection owns the registry once handed it:
  *  - open: the server connects before the client (the client's initialize needs it listening). An open that fails

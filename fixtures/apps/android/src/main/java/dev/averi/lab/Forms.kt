@@ -2,11 +2,11 @@
 
 package dev.averi.lab
 
-// The forms family (fixtures/apps/cells/forms.json) on Android (docs/plans/2026-10-15-ground-truth-lab-app.md, phase
-// 2b) — the iOS app's Forms.swift in Compose: the fields of a payment form, a submit, maybe a country picker sheet,
-// laid out as a banking app lays them out (a top bar, a scroll column, titles above the fields, errors under them),
-// every one reporting to the oracle (Lab.kt#field): the value the MODEL holds, the focus, the error it shows and the
-// identifier it shows it under. A fill is judged by that, never by a tree.
+// The forms family (fixtures/apps/cells/forms.json) on Android (docs/plans/2026-10-15-ground-truth-lab-app.md) — the
+// iOS app's Forms.swift in Compose: the fields of a payment form, a submit, maybe a country picker sheet, laid out as a
+// banking app lays them out (a top bar, a scroll column, titles above the fields, errors under them), every one
+// reporting to the oracle (Lab.kt#field): the value the MODEL holds, the focus, the error it shows and the identifier
+// it shows it under. A fill is judged by that, never by a tree.
 //
 // Nothing here transforms what is typed (no capitalisation, no autocorrection, no mask): a value that does not land as
 // typed is averi's or adb's doing, not the app's — but for a field with a `format` (form-format, D18), which reformats

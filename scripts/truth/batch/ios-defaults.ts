@@ -33,9 +33,7 @@ export const HAND_PREFIX = 'D43 (iOS): ';
 /** A late writer's RESTORE line's start: a domain changed after the restore had verified it. */
 export const LATE_HAND_PREFIX = 'D43 (iOS, changed after the restore — a late writer): ';
 
-/** The restore's verdict label. */
 export const RESTORE_LABEL = 'D43 WDA-window restore';
-/** The compare's verdict label. */
 export const COMPARE_LABEL = 'D43 WDA-window compare';
 /**
  * What a domains window's lines call it (T2b, batch-13 gap 3): its restore's and its compare's verdict labels, its
@@ -383,8 +381,7 @@ export function stateIn(text: string | undefined): DomainsState | string {
 
 /**
  * defaults' words for a read of a domain that is not there, naming this domain only: `Domain '<domain>' not found.` —
- * the host's defaults (Darwin 27, seen by the T2 S4 review) and the lab simulator's alike (iOS 27.0, batch-13: the
- * same words, byte for byte).
+ * the host's defaults (Darwin 27) and the lab simulator's alike (iOS 27.0, batch-13: the same words, byte for byte).
  */
 const notFoundSaid = (domain: string): RegExp => new RegExp(`\\bDomain '${escapeRegExp(domain)}' not found\\.`);
 
