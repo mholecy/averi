@@ -133,9 +133,8 @@ function describeIntent(intent: LaunchIntent): string {
  * in `launch` does the same). Kept, because that advice is
  * what makes the message recoverable: the reader's next move is in
  * averi.yaml or in the call, not in adb. Rejected: a typed AmStartError
- * thrown here and translated by the callers — there are two (run/ for
- * launch_app, flow/ for the launch step), so one message would have two
- * translation sites that must agree. No import crosses the layer — only
+ * thrown here and worded by flow/launch.ts's launchApp, which launch_app and
+ * the flow's launch step share. As it is, no import crosses the layer — only
  * words do.
  *
  * Why a launch is checked at all: `adb()` only rejects on a
@@ -354,7 +353,7 @@ export class AndroidAdapter implements DeviceAdapter {
       // Never beside `-n`: an explicit component already names the package,
       // and an activity given as a full "other.pkg/Activity" component would
       // contradict a `-p` for this one. The rule for which activity a launch
-      // names (and when averi.yaml's applies) is flow/config.ts's
+      // names (and when averi.yaml's applies) is flow/launch.ts's
       // resolveLaunchActivity; this is only how the result is said in `am`.
       argv.push('-p', packageName);
     }
@@ -401,8 +400,9 @@ export class AndroidAdapter implements DeviceAdapter {
         causeOf(outcome),
       );
     }
-    // No wait and no note (D49a is iOS's). A link two activities handle, none of them preferred, starts Android's
-    // "Open with" chooser, which am reports as `started` (android-start.ts; measured, batch-9 D55): so ONE focus read
+    // No wait and no note (the foreground wait is iOS's, ios.ts). A link two activities handle, none of them
+    // preferred, starts Android's "Open with" chooser, which am reports as `started` (android-start.ts; measured,
+    // batch-9 D55): so ONE focus read
     // after the start asks whether the chooser is in front (D55, android-chooser.ts; ADR 0041). Only a positive
     // match names a holder; a failed or unreadable read, or a chooser not in front yet, names none.
     // D55c: the chooser named, one dump of its tree reads its sheet (linkChooserInFront); none is D55's `{ component }`.
@@ -550,7 +550,7 @@ export class AndroidAdapter implements DeviceAdapter {
       if (tree !== undefined) return tree;
       const status = raw.trim().slice(0, 200);
       // "null root node" is uiautomator saying the app has no window to dump YET
-      // (cold launch, ~2-3 s; mid-animation). The one-shot MCP tools opt into a
+      // (cold launch, ~2-3 s; mid-animation). A one-shot read opts into a
       // single bounded retry with `settle`; pollers do NOT —
       // their own poll interval already is the retry, and a hidden extra
       // second per miss would only shrink the number of probes their deadline
@@ -895,7 +895,7 @@ export class AndroidAdapter implements DeviceAdapter {
     // a direct caller cannot leave the field half-typed. An ASCII value pays one regex test, no device call.
     const refusal = refusalOf(text, this.typeable);
     if (refusal !== undefined) throw new Error(`typeText ${refusal}`);
-    // Each character is declared typed (A17, ExecOptions.typed): no failure shows it. A leading `-` cannot form an
+    // Each character is declared typed (ExecOptions.typed): no failure shows it. A leading `-` cannot form an
     // option (D74): it is the one word `-` (by code; read back by
     // docs/truth/live-records/d74-dash-text/android-input-dash.sh).
     for (const ch of text) {
@@ -1040,8 +1040,8 @@ export class AndroidAdapter implements DeviceAdapter {
 
   /**
    * The IME window's touchable region, and `mInputShown` beside it, in ONE
-   * adb call (the floating-Gboard device check, the three "Device check"
-   * sections of the bug note below; emulator-5554, API 33, 1080x2220). Why: a
+   * adb call (the floating-Gboard device checks of 2026-10-08 in the bug
+   * note below; emulator-5554, API 33, 1080x2220). Why: a
    * floating Gboard keeps an IME inset of only its 132-px collapse strip
    * (`ITYPE_IME frame=[0,2088][1080,2220] visible=true`), so keyboardState's
    * band missed the panel drawn at x 359–1040, y 1269–1912 — a guarded tap on

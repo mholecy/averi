@@ -8,7 +8,7 @@
  * string to the device, where `sh` (mksh on Android) splits it again — words,
  * quotes, `&`, `;`, `$`, backticks, globs and newlines all interpreted.
  * execFile adds no shell on the host, so the host side is safe and the
- * device side is not. Measured on emulator-5554 (API 33) by the review, with
+ * device side is not. Measured on emulator-5554 (API 33), with
  * harmless commands only, all three exiting 0:
  *
  *   -d app://login?a=1&b=2    the activity got `app://login?a=1`; `b=2` ran in the background
@@ -25,7 +25,7 @@
  * `''`, so it stays an argument instead of vanishing. Plain words (`input`,
  * `tap`, `540`, `md.bank.app`, `md.bank.app/.MainActivity`,
  * `android.intent.action.VIEW`, `%s`) pass unquoted, so the command lines in
- * ExecError messages and in the tests read as they always did.
+ * ExecError messages and in the tests stay readable.
  *
  * Deliberately NOT here:
  * - `adb exec-out`: there the adb CLIENT escapes every word after the

@@ -147,7 +147,7 @@ export type IosTreeSourceDeps = Omit<WdaServerOptions, 'udid'> & {
 /**
  * The adapter for a configured setting, bound to one simulator. Lives with the
  * seam, not in the registry: which backend serves a setting is adapter knowledge
- * (ARCHITECTURE §2, §3), and the registry's one line is to ask for it.
+ * (ARCHITECTURE §2, §3).
  * A Record over the setting, so a new one without a constructor is a compile
  * error here — not a runtime default somewhere above. `auto` (A41a) is both
  * sources, of which its first read keeps one.
@@ -458,8 +458,8 @@ const describeEmptyPayload = (types: readonly (string | undefined)[]): string =>
  * on the same simulator and 30 s more of waiting each cured 0 of 5; only the next reboot did. HID was unaffected (an
  * `idb ui swipe` 5/5 while wedged) and the companion's log said nothing. So the cause is an accessibility query made
  * too soon after a boot — D20's device run started its companion right after the boot and met it on every read
- * (133 in a 90 s `scroll_until`, 5 of 5 repeats); `ios-run.sh`, which starts it after bootstatus and 3 s, never did
- * in 13 runs.
+ * (133 in a 90 s `scroll_until`, 5 of 5 repeats); the owner's D0 runs (through `ios-run.sh`, a script outside the
+ * repo), which start it after bootstatus and 3 s, never did in 13 runs.
  *
  * Hence a PersistentReadError: no poll retries it (types.ts — polled, every waiting caller would wait to its deadline,
  * which is all D20's 90 s were), and averi neither re-fronts the app, nor re-reads, nor reboots: nothing short of a

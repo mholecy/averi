@@ -48,7 +48,8 @@ export type WdaSide = IosTreeSource & { bringUp(): Promise<void>; buildCached():
  * - WDA came up → every call is WDA's, exactly as under `treeSource: wda` — a later WDA failure is WDA's error, never a
  *   switch to idb.
  * - It did not → the reason is said once on stderr, WDA is shut down, every read is idb's, and `claimNote` is set: the
- *   tools add it to each reply that claims what it read (idbFallbackNote). Nothing is refused for it.
+ *   tools add it to each reply that claims what it read (idbFallbackNote). No read is refused for it; a text idb
+ *   cannot type is refused as under `treeSource: idb` (typeText).
  *
  * Before the choice, what is asked without a tree read is idb's: a launch's application label (WDA's would be
  * `declined` — it is not up), `kind` (the label's wording) and no settle cadence (the default 500). Typing waits for

@@ -91,8 +91,8 @@ export function inputLost(command: string): ExecError {
 }
 
 /**
- * A helper call, as the D0 harness sees it (scripts/perf/instrument.ts): it is no process, so the execFile wrapper
- * never sees it. `start` is published with `{ argv }` (as shown: a typed word is `<typed text>`, A17) when the
+ * A helper call, as a diagnostics_channel subscriber sees it: it is no process, so the execFile wrapper never sees
+ * it. `start` is published with `{ argv }` (as shown: a typed word is `<typed text>`, A17) when the
  * helper takes a call, `end` with the same object and `ok` set when it answers (a nonzero code, a death, a timeout:
  * not ok) — the subscriber keys its record by the object.
  */

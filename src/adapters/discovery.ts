@@ -63,8 +63,8 @@ const ADB_LINE = new RegExp(`^(\\S+)\\s+(${Object.keys(ADB_STATES).join('|')})\\
  * free with the listing (the runtime key), so the flag changes nothing
  * there. Default: the versions are read.
  *
- * Why the flag: the bound device's per-call check (`discoveryOver`, asked by
- * mcp/registry.ts#get) asks only "is it still booted?", and a getprop is a
+ * Why the flag: the bound device's per-call check (`discoveryOver`) asks
+ * only "is it still booted?", and a getprop is a
  * full `adb shell` round trip — ≈30–35 ms, up to ~70 ms, per device in
  * adb's `device` state, on every tool call
  * (docs/plans/2026-10-30-performance-backlog.md, D13 note (2026-10-31,
@@ -78,8 +78,8 @@ export interface ListOpts {
 /**
  * `adb devices -l`, then `getprop ro.build.version.release` on each device
  * adb calls `device` (an offline or unauthorized one cannot answer; its
- * version is `unknown`). The getprop's argv is adb-shell.ts#adbShellArgv's —
- * every word quoted, even words that need no quoting.
+ * version is `unknown`). The getprop's argv is adb-shell.ts#adbShellArgv's:
+ * a word is quoted only where `sh` would interpret it, so this one goes plain.
  *
  * `versions: false` lists from `adb devices -l` alone — why, and what it
  * saves, is on `ListOpts`.
@@ -267,8 +267,8 @@ export type BootedProof = (udid: string) => Promise<boolean>;
 
 /**
  * THE implementation of `check`, over any listing — so the registry's fakes
- * keep the real order of steps. The registry asks it on EVERY tool call
- * (mcp/registry.ts#get), so it is no cache, and it asks the least it can:
+ * keep the real order of steps. It is asked on EVERY call to a bound
+ * device, so it is no cache, and it asks the least it can:
  *
  * 1. iOS with a proof: `iosBooted(udid)`, read afresh each call. Proven, the
  *    device is usable and nothing is listed — `simctl list devices` costs

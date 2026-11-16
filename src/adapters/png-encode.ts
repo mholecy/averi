@@ -5,10 +5,9 @@ import type { RgbaImage } from './types.js';
 
 /**
  * THE ONE PNG ENCODER (D19, docs/adr/0035-android-captures-raw-pixels.md): a raw capture (Android's
- * `screencap 2>/dev/null | gzip -1`) becomes a PNG on the host only where a PNG leaves the process — the `screenshot`
- * tool's image, `ensure_state`'s and a `verify` leg's final frame, a stored baseline, the OCR recognizer's input — and
- * `DeviceAdapter.screenshot()` (types.ts). An 8-bit RGBA PNG (colour type 6), one IDAT: verify/png.ts decodes it on its
- * fast path to the same bytes.
+ * `screencap 2>/dev/null | gzip -1`) becomes a PNG on the host only where a PNG leaves the process (shown, stored or
+ * recognized) and in `DeviceAdapter.screenshot()` (types.ts). An 8-bit RGBA PNG (colour type 6), one IDAT:
+ * verify/png.ts decodes it on its fast path to the same bytes.
  *
  * Two settings, chosen per image by how it compresses (measured 2026-10-31 on 1080×2220 frames of the lab AVD; the
  * references are the device's own `screencap -p` — zlib level 6, adaptive filters, ~230 ms on the device — and pngjs
