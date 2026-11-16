@@ -385,8 +385,9 @@ one happens by itself.
   `⛔ reach` line** — idb returns a 0×0 tree on a rendered screen (measured 2026-10-06/07). averi treats it as an
   unread device: waits and asserts fail instead of reading "absent", and the reach ladder will not run a destructive
   rung (`clearState`, `destructive: true`) on it, so nothing was wiped. The measured trigger is an earlier WebDriverAgent session on that simulator
-  (the default `auto` once WebDriverAgent came up, or `treeSource: wda`, in any project, or another XCTest driver): every app process launched after it starts stuck, and
-  waiting does not end it (18+ min measured). The same 0×0 shape is also a healthy app's first read right after a
+  (the default `auto` once WebDriverAgent came up, or `treeSource: wda`, in any project, or another XCTest driver):
+  every app process launched after it starts stuck, and waiting does not end it (18+ min measured). The same 0×0
+  shape is also a healthy app's first read right after a
   launch (0.4 s after `launch_app`, measured 2026-10-08): `ui_snapshot` reads once more a second later before failing,
   and its error then says `The read was retried once after 1 s and was still empty` (a healthy launch had a tree by
   then); waits and asserts poll past it. averi re-enables the simulator's accessibility automation before each
