@@ -1239,8 +1239,8 @@ describe('evaluateOcrAssert — a thousands separator the recognizer reads as no
 
 describe('measureOcrAssert — the ocr assert\'s one measurement, every "not read" failing closed', () => {
   /**
-   * The crop → recognize → region error → verdict chain (assert-capture-ocr
-   * C2): its unread sentences must not drift from fail-closed.ts. Each is
+   * The crop → recognize → region error → verdict chain: its unread
+   * sentences must not drift from fail-closed.ts. Each is
    * pinned whole here, on a measuredFrameFor fixture, with no poll around it.
    */
   const cta = n({ identifier: 'cta', rect: { x: 24, y: 780, width: 354, height: 44 } });

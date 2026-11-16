@@ -457,7 +457,7 @@ describe('compareRectParity — finding semantics', () => {
     expect(r.findings.every((f) => Number.isFinite(f.delta))).toBe(true);
   });
 
-  // The tolerance lives in the contract only (parity review P2), so the
+  // The tolerance lives in the contract only, so the
   // looser threshold is set where production sets it.
   it('respects contract tolerance_pct: default 2.0 when unset, the contract\'s value when set', () => {
     const c = contract();

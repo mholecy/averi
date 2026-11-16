@@ -868,7 +868,7 @@ describe('ocr asserts (what the element RENDERS)', () => {
   });
 
   /**
-   * assert-capture-ocr C2: were the measure's catch to turn every recognizer
+   * Were the measure's catch to turn every recognizer
    * throw into a miss, a host without `swiftc` would poll the whole 12 s
    * default before saying so. An `OcrUnavailableError` ends the assert after
    * its one read, fail-closed, in the shape a refused capture does (2794f5e)
@@ -951,10 +951,9 @@ describe('color asserts (fill vs expected hex, CIEDE2000)', () => {
 
   /**
    * The caveats a sample carries are worded ONCE, in color-parity.ts
-   * (`sampleCaveats`), for the table row and this assert alike — since
-   * 63e4ca4 the assert prints the table's fuller wording, recovery step
-   * included. Pinned here at the assert, exactly, because this is the surface
-   * a caller reads.
+   * (`sampleCaveats`), for the table row and this assert alike: the assert
+   * prints the table's fuller wording, recovery step included. Pinned here at
+   * the assert, exactly, because this is the surface a caller reads.
    */
   it('names a clipped sample and a busy one in the table\'s own words, recovery step included', async () => {
     // Clipped: the card hangs 60% below a 320px-tall png (y 280..380).
@@ -1923,7 +1922,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
 });
 
 describe('assertSpecSchema', () => {
-  // assert-capture-ocr C3: a `match` that does not compile, past the schema,
+  // A `match` that does not compile, past the schema,
   // would fail mid-run — an element assert would throw out of assertAll a few
   // ms in, losing the batch's other results, and an ocr assert would poll its
   // whole 12 s budget as "OCR failed". The schema is where that mistake is
@@ -2015,8 +2014,8 @@ describe('assertSpecSchema', () => {
 
 /**
  * The four asserts share one polling primitive but deliberately DISAGREE on
- * how a timeout is explained. Nothing pinned that disagreement, so collapsing
- * the loops could have silently inverted it — these lock it down.
+ * how a timeout is explained. Unpinned, collapsing the loops could silently
+ * invert that disagreement — these lock it down.
  */
 describe('timeout-detail precedence (shared poll, per-assert wording)', () => {
   /** Sees the element for the first read, then can no longer produce a tree. */
@@ -2104,7 +2103,7 @@ describe('poll cadence and preconditions', () => {
 });
 
 describe('rect and color asserts report an unreadable tree at timeout', () => {
-  /** Never produces a tree — the `detail ?? notFound(readError)` branch. */
+  /** Never produces a tree — the `detail ?? notFound(…)` branch. */
   function blind() {
     const fake = dashboardFake();
     fake.uiTree = async () => {
@@ -2260,7 +2259,7 @@ describe('pixel asserts under the Android soft keyboard (2026-10-06)', () => {
     expect(fake.screenshots).toHaveLength(0);
     expect(fake.attachedKeyboard.touchableAnswers.queries).toBeGreaterThan(0);
 
-    // The input method not saying shown in the same call: no panel, the band alone — measured as before.
+    // The input method not saying shown in the same call: no panel, the band alone — measured.
     const unconfirmed = cardFake();
     unconfirmed.attachKeyboard({ state: 'shown', frame: BELOW });
     unconfirmed.attachedKeyboard.touchableAnswers.current = { witness: 'unknown', region: [PANEL, BELOW] };

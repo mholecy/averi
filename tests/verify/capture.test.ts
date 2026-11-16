@@ -18,7 +18,7 @@ import { Shot } from '../../src/verify/shot.js';
 
 /**
  * verify/capture.ts is the one owner of frame stability and of the png
- * scale (ARCHITECTURE.md §8). What is worth pinning is the CONTRACT every
+ * scale (ARCHITECTURE.md §2 and §8). What is worth pinning is the CONTRACT every
  * consumer relies on: the frame that comes back is a settled one, the budget
  * is the `screenshot` tool's, a tree or device read that fails lands on the
  * frame as a reason rather than as an exception, and the scale is derived

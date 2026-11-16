@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ExecError, type ExecFn } from '../../src/adapters/exec.js';
 import { ocrEngineFor, OcrUnavailableError, ocrUnavailableReason, VisionOcr, type OcrEngine } from '../../src/verify/ocr.js';
 
-// Passthrough spies on the two filesystem calls the engine's build makes, so a
+// Passthrough spies on the two filesystem calls these tests watch or fail, so a
 // test can see an engine look for the cached binary (`existsSync`) and fail a
 // source write half-way (`writeFile`). Both behave as the real ones unless a
 // test says otherwise.

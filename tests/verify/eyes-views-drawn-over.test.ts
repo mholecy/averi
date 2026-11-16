@@ -168,8 +168,8 @@ describe('D84 negatives at the cell\'s geometry: the later-listed B is lifted on
   });
 
   // A touch layer holding A's centre (540,391) and reaching below A's bottom (a sibling narrower than A ending above
-  // its bottom is A's own content, draw-order.ts#NOT_DRAWN's `onTarget`, excused before and after D84) — what the
-  // listing cannot tell from B.
+  // its bottom is A's own content, draw-order.ts#NOT_DRAWN's `onTarget`, excused) — what the listing cannot tell from
+  // B.
   const withLayer = (): Promise<UiNode> => withSibling('lab.layer', '[400,340][1040,500]');
 
   it('a later-listed sibling that draws nothing (a touch layer) over A\'s centre, no screenshot: a cover, its order untold — refused', async () => {
