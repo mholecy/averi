@@ -31,9 +31,8 @@ function labUdid(udid: string): string {
 }
 
 /**
- * The lab's WebDriverAgent by its exact patterns: its own derived data
- * (lab-device.ts#LAB_WDA_DERIVED_DATA, never device-check's `averi-wda`) and the runner under the lab simulator's
- * folder.
+ * The lab's WebDriverAgent by its exact patterns: its own derived data (lab-device.ts#LAB_WDA_DERIVED_DATA, never
+ * device-check's `averi-wda`) and the runner under the lab simulator's folder.
  */
 export const wdaKillPatterns = (udid: string): string[] => ['DerivedData/averi-wda-lab([/ ]|$)', `Devices/${labUdid(udid)}/.*WebDriverAgentRunner`];
 

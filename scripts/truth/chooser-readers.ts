@@ -69,10 +69,10 @@ function labEntryOf(e: OpenEntry): LabEntry | undefined {
 }
 
 /**
- * The preferred read's text (a call that answered): only the `Preferred Activities User N:`
- * block(s), each running to the next top-level line; in a block, each entry is its first line (a hash and a component)
- * and every line after it indented deeper, or blank. A dump with no such block (API 33's whole dump cut short, another
- * command's output) is unread.
+ * The preferred read's text (a call that answered): only the `Preferred Activities User N:` block(s), each running to
+ * the next top-level line; in a block, each entry is its first line (a hash and a component) and every line after it
+ * indented deeper, or blank. A dump with no such block (API 33's whole dump cut short, another command's output) is
+ * unread.
  */
 export function preferredIn(out: string): PreferredRead {
   let users = 0;

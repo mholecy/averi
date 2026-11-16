@@ -77,8 +77,7 @@ export * from './golden-spec/rows.js';
  * formExpectations' `source` is, so a caller cannot forget the capture it replays. `tree`, the replayed tree's payload:
  * where it lists the target's node (truth.ts#nodeFramesIn, by the selector the open rows ask — its identifier, or a
  * text target's text), the open tap is held to that node's centre (base.ts#atProbe); without it, to the reach around
- * the probe point. golden.ts hands it every capture's (tests/differential/golden-wiring.test.ts); a unit test of a
- * row's choice may leave it out.
+ * the probe point. Every replay passes it; a unit test of a row's choice may leave it out.
  */
 export function expectations(platform: Platform, t: TargetTruth, cell: CellTruth | undefined, source: SourceKind, tree?: string): Expectation[] {
   // The target contract, decided once (target-contract.ts#contractOf); it asks nothing of a target its truth

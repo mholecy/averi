@@ -261,6 +261,7 @@ private fun StickyList(cell: Cell, lab: Lab) {
     val density = LocalDensity.current
     val initial = with(density) { stickyOffset(cell).roundToPx() }
     val state = rememberLazyListState(0, initial)
+    // The list's offset in pixels down its content: the header item (index 0) then rows of ROW_HEIGHT.
     val header = with(density) { STICKY_HEADER.roundToPx() }
     val row = with(density) { ROW_HEIGHT.roundToPx() }
     ReportScroll(lab, "list", { state.isScrollInProgress }) {

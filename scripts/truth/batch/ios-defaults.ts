@@ -40,7 +40,8 @@ export const COMPARE_LABEL = 'D43 WDA-window compare';
 /**
  * What a domains window's lines call it (T2b, batch-13 gap 3): its restore's and its compare's verdict labels, its
  * backup's step, its RESTORE lines' starts (`hand`, and `lateHand` for a late writer's). The WDA window's are
- * D43_LABELS; another block's window takes domainLabels(its id), so no line of it says D43.
+ * D43_LABELS; another block's window would take domainLabels(its id), so no line of it says D43 (none in scripts/;
+ * tests/truth/batch/ios-domains-sim.test.ts exercises it).
  */
 export interface DomainLabels {
   restore: string;

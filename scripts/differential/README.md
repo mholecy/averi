@@ -227,7 +227,7 @@ one's `as`, the live KNOWN's `note`) and calibration.json to docs/bugs: every `b
 a calibration.json residual's status or an ADR's numbered residual, every note calibration.json expects OPEN-RED with
 its rows in KNOWN filed as it, and every note a KNOWN row is filed as an open note of calibration.json (but the
 live-only ones it lists, each excluded from the calibration with its reason, and the notes calibrated on the replay
-whose live KNOWN entries await a live record at their fix, `AWAITING_LIVE`, each with its reason).
+whose live KNOWN entries await a live record at their fix, `AWAITING_LIVE` (currently empty), each with its reason).
 
 The form cells (`form-basic`, `form-errors`, `form-keyboard`, `form-prefilled`, `form-picker`; phase 1b) have no
 coloured targets. Their truth (`CellTruth.form`) is the app's own model — per field its value, focus and the error it
@@ -402,10 +402,11 @@ Whether the probe reveals the row and the stop goes on is the live golden's (pha
 `scripts/truth/calibrate.ts` runs golden (`--json`, the whole corpus) over the src of each before and after commit
 `scripts/truth/calibration.json` names — every visibility note and the field-error notes, each calibrated on golden
 rows, or why none can be (needs a cell, phase 2b, a live run, OCR; a residual), and every other bug note excluded with
-its class — and writes `docs/truth/calibration.md`:
+its class — and writes its report to `--out <file>` (stdout without it; `<out>.partial` for `--note` runs); the
+committed `docs/truth/calibration.md` comes from `--out docs/truth/calibration.md`:
 
 ```sh
-node --import tsx scripts/truth/calibrate.ts --worktrees <dir> [--note <n>[,<n>…]] [--out docs/truth/calibration.md] [--remove] \
+node --import tsx scripts/truth/calibrate.ts --worktrees <dir> [--note <n>[,<n>…]] [--out <file>] [--remove] \
   [--cache <dir>] [--no-cache]
 ```
 

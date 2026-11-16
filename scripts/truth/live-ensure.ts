@@ -37,8 +37,8 @@ export const POLL_S = 0.5;
 /**
  * One tree read, with room: idb `describe-all` ~150 ms and a WDA `/source` 35–90 ms warm, uiautomator's dump ~2.3 s
  * (docs/plans/2026-10-30-performance-backlog.md, the per-verb measurements). Kept by D30's calibration (the same file,
- * D30: one run a source in batch-3, two more in batch-9): every residual under half of heldSlackS, the thinnest
- * uiautomator's, 5.12 s of 5.25 s.
+ * D30: one run a source in batch-3, 2026-11-02, two more in batch-9, 2026-11-03): every residual under half of
+ * heldSlackS, the thinnest uiautomator's, 5.12 s of 5.25 s; a run past 5.25 s reopens the calibration.
  */
 export const READ_S: Record<Source, number> = { idb: 0.5, wda: 0.5, uiautomator: 3 };
 /** One tap: idb `ui tap` ~185 ms, WDA's alike; adb `input tap` slower — the same measurements, with room. */

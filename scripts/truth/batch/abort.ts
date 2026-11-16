@@ -12,8 +12,8 @@ import { EXIT, firstLineOf, messageOf, stepLine, summaryLines, timeOf, twoDigits
  * remembered "Open" answer, the chooser, the simulator settings, a worktree registered in the repo). Whatever stops the
  * run inside one puts it back first:
  * - SIGINT, SIGTERM or SIGHUP (a Ctrl-C, a kill, a closed terminal);
- * - a throw out of the run's body or an uncaught exception or unhandled rejection anywhere. Never the
- *   `exit` event: it is synchronous, and a restore is not.
+ * - a throw out of the run's body or an uncaught exception or unhandled rejection anywhere. Never the `exit` event: it
+ *   is synchronous, and a restore is not.
  *
  * The abort, once: later signals are only noted; the running probes are stopped, each its whole group (they do not get
  * the terminal's Ctrl-C); each dirty window is put back, the last opened first, by its own restore through detached

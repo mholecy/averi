@@ -56,6 +56,7 @@ export interface CaseRun {
   verdict: LiveVerdict;
 }
 
+/** How long the app is given to write once the calls are done. */
 const WRITE_SETTLE_MS = 800;
 
 /** The one place a record is shaped: a skip's and a run's, in the order a recorded file keeps its keys. */

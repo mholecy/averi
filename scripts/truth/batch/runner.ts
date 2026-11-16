@@ -62,8 +62,8 @@ import { canonicalJson, EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parse
  * 4. the AbortGuard armed (abort.ts): a signal, a throw out of a block or an uncaught error from here on puts the dirty
  *    windows back and prints the abort SUMMARY, exit 130;
  * 5. the preconditions (preconditions.ts): the checkout, then each wanted block's own, all before the first block runs.
- *    One not shown makes its block INCONCLUSIVE naming why, never a refusal (the S3 choice); a failed
- *    checkout does so for every block, and the SUMMARY is still written;
+ *    One not shown makes its block INCONCLUSIVE naming why, never a refusal (the S3 choice); a failed checkout does so
+ *    for every block, and the SUMMARY is still written;
  * 6. each wanted block, in the batch's order: its needs (each checked in full by the first block that names it, then
  *    rechecked before each later one — NeedSpec; S6b supplies the checks — the lab simulator, the lab emulator), a
  *    failed one making it INCONCLUSIVE, not run; then its `run(ctx)`;
