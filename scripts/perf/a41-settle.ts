@@ -18,8 +18,8 @@ import { censoredAt, classesOf, movedId, wrongSettle, type CadencePass, type Tri
  * a later read in the window has the id at another rect (a41.ts#wrongSettle); a41.ts#CadencePass says
  * which settles are judged.
  *
- * The clock is the caller's: a test fakes Date and mocks src/util/sleep.ts (T5's way); the device-free CLI
- * (scripts/perf/a41-report.ts) installs installReplayClock for its process.
+ * The clock is the caller's: a test fakes Date and mocks src/util/sleep.ts (T5's way); a device-free process installs
+ * installReplayClock for itself.
  */
 
 export interface ReplayClock {
