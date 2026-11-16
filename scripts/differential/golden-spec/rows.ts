@@ -9,9 +9,9 @@ import { ASSERTS_FAILED, carouselReply, claimsTap, claimsVisible, dismissalCover
 import { BUDGET_MS, first, landed, notTapped, passed, passes, pointsText, reachedWithNoSwipe, said, strokes, strokesOff, swipes, tapPoints, touchDowns, within, type Expectation } from './judges.js';
 
 /**
- * Phase 3's row types (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 3 B1): what each verb must answer of an
- * open target whose MEASURED geometry (truth.ts#geometryOf) is not `whole`, and of the dismissal and the stroke's
- * direction. Shared by the families: edges.ts and bars.ts map a geometry to its rows; B2–B5 wire them to their cells. A
+ * The row types (docs/plans/2026-10-15-ground-truth-lab-app.md): what each verb must answer of an open target whose
+ * MEASURED geometry (truth.ts#geometryOf) is not `whole`, and of the dismissal and the stroke's direction. Shared by
+ * the families: edges.ts and bars.ts map a geometry to its rows, false-covers.ts asks the dismissal's (dismissRow). A
  * target carries a geometry only when its capture's state reported the bands, scroll views or chrome; a capture without
  * them asks none of these rows.
  *
@@ -206,13 +206,13 @@ export function bandColour(platform: Platform, t: TargetTruth, cell: CellTruth):
 export interface StrokeOptions extends RowOptions {
   /**
    * The replayed tree lists a scroller at the clip of the scroll view the truth names (truth.ts#scrollerListedIn): a
-   * target the tree does not list (`absent`) is held inside it too. Set by edges.ts#absentRows only — for a target laid
-   * out nowhere (CellTruth.absent), whose scroll view is the one place it can come from (the L7 carousels: the page lies
-   * across the stroke, so the carousel is the only listed scroller that could take it). A framed target the tree does
-   * not list is not held so (edges.ts#edgeRows): scroll-bounded's O and F on Android lie in `lower`, one of two
-   * vertical lists, and averi strokes only the largest, its reply blaming exhaustion without naming `lower` — holding
-   * them inside turned both rows red (T6). The absent-only condition stands in for "the named scroll view is the only
-   * listed scroller that could take the stroke"; the case of two along the stroke is `namedSuffices`.
+   * target the tree does not list (`absent`) is held inside it too. Set only for a target laid out nowhere
+   * (CellTruth.absent), whose scroll view is the one place it can come from (the L7 carousels: the page lies across the
+   * stroke, so the carousel is the only listed scroller that could take it). A framed target the tree does not list is
+   * not held so (edges.ts#edgeRows): scroll-bounded's O and F on Android lie in `lower`, one of two vertical lists, and
+   * averi strokes only the largest, its reply blaming exhaustion without naming `lower` — holding them inside turned
+   * both rows red (T6). The absent-only condition stands in for "the named scroll view is the only listed scroller that
+   * could take the stroke"; the case of two along the stroke is `namedSuffices`.
    */
   scrollerListed?: boolean;
   /**
@@ -220,7 +220,7 @@ export interface StrokeOptions extends RowOptions {
    * touch-down outside that scroll view passes only when the reply quotes its rect among the scroll views the swipes
    * did not go over (`namesUntried`) — averi strokes the largest scroller before it reads the target, and its exhausted
    * stop names the listed scroll views along the stroke the swipes did not go over (D76,
-   * interact/stroke-plan.ts#strokedBeside). Set by edges.ts#edgeRows (scroll-bounded's O and F on Android, rows of
+   * interact/stroke-plan.ts#strokedBeside). Set for such a target (scroll-bounded's O and F on Android, rows of
    * `lower`).
    */
   namedSuffices?: boolean;
@@ -338,7 +338,7 @@ function notReachedStill(platform: Platform, t: TargetTruth, cell: CellTruth, ro
  * (flushProbe): what shows of the target ends on that side within a pixel of its own scroll view's edge (at a top or
  * left edge also where its piece ends at a pinned chrome's inner edge), and a swipe was sent from inside that scroll
  * view toward that edge. The replay checks only that the probe is sent toward the cut; whether it reveals the row and
- * the stop goes on is live (phase 5). Any other "visible" is red.
+ * the stop goes on is the live golden's. Any other "visible" is red.
  */
 export function fullyRow(platform: Platform, t: TargetTruth, cell: CellTruth, ask: StopAsk): Expectation {
   return {
@@ -421,7 +421,7 @@ export function unfitSide(t: Pick<TargetTruth, 'frame' | 'scrollView'>, cell: Pi
 /**
  * R-unfit (T6d): `fully: true` toward the side it is cut on ends D52's `unfit` — "as wide as its scroll view … drop
  * fully: true" (replies.ts#carouselReply) — on the first read, with no swipe (a replayed tree never moves, so the
- * first read is the one D52 judges), and says no inferred axis (the tree told it: edges.ts asks this row only then).
+ * first read is the one D52 judges), and says no inferred axis (the tree told it: the row is asked only then).
  * Any other reply is red, its kind said. Asked in R-fully's place (the same key: verb `fully`), where unfitSide holds.
  */
 export function unfitRow(platform: Platform, t: TargetTruth, ask: StopAsk, side: Direction): Expectation {
@@ -508,11 +508,11 @@ function landRow(platform: Platform, t: TargetTruth, ask: TapAsk, opts: RowOptio
 }
 
 /**
- * R-dismiss (B5 wires it, with a cell whose `config.ios.keyboardDismiss` names `dismissal`): a tap on `control`, under
- * the keyboard, sends the configured dismissal — a tap inside the dismissal element's frame — and is not refused for
- * a bar lying over that element. With the `keyboard`'s frame (a replayed tree, where it never goes): nothing else is
- * tapped — no tap inside the keyboard (it would press a key), and no `Tapped` reply (the control is still under it), as
- * the form's own under-keyboard row it stands in for asks (golden-spec/forms.ts).
+ * R-dismiss (asked of a cell whose `config.ios.keyboardDismiss` names `dismissal`): a tap on `control`, under the
+ * keyboard, sends the configured dismissal — a tap inside the dismissal element's frame — and is not refused for a bar
+ * lying over that element. With the `keyboard`'s frame (a replayed tree, where it never goes): nothing else is tapped —
+ * no tap inside the keyboard (it would press a key), and no `Tapped` reply (the control is still under it), as the
+ * form's own under-keyboard row it stands in for asks (golden-spec/forms.ts).
  */
 export function dismissRow(platform: Platform, control: { tag: string; id: string }, dismissal: { label: string; frame: Rect }, keyboard?: Rect): Expectation & { target: string } {
   return {

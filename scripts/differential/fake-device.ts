@@ -273,7 +273,10 @@ function displays(profile: DeviceProfile, keyboard: KeyboardState): string {
   return keyboard === 'hidden' ? API33.hidden : keyboard === 'shown' ? API33.shown : API33_FLOATING;
 }
 
-/** The one app the fake device has installed: what a replay's config names and launches (differential.ts), and what a recorded WDA source names as active (recorded-source.ts). */
+/**
+ * The one app the fake device has installed: the app a replay's config names and launches, and the one a recorded WDA
+ * source names as active.
+ */
 export const REPLAYED_APP = 'differential.app';
 
 const appinfo = (name: string) => `{\n    CFBundleDisplayName = "${name}";\n    CFBundleIdentifier = "${REPLAYED_APP}";\n    CFBundleName = "${name}";\n}\n`;

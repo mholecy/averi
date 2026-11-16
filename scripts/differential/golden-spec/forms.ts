@@ -7,8 +7,7 @@ import { ocrFailsClosed } from './text.js';
 import { BUDGET_MS, classed, closesItsOwnLayer, failed, first, IDB_REASONS, judgedUnlisted, notTapped, passed, passes, pointsText, presentedRemedyMissing, reachedWithNoSwipe, REASONS_AND_KEYBOARD, REASONS_AND_KEYBOARD_UNLISTED, said, swipes, tappedInside, tapPoints, touchDowns, within, type Expectation } from './judges.js';
 
 /**
- * The forms family's rows (fixtures/apps/cells/forms.json, phase 1b) — see formRows; golden-spec.ts#formExpectations
- * asks them.
+ * The forms family's rows (fixtures/apps/cells/forms.json) — see formRows; golden-spec.ts#formExpectations asks them.
  */
 
 /** docs/verification.md, "Forms & validation", "Field errors" — the rule a field-error row relies on. */
@@ -371,7 +370,7 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth, unli
             IDB_REASONS,
           ),
         );
-        // Its OCR half (phase 4): the recognizer on the real pixels reads the keyboard there.
+        // Its OCR half: the recognizer on the real pixels reads the keyboard there.
         const field = truth.form?.fields.find((f) => f.tag === c.tag);
         rows.push(judgedUnlisted({ target, ...ocrFailsClosed(platform, { id: c.id }, field === undefined ? c.tag : field.value !== '' ? field.value : field.title, 'the soft keyboard over it') }, unlisted, IDB_REASONS));
       }

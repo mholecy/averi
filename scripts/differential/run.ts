@@ -54,8 +54,9 @@ interface ShardOutput {
 
 /**
  * The order the shards take trees in: the costliest first, so the run does not end on one shard still busy with a big
- * tree. The cost is a guess — the payload's size, an Android tree's times four (three device variants, and its frames
- * are the larger to decode) — and only the order depends on it: which shard runs a tree is decided at run time.
+ * tree. The cost is a guess — the payload's size, an Android tree's times four (it has more device variants,
+ * differential.ts#variantsOf, and its frames are the larger to decode) — and only the order depends on it: which shard
+ * runs a tree is decided at run time.
  */
 function byCost(corpus: Recording[]): Recording[] {
   const cost = (r: Recording) => r.payload.length * (r.platform === 'android' ? 4 : 1);

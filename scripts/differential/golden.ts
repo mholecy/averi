@@ -232,7 +232,6 @@ export const cellOf = (r: Pick<Recording, 'file'>) => r.file.slice(0, r.file.ind
  */
 const stemOf = (r: Pick<Recording, 'file'>) => r.file.replace(/\.(json|xml)$/, '');
 
-/** `--only`'s value: comma-separated tokens, blanks dropped. */
 export const parseOnly = (value: string | undefined): string[] | undefined =>
   value === undefined ? undefined : value.split(',').map((t) => t.trim()).filter((t) => t !== '');
 
@@ -255,7 +254,6 @@ export function selectRecordings<R extends Pick<Recording, 'run' | 'file'>>(reco
   return recordings.filter((r) => only.some((t) => matches(r, t)));
 }
 
-/** `--json`'s output: the side's code root and each capture's checks and broken targets. */
 export interface GoldenJson {
   side: string;
   results: GoldenResult[];

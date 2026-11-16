@@ -49,14 +49,14 @@ import type { Expectation } from './golden-spec/judges.js';
  * The rows live in scripts/differential/golden-spec/ (one file per cell family of fixtures/apps/cells/ that has rows;
  * covered.ts serves react-native.json), the judges they share in golden-spec/judges.ts, the row types in
  * golden-spec/rows.ts; this module is what the golden mode and the tests import, and it picks a target's rows
- * (expectations). A coloured target's rows are chosen by its truth — presented-over, else its MEASURED geometry
- * (truth.ts#geometryOf) — never by its cell's family: edges.ts and bars.ts are geometry groups, asked of a target of
- * any family whose capture measured an edge, band or chrome geometry, and base.ts's open rows of any target measured
- * `whole` (or unmeasured). A row not keyed on a target's geometry is wired here too: false-covers' text targets
- * (golden-spec/false-covers.ts#ownPartsRows) through expectations(), and its R-dismiss (rows.ts#dismissRow, a form
- * cell's row under its `config.ios.keyboardDismiss`) through formExpectations, in place of the form's own
- * under-keyboard tap. So a B5 (false covers) author edits golden-spec/false-covers.ts (its rows), this module (to ask
- * them), rows.ts only for a new row type — and the family's catalog file, app views and
+ * (expectations). A coloured target's rows are chosen by its truth — presented-over or covered, else its MEASURED
+ * geometry (truth.ts#geometryOf) — never by its cell's family: edges.ts and bars.ts are geometry groups, asked of a
+ * target of any family whose capture measured an edge, band or chrome geometry, and base.ts's open rows of any target
+ * measured `whole` (or unmeasured). A row not keyed on a target's geometry is wired here too: false-covers' text
+ * targets (golden-spec/false-covers.ts#ownPartsRows) through expectations(), and its R-dismiss (rows.ts#dismissRow, a
+ * form cell's row under its `config.ios.keyboardDismiss`) through formExpectations, in place of the form's own
+ * under-keyboard tap. So a false-covers author edits golden-spec/false-covers.ts (its rows), this module (to ask them),
+ * rows.ts only for a new row type — and the family's catalog file, app views and
  * tests/differential/golden/false-covers.known.ts, as every batch does — a label target (CatalogTarget.label, an icon
  * button's icon) through ownPartsRows too, asked by its label. A text target (CatalogTarget.text) of any family adds
  * golden-spec/text.ts's rows (its string read back from the tree and, `ocr`, by the host's recognizer from the
@@ -69,15 +69,16 @@ export { dismissalOf, dismissRows, ownPartsRows } from './golden-spec/false-cove
 export * from './golden-spec/rows.js';
 
 /**
- * A coloured target's rows, by its truth: beneath a presented layer (presented.ts); open and `whole` — or with no
- * measured geometry — reached and drawn as itself (base.ts); open with a measured geometry at an edge (edges.ts) or in
- * a band or under chrome (bars.ts). `cell`, the target's capture, is what a geometry's rows read the bands and the
- * chrome from; without it (`undefined`) no geometry row is asked. `source`, the replayed tree's: whether its capture
- * listed the target (TargetTruth.listed) — an edge row accepts a target its tree did not. Both are required, as
- * formExpectations' `source` is, so a caller cannot forget the capture it replays. `tree`, the replayed tree's payload:
- * where it lists the target's node (truth.ts#nodeFramesIn, by the selector the open rows ask — its identifier, or a
- * text target's text), the open tap is held to that node's centre (base.ts#atProbe); without it, to the reach around
- * the probe point. Every replay passes it; a unit test of a row's choice may leave it out.
+ * A coloured target's rows, by its truth: beneath a presented layer (presented.ts); covered by a sibling drawn over its
+ * centre (covered.ts); open and `whole` — or with no measured geometry — reached and drawn as itself (base.ts); open
+ * with a measured geometry at an edge (edges.ts) or in a band or under chrome (bars.ts). `cell`, the target's capture,
+ * is what a geometry's rows read the bands and the chrome from; without it (`undefined`) no geometry row is asked.
+ * `source`, the replayed tree's: whether its capture listed the target (TargetTruth.listed) — an edge row accepts a
+ * target its tree did not. Both are required, as formExpectations' `source` is, so a caller cannot forget the capture
+ * it replays. `tree`, the replayed tree's payload: where it lists the target's node (truth.ts#nodeFramesIn, by the
+ * selector the open rows ask — its identifier, or a text target's text), the open tap is held to that node's centre
+ * (base.ts#atProbe); without it, to the reach around the probe point. Every replay passes it; a unit test of a row's
+ * choice may leave it out.
  */
 export function expectations(platform: Platform, t: TargetTruth, cell: CellTruth | undefined, source: SourceKind, tree?: string): Expectation[] {
   // The target contract, decided once (target-contract.ts#contractOf); it asks nothing of a target its truth
@@ -103,7 +104,7 @@ export function expectations(platform: Platform, t: TargetTruth, cell: CellTruth
  * The rows of a target its capture laid out no frame for (CellTruth.absent, T6: the L7 carousels' C) — scroll_until and
  * `fully: true` toward it (golden-spec/edges.ts#absentRows). `tree`, the replayed tree's payload: where it lists the
  * target's scroll view a scroller (truth.ts#scrollerListedIn), every touch-down is held inside it; without it, the
- * screen's region only. golden.ts asks them after the framed targets' rows.
+ * screen's region only.
  */
 export function absentExpectations(platform: Platform, a: AbsentTarget, cell: CellTruth, source: SourceKind, tree?: string): Expectation[] {
   return absentRows(platform, a, cell, source, tree);
