@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { hostPaths, scrub, subsOf } from '../../scripts/release/clean-log.js';
 
-/** The release record's logs hold no host path (docs/release.md; path-hygiene.test.ts holds docs/ to it): clean-log.ts. */
+/**
+ * The release record's logs hold no host path (docs/release.md; tests/docs/path-hygiene.test.ts holds docs/ to it):
+ * clean-log.ts.
+ */
 describe('scrub: host paths replaced by labels, longest first', () => {
   it('replaces every occurrence of each path', () => {
     expect(scrub('a /w/repo/x and /w/repo/y', [['/w/repo', '<repo>']])).toBe('a <repo>/x and <repo>/y');
