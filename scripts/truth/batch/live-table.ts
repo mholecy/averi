@@ -5,8 +5,10 @@ import { firstLineOf, messageOf } from './words.js';
 /**
  * Main's live-cases table: selectCases (the cases a run takes) and catalogOf (the lab's cells). Loaded from the
  * checkout's own scripts/truth/live-cases.ts by a dynamic import — never a grep, and never a static import, which would
- * load this module's own tree's table rather than the checkout's (`repo`). A load that fails (a missing file, a syntax
- * error) is named by its callers, never thrown.
+ * load this module's own tree's table rather than the checkout's (`repo`); when this module joined the mutation run
+ * (ADR 0038's T2 amendment) its sandbox held scripts/truth/batch/ alone, so the dynamic import needed no new entry
+ * there (the sandbox holds scripts/truth/*.ts since A11). A load that fails (a missing file, a syntax error) is named
+ * by its callers, never thrown.
  */
 
 /**

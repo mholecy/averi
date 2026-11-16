@@ -301,10 +301,10 @@ final class LongListController: UITableViewController {
 /// reading order — the card's rows between the targets above and below them; grouped (`blur-menu-grouped`), the card
 /// and the screen beneath are each an accessibility container of the screen's size, the card's declared first: its rows
 /// listed before every target beneath, which starts above them (mp-native's chooser under idb, ADR 0015).
-/// ADR 0018 residual 9's probes, each grouped: `blur-menu-stacked` declares the three in the order they are
-/// drawn (the screen beneath, the backdrop, the card; no zIndex) — with blur-menu-grouped's reverse declaration it
-/// tells whether WDA lists the backdrop and the screen beneath, both at 0,0 the screen's size, in draw order or in
-/// declaration order; `blur-menu-unhidden` is blur-menu-grouped with the backdrop not `.accessibilityHidden`.
+/// ADR 0018 residual 9's probes, each grouped: `blur-menu-stacked` declares the three in the order they are drawn (the
+/// screen beneath, the backdrop, the card; no zIndex) — with blur-menu-grouped's reverse declaration it tells whether
+/// WDA lists the backdrop and the screen beneath, both at 0,0 the screen's size, in draw order or in declaration order;
+/// `blur-menu-unhidden` is blur-menu-grouped with the backdrop not `.accessibilityHidden`.
 struct BlurMenuScreen: View {
     @EnvironmentObject var lab: Lab
     let cell: Cell

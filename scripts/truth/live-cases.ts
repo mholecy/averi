@@ -554,11 +554,13 @@ const FORMS: Omit<Case, 'group'>[] = [
   { id: 'f14', cell: F, says: 'fill, clear, a phone number with its `+421` under a `+421` placeholder', calls: [fill(F, 'phone', '+421903123456', true)], judge: holds('phone', '+421903123456') },
   // D63: the date field keeps 8 digits, so a no-clear `2026` after a full date changes nothing, though the field's text
   // holds it; averi must say the field did not change, not Filled (live-forms.ts#refusedUnchanged). A `loud-changed`
-  // here points to the caret landing inside the text (the cap then keeps other digits), not to D63.
+  // here points to the caret landing inside the text (the cap then keeps other digits), not to D63. Run on the device
+  // in batch-10 (2026-11-03): ok 3/3 on every source.
   { id: 'f15', cell: F, says: 'fill, clear, a full date; then, no clear, digits the full field refuses though its text holds them: did not change', calls: [fill(F, 'date', '31122026', true), fill(F, 'date', '2026')], judge: refusedUnchanged('date', '31.12.2026') },
   // D64: the date field keeps 8 digits, so a no-clear `12` after `31.12.202` keeps the `1` alone — `31.12.2021`, a reading
   // that holds `12` only inside the earlier text; averi must fail it, not say Filled (live-forms.ts#refusedCapped). A
-  // `loud-changed` here points to the caret landing inside the text (the cap then keeps other digits), not to D64.
+  // `loud-changed` here points to the caret landing inside the text (the cap then keeps other digits), not to D64. Run
+  // on the device in batch-10 (2026-11-03): ok 3/3 on each source.
   { id: 'f16', cell: F, says: 'fill, clear, a date one digit short; then, no clear, two digits the field keeps only the first of, though its text holds them: refused', calls: [fill(F, 'date', '3112202', true), fill(F, 'date', '12')], judge: refusedCapped('date', '31.12.2021') },
   // L7: form-grouped (D60, D37's `+421`) — ibanEager adds a space as soon as a group of four is complete (group4eager:
   // `SK31` shows `SK31 `), phoneGrouped groups a phone number in threes under a `+421` placeholder (phone3). Read on

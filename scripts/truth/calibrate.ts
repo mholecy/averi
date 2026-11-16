@@ -13,12 +13,12 @@ import { WORKING_TREE, type SideRun } from './side-run.js';
 import { isMain } from '../is-main.js';
 
 /**
- * Phase 3's calibration (docs/plans/2026-10-15-ground-truth-lab-app.md): golden must fail on the commit before a
- * note's fix and pass after it. Golden runs (`--json`, the whole truth corpus) with THIS checkout's harness and truth
- * over the src of every before and after commit of the notes of scripts/truth/calibration.json (withSides: the commit
- * a note's first fix was made on and its last fix, unless the table says otherwise; side.ts loads an older src as it
- * is), and each note that names golden rows gets a verdict from its rows — a note with several fixes
- * one verdict per before/after pair (`pairs`, pairsOf: `<n>.1` its own, `<n>.2` … the further ones):
+ * The calibration (docs/plans/2026-10-15-ground-truth-lab-app.md): golden must fail on the commit before a note's fix
+ * and pass after it. Golden runs (`--json`, the whole truth corpus) with THIS checkout's harness and truth over the src
+ * of every before and after commit of the notes of scripts/truth/calibration.json (withSides: the commit a note's first
+ * fix was made on and its last fix, unless the table says otherwise; side.ts loads an older src as it is), and each
+ * note that names golden rows gets a verdict from its rows — a note with several fixes one verdict per before/after
+ * pair (`pairs`, pairsOf: `<n>.1` its own, `<n>.2` … the further ones):
  *
  *   CALIBRATED            every named row red before WITH the note's defect (`defect`: the note's own symptom, a
  *                         pattern of the row's mismatch or of its reply where the mismatch quotes only its start),
@@ -155,8 +155,8 @@ export interface CalibrationEntry {
    */
   pairs?: CalibrationPair[];
   /**
-   * The note's live calibration (phase 5): its live cases at a before and an after commit, on the lab device — each
-   * with the pair it calibrates (LiveCalibration.pair: the note's own unless it says so; pairsOf attaches it there).
+   * The note's live calibration: its live cases at a before and an after commit, on the lab device — each with the pair
+   * it calibrates (LiveCalibration.pair: the note's own unless it says so; pairsOf attaches it there).
    */
   live?: LiveCalibration[];
 }
@@ -179,11 +179,11 @@ export interface CalibrationPair {
 }
 
 /**
- * A live calibration (phase 5; scripts/truth/live.ts `--side`): the note's live cases run against the REAL lab app at
- * the note's before and after commits, the app's tap log, offsets and strokes the oracle — what a replayed tree cannot
- * show. Recorded by hand from the runs (a device is no vitest test): `verdict` as the golden verdicts read — CALIBRATED
- * every case not ok before with the note's defect and ok after, DOES-NOT-FAIL a case ok before — and `summary` the
- * committed live summary holding each side's replies and app state.
+ * A live calibration (scripts/truth/live.ts `--side`): the note's live cases run against the REAL lab app at the note's
+ * before and after commits, the app's tap log, offsets and strokes the oracle — what a replayed tree cannot show.
+ * Recorded by hand from the runs (a device is no vitest test): `verdict` as the golden verdicts read — CALIBRATED every
+ * case not ok before with the note's defect and ok after, DOES-NOT-FAIL a case ok before — and `summary` the committed
+ * live summary holding each side's replies and app state.
  */
 export interface LiveCalibration {
   platform: 'ios' | 'android';

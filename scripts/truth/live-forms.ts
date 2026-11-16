@@ -150,16 +150,16 @@ export const FOCUS_UNREAD_HEDGE = {
  * premise its own, checked first: the field missing or empty means the prefix was never inserted — the lab's fault, a
  * SKIP whatever averi replied, where the app logged a `focus` event for the field; with none, averi's tap never focused
  * it — LOUD `loud-untouched`, said so, or a MISMATCH `fill-claim-unfocused` over a Filled (averi's false claim, a class
- * of its own: a failure other than a claim over the prefix); a claim of done over anything but
- * `inserted` means the field took the keys it must refuse — a SKIP too (labFaultWhy), averi's Filled maybe true. No
- * KNOWN entry matches a SKIP.
+ * of its own: a failure other than a claim over the prefix); a claim of done over anything but `inserted` means the
+ * field took the keys it must refuse — a SKIP too (labFaultWhy), averi's Filled maybe true. No KNOWN entry matches a
+ * SKIP.
  * Then, D64b-3: under uiautomator, the one source that skips that re-read, a Filled over `inserted` whose ⚠ line says
- * the text after focus was not read (replies.ts#focusTextNotReadSaid) is an honest hedge — ok, counted under its residual
- * (`FOCUS_UNREAD_HEDGE`, the carousel's hedged maxSwipes' way: LiveVerdict.accepted), as the reply does not claim the
- * text is the typing. Then refusedLadder with "did not change": ok only on an error saying so with `inserted` held (what
- * the post-focus re-read lets averi say: it read `inserted` before typing); any other claim of done over `inserted` is
- * a MISMATCH `fill-claim` no KNOWN entry matches: a plain Filled, or a hedge from a source that re-reads (idb, wda: it
- * would mean they skip it).
+ * the text after focus was not read (replies.ts#focusTextNotReadSaid) is an honest hedge — ok, counted under its
+ * residual (`FOCUS_UNREAD_HEDGE`, the carousel's hedged maxSwipes' way: LiveVerdict.accepted), as the reply does not
+ * claim the text is the typing. Then refusedLadder with "did not change": ok only on an error saying so with `inserted`
+ * held (what the post-focus re-read lets averi say: it read `inserted` before typing); any other claim of done over
+ * `inserted` is a MISMATCH `fill-claim` no KNOWN entry matches: a plain Filled, or a hedge from a source that re-reads
+ * (idb, wda: it would mean they skip it).
  */
 export const refusedOnFocus =
   (tag: string, inserted: string) =>
@@ -332,14 +332,13 @@ export const judgeUnderSheet =
 
 /**
  * c5–c7: an element assert, a colour assert and a flow's `wait:` on name beneath form-picker's sheet, open at launch
- * and fully expanded (the not-founds a scratch driver asked:
- * docs/truth/live-android-2026-10-19-hint-everywhere.md). name lies beneath the sheet, so the call must fail on not
- * finding it (replies.ts#missedTarget: the assert's `not found within …`, the flow's `Timed out … waiting for element`),
- * nothing may fire, and the not-found says the sheet's remedy exactly once (`remedyUnderSheet`): none, or "close it
- * first" twice, is LOUD. A MISMATCH otherwise: a pass or a flow done; an assert that FAILED on an element it found (the
- * colour wrong) — averi resolved an element beneath the sheet; and an ERROR that is no wait for the target (a flow the
- * config lacks, a bad argument) — a harness fault, named so, never an honest LOUD. The why quotes an assert's verdict
- * line, not its summary.
+ * and fully expanded (the not-founds a scratch driver asked: docs/truth/live-android-2026-10-19-hint-everywhere.md).
+ * name lies beneath the sheet, so the call must fail on not finding it (replies.ts#missedTarget: the assert's
+ * `not found within …`, the flow's `Timed out … waiting for element`), nothing may fire, and the not-found says the
+ * sheet's remedy exactly once (`remedyUnderSheet`): none, or "close it first" twice, is LOUD. A MISMATCH otherwise: a
+ * pass or a flow done; an assert that FAILED on an element it found (the colour wrong) — averi resolved an element
+ * beneath the sheet; and an ERROR that is no wait for the target (a flow the config lacks, a bad argument) — a harness
+ * fault, named so, never an honest LOUD. The why quotes an assert's verdict line, not its summary.
  */
 export const judgeMissUnderSheet =
   (tag: string) =>

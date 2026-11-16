@@ -229,7 +229,7 @@ private fun TabbarFloating(cell: Cell, lab: Lab) {
 /**
  * `fab`: a scroll view (`list`) under a transparent full-width host (128 dp, 16 dp above the navigation band, listed
  * after the list) holding only a round 96-dp FAB (chrome `fab`): L and K lie in the host's band beside the FAB, W above
- * it (calibration.json #24 — the host is no cover; averi's accepted reading is that it is).
+ * it (calibration.json #24 — the host is no cover; averi's reading, accepted in round 13, is that it is).
  */
 @Composable
 private fun Fab(cell: Cell, lab: Lab) {
