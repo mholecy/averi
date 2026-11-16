@@ -101,10 +101,6 @@ One platform fact sits above the adapters on purpose: the stroke pace `interact/
 idb-measured constant that `interact/scroll-rounds.ts#strokeKind` picks by the tree's `flatList` mark (read as
 `ui-tree/dialect.ts#TreeDialect.topLayerOnly`; ADR 0018 Decision 4; backlog A4 tracks moving it onto the adapter).
 
-The rule earned its keep: the platform layer once imported the selector layer (for a `tapElement` with no platform
-code in it), and `flow/config.ts` had become the home of vocabulary neither flow nor config owns. Both inversions were
-invisible until the arrows were drawn.
-
 Everything runs locally on the dev machine; nothing talks to the cloud.
 
 ### The layers
@@ -593,8 +589,8 @@ Small and high-level — agents do better with fewer, smarter tools. Each tool's
 | `verify(platforms?, state?, flow?, asserts?, contract?, environment?)` | The same sequence on both platforms, legs concurrent; parity tables from a layout contract |
 | `get_logs(platform, sinceSeconds?, grep?, maxLines?)` | Crash/exception scan with a header of what the grep matched |
 
-Every tool that resolves a device takes `configPath` (default `./averi.yaml`), so on iOS each gets the project's tree
-source. `record_flow` is not a tool — a v2 idea (§9).
+Every device tool (every tool except `list_devices` and `select_device`) takes `configPath` (default `./averi.yaml`), so
+on iOS each gets the project's tree source. `record_flow` is not a tool — a v2 idea (§9).
 
 ### Which tools read averi.yaml
 

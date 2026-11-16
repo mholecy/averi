@@ -33,10 +33,11 @@ Ask the user which platforms they need if the repo doesn't make it obvious.
 - If `xcode-select -p` points at CommandLineTools, that's fine — averi injects `DEVELOPER_DIR`
   itself when Xcode is at `/Applications/Xcode.app` (anywhere else, set `DEVELOPER_DIR` in
   `.mcp.json`'s `env`), no sudo needed.
-- Only for `app.ios.treeSource: wda` (step 4): averi builds WebDriverAgent with `xcodebuild`
-  from the `appium-webdriveragent` package — an optional dependency installed with averi
-  (`npx -y averi` included). If that optional install was skipped or failed (e.g.
-  `--omit=optional`), `treeSource: wda` fails with a message naming the package.
+- For the default `app.ios.treeSource: auto` and for `wda` (step 4): averi builds WebDriverAgent
+  with `xcodebuild` from the `appium-webdriveragent` package — an optional dependency installed
+  with averi (`npx -y averi` included). If that optional install was skipped or failed (e.g.
+  `--omit=optional`), `auto` reads the tree through idb with a `⚠` line naming the reason, and
+  `treeSource: wda` fails with a message naming the package.
 
 **Check:**
 
@@ -227,12 +228,14 @@ per-platform steps (`android:`/`ios:` on one step), keypads whose digits have no
 in), and `branch:` for state-dependent paths (e.g. Keychain-surviving PIN login on iOS). Full
 step reference is in the skill you installed in step 3.
 
-> **React Native app on iOS:** if `id:` selectors miss static text and containers under the
-> default tree source, that's expected — add `app.ios.treeSource: wda` to `averi.yaml` (one
+> **React Native app on iOS:** if `id:` selectors miss static text and containers, the tree was
+> read through idb, which drops container ids: under the default `auto` that means WebDriverAgent
+> could not come up (the replies carry a `⚠` line naming the reason). Fix what it names, or add
+> `app.ios.treeSource: wda` to `averi.yaml` to pin WebDriverAgent and fail loudly instead (one
 > line; taps/typing stay on idb, only the tree read routes through WebDriverAgent; first WDA
 > build per Xcode version takes minutes; it needs the optional `appium-webdriveragent` package,
 > see step 0). Details: https://github.com/mholecy/averi/blob/main/docs/plans/ios-wda-tree-source.md.
-> With `wda` averi also sees the iOS soft keyboard: a tap on an element it covers is refused
+> Through WebDriverAgent averi also sees the iOS soft keyboard: a tap on an element it covers is refused
 > rather than sent into the keys — unless `app.ios.keyboardDismiss` names what hides it, e.g.
 > `[{ tap: { id: login_title } }, { accessory: true }]` (a neutral element whose tap does not
 > submit — a title or label, never a button — or the Done toolbar above a number pad); then
