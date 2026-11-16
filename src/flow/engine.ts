@@ -394,8 +394,8 @@ export interface EngineOptions {
 /**
  * What a run-layer request carries for the engine beyond the config and the
  * adapter: the credential environment and the session. One type, so the run
- * layer declares (and documents) them once — the comments are EngineOptions'
- * own.
+ * layer declares (and documents) them once — the comments are
+ * EngineOptions' own.
  */
 export type EngineContext = Pick<EngineOptions, 'environment' | 'session'>;
 
@@ -1155,9 +1155,9 @@ export class FlowEngine {
       this.log('⚠ detect', `${subject} — ${readFailed(outcome.readError)}`);
     }
     // A probe that read NO tree in any round is unknown, not "no" (the
-    // measured incident: the idb 0×0 tree) — the ladder refuses a destructive
-    // rung on it. One good read makes it "no" even if a later read failed:
-    // that tree was knowledge.
+    // measured incident of 2026-10-06: the idb 0×0 tree) — the ladder refuses
+    // a destructive rung on it. One good read makes it "no" even if a later
+    // read failed: that tree was knowledge.
     // `treesRead === 0` means every round's read failed, so the last one's
     // error is set; the second test only narrows the type.
     if (outcome.treesRead === 0 && outcome.readError !== undefined) return { answer: 'unknown', readError: outcome.readError };
@@ -1342,7 +1342,9 @@ export class FlowEngine {
     const { element, timeout, ...rest } = spec;
     // The YAML's `timeout: 2s` is this layer's vocabulary; interact takes ms.
     // The pause after each swipe is interact/scroll.ts's own (400 ms): it is
-    // a gesture-settle wait, not this engine's poll interval.
+    // a gesture-settle wait, not this engine's poll interval. Inside flows
+    // that pause is not measured on a device (it was the 500 ms poll
+    // interval before): a device run should check `scroll_until` steps.
     const result = await scrollUntilVisible(this.adapter, element, {
       ...rest,
       // A flow names a scroll view by element spec, never by rect (D81): a failure's way into one asks for a spec.

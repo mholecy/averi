@@ -49,13 +49,13 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
  * Measured (the lab app's `scroll-bounded`, WDA): `direction: "up"` for F at content y 1380 of `lower` (0,380 402x180)
  * at its top stroked up three times, moved nothing and failed advising `down`.
  *
- * Until then a target never sighted short of the far edge is "the caller's direction to honour" (`beyondFarEdgeIn`,
- * `nextStroke`): nothing is guessed from a screen no stroke changed. The caller's direction is stroked first; the turn
- * needs PROOF from the reads — strokes that changed nothing are no proof on their own (they may not have been taken:
- * scroll-rounds.ts#UNMOVED_STROKES_EXHAUST), the tree's own listing of where the content ends is — and a tree that
- * lists the target past that scroll view's far edge, which is no guess either. Why turn rather than fail with the
- * advice: the reply already knew the way, and a caller who asked the wrong way gets the row at the cost of the one
- * stroke that proved it.
+ * Until a stroke proves the end, a target never sighted short of the far edge is "the caller's direction to honour"
+ * (`beyondFarEdgeIn`, `nextStroke`): nothing is guessed from a screen no stroke changed. The caller's direction is
+ * stroked first; the turn needs PROOF from the reads — strokes that changed nothing are no proof on their own (they may
+ * not have been taken: scroll-rounds.ts#UNMOVED_STROKES_EXHAUST), the tree's own listing of where the content ends is —
+ * and a tree that lists the target past that scroll view's far edge, which is no guess either. Why turn rather than
+ * fail with the advice: the reply already knew the way, and a caller who asked the wrong way gets the row at the cost
+ * of the one stroke that proved it.
  *
  * Decidable on WDA's trees only (unclipped frames: ui-tree/geometry.ts#Clips.contentToward). Not on uiautomator's: its
  * rects are cut to the scroll container, so where the content ends is not listed — content past the edge reads flush

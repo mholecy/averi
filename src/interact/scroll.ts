@@ -34,9 +34,9 @@ export interface ScrollOptions {
   settleMs?: number;
   /**
    * The eyes a `fully visible` claim is confirmed with, and the order question asked of two controls listed in reading
-   * order (ui-tree/eyes.ts; verify/eyes.ts#eyesOn, which the composition roots hand in). REQUIRED (A30; ADR 0024, amendment
-   * A30): were it optional, a caller that forgot them would typecheck and say every such claim as the tree's, unchecked
-   * ("… a screenshot could not tell (no screenshot was taken)"). A test hands a fake (tests/helpers/eyes.ts).
+   * order (ui-tree/eyes.ts; verify/eyes.ts#eyesOn, which the composition roots hand in). REQUIRED (A30; ADR 0024,
+   * amendment A30): were it optional, a caller that forgot them would typecheck and say every such claim as the tree's,
+   * unchecked ("… a screenshot could not tell (no screenshot was taken)"). A test hands a fake (tests/helpers/eyes.ts).
    */
   eyes: Eyes;
   /**

@@ -164,10 +164,10 @@ export async function loadConfigIfPresent(path: string): Promise<AveriConfig | u
  * credential values (gitignored). Shell/CI exports win over the file, so a
  * variable the user set is never overridden; the file is re-read on EVERY
  * load, so editing .env.averi mid-session takes effect on the next tool call
- * (a first-load-wins read was seen to keep typing stale credentials for the
- * server's whole lifetime). Returned, not written into `process.env`:
- * nothing is written, so nothing needs refreshing on the next load, and no
- * state decides a value. A missing file contributes nothing.
+ * (measured 2026-08-05: a first-load-wins read kept typing stale credentials
+ * for the server's whole lifetime). Returned, not written into
+ * `process.env`: nothing is written, so nothing needs refreshing on the next
+ * load, and no state decides a value. A missing file contributes nothing.
  *
  * So a name REMOVED from .env.averi is gone on the next load (kept in
  * `process.env`, a removed `AVERI_ENV` would keep every later run on the old

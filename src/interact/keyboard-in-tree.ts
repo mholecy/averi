@@ -135,9 +135,10 @@ export class AfterDismissalTap extends KeyboardGuardError {
 
 /**
  * What a refusal after the in-tree model's moves says: a move cannot be undone, and the screen is the reader's to look
- * at. Not the window model's sentence after a failed look (keyboard-window.ts, the `hint` its Hiding carries): that one
- * says back may have NAVIGATED if no keyboard was really up, and whether the witness could be asked — a different fact
- * about a different key, so it is written there.
+ * at. One tap says only that; several moves, or a drag, say what more they may have done. Not the window model's
+ * sentence after a failed look (keyboard-window.ts, the `hint` its Hiding carries): that one says back may have
+ * NAVIGATED if no keyboard was really up, and whether the witness could be asked — a different fact about a different
+ * key, so it is written there.
  */
 const mayHaveChanged = (moves: readonly DismissalMove[]): string =>
   moves.length === 1 && moves[0].kind === 'tap'

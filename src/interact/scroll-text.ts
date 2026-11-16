@@ -417,7 +417,8 @@ const detentText = (detent: DetentMove | undefined): string => (detent === undef
 /**
  * The flush clause (flush-check.ts), with no separator: what the stop's edge on its scroll container means — checked by
  * a probe (after `fully visible after N swipes; `), or not checked (the hedge a `NOT CONFIRMED WHOLE` lead opens with,
- * T17: `flushHedged`). The container is quoted as a node's rect (`rectText`): it is one.
+ * T17: `flushHedged`). The container is quoted as a node's rect (`rectText`): it is one. Exported because the
+ * troubleshooting reference quotes its rendering (tests/mcp/tool-descriptions.test.ts pins its `axis` rendering).
  */
 export function flushText(flush: Flush): string {
   const cut = "it may be cut there, a rect assert or screenshot may measure part of it";
@@ -1067,7 +1068,10 @@ function shortClause(judged: Judged): string {
   }
 }
 
-/** Which bound ended it, as the failure's cause. */
+/**
+ * Which bound ended it, as the failure's cause. The troubleshooting reference quotes its rendering
+ * (tests/mcp/tool-descriptions.test.ts pins the proven end's).
+ */
 export function boundText(by: BoundBy, swipes: number, remedy: WithinRemedy = WITHIN_REMEDY.rect): string {
   switch (by.of) {
     case 'exhausted': {
