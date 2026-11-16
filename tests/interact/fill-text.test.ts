@@ -164,7 +164,7 @@ describe('fillReply and fillStepText — the MCP reply and the flow line of the 
     );
   });
 
-  // m-1 (review 2026-10-08, bundle C round 1) and df8a91a: a clear alone
+  // df8a91a: a clear alone
   // whose read after the delete lost the field — deletes on BOTH media.
   it('a clear alone: "Cleared … (N deletes sent)" in the reply and `=  (N deletes sent)` on the line; verified keeps "Filled" and characters', () => {
     expect(both('role:textfield value:"XX12345"', fact({ typed: 0, readBack: { kind: 'lost', why: 'unmatched' }, cleared: 7 }))).toEqual({
@@ -195,7 +195,7 @@ describe('fillReply and fillStepText — the MCP reply and the flow line of the 
   });
 
   it('focused: nothing typed, no delete sent, not verified — never "Cleared", never "Typed 0 characters"', () => {
-    // M-1 (review 2026-10-08): a clear ALONE on a label was "Filled … (0 characters)".
+    // Unguarded, a clear ALONE on a label would read "Filled … (0 characters)".
     expect(both('text:"IBAN*"', fact({ typed: 0, role: 'text', readBack: { kind: 'nothing-typed' }, cleared: 'unmeasured' }))).toEqual({
       reply: 'Focused text:"IBAN*" — NOT verified: clear sent no delete — a role text node\'s length is not the field\'s',
       flow: [['⚠ fill', 'text:"IBAN*" =  — NOT verified: clear sent no delete — a role text node\'s length is not the field\'s']],
@@ -370,14 +370,14 @@ describe('fillFailureText — every error a fill throws', () => {
         'not a transformed input; content withheld from this error',
     );
     expect(mismatch({ kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true }, 2, 2)).toMatch(/the first 1 typed character is there, .* the last 1 did not land/);
-    // D28 code review: nothing added, only a typed space shown as another space — never "grouped".
+    // D28: nothing added, only a typed space shown as another space — never "grouped".
     expect(mismatch({ kind: 'dropped-tail', landed: 4, dropped: 5, grouped: false }, 9, 4)).toBe(
       'fill: typed 9 characters but the field shows 4 — the first 4 typed characters are there, its spaces shown as another kind of space, ' +
         'the last 5 did not land: dropped, or refused by the field (a length cap, a character it does not take) — not a transformed input; content withheld from this error',
     );
   });
 
-  // D64 review round 2 (NIT-2): a dropped tail that is a whole landing too (fill-landing.ts#wholeLandingToo: `11 ` for
+  // D64: a dropped tail that is a whole landing too (fill-landing.ts#wholeLandingToo: `11 ` for
   // `11` after `1`) was typed nothing again; the reply says the other reading and its remedy
   it('a dropped tail that is a whole landing too adds the select-all reading and `clear: true`', () => {
     expect(mismatch({ kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true, wholeToo: true }, 2, 3)).toBe(
@@ -387,7 +387,7 @@ describe('fillFailureText — every error a fill throws', () => {
     );
   });
 
-  // D64 code review: the same for a plain length (an exact prefix: `-5-` for `-5` after `-5`, `xaa` for `aa` after `xa`)
+  // D64: the same for a plain length (an exact prefix: `-5-` for `-5` after `-5`, `xaa` for `aa` after `xa`)
   it('a length that is a whole landing too says the field may have replaced its text, and `clear: true`', () => {
     expect(mismatch({ kind: 'length', wholeToo: true }, 2, 3)).toBe(
       'fill: typed 2 characters but the field shows 3 — the field may have replaced its text (select-all): fill with `clear: true` (content withheld from this error)',
@@ -408,7 +408,7 @@ describe('fillFailureText — every error a fill throws', () => {
     );
   });
 
-  // D79 review round 1, MAJOR-1: the rest of the class — a `length` whose field count is the typed one
+  // D79: the rest of the class — a `length` whose field count is the typed one
   it('a length of as many characters as typed says how many are the typing, or that some are bullets', () => {
     expect(mismatch({ kind: 'length', equal: { why: 'padded', typedPart: 1 } }, 2, 2)).toBe('fill: typed 2 characters but the field shows 2, only 1 of them past its earlier text (content withheld from this error)');
     expect(mismatch({ kind: 'length', equal: { why: 'placeholder' } }, 7, 7)).toBe(

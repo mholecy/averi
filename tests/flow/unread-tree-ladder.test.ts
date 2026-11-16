@@ -499,7 +499,7 @@ flows:
     expect(error.trace.some((t) => t.detail?.includes('escalating to') === true)).toBe(false);
   });
 
-  // D21 review round 2: an `assert:` step is a flow step like a wait — the Verifier the engine builds keeps the
+  // D21: an `assert:` step is a flow step like a wait — the Verifier the engine builds keeps the
   // default (persistentRead: 'throw'), so the named error, not a plain "flow asserts failed", reaches isTerminal.
   it('`optional: - assert:` does not skip it: the flow stops there, the step after it never runs', async () => {
     const { fake } = wedgedIdb(always);

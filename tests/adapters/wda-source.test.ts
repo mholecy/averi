@@ -228,7 +228,7 @@ describe('parseWdaSource — normalization and input shapes', () => {
     expect(showsProgress(tree)).toBe(true);
   });
 
-  // The stated residual (D27 review, 2026-10-31): a hidden spinner — 0/0, a covered layer's — still reads as loading.
+  // The stated residual (D27): a hidden spinner — 0/0, a covered layer's — still reads as loading.
   // Not filtered by decision: the hold and scroll_until fall back to their bounded windows, the safe direction.
   it('a hidden (0/0) ActivityIndicator on a loaded screen still makes showsProgress true', () => {
     const tree = parseWdaSourceValue(

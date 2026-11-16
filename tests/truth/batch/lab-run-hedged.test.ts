@@ -11,7 +11,7 @@ import { UNAIMABLE_LEGS } from '../../../scripts/truth/live-carousel.js';
 import { CATALOG, FakeSeam, LAB_SERIAL, labWorld, rejudgeWith, type Answer, type LabWorld } from './lab-fakes.js';
 import { hedgedLegs, liveSummary } from './standing-fakes.js';
 
-// The hedged ceiling's MISMATCH end to end (A21's code review, carried into A22): a carousel run whose every unaimable
+// The hedged ceiling's MISMATCH end to end (A21, carried into A22): a carousel run whose every unaimable
 // leg ended hedged, judged by live-cases.ts#summarize itself (standing-fakes.ts#liveSummary), its lines and its failure
 // reasons the fake rejudge's — through labRun and runBatch to the carousel block's FAIL and exit 1. Its own file:
 // lab-run.test.ts stays off live-cases.ts (its case tables are a heavy import, paid by every mutant's run of the lab

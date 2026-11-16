@@ -6,8 +6,8 @@ import { describe, expect, it } from 'vitest';
 import { rebootSimulatorAdvice } from '../../src/adapters/simulator-reboot.js';
 
 /**
- * simulator-reboot.ts owns the simulator reboot command (iOS adapter stack
- * review, candidate 2); this file pins the wording and that no other module
+ * simulator-reboot.ts owns the simulator reboot command; this file pins
+ * the wording and that no other module
  * under src/ spells the command in its CODE — a new message that needs the
  * reboot calls the builder, or this fails. The call sites themselves are
  * proven by their full-string pins (ios.test.ts, ios-tree-source.test.ts,

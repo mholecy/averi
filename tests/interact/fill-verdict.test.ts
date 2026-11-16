@@ -150,7 +150,7 @@ describe('judgeFill — what the facts mean', () => {
     });
     // With a value whose exact read-back landed, the field shows the value: the clear did its job.
     expect(judgeFill(fact({ typed: 5, readBack: landed, cleared: 1, ...stuck }))).toMatchObject({ did: 'filled', sent: { what: 'characters', n: 1 }, reasons: [] });
-    // Probe J (review of this branch): the unchanged round was the first, so no characters are claimed of a verified fill.
+    // The unchanged round was the first, so no characters are claimed of a verified fill.
     expect(judgeFill(fact({ typed: 5, readBack: landed, cleared: 0, ...stuck }))).toEqual({ did: 'filled', typed: 5, reasons: [], caveats: [] });
     // A clear alone over several rounds counts every delete sent, not the first round's.
     expect(judgeFill(fact({ typed: 0, readBack: nothingTyped, cleared: 5, clearUnchanged: { shows: 9, deletes: 14 } })).sent).toEqual({ what: 'deletes', n: 14 });
@@ -164,7 +164,7 @@ describe('judgeFill — what the facts mean', () => {
   });
 
   // What `sent` says, case by case — expected values, not the formula
-  // (review round 2: the loop below once restated judgeFill's own rule).
+  // (a loop that restated judgeFill's own rule would prove nothing).
   it('sent: characters seen deleted of a fill that typed or was verified; every delete sent of an unverified clear alone; nothing else', () => {
     const lost = { kind: 'lost', why: 'unmatched' } as const;
     const stuck = { shows: 9, deletes: 12 };

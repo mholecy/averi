@@ -380,7 +380,7 @@ describe('the screen without the device: the window the tree vouches for (ui-tre
 
 
 /**
- * The owner's decision (code review of round 8, P2): Android's status band reaches the pixel asserts. An
+ * The owner's decision: Android's status band reaches the pixel asserts. An
  * edge-to-edge app bar (Android 15+) laid from the screen's top under the 66-px band fails a colour assert closed —
  * kept — and the advice leads with what to assert instead: its title, which lies clear of the band and is judged on
  * its own.

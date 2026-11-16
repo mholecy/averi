@@ -148,7 +148,7 @@ describe('WdaServer.ensureRunning', () => {
 
   // A /source that times out on a deep tree is the documented WDA weakness — the
   // server is alive (answers /status). Killing it would lose the session and then
-  // report "still does not answer", which is false (review 2026-09-18).
+  // report "still does not answer", which is false.
   it('a /source TIMEOUT on a server that still answers /status is NOT a restart', async () => {
     const { dd } = await tempDerivedData(true);
     const spawner = fakeSpawn();
@@ -696,7 +696,7 @@ describe('WdaServer.keys — one session per WDA start, one retry on a lost sess
     server.stop();
   });
 
-  // Review round 1: two typings in flight on the old session, both lost — the second must not forget the session the
+  // Two typings in flight on the old session, both lost — the second must not forget the session the
   // first just made (WDA ends every other session when one is made, so a third would end the first's).
   it('two concurrent typings that both meet a lost session make ONE new session between them', async () => {
     const { server, posts } = await keysSetup((req) => (req.url.includes('/session/S1/') ? { status: 404, body: { value: { error: 'invalid session id' } } } : { status: 200, body: { value: null } }));
@@ -719,7 +719,7 @@ describe('WdaServer.keys — one session per WDA start, one retry on a lost sess
     server.stop();
   });
 
-  // T4 review: the status alone decides too — any 404 is a lost session, whatever its body says (wda.ts#postKeys).
+  // T4: the status alone decides too — any 404 is a lost session, whatever its body says (wda.ts#postKeys).
   it('a bare HTTP 404, its body naming no "invalid session id": a lost session too — one new session, sent once more', async () => {
     const { server, posts } = await keysSetup((_req, n) => (n === 1 ? { status: 404, body: { value: { error: 'unknown command', message: 'Unhandled endpoint' } } } : { status: 200, body: { value: null } }));
     await server.keys('Šťastný');
@@ -762,7 +762,7 @@ describe('WdaServer.keys — one session per WDA start, one retry on a lost sess
     server.stop();
   });
 
-  // Review round 1: WDA's message is NSError's description, which may hold the value escaped (`\\U0161`) or a part of
+  // WDA's message is NSError's description, which may hold the value escaped (`\\U0161`) or a part of
   // it — no cut of the text can be sure of it, so /wda/keys' error quotes the status and `value.error` alone.
   it.each([
     ['the value quoted whole', 'Failed to type "Šťastný": no keyboard focus'],
@@ -875,7 +875,7 @@ describe('WdaServer.shutdown — the process-shutdown form of stop()', () => {
 
   it('a WEDGED listener (probe times out) is not "quiet": shutdown() waits, then kills it', async () => {
     // The state a shutdown mid-/source most often meets; the first cut read any
-    // fetch failure as a free port and returned in 1 ms (review 2026-09-18).
+    // fetch failure as a free port and returned in 1 ms.
     const killed: number[] = [];
     const { dd } = await tempDerivedData(true);
     const spawner = fakeSpawn();

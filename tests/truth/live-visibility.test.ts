@@ -540,7 +540,8 @@ describe('the live KNOWN pins the rule a case fails by and the kind of reply it 
   });
   // A consistency check of the data, not a second judge: live-visibility.ts produces `stop-claim` only on a `visible`
   // reply, so an entry pinning it on another kind could never match; `tap-claim` on a `Tapped` reply (judgeTap), and
-  // in judgeAbsentAtEnd on any reply but a stop.
+  // in judgeAbsentAtEnd on any reply but `visible` once the app logged something since the launch. The tap-claim half
+  // below is stricter than the producer: an absent-at-end tap-claim on another kind would be rejected here.
   it('a claim pins the kind it claims on: a stop claimed on `visible`, a tap claimed on `Tapped`', () => {
     const bad = Object.entries(LIVE_KNOWN).filter(([, e]) => (e.cls === 'stop-claim' && e.kind !== 'visible') || (e.cls === 'tap-claim' && e.kind !== 'Tapped'));
     expect(bad).toEqual([]);

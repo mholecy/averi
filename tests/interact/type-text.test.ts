@@ -86,7 +86,7 @@ describe('assertTypeable names ENTER only for a newline and a return', () => {
 });
 
 /**
- * Code review of round 7, P2: the remedy after the fate told U+0007, a tab
+ * The remedy after the fate told U+0007, a tab
  * and ESC to "send the key deliberately — pressKey('enter')" — a key that is
  * not theirs, and submits the form. `pressKey('enter')` is named for a
  * newline and a return only (adapters/input-text.ts#controlCharRemedy).

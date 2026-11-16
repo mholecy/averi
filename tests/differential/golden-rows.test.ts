@@ -568,12 +568,12 @@ describe('R-stroke of a FRAMED target its tree does not list: a touch-down besid
     const rs = expectations('android', off, cell, 'uiautomator', LISTED);
     expect(rs.find((r) => r.verb === 'scroll_until')!.says).toBe('R-off, R-stroke: swipes down for it, every touch-down clear of the bands and the chrome and inside its scroll view list, or the reply names list (0,380 402x180)');
     expect(verdict(rs, 'scroll_until', out(NAMED, [BESIDE]))).toBeUndefined();
-    // The rect quoted elsewhere — as the scroll view swiped — is not the list named as untried (review round 1).
+    // The rect quoted elsewhere — as the scroll view swiped — is not the list named as untried.
     const SWIPED = 'ERROR scroll_until id:"lab.edges.A" failed after 2 swipes (… the swipes went over the scroll view 0,380 402x180 only; the tree shows another scroll view that scrolls vertically, which the swipes did not go over: scrollable (0,600 402x180) — if the element lies in it, …) — element never appeared in the tree';
     expect(verdict(rs, 'scroll_until', out(SWIPED, [BESIDE]))).toMatch(/^touched down outside its scroll view list at \(201,699\), and the reply does not name it \(0,380 402x180\)/);
     const ELSEWHERE = 'ERROR scroll_until id:"lab.edges.A" failed after 2 swipes (… content exhausted, still loading, or the swipes were not taken) — element lies outside its scroll view scrollable (0,380 402x180)';
     expect(verdict(rs, 'scroll_until', out(ELSEWHERE, [BESIDE]))).toMatch(/^touched down outside its scroll view list at \(201,699\), and the reply does not name it/);
-    // A label holding a dash does not end the clause: the list named after it is still named (code review).
+    // A label holding a dash does not end the clause: the list named after it is still named.
     const DASHED = 'ERROR scroll_until id:"lab.edges.A" failed after 2 swipes (… which the swipes did not go over: scrollable "A — B" (0,600 402x180), scrollable (0,380 402x180) — if the element lies in one of them, …) — element never appeared in the tree';
     expect(verdict(rs, 'scroll_until', out(DASHED, [BESIDE]))).toBeUndefined();
     // …nor after that clause's dash: another list named untried, this one quoted past it.

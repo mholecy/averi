@@ -379,7 +379,7 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
     expect(moved.typed).toEqual(['SK3112000000']); // no wipe: the deletes would go where the typing went
   });
 
-  // Review round 1: fill-landing.ts#tookText gates the landing — after a retry too, where the loop's own not-taken check
+  // fill-landing.ts#tookText gates the landing — after a retry too, where the loop's own not-taken check
   // no longer returns.
   it('a non-input that ends on its own resolved text after the wipe and retype has not landed', async () => {
     const { io, intent, field } = scripted();
@@ -398,7 +398,7 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
 });
 
 /**
- * A9 review round 1: arms of the switch only a script of reads reaches, each pinned against a hand mutant (`again` lost,
+ * A9: arms of the switch only a script of reads reaches, each pinned against a hand mutant (`again` lost,
  * the tail gate's `tails() === 0`, the report skipped). `rounds`: per typing sent, the poll's reads; the last repeats.
  */
 describe('typeAndConfirm — the arms after a retry', () => {
@@ -594,7 +594,7 @@ describe('typeAndConfirm — an earlier text that holds the value is no landing 
     expect(reads()).toBe(5);
   });
 
-  // review round 1, m-2: `11 ` for `11` after `1` is a select-all field's whole value with an eager mark as much as a
+  // `11 ` for `11` after `1` is a select-all field's whole value with an eager mark as much as a
   // dropped `1` — typing `1` again could leave `111`, said Filled; refused honestly instead, nothing typed again
   it('on-return: a reading that holds the value across the seam is not typed into again — missed', async () => {
     const { io, intent, typed } = scripted({ prefilled: '1', format: () => '11 ' });
@@ -625,7 +625,7 @@ describe('typeAndConfirm — an earlier text that holds the value is no landing 
   it.each([
     ['11 ', '11', '1', '1', { kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true }],
     ['-5-', '-5', '-5', '5', { kind: 'length' }],
-    // D79 review round 1, NIT-2: the value itself, the hedge gone, the append count kept
+    // D79: the value itself, the hedge gone, the append count kept
     ['55', '55', '5', '5', { kind: 'length', equal: { why: 'value-itself', appendWouldShow: 3 } }],
   ])('`%s` for `%s` after `%s`, a sibling gaining the missing `%s`: missed, elsewhere, no hedge', async (shown, value, before, gained, differs) => {
     const { io, intent, typed } = scripted({ prefilled: before, format: () => shown, elsewhere: () => gained });

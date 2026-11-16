@@ -357,7 +357,7 @@ describe('scrollUntilVisible — the soft keyboard', () => {
 /**
  * 2026-10-08, the two "Device check" sections of
  * docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md and
- * review round 1, at the driver: the stroke over a keyboard, the turned and
+ * At the driver: the stroke over a keyboard, the turned and
  * shortened strokes' points, the convergence a fling's physics needs the
  * real stroke lengths for, and the deadline passing during a stroke (the
  * rules behind them: tests/interact/scroll-rounds.test.ts).
@@ -680,7 +680,7 @@ describe('scrollUntilVisible — strokes that drag, not fling, over the scroll c
 });
 
 /**
- * Code review of fix/r7-sliver, item 1 (2026-10-10): uiautomator cuts every rect to its scroller, so a node cut to a
+ * uiautomator cuts every rect to its scroller, so a node cut to a
  * sliver at the scroller's edge has its centre on the screen, and a plain stop there would stop on exactly the strip the
  * next tap refuses (tap-judgement.ts#TapJudge.aim). The plain stop scrolls on.
  */
@@ -904,7 +904,7 @@ describe('scrollUntilVisible — nested clipping containers and a loading list (
 });
 
 /**
- * Code review P2 (2026-10-09): a selector matching two nodes — a container and its button sharing an id — judged by
+ * A selector matching two nodes — a container and its button sharing an id — judged by
  * scroll_until on the match more of which showed (the container, its centre clear) would be refused by the next tap,
  * which acts on the button (resolveNow's preference for a sole interactive match). The scroll judges the tap's match.
  */
@@ -1038,7 +1038,7 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
     expect(error.message).not.toMatch(/CLIPPED|layout defect|fully revealed/);
   });
 
-  // Code review of round 6, P2: `fully` judges clipping against the whole screen, but the stop also needs the centre
+  // `fully` judges clipping against the whole screen, but the stop also needs the centre
   // below the band — full-bleed content whose ROUNDED centre lies in the band (at y 0: 122 pt or less under 62) never
   // stops, and says why. The verification round: 123 pt rounds its centre 61.5 to 62, and stops.
   it('full-bleed content shorter than twice the band (0,0 402x106, centre y 53): no fully: true stop either — the failure names the status bar, no clip', async () => {
@@ -1095,7 +1095,7 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
     expect(fake.swipes).toEqual([{ from: { x: 201, y: 699 }, to: { x: 201, y: 175 } }]);
   });
 
-  // Code review of round 6b, P1: CONTINUE's FRAME (780–824) lies over neither edge of the row at 776–828, so with the far
+  // CONTINUE's FRAME (780–824) lies over neither edge of the row at 776–828, so with the far
   // side read off it the scroll would swipe up twice more, unmoved, before the stuck turn; idb's list pins CONTINUE, whose
   // reach runs to the screen's bottom (draw-order.ts#bottomPinned) — over the row's far (bottom) side.
   it('direction up, fully: true, from -20 flung to 776 — its top under CONTINUE, and CONTINUE\'s reach (down to 874) over its bottom: turned at once, the stroke back reveals it — not "a layout defect"', async () => {
@@ -1458,7 +1458,7 @@ describe('scroll_until within (D78): a selector that does not parse is refused b
 });
 
 /**
- * D81 (review round 2, MINOR-A): the caller's remedy form is the caller's option (`ScrollOptions.remedy`) — the MCP
+ * D81: the caller's remedy form is the caller's option (`ScrollOptions.remedy`) — the MCP
  * tool sets none and keeps D78's rect form, a flow sets `spec` (its engine test pins that side). Driven to the
  * exhausted bound over android scroll-bounded's real dump: O, a row of `lower`, the swipes over `upper`.
  */

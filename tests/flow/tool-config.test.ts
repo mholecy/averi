@@ -62,7 +62,7 @@ describe('loadForCall — the one read of a tool call, judged by its policy', ()
     await expect(loadForCall(OPTIONAL_CONFIG, path)).rejects.toThrow(path);
   });
 
-  // Review round 1: only a MISSING file is no config. Any other read error —
+  // Only a MISSING file is no config. Any other read error —
   // here a directory where the file should be — throws as it came under
   // `optional` too, rather than passing for "no averi.yaml".
   it('optional: a read error other than a missing file (a directory at the path) fails as it came, EISDIR', async () => {

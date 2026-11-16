@@ -472,7 +472,7 @@ describe('parseImeInsets — is a soft keyboard shown, and which rect does it co
     expect(parseImeInsets(HIDING + lines(STATUS_BAR_36, lookalike))).toEqual({ state: 'hidden' });
   });
 
-  // The second witness (review 2026-10-03): DisplayPolicy's mIsImeShowing
+  // The second witness: DisplayPolicy's mIsImeShowing
   // line, present in all three real dumps. A false `shown` presses back on a
   // screen with no keyboard; a silent `hidden` switches the guard off. Both
   // become `unknown` wherever the two witnesses disagree or one is missing

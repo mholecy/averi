@@ -10,7 +10,7 @@ import { escapeRegExp } from '../../src/util/regex.js';
  * `it.each` table whose own callback passes its first parameter to one of them (`replayed`, below, read off the
  * syntax tree: a commented-out row names nothing) — or it is exempt below, with the reason it cannot be judged by
  * `live.ts --rejudge`. A record a test only reads is not replayed. Without this, a row dropped from
- * live-rejudge.test.ts would leave a record no test rejudges, and nothing would fail (T3's review rounds 1 to 4). What
+ * live-rejudge.test.ts would leave a record no test rejudges, and nothing would fail. What
  * it cannot see, being read off the source and not the run: a helper that names a record but is never called, and an
  * early return at run time that skips the rejudge.
  */
@@ -188,7 +188,7 @@ describe('every committed live record is replayed by live-rejudge.test.ts, or ex
     expect(isReplayed(template, 'lv2-group.json')).toBe(false);
   });
 
-  // T3's review round 3: what a text match took for a row.
+  // What a text match took for a row.
   const table = (rows: string) => `it.each([\n${rows}\n] as const)('%s', async (record, want) => {\n  await rejudgeInProcess(record, 'forms');\n});`;
   it('a row commented out names nothing: `//` (b4) or `/* */` (b5); nor a rejudge call commented out', () => {
     const b4 = table("  // ['a-1.json', 'forms', { cases: 1 }],\n  ['b-1.json', 'forms', { cases: 1 }],");
@@ -207,7 +207,7 @@ describe('every committed live record is replayed by live-rejudge.test.ts, or ex
     expect(isReplayed(d1, 'b-1.json')).toBe(true);
   });
 
-  // T3's review round 4: a skipped or todo call runs no rejudge.
+  // A skipped or todo call runs no rejudge.
   it.each([
     ['describe.skip (e1)', "describe.skip('d', () => {\n  it('x', async () => { await rejudgeInProcess('a-1.json', 'forms'); });\n});"],
     ['it.skip (e2)', "it.skip('x', async () => { await rejudgeInProcess('a-1.json', 'forms'); });"],

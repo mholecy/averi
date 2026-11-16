@@ -232,7 +232,7 @@ describe('Clips.axesOf — a scroll view\'s axis and those of the scroll views n
     expect(clips.toldOn('horizontal', PAGE, () => false)).toEqual([chips, inner]);
     expect(clips.toldOn('vertical', PAGE, () => false).map((n) => n.rect)).toEqual([PAGE]);
     expect(clipsOf(tree, FLAT).toldOn('horizontal', PAGE, () => false)).toEqual([]);
-    // Only those meeting the screen given, and none the caller says are the keyboard's own (review round 2).
+    // Only those meeting the screen given, and none the caller says are the keyboard's own.
     expect(clips.toldOn('horizontal', rect(0, 200, 402, 600), () => false)).toEqual([inner]);
     expect(clips.toldOn('horizontal', PAGE, (n) => n === chips)).toEqual([inner]);
   });

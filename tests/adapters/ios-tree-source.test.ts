@@ -138,7 +138,7 @@ describe('parseIdbDescribeAll — the flat list and what only it needs', () => {
     });
     expect(tree.children).toHaveLength(3);
     expect(tree.children.every((c) => c.children.length === 0)).toBe(true); // flat stays flat
-    // The root says so: its children's order is the list's (ui-tree/draw-order.ts reads it — code review P1).
+    // The root says so: its children's order is the list's (ui-tree/draw-order.ts reads it).
     expect(tree.flatList).toBe(true);
     expect(tree.children.every((c) => c.flatList === undefined)).toBe(true);
   });
@@ -463,7 +463,7 @@ describe('IdbTreeSource — an empty tree is a read error, not a screen on which
     );
   });
 
-  // 2026-10-08 (iOS adapter stack review, candidate 2): the reboot names the
+  // The reboot names the
   // simulator the source is BOUND to — not `<udid>`, not simctl's `booted` —
   // and nothing in the advice points at the server's stderr, which the agent
   // reading the tool result cannot see.

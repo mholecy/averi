@@ -1100,6 +1100,9 @@ flows:
 `);
 
   it('converges in ONE call, and the destructive rung still runs exactly once', async () => {
+    // The positive case of the throw path: were a throwing last rung to skip the recovery pass, this would fail
+    // (no `↻ recovery`), and the never-re-runs-a-destructive-rung case below would pass with the destructiveness
+    // filter deleted.
     const fake = lateInterstitial();
     const trace = await FlowEngine.run(cfg, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' });
     expect(fake.launches).toHaveLength(1); // one wipe, not two
@@ -1761,7 +1764,7 @@ flows:
     expect(fake.swipes).toHaveLength(0);
   });
 
-  // D81 review round 1, MINOR-1 (the coordinator's decision): inside `optional:` a `within` that names no scroll view
+  // D81 (the coordinator's decision): inside `optional:` a `within` that names no scroll view
   // fails the flow — an authoring error no screen cures — unless it is `absent`, which is skipped like an absent
   // interstitial. Over android scroll-bounded's real dump (`upper` and `lower`, both vertical) and idb's flat list.
   describe('`within` refused inside `optional:`', () => {
@@ -1820,7 +1823,7 @@ flows:
     });
   });
 
-  // D81 review round 1, MINOR-2: a flow names elements by spec — the exhausted reply's way into a list it never swiped
+  // D81: a flow names elements by spec — the exhausted reply's way into a list it never swiped
   // asks for a spec of it, not the rect a flow cannot give.
   it('a flow\'s exhausted reply names the list beside by spec, never by rect', async () => {
     const BOUNDED = parseDump(readFileSync(new URL('../fixtures/truth/android-averi_lab-api33/scroll-bounded.xml', import.meta.url), 'utf8'));
@@ -2466,7 +2469,7 @@ flows:
       expect(fake.taps).toEqual([]);
     });
 
-    // Code review of round 6, P1: a button pinned under iOS's status bar (centre in the band) is an OffScreenRefusal on
+    // A button pinned under iOS's status bar (centre in the band) is an OffScreenRefusal on
     // a present element — terminal in an optional:, the owner's safe direction — and its remedy offers no scroll_until.
     it('a tap on an element pinned under iOS\'s status bar: refused, the flow fails — not skipped, nothing tapped — and the line says it is pinned', async () => {
       const fake = formFake();
@@ -2534,7 +2537,7 @@ flows:
       });
     });
 
-    // Code review, against the spec card: a failure after the
+    // Against the spec card: a failure after the
     // element was found stays another error. The tap's own resolution never
     // saw it, but the presence check did — so the skip quotes the tap.
     it('a tap SIGHTED by the presence check that then leaves for the whole tap budget: the tap\'s timeout, not (not present)', async () => {
@@ -3214,7 +3217,7 @@ flows:
         expect(JSON.stringify(error.trace)).not.toContain('optional step not skipped');
       });
 
-      // Code review, MINOR 3: terminal is "never escalate past
+      // Terminal is "never escalate past
       // it", not "never look". A rung that reached the state before a
       // TRAILING optional tap was refused has done its job — the ladder's
       // post-failure probe sees it, and the call passes.
@@ -3415,7 +3418,7 @@ flows:
       - ${step}
 `);
 
-  // D66 review (docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md): the flow's `tap:` step says
+  // D66 (docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md): the flow's `tap:` step says
   // what the MCP tap's reply says, as a `⚠ tap` line before the tap line; the tap is sent and the flow goes on.
   it('a tap on a node marked disabled: one ⚠ tap line with the tap reply\'s words, the tap sent, the flow done', async () => {
     const fake = new FakeAdapter({ s: screen(node({ role: 'button', identifier: 'go', rect: { x: 100, y: 200, width: 40, height: 20 }, disabled: true })) }, 's');
@@ -3429,7 +3432,7 @@ flows:
     expect(fake.tapPoints).toEqual([{ x: 120, y: 210 }]);
   });
 
-  // D66 review round 2, decided: quiet suppresses the tap line, not the warning — as the keyboard's ⚠ tap line.
+  // D66, decided: quiet suppresses the tap line, not the warning — as the keyboard's ⚠ tap line.
   it('an optional tap: on a present node marked disabled, the ⚠ tap line too, the tap sent', async () => {
     const fake = new FakeAdapter({ s: screen(node({ role: 'button', identifier: 'promo_close', rect: { x: 100, y: 200, width: 40, height: 20 }, disabled: true })) }, 's');
     const trace = await FlowEngine.run(flow('optional:\n          - tap: { id: promo_close }'), fake, FAST, { flow: 'f' });
@@ -3724,7 +3727,7 @@ flows:
     expect(fake.taps).toEqual([]);
   });
 
-  // Verification of code review of round 6, P1: the remedy after back is judged in the tree that holds the node handed
+  // The remedy after back is judged in the tree that holds the node handed
   // back (the guard's second look) — in the first read's tree it is not found, and the wording would fall back to "both".
   it('an optional tap: whose target the re-layout after back pinned under a status band: the remedy reads the second look\'s tree — pinned, no scroll_until', async () => {
     const fake = loginFake();

@@ -139,7 +139,7 @@ describe('IosAdapter.openDeepLink — the schemes could not be read: opened as b
     expect(stderrLines()).toEqual([notYetRead('simctl appinfo: no such bundle')]);
   });
 
-  // Review round 2: an appinfo failure is not cached — the app may be installed outside averi (Xcode, `simctl install`
+  // An appinfo failure is not cached — the app may be installed outside averi (Xcode, `simctl install`
   // by hand), and every later own-scheme link would otherwise reply a bare "Opened".
   it('a link before the app is installed, then the app appears outside averi: the next link looks up again and waits', async () => {
     let installed = false;
@@ -408,7 +408,7 @@ describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)",
 // D56 (2026-11-02; ADR 0032's D56 amendment): a launch behind iOS's system alert — an unanswered "Open in “AveriLab”?"
 // keeps every launch behind it (batch-2) — names it and its buttons' centres in its ⚠ note, from the same reads as a
 // link's (D54): on idb the label read that lists it, on WDA one short /source at the bound. The launch still never
-// fails, and its happy path makes the same calls as before.
+// fails, and its happy path makes no call a launch without the check would not.
 describe("IosAdapter.launch — the system alert it waits behind, named in its note (D56)", () => {
   const LAUNCH = 'xcrun simctl launch AAAA-1111 dev.averi.lab';
   const APPINFO = 'xcrun simctl appinfo AAAA-1111 dev.averi.lab';

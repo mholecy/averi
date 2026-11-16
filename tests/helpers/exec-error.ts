@@ -7,7 +7,7 @@ import { shownCommand } from '../../src/adapters/failure-text.js';
  * ("Command failed: <cmd>\n"), so a real ExecError NEVER has a blank `stderr`.
  * A fixture built with `new ExecError(cmd, 1, '')` is a shape production
  * cannot emit — a guard written against it passed its test and was dead on a
- * device (2026-09-18 review, BLOCKER). Use this instead of the constructor
+ * device. Use this instead of the constructor
  * whenever a test needs "the command exited non-zero".
  */
 export const execErrorLikeExec = (

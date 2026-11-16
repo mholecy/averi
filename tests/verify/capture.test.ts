@@ -28,7 +28,7 @@ import { Shot } from '../../src/verify/shot.js';
 // The one sleep owner (util/sleep.ts) is recorded, not waited on: the two
 // budgets here are sequences of delays, and the sequence is what to pin —
 // a wall clock is a flake, and the real tree-retry budget cost this file
-// 1.5 s (review 2026-10-03, round 2). Yields a macrotask so nothing spins.
+// 1.5 s. Yields a macrotask so nothing spins.
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 beforeEach(() => {
   resetSleeps();
@@ -530,7 +530,7 @@ describe('measuredFrameFor — the pure tail captureFrame and the comparator fix
     });
   });
 
-  // The parity code review's A3: a screen changed since the memoized read
+  // A screen changed since the memoized read
   // is re-read once before a wider-than-screen refusal, and the frame's
   // scale and window both use what the device says now.
   it('re-reads the device screen once before a wider-than-screen refusal, and measures the frame by the fresh screen', async () => {

@@ -197,7 +197,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
   });
 
   /**
-   * Stage B (2026-10-07): the configured dismissals. The guard's two looks
+   * Stage B: the configured dismissals. The guard's two looks
    * are as above; on the second covering look the first usable strategy is
    * tapped ONCE, the hide delay waited, the target resolved a third time
    * and the band read off that look. The measured facts behind the
@@ -388,7 +388,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
     });
 
     /**
-     * Review round 1: the resolution policy prefers the sole interactive
+     * The resolution policy prefers the sole interactive
      * match, so a `tap: { text: "Sign in" }` on a screen where a title and a
      * BUTTON share the label would have tapped the button — the one thing a
      * dismissal must never do. Interactive matches are dropped before any
@@ -433,7 +433,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
     });
 
     /**
-     * Review round 1: "there" is not "on screen" — WDA keeps off-screen nodes
+     * "There" is not "on screen" — WDA keeps off-screen nodes
      * in the tree, and a title scrolled above the viewport or under an
      * alert's text is still found by its selector. The tap point must lie
      * inside the root's rect and must not be drawn over by later content.
@@ -1032,7 +1032,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
   });
 
   /**
-   * The keyboard's OWN controls (review 2026-10-07): a tap on a key, on the
+   * The keyboard's OWN controls: a tap on a key, on the
    * accessory toolbar's Done, on the Passwords bar or on dictation lands
    * inside the band and is what the user does — an OTP digit, the one
    * non-submitting dismissal. The WDA source marks their Windows
@@ -1085,7 +1085,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
 });
 
 /**
- * Stage B (2026-10-07): the in-tree dismissal after a fill. One tree read;
+ * Stage B: the in-tree dismissal after a fill. One tree read;
  * a band → the configured strategy tapped once and one re-read to confirm;
  * no band → nothing. `enter` is never pressed on this path: it was
  * measured to SUBMIT the login from the password field (K5d).
@@ -1217,7 +1217,7 @@ describe('dismissKeyboard — the in-tree model (no oracle), stage B', () => {
     expect(sleeps).toEqual([KEYBOARD_HIDE_DELAY_MS]);
   });
 
-  // D21 code review: a read no wait cures (PersistentReadError — idb's wedged accessibility service) passes through
+  // D21: a read no wait cures (PersistentReadError — idb's wedged accessibility service) passes through
   // the guard's wrap unchanged, so the read loops above and the flow engine's isTerminal still see its class.
   it('a confirming read that throws a PersistentReadError: thrown as it came, not wrapped in AfterDismissalTap', async () => {
     const fake = withBand();

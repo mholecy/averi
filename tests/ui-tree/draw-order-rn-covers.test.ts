@@ -92,7 +92,7 @@ describe('rn-field under WDA: a field\'s own floating label listed before it is 
 });
 
 /**
- * The review's shapes (round 9, MAJOR-1), on the rn-banner capture edited: a cover NARROWER than its target is no
+ * Shapes on the rn-banner capture, edited: a cover NARROWER than its target is no
  * target's own content — only a field's own floating label is (ADR 0014's relation) — so it stays a cover.
  */
 describe('rn-banner edited: a cover narrower than its target is still its cover', () => {

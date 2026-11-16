@@ -347,7 +347,7 @@ describe('keyboardMarks — the band rule on synthetic shapes', () => {
   });
 
   /**
-   * Review round 2: `rawIdentifier` is app-settable (a React Native testID).
+   * `rawIdentifier` is app-settable (a React Native testID).
    * An app element named `inputView` must not mark the APP's Window and
    * exempt every target in it from the guard. Two guards, each pinned.
    */

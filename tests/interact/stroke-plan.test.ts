@@ -549,7 +549,7 @@ describe('strokedBeside — the listed scroll views along the stroke the swipes 
     const tree = screenOf([loose(UPPER, 'upper'), loose({ x: 0, y: 1300, width: 1080, height: 495 }, 'lower')]);
     const { memory, drawn } = sentOn(tree, 'up');
     expect(drawn !== undefined && containsPoint(UPPER, drawn.from)).toBe(true);
-    // Over the screen box the touch-down is said, and the list it lies in (review round 1).
+    // Over the screen box the touch-down is said, and the list it lies in.
     expect(strokedBeside(memory, factsOf(tree), 'up', BOX)).toEqual({ axis: 'vertical', at: drawn?.from, landed: UPPER, others: [{ role: 'scrollable', label: null, identifier: 'lower', rect: { x: 0, y: 1300, width: 1080, height: 495 } }] });
     // No stroke sent yet (the plan held): no touch-down to leave out or to say.
     const held = planOn(tree, 'up').memory;
@@ -740,7 +740,7 @@ describe('a named scroll view (`within`, D78) — the one the strokes go over un
     const tree = screenOf([node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { ...STRIP } })]);
     const named = seeRead(nameScrollView(startStrokes(), factsOf(tree), STRIP), { facts: factsOf(tree), line: { y: 700, witnessed: true }, target: undefined });
     expect(planStroke(named, { kind: 'full', toward: 'right', reach: 1, gesture: BOX, read: { facts: factsOf(tree), target: undefined } }).noRoom).toEqual({ rect: STRIP, toward: 'right', room: 60 });
-    // Review round 1, MINOR-2: one running past the gesture box is judged on its part on it — 30 of its 200.
+    // One running past the gesture box is judged on its part on it — 30 of its 200.
     const PAST: Rect = { x: 1050, y: 400, width: 200, height: 600 };
     const past = screenOf([node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { ...PAST } })]);
     expect(planStroke(nameScrollView(startStrokes(), factsOf(past), PAST), { kind: 'full', toward: 'right', reach: 1, gesture: BOX, read: { facts: factsOf(past), target: undefined } }).noRoom).toEqual({ rect: PAST, toward: 'right', room: 30 });

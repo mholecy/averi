@@ -257,7 +257,7 @@ flows: {}
   });
 });
 
-// D21 review: a tree read no wait cures (idb's wedged accessibility service) fails the leg's asserts,
+// D21: a tree read no wait cures (idb's wedged accessibility service) fails the leg's asserts,
 // each after one read, and the leg keeps its section, its frame's screenshot (idb's capture is unaffected by the wedge)
 // and its health line — it is not rejected whole.
 describe('a leg whose tree read no wait cures', () => {
@@ -330,7 +330,7 @@ describe('parity containment', () => {
 });
 
 /**
- * The false WITHIN TOLERANCE of the parity review (P1). A tree
+ * A false WITHIN TOLERANCE. A tree
  * whose content starts inset — a filtered dump, or idb's flat source with no
  * window rect under its 0x0 root — reads its CONTENT width (384) as the
  * screen's. On a 402-pt screen whose card is 368 wide against a contract

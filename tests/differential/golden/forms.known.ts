@@ -1,6 +1,7 @@
 import { ANDROID, IDB_STROKE, idbUnmarkedTap, IOS, keys, NOT_YET_IN_TREE, twice, type KnownFile } from './known.js';
 
 // The forms family's ratchet (fixtures/apps/cells/forms.json, phase 1b).
+// Struck off (no row here): L2, F2A1, FU1 — see scripts/truth/calibration.json.
 
 // Phase 2b's Android form cells. uiautomator lists only the presented window — here the picker's ModalBottomSheet,
 // fully expanded — so the form beneath is not found and scroll_until strokes the sheet: lab note L1, whose fix

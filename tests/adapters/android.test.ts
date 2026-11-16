@@ -917,7 +917,7 @@ describe('AndroidAdapter interactions', () => {
     expect(calls.filter((c) => c.includes('wm size'))).toHaveLength(1);
   });
 
-  // adapters/types.ts#viewport (the parity code review's A3, 2026-10-07): a
+  // adapters/types.ts#viewport: a
   // FAILED read is not kept — kept, one transient `wm size` failure would
   // strip the device-screen witness for the life of the server.
   it('viewport does not memoize a FAILED read: the next call asks wm size again, and its success is kept', async () => {
@@ -1104,7 +1104,7 @@ describe('AndroidAdapter.viewport — the status band, out of `dumpsys window di
     return { adapter: new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }), reads };
   };
 
-  // Code review of fix/r8-band, round 1, MAJOR-1: the registry keeps one adapter per device for the server's life,
+  // The registry keeps one adapter per device for the server's life,
   // and a failed first read was kept as "no band" — a cold device's 2 s timeout switched N1's fix off for good.
   it('a band read that FAILED FAST (adb exits non-zero) is not kept: the next viewport() asks again, and the first answer is kept', async () => {
     let answer: string | Error = execErrorLikeExec('adb shell dumpsys window displays', 1, 'error: closed');
@@ -1116,7 +1116,7 @@ describe('AndroidAdapter.viewport — the status band, out of `dumpsys window di
     expect(reads).toHaveLength(2); // the failure, the answer — then kept
   });
 
-  // Code review of fix/r8-band, round 2: retried every call, a hung dumpsys would cost up to 2 s on each viewport().
+  // Retried every call, a hung dumpsys would cost up to 2 s on each viewport().
   it('a band read that TIMED OUT is kept as no band: the next viewport() makes no dumpsys call — until launch, or a fresh read', async () => {
     let answer: string | Error = execErrorLikeExec('adb shell dumpsys window displays', null, '', { timedOut: true });
     const { adapter, reads } = scripted(() => answer);

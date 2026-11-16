@@ -116,7 +116,7 @@ describe('readingOf — the whole answer about one reading', () => {
     // again
     ['the value itself, a prefix of what the field should hold too: a length that is a whole landing too', '55', { value: '55', before: '5' }, { kind: 'missed', tail: { missing: '5', retypable: false }, differs: { kind: 'length', wholeToo: true, equal: { why: 'value-itself', appendWouldShow: 3 } } }],
     ['the value decorated, inside the earlier text\'s span: never typed again', '-5-', { value: '-5', before: '-5' }, { kind: 'missed', tail: { missing: '5', retypable: false }, differs: { kind: 'length', wholeToo: true } }],
-    // D71 review round 1, n1: the select-all hedge is of a reading that took the text — a non-input showing its own
+    // D71: the select-all hedge is of a reading that took the text — a non-input showing its own
     // text is not-taken, unmarked; its tail is held back as before (a whole landing too), so nothing is typed again
     ['a non-input showing its own text, the value with a tail too: not-taken, no hedge', '55', { value: '55', before: '5', isInput: false, resolvedValue: '55' }, { kind: 'not-taken', tail: { missing: '5', retypable: false }, differs: { kind: 'length', equal: { why: 'padded', typedPart: 1 } } }],
     ['a non-input showing its own text, the value, no tail: not-taken, no hedge', '1 ', { value: '1 ', before: '1', isInput: false, resolvedValue: '1 ' }, { kind: 'not-taken', differs: { kind: 'length', equal: { why: 'padded', typedPart: 1 } } }],
@@ -154,14 +154,14 @@ describe('readingOf — the whole answer about one reading', () => {
                   seen.add(differs.kind);
                   if ('wholeToo' in differs && differs.wholeToo === true) {
                     // D71: a tail held back, or the value itself refused with no tail proven (`1 ` after `1`) — never
-                    // typed again, and only of a reading that took the text (review round 1, n1, n2)
+                    // typed again, and only of a reading that took the text
                     if (!(tail !== undefined || observed === value) || tail?.retypable === true) throw wrong('wholeToo is a tail held back or the value itself, never retyped');
                     if (r.kind === 'not-taken') throw wrong('a not-taken is never marked wholeToo');
                     seen.add('wholeToo');
                   }
-                  // D79: why a `length` of the typed count is no match — said there and nowhere else (code review: one
+                  // D79: why a `length` of the typed count is no match — said there and nowhere else (one
                   // discriminated `equal`). The value itself refused says the append count: the earlier text's count
-                  // (its named placeholder aside, review round 1, NIT-3) plus the typed one
+                  // (its named placeholder aside) plus the typed one
                   const priorCount = clear ? 0 : heldText(before, placeholder).length;
                   const isValueItself = differs.kind === 'length' && differs.wholeToo === true && observed === value;
                   if (differs.kind === 'length' && (differs.equal !== undefined) !== (observed.length === value.length)) throw wrong('equal is of a length of the typed count alone');
@@ -386,7 +386,7 @@ describe('an earlier text that vanished — an unnamed placeholder (D29)', () =>
     expect(landingOf('1234 5678', expecting(e('12345678', '1')))).toEqual({ kind: 'landed', reformatted: { added: 1, respaced: 0 } });
   });
 
-  // D61 review round 1, MINOR: accepted, not a guard — with repeated characters a dropped key other than the head
+  // D61: accepted, not a guard — with repeated characters a dropped key other than the head
   // leaves the same reading (`1` held, `1100` typed, the second key lost: `1` + `100`, shown `1,100`). It passes, with
   // the point line, as the exact rule already passes the ungrouped `1100` after the same `1`.
   it('landingOf: `1,100` after `1`, typed `1100` — an accepted pass, as the exact rule accepts it ungrouped (D61)', () => {
@@ -417,14 +417,14 @@ describe('an earlier text that vanished — an unnamed placeholder (D29)', () =>
     expect(landingOf('SK31 1200 00', expecting(e('0000', 'SK3112')))).toEqual({ kind: 'landed', reformatted: { added: 2, respaced: 0 } });
   });
 
-  // D29 review round 1, MAJOR-1: the guard compares letters and digits, not the text as typed — an earlier text the
+  // D29: the guard compares letters and digits, not the text as typed — an earlier text the
   // field regrouped (`1,000` shown `10,00…`) is still there, and the reading is judged after it alone.
   it('an earlier text the field regrouped is still there: judged after it, never as the value alone', () => {
     expect(landingOf('10,001,000', expecting(e('10001000', '1,000')))).toBeUndefined();
     expect(tailAskedOf('100,010', e('1000105', '1,000'))).toBeUndefined();
   });
 
-  // D29 review round 2, MINOR-A (the owner's decision): an earlier text with no letters or digits (a dash) keeps the
+  // D29 (the owner's decision): an earlier text with no letters or digits (a dash) keeps the
   // pre-D29 judgment — a false mismatch, never a wrong pass; deliberately not loosened. A `_` mask template: D51,
   // below.
   it('an earlier text with no letters or digits: judged after it alone, as before D29', () => {
@@ -681,7 +681,7 @@ describe('without clear, the value must be in the typing past the earlier text (
     expect(landingOf('Hello worldw', e('Hello worldw', 'Hello world', { clear: true }))).toEqual({ kind: 'landed' });
   });
 
-  // review round 1, M-1: the earlier text is judged over D61's priors — a reading whose letters and digits are exactly
+  // The earlier text is judged over D61's priors — a reading whose letters and digits are exactly
   // the value's, and no start of the earlier text's plus the value's, is judged as the value alone too (`valueAlone`)
   it.each([
     ['+421903123456', '421903123456', '+421', "a leading `+` the field adds, under idb's unnamed `+421`"],
@@ -692,7 +692,7 @@ describe('without clear, the value must be in the typing past the earlier text (
     expect(landingOf(shown, e(value, before))).toEqual({ kind: 'landed' });
   });
 
-  // review round 1, m-2: a reading that holds the value across the seam (an occurrence that ends past the earlier
+  // A reading that holds the value across the seam (an occurrence that ends past the earlier
   // text) is also explained as a full landing — a select-all field with an eager mark, a caret not at the end — so its
   // "tail" is not typed again: retyped, the field could end Filled over content the retype made wrong
   it.each([
@@ -721,13 +721,13 @@ describe('without clear, the value must be in the typing past the earlier text (
     expect(retypableTailOf('Note: 12', e('12/', 'Note: '))).toBe('/');
   });
 
-  // review round 2, NIT-2: the miss keeps its kind, and says it is a whole landing too, for the wording
+  // The miss keeps its kind, and says it is a whole landing too, for the wording
   it('the difference: `11 ` after `1` and `a1 1` after `a1` are dropped tails that are whole landings too', () => {
     expect(notLandedDiffers('11 ', e('11', '1'))).toEqual({ kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true, wholeToo: true });
     expect(notLandedDiffers('a1 1', e('1 ', 'a1'))).toEqual({ kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true, wholeToo: true });
   });
 
-  // D64 code review: every shape whose tail is not typed again is marked, whatever its kind — an exact prefix reads
+  // D64: every shape whose tail is not typed again is marked, whatever its kind — an exact prefix reads
   // `length`
   it.each([
     ['-5-', '-5', '-5'],
@@ -800,7 +800,7 @@ describe('the difference — what a missed read-back differs by, without content
     // D28: a reformatted strict prefix is a dropped tail — iOS React Native's rf2 read "transformed the input"
     ['a grouping field that dropped the tail (rf2): a dropped tail, not a transformed input', { observed: '1 234 567,', value: '1234567,89', clear: true }, { kind: 'dropped-tail', landed: 8, dropped: 2, grouped: true }],
     ['the same on Android (no-break spaces), no clear onto held text', { observed: 'SK31\u00A01200\u00A00', before: 'SK31', value: '12000000' }, { kind: 'dropped-tail', landed: 5, dropped: 3, grouped: true }],
-    // D28 code review: a prefix only RESPACED (a typed space shown as a no-break space), nothing added, is not grouped
+    // D28: a prefix only RESPACED (a typed space shown as a no-break space), nothing added, is not grouped
     ['a respaced-only prefix (`Jan\u00A0` for `Jan Novak`): a dropped tail, not grouped', { observed: 'Jan\u00A0', value: 'Jan Novak', clear: true }, { kind: 'dropped-tail', landed: 4, dropped: 5, grouped: false }],
     // D29: idb names no placeholder — `before` was the UIKit field's own `SK00 0000 0000 …`, gone at the first key
     ['a grouping field that dropped the tail after its unnamed placeholder vanished: a dropped tail, not a length', { observed: 'SK31 1200 0', before: 'SK00 0000 0000 \u2026', value: 'SK3112000000' }, { kind: 'dropped-tail', landed: 9, dropped: 3, grouped: true }],

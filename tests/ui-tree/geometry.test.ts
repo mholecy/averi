@@ -503,7 +503,7 @@ describe('Clips.cutSliver at any depth, synthetic shapes — a node cut at a cli
 });
 
 /**
- * The clippedOut evidence (code review of round 7, P1) at every edge, through the parser as uiautomator dumps it —
+ * The clippedOut evidence at every edge, through the parser as uiautomator dumps it —
  * the verification's probe shapes — and the two stated residuals it leaves (geometry.ts#evidentCut, "Unknowable").
  */
 describe('Clips.cutSliver at any depth — clippedOut evidence at each edge, parsed (geometry.ts#evidentCut)', () => {

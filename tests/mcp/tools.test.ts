@@ -368,7 +368,9 @@ describe('ensure_state and run_flow — the flow tools', () => {
 
   /**
    * The `⚠ clearState` line's running count is the SESSION's — the server's,
-   * shared by every tool that runs the engine.
+   * shared by every tool that runs the engine. A module-global count would
+   * carry over from one server to the next, so a second server starting at 1
+   * is pinned.
    */
   it('the clearState count belongs to the server: its three engine tools share it, both verify legs too, a second server starts at 1', async () => {
     const configPath = await file(
@@ -817,7 +819,7 @@ describe('type_text refuses a control character before anything is sent', () => 
       expect(result.isError).toBe(true);
       expect(result.text).toContain('cannot type U+0009');
       expect(result.text).toContain('there is no tab key');
-      expect(result.text).not.toContain("pressKey('enter')"); // code review of round 7, P2: ENTER is a newline's and a return's remedy only
+      expect(result.text).not.toContain("pressKey('enter')"); // ENTER is a newline's and a return's remedy only
       expect(fake.taps).toEqual([]);
       expect(fake.deletes).toEqual([]);
       expect(fake.typed).toEqual([]);
@@ -1053,7 +1055,7 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
     expect(result.text).toContain('app.ios.treeSource: wda');
   });
 
-  // D21 review round 2: the `assert` tool is one of the two callers that ask for a FAILING result on a read no wait
+  // D21: the `assert` tool is one of the two callers that ask for a FAILING result on a read no wait
   // cures (persistentRead: 'fail'): the reply is the assert's FAIL line with the error's message, after one read.
   it('assert: idb\'s wedged accessibility service fails the assert after one read — a result, not an error', async () => {
     const wedged = new FakeAdapter({}, 'none');
@@ -1478,7 +1480,7 @@ describe('assert — results always, health only with a loadable averi.yaml', ()
     expect(result.bound).toEqual([]);
   });
 
-  // Review round 1: only a MISSING file means "no averi.yaml". A path the
+  // Only a MISSING file means "no averi.yaml". A path the
   // file cannot be read from for another reason (here a directory) fails the
   // call as it came.
   it('android: a configPath that is a directory → an error (EISDIR), before a device is bound', async () => {
@@ -1804,7 +1806,7 @@ describe('tap and type_text under the Android soft keyboard', () => {
     expect(fake.tapPoints).toEqual([{ x: 249, y: 1766 }]);
   });
 
-  // D66 review: the mark read is the node the guard hands back after hiding the keyboard, not the first look's.
+  // D66: the mark read is the node the guard hands back after hiding the keyboard, not the first look's.
   it('tap under the keyboard: the node found again after back carries the mark → the ⚠ line, tapped at the re-resolved point', async () => {
     const fake = loginFake();
     fake.onKey = (key, self) => {

@@ -175,7 +175,7 @@ export class FakeAdapter implements DeviceAdapter {
     // A SNAPSHOT, as both real adapters return (each read parses a fresh object
     // graph). Handing out the live screen let a node mutated by a later fake
     // `tap` rewrite what an earlier read "saw", which made the clear-on-focus
-    // fill test unable to fail (review 2026-09-18, round 3).
+    // fill test unable to fail.
     return structuredClone(this.screens[this.current]);
   }
 

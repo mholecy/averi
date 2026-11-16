@@ -294,7 +294,7 @@ describe('pollTree — the one deadline loop', () => {
   // dump threw after ONE read at 615 ms of a 1500 ms budget; a `wait:`
   // landing at 8.5 s of 10 timed out at 9.6 s) and refusing a round after a
   // pause that crossed the deadline (the same two cases, timed out AT the
-  // deadline where HEAD found them).
+  // deadline where the shipped rule found them).
   // A predicate that waits bounds its own wait with the deadline it is
   // handed; the loop keeps the slack a late element is found by.
   it('a late round still inside the deadline IS taken: an element appearing at 2 s of 2.5 s is found by a read that ends past it', async () => {

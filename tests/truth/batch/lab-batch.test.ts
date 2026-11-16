@@ -320,7 +320,7 @@ describe('needs not met make their blocks INCONCLUSIVE, the others run (b11-dry 
     const why = `the Android build failed (exit 1; ${join(dirOf('lab'), 'android-build.log')})`;
     expect(s).toContain(`LAB android-build: ERROR — ${why}`);
     expect(s).toContain(`lab check: INCONCLUSIVE — android-build: ${why}`);
-    // batch-11's WARN (review round 1, MINOR 3): the build's why, the APK already installed used.
+    // batch-11's WARN: the build's why, the APK already installed used.
     expect(s.find((l) => l.startsWith('LAB android:'))).toMatch(new RegExp(`^LAB android: WARN — ${why.replace(/[()]/g, '\\$&')}; the app already installed is used: averi_lab emulator LAB-SERIAL; not rebuilt;`));
     expect(seam.words.filter((w) => w.includes('gradlew')).at(-1)).toMatch(/--stop$/);
     expect(seam.words.some((w) => w.includes('install -r'))).toBe(false);
@@ -387,7 +387,7 @@ describe('an abort landing during the build\'s own --stop (review round 2, MINOR
     seam.handlers!.signal('SIGINT');
     expect(await done).toBe(130);
     expect(seam.words.filter((w) => w.endsWith('gradlew --stop'))).toHaveLength(2);
-    // The reason the one the marker was kept for (code review, MINOR 2).
+    // The reason the one the marker was kept for.
     expect(outText()).toContain("NOTE lab android: the Gradle daemon stopped at the run's end (its --stop failed: exit 143)");
   });
 });
@@ -406,7 +406,7 @@ describe('the abort inside the WDA window: the WDA ended, the wait, the restore;
     expect(world.domains.get('com.apple.Accessibility')!.ApplicationAccessibilityEnabled).toEqual({ t: 'bool', c: 'true', v: 'true' });
   });
 
-  /** RESTORE.txt when port 8120 stays listened on: the WDA's kill, each domain, the compare (review round 1, BLOCKER). */
+  /** RESTORE.txt when port 8120 stays listened on: the WDA's kill, each domain, the compare. */
   const blockedRestore = (how: string) => {
     const dir = dirOf('D43');
     return [
@@ -453,7 +453,7 @@ describe('the abort inside the WDA window: the WDA ended, the wait, the restore;
     expect(await go(batch())).toBe(1);
     expect(readFileSync(join(out, 'RESTORE.txt'), 'utf8')).toBe(blockedRestore('ended'));
     expect(summary().some((l) => l.startsWith('D43 WDA-window compare'))).toBe(false);
-    // Not put back, never PASS (review round 2): the block's verdict INCONCLUSIVE whatever its judge would say.
+    // Not put back, never PASS: the block's verdict INCONCLUSIVE whatever its judge would say.
     expect(summary()).toContain("D43 verdict: INCONCLUSIVE — the lab's settings not put back (see RESTORE)");
     expect(summary().some((l) => l.startsWith('D43 verdict: PASS'))).toBe(false);
   });

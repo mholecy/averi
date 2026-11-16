@@ -69,11 +69,11 @@ function drawnAt(rect: Rect, hex: string, { width, height } = { width: 402, heig
   });
 }
 
-// D21 review: a read error no wait cures (PersistentReadError — idb's wedged accessibility service).
+// D21: a read error no wait cures (PersistentReadError — idb's wedged accessibility service).
 // Under persistentRead: 'fail' it fails THE assert, after its one read, with the error's message as the detail — what
 // a verify leg (whose frame, screenshot and health line a throw would lose) and the MCP assert tool ask for. By
 // default it is thrown as it came, after the one read: a flow's `assert:` step must reach the engine's isTerminal
-// with the named error (review round 2), not as a plain "flow asserts failed". Reads are bounded to the ones each test
+// with the named error, not as a plain "flow asserts failed". Reads are bounded to the ones each test
 // expects (D38, tests/helpers/terminal-read.ts).
 //
 // A20: the policy is applied once, by the Verifier's one step every assert runs through (`decided`) — not by each
@@ -571,7 +571,7 @@ describe('rect asserts (geometry vs Figma-frame values)', () => {
     expect(result.detail).toContain('(measured only, never fails)');
   });
 
-  // The false pass of the parity review (P1): a tree whose content
+  // A false pass: a tree whose content
   // starts inset reads its CONTENT width (384) as the screen's, which turns a
   // real -4.2 % `w` delta on a 402-pt screen into +0.06 %.
   it('fails closed on a CONTENT width instead of passing with a caveat in the detail', async () => {
@@ -626,7 +626,7 @@ describe('rect asserts (geometry vs Figma-frame values)', () => {
   });
 
   /**
-   * The parity code review's A3: `viewport()` is memoized, so a screen
+   * `viewport()` is memoized, so a screen
    * changed after the first read (`wm size`, an unfold) would refuse until
    * the server restarted (device check row 18c). Before a wider-than-screen
    * refusal the assert re-reads the screen ONCE, bypassing the memo.

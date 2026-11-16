@@ -328,7 +328,7 @@ describe('IosAdapter.launch — the wait fails open: it never fails a launch and
     expect(d.appinfos()).toHaveLength(1);
   });
 
-  // Review round 2: a read that cannot say whose tree it is (no Application,
+  // A read that cannot say whose tree it is (no Application,
   // or an unlabelled one — unmeasured, and possibly idb's full-frame launch
   // transient) is a poll miss, not a stop, so a cold launch keeps its wait.
   const BUTTON = { type: 'Button', AXLabel: 'Cancel', frame: f(16, 90, 60, 30) };

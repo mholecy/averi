@@ -37,7 +37,7 @@ class FakeSeam implements ProcessSeam {
     this.events.push(`start ${cmd} ${args.join(' ')}`);
     return { pid, exited, closed: exited.then(() => {}), out: () => (args[0] === 'judge' ? `${args[1]}\n` : ''), err: () => '', release: () => {} };
   }
-  /** Every kill throws `kill EPERM`, as one did under load (review round 2). */
+  /** Every kill throws `kill EPERM`, as one did under load. */
   killThrows = false;
   /** The groups whose kills (and probes) throw `kill EPERM`. */
   readonly refusePids = new Set<number>();

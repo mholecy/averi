@@ -71,7 +71,7 @@ const IDB_DESCRIBE_ALL = JSON.stringify([
 ]);
 
 describe('IosAdapter interactions', () => {
-  // D66 review: a real IosAdapter over the WDA parser on the committed SWIFT form capture (wda-capture-swift-form-pushed.json,
+  // D66: a real IosAdapter over the WDA parser on the committed SWIFT form capture (wda-capture-swift-form-pushed.json,
   // CONTINUE `isEnabled` "0"): the tap is sent through idb at its centre and the reply warns. No device: the tree
   // source answers the capture, idb's exec answers nothing but the screen size.
   it('end to end on the WDA source: the SWIFT form\'s disabled CONTINUE is tapped all the same, and the reply warns', async () => {
@@ -172,7 +172,7 @@ describe('IosAdapter interactions', () => {
     expect(calls.filter((c) => c.full.startsWith('idb describe'))).toHaveLength(1);
   });
 
-  // adapters/types.ts#viewport (the parity code review's A3, 2026-10-07): a
+  // adapters/types.ts#viewport: a
   // FAILED read is not kept — kept, one transient `idb describe` failure
   // would strip the device-screen witness for the life of the server.
   it('viewport does not memoize a FAILED read: the next call asks idb again, and its success is kept', async () => {
@@ -301,7 +301,7 @@ describe('IosAdapter.uiTree and dispose — one delegation each to the tree sour
       applicationLabel: () => Promise.reject(new Error('unused')),
       // Resolves on a MACROTASK, so `await adapter.dispose()` observes the
       // release only if dispose really returned this chain — a fire-and-forget
-      // dispose would pass on microtask ordering alone (review 2026-09-18).
+      // dispose would pass on microtask ordering alone.
       dispose: () =>
         new Promise<void>((resolve) =>
           setTimeout(() => {
@@ -1122,7 +1122,7 @@ describe('IosAdapter + fillField — a dropped tail on one fill makes the next f
     expect(typed()).toEqual(['J', FIRST_KEY_ALONE_MS, 'an Novak', 'o', FIRST_KEY_ALONE_MS, 'vak']);
   });
 
-  // D28 code review: a flow's `type:` (and `type_text` without a selector) is blind, but types through the same adapter —
+  // D28: a flow's `type:` (and `type_text` without a selector) is blind, but types through the same adapter —
   // after a fill reported the app's drop, it too sends its first key alone (ADR 0034's D28 amendment, rf4).
   it('after a fill reported a drop, a flow\'s blind `type:` into that app sends its first key alone too', async () => {
     const { adapter, typed } = rnLab(3);
@@ -1133,7 +1133,7 @@ describe('IosAdapter + fillField — a dropped tail on one fill makes the next f
     expect(typed()).toEqual(['S', FIRST_KEY_ALONE_MS, 'K3112000000']);
   });
 
-  // D24 review: a native field capped at 5 characters keeps `Jan N` for good; its fill fails after one retype that
+  // D24: a native field capped at 5 characters keeps `Jan N` for good; its fill fails after one retype that
   // moved nothing, and the app is not marked — the next fill is one burst.
   it('a capped field\'s failed fill marks nothing: the next fill into that app is one burst', async () => {
     const { adapter, typed } = rnLab(5, 0);

@@ -175,7 +175,7 @@ describe('AndroidAdapter — every user value reaches the device command as one 
     ]);
   });
 
-  // The remedy (code review of round 7, P2): pressKey('enter') for a newline and a return only; a tab has no key.
+  // The remedy: pressKey('enter') for a newline and a return only; a tab has no key.
   it.each([
     ['a newline', 'ab\ncd', '"\\n"', /pressKey\('enter'\)/],
     ['a return', 'ab\rcd', '"\\r"', /pressKey\('enter'\)/],
@@ -236,7 +236,7 @@ describe('AndroidAdapter — every user value reaches the device command as one 
     expect(commands).toEqual([['gzip', '-1']]);
   });
 
-  // Code review: screencap's stdout is gzip's input, so a word it printed there would land INSIDE the stream; its
+  // screencap's stdout is gzip's input, so a word it printed there would land INSIDE the stream; its
   // stderr is sent to /dev/null — while the shell's own "gzip: not found" (sh's stderr, merged by exec-out) still
   // arrives, the one answer that pins `-p` (screenshot-bytes.ts#screencapRaw). Run on the host sh as on the device's.
   it("the raw capture drops screencap's stderr but not the shell's word that gzip is missing", () => {

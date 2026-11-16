@@ -754,7 +754,7 @@ describe('a need\'s end: once per need met, after the last block and before the 
     seam.handlers!.signal('SIGINT');
     expect(await done).toBe(130);
     expect(order).toEqual([]);
-    // The abort's SUMMARY says the key was not read (T2b review round 1): never silent about it.
+    // The abort's SUMMARY says the key was not read: never silent about it.
     expect(summary()).toContain(`ERROR android's key unread: ${ABORTED}`);
     rmSync(out, { recursive: true, force: true });
     seam = new FakeSeam([git(), probes, live()]);

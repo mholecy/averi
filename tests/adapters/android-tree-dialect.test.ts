@@ -104,7 +104,7 @@ describe('parseUiautomatorXml', () => {
       expect(held()).toBe('Jan Novak'); // a trimmed reading would leave `JJan Novak`
     });
 
-    // Review round 1, MAJOR-1: matching through the LABEL is trimmed; the `value` path sees the field's real text, as
+    // Matching through the LABEL is trimmed; the `value` path sees the field's real text, as
     // on iOS — a flow that matched a trimmed Android value quotes the space or uses `~`.
     it('an input named by its content-desc: `text:"Jan"` no longer matches its value, `text:"Jan "` and `value:"Jan "` do', () => {
       const tree = parseDump('<hierarchy><node class="android.widget.EditText" content-desc="First name" text="Jan " bounds="[0,0][100,100]" /></hierarchy>');
@@ -120,7 +120,7 @@ describe('parseUiautomatorXml', () => {
       expect(findAll(tree, 'text:Jan')).toHaveLength(1);
     });
 
-    // Review round 1, MINOR-1: a hint is the same kind of string as text, compared with a reading exactly — kept untrimmed,
+    // A hint is the same kind of string as text, compared with a reading exactly — kept untrimmed,
     // so an empty field showing `Name ` reads empty, not as 5 characters to clear.
     it('an empty input whose dump names `hint="Name "` and shows it as `text="Name "` reads empty: a clear deletes nothing', async () => {
       const { fake } = androidField('Name ', { hint: 'Name ' });
@@ -338,9 +338,9 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
     const of = (id: string) => [...everyNode(t)].find((n) => n.identifier === id)!;
     expect(of('cut_row')).toMatchObject({ rect: { x: 66, y: 1450, width: 948, height: 100 }, cutBounds: { x: 66, y: 1500, width: 948, height: 50 } });
     expect(of('badge_row')).not.toHaveProperty('cutBounds'); // a badge hanging off it
-    expect(of('wider_row')).not.toHaveProperty('cutBounds'); // a full-bleed child: not its exact x and width (code review P1)
+    expect(of('wider_row')).not.toHaveProperty('cutBounds'); // a full-bleed child: not its exact x and width
     expect(of('wider_row').rect).toEqual({ x: 66, y: 700, width: 948, height: 60 });
-    expect(of('both_sides')).not.toHaveProperty('cutBounds'); // past both edges: overflow, not a cut (code review P3)
+    expect(of('both_sides')).not.toHaveProperty('cutBounds'); // past both edges: overflow, not a cut
     expect(of('edge_row')).not.toHaveProperty('cutBounds'); // past the list's edge only: the flush probe's case
     expect(of('collapsed')).not.toHaveProperty('cutBounds');
     expect(of('unscrolled')).not.toHaveProperty('cutBounds'); // in no scroll container
@@ -891,7 +891,7 @@ describe('the uiautomator parser marks the one window presented when the dump sh
 });
 
 
-// A27's code review: the dialect's rules its other cases left to draw order's tests, through parseUiautomatorXml with a
+// A27: the dialect's rules its other cases left to draw order's tests, through parseUiautomatorXml with a
 // port that records what it is asked (the candidates `uncut` found, each with its gained strip), and the sheet
 // recognizers on synthetic variants of the lab's captures.
 describe('parseUiautomatorXml — a node cut short of its own descendants, as the port is asked of it', () => {

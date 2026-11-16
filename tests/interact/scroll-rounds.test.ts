@@ -161,7 +161,7 @@ describe('round — the soft keyboard', () => {
     expect(decided(played.steps[0])).toEqual({ do: 'stroke', kind: 'full', toward: 'down', reach: 1, coverTop: 1398, box: SCREEN_1080 }); // no clipping container: the screen box
     // The witness on the round the band changes; none on the moot stop. `unlocated` is put to a SHOWN reading, which asks nothing.
     expect(played.rounds.map((r) => r.asks)).toEqual([['witness'], [], ['unlocated']]);
-    // Clear of the band at the stop: the band changes nothing there, so it is not reported (review 2026-10-08).
+    // Clear of the band at the stop: the band changes nothing there, so it is not reported.
     const result = resultOf(played);
     expect(result).toEqual({ swipes: 1, visible: 1, clipped: [] });
     expect(describeScrollResult(result)).toBe('fully visible after 1 swipe');
@@ -178,7 +178,7 @@ describe('round — the soft keyboard', () => {
 
   it('Android, fully: true at the end of the content with the row still under the IME: the keyboard is named, with how to hide it — not a layout defect', () => {
     const played = play({ ...ANDROID, fully: true }, reads([1360, 1360, 1360, 1360], formRow, { cover: UP_IME }));
-    // After TWO identical swipes that did not move it (review round 2: one can be a transient), not one — and one back.
+    // After TWO identical swipes that did not move it (one can be a transient), not one — and one back.
     expect(failureOf(played, 'id:priority_select').message).toBe(
       'scroll_until id:priority_select failed after 3 swipes — element is in the viewport but CLIPPED at bottom, 52% of it is in ' +
         'the viewport above the soft keyboard over [0,1398][1080,2220], and the content is exhausted: swiping down no longer moves ' +
@@ -390,7 +390,7 @@ describe('round — the soft keyboard', () => {
 /**
  * 2026-10-08, the two "Device check" sections of
  * docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md and
- * review round 1: the settled stop, the turn after a fling past the target,
+ * The settled stop, the turn after a fling past the target,
  * and a target off the frame that the strokes no longer move — the reads of
  * scroll.test.ts#wdaForm (the SwiftUI form under WDA, the pad up) and of
  * the Android forms, written out.
@@ -538,7 +538,7 @@ describe('round — after the device check', () => {
   });
 
   it('a zero-area rect carries no position — it is not called exhausted, the scroll runs to its bound', () => {
-    // An unchanged tree too (code review: without a fingerprint the whole-tree rule could not fire here, so it did not prove the match rule's).
+    // An unchanged tree too (without a fingerprint the whole-tree rule could not fire here, so it did not prove the match rule's).
     const field: Row = { ...lastField({ x: 66, y: 1769, width: 948, height: 0 }), rest: 'f' };
     expect(failureOf(play(ANDROID, [field, field, field, field, field]), 'id:my_note_input').message).toMatch(/failed after 4 swipes \(maxSwipes\)/);
   });
@@ -1291,7 +1291,7 @@ describe('round — strokes drawn across the scroll view they went over (D59b)',
       'after 2 swipes (the last 2, swiping right, did not change the screen: they touched down at 864,1110 on text "Banner" at 0,1000 1080x200, drawn over the list 0,0 1080x2220, which may have taken them (else: content exhausted, still loading))',
     );
     expect(boundText({ of: 'exhausted', lastStroke: 'right', unchanged: 'matches', across }, 3)).toBe(`after 3 swipes (the last 2, swiping right, did not move it: ${ACROSS}; else: content exhausted, or the swipes were not taken)`);
-    // idb's top-layer hint stays after the else, as on the generic stop (code review).
+    // idb's top-layer hint stays after the else, as on the generic stop.
     expect(boundText({ of: 'exhausted', lastStroke: 'right', unchanged: 'tree', across, unlisted: 'idb' }, 2)).toBe(
       `after 2 swipes (the last 2, swiping right, did not change the screen: ${ACROSS}; else: content exhausted, still loading, or the swipes were not taken — idb lists only what a presented sheet, alert or cover leaves to accessibility: if the element lies beneath one, close it first)`,
     );
@@ -3166,7 +3166,7 @@ describe('round — the scroll views the strokes did not go over, before the tar
     expect(boundText({ of: 'exhausted', lastStroke: 'down', unchanged: 'tree', beside: { axis: 'vertical', strokedOver: UPPER, others: more.slice(0, 3) } }, 2)).toContain('scrollable id:l2 (0,1200 1080x90) as within: {"x":0,"y":1200,"width":1080,"height":90} — if the element');
   });
 
-  // D81 review round 1, MINOR-2: a caller naming elements by spec (a flow) cannot pass a rect — the way in asks for a
+  // D81: a caller naming elements by spec (a flow) cannot pass a rect — the way in asks for a
   // spec of the scroll view; the tool's words (the rect form, the default) stay byte-identical, pinned above.
   it('boundText by spec (a flow): no rect offered — one, several, at maxSwipes and the timeout, and the across clause', () => {
     const SPEC = 'scroll_until it again naming that scroll view by an element spec of it or of an element inside it (within: { id: … })';
@@ -3399,7 +3399,7 @@ describe('round — `within`, the scroll view named for the strokes until the ta
     expect(failureOf(played, 'id:x').message).toMatch(/— swipe the screen so more of the scroll view shows, or hide the keyboard first \(tap a neutral element such as the screen title\), then scroll_until it again; this adapter cannot hide it on its own \(ADVICE\)$/);
   });
 
-  // Review round 1, MINOR-4 (the coordinator's decision): a round whose tree did not read does not stop on the last
+  // The coordinator's decision: a round whose tree did not read does not stop on the last
   // read's line — it holds for a read; the gesture box cut at 1100 (54 of `lower` on it) on a failed read.
   const CUT: Rect = { x: 0, y: 0, width: 1080, height: 1100 };
   const cutScreen: UsableScreen = { box: CUT, boxes: [CUT], oriented: CUT, from: 'device' };
@@ -3439,7 +3439,7 @@ describe('round — `within`, the scroll view named for the strokes until the ta
     expect(named(R, { room: 80 })).toContain('which has no room for a swipe down: what is drawn over it leaves too little of the 80 of its height on the screen — swipe');
     expect(named(R, { room: 120 })).toContain('which has no room for a swipe down: what is drawn over it leaves too little of the 120 of its height on the screen — swipe the screen');
     expect(named(R, { room: 300, keyboard: { lineY: 2400, remedy: BACK } })).toContain('which has no room for a swipe down: the keyboard covers it from y 2400, and what is drawn over it leaves too little of the 300 of its height left — swipe the screen');
-    // MAJOR-1 (review round 1): the way out follows the adapter's KeyboardRemedy — where no key hides the keyboard (iOS,
+    // The way out follows the adapter's KeyboardRemedy — where no key hides the keyboard (iOS,
     // dismissal `none`) a neutral tap, then the adapter's own advice; a flow's: a tap: step before this one.
     const ios = { of: 'noRoom' as const, rect: R, toward: 'down' as const, room: 40, keyboard: { lineY: 2200, remedy: NO_BACK } };
     const iosOutcome = { kind: 'within' as const, swipes: 0, within: R, refused: ios };
@@ -3449,7 +3449,7 @@ describe('round — `within`, the scroll view named for the strokes until the ta
     expect(scrollFailure({ ...iosOutcome, within: { id: 'list' } }, 'id:x', 'spec').message).toMatch(
       /— add a swipe: step before this one so more of the scroll view shows, or hide the keyboard first \(tap a neutral element such as the screen title — a tap: step before this one\), then run the flow again; this adapter cannot hide it on its own \(ADVICE\)$/,
     );
-    // Code review 2: the flow's whole way out is in steps, the no-keyboard case too — no `scroll_until it again`.
+    // The flow's whole way out is in steps, the no-keyboard case too — no `scroll_until it again`.
     expect(scrollFailure({ kind: 'within', swipes: 0, within: { id: 'list' }, refused: { of: 'noRoom', rect: R, toward: 'down', room: 60 } }, 'id:x', 'spec').message).toBe(
       'scroll_until id:x stopped before any swipe — within id:"list" names the scroll view 0,2160 1080x400, which has no room for a swipe down: 60 of its height lies on the screen, under the 80 a swipe needs — add a swipe: step before this one so more of the scroll view shows, then run the flow again',
     );

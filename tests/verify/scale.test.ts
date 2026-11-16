@@ -287,7 +287,7 @@ describe('pngScale on the real iOS filter-sheet dump', () => {
 });
 
 /**
- * The rect denominator (the parity review's P1): the window's width, judged
+ * The rect denominator: the window's width, judged
  * under the png scale's policy. Were the rect table and the `rect` assert to
  * read geometry.ts directly and keep a CONTENT width as a remark, a width
  * `pngScale` refused on the same tree would still divide every rect delta,
@@ -443,7 +443,7 @@ describe('windowWidth — the rect denominator, one trust policy with the scale'
 });
 
 /**
- * The parity code review's A1/A2: an Android app window laid out BESIDE a
+ * An Android app window laid out BESIDE a
  * side navigation bar or a display cutout in landscape. Numbers of a
  * 2400x1080 phone (`wm size` reports it portrait, as built): a 3-button nav
  * bar 126–168 px, a cutout 80–130 px. uiautomator's root is the app window,

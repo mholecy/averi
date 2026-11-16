@@ -181,7 +181,7 @@ describe('screenBox — the device screen is the box a gesture swipes in', () =>
 /**
  * 2026-10-08, the iOS device check of
  * docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md and
- * review round 1: the stroke drawn over a keyboard is the uncovered box's,
+ * The stroke drawn over a keyboard is the uncovered box's,
  * its TOUCH-DOWN never inside the keyboard clearance (0.8 of the uncovered
  * height) nor higher than the keyboard-less stroke's touch-down.
  */
@@ -230,7 +230,7 @@ describe('swipeVectorAbove — the touch-down placed clear of a keyboard, never 
   });
 });
 
-/** Review round 2 (2026-10-08): the stroke `scroll_until` shortens after each turn round a target a fling carried past. */
+/** The stroke `scroll_until` shortens after each turn round a target a fling carried past. */
 describe('shortenStroke — the touch-down kept, the reach scaled, never a tap', () => {
   const down = { from: { x: 201, y: 458 }, to: { x: 201, y: 114 } }; // the WDA content-down stroke, 344 pt
 

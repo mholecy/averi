@@ -797,7 +797,7 @@ describe('problemsThrownBy — contract problems are collected, bugs propagate',
 });
 
 /**
- * The parity code review's A1: an Android window beside a left-hand nav bar
+ * An Android window beside a left-hand nav bar
  * or cutout starts inset, and tree rects are in SCREEN coordinates — so x is
  * measured from the window's left edge, as a Figma frame's x is from the
  * canvas's edge. A 2400x1080 phone, notch on the left.
