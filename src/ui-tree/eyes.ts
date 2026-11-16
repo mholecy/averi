@@ -21,7 +21,7 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  * Why: the tree cannot see a surface that has no node. On the lab's `form-keyboard` (Android) the bar riding on the
  * IME draws 28 px of padding above its `Continue` and dumps no node for it; after one stroke `phone` lay flush with
  * `Continue` and `scroll_until` answered "fully visible after 1 swipe" while the bar's padding covered 18 px of the
- * field (live case k7; ADR 0013's residual, the owner's decision of 2026-10-18 point 5:
+ * field (ADR 0013's residual, the owner's decision of 2026-10-18 point 5:
  * docs/adr/0013-refuse-a-tap-on-a-sliver-cut-by-its-scroll-container.md). Pixels can see it.
  *
  * WHEN — the trigger, narrow on purpose (one screenshot, never on every round): only where a `fully visible` claim is
@@ -154,7 +154,6 @@ export interface EyesAsked {
   readonly edges: readonly { readonly edge: Edge; readonly by: Rect | ClipLine }[];
 }
 
-/** `question` as asked (`EyesAsked`), its rects copied. */
 export const askedOf = (question: EyesQuestion): EyesAsked => ({
   region: { ...question.region },
   edges: question.edges.map(({ edge, by }) => ({ edge, by: by === CLIP_LINE ? CLIP_LINE : { ...by.rect } })),
@@ -204,8 +203,8 @@ export function reachesPoint({ edge, depth }: SurfaceFinding, region: Rect, poin
  *
  * WHEN — narrow, as the first question's trigger: only for a standing `covered` with remedy `unordered` (a cover the
  * listing does not order — ui-tree/standing.ts#Remedy), once per look, by the verbs that may act on the answer (the tap,
- * `scroll_until`'s stop, the pixel assert, which reuses the frame it captures anyway); a tree-only caller (the dismissal
- * picker, `ui_snapshot`) asks nothing and keeps the untold order.
+ * `scroll_until`'s stop, the pixel assert, which reuses the frame it captures anyway); a tree-only caller (one with no
+ * eyes wired) asks nothing and keeps the untold order.
  *
  * AND A TEXT IN A CONTROL'S TOUCH MARGIN (`ClearPair`, ADR 0026): a standing `covered` with remedy `scroll` whose every
  * cover is a text the tree suspects lies in the target's touch margin only (cover.ts#marginText: Compose dumps a

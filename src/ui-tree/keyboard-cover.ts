@@ -30,7 +30,7 @@ import { keyboardInTree, keyboardSideNodes, type KeyboardRemedy } from './soft-k
  * - idb's band, read by its shape (soft-keyboard.ts#flatListKeyboardBand,
  *   draw-order.ts#DrawOrder.keyboardBandTop) — a POSITION and nothing more,
  *   never a reading: an idb reading stays `unknown`, so the guard and the
- *   in-tree dismissal press nothing there (K5d).
+ *   in-tree dismissal press nothing there.
  * State — shown, hidden, covering a point — is asked of a reading only.
  * Position — the line nothing may be aimed, stroked or measured under, and
  * which nodes are the keyboard's own, under no line — is

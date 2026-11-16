@@ -75,11 +75,11 @@ export function keyboardInTree(tree: UiNode): SoftKeyboard {
  * of that run (`to` exclusive), `at` the background's. The last node listed with that shape is
  * taken; one failing the keys rule is passed over for an earlier one.
  * Measured on the 207 flat idb trees of the run2–run9 device checks'
- * ui_snapshot replies: the 14 with a
- * keyboard — run2 #250, run3 #45–#51, run7 #96, run8 #233, run9 #87, #95,
- * #184, #246, #420 — each read a band, its top 589 or 590, and the other
- * 193 none. Its two shapes: the SWIFT form's number pad (run2-ios #250,
- * `other 0,589 402x285` after `1`…`Delete`) and the QWERTY keyboard
+ * ui_snapshot replies: those with a keyboard — run2 #250, run3 #45–#51,
+ * run7 #96, run8 #233, run9 #87, #95, #184, #246, #420 — each read a band,
+ * its top 589 or 590, and the others none. Its two shapes: the SWIFT
+ * form's number pad (run2-ios #250, `other 0,589 402x285` after
+ * `1`…`Delete`) and the QWERTY keyboard
  * (run3-ios #45, run8-ios #233: `other 0,590 402x284` after the keys,
  * `Dictate 325,805 68x69` after it). Shape, not labels: key labels follow the
  * language and the layout. The app's own PIN pad (run5-ios #81) has no such

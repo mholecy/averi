@@ -75,11 +75,11 @@ export const absenceVerdict = (
  * holding nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon), so it could not decide this —
  * the screen had not rendered by the deadline; compare with screenshot, and
  * a longer timeout may be all it needs` — the whole note a poll that timed
- * out on an `unknown` puts beneath its headline, its advice included: the
- * flow engine's `wait:` and `branch:` (a hint line under pollTimeoutMessage)
- * and the absent assert's "could not verify" detail. One spelling for both
- * layers, here beside the verdict it explains; `timeout` is the field's name
- * in an averi.yaml step and in an assert spec alike. The ladder's "every UI
+ * out on an `unknown` puts beneath its headline, its advice included, in
+ * the flow (a `wait:` or `branch:` step) and in verify (an absent assert).
+ * One spelling for both layers, here beside the verdict it explains;
+ * `timeout` is the field's name in an averi.yaml step and in an assert spec
+ * alike. The ladder's "every UI
  * tree read was bare, the last one …" (flow/engine.ts describeUnreadCause)
  * is a different fact — a whole probe, not the last round — and keeps its
  * own sentence around the same shape.

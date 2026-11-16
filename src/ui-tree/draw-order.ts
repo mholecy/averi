@@ -679,7 +679,8 @@ const NOT_DRAWN = {
    * app named) was excused here, and a tap on the login screen beneath was
    * sent onto it. A wrapper with children stays excused there too: it may be
    * a pass-through layer (Safari's `CapsuleViewController`, its bar only).
-   * In a NESTED run in reading order (reading-order.ts#listsNestedReadingOrder: WDA's), a LEAF the app named (an
+   * In a NESTED run in reading order (reading-order.ts#listsNestedReadingOrder: WDA's run sorted by top, or
+   * uiautomator's in location order), a LEAF the app named (an
    * identifier) is drawn — React Native's View with a testID and nothing in it, a cover over the target (lab note LR3,
    * rn-banner's `C.cover`) — unless it holds a sibling of its own whole: WDA flattens an RN View's content into its
    * siblings (myport's `login_username_field`). Elsewhere a named leaf stays excused (placed.ts#FRAME_EXCUSES).
@@ -1723,7 +1724,7 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
     return after(found).flatMap((p) => (rectIntersection(p.node.rect, container) !== undefined && draws(p) ? [p.node] : []));
   };
 
-  /** `paintsOver`'s two exemptions (`DrawOrder.paintsOver`): the cover hangs off one of `target`'s own branches — the nearest ancestor of it holding the cover is not screen-sized. */
+  /** `paintsOver`'s two exemptions (`DrawOrder.paintsOver`): the cover hangs off one of `target`'s own branches — the nearest ancestor of it holding the cover is at most half the screen (OWN_BRANCH_SCREEN_FRACTION). */
   const ownBranch = (target: Placed, cover: Placed): boolean => {
     let shared = target.parent;
     while (shared !== undefined && !within(cover, shared)) shared = shared.parent;
