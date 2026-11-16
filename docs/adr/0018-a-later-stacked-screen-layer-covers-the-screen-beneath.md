@@ -734,10 +734,10 @@ test surface (tests/ui-tree/presentation.test.ts):
   now hands the module on as `presentation`, and `standing.ts#Scene.presentedAt` keeps its signature);
 - `fallback` — which adapter infers what the source did not judge.
 
-Behind it, three adapters, composed per tree: BY MARKS (`byMarks`, holding `markOf` — **the one reader of
-`UiNode.presentation` / `presentationElement` is now `presentation.ts#markOf`**, the one that decides what is
-presented; today other code reads the marks for its own purpose too: `ios-system-alert.ts`, `miss.ts`,
-`window-mark.ts`; read on every tree), BY SHAPE
+Behind it, three adapters, composed per tree: BY MARKS (`byMarks`, holding `markOf`, read on every tree —
+**the one reader of `UiNode.presentation` / `presentationElement` is now `presentation.ts#markOf`** (today: the one
+that decides what is presented; `ios-system-alert.ts`, `miss.ts` and `window-mark.ts` read the marks for their own
+purposes)), BY SHAPE
 (`byShape`, the former `presented-by-shape.ts` whole: `presentedOver`, `givesWay`, `presentedSurface`,
 `OVER_PRESENTED`), asked only of an unjudged tree that is not Android's, and BY UIAUTOMATOR (`byUiautomator`), asked of
 Android's tree (the uiautomator root's `paddedTouchTargets` mark). The frame excuses moved to `placed.ts#FRAME_EXCUSES`

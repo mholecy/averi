@@ -66,7 +66,7 @@ No earlier baseline: the latest, in scope.json, is its first.
 
 ## src/ui-tree/draw-order.ts
 
-- 86.60 % on 2026-11-09 (D75, comments only; `npm run mutate -- --group core --force` at 0a52f450, cold): 948 mutants, 124 survived, 3 without coverage
+- 86.60 % on 2026-11-09 (D75, comments only; `npm run mutate -- --group core --force` at 0a52f450, cold): 948 mutants, 821 killed, 124 survived, 3 without coverage
 - 86.60 % on 2026-11-02 (D45, direct tests of paintsOver, drawnOverAt, drawnOverStrip, ofKeyboardBand): 948 mutants, 124 survived, 3 without coverage
 - 77.22 % on 2026-11-01 (D36)
 

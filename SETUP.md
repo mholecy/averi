@@ -235,8 +235,8 @@ step reference is in the skill you installed in step 3.
 > line; taps/typing stay on idb, only the tree read routes through WebDriverAgent; first WDA
 > build per Xcode version takes minutes; it needs the optional `appium-webdriveragent` package,
 > see step 0). Details: https://github.com/mholecy/averi/blob/main/docs/plans/ios-wda-tree-source.md.
-> Through WebDriverAgent averi also sees the iOS soft keyboard: a tap on an element it covers is refused
-> rather than sent into the keys — unless `app.ios.keyboardDismiss` names what hides it, e.g.
+> Through WebDriverAgent averi also sees the iOS soft keyboard: a tap on an element it covers is
+> refused rather than sent into the keys — unless `app.ios.keyboardDismiss` names what hides it, e.g.
 > `[{ tap: { id: login_title } }, { accessory: true }]` (a neutral element whose tap does not
 > submit — a title or label, never a button — or the Done toolbar above a number pad); then
 > averi taps that first. No key hides the iOS keyboard without submitting, so there is no
@@ -310,8 +310,10 @@ Then report to the user:
 - [ ] Skill installed at `.claude/skills/averi/` (`SKILL.md` + `references/`)
 - [ ] `averi.yaml` committed-ready: which states and flows it defines
 - [ ] Cold + warm `ensure_state` both passed (include the timings)
-- [ ] If `treeSource: wda` is enabled: `ui_snapshot` on iOS returned a tree (proves WDA built and started)
-- [ ] Anything flagged: missing test ids, `treeSource: wda` enabled, platforms skipped and why
+- [ ] iOS (skip with `treeSource: idb`): the `ensure_state` and `assert` replies carry no `⚠ read through idb` line
+  (proves WDA built and started; `ui_snapshot` never carries that line, so it does not tell)
+- [ ] Anything flagged: missing test ids, the iOS tree source (`auto` default, or pinned) and whether WDA came up,
+  platforms skipped and why
 
 If any box is unchecked, setup is **not done** — say so plainly and list what's missing.
 
@@ -383,7 +385,7 @@ one happens by itself.
   `⛔ reach` line** — idb returns a 0×0 tree on a rendered screen (measured 2026-10-06/07). averi treats it as an
   unread device: waits and asserts fail instead of reading "absent", and the reach ladder will not run a destructive
   rung (`clearState`, `destructive: true`) on it, so nothing was wiped. The measured trigger is an earlier WebDriverAgent session on that simulator
-  (`treeSource: wda` in any project, or another XCTest driver): every app process launched after it starts stuck, and
+  (the default `auto` once WebDriverAgent came up, or `treeSource: wda`, in any project, or another XCTest driver): every app process launched after it starts stuck, and
   waiting does not end it (18+ min measured). The same 0×0 shape is also a healthy app's first read right after a
   launch (0.4 s after `launch_app`, measured 2026-10-08): `ui_snapshot` reads once more a second later before failing,
   and its error then says `The read was retried once after 1 s and was still empty` (a healthy launch had a tree by

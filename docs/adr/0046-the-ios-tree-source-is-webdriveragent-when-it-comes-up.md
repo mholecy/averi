@@ -37,7 +37,8 @@ read is idb's for the adapter's life, and every reply that claims what it read c
   package is present, the first build succeeds, and /status answers within its readiness bound. It is decided once,
   lazily, at the first tree read, and kept. There is no probe at startup or at `launch_app`. Pre-warming is A41b.
   (Superseded at `launch_app` by A41d, the last section: a launch with WDA's build cached makes the choice before it
-  launches. Nothing starts WDA at startup or at `select_device`.)
+  launches. Nothing starts WDA at startup or at `select_device`. A41b's pre-warm (`IosTreeSource.prewarm`,
+  `adapters/prewarm.ts`) is removed.)
 - The fallback is said twice. averi's stderr gets one line with WDA's whole error. Each claiming reply gets
   `⚠ read through idb: WebDriverAgent did not come up (<reason>; select_device again to retry) and idb lists no
   presented layer or scroll clip — a layer over the target or a clip cutting it was not judged`
