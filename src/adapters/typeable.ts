@@ -3,7 +3,7 @@
  * function (`refusalOf`), which finds the first character it refuses and words the refusal
  * (docs/adr/0037-a-value-the-adapter-cannot-type-is-refused-before-any-device-call.md, D43a).
  *
- * A leaf, as input-text.ts is: interact/type-text.ts refuses with it before any device call, and the Android adapter's
+ * A leaf, as input-text.ts is: the interact layer refuses with it before any device call, and the Android adapter's
  * `typeText` again, defensively, for a caller that bypasses interact/ — neither imports the other for it.
  *
  * Data, not a method: the flow's read hand-off wraps the adapter in a Proxy that makes every method it does not class

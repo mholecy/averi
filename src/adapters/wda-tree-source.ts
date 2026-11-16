@@ -29,10 +29,10 @@ export class TreeSourceReleasedError extends Error {}
 /**
  * The WebDriverAgent adapter at the iOS tree-source seam (ios-tree-source.ts):
  * owns ONE WdaServer for its simulator and turns `/source` into the
- * normalized tree. This is the only module that joins wda.ts (the server's
- * lifecycle) to wda-source.ts (the payload's parsing); the two stay coupled
- * through nothing but `source(): Promise<unknown>`, on purpose — each is
- * testable without the other.
+ * normalized tree. wda.ts (the server's lifecycle) and wda-source.ts (the
+ * payload's parsing) stay coupled through nothing but
+ * `source(): Promise<unknown>`, on purpose — each is testable without the
+ * other.
  *
  * The server is constructed with the source. That is cheap (a per-UDID port
  * allocation and a log path — no process until the first read, since

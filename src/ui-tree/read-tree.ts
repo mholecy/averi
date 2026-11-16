@@ -377,13 +377,12 @@ export interface PollRound {
  *   pause past the deadline and end one read after it. That slack is kept
  *   on purpose: it is the read that finds a late element (a `wait:` that
  *   lands at 8.5 s of 10 under 1.5 s dumps; a static element a slow dump
- *   needs two reads to prove still). Two tightenings were tried and
- *   withdrawn against the reviewer's own measurements:
- *   projecting the previous round's cost (it shortened every caller's
- *   timeout — a static element threw after one read at 615 ms of 1500) and
- *   refusing a round after a pause that crossed the deadline (it turned two
- *   found-late cases into timeouts AT the deadline). The before/after
- *   figures are kept once, on `Verifier.treePoll` (verify/assert.ts).
+ *   needs two reads to prove still). Two tighter rules measured worse:
+ *   projecting the previous round's cost shortens every caller's timeout
+ *   (a static element threw after one read at 615 ms of 1500), and
+ *   refusing a round after a pause that crossed the deadline turns
+ *   found-late cases into timeouts AT the deadline (two of them;
+ *   tests/ui-tree/read-tree.test.ts states the cases and pins the rule).
  * - The pause after a round is `pauseAfterRead` of the round's READ
  *   (docs/adr/0029-poll-cadence-counts-the-read.md), timed on `Date.now()`,
  *   the clock the deadline already uses, so a test that fakes Date
@@ -610,11 +609,11 @@ export const anotherScreen = (before: ScreenIdentity, after: ScreenIdentity): bo
  * - RECYCLED ROWS give a loud stop: under idb, which lists no scroll view, a fling that replaces every identified row
  *   it lists — touching down on a row or a gap — reads `changed` (the stop where the scroll could have gone on: the
  *   failure the decision prefers to a claimed stop); a list that also lists a node the read after keeps under the
- *   touch-down (a labelled header, a scroll view) is a scroll. Met on the first real list (a full 300 ms stroke flung
- *   the lab's 45-row SwiftUI picker ~1 040 pt, past all 15 rows the read before listed; every D0 repeat stopped so):
- *   idb's full strokes are paced (interact/stroke-plan.ts#PACED; ADR 0018, "idb's presented layer", Decision 4),
- *   524 pt in 1.5 s carrying it ~570 pt and keeping two rows. Narrowed, not closed: a list whose
- *   rows are taller than a stroke's overlap, or one that flings further at that pace, still reads `changed`;
+ *   touch-down (a labelled header, a scroll view) is a scroll. A full 300 ms stroke flings the lab's 45-row SwiftUI
+ *   picker ~1 040 pt, past all 15 rows the read before listed (every D0 repeat stopped so), so idb's full strokes are
+ *   paced (interact/stroke-plan.ts#PACED; ADR 0018, "idb's presented layer", Decision 4), 524 pt in 1.5 s carrying it
+ *   ~570 pt and keeping two rows. That narrows the case, not closes it: a list whose rows are taller than a stroke's
+ *   overlap, or one that flings further at that pace, still reads `changed`;
  * - a stroke whose touched node PERSISTS while the sheet goes — a row label the host repeats by role and label (a
  *   picker sheet over a list of the same items), a title, a scroll view at the very rect of one the host lists — keeps
  *   it unchanged, the stop claimed;

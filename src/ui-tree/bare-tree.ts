@@ -26,7 +26,7 @@ import { countOf } from '../util/count.js';
  * - NOT "no node has a label/identifier/value": the wrappers every source
  *   emits before an app has rendered are all named by their framework. WDA's
  *   `Application` carries the app's display name as its label
- *   (fixtures/wda-source-rn-myport.json: "MyPort"); idb's flat list opens
+ *   (tests/fixtures/wda-source-rn-myport.json: "MyPort"); idb's flat list opens
  *   with an `Application` element labelled the same way; Android's decor
  *   chain carries android:id/content and the status/navigation bar
  *   backgrounds, stripped by the parser to identifiers "content",
@@ -143,10 +143,12 @@ import { countOf } from '../util/count.js';
  * missed, its nodes read as content); that a status item always stands
  * beside it; the band's cap on other devices (CLOCK_BAND_FRACTION); and that
  * an APP's tree carries no status bar — the one whole app read the note
- * recorded on iOS 27 (bare, 2 nodes, at +3.0 s) had none, no WDA fixture
- * holds a StatusBar, and uiautomator dumps only the app's window (its
- * decor's `statusBarBackground` is identifier-only, bare by the clause
- * above, and holds no clock, so these clauses leave Android's decor alone).
+ * recorded on iOS 27 (bare, 2 nodes, at +3.0 s) had none, though WDA lists
+ * one with a system alert up
+ * (tests/fixtures/wda-capture-contacts-open-in-alert.json), and
+ * uiautomator dumps only the app's window (its decor's
+ * `statusBarBackground` is identifier-only, bare by the clause above, and
+ * holds no clock, so these clauses leave Android's decor alone).
  * A loaded screen with one button and no status bar in its tree is not bare.
  */
 export function isBareTree(tree: UiNode): boolean {

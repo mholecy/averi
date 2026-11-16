@@ -707,11 +707,10 @@ export interface UiNode {
  * where it stopped, and one that replaces a node's `children` while it holds
  * that node is walked through the new ones. An explicit stack, not a
  * recursive `yield*`: each node is reached in one step rather than through a
- * generator per ancestor, and the walk has no depth limit. Children are
- * pushed last first, so they pop in the order listed — the pre-order of the
- * recursive definition. What it never sees is a `children` array changed
- * in place after its node was walked past: its children are on the stack
- * by then.
+ * generator per ancestor, and the walk has no depth limit. The order is the
+ * recursive definition's pre-order. What it never sees is a `children` array
+ * changed in place after its node was walked past: its children are on the
+ * stack by then.
  */
 export function* everyNode(root: UiNode): Generator<UiNode> {
   const stack = [root];
@@ -804,8 +803,8 @@ export type SoftKeyboard =
  * docs/bugs/2026-10-05-ios-tap-lands-on-soft-keyboard.md
  *
  * Two kinds of keyboard, one fact with two halves — stated in full here,
- * beside the capability; the in-tree dismissal (interact/keyboard-in-tree.ts)
- * points here and ARCHITECTURE §3 repeats the short form. Providing an
+ * beside the capability (ARCHITECTURE.md's vocabulary names them the window
+ * model and the in-tree model). Providing an
  * oracle asserts the WINDOW model: the keyboard it describes is a separate
  * window that `back` hides, and interact/keyboard-window.ts — the model an
  * adapter with the oracle gets (interact/keyboard.ts#keyboardModel chooses,
@@ -1032,7 +1031,7 @@ export interface SystemAlert {
  * The alert that holds a link or a launch (D54, D56): `asksForApp` — its title contains one of the app's names the wait
  * held, so a link's reply may say iOS asks to open it there; otherwise it calls it a system alert, and no more. A
  * launch's wait may have asked no names (a WDA launch), and its text never reads this: on a launch it is computed and
- * unused. The name is D54's, kept through A10.
+ * unused.
  */
 export interface LinkAlert extends SystemAlert {
   asksForApp: boolean;
@@ -1080,8 +1079,8 @@ export type FocusedWindow =
  * read error is a poll miss (ui-tree/read-tree.ts#readTreeOrMiss: a device still launching, a tree momentarily
  * unproducible), and the loops that wait on a tree read past it until their deadline. This one they do not — the read
  * seam throws it (docs/adr/0036-a-read-failure-no-wait-cures-is-thrown-by-the-read-seam.md) — and the flow engine's
- * ladder neither escalates past it nor re-runs rungs on it (engine.ts#isTerminal), because a re-read, a relaunch or a
- * re-run reach flow cannot end it, and polling it to a deadline only spends the budget (D20's device run: a
+ * ladder neither escalates past it nor re-runs rungs on it (flow/engine.ts#isTerminal), because a re-read, a relaunch
+ * or a re-run reach flow cannot end it, and polling it to a deadline only spends the budget (D20's device run: a
  * `scroll_until` made 133 failing reads over 90 s and then said so). A base class here, beside the adapter contract, so
  * the read loops ask "does this heal?" without knowing which platform said no.
  */
@@ -1092,10 +1091,11 @@ export interface DeviceAdapter {
   /** Reinstall triggers the app's login requirement — intentional. */
   install(appPath: string): Promise<void>;
   /**
-   * Returns when the platform has started the app — on iOS (the idb source)
-   * not before the tree is the launched app's, or a bounded wait says it was
-   * not (AppHolder's `unknown`; adapters/ios-foreground.ts). Android returns at
-   * once: the stale-tree window after a switch is unmeasured there.
+   * Returns when the platform has started the app — on iOS not before the
+   * tree source names the launched app (idb: the tree's Application; WDA,
+   * once up: its active app), or a bounded wait says it did not (AppHolder's
+   * `unknown`; adapters/ios-foreground.ts). Android returns at once: the
+   * stale-tree window after a switch is unmeasured there.
    */
   launch(bundleId: string, opts?: LaunchOptions): Promise<AppHolder>;
   terminate(bundleId: string): Promise<void>;
@@ -1172,10 +1172,9 @@ export interface DeviceAdapter {
    *
    * MEMOIZED per adapter — a SUCCESSFUL read; the panel rarely changes
    * under a session — and that is part of the contract, not a detail: the
-   * layers above read it freely (per captured frame, per absent check)
-   * instead of caching it themselves (the Verifier and the FlowEngine keep
-   * no memo of their own). An adapter that re-read the device on every call
-   * would make every pixel assert poll pay a shell-out.
+   * layers above read it freely instead of caching it themselves. An adapter
+   * that re-read the device on every call would make every pixel assert poll
+   * pay a shell-out.
    *
    * Two exceptions. A FAILED read is not kept: one transient `idb describe`
    * or `wm size` failure must not take the witness away for the life of the
@@ -1351,11 +1350,11 @@ export interface DeviceAdapter {
   /**
    * Release device-bound resources the adapter started (on iOS the WdaServer
    * behind the wda tree source, and the idb helper). Optional and idempotent.
-   * Two callers: the registry when it evicts an adapter (a rebind must not
-   * leak a server driving the old device), and the process shutdown, which
-   * AWAITS it — so a returned promise must resolve when the resource is
-   * actually released, not when the release was queued. It may reject; both
-   * callers swallow the rejection, since the adapter is gone either way.
+   * It is asked when an adapter is evicted (a rebind must not leak a server
+   * driving the old device) and at process shutdown, which AWAITS it — so a
+   * returned promise must resolve when the resource is actually released, not
+   * when the release was queued. It may reject; the rejection is swallowed,
+   * since the adapter is gone either way.
    */
   dispose?(): void | Promise<void>;
 }

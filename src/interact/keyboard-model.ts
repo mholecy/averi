@@ -98,9 +98,8 @@ export interface ResolvedClear extends Resolved {
    * itself: `back` pressed and the keyboard hidden; pressed and unconfirmed;
    * a configured dismissal tapped; or nothing pressed but
    * a wait for a window state the input method contradicted. It is ALSO
-   * folded into `note`, so a caller that prints notes (the MCP tools) needs
-   * nothing new; a caller that does not (the flow trace) reads this field to
-   * say the one thing it must.
+   * folded into `note`, so a caller that prints notes needs nothing new; a
+   * caller that does not reads this field to say the one thing it must.
    */
   keyboardHidden?: string;
 }

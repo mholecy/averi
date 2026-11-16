@@ -137,7 +137,6 @@ function fieldAbove(message: UiNode, fields: UiNode[]): UiNode | undefined {
   return between ? undefined : above;
 }
 
-/** An identifier naming its text an error: `<…>_error`, `<…>.error` or `<…>-error`, in any case. */
 const ERROR_IDENTIFIER = /[._-]error$/i;
 
 /** How far below its field's bottom, in pt, a message may start and still be that field's (see `fieldAbove`). */

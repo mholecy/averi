@@ -27,8 +27,7 @@ import { headerWithRule, row, type Column } from './table.js';
  *   frame, the assert from its caller — and a width that answer refuses (0
  *   wide, a CONTENT width, wider than the device screen) reaches no verdict.
  *   Were geometry.ts's "unreliable" flag kept as a remark, a content width
- *   would print a warning and then WITHIN TOLERANCE under it (the 2026-10-07
- *   parity review, P1).
+ *   would print a warning and then WITHIN TOLERANCE under it.
  * - Contract values are Figma-frame units, normalized by `figma_frame_width`
  *   (fallback: the widest anchor `w`). Omitted anchor fields are compared
  *   platform-to-platform only, never against the contract.
@@ -323,8 +322,8 @@ function compareAspect(anchor: LayoutAnchor, a: Rect, i: Rect, ctx: CompareConte
  * `tolerance_aspect_pct` when it declares one — never a non-number — else
  * that same width tolerance.
  *
- * The tolerances live in the contract and nowhere else (parity review
- * 2026-10-07 P2): a test-facing `tolerancePct` option that production never
+ * The tolerances live in the contract and nowhere else: a test-facing
+ * `tolerancePct` option that production never
  * passed would leak — with the overridden width as the aspect fallback, it
  * would widen the shape check whenever the contract left
  * `tolerance_aspect_pct` unset. So there is one width to fall back to, and

@@ -34,8 +34,8 @@ import { headerWithRule, row as tableRow, type Column } from './table.js';
  *   the contract hex together while staying close to each other.
  * - Measured consequence: the real 2026-08-13 bug (10.19) is over the primary
  *   axis (8) but UNDER the default contract axis (12) — a single-platform run
- *   at defaults would MISS it, so the output says "consider tolerance_de 6"
- *   whenever only vs-contract comparisons apply.
+ *   at defaults would MISS it, so the output says "consider tolerance_de: 6"
+ *   when a platform is not provided and the tolerance is above 6.
  * - Scale is derived per platform at runtime, ONCE per captured frame
  *   (verify/capture.ts, verify/scale.ts): the device screen when it will
  *   say, the tree when it will not. Never hardcoded 2x/3x. Degenerate

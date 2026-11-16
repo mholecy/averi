@@ -304,8 +304,8 @@ export class WdaServer {
    * xcodebuild has neither exited nor been stopped since (stop() and
    * shutdown() clear `child`; a restart is up again only once its own start
    * reached /status, under a new number). No device call — what the
-   * launch's foreground wait asks before activeAppInfo (wda-tree-source.ts),
-   * so a launch never starts WDA; the number lets it remember a failed ask
+   * launch's foreground wait asks before activeAppInfo, so a launch never
+   * starts WDA; the number lets it remember a failed ask
    * for one child's life. A runner that died inside the simulator while
    * xcodebuild lives on still reads as up; activeAppInfo then fails in WDA's
    * words.

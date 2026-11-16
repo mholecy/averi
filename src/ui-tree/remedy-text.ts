@@ -3,7 +3,7 @@ import type { MarkedLayer } from './presentation.js';
 import type { NoScrollRemedy, Remedy, RemedyCase } from './standing.js';
 
 /**
- * THE CLAUSES OF A REMEDY every verb quotes (A26, UT1): standing.ts decides a node's remedy (`Remedy`, `remedied`) and
+ * THE CLAUSES OF A REMEDY every verb quotes: standing.ts decides a node's remedy (`Remedy`, `remedied`) and
  * words nothing; each verb owns its sentence, and the clauses more than one verb says live here — beneath a presented
  * screen (`presentedRemedy`, `presentedOr`, and `scroll_until`'s stop on it, `presentedStop`), under a cover listed in
  * reading order with the node (`orderRemedyText`), and where neither lies in a scroll view (`bothPinnedRemedyText`),

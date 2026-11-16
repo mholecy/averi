@@ -68,8 +68,8 @@ const ROLE_MAP: Record<string, string> = {
   // when LABELLED — so a spinner with a value and no label counts toward bare, and a labelled screen-sized one counts
   // as content; one `isVisible`/`isAccessible` 0/0 can root a hidden subtree (hiddenRoots, below). A selector matches
   // it by `role:progress`, not by `role:other`.
-  // Residual, by decision (D27 review): showsProgress counts EVERY progress node with area, so an invisible spinner (a
-  // covered layer, 0/0) or an off-screen one (a FlatList footer spinner below the viewport) also reads as loading — not
+  // Residual, by decision: showsProgress counts EVERY progress node with area, so an invisible spinner (a covered
+  // layer, 0/0) or an off-screen one (a FlatList footer spinner below the viewport) also reads as loading — not
   // filtered, since a footer spinner below the fold means the list is still loading a page. The safe direction: the
   // hold falls back to the whole ensureTimeoutMs window, scroll_until to its maxSwipes / timeoutMs bound, instead of
   // "exhausted".
@@ -107,8 +107,7 @@ const PRESENTATIONS: readonly (readonly [string, TypedPresentationKind])[] = [
  * WDA's `value` of an EMPTY field is that same text (measured 2026-10-09,
  * iPhone 17 / iOS 27.0, Contacts "New Contact": `textfield id:Company value
  * 'Company'`), so it is carried as the node's `placeholder` (UiNode) and fill
- * counts a value equal to it as empty. Not seen in a captured fixture: the
- * shrunk ones dropped it.
+ * counts a value equal to it as empty.
  */
 interface WdaElement {
   type?: string;

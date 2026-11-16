@@ -6,7 +6,7 @@ import { noScrollHelps, type RemedyCase, type TouchRemedied } from '../ui-tree/s
 import { cutRemedy, dismissKeyboardFirstText, hideClause, keyboardUpText, ridingKeyboard, wholeThinWayPast, type KeyboardUp } from './target-text.js';
 
 /**
- * THE TOUCH REMEDY's sentence (A26): what the tap's refusal and `scroll_until`'s stop say to do about a target that
+ * THE TOUCH REMEDY's sentence: what the tap's refusal and `scroll_until`'s stop say to do about a target that
  * stands `cut` or `covered` — one function of the standing (ui-tree/standing.ts#TouchRemedied: its kind, its remedy,
  * its cut's `by` and `within`, its cover) and the soft keyboard when it is up (`KeyboardUp`), so the two touch verbs
  * cannot word one target two ways.
@@ -18,12 +18,12 @@ import { cutRemedy, dismissKeyboardFirstText, hideClause, keyboardUpText, riding
  * - `cut` by a node drawn after it, `scroll`: scroll the list out from under that node, its way past, and the riding
  *   keyboard first (`cutByRemedy`); `bothPinned`: no scroll (`cutByPinnedRemedy`, the node it is pinned under the
  *   remedy's `under`). docs/adr/0015-flat-list-reading-order-break.md (its D88 amendment)
- * - `covered`, `unordered`, `seenOver` or `bothPinned`: no scroll (ui-tree/remedy-text.ts#noScrollRemedyText);
- *   `scroll`: a scroll, refined for a wrapper that may only position its one child (`positionerRemedy`).
+ * - `covered`: under `unordered`, `seenOver` or `bothPinned`, no scroll (ui-tree/remedy-text.ts#noScrollRemedyText);
+ *   under `scroll`, a scroll, refined for a wrapper that may only position its one child (`positionerRemedy`).
  *
  * The keyboard is the caller's reading (`KeyboardUp`: the tap's reading line, `scroll_until`'s applied cover), named
  * only for a cut by a node drawn after it; whether that node rides on it is target-text.ts#ridingKeyboard's
- * (a geometric judgement kept with the words for now: review 2026-11-11's ST2).
+ * (a geometric judgement kept with the words).
  * Not the other kinds: an off-screen, system-bar or under-keyboard target is refused by the tap in its own words, and
  * `scroll_until` scrolls those (or stops on its own sentence) — the two verbs share no sentence there.
  */

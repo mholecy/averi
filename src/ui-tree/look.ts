@@ -25,7 +25,7 @@ import { sceneOf, type Scene } from './standing.js';
  *   `overlapping` or its `remedy`; `scroll_until`'s pure read holds only the synchronous facts its round hands in
  *   (`ofKeyboard`), its two async questions asked by the round's protocol (interact/scroll-read.ts#AppliedKeyboard).
  *
- * The screen is not a look's — BY DECISION, where the architecture review's candidate (A3) put it in the Look: a verb
+ * The screen is not a look's — BY DECISION: a verb
  * asks ui-tree/usable-screen.ts#usableScreen of the look's tree (a Look is a TreeRead) and falls back to its
  * `treeScreen` itself, because which look's screen it judges on is the verb's — the tap judges every look of one tap
  * on its FIRST look's screen (the orientation does not turn inside one tap) and reads it again `fresh` before

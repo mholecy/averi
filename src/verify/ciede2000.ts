@@ -8,8 +8,8 @@
  * Why CIEDE2000 and not RGB distance: emulator vs simulator color pipelines
  * differ slightly and the app background is a gradient, so the metric must
  * match perceptual difference — the 2026-08-13 real bug (#CFCFD3 vs #FDFDFD)
- * measures dE00 10.19, and every tolerance in the color-parity loop is
- * calibrated against that number.
+ * measures dE00 10.19, and the default tolerances are set against that
+ * number (color-parity.ts: over the primary axis, under the contract axis).
  */
 
 export type Lab = readonly [l: number, a: number, b: number];

@@ -116,7 +116,7 @@ export const PGREP_TIMEOUT_MS = 5_000;
 
 /**
  * How many checks in a row of one bundle may find pgrep saying no while launchctl says running before its liveness
- * asks launchctl alone (D33 review): one is a stale path (dropped, appinfo read again); two, the second after a fresh
+ * asks launchctl alone: one is a stale path (dropped, appinfo read again); two, the second after a fresh
  * appinfo, is a pattern that misses the app's process.
  */
 const DISAGREEMENTS_TO_GIVE_UP = 2;
@@ -143,7 +143,7 @@ const approvalCacheKey = ({ scheme, bundleId }: SchemeApproval): string => `${bu
  *   foreground wait saw it in front (D49a). A link that brings another app forward, or a tap that does, is not seen:
  *   the key stays the launched app's;
  * - `forgotten`: that bundle was terminated through this adapter — NOT known, so nothing is split and nothing learned
- *   until the next launch (D24 review: a key must not outlive its app).
+ *   until the next launch (a key must not outlive its app).
  */
 type FrontApp = { kind: 'unlaunched' } | { kind: 'launched'; bundleId: string } | { kind: 'forgotten' };
 
@@ -865,7 +865,7 @@ export class IosAdapter implements DeviceAdapter {
    * refusals above this layer point at the fix without naming an iOS config
    * key themselves. That holds under WDA only: under idb no guard acts (the
    * idb source marks no node as the keyboard — the comment above), the list
-   * is inert (config.ts#inertKeyboardDismissNote), and the refusal that
+   * is inert (flow/config.ts#inertKeyboardDismissNote), and the refusal that
    * reaches an idb user is the band line's (ADR 0006) — so there the sentence
    * says to tap the dismissal yourself, and that the list applies under WDA.
    */

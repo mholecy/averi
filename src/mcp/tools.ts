@@ -49,7 +49,7 @@ import { PIXEL_OVERLAP_SLACK } from '../ui-tree/geometry.js';
  * handlers depend on and returns the server; mcp/server.ts (the bin) connects
  * it to stdio, tests/mcp/tools.test.ts connects it to the SDK's in-memory
  * transport and calls the tools through a real `Client` — the module's
- * interface as its only caller, an MCP client, sees it: names, schemas,
+ * interface as an MCP client sees it: names, schemas,
  * response content, `isError`.
  *
  * What is injected, and what is not: the registry (whose AdapterFactory seam

@@ -16,8 +16,9 @@ import type { RawImage } from '../adapters/types.js';
  * Why not pngjs alone: on a full-screen capture (iOS 1206×2622, Android
  * 1080×2220) pngjs spends ~90 % of its 20–30 ms in its JavaScript unfilter and
  * bitmapper, one closure call and one fresh line Buffer per row, and zlib is
- * 2–3 ms of it. Every device screenshot this server takes is the same shape —
- * 8-bit RGBA (or RGB), not interlaced — so `fastDecode` handles exactly that
+ * 2–3 ms of it. Every PNG capture this server decodes (iOS's, and Android's
+ * where the raw path is refused) is the same shape — 8-bit RGBA (or RGB),
+ * not interlaced — so `fastDecode` handles exactly that
  * shape with native inflate and CRC and a flat typed-array unfilter, and hands
  * anything else to pngjs. Native image libraries (sharp) and WASM/napi decoders
  * were weighed and rejected: a per-platform binary breaks the `npx` install.
@@ -92,7 +93,7 @@ function asBuffer(bytes: Uint8Array): Buffer {
  *   sRGB+eXIf), so declining on them would decline every capture. An unknown
  *   CRITICAL chunk declines (pngjs throws "Unsupported critical chunk type").
  * - gAMA is read for its CRC only: pngjs records the gamma on its result but
- *   never applies it to the pixels, and no caller reads it.
+ *   never applies it to the pixels.
  * - tRNS declines: on an RGB image pngjs turns the pixels matching its colour
  *   key to transparent black (alpha AND colour zeroed). PLTE declines too —
  *   allowed as a suggested palette on a truecolour image, but rare enough that
@@ -112,7 +113,7 @@ function asBuffer(bytes: Uint8Array): Buffer {
  * in for the older Node.
  *
  * Exported for the tests (tests/verify/png.test.ts), which pin which inputs the
- * fast path takes; no production importer — callers decode with `decodePng`.
+ * fast path takes; callers decode with `decodePng`.
  */
 export function fastDecode(input: Uint8Array, crc32: Crc32 | null = nativeCrc): RawImage | undefined {
   if (crc32 === null) return undefined;

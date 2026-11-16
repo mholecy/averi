@@ -50,8 +50,8 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  * them inside its own sentence, and the two touch verbs share one sentence of a
  * `cut` or `covered` standing's remedy (interact/touch-remedy.ts). This module
  * decides; it words nothing.
- * The keyboard actions stay with the callers, and the keyboard guard (K1)
- * alone acts on the keyboard.
+ * The keyboard actions stay with the callers, and the keyboard guard alone
+ * acts on the keyboard.
  *
  * Contract of `standing(node, screen, purpose)`:
  * - The point judged is the node's centre as a tap sends it
@@ -234,8 +234,9 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *   screen-sized node): the `fully` stop stops on it, so a rect
  *   assert after it works — no strokes over a modal sheet — and a pixel
  *   assert on it fails closed with its own advice (assert something in it
- *   clear of the bar). A scroll view's content is lifted, whatever its
- *   shape.
+ *   clear of the bar). A scroll view's content is lifted, unless it is
+ *   screen-sized and taller than the room between the bands
+ *   (`pinnedSurface`'s `screen`).
  *   docs/adr/0009-android-navigation-band.md
  * - A sliver: uiautomator cuts most rects to their scroller, so a cut node's
  *   centre is on the screen (one it does not cut is judged by THE DRAWN
@@ -509,7 +510,7 @@ export interface StandingFacts {
  *    scroll view's one content container beside its rows (scroll-sticky.wda), and a stroke moves the rows from under
  *    it. Not where the tree cannot say (idb's flat list).
  *    remedy-text.ts#bothPinnedRemedyText. `under`: the node it is pinned under — its cover's node, or (below) the node
- *    it is cut by (A26).
+ *    it is cut by.
  *    And (D88) a touch's `cut` by a node drawn after it (geometry.ts#Cut.by), on the same two facts of the node and that
  *    node — Compose's text-under-bar P, cut to 825x22 by Continue, which the pixel assert judges `covered` by it: one
  *    remedy for one target. The cut is ambiguous — the rest may lie under that node, or it is only that thin — and no
@@ -1108,7 +1109,7 @@ export function farEdgeFrames(screen: UsableScreen, best: Standing | undefined, 
   return { frames: regionAtBottom ? uncutFrames.map((f) => aboveNavigationBand(f, screen, box)) : uncutFrames, uncutFrames };
 }
 
-/** The tap's box: the box that holds the centre, else the first (`touchScreen`'s; the node's own rect when it fails open). */
+/** The tap's box: the box that holds the centre, else `touchScreen`'s box (the node's own rect when it fails open). */
 const chosenBox = (centre: Point, screen: JudgedBoxes): Rect => screen.boxes.find((b) => containsPoint(b, centre)) ?? screen.box;
 
 /**
@@ -1268,7 +1269,10 @@ function inStopFrame(judged: Judged, box: Rect, bands: JudgedBoxes | undefined, 
   return { facts, outside: { facts, kind: 'offScreen', at: centre, visible: 0 } };
 }
 
-/** THE ORDER past the frame, for both stops: where it lies, cut, covered by `cover`, its centre under a line no guard acts on — else `reachable` at its centre. */
+/**
+ * THE ORDER (`ordered`) past the frame, for both stops — the tap has its own (`tapStanding`); the line is one no guard
+ * acts on.
+ */
 function stopOrdered(facts: StandingFacts, placed: PointPlace, cut: TouchJudgement | undefined, cover: Cover | undefined, line: KeyboardLine | undefined): TouchJudgement {
   return ordered<TouchJudgement>(
     pointPlaced(facts, placed, facts.visible),
@@ -1488,8 +1492,8 @@ const singleBox = (usable: UsableScreen): JudgedBoxes => ({
 });
 
 /**
- * The node's cut at the navigation bar, as the tree can tell it (N-b,
- * ADR 0009): the bottom of what of it is drawn (geometry.ts#drawnPart — its
+ * The node's cut at the navigation bar, as the tree can tell it
+ * (ADR 0009): the bottom of what of it is drawn (geometry.ts#drawnPart — its
  * rect, or the part its scroll views draw where uiautomator dumped it past
  * one, ADR 0010's drawn frame) flush, within a unit, with the band's top
  * (geometry.ts#flushEdges' unit), inside a clipping scroller

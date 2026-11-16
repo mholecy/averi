@@ -9,9 +9,9 @@ import { decodePng } from './png.js';
  * - `decode()` — the pixels: a raw capture's as they are, a PNG's through verify/png.ts#decodePng, which throws on a
  *   damaged one (the caller words it). Memoized, the throw too: the region check and the frame's measurement decode a
  *   capture once between them;
- * - `png()` — the bytes where a PNG leaves the process (the `screenshot` tool, `ensure_state`'s and a `verify` leg's
- *   image, a stored baseline, the OCR recognizer's file): the device's as they are, a raw capture's encoded on the
- *   host (adapters/png-encode.ts) — the one encode a frame pays, and only when someone asks;
+ * - `png()` — the bytes where a PNG leaves the process (shown, stored or recognized): the device's as they are, a
+ *   raw capture's encoded on the host (adapters/png-encode.ts) — the one encode a frame pays, and only when someone
+ *   asks;
  * - `equals()` — the stability wait's question: two PNGs by their bytes (the device's encoder is deterministic), two
  *   raw captures by their pixels — no encode, no decode. A PNG beside a raw capture (the adapter fell back between
  *   them) by their decodes; one that does not decode equals nothing.

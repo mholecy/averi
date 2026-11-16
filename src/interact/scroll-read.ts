@@ -338,8 +338,8 @@ function offeredKeyboard(shown: KeyboardCover | undefined, viewport: DeviceScree
  * the viewport's width from the line to its bottom, the shape idb's band
  * has (soft-keyboard.ts#flatListKeyboardBand) — with the reading's
  * `remedy`. Applied with no witness: it is read off the very tree being
- * judged, as WDA's band is. None when there is no band, or it lies at or
- * below the viewport's bottom.
+ * judged. None when there is no band, or it lies at or below the
+ * viewport's bottom.
  * docs/adr/0006-idb-keyboard-band-is-a-keyboard-line.md
  */
 function bandKeyboardOf(line: KeyboardLine | undefined, viewport: DeviceScreen & { x: number; y: number }, remedy: KeyboardRemedy): AppliedKeyboard | undefined {

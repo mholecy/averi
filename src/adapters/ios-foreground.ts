@@ -166,8 +166,8 @@ import { sleep } from '../util/sleep.js';
  * dumps the focused window), so android.ts waits for nothing.
  */
 
-// The bound is FOREGROUND_WAIT_MS, in adapters/types.ts beside AppHolder (A16): the MCP tool descriptions quote it,
-// and mcp/ reads no platform module outside its composition root.
+// The bound is FOREGROUND_WAIT_MS, in adapters/types.ts beside AppHolder: mcp/ words it too, and reads no platform
+// module outside its composition root.
 
 /**
  * The pause between reads. Short: a describe-all already takes a few tenths

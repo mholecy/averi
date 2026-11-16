@@ -26,9 +26,8 @@ import { inferScreenSize, SCREEN_AGREEMENT_PCT, screenOf, windowTurnsScreen, typ
  *   edge, which a scroll view inflates without limit) — and usable; else no
  *   usable screen (undefined). What that means is the caller's: the gesture
  *   box throws and nothing is swiped, the scroll keeps the last round's
- *   screen, and every judgement — the tap, the stops, the pixel assert —
- *   takes `treeScreen`, THE "no device screen" (a touch fails open on a root
- *   of no area).
+ *   screen, and every judgement takes `treeScreen`, THE "no device screen"
+ *   (a touch fails open on a root of no area).
  * - `boxes` — the boxes a point or a rect is judged ON SCREEN in, so the
  *   scroll and the tap after it agree by construction (the rule is
  *   `judgedBoxes`): the oriented box alone when a window witnessed the

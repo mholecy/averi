@@ -168,7 +168,7 @@ function zeroAreaNote([only, ...more]: readonly Edge[]): string {
 /** THE remedy both of idb's dialect notes end on (`noIdListed`, `idUnlisted`): the tree source that lists identifiers. */
 export const TREE_SOURCE_REMEDY = 'set app.ios.treeSource: wda in averi.yaml';
 
-/** THE fact of `noIdListed`'s note, as its words say it — the phrase a judge of the reply reads (scripts/truth/replies.ts). */
+/** THE fact of `noIdListed`'s note, as its words say it — the phrase a judge of the reply reads. */
 export const NO_ID_LISTED = "idb's read lists no id on any element";
 
 /**
@@ -176,7 +176,7 @@ export const NO_ID_LISTED = "idb's read lists no id on any element";
  * tell them apart): both of idb's dialect notes say them, after their fact, as possible reasons. One phrase with no
  * parenthesis inside, since a one-line reply wraps the note in one (`withMissNote`); the container's forms (SwiftUI's
  * `.contain`, a React Native `testID` on a non-interactive view) are the ui_snapshot description's and the
- * troubleshooting reference's, not each reply's. The phrase a judge of the reply reads (scripts/truth/replies.ts).
+ * troubleshooting reference's, not each reply's. The phrase a judge of the reply reads.
  */
 export const IDB_UNLISTS =
   'idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, ' +
@@ -184,7 +184,7 @@ export const IDB_UNLISTS =
 
 /**
  * The phrase both notes' remedies open with, after their fact and idb's reasons: close what lies over the element;
- * else, if it shows, what each read leaves. The phrase a judge of the reply reads (scripts/truth/replies.ts).
+ * else, if it shows, what each read leaves. The phrase a judge of the reply reads.
  */
 export const COVERED_FIRST = 'If something covers it, close that first; if it is showing,';
 
@@ -202,7 +202,7 @@ const idUnlistedNote = (id: string): string =>
 
 /**
  * Whether the miss's note already says that idb lists nothing beneath a presented layer (`IDB_UNLISTS`): a reply that
- * carries it says `TOP_LAYER_ONLY_HINT` no second time (interact/scroll-rounds.ts, the unmoved stop's `unlisted`).
+ * carries it says `TOP_LAYER_ONLY_HINT` no second time.
  */
 export const saysTopLayerOnly = (miss: Miss): boolean => miss.of === 'noIdListed' || miss.of === 'idUnlisted';
 

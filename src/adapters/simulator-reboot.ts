@@ -12,7 +12,7 @@
  * stripped) and fails if the reboot command is spelled anywhere else.
  *
  * Not here: the advice that names a reboot without a command
- * (run/verify.ts's appAlive: unknown line, which has no UDID in scope, and
+ * (run/app-health.ts's appAlive: unknown line, which has no UDID in scope, and
  * the registry's "reboot it or select_device another one") — neither spells
  * the command, so neither duplicates this one.
  */

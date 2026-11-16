@@ -8,7 +8,7 @@
  * string to the device, where `sh` (mksh on Android) splits it again — words,
  * quotes, `&`, `;`, `$`, backticks, globs and newlines all interpreted.
  * execFile adds no shell on the host, so the host side is safe and the
- * device side is not. Measured on emulator-5554 (API 33) by the review, with
+ * device side is not. Measured on emulator-5554 (API 33), with
  * harmless commands only, all three exiting 0:
  *
  *   -d app://login?a=1&b=2    the activity got `app://login?a=1`; `b=2` ran in the background
@@ -25,7 +25,7 @@
  * `''`, so it stays an argument instead of vanishing. Plain words (`input`,
  * `tap`, `540`, `md.bank.app`, `md.bank.app/.MainActivity`,
  * `android.intent.action.VIEW`, `%s`) pass unquoted, so the command lines in
- * ExecError messages and in the tests read as they always did.
+ * ExecError messages and in the tests stay readable.
  *
  * Deliberately NOT here:
  * - `adb exec-out`: there the adb CLIENT escapes every word after the
@@ -42,7 +42,7 @@
  *   typeText keeps it.
  *
  * What this means for the adapter's callers, and what is not yet measured:
- * - typeText: each character is one quoted word. The argv `input text`
+ * - typeText: each character is one word through shellQuote. The argv `input text`
  *   receives for `'`, `\` and the other shell metacharacters is UNVERIFIED
  *   on a device (the per-char typing and its pacing were measured in
  *   e594a21 / 00db84c / 2070647).
@@ -74,10 +74,11 @@ export function shellQuote(word: string): string {
 }
 
 /**
- * The argv as one command line for the device's `sh -c`: each word quoted,
- * joined with a space — which is also what adb's own join produces from the
- * quoted words, so passing `argv.map(shellQuote)` as separate adb arguments
- * and passing this one string are the same bytes on the device.
+ * The argv as one command line for the device's `sh -c`: each word through
+ * shellQuote (quoted only where `sh` would interpret it), joined with a
+ * space — which is also what adb's own join produces from the quoted words,
+ * so passing `argv.map(shellQuote)` as separate adb arguments and passing
+ * this one string are the same bytes on the device.
  */
 export function shellCommandLine(argv: readonly string[]): string {
   return argv.map(shellQuote).join(' ');
@@ -85,7 +86,7 @@ export function shellCommandLine(argv: readonly string[]): string {
 
 /**
  * `adb -s <serial> shell <argv>` as the argv handed to the `adb` binary, each
- * device word quoted by shellQuote — the one builder of a device shell
+ * device word through shellQuote — the one builder of a device shell
  * command, so no caller spells the quoting itself.
  */
 export function adbShellArgv(serial: string, argv: readonly string[]): string[] {

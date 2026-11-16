@@ -21,9 +21,9 @@ import { ExecError, type ExecResult } from './exec.js';
  * command's own lines; any other failure — adb's (exit 255, device offline /
  * not found), a timeout, a non-zero exit with no diagnosis of the
  * command's — is THROWN as it came, because it says nothing about whether
- * anything started and every caller would pass it on unchanged. The review
- * sketched that as a third outcome, `transport`; it is a throw on purpose,
- * since a union member every caller forwards untouched is pass-through.
+ * anything started and every caller would pass it on unchanged. It is a throw
+ * on purpose, not a third outcome: a union member every caller forwards
+ * untouched is pass-through.
  * One addition to a thrown monkey failure: monkey prints to stdout, which
  * an ExecError's message leaves out, so its last few stdout lines are
  * added to the message of a new ExecError (same class, same fields, the
@@ -49,8 +49,8 @@ import { ExecError, type ExecResult } from './exec.js';
  * apps handle starts the system chooser — an activity started, so `started`;
  * the deep link then reads the focus to name it (D55, android-chooser.ts).
  *
- * `monkey` — its exit status IS the verdict (the review's measurement: exit
- * 252 for a package with nothing to launch), and its own diagnoses are the
+ * `monkey` — its exit status IS the verdict (measured: exit 252 for a
+ * package with nothing to launch), and its own diagnoses are the
  * lines it starts with `** ` in column 0 (MONKEY_DIAGNOSIS_LINE_RE), on
  * either stream. A non-zero exit with such a line is `refused`; exit 0 is
  * `started`, whatever it printed. Every such line is a reason, and quoted:

@@ -1,8 +1,8 @@
 /**
  * Type a value into a focused field and CONFIRM it is there — the one module
- * that decides when typed text has landed, how long to wait for it, and what
- * to send again when it has not. interact/fill.ts drives it after the focus
- * tap and the clear; nothing else types into a field it then reads back.
+ * that waits for typed text to land, bounds that wait, and decides what to
+ * send again when it has not. Nothing else types into a field it then reads
+ * back.
  *
  * Interface: `typeAndConfirm(io, intent) → Typed`. `io` is the device as the
  * field sees it (type, delete, read the field — its node, or why it was lost
@@ -86,8 +86,8 @@ export interface FieldIo {
    * The field dropped the tail of a typing and the tail typed again repaired it (DeviceAdapter.noteDroppedTail): said
    * once a fill, when the typing has landed whole through a tail retype — never for a field that keeps its prefix for
    * good (capped, trimming: its fill fails) — so the adapter may type into this app differently from then on (D24 —
-   * iOS sends the first key alone). The tail retypes of this fill are typed as before (ADR 0023: a retyped tail lands
-   * whole, 45 of 45); the fill's own rules do not change.
+   * iOS sends the first key alone). The report changes nothing within this fill: its tail retypes are typed the same
+   * way (ADR 0023: a retyped tail lands whole, 45 of 45), and its own rules hold.
    */
   reportDroppedTail(): void;
 }

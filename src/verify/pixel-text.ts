@@ -7,7 +7,7 @@ import { outsideItsScrollView, type PixelStanding, type Remedy } from '../ui-tre
 import { systemBarName } from '../ui-tree/system-bar.js';
 
 /**
- * THE PIXEL VERB'S WORDS (A26, VR1): every sentence the pixel assert (the color and ocr asserts' poll,
+ * THE PIXEL VERB'S WORDS: every sentence the pixel assert (the color and ocr asserts' poll,
  * pixel-poll.ts) says of what lies over its element — the soft keyboard (`keyboardOver`), and each kind of a
  * standing not reachable with its remedy (`pixelMissText`) — rendered here, from facts the poll judged; pixel-poll.ts
  * judges what lies over the element and words none of it (its own sentences of timing and capture — a region that

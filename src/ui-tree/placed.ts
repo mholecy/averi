@@ -113,8 +113,7 @@ export const CONTENT_FRAMED_ROLES: ReadonlySet<string> = new Set(['scrollable'])
 
 /**
  * AN UNNAMED WRAPPER: a structural role (`STRUCTURAL_ROLES`: `container`, `other`) with no label, identifier or value —
- * nothing of its own a reader could name or read. The keyboard's blank point lets the drag start over one
- * (interact/keyboard-dismissal.ts#blankPoint); `emptyFrame` narrows it to the `container` role.
+ * nothing of its own a reader could name or read. `emptyFrame` narrows it to the `container` role.
  */
 export const isUnnamedWrapper = (n: UiNode): boolean => STRUCTURAL_ROLES.has(n.role) && !n.label && !n.identifier && !n.value;
 
@@ -172,8 +171,8 @@ export type FrameRow = 'structural' | 'screenSizedHost' | 'contentFramed';
  * rows of the same names (draw-order.ts#NOT_DRAWN: `structural`, `screenSizedHost`, `contentFramed`, whose docs have
  * the rules and their measurements) ask them, less what the presentation module takes back over a screen presented
  * over the target's (presentation.ts#PresentedOver.givesWay); the shape adapter (presentation.ts#byShape) asks them
- * too, to name such a screen's surface from the same rows (`presentedSurface`). Each caller hands in the tree's `ancestry`
- * (dialect.ts#TreeDialect), which `structural` asks of a named leaf.
+ * too, to name such a screen's surface from the same rows (`presentedSurface`). The tree's `ancestry`
+ * (dialect.ts#TreeDialect) is handed in: `structural` asks it of a named leaf.
  */
 export const FRAME_EXCUSES = {
   structural: ({ node, parent }: Placed, target: Placed, screenArea: number, ancestry: boolean): boolean =>

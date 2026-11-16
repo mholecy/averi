@@ -2,9 +2,9 @@ import type { UiNode } from '../adapters/types.js';
 
 /**
  * THE TREE'S DIALECT: what its source's listing means, read off the marks the source put on the tree's ROOT — the one
- * reader of those marks in ui-tree and above. A mark of the source, never of the tree's shape: ui-tree knows no
- * platform, and a shape (a rectless root over leaves) would also match a test's or a future source's tree. A tree no
- * source marked (a hand-built tree, a normalized snapshot) reads as a nested tree that says nothing more.
+ * reader of those marks in src/. A mark of the source, never of the tree's shape: ui-tree knows no platform, and a
+ * shape (a rectless root over leaves) would also match a test's or a future source's tree. A tree no source marked (a
+ * hand-built tree, a normalized snapshot) reads as a nested tree with clipped frames (`cutsAtLater`) and no other mark.
  *
  * The WRITERS — each mark is set there and nowhere else in src/ (adapters/types.ts#UiNode says what each mark means):
  * - adapters/ios-tree-source.ts#markIdbDialect: `flatList` (idb's describe-all; scripts/differential/recorded-source.ts

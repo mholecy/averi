@@ -176,7 +176,7 @@ export type ScrollAdapter = Pick<
  * it (below), not at the timeout.
  *
  * The device check of that fix (the note's two "Device check" sections)
- * found three more things, each fixed where it lives:
+ * found four more things, each fixed where it lives:
  * - The stroke (`swipeVectorAbove`): drawn over the box above the keyboard,
  *   a content-up stroke touched down in the app's top bar and moved nothing
  *   under WDA. It is still the uncovered box's stroke, its touch-down never
@@ -218,14 +218,14 @@ export type ScrollAdapter = Pick<
  *   a `dragSpeed` (Android) at that speed (swipe.ts#dragMs) — the time it
  *   costs against the 15 s default is on adapters/android.ts#dragSpeed. On
  *   idb's flat list a full stroke is paced by its plan (stroke-plan.ts#PACED,
- *   524 pt in 1.5 s; D20) — estimated, not measured: a round ≈ 2.2–2.5 s (the
- *   stroke, the 400 ms settle, an idb read, overhead) against ~1 s before, so
- *   six rounds ≈ 13–15 s and the 15 s timeout may fire before `maxSwipes`; a
- *   call may end up to ~2.2 s past the timeout (judged before a stroke: the
- *   stroke, the settle and the read after it), ~1.2 s more than before; and
- *   six paced strokes reach ~3 400 pt, not the ~6 200 pt the fling did (ADR
+ *   524 pt in 1.5 s; D20) — estimated: a round ≈ 2.2–2.5 s (the stroke, the
+ *   400 ms settle, an idb read, overhead) against ~1 s unpaced, so six rounds
+ *   ≈ 13–15 s and the 15 s timeout may fire before `maxSwipes`; a call may
+ *   end up to ~2.2 s past the timeout (judged before a stroke: the stroke,
+ *   the settle and the read after it), ~1.2 s more than unpaced; and six
+ *   paced strokes reach ~3 400 pt, not the ~6 200 pt the fling did (ADR
  *   0018, "idb's presented layer", Decision 4). The limits stay at their
- *   defaults until the owner's device run.
+ *   defaults: the device check passed 5 of 5, in 9.0 s (D20).
  * - Exhausted (scroll-rounds.ts#UNMOVED_STROKES_EXHAUST): a
  *   target in the tree, off the frame, with a non-zero rect, that two
  *   identical strokes in a row left — with every other match — where it was,
@@ -324,8 +324,6 @@ export async function scrollUntilVisible(
     // a round, never held across rounds (ui-tree/keyboard-cover.ts): the
     // round gets its synchronous facts — the cover, which nodes are the
     // keyboard's own — and its two questions only as answers to an `ask`.
-    // Asked in the reading's order: the screen, then `cover()` (the state,
-    // and the region while it reads shown).
     let reading: KeyboardReading | undefined;
     let seen: RoundSeen;
     if (markedRead.tree === undefined) {
@@ -337,9 +335,6 @@ export async function scrollUntilVisible(
       matched ||= found.length > 0;
       reading = readKeyboard(adapter, tree);
       const cover = await reading.cover();
-      // The tree itself: what the round asks of it — the matches' clipping
-      // ancestors, the largest scroller, the fingerprint, progress — it
-      // derives (scroll-read.ts#TreeFacts); nothing to hand in or forget.
       seen = {
         read: {
           tree,

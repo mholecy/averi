@@ -3,15 +3,15 @@ import { z } from 'zod';
 /**
  * Timeouts are written the way a human would in averi.yaml ("15s") and the way
  * a caller would in a tool argument (a number of ms). One parser for both,
- * owned here because every layer needs it — flow steps, assert specs,
- * scroll_until — and none of them owns the notion of a duration.
+ * owned here because several layers read one, and none of them owns the
+ * notion of a duration.
  */
 
 const DURATION = /^(\d+(?:\.\d+)?)(ms|s|m)$/;
 
 /**
  * The one reader of a duration: its ms, or why it is no duration — in the words parseDuration throws and
- * durationSchema refuses with. A number is ms as it is; a negative or non-finite one is no duration (A19).
+ * durationSchema refuses with. A number is ms as it is; a negative or non-finite one is no duration.
  */
 function readDuration(value: string | number): { ms: number } | { issue: string } {
   if (typeof value === 'number') {
@@ -32,7 +32,7 @@ export function parseDuration(value: string | number): number {
 }
 
 /**
- * The one schema of a duration field (A19). A value parseDuration would refuse is refused here, with its message, so
+ * The one schema of a duration field. A value parseDuration would refuse is refused here, with its message, so
  * averi.yaml fails at load naming the field (`flows.f.steps.0.wait.timeout: Invalid duration "5 sec" — …`) and a tool
  * call fails before a device is bound — never a plain Error mid-flow, which a reach rung would escalate past and an
  * `optional:` would log as skipped. The value is kept as written, not turned into ms: the spec types stay

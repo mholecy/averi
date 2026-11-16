@@ -153,10 +153,9 @@ export const MIN_STROKE_FRACTION = 0.03;
  * holds, and the stroke still runs the same way. Never shorter than twice
  * TOUCH_SLOP nor than MIN_STROKE_FRACTION of `side` — the gesture box's
  * side along the stroke (its height for up/down, its width for
- * left/right) — and never longer than the stroke given. Used by `scroll_until`
- * to shorten the stroke after each turn round a target a fling carried past
- * (interact/course.ts#nextStroke), so the distance left shrinks
- * however far the app flings. Pure.
+ * left/right) — and never longer than the stroke given. Applied on each turn
+ * round a target a fling carried past, so the distance left shrinks however
+ * far the app flings. Pure.
  */
 export function shortenStroke(stroke: Stroke, factor: number, side: number): Stroke {
   const dx = stroke.to.x - stroke.from.x;

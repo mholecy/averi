@@ -119,7 +119,7 @@ export class KeyboardStateDisagreement extends KeyboardGuardError implements Ref
 // refuse on THIS model — sit on the window `Hiding` that supplies the words.
 // The two that carry a RULE are functions: `recheck` holds the budget rule
 // beside the answer it shapes, `dismissal` the one `unknown → back` row in
-// the codebase. There is one `pressKey('back')` in the codebase
+// the codebase. There is one `pressKey('back')` for the keyboard
 // (`pressBack`, below), one `unknown → back` rule (the dismissal's) and one
 // `unknown → proceed` rule (the guard's, in keyboard.ts), each with its
 // reason beside it.

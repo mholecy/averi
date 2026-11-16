@@ -185,12 +185,12 @@ function walkExtent(tree: UiNode): Extent {
   let sawScreenShaped = false;
   // A tie in reach is broken toward the origin only under a root of NO area: a
   // multi-window dump lists its windows in no meaningful order, so first-wins
-  // would let listing order decide `reliable` (D47). A root WITH area is the
+  // would let listing order decide `reliable`. A root WITH area is the
   // window by design (uiautomator's inset app window, A1 in verify/scale.ts),
   // is visited first and keeps the tie: an origin child reaching only as far
   // must not turn its inset into a reliable screen width. Residual: under a
   // root with area, a tie between two descendants that both reach past the root
-  // is still decided by tree order; no source produces one today (D47).
+  // is still decided by tree order; no source produces one today.
   const tieGoesToOrigin = !hasArea(tree.rect);
   const walk = (n: UiNode): void => {
     if (onLayout(n.rect)) {
@@ -781,7 +781,7 @@ export interface Clips {
    * (interact/stroke-plan.ts#strokeRoom): the axis it scrolls on, and every scroll view nested in it (its descendants
    * that scroll, at any depth; one of its own rect left out; a text input left out — a Compose text field dumps as a
    * scrolling (Horizontal)ScrollView, role `textfield` (`INPUT_ROLE`), adapters/android-tree-dialect.ts — so a stroke
-   * the plan sends inside a nested scroll view never lands in a field, D59b; Android's case: WDA marks no node
+   * the plan sends inside a nested scroll view never lands in a field; Android's case: WDA marks no node
    * clipping, and a scrolling WDA text view is a scroll view of its own role) with theirs, each as
    * scroll-containers.ts#scrollAxis says on this tree's dialect (`unclipped`), undefined where it cannot tell.
    * Undefined when the tree holds no scroll view of that rect (the list moved). Found as draw order finds its container
@@ -795,7 +795,7 @@ export interface Clips {
    * a band the caller cut out, is no list a swipe can reach) and is none of the keyboard's own (`ofKeyboard`, the
    * caller's reading: WDA's suggestion strip) — text inputs left out, as `axesOf`'s `nested` leaves them; none on a
    * tree that lists no ancestry (idb's flat list lists no scroll view). For the exhausted stop's sentence when the strokes
-   * went across their scroll view (interact/stroke-plan.ts#strokedAcross, D59b): one the tree shows that scrolls the
+   * went across their scroll view (interact/stroke-plan.ts#strokedAcross): one the tree shows that scrolls the
    * stroke's way is named, wherever it lies. One walk of the tree a call.
    */
   toldOn(axis: ScrollAxis, screen: Rect, ofKeyboard: (node: UiNode) => boolean): readonly UiNode[];
@@ -803,7 +803,7 @@ export interface Clips {
    * Every scroll view of the tree, as `toldOn` counts one (text inputs left out, meeting `screen`, none of the
    * keyboard's own), in tree order, each with the one axis the tree tells it scrolls on — undefined where it cannot tell
    * (a Compose lazy list, a RecyclerView); none on a tree that lists no ancestry. `toldOn` is those told on its axis.
-   * For `scroll_until`'s `within` refused on a stale rect (interact/within.ts, D78): every scroll view a `within` rect
+   * For `scroll_until`'s `within` refused on a stale rect (interact/within.ts): every scroll view a `within` rect
    * could name for the stroke, the unknown ones too. One walk of the tree a call.
    */
   scrollViewsOn(screen: Rect, ofKeyboard: (node: UiNode) => boolean): readonly ListedScrollView[];
@@ -821,8 +821,8 @@ export interface Clips {
    * a node to its scroll view, so the edge that moves with the content lies INSIDE the frame; WDA's unclipped frames put
    * it past, so there only a truly empty scroll view is blank — and blank comes before the end proof below: an empty
    * WDA scroll view (an empty state, or a lazy stack's unrealised stretch) is `blank`, never `ends`, and a stroke over
-   * it runs to the bound. A rule of the frame alone, before the dialect's guards. Measured (lab note LV1,
-   * docs/bugs/2026-10-16-lab-android-scroll-until-reads-a-list-moving-through-blank-content-as-exhausted.md): the lab
+   * it runs to the bound. A rule of the frame alone, before the dialect's guards. Measured
+   * (docs/bugs/2026-10-16-lab-android-scroll-until-reads-a-list-moving-through-blank-content-as-exhausted.md): the lab
    * app's `tabbar-floating` `list` 0,550 1080x1670 (a Compose verticalScroll, which dumps no content container) lists
    * T and R and nothing else; two strokes past R it lists nothing, and two more strokes read the same empty list while
    * each moved it ~860 px — "did not change the screen" was the dump's, not the list's. Not of a scroll view the tree
@@ -845,9 +845,9 @@ export interface Clips {
    * safe answer. And only for a scroll view that scrolls ALONG that edge's axis (scroll-containers.ts#scrollAxis: its
    * content listed running on past its frame on that axis —
    * `lower`'s, 1120 pt below its bottom): a horizontal carousel lists nothing below its bottom because nothing of it
-   * ever lies there, which says nothing of whether a vertical stroke over it could move anything (code review of
-   * arch/r22-lv4, MAJOR-1: Account Detail's carousel under its list "proved" the end after one stroke, and the failure
-   * lost the list drawn over the touch-down it had named). An axis the tree cannot tell proves nothing. Residual,
+   * ever lies there, which says nothing of whether a vertical stroke over it could move anything (else Account
+   * Detail's carousel under its list "proves" the end after one stroke, and the failure loses the list drawn over the
+   * touch-down it had named). An axis the tree cannot tell proves nothing. Residual,
    * stated as it is: a lazy list (a table) lists only the rows it has laid out, so one resting EXACTLY on a row
    * boundary with its earlier rows dropped (a sticky section header pinned at its top reads the same) lists nothing
    * past its top and reads as ending there. Nothing in the reads rules that out: interact/scroll-rounds.ts asks this
@@ -949,7 +949,7 @@ const SCREEN_EDGE_SLACK = 1;
 /**
  * The sides of `rect` the source cut at the edge of `screen` (`DrawnFrame.unknownPast`): each lies within
  * SCREEN_EDGE_SLACK of the screen's matching edge while `frame` — what its scroll views draw — ends more than that
- * inside the screen on that side. Measured (lab note D17, API 33): the carousel `[66,380][1014,614]`, its card C laid at
+ * inside the screen on that side. Measured (API 33): the carousel `[66,380][1014,614]`, its card C laid at
  * x 586 948 wide, dumped `[586,380][1080,614]` — right; at rest `[1014,380][1080,614]` — right, its left known. A
  * full-width row of a full-width list lies on the screen's edges with its frame: none. In the order of `EDGES`.
  */
@@ -1000,7 +1000,7 @@ function showsMotion(rect: Rect, frame: Rect, axis: ScrollAxis): boolean {
  * lie apart along the OTHER axis — content laid out across the stroke, not one thing cut at both ends: the full-width
  * rows of a vertical list a sideways stroke goes over (measured: the lab app's `form-picker`, a list whose axis its
  * class does not say, lists 14 rows each 0..1080 — none has an x edge inside, yet they are its content, shown). Its
- * read is evidence as any listing is; LV1's blank viewport lists nothing, and an undescribed image spanning it one
+ * read is evidence as any listing is; a blank viewport lists nothing, and an undescribed image spanning it one
  * node. Its price: two columns, or a full-height decor line beside a container, each cut at both ends, read as content
  * shown too, so a blank stretch under them still reads unchanged (ADR 0021's residuals).
  * Apart: one ends within `MOTION_EDGE_SLACK` of where the other begins, or before (a rounding of the bounds
@@ -1363,14 +1363,9 @@ export function largestScroller(tree: UiNode): Rect | undefined {
  * them), side by side here. The layer and the subject pick one,
  * never the caller's taste:
  * - `rectText`, `x,y wxh` — a NODE's rect as the tree gives it, and any
- *   rect a ui-tree/ or verify/ sentence quotes, the keyboard's included:
- *   verify/'s
- *   sentences (the text table's off-screen region, the pixel poll's
- *   position change and its soft-keyboard miss, which quotes the keyboard
- *   beside the element this way), tap-judgement.ts's off-screen tap, the fill's
- *   not-an-input caveat, and keyboard-cover.ts's stderr diagnostic for a
- *   refused floating panel (the touchable region and the band beside it,
- *   both quoted as rects).
+ *   rect a ui-tree/, verify/ or interact/ sentence quotes, the keyboard's
+ *   included (the pixel poll's soft-keyboard miss quotes it beside the
+ *   element this way).
  * - `frameText`, `[x,y][x2,y2]` — the soft KEYBOARD's frame as dumpsys
  *   prints it (the oracle's, or the in-tree band): the tap guard's and the
  *   dismissal's messages on either model, and `scroll_until`'s keyboard
@@ -1389,15 +1384,14 @@ export function rectText(r: Rect): string {
 /** A node as a sentence quotes it (`nodeText`): its role, label, id and rect — not its subtree, which is no fact of a sentence. */
 export type QuotedNode = Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>;
 
-/** What a sentence keeps of `n` (`QuotedNode`), its rect copied. */
 export const quoted = ({ role, label, identifier, rect }: QuotedNode): QuotedNode => ({ role, label, identifier, rect: { ...rect } });
 
 /**
  * How a sentence names the scroll view a node lies outside of — `outside its scroll view scrollable id:form (0,0
  * 402x780)` — or past one edge of (`where`: `below its scroll view …`, interact/target-text.ts#pastSideText), when
  * nothing of the node, or not its centre, is drawn there (ui-tree/standing.ts, the drawn frame, `Clips.drawnIn`). The
- * pixel assert's miss heads (verify/pixel-text.ts#OUTSIDE_ITS_SCROLL_VIEW, #TOO_THIN_IN_ITS_SCROLL_VIEW), quoted whole
- * by the tool description, end with the same words.
+ * pixel assert's miss heads (verify/pixel-text.ts#OUTSIDE_ITS_SCROLL_VIEW, #TOO_THIN_IN_ITS_SCROLL_VIEW) end with the
+ * same words.
  */
 export const outsideScrollViewText = (scroller: QuotedNode, where = 'outside'): string =>
   `${where} its scroll view ${nodeText(scroller)}`;
@@ -1405,8 +1399,8 @@ export const outsideScrollViewText = (scroller: QuotedNode, where = 'outside'): 
 /**
  * How a sentence names a NODE drawn over another — `button "Continue to
  * summary" (24,780 354x44)`: its role, its label quoted (else its id), its
- * rect (`rectText`). The dismissal picker's skip line names a cover
- * shorter, on purpose (interact/target-text.ts#coverName).
+ * rect (`rectText`). A cover a dismissal skips is named shorter, on
+ * purpose (interact/target-text.ts#coverName).
  */
 export const nodeText = (n: QuotedNode): string =>
   `${n.role}${n.label ? ` ${JSON.stringify(n.label)}` : n.identifier ? ` id:${n.identifier}` : ''} (${rectText(n.rect)})`;
@@ -1435,9 +1429,8 @@ export const frameText = ({ x, y, width, height }: Rect): string => `[${x},${y}]
  * this band at the head of the content is read as the bar's
  * (`firstContent`'s misses, stated there). Here, not in draw-order.ts:
  * idb's keyboard band starts below it too
- * (ui-tree/soft-keyboard.ts#flatListKeyboardBand's `barLine`, which
- * draw-order.ts passes it as, `flatListBarLine`; the band's top is
- * `DrawOrder.keyboardBandTop`).
+ * (ui-tree/soft-keyboard.ts#flatListKeyboardBand's `barLine`; the band's
+ * top is `DrawOrder.keyboardBandTop`).
  */
 export const FLAT_LIST_TOP_BAR_FRACTION = 0.2;
 
