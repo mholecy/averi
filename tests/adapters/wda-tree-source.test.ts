@@ -266,7 +266,7 @@ describe('WdaTreeSource.applicationLabel — which app WebDriverAgent reads, ask
     expect(exec.calls).toEqual([]);
   });
 
-  // Review of D54: the ask's own 2 s budget (ACTIVE_APP_TIMEOUT_MS), not /source's 30 s.
+  // D54: the ask's own 2 s budget (ACTIVE_APP_TIMEOUT_MS), not /source's 30 s.
   it('the ask runs under its own 2 s budget', async () => {
     const { source } = await setup();
     await source.read();

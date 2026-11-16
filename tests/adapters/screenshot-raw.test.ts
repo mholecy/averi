@@ -83,7 +83,7 @@ describe('screencapRaw — the raw frame, or why not', () => {
   });
 
   it('a gzip stream with nothing in it (screencap failed, its words in /dev/null; gzip ran) is refused for this call only', () => {
-    // Round 3, NIT-1: not a transport error here — the adapter's `-p` then fails with the device's own message.
+    // Not a transport error here — the adapter's `-p` then fails with the device's own message.
     expect(screencapRaw(gzipSync(Buffer.alloc(0)), SOURCE)).toEqual({ refused: 'screencap wrote an empty frame (0 bytes after gunzip)', lasting: false });
   });
 

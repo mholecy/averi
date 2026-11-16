@@ -319,7 +319,7 @@ describe('scroll_until\'s covered stop (a keyboard over the whole screen) on a t
 // full-screen dialog (dialog-fullscreen) or an expanded sheet with no scrim (form-picker), but the window manager types
 // the focused window — a Dialog's is TYPE_APPLICATION, an activity's TYPE_BASE_APPLICATION. Asked on a miss only (an
 // adb call after the wait, or before scroll_until's first stroke), it marks the root presented, or says the screen is
-// alone and drops the active-window hint; where it gives no word, the replies are as before.
+// alone and drops the active-window hint; where it gives no word, the replies keep the active-window hint.
 describe('a miss on an unmarked uiautomator tree asks the window manager', () => {
   const TRUTH = new URL('../fixtures/truth/android-averi_lab-api33/', import.meta.url);
   const lab = (cell: string): UiNode => {

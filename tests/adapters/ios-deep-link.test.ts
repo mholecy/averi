@@ -62,7 +62,7 @@ describe("IosAdapter.openDeepLink — a link nothing expects is opened exactly a
     expect(d.calls).toEqual([...WRITES, openurl('averilab')]);
   });
 
-  // Review of D49a: iOS's own schemes are never the project's app — no lookup at all.
+  // D49a: iOS's own schemes are never the project's app — no lookup at all.
   it.each(['tel:+421900', 'TELPROMPT:1', 'mailto:a@b.c', 'sms:1', 'facetime:a', 'facetime-audio:a', 'maps://?q=x', 'itms-apps://x', 'itms-services://x', 'app-settings:', 'shortcuts://run', 'x-apple-health://'])(
     'one of iOS\'s own schemes (%s): the writes and openurl, nothing else',
     async (url) => {
@@ -230,8 +230,8 @@ describe("IosAdapter.openDeepLink — a link to the project's own scheme waits l
     expect(linkTextOf(outcome)).toMatch(/\(every launch stays behind it until then\)\. 3 s after opening averilab:\/\/d49 in dev\.averi\.lab \("AveriLab"\), the UI tree was still the app labelled "Contacts" — /);
   });
 
-  // Review of D49a (MINOR 1): a launch before WDA is up stays silent, but an own-scheme link may wait behind "Open in
-  // …?" — so it says it did not check rather than a bare "Opened".
+  // D49a: a launch before WDA is up stays silent, but an own-scheme link may wait behind "Open in …?" — so it says it
+  // did not check rather than a bare "Opened".
   it('WebDriverAgent not up yet (declined): no wait — and a short note that it was not checked', async () => {
     const d = lab([{ kind: 'declined' }]);
     expect(linkTextOf(await d.adapter.openDeepLink('averilab://d49', { appId: LAB }))).toBe(
@@ -242,7 +242,7 @@ describe("IosAdapter.openDeepLink — a link to the project's own scheme waits l
     expect(sleeps).toEqual([]);
   });
 
-  // Review of D49a: "did not see it come forward" only when the wait read another app; when it could not tell, the
+  // D49a: "did not see it come forward" only when the wait read another app; when it could not tell, the
   // lead says so.
   it('the ask fails: no "did not see" — a lead that it could not check, then launch\'s "could not check" note worded for the link', async () => {
     const outcome = await lab([new Error('WDA /wda/activeAppInfo request failed: ECONNREFUSED\nstack')]).adapter.openDeepLink('averilab://d49', { appId: LAB });
@@ -379,7 +379,7 @@ describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)",
     expect(await d.adapter.openDeepLink('averilab://d54', { appId: LAB })).toEqual({ holder: 'alert', alert: { ...OPEN_IN, asksForApp: false } });
   });
 
-  // Review of D54: on idb the names are asked at the first label. When they cannot be read, an alert whose title reads
+  // D54: on idb the names are asked at the first label. When they cannot be read, an alert whose title reads
   // the English "Open in “…”?" needs none, so it is named all the same; only one that needs the names is "could not check".
   const NO_NAMES = appinfo(undefined, undefined, { path: LAB_PATH });
 

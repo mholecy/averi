@@ -940,9 +940,9 @@ describe('WdaServer.shutdown — the process-shutdown form of stop()', () => {
 });
 
 describe('WdaServer.shutdown — real lsof (integration)', () => {
-  // No fake can see what lsof lists: the round-2 BLOCKER (averi SIGKILLing
-  // itself) was invisible to every faked-exec test. Real lsof, a child process
-  // that listens, and a connection from THIS process as the client end.
+  // No fake can see what lsof lists: averi SIGKILLing itself was invisible
+  // to every faked-exec test. Real lsof, a child process that listens, and a
+  // connection from THIS process as the client end.
   const hasLsof = (() => {
     try {
       execFileSync('which', ['lsof'], { stdio: 'ignore' });
