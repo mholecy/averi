@@ -54,7 +54,7 @@ describe('landingOf — did this reading land, and how', () => {
     ['without clear the value inside the reading lands (an append)', 'Note: hello', { value: 'hello', before: 'Note: ' }, { kind: 'landed' }],
     ['without clear a reading without the value does not land', 'Note: hel', { value: 'hello', before: 'Note: ' }, undefined],
     ['a named placeholder is no content: `Search` holds no `ear`', 'Search', { value: 'ear', placeholder: 'Search' }, undefined],
-    // the placeholder kind (probe B)
+    // the placeholder kind
     ['a reading exactly the named placeholder, which is the value too: placeholder, not verified', 'Search', { value: 'Search', placeholder: 'Search' }, { kind: 'placeholder' }],
     ['the same with clear', 'Search', { value: 'Search', clear: true, placeholder: 'Search' }, { kind: 'placeholder' }],
     ['a reading other than the named placeholder lands', 'hello', { value: 'hello', clear: true, placeholder: 'Search' }, { kind: 'landed' }],
@@ -436,8 +436,8 @@ describe('an earlier text that vanished — an unnamed placeholder (D29)', () =>
     expect(landingOf('34 12', expecting(e('3412', '12')))).toEqual({ kind: 'landed', reformatted: { added: 1, respaced: 0 } });
   });
 
-  // MINOR-3: the earlier text first — a reading that is a prefix of the earlier text itself (`SK` of `SK00 …`) is no
-  // proof that the typing landed: nothing of it counted, nothing typed again.
+  // The earlier text first — a reading that is a prefix of the earlier text itself (`SK` of `SK00 …`) is no proof that
+  // the typing landed: nothing of it counted, nothing typed again.
   it('a reading that is a prefix of the earlier text too: judged after the earlier text first — none of the typing landed', () => {
     expect(tailAskedOf('SK', e('SK3112000000', PH))?.retypable).toBe(false); // a prefix of the earlier text alone
     expect(retypableTailOf('SK', e('SK3112000000', PH))).toBeUndefined();

@@ -429,8 +429,8 @@ describe('safeTap — the one point to tap, never "Always" (d55-b11.ts:301–345
       '<node index="9" text="" resource-id="android:id/scrim" class="android.view.View" package="android" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,1700][1080,1900]" /><node index="3" text="" resource-id="android:id/button_bar_container"',
     );
     expect(safeTap(tree(scrim), { row: 2 })).toEqual({ ok: false, refusal: 'other-node', why: 'the point (540, 1881) lands on scrim, not row 2 ("AveriLab", "AveriLab twin")' });
-    // A node inside the target there is the target's (its labels' box widened under the point), and the
-    // list above it takes the click: both fine.
+    // A node inside the target there is the target's (its labels' box widened under the point), and the list above it
+    // takes the click: both fine.
     const inside = resolverXml().replace('bounds="[132,1825][431,1937]"', 'bounds="[132,1825][1000,1937]"');
     expect(safeTap(tree(inside), { row: 2 }, { x: 540, y: 1881 })).toMatchObject({ ok: true });
     expect(safeTap(tree(), { row: 'AveriLab twin' }, { x: 541, y: 1882 })).toMatchObject({ ok: true });

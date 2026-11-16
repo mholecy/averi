@@ -188,8 +188,8 @@ function withFrames(fake: FakeAdapter, frames: Buffer[]): FakeAdapter {
 
 describe('the server itself', () => {
   // A sentinel, so this is the pass-through alone. That the ENTRY hands over
-  // package.json's version (it once reported 0.0.1 for every release) is
-  // tests/mcp/server.test.ts's, against the real process.
+  // package.json's version is tests/mcp/server.test.ts's, against the real
+  // process.
   it('reports the version it was built with in serverInfo', async () => {
     const { client } = await connect({}, '9.9.9-test');
     expect(client.getServerVersion()).toMatchObject({ name: 'averi', version: '9.9.9-test' });
@@ -1074,9 +1074,9 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
   });
 
   // docs/plans/2026-10-08-round3-phase2-device-check.md, finding 5:
-  // ui_snapshot is the one-shot read that asks the adapter to wait out a
-  // launch transient — Android's null root, iOS idb's empty tree — so it must
-  // pass `settle: true`; the retry itself is the adapter's
+  // ui_snapshot is the one-shot read that asks the adapter to wait out a launch
+  // transient — Android's null root, iOS idb's empty tree — so it must pass
+  // `settle: true`; the retry itself is the adapter's
   // (tests/adapters/ios.test.ts, tests/adapters/android.test.ts). Both
   // platforms, since the handler does not branch.
   it.each(['android', 'ios'] as const)('ui_snapshot on %s reads the tree with settle: true — the one-shot caller of the adapter\'s transient retry', async (platform) => {
@@ -1543,7 +1543,7 @@ describe('a duration that does not parse is refused at parse, before a device is
 });
 
 /**
- * C3: a regex field that does not compile is refused with the arguments it
+ * A regex field that does not compile is refused with the arguments it
  * came in — or with averi.yaml, at load — and never reaches a device.
  * Unchecked, an element assert's bad `match` would throw out of the poll
  * mid-batch, an ocr assert's poll its whole 12 s budget as "OCR failed", a

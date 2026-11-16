@@ -425,7 +425,7 @@ flows:
     ).toThrow(/Invalid averi\.yaml/);
   });
 
-  // C3: an `assert:` step's match is validated when averi.yaml is parsed —
+  // An `assert:` step's match is validated when averi.yaml is parsed —
   // unchecked, it would load clean and throw mid-flow, on a device.
   it('rejects an assert step whose match is not a valid regex, naming the step\'s path', () => {
     expect(() =>

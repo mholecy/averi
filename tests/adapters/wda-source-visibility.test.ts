@@ -196,7 +196,8 @@ describe('PARKED cell content — a cell UIKit has not laid out lists its conten
               el('Button', { label: 'Chip 3', rect: r(410, 320, 180, 80), isVisible: '0' }),
             ] }),
           ] }),
-          // A row holding a collection view, its second card (a cell nested in the row's cell) past the right edge.
+          // A row holding a collection view, its card C (the second, a cell nested in the row's cell) past the right
+          // edge.
           el('Cell', { rect: r(0, 420, 402, 200), children: [
             el('CollectionView', { rect: r(0, 420, 402, 200), children: [
               el('Cell', { label: 'Card A', rect: r(16, 430, 300, 180), children: [el('StaticText', { label: 'Card A text', rect: r(30, 500, 100, 20) })] }),

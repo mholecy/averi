@@ -266,10 +266,9 @@ describe('the two questions disagree on purpose, per row', () => {
 
 /**
  * The `target` column's rules on measured iOS shapes that sit over or around a target — rows answered for every
- * target (the tap, `scroll_until`'s stop, the pixel assert and the in-tree dismissal picker), each asked here as
- * `exposure(target, screen).covers`: the screen-sized host and its size edge, the itemless toolbar (the Contacts
- * sheet) and what makes a toolbar's item, the content-framed scroll view (the SWIFT form) and what still covers as
- * itself, and the measured input-accessory bar.
+ * target, each asked here as `exposure(target, screen).covers`: the screen-sized host and its size edge, the itemless
+ * toolbar (the Contacts sheet) and what makes a toolbar's item, the content-framed scroll view (the SWIFT form) and
+ * what still covers as itself, and the measured input-accessory bar.
  * docs/adr/0016-the-dismissal-picker-asks-the-tap-standing.md ("What `shadowing` was measured on")
  */
 describe('the target column: the shared predicates, on measured hosts, toolbars, content-framed scroll views and the accessory bar', () => {
@@ -1702,8 +1701,8 @@ describe('presentedAt — the presented screen\'s surface at a point, asked for 
 
 /**
  * `presentedOver(node)` — `presentedAt` less the point: the presented screen's surface over the node wherever the node
- * lies, which the standing's remedy asks when its frame named none (ui-tree/standing.ts#remedied). The same rule, so
- * the same rows: what draws for the node as a target (the `target` column) and is a presented screen's surface.
+ * lies. The same rule, so the same rows: what draws for the node as a target (the `target` column) and is a presented
+ * screen's surface.
  */
 describe('presentedOver — the presented screen\'s surface over a node, geometry-free (ADR 0018)', () => {
   const screen = (key: string) => STACKED.screens[key];

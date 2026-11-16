@@ -8,7 +8,7 @@ import { carouselReply, swipesOf } from '../../scripts/truth/replies.js';
  * T12's evidence (docs/truth/live-records/t12-first-probe, ADR 0013's T12 amendment): the counts the backlog row and the
  * ADR state, read back off the committed records. Base 5f126fdc's src against the fix's, one harness (the fix's), ABBA,
  * each group labelled by a raw-strokes read before and after it (label-group.mjs). The folder is outside
- * tests/truth/live-records-replayed.test.ts's guard (it reads no folders); the tests below rejudge each record.
+ * tests/truth/live-records-replayed.test.ts's guard (it reads no folders); the describe below rejudges each record.
  */
 
 const DIR = new URL('../../docs/truth/live-records/t12-first-probe/', import.meta.url);

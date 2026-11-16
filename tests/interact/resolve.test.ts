@@ -263,8 +263,8 @@ describe('resolveSettled — appear AND hold still', () => {
       ]);
     });
 
-    // D21: the late read is a read like pollTree's — a read no wait cures is thrown as it came, not wrapped in
-    // a plain timeout (which an `optional:` would skip as an absent element).
+    // D21: the late read is a read like pollTree's — a read no wait cures is thrown as it came, not wrapped in a plain
+    // timeout (which an `optional:` would skip as an absent element).
     it('the late read meets a PersistentReadError: thrown as it came, not as a timeout', async () => {
       const wedged = new PersistentReadError('wedged until a reboot');
       const { fake, reads } = wdaStart(() => wedged);
@@ -486,7 +486,7 @@ describe('tapElement', () => {
     const real = fake.uiTree.bind(fake);
     fake.uiTree = async (o?: { settle?: boolean }) => (opts.push(o), real());
     await tapElement(fake, { id: 'go' }, FAST);
-    expect(opts.length).toBeGreaterThanOrEqual(2); // the rect-stable wait reads at least twice
+    expect(opts.length).toBeGreaterThanOrEqual(2);
     expect(opts.every((o) => o === undefined || (o as { settle?: boolean }).settle !== true)).toBe(true);
   });
 

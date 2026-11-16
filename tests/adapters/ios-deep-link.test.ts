@@ -242,8 +242,7 @@ describe("IosAdapter.openDeepLink — a link to the project's own scheme waits l
     expect(sleeps).toEqual([]);
   });
 
-  // D49a: "did not see it come forward" only when the wait read another app; when it could not tell, the
-  // lead says so.
+  // D49a: "did not see it come forward" only when the wait read another app; when it could not tell, the lead says so.
   it('the ask fails: no "did not see" — a lead that it could not check, then launch\'s "could not check" note worded for the link', async () => {
     const outcome = await lab([new Error('WDA /wda/activeAppInfo request failed: ECONNREFUSED\nstack')]).adapter.openDeepLink('averilab://d49', { appId: LAB });
     expect(linkTextOf(outcome)).toBe(
@@ -379,8 +378,8 @@ describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)",
     expect(await d.adapter.openDeepLink('averilab://d54', { appId: LAB })).toEqual({ holder: 'alert', alert: { ...OPEN_IN, asksForApp: false } });
   });
 
-  // D54: on idb the names are asked at the first label. When they cannot be read, an alert whose title reads
-  // the English "Open in “…”?" needs none, so it is named all the same; only one that needs the names is "could not check".
+  // D54: on idb the names are asked at the first label. When they cannot be read, an alert whose title reads the
+  // English "Open in “…”?" needs none, so it is named all the same; only one that needs the names is "could not check".
   const NO_NAMES = appinfo(undefined, undefined, { path: LAB_PATH });
 
   it("idb, the app's names unreadable: the English-form alert is named (not as asking for the app) — one describe-all, no pause", async () => {

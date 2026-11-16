@@ -106,8 +106,8 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
     expect(dropped).toEqual([3]);
   });
 
-  // D24: a capped or trimming field (maxLength, an IBAN or phone mask) keeps a strict prefix for good. Its one
-  // retype changes nothing, the fill fails (ADR 0023), and that is no drop: the app must not be marked for it.
+  // D24: a capped or trimming field (maxLength, an IBAN or phone mask) keeps a strict prefix for good. Its one retype
+  // changes nothing, the fill fails (ADR 0023), and that is no drop: the app must not be marked for it.
   it('a capped field (its retype moves nothing) is not reported as a drop', async () => {
     const { io, intent, typed, dropped } = scripted({ keep: [5, 0] });
     expect((await typeAndConfirm(io, intent)).kind).toBe('missed');

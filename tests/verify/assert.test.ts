@@ -754,10 +754,10 @@ describe('ocr asserts (what the element RENDERS)', () => {
   /**
    * The 2026-08-26 follow-up: the crop is scaled by the DEVICE screen, not by
    * whatever the tree's widest rect happens to be
-   * (docs/bugs/2026-08-26-png-scale-needs-out-of-tree-screen-size.md). The
-   * tree here is the shape that fails closed in 0.5.0 — a rect-less root over
-   * an inset, oversized node, with an off-screen scrim for company — and the
-   * assert reads the element anyway.
+   * (docs/bugs/2026-08-26-png-scale-needs-out-of-tree-screen-size.md). The tree
+   * here is the shape that failed closed before the crop was scaled by the
+   * device screen — a rect-less root over an inset, oversized node, with an
+   * off-screen scrim for company — and the assert reads the element anyway.
    */
   const sheetFake = () => {
     resetLayout();
@@ -868,13 +868,12 @@ describe('ocr asserts (what the element RENDERS)', () => {
   });
 
   /**
-   * Were the measure's catch to turn every recognizer
-   * throw into a miss, a host without `swiftc` would poll the whole 12 s
-   * default before saying so. An `OcrUnavailableError` ends the assert after
-   * its one read, fail-closed, in the shape a refused capture does (2794f5e)
-   * — and a passing element assert after it in the same batch is still
-   * evaluated. The read count is the guard: a poll that went on would read
-   * again every few ms of its 2 s budget.
+   * Were the measure's catch to turn every recognizer throw into a miss, a host
+   * without `swiftc` would poll the whole 12 s default before saying so. An
+   * `OcrUnavailableError` ends the assert after its one read, fail-closed, in
+   * the shape a refused capture does (2794f5e) — and a passing element assert
+   * after it in the same batch is still evaluated. The read count is the guard:
+   * a poll that went on would read again every few ms of its 2 s budget.
    */
   it('an engine that will never read ends the assert after one read, and the batch goes on', async () => {
     let reads = 0;
@@ -1922,11 +1921,10 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
 });
 
 describe('assertSpecSchema', () => {
-  // A `match` that does not compile, past the schema,
-  // would fail mid-run — an element assert would throw out of assertAll a few
-  // ms in, losing the batch's other results, and an ocr assert would poll its
-  // whole 12 s budget as "OCR failed". The schema is where that mistake is
-  // caught, naming the field.
+  // A `match` that does not compile, past the schema, would fail mid-run — an
+  // element assert would throw out of assertAll a few ms in, losing the batch's
+  // other results, and an ocr assert would poll its whole 12 s budget as "OCR
+  // failed". The schema is where that mistake is caught, naming the field.
   it.each([
     ['element match', { element: { id: 'x' }, match: '(' }, ['match']],
     ['ocr match', { element: { id: 'x' }, ocr: { match: '(' } }, ['ocr', 'match']],

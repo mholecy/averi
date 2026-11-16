@@ -471,12 +471,11 @@ describe('a sliver of the element on the screen thinner than the slack fails clo
 /**
  * RESIDUAL (ADR 0018 residual 11, closed for WDA's marked layers, open for a tree that marks none, as here): beneath an
  * UNDIMMED partial presented surface — a later screen-sized layer holding only a sheet's scroll view over the screen's
- * lower part, no dimming view — a target the sheet does not lie over
- * (wholly above the screen, or under the status bar) is told "close it first" by the tap and the pixel assert, which
- * judge the presented fact of the node (draw-order.ts#DrawOrder.presentedOver), while `scroll_until` strokes: it
- * stops only on a surface in its read's frame or at its stroke's touch-down (draw-order.ts#DrawOrder.presentedAt),
- * and the touch-down misses the sheet. The verbs' wording agrees; their behaviour does not, and this
- * pins it.
+ * lower part, no dimming view — a target the sheet does not lie over (wholly above the screen, or under the status bar)
+ * is told "close it first" by the tap and the pixel assert, which judge the presented fact of the node
+ * (draw-order.ts#DrawOrder.presentedOver), while `scroll_until` strokes: it stops only on a surface in its read's frame
+ * or at its stroke's touch-down (draw-order.ts#DrawOrder.presentedAt), and the touch-down misses the sheet. The verbs'
+ * wording agrees; their behaviour does not, and this pins it.
  */
 describe('residual: an undimmed partial sheet — the tap and the pixel assert say close it first, scroll_until strokes', () => {
   const undimmed = (y: number): { tree: UiNode; target: UiNode } => {

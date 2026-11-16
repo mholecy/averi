@@ -13,13 +13,13 @@ import { runBatch, type Block } from '../../../scripts/truth/batch/runner.js';
 import { LIVE_GOLDEN_HEADER } from '../../../scripts/truth/batch/steps.js';
 import { CATALOG, LAB_SERIAL, LAB_UDID, labWorld, type LabWorld, type WorldOptions } from './lab-fakes.js';
 
-// The lab plumbing under runBatch (T2 S6b): a fake batch — the lab block (the Android build and the
-// device checks), an Android block with the tri-state reads around its live run, an iOS block whose live run is in the
-// WDA window after its own health check (the finportal key read by the ios need's end) — over a fake process seam that
-// answers git and live.ts as runner.test.ts does and every lab call through the fake lab (lab-fakes.ts), with real
-// files in a temp dir, a fixed clock and pid. The whole SUMMARY; a need that fails; ONLY=lab; a build that fails; the
-// work's check not fit; the abort inside the WDA window; the lab's processes at the run's end. Every call is checked
-// for the VIOLATIONs lab-fakes.ts records (b11-dry's, made exact; afterEach). No device.
+// The lab plumbing under runBatch (T2 S6b): a fake batch — the lab block (the Android build and the device checks), an
+// Android block with the tri-state reads around its live run, an iOS block whose live run is in the WDA window after
+// its own health check (the finportal key read by the ios need's end) — over a fake process seam that answers git and
+// live.ts as runner.test.ts does and every lab call through the fake lab (lab-fakes.ts), with real files in a temp dir,
+// a fixed clock and pid. The whole SUMMARY; a need that fails; ONLY=lab; a build that fails; the work's check not fit;
+// the abort inside the WDA window; the lab's processes at the run's end. Every call is checked for the VIOLATIONs
+// lab-fakes.ts records (b11-dry's, made exact; afterEach). No device.
 
 const HEAD = 'a'.repeat(40);
 const ID = '20261105-094426-4242';

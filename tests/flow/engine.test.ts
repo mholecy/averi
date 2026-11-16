@@ -4357,7 +4357,7 @@ flows:
     // call pays a spurious logout and login to end up where the app already
     // was — pinned below rather than hidden. With a destructive unwinding
     // rung (a `reset` launching with clearState) the same stale read costs a
-    // wipe of a logged-in app.
+    // wipe of a logged-in app, as it did on fb171ef (1225d63 on main).
     const fake = loopFake('onboarding');
     const read = fake.uiTree.bind(fake);
     let reads = 0;

@@ -542,8 +542,8 @@ describe('fillField — the post-focus re-read, only where focus can change the 
   });
 
   it('kept on-return: a layout that moves on focus (keyboard avoidance) still has its dropped tail typed again — the other inputs are compared as read after focus', async () => {
-    // Every rect moves up 100 on focus and the first typing keeps 3 of 9. With the
-    // other inputs taken from the pre-tap tree (keyed by rect), every one reads gone: `unproven`, no retype.
+    // Every rect moves up 100 on focus and the first typing keeps 3 of 9. With the other inputs taken from the pre-tap
+    // tree (keyed by rect), every one reads gone: `unproven`, no retype.
     resetLayout();
     const fake = new FakeAdapter(
       {
@@ -655,9 +655,9 @@ describe('fillField — the post-focus re-read, only where focus can change the 
   });
 
   it('accepted residual (R1, ADR 0028): a field WRONGLY said plain, autofilled with N bullets on focus, dropping exactly N keys, passes silently', async () => {
-    // With the re-read the count would start at 3 and `3 + 5` fail; skipped, the
-    // field shows 3 + (5 − 3) = 5 bullets, the typed length — the one reading no read-back can tell from a landed fill.
-    // Recorded, not wanted: if this ever fails, the residual is closed and ADR 0028 must say so.
+    // With the re-read the count would start at 3 and `3 + 5` fail; skipped, the field shows 3 + (5 − 3) = 5 bullets,
+    // the typed length — the one reading no read-back can tell from a landed fill. Recorded, not wanted: if this ever
+    // fails, the residual is closed and ADR 0028 must say so.
     const fake = field({ secure: false });
     onFocus(fake, (f) => (f.value = '•'.repeat(3)));
     appendBullets(fake, 3);
@@ -1500,7 +1500,7 @@ describe('fillField — a field that shows its hint or placeholder as its value 
         fake.typed.push(t); // the typing never lands: the field still shows `Search`
       };
       await expect(fillField(fake, { id: 'last_name' }, 'ear', FAST)).rejects.toThrow(/^fill: typed 3 characters but the field shows 6/);
-      // The one reading the tree cannot tell apart: the value IS the placeholder's text (probe B's shape, without clear).
+      // The one reading the tree cannot tell apart: the value IS the placeholder's text (without clear).
       const same = hintedField('', { hint: 'Search', named: true });
       await expect(fillField(same.fake, { id: 'last_name' }, 'Search', FAST)).resolves.toMatchObject({ readBack: { kind: 'placeholder' } });
     });
