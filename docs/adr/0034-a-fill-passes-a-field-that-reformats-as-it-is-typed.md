@@ -207,8 +207,9 @@ Three findings:
   maxLength, an integer-only amount that ignores `,`), so the error names both; on iOS the tail was typed again
   first, so a fill failing the same way twice is a field refusing the rest. An exact prefix keeps its old `length`
   wording.
-- **The rules live in a pure leaf** (review round 1, MINOR-2): `reformatOf`, `prefixOf`, `tailOf` and the separator
-  sets are `interact/fill-reformat.ts`'s (`tailOf` is `fill-landing.ts`'s since A2, below), `reformatOf` and `prefixOf` taking ONE greedy walk (`walk`, D28 code review); the typing (`fill-type.ts`) and the judge (`fill-verdict.ts`) both import
+- **The rules live in a pure leaf**: `reformatOf`, `prefixOf`, `tailOf` and the separator sets are
+  `interact/fill-reformat.ts`'s (`tailOf` is `fill-landing.ts`'s since A2, below), `reformatOf` and `prefixOf` taking
+  ONE greedy walk (`walk`, D28 code review); the typing (`fill-type.ts`) and the judge (`fill-verdict.ts`) both import
   it, and neither imports the other.
 - **Android** (review round 1, NIT-2). No tail is typed again there, but `whereTyped`'s missing text now comes from
   `tailOf` on every platform: an Android clear-fill whose reading is a reformatted prefix, and whose sibling input

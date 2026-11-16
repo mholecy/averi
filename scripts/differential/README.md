@@ -67,7 +67,7 @@ is one group, `device calls only` when the replies agree, with an example each),
 both outcomes) and, with `--all`, `calls.jsonl` (every call).
 
 On 12 cores a corpus of 479 trees (about 245 000 calls, each on both sides) took about five and a half minutes
-(measured 2026-10-14; the corpus is outside git, and a larger one takes longer in proportion).
+(measured 2026-10-14; the corpus is outside git, and a larger one is expected to take longer in proportion).
 
 Per tree:
 

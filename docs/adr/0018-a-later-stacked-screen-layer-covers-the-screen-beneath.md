@@ -734,16 +734,14 @@ test surface (tests/ui-tree/presentation.test.ts):
   now hands the module on as `presentation`, and `standing.ts#Scene.presentedAt` keeps its signature);
 - `fallback` — which adapter infers what the source did not judge.
 
-Behind it, three adapters, composed per tree: BY MARKS (`byMarks`, holding `markOf`, read on every tree —
-**the one reader of `UiNode.presentation` / `presentationElement` is now `presentation.ts#markOf`** (today: the one
-that decides what is presented; `ios-system-alert.ts`, `miss.ts` and `window-mark.ts` read the marks for their own
-purposes)), BY SHAPE
-(`byShape`, the former `presented-by-shape.ts` whole: `presentedOver`, `givesWay`, `presentedSurface`,
-`OVER_PRESENTED`), asked only of an unjudged tree that is not Android's, and BY UIAUTOMATOR (`byUiautomator`), asked of
-Android's tree (the uiautomator root's `paddedTouchTargets` mark). The frame excuses moved to `placed.ts#FRAME_EXCUSES`
-beside the other frame predicates, so the shape adapter asks them directly and draw order hands it no callback. The
-WDA parser's marking (`wda-source.ts#presentedLayers`, `presentedScreen`) stays in the parser: it reads WDA's raw
-elements and flags, which ui-tree never sees; the module reads what it marks.
+Behind it, three adapters, composed per tree: BY MARKS (`byMarks`, holding `markOf`, read on every tree — **the reader
+that decides what is presented is `presentation.ts#markOf`**; `ios-system-alert.ts`, `miss.ts` and `window-mark.ts` read
+the marks for their own purposes), BY SHAPE (`byShape`, the former `presented-by-shape.ts` whole: `presentedOver`,
+`givesWay`, `presentedSurface`, `OVER_PRESENTED`), asked only of an unjudged tree that is not Android's, and BY
+UIAUTOMATOR (`byUiautomator`), asked of Android's tree (the uiautomator root's `paddedTouchTargets` mark). The frame
+excuses moved to `placed.ts#FRAME_EXCUSES` beside the other frame predicates, so the shape adapter asks them directly
+and draw order hands it no callback. The WDA parser's marking (`wda-source.ts#presentedLayers`, `presentedScreen`) stays
+in the parser: it reads WDA's raw elements and flags, which ui-tree never sees; the module reads what it marks.
 
 The uiautomator adapter knows no fact of its own yet and answers as the shape adapter — what Android got before: a
 pure move. Its doc says how L1 lands there: read the dump's window facts (a window smaller than the screen — a dialog;
