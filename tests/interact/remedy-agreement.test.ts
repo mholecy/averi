@@ -470,8 +470,8 @@ describe('a sliver of the element on the screen thinner than the slack fails clo
 
 /**
  * RESIDUAL (ADR 0018 residual 11, closed for WDA's marked layers, open for a tree that marks none, as here): beneath an
- * UNDIMMED partial presented surface — a later screen-sized layer holding
- * only a sheet's scroll view over the screen's lower part, no dimming view — a target the sheet does not lie over
+ * UNDIMMED partial presented surface — a later screen-sized layer holding only a sheet's scroll view over the screen's
+ * lower part, no dimming view — a target the sheet does not lie over
  * (wholly above the screen, or under the status bar) is told "close it first" by the tap and the pixel assert, which
  * judge the presented fact of the node (draw-order.ts#DrawOrder.presentedOver), while `scroll_until` strokes: it
  * stops only on a surface in its read's frame or at its stroke's touch-down (draw-order.ts#DrawOrder.presentedAt),

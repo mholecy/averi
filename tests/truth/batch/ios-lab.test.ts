@@ -533,7 +533,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     expect(spec?.stateFile).toBe(join(ctx.dir, 'state.json'));
     expect(spec?.block).toBe('D43');
     expect(spec !== undefined && 'secs' in spec).toBe(false);
-    // The WDA's kill first, then S4's per domain, then the compare.
+    // The WDA's kill first, then one import per domain, then the compare.
     expect(spec?.hand[0]).toBe(portHand(LAB_UDID));
     expect(spec?.hand[1]).toMatch(/^D43 \(iOS\): xcrun simctl spawn LAB-SIMULATOR-UDID defaults import com\.apple\.keyboard\.preferences /);
     expect(spec?.hand.at(-1)).toBe(compareHand(join(ctx.dir, 'state.json')));

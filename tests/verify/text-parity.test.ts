@@ -1411,7 +1411,8 @@ describe('survivesIn — the UNREAD guard predicate', () => {
   it('DOES let a 3-character part vouch — the floor is pinned from both sides', () => {
     // The other half of the bound. Without this, MIN_PART_LENGTH could drift
     // up to 6 and every test would stay green while the guard silently
-    // over-narrowed — this directory records that failure class three times.
+    // over-narrowed — docs/bugs/2026-08-27-user-settings-run-four-findings.md
+    // records the mutation at 2, 4 and 6, each failing.
     expect(survivesIn('Balance, CZK', 'Total CZK 1 121,00')).toBe(true);
   });
 

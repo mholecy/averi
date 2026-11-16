@@ -1474,9 +1474,9 @@ describe('fillField — a field that shows its hint or placeholder as its value 
       expect(real()).toBe('Ann');
     });
 
-    // Review of this branch, probe C: a field that shows exactly its
-    // placeholder may be empty or may HOLD that very text; a clear alone that
-    // deleted nothing never saw which. Not verified — never "Filled".
+    // A field that shows exactly its placeholder may be empty or may HOLD that
+    // very text; a clear alone that deleted nothing never saw which. Not
+    // verified — never "Filled".
     it('a clear ALONE on a field showing only its placeholder: nothing deleted, and NOT verified — empty, or holding that text', async () => {
       const { fake } = hintedField('', { hint: 'Company', named: true });
       const result = await fillField(fake, { id: 'last_name' }, '', { ...FAST, clear: true });

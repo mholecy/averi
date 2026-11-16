@@ -9,7 +9,7 @@ import { nodeProcess } from '../../../scripts/truth/batch/proc.js';
 
 vi.setConfig({ testTimeout: 10_000, hookTimeout: 10_000 });
 
-// scripts/truth/batch/preconditions.ts over real temporary git repos, git started through S2's bounded seam (proc.ts):
+// scripts/truth/batch/preconditions.ts over real temporary git repos, git started through the bounded seam (proc.ts):
 // the answers preconditions.test.ts fakes, given by git itself. Each repo is made in a mkdtemp with its own HOME and
 // git config, and without the GIT_DIR, GIT_WORK_TREE and GIT_INDEX_FILE a hook's context would pass down: nothing of
 // the machine's git setup, or of the checkout running the tests, reaches it. Kept apart from preconditions.test.ts: it
