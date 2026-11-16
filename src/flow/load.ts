@@ -113,7 +113,7 @@ export async function loadProjectConfig(configPath?: string): Promise<ProjectCon
  * changed ones, an unchanged file says nothing. Per file, so A → B → A does
  * not re-announce A's names. The memo (`announced`) is log-only and
  * lives beside the one impure function: it decides what is SAID, never what
- * any value IS — `envBeside` itself is pure.
+ * any value IS — `envBeside` itself keeps no state.
  */
 function announce(configPath: string, contributed: Readonly<Record<string, string>>): string[] {
   const last = announced.get(configPath) ?? {};
@@ -175,8 +175,9 @@ export async function loadConfigIfPresent(path: string): Promise<AveriConfig | u
  * by the same server; and the file does not reach child processes: adb, xcrun
  * and xcodebuild inherit the shell's environment only.
  *
- * Pure: a function of the file's text and `processEnv`, nothing remembered
- * between calls. `contributed` is the file's names that made it into `env`
+ * No state is kept between calls: the result is a function of the file's
+ * text and `processEnv`, and reading `.env.averi` is its only I/O.
+ * `contributed` is the file's names that made it into `env`
  * (not shadowed by the real environment), for the caller's stderr line
  * (`announce`, above).
  *

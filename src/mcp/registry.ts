@@ -262,7 +262,7 @@ export class AdapterRegistry {
    * iOS/wda adapter's dispose stops its WebDriverAgent and polls until the
    * port is quiet, and `process.exit` must not pre-empt that
    * (docs/bugs/2026-09-18-wda-orphan-after-server-restart.md). The caller
-   * (mcp/lifecycle.ts) bounds the wait; this method does not.
+   * bounds the wait; this method does not.
    */
   async shutdown(): Promise<void> {
     this.closed = true;

@@ -503,10 +503,6 @@ const configSchema = z
 
 export type AveriConfig = z.infer<typeof configSchema>;
 
-/**
- * The app averi.yaml names for a platform — `app.android.package` or `app.ios.bundleId` — or undefined when it names
- * none.
- */
 export const appIdOf = (cfg: AveriConfig, platform: Platform): string | undefined => {
   const app = cfg.app[platform];
   if (app === undefined) return undefined;
@@ -581,11 +577,12 @@ export class SetupError extends Error {
 /**
  * The steps nested inside a step, or `undefined` if this kind holds none.
  *
- * The single place that knows which kinds are containers. Three walks over
- * Step depend on that: the engine's dispatcher, the reference check below, and
- * `stepsAreDestructive`. The dispatcher must stay hand-written — it is a
- * discriminated switch with a different return per kind, and it throws on an
- * unhandled one — but the two recursive walks are pure structure, and having
+ * The single place the recursive walks learn which kinds are containers.
+ * Three walks over Step need that: the engine's dispatcher, the reference
+ * check below, and `stepsAreDestructive`. The dispatcher must stay
+ * hand-written and names the kinds itself — it is a discriminated switch with
+ * a different return per kind, and it throws on an unhandled one — but the
+ * two recursive walks are pure structure, and having
  * them re-derive the nesting independently is how a container kind added later
  * gets covered in one of them and silently skipped in the other.
  */

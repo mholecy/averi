@@ -65,8 +65,9 @@ interface EngineCall extends EngineContext {
  * engine's read hand-off
  * (docs/adr/0030-a-read-is-handed-on-only-as-a-first-sample-or-a-positive-verdict.md),
  * which dies with the run — so ensure_state runs them side by side, and the
- * pidof (44–48 ms; docs/plans/2026-10-30-performance-backlog.md, D13 note
- * (2026-10-31, averi_lab API 33)) hides under the frame's settle sleep and
+ * pidof (44–48 ms in D3's run, 32–60 ms in D13's;
+ * docs/plans/2026-10-30-performance-backlog.md, D13 note (2026-10-31,
+ * averi_lab API 33)) hides under the frame's settle sleep and
  * screencaps. run_flow takes no frame and asks the health alone. A verify leg
  * keeps them in sequence (run/verify.ts).
  */

@@ -8,7 +8,7 @@ import { errorMessage } from '../util/error-message.js';
  * amendment). The device-log excerpt `get_logs` returns is not health, and is its own leaf (run/log-excerpt.ts).
  *
  * Its place is run/ (A24's order, tests/architecture/layering.test.ts): the app to ask about is averi.yaml's
- * (`app.<platform>`, flow/config.ts#appIdOf), above verify/, and its callers are run/'s compositions.
+ * (`app.<platform>`, flow/config.ts#appIdOf), above verify/.
  * It is not an assert (verify/), and not a device command (adapters/): it reads the adapter's two answers,
  * `isAppRunning` and `logs`, and words them.
  *

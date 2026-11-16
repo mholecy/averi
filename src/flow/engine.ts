@@ -810,8 +810,9 @@ export class FlowEngine {
         //
         // One SECOND LOOK first: the entry probe is a single read (so the
         // warm path stays one read), and both of these are what a cold
-        // launch looks like for a while — SKILL.md sends agents to
-        // ensure_state right after launch_app. Measured 2026-10-06 on
+        // launch looks like for a while — an agent may call ensure_state
+        // right after launch_app (skill/references/averi-yaml.md says it is
+        // safe). Measured 2026-10-06 on
         // finportal (Android 13 emulator, RN debug build): null root to
         // ~+3 s, the decor alone (android:id/content, action_bar_root)
         // +5.3…+13.8 s, `login_screen` at +18.3 s; through WDA the 7-node
@@ -1261,7 +1262,7 @@ export class FlowEngine {
     const appId = appIdOf(this.cfg, this.adapter.platform);
     if (appId === undefined) throw new SetupError(`averi.yaml has no app.${this.adapter.platform} section`);
     // The launch itself — activity, adapter call, wipe count, wording — is
-    // flow/launch.ts's, shared with launch_app; the step's app id is the
+    // flow/launch.ts's; the step's app id is the
     // config's. Its caveat and its wipe each get a `⚠` line right under the
     // line they qualify.
     const launched = await launchApp(this.adapter, this.cfg, this.session, {
@@ -1343,8 +1344,8 @@ export class FlowEngine {
     // The YAML's `timeout: 2s` is this layer's vocabulary; interact takes ms.
     // The pause after each swipe is interact/scroll.ts's own (400 ms): it is
     // a gesture-settle wait, not this engine's poll interval. Inside flows
-    // that pause is not measured on a device (it was the 500 ms poll
-    // interval before): a device run should check `scroll_until` steps.
+    // that pause is not measured on a device: a device run should check
+    // `scroll_until` steps.
     const result = await scrollUntilVisible(this.adapter, element, {
       ...rest,
       // A flow names a scroll view by element spec, never by rect (D81): a failure's way into one asks for a spec.
@@ -1401,7 +1402,7 @@ export class FlowEngine {
     // keyboard) must not take them down with it. The keyboard line
     // (tracingDismissal's) comes first: it happened first, before the focus tap.
     for (const caveat of said.caveats) this.log(caveat.action, caveat.text);
-    // What the dismissal did (stage B): on the in-tree model it may tap a
+    // What the dismissal did: on the in-tree model it may tap a
     // configured element — said on the fill line, since the step did it — or
     // leave the keyboard up with a reason, a `⚠ fill` line like the
     // masked-append one, so the next step's refusal is not a surprise. On the
@@ -1485,10 +1486,10 @@ export class FlowEngine {
    * spent before a second read could happen, so optional taps NEVER landed on
    * a device with realistic dump latency and were silently logged as "not
    * present" (measured 2026-08-19/20, two independent apps, 100% repro). The
-   * presence poll below is immune to that: pollUntil always completes at
-   * least one tree read before checking its deadline, and one sighting is
-   * enough — after that the step is committed and taps with the normal tap
-   * timeout, exactly as a non-optional tap would.
+   * presence poll below (resolvePresent) is immune to that: pollTree always
+   * completes at least one tree read before checking its deadline, and one
+   * sighting is enough — after that the step is committed and taps with the
+   * normal tap timeout, exactly as a non-optional tap would.
    *
    * A tap's own `timeout:` widens the presence window (an interstitial gated
    * on a network round-trip can take far longer than the default to exist at
@@ -1576,7 +1577,7 @@ export class FlowEngine {
         //
         // Asked of interact, not deduced from missing evidence (a `present`
         // flag, `instanceof KeyboardGuardError` as the one failure known to
-        // have found the element, stage B): that reads a fill whose field was
+        // have found the element): that reads a fill whose field was
         // found and tapped, but whose text never landed, and a fill refused
         // for a control character, as "skipped step (not present)". A
         // KeyboardGuardError quotes its headline because it is not
@@ -1630,7 +1631,7 @@ export class FlowEngine {
    * - the step succeeded after the guard pressed `back`: the sentence the
    *   result carries ("…; hidden before tapping", or "…; back pressed; the
    *   keyboard's state afterwards could not be read") — or, on the in-tree
-   *   model (stage B), after it tapped a configured dismissal ("…; hidden by
+   *   model, after it tapped a configured dismissal ("…; hidden by
    *   tapping id:"login_title" before tapping");
    * - the step FAILED after it: the attempt ("…; back pressed"), BEFORE the
    *   step's `✗` line — the key press happened whether or not the step
@@ -1655,7 +1656,7 @@ export class FlowEngine {
   }
 
   /**
-   * The failure half of `tracingDismissal`, on its own (stage B): any
+   * The failure half of `tracingDismissal`, on its own: any
    * KeyboardGuardError's `traceLine`, logged as `action` BEFORE the error
    * goes on to the step's `✗` line. The one catch for the guard's two steps
    * above and for the post-fill `dismissKeyboard` (runFill), whose result has
