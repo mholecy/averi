@@ -7,9 +7,10 @@ import { parseDump } from '../helpers/android-dumps.js';
 
 // The held cells' bare phase (Held.swift, Held.kt: a white screen-sized root with nothing in it) must read BARE through
 // every tree source — else the entry probe reads content, no second look is earned, and the ensure group's h1–h3 are
-// MISMATCH entry-not-bare on every run. No capture of a held cell exists (they carry no truth), so each source's dump
-// is a committed capture of a lab cell built on the same root, its cell's own content (every `lab.<cell>.*` node and
-// what it holds) taken out: what the same app draws with nothing on its screen, through the real parsers.
+// MISMATCH entry-not-bare on every run. No iOS capture of a held cell exists, and this test reads none of Android's
+// (held-no, held-no-spinner), so each source's dump is a committed capture of a lab cell built on the same root, its
+// cell's own content (every `lab.<cell>.*` node and what it holds) taken out: what the same app draws with nothing on
+// its screen, through the real parsers.
 
 const TRUTH = new URL('../fixtures/truth/', import.meta.url);
 const read = (file: string) => readFileSync(new URL(file, TRUTH), 'utf8');

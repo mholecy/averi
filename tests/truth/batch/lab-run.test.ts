@@ -18,7 +18,7 @@ import { CATALOG, FakeSeam, FOCUS_CHOOSER, LAB_SERIAL, labWorld, PREFERRED_WITH_
 // group, a default the run left failing the batch by name; the exit codes 0, 1, 2, 3, 130. What summarize itself
 // names (the hedged ceiling, a LOUD that fails nothing, a stale premise) is standing.test.ts's: live-cases.ts stays out
 // of this file's imports, which the lab group's cold mutation run pays for every mutant (ADR 0038's A21 amendment).
-// Every call is checked for b11-dry's VIOLATIONs (afterEach). No device.
+// Every call is checked for the VIOLATIONs lab-fakes.ts records (b11-dry's, made exact; afterEach). No device.
 
 const HEAD = 'a'.repeat(40);
 const ID = '20261111-101500-4242';

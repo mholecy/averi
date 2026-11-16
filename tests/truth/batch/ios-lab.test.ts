@@ -36,7 +36,8 @@ import { CATALOG, LAB_UDID, labWorld, runOf, STALE_COMPANION_ERR, type LabWorld,
 // scripts/truth/batch/ios-lab.ts over the fake lab (lab-fakes.ts): the `ios` need, the health check and the Open-in
 // alert, the reset, the WDA window on its normal path and as the abort's dirty window, the iOS stretch's end and the
 // run's last step. Real files in a temp dir, through io.ts; waits recorded, never waited. Every call of every test is
-// checked for b11-dry's VIOLATIONs made exact (afterEach). The titles name the batch and the fix each rule comes from.
+// checked for the VIOLATIONs lab-fakes.ts records (b11-dry's, made exact; afterEach). The titles name the batch and
+// the fix each rule comes from.
 
 let dir: string;
 let world: LabWorld;

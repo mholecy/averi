@@ -11,7 +11,8 @@ import { nodeProcess } from '../../../scripts/truth/batch/proc.js';
 // scripts/truth/batch/bounded.ts over the real process seam (proc.ts): real children in process groups of their own.
 // src/adapters/exec.ts kills only the direct child on a timeout, so live.ts or a Gradle build would leave its
 // grandchildren running; a batch call must take its whole group with it. Kept apart from bounded.test.ts: it spawns
-// processes, which the mutation run does not. Every child is ended in afterEach, whatever the test did.
+// processes, which the mutation run does not. Each child whose pid a test read from its pidfile is ended in afterEach,
+// whatever the test did; one whose pid never came ends by its fixture's own bound (proc-child.mjs, 60 s).
 
 const HELPER = join(import.meta.dirname, '..', '..', 'fixtures', 'batch', 'proc-child.mjs');
 const node = process.execPath;

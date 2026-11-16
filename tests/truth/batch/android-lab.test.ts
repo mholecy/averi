@@ -13,7 +13,8 @@ import { CATALOG, DEVICE_APK, fixture, LAB_SERIAL, labWorld, runOf, type LabWorl
 // scripts/truth/batch/android-lab.ts over the fake lab (lab-fakes.ts): the `android` need and its recheck, the
 // handlers' need, the tri-state reads around a block, a tree kept with its fitness as a fixture, the probe's own
 // restore as a bounded child, the chooser's stretch. Real files in a temp dir, through io.ts. Every call of every test
-// is checked for b11-dry's VIOLATIONs made exact (afterEach): an adb call for another serial, any `input tap`.
+// is checked for the VIOLATIONs lab-fakes.ts records (b11-dry's, made exact; afterEach): an adb call for another
+// serial, any `input tap`.
 
 let dir: string;
 let world: LabWorld;

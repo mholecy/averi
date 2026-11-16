@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { freshIn, nodeFs } from '../../../scripts/truth/batch/io.js';
 
 // scripts/truth/batch/io.ts: the module's one filesystem seam, held to its contract on real files in a temp dir —
-// above all, that nothing it does removes or overwrites what a run wrote.
+// above all, that nothing it does removes or empties a run's evidence; what it replaces (a link, a probe's state
+// file) it replaces by one rename.
 
 let dir: string;
 beforeEach(() => {

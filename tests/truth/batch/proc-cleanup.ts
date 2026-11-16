@@ -3,11 +3,14 @@ import type { ChildProcess } from 'node:child_process';
 // The real-child tests' cleanup: whatever a test did, its children end and hold nothing of vitest open. Under parallel
 // load a kill was refused with EPERM once, and a child left with its pipes open kept the worker alive:
 // so each kill is tried again, every pipe is destroyed and every child unref'd. The fixtures bound their own lives too
-// (proc-child.mjs, abort-child.ts), so a child no kill reached still ends.
+// (tests/fixtures/batch/proc-child.mjs, tests/fixtures/batch/abort-child.ts), so a child no kill reached still ends.
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** SIGKILL to `target` (a pid, or -pgid for a group); EPERM tried again up to 3 times, 50 ms apart; ESRCH is done. */
+/**
+ * SIGKILL to `target` (a pid, or -pgid for a group); EPERM tried again up to 3 times, 50 ms apart; any other error
+ * (ESRCH, gone) is done.
+ */
 export async function killHard(target: number): Promise<void> {
   for (let i = 0; i < 4; i++) {
     try {
