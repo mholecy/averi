@@ -132,7 +132,10 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // stroked for (residual 6) — two strokes on the layer, the backgrounded sheet dismissed by the first or not.
   // Round 7's A5 (a1261499; ios-idb-sheet-a5-1.json, -2.json, ios-idb-vis-a5.json): a list holding UIKit's dismiss
   // region marks the layer presented, so sheet-medium's A–D and sheet-medium-edges' H and G stop before any swipe —
-  // their six entries struck off (ok in three runs of three).
+  // their six entries struck off (ok in three runs of three). Beneath the large sheet idb's list showed no sign of it:
+  // A's and B's stroke still dismissed it, but scroll_until's changed stop said so and claimed nothing — LOUD
+  // (`presented-changed`) on `refused`, no longer a stop claimed on `visible`: known still then, the sheet's loss
+  // residual 6's cost; C and D, never dismissed, took two strokes as before.
   // Round 16 (bugs/r16-r6, ADR 0018 "idb's presented layer" Decision 3; ios-vis-r16-r6-1.json, -2.json): A's and B's
   // strokes are feelers (160 pt in 600 ms from (201,175)) — the sheet springs back, nothing dismissed, the unmoved
   // stop saying idb lists only what a presented sheet, alert or cover leaves: `presented-stroke` on `not found`, as C,

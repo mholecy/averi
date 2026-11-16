@@ -574,7 +574,7 @@ export interface A41Report {
   missing: string[];
   /**
    * The required parts read but not proven (unprovenOf, A44): the cadence judgement, legs (a) and (b) of the first tap
-   * and the foreground leg. Any of them unproven makes the report INCONCLUSIVE, as a missing file does.
+   * and the foreground leg. Any of them unproven is INCONCLUSIVE to whoever judges the report, as a missing file is.
    */
   unproven: string[];
   /** Whether a WebDriverAgent build ran (WDA_BUILD_LINE in a WDA child's log); undefined: no log read. */

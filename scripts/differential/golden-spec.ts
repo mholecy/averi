@@ -57,9 +57,9 @@ import type { Expectation } from './golden-spec/judges.js';
  * form cell's row under its `config.ios.keyboardDismiss`) through formExpectations, in place of the form's own
  * under-keyboard tap. So a false-covers author edits golden-spec/false-covers.ts (its rows), this module (to ask them),
  * rows.ts only for a new row type — and the family's catalog file, app views and
- * tests/differential/golden/false-covers.known.ts, as every batch does — a label target (CatalogTarget.label, an icon
- * button's icon) through ownPartsRows too, asked by its label. A text target (CatalogTarget.text) of any family adds
- * golden-spec/text.ts's rows (its string read back from the tree and, `ocr`, by the host's recognizer from the
+ * tests/differential/golden/false-covers.known.ts, as every family's author does — a label target (CatalogTarget.label,
+ * an icon button's icon) through ownPartsRows too, asked by its label. A text target (CatalogTarget.text) of any family
+ * adds golden-spec/text.ts's rows (its string read back from the tree and, `ocr`, by the host's recognizer from the
  * screenshot) to those its geometry asks.
  */
 

@@ -920,7 +920,8 @@ export function judgeCarry(reply: string, state: LabState, start: LabState): Liv
   if (verdict.outcome === 'MISMATCH' || f0 === undefined || region === undefined) return verdict;
   const o0 = start.offsets?.[CARRY.view] ?? 0;
   const top = (o: number) => f0.y - (o - o0);
-  // The view filter states the intent: judgeScroll's first check already fails another view's stroke that moves.
+  // The view filter states the intent: directionBreaks' first check (`beside`) already makes judgeScroll fail another
+  // view's stroke that moves.
   const strokes = strokesSince(state, start).filter((s) => s.view === CARRY.view);
   const turned = strokes.filter((s) => s.to < s.from - MOVE_SLACK);
   // A move as well as the window test (D83). The window test alone implies a move of more than region.height −
