@@ -32,8 +32,7 @@ vi.mock('../../src/util/sleep.js', async (importOriginal) => {
  * classes, the deadline passing during a stroke, the round bound counted in
  * tree reads. The round's rules — the judgement, the witness's ordering, the
  * confirming reads, the turn, stuck and exhausted, every failure's wording —
- * are observation tables in tests/interact/scroll-rounds.test.ts since
- * 2026-10-09 (the scroll-rounds deepening).
+ * are observation tables in tests/interact/scroll-rounds.test.ts.
  */
 
 const FAST = { eyes: NO_EYES, maxSwipes: 4, timeoutMs: 2_000, settleMs: 1 };
@@ -84,7 +83,7 @@ describe('scrollUntilVisible — the result says what the scroll achieved', () =
 
   it('reports the CLIPPED fraction and edges instead of a bare "visible" (the 2026-08-27 finding)', async () => {
     // 40px tall, stopping at y=1970 → a quarter of it below the fold, its centre (1990) still on screen — a plain stop
-    // needs that since code review P3 (at y=1980 the centre lies on the edge, off screen, and the scroll goes on).
+    // needs that (at y=1980 the centre lies on the edge, off screen, and the scroll goes on).
     const result = await scrollUntilVisible(scrollingFake(2570), { id: 'submit_button' }, FAST);
     expect(result).toEqual({ swipes: 1, visible: 0.75, clipped: ['bottom'] });
     expect(describeScrollResult(result)).toBe(
@@ -269,9 +268,7 @@ describe('scrollUntilVisible — the soft keyboard', () => {
    * (as `asks`); these are the same scenarios at the DRIVER, counted as the
    * fake oracle saw them — the queries a device would answer, which is what
    * the keyboard reading's cost table promises (ui-tree/keyboard-cover.ts).
-   * They stood here as single assertions until the scroll-rounds deepening
-   * (2026-10-09) moved them to the pure table; code review P2 put the
-   * device-side count back beside it. `[window, touchable, witness]`.
+   * `[window, touchable, witness]`.
    */
   it.each([
     ['a band that changes nothing (a clean stop clear above it): no witness', { startY: 500 }, [], {}, [1, 1, 0]],
@@ -360,7 +357,7 @@ describe('scrollUntilVisible — the soft keyboard', () => {
 /**
  * 2026-10-08, the two "Device check" sections of
  * docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md and
- * review round 1, at the driver: the stroke over a keyboard, the turned and
+ * At the driver: the stroke over a keyboard, the turned and
  * shortened strokes' points, the convergence a fling's physics needs the
  * real stroke lengths for, and the deadline passing during a stroke (the
  * rules behind them: tests/interact/scroll-rounds.test.ts).
@@ -683,9 +680,9 @@ describe('scrollUntilVisible — strokes that drag, not fling, over the scroll c
 });
 
 /**
- * Code review of fix/r7-sliver, item 1 (2026-10-10): uiautomator cuts every rect to its scroller, so a node cut to a
- * sliver at the scroller's edge has its centre on the screen, and a plain stop stopped on exactly the strip the next
- * tap refuses (tap-judgement.ts#TapJudge.aim). The plain stop now scrolls on.
+ * uiautomator cuts every rect to its scroller, so a node cut to a
+ * sliver at the scroller's edge has its centre on the screen, and a plain stop there would stop on exactly the strip
+ * the next tap refuses (tap-judgement.ts#TapJudge.aim). The plain stop scrolls on.
  */
 describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap refuses (2026-10-10)', () => {
   const FORM: Rect = { x: 0, y: 242, width: 1080, height: 1736 };
@@ -768,8 +765,8 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
     expect(fake.swipes).toEqual([]);
   });
 
-  // A26: the bound's quote of the tap is the tap's own remedy, word for word (interact/touch-remedy.ts#touchRemedyText) —
-  // before, it said the scroll alone, without the way past the tap gives a node that only reads cut.
+  // A26: the bound's quote of the tap is the tap's own remedy, word for word
+  // (interact/touch-remedy.ts#touchRemedyText).
   it('at the bound, the quote of the tap is the tap\'s own refusal\'s remedy, word for word — the way past included', async () => {
     const fake = new SwiftForm(1000);
     const failed = await scrollUntilVisible(fake, 'id:details_toggle', { ...FAST, maxSwipes: 0 }).catch((e: Error) => e.message);
@@ -908,9 +905,9 @@ describe('scrollUntilVisible — nested clipping containers and a loading list (
 });
 
 /**
- * Code review P2 (2026-10-09): a selector matching two nodes — a container and its button sharing an id — was judged by
- * scroll_until on the match more of which showed (the container, its centre clear), while the next tap acted on the
- * button (resolveNow's preference for a sole interactive match) and refused it. The scroll judges the tap's match.
+ * A selector matching two nodes — a container and its button sharing an id — judged by
+ * scroll_until on the match more of which showed (the container, its centre clear) would be refused by the next tap,
+ * which acts on the button (resolveNow's preference for a sole interactive match). The scroll judges the tap's match.
  */
 describe('scrollUntilVisible — the match the next tap acts on (code review P2)', () => {
   const ios = (children: UiNode[]) => {
@@ -1018,7 +1015,6 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
    * A target pinned with its centre in the band, the default direction down (2026-10-09, docs/bugs/2026-10-09-ios-scroll-
    * until-never-turns-back-when-target-stays-clipped-or-in-status-band.md): turned up at once — it lies at the edge a down
    * stroke pushes it out through — up twice, then one stroke down, the way never stroked, before it is called pinned.
-   * Until then: down twice, and "try direction: up".
    */
   const PINNED_STROKES = [1, 1, -1];
 
@@ -1043,7 +1039,7 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
     expect(error.message).not.toMatch(/CLIPPED|layout defect|fully revealed/);
   });
 
-  // Code review of round 6, P2: `fully` judges clipping against the whole screen, but the stop also needs the centre
+  // `fully` judges clipping against the whole screen, but the stop also needs the centre
   // below the band — full-bleed content whose ROUNDED centre lies in the band (at y 0: 122 pt or less under 62) never
   // stops, and says why. The verification round: 123 pt rounds its centre 61.5 to 62, and stops.
   it('full-bleed content shorter than twice the band (0,0 402x106, centre y 53): no fully: true stop either — the failure names the status bar, no clip', async () => {
@@ -1055,10 +1051,10 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
     expect(error.message).not.toMatch(/CLIPPED|layout defect|fully revealed/);
   });
 
-  // Until docs/bugs/2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md the
-  // default direction swiped DOWN twice and advised `direction: "up"`; the row lies at the edge a down stroke pushes it out
-  // through, so the scroll now turns up itself, at once; stuck that way, it swipes once down — the way never stroked —
-  // and then says it is pinned. `direction: "up"` from the start: up twice, once down, the same sentence.
+  // docs/bugs/2026-10-09-ios-scroll-until-never-turns-back-when-target-stays-clipped-or-in-status-band.md: the row lies
+  // at the edge a down stroke pushes it out through, so the scroll turns up itself, at once; stuck that way, it swipes
+  // once down — the way never stroked — and then says it is pinned. `direction: "up"` from the start: up twice, once
+  // down, the same sentence.
   it('a screen that does not scroll, the target under the bar (24,10 354x52): both directions are swiped before it is called pinned — no "try direction"', async () => {
     const pinned =
       "its centre stays under the status bar at (201,36), in the top 62 of the screen (tree units), where a tap goes to the status bar, and the content is exhausted: " +
@@ -1100,9 +1096,9 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
     expect(fake.swipes).toEqual([{ from: { x: 201, y: 699 }, to: { x: 201, y: 175 } }]);
   });
 
-  // Code review of round 6b, P1: until then the far side was read off CONTINUE's FRAME (780–824), over neither edge of the
-  // row at 776–828, so the scroll swiped up twice more, unmoved, before the stuck turn; idb's list pins CONTINUE, whose
-  // reach runs to the screen's bottom (draw-order.ts#bottomPinned) — over the row's far (bottom) side.
+  // CONTINUE's FRAME (780–824) lies over neither edge of the row at 776–828, so with the far
+  // side read off it the scroll would swipe up twice more, unmoved, before the stuck turn; idb's list pins CONTINUE,
+  // whose reach runs to the screen's bottom (draw-order.ts#bottomPinned) — over the row's far (bottom) side.
   it('direction up, fully: true, from -20 flung to 776 — its top under CONTINUE, and CONTINUE\'s reach (down to 874) over its bottom: turned at once, the stroke back reveals it — not "a layout defect"', async () => {
     const fake = await following(-20, (travel, y) => (travel > 0 ? 776 : y + travel));
     expect(await scrollUntilVisible(fake, 'id:swift_payment.form.priority_select', { ...FAST, maxSwipes: 6, direction: 'up', fully: true })).toEqual({ swipes: 2, visible: 1, clipped: [] });
@@ -1115,7 +1111,8 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
  * idb's keyboard band in the stroke box (round 7, 2026-10-10; docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-
  * soft-keyboard.md): idb marks no keyboard node, so the reading saw none and every stroke was `201 699 201 175` — a
  * touch-down on the keys (`Z X C V`, `5`), the form never scrolled, and the reply said "content exhausted". The band's
- * line (ui-tree/keyboard-position.ts#KeyboardPosition.line) now ends the stroke box, and (owner decision D2) the judgement is made above it.
+ * line (ui-tree/keyboard-position.ts#KeyboardPosition.line) ends the stroke box, and (owner decision D2) the judgement
+ * is made above it.
  */
 describe('scroll_until over idb\'s soft keyboard (round 7)', () => {
   const NO_STROKE_ON_KEYS = 'never on the keys';
@@ -1322,7 +1319,6 @@ describe('scroll_until over idb\'s soft keyboard (round 7)', () => {
  * so a scroll may bring it out from under it), and, the strokes moving nothing, fails naming the bar and the way past —
  * with the keyboard up, dismiss it first. Real captures of the lab's `form-keyboard`, served unchanged by every read.
  */
-// Lab note F2A1 (the doc above).
 describe('scrollUntilVisible — a control cut by a node drawn after it is no stop', () => {
   const capture = async (name: string): Promise<UiNode> => parseDump(await readFile(new URL(`../fixtures/${name}`, import.meta.url), 'utf8'));
   const IME: Rect = { x: 0, y: 1398, width: 1080, height: 822 };
@@ -1464,7 +1460,7 @@ describe('scroll_until within (D78): a selector that does not parse is refused b
 });
 
 /**
- * D81 (review round 2, MINOR-A): the caller's remedy form is the caller's option (`ScrollOptions.remedy`) — the MCP
+ * D81: the caller's remedy form is the caller's option (`ScrollOptions.remedy`) — the MCP
  * tool sets none and keeps D78's rect form, a flow sets `spec` (its engine test pins that side). Driven to the
  * exhausted bound over android scroll-bounded's real dump: O, a row of `lower`, the swipes over `upper`.
  */
@@ -1489,7 +1485,7 @@ describe('scrollUntilVisible — the remedy form of a failure naming the list be
 /**
  * D80: a `within` whose scroll view the keyboard leaves no room in, through the driver with the keyboard oracle as the
  * Android adapter reads it (the IME's frame, its top at 1100, over all of `lower` but 54 of its height): stopped before
- * any swipe — before D80 the stroke fell back to the screen whole, touching down at (540,880), on `upper`.
+ * any swipe — without D80 the stroke would fall back to the screen whole, touching down at (540,880), on `upper`.
  */
 describe('scrollUntilVisible — a named scroll view with no room under the keyboard (D80)', () => {
   it('the MCP tool\'s rect: no swipe sent, a WithinRefusedError `noRoom`, the way out Android\'s `press_key back`', async () => {

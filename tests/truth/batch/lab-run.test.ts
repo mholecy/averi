@@ -115,7 +115,6 @@ const dirtyState = (): string => {
   writeFileSync(file, '{"dirty":true}');
   return file;
 };
-/** The index of the first call holding `text` at or after `from`. */
 const callAt = (text: string, from = 0) => seam.words.findIndex((w, i) => i >= from && w.includes(text));
 
 describe('lab-run.ts: a clean run, the blocks\' order and the lab block', () => {

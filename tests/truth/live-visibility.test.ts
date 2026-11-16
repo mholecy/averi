@@ -531,15 +531,18 @@ describe('the live KNOWN pins the rule a case fails by and the kind of reply it 
     expect(knownLive('android', 'uiautomator', 'tap:fab.L', 'tap-claim', 'refused')).toBeUndefined();
     expect(knownLive('android', 'uiautomator', 'tap:fab.L', 'tap-refused', 'not found')).toBeUndefined();
     expect(knownLive('android', 'uiautomator', 'tap:fab.L', 'tap-refused', undefined)).toBeUndefined();
-    // Struck off by residual 19's fix (the window manager's word): the strokes beneath the full-screen dialog are no longer known.
+    // Struck off by residual 19's fix (the window manager's word): the strokes beneath the full-screen dialog are not
+    // known.
     expect(knownLive('android', 'uiautomator', 'scroll:dialog-fullscreen.A', 'presented-stroke', 'not found')).toBeUndefined();
-    // Struck off by LV1's fix (round 14): its unchanged claim is no longer known.
+    // Struck off by LV1's fix (round 14): its unchanged claim is not known.
     expect(knownLive('android', 'uiautomator', 'scroll:tabbar-floating.F', 'unchanged-claim', 'not found')).toBeUndefined();
     expect(knownLive('android', 'uiautomator', 'tap:scroll-bounded.S', 'tap-refused-fired', 'refused')).toBeUndefined();
     expect(knownLive('ios', 'wda', 'scroll:no-such.case', 'stop-claim', 'visible')).toBeUndefined();
   });
-  // A consistency check of the data, not a second judge: live-visibility.ts produces `tap-claim` only on a `Tapped`
-  // reply and `stop-claim` only on a `visible` one, so an entry pinning either rule on another kind could never match.
+  // A consistency check of the data, not a second judge: live-visibility.ts produces `stop-claim` only on a `visible`
+  // reply, so an entry pinning it on another kind could never match; `tap-claim` on a `Tapped` reply (judgeTap), and
+  // in judgeAbsentAtEnd on any reply but `visible` once the app logged something since the launch. The tap-claim half
+  // below is stricter than the producer: an absent-at-end tap-claim on another kind would be rejected here.
   it('a claim pins the kind it claims on: a stop claimed on `visible`, a tap claimed on `Tapped`', () => {
     const bad = Object.entries(LIVE_KNOWN).filter(([, e]) => (e.cls === 'stop-claim' && e.kind !== 'visible') || (e.cls === 'tap-claim' && e.kind !== 'Tapped'));
     expect(bad).toEqual([]);

@@ -8,9 +8,9 @@ import type { ExecFn, ExecResult } from '../../src/adapters/exec.js';
  * The fakes that drive WdaServer without xcodebuild, a simulator or a socket:
  * an exec that records, a fetch scripted per URL, a spawn whose child never
  * has a pid (so nothing real is ever signalled), and a DerivedData directory
- * with or without an .xctestrun. Shared by wda.test.ts (the server) and
- * wda-tree-source.test.ts (the adapter at the tree-source seam that owns one)
- * so the seam's tests exercise the REAL WdaServer through the same fakes.
+ * with or without an .xctestrun. Shared by the server's tests and the
+ * adapter's at the tree-source seam that owns one, so the seam's tests
+ * exercise the REAL WdaServer through the same fakes.
  */
 export const WDA_STATUS = {
   value: { build: { productBundleIdentifier: 'com.facebook.WebDriverAgentRunner' } },

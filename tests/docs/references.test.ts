@@ -26,8 +26,7 @@ const ROOT = join(import.meta.dirname, '..', '..');
 
 /**
  * Bug notes the source cites that git does not track yet: exactly these paths are let through, and a NEW untracked
- * reference still fails. Empty since the notes untracked in the main checkout were committed (83059cb,
- * docs/device-checks-r5-r20). Remove a line once its note is tracked (the test then says so) or its references are gone.
+ * reference still fails. Remove a line once its note is tracked (the test then says so) or its references are gone.
  */
 const UNDECIDED_BUG_NOTES: ReadonlySet<string> = new Set<string>([]);
 

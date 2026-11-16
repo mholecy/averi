@@ -10,10 +10,9 @@ import {
 import { TOOL_CONFIG } from '../../src/mcp/config-policy.js';
 
 /**
- * The tool → policy mapping (mcp/config-policy.ts), pinned as data. Moved
- * here from tests/flow/tool-config.test.ts with the table itself (review
- * round 1); what each policy DOES is pinned there, and through the protocol
- * in tests/mcp/tools.test.ts.
+ * The tool → policy mapping (mcp/config-policy.ts), pinned as data. What
+ * each policy DOES is pinned in tests/flow/tool-config.test.ts, and through
+ * the protocol in tests/mcp/tools.test.ts.
  */
 
 describe('TOOL_CONFIG — what each config-reading tool reads, per platform', () => {

@@ -23,8 +23,7 @@ import { node } from '../helpers/fake.js';
  * geometry.ts's viewport and screen arithmetic, asked directly (backlog D45): which way a window says the screen faces
  * (`windowTurnsScreen`), which edges a rect runs past (`clippedEdges`) or lies wholly past (`wholePast`), how much of it
  * a box holds (`visibleFractionInViewport`), the system bands a box loses (`belowStatusBand`, `aboveNavigationBand`),
- * and the drawn-frame and screen-edge arithmetic. Each was reached before only through its callers (ui-tree/standing.ts,
- * ui-tree/usable-screen.ts, interact/scroll-text.ts). `inferScreenSize` and `screenOf` are geometry-screen-size.test.ts's,
+ * and the drawn-frame and screen-edge arithmetic. `inferScreenSize` and `screenOf` are geometry-screen-size.test.ts's,
  * the rect spellings geometry-text.test.ts's.
  */
 

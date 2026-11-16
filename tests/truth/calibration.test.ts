@@ -229,7 +229,7 @@ describe('calibration.json', () => {
     expect(() => gitParentOf(ROOT)('0000000')).toThrow(`calibrate: 0000000 is no commit with a first parent in ${ROOT}`);
   });
 
-  // The anchor a derived side has outside the table: the committed report (docs/truth/calibration.md, which step 8's
+  // The anchor a derived side has outside the table: the committed report (docs/truth/calibration.md, which the
   // calibrate run writes) names the sides it judged. A `fix` reordered, or an `after` changed, after that run moves a
   // side — the red side follows `fix[0]` — and is caught here until calibrate is run again and its report committed.
   it.skipIf(!history)('the committed report judged the sides the table now gives: each pair\'s before → after as calibration.md prints it', () => {

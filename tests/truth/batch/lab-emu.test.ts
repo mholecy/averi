@@ -379,7 +379,7 @@ describe('clearLabEntry — the abort-safe reinstall that clears a lab default (
     expect(seen).toEqual(['proven true']);
     expect(r).toMatchObject({ ok: true, how: expect.stringMatching(/; D55 restore: OK — the state file put back$/) });
     const o3 = files();
-    // Its failure with no hand line of its own: the RESTORE line names its command (T2 S5 review round 1).
+    // Its failure with no hand line of its own: the RESTORE line names its command.
     o3.putBack = restoreOf(async () => ({ ok: false, why: 'D55 restore: NOT VERIFIED — no hand given' }));
     expect(await clearLabEntry(await emuOf(fakeEmu({ entries: [{ flag: 'true' }], writes: true })), o3)).toEqual({ ok: false, why: "reinstalled and proven, but the lab's state not put back: D55 restore: NOT VERIFIED — no hand given", hand: [`D55 (Android): the lab's state not put back: ${RESTORE_CMD}`] });
     const o2 = files();
@@ -455,7 +455,7 @@ describe('clearLabEntry — the abort-safe reinstall that clears a lab default (
     expect(await clearLabEntry(await emuOf(fakeEmu({ entries: [{ flag: 'true' }], writes: true, cells: '{"cells":[]}\n' })), other)).toMatchObject({
       ok: false,
       why: `the reinstall not proven: the reinstalled APK's ${CELLS_ENTRY} is not the catalog's ${other.catalog}; the lab is installed`,
-      // The hand line names the step that failed (T2 S5 review round 1).
+      // The hand line names the step that failed.
       hand: [
         `D55 (Android): the installed lab not proven the pulled APK (the reinstalled APK's assets/cells.json is not the catalog's ${other.catalog}): adb -s ${SERIAL} shell pm path dev.averi.lab, adb -s ${SERIAL} pull <that path> <a file>, unzip -p <that file> assets/cells.json must equal ${other.catalog}; if not, adb -s ${SERIAL} uninstall dev.averi.lab && adb -s ${SERIAL} install ${other.apk}; then: adb -s ${SERIAL} shell dumpsys package preferred`,
       ],
@@ -638,7 +638,7 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     const w = await windowOf(fake);
     const detached = fakeEmu({ chooser: 1 });
     expect(await w.restore(detached.run)).toEqual({ ok: true, how: 'chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0)' });
-    // `adb get-state` first, then the dismissal (T2 S5 review round 1).
+    // `adb get-state` first, then the dismissal.
     expect(detached.words().slice(0, 3)).toEqual(['get-state', `shell ${CHOOSER_FOCUS_COMMAND}`, 'shell input keyevent KEYCODE_BACK']);
     expect(fake.words()).toEqual(['emu avd name']);
   });
@@ -678,7 +678,7 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     fake.st.reachable = false;
     const p = await w.restore(fake.run);
     expect(p).toEqual({ ok: false, why: 'interrupted during the reinstall: whether the lab is installed is unknown (adb get-state: exit 1 error: no devices/emulators found)', hand: [expect.stringMatching(/^D55 \(Android\): whether the lab is installed is unknown/)] });
-    // Unknown at once: no key, no pm path, no install after the failed get-state (T2 S5 review round 1).
+    // Unknown at once: no key, no pm path, no install after the failed get-state.
     expect(fake.words()).toEqual(['emu avd name', 'get-state']);
   });
 
@@ -712,7 +712,7 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     });
     expect(await w.restore(fake.run)).toEqual({ ok: false, why: 'D55 restore: NOT VERIFIED — the state file not read back equal', hand: ['D55 (Android): the probe --restore'] });
     expect(seen).toEqual([true]);
-    // With no hand line of its own, the RESTORE line names its command (T2 S5 review round 1).
+    // With no hand line of its own, the RESTORE line names its command.
     const bare = fakeEmu();
     const w3 = await windowOf(bare, { progress: { step: 'started' }, putBack: restoreOf(async () => ({ ok: false, why: 'NOT VERIFIED' })) });
     expect(await w3.restore(bare.run)).toEqual({ ok: false, why: 'NOT VERIFIED', hand: [`D55 (Android): the lab's state not put back: ${RESTORE_CMD}`] });
@@ -756,7 +756,7 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     expect(await w.restore(fake.run)).toEqual({ ok: true, how: "chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0); nothing was wiped; the probe's state put back" });
     expect(asked).toBe(1);
     expect(readState(o).dirty).toBe(false);
-    // The restore failing: its own why, no "put back" claimed (review round 5).
+    // The restore failing: its own why, no "put back" claimed.
     const failed = await windowOf(fakeEmu(), { stateFile: o.stateFile.replace('state.json', 'none.json'), putBack: restoreOf(async () => ({ ok: false, why: 'NOT VERIFIED', hand: ['h'] })) });
     expect(await failed.restore(fakeEmu().run)).toEqual({ ok: false, why: 'NOT VERIFIED', hand: ['h'] });
   });
@@ -790,7 +790,7 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
 
   it('after the restore: a last-chosen entry not accepted is put back with its WARN; a default FAIL; unproven or a chooser that stays, not put back', async () => {
     const other = fakeEmu({ entries: [{ flag: 'false', authority: 'pair' }] });
-    // A WARN, the cleanup's own words (T2 S5 review round 1: the abort and cleanUp agree).
+    // A WARN, the cleanup's own words (the abort and cleanUp agree).
     const p = await (await windowOf(other)).restore(other.run);
     const c = await cleanUp(await emuOf(fakeEmu({ entries: [{ flag: 'false', authority: 'pair' }] })), files());
     expect(p).toEqual({ ok: true, verdict: 'WARN', how: c.line.replace(/^D55 cleanup: WARN — /, '') });

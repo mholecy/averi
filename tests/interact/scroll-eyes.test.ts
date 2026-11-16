@@ -113,8 +113,8 @@ describe('scroll_until — the eyes confirm a fully claim', () => {
     );
   });
 
-  // Since A30 the eyes are required, so "no eyes" is no longer a path of scroll.ts: this pins how NO_EYES, the tests'
-  // fake (tests/helpers/eyes.ts), words its answer — ui-tree/eyes.ts#unseen's, the tree's claim, unchecked.
+  // The eyes are required (A30), so "no eyes" is not a path of scroll.ts: this pins how NO_EYES, the tests' fake
+  // (tests/helpers/eyes.ts), words its answer — ui-tree/eyes.ts#unseen's, the tree's claim, unchecked.
   it('k7 under NO_EYES: unseen\'s wording — the tree\'s claim, unchecked, "no screenshot was taken"', async () => {
     const fake = await k7();
     const reply = describeScrollResult(await scrollUntilVisible(fake, PHONE, { ...FAST, eyes: NO_EYES }));

@@ -107,7 +107,7 @@ flows:
       - launch: { clearState: false }
 `);
 
-/** The second look runs over ensureTimeoutMs; tapTimeoutMs, its window before 2026-10-07, is kept far shorter so a test can tell them apart. */
+/** The second look runs over ensureTimeoutMs; tapTimeoutMs is kept far shorter so a test can tell them apart. */
 const FAST = {
   pollMs: 5, tapTimeoutMs: 60, waitTimeoutMs: 60, ensureTimeoutMs: 1000, optionalTimeoutMs: 30,
   assertTimeoutMs: 60, reachRecheckMs: 40, pinKeyDelayMs: 1, env: {},  // A fresh session at every use — a spread or a direct pass — so no test
@@ -289,8 +289,8 @@ describe('a cold launch\'s bare trees are not "not in state": the ladder looks a
   });
 
   // The refusal's cause is what the entry probe and the second look learned
-  // TOGETHER (review 2026-10-07): until then it was the second look's alone,
-  // so each mixed order below was worded with something false.
+  // TOGETHER: the second look's alone would word each mixed order below with
+  // something false.
   it('mixed, bare entry then a second look whose every read failed: the refusal names the bare tree AND the failure — not "never read a UI tree"', async () => {
     const { fake } = timeline((_, read) => (read === 0 ? ANDROID_DECOR : ANDROID_NULL_ROOT));
     const error = await failure(FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 120 }, { state: 'logged_out' }));
@@ -378,10 +378,10 @@ describe('a cold launch\'s bare trees are not "not in state": the ladder looks a
 });
 
 /**
- * D2 (2026-10-31, docs/adr/0033-a-held-rendered-no-ends-the-second-look-before-a-cheap-rung.md): before a CHEAP rung
- * the second look also ends once a rendered tree outside the state has held the same `treeFingerprint` for
- * `reachRecheckMs` — a bare cold launch that turned into a settled login screen for `logged_in` no longer polls the
- * whole ensureTimeoutMs (20 s) before the rung. FAST's reachRecheckMs is 40 ms and its ensureTimeoutMs 1 s, so "after
+ * D2 (docs/adr/0033-a-held-rendered-no-ends-the-second-look-before-a-cheap-rung.md): before a CHEAP rung the second
+ * look also ends once a rendered tree outside the state has held the same `treeFingerprint` for `reachRecheckMs` — a
+ * bare cold launch that turned into a settled login screen for `logged_in` does not poll the whole ensureTimeoutMs
+ * (20 s) before the rung. FAST's reachRecheckMs is 40 ms and its ensureTimeoutMs 1 s, so "after
  * the hold" and "at the deadline" are far apart in time.
  */
 describe('the second look before a CHEAP rung ends on a held rendered "no" (D2)', () => {
@@ -497,10 +497,10 @@ describe('the second look before a CHEAP rung ends on a held rendered "no" (D2)'
   });
 
   /**
-   * Round-1 review's BLOCKER (2026-10-31): a hold before a cheap rung shortened the wait before the NEXT, destructive
-   * rung from the whole window to the hold — the cheap rung ran on a loading screen with no progress node, its
-   * re-check read that screen as a rendered "no" (not bare: no second look), and the wipe ran at once. Base 2f431be7
-   * waited the window out and found the state. So no hold where a destructive rung lies ahead, transitively.
+   * A hold before a cheap rung would shorten the wait before the NEXT, destructive rung from the whole window to the
+   * hold — the cheap rung would run on a loading screen with no progress node, its re-check read that screen as a
+   * rendered "no" (not bare: no second look), and the wipe run at once. So no hold where a destructive rung lies
+   * ahead, transitively.
    */
   const LOADING = parseDump(
     androidXml(`
@@ -558,10 +558,9 @@ describe('the second look before a CHEAP rung ends on a held rendered "no" (D2)'
 });
 
 /**
- * A bare probe gets the second look before a CHEAP rung too (2026-10-08,
- * review of the absent-on-bare change): with `absent:` undecided on the
- * decor, the entry probe of a state detected by an absence is bare, and a
- * cheap rung run at once taps a screen with nothing on it.
+ * A bare probe gets the second look before a CHEAP rung too: with `absent:`
+ * undecided on the decor, the entry probe of a state detected by an absence
+ * is bare, and a cheap rung run at once taps a screen with nothing on it.
  */
 describe('a bare probe looks again before a cheap rung', () => {
   const PROMPT_CFG = parseConfig(`
@@ -617,12 +616,11 @@ describe('a state with no reach flows says honestly that a bare read could not c
 });
 
 /**
- * An ABSENCE on a bare tree is not "yes" either (2026-10-08, flow-engine
- * review candidate 2, flow/condition.ts): nothing in the decor matches any
- * selector, so until then a state detected by `absent: true` was "already
- * active" on a cold launch, a `wait:` on it passed at once, a `branch:` arm
- * on it was taken, and the absent assert passed — all before the app had
- * drawn anything.
+ * An ABSENCE on a bare tree is not "yes" either (flow/condition.ts): nothing
+ * in the decor matches any selector, so were it "yes", a state detected by
+ * `absent: true` would be "already active" on a cold launch, a `wait:` on it
+ * would pass at once, a `branch:` arm on it would be taken, and the absent
+ * assert would pass — all before the app had drawn anything.
  */
 describe('an absent condition on a bare tree is undecided: not detected, not waited past, not branched on, not asserted', () => {
   const ABSENT_CFG = parseConfig(`
@@ -787,9 +785,9 @@ flows:
  * SpringBoard's launch tree on iOS 27 through idb (docs/bugs/2026-10-08-ios-
  * launch-transition-tree-reads-as-rendered.md, measured on an iPhone 17
  * simulator): the status bar and the app's zooming icon for ~1.2 s, the
- * status bar alone to ~2.1 s, then the app. Before 2026-10-08 the ENTRY probe
- * read the first as "no" and `ensure_state` ran the DESTRUCTIVE rung at once,
- * an `absent:` passed, and the absent assert PASSED.
+ * status bar alone to ~2.1 s, then the app. Read as rendered, the first would
+ * make the ENTRY probe "no": `ensure_state` would run the DESTRUCTIVE rung at
+ * once, an `absent:` would pass, and the absent assert would PASS.
  */
 describe('iOS 27 idb: SpringBoard\'s launch tree is bare — no wipe, no absence passed', () => {
   const ax = (type: string, label: string | null, frame: { x: number; y: number; width: number; height: number }, id: string | null = null, value: string | null = null) => ({

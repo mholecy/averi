@@ -17,11 +17,11 @@ import { boundReads } from '../helpers/terminal-read.js';
  * idb-empty-tree-persists-on-pin-screen.md): `idb ui describe-all` returned
  * only a 0×0 Application for minutes on a RENDERED screen. Every read below
  * that is "stuck" goes through the REAL IdbTreeSource with that payload, so
- * what the engine sees is what the adapter now throws (IdbEmptyTreeError),
- * not a stand-in error. Before the fix the payload parsed as a tree in which
- * nothing matched, and mp-native's `logged_in.reach: [dismiss_post_login_
- * prompts, login_registered, login]` escalated into its `clearState` login —
- * wiping the app and its device registration on a screen nobody had read.
+ * what the engine sees is what the adapter throws (IdbEmptyTreeError), not a
+ * stand-in error. Parsed as a tree in which nothing matched, the payload
+ * would let mp-native's `logged_in.reach: [dismiss_post_login_prompts,
+ * login_registered, login]` escalate into its `clearState` login — wiping
+ * the app and its device registration on a screen nobody had read.
  */
 
 const STUCK_PAYLOAD = JSON.stringify([
@@ -267,7 +267,7 @@ describe('an unknown probe gets ONE second look before a destructive rung is ref
     // the post-rung grace (40 ms), then readable inside the second look.
     // Timed, not counted, because a grace poll's read count is not fixed:
     // stuck for 100 ms after the launch, against a 1 s second look (the
-    // window is ensureTimeoutMs since 2026-10-07; it was tapTimeoutMs).
+    // window is ensureTimeoutMs).
     const { fake, state } = stuckIdb(() => false);
     const launch = fake.launch.bind(fake);
     fake.launch = async (appId, opts) => {
@@ -499,7 +499,7 @@ flows:
     expect(error.trace.some((t) => t.detail?.includes('escalating to') === true)).toBe(false);
   });
 
-  // D21 review round 2: an `assert:` step is a flow step like a wait — the Verifier the engine builds keeps the
+  // D21: an `assert:` step is a flow step like a wait — the Verifier the engine builds keeps the
   // default (persistentRead: 'throw'), so the named error, not a plain "flow asserts failed", reaches isTerminal.
   it('`optional: - assert:` does not skip it: the flow stops there, the step after it never runs', async () => {
     const { fake } = wedgedIdb(always);

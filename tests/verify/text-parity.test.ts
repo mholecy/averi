@@ -52,8 +52,8 @@ const n = (partial: Partial<UiNode>): UiNode => ({
 
 /**
  * Height defaults to a REAL phone aspect (402x874pt / 1080x2348px, 2.174),
- * not a round 2x: the png scale is now cross-checked against the window's
- * own aspect, so a fictional root would fail closed for the right reason.
+ * not a round 2x: the png scale is cross-checked against the window's own
+ * aspect, so a fictional root would fail closed for the right reason.
  */
 const root = (width: number, children: UiNode[], height = Math.round(width * 2.174)): UiNode =>
   n({ role: 'container', rect: { x: 0, y: 0, width, height }, children });
@@ -315,7 +315,7 @@ describe('compareTextParity — the occlusion guard', () => {
       },
     });
     expect(r.occluded).toHaveLength(0);
-    // Not OCCLUDED — and not a phantom copy-drift FAIL either (review 2026-09-18):
+    // Not OCCLUDED — and not a phantom copy-drift FAIL either:
     // the row is OK with a note; the reported strings stay verbatim.
     expect(r.rows[0].verdict).toBe('OK');
     expect(r.findings).toEqual([]);
@@ -485,8 +485,8 @@ describe('compareTextParity — the occlusion guard', () => {
   it('a COMBINED a11y label is READ, not OCCLUDED — the joining comma is never rendered', () => {
     // Measured 2026-08-27 on user_settings.overview: accessibility.md §8 requires
     // a multi-part row to expose ONE combined '{label}, {value}' node. The comma
-    // exists only in the label, so a literal containment test marked every such
-    // row UNREAD — and OCCLUDED WITHHOLDS the row from copy drift, silently
+    // exists only in the label, so a literal containment test would mark every
+    // such row UNREAD — and OCCLUDED WITHHOLDS the row from copy drift, silently
     // suppressing the very check the guard exists to protect.
     const c = contract([{ id: 'profile_row_6', text_dynamic: true }]);
     const r = compareTextParity(c, {
@@ -506,10 +506,10 @@ describe('compareTextParity — the occlusion guard', () => {
   });
 
   it('a product row whose toggle state is in the label is COMPARED, not withheld', () => {
-    // The device shape that kept finding 3 open: ', visible' names a toggle
-    // GRAPHIC, so that part can never be read — and while the whole joined
-    // string had to survive, the row was withheld from copy drift, which is
-    // the exact harm this guard was supposed to prevent.
+    // The device shape of finding 3: ', visible' names a toggle GRAPHIC, so
+    // that part can never be read — and were the whole joined string to have
+    // to survive, the row would be withheld from copy drift, the exact harm
+    // this guard exists to prevent.
     const c = contract([{ id: 'product_row_4', text_dynamic: true }]);
     const r = compareTextParity(c, {
       android: {
@@ -537,7 +537,7 @@ describe('compareTextParity — the occlusion guard', () => {
 describe('compareTextParity — regressions found in review', () => {
   it('an id on a container AND its text child is read ONCE, not once per ancestor', () => {
     // findBySpec returns ancestors and their matching descendants, so walking
-    // every match double-counted the leaf and reported
+    // every match would double-count the leaf and report
     // 'Enter amount Enter amount' as a copy drift.
     const nested = root(402, [
       n({ role: 'container', identifier: 'amount', children: [text('amount', 'Enter amount')] }),
@@ -548,10 +548,10 @@ describe('compareTextParity — regressions found in review', () => {
   it('a React Native <Text> read through WDA is ONE string, not "Prihlásenie Prihlásenie" (2026-10-08)', async () => {
     // The real capture (MyPort login, iPhone 17, WDA, 2026-10-07): WDA
     // reports the <Text> as a StaticText `login_title` holding one
-    // unidentified StaticText with the identical label, value and rect. The
-    // walk above read both and joined them, so the tree fallback (no OCR)
-    // reported android-vs-ios and ios-vs-contract drift that was not on
-    // screen. The adapter now drops the echo (wda-source.ts#isTextEcho).
+    // unidentified StaticText with the identical label, value and rect. A
+    // walk that read both and joined them would make the tree fallback (no
+    // OCR) report android-vs-ios and ios-vs-contract drift that is not on
+    // screen. The adapter drops the echo (wda-source.ts#isTextEcho).
     const ios = parseWdaSource(await readFile(new URL('../fixtures/wda-source-myport-login-no-keyboard.json', import.meta.url), 'utf8'));
     expect(renderedTextFromTree(ios, 'login_title')).toEqual(['Prihlásenie']);
     // Android's uiautomator reports the same <Text> as one TextView.
@@ -562,8 +562,8 @@ describe('compareTextParity — regressions found in review', () => {
   });
 
   it('a platform whose tree carries no rendered copy is UNREAD, never compared as ""', () => {
-    // The normal iOS shape on the tree source. Comparing it as '' dispatched
-    // two confident phantom findings on every non-macOS host.
+    // The normal iOS shape on the tree source. Comparing it as '' would
+    // dispatch two confident phantom findings on every non-macOS host.
     const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
     const r = compareTextParity(c, {
       android: { tree: root(1080, [text('cta', 'CONTINUE')]) },
@@ -577,7 +577,7 @@ describe('compareTextParity — regressions found in review', () => {
 
   it('the UNREAD guard tolerates textAllCaps: tree "Continue" vs rendered "CONTINUE"', () => {
     // Android's AccessibilityNodeInfo reports the UNTRANSFORMED text, so a
-    // case-sensitive survival test failed every Material caps button.
+    // case-sensitive survival test would fail every Material caps button.
     const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
     const r = compareTextParity(c, {
       android: { tree: root(1080, [text('cta', 'Continue')]), ocr: { byId: ocrMap({ cta: [line('CONTINUE', 30)] }), pngWidth: 1080 } },
@@ -691,11 +691,9 @@ describe('ocrRegionsFor', () => {
 
 describe('textMeasurement(...).measure — the text table\'s per-leg measurement', () => {
   /**
-   * Until 2026-10-04 this phase lived in run/verify.ts as `runOcr`, and these
-   * wordings were pinned only through the whole verify run. They are the text
-   * table's own now, with exactly one emission site each; the run tests still
-   * see them through the table. Reached as production reaches it — through
-   * `textMeasurement` with a supplied engine (since 2026-10-05 the bare
+   * These wordings are the text table's own, with exactly one emission site
+   * each; the run tests see them through the table. Reached as production
+   * reaches it — through `textMeasurement` with a supplied engine (the bare
    * per-leg function is private); the no-engine case is the describe below.
    */
   const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
@@ -767,7 +765,7 @@ describe('textMeasurement(...).measure — the text table\'s per-leg measurement
     const { engine } = recording();
     const tree = root(100, [n({ identifier: 'cta', rect: { x: 10, y: 10, width: 40, height: 10 } })], 200);
     // The device screen reads twice the tree — the whole-capture fact the
-    // table says once (review 2026-08-27: the text table used to drop it).
+    // table says once.
     const f = frame(tree, 200, 400, { width: 200, height: 400 });
     const { note } = ocrRegionsFor(c, f);
     expect(note).toMatch(/DEVICE screen/);
@@ -779,11 +777,10 @@ describe('textMeasurement(...).measure — the text table\'s per-leg measurement
 
 describe('textMeasurement — the text table\'s one run-level decision', () => {
   /**
-   * Both halves of the absent-engine policy in one value (2026-10-05): the
-   * caveat the section prints before any leg, and the per-leg `measure` that
-   * then stands on tree evidence WITHOUT a note of its own. Until that date
-   * `textRecognizer` produced the notes and `measureTextLeg` took the engine
-   * as a bare argument — two things a caller had to keep in step.
+   * Both halves of the absent-engine policy in one value: the caveat the
+   * section prints before any leg, and the per-leg `measure` that then stands
+   * on tree evidence WITHOUT a note of its own — two things a caller would
+   * otherwise have to keep in step.
    */
   const onHost = async (platform: string, body: () => void | Promise<void>) => {
     const real = Object.getOwnPropertyDescriptor(process, 'platform')!;
@@ -1242,12 +1239,9 @@ describe('evaluateOcrAssert — a thousands separator the recognizer reads as no
 
 describe('measureOcrAssert — the ocr assert\'s one measurement, every "not read" failing closed', () => {
   /**
-   * Review 2026-10-07 (assert-capture-ocr C2): the crop → recognize → region
-   * error → verdict chain was a closure in assert.ts, and its unread
-   * sentences had drifted from fail-closed.ts — a region error came back raw,
-   * a throw as a bare "OCR failed: …", the two in evaluateOcrAssert were
-   * hand-written. Each is pinned whole here, on a measuredFrameFor fixture,
-   * with no poll around it.
+   * The crop → recognize → region error → verdict chain (assert-capture-ocr
+   * C2): its unread sentences must not drift from fail-closed.ts. Each is
+   * pinned whole here, on a measuredFrameFor fixture, with no poll around it.
    */
   const cta = n({ identifier: 'cta', rect: { x: 24, y: 780, width: 354, height: 44 } });
   const input = (f = frame(root(402, [cta], 874), 402, 874, { width: 402, height: 874 })) => ({ rect: cta.rect, shot: Shot.ofPng(Buffer.from('png bytes')), measured: f });
@@ -1424,11 +1418,12 @@ describe('survivesIn — the UNREAD guard predicate', () => {
   it('ACCEPTED COST: a dialog over the value is read when the label part is legible', () => {
     // Pinned as a limitation, not as a virtue. The parts rule cannot see
     // PARTIAL occlusion of a combined row, and on a text_dynamic anchor no
-    // string comparison follows — so this shape now passes silently where it
-    // used to fail loudly. Accepted because a WHOLLY covered region still has
-    // no survivor (the test below), because the same blindness always existed
-    // for the two-node spelling of this row, and because the false positive it
-    // replaces suppressed the copy check on every combined row.
+    // string comparison follows — so this shape passes silently where a
+    // whole-string test would fail loudly. Accepted because a WHOLLY covered
+    // region still has no survivor (the test below), because the same
+    // blindness exists for the two-node spelling of this row, and because a
+    // whole-string test's false positive would suppress the copy check on
+    // every combined row.
     expect(survivesIn('Notifications, On', 'Allow notifications from this app?')).toBe(true);
     // The bound that makes it acceptable: cover the whole region and the guard
     // still fires.
@@ -1456,9 +1451,9 @@ const thrownBy = (run: () => unknown): string => {
 };
 
 /**
- * The validator run/verify.ts asks BEFORE the legs (2026-10-03): the exact
- * message per invalid field, nothing for a valid contract, and each message
- * the very string the comparator throws for the same field at read time.
+ * The validator run/verify.ts asks BEFORE the legs: the exact message per
+ * invalid field, nothing for a valid contract, and each message the very
+ * string the comparator throws for the same field at read time.
  */
 describe('validateTextContract — the read-time diagnosis, without a capture', () => {
   it('a valid contract (text, text_dynamic true and false, a tolerance, an anchor not opted in) has no problems', () => {

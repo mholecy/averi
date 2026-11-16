@@ -73,7 +73,7 @@ describe('…and not a stroke that moved content', () => {
 
   // RECYCLED ROWS: a fling that replaces every row a list lists, the touch-down on one of them. idb lists no scroll view,
   // and an identified row cannot persist where every id changed — so nothing the stroke touched is still there, and the
-  // stop is loud: what the slice's review round 2 decided (a dismissed sheet's rows read exactly so; the loud stop is the
+  // stop is loud, as decided (a dismissed sheet's rows read exactly so; the loud stop is the
   // failure the spec prefers). Every role a row takes: a Button, idb's `Other` (an RN row) and `Group` (SwiftUI's).
   for (const type of ['Button', 'Other', 'Group']) {
     it(`residual: idb rows of type ${type} with ids, every row recycled under a touch-down on one — a loud changed stop`, () => {
@@ -110,7 +110,7 @@ describe('…and not a stroke that moved content', () => {
     expect(played.outcome?.kind).toBe('changed');
   });
 
-  // THE DISMISSED SHEET WITH NAMED CONTENT (the slice's review round 2): the lab's long-list sheet as idb lists it, its
+  // THE DISMISSED SHEET WITH NAMED CONTENT: the lab's long-list sheet as idb lists it, its
   // rows given ids, then the host — the stroke at (201,175) touched a row of the sheet, which the host does not list.
   for (const type of ['StaticText', 'Other']) {
     it(`sheet-long-list's rows as ${type} with ids, then the host: the touched row is gone — changed`, () => {

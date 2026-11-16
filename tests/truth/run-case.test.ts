@@ -453,7 +453,6 @@ describe('runCase: the focus reads and the launcher start (the chooser group, T7
     expect(lab.log).toEqual(['launch c', 'focus', 'call tap under uiautomator-x1.yaml', 'pause 800', 'state', 'focus', 'screenshot', 'back', 'focus']);
     expect(run.record.focus).toEqual({ before: LAB, between: [], after: CHOOSER, teardown: LAB });
     expect(run.verdict).toEqual(NOT);
-    // Dropped: nothing said.
     expect(notes).toEqual([]);
   });
 

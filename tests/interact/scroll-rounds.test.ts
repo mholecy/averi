@@ -15,15 +15,13 @@ import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import type { KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
 
 /**
- * `scroll_until`'s round as observation tables (2026-10-09, the
- * scroll-rounds deepening): each test is the reads a scroll saw and what
- * the rounds did with them — through tests/helpers/rounds.ts#play, the
- * reducer's test adapter, with no device, no clock and no timers. Until
- * that date each was a scripted FakeAdapter whose physics produced these
- * reads; the reads are written out here, one row each, with the fake they
- * came from named in the comment. What only the driver can show — stroke
- * points, adb query counts, a read failure quoted end to end, the error
- * classes, the deadline passing during a stroke — stays in
+ * `scroll_until`'s round as observation tables: each test is the reads a
+ * scroll saw and what the rounds did with them — through
+ * tests/helpers/rounds.ts#play, the reducer's test adapter, with no device,
+ * no clock and no timers. The reads are written out here, one row each,
+ * with the fake they came from named in the comment. What only the driver
+ * can show — stroke points, adb query counts, a read failure quoted end to
+ * end, the error classes, the deadline passing during a stroke — stays in
  * tests/interact/scroll.test.ts.
  */
 
@@ -163,7 +161,7 @@ describe('round — the soft keyboard', () => {
     expect(decided(played.steps[0])).toEqual({ do: 'stroke', kind: 'full', toward: 'down', reach: 1, coverTop: 1398, box: SCREEN_1080 }); // no clipping container: the screen box
     // The witness on the round the band changes; none on the moot stop. `unlocated` is put to a SHOWN reading, which asks nothing.
     expect(played.rounds.map((r) => r.asks)).toEqual([['witness'], [], ['unlocated']]);
-    // Clear of the band at the stop: the band changes nothing there, so it is not reported (review 2026-10-08).
+    // Clear of the band at the stop: the band changes nothing there, so it is not reported.
     const result = resultOf(played);
     expect(result).toEqual({ swipes: 1, visible: 1, clipped: [] });
     expect(describeScrollResult(result)).toBe('fully visible after 1 swipe');
@@ -180,7 +178,7 @@ describe('round — the soft keyboard', () => {
 
   it('Android, fully: true at the end of the content with the row still under the IME: the keyboard is named, with how to hide it — not a layout defect', () => {
     const played = play({ ...ANDROID, fully: true }, reads([1360, 1360, 1360, 1360], formRow, { cover: UP_IME }));
-    // After TWO identical swipes that did not move it (review round 2: one can be a transient), not one — and one back.
+    // After TWO identical swipes that did not move it (one can be a transient), not one — and one back.
     expect(failureOf(played, 'id:priority_select').message).toBe(
       'scroll_until id:priority_select failed after 3 swipes — element is in the viewport but CLIPPED at bottom, 52% of it is in ' +
         'the viewport above the soft keyboard over [0,1398][1080,2220], and the content is exhausted: swiping down no longer moves ' +
@@ -373,7 +371,7 @@ describe('round — the soft keyboard', () => {
     const iosRow = (y: number): Row => ({ found: [match({ x: 66, y, width: 336, height: 52 }, 'priority_select')], cover: coverOver(IOS_BAND, NO_BACK) });
     const played = play({ ...IPHONE, fully: true }, [iosRow(545), iosRow(345), iosRow(345)]);
     expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] });
-    // The stroke started above the band (the old one: y ≈ 699, on a key).
+    // The stroke started above the band (not at y ≈ 699, on a key).
     expect(strokeCovers(played)).toEqual([IOS_BAND.y]);
   });
 
@@ -392,7 +390,7 @@ describe('round — the soft keyboard', () => {
 /**
  * 2026-10-08, the two "Device check" sections of
  * docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md and
- * review round 1: the settled stop, the turn after a fling past the target,
+ * The settled stop, the turn after a fling past the target,
  * and a target off the frame that the strokes no longer move — the reads of
  * scroll.test.ts#wdaForm (the SwiftUI form under WDA, the pad up) and of
  * the Android forms, written out.
@@ -427,9 +425,7 @@ describe('round — after the device check', () => {
   });
 
   it('a read that no longer finds the target after a turn: the turned stroke carried it out the other way (it was short of that edge), so the next goes back — the caller\'s direction — as a turn of its own', () => {
-    // Until 2026-10-09 this read cleared the turn ("a lazy list dropped it:
-    // nothing to turn for") and the stroke went the caller's way for that
-    // reason; now it goes the caller's way because the drop is read as the
+    // The stroke goes the caller's way because the drop is read as the
     // target leaving through the edge the up-stroke moved it toward — and
     // it is counted as a turn, halving the reach again.
     const played = play(FULLY, [wdaRow(681), wdaRow(300), wdaRow(-48), wdaGone]); // the turned stroke drops it from the tree
@@ -542,7 +538,8 @@ describe('round — after the device check', () => {
   });
 
   it('a zero-area rect carries no position — it is not called exhausted, the scroll runs to its bound', () => {
-    // An unchanged tree too (code review: without a fingerprint the whole-tree rule could not fire here, so it did not prove the match rule's).
+    // An unchanged tree too (without a fingerprint the whole-tree rule could not fire here, so it would not prove the
+    // match rule's).
     const field: Row = { ...lastField({ x: 66, y: 1769, width: 948, height: 0 }), rest: 'f' };
     expect(failureOf(play(ANDROID, [field, field, field, field, field]), 'id:my_note_input').message).toMatch(/failed after 4 swipes \(maxSwipes\)/);
   });
@@ -909,7 +906,7 @@ describe('round — a lazy list that drops the target, and a screen strokes no l
     const twoKinds = play({ ...FULLY_ANDROID, maxSwipes: 6 }, [{ ...lastName(1317), rest: 'a' }, { ...imeGone, rest: 'a' }, { ...imeGone, rest: 'a' }, { ...imeGone, rest: 'a' }]);
     expect(twoKinds.outcome).toMatchObject({ swipes: 3, by: { of: 'exhausted', unchanged: 'tree' } });
     // Every read is a tree the round reads itself (deep/r3-scroll): rows that name nothing are one unchanged screen —
-    // exhausted, as on a device. Until then a row without a fingerprint never was: the rule a driver could forget.
+    // exhausted, as on a device.
     expect(play({ ...FULLY_ANDROID, maxSwipes: 3 }, [{ found: [] }, { found: [] }, { found: [] }]).outcome).toMatchObject({ by: { of: 'exhausted', unchanged: 'tree' } });
   });
 
@@ -984,9 +981,9 @@ describe('round — the flush check across nested clipping containers, and a pro
     expect(describeScrollResult(result)).toMatch(/every scroll container around it from that one outward scrolls only sideways, so no probe swipe can move its bottom edge into view to check it — it may be cut there/);
   });
 
-  // The stroke box judged twice (deep/r3-scroll, 2026-10-09): the round judged room over the screen, the driver over the
-  // screen ABOVE the keyboard, and fell back to the whole screen when that had none — a probe touching down off the
-  // container moves nothing, and that was reported "nothing of it is cut there".
+  // The stroke box judged twice (deep/r3-scroll, 2026-10-09): were the round to judge room over the screen and the
+  // driver over the screen ABOVE the keyboard, falling back to the whole screen when that had none, a probe touching
+  // down off the container would move nothing, and be reported "nothing of it is cut there".
   it('a probe whose container has room on the screen but not above the keyboard is not sent — `room`, never `checked` — and an outer ancestor with room above it is probed instead', () => {
     // A list running on under the IME from y 1340: 800 px on the screen, 58 above the keyboard's top (1398).
     const UNDER: Rect = { x: 0, y: 1340, width: 1080, height: 800 };
@@ -1144,7 +1141,7 @@ describe('round — a node drawn over the stroke\'s container (docs/bugs/2026-10
     const steps = played.steps.filter((st) => st.do === 'stroke');
     expect(steps[0]).toMatchObject({ toward: 'down', box: SCREEN_1080 }); // no room going down: the screen box (P5)
     expect(steps[1]).toMatchObject({ toward: 'up', box: STRIP });
-    expect(containsPoint(STRIP, strokes(played)[1].from)).toBe(true); // until then 540,444 — the screen's 0.2, off the strip
+    expect(containsPoint(STRIP, strokes(played)[1].from)).toBe(true); // not 540,444 — the screen's 0.2, off the strip
   });
 
   it('…and a turn down from a strip chosen going up takes the list around it, which has room going down — never the screen box (D1)', () => {
@@ -1295,7 +1292,7 @@ describe('round — strokes drawn across the scroll view they went over (D59b)',
       'after 2 swipes (the last 2, swiping right, did not change the screen: they touched down at 864,1110 on text "Banner" at 0,1000 1080x200, drawn over the list 0,0 1080x2220, which may have taken them (else: content exhausted, still loading))',
     );
     expect(boundText({ of: 'exhausted', lastStroke: 'right', unchanged: 'matches', across }, 3)).toBe(`after 3 swipes (the last 2, swiping right, did not move it: ${ACROSS}; else: content exhausted, or the swipes were not taken)`);
-    // idb's top-layer hint stays after the else, as on the generic stop (code review).
+    // idb's top-layer hint stays after the else, as on the generic stop.
     expect(boundText({ of: 'exhausted', lastStroke: 'right', unchanged: 'tree', across, unlisted: 'idb' }, 2)).toBe(
       `after 2 swipes (the last 2, swiping right, did not change the screen: ${ACROSS}; else: content exhausted, still loading, or the swipes were not taken — idb lists only what a presented sheet, alert or cover leaves to accessibility: if the element lies beneath one, close it first)`,
     );
@@ -1336,7 +1333,7 @@ describe('round — a target under the app\'s chrome (2026-10-09)', () => {
     expect(describeScrollResult(result)).toBe(
       `visible after 2 swipes — PARTLY UNDER ${COVER}, drawn over it — 77% of it shows, its centre clear. A rect assert or screenshot on this element will measure what is drawn over it too`,
     );
-    // At rest with its centre clear, no swipe at all — as before.
+    // At rest with its centre clear, no swipe at all.
     expect(play(IPHONE, [form(740)]).steps.map((st) => st.do)).toEqual(['stop']);
   });
 
@@ -1385,7 +1382,7 @@ describe('round — a target under the app\'s chrome (2026-10-09)', () => {
     const row = (y: number): Row => ({ found: [match({ x: 0, y, width: 402, height: 60 }, 'r')] });
     const played = play(IPHONE, [row(850), row(600), row(600)]);
     expect(played.steps.map((st) => st.do)).toEqual(['stroke', 'confirm', 'stop']);
-    // The centre (201,873) still on the 874-pt screen, the row clipped: a stop, as before — the tap presses the centre.
+    // The centre (201,873) still on the 874-pt screen, the row clipped: a stop — the tap presses the centre.
     expect(describeScrollResult(resultOf(play(IPHONE, [row(843)])))).toBe(
       'visible after 0 swipes — CLIPPED at bottom, 52% of it is in the viewport. A rect assert or screenshot on this element will measure the CLIPPED box',
     );
@@ -1496,8 +1493,9 @@ describe('round — a target resting in the frame at the edge the strokes push i
     expect(reaches(played)).toEqual([1]);
   });
 
-  // Review of the first cut (2026-10-09): the edge test alone turned a row coming in from below whose top a bottom bar
-  // covers — the bar is over its far edge, but it sits in the near half of the frame. Only a cover in the far half counts.
+  // Review of the first cut (2026-10-09): the edge test alone would turn a row coming in from below whose top a bottom
+  // bar covers — the bar is over its far edge, but it sits in the near half of the frame. Only a cover in the far half
+  // counts.
   it('a snackbar low on the screen (0,1700 1000x80) over the top of a row coming in from below (1720): stroked on down, as before — not turned away', () => {
     const snack = node({ role: 'button', identifier: 'snack', label: 'Undo', rect: { x: 0, y: 1700, width: 1000, height: 80 } });
     const row = (y: number): Row => ({ found: [match({ x: 0, y, width: 1000, height: 100 })], over: [snack] });
@@ -1977,7 +1975,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
   const { parseWdaSource } = await import('../../src/adapters/wda-source.js');
   const screens: Record<string, UiNode> = {
     ...(await stackedLayers()),
-    // Contacts' discard popover with the keyboard down: the raw /source capture, parsed as ui_snapshot parses it now.
+    // Contacts' discard popover with the keyboard down: the raw /source capture, parsed as ui_snapshot parses it.
     blurMenuGrouped: parseWdaSource(await readFile(new URL('../fixtures/truth/ios-iphone17-ios27/blur-menu-grouped.wda.json', import.meta.url), 'utf8')),
     contactsDiscardPopoverKeyboardDown: parseWdaSource(await readFile(new URL('../fixtures/wda-capture-contacts-discard-popover.json', import.meta.url), 'utf8')),
   };
@@ -2514,7 +2512,7 @@ describe('round — a WDA target\'s strokes go over its own scroll view', () => 
   });
 
   // The stop the region holds back (motion-shown.ts#carriedUnder): measured live, the turned stroke carried R back to y
-  // 114, under the header idb lists it beneath, and the plain stop claimed it there — the tap went to the header. Now no
+  // 114, under the header idb lists it beneath, and the plain stop claimed it there — the tap went to the header. No
   // stop short of the line a stroke over the region touches down on (391 of 24,300 354x455), on the side the content
   // was first seen moving toward (the top): the strokes go on over the region; R left there, the failure says so.
   describe('tabbar-floating under idb: R carried back under the header is no stop', () => {
@@ -2660,8 +2658,8 @@ describe('round — a WDA target\'s strokes go over its own scroll view', () => 
   // LE4's note, its residual: Account Detail's card carousel (24,138 354x85, read horizontal from its cards past its
   // frame) under the transactions list (0,180 402x694, listed after it, no ancestor of the carousel): a card right of
   // the carousel, scrolled for `down`, has no scroll view that scrolls along the stroke, and the stroke plan falls back
-  // to the nearest, the carousel — a vertical 52-pt stroke touching down where the list is drawn over it — as before
-  // the axis rule (stroke-plan.ts#strokeRoom). A carousel nested IN the list gives way to the list
+  // to the nearest, the carousel — a vertical 52-pt stroke touching down where the list is drawn over it
+  // (stroke-plan.ts#strokeRoom). A carousel nested IN the list gives way to the list
   // (tests/interact/stroke-plan.test.ts, "the axis").
   it('a card of a horizontal carousel no list holds, scrolled for `down`: no scroll view along the stroke, so the vertical stroke goes inside the carousel (the fallback), and the failure names the list drawn over its touch-down', () => {
     const CAROUSEL: Rect = { x: 24, y: 138, width: 354, height: 85 };
@@ -3097,7 +3095,7 @@ describe('round — a read that lists none of the stroked scroll view\'s content
  * `uiautomator dump` snapshots only after a second with no accessibility event), the read after a stroke IS the settled
  * read: a stop judged on it is reported at once, settled, no confirming read. What confirms for another reason still
  * does: a presented hold (ADR 0018), a confirming read that failed, the read after the flush check's probe. Without
- * the rule (every other test in this file), the read after a stroke is confirmed as before.
+ * the rule (every other test in this file), the read after a stroke is confirmed.
  */
 describe('round — a tree read that waits for the screen at rest (readSettles)', () => {
   const SETTLES: Rules = { ...ANDROID, readSettles: true };
@@ -3169,7 +3167,7 @@ describe('round — the scroll views the strokes did not go over, before the tar
     expect(boundText({ of: 'exhausted', lastStroke: 'down', unchanged: 'tree', beside: { axis: 'vertical', strokedOver: UPPER, others: more.slice(0, 3) } }, 2)).toContain('scrollable id:l2 (0,1200 1080x90) as within: {"x":0,"y":1200,"width":1080,"height":90} — if the element');
   });
 
-  // D81 review round 1, MINOR-2: a caller naming elements by spec (a flow) cannot pass a rect — the way in asks for a
+  // D81: a caller naming elements by spec (a flow) cannot pass a rect — the way in asks for a
   // spec of the scroll view; the tool's words (the rect form, the default) stay byte-identical, pinned above.
   it('boundText by spec (a flow): no rect offered — one, several, at maxSwipes and the timeout, and the across clause', () => {
     const SPEC = 'scroll_until it again naming that scroll view by an element spec of it or of an element inside it (within: { id: … })';
@@ -3402,7 +3400,7 @@ describe('round — `within`, the scroll view named for the strokes until the ta
     expect(failureOf(played, 'id:x').message).toMatch(/— swipe the screen so more of the scroll view shows, or hide the keyboard first \(tap a neutral element such as the screen title\), then scroll_until it again; this adapter cannot hide it on its own \(ADVICE\)$/);
   });
 
-  // Review round 1, MINOR-4 (the coordinator's decision): a round whose tree did not read does not stop on the last
+  // The coordinator's decision: a round whose tree did not read does not stop on the last
   // read's line — it holds for a read; the gesture box cut at 1100 (54 of `lower` on it) on a failed read.
   const CUT: Rect = { x: 0, y: 0, width: 1080, height: 1100 };
   const cutScreen: UsableScreen = { box: CUT, boxes: [CUT], oriented: CUT, from: 'device' };
@@ -3442,7 +3440,7 @@ describe('round — `within`, the scroll view named for the strokes until the ta
     expect(named(R, { room: 80 })).toContain('which has no room for a swipe down: what is drawn over it leaves too little of the 80 of its height on the screen — swipe');
     expect(named(R, { room: 120 })).toContain('which has no room for a swipe down: what is drawn over it leaves too little of the 120 of its height on the screen — swipe the screen');
     expect(named(R, { room: 300, keyboard: { lineY: 2400, remedy: BACK } })).toContain('which has no room for a swipe down: the keyboard covers it from y 2400, and what is drawn over it leaves too little of the 300 of its height left — swipe the screen');
-    // MAJOR-1 (review round 1): the way out follows the adapter's KeyboardRemedy — where no key hides the keyboard (iOS,
+    // The way out follows the adapter's KeyboardRemedy — where no key hides the keyboard (iOS,
     // dismissal `none`) a neutral tap, then the adapter's own advice; a flow's: a tap: step before this one.
     const ios = { of: 'noRoom' as const, rect: R, toward: 'down' as const, room: 40, keyboard: { lineY: 2200, remedy: NO_BACK } };
     const iosOutcome = { kind: 'within' as const, swipes: 0, within: R, refused: ios };
@@ -3452,7 +3450,7 @@ describe('round — `within`, the scroll view named for the strokes until the ta
     expect(scrollFailure({ ...iosOutcome, within: { id: 'list' } }, 'id:x', 'spec').message).toMatch(
       /— add a swipe: step before this one so more of the scroll view shows, or hide the keyboard first \(tap a neutral element such as the screen title — a tap: step before this one\), then run the flow again; this adapter cannot hide it on its own \(ADVICE\)$/,
     );
-    // Code review 2: the flow's whole way out is in steps, the no-keyboard case too — no `scroll_until it again`.
+    // The flow's whole way out is in steps, the no-keyboard case too — no `scroll_until it again`.
     expect(scrollFailure({ kind: 'within', swipes: 0, within: { id: 'list' }, refused: { of: 'noRoom', rect: R, toward: 'down', room: 60 } }, 'id:x', 'spec').message).toBe(
       'scroll_until id:x stopped before any swipe — within id:"list" names the scroll view 0,2160 1080x400, which has no room for a swipe down: 60 of its height lies on the screen, under the 80 a swipe needs — add a swipe: step before this one so more of the scroll view shows, then run the flow again',
     );

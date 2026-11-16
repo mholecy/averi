@@ -11,9 +11,7 @@ import { loadSide } from '../../scripts/differential/side.js';
 import type { AbsentTarget, CellTruth, TargetTruth } from '../../scripts/truth/schema.js';
 
 // The golden mode's wiring of phase 3's truth (golden.ts#goldenRecording), on a synthetic capture: the committed
-// Android `open` capture (its tree and screenshot) with a truth whose targets carry a measured geometry — none of the
-// committed corpus does, so golden.test.ts cannot see whether golden hands expectations() the cell's truth,
-// consistency() the platform and the screen, or drops the live-only rows.
+// Android `open` capture (its tree and screenshot) with a truth whose targets carry a measured geometry.
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const RUN = fileURLToPath(new URL('../fixtures/truth/android-averi_lab-api33/', import.meta.url));

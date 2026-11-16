@@ -10,15 +10,15 @@ import { NO_EYES } from '../helpers/eyes.js';
 
 /**
  * Android's status band END TO END through the real AndroidAdapter over a
- * scripted adb (2026-10-12, docs/bugs/2026-10-10-android-tap-and-scroll-
- * until-treat-the-system-status-bar-as-app-screen.md): the adapter reads the
- * status bar out of `dumpsys window displays` (the real API 33 dump, its
+ * scripted adb (docs/bugs/2026-10-10-android-tap-and-scroll-until-treat-
+ * the-system-status-bar-as-app-screen.md): the adapter reads the status bar
+ * out of `dumpsys window displays` (the real API 33 dump, its
  * `InsetsSource type=ITYPE_STATUS_BAR frame=[0,0][1080,66] visible=true`)
- * and the tap's on-screen rule and `scroll_until`'s stop — interact/'s,
- * unchanged, iOS's since 2026-10-09 — judge Google Contacts' collapsed app
- * bar against it. The rects are the device check's (run10-android,
- * #99/#145): the list `0,0 1080x1977` scrollable, the app bar `0,0
- * 1080x66`, its `All contacts` text cut to `149,0 213x6`.
+ * and the tap's on-screen rule and `scroll_until`'s stop — interact/'s, as
+ * on iOS — judge Google Contacts' collapsed app bar against it. The rects
+ * are the device check's (run10-android, #99/#145): the list `0,0
+ * 1080x1977` scrollable, the app bar `0,0 1080x66`, its `All contacts` text
+ * cut to `149,0 213x6`.
  */
 
 // The one sleep owner is recorded, not waited on — the settles are not this test's subject.

@@ -19,11 +19,11 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 });
 
 /**
- * The ONE engine-selection rule (2026-10-04). Until then the `ocr` assert and
- * the verify run's text table each wrote "ask the reason, then construct"
- * themselves; a drift between the two would have let one caller skip a check
- * the other refused. The rule is pinned here once, and the two callers are
- * pinned to quote the same reason in tests/run/verify.test.ts.
+ * The ONE engine-selection rule: were the `ocr` assert and the verify run's
+ * text table each to write "ask the reason, then construct" themselves, a
+ * drift between the two would let one caller skip a check the other refused.
+ * The rule is pinned here once, and the two callers are pinned to quote the
+ * same reason in tests/run/verify.test.ts.
  */
 const onHost = async (platform: string, body: () => void | Promise<void>) => {
   const real = Object.getOwnPropertyDescriptor(process, 'platform')!;
@@ -180,7 +180,7 @@ describe('VisionOcr — which failures are permanent (2026-10-08, review 2026-10
 describe('VisionOcr — the toolchain probe runs once per process, not once per engine', () => {
   /**
    * Every Verifier builds its own VisionOcr, and every flow step and verify
-   * leg builds its own Verifier — so a per-instance probe paid `swiftc
+   * leg builds its own Verifier — so a per-instance probe would pay `swiftc
    * --version` (0.1–0.5 s) per Verifier. The probe is memoized per ExecFn,
    * like xcode-env's: the real exec is shared by every production engine, so
    * the probe runs once per process; a test's fake exec is its own cache.
@@ -282,11 +282,11 @@ describe('VisionOcr — the toolchain probe runs once per process, not once per 
 describe('VisionOcr — one compile per binary per process, on staging paths no other build shares (D15)', () => {
   /**
    * Each Verifier builds its own VisionOcr, so two engines in one process (a
-   * run_flow and a tool call) that both find no cached binary used to both
-   * write `${binary}.${pid}.swift` and compile to `${binary}.${pid}`: one
-   * truncated the other's source mid-compile (a spurious syntax error) or
-   * renamed the other's half-written output (a corrupt published binary).
-   * Concurrent builds of one binary now share ONE compile, and every build
+   * run_flow and a tool call) can both find no cached binary. Were both to
+   * write `${binary}.${pid}.swift` and compile to `${binary}.${pid}`, one
+   * would truncate the other's source mid-compile (a spurious syntax error)
+   * or rename the other's half-written output (a corrupt published binary).
+   * Concurrent builds of one binary share ONE compile, and every build
    * stages on paths of its own.
    */
   const REGION = [{ id: 'element', x: 0, y: 0, w: 10, h: 10 }];

@@ -167,7 +167,7 @@ describe('the Android build (batch-11.sh:298, 308–314): JDK 17, gradlew assemb
       how,
       warning: `java_home -v 17 → nothing: exit 1 Unable to find any JVMs matching version "17"; ${join(dir, 'none')}: no *.jdk (or unreadable) — the build used the one from JavaVirtualMachines`,
     });
-    // Said once (code review): the build's later answers — the device need's ensure, a recheck — come without it.
+    // Said once: the build's later answers — the device need's ensure, a recheck — come without it.
     expect(await kit.android.ensure(needCtx(sandboxed))).toStrictEqual({ ok: true, how });
     expect(await need(kit, ANDROID_BUILD_NEED).check(needCtx(sandboxed))).toStrictEqual({ ok: true, how });
     expect(kit.android.builtUnder?.()).toBe(`JDK 17: ${zulu} (from JavaVirtualMachines)`);
@@ -263,7 +263,7 @@ describe('the Gradle daemon after an interrupted Android build (review round 1, 
     const run = runOf(world);
     await b.lastly({ run, step: say });
     expect(run.seen.map((s) => s.words)).toEqual([`${join(repo, 'fixtures/apps/android', 'gradlew')} --stop`]);
-    // Its reason: the stop that failed, not a cut build (code review, MINOR 2).
+    // Its reason: the stop that failed, not a cut build.
     expect(steps.at(-1)).toBe("NOTE lab android: the Gradle daemon stopped at the run's end (its --stop failed: exit 1 busy)");
   });
 

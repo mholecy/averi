@@ -45,16 +45,14 @@ const overIt = (s: PixelStanding): string => {
 };
 
 /**
- * Every node of area — not only the labelled or interactive ones (review of fix/r8-pixel, round 1) — judged by
- * its standing for the pixel assert (ui-tree/standing.ts#Scene.standing, `{ of: 'pixel' }`) on the screen the assert
- * judges in (the usable screen's `oriented` box, else the tree's own): the misses, one line each, `<fixture>:
- * <element> — <what lies over it>`.
+ * Every node of area — not only the labelled or interactive ones — judged by its standing for the pixel assert
+ * (ui-tree/standing.ts#Scene.standing, `{ of: 'pixel' }`) on the screen the assert judges in (the usable screen's
+ * `oriented` box, else the tree's own): the misses, one line each, `<fixture>: <element> — <what lies over it>`.
  */
 async function sweep(androidBand?: number, reads: Reads = (r) => r, androidNavigation?: number): Promise<{ judged: number; misses: string[] }> {
   const misses: string[] = [];
   let judged = 0;
   for (const [name, tree, device] of await fixtureTrees(androidBand, androidNavigation)) {
-    // The round's look and the screen it is judged on: the usable screen on the device, else the tree's own.
     const { scene } = lookOn({}, tree);
     const usable = (await usableScreen({ viewport: async () => device }, { tree })) ?? treeScreen(tree);
     for (const n of everyNode(tree)) {
@@ -78,10 +76,10 @@ const coversNamed = (misses: readonly string[]): Record<string, number> => {
 };
 
 /**
- * Round 8 (review of fix/r8-pixel, round 1): the pixel assert's chrome over every node of every real tree the
- * suite holds. The first cut asked the tap's cover question (`exposure`) and failed ~30 nodes on things that take
- * a touch and hide no pixel — the element's own content listed beside it, a clickable layer, a 2-pt edge. What is
- * left is chrome: CONTINUE, the floating tab bar, Compose's top bar over a scrolled field, the RN debugger banner.
+ * Round 8: the pixel assert's chrome over every node of every real tree the suite holds. The tap's cover question
+ * (`exposure`) would fail ~30 nodes on things that take a touch and hide no pixel — the element's own content
+ * listed beside it, a clickable layer, a 2-pt edge. What is left is chrome: CONTINUE, the floating tab bar,
+ * Compose's top bar over a scrolled field, the RN debugger banner.
  */
 const OCR: Reads = (r: Rect): Rect => r; // the ocr assert reads the whole rect
 
@@ -127,7 +125,8 @@ describe('Scene.standing for the pixel assert over every fixture node (round 8)'
       'button "Continue to summary" (24,512 354x44, reaching 24,512 354x77)': 1,
       'button "Continue to summary" (24,780 354x44, reaching 24,780 354x94)': 19,
       // idb's Application node, judged as an element: every node of the flat list after it lies over its sample.
-      // …twice since 2026-10-22: it is also a cover of the chooser's SWIFT row, listed after it and holding its centre (ADR 0015's amendment; the eyes tell the order).
+      // …twice: it is also a cover of the chooser's SWIFT row, listed after it and holding its centre (ADR 0015's
+      // amendment; the eyes tell the order).
       'button "Loan repayment, 17.07.2026, +602,00 EUR" (24,435 354x52)': 2,
       'button "Priority*, Standard" (24,390 354x52)': 1,
       'button "Priority*, Standard" (24,399 354x52)': 1,
@@ -230,9 +229,8 @@ describe('own content and clickable layers count only on the element\'s own bran
 
 
 /**
- * Review of fix/r8-pixel, round 2: three loosenings of round 1 reopened the note's false PASS. Each probe is a shape
- * that must fail closed — a sheet or a FAB is chrome even where it lies inside the element's rect, and a screen-sized
- * element is judged over what its reader reads.
+ * Each probe is a shape that must fail closed — a sheet or a FAB is chrome even where it lies inside the element's
+ * rect, and a screen-sized element is judged over what its reader reads.
  */
 describe('the round-2 probes: chrome inside the element\'s rect still counts', () => {
   const rect = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
@@ -362,7 +360,8 @@ describe('the screen without the device: the window the tree vouches for (ui-tre
     const pay = n('button', rect(24, 600, 354, 52), { label: 'Pay' });
     const window = n('application', rect(0, 0, 402, 874), { children: [n('scrollable', rect(0, 0, 402, 1300)), element, pay] });
     const tree = n('container', rect(0, 0, 0, 0), { children: [window] });
-    // Until S3 the tree's screen (screenOf: the 402x1300 content) — the page was no screen-sized element and was offered a scroll.
+    // Judged in the tree's screen (screenOf: the 402x1300 content), the page would be no screen-sized element and would
+    // be offered a scroll.
     expect(await over(silent, tree, element)).toMatch(
       /^button "Pay" \(24,600 354x52\) is drawn over the element \(element 0,40 402x834\) — the capture would show it, not the element — assert something in it that lies clear of that; no scroll moves the screen itself/,
     );
@@ -383,7 +382,7 @@ describe('the screen without the device: the window the tree vouches for (ui-tre
 
 
 /**
- * The owner's decision (code review of round 8, P2): Android's status band reaches the pixel asserts. An
+ * The owner's decision: Android's status band reaches the pixel asserts. An
  * edge-to-edge app bar (Android 15+) laid from the screen's top under the 66-px band fails a colour assert closed —
  * kept — and the advice leads with what to assert instead: its title, which lies clear of the band and is judged on
  * its own.

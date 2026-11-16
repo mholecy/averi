@@ -8,13 +8,13 @@ import { FakeAdapter, node } from '../helpers/fake.js';
 import { Shot } from '../../src/verify/shot.js';
 
 /**
- * Baseline creation fails CLOSED (review 2026-10-06): only a confirmed
- * window stores a file. The one frame that exercises it — `unjudged`, no
- * `confirmed` at all — cannot come out of the real `captureBaselineFrame`
- * today: creation passes no deadline, so the pair always gets its second
- * capture. The capture is therefore replaced here, in its own file so no
- * other test sees the mock, with one that hands the assert exactly that
- * frame. The first cut of the check (`confirmed === false`) stored it.
+ * Baseline creation fails CLOSED: only a confirmed window stores a file.
+ * The one frame that exercises it — `unjudged`, no `confirmed` at all —
+ * cannot come out of the real `captureBaselineFrame` today: creation passes
+ * no deadline, so the pair always gets its second capture. The capture is
+ * therefore replaced here, in its own file so no other test sees the mock,
+ * with one that hands the assert exactly that frame. A check of
+ * `confirmed === false` would store it.
  */
 const next = vi.hoisted(() => ({ frame: undefined as unknown }));
 vi.mock('../../src/verify/capture.js', async (importOriginal) => ({

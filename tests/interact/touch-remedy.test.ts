@@ -10,8 +10,7 @@ import { node } from '../helpers/fake.js';
 
 // THE touch remedy's sentence (interact/touch-remedy.ts, A26): one function of a `cut` or `covered` standing and the
 // soft keyboard, which the tap's refusal and scroll_until's `overlapped` stop and sliver failures all call. Each row is
-// one (kind, remedy, cut.by, keyboard) case; the verbs' own sentences around it are pinned where they are said
-// (tap.test.ts, scroll.test.ts, remedy-agreement.test.ts).
+// one (kind, remedy, cut.by, keyboard) case; the verbs' own sentences around it are pinned where they are said.
 
 const FACTS = {} as StandingFacts;
 const rect = (x: number, y: number, width: number, height: number): Rect => ({ x, y, width, height });

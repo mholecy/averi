@@ -8,8 +8,7 @@ import { createAveriServer } from '../../src/mcp/tools.js';
 
 /**
  * What an MCP client reads when adb lists the only Android device as
- * `unauthorized` or `offline` (C5, 2026-10-09: both read "No booted Android
- * emulator/device found (adb devices)"). Through the real chain short of a
+ * `unauthorized` or `offline` (C5). Through the real chain short of a
  * process: the client, createAveriServer, the AdapterRegistry, and
  * discovery.ts's `adb devices -l` parser over a fake exec. No adapter may be
  * built — the factory throws — and nothing but `adb devices -l` succeeds:

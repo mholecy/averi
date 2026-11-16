@@ -10,7 +10,7 @@ import { NO_EYES } from '../helpers/eyes.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on: a cadence
 // is a sequence of delays, and asserting the sequence is exact where a wall
-// clock is a flake (review 2026-10-03). Every test in this file runs on the
+// clock is a flake. Every test in this file runs on the
 // no-op, under a faked Date (Date ONLY) that each recorded sleep moves by its
 // own length — tests/helpers/sleep-recorder.ts's clock rule — so the
 // deadline-based ones end in virtual time and every fake read takes exactly
@@ -219,14 +219,12 @@ describe('fillField — focus, clear, type, verify', () => {
   });
 
   // docs/bugs/2026-10-09-android-clear-reads-edittext-hint-as-content.md.
-  // Until 2026-10-09 this field threw `field still shows 4 characters after
-  // clearing twice` before typing. A field whose deletes change NOTHING is
-  // indistinguishable, in the tree, from an EMPTY field showing its hint or
-  // placeholder as its value — which every tree source reports, and which
-  // that throw failed on every hinted stock EditText. So the clear stops on
-  // the unchanged round and the exact read-back decides: a field that truly
-  // ignores deletes still fails, but only after the value was typed into it
-  // (twice: the mismatch retry's wipe is ignored as well).
+  // A field whose deletes change NOTHING is indistinguishable, in the tree,
+  // from an EMPTY field showing its hint or placeholder as its value — which
+  // every tree source reports. So the clear stops on the unchanged round and
+  // the exact read-back decides: a field that truly ignores deletes still
+  // fails, but only after the value was typed into it (twice: the mismatch
+  // retry's wipe is ignored as well).
   it('a field whose deletes change nothing (indistinguishable from an empty hinted field): one round, then typed, and the exact read-back fails it', async () => {
     const stubborn = formFake('2.50');
     stubborn.clearText = async (count: number) => {
@@ -244,8 +242,8 @@ describe('fillField — focus, clear, type, verify', () => {
     fake.typeText = async (text: string) => {
       fake.typed.push(text); // drop everything: value never changes
     };
-    // The field still shows what it showed before typing: since 2026-10-09
-    // the error says so instead of leaving two bare lengths.
+    // The field still shows what it showed before typing: the error says so
+    // instead of leaving two bare lengths.
     await expect(fillField(fake, { id: 'amount_input' }, '12.34', FAST)).rejects.toThrow(
       'fill: typed 5 characters but the field shows 4 — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)',
     );
@@ -283,8 +281,8 @@ describe('fillField — focus, clear, type, verify', () => {
   });
 
   it('value "" with clear: true clears what the field holds AFTER focus — a field that autofills on focus ends empty', async () => {
-    // A clear alone has no read-back to catch an autofill (review 2026-09-18
-    // measured Android populating a password field on focus), so the loop
+    // A clear alone has no read-back to catch an autofill (Android, measured
+    // 2026-09-18, populates a password field on focus), so the loop
     // counts from a post-focus read, not the pre-tap tree that showed nothing.
     const fake = formFake(null);
     const origTap = fake.tap.bind(fake);
@@ -348,7 +346,7 @@ describe('fillField — focus, clear, type, verify', () => {
     );
   });
 
-  // D21 code review: a read no wait cures (PersistentReadError — idb's wedged accessibility service) is not a
+  // D21: a read no wait cures (PersistentReadError — idb's wedged accessibility service) is not a
   // FillValueFailure('reread-failed'): it passes through unchanged, so `optional:` does not take it for a fill whose
   // value did not land, and the flow engine's isTerminal still sees its class.
   it('a re-read that throws a PersistentReadError: thrown as it came, not a reread-failed FillValueFailure', async () => {
@@ -443,7 +441,7 @@ describe('fillField — masked fields verify by length', () => {
     expect(maskedAppend).toEqual({ held: 20 }); // its sentence is fill-text.ts's (fill-text.test.ts)
   });
 
-  // Review 2026-09-18: the pre-tap read is stale for both shapes below, and a
+  // The pre-tap read is stale for both shapes below, and a
   // `preLen` taken from it failed two correct fills.
   it('autofill that POPULATES a masked field on focus does not fail the fill (pre-fill re-read after focus)', async () => {
     const fake = formFake(null);
@@ -475,7 +473,7 @@ describe('fillField — masked fields verify by length', () => {
  * The post-focus re-read is skipped where nothing it feeds can change the verdict
  * (docs/adr/0028-a-fill-re-reads-after-focus-only-where-focus-can-change-the-count.md): a value typed without `clear`
  * into an EMPTY input its source says is plain (`secure: false`), named by a sole `id` selector, on an adapter that
- * never types a dropped tail again (`may-arrive-late`: Android). Everything else is read after focus as before.
+ * never types a dropped tail again (`may-arrive-late`: Android). Everything else is read after focus.
  * Each case logs what the fill asks of the device in order; between the focus tap and the typing a `read` is the
  * re-read.
  */
@@ -612,8 +610,8 @@ describe('fillField — the post-focus re-read, only where focus can change the 
     await expect(fillField(fake, { id: 'amount_input' }, 'password', FAST)).rejects.toThrow(`fill: typed 8 characters but the field shows 6 ${SAID_PLAIN}`);
   });
 
-  // A2: the said-plain failure is a landing of its own (fill-landing.ts#Landing `said-plain`), with today's timing: a
-  // reading LONGER than typed stops the poll at once, a shorter one polls the whole budget (it may still be arriving).
+  // A2: the said-plain failure is a landing of its own (fill-landing.ts#Landing `said-plain`): a reading LONGER than
+  // typed stops the poll at once, a shorter one polls the whole budget (it may still be arriving).
   it('skipped: a field said plain failing on bullets reads no more of the tree than before — at once when longer, the whole poll when shorter', async () => {
     const counted = (fake: FakeAdapter) => {
       const reads = { n: 0 };
@@ -634,10 +632,8 @@ describe('fillField — the post-focus re-read, only where focus can change the 
     expect(shorterReads.n).toBe(7); // the settle wait (2), the whole value poll (5)
   });
 
-  // A2 code review: until A2 fill.ts threw this failure itself for a skipped re-read, before its generic mismatch path —
-  // no `elsewhere`, no `again`, no not-input finding. It now leaves through the typing's `missed`; the reply must stay
-  // the same even when another input changed while typing (a masked reading proves no missing tail, so nothing reads
-  // as typed elsewhere).
+  // A2: this failure leaves through the typing's `missed`; the reply must stay the same even when another
+  // input changed while typing (a masked reading proves no missing tail, so nothing reads as typed elsewhere).
   it('skipped: a field said plain that shows FEWER bullets, another input changed meanwhile — the same reply, nothing named elsewhere', async () => {
     resetLayout();
     const fake = new FakeAdapter(
@@ -782,9 +778,9 @@ describe('fillField — the post-focus re-read, only where focus can change the 
   });
 });
 
-// The dismissal itself (`dismissKeyboard`) is keyboard.ts's since 2026-10-04 and
-// is pinned per model in tests/interact/keyboard-window.test.ts and
-// keyboard-in-tree.test.ts. What stays here is the seam between the two calls.
+// The dismissal itself (`dismissKeyboard`) is keyboard.ts's and is pinned per
+// model in tests/interact/keyboard-window.test.ts and keyboard-in-tree.test.ts.
+// What stays here is the seam between the two calls.
 describe('fillField and the keyboard dismissal are two calls', () => {
   it('fillField itself never presses a key — the caller dismisses after it has the warning in hand', async () => {
     const fake = formFake();
@@ -835,12 +831,11 @@ describe('fillField — resolution is the shared policy', () => {
 });
 
 /**
- * What text averi types (interact/type-text.ts, code review 2026-10-07): a
- * value holding a control character is refused BEFORE any device call. The
- * refusal used to be the Android adapter's alone — reached after the fill's
- * focus tap and clear, so a refused value wiped the field and then failed —
- * and iOS typed the characters. Every adapter method is recorded through a
- * proxy, so "no device call" means none at all, a tree read included.
+ * What text averi types (interact/type-text.ts): a
+ * value holding a control character is refused BEFORE any device call: a
+ * refusal reached after the fill's focus tap and clear would wipe the field
+ * and then fail. Every adapter method is recorded through a proxy, so "no
+ * device call" means none at all, a tree read included.
  */
 describe('fillField refuses a control character before anything is sent', () => {
   const recorded = (fake: FakeAdapter) => {
@@ -875,7 +870,7 @@ describe('fillField refuses a control character before anything is sent', () => 
         const { proxy, calls } = recorded(fake);
         const fill = fillField(proxy, { id: 'amount_input' }, `ab${ch}cd`, { ...FAST, clear: true });
         await expect(fill).rejects.toThrow(`cannot type ${code}`);
-        // The remedy names pressKey('enter') for a newline and a return only (code review of round 7, P2).
+        // The remedy names pressKey('enter') for a newline and a return only.
         await expect(fill).rejects.toThrow(ch === '\n' || ch === '\r' ? /pressKey\('enter'\)/ : /^(?!.*pressKey).*cannot be typed\.$/);
         expect(calls).toEqual([]);
         expect(fake.taps).toEqual([]);
@@ -911,8 +906,7 @@ describe('fillField refuses a control character before anything is sent', () => 
 /**
  * D43a (docs/adr/0037-a-value-the-adapter-cannot-type-is-refused-before-any-device-call.md): a value holding a
  * character the adapter cannot type is refused where a control character is — before the field is resolved, so no
- * tree read, no keyboard dismissal, no focus tap, no clear and nothing typed. Before it, iOS refused with idb's
- * Python trace after the tap (and the clear), and Android typed the prefix and then crashed: a half-typed field.
+ * tree read, no keyboard dismissal, no focus tap, no clear and nothing typed.
  */
 describe('fillField refuses a character the adapter cannot type before anything is sent', () => {
   const recorded = (fake: FakeAdapter) => {
@@ -1082,7 +1076,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     expect(result).toMatchObject({ role: 'other', readBack: { kind: 'landed' }, notInput: undefined });
   });
 
-  // m-4 (review 2026-10-08): a WDA StaticText exposes its label as its value.
+  // A WDA StaticText exposes its label as its value.
   it('a non-input whose value never changes is NOT the field: no throw, no delete, readBack not-taken, the input named', async () => {
     resetLayout();
     const fake = new FakeAdapter(
@@ -1096,7 +1090,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     expect(cleared).toMatchObject({ cleared: 'unmeasured', readBack: { kind: 'not-taken' } });
   });
 
-  // m2-1 (review 2026-10-08, round 2): the retry deleted the label's length into the focused field.
+  // Taken for the field, the label would have the retry delete its length into the focused one.
   it('a label whose value changes on focus (`Name` → `Name*`) is not the field: no delete into the focused one, not-taken', async () => {
     resetLayout();
     const label = node({ role: 'text', identifier: 'name_label', value: 'Name', rect: { x: 0, y: 0, width: 100, height: 10 } });
@@ -1113,7 +1107,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     expect(result).toMatchObject({ cleared: 'unmeasured', readBack: { kind: 'not-taken' }, notInput: { input: expect.objectContaining({ identifier: 'name' }) } });
   });
 
-  // D79 code review (spec NIT): a `not-taken` reading (a non-input showing its own text) is worded only after a retry
+  // D79: a `not-taken` reading (a non-input showing its own text) is worded only after a retry
   // (fill-type.ts). Through fillField its earlier text is its own text — the post-focus re-read is made only of an empty
   // or all-bullet one (fill.ts) — so its own text again reads `unchanged`, an equal count that says why; no `equal`
   // clause reaches this route (the fill-landing rows of `55` after `5` and `1 ` after `1` are Differences no reply
@@ -1179,7 +1173,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     expect(result).toMatchObject({ role: 'other', cleared: 'unmeasured', readBack: { kind: 'landed' }, notInput: undefined });
   });
 
-  // m-2 (review 2026-10-08): identity is not screen identity.
+  // Identity is not screen identity.
   it('the identity fallback does not read a NEXT screen whose field shares the id and rect', async () => {
     const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
     const next = node({
@@ -1235,7 +1229,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     await expect(fillField(fake, 'id:pin', '', { ...FAST, clear: true })).rejects.toThrow('fill: field still shows 1 character after clearing twice');
   });
 
-  // m-2 (review 2026-10-08, bundle C round 1): `lost` is the LAST read's finding, reset on every read.
+  // `lost` is the LAST read's finding, reset on every read.
   it('a first read after typing that misses the field, then one that finds it with no value: no-value, no `lost`', async () => {
     const fake = idbFloatingLabelFake('IBAN*', null);
     const real = fake.uiTree.bind(fake);
@@ -1258,7 +1252,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     expect(result.readBack).toEqual({ kind: 'no-value' }); // no reason rides on any kind but lost
   });
 
-  // m-1 (review 2026-10-08, bundle C round 1): the read after the first
+  // The read after the first
   // delete lost the field (the keyboard moved it, the value selector no
   // longer matches), which read as "empty" — `Filled … (0 characters,
   // cleared 7 characters first)` while the field still held `XX`.
@@ -1659,7 +1653,7 @@ describe('fillField — the mismatch error says what differs, without content (2
     );
   });
 
-  // D18 review round 1 (d): a de-DE thousands mark reads as a 3-decimal mask's point would — passed, with a ⚠ caveat.
+  // D18: a de-DE thousands mark reads as a 3-decimal mask's point would — passed, with a ⚠ caveat.
   it('a field that adds a `.` between thousands is filled, the point said as a caveat', async () => {
     const result = await fillField(transforming(null, (s) => s.replace(/\./g, '').replace(/^(\d)(\d{3})$/, '$1.$2')), { id: 'notes' }, '1234', FAST);
     expect(result).toMatchObject({ readBack: { kind: 'landed' }, reformatted: { added: 1, point: '.' } });
@@ -1668,9 +1662,7 @@ describe('fillField — the mismatch error says what differs, without content (2
     );
   });
 
-  // Until D18 the mask here inserted a space (`1234 5`) — a reformat that passes now (fill-reformat.ts#reformatOf). A cents
-  // mask's decimal point changes the amount, so it still fails — since D53 naming the check and the remedy, not the
-  // value.
+  // A cents mask's decimal point changes the amount, so it fails — naming the check and the remedy, not the value.
   it('a cents mask that inserts a decimal point fails separated: every typed character there, the check, the remedy', async () => {
     const message = await failureOf(fillField(transforming(null, (s) => s.replace(/^(\d{3})(\d+)$/, '$1.$2')), { id: 'notes' }, '12345', FAST));
     expect(message).toBe(
@@ -1757,12 +1749,12 @@ describe('fillField — a textfield whose null value is empty: a dropped fill is
 /**
  * The review of fix/r3-fill (2026-10-09) probed the hint-aware clear and the
  * mismatch wording with shapes the first round missed (its probes A–K; the
- * letters are kept in the test names). Since the fill-clear deepening
- * (2026-10-09) the clear's RULES behind A, E, I, J, K and the third round
- * are rows of tests/interact/fill-clear.test.ts (clearStep, one reading at a
- * time) and the mismatch's kinds rows of fill-landing.test.ts
- * (readingOf); what stays here for those is the driver's part — the
- * device calls in their order and count, and the facts it hands on.
+ * letters are kept in the test names). The clear's RULES behind A, E, I, J,
+ * K and the third round are rows of tests/interact/fill-clear.test.ts
+ * (clearStep, one reading at a time) and the mismatch's kinds rows of
+ * fill-landing.test.ts (readingOf); what stays here for those is the
+ * driver's part — the device calls in their order and count, and the facts
+ * it hands on.
  */
 describe('fillField — the review probes of the hint-aware clear (2026-10-09)', () => {
   it('A: a MASKED field the deletes and the typing never reach (the focus tap missed) fails as clear-twice — bullets are no hint', async () => {
@@ -1793,7 +1785,7 @@ describe('fillField — the review probes of the hint-aware clear (2026-10-09)',
     );
   });
 
-  // Review round 2, probe K: deletes go from the end, so a reading that
+  // Deletes go from the end, so a reading that
   // STARTED with the placeholder's text can end on it with text left.
   it('K: a clear alone that ends on the placeholder from a reading that started with it is NOT verified — `Company` may be held text', async () => {
     const { fake, real } = hintedField('Companyabc', { hint: 'Company', named: true });
@@ -1845,12 +1837,12 @@ describe('fillField — the review probes of the hint-aware clear (2026-10-09)',
     };
     await expect(fillField(fake, { id: 'last_name' }, 'company', FAST)).rejects.toThrow(
       // D79: the two counts are equal, and the reading is exactly the placeholder — an emptied field (as here) or
-      // typing the app turned into that text; the tree cannot tell which, and the reply says so (review round 2, MINOR-1)
+      // typing the app turned into that text; the tree cannot tell which, and the reply says so
       'fill: typed 7 characters but the field shows 7, exactly its placeholder: empty, or the typing turned into that text — the tree cannot tell which (content withheld from this error)',
     );
   });
 
-  // D79 review round 2, MINOR-1: the other reading of the same shape — iOS auto-capitalisation turns a typed `search`
+  // D79: the other reading of the same shape — iOS auto-capitalisation turns a typed `search`
   // into `Search`, the named placeholder's text, in a field that selected its earlier `foo` on focus. The field holds the
   // typing; the reply must not say no key landed. (With clear the same first reading is typed once more and the last
   // reading is `unchanged`; without, it is the final one.)
@@ -1900,7 +1892,7 @@ describe('fillField — the review probes of the hint-aware clear (2026-10-09)',
       if (fake.focused) fake.focused.value = '•'.repeat(t.length - 1) + t.slice(-1);
     };
     await expect(fillField(fake, { id: 'amount_input' }, 'secret', FAST)).rejects.toThrow(
-      // D79 review round 1: the two counts are equal — the reply says some are bullets, not comparable
+      // D79: the two counts are equal — the reply says some are bullets, not comparable
       'fill: typed 6 characters but the field shows 6, some of them bullets: the typing cannot be compared with them (content withheld from this error)',
     );
   });
@@ -2148,7 +2140,7 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
     expect(fake.droppedTails).toEqual([]); // nothing learned: Android's typing stays as it is (D24)
   });
 
-  // D64 (ADR 0034's D64 amendment): without clear, an earlier text that holds the value no longer passes a typing that
+  // D64 (ADR 0034's D64 amendment): without clear, an earlier text that holds the value does not pass a typing that
   // kept only its head — the value must be in what was typed past the earlier text.
   it('a prefilled `Hello world` whose earlier text holds `world`, the first typing keeping `w`: the tail typed again, landed (D64)', async () => {
     const fake = formFake('Hello world');
@@ -2168,7 +2160,7 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
   });
 
   // D71 (ADR 0034's D71 amendment): `55` typed after `5` that kept one key reads the value itself — it replied Filled
-  // at once. It fails now, naming the select-all reading and `clear: true`, and nothing is typed again.
+  // at once. It fails, naming the select-all reading and `clear: true`, and nothing is typed again.
   it.each(['on-return', 'may-arrive-late'] as const)('%s: a prefilled `5`, `55` typed and one key dropped: not Filled, the select-all hedge, nothing typed again (D71)', async (delivery) => {
     const fake = formFake('5');
     fake.typingDelivery = delivery;
@@ -2183,7 +2175,7 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
 
   // D79: D71's refusal of a reading that is the value itself read as equal counts ("typed 2 characters but the field
   // shows 2"), the class of docs/bugs/2026-10-09-fill-mismatch-error-says-equal-counts-when-app-transforms-text.md. It
-  // says now what an append would have shown — the earlier text's count and the typed one — and no content.
+  // says what an append would have shown — the earlier text's count and the typed one — and no content.
   it.each([
     ['55', '5', 3],
     ['1212', '12', 6],
@@ -2209,7 +2201,7 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
     expect(fake.typed).toEqual([value]);
   });
 
-  // D79 review round 1, MAJOR-1: any `length` whose earlier text pads the reading up to the typed count read as equal
+  // D79: any `length` whose earlier text pads the reading up to the typed count would read as equal
   // counts too ("typed 2 characters but the field shows 2"). It says how many of them are past the earlier text.
   it.each(['15', '1-', '1 '])('`11` typed after `1`, read `%s`: no bare equal counts, the count past the earlier text (D79)', async (shown) => {
     const fake = formFake('1');
@@ -2256,9 +2248,9 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
     );
   });
 
-  // D71 review round 1, m1 (ADR 0034's residual 12): an UNNAMED placeholder (idb) with no letter or digit that the
+  // D71 (ADR 0034's residual 12): an UNNAMED placeholder (idb) with no letter or digit that the
   // value starts with, or whose skeleton the value repeats (`€5` after `€` is the same shape; the fake types ASCII
-  // only), is read as the earlier text — a correct fill without clear now fails, with the hedge. Its remedy,
+  // only), is read as the earlier text — a correct fill without clear fails, with the hedge. Its remedy,
   // `clear: true`, is traced here end to end: the clear's delete leaves the placeholder showing (`unchanged`, after the
   // re-read), the typing is judged by equality, and the fill lands.
   it.each([
@@ -2313,7 +2305,7 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
     expect([otp2.value, note.value]).toEqual(['2', '34']);
   });
 
-  // D64 round 3: `11 ` after `1` and `-5-` after `-5` read as whole landings too, and say so (select-all, `clear: true`);
+  // D64: `11 ` after `1` and `-5-` after `-5` read as whole landings too, and say so (select-all, `clear: true`);
   // keys proven typed elsewhere are no select-all, so the reply says where they went and not that.
   it.each([
     [
@@ -2326,7 +2318,7 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
         'content withheld from this error',
     ],
     ['-5-', '-5', '-5', '5', 'fill: typed 2 characters but the field shows 3 (content withheld from this error)'],
-    // D79 review round 1, NIT-2: the value itself, the hedge gone, the append count kept
+    // D79: the value itself, the hedge gone, the append count kept
     ['55', '55', '5', '5', 'fill: typed 2 characters but the field shows only the typed text, where an append would show 3 (content withheld from this error)'],
   ])('`%s` for `%s` after `%s`, a sibling gaining `%s`: the reply names the other input, without the select-all hedge', async (shown, value, before, gained, reply) => {
     resetLayout();
@@ -2374,7 +2366,7 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
   const doubled = (a: string) => String(Number(a) * 2);
 
   it('a sibling the app recomputes proves nothing of where the typing went: with clear, the wipe and retype runs as it always did', async () => {
-    // Review round 2: `converted` going "" → "24" read as the focus moving, and a clear fill that recovered failed.
+    // Read as the focus moving, `converted` going "" → "24" would fail a clear fill that recovered.
     const { fake, amount } = fxFake(doubled);
     const result = await fillField(fake, { id: 'amount' }, '1234', { ...FAST, clear: true });
     expect(fake.typed).toEqual(['1234', '1234']);

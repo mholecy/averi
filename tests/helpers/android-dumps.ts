@@ -30,8 +30,7 @@ UI hierchary dumped to: /dev/tty`;
 /**
  * The line `adb shell "dumpsys input_method | grep -m1 mInputShown"` prints —
  * real, emulator-5554 (API 33), 2026-10-04 (false); true was observed on the
- * login screen the same day. Shared by the adapter's witness tests and the
- * end-to-end keyboard test.
+ * login screen the same day.
  */
 export const INPUT_SHOWN_LINE = (shown: boolean) =>
   `  mShowRequested=${shown} mShowExplicitlyRequested=false mShowForced=false mInputShown=${shown}\n`;
@@ -43,9 +42,7 @@ export const INPUT_SHOWN_LINE = (shown: boolean) =>
  * it. `displays`: the lines of `dumpsys window displays` the oracle's state()
  * reads; `touchable`: what AndroidAdapter's keyboardTouchable command prints
  * — the `mInputShown` line of `dumpsys input_method`, then the `touchable
- * region=` line of `dumpsys window InputMethod`. Shared by the adapter's
- * parser tests, the reader's rules (tests/ui-tree/keyboard-cover.test.ts) and
- * the end-to-end keyboard test.
+ * region=` line of `dumpsys window InputMethod`.
  */
 export const GBOARD = {
   /** Floating, IBAN field focused, the panel drawn at about x 359–1040, y 1269–1912: the IME inset is only the 132-px collapse strip. */

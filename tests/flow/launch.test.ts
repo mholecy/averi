@@ -5,10 +5,7 @@ import { el, FakeAdapter, screen } from '../helpers/fake.js';
 
 /**
  * The one launch (flow/launch.ts), through its interface: what it hands the
- * adapter, how it words what it did, and when it counts a wipe. Its two
- * callers are pinned at theirs — the flow's trace lines in
- * tests/flow/engine.test.ts "launch step", launch_app's reply and the shared
- * session count in tests/mcp/tools.test.ts.
+ * adapter, how it words what it did, and when it counts a wipe.
  */
 
 const CFG = parseConfig('app:\n  android: { package: md.bank.app, activity: .MainActivity }\n');
@@ -96,7 +93,7 @@ app:
     expect(resolveLaunchActivity(parseConfig('app:\n  android: { package: md.bank.app }\n'), { platform: 'android', appId: 'md.bank.app' })).toBeUndefined();
   });
 
-  // 2026-10-03: WHEN the fallback applies is this rule's too, for both callers.
+  // WHEN the fallback applies is this rule's too, for the flow's launch step and launch_app alike.
   const SEND = { action: 'android.intent.action.SEND' };
   const entry = { platform: 'android' as const, appId: 'md.bank.app' };
 

@@ -13,17 +13,16 @@ import {
 } from '../../src/flow/tool-config.js';
 
 /**
- * flow/tool-config.ts at its own level (2026-10-08): the policy vocabulary,
- * the one read it drives, and the pure iOS settings over what was read. Real
- * files in a temp dir, no device; tests/mcp/tools.test.ts pins the same
- * policies through the protocol, and that each tool reads the file once.
+ * flow/tool-config.ts at its own level: the policy vocabulary, the one read
+ * it drives, and the pure iOS settings over what was read. Real files in a
+ * temp dir, no device; tests/mcp/tools.test.ts pins the same policies
+ * through the protocol, and that each tool reads the file once.
  *
- * The iosToolSettings rows moved here from tests/flow/load.test.ts's
- * `iosToolSettingsFor` describe, which pinned the read and the derivation
- * together; the read's half (android never reads, missing → undefined,
- * invalid → throws naming the file) is now loadForCall's `none`/`optional`
- * rows below, and mcp/config-policy.ts's `onIos` entries tie the two
- * together (that table is pinned in tests/mcp/config-policy.test.ts).
+ * The read's half of the iOS settings (android never reads, missing →
+ * undefined, invalid → throws naming the file) is loadForCall's
+ * `none`/`optional` rows below, and mcp/config-policy.ts's `onIos` entries
+ * tie the two together (that table is pinned in
+ * tests/mcp/config-policy.test.ts).
  */
 
 let dir: string;
@@ -63,7 +62,7 @@ describe('loadForCall — the one read of a tool call, judged by its policy', ()
     await expect(loadForCall(OPTIONAL_CONFIG, path)).rejects.toThrow(path);
   });
 
-  // Review round 1: only a MISSING file is no config. Any other read error —
+  // Only a MISSING file is no config. Any other read error —
   // here a directory where the file should be — throws as it came under
   // `optional` too, rather than passing for "no averi.yaml".
   it('optional: a read error other than a missing file (a directory at the path) fails as it came, EISDIR', async () => {
@@ -109,7 +108,7 @@ describe('loadForCall — the one read of a tool call, judged by its policy', ()
     expect(said()).toContain('averi: loaded AVERI_TOOL_CONFIG_TEST from .env.averi');
   });
 
-  /** Review round 1 of stage B: the key under the default tree source is inert — said on stderr once per file, by every loader. */
+  /** Review round 1 of stage B: the key under a pinned `treeSource: idb` is inert — said on stderr once per file, by every loader. */
   describe('the inert-key note', () => {
     const INERT = 'app:\n  ios: { bundleId: md.bank.app, treeSource: idb, keyboardDismiss: [{ accessory: true }] }\n';
     const notes = () => said().filter((line) => line.includes('keyboardDismiss'));
@@ -127,9 +126,8 @@ describe('loadForCall — the one read of a tool call, judged by its policy', ()
 });
 
 /**
- * One derivation for both fields since K3 (2026-10-07): every row pins the
- * WHOLE two-field result, so a value leaking from one field into the other
- * fails.
+ * One derivation for both fields (K3): every row pins the WHOLE two-field
+ * result, so a value leaking from one field into the other fails.
  */
 describe('iosToolSettings — the iOS settings of a config already read', () => {
   const NONE = { treeSource: undefined, dismissals: undefined };

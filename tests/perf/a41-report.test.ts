@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Trial } from '../../scripts/perf/a41.js';
 import { main } from '../../scripts/perf/a41-report.js';
 
-// scripts/perf/a41-report.ts over real files (A44 review): a cadence run that recorded some trials and some errors
+// scripts/perf/a41-report.ts over real files (A44): a cadence run that recorded some trials and some errors
 // exits 0 (a41.ts#cadenceExit: only no trial is 3), and is caught here instead — its judgement unproven, so the report
 // says it in `unproven`, and the batch's report block is INCONCLUSIVE on it (lab-a41-ios.test.ts).
 

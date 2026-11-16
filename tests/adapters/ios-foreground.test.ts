@@ -177,8 +177,8 @@ describe('IosAdapter.launch waits until the tree is the launched app\'s', () => 
    * CASE: the session's first launch, the bank app in front since before the server started (never launched by it, so its
    * names are unknown here); the screenshot showed Contacts while idb served "Skeleton Internal" >= 4.5 s after the launch and
    * Contacts' only by ~15 s. The old note said "If the screenshot shows com.apple.MobileAddressBook … this can be ignored":
-   * the screenshot did, and ignoring it was the wrong-app read. Now: the previous app's until proven otherwise, and the
-   * localized reading only past a 20 s re-read — never on the screenshot alone.
+   * the screenshot did, and ignoring it was the wrong-app read. The note: the previous app's until proven otherwise,
+   * and the localized reading only past a 20 s re-read — never on the screenshot alone.
    */
   it('never in front, the label no app averi launched (the measured case): reads until the bound and no longer, then a note: the previous app\'s tree until a read says otherwise, a localized name only past 20 s', async () => {
     const d = device([BANK]);
@@ -328,7 +328,7 @@ describe('IosAdapter.launch — the wait fails open: it never fails a launch and
     expect(d.appinfos()).toHaveLength(1);
   });
 
-  // Review round 2: a read that cannot say whose tree it is (no Application,
+  // A read that cannot say whose tree it is (no Application,
   // or an unlabelled one — unmeasured, and possibly idb's full-frame launch
   // transient) is a poll miss, not a stop, so a cold launch keeps its wait.
   const BUTTON = { type: 'Button', AXLabel: 'Cancel', frame: f(16, 90, 60, 30) };
@@ -393,7 +393,7 @@ describe('IosAdapter.launch — the wait fails open: it never fails a launch and
 // D48 (batch-2 D, 2026-11-02, main 39c1fcda): on the WDA source `launch_app`
 // waited for nothing, and in 2 of 5 runs the `ui_snapshot` right after it read
 // Contacts' whole tree. WebDriverAgent's sessionless /source reads the app AX
-// lists as active, which lags the switch like idb's; the launch now asks WDA
+// lists as active, which lags the switch like idb's; the launch asks WDA
 // which app that is (/wda/activeAppInfo, by bundle id) once WDA is up.
 describe('IosAdapter.launch on the WDA source waits until WebDriverAgent names the launched bundle (D48)', () => {
   it("the launched bundle on the first ask: one ask, no pause, no note — and simctl appinfo never asked", async () => {
@@ -530,8 +530,8 @@ describe('the launch and the liveness check share one appinfo per bundle (D33)',
   });
 });
 
-// D54: the WDA alert read (ForegroundCheck.alert) is asked only at the bound with SpringBoard last named; since D56 for
-// a launch too, whose note then names the alert (ADR 0032's D56 amendment).
+// D54: the WDA alert read (ForegroundCheck.alert) is asked only at the bound with SpringBoard last named; for a launch
+// too, whose note then names the alert (ADR 0032's D56 amendment).
 describe('awaitForeground — the one alert read, at the bound with SpringBoard last named (D54, D56)', () => {
   const ALERT = { title: 'Open in “AveriLab”?', buttons: [{ label: 'Open', centre: { x: 275, y: 474 } }] };
   /** D48's note for a launch that read SpringBoard to the bound — what a launch says when no alert is found. */

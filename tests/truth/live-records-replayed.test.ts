@@ -10,21 +10,19 @@ import { escapeRegExp } from '../../src/util/regex.js';
  * `it.each` table whose own callback passes its first parameter to one of them (`replayed`, below, read off the
  * syntax tree: a commented-out row names nothing) — or it is exempt below, with the reason it cannot be judged by
  * `live.ts --rejudge`. A record a test only reads is not replayed. Without this, a row dropped from
- * live-rejudge.test.ts left a record no test rejudges, and nothing failed (T3's review rounds 1 to 4). What it cannot
- * see, being read off the source and not the run: a helper that names a record but is never called, and an early
- * return at run time that skips the rejudge.
+ * live-rejudge.test.ts would leave a record no test rejudges, and nothing would fail. What
+ * it cannot see, being read off the source and not the run: a helper that names a record but is never called, and an
+ * early return at run time that skips the rejudge.
  */
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const RECORDS = `${ROOT}docs/truth/live-records`;
 
-/** A1's keyboard scroll probes (round 7), run from a scratch copy of the harness. */
 const KBSCROLL = "round 7's A1 keyboard scroll probe from a scratch copy of the harness: its ids (ks-*) are no live.ts case";
-/** A3's scratch driver (round 7), its assert replies alone. */
 const HINT_ASSERTS = "round 7's A3 scratch driver's assert replies: no live.ts case id in it";
 
-/** The records no `--rejudge` can judge, each with its reason. (A9's raw typing diagnosis, a9-fill-tail-diag/, and T11's
- * evidence, t11-carousel-visible/, are folders, which this guard does not read.) */
+/** The records no `--rejudge` can judge, each with its reason. (A folder — A9's raw typing diagnosis,
+ * a9-fill-tail-diag/, T11's evidence, t11-carousel-visible/, and every other — is not read by this guard.) */
 const EXEMPT: Readonly<Record<string, string>> = {
   'android-hint-everywhere-9fa59ae-asserts.json': HINT_ASSERTS,
   'android-hint-everywhere-e726c77-asserts.json': HINT_ASSERTS,
@@ -49,7 +47,6 @@ const rowRecord = (row: ts.Expression): string | undefined => (ts.isArrayLiteral
 const templateOf = (node: ts.TemplateExpression): RegExp =>
   new RegExp(`(?:^|/)${[node.head.text, ...node.templateSpans.map((span) => span.literal.text)].map(escapeRegExp).join('\\d+')}$`);
 
-/** A call to `rejudgeInProcess` or `rejudgeCli`. */
 const isRejudge = (node: ts.Node): node is ts.CallExpression =>
   ts.isCallExpression(node) && ts.isIdentifier(node.expression) && (node.expression.text === 'rejudgeInProcess' || node.expression.text === 'rejudgeCli');
 
@@ -68,7 +65,6 @@ const isSkipped = (node: ts.CallExpression): boolean =>
     (arg) => ts.isObjectLiteralExpression(arg) && arg.properties.some((p) => ts.isPropertyAssignment(p) && ts.isIdentifier(p.name) && p.name.text === 'skip' && p.initializer.kind === ts.SyntaxKind.TrueKeyword),
   );
 
-/** `expr` without `as const`, `satisfies …` or parentheses around it. */
 const unwrapped = (expr: ts.Expression): ts.Expression =>
   ts.isAsExpression(expr) || ts.isSatisfiesExpression(expr) || ts.isParenthesizedExpression(expr) ? unwrapped(expr.expression) : expr;
 
@@ -192,7 +188,7 @@ describe('every committed live record is replayed by live-rejudge.test.ts, or ex
     expect(isReplayed(template, 'lv2-group.json')).toBe(false);
   });
 
-  // T3's review round 3: what a text match took for a row.
+  // What a text match took for a row.
   const table = (rows: string) => `it.each([\n${rows}\n] as const)('%s', async (record, want) => {\n  await rejudgeInProcess(record, 'forms');\n});`;
   it('a row commented out names nothing: `//` (b4) or `/* */` (b5); nor a rejudge call commented out', () => {
     const b4 = table("  // ['a-1.json', 'forms', { cases: 1 }],\n  ['b-1.json', 'forms', { cases: 1 }],");
@@ -211,7 +207,7 @@ describe('every committed live record is replayed by live-rejudge.test.ts, or ex
     expect(isReplayed(d1, 'b-1.json')).toBe(true);
   });
 
-  // T3's review round 4: a skipped or todo call runs no rejudge.
+  // A skipped or todo call runs no rejudge.
   it.each([
     ['describe.skip (e1)', "describe.skip('d', () => {\n  it('x', async () => { await rejudgeInProcess('a-1.json', 'forms'); });\n});"],
     ['it.skip (e2)', "it.skip('x', async () => { await rejudgeInProcess('a-1.json', 'forms'); });"],

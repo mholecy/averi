@@ -9,9 +9,10 @@ import { casesOnMain, cellsOnMain } from '../../../scripts/truth/batch/precondit
 import { summarize, THIS_CHECKOUT } from '../../../scripts/truth/live-cases.js';
 
 // casesOnMain, cellsOnMain and completeness over this checkout's own live-cases.ts and catalog, read the way a batch
-// reads main's (live-table.ts#liveTableOf: a dynamic import of the checkout's file, never a grep). Kept apart from
-// cases.test.ts and preconditions.test.ts: the mutation run's sandbox holds scripts/truth/batch/ alone, not
-// live-cases.ts and what it imports. No device, no network: temp run folders with fixture logs.
+// reads main's (live-table.ts#liveTableOf: a dynamic import of the checkout's file, never a grep). No device, no
+// network: temp run folders with fixture logs. Kept apart from cases.test.ts and preconditions.test.ts:
+// scripts/mutation/scope.json maps cases.ts's mutants to cases.test.ts and preconditions.ts's to
+// preconditions.test.ts, not to this file, which reads the real table.
 
 const ROOT = join(import.meta.dirname, '..', '..', '..');
 let dir: string;

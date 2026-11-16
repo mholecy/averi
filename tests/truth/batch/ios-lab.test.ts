@@ -65,7 +65,6 @@ const config = (over: { udid?: string } = { udid: LAB_UDID }) => ({ out: join(di
 const steps: string[] = [];
 const needCtx = (run: Run = runOf(world), udid: string | null = LAB_UDID): NeedCtx => ({ bounded: run, labDir: join(dir, 'lab'), config: config(udid === null ? {} : { udid }), fs: nodeFs, step: (w, t) => void steps.push(`${w} ${t}`) });
 beforeEach(() => void (steps.length = 0));
-/** The words of the calls made, from the `n`th on. */
 const words = (from = 0) => world.calls.slice(from);
 /** A build need that was met with `app`, counting how often it is asked. */
 const builtRef = (app: string) => {
@@ -244,7 +243,7 @@ describe('the ios need (batch-11.sh:383–410): guard, reset, the finportal key\
   it('met: its how names the simulator, the reset, the build and the cells; the installed cells kept in the lab folder', async () => {
     const ios = iosLab({ wait });
     const r = await (ios.need as { check(c: NeedCtx): Promise<unknown> }).check(needCtx());
-    // Exactly met: no warning field at all (code review mutation round).
+    // Exactly met: no warning field at all.
     expect(r).toStrictEqual({ ok: true, how: "averi-lab iPhone 17 simulator, iOS 27.0, reset; not rebuilt; the installed cells.json is main's" });
     expect(readFileSync(join(dir, 'lab', 'ios-installed-cells.json'), 'utf8')).toBe(CATALOG);
     expect(steps).toContain("NOTE com.apple.launchservices.schemeapproval's finportal key at the iOS stretch's start: absent (read only: no batch writes it)");
@@ -303,7 +302,7 @@ describe('the ios need (batch-11.sh:383–410): guard, reset, the finportal key\
     const r = await (iosLab({ wait, reset: false, build: ref }).need as { check(c: NeedCtx): Promise<unknown> }).check(needCtx());
     expect(r).toEqual({ ok: true, how: "averi-lab iPhone 17 simulator, iOS 27.0; this run's build installed; the installed cells.json is main's" });
     expect(words()).toContain(`xcrun simctl install ${LAB_UDID} ${app}`);
-    // The need asks its build itself (review round 1, MAJOR 2): the build need's order in a block no longer matters.
+    // The need asks its build itself: the build need's order in a block does not matter.
     expect(ref.asked).toBe(1);
   });
 
@@ -479,7 +478,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     expect(stateOf(nodeFs, join(two.ctx.dir, 'state.json'))).toBe('dirty');
     expect(two.events.some((e) => e.includes('compare'))).toBe(false);
     expect(two.windows.get(WDA_WINDOW)!.hand[0]).toBe(portHand(LAB_UDID));
-    // Not put back: the block's verdict is never left to a judge's PASS (review round 2).
+    // Not put back: the block's verdict is never left to a judge's PASS.
     expect(two.events).toContain("verdict D43 live verdict: INCONCLUSIVE — the lab's settings not put back (see RESTORE)");
     // A restore that is not verified leaves the state dirty: nothing is compared (compare would refuse it anyway).
     fresh({ restoreFails: true });
@@ -533,7 +532,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     expect(spec?.stateFile).toBe(join(ctx.dir, 'state.json'));
     expect(spec?.block).toBe('D43');
     expect(spec !== undefined && 'secs' in spec).toBe(false);
-    // The WDA's kill first (review round 1, MINOR 4), then S4's per domain, then the compare.
+    // The WDA's kill first, then S4's per domain, then the compare.
     expect(spec?.hand[0]).toBe(portHand(LAB_UDID));
     expect(spec?.hand[1]).toMatch(/^D43 \(iOS\): xcrun simctl spawn LAB-SIMULATOR-UDID defaults import com\.apple\.keyboard\.preferences /);
     expect(spec?.hand.at(-1)).toBe(compareHand(join(ctx.dir, 'state.json')));
@@ -596,7 +595,7 @@ describe('the run\'s last step: the lab\'s WebDriverAgent and idb_companion ende
     const say = (w: string, t: string) => void steps.push(`${w} ${t}`);
     await endLabProcesses(() => LAB_UDID, wait)({ run, step: say });
     expect(steps).toEqual([`NOTE the lab's WebDriverAgent (port 8120 free (a listener killed)) and idb_companion of ${LAB_UDID} ended`]);
-    // Read again through portFree, after its wait (code review, NIT 3).
+    // Read again through portFree, after its wait.
     expect(waits).toEqual([PORT_RECHECK_MS]);
     steps.length = 0;
     await endLabProcesses(() => LAB_UDID, wait)({ run: async (cmd) => ({ code: cmd === 'pkill' ? 1 : 0, timedOut: false, signal: null, out: cmd === 'lsof' ? '7\n' : '', err: '' }), step: say });
@@ -668,7 +667,7 @@ describe("batch-13 fixes: idb's companion entry dropped after every companion en
       const r = await runOf(world)(cmd, args, call);
       return args[0] === 'disconnect' ? { ...r, code: 1, err: 'DisconnectCommandException: Could not disconnect' } : r;
     };
-    // The reset's warning carried to the check's caller, in the same words (code review).
+    // The reset's warning carried to the check's caller, in the same words.
     expect(await iosCheck(needCtx(), await simOf(run), 'D43 wda 1')).toStrictEqual({ ok: true, warning: "idb's companion entry may be stale — idb disconnect: exit 1 DisconnectCommandException: Could not disconnect" });
     expect(steps.at(-1)).toBe("WARN ios-reset: idb's companion entry may be stale — idb disconnect: exit 1 DisconnectCommandException: Could not disconnect");
     expect(words()).toContain(`idb disconnect ${LAB_UDID}`);

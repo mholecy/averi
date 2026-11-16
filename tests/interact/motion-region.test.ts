@@ -15,8 +15,7 @@ import { node } from '../helpers/fake.js';
  * region its carried rows were seen moving in, and the holds it puts on a stop there (interact/motion-ledger.ts
  * #regionOf, #heldBack, its geometry interact/motion-shown.ts); the stroke plan, told the region, strokes over it
  * (interact/stroke-plan.ts#planStroke, `screenBox` when the stroke's way is not over it — the round's ask,
- * scroll-rounds.ts#round). Moved here from tests/interact/stroke-plan.test.ts when the region became the ledger's
- * (round 15, the motion ledger): the cases are the ledger's and the plan's together, as one feature (lab note LV3).
+ * scroll-rounds.ts#round). The cases are the ledger's and the plan's together, as one feature (lab note LV3).
  */
 
 /** The iPhone 17's screen, the gesture box of the captures below. */

@@ -27,7 +27,7 @@ const run = promisify(execFile);
  * carousel-in-list's C under idb as it read before A38b's row stroke (interact/stroke-plan.ts#rowOf): its sideways
  * strokes over the screen's middle (y 437, below the carousel), none moving it, "content exhausted … a layout
  * defect" — R-direction on `refused`, known as ADR 0010's residual 5 until A38b struck it off (stroked inside the
- * carousel since, the replay green; the next Gate C proves it live): a record before it reads not known.
+ * carousel since, the replay green): a record before it reads not known.
  */
 const A38B_IDB = ['scroll:carousel-in-list.C'];
 

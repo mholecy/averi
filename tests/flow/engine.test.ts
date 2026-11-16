@@ -18,10 +18,10 @@ import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 // The one sleep owner (util/sleep.ts) is recorded, not waited on
 // (tests/helpers/sleep-recorder.ts): every poll cadence and the fill's 350 ms
 // focus delay collapse to one macrotask yield, so EngineOptions needs no
-// test-only timing knob (review 2026-10-03). Every test fakes the Date, and the
-// recorder moves it by each sleep: a deadline plays out in virtual time, the
-// same rounds on any machine, and a timeout costs no wall clock (T1). A fake
-// that must outlast a budget moves the clock itself (vi.setSystemTime).
+// test-only timing knob. Every test fakes the Date, and the recorder moves it
+// by each sleep: a deadline plays out in virtual time, the same rounds on any
+// machine, and a timeout costs no wall clock (T1). A fake that must outlast a
+// budget moves the clock itself (vi.setSystemTime).
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -70,7 +70,7 @@ flows:
       - tap: { id: tab_payments }
 `);
 
-/** The environment every engine here resolves `${VAR}` from — a value, not process.env (2026-10-04). */
+/** The environment every engine here resolves `${VAR}` from — a value, not process.env. */
 const TEST_ENV = { TEST_USER: 'alice@bank.md', TEST_PASSWORD: 'hunter2secret', TEST_PIN: '1234' };
 /** TEST_ENV without the named variables — for the "variable is not set" cases. */
 const envWithout = (...names: string[]) =>
@@ -239,13 +239,12 @@ flows:
     expect(none.typed).toEqual([]);
   });
 
-  // 2026-10-08 (after-ios-idb review #4): the digits were stripped and
-  // whatever was left typed — so a value with none typed nothing, traced
-  // "0 digits" and passed, and the PIN was rejected a screen later. Refused
-  // on either path (keypad taps or keystrokes) as a config error — the
-  // step's ✗ line, no "0 digits" success line — quoting what the author
-  // wrote, never the value. (Nothing typed is not asserted: zero digits
-  // typed nothing before the fix too.)
+  // Were the digits stripped and whatever was left typed, a value with none
+  // would type nothing, trace "0 digits" and pass, and the PIN be rejected a
+  // screen later. Refused on either path (keypad taps or keystrokes) as a
+  // config error — the step's ✗ line, no "0 digits" success line — quoting
+  // what the author wrote, never the value. (Nothing typed is not asserted:
+  // zero digits would type nothing without the refusal too.)
   describe('type_pin refuses a value with no digits before the first key', () => {
     const pinCfg = (value: string, keypad = false) =>
       parseConfig(`
@@ -621,9 +620,9 @@ flows:
     expect(entry?.detail).toMatch(/failed, escalating to login — /);
   });
 
-  // A19: until a duration was one schema, `timeout: 5 sec` loaded clean and parseDuration threw a plain Error when the
-  // rung ran — not terminal (engine.ts#isTerminal), so the ladder escalated past the typo into the clearState login.
-  // Now the config never loads, so the ladder never meets it; the empty taps and launches are a sanity check.
+  // A19: were a duration not one schema, `timeout: 5 sec` would load clean and parseDuration throw a plain Error when
+  // the rung ran — not terminal (engine.ts#isTerminal), so the ladder would escalate past the typo into the clearState
+  // login. The config never loads, so the ladder never meets it; the empty taps and launches are a sanity check.
   it('a bad duration never reaches the ladder: the config is refused at load', async () => {
     const fake = new FakeAdapter(screens(), 'biometrics_prompt');
     const typo = cfgYaml.replace('- tap: { id: not_now }', '- tap: { id: not_now, timeout: 5 sec }');
@@ -884,9 +883,9 @@ flows:
   });
 
   it('spends its single pass across a run\'s state AND flow — one per tool call, a verify leg included', async () => {
-    // 2026-10-07: a verify leg with a state and a flow is ONE run. Before,
-    // it called two entries, each with its own budget, so the flow's
-    // `requires` got a second pass after the state had spent the first.
+    // A verify leg with a state and a flow is ONE run: two entries, each with
+    // its own budget, would give the flow's `requires` a second pass after
+    // the state had spent the first.
     const cfg2 = parseConfig(`
 app:
   android: { package: md.bank.app }
@@ -1101,9 +1100,9 @@ flows:
 `);
 
   it('converges in ONE call, and the destructive rung still runs exactly once', async () => {
-    // The previously-VACUOUS shape, now as the positive case: this is the test
-    // the 0.5.0 review found proved nothing, because the throw path skipped
-    // the pass entirely and it passed with the destructiveness filter deleted.
+    // The positive case of the throw path: were a throwing last rung to skip the recovery pass, this would fail
+    // (no `↻ recovery`), and the never-re-runs-a-destructive-rung case below would pass with the destructiveness
+    // filter deleted.
     const fake = lateInterstitial();
     const trace = await FlowEngine.run(cfg, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' });
     expect(fake.launches).toHaveLength(1); // one wipe, not two
@@ -1120,9 +1119,8 @@ flows:
   it('re-checks detect for the throwing rung before anything else', async () => {
     // The smaller half of the same rethrow: the ladder re-checks `detect`
     // after a rung that failed, because a flow can REACH the state and then
-    // die on a later step — and the last rung alone jumped over that check.
-    // Single-rung on purpose: the recovery pass has nothing to run here, so
-    // only the detect can make this pass.
+    // die on a later step. Single-rung on purpose: the recovery pass has
+    // nothing to run here, so only the detect can make this pass.
     const cfg2 = parseConfig(`
 app:
   android: { package: md.bank.app }
@@ -1362,9 +1360,6 @@ flows:
     expect(session.clearStateCount).toBe(2);
   });
 
-  // The count used to be a module global the engine tests zeroed by hand
-  // (2026-10-07): every engine continued whatever count the process had
-  // reached. Now the count is the session's, and two sessions share nothing.
   it('two sessions count apart — nothing leaks from the runs of another', async () => {
     const fake = new FakeAdapter(buildScreens(), 'dashboard');
     await FlowEngine.run(cfg, fake, FAST, { flow: 'cold' });
@@ -1403,11 +1398,10 @@ flows:
     expect(trace).toContainEqual({ action: 'launch', detail: 'md.bank.app/.MainActivity (state cleared)' });
   });
 
-  // 2026-10-03, decided: app.android.activity applies only when the step
-  // names neither an activity nor an intent — the launch_app rule, now the
-  // one rule (flow/launch.ts#resolveLaunchActivity). This test pinned the
-  // opposite until then. The adapter scopes the activity-less intent to the
-  // package (tests/adapters/android.test.ts).
+  // Decided: app.android.activity applies only when the step names neither
+  // an activity nor an intent — the launch_app rule, the one rule
+  // (flow/launch.ts#resolveLaunchActivity). The adapter scopes the
+  // activity-less intent to the package (tests/adapters/android.test.ts).
   it('a step with an intent and no activity launches with the intent alone — app.android.activity stays out of it', async () => {
     const cfg = parseConfig(`
 app:
@@ -1424,9 +1418,9 @@ flows:
     expect(trace).toContainEqual({ action: 'launch', detail: 'md.bank.app' });
   });
 
-  // 2026-10-09: the launch's caveat (AppHolder's `unknown` — iOS's foreground
-  // wait giving up, adapters/ios-foreground.ts) is a ⚠ line right under the
-  // launch line, in launch_app's words; the flow goes on.
+  // The launch's caveat (AppHolder's `unknown` — iOS's foreground wait giving
+  // up, adapters/ios-foreground.ts) is a ⚠ line right under the launch line,
+  // in launch_app's words; the flow goes on.
   it("the launch's note is a `⚠ launch` line right under the launch line, and the flow goes on; no note, no line", async () => {
     const cfg = parseConfig(`
 app:
@@ -1489,7 +1483,7 @@ describe('transient UI-tree read failures', () => {
     };
   };
 
-  // `warm` is a non-destructive rung on purpose (2026-10-06): a DESTRUCTIVE
+  // `warm` is a non-destructive rung on purpose: a DESTRUCTIVE
   // rung behind a probe that never read a tree is refused instead of run —
   // tests/flow/unread-tree-ladder.test.ts pins that side.
   const cfg = parseConfig(`
@@ -1532,9 +1526,9 @@ flows:
     expect(trace).toContainEqual({ action: 'state home', detail: 'reached after warm' });
   });
 
-  // Until 2026-10-03 the detect probe swallowed its read error: a device that
-  // was gone looked exactly like "not in this state", and the ladder escalated
-  // with nothing in the trace saying it had never been asked.
+  // A detect probe that swallowed its read error would make a device that was
+  // gone look exactly like "not in this state", and the ladder escalate with
+  // nothing in the trace saying it had never been asked.
   it('a detect probe that cannot read the tree says so in the trace — the ladder still runs, the reason is no longer silent', async () => {
     const fake = new FakeAdapter(buildScreens(), 'dashboard');
     failingTree(fake, Number.POSITIVE_INFINITY);
@@ -1544,7 +1538,7 @@ flows:
       action: '⚠ detect',
       detail: 'element id:"dashboard_root" treated as not detected — last UI tree read failed: ' + NULL_ROOT,
     });
-    expect(fake.launches).toHaveLength(1); // the reach flow ran, as before
+    expect(fake.launches).toHaveLength(1); // the reach flow ran
   });
 
   it('a detect probe that reads fine and simply misses adds NO such line', async () => {
@@ -1770,7 +1764,7 @@ flows:
     expect(fake.swipes).toHaveLength(0);
   });
 
-  // D81 review round 1, MINOR-1 (the coordinator's decision): inside `optional:` a `within` that names no scroll view
+  // D81 (the coordinator's decision): inside `optional:` a `within` that names no scroll view
   // fails the flow — an authoring error no screen cures — unless it is `absent`, which is skipped like an absent
   // interstitial. Over android scroll-bounded's real dump (`upper` and `lower`, both vertical) and idb's flat list.
   describe('`within` refused inside `optional:`', () => {
@@ -1829,7 +1823,7 @@ flows:
     });
   });
 
-  // D81 review round 1, MINOR-2: a flow names elements by spec — the exhausted reply's way into a list it never swiped
+  // D81: a flow names elements by spec — the exhausted reply's way into a list it never swiped
   // asks for a spec of it, not the rect a flow cannot give.
   it('a flow\'s exhausted reply names the list beside by spec, never by rect', async () => {
     const BOUNDED = parseDump(readFileSync(new URL('../fixtures/truth/android-averi_lab-api33/scroll-bounded.xml', import.meta.url), 'utf8'));
@@ -2070,8 +2064,8 @@ flows:
 
   // The fill's mechanics (clear retries, verified typing, the masked-value
   // length rule, autofill/re-entry re-reads, per-platform keyboard dismissal)
-  // are pinned in tests/interact/fill.test.ts since 2026-10-03. What stays
-  // here is the STEP: the YAML reaching the fill, and the trace it writes.
+  // are pinned in tests/interact/fill.test.ts. What stays here is the STEP:
+  // the YAML reaching the fill, and the trace it writes.
   const appendBullets = (fake: ReturnType<typeof formFake>) => {
     fake.typeText = async (text: string) => {
       fake.typed.push(text);
@@ -2109,7 +2103,8 @@ flows:
 
   it('the ⚠ fill warning is in the trace even when dismissing the keyboard then throws (review 2026-10-03)', async () => {
     const fake = formFake('•'.repeat(20));
-    fake.attachKeyboard(); // an Android fake (window state unknown → back): the in-tree model presses no key since stage B
+    // An Android fake (window state unknown → back): the in-tree model presses no key (stage B)
+    fake.attachKeyboard();
     appendBullets(fake);
     fake.pressKey = async () => {
       throw new Error('idb ui key: timed out');
@@ -2157,8 +2152,8 @@ flows:
 
   it('a failure swallowed by `optional` — even through a `branch` — logs `skipped`, never ✗', async () => {
     const fake = formFake('9.99');
-    // A wait's timeout, not a fill that did not land: since 2026-10-09 that
-    // one fails the flow (the table below). This test is about the branch in between.
+    // A wait's timeout, not a fill that did not land: that one fails the flow
+    // (the table below). This test is about the branch in between.
     const c = parseConfig(`
 app: { android: { package: md.bank.app } }
 flows:
@@ -2176,9 +2171,9 @@ flows:
   });
 
   /**
-   * One fact, one table (2026-10-08): an `optional:` step is skipped "(not
-   * present)" exactly when the interaction module threw ElementNotFoundError, and
-   * with its own headline otherwise — every row is still skipped, none ✗.
+   * One fact, one table: an `optional:` step is skipped "(not present)"
+   * exactly when the interaction module threw ElementNotFoundError, and with
+   * its own headline otherwise — every row is still skipped, none ✗.
    */
   describe('optional: — "(not present)" only when interact never found the element', () => {
     const optionalFlow = (inner: string) =>
@@ -2325,9 +2320,8 @@ flows:
       expect(fake.typed).toEqual([]);
     });
 
-    // Until 2026-10-09 both were skipped with the fill's headline. Owner's
-    // decision: a fill that failed on its VALUE fails the flow, like a tap
-    // refused on a present element — a half-typed login must not run on.
+    // Owner's decision: a fill that failed on its VALUE fails the flow, like a
+    // tap refused on a present element — a half-typed login must not run on.
     const notSkipped = async (fake: FakeAdapter, inner: string) => {
       const error = (await FlowEngine.run(optionalFlow(`${inner}\n      - tap: { id: submit_button }`), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
       expect(error).toBeInstanceOf(FlowError);
@@ -2439,8 +2433,7 @@ flows:
       expect(fake.swipes).toEqual([]);
     });
 
-    // 2026-10-08 it was skipped with the refusal's headline; since 2026-10-09
-    // (owner's decision) a refusal on a PRESENT element is never skipped.
+    // Owner's decision: a refusal on a PRESENT element is never skipped.
     it('a tap on an element BELOW THE FOLD is not (not present): it was found — the off-screen refusal fails the flow, not skipped, nothing tapped', async () => {
       const fake = formFake();
       fake.live().children.push(node({ role: 'button', identifier: 'promo_close', rect: { x: 40, y: 2100, width: 100, height: 40 } })); // below the 1000x2000 screen
@@ -2457,8 +2450,8 @@ flows:
       expect(fake.taps).toEqual([]);
     });
 
-    // 2026-10-10 (docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-…, owner decision: refuse):
-    // a target cut to a sliver by its scroll container's edge is a refusal on a present element — terminal in an optional:.
+    // Owner decision (docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-…): a target cut to a
+    // sliver by its scroll container's edge is a refusal on a present element — terminal in an optional:.
     it('a tap on an element cut to a sliver at its scroll container\'s edge: refused, the flow fails — not skipped, nothing tapped', async () => {
       const fake = formFake();
       const toggle = node({ role: 'container', identifier: 'details_toggle', rect: { x: 40, y: 1950, width: 900, height: 50 }, children: [node({ role: 'button', rect: { x: 40, y: 1962, width: 900, height: 38 } })] });
@@ -2478,7 +2471,7 @@ flows:
       expect(fake.taps).toEqual([]);
     });
 
-    // Code review of round 6, P1: a button pinned under iOS's status bar (centre in the band) is an OffScreenRefusal on
+    // A button pinned under iOS's status bar (centre in the band) is an OffScreenRefusal on
     // a present element — terminal in an optional:, the owner's safe direction — and its remedy offers no scroll_until.
     it('a tap on an element pinned under iOS\'s status bar: refused, the flow fails — not skipped, nothing tapped — and the line says it is pinned', async () => {
       const fake = formFake();
@@ -2511,10 +2504,10 @@ flows:
       ]);
     });
 
-    // 2026-10-08 (review of after-ios-idb #4): a CONFIG refusal is not an
-    // absent interstitial. Skipped, an empty secret inside `optional:` let the
-    // flow run on with the login half-typed; now it fails the flow with its
-    // own refusal, the ✗ on the step that raised it, and no skip line.
+    // A CONFIG refusal is not an absent interstitial. Skipped, an empty secret
+    // inside `optional:` would let the flow run on with the login half-typed;
+    // it fails the flow with its own refusal, the ✗ on the step that raised
+    // it, and no skip line.
     describe('a config refusal inside optional: fails the flow, never skipped', () => {
       const credentialFlow = (inner: string) =>
         parseConfig(`
@@ -2546,7 +2539,7 @@ flows:
       });
     });
 
-    // Code review 2026-10-08, against the spec card: a failure after the
+    // Against the spec card: a failure after the
     // element was found stays another error. The tap's own resolution never
     // saw it, but the presence check did — so the skip quotes the tap.
     it('a tap SIGHTED by the presence check that then leaves for the whole tap budget: the tap\'s timeout, not (not present)', async () => {
@@ -2668,8 +2661,8 @@ flows:
     expect(trace).toContainEqual({ action: 'fill', detail: 'id:"amount_input" = ***' });
   });
 
-  // 2026-10-07 (docs/bugs/2026-10-07-ios-fill-empty-value-fails-in-idb.md):
-  // "" is typed as a no-op on both platforms now, so a credential whose
+  // docs/bugs/2026-10-07-ios-fill-empty-value-fails-in-idb.md:
+  // "" is typed as a no-op on both platforms, so a credential whose
   // variable is set but EMPTY (`TEST_PIN=` in .env.averi) must fail the step
   // before the device is touched — it would otherwise pass as `***` and the
   // bank would reject it one screen later. A literal "" is a different thing:
@@ -2692,9 +2685,9 @@ flows:
     expect(fake.typed).toEqual([]);
   });
 
-  // 2026-10-08 (after-ios-idb review #4): a credential DECLARED as "" never
-  // met the variable check and was typed as nothing — the fill passed as
-  // `***`. Refused before the field is tapped, like the empty variable above.
+  // A credential DECLARED as "" never meets the variable check: unrefused, it
+  // would be typed as nothing and the fill pass as `***`. Refused before the
+  // field is tapped, like the empty variable above.
   it('a credential declared as "" fails the fill before the field is tapped', async () => {
     const cfgSecret = parseConfig(`
 app: { android: { package: md.bank.app } }
@@ -2840,7 +2833,7 @@ ${assert}
 describe('absent detect conditions', () => {
   // The transactions_list ambiguity: Card Detail embeds the same list, so
   // "row present" alone matches both screens; "row present AND card face
-  // absent" is the discriminator that was previously inexpressible.
+  // absent" is the discriminator.
   const cfg = parseConfig(`
 app: { android: { package: md.bank.app } }
 states:
@@ -2855,8 +2848,8 @@ states:
   function fakeOn(screenName: 'transactions' | 'cards' | 'cards_offscreen') {
     resetLayout();
     // The row is a rendered `text`: a screen of identified-but-unlabeled
-    // `other` nodes alone is BARE (ui-tree/bare-tree.ts), and since
-    // 2026-10-08 an absence on a bare tree is not "yes" (describe below).
+    // `other` nodes alone is BARE (ui-tree/bare-tree.ts), and an absence on a
+    // bare tree is not "yes".
     const row = () => el({ role: 'text', identifier: 'row_0' });
     const screens = {
       transactions: screen(row()),
@@ -2907,10 +2900,8 @@ describe('failure modes', () => {
 });
 
 /**
- * One tool call = one engine run (2026-10-07, flow-engine review candidate 1).
- * The engine had two entries that each reset the trace, and `verify` called
- * both on one instance; now a run names a state, a flow or both, and owns one
- * trace for all of it.
+ * One tool call = one engine run: a run names a state, a flow or both, and
+ * owns one trace for all of it.
  */
 describe('run — the one entry', () => {
   it('a state and a flow in one run: a failing flow\'s FlowError carries the state\'s lines too', async () => {
@@ -2944,7 +2935,7 @@ describe('run — the one entry', () => {
   it('the engine is only reachable through one run, and a run must name something', () => {
     // @ts-expect-error — a request must name a state, a flow, or both
     const nothing: RunRequest = {};
-    // @ts-expect-error — a run must be handed its session: an omitted one silently reset the count per call
+    // @ts-expect-error — a run must be handed its session: an omitted one would silently reset the count per call
     const sessionless: EngineOptions = { env: {} };
     // @ts-expect-error — the constructor is private: build-and-keep is not a shape the engine offers
     const kept = (cfg: AveriConfig, a: FakeAdapter) => new FlowEngine(cfg, a, FAST);
@@ -3006,7 +2997,7 @@ flows:
 
   it('an environment that overrides nothing is still the first trace line, with no detail', async () => {
     // Pins the no-override form of the line (the names come from
-    // Credentials.overriddenNames since 2026-10-05; the wording must not move).
+    // Credentials.overriddenNames; the wording must not move).
     const cfg = { ...MULTI_ENV, environments: { ...MULTI_ENV.environments, mirror: { credentials: {} } } };
     const fake = new FakeAdapter(buildScreens(), 'fresh_login');
     const trace = await FlowEngine.run(cfg, fake, { ...MULTI, environment: 'mirror' }, { flow: 'type_username' });
@@ -3125,11 +3116,11 @@ flows:
     expect(fake.screenshots).toHaveLength(0);
   });
 
-  // 2026-10-09, owner's decision (docs/bugs/2026-10-09-android-compose-button-
+  // Owner's decision (docs/bugs/2026-10-09-android-compose-button-
   // text-refused-as-under-its-own-button.md, item 3): `optional:` skips an
   // ABSENT element only. One that is present and refused a tap is the
-  // interstitial itself — skipped, mp-native's login_registered rung ran on
-  // into its `wait:` and the ladder escalated to the registering login.
+  // interstitial itself — skipped, mp-native's login_registered rung would
+  // run on into its `wait:` and the ladder escalate to the registering login.
   describe('inside optional: a covered target fails the flow, never skipped — an absent one still is', () => {
     const NOT_SKIPPED = 'failed — optional step not skipped: its element is present, but the tap was refused — id:"priority" is under button "Continue to summary" (24,780 354x44) at its centre (201,797), drawn over it';
     const failedLines = (error: FlowError) => error.trace.filter((t) => t.action.startsWith('✗') || t.action === 'optional');
@@ -3228,7 +3219,7 @@ flows:
         expect(JSON.stringify(error.trace)).not.toContain('optional step not skipped');
       });
 
-      // Code review 2026-10-09, MINOR 3: terminal is "never escalate past
+      // Terminal is "never escalate past
       // it", not "never look". A rung that reached the state before a
       // TRAILING optional tap was refused has done its job — the ladder's
       // post-failure probe sees it, and the call passes.
@@ -3310,7 +3301,7 @@ flows:
         ]);
       });
 
-      // 2026-10-09, owner's decision: a fill that failed on its VALUE inside
+      // Owner's decision: a fill that failed on its VALUE inside
       // `optional:` is the same terminal finding — no escalation, no salvage,
       // and the ladder's detect probe still runs first.
       describe('an optional fill whose value did not land, or was refused: terminal the same way', () => {
@@ -3429,7 +3420,7 @@ flows:
       - ${step}
 `);
 
-  // D66 review (docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md): the flow's `tap:` step says
+  // D66 (docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md): the flow's `tap:` step says
   // what the MCP tap's reply says, as a `⚠ tap` line before the tap line; the tap is sent and the flow goes on.
   it('a tap on a node marked disabled: one ⚠ tap line with the tap reply\'s words, the tap sent, the flow done', async () => {
     const fake = new FakeAdapter({ s: screen(node({ role: 'button', identifier: 'go', rect: { x: 100, y: 200, width: 40, height: 20 }, disabled: true })) }, 's');
@@ -3443,7 +3434,7 @@ flows:
     expect(fake.tapPoints).toEqual([{ x: 120, y: 210 }]);
   });
 
-  // D66 review round 2, decided: quiet suppresses the tap line, not the warning — as the keyboard's ⚠ tap line.
+  // D66, decided: quiet suppresses the tap line, not the warning — as the keyboard's ⚠ tap line.
   it('an optional tap: on a present node marked disabled, the ⚠ tap line too, the tap sent', async () => {
     const fake = new FakeAdapter({ s: screen(node({ role: 'button', identifier: 'promo_close', rect: { x: 100, y: 200, width: 40, height: 20 }, disabled: true })) }, 's');
     const trace = await FlowEngine.run(flow('optional:\n          - tap: { id: promo_close }'), fake, FAST, { flow: 'f' });
@@ -3641,8 +3632,8 @@ flows:
     expect(fake.typed).toEqual([]);
   });
 
-  // Skipped with its headline until 2026-10-09: nothing was sent and the
-  // target resolved, so it is a refusal on a PRESENT element — not skipped.
+  // Nothing was sent and the target resolved, so it is a refusal on a
+  // PRESENT element — not skipped.
   it('an optional: tap refused that way is NOT skipped: ⚠ tap, then its ✗ saying it was not skipped, nothing sent', async () => {
     const fake = loginFake();
     fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
@@ -3714,8 +3705,8 @@ flows:
     expect(fake.taps).toEqual([]);
   });
 
-  // Skipped until 2026-10-09; a refusal on a present element now fails the
-  // flow even inside `optional:` (owner's decision), and its ✗ is the one line.
+  // A refusal on a present element fails the flow even inside `optional:`
+  // (owner's decision), and its ✗ is the one line.
   it('an optional tap: whose target the keyboard\'s re-layout moved off screen AFTER back: the ✗ line says back was pressed, not skipped (2026-10-08, review m2)', async () => {
     const fake = loginFake();
     fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
@@ -3738,8 +3729,9 @@ flows:
     expect(fake.taps).toEqual([]);
   });
 
-  // Verification of code review of round 6, P1: the remedy after back is judged in the tree that holds the node handed
-  // back (the guard's second look) — in the first read's tree it is not found, and the wording fell back to "both".
+  // The remedy after back is judged in the tree that holds the node handed
+  // back (the guard's second look) — in the first read's tree it is not found, and the wording would fall back to
+  // "both".
   it('an optional tap: whose target the re-layout after back pinned under a status band: the remedy reads the second look\'s tree — pinned, no scroll_until', async () => {
     const fake = loginFake();
     fake.viewportSize = { width: 1080, height: 2220, statusBand: 62 };
@@ -3974,7 +3966,7 @@ flows:
 });
 
 /**
- * The in-tree keyboard (iOS, 2026-10-07; docs/bugs/2026-10-05-ios-tap-lands-
+ * The in-tree keyboard (iOS; docs/bugs/2026-10-05-ios-tap-lands-
  * on-soft-keyboard.md): the WDA source marks the band the keyboard covers
  * (role `keyboard`), the adapter has no oracle, and the guard REFUSES a
  * target under it — nothing to press. The policy is pinned in
@@ -4049,8 +4041,8 @@ ${steps}
     expect(fake.taps).toEqual([]);
   });
 
-  // Skipped until 2026-10-09; the target resolved on both looks and nothing
-  // was sent — a refusal on a PRESENT element, so the step fails the flow.
+  // The target resolved on both looks and nothing was sent — a refusal on a
+  // PRESENT element, so the step fails the flow.
   it('an optional: tap under the band with no dismissal is NOT skipped: ⚠ tap, then its ✗ saying it was not skipped', async () => {
     const fake = iosFake();
     const error = (await FlowEngine.run(flow('      - optional:\n          - tap: { id: login_submit }'), fake, FAST, { flow: 'f' }).catch((e: unknown) => e)) as FlowError;
@@ -4082,9 +4074,9 @@ ${steps}
   });
 
   /**
-   * Stage B (2026-10-07): `app.ios.keyboardDismiss` reaches the guard through
-   * the engine — converted once in the constructor, passed to every tap and
-   * fill and to the post-fill dismissal. The policy is pinned in
+   * Stage B: `app.ios.keyboardDismiss` reaches the guard through the engine —
+   * converted once in the constructor, passed to every tap and fill and to
+   * the post-fill dismissal. The policy is pinned in
    * tests/interact/keyboard-in-tree.test.ts; here the STEP and its trace lines.
    */
   describe('with app.ios.keyboardDismiss configured (stage B)', () => {
@@ -4238,11 +4230,12 @@ ${steps}
 describe('a reach rung whose requires: re-enters the state being ensured', () => {
   // Not a config error (flow/config.ts, rejectDetectCycles): the mutual
   // login/logout shape works from either state on the loop. From a third
-  // screen the nested ladder used to re-run the same first rung forever —
-  // no step runs between the two entries, so the screen never changes and
-  // the call hung. Now the re-entry fails the rung that closed the loop (a
-  // ReentryError naming it, NOT terminal): the ladder escalates as for any
-  // failed rung, and with no rung left the call fails fast with that error.
+  // screen, unguarded, the nested ladder would re-run the same first rung
+  // forever — no step runs between the two entries, so the screen never
+  // changes and the call would hang. The re-entry fails the rung that closed
+  // the loop (a ReentryError naming it, NOT terminal): the ladder escalates as
+  // for any failed rung, and with no rung left the call fails fast with that
+  // error.
   const LOOP = parseConfig(`
 app: {}
 states:
@@ -4284,8 +4277,8 @@ flows:
    * Counts tree reads, and flips the fake to a screen the ensured state
    * detects (`home` by default) at read `flipAt` (100 by default) — far past
    * anything the guarded engine reads. Without the guard the loop then ends by itself and the
-   * test fails by ASSERTION, where it used to spin the worker until the heap
-   * was gone.
+   * test fails by ASSERTION, rather than spinning the worker until the heap
+   * is gone.
    */
   const countReads = (fake: FakeAdapter, detected = 'home', flipAt = 100) => {
     const read = fake.uiTree.bind(fake);
@@ -4525,7 +4518,7 @@ flows:
 
 // D35 → L5 (ADR 0040): an engine built WITHOUT pollMs (production) leaves the settle cadence to the adapter's fact —
 // a flow tap's and fill's settle — while its own 500 still paces everything else: the fill's value poll (passed
-// explicitly), `wait:`, the `optional:` probe and detect. An engine given pollMs pins it everywhere, as before.
+// explicitly), `wait:`, the `optional:` probe and detect. An engine given pollMs pins it everywhere.
 describe('the settle cadence is the adapter\'s when the engine pins none (ADR 0040)', () => {
   const cfg = parseConfig(`
 app:

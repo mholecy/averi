@@ -14,7 +14,7 @@ import { resetSleeps } from '../helpers/sleep-recorder.js';
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 
 /**
- * D19 review, MINOR-4: a baseline stored before D19 is the DEVICE's PNG (`screencap -p`); after it, Android's frame is
+ * D19: a baseline stored before D19 is the DEVICE's PNG (`screencap -p`); after it, Android's frame is
  * the raw capture. The screenshot assert must compare the two equal — by pixels, threshold 0 — and a baseline it
  * creates from a raw capture (averi's own PNG) must hold the same pixels. One real pair from the lab AVD.
  */

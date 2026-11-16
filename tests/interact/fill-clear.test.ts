@@ -54,7 +54,7 @@ describe('clearStep — what one reading means for the clear', () => {
     expect(play(['2.50', null], 'Amount')).toEqual({ trace: ['delete 4'], facts: { cleared: 4, end: { kind: 'empty' } } });
   });
 
-  // Review round 2, probe K: deletes go from the end, so what they leave is
+  // Deletes go from the end, so what they leave is
   // a prefix of what was there.
   it('deleted INTO the named placeholder: `other` from a reading that did not start with it, `prefix` from one that did (K)', () => {
     expect(play(['Zed', 'Company'], 'Company')).toEqual({ trace: ['delete 3'], facts: { cleared: 3, end: { kind: 'empty', placeholder: 'other' } } });
@@ -110,7 +110,7 @@ describe('clearStep — what one reading means for the clear', () => {
     expect(play(['abc', 'Hint A', 'Hint B', 'Hint C'])).toEqual({ trace: ['delete 3', 'delete 6', 'delete 6'], failure: { code: 'clear-twice', left: 6, rounds: 3 } });
   });
 
-  // m-1 (review 2026-10-08): not found is not empty.
+  // Not found is not empty.
   it('a read that finds no field ends the clear `lost`, after a delete or after the re-read — never empty', () => {
     expect(play(['XX12345', LOST])).toEqual({ trace: ['delete 7'], facts: { cleared: 7, end: { kind: 'lost', why: 'unmatched' } } });
     expect(play(['abc', 'abc', { lost: 'screen-changed' }])).toEqual({ trace: ['delete 3', 'reread'], facts: { cleared: 3, end: { kind: 'lost', why: 'screen-changed' } } });

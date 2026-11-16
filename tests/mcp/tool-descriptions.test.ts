@@ -11,8 +11,7 @@ import { node } from '../helpers/fake.js';
 
 /**
  * The operation defaults a tool description quotes have one owner — the
- * module whose code applies them (architecture review 2026-10-07,
- * mcp-surface candidate 3). A test that only compared a description with the
+ * module whose code applies them. A test that only compared a description with the
  * constant's CURRENT value would pass for a literal that happens to equal it
  * today, which is exactly the drift being ruled out; so each owner's
  * constant is replaced here with a value no description could carry by
@@ -250,7 +249,7 @@ describe('tool descriptions quote each operation default from its owner', () => 
     }
     expect(full('launch_app')).toContain('`treeSource: wda`: until WebDriverAgent names the launched bundle as its active app');
     expect(troubleshooting).toContain('**iOS `⚠ … after launching <app>, WebDriverAgent still read <other> as the active app …`**');
-    // The 2026-10-09 correction (ios-foreground.ts#notInFront): the screenshot switches before the tree does.
+    // The correction (ios-foreground.ts#notInFront): the screenshot switches before the tree does.
     expect(troubleshooting).not.toContain('If it shows the launched app, its on-screen name differs from its Info.plist name (a localized display name) and you can go on.');
     expect(troubleshooting).toContain('The screenshot does not settle it: it shows the launched app before idb\'s tree does.');
     expect(troubleshooting).toContain('averi could not tell which app the tree shows, and the parentheses say why. The tree may still be the previous app\'s. Read again before you trust a read (the screenshot switches before the tree).');
@@ -737,7 +736,7 @@ describe('every description keeps the rules an agent must not break', () => {
   });
 });
 
-// D43 (ADR 0037's D43 amendment): a wda project types non-ASCII, so the description no longer says one set for both.
+// D43 (ADR 0037's D43 amendment): a wda project types non-ASCII, so the description does not say one set for both.
 describe('type_text says what each path types', () => {
   it('not "only printable ASCII … on both platforms"', () => {
     expect(description('type_text')).not.toMatch(/on both platforms/);

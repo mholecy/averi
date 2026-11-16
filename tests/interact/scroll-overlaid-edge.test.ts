@@ -26,8 +26,8 @@ const failure = async (cell: string, selector: string, fully: boolean): Promise<
 const RUNS_ON = "drawn after it — the dump (Compose's, on Android) leaves out of a node's bounds what a later node covers, so the rest of it may lie under that container";
 
 describe('scroll_until on a node cut at an overlay', () => {
-  // Neither P nor Continue lies in a scroll view (the cell lists none): no scroll moves either, so no swipe is sent (D87) —
-  // it stroked 3 times before, then blamed "a layout defect", which the stop still says without the strokes.
+  // Neither P nor Continue lies in a scroll view (the cell lists none): no scroll moves either, so no swipe is sent
+  // (D87).
   it('pinned-bar P, fully: true — no "fully visible": stops before any swipe naming Continue, with no share of it said to show', async () => {
     const fake = fakeOf('pinned-bar');
     const e = (await scrollUntilVisible(fake, 'id:"lab.pinned-bar.P"', { ...FAST, fully: true }).catch((err: unknown) => err)) as Error;
@@ -41,8 +41,8 @@ describe('scroll_until on a node cut at an overlay', () => {
     expect(e.message).toContain('stopped before any swipe');
     expect(fake.swipes).toEqual([]);
   });
-  // The plain stop is the next tap's point (its centre clear, the probe there fired P): it stops, its words as before —
-  // a stated residual (ADR 0013, refined 2026-10-20): its reply does not say the row may run on under the button.
+  // The plain stop is the next tap's point (its centre clear, the probe there fired P): it stops — a stated residual
+  // (ADR 0013, refined 2026-10-20): its reply does not say the row may run on under the button.
   it('pinned-bar P, the plain stop: its centre clear — stops, as before', async () => {
     expect(describeScrollResult(await scrollUntilVisible(fakeOf('pinned-bar'), 'id:"lab.pinned-bar.P"', FAST))).toBe('fully visible after 0 swipes');
   });

@@ -5,8 +5,8 @@ import { maskTemplate, prefixOf, reformatOf, separatedOf, skeleton } from '../..
  * D18: a field that reformats as it is typed (an IBAN grouped in fours, an amount's thousands) shows every typed
  * character, in order, with separators of its own between them — measured on the lab's Compose, React Native and
  * VisualTransformation fields (docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md). Tight: a field
- * that dropped, reordered or changed a character never passes, nor an added separator that is no grouping (review
- * round 1, MAJOR-1: every pair the reviewer found is pinned below).
+ * that dropped, reordered or changed a character never passes, nor an added separator that is no grouping (every
+ * pair a review found is pinned below).
  */
 describe('reformatOf — the typed characters in order, one separator added between groups', () => {
   it('an IBAN grouped in fours, an amount grouped by thousands (a no-break space), a date and a phone', () => {
@@ -70,7 +70,7 @@ describe('reformatOf — the typed characters in order, one separator added betw
     expect(reformatOf('end. Start', 'end.Start')).toBeUndefined();
   });
 
-  // Round 2, MAJOR-A: autocorrect splitting a word reads as a separator between two letters.
+  // Autocorrect splitting a word reads as a separator between two letters.
   it('a separator between two letters passes only in a code (digits, no typed space): an IBAN, never prose', () => {
     expect(reformatOf('a lot', 'alot')).toBeUndefined();
     expect(reformatOf('in fact is', 'infact is')).toBeUndefined();
@@ -85,7 +85,7 @@ describe('reformatOf — the typed characters in order, one separator added betw
     expect(reformatOf('LC55 HEMM 0001 0001 0012 0001 2', 'LC55HEMM00010001001200012')).toEqual({ added: 6, respaced: 0 });
   });
 
-  // Round 2, MINOR-C: the false mismatches ADR 0034 lists — each fails loudly; the remedy is to type it as shown.
+  // The false mismatches ADR 0034 lists — each fails loudly; the remedy is to type it as shown.
   it('the false mismatches ADR 0034 names stay mismatches', () => {
     expect(reformatOf('+421 900-123-456', '+421900123456')).toBeUndefined();
     expect(reformatOf('1 2 3 4', '1234')).toBeUndefined();
@@ -93,7 +93,7 @@ describe('reformatOf — the typed characters in order, one separator added betw
     expect(reformatOf('1 234', '12 34')).toBeUndefined();
   });
 
-  // Round 2, NIT-B: code points on both sides.
+  // Code points on both sides.
   it('an astral letter is one character on both sides', () => {
     expect(reformatOf('𝐀𝐁𝐂𝐃 1234', '𝐀𝐁𝐂𝐃1234')).toEqual({ added: 1, respaced: 0 });
   });
@@ -119,7 +119,7 @@ describe('reformatOf — the typed characters in order, one separator added betw
     expect(reformatOf('1.234.5', '12345')).toBeUndefined(); // one digit after the last
     expect(reformatOf('1.234.5', '1234.5')).toBeUndefined(); // the typing's own point
     expect(reformatOf('1,234,5', '1234,5')).toBeUndefined();
-    expect(reformatOf('0,12.345', '0,12345')).toBeUndefined(); // round 2, MINOR-B: a fraction is no whole part
+    expect(reformatOf('0,12.345', '0,12345')).toBeUndefined(); // a fraction is no whole part
     expect(reformatOf('.1,234', '.1234')).toBeUndefined(); // a fraction from the reading's first character
     expect(reformatOf('1,23a', '123a')).toBeUndefined(); // a group of three holds digits only
     expect(reformatOf('1,a23', '1a23')).toBeUndefined();

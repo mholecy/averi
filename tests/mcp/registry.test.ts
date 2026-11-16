@@ -79,7 +79,7 @@ describe('AdapterRegistry', () => {
     expect(probes).toEqual(['android', 'android']);
   });
 
-  // D13 (2026-10-31): get() runs on every tool call, and reads nothing but
+  // D13: get() runs on every tool call, and reads nothing but
   // ids and states — on Android a version is a getprop per attached device.
   it('get() lists without OS versions, on both its paths; select() and listAll() still ask for them', async () => {
     const { registry, versions } = makeRegistry([device('phone'), device('sim', 'booted', 'ios')]);
@@ -119,11 +119,10 @@ describe('AdapterRegistry', () => {
     await expect(registry.select('android', 'phone')).rejects.toThrow(/offline/);
   });
 
-  // C5 (2026-10-09): adb lists a phone waiting on its RSA prompt as
-  // `unauthorized`, and a transport it cannot talk to as `offline`. Both
-  // read "No booted Android emulator/device found" / "is no longer booted";
-  // the reply now names the device and the state, and says what to do —
-  // the wording is adapters/discovery.ts#androidUnusable's, pinned there.
+  // C5: adb lists a phone waiting on its RSA prompt as `unauthorized`, and a
+  // transport it cannot talk to as `offline`. The reply names the device and
+  // the state, and says what to do — the wording is
+  // adapters/discovery.ts#androidUnusable's, pinned there.
   describe('an Android device adb lists but cannot drive is named, with what to do — never picked', () => {
     const UNAUTHORIZED = /"R58M123" is unauthorized: .*accept the "Allow USB debugging\?" prompt.*`adb kill-server`/;
     const OFFLINE = /"emulator-5556" is offline: adb sees it but cannot talk to it\..*`adb kill-server && adb start-server`/;
@@ -225,8 +224,8 @@ describe('AdapterRegistry', () => {
     });
   });
 
-  // D22 (2026-10-31): on iOS the still-booted check was `simctl list devices` (~110 ms) on every tool call. Discovery's
-  // check owns the proof and its steps (pinned in adapters/discovery.test.ts); here, what the registry does with it.
+  // D22: a `simctl list devices` still-booted check would cost ~110 ms on every iOS tool call. Discovery's check owns
+  // the proof and its steps (pinned in adapters/discovery.test.ts); here, what the registry does with it.
   describe('the bound simulator proven booted from its device.plist (D22)', () => {
     it('proven booted: no listing, the same cached adapter, bound to the same simulator', async () => {
       const { registry, probes, bound, plistReads } = makeRegistry([device('sim', 'booted', 'ios')], undefined, async () => true);
@@ -343,7 +342,7 @@ describe('AdapterRegistry', () => {
     const fresh = await registry.get('ios', {});
     expect(fresh).not.toBe(fallen);
     expect(created).toHaveLength(3);
-    // A healthy adapter survives a re-select of its device, as before.
+    // A healthy adapter survives a re-select of its device.
     await registry.select('ios', 'sim');
     expect(await registry.get('ios', {})).toBe(fresh);
   });
@@ -445,7 +444,7 @@ describe('AdapterRegistry.shutdown — the process-shutdown path', () => {
   it('a get() parked on a probe when shutdown ran cannot cache a fresh adapter afterwards', async () => {
     // Otherwise the in-flight tool call would create — and on iOS/wda spawn —
     // exactly the server the shutdown just stopped, into a registry nobody
-    // disposes again (review 2026-09-18).
+    // disposes again.
     let release!: () => void;
     const gate = new Promise<void>((r) => { release = r; });
     let gated = true;
@@ -466,8 +465,8 @@ describe('defaultFactory — the wiring the injected factories above never see',
   // No device is touched. Which backend a kind gets is adapters/ knowledge and
   // is pinned there (ios-tree-source.test.ts, createIosTreeSource); this file
   // pins only what the registry adds: the bound device id goes through and
-  // android gets its own adapter. (There is no unbound call since 2026-10-08:
-  // the id is required by the type, and listing is DeviceDiscovery's.)
+  // android gets its own adapter. (There is no unbound call: the id is
+  // required by the type, and listing is DeviceDiscovery's.)
 
   it('a bound wda adapter is bound to the GIVEN device id — its WebDriverAgent holds that udid\'s port, not `booted`\'s', () => {
     // The one consequence of the udid a wda source is constructed with that

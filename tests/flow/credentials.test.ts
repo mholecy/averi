@@ -5,8 +5,7 @@ import { resolveCredentials } from '../../src/flow/credentials.js';
 /**
  * flow/credentials.ts: config + environment + requested name → frozen
  * credentials. The environment is a plain object here — the module reads no
- * `process.env`, so nothing is set up or scrubbed (2026-10-04, C2; the tests
- * these replace lived in config.test.ts and set `process.env.AVERI_ENV`).
+ * `process.env`, so nothing is set up or scrubbed.
  */
 
 const MULTI_ENV = `
@@ -118,9 +117,9 @@ describe('Credentials.resolve — $name, ${VAR}, plain', () => {
     );
   });
 
-  // 2026-10-07: `PASSWORD=` in .env.averi parses to "", and the adapters type
-  // "" as a no-op (DeviceAdapter.typeText) — so an empty variable would have
-  // typed nothing, passed, and been rejected by the bank one screen later, the
+  // `PASSWORD=` in .env.averi parses to "", and the adapters type "" as a
+  // no-op (DeviceAdapter.typeText) — so an empty variable would have typed
+  // nothing, passed, and been rejected by the bank one screen later, the
   // 2026-08-06 misdiagnosis shape. Refused like an unset one, saying which.
   it('an EMPTY variable is refused like an unset one, saying it is set but empty', () => {
     expect(() => resolveCredentials(cfg, { ...ENV, AVERI_TEST_EMPTY: '' }).resolve('${AVERI_TEST_EMPTY}')).toThrow(
@@ -135,11 +134,10 @@ describe('Credentials.resolve — $name, ${VAR}, plain', () => {
     expect(resolveCredentials(cfg, ENV).resolve('')).toEqual({ value: '', secret: false });
   });
 
-  // 2026-10-08 (after-ios-idb review #4): the empty check lived only in the
-  // `${VAR}` expansion, so a credential declared as "" — no variable in it —
-  // resolved to "", was typed as nothing, and the step passed. A secret is
-  // never empty, whichever path produced it; the remedy names the layer the
-  // "" was declared in.
+  // With the empty check only in the `${VAR}` expansion, a credential declared
+  // as "" — no variable in it — would resolve to "", be typed as nothing, and
+  // the step would pass. A secret is never empty, whichever path produced it;
+  // the remedy names the layer the "" was declared in.
   it('a credential declared as "" is refused like an empty variable, naming the layer it was declared in', () => {
     const literal = parseConfig(`
 app:

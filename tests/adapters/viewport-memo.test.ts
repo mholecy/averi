@@ -5,7 +5,7 @@ import { ViewportMemo } from '../../src/adapters/viewport-memo.js';
 /**
  * The memo behind both adapters' viewport() (adapters/viewport-memo.ts):
  * a success is kept, a read in flight is shared, a failure is dropped, and
- * `fresh` replaces the memo (the parity code review's A3, 2026-10-07).
+ * `fresh` replaces the memo.
  */
 describe('ViewportMemo', () => {
   const scripted = (...answers: (DeviceScreen | Error)[]) => {

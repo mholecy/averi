@@ -142,7 +142,7 @@ describe('labLine and needsLine — a need checked once, its lab line in the SUM
   it('LAB <need>: OK — how; ERROR — why', () => {
     expect(labLine('android', { ok: true, how: 'emulator-5554, averi_lab' })).toBe('LAB android: OK — emulator-5554, averi_lab');
     expect(labLine('ios', { ok: false, why: 'no lab simulator booted' })).toBe('LAB ios: ERROR — no lab simulator booted');
-    // Met with a warning, typed (T2 S6b review round 1; its code review: the warning is the outcome, not a flag).
+    // Met with a warning, typed (the warning is the outcome, not a flag).
     expect(labLine('android', { ok: true, how: 'averi_lab emulator S', warning: 'the build failed; the app already installed is used' })).toBe('LAB android: WARN — the build failed; the app already installed is used: averi_lab emulator S');
     expect(labLine('android', { ok: true, how: 'x\nmore', warning: 'w' })).toBe('LAB android: WARN — w: x');
   });

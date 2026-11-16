@@ -8,11 +8,11 @@ import { node } from '../helpers/fake.js';
 const fixture = (name: string): Promise<string> => readFile(new URL(`../fixtures/${name}`, import.meta.url), 'utf8');
 
 /**
- * The field/error pairing rule now has ONE owner shared by both iOS tree
+ * The field/error pairing rule has ONE owner shared by both iOS tree
  * sources (idb's flat list, WDA's nested tree). That makes it worth pinning
- * properly: a change here silently changes both platforms at once, and the
- * previous fixtures only ever had one field and one candidate — so most of
- * the rule was passing by coincidence rather than by test.
+ * properly: a change here silently changes both sources at once, and
+ * fixtures with only one field and one candidate would pass most of the
+ * rule by coincidence rather than by test.
  */
 
 const field = (id: string, y: number, height = 20): UiNode =>

@@ -510,7 +510,7 @@ describe("compare — a late writer after the restore (batch-11 review round 1: 
     expect(c.line).not.toMatch(/[\n\r]/);
     expect(COMPARE_VALUE_CHARS).toBe(60);
     writeFileSync(stateFile(), JSON.stringify({ ...readState(), dirty: false })); // the first compare marked it dirty
-    // Cut by code points (T2 S4 review round 2): an emoji across the cut stays whole, never half a surrogate pair.
+    // Cut by code points: an emoji across the cut stays whole, never half a surrogate pair.
     const emoji = `"${'z'.repeat(COMPARE_VALUE_CHARS - 2)}😀😀"`;
     fake.domains.set(A11Y, { ...exported(A11Y, 'backup'), u: { t: 'string', c: emoji } });
     expect((await compare(sim, stateFile())).domains[2]).toMatchObject({ changes: [`u absent → string "${'z'.repeat(COMPARE_VALUE_CHARS - 2)}😀…`] });

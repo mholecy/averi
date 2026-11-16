@@ -66,10 +66,10 @@ describe('the lab\'s form-shared-id (Compose, in location order by chance, unmar
 });
 
 /**
- * The review's MAJOR 1 (D75 round 1): marking is not monotone-cautious. A control listed AFTER the target in a classic
+ * D75: marking is not monotone-cautious. A control listed AFTER the target in a classic
  * run, over its centre, was a cover by the draw order (`drawn`: the tap refused); in a marked run it is a peer whose
  * order is untold — still a cover with no screenshot, but LIFTED when the eyes see the target on top (ADR 0024's
- * judgement, now on Android frames). Unmeasured live in that direction (ADR 0015's D75 residual; backlog D77).
+ * judgement, on Android frames). Unmeasured live in that direction (ADR 0015's D75 residual; backlog D77).
  */
 describe('a later-listed control over the target\'s centre in a classic run: drawn unmarked, untold marked, lifted by the eyes', () => {
   const OVERLAP = `<hierarchy rotation="0">
@@ -105,7 +105,7 @@ describe('a later-listed control over the target\'s centre in a classic run: dra
 });
 
 /**
- * The review's spec pin (D75 round 2): a real form the mark reaches — rn-field on Android, React Native's screen view
+ * D75's spec pin: a real form the mark reaches — rn-field on Android, React Native's screen view
  * listing its three field boxes, each label and each EditText as siblings in location order, marked — judges every
  * field and label exactly as the unmarked tree did: the same covers, the same share shown, the same tap point.
  */

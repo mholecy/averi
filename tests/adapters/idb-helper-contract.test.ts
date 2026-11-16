@@ -180,11 +180,11 @@ describe.skipIf(found === undefined)('the helper\'s bootstrap — what it import
     "    if argv[0] == 'big':",
     '        sys.stdout.buffer.write(bytes([0x00, 0x0a, 0xff, 0x0d, 0x89, 0x50]) * (5 * 1024 * 1024 // 6))',
     '        return 0',
-    // A surrogate escape (an undecodable byte of an argv or a file name) printed as text: stderr's error handler.
     // A helper that dies inside gen_main — after it acknowledged the request (D7b).
     "    if argv[0] == 'exit':",
     '        import os',
     '        os._exit(9)',
+    // A surrogate escape (an undecodable byte of an argv or a file name) printed as text: stderr's error handler.
     "    if argv[0] == 'surrogate':",
     "        print('\\udcff', file=sys.stderr)",
     '        return 0',

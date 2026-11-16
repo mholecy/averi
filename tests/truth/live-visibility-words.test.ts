@@ -410,9 +410,9 @@ describe('the special cases\' judges at their edges', () => {
     });
     it('only the table\'s strokes are judged: another view\'s that moved nothing is no carry past the window', () => {
       // The review's counterexample: a header over all but the table's last 32 pt (the region y 842, 32 tall), L at 830 at
-      // the launch, no frame of it at the stop; another view's stroke from rest to rest would read as a carry past. Since
-      // D83 the move test rules it out as well: the view filter is equivalent (another view's stroke that moves more than
-      // the slack is judgeScroll's R-direction first, even on a LOUD stop), and this pins the verdict, not the filter.
+      // the launch, no frame of it at the stop; another view's stroke from rest to rest would read as a carry past. The
+      // move test rules it out as well: the view filter is equivalent (another view's stroke that moves more than the
+      // slack is judgeScroll's R-direction first, even on a LOUD stop), and this pins the verdict, not the filter.
       const narrow = narrowed(830, 64);
       const failed = 'ERROR scroll_until id:"lab.sheet-long-list.L" failed after 1 swipe (maxSwipes) — element never appeared in the tree';
       const s = { ...narrow, frames: {}, strokes: [stroke(0, 0, 'other')] };

@@ -55,7 +55,7 @@ describe('parseWdaSource — RN fixture (the idb-invisible identifiers)', () => 
   it('keeps the whole nested tree, including invisible nodes, but the text echoes (31 of 35)', () => {
     // 35 elements in the dump; the 4 unidentified StaticText children that
     // echo their <Text> parent (placeholder_title/status/gateway/scope) are
-    // dropped since 2026-10-08 (wda-source.ts#isTextEcho).
+    // dropped (wda-source.ts#isTextEcho).
     expect(nodes).toHaveLength(31);
   });
 
@@ -125,8 +125,8 @@ describe('parseWdaSource — native skeleton fixture', () => {
 describe('parseWdaSource — a React Native <Text> is one element, not its echo (2026-10-08)', () => {
   // WDA reports every RN <Text> as a StaticText (the testID's) holding ONE
   // unidentified StaticText with the identical label, value and rect. Kept,
-  // the copy read "Prihlásenie Prihlásenie" in the text table's tree
-  // fallback and a text: selector matched twice (wda-source.ts#isTextEcho).
+  // the copy would read "Prihlásenie Prihlásenie" in the text table's tree
+  // fallback and a text: selector would match twice (wda-source.ts#isTextEcho).
   const tree = parseWdaSource(MYPORT_LOGIN);
 
   it('login_title on the real capture is a leaf text node carrying the id, label and value', () => {
@@ -228,7 +228,7 @@ describe('parseWdaSource — normalization and input shapes', () => {
     expect(showsProgress(tree)).toBe(true);
   });
 
-  // The stated residual (D27 review, 2026-10-31): a hidden spinner — 0/0, a covered layer's — still reads as loading.
+  // The stated residual (D27): a hidden spinner — 0/0, a covered layer's — still reads as loading.
   // Not filtered by decision: the hold and scroll_until fall back to their bounded windows, the safe direction.
   it('a hidden (0/0) ActivityIndicator on a loaded screen still makes showsProgress true', () => {
     const tree = parseWdaSourceValue(

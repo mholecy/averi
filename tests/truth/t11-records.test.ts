@@ -24,9 +24,9 @@ const named = (id: string, ...sets: [string, string][]) => sets.flatMap(([dir, p
 const claims = (r: CaseRecord) => carouselReply(r.replies[0]) === 'fully-visible';
 const falseClaim = (r: CaseRecord) => claims(r) && isCut(r.state!);
 const strokes = (r: CaseRecord) => (r.state!.strokes ?? []).filter((x) => x.view === 'carousel');
-/** How far the app says the call's first stroke carried C: a pre-drag case's second carousel stroke. */
 /** The carries of a raw-strokes read (raw/raw-strokes.mjs). */
 const carriesIn = (file: string) => readFileSync(new URL(file, DIR), 'utf8').trim().split('\n').flatMap((l) => (JSON.parse(l) as { strokes: { carry: number }[] }).strokes.map((s) => s.carry));
+/** How far the app says the call's first stroke carried C: a pre-drag case's second carousel stroke. */
 const probeCarry = (r: CaseRecord) => {
   const s = strokes(r)[1];
   return s.to - s.from;

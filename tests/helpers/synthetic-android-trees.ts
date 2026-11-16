@@ -1,5 +1,5 @@
 /**
- * SYNTHETIC uiautomator dumps — built by the review of fix/r6, not captured
+ * SYNTHETIC uiautomator dumps — built, not captured
  * on a device: classic Android Views whose bottom-pinned CTA is laid AFTER a
  * text in the SAME layout and over it, real covers. The CTA is inset from
  * its layout's sides, not evenly on all four, and carries its own label, so
@@ -52,8 +52,8 @@ export const CLASSIC_VIEWS = {
 
 /**
  * A classic-View Settings row cut to a 33-px SLIVER at its list's top, its
- * texts dumped INVERTED — SYNTHETIC, built by the code review of round 7
- * (P1) on the shape of run9-android's Settings homepage (tests/adapters/
+ * texts dumped INVERTED — SYNTHETIC, built
+ * on the shape of run9-android's Settings homepage (tests/adapters/
  * android.test.ts's SETTINGS: `text="Apps" bounds="[198,297][324,58]"`
  * under the collapsing app bar). uiautomator cuts the row to the list
  * (`[0,297][1080,330]`) and its icon with it (`[66,297][132,330]`, the

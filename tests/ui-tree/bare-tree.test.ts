@@ -14,7 +14,7 @@ import { idbSpinnerDescribeAll } from '../helpers/live-records.js';
  * through the real parsers (docs/bugs/2026-10-06-ui-snapshot-empty-right-
  * after-launch.md and its addendum). Every wrapper is named by its
  * framework, and a loaded screen can consist of labelled container/other
- * nodes only — both review rounds of 2026-10-06 are pinned here.
+ * nodes only.
  */
 
 const FULL = { x: 0, y: 0, width: 402, height: 874 };
@@ -126,8 +126,8 @@ describe('isBareTree: loaded screens are NOT bare', () => {
     )))).toBe(false);
   });
 
-  // Review round 2 (2026-10-06): screens whose content is labelled
-  // container/other nodes only — a roles-only rule called all eight bare.
+  // Screens whose content is labelled container/other nodes only — a
+  // roles-only rule would call all eight bare.
   it('idb UIKit: Heading + Cell rows + Link (Cell → container; Heading, Link → other)', () => {
     expect(isBareTree(idb(
       ax('Heading', 'Accounts', { x: 16, y: 60, width: 200, height: 30 }),
@@ -305,9 +305,9 @@ describe('isBareTree: a status bar is not a reason to call a loaded screen bare'
 });
 
 /**
- * Review of 2026-10-08 (M1): with a clock found anywhere in a label inside
- * the top 8 %, these loaded screens — none with a status bar — read bare.
- * Each must stay content.
+ * With a clock found anywhere in a label inside the top 8 %, these loaded
+ * screens — none with a status bar — would read bare. Each must stay
+ * content.
  */
 describe('isBareTree: app content shaped like a clock is not a status bar', () => {
   const IPAD = { x: 0, y: 0, width: 1024, height: 1366 };
@@ -349,7 +349,7 @@ describe('isBareTree: app content shaped like a clock is not a status bar', () =
   });
 });
 
-/** The status bar's edges (review of 2026-10-08, m3): each pin fails if the band is widened or its gates are dropped. */
+/** The status bar's edges: each pin fails if the band is widened or its gates are dropped. */
 describe('isBareTree: what the status bar takes, and no more', () => {
   const onSpringBoard = (...els: Record<string, unknown>[]) => springBoard(...els);
   const BUTTON = axv('Button', 'Start', { x: 20, y: 760, width: 362, height: 48 }, null, null);

@@ -22,17 +22,17 @@ const rect = (x: number, y: number, width: number, height: number) => ({ x, y, w
  * questions, each pinned on the device shapes its rows were measured on.
  */
 
-/** mp-native's SWIFT form under idb at six scroll positions, rows under the top bar (device check C3-3, 2026-10-09). */
 const PAD = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')) as { elements: unknown[] };
 const MODAL = JSON.parse(await readFile(new URL('../fixtures/idb-modal-listed-before-content.json', import.meta.url), 'utf8')) as { screens: Record<string, unknown[]> };
+/** mp-native's SWIFT form under idb at six scroll positions, rows under the top bar (device check C3-3, 2026-10-09). */
 const C33 = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-scrolled-under-top-bar.json', import.meta.url), 'utf8')) as { positions: Record<string, unknown[]> };
 /** The iPhone 17's screen, 402x874 pt. */
 const IPHONE_BOX = rect(0, 0, 402, 874);
 /** Measured ui_snapshots of a layer stacked over a screen, under WDA (ADR 0018). */
 const STACKED = { screens: await stackedLayers() };
-/** Contacts' discard popover with the keyboard down: the raw /source capture, parsed as ui_snapshot parses it now. */
 /** mp-native's SWIFT form pushed over the tab host, the host's hidden tab bar listed after it (ADR 0019): the raw /source capture. */
 const SWIFT_PUSHED = parseWdaSource(await readFile(new URL('../fixtures/wda-capture-swift-form-pushed.json', import.meta.url), 'utf8'));
+/** Contacts' discard popover with the keyboard down: the raw /source capture, parsed as ui_snapshot parses it. */
 const DISCARD_POPOVER_KEYBOARD_DOWN = parseWdaSource(await readFile(new URL('../fixtures/wda-capture-contacts-discard-popover.json', import.meta.url), 'utf8'));
 
 describe('drawnOver — the nodes drawn over a clipping container (the floating tab bar)', () => {
@@ -598,7 +598,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
     expect(seen.minPiece).toBe(65); // 0.06 × 1080, rounded
     expect(seen.tapAt).toEqual({ point: { x: 33, y: 1940 }, moved: true, piece: rect(0, 1840, 66, 200) }); // the 66-px column left of the host
     expect(coverNodes(order.exposure(tab, PIXEL).covers)).toEqual([]);
-    // A small target above the tabs, wholly inside the host (review round 1): the host holds it, but neither its list nor
+    // A small target above the tabs, wholly inside the host: the host holds it, but neither its list nor
     // the screen — still a cover, at the band where the touch-down at y 1857 was swallowed.
     const amount = uiNode({ role: 'text', label: '-12,00 €', rect: rect(800, 1845, 200, 30) });
     const small = drawOrder(uiNode({ role: 'container', rect: PIXEL, children: [uiNode({ role: 'container', rect: rect(0, 825, 1080, 1395), clipsDescendants: true, children: [amount] }), host] }));
@@ -888,7 +888,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       const tree = (later: UiNode) => uiNode({ role: 'container', rect: rect(0, 0, 0, 0), children: [uiNode({ role: 'other', rect: IPHONE }), field, later] });
       expect(coverNodes(drawOrder(tree(label)).exposure(field, IPHONE).covers)).toEqual([]);
       expect(coverNodes(drawOrder(tree(header)).exposure(field, IPHONE).covers)).toEqual([header]);
-      // A pinned footer's text straddling the BOTTOM edge (review round 2) — narrower, its centre on the field — still covers.
+      // A pinned footer's text straddling the BOTTOM edge — narrower, its centre on the field — still covers.
       const footer = uiNode({ role: 'text', label: 'Total 120 CZK', rect: rect(24, 330, 250, 40) });
       expect(coverNodes(drawOrder(tree(footer)).exposure(field, IPHONE).covers)).toEqual([footer]);
     });
@@ -972,7 +972,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       // residual the owner accepted (docs/bugs/2026-10-09-ios-idb-modal-listed-before-content-…); over the bar it still is.
       const sheet = uiNode({ role: 'button', label: 'Sheet', rect: rect(16, 200, 370, 400) });
       expect(coverNodes(drawOrder(flat(back, row, sheet)).exposure(row, IPHONE).covers)).toEqual([]);
-      // One that holds the row whole never breaks (review of fix/r6b-idb, HIGH 2): a cover in its own right.
+      // One that holds the row whole never breaks: a cover in its own right.
       const whole = uiNode({ role: 'button', label: 'Sheet', rect: rect(0, 200, 402, 400) });
       expect(coverNodes(drawOrder(flat(back, row, whole)).exposure(row, IPHONE).covers)).toEqual([whole]);
       // A node of the bar lying on another (a badge on BackButton) starts the content — the stated miss: no cover of it.
@@ -999,7 +999,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       expect(seen.tapAt).toEqual({ point: { x: 75, y: 88 }, moved: true, piece: rect(0, 70, 150, 36) });
     });
 
-    // Code review of round 6, P4: firstContent's stated miss, pinned. A first row lying wholly inside the band and clear
+    // firstContent's stated miss, pinned. A first row lying wholly inside the band and clear
     // of the bar's items is read as the bar's, so content listed after it that ends inside the band is no cover of it.
     it('the residual, pinned: a first row wholly inside the band and clear of Back (120–160) is read as the bar\'s — a tip ending in the band over it reads clear; a menu reaching past the band still covers it', () => {
       const back = uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) });
@@ -1758,7 +1758,7 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
   };
   /**
    * The round-5 ui_snapshots (tests/fixtures/android-ui-snapshot-compose.json), by screen — each root marked
-   * `paddedTouchTargets`, as the parser marks every uiautomator root since the snapshots were taken (code review of round 6b, P2).
+   * `paddedTouchTargets`, as the parser marks every uiautomator root since the snapshots were taken.
    */
   const snapshots = async (): Promise<Record<string, UiNode>> =>
     Object.fromEntries(
@@ -2070,7 +2070,6 @@ describe('exposure.centreExcused — the later nodes the target column excused t
 });
 
 describe('exposure — a React Native field\'s floating label is its own field\'s (the RN lab app, rn-field\'s N and M)', () => {
-  // Round 7's RN lab app.
   /** The RN lab app's rn-field under WDA (iPhone 17, iOS 27): each input inside an unnamed wrapper of its rect. Parsed afresh per case: the negatives edit it. */
   const wda = async () => parseWdaSource(await readFile(new URL('../fixtures/wda-source-rn-field.json', import.meta.url), 'utf8'));
   /** The same screen under uiautomator (averi_lab, API 33, 1080x2220 at 2.75): the label 3 px past its EditText above and below. */

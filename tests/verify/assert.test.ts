@@ -17,12 +17,12 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { bothPinnedRemedyText } from '../../src/ui-tree/remedy-text.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on
-// (tests/helpers/sleep-recorder.ts): since 2026-10-05 the stability delay
-// is capture.ts's constant and no option of the Verifier's, so this file
-// cannot buy speed with a small `pollMs` any more — it pins the DELAY
-// SEQUENCE instead. Every test fakes the Date and the recorder moves it: a
-// deadline plays out in recorded sleeps, so a miss costs no wall clock and
-// holds the same rounds on any machine (T1).
+// (tests/helpers/sleep-recorder.ts): the stability delay is capture.ts's
+// constant and no option of the Verifier's, so this file cannot buy speed
+// with a small `pollMs` — it pins the DELAY SEQUENCE instead. Every test
+// fakes the Date and the recorder moves it: a deadline plays out in
+// recorded sleeps, so a miss costs no wall clock and holds the same rounds
+// on any machine (T1).
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 beforeEach(() => {
   resetSleeps();
@@ -32,7 +32,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-/** Poll interval only (2026-10-05) — the stability delay is not this file's to set. */
+/** Poll interval only — the stability delay is not this file's to set. */
 const FAST = { pollMs: 5, timeoutMs: 100 };
 
 function dashboardFake() {
@@ -69,15 +69,15 @@ function drawnAt(rect: Rect, hex: string, { width, height } = { width: 402, heig
   });
 }
 
-// D21 review (2026-10-31): a read error no wait cures (PersistentReadError — idb's wedged accessibility service).
+// D21: a read error no wait cures (PersistentReadError — idb's wedged accessibility service).
 // Under persistentRead: 'fail' it fails THE assert, after its one read, with the error's message as the detail — what
 // a verify leg (whose frame, screenshot and health line a throw would lose) and the MCP assert tool ask for. By
 // default it is thrown as it came, after the one read: a flow's `assert:` step must reach the engine's isTerminal
-// with the named error (review round 2), not as a plain "flow asserts failed". Reads are bounded to the ones each test
+// with the named error, not as a plain "flow asserts failed". Reads are bounded to the ones each test
 // expects (D38, tests/helpers/terminal-read.ts).
 //
-// A20 (2026-11-11): the policy is applied once, by the Verifier's one step every assert runs through (`decided`) — not
-// by each poll, nor by a hand `.catch` at each pixel assert, one of which forgotten rejected a whole verify leg. So
+// A20: the policy is applied once, by the Verifier's one step every assert runs through (`decided`) — not by each
+// poll, nor by a hand `.catch` at each pixel assert, one of which, forgotten, would reject a whole verify leg. So
 // EVERY assert kind is looped here, under both settings. The screenshot assert is the one that reads no tree: a capture
 // the adapter refuses fails it closed under either setting (pixel-poll.ts's header), pinned with the rest.
 describe('asserts on a tree read no wait cures', () => {
@@ -231,7 +231,7 @@ describe('element asserts', () => {
       {
         s: screen(
           node({ identifier: 'card_face', rect: { x: 0, y: -300, width: 100, height: 100 } }), // iOS keeps it, scrolled above the top
-          // A rendered `text`: identified-unlabeled `other` nodes alone are a BARE tree, where absence is undecided (2026-10-08).
+          // A rendered `text`: identified-unlabeled `other` nodes alone are a BARE tree, where absence is undecided.
           el({ role: 'text', identifier: 'row_0' }),
         ),
       },
@@ -412,8 +412,8 @@ describe('exact-text misses hint at a combined accessibility element', () => {
     const verifier = new Verifier(fake, FAST);
     for (const id of ['dash', 'space']) {
       const result = await verifier.assert({ element: { id }, text: '1 of 13 selected' });
-      // The hint's full sentence, byte-for-byte — text-hint.ts moved to verify/
-      // on 2026-10-04 and this wording is the thing that must not drift.
+      // The hint's full sentence, byte-for-byte — this wording is the thing
+      // that must not drift.
       expect(result.detail).toContain('no node has this exact text, but 1 node(s) CONTAIN it as a whole segment:');
       expect(result.detail).toContain(
         '(iOS combines a container\'s children into one accessibility element — use match: "1 of 13 selected" for a cross-platform assert)',
@@ -571,7 +571,7 @@ describe('rect asserts (geometry vs Figma-frame values)', () => {
     expect(result.detail).toContain('(measured only, never fails)');
   });
 
-  // The false pass of the 2026-10-07 parity review (P1): a tree whose content
+  // A false pass: a tree whose content
   // starts inset reads its CONTENT width (384) as the screen's, which turns a
   // real -4.2 % `w` delta on a 402-pt screen into +0.06 %.
   it('fails closed on a CONTENT width instead of passing with a caveat in the detail', async () => {
@@ -626,8 +626,8 @@ describe('rect asserts (geometry vs Figma-frame values)', () => {
   });
 
   /**
-   * The parity code review's A3 (2026-10-07): `viewport()` is memoized, so a
-   * screen changed after the first read (`wm size`, an unfold) refused until
+   * `viewport()` is memoized, so a screen
+   * changed after the first read (`wm size`, an unfold) would refuse until
    * the server restarted (device check row 18c). Before a wider-than-screen
    * refusal the assert re-reads the screen ONCE, bypassing the memo.
    */
@@ -724,9 +724,9 @@ describe('ocr asserts (what the element RENDERS)', () => {
 
   /**
    * The rect-off-the-png sentence (verify/text-parity.ts `ocrRegionForRect`,
-   * worded through ui-tree/geometry.ts `rectText` since 2026-10-06) was
-   * pinned nowhere: a change to the shared rect wording reached it
-   * unnoticed. Pinned exactly here, at the surface an agent reads.
+   * worded through ui-tree/geometry.ts `rectText`), pinned exactly here, at
+   * the surface an agent reads, so a change to the shared rect wording does
+   * not reach it unnoticed.
    */
   it('an element whose rect lands off the screenshot fails closed and says where the rect was', async () => {
     resetLayout();
@@ -757,7 +757,7 @@ describe('ocr asserts (what the element RENDERS)', () => {
    * (docs/bugs/2026-08-26-png-scale-needs-out-of-tree-screen-size.md). The
    * tree here is the shape that fails closed in 0.5.0 — a rect-less root over
    * an inset, oversized node, with an off-screen scrim for company — and the
-   * assert now reads the element anyway.
+   * assert reads the element anyway.
    */
   const sheetFake = () => {
     resetLayout();
@@ -868,13 +868,13 @@ describe('ocr asserts (what the element RENDERS)', () => {
   });
 
   /**
-   * Review 2026-10-07 (assert-capture-ocr C2): the measure's catch turned
-   * every recognizer throw into a miss, so a host without `swiftc` polled the
-   * whole 12 s default before saying so. An `OcrUnavailableError` now ends
-   * the assert after its one read, fail-closed, in the shape a refused
-   * capture does (2794f5e) — and a passing element assert after it in the
-   * same batch is still evaluated. The read count is the guard: a poll that
-   * went on would read again every few ms of its 2 s budget.
+   * assert-capture-ocr C2: were the measure's catch to turn every recognizer
+   * throw into a miss, a host without `swiftc` would poll the whole 12 s
+   * default before saying so. An `OcrUnavailableError` ends the assert after
+   * its one read, fail-closed, in the shape a refused capture does (2794f5e)
+   * — and a passing element assert after it in the same batch is still
+   * evaluated. The read count is the guard: a poll that went on would read
+   * again every few ms of its 2 s budget.
    */
   it('an engine that will never read ends the assert after one read, and the batch goes on', async () => {
     let reads = 0;
@@ -1176,10 +1176,9 @@ describe('screenshot baseline asserts', () => {
 
   it('diffs and baselines the SETTLED frame, never the first capture (verify/capture.ts, since 2026-10-04)', async () => {
     // A screen mid-animation: two different frames, then it holds still.
-    // Until 2026-10-04 this assert took one bare screenshot — the first,
-    // mid-animation one — so the baseline it wrote and the frame it later
-    // diffed were both coin tosses. It now goes through captureFrame's
-    // stability wait like every other pixel reading.
+    // On one bare screenshot — the first, mid-animation one — the baseline it
+    // wrote and the frame it later diffed would both be coin tosses. It goes
+    // through captureFrame's stability wait like every other pixel reading.
     const movingA = png(50, 50, (p) => p.data.fill(0, 0, p.data.length / 4));
     const movingB = png(50, 50, (p) => p.data.fill(0, 0, p.data.length / 2));
     const settled = png(50, 50);
@@ -1195,12 +1194,12 @@ describe('screenshot baseline asserts', () => {
     const first = await verifier.assert({ screenshot: { baseline: 'dash' } });
     expect(first).toMatchObject({ pass: true, detail: expect.stringContaining('baseline created') });
     // movingA, movingB, settled, settled — the capture that confirmed stability is the one stored.
-    // ...then, since 2026-10-06, the four captures of the baseline confirmation window (capture.ts).
+    // ...then the four captures of the baseline confirmation window (capture.ts).
     expect(fake.screenshots).toHaveLength(8);
     expect((await readFile(join(dir, 'android', 'dash.png'))).equals(settled)).toBe(true);
     // The wait between captures is capture.ts's 300 ms, not the Verifier's
-    // pollMs (FAST: 5) — one budget, whoever calls (2026-10-05).
-    // The window adds its one 300 ms wait (2026-10-06).
+    // pollMs (FAST: 5) — one budget, whoever calls.
+    // The window adds its one 300 ms wait.
     expect(sleeps).toEqual([...Array(3).fill(STABILITY_DELAY_MS), 300]);
 
     // The same still screen on a rerun is a 0% diff against the settled baseline: two identical captures.
@@ -1337,8 +1336,8 @@ describe('screenshot baseline asserts — a frame that did not settle is never a
    * aliases-a-blinking-caret.md): a caret blinking 500 ms on, 500 ms off, on
    * a device whose screencap takes 650 ms (the Android emulator measured
    * that day). The settled pair lands 950 ms apart — in phase — so the pair
-   * alone compares equal, and until this date the assert CREATED a baseline
-   * from it. The confirmation window's next captures fall in the other phase.
+   * alone compares equal. The confirmation window's next captures fall in the
+   * other phase.
    */
   const caretDevice = () => {
     const fake = dashboardFake();
@@ -1356,7 +1355,7 @@ describe('screenshot baseline asserts — a frame that did not settle is never a
   it('refuses to CREATE a baseline from a caret screen the settled pair alone would have stored (2026-10-06)', async () => {
     // 100 ms into the caret's on-phase.
     vi.setSystemTime(1_000_000_100);
-    // The old rule on this very screen: two captures, in phase, settled.
+    // The settled pair alone on this very screen: two captures, in phase, settled.
     const pairOnly = await captureFrame(caretDevice());
     expect(pairOnly).toMatchObject({ stability: 'settled', captures: 2 });
 
@@ -1411,20 +1410,19 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   };
   /**
    * The byte offset of a pixel INSIDE the card (its centre; the tree and the
-   * png share a scale of 1 here). Since 2026-10-06 the color and ocr asserts
-   * judge stability over the element's own region, so an "animation" must
-   * move a pixel the assert measures to keep a frame moving: the pixel at
-   * (0, 0) these tests painted until then lies outside the card and would
-   * now settle — the status-bar clock the change was made for.
+   * png share a scale of 1 here). The color and ocr asserts judge stability
+   * over the element's own region, so an "animation" must move a pixel the
+   * assert measures to keep a frame moving: a pixel at (0, 0) lies outside
+   * the card and would settle — the status-bar clock the region rule is for.
    */
   const inCard = (p: PNG) => ((CARD.y + CARD.height / 2) * p.width + CARD.x + CARD.width / 2) << 2;
 
   it('the stability delay is capture.ts\'s 300 ms whatever pollMs the Verifier was given — one budget for every consumer', async () => {
     const fake = cardFake();
     fake.nextScreenshot = png(1000, 320, (p) => fill(p, '#FDFDFD'));
-    // A FlowEngine builds its Verifier with pollMs 500: until 2026-10-05 that
-    // became the delay between stability captures, so an assert inside a flow
-    // waited 500 where the MCP tool waited 300.
+    // A FlowEngine builds its Verifier with pollMs 500: were that the delay
+    // between stability captures, an assert inside a flow would wait 500
+    // where the MCP tool waits 300.
     const verifier = new Verifier(fake, { pollMs: 500, timeoutMs: 100 });
     const result = await verifier.assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
     expect(result.pass).toBe(true);
@@ -1617,17 +1615,17 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
 
   it('live content OFF the element does not keep a color assert from settling: the card holds still, and the assert passes once a second read confirms where it is (2026-10-06)', async () => {
     const { fake, probe } = clockScreen(() => CARD);
-    // Until 2026-10-06 this screen never settled and the assert failed "the
-    // screen did not settle: 6 captures …" about pixels it never reads.
+    // Judged over the whole screen, this screen would never settle and the
+    // assert would fail "the screen did not settle: 6 captures …" about pixels
+    // it never reads.
     const result = await new Verifier(fake, { pollMs: 300, timeoutMs: 3000 }).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
     expect(result.pass).toBe(true);
     expect(result.detail).toContain('sampled #FDFDFD');
     // Settled over the card's region only, so the first round is silent (no
     // earlier read to confirm the rect) and the second, whose read agrees,
     // measures: two rounds of a still screen's cost — two captures and one
-    // stability wait each — with the poll's pause between them. A first
-    // version of this test (review round 1) pinned ONE round: that was the
-    // stale-rect window, closed the same day.
+    // stability wait each — with the poll's pause between them. ONE round
+    // would be the stale-rect window.
     expect(probe.treeReads).toBe(2);
     expect(fake.screenshots).toHaveLength(4);
     expect(sleeps).toEqual([STABILITY_DELAY_MS, 300, STABILITY_DELAY_MS]);
@@ -1719,10 +1717,10 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   });
 
   /**
-   * The pixel poll's contract (verify/pixel-poll.ts, 2026-10-06): the
-   * measurement runs ONLY on a settled, decoded frame. Pinned at the assert
-   * surface — the recognizer the ocr assert closes over is the probe, and
-   * every frame below would read "CONTINUE" if it were ever handed one.
+   * The pixel poll's contract (verify/pixel-poll.ts): the measurement runs
+   * ONLY on a settled, decoded frame. Pinned at the assert surface — the
+   * recognizer the ocr assert closes over is the probe, and every frame below
+   * would read "CONTINUE" if it were ever handed one.
    */
   const countingEngine = () => {
     const probe = { recognized: 0 };
@@ -1813,11 +1811,10 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
    * docs/bugs/2026-10-06-pixel-assert-default-timeout-fits-no-round-on-device.md:
    * with the shared 3 s default a color/ocr assert could not pass on the
    * Android emulator even on a still screen. One round there is a 2.7 s
-   * uiautomator read plus two 0.65 s screencaps 300 ms apart, and since
-   * 4954ab4 the capture honours the deadline (before it, the round overran
-   * the 3 s budget by ~1.3 s and that overrun was the only reason it
-   * passed). The device numbers below are the ones measured that day; the
-   * 1.5 s / 300 ms fakes of `Verifier.treePoll`'s table are what hid this.
+   * uiautomator read plus two 0.65 s screencaps 300 ms apart, and the
+   * capture honours the deadline (4954ab4). The device numbers below are the
+   * ones measured that day; the 1.5 s / 300 ms fakes of `Verifier.treePoll`'s
+   * table are what hid this.
    */
   const deviceTimed = (live: boolean) => {
     const fake = cardFake();
@@ -1858,7 +1855,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     expect(result.pass).toBe(true);
     expect(fake.screenshots).toHaveLength(4);
     // Two rounds of 2.7 s read + 0.65 + 0.3 + 0.65 s captures, and only the 150 ms floor between them: the 2.7 s
-    // read already outlasts the 300 ms poll (pollTree, ADR 0029 — 8900 before it, when the whole 300 ms was slept).
+    // read already outlasts the 300 ms poll (pollTree, ADR 0029 — 8900 if the whole 300 ms were slept).
     expect(Date.now() - t0).toBe(8750);
   });
 
@@ -1926,11 +1923,11 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
 });
 
 describe('assertSpecSchema', () => {
-  // Architecture review 2026-10-07 (assert-capture-ocr C3): a `match` that
-  // does not compile used to pass the schema and fail mid-run — an element
-  // assert threw out of assertAll a few ms in, losing the batch's other
-  // results, and an ocr assert polled its whole 12 s budget as "OCR failed".
-  // The schema is now where that mistake is caught, naming the field.
+  // assert-capture-ocr C3: a `match` that does not compile, past the schema,
+  // would fail mid-run — an element assert would throw out of assertAll a few
+  // ms in, losing the batch's other results, and an ocr assert would poll its
+  // whole 12 s budget as "OCR failed". The schema is where that mistake is
+  // caught, naming the field.
   it.each([
     ['element match', { element: { id: 'x' }, match: '(' }, ['match']],
     ['ocr match', { element: { id: 'x' }, ocr: { match: '(' } }, ['ocr', 'match']],
@@ -2139,9 +2136,9 @@ describe('rect and color asserts report an unreadable tree at timeout', () => {
 /**
  * docs/bugs/2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md:
  * on Android the soft keyboard is a separate window, absent from the tree, so
- * a node under it keeps its at-rest rect — and until this fix a color assert
- * sampled the key faces (#FFFFFF) and an ocr assert read the `?123` key, each
- * reported as the ELEMENT'S. Since 2026-10-06 the pixel poll asks the
+ * a node under it keeps its at-rest rect — and a color assert that did not
+ * ask would sample the key faces (#FFFFFF), an ocr assert would read the
+ * `?123` key, each reported as the ELEMENT'S. The pixel poll asks the
  * adapter's keyboard oracle once per round, before any capture
  * (verify/pixel-poll.ts, header). The fake attaches the oracle as a test asks;
  * without one it behaves like iOS — no oracle, nothing queried, nothing
@@ -2292,9 +2289,9 @@ describe('pixel asserts under the Android soft keyboard (2026-10-06)', () => {
   });
 
   /**
-   * Review 2026-10-06: covered in round 1, found CLEAR by round 2's query, and
-   * round 2's one capture cut by the deadline. The last look said hidden, so
-   * "dismiss the keyboard" would be false; the cut sentence is the truth.
+   * Covered in round 1, found CLEAR by round 2's query, and round 2's one
+   * capture cut by the deadline. The last look said hidden, so "dismiss the
+   * keyboard" would be false; the cut sentence is the truth.
    */
   it('a covered miss that a later query contradicted is not the timeout wording — the cut round after it is', async () => {
     const fake = cardFake();
@@ -2351,8 +2348,8 @@ describe('pixel asserts under the Android soft keyboard (2026-10-06)', () => {
 });
 
 /**
- * The same rule from the tree (iOS, 2026-10-07): the WDA source marks the
- * band the keyboard covers with role `keyboard`
+ * The same rule from the tree (iOS): the WDA source marks the band the
+ * keyboard covers with role `keyboard`
  * (tests/adapters/wda-source-keyboard.test.ts), the adapter has no oracle,
  * and the pixel poll reads the band off the round's own tree — no query, no
  * extra read — with a remedy that names no `back`.
@@ -2771,11 +2768,11 @@ describe('pixel asserts under idb\'s keyboard band (D2)', async () => {
 });
 
 /**
- * A capture the adapter REFUSES (adapters/screenshot-bytes.ts, 2026-10-08) is
- * not a poll miss: it ends THAT assert at once — one capture, no polling to
- * the deadline — failing closed with the adapter's first line, and
- * `assertAll` goes on to the next assert (pixel-poll.ts's header). Only a
- * png that came back and does not decode is a miss (the "not a png" tests above).
+ * A capture the adapter REFUSES (adapters/screenshot-bytes.ts) is not a poll
+ * miss: it ends THAT assert at once — one capture, no polling to the
+ * deadline — failing closed with the adapter's first line, and `assertAll`
+ * goes on to the next assert (pixel-poll.ts's header). Only a png that came
+ * back and does not decode is a miss (the "not a png" tests above).
  */
 describe('a capture the adapter refuses fails that assert closed, and the batch goes on', () => {
   const REFUSAL = '`adb -s emulator-5554 exec-out screencap -p` on device emulator-5554 returned 0 bytes — not a PNG';

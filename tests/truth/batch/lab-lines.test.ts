@@ -113,7 +113,7 @@ describe('the WDA window\'s put-back line: S4\'s line and the port part (the por
   it('restored with the port free: S4\'s line, the port named — free, or free once a listener was killed', () => {
     expect(wdaRestoredOf(restored, false, hand)).toEqual({ ok: true, line: 'D43 WDA-window restore: OK — every domain equals its backup (nothing put back); port 8120 free', hand: [] });
     expect(wdaRestoredOf(restored, true, hand).line).toMatch(/; port 8120 free \(a listener killed\)$/);
-    // Not verified: the window's own hand lines (code review, MAJOR 1: one builder for every end).
+    // Not verified: the window's own hand lines (one builder for every end).
     expect(wdaRestoredOf(failed, false, hand)).toEqual({ ok: false, line: `${failed.line}; port 8120 free`, hand });
   });
 

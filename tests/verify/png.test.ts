@@ -10,9 +10,9 @@ import { decodePng, fastDecode } from '../../src/verify/png.js';
  * verify/png.ts is the one PNG decoder of the pixel readers. Its contract is
  * pngjs's answer, byte for byte: the fast path may only take an input whose
  * decode it reproduces exactly, and every other input — and every error — is
- * pngjs's own. So each test compares against `PNG.sync.read` (the reference
- * the callers used before), and the fast-path tests also pin WHICH inputs it
- * takes, or the equality would hold trivially through the fallback.
+ * pngjs's own. So each test compares against `PNG.sync.read`, and the
+ * fast-path tests also pin WHICH inputs it takes, or the equality would hold
+ * trivially through the fallback.
  */
 
 const FIXTURES = fileURLToPath(new URL('../fixtures', import.meta.url));

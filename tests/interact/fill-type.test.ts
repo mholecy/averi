@@ -7,9 +7,9 @@ import { node } from '../helpers/fake.js';
 vi.mock('../../src/util/sleep.js', () => ({ sleep: async () => undefined }));
 
 /**
- * The typing, its poll and what it sends again, through `typeAndConfirm`'s own interface with a scripted field; its
- * one caller, fillField, pins it end to end (fill.test.ts). Whether a reading landed, and what tail it proves dropped,
- * is fill-landing.test.ts's.
+ * The typing, its poll and what it sends again, through `typeAndConfirm`'s own interface with a scripted field;
+ * fillField pins it end to end (fill.test.ts). Whether a reading landed, and what tail it proves dropped, is
+ * fill-landing.test.ts's.
  */
 
 /** A read that found the field showing `value` (FieldIo.read: a node, or why it was lost). */
@@ -379,7 +379,7 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
     expect(moved.typed).toEqual(['SK3112000000']); // no wipe: the deletes would go where the typing went
   });
 
-  // Review round 1: fill-landing.ts#tookText gates the landing — after a retry too, where the loop's own not-taken check
+  // fill-landing.ts#tookText gates the landing — after a retry too, where the loop's own not-taken check
   // no longer returns.
   it('a non-input that ends on its own resolved text after the wipe and retype has not landed', async () => {
     const { io, intent, field } = scripted();
@@ -398,7 +398,7 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
 });
 
 /**
- * A9 review round 1: arms of the switch only a script of reads reaches, each pinned against a hand mutant (`again` lost,
+ * A9: arms of the switch only a script of reads reaches, each pinned against a hand mutant (`again` lost,
  * the tail gate's `tails() === 0`, the report skipped). `rounds`: per typing sent, the poll's reads; the last repeats.
  */
 describe('typeAndConfirm — the arms after a retry', () => {
@@ -550,7 +550,7 @@ describe('typeAndConfirm — a reading unchanged since typing began is no landin
 
 /**
  * D64 (A): without clear, the value must be in what was typed past the earlier text (fill-landing.ts#landingOf), not
- * anywhere in the reading. A field whose earlier text holds the value no longer passes at the first read when only part
+ * anywhere in the reading. A field whose earlier text holds the value does not pass at the first read when only part
  * of the typing landed: on iOS the dropped tail is typed again, as for any other field; a capped field and keys that
  * went into another input end in a miss.
  */
@@ -594,7 +594,7 @@ describe('typeAndConfirm — an earlier text that holds the value is no landing 
     expect(reads()).toBe(5);
   });
 
-  // review round 1, m-2: `11 ` for `11` after `1` is a select-all field's whole value with an eager mark as much as a
+  // `11 ` for `11` after `1` is a select-all field's whole value with an eager mark as much as a
   // dropped `1` — typing `1` again could leave `111`, said Filled; refused honestly instead, nothing typed again
   it('on-return: a reading that holds the value across the seam is not typed into again — missed', async () => {
     const { io, intent, typed } = scripted({ prefilled: '1', format: () => '11 ' });
@@ -603,7 +603,7 @@ describe('typeAndConfirm — an earlier text that holds the value is no landing 
   });
 
   // D71: `55` after `5` was the value itself and replied Filled at once, the second key dropped — an append should have
-  // left `555`. Refused now, and nothing typed again: a select-all field reads `55` too, and a retyped `5` there would
+  // left `555`. Refused, and nothing typed again: a select-all field reads `55` too, and a retyped `5` there would
   // end Filled over `555`.
   it.each(['on-return', 'may-arrive-late'] as const)('%s: `55` after `5`, the second key dropped — missed, a length that is a whole landing too, nothing typed again', async (delivery) => {
     const { io, intent, typed } = scripted({ prefilled: '5', keep: [1] });
@@ -620,12 +620,12 @@ describe('typeAndConfirm — an earlier text that holds the value is no landing 
     expect(s.typed).toEqual(['55']);
   });
 
-  // D64 round 3: keys proven typed elsewhere are no select-all, so the reading's whole-landing hedge goes with them
+  // D64: keys proven typed elsewhere are no select-all, so the reading's whole-landing hedge goes with them
   // (fill-landing.ts#withoutWholeToo) — the reply must not say both.
   it.each([
     ['11 ', '11', '1', '1', { kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true }],
     ['-5-', '-5', '-5', '5', { kind: 'length' }],
-    // D79 review round 1, NIT-2: the value itself, the hedge gone, the append count kept
+    // D79: the value itself, the hedge gone, the append count kept
     ['55', '55', '5', '5', { kind: 'length', equal: { why: 'value-itself', appendWouldShow: 3 } }],
   ])('`%s` for `%s` after `%s`, a sibling gaining the missing `%s`: missed, elsewhere, no hedge', async (shown, value, before, gained, differs) => {
     const { io, intent, typed } = scripted({ prefilled: before, format: () => shown, elsewhere: () => gained });

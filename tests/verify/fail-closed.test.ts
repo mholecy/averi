@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { failClosed } from '../../src/verify/fail-closed.js';
 
 /**
- * The trailing full stop has one owner since 2026-10-08: a reason that is
- * another component's sentence (an adapter's transport error, a recognizer's
+ * The trailing full stop has one owner: a reason that is another
+ * component's sentence (an adapter's transport error, a recognizer's
  * message) must not read `attention.; failing closed`.
  */
 describe('failClosed', () => {

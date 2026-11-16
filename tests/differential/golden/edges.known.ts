@@ -2,16 +2,15 @@ import { ANDROID, IDB_STROKE, IOS, keys, twice, type KnownFile } from './known.j
 
 // The edges family's ratchet (fixtures/apps/cells/edges.json): scroll-bounded, scroll-sticky, scroll-top-edge (and
 // round 4's scroll-top-edge-end, its content ending at the screen's bottom: #17's turn-back, live), and round 3's
-// Android variants scroll-bounded-flush (all green: #12, #13 calibrate on it) and scroll-sticky-cut, and round 4's
-// scroll-sticky-view (all green: the row's content an Android View the header does not cut, #9 calibrates on it), and
-// round 14's scroll-sticky-rest (Android only, VA1: scroll-sticky-cut at rest, R whole under the merged header — all
-// green; `fully` is not asked of a whole target, live asks it: docs/truth/live-android-2026-10-18-visibility.md), and
-// round 6's carousel-in-list (both platforms; iOS captured by round 6's iOS device check, 2026-10-18, once the host's
-// Xcode 27.1 had run its first launch) and scroll-collapsing (Android only: a View
-// list under a collapsing app bar, its row A dumped with inverted bounds — #10; all green) — its rows by geometry
-// (scripts/differential/golden-spec/edges.ts, bars.ts for the band and the sticky header's overlap).
-// scripts/truth/calibration.json owns only the link from each lab note to its rows (LE4 is calibrated since
-// round 5's 0a, LE1, LE2's fixed half, LE3 and VA1's fully half since round 14); this KNOWN owns the ratchet, as presented.known.ts does for L1.
+// Android variants scroll-bounded-flush (#12, #13 calibrate on it) and scroll-sticky-cut, and round 4's
+// scroll-sticky-view (the row's content an Android View the header does not cut, #9 calibrates on it), and round 14's
+// scroll-sticky-rest (Android only, VA1: scroll-sticky-cut at rest, R whole under the merged header; `fully` is not
+// asked of a whole target, live asks it: docs/truth/live-android-2026-10-18-visibility.md), and round 6's
+// carousel-in-list (both platforms; iOS captured by round 6's iOS device check, 2026-10-18, once the host's Xcode 27.1
+// had run its first launch) and scroll-collapsing (Android only: a View list under a collapsing app bar, its row A
+// dumped with inverted bounds — #10) — its rows by geometry (scripts/differential/golden-spec/edges.ts, bars.ts for
+// the band and the sticky header's overlap).
+// scripts/truth/calibration.json owns only the link from each lab note to its rows; this KNOWN owns the ratchet.
 
 /** LE2's rest, accepted (ADR 0010's residual 5): with no scroll view listed and no screenshot per tap or stop, the tap, the plain stop and the strokes are judged on the screen alone; treeSource: wda lists the scroll views. */
 const IDB_NO_SCROLL_VIEW = 'residual:ADR 0010 residual 5 — idb lists no scroll view: the tap, the plain stop and the strokes are judged on the screen alone';
@@ -22,17 +21,12 @@ const BESIDE_LOWER = 'touched down outside its scroll view lower at (201,699) (2
 export const edges: KnownFile = {
   family: 'edges',
   known: Object.fromEntries([
-    // LAB FINDING LE1 — fixed on bugs/r14-le1 (round 14): uiautomator's bounds of a Compose verticalScroll's rows past
-    // their container (scroll-bounded's P and S) and of a horizontalScroll's card past its carousel (carousel-in-list's
-    // C) are judged by what their scroll views draw (ui-tree/geometry.ts#Clips.drawnIn, now on every tree that lists
-    // ancestry): all seven rows green, struck off here, calibrated in scripts/truth/calibration.json.
     // LAB FINDING LE2 — idb lists no scroll view (docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md):
-    // partly fixed on bugs/r14-le2 (round 14) — the drawn frame is UNTOLD on idb's flat list (ui-tree/geometry.ts
-    // #DrawnUntold), and the eyes look where a claim rests on it: O's and C's colour, which read as the screen beside
-    // them, fail closed (verify/eyes.ts#apartOfFrame); P's and S's `fully: true` stops see the clip line
-    // (ui-tree/eyes.ts#eyesQuestion) — the four rows green, struck off here, calibrated in scripts/truth/calibration.json.
-    // The rest is ADR 0010's residual 5, accepted: S and O Tapped, S and O reached by the plain stop, F's (and C's,
-    // below) strokes over the screen. WDA answers every one of these rows as the truth does.
+    // the drawn frame is UNTOLD on idb's flat list (ui-tree/geometry.ts#DrawnUntold), and the eyes look where a claim
+    // rests on it: O's and C's colour, which read as the screen beside them, fail closed (verify/eyes.ts#apartOfFrame);
+    // P's and S's `fully: true` stops see the clip line (ui-tree/eyes.ts#eyesQuestion). The rest is ADR 0010's
+    // residual 5, accepted: S and O Tapped, S and O reached by the plain stop, F's strokes over the screen. WDA answers
+    // every one of these rows as the truth does.
     ...keys(`${IOS}/scroll-bounded.idb.json`, ['S'], ['tap'], { cls: 'Tapped', kind: 'Tapped', calls: ['idb ui tap 201 584'], note: 'idb lists no scroll view — Tapped beneath its clip', as: IDB_NO_SCROLL_VIEW }),
     ...keys(`${IOS}/scroll-bounded.idb.json`, ['S'], ['scroll_until'], { cls: 'reached where it is sliver, after 0 swipe(s) that move nothing', kind: 'visible', calls: [], note: 'idb lists no scroll view', as: IDB_NO_SCROLL_VIEW }),
     ...keys(`${IOS}/scroll-bounded.idb.json`, ['O'], ['tap'], { cls: 'Tapped', kind: 'Tapped', calls: ['idb ui tap 201 652'], note: 'idb lists no scroll view — Tapped on the background', as: IDB_NO_SCROLL_VIEW }),
@@ -42,33 +36,19 @@ export const edges: KnownFile = {
     // under the clip listed AFTER it and holding its centre (the truth probe at (201,652) fires Continue). A control past
     // the reading-order break that holds the target's centre is a cover whose order is not told (ui-tree/draw-order.ts,
     // ADR 0015 amended): the colour assert fails closed, the plain stop refuses before any swipe, and the tap is moved
-    // clear of Continue to (201,670) — it no longer presses Continue. What stays is the residual: the tap still says
-    // Tapped, on the background below the clip, and no scroll_until swipe is sent.
+    // clear of Continue to (201,670). What stays is the residual: the tap still says Tapped, on the background below
+    // the clip, and no scroll_until swipe is sent.
     ...keys(`${IOS}/scroll-bounded-footer.idb.json`, ['O'], ['tap'], { cls: 'Tapped', kind: 'Tapped', calls: ['idb ui tap 201 670'], note: 'idb lists no scroll view — moved clear of Continue, Tapped on the background beneath the clip', as: IDB_NO_SCROLL_VIEW }),
     ...keys(`${IOS}/scroll-bounded-footer.idb.json`, ['O'], ['scroll_until'], { cls: 'no swipe', kind: 'refused', calls: [], note: 'idb lists no scroll view — refused before any swipe: Continue overlaps its centre, the order not told', as: IDB_NO_SCROLL_VIEW }),
-    // LE2 across, on carousel-in-list's C (the card right of the carousel's clip, 378,138 354x85 against its
-    // scrollable 24,138 354x85): idb lists no carousel, so scroll_until stroked sideways across the SCREEN's middle
-    // (y 437, below the carousel) and failed "content exhausted". Fixed by A38b (interact/stroke-plan.ts#rowOf): a
-    // sideways stroke for a target idb lists goes over its own row, 322 181 → 80 181, inside the carousel — ok,
-    // struck off here.
-    // LAB FINDING LE4 — fixed on arch/r21-strokes (958bd27, round 5's 0a), merged with arch/round-21: WDA's O and F of
-    // scroll-bounded, stroked over the screen beside `lower` until then, are stroked inside it (201 524 → 416) and green;
-    // struck off here, calibrated in scripts/truth/calibration.json.
-    // LAB FINDING LE3 — fixed on bugs/r14-le3 (round 14): SwiftUI lists the pinned section header before the rows it
-    // lies over; the parsers keep its Header trait (UiNode.heading), and a heading listed before a target it overlaps,
-    // in a reading-order listing, is drawn over it (ui-tree/reading-order.ts#headingsOver): R's colour and fully rows
-    // green on idb and WDA, struck off here, calibrated in scripts/truth/calibration.json.
-    // LAB FINDING VA1 — fixed on bugs/r14-va1 (round 14): Compose cuts a row (and its content) at a sticky header that
-    // is one accessibility element, pinned at its list's top — the tree's row 128,457 825x110 begins at the header's
-    // bottom, as a first row at rest whole under it does. `fully: true` probes toward the header
-    // (ui-tree/later-edges.ts#PinnedEdge, the flush probe): R fully green, struck off here, calibrated in
-    // scripts/truth/calibration.json. The colour assert has no probe: it samples the cut rect (a PASS on R's own
-    // colour) — the residual, accepted.
+    // LAB FINDING VA1 — Compose cuts a row (and its content) at a sticky header that is one accessibility element,
+    // pinned at its list's top — the tree's row 128,457 825x110 begins at the header's bottom, as a first row at rest
+    // whole under it does. `fully: true` probes toward the header (ui-tree/later-edges.ts#PinnedEdge, the flush probe).
+    // The colour assert has no probe: it samples the cut rect (a PASS on R's own colour) — the residual, accepted.
     ...keys(`${ANDROID}/scroll-sticky-cut.xml`, ['R'], ['colour'], { cls: 'passed on #00897B', kind: 'PASS', calls: [], note: 'the row cut at the header, its content too — the sample is the cut rect', as: PINNED_NO_PROBE }),
   ]),
-  // scroll-top-edge(-end)'s T, in the status band and its scroll view, is asked R-fully too (7 rows, 6 before round 5):
-  // the target contract asks `fully` of a band target in a scroll view (scripts/truth/target-contract.ts#fullyAsked),
-  // as the live golden always did.
+  // scroll-top-edge(-end)'s T, in the status band and its scroll view, is asked R-fully too (7 rows): the target
+  // contract asks `fully` of a band target in a scroll view (scripts/truth/target-contract.ts#fullyAsked), as the live
+  // golden always did.
   counts: {
     [`${ANDROID}/scroll-bounded.xml`]: 14,
     [`${ANDROID}/scroll-sticky.xml`]: 4,
@@ -82,8 +62,8 @@ export const edges: KnownFile = {
     [`${ANDROID}/carousel-in-list-cut.xml`]: 2,
     [`${ANDROID}/scroll-collapsing.xml`]: 5,
     // T6's L7 carousels (Android only): B and U as carousel-in-list's (R-off's three each), and C — laid out nowhere at
-    // launch (CellTruth.absent) — R-absent's R-stroke and R-fully (golden-spec/edges.ts#absentRows): all green, D59b's
-    // strokes (824,497)→(256,497) inside the carousel.
+    // launch (CellTruth.absent) — R-absent's R-stroke and R-fully (golden-spec/edges.ts#absentRows): D59b's strokes
+    // (824,497)→(256,497) inside the carousel.
     [`${ANDROID}/carousel-lazy.xml`]: 8,
     [`${ANDROID}/carousel-recycler.xml`]: 8,
     [`${ANDROID}/carousel-lazy-free.xml`]: 8,

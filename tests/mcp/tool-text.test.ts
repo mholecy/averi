@@ -17,7 +17,7 @@ describe('tap and type_text response lines', () => {
   });
 
   // D66 (docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md): a tap on a node the tree marks
-  // disabled was sent, and says so on its own line below; unmarked, the reply is as before, byte for byte.
+  // disabled was sent, and says so on its own line below.
   it('tapText warns on its own line when the tapped node is marked disabled, after the moved part and the note', () => {
     const warn = '\n⚠ The tree marks the target disabled, the tap may do nothing; read again before relying on it.';
     expect(tapText('id:go', { disabled: true })).toBe(`Tapped id:go${warn}`);
@@ -27,8 +27,8 @@ describe('tap and type_text response lines', () => {
     expect(tapText('id:p', { note: 'a note', moved: 'at (1,2)' })).toBe('Tapped id:p at (1,2) (a note)');
   });
 
-  // The type_text reply WITH a selector is interact/fill-text.ts's since
-  // 2026-10-09, pinned beside the flow line in tests/interact/fill-text.test.ts.
+  // The type_text reply WITH a selector is interact/fill-text.ts's, pinned
+  // beside the flow line in tests/interact/fill-text.test.ts.
   it('typedText (no selector: nothing read back) counts characters, singular for one', () => {
     expect(typedText(1)).toBe('Typed 1 character');
     expect(typedText(22)).toBe('Typed 22 characters');
@@ -55,9 +55,9 @@ describe('launch_app response line', () => {
     expect(launchText('android', { app: 'md.bank.app/.MainActivity' })).toBe('Launched md.bank.app/.MainActivity on android');
   });
 
-  // 2026-10-09: the launch's caveat (Launched.note — iOS's foreground
-  // wait giving up) on its own ⚠ line, as swipeText lays out its note; the
-  // wipe's sentence under it, labelled as the flow's trace line is.
+  // The launch's caveat (Launched.note — iOS's foreground wait giving up) on
+  // its own ⚠ line, as swipeText lays out its note; the wipe's sentence under
+  // it, labelled as the flow's trace line is.
   it("says (state cleared) after the platform, and puts the note, then the wipe, each on a ⚠ line of its own — the flow's order", () => {
     expect(
       launchText('ios', { app: 'com.apple.MobileAddressBook', note: 'the tree was still another app', wiped: 'app state wiped (1 this session)' }),

@@ -179,9 +179,9 @@ describe('resolveSettled — appear AND hold still', () => {
     expect(reads).toBe(4);
   });
 
-  // 2026-10-08: the two ways a settle wait ends are two sentences, and only
-  // the first is ElementNotFoundError. Until then both read "(visible and
-  // settled)", and the flow's `optional:` had to guess which one it got.
+  // The two ways a settle wait ends are two sentences, and only the first is
+  // ElementNotFoundError: worded alike, the flow's `optional:` would have to
+  // guess which one it got.
   it('a target that NEVER resolves times out as ElementNotFoundError, worded "to appear" — nothing about settling', async () => {
     resetLayout();
     const fake = new FakeAdapter({ s: screen() }, 's');
@@ -292,7 +292,7 @@ describe('resolveSettled — appear AND hold still', () => {
     });
   });
 
-  // Code review of round 7: the extra read follows a RUN of one sighting,
+  // The extra read follows a RUN of one sighting,
   // not one sighting in all — a target seen, gone, and seen again only on a
   // slow last read had no second read either.
   describe('the extra read follows a run of one sighting at the end of the budget', () => {
@@ -1418,7 +1418,7 @@ describe('iOS\'s status band (2026-10-09)', () => {
   });
 
   /**
-   * The remedy as far as the tree knows it (code review of round 6, P1: a button pinned at the top was told to
+   * The remedy as far as the tree knows it (a button pinned at the top is never told to
    * `scroll_until it first`, which no scroll does). A WDA-shaped tree has ancestry: a button in no scroll view is
    * pinned there; one in a `scrollable` is scrolled out. idb's flat list has none, so it says both (above).
    */

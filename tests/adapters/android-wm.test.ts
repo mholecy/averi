@@ -7,10 +7,9 @@ import { GBOARD, GBOARD_PANEL, GBOARD_STRIP, INPUT_SHOWN_LINE } from '../helpers
 
 // A27: ONE `mCurrentFocus` reader for both of its readers — parseFocusedWindow, which wants the focused window's hash
 // (to find its block in `dumpsys window windows`), and the chooser's focus read (defaultDisplayFocus), which wants its
-// component. Before A27 each had its own regex, and they did not read one line alike: the hash reader took any
-// `Window{<hash> …`, the component reader only `Window{<hash> u<user> <pkg>/<class>}`. These tests pin where they
-// differ, so the one reader keeps both answers as they were (no fixture shows a line the two would read differently:
-// every real line is `Window{<hash> u0 …}`).
+// component. The hash is read of any `Window{<hash> …`, the component of `Window{<hash> u<user> <pkg>/<class>}` only.
+// These tests pin where they differ (no fixture shows a line the two would read differently: every real line is
+// `Window{<hash> u0 …}`).
 
 const dumpOf = (cell: string): string => readFileSync(new URL(`../fixtures/truth/android-averi_lab-api33/${cell}.windows.txt`, import.meta.url), 'utf8');
 const SCREEN = { width: 1080, height: 2220 };
@@ -49,7 +48,7 @@ describe('the focus line, read once: the window\'s hash for parseFocusedWindow, 
     expect(defaultDisplayFocus(lines)).toStrictEqual({ window: 'android/com.android.internal.app.ResolverActivity' });
     const dump = focusRecordAs('u0 Dialog Title');
     // A35: the first line names a window the dump does not list, so it is no display's that can be told; the second's
-    // window is display 0's (before A35 the first line decided: unknown)
+    // window is display 0's
     expect(parseFocusedWindow(dump.replace('mCurrentFocus=', 'mCurrentFocus=Window{2222222 u0 dev.averi.lab/dev.averi.lab.Other}\n  mCurrentFocus='))).toEqual(STACKED);
   });
 
@@ -65,9 +64,7 @@ describe('the focus line, read once: the window\'s hash for parseFocusedWindow, 
 // not read. Where the dump says which display a line is, that decides: a `Display: mDisplayId=<n>` header (`dumpsys
 // window displays`, CHOOSER_FOCUS_COMMAND), or, in FOCUSED_WINDOW_COMMAND's answer (no headers), each window block's
 // `mDisplayId=<n>` — the focus line whose window is display 0's, the size line after it, display 0's windows. A dump
-// that names no display is one display's, whole. Before A35 the reads answered a second display three ways (every
-// display must agree; the first found; display 0's block, the chooser's) — pinned by A27 on synthetic dumps, decided
-// here on A35's capture (docs/truth/live-records/a35-two-display/).
+// that names no display is one display's, whole.
 
 const fixtures = new URL('../fixtures/', import.meta.url);
 const truth = new URL('../fixtures/truth/', import.meta.url);
@@ -135,7 +132,6 @@ describe('A35: the captured two-display dumps (emulator-5554 + a 720x1280 overla
     expect(count(dump, /^[ \t]*InsetsSource type=ITYPE_NAVIGATION_BAR /gm)).toBe(1);
     expect(parseImeInsets(dump)).toEqual({ state: 'hidden' });
     expect(parseStatusBand(dump)).toBe(66);
-    // before A35 none: every display had to agree, and the two DisplayFrames sizes differ
     expect(parseNavigationBand(dump)).toBe(2154);
     expect(parseNavigationBand(dump)).toBe(parseNavigationBand(displayZero(dump)));
   });
@@ -157,7 +153,7 @@ describe('A35: the captured two-display dumps (emulator-5554 + a 720x1280 overla
   });
 
   it("the focused window: display 0's focus (the one whose window block says mDisplayId=0), display 0's size, display 0's windows beside it", () => {
-    // b: Settings' frame is [0,0][1080,2220] on display 0 — before A35 read as 720x1280, display 4's size (the first found)
+    // b: Settings' frame is [0,0][1080,2220] on display 0
     expect(parseFocusedWindow(read('focused-window', 'b-settings-d0'))).toEqual({ of: 'screenAlone', frame: { x: 0, y: 0, width: 1080, height: 2220 } });
     // a: the launcher's GoogleDiscoverWindow is a visible app window beside it on display 0, as on one display
     expect(parseFocusedWindow(read('focused-window', 'a-launcher-d0'))).toEqual({ of: 'unknown' });
@@ -396,8 +392,7 @@ describe('the InsetsState readers: an entry with a token missing, a frame of no 
   });
 });
 
-// The parsers' own cases, moved from tests/adapters/android.test.ts (A27): there each sat beside the adapter call that
-// reads with it; the adapter's cases stay there.
+// The parsers' own cases (A27); the adapter's cases are tests/adapters/android.test.ts's.
 /** A real `dumpsys window displays` (tests/fixtures/dumpsys-window-displays-<name>.txt). */
 const dumpsys = (name: string) => readFile(new URL(`../fixtures/dumpsys-window-displays-${name}.txt`, import.meta.url), 'utf8');
 
@@ -477,7 +472,7 @@ describe('parseImeInsets — is a soft keyboard shown, and which rect does it co
     expect(parseImeInsets(HIDING + lines(STATUS_BAR_36, lookalike))).toEqual({ state: 'hidden' });
   });
 
-  // The second witness (review 2026-10-03): DisplayPolicy's mIsImeShowing
+  // The second witness: DisplayPolicy's mIsImeShowing
   // line, present in all three real dumps. A false `shown` presses back on a
   // screen with no keyboard; a silent `hidden` switches the guard off. Both
   // become `unknown` wherever the two witnesses disagree or one is missing

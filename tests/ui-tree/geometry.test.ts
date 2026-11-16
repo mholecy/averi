@@ -68,9 +68,9 @@ describe('inferScreenSize', () => {
   });
 
   // Both of these assert the WHOLE answer on purpose. Asserting `.width` alone
-  // let a later change turn "ignored" into "refused" without a test noticing
-  // (caught in review 2026-08-27): the width was still 402, but `reliable` had
-  // gone false and every png scale on the shape failed closed.
+  // let a later change turn "ignored" into "refused" without a test noticing:
+  // the width was still 402, but `reliable` had gone false and every png scale
+  // on the shape failed closed.
   it('ignores an off-viewport sibling parked at x = screen width', () => {
     const tree = treeWith(node({ x: 402, y: 0, width: 402, height: 874 }));
     expect(inferScreenSize(tree)).toEqual({ width: 402, height: 874, reliable: true, trustworthyHeight: true, windowLeg: 'root' });
@@ -84,8 +84,8 @@ describe('inferScreenSize', () => {
   /**
    * A ROOT is the window by construction, so its own layout may straddle the
    * edge: horizontally scrollable content does exactly that, and iOS reports
-   * the full frame of a partly visible cell. Round 3 briefly applied the
-   * child-leg contradiction test here too and refused every such screen.
+   * the full frame of a partly visible cell. The child-leg contradiction test,
+   * applied here too, would refuse every such screen.
    */
   it('lets a root keep its window when content straddles the edge (carousel, list cell mid-swipe)', () => {
     const tree = treeWith(node({ x: 364, y: 200, width: 340, height: 300 }));
@@ -94,9 +94,9 @@ describe('inferScreenSize', () => {
 
   /**
    * The shape gate keeps a bar from being CROWNED, but a bar that is never a
-   * candidate still reaches the walk — which used to hand `reliable` to any
-   * origin-anchored maximum. Pixel-scale junk in a point tree then read as an
-   * 804pt screen, in silence: hole 1, third appearance.
+   * candidate still reaches the walk — which, unchecked, would hand `reliable`
+   * to any origin-anchored maximum. Pixel-scale junk in a point tree would then
+   * read as an 804pt screen, in silence: hole 1, third appearance.
    */
   it('refuses a walked width that the tree\'s own screen-shaped rects contradict', () => {
     const tree = node({ x: 0, y: 0, width: 0, height: 0 }, null, [
@@ -140,9 +140,9 @@ describe('inferScreenSize', () => {
   });
 
   it('keeps a tall scroll container out of the running — a screen is not that shape', () => {
-    // It used to win the tie on height and hand back a CONTENT height wearing
-    // the trustworthy flag; worse, it made the tree read "portrait" for a
-    // landscape run and defeated the rotation rule (review 2026-08-27).
+    // In the running it would win the tie on height and hand back a CONTENT
+    // height wearing the trustworthy flag; worse, it would make the tree read
+    // "portrait" for a landscape run and defeat the rotation rule.
     const tree = node({ x: 0, y: 0, width: 0, height: 0 }, null, [
       node(SCREEN),
       node({ x: 0, y: 0, width: 402, height: 6000 }),
@@ -151,10 +151,10 @@ describe('inferScreenSize', () => {
   });
 
   /**
-   * Found in review 2026-08-27. Widest-wins alone crowned a small
-   * origin-anchored sub-view whose aspect looked like a screen, and the png
-   * scale then read 6.0 in silence — the very failure this file exists to
-   * prevent. A child is only the window if it CONTAINS the on-layout content.
+   * Widest-wins alone would crown a small origin-anchored sub-view whose
+   * aspect looked like a screen, and the png scale would then read 6.0 in
+   * silence — the very failure this file exists to prevent. A child is only
+   * the window if it CONTAINS the on-layout content.
    */
   it('refuses to resolve a child the layout inside it contradicts, rather than crowning a sub-view', () => {
     const tree = node({ x: 0, y: 0, width: 0, height: 0 }, null, [
@@ -185,8 +185,8 @@ describe('inferScreenSize', () => {
   /**
    * The other direction, also from review: a non-edge-to-edge uiautomator dump
    * whose app window starts BELOW the status bar leaves the bar as the only
-   * origin-anchored root. Crowning it scaled a 2400px capture by 30x down and
-   * failed closed on a capture 0.5.0 read correctly.
+   * origin-anchored root. Crowning it would scale a 2400px capture by 30x down
+   * and fail closed on a capture 0.5.0 read correctly.
    */
   it('refuses a BAR — a candidate the content towers over — and walks instead', () => {
     const tree = node({ x: 0, y: 0, width: 0, height: 0 }, null, [
@@ -248,7 +248,7 @@ describe('inferScreenSize on the real iOS filter-sheet shape', () => {
   });
 });
 
-// ─── Viewport predicates (moved here from selectors.test.ts, 2026-10-04) ────
+// ─── Viewport predicates ────
 
 
 describe('absentFromViewport — the one meaning of "gone", shared by state detects and absent asserts', () => {
@@ -503,7 +503,7 @@ describe('Clips.cutSliver at any depth, synthetic shapes — a node cut at a cli
 });
 
 /**
- * The clippedOut evidence (code review of round 7, P1) at every edge, through the parser as uiautomator dumps it —
+ * The clippedOut evidence at every edge, through the parser as uiautomator dumps it —
  * the verification's probe shapes — and the two stated residuals it leaves (geometry.ts#evidentCut, "Unknowable").
  */
 describe('Clips.cutSliver at any depth — clippedOut evidence at each edge, parsed (geometry.ts#evidentCut)', () => {

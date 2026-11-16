@@ -18,8 +18,7 @@ describe('formatLogExcerpt', () => {
   });
 
   // One limit, one owner: the get_logs tool's schema default is this same
-  // constant (tests/mcp/tool-descriptions.test.ts); until 2026-10-08 the
-  // function alone defaulted to 2000.
+  // constant (tests/mcp/tool-descriptions.test.ts).
   it('keeps LOG_MAX_LINES lines when the caller names no budget', () => {
     const out = formatLogExcerpt(lines(LOG_MAX_LINES + 1), undefined).split('\n');
     expect(out[0]).toBe(`[truncated: showing last ${LOG_MAX_LINES} of ${LOG_MAX_LINES + 1} lines]`);

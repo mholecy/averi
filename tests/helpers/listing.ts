@@ -11,9 +11,9 @@ export const device = (id: string, state: Device['state'] = 'booted', platform: 
 });
 
 /**
- * A listing over `devices`, which a test may change mid-flight (devices boot and vanish) — what the discovery and
- * registry tests hand `discoveryOver`. `platforms` records each listing's platform; `versions`, whether it asked for OS
- * versions (a listing's default: yes). `onList` gates each listing — lets a test freeze one mid-flight.
+ * A listing over `devices`, which a test may change mid-flight (devices boot and vanish). `platforms` records each
+ * listing's platform; `versions`, whether it asked for OS versions (a listing's default: yes). `onList` gates each
+ * listing — lets a test freeze one mid-flight.
  */
 export function recordingListing(devices: Device[], onList?: () => Promise<void> | void) {
   const platforms: Platform[] = [];

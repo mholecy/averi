@@ -15,8 +15,7 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 // The IN-TREE model (interact/keyboard-in-tree.ts: iOS under WDA, the adapter
 // has no keyboard oracle), through the module's interface — tapElement,
 // fillField, resolveClearOfKeyboard, dismissKeyboard — on the fake without
-// one. The window model's pins are tests/interact/keyboard-window.test.ts;
-// the two files were one until 2026-10-07 (the keyboard-model review).
+// one. The window model's pins are tests/interact/keyboard-window.test.ts.
 //
 // The one sleep owner (util/sleep.ts) is recorded, not waited on (as in
 // fill.test.ts): the hide delay is asserted as a delay in a sequence.
@@ -101,8 +100,8 @@ function swiftFormFake(toolbar: boolean): FakeAdapter {
  * `0 83 402 48` and `0 62 402 812` (`bar` / `sheet` say which are there), each holding ONE empty `container` of its own rect
  * (the raw `/source` at 347e70d — the first version of this fake built them childless, after the note's since-corrected
  * premise, and passed while the device still refused), then the band `0 573 402 301`.
- * Until 2026-10-09 either toolbar alone refused the title dismissal as "covered by toolbar". The fake's hit test lands
- * on the identified title container; a tap there hides the keyboard (assumed — not tried on the device).
+ * The fake's hit test lands on the identified title container; a tap there hides the keyboard (assumed — not tried on
+ * the device).
  */
 const CONTACTS_TITLE_TAP: KeyboardDismissal = { kind: 'tap', target: { role: 'text', text: 'New Contact' } };
 function contactsSheetFake({ bar, sheet }: { bar: boolean; sheet: boolean }): FakeAdapter {
@@ -198,7 +197,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
   });
 
   /**
-   * Stage B (2026-10-07): the configured dismissals. The guard's two looks
+   * Stage B: the configured dismissals. The guard's two looks
    * are as above; on the second covering look the first usable strategy is
    * tapped ONCE, the hide delay waited, the target resolved a third time
    * and the band read off that look. The measured facts behind the
@@ -389,7 +388,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
     });
 
     /**
-     * Review round 1: the resolution policy prefers the sole interactive
+     * The resolution policy prefers the sole interactive
      * match, so a `tap: { text: "Sign in" }` on a screen where a title and a
      * BUTTON share the label would have tapped the button — the one thing a
      * dismissal must never do. Interactive matches are dropped before any
@@ -434,7 +433,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
     });
 
     /**
-     * Review round 1: "there" is not "on screen" — WDA keeps off-screen nodes
+     * "There" is not "on screen" — WDA keeps off-screen nodes
      * in the tree, and a title scrolled above the viewport or under an
      * alert's text is still found by its selector. The tap point must lie
      * inside the root's rect and must not be drawn over by later content.
@@ -882,11 +881,10 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
   });
 
   // The read that installs the dead tree still returned a tree holding the
-  // target, so the second look DID find it once: since 2026-10-08 that is
-  // the "found, but never held still" sentence, not the never-found one, with
-  // the read error beneath saying why no second agreeing read came — since
-  // 2026-10-09 worded "found once, but no second read came" (one more read
-  // was taken past the budget, and it failed too).
+  // target, so the second look DID find it once: that is the "found once,
+  // but no second read came" sentence, not the never-found one, with the
+  // read error beneath saying why no second agreeing read came (one more
+  // read was taken past the budget, and it failed too).
   it('a second look that reads a dead tree keeps the read error beneath the headline', async () => {
     const fake = iosFake();
     onRead(fake, 3, () => {
@@ -1015,7 +1013,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
   });
 
   it('the guard\'s answer carries the node, its note, the point to tap and the tree the node was resolved in — nothing of the keyboard (in-tree clear, and oracle hidden)', async () => {
-    // The tree since 2026-10-19: the fill's proof of what the other inputs held before it typed (fill-type.ts).
+    // The tree: the fill's proof of what the other inputs held before it typed (fill-type.ts).
     const clear = await resolveClearOfKeyboard(iosFake(), 'id:login_title', FAST);
     expect(Object.keys(clear)).toEqual(['node', 'note', 'point', 'tree']);
     const android = iosFake();
@@ -1034,7 +1032,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
   });
 
   /**
-   * The keyboard's OWN controls (review 2026-10-07): a tap on a key, on the
+   * The keyboard's OWN controls: a tap on a key, on the
    * accessory toolbar's Done, on the Passwords bar or on dictation lands
    * inside the band and is what the user does — an OTP digit, the one
    * non-submitting dismissal. The WDA source marks their Windows
@@ -1087,9 +1085,9 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
 });
 
 /**
- * Stage B (2026-10-07): the in-tree dismissal after a fill. One tree read;
+ * Stage B: the in-tree dismissal after a fill. One tree read;
  * a band → the configured strategy tapped once and one re-read to confirm;
- * no band → nothing. `enter` is never pressed on this path any more: it was
+ * no band → nothing. `enter` is never pressed on this path: it was
  * measured to SUBMIT the login from the password field (K5d).
  */
 describe('dismissKeyboard — the in-tree model (no oracle), stage B', () => {
@@ -1219,7 +1217,7 @@ describe('dismissKeyboard — the in-tree model (no oracle), stage B', () => {
     expect(sleeps).toEqual([KEYBOARD_HIDE_DELAY_MS]);
   });
 
-  // D21 code review: a read no wait cures (PersistentReadError — idb's wedged accessibility service) passes through
+  // D21: a read no wait cures (PersistentReadError — idb's wedged accessibility service) passes through
   // the guard's wrap unchanged, so the read loops above and the flow engine's isTerminal still see its class.
   it('a confirming read that throws a PersistentReadError: thrown as it came, not wrapped in AfterDismissalTap', async () => {
     const fake = withBand();

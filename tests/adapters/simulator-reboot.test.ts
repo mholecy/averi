@@ -6,13 +6,12 @@ import { describe, expect, it } from 'vitest';
 import { rebootSimulatorAdvice } from '../../src/adapters/simulator-reboot.js';
 
 /**
- * 2026-10-08 (iOS adapter stack review, candidate 2): the simulator reboot
- * command was spelled in three messages, two ways, one of them with a
- * `<udid>` placeholder. simulator-reboot.ts owns it now; this file pins the
- * wording and that no other module under src/ spells the command in its
- * CODE — a new message that needs the reboot calls the builder, or this
- * fails. The call sites themselves are proven by their full-string pins
- * (ios.test.ts, ios-tree-source.test.ts, wda.test.ts), not here.
+ * simulator-reboot.ts owns the simulator reboot command; this file pins
+ * the wording and that no other module
+ * under src/ spells the command in its CODE — a new message that needs the
+ * reboot calls the builder, or this fails. The call sites themselves are
+ * proven by their full-string pins (ios.test.ts, ios-tree-source.test.ts,
+ * wda.test.ts), not here.
  *
  * Comments are stripped before matching: a comment that mentions
  * `xcrun simctl boot` advises no one. The match is the TEXT form
@@ -33,12 +32,12 @@ function sourceFiles(dir: string): string[] {
 /**
  * The file without its comments, as TypeScript's own printer writes it back
  * with `removeComments` — so a string is a string and a comment is a
- * comment, whatever characters sit around them. Until round 4 (2026-10-08)
- * this was two regexes: block comments, then `//` to the line's end where it
- * started a line or followed whitespace. That kept a comment that follows
- * code with no space (`foo();// …`), which the scan then matched as code,
- * and it cut a line at a ` // ` inside a string (`'a // b'`), so any code
- * after it on that line — a second string spelling the command — was never
+ * comment, whatever characters sit around them. Two regexes (block comments,
+ * then `//` to the line's end where it started a line or followed
+ * whitespace) would keep a comment that follows code with no space
+ * (`foo();// …`), which the scan would then match as code, and would cut a
+ * line at a ` // ` inside a string (`'a // b'`), so any code after it on
+ * that line — a second string spelling the command — would never be
  * scanned. The printer re-quotes strings (`'…'` comes back as `"…"`) and,
  * with no parent nodes to read the source text from, escapes non-ASCII
  * (`—` comes back as `\u2014`); the match below never looks at quotes and

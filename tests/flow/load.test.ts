@@ -13,11 +13,8 @@ import {
 
 /**
  * flow/load.ts at its own level: real files in a temp dir, no device. The
- * loader describes below moved here verbatim from tests/flow/config.test.ts
- * on 2026-10-04 (C6); the environment tests are new that day — they pin what
- * the `.env.averi` reading GUARANTEES (precedence, re-read, what is said on
- * stderr) through its returned value, where the tests they replace could
- * only read the side effect on `process.env`.
+ * environment tests pin what the `.env.averi` reading GUARANTEES
+ * (precedence, re-read, what is said on stderr) through its returned value.
  */
 
 describe('envBeside — the environment a project runs in', () => {
@@ -88,9 +85,9 @@ describe('envBeside — the environment a project runs in', () => {
   });
 
   it('a name removed from the file is gone on the next load — AVERI_ENV included', async () => {
-    // Until 2026-10-04 the file was written into process.env and a removed
-    // name stayed there for the server's life: a removed AVERI_ENV kept every
-    // later run on the old backend.
+    // Were the file written into process.env, a removed name would stay there
+    // for the server's life: a removed AVERI_ENV would keep every later run
+    // on the old backend.
     const path = await project('AVERI_ENV=staging\nAVERI_T_KEPT=k\nAVERI_T_GONE=g\n');
     const first = await envBeside(path, {});
     expect(first.env.AVERI_ENV).toBe('staging');
@@ -104,8 +101,8 @@ describe('envBeside — the environment a project runs in', () => {
   });
 
   it('one project\'s file values do not leak into another project loaded by the same server', async () => {
-    // Until 2026-10-04 project B, with no file of its own, saw project A's
-    // values because A's load had written them into process.env.
+    // Were A's load to write its values into process.env, project B, with no
+    // file of its own, would see them.
     const a = await project('AVERI_T_FROM_A=a\n');
     const dirA = dir;
     const b = await project(); // no .env.averi

@@ -2,9 +2,7 @@
  * Where a cut refusal's coordinate escape (`… tap by coordinates`) stands against the remedies it names: how many of
  * them come first (`dismiss it first`, `scroll_until it`, `scroll again`), none after it (else it throws), and whether
  * the escape closes its sentence (its parentheses closed, then the end, `; nothing was tapped`, or the full stop) — all
- * within that sentence. F2A1's order, the owner's decision of 2026-10-18 (the way past kept, the remedy before it) —
- * read by the tap's and scroll_until's tests over the lab's real form-keyboard captures (tests/interact/tap-judgement
- * .test.ts, tests/interact/scroll.test.ts).
+ * within that sentence. F2A1's order, the owner's decision of 2026-10-18 (the way past kept, the remedy before it).
  */
 export function remedyThenEscape(reply: string): { remedies: number; escapeLast: boolean } {
   const escape = reply.indexOf('tap by coordinates');

@@ -23,8 +23,6 @@ vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'))
  * One element in the vocabulary both backends share, spelled the two ways
  * the backends spell it: an idb describe-all element and a WDA /source node.
  * Every case below runs through BOTH parsers and expects the same UiNode.
- * Until 2026-10-02 each parser carried its own copy of the normalization and
- * each test file pinned its own copy — nothing pinned that they agreed.
  */
 const asIdb = (r: RawIosElement) => ({
   type: r.type, AXLabel: r.label, AXUniqueId: r.identifier, AXValue: r.value, frame: r.rect,
@@ -81,8 +79,8 @@ const CASES: { name: string; raw: RawIosElement; expected: Omit<UiNode, 'childre
   },
   {
     // The role map is a plain object: `constructor`, `toString`, ... are
-    // answered by its prototype, and before 2026-10-02 both copies returned
-    // the FUNCTION as the role (an own-key lookup is the fix, in the one owner).
+    // answered by its prototype, so a plain lookup would return the FUNCTION
+    // as the role (an own-key lookup is the fix, in the one owner).
     name: 'a type that is a prototype key of the role map is `other`, not a function',
     raw: { type: 'constructor', label: 'ctor' },
     expected: { role: 'other', label: 'ctor', identifier: null, value: null, rect: { x: 0, y: 0, width: 0, height: 0 } },
@@ -140,7 +138,7 @@ describe('parseIdbDescribeAll — the flat list and what only it needs', () => {
     });
     expect(tree.children).toHaveLength(3);
     expect(tree.children.every((c) => c.children.length === 0)).toBe(true); // flat stays flat
-    // The root says so: its children's order is the list's (ui-tree/draw-order.ts reads it — code review P1).
+    // The root says so: its children's order is the list's (ui-tree/draw-order.ts reads it).
     expect(tree.flatList).toBe(true);
     expect(tree.children.every((c) => c.flatList === undefined)).toBe(true);
   });
@@ -405,8 +403,8 @@ describe('IdbTreeSource.applicationLabel — which app a read is of', () => {
 // docs/bugs/2026-10-06-ios-idb-empty-tree-persists-on-pin-screen.md: idb
 // returned a lone 0×0 Application for minutes on a RENDERED screen. Read as
 // a tree, nothing matched it, so `absent` passed and the ensure_state ladder
-// escalated into its clearState rung. It is a read error now; the signature
-// is NARROW — no element with any area — so idb's normal launch transient, a
+// escalated into its clearState rung. It is a read error; the signature is
+// NARROW — no element with any area — so idb's normal launch transient, a
 // lone FULL-FRAME Application, stays a tree.
 describe('IdbTreeSource — an empty tree is a read error, not a screen on which nothing matches', () => {
   const ZERO = { x: 0, y: 0, width: 0, height: 0 };
@@ -465,7 +463,7 @@ describe('IdbTreeSource — an empty tree is a read error, not a screen on which
     );
   });
 
-  // 2026-10-08 (iOS adapter stack review, candidate 2): the reboot names the
+  // The reboot names the
   // simulator the source is BOUND to — not `<udid>`, not simctl's `booted` —
   // and nothing in the advice points at the server's stderr, which the agent
   // reading the tool result cannot see.
