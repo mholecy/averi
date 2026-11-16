@@ -122,9 +122,9 @@ describe('the crash excerpt', () => {
 });
 
 /**
- * The one failure policy (A29). Its callers await appHealth bare, because it words every DEVICE failure into the line
- * itself; what it does not catch is an adapter breaking its contract, which fails each caller's call alike (their own
- * tests pin that).
+ * The one failure policy (A29): appHealth words every DEVICE failure into the line itself, so a caller needs no catch;
+ * what it does not catch is an adapter breaking its contract, which fails the calling command (the callers' own tests
+ * pin that).
  */
 describe('one failure policy: the device\'s failures are the line\'s, nothing else is caught', () => {
   it('a question the device cannot answer is `unknown`, on either platform, naming the platform\'s check', async () => {

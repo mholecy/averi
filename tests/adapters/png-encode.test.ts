@@ -72,7 +72,7 @@ describe('encodePng', () => {
   });
 
   it('a UI frame with a photo strip (MINOR-2): the strip is Up, and the whole is within 1.1× of zlib 6 with adaptive filters', async () => {
-    // 120 rows: the sample's ratio stays under PHOTO_RATIO (~0.06), so the frame takes the UI path, row by row.
+    // 120 rows: the sample's ratio stays under PHOTO_RATIO (0.08), so the frame takes the UI path, row by row.
     const strip = photo(BANDS.width, 120);
     const data = Buffer.from(BANDS.data);
     strip.data.copy(data, 800 * BANDS.width * 4);

@@ -143,7 +143,8 @@ describe('Scene.standing for scroll_until\'s stop — measured cases, fixture ×
     // Device check C3-3: rows scrolled under the top bar are no cover of Back; the pinned CONTINUE still covers the row under it.
     ['idb scrolled under the top bar, position 2: Back, plain', () => idbAt('idb-swift-form-scrolled-under-top-bar.json', 'positions', 'pos2'), 'BackButton', IPHONE, PLAIN, { kind: 'reachable', at: { x: 44, y: 84 } }],
     ['…position 6: payee_country_select under CONTINUE, plain', () => idbAt('idb-swift-form-scrolled-under-top-bar.json', 'positions', 'pos6'), 'swift_payment.form.payee_country_select', IPHONE, PLAIN, { kind: 'covered', cover: 'swift_payment.form.continue_button' }],
-    // A modal listed before the content it is drawn over: its rows and the picker stand clear.
+    // A modal listed before the content it is drawn over: its SWIFT row is covered by row_0 (order untold), the picker
+    // stands clear.
     ['idb modal listed before content: the chooser\'s SWIFT row, plain: row_0 holds its centre, order untold', () => idbAt('idb-modal-listed-before-content.json', 'screens', 'chooser'), 'accounts.detail.payment_type_sheet.row_swift', IPHONE, PLAIN, { kind: 'covered', cover: 'transactions.list.row_0' }],
     ['…the value-date picker, plain', () => idbAt('idb-modal-listed-before-content.json', 'screens', 'valueDatePicker'), 'swift_payment.form.value_date_picker', IPHONE, PLAIN, { kind: 'reachable', at: { x: 205, y: 479 } }],
     // A Compose button's text under its own control is no cover of it.
@@ -265,7 +266,8 @@ describe('Scene.standing — the Android navigation band (D7): a centre in it is
     ['accountDetail row_30 reaching 33 px into the band, fully: true: under the navigation bar, as a region', () => compose('accountDetail'), 'transactions.list.row_30', PIXEL_NAV, FULLY, { kind: 'systemBar', at: { x: 540, y: 2138 }, bar: { edge: 'bottom', top: 2154 }, band: { x: 0, y: 2154, width: 1080, height: 66 } }],
     ['…plain stop: reachable (its centre clear)', () => compose('accountDetail'), 'transactions.list.row_30', PIXEL_NAV, PLAIN, { kind: 'reachable', at: { x: 540, y: 2138 } }],
     ['…tap: reachable', () => compose('accountDetail'), 'transactions.list.row_30', PIXEL_NAV, TAP, { kind: 'reachable', at: { x: 540, y: 2138 } }],
-    // No scroll lifts a full-bleed header in no scroll view out of the band (ADR 0009): contactsSyncPromo's "Close sheet" scrim 0,0 1080x1087, laid from the top edge at full width, stops `fully` as before.
+    // No scroll lifts a full-bleed header in no scroll view out of the band (ADR 0009): contactsSyncPromo's "Close
+    // sheet" scrim 0,0 1080x1087, laid from the top edge at full width: `fully` stops on it.
     ['contactsSyncPromo "Close sheet" 0,0 1080x1087 (full-bleed), fully: true: reachable', () => compose('contactsSyncPromo'), 'Close sheet', PIXEL, FULLY, { kind: 'reachable', at: { x: 540, y: 544 } }],
     ['…plain stop: reachable', () => compose('contactsSyncPromo'), 'Close sheet', PIXEL, PLAIN, { kind: 'reachable', at: { x: 540, y: 544 } }],
   ] as const)('%s', async (_name, tree, id, screen, purpose, expected) => {
@@ -339,7 +341,8 @@ describe('Scene.standing for the pixel assert — measured cases, fixture × rea
     // Round 8: a label under CONTINUE sampled CONTINUE's colour — the pinned bar named, with its reach to the screen's bottom.
     ['idb SWIFT form, priority_select at rest under CONTINUE, colour', () => swiftIdb(), 'swift_payment.form.priority_select', IPHONE, COLOUR, { kind: 'covered', cover: 'swift_payment.form.continue_button', reach: { x: 24, y: 780, width: 354, height: 94 } }],
     ['…at 700, its sample (706–746) clear of the bar from 780: colour measures', () => swiftIdbAt(700), 'swift_payment.form.priority_select', IPHONE, COLOUR, { kind: 'reachable', at: { x: 201, y: 726 } }],
-    // Round 8: `value_date_select` at 24,30 under the 62-pt band passed on the status bar's colour.
+    // Round 8: `value_date_select` at 24,30 under the 62-pt band passed on the status bar's colour. Pinned here on
+    // priority_select flung to -20, read by OCR: the band is named over what it reads.
     ['…flung to -20: the status band over what it reads, the band\'s rect quoted', () => swiftIdbAt(-20), 'swift_payment.form.priority_select', IPHONE, OCR, { kind: 'systemBar', at: { x: 201, y: 6 }, bar: { edge: 'top', bottom: 62 }, band: { x: 0, y: 0, width: 402, height: 62 } }],
     // idb's flat list: its Application node, screen-sized, under the content listed over it — the root's own remedy.
     ['idb number pad: the Application root, colour: content on its background', () => idbAt('idb-swift-form-number-pad.json', 'elements'), 'Skeleton Internal', IPHONE, COLOUR, { kind: 'covered', cover: 'TextFieldWithComponentStyle', reach: { x: 42, y: 425, width: 318, height: 20 }, overRoot: true }],
@@ -482,8 +485,8 @@ describe('Scene.standing for the stop — its covers judged below the status ban
 
 /**
  * D17: uiautomator cuts a carousel's card at the SCREEN's edge, not its carousel's (adapters/types.ts#UiNode.boundsCutAtScreen).
- * The lab's `carousel-in-list` dump (API 33), its C moved to where the live check left it: the app laid C at x 586,
- * 948 wide, the dump `[586,380][1080,614]`.
+ * The lab's `carousel-in-list` dump (API 33), its C (dumped `[1014,380][1080,614]`) moved to where the live check left
+ * it: the app laid C at x 586, 948 wide, which uiautomator dumps as `[586,380][1080,614]`.
  */
 describe('Scene.standing — a side uiautomator cut at the screen\'s edge (D17): `unknownPast`, its visible fraction an upper bound', () => {
   const carousel = async (cRect: Rect): Promise<{ t: UiNode; c: UiNode }> => {
@@ -831,7 +834,8 @@ describe('Scene.standing for the tap — idb\'s chrome and its keyboard band, as
       'Payee’s bank street & no.*',
       { kind: 'covered', cover: 'swift_payment.form.continue_button' },
     ],
-    // A modal listed before the content it is drawn over: the chooser's rows and the picker stand clear; CONTINUE, listed last, still covers.
+    // A modal listed before the content it is drawn over: the chooser's own-transfer row and the picker stand clear;
+    // CONTINUE, listed last, still covers.
     ['idb modal: the chooser\'s own-transfer row, reachable', () => idbAt('idb-modal-listed-before-content.json', 'screens', 'chooser'), 'accounts.detail.payment_type_sheet.row_own', { kind: 'reachable', at: { x: 201, y: 423 } }],
     // …row_0, listed after its SWIFT row (drawn under the chooser) and holding its centre, is a cover whose order is not told (the eyes tell it, ADR 0024).
     ['…its SWIFT row, covered by row_0 (order untold)', () => idbAt('idb-modal-listed-before-content.json', 'screens', 'chooser'), 'accounts.detail.payment_type_sheet.row_swift', { kind: 'covered', cover: 'transactions.list.row_0', largest: { x: 45, y: 487, width: 312, height: 18 } }],
@@ -996,19 +1000,21 @@ describe('Scene.standing for the stop — the status band and a keyboard line (m
     ['a hero 0,0 402x123, fully: true: likewise', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: box(402, 123) })), 'hero', IPHONE, FULLY, { kind: 'reachable', at: { x: 201, y: 62 } }],
     // Not full-bleed (inset 10 a side): the region rule holds.
     ['a card 10,0 382x300, fully: true: under the status bar, as a region', () => on(box(402, 874), node({ role: 'image', identifier: 'hero', rect: { x: 10, y: 0, width: 382, height: 300 } })), 'hero', IPHONE, FULLY, { kind: 'systemBar', at: { x: 201, y: 150 }, bar: { edge: 'top', bottom: 62 }, band: box(402, 62) }],
-    // Android 15+'s edge-to-edge app bar under the 66-px band, and a screen-sized root: `fully` stops on each as before.
+    // Android 15+'s edge-to-edge app bar under the 66-px band, and a screen-sized root: `fully` stops on each.
     ['an edge-to-edge app bar 0,0 1080x210, fully: true: reachable', () => on(box(1080, 2220), node({ role: 'container', identifier: 'hero', rect: box(1080, 210) })), 'hero', PIXEL_NAV, FULLY, { kind: 'reachable', at: { x: 540, y: 105 } }],
-    // Screen-sized but not laid from the top edge (0,40 1080x2180, into both bands): stops as before too.
+    // Screen-sized but not laid from the top edge (0,40 1080x2180, into both bands): it stops too.
     ['a screen-sized node 0,40 1080x2180 into both bands, fully: true: reachable', () => on(box(1080, 2220), node({ role: 'container', identifier: 'hero', rect: { x: 0, y: 40, width: 1080, height: 2180 } })), 'hero', PIXEL_NAV, FULLY, { kind: 'reachable', at: { x: 540, y: 1130 } }],
     // In a scroll view the same shapes are content a scroll lifts out of the band: `fully` strokes on.
     ['a list row 0,0 1080x150 in a scroll view, fully: true: under the status bar, as a region', () => inList(box(1080, 2220), { x: 0, y: 0, width: 1080, height: 150 }), 'hero', PIXEL_NAV, FULLY, { kind: 'systemBar', at: { x: 540, y: 75 }, bar: { edge: 'top', bottom: 66 }, band: box(1080, 66) }],
     ['a screen-sized 0,160 1080x2000 in a scroll view (it fits between the bands), fully: true: under the navigation bar, as a region', () => inList(box(1080, 2220), { x: 0, y: 160, width: 1080, height: 2000 }), 'hero', PIXEL_NAV, FULLY, { kind: 'systemBar', at: { x: 540, y: 1160 }, bar: { edge: 'bottom', top: 2154 }, band: { x: 0, y: 2154, width: 1080, height: 66 } }],
-    // …unless it is taller than the room between the bands (2220 − 66 − 66 = 2088): no scroll lifts all of it out, and it stops as before.
+    // …unless it is taller than the room between the bands (2220 − 66 − 66 = 2088): no scroll lifts all of it out, and
+    // it stops.
     ['a screen-sized 0,0 1080x2100 in a scroll view, taller than the room between the bands, fully: true: reachable', () => inList(box(1080, 2220), { x: 0, y: 0, width: 1080, height: 2100 }), 'hero', PIXEL_NAV, FULLY, { kind: 'reachable', at: { x: 540, y: 1050 } }],
     // idb's flat list cannot say whether a node lies in a scroll view (`inScroller` undefined): it counts as none.
     ['idb: a row 0,0 402x150 laid from the top edge at full width, fully: true: reachable (exempt)', () => idbRow(0), 'hero', IPHONE, FULLY, { kind: 'reachable', at: { x: 201, y: 75 } }],
     ['idb: the same row at 0,20, no full-bleed header, fully: true: under the status bar, as a region', () => idbRow(20), 'hero', IPHONE, FULLY, { kind: 'systemBar', at: { x: 201, y: 95 }, bar: { edge: 'top', bottom: 62 }, band: box(402, 62) }],
-    // The bottom edge alike: a full-width surface reaching the screen's bottom in no scroll view (a bottom sheet) stops at once; in one, it is lifted.
+    // The bottom edge alike: a full-width surface reaching the screen's bottom in no scroll view (a bottom sheet) stops
+    // at once; in a scroll view a scroll can lift it out of the band, so the region rule holds.
     ['a bottom sheet 0,1100 1080x1120 in no scroll view, fully: true: reachable', () => on(box(1080, 2220), node({ role: 'container', identifier: 'hero', rect: { x: 0, y: 1100, width: 1080, height: 1120 } })), 'hero', PIXEL_NAV, FULLY, { kind: 'reachable', at: { x: 540, y: 1660 } }],
     ['…the same surface in a scroll view: under the navigation bar, as a region', () => inList(box(1080, 2220), { x: 0, y: 1100, width: 1080, height: 1120 }), 'hero', PIXEL_NAV, FULLY, { kind: 'systemBar', at: { x: 540, y: 1660 }, bar: { edge: 'bottom', top: 2154 }, band: { x: 0, y: 2154, width: 1080, height: 66 } }],
     ['…a full-width surface short of the bottom edge (0,1100 1080x1100) in no scroll view: under the navigation bar, as a region', () => on(box(1080, 2220), node({ role: 'container', identifier: 'hero', rect: { x: 0, y: 1100, width: 1080, height: 1100 } })), 'hero', PIXEL_NAV, FULLY, { kind: 'systemBar', at: { x: 540, y: 1650 }, bar: { edge: 'bottom', top: 2154 }, band: { x: 0, y: 2154, width: 1080, height: 66 } }],
@@ -1107,7 +1113,7 @@ describe('farEdgeFrames — the far edge\'s frames, cut beside the rule that set
     const screen: UsableScreen = usable({ box: wide, boxes: [wide, tall], navigationBand: 900 });
     const best = rowAt(2100, 100, FULLY);
     expect(farEdgeFrames(screen, best)).toEqual({ frames: [wide, tall], uncutFrames: [wide, tall] });
-    // Cut on its own shape, the upright box would lose its bottom 100: the first box's shape decides, as the round always did.
+    // Cut on its own shape, the upright box would lose its bottom 100: the first box's shape decides.
     expect(farEdgeFrames(usable({ box: tall, boxes: [tall], navigationBand: 900 }), best).frames).toEqual([{ x: 0, y: 0, width: 600, height: 900 }]);
   });
 });
@@ -1452,7 +1458,7 @@ describe('Scene.standing — the drawn frame: what of a node its scroll views dr
     // Android's dialect: no unclipped-frames mark — but a rect uiautomator did not cut is cut by the drawn frame all the same.
     const android = node({ role: 'container', rect: box(402, 874), children: [{ ...form, clipsDescendants: true as const }, bar] });
     const flat = { ...node({ role: 'container', rect: box(402, 874), children: [form, ...form.children, name, street, bar] }), flatList: true as const };
-    // Judged on the screen alone, as before: the name field's centre (201,827) on it — tapped where nothing covers it
+    // Judged on the screen alone: the name field's centre (201,827) on it — tapped where nothing covers it
     // (idb's CONTINUE, pinned at a flat list's bottom, reaches down over it) — and 5 pt of the street field measured.
     expect(said(sceneOf(plain).standing(name, IPHONE, TAP))).toEqual({ kind: 'reachable', at: { x: 201, y: 827 } });
     expect(said(sceneOf(flat).standing(name, IPHONE, TAP))).toEqual({ kind: 'covered', cover: 'continue' });
@@ -1615,11 +1621,11 @@ describe('Scene.standing — a sliver cut by a node drawn after it (Compose\'s b
 });
 
 /**
- * A text in a control's touch margin (ui-tree/cover.ts#marginText): Compose dumps a control's touch target, grown to
- * 48 dp past what it draws, and lays the next field's title in that margin. After `back` on the lab's form-keyboard,
- * phone is `55,1280 970x132` (what it draws: `55,1296 970x99`), and `vs.title` `55,1406 258x56` overlaps its dumped
- * bottom by 6 px, 11 px below what it draws. The tree alone cannot tell, so the cover stands; only the eyes' `clear`
- * excuses it, and then for every reader of the draw order alike.
+ * A text in a control's touch margin (ui-tree/cover.ts#marginText): Compose dumps a control's touch target, grown to a
+ * 48 dp minimum around what it draws, and lays the next field's title in that margin. After `back` on the lab's
+ * form-keyboard, phone is `55,1280 970x132` (what it draws: `55,1296 970x99`), and `vs.title` `55,1406 258x56` overlaps
+ * its dumped bottom by 6 px, 11 px below what it draws. The tree alone cannot tell, so the cover stands; only the
+ * eyes' `clear` excuses it, and then for every reader of the draw order alike.
  * docs/bugs/2026-10-19-lab-android-fully-true-on-phone-after-back-refused-under-the-next-fields-title-its-touch-target-overlaps.md
  */
 describe('Scene.standing — a text in a control\'s touch margin, seen clear or not', () => {
@@ -1668,10 +1674,10 @@ describe('Scene.standing — a text in a control\'s touch margin, seen clear or 
 });
 
 /**
- * The facts and shapes a standing carries that its readers quote (the sentences, interact/course.ts, the far edge) —
- * each on the smallest tree that makes it, on a 400x800 screen with no band read: which scroll view a sentence names
- * where scroll views nest, a `fully` stop's clip by its scroll view (`ScrollViewCut`), the drawn frame, the cover
- * judged above a keyboard line, a sliver at the screen's side.
+ * The facts and shapes a standing carries that its readers quote — each on the smallest tree that makes it, on a
+ * 400x800 screen with no band read: which scroll view a sentence names where scroll views nest, a `fully` stop's clip
+ * by its scroll view (`ScrollViewCut`), the drawn frame, the cover judged above a keyboard line, a sliver at the
+ * screen's side.
  */
 describe('Scene.standing — the facts its readers quote, on the smallest trees', () => {
   const PLAIN_SCREEN = usable({ box: box(400, 800), boxes: [box(400, 800)] });

@@ -1105,7 +1105,7 @@ describe('AndroidAdapter.viewport — the status band, out of `dumpsys window di
   };
 
   // The registry keeps one adapter per device for the server's life,
-  // and a failed first read was kept as "no band" — a cold device's 2 s timeout switched N1's fix off for good.
+  // and a failed first read was kept as "no band" — a cold device's 2 s timeout switched the band read off for good.
   it('a band read that FAILED FAST (adb exits non-zero) is not kept: the next viewport() asks again, and the first answer is kept', async () => {
     let answer: string | Error = execErrorLikeExec('adb shell dumpsys window displays', 1, 'error: closed');
     const { adapter, reads } = scripted(() => answer);

@@ -9,7 +9,8 @@ import { wdaSourceRoot } from '../helpers/wda-source-root.js';
 // keyboard: the HIDDEN SUBTREE (`UiNode.hidden`) and the PARKED content of a cell UIKit has not laid out.
 // docs/adr/0019-wda-hidden-subtrees-and-parked-cell-content.md
 //
-// The captures are real /source bytes (tests/fixtures/wda-capture-*.json, each `_comment` says where from).
+// The captures are real /source bytes (tests/fixtures/wda-capture-*.json; each `_comment` says where from, and the two
+// lab-sheet-long-list-scrolled-* captures carry none).
 
 const capture = async (name: string): Promise<UiNode> => parseWdaSource(await readFile(new URL(`../fixtures/wda-capture-${name}.json`, import.meta.url), 'utf8'));
 
@@ -128,7 +129,7 @@ describe('PARKED cell content — a cell UIKit has not laid out lists its conten
       'text add instant message 20,1306 362x52',
     ]);
     // Not one parked frame is left: no cell's label, Insert button or Notes field sits at the sheet's origin any more
-    // (what does — the sheet's `Poster` image, a 0x0 frame — is no cell's).
+    // (what does — the sheet's `Poster` image, a 10x24 frame — is no cell's).
     const cellContent = (n: UiNode) => /^(add |Insert$|Notes$)/.test(n.label ?? '');
     expect(all(tree).filter((n) => cellContent(n) && n.rect.x === 0 && n.rect.y === 62).map((n) => `${n.role} ${n.label}`)).toEqual([]);
     expect(all(tree).filter(cellContent).length).toBeGreaterThan(30);
@@ -195,7 +196,8 @@ describe('PARKED cell content — a cell UIKit has not laid out lists its conten
               el('Button', { label: 'Chip 3', rect: r(410, 320, 180, 80), isVisible: '0' }),
             ] }),
           ] }),
-          // A row holding a collection view, its third card (a cell nested in the row's cell) past the right edge.
+          // A row holding a collection view, its card C (the second, a cell nested in the row's cell) past the right
+          // edge.
           el('Cell', { rect: r(0, 420, 402, 200), children: [
             el('CollectionView', { rect: r(0, 420, 402, 200), children: [
               el('Cell', { label: 'Card A', rect: r(16, 430, 300, 180), children: [el('StaticText', { label: 'Card A text', rect: r(30, 500, 100, 20) })] }),

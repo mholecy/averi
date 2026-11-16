@@ -2450,8 +2450,10 @@ flows:
       expect(fake.taps).toEqual([]);
     });
 
-    // Owner decision (docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-…): a target cut to a
-    // sliver by its scroll container's edge is a refusal on a present element — terminal in an optional:.
+    // Owner decision
+    // (docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md): a
+    // target cut to a sliver by its scroll container's edge is a refusal on a present element — terminal in an
+    // optional:.
     it('a tap on an element cut to a sliver at its scroll container\'s edge: refused, the flow fails — not skipped, nothing tapped', async () => {
       const fake = formFake();
       const toggle = node({ role: 'container', identifier: 'details_toggle', rect: { x: 40, y: 1950, width: 900, height: 50 }, children: [node({ role: 'button', rect: { x: 40, y: 1962, width: 900, height: 38 } })] });
@@ -2539,9 +2541,9 @@ flows:
       });
     });
 
-    // Against the spec card: a failure after the
-    // element was found stays another error. The tap's own resolution never
-    // saw it, but the presence check did — so the skip quotes the tap.
+    // A failure after the element was found stays another error. The tap's own
+    // resolution never saw it, but the presence check did — so the skip quotes
+    // the tap.
     it('a tap SIGHTED by the presence check that then leaves for the whole tap budget: the tap\'s timeout, not (not present)', async () => {
       const fake = formFake();
       const real = fake.uiTree.bind(fake);
@@ -3219,10 +3221,6 @@ flows:
         expect(JSON.stringify(error.trace)).not.toContain('optional step not skipped');
       });
 
-      // Terminal is "never escalate past
-      // it", not "never look". A rung that reached the state before a
-      // TRAILING optional tap was refused has done its job — the ladder's
-      // post-failure probe sees it, and the call passes.
       // The probe is OptionalNotSkipped's alone: a SetupError is a broken
       // descriptor and fails the call even on a screen already in the state.
       it('a rung that reached the state and THEN raised a SetupError: no probe rescues it, the call fails', async () => {
@@ -3262,6 +3260,8 @@ flows:
         expect(error.trace.some((t) => t.action === 'state logged_in')).toBe(false);
       });
 
+      // Terminal is "never escalate past it", not "never look". A rung that reached the state before a TRAILING
+      // optional tap was refused has done its job — the ladder's post-failure probe sees it, and the call passes.
       it('a rung that reached the state before its trailing optional tap was refused: the probe sees it, the call passes, no escalation', async () => {
         const reached = parseConfig(`
 app: { android: { package: md.bank.app } }
@@ -4357,7 +4357,7 @@ flows:
     // call pays a spurious logout and login to end up where the app already
     // was — pinned below rather than hidden. With a destructive unwinding
     // rung (a `reset` launching with clearState) the same stale read costs a
-    // wipe of a logged-in app, as it did on fb171ef.
+    // wipe of a logged-in app, as it did on fb171ef (1225d63 on main).
     const fake = loopFake('onboarding');
     const read = fake.uiTree.bind(fake);
     let reads = 0;

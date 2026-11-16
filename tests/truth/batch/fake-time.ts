@@ -2,7 +2,7 @@ import { vi } from 'vitest';
 
 // The batch tests' fake time (T2c): a budget or a bound raced against a wait is decided by the times the test gives,
 // never by a stall of the machine. setTimeout, clearTimeout and Date are faked — the abort's judging budget reads
-// Date.now — and time is advanced 1 ms at a time, so no timer fires out of its order.
+// Date.now — and advanceUntil advances it 1 ms at a time, so it stops at the first moment its condition holds.
 // Each test file restores real timers in an afterEach too: a test hung past vitest's timeout leaves none faked.
 
 /** An abort's longest fake wait in these tests: a 300 ms budget, a 400 ms restore or end, kill graces — under 1 s. */

@@ -186,9 +186,9 @@ describe('judgeFill — what the facts mean', () => {
     for (const [f, sent] of rows) expect([f, judgeFill(fact(f)).sent]).toEqual([f, sent]);
   });
 
-  // Review of the hint-aware clear, probes C and K: a clear alone that ended
-  // on its named placeholder without seeing the field empty. fill.ts reports
-  // the fact (clearPlaceholder); the judgement is here.
+  // A clear alone that ended on its named placeholder without seeing the
+  // field empty. fill.ts reports the fact (clearPlaceholder); the judgement is
+  // here.
   it('clearPlaceholder: `shown` and `prefix` make a clear alone NOT verified (placeholder); `other`, or anything typed, does not', () => {
     const rows: [Partial<FillResult> & Pick<FillResult, 'readBack' | 'typed'>, Pick<FillVerdict, 'did' | 'sent' | 'reasons'>][] = [
       // C: the field read its placeholder before any delete — nothing sent.

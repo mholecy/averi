@@ -13,7 +13,8 @@ import { CATALOG, FakeSeam, LAB_UDID, labWorld, type Answer, type LabWorld } fro
 // fake process seam that answers git and the batch's node children — golden.ts, baseline.ts, a41-probe.ts, a41-report.ts
 // — by writing what each writes, with real files in a temp dir: the blocks' order (the lab, the idb probes, then the
 // WDA probes inside one D43 window, then the report), every child after its health check, the children's argv, a child
-// that fails, `--groups idb`. Every call is checked for b11-dry's VIOLATIONs (afterEach). No device.
+// that fails, `--groups idb`. Every call is checked for the VIOLATIONs lab-fakes.ts records (b11-dry's, made exact;
+// afterEach). No device.
 
 const HEAD = 'a'.repeat(40);
 const ID = '20261112-101500-4242';
@@ -151,7 +152,8 @@ describe('lab-a41-ios.ts: a clean run — the lab, the idb probes, the WDA probe
     expect(await go()).toBe(0);
     expect(Object.keys(A41_SECS).sort()).toEqual(Object.keys(EXPECTED_SECS).sort());
     for (const [k, v] of Object.entries(EXPECTED_SECS)) expect(A41_SECS[k as keyof typeof A41_SECS], k).toBeGreaterThanOrEqual(2 * v);
-    // The overhead counts each health check this run made (one before each device child).
+    // The overhead counts each health check this run made (one before each device child, the window's first and its end
+    // check).
     expect(seam.words.filter((w) => w.startsWith('idb ui swipe 200 600 200 400')).length).toBeLessThanOrEqual(7 + 2);
     expect(Object.values(EXPECTED_SECS).reduce((a, b) => a + b, 0) + EXPECTED_OVERHEAD_SECS).toBeLessThan(25 * 60);
   });
@@ -213,8 +215,8 @@ describe('a probe that is not whole: INCONCLUSIVE naming it, the window still pu
     };
     expect(await go()).toBe(3);
     expect(children()).toEqual(['golden', 'baseline-idb', 'hit-test', 'baseline-wda', 'wda-cold', 'a41-report']);
-    // Two boots: the failed reset before cadence, and the window's own end check (ios-lab.ts#wdaWindow, as Gate C) — none
-    // before auto-tap.
+    // Two boots: the failed reset before cadence, and the window's own end check (ios-lab.ts#wdaWindow) — none before
+    // auto-tap.
     expect(n).toBe(2);
     expect(verdicts().find((l) => l.startsWith('a41 wda probe verdict: INCONCLUSIVE'))).toMatch(/the iOS reset before a41 cadence failed: .* — no a41 cadence; not run: cadence, auto-tap$/);
   });

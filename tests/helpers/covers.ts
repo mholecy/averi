@@ -8,5 +8,8 @@ export const coverNodes = (covers: readonly Cover[]): UiNode[] => covers.map((c)
 export const tagged = (covers: readonly Cover[]): { node: UiNode; order: CoverOrder['kind']; presented: boolean }[] =>
   covers.map(({ node, order, presented }) => ({ node, order: order.kind, presented }));
 
-/** The node of `tree` whose identifier is `id` — a test's lookup; it throws through `!` use when there is none. */
+/**
+ * The node of `tree` whose identifier is `id` — a test's lookup; undefined when there is none (the `!` is a type
+ * assertion only, so a caller that uses the result gets the TypeError).
+ */
 export const byId = (tree: UiNode, id: string): UiNode => [...everyNode(tree)].find((n) => n.identifier === id)!;

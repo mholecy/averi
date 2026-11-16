@@ -7,10 +7,11 @@ import { parseDump } from '../helpers/android-dumps.js';
 
 /**
  * `UiNode.secure`: what each parser says of an input's masking, read off the lab's two payment forms as captured
- * (tests/fixtures/truth). Each form has four plain fields and a PIN; the PIN is the one secure field. The fill reads
- * it (interact/fill.ts, docs/adr/0028-a-fill-re-reads-after-focus-only-where-focus-can-change-the-count.md): `false`
- * lets it skip the post-focus re-read, so a `false` the source did not say is the costly mistake — every case below
- * that is not an input, or whose source printed nothing, must read undefined.
+ * (tests/fixtures/truth). Each form has four plain fields and a PIN; the PIN is the one secure field. A `false` lets
+ * the fill skip the post-focus re-read (interact/fill-landing.ts#needsHeldCount;
+ * docs/adr/0028-a-fill-re-reads-after-focus-only-where-focus-can-change-the-count.md), so a `false` the source did not
+ * say is the costly mistake — every case below that is not an input, or whose source printed nothing, must read
+ * undefined.
  */
 const truth = async (dir: string, name: string) => readFile(new URL(`../fixtures/truth/${dir}/${name}`, import.meta.url), 'utf8');
 const android = async (form: string) => parseDump(await truth('android-averi_lab-api33', `${form}.xml`));

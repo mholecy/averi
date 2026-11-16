@@ -54,7 +54,7 @@ export const CLASSIC_VIEWS = {
  * A classic-View Settings row cut to a 33-px SLIVER at its list's top, its
  * texts dumped INVERTED — SYNTHETIC, built
  * on the shape of run9-android's Settings homepage (tests/adapters/
- * android.test.ts's SETTINGS: `text="Apps" bounds="[198,297][324,58]"`
+ * android-tree-dialect.test.ts's SETTINGS: `text="Apps" bounds="[198,297][324,58]"`
  * under the collapsing app bar). uiautomator cuts the row to the list
  * (`[0,297][1080,330]`) and its icon with it (`[66,297][132,330]`, the
  * row's own height: no inside evidence), while the title and the summary,

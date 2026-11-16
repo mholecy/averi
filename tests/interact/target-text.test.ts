@@ -7,8 +7,8 @@ import { coverName, cutRemedy, cutSliverText, pastSideText, underKeyboardText, u
 /**
  * The phrases a cut or a side target is said in, one wording for the tap's
  * refusal, `scroll_until`'s failures, the wait's hint and the picker's skip
- * lines. Each row is the literal those callers quote (their own tests pin
- * them in context: resolve.test, scroll.test, keyboard-in-tree.test).
+ * lines. Each row is the literal the callers quote; their own tests pin it
+ * in context.
  */
 describe('cutRemedy — the scroll toward where the rest of a cut target lies', () => {
   it.each([

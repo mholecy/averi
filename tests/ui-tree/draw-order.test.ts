@@ -18,8 +18,8 @@ import { coverNodes, tagged } from '../helpers/covers.js';
 const rect = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
 
 /**
- * The draw-order module's interface (ui-tree/draw-order.ts): its
- * questions, each pinned on the device shapes its rows were measured on.
+ * The draw-order module's interface (ui-tree/draw-order.ts): its questions, pinned on the measured device shapes where
+ * a row cites one; the other rows are synthetic and say so.
  */
 
 const PAD = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')) as { elements: unknown[] };
@@ -266,10 +266,9 @@ describe('the two questions disagree on purpose, per row', () => {
 
 /**
  * The `target` column's rules on measured iOS shapes that sit over or around a target — rows answered for every
- * target (the tap, `scroll_until`'s stop, the pixel assert and the in-tree dismissal picker), each asked here as
- * `exposure(target, screen).covers`: the screen-sized host and its size edge, the itemless toolbar (the Contacts
- * sheet) and what makes a toolbar's item, the content-framed scroll view (the SWIFT form) and what still covers as
- * itself, and the measured input-accessory bar.
+ * target, each asked here as `exposure(target, screen).covers`: the screen-sized host and its size edge, the itemless
+ * toolbar (the Contacts sheet) and what makes a toolbar's item, the content-framed scroll view (the SWIFT form) and
+ * what still covers as itself, and the measured input-accessory bar.
  * docs/adr/0016-the-dismissal-picker-asks-the-tap-standing.md ("What `shadowing` was measured on")
  */
 describe('the target column: the shared predicates, on measured hosts, toolbars, content-framed scroll views and the accessory bar', () => {
@@ -969,7 +968,9 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       const bar = uiNode({ role: 'button', label: 'Pinned', rect: rect(0, 320, 402, 60) });
       expect(coverNodes(drawOrder(flat(back, row, bar)).exposure(row, IPHONE).covers)).toEqual([bar]);
       // A sheet listed last that starts ABOVE a content target: the reading-order break — no cover of it, the stated
-      // residual the owner accepted (docs/bugs/2026-10-09-ios-idb-modal-listed-before-content-…); over the bar it still is.
+      // residual the owner accepted
+      // (docs/bugs/2026-10-09-ios-idb-modal-listed-before-content-reads-covered-by-the-content-behind-it.md); over the
+      // bar it still is.
       const sheet = uiNode({ role: 'button', label: 'Sheet', rect: rect(16, 200, 370, 400) });
       expect(coverNodes(drawOrder(flat(back, row, sheet)).exposure(row, IPHONE).covers)).toEqual([]);
       // One that holds the row whole never breaks: a cover in its own right.
@@ -1091,7 +1092,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
         const swift = byId('accounts.detail.payment_type_sheet.row_swift');
         const row0 = byId('transactions.list.row_0');
         expect(tagged(order.exposure(swift, IPHONE).covers)).toEqual([{ node: row0, order: 'untold', presented: false }]);
-        // …and the screenshot sees row_0 under the chooser's row: nothing covers it, tapped at its centre as before.
+        // …and the screenshot sees row_0 under the chooser's row: nothing covers it, tapped at its centre.
         const HEX = { overlap: '#FFFFFF', own: '#FFFFFF', other: '#F5F5F5' };
         expect(drawOrder(tree, seenOrderOf(swift, [{ peer: row0, seen: 'over', ...HEX }])).exposure(swift, IPHONE)).toMatchObject({ covers: [], shows: 1, tapAt: { point: { x: 201, y: 479 }, moved: false } });
       });
@@ -1232,7 +1233,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
         expect(seen.centreCover?.node.identifier).toBe(CONTINUE);
         expect(coverAtPoint(seen.covers, { x: 135, y: 827 })?.node.identifier).toBe(CONTINUE);
         expect([seen.shows, seen.tapAt]).toEqual([0, undefined]);
-        // Where it lay under the frame itself (42,807, centre 817): refused as before.
+        // Where it lay under the frame itself (42,807, centre 817): refused.
         label.rect = rect(42, 807, 186, 20);
         expect(drawOrder(tree).exposure(label, IPHONE)).toMatchObject({ shows: 0 });
       });
@@ -1700,8 +1701,8 @@ describe('presentedAt — the presented screen\'s surface at a point, asked for 
 
 /**
  * `presentedOver(node)` — `presentedAt` less the point: the presented screen's surface over the node wherever the node
- * lies, which the standing's remedy asks when its frame named none (ui-tree/standing.ts#remedied). The same rule, so
- * the same rows: what draws for the node as a target (the `target` column) and is a presented screen's surface.
+ * lies. The same rule, so the same rows: what draws for the node as a target (the `target` column) and is a presented
+ * screen's surface.
  */
 describe('presentedOver — the presented screen\'s surface over a node, geometry-free (ADR 0018)', () => {
   const screen = (key: string) => STACKED.screens[key];
@@ -1758,7 +1759,7 @@ describe('exposure — a Compose label\'s own control, a row\'s own content (202
   };
   /**
    * The round-5 ui_snapshots (tests/fixtures/android-ui-snapshot-compose.json), by screen — each root marked
-   * `paddedTouchTargets`, as the parser marks every uiautomator root since the snapshots were taken.
+   * `paddedTouchTargets`, as the parser marks every uiautomator root (the snapshots predate the mark).
    */
   const snapshots = async (): Promise<Record<string, UiNode>> =>
     Object.fromEntries(

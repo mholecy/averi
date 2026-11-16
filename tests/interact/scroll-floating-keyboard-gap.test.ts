@@ -24,7 +24,9 @@ const BAND: Rect = { x: 0, y: 2088, width: 1080, height: 132 };
 const SUBMIT = 'id:"lab.form-keyboard-floating.submit"';
 const SUBMIT_BOUNDS = 'bounds="[55,1928][1025,2060]"';
 const FAST = { eyes: NO_EYES, maxSwipes: 4, timeoutMs: 2_000, settleMs: 1 };
-/** The straddling submit's failure as worded with no gap rule (the base commit's reply, verbatim): the gap judgement is dropped, never worded. */
+/**
+ * The straddling submit's failure as worded with no gap rule, verbatim: the gap judgement is dropped, never worded.
+ */
 const STRADDLING =
   'scroll_until id:"lab.form-keyboard-floating.submit" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — ' +
   'element in tree but never intersected the 1080x1092 screen above the soft keyboard over [71,1092][1008,1884] (last rect {"x":55,"y":1860,"width":970,"height":132}). ' +

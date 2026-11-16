@@ -11,8 +11,8 @@ import { charactersText } from '../../src/util/count.js';
  * makes the two say different things fails here in one place (df8a91a: a
  * clear alone read `(N deletes sent)` in the reply and `cleared N characters
  * first` on the flow line). The judgement itself (codes) is fill-verdict.test.ts's;
- * the end-to-end agreement through a fake device stays with tools.test.ts and
- * engine.test.ts.
+ * the end-to-end agreement through a fake device stays with tests/mcp/tools.test.ts
+ * and tests/flow/engine.test.ts.
  */
 const fact = (f: Partial<FillResult> & Pick<FillResult, 'readBack' | 'typed'>): FillResult => ({ role: 'textfield', ...f });
 const landed = { kind: 'landed' } as const;

@@ -1966,8 +1966,9 @@ describe('round — a cover the target shows past only on its far side (the roun
  * screen-sized layer in the app's Window): no scroll moves it out from under that screen, and a stroke on the screen
  * may dismiss it (a page sheet's pull-to-dismiss, a "Discard Changes?" prompt) — so the round confirms with one more
  * read, sends no stroke, and stops naming the presented screen. On the measured ui_snapshots
- * (tests/fixtures/wda-ui-snapshot-stacked-layers.json) and one raw /source capture
- * (tests/fixtures/wda-capture-contacts-discard-popover.json).
+ * (tests/fixtures/wda-ui-snapshot-stacked-layers.json) and two raw /source captures
+ * (tests/fixtures/truth/ios-iphone17-ios27/blur-menu-grouped.wda.json,
+ * tests/fixtures/wda-capture-contacts-discard-popover.json).
  */
 describe('round — a target under a screen presented over it (docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md)', async () => {
   const { readFile } = await import('node:fs/promises');
@@ -1975,8 +1976,8 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
   const { parseWdaSource } = await import('../../src/adapters/wda-source.js');
   const screens: Record<string, UiNode> = {
     ...(await stackedLayers()),
-    // Contacts' discard popover with the keyboard down: the raw /source capture, parsed as ui_snapshot parses it.
     blurMenuGrouped: parseWdaSource(await readFile(new URL('../fixtures/truth/ios-iphone17-ios27/blur-menu-grouped.wda.json', import.meta.url), 'utf8')),
+    // Contacts' discard popover with the keyboard down: the raw /source capture, parsed as ui_snapshot parses it.
     contactsDiscardPopoverKeyboardDown: parseWdaSource(await readFile(new URL('../fixtures/wda-capture-contacts-discard-popover.json', import.meta.url), 'utf8')),
   };
   const rowOf = (key: string, id: string): Row => {
@@ -2493,7 +2494,8 @@ describe('round — a WDA target\'s strokes go over its own scroll view', () => 
 
   // Its idb twin: idb's flat list lists no scroll view (the target's is untold), so before a read sees R move the stroke
   // goes over the screen; once two reads see it carried, with T, the turned stroke goes over where they were seen
-  // moving (motion-shown.ts#MotionShown) — inside the list (0,200 402x640, state.json), not in the header at y 175.
+  // moving (motion-shown.ts#MotionShown) — inside the list (0,200 402x640, tabbar-floating.state.json), not in the
+  // header at y 175.
   it('tabbar-floating under idb: the capture with T, R and F carried 1108 pt (as measured live) — the first stroke over the screen (699), the turned one touching down inside the list (391), where T and R were seen moving', () => {
     const LIST: Rect = { x: 0, y: 200, width: 402, height: 640 };
     const raw = readFileSync(new URL('../fixtures/truth/ios-iphone17-ios27/tabbar-floating.idb.json', import.meta.url), 'utf8');

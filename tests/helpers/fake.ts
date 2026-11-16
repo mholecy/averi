@@ -140,7 +140,10 @@ export class FakeAdapter implements DeviceAdapter {
   typingDelivery: TypingDelivery = 'on-return';
   /** Assignable: what typeText types — FAKE_TYPEABLE, printable ASCII; a test of typing a wider set sets PERMISSIVE. */
   typeable: Typeable = FAKE_TYPEABLE;
-  /** Assignable: the settle cadence fact (types.ts#DeviceAdapter.settleCadenceMs) — absent, as on Android and WDA, unless a test sets it (idb's 300). */
+  /**
+   * Assignable: the settle cadence fact (types.ts#DeviceAdapter.settleCadenceMs) — absent unless a test sets it. The
+   * real sources have it (idb 300, WDA 300); Android sets none.
+   */
   settleCadenceMs?: number;
   /** Each DeviceAdapter.noteDroppedTail a fill sent, in order with the typing: the index into `typed` it came after. */
   droppedTails: number[] = [];

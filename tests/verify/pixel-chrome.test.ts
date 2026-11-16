@@ -329,7 +329,7 @@ describe('the round-2 probes: chrome inside the element\'s rect still counts', (
     const dialog = n('container', rect(90, 400, 900, 1200), { label: 'Dialog', children: [n('button', rect(100, 1450, 880, 120), { label: 'OK' })] });
     const withDialog = n('container', rect(0, 0, 1080, 2220), { children: [content, dialog] });
     expect(await judge(PIXEL_3A, withDialog, content, colorSampleRect)).toBe(`button "OK" (100,1450 880x120) is drawn over the element (element 0,66 1080x2154) — ${NEVER}`);
-    // …a row in the same scroll view is scrolled clear as before.
+    // …a row in the same scroll view is scrolled clear.
     const row = n('container', rect(24, 30, 354, 52), { identifier: 'row' });
     const rowTree = n('application', rect(0, 0, 402, 874), { children: [n('scrollable', rect(0, 0, 402, 874), { children: [row] })] });
     expect(await judge(IPHONE, rowTree, row, colorSampleRect)).toBe(

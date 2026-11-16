@@ -8,7 +8,8 @@ import { describe, expect, it } from 'vitest';
 //
 // The file is transpiled here, not imported: the RN app's tsconfig extends a package only its own node_modules hold
 // (the RN README's install), which a checkout of averi alone has not got. Its module is evaluated from a data: URL, so
-// src/format.ts must stay import-free (no relative or package import resolves there): the first test says so loudly.
+// fixtures/apps/rn/src/format.ts must stay import-free (no relative or package import resolves there): the first test
+// says so loudly.
 type Format = (format: string | undefined, text: string) => string;
 const source = readFileSync(new URL('../../fixtures/apps/rn/src/format.ts', import.meta.url), 'utf8');
 /** Every import or re-export the RN format module would need resolved — none may be there. */

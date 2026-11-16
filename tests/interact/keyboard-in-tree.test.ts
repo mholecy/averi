@@ -98,8 +98,8 @@ function swiftFormFake(toolbar: boolean): FakeAdapter {
  * `text 'New Contact' 149 89 104 22` inside `container id:"New Contact" 0 78 402 54`, the form's `scrollable 0 62 402 812`
  * with its rows (`add pronouns` at y 692 — centre (223,703), under the keyboard), then the two `toolbar 'Toolbar'`s
  * `0 83 402 48` and `0 62 402 812` (`bar` / `sheet` say which are there), each holding ONE empty `container` of its own rect
- * (the raw `/source` at 347e70d — the first version of this fake built them childless, after the note's since-corrected
- * premise, and passed while the device still refused), then the band `0 573 402 301`.
+ * (as the raw `/source` at 347e70d has them: built childless, the fake would pass while the device refuses), then the
+ * band `0 573 402 301`.
  * The fake's hit test lands on the identified title container; a tap there hides the keyboard (assumed — not tried on
  * the device).
  */

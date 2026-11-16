@@ -25,8 +25,8 @@ import { parseDump } from '../helpers/android-dumps.js';
 // ONE remedy for a target that is not reachable itself (ui-tree/standing.ts#Remedy), decided once by the standing with
 // one precedence — a screen presented over the target first (docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md),
 // then the rest — and only rendered by the verbs: the tap's refusal (interact/tap-judgement.ts), the pixel assert's miss
-// (verify/pixel-poll.ts) and scroll_until's stop (interact/scroll-rounds.ts). A table over the trees with a presented
-// screen: each verb's answer for the same target names the same remedy.
+// (verify/pixel-poll.ts) and scroll_until's stop (interact/scroll-rounds.ts, worded by interact/scroll-text.ts). A
+// table over the trees with a presented screen: each verb's answer for the same target names the same remedy.
 
 // The tap and the pixel assert read idb's band from the look's keyboard position (ui-tree/look.ts#Look.keyboard, over
 // ui-tree/keyboard-position.ts#keyboardPosition), which finds one only in idb's flat list, where no screen reads as
@@ -131,9 +131,9 @@ const PRESENTED_FOR_THE_ELEMENT = presentedRemedy('pixel');
 const PRESENTED_OVER = presentedRemedy('touch');
 
 describe('one remedy for a target beneath a presented screen — the tap, the pixel assert and scroll_until agree', () => {
-  /** The cases: the probe, and the real ui_snapshots' targets on which the verbs disagreed. */
   /** The action sheet WDA types in the discard popover's layer, as the remedy names it. */
   const DISCARD_SHEET: MarkedLayer = { kind: 'actionSheet', label: 'Are you sure you want to discard this new contact?' };
+  /** The cases: the probe, and the real ui_snapshots' targets on which the verbs disagreed. */
   const cases = async (): Promise<[string, UiNode, UiNode, MarkedLayer?][]> => {
     const screens = await stacked();
     const { tree, target } = probe();
@@ -303,8 +303,7 @@ describe('presented first over a cut and over the soft keyboard — each verb\'s
  * A target NOTHING of which lies in the frame a verb judges — wholly below the screen, or wholly inside the status band
  * — beneath a presented screen: the presented fact is judged of the node itself, geometry-free
  * (ui-tree/draw-order.ts#DrawOrder.presentedOver, the rule `scroll_until`'s stroke asks at its touch-down less the
- * point), so the tap, the colour and ocr asserts and `scroll_until` all say "close it first", where the tap said
- * "scroll_until it first", the bar's advice, and the colour assert "scroll it on-screen".
+ * point), so the tap, the colour and ocr asserts and `scroll_until` all say "close it first".
  * docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md
  */
 describe('a target wholly out of the judged frame beneath a presented screen — presented judged of the node', () => {
@@ -470,13 +469,13 @@ describe('a sliver of the element on the screen thinner than the slack fails clo
 });
 
 /**
- * RESIDUAL (ADR 0018 residual 11): beneath an UNDIMMED partial presented surface — a later screen-sized layer holding
- * only a sheet's scroll view over the screen's lower part, no dimming view — a target the sheet does not lie over
- * (wholly above the screen, or under the status bar) is told "close it first" by the tap and the pixel assert, which
- * judge the presented fact of the node (draw-order.ts#DrawOrder.presentedOver), while `scroll_until` strokes: it
- * stops only on a surface in its read's frame or at its stroke's touch-down (draw-order.ts#DrawOrder.presentedAt),
- * and the touch-down misses the sheet. The verbs' wording agrees; their behaviour does not, and this
- * pins it.
+ * RESIDUAL (ADR 0018 residual 11, closed for WDA's marked layers, open for a tree that marks none, as here): beneath an
+ * UNDIMMED partial presented surface — a later screen-sized layer holding only a sheet's scroll view over the screen's
+ * lower part, no dimming view — a target the sheet does not lie over (wholly above the screen, or under the status bar)
+ * is told "close it first" by the tap and the pixel assert, which judge the presented fact of the node
+ * (draw-order.ts#DrawOrder.presentedOver), while `scroll_until` strokes: it stops only on a surface in its read's frame
+ * or at its stroke's touch-down (draw-order.ts#DrawOrder.presentedAt), and the touch-down misses the sheet. The verbs'
+ * wording agrees; their behaviour does not, and this pins it.
  */
 describe('residual: an undimmed partial sheet — the tap and the pixel assert say close it first, scroll_until strokes', () => {
   const undimmed = (y: number): { tree: UiNode; target: UiNode } => {
@@ -1034,7 +1033,10 @@ describe('one remedy for a target cut by a later node where neither lies in a sc
     }
   });
 
-  /** A field `55,y 970x42` cut at its top by a bar laid after it ending at `barBottom`, neither in a scroll view; scroll_until with the keyboard's line at 1398. */
+  /**
+   * A field `55,y 970x42` laid flush under a bar laid after it (the field's top at `barBottom`, where the bar ends),
+   * neither in a scroll view; scroll_until with the keyboard's line at 1398.
+   */
   const underBar = (barBottom: number) => {
     const field = node({ role: 'textfield', identifier: 't', rect: { x: 55, y: barBottom, width: 970, height: 42 } });
     const tree = node({ role: 'container', rect: { ...PIXEL_BOX }, children: [field, node({ role: 'button', identifier: 'bar', rect: { x: 0, y: barBottom - 132, width: 1080, height: 132 } })] });

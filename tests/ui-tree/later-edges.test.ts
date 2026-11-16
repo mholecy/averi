@@ -11,7 +11,8 @@ import { parseDump } from '../helpers/android-dumps.js';
  * flush against it classified once — `overlaid`, `outsideScrollView`, `pinnedInScrollView`, `sameScrollView`,
  * `aligned`, `none` — over the lab's real captures (tests/fixtures/truth/android-averi_lab-api33), Compose's own
  * snapshots and the shapes the overlay must not make.
- * What each class means to a judgement is tested end to end in overlaid-edge.test.ts, eyes.test.ts and the golden rows.
+ * What each class means to a judgement is tested end to end in overlaid-edge.test.ts, tests/verify/eyes.test.ts and
+ * the golden rows.
  */
 
 const lab = async (cell: string): Promise<UiNode> =>
@@ -61,8 +62,8 @@ describe('LaterEdge — each edge of a node classified, over the lab\'s captures
     ['form-keyboard.after-back', 'lab.form-keyboard.note', only('top', 'outsideScrollView lab.form-keyboard.submit 14')],
     ['form-keyboard.after-back', 'lab.form-keyboard.phone', only('top', 'none')],
     // VA1's shape: R cut at the merged sticky header IN its own list, the header pinned at the list's top —
-    // `pinnedInScrollView`, its content `Target R` cut alike (a first row at rest lies whole under it, the same tree:
-    // the flush probe's to tell).
+    // `pinnedInScrollView`, its content `Target R` cut alike (the same list at rest, scroll-sticky-rest, lies whole
+    // under it: the flush probe's to tell).
     ['scroll-sticky-cut', 'lab.scroll-sticky-cut.R', only('top', 'pinnedInScrollView lab.scroll-sticky-cut.header 110')],
     // Layout neighbours laid flush, sharing an alignment line in no scroll view: Q above N's 48-dp touch target.
     ['bands', 'lab.bands.Q', only('bottom', 'aligned lab.bands.N 132')],

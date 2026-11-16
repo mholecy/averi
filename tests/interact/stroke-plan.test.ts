@@ -14,7 +14,7 @@ import { node } from '../helpers/fake.js';
 import { stackedLayers } from '../helpers/stacked-layers.js';
 
 /**
- * `scroll_until`'s stroke plan through its interface (interact/stroke-plan.ts, A1 of the round-21 architecture pass):
+ * `scroll_until`'s stroke plan through its interface (interact/stroke-plan.ts):
  * a read's facts and the course's direction in, the stroke as the driver sends it out — its scroll view, box, cover
  * and points — with the presented surface at its touch-down and the node a sent stroke touched down on. The stroke
  * decisions of a single read are asked here of the plan; what spans reads and the course (a turn, a failed read, a

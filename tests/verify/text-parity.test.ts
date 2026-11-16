@@ -1239,9 +1239,9 @@ describe('evaluateOcrAssert — a thousands separator the recognizer reads as no
 
 describe('measureOcrAssert — the ocr assert\'s one measurement, every "not read" failing closed', () => {
   /**
-   * The crop → recognize → region error → verdict chain (assert-capture-ocr
-   * C2): its unread sentences must not drift from fail-closed.ts. Each is
-   * pinned whole here, on a measuredFrameFor fixture, with no poll around it.
+   * The crop → recognize → region error → verdict chain: its unread sentences
+   * must not drift from fail-closed.ts. Each is pinned whole here, on a
+   * measuredFrameFor fixture, with no poll around it.
    */
   const cta = n({ identifier: 'cta', rect: { x: 24, y: 780, width: 354, height: 44 } });
   const input = (f = frame(root(402, [cta], 874), 402, 874, { width: 402, height: 874 })) => ({ rect: cta.rect, shot: Shot.ofPng(Buffer.from('png bytes')), measured: f });
@@ -1411,7 +1411,8 @@ describe('survivesIn — the UNREAD guard predicate', () => {
   it('DOES let a 3-character part vouch — the floor is pinned from both sides', () => {
     // The other half of the bound. Without this, MIN_PART_LENGTH could drift
     // up to 6 and every test would stay green while the guard silently
-    // over-narrowed — this directory records that failure class three times.
+    // over-narrowed — docs/bugs/2026-08-27-user-settings-run-four-findings.md
+    // records the mutation at 2, 4 and 6, each failing.
     expect(survivesIn('Balance, CZK', 'Total CZK 1 121,00')).toBe(true);
   });
 

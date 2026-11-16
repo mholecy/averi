@@ -38,8 +38,8 @@ export const INPUT_SHOWN_LINE = (shown: boolean) =>
 /**
  * The floating-Gboard device check (2026-10-08, emulator-5554, Pixel_3a AVD,
  * API 33, 1080x2220 portrait — docs/bugs/2026-10-05-android-floating-gboard-
- * keyboard.md, the three "Device check" sections), as the commands printed
- * it. `displays`: the lines of `dumpsys window displays` the oracle's state()
+ * keyboard.md, its "Device check" sections), as the commands printed it.
+ * `displays`: the lines of `dumpsys window displays` the oracle's state()
  * reads; `touchable`: what AndroidAdapter's keyboardTouchable command prints
  * — the `mInputShown` line of `dumpsys input_method`, then the `touchable
  * region=` line of `dumpsys window InputMethod`.

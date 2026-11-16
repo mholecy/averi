@@ -17,12 +17,14 @@ import { captureBaselineFrame, captureFrame } from '../../src/verify/capture.js'
  * starts, on a clock only this file advances: each sleep moves it by its
  * length and each capture by the capture time c. (Sampling at the end of a
  * capture instead shifts every sample by the same c — a phase shift, which
- * the phase sweep already covers.) capture.ts reads no wall clock on this
- * path — baseline creation has no deadline — so the clock is the test's own
- * number rather than a faked Date; fractional ms stay exact.
+ * the phase sweep already covers.) capture.ts reads the wall clock on this
+ * path only to cost a re-capture, which decides nothing without a deadline
+ * (baseline creation has none), so the clock is the test's own number rather
+ * than a faked Date; fractional ms stay exact.
  *
  * The sleep mock here does NOT yield a macrotask, unlike
- * tests/helpers/sleep-recorder.ts: the grid is ~10 000 runs, and a
+ * tests/helpers/sleep-recorder.ts: the grid is 2 640 runs a sweep (33
+ * periods x 4 capture times x 20 phases), swept several times, and a
  * setTimeout(0) per sleep would cost the suite tens of seconds. Nothing on
  * this path reacts on a timer.
  */

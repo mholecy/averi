@@ -33,7 +33,8 @@ import { IDB_TYPEABLE, WDA_TYPEABLE } from '../../src/adapters/ios-typing.js';
  * settled frame rather than a bare screenshot, when the config is consulted
  * and when its absence or invalidity is tolerated, what is loaded before a
  * device is touched. The one-line delegations (terminate_app, press_key, …)
- * are pinned only by name in the vocabulary test.
+ * get one call each in the adapter-binding tests below, which pin only that
+ * the call succeeds on the bound adapter.
  */
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on — as in
@@ -187,8 +188,8 @@ function withFrames(fake: FakeAdapter, frames: Buffer[]): FakeAdapter {
 
 describe('the server itself', () => {
   // A sentinel, so this is the pass-through alone. That the ENTRY hands over
-  // package.json's version (it once reported 0.0.1 for every release) is
-  // tests/mcp/server.test.ts's, against the real process.
+  // package.json's version is tests/mcp/server.test.ts's, against the real
+  // process.
   it('reports the version it was built with in serverInfo', async () => {
     const { client } = await connect({}, '9.9.9-test');
     expect(client.getServerVersion()).toMatchObject({ name: 'averi', version: '9.9.9-test' });
@@ -1073,10 +1074,11 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
   });
 
   // docs/plans/2026-10-08-round3-phase2-device-check.md, finding 5:
-  // ui_snapshot is the one-shot read that asks the adapter to wait out a
-  // launch transient — Android's null root, iOS idb's empty tree — so it must
-  // pass `settle: true`; the retry itself is the adapter's (ios.test.ts,
-  // android.test.ts). Both platforms, since the handler does not branch.
+  // ui_snapshot is the one-shot read that asks the adapter to wait out a launch
+  // transient — Android's null root, iOS idb's empty tree — so it must pass
+  // `settle: true`; the retry itself is the adapter's
+  // (tests/adapters/ios.test.ts, tests/adapters/android.test.ts). Both
+  // platforms, since the handler does not branch.
   it.each(['android', 'ios'] as const)('ui_snapshot on %s reads the tree with settle: true — the one-shot caller of the adapter\'s transient retry', async (platform) => {
     const seen: ({ settle?: boolean } | undefined)[] = [];
     const recording = home();
@@ -1293,7 +1295,7 @@ describe('every tool gets the project\'s adapter — one per simulator and confi
     expect(result.text.split('read through idb: the note'), result.text).toHaveLength(2);
   });
 
-  // Review r3-1: a flow's `fill:` of a value the fallen-back adapter cannot type is refused WITH the note
+  // A flow's `fill:` of a value the fallen-back adapter cannot type is refused WITH the note
   // (interact/type-text.ts#assertTypeableOn); the FlowError, the run's error and verify's reply must not add it again.
   const FILL_WDA_ONLY = `${VALID_CONFIG.replace('states:\n', 'states:\n  filled:\n    detect: { element: { id: nowhere } }\n    reach: [fill_wda_only]\n')}  fill_wda_only:\n    steps:\n      - tap: { id: home_root }\n      - fill: { id: home_root, value: "Šťastný" }\n`;
 
@@ -1541,7 +1543,7 @@ describe('a duration that does not parse is refused at parse, before a device is
 });
 
 /**
- * C3: a regex field that does not compile is refused with the arguments it
+ * A regex field that does not compile is refused with the arguments it
  * came in — or with averi.yaml, at load — and never reaches a device.
  * Unchecked, an element assert's bad `match` would throw out of the poll
  * mid-batch, an ocr assert's poll its whole 12 s budget as "OCR failed", a

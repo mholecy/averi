@@ -372,7 +372,7 @@ describe('the form rows', () => {
         ['Tapped id:"lab.f.country"', [], /^Tapped/],
         ['ERROR … under button "Albania"', [], /^refused without "close it first"/],
         [TIMED_OUT, [], /^refused without "close it first": ERROR Timed out/],
-        // form-picker on uiautomator: the expanded sheet unmarked, the wait's hint only
+        // a reply with the wait's hint only, no presented word: the hint class, not the presented remedy
         [HINTED, [], HINT_CLASS],
       ],
     ],

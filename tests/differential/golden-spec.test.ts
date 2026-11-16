@@ -81,7 +81,7 @@ const target = (over: Partial<TargetTruth>): TargetTruth => ({
  * An open target its replayed source does not list (TargetTruth.listed): the lab's UIKit table row under idb, which lists
  * no identifier on any element (docs/bugs/2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md).
  * The honest answer is not tapped, nothing sent, the source's limit named; under WDA, which lists it, the rows are the
- * open ones. The replies are the captures' own (before the fix, from the golden run; after it, as averi words them).
+ * open ones. The replies below are worded as averi words them, the source's limit by missNote.
  */
 describe('an open target the replayed source does not list (sheet-long-list R under idb)', () => {
   const IOS = new URL('../fixtures/truth/ios-iphone17-ios27/', import.meta.url);

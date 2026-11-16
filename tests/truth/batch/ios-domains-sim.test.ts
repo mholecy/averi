@@ -12,8 +12,8 @@ import { stateOf } from '../../../scripts/truth/batch/run-dir.js';
 // scripts/truth/batch/ios-domains.ts over a simulator: a recording fake Run stands in for xcrun simctl (its domains in
 // memory, `defaults export` writing the typed map to the host file) and for python3's plistlib (the file's map, or a
 // failure for one it cannot read). Real files in a temp dir, through io.ts. Every call of every test is checked for
-// what b11-dry's shims flagged as a VIOLATION: device-check's simulator or WDA ports named, or `defaults write|delete|
-// import|rename` on the schemeapproval domain (afterEach). No device is touched.
+// what b11-dry's shims flagged as a VIOLATION: device-check's simulator or WDA ports named, or any `defaults` verb but
+// `read` on the schemeapproval domain (afterEach). No device is touched.
 
 const LAB = 'LAB-SIMULATOR-UDID';
 const A11Y = 'com.apple.Accessibility';

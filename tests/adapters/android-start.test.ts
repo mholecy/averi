@@ -10,8 +10,7 @@ import { execErrorLikeExec } from '../helpers/exec-error.js';
  * the 2026-10-03 launch tests used (android.test.ts) and the review's
  * 2026-10-07 measurement of a deep link nothing handles (exit 0 and an
  * `Error: Activity not started` line). The monkey line is AOSP Monkey.java's,
- * at the review's measured exit 252; its exact device text is the one
- * unmeasured sample (android-start.ts says so, once).
+ * measured on stdout at exit 252 (D73).
  */
 
 const prints = (stdout: string, stderr = '') => async (): Promise<ExecResult> => ({ stdout: Buffer.from(stdout), stderr });

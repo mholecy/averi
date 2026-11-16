@@ -497,8 +497,6 @@ describe('capture', () => {
     expect(lab.taps).toEqual([[20, 20]]); // A's probe only: nothing of C to tap
     const truth = JSON.parse(await readFile(join(out, 'open.truth.json'), 'utf8')) as CellTruth;
     expect(truth.targets.map((t) => t.tag)).toEqual(['A']);
-    // listed as each raw tree has it (truth.ts#listedIn): golden's `absent` (target-contract.ts#askedUnlistedBy) reads it.
-    // and the direction it lies in (CatalogTarget.toward): golden's scroll_until for it.
     expect(truth.absent).toEqual([{ tag: 'C', id: 'lab.open.C', color: '#D81B60', declared: 'open', scrollView: 'carousel', listed: { uiautomator: false }, toward: 'right' }]);
     expect(lines).toContain('open/C: absent — the app reported no frame for it (the catalog allows it), not probed');
     expect(lines.some((l) => /WARNING/.test(l))).toBe(false);

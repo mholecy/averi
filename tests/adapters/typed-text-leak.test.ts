@@ -21,7 +21,7 @@ vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'))
 // the helper off, and D24's split, failing on either of its two calls — and no piece of the text may stand in the
 // error's command, message or stack, in anything `inspect` prints of it, or in what the helper's channel published.
 
-/** iOS's text: each grapheme a letter nothing else prints, so D24's first key alone ('Ж') is as findable as the rest. */
+/** iOS's text: each piece a string nothing else prints, so D24's first key alone ('Ж') is as findable as the rest. */
 const IOS_TEXT = 'ЖЩ§hunter2Ђ';
 const IOS_PIECES = ['Ж', 'Щ', '§', 'hunter2', 'Ђ'];
 /** Android's: ASCII (`input text`'s), one call per character, each a mark no message or stack holds. */

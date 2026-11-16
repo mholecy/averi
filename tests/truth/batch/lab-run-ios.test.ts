@@ -22,8 +22,8 @@ import { CATALOG, FakeSeam, LAB_UDID, labWorld, rejudgeWith, until, type Answer,
 // fake lab (lab-fakes.ts) and a fake process seam that answers git and live.ts — its run and its `--rejudge` — with
 // real files in a temp dir, a fixed clock and pid: the blocks' order (the lab, every idb run, then every WebDriverAgent
 // run, each in its own D43 window); the guard and the refusals; a simulator not up; a FAIL, an unproven run, a backup
-// that fails, a CHANGED finportal key; the interrupt inside a window. Every call is checked for b11-dry's VIOLATIONs
-// (afterEach). No device.
+// that fails, a CHANGED finportal key; the interrupt inside a window. Every call is checked for the VIOLATIONs
+// lab-fakes.ts records (b11-dry's, made exact; afterEach). No device.
 
 const HEAD = 'a'.repeat(40);
 const ID = '20261111-101500-4242';

@@ -7,9 +7,10 @@ import type { CallResult, Run } from '../../../scripts/truth/batch/bounded.js';
 import { DOMAINS, decideRestore, TYPED_PY, typedMapOf } from '../../../scripts/truth/batch/ios-defaults.js';
 import { backup, LabSim } from '../../../scripts/truth/batch/ios-domains.js';
 
-// ios-defaults.ts's typed read (TYPED_PY) through the host's real python3 plistlib, on XML plists written here: the
-// read the fakes of ios-domains-sim.test.ts stand in for. Kept apart, in the normal suite only: it starts python3,
-// which the mutation run's tests do not. Each run bounded (spawnSync's timeout); no device.
+// ios-defaults.ts's typed read (TYPED_PY) through the host's real python3 plistlib, on XML plists written here and on
+// two committed exports (the host's XML, the simulator's binary): the read the fakes of ios-domains-sim.test.ts stand
+// in for. Kept apart, in the normal suite only: it starts python3, which the mutation run's tests do not. Each run
+// bounded (spawnSync's timeout); no device.
 
 let dir: string;
 beforeEach(() => {

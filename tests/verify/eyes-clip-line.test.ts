@@ -17,7 +17,7 @@ import { NO_EYES } from '../helpers/eyes.js';
  * scroll view) is looked at once, every edge. Over the lab's real `scroll-bounded` capture (iOS 27, 402x874 pt, the png
  * 1206x2622): P `51,290 300x64` cut at `upper`'s bottom (330), S `51,552 300x64` at `lower`'s (560) — below each line
  * the screen's white runs across the target's columns and beside them alike, while beside its drawn rows the scroll
- * view's grey lies; W `51,130 300x64` lies whole in `upper`.
+ * view's grey lies; W `51,120 300x64` lies whole in `upper`.
  * docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md
  */
 

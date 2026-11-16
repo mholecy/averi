@@ -150,7 +150,7 @@ describe('compareColorParity — the live-validated semantics', () => {
 
   it('dominant (mode) sampling is immune to glyph noise — a mean would be dragged dark', () => {
     const captures = capturePair(WHITE, WHITE);
-    // Scatter dark "glyph" rows over ~25% of the android card.
+    // Scatter dark "glyph" rows over ~13% of the android card.
     const png = captures.android.image as PNG;
     for (let y = 30; y < 70; y += 8) paint(png, 30, y, 80, 2, '#1A1A1A');
     const r = compareColorParity(cardContract(), captures);
@@ -269,7 +269,7 @@ describe('compareColorParity — missing anchors and off-png rects', () => {
 
   it('a rect clipped >40% off-png is clamped, sampled, and flagged — never silently dropped', () => {
     const captures = capturePair(WHITE, WHITE);
-    // Push half the android card below the png bottom edge: 100x60 rect with
+    // Push most of the android card below the png bottom edge: 100x60 rect with
     // only 100x24 remaining on-png → 60% clipped.
     (captures.android.tree.children[0] as UiNode).rect = { x: 20, y: 376, width: 100, height: 60 };
     paint(captures.android.image as PNG, 20, 376, 100, 24, WHITE);
@@ -317,8 +317,7 @@ describe('compareColorParity — single-platform runs', () => {
   // NaN cannot reach here through a contract FILE — that is JSON, `NaN`
   // serializes to `null`, and `null ?? DEFAULT` takes the default. It IS
   // reachable from a contract built in code (the field is `unknown`), which
-  // is where the finite check earns its keep. The contract is the one way in
-  // (parity review P2).
+  // is where the finite check earns its keep. The contract is the one way in.
   it('a NaN tolerance_de in a contract built in code is rejected, and a null in the JSON just defaults', () => {
     const c: LayoutContract = { ...contract({ screen: 's', anchors: [{ id: 'card', bg: WHITE }] }), tolerance_de: Number.NaN };
     const captures = { android: capturePair(WHITE, WHITE).android };
