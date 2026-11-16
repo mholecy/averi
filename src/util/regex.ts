@@ -2,8 +2,7 @@ import { z } from 'zod';
 import { errorMessage } from './error-message.js';
 
 /**
- * A string field that IS a regular expression — an element assert's `match`,
- * an ocr assert's `ocr.match`, get_logs' `grep` — validated where the field is
+ * A string field that IS a regular expression, validated where the field is
  * parsed, not where the pattern is first compiled.
  *
  * Were such a field a bare `z.string()`, the pattern would meet `new RegExp`
@@ -45,7 +44,7 @@ export const regexSource = (flags = ''): z.ZodEffects<z.ZodString> =>
  * nothing else. Valid with or without the `u` flag, and outside a character class only. `/` is left alone (a RegExp
  * constructor needs no `/` escape) and so is `-` (literal outside a class, and `\-` there is a syntax error under `u`).
  *
- * The one escape for JS patterns (T22): the element assert's text hint shows its output verbatim as the `match:` to
+ * The one escape for JS patterns: the element assert's text hint shows its output verbatim as the `match:` to
  * write (verify/text-hint.ts#textHint), and every other literal spliced into a pattern goes through it. Here, not in
  * verify/, because every layer and the scripts can reach a util leaf. adapters/ios-liveness.ts#ereEscape escapes the
  * same 14 characters for pgrep's POSIX ERE, another grammar.

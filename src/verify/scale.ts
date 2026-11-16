@@ -27,8 +27,8 @@ import { usableSize, type DeviceScreen, type Rect, type UiNode } from '../adapte
  * A width this file does not trust reaches no verdict of either kind: kept
  * as a remark beside a verdict, it would print "every delta below is scaled
  * wrong" over a WITHIN TOLERANCE verdict, or pass an assert with
- * "(UNRELIABLE …)" in its detail, while `pngScale`, on the same tree, refuses
- * that width. The tree-side refusals are worded once (`untrustedTreeWidth`).
+ * "(UNRELIABLE …)" in its detail, while `pngScale`, with no device screen,
+ * refuses that width. The tree-side refusals are worded once (`untrustedTreeWidth`).
  * The scale's plausibility bound (`PLAUSIBLE_SCALE_*`) is here too, so no
  * comparator keeps a scale-trust rule of its own.
  */
@@ -180,11 +180,11 @@ const MAX_SYSTEM_BAR_INSET_PCT = 10;
  *
  * - the platform does that at all (`DeviceScreen.windowsBesideSystemBars`,
  *   Android only — an inset rect in an iOS tree is content: the 0x0 idb
- *   root over content at 16→384 on a 402-pt screen, the P1 false pass, is
+ *   root over content at 16→384 on a 402-pt screen, a false pass, is
  *   never asked);
  * - the rect is LANDSCAPE-shaped: system bars and cutouts sit beside a
  *   window only in landscape; in portrait they are above and below it, and
- *   the window spans the width (the P1 shape is portrait, so even on a
+ *   the window spans the width (that idb shape is portrait, so even on a
  *   flagged screen it fails here, as it does the span below; on a
  *   near-square foldable this is the check that keeps an inset portrait
  *   pane out);

@@ -34,9 +34,11 @@ import { absenceVerdict, bareTimeoutNote } from '../ui-tree/verdict.js';
 import { flattenTree, textHint } from './text-hint.js';
 
 /**
- * Declarative checks (ARCHITECTURE.md §5). Three tiers, cheapest first:
- * element asserts (deterministic), agent-vision screenshots (not here — the
- * agent looks at `screenshot` output itself), pixel-diff vs. stored baseline.
+ * Declarative checks (ARCHITECTURE.md §5, the `assert` tool), cheapest
+ * first: the tree asserts (element, absent, text, rect), then the pixel
+ * asserts (colour, OCR) and the pixel diff against a stored baseline.
+ * Agent-vision screenshots are no assert here: the agent looks at
+ * `screenshot` output itself.
  */
 
 const screenshotAssert = z
@@ -177,8 +179,8 @@ export const DEFAULT_BASELINE_DIR = '.averi/baselines';
 
 /**
  * The default budget of a tree assert (element, absent, rect, text) that names
- * no `timeout`. Exported for the MCP tool descriptions and the bare-tree note
- * (mcp/tools.ts, mcp/tool-text.ts), which quote it rather than restate it.
+ * no `timeout`. Exported for the MCP tool descriptions and the bare-tree
+ * note, which quote it rather than restate it.
  */
 export const ASSERT_TIMEOUT_MS = 3_000;
 
@@ -194,7 +196,7 @@ export const ASSERT_TIMEOUT_MS = 3_000;
  * asserts could not pass on that device even on a still screen. 12 s covers
  * two rounds there with a margin for a slower emulator; a poll that passes
  * returns as soon as it does, so the larger budget costs only a failing
- * assert. Exported for the `assert` tool's description, which quotes it.
+ * assert. Exported for the MCP tool descriptions, which quote it.
  * docs/bugs/2026-10-06-pixel-assert-default-timeout-fits-no-round-on-device.md
  */
 export const PIXEL_ASSERT_TIMEOUT_MS = 12_000;
@@ -230,9 +232,9 @@ export interface VerifierOptions {
    * read — so a flow's `assert:` step stops the flow on the named error, which the engine's `isTerminal` holds
    * (`optional:` does not skip it, the ladder neither escalates past it nor salvages it). `fail`: the assert fails,
    * its message the detail, and the next assert runs — for a caller whose reply is the assert results themselves
-   * (a `verify` leg, where a throw would lose its frame, screenshot and health line). D21 review round 2: a failing
-   * result everywhere would turn a flow's wedged assert into a plain "flow asserts failed" that `optional:` skips and
-   * the ladder escalates past.
+   * (a `verify` leg, where a throw would lose its frame, screenshot and health line). A failing result everywhere
+   * would turn a flow's wedged assert into a plain "flow asserts failed" that `optional:` skips and the ladder
+   * escalates past.
    */
   persistentRead?: PersistentReadMode;
 }
@@ -326,7 +328,7 @@ export class Verifier {
    * which every poll throws at once, after its one read) is the assert's failing result under `fail`, its message the
    * detail; under `throw`, and for any other error, it propagates as it came. Applied here once, no assert can
    * forget it: one that did would reject a whole verify leg (run/verify.ts), losing its frame, screenshot and health
-   * line — what D21 round 2 set `fail` up to keep.
+   * line — what `fail` keeps.
    */
   private async decided({ description, run }: PlannedAssert): Promise<AssertResult> {
     try {
@@ -551,10 +553,10 @@ export class Verifier {
    * assert from the MCP tool 300 — the budget capture.ts documents as one.
    * The round's deadline is handed to the capture instead (by the pixel
    * poll), so a capture stops short of it. Measured with a fake-device
-   * harness, before that change and after (screencap
-   * 300 ms, uiautomator dump 1.5 s, timeoutMs 3000, pollMs 300):
+   * harness (screencap 300 ms, uiautomator dump 1.5 s, timeoutMs 3000,
+   * pollMs 300), pollMs forwarded as the delay against the deadline handed in:
    *
-   *   screen               before                        after
+   *   screen               pollMs as delay               deadline handed in
    *   never settles        4.86 s · 6 shots · 1 round,   4.24 s · 2 shots · 2 rounds · the failure
    *                        a "verdict" from a frame      says the frame never settled; the 2nd
    *                        nobody knew was moving        round's read ends past the deadline and
@@ -568,8 +570,8 @@ export class Verifier {
    * with a 1.5 s dump and a 3 s budget exactly one evaluation fits.
    * The overrun that remains is one tree read past the deadline — the slack
    * every poll has (ui-tree/read-tree.ts), kept so a late element is found;
-   * what is gone is the capture budget spent on top of it, and the verdict
-   * from a frame that was still moving.
+   * no capture budget is spent on top of it, and no verdict comes from a
+   * frame that was still moving.
    */
   private async treePoll(
     evaluate: (tree: UiNode) => PollVerdict | typeof Undecided | undefined | Promise<PollVerdict | typeof Undecided | undefined>,

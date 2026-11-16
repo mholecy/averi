@@ -32,8 +32,8 @@ import { errorMessage } from '../util/error-message.js';
  * tesseract, no model download. `usesLanguageCorrection` stays OFF: UI copy is
  * not prose, and correction rewrites token-shaped and truncated strings.
  *
- * macOS only. Every caller must treat unavailability as SKIPPED-with-a-reason,
- * never as a pass — see `ocrUnavailableReason`.
+ * macOS only. Every caller must treat unavailability as a failed check or a
+ * SKIPPED note with a reason, never as a pass — see `ocrUnavailableReason`.
  */
 
 /** One anchor's rect in PNG PIXELS (tree rect x the png/tree scale). */

@@ -568,8 +568,8 @@ function sizeTolerancePctOf(contract: LayoutContract): number {
  * `isDynamic`), over the same anchors (`wantsTextCheck`), so the messages are
  * the read-time ones byte for byte. The only difference is that this lists
  * EVERY problem where the comparator stops at the first. Unlike colour,
- * nothing here depends on the device: the comparator parses both fields of
- * every opted-in anchor before it measures anything.
+ * nothing here depends on the device: the comparator parses each opted-in
+ * anchor's fields before it measures that anchor.
  */
 export function validateTextContract(contract: LayoutContract): string[] {
   return problemsThrownBy('text parity: ', [

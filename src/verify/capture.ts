@@ -178,15 +178,15 @@ import { pngScale, windowWidth, type PngScale, type WindowWidth } from './scale.
  * creeps in. Tests mock util/sleep and pin the DELAY SEQUENCE instead.
  */
 const STABILITY_ATTEMPTS = 5;
-/** Exported for the tests, which pin the delay SEQUENCE against it; no production importer. */
+/** Exported for the tests, which pin the delay SEQUENCE against it. */
 export const STABILITY_DELAY_MS = 300;
 
 /**
- * The tree-read budget: a failed `uiTree()` is retried up to 5 times, 300 ms
- * apart. The same numbers as the stability budget, but a DIFFERENT budget —
- * one re-asks a device that answered "no window yet", the other re-captures
- * a screen that is still moving — so each is named for what it governs and
- * either can move without the other.
+ * The tree-read budget: `uiTree()` is attempted up to 5 times in all (4
+ * retries), 300 ms apart. The same numbers as the stability budget, but a
+ * DIFFERENT budget — one re-asks a device that answered "no window yet", the
+ * other re-captures a screen that is still moving — so each is named for
+ * what it governs and either can move without the other.
  */
 const TREE_READ_ATTEMPTS = 5;
 const TREE_READ_DELAY_MS = 300;
@@ -516,7 +516,7 @@ export async function captureFrame(
   // settled, captures); only the measured half is added below.
   // The supplied tree is walked ONCE for the whole capture — the region
   // check's scale on every differing pair, the frame's scale and its window
-  // all read this one size (the parity code review's A4).
+  // all read this one size.
   const suppliedSize = opts.tree === undefined ? undefined : treeSizeOf(opts.tree);
   const wait = await stableScreenshot(
     adapter,
@@ -627,9 +627,9 @@ export const witnessScreen = (adapter: Pick<DeviceAdapter, 'viewport'>): Promise
  * re-read FRESH at most once — when a window reads wider than the side it
  * faces (`WindowWidth.widerThanScreen`), the one refusal a stale screen can
  * cause — and the window judged again against what the device says now.
- * The parity code review's A3: with the screen memoized and no re-read, a
- * `wm size` or an unfold after the first read would keep refusing until the
- * MCP server restarted (the device check, row 18c).
+ * Without the re-read, with the screen memoized, a `wm size` or an unfold
+ * after the first read would keep refusing until the MCP server restarted
+ * (the device check, row 18c).
  *
  * The refusal that survives says which: the screen was read again and
  * still says so (the tree, not a stale size), or the re-read failed (a
@@ -702,7 +702,7 @@ export function measuredFrameFor(tree: UiNode, image: RgbaImage, screen?: Device
 
 /**
  * The tree's `inferScreenSize`, walked ONCE per frame and handed to both the
- * png scale and the window width (the parity code review's A4) — or the
+ * png scale and the window width — or the
  * walk's throw, carried, so each answer still fails with its own words.
  */
 type TreeSize = { size: ScreenSize; thrown?: undefined } | { size?: undefined; thrown: unknown };
@@ -824,7 +824,7 @@ interface StabilityRegion {
   tree: UiNode;
 }
 
-/** A region with its tree already walked — the size every pair's scale reads (A4). */
+/** A region with its tree already walked — the size every pair's scale reads. */
 interface SizedRegion extends StabilityRegion {
   size: TreeSize;
 }
@@ -850,7 +850,7 @@ async function regionSettled(
   if (earlier === undefined || later === undefined) return undefined;
   if (earlier.width !== later.width || earlier.height !== later.height) return undefined;
   const screen = await witnessScreen(adapter);
-  // The scale only — the window is not this check's question (A4).
+  // The scale only — the window is not this check's question.
   const scale = scaleFor(region.tree, later, screen, region.size);
   if (scale.error !== undefined) return undefined;
   const bounds = pngRegion(region.rect, scale.scale, later);
