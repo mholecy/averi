@@ -118,9 +118,10 @@ export interface Revealing {
  * quarter: a 74-px probe moved the lab's S 57–61 px of its 154-px cut, and 21 or 38 on a loaded host, so quarter-steps
  * took three probes and two reads each and ran out of time; the reveal takes the rest in one stroke, or halves the room
  * toward it. At a top or left edge the cap (PROBE_MAX_TRAVEL_FRACTION) still holds: the content's start lies that way.
- * The stroke's floor (swipe.ts#shortenStroke: the larger of 2 × TOUCH_SLOP and 3 % of the side) outweighs the half
- * under a room of twice that floor — about 96 px on a side up to 1600, about 133 on the Pixel_3a's 2220 — and at a
- * room of a few tens of px may carry the uncut edge out: the match then reads `fills`, "may be cut".
+ * The stroke's floor (swipe.ts#shortenStroke: the larger of 2 × TOUCH_SLOP and 3 % of the gesture box's side along
+ * the stroke) outweighs the half under a room of twice that floor — about 96 px on a box side up to 1600 px, about
+ * 133 on a box the Pixel_3a's full 2220 tall — and at a room of a few tens of px may carry the uncut edge out: the
+ * match then reads `fills`, "may be cut".
  * docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md
  */
 const REVEAL_ROOM_FRACTION = 0.5;

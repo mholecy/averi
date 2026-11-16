@@ -74,8 +74,9 @@ export function shellQuote(word: string): string {
 }
 
 /**
- * The argv as one command line for the device's `sh -c`: each word quoted,
- * joined with a space — which is also what adb's own join produces from the
+ * The argv as one command line for the device's `sh -c`: each word through
+ * shellQuote (quoted only where `sh` would interpret it), joined with a
+ * space — which is also what adb's own join produces from the
  * quoted words, so passing `argv.map(shellQuote)` as separate adb arguments
  * and passing this one string are the same bytes on the device.
  */
@@ -85,7 +86,7 @@ export function shellCommandLine(argv: readonly string[]): string {
 
 /**
  * `adb -s <serial> shell <argv>` as the argv handed to the `adb` binary, each
- * device word quoted by shellQuote — the one builder of a device shell
+ * device word through shellQuote — the one builder of a device shell
  * command, so no caller spells the quoting itself.
  */
 export function adbShellArgv(serial: string, argv: readonly string[]): string[] {

@@ -353,7 +353,7 @@ function wholeLandingToo(held: string, e: TextExpectation): boolean {
  *    `said-plain`, a longer one without clear, carries this Difference itself and never gets here; one of the typed
  *    length lands). Before `unchanged` (A2): no reading of a field whose count was never read says more than that.
  * 1. `unchanged`: the reading is exactly what the field showed when typing began — whatever it is, bullets included
- *    (probes D and D2 were told "the app transformed the input").
+ *    (else such a field would be told "the app transformed the input").
  * 2. `masked`: bullets only, compared by length; `held` without clear.
  * 3. `length` of a PARTLY masked reading (Android's show-the-last-character password field, `•••••t`): its content is
  *    not comparable either (hasBullet: • and ● only — `*` and `·` are ordinary text too).

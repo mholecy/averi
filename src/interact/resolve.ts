@@ -32,7 +32,8 @@ import { keyboardMayCoverText } from './target-text.js';
  * MCP schema. Options are plain milliseconds.
  */
 
-// What a caller points at, and every match of it: ui-tree/selectors.ts's (a miss asks of the target too, ui-tree/miss.ts).
+// What a caller points at, and every match of it: ui-tree/selectors.ts's (a miss asks of the target too,
+// ui-tree/miss.ts).
 export { findTarget, type Target } from '../ui-tree/selectors.js';
 
 export const describeTarget = (target: Target): string =>

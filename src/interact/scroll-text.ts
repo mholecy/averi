@@ -1151,7 +1151,8 @@ function acrossText({ rect, axis, along }: StrokedAcross, remedy: WithinRemedy):
   const drawn = `each went across the scroll view it was drawn over, ${rectText(rect)}, which scrolls ${axis}ly, and the tree shows`;
   if (along !== undefined) {
     const why = along.noRoom === true ? 'but which had no room for a swipe' : 'and which the swipes did not go over';
-    // D78: one the swipes did not go over, the target not read yet, is the next call's `within`; else the way in by hand.
+    // D78: one the swipes did not go over, the target not read yet, is the next call's `within`; else the way in by
+    // hand.
     const into =
       along.noRoom === true || along.targetRead === true
         ? 'swipe inside it (swipe, its coordinates), then scroll_until it'

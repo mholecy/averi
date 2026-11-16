@@ -262,7 +262,7 @@ export const shownText = (n: Pick<UiNode, 'value'>, isInput: boolean): string | 
  *   tell, so it is not verified.
  *   Typed fills only: a clear alone that ends on the placeholder is
  *   `nothing-typed` with the fact `clearPlaceholder`, and judgeFill decides
- *   whether that is the `placeholder` reason (probes C and K).
+ *   whether that is the `placeholder` reason.
  */
 export type ReadBack =
   | { kind: 'landed' }
@@ -357,7 +357,7 @@ export interface OtherInput {
  * - `unchanged`: the field shows exactly what it showed when typing began
  *   — the typing did not reach it (a focus tap that missed, a field that
  *   ignores input), or the field refused it (already at its maxLength) —
- *   not "the app transformed the input" (probes D and D2).
+ *   not "the app transformed the input".
  * - `dropped-tail` (D28): the field holds the first `landed` characters of
  *   the typing, reformatted (interact/fill-landing.ts#NotLanded): `grouped`
  *   when the field added separators of its own, else it only showed its typed

@@ -1356,7 +1356,7 @@ export class FlowEngine {
     });
     // ⚠ for a clipped stop, and for one the `unlocated` row qualifies: the
     // input method says a keyboard is up that nothing could place, so "fully
-    // visible" is not established either — nor (T17) on a flush edge no
+    // visible" is not established either — nor on a flush edge no
     // probe checked: both open NOT CONFIRMED (scroll-text.ts#stopHedges). The
     // `unlocated` row is asked again on its own, defensively: stopHedges says
     // nothing of a stop with a surface the eyes saw, and such a stop never

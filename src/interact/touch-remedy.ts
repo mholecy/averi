@@ -6,7 +6,7 @@ import { noScrollHelps, type RemedyCase, type TouchRemedied } from '../ui-tree/s
 import { cutRemedy, dismissKeyboardFirstText, hideClause, keyboardUpText, ridingKeyboard, wholeThinWayPast, type KeyboardUp } from './target-text.js';
 
 /**
- * THE TOUCH REMEDY's sentence (A26): what the tap's refusal and `scroll_until`'s stop say to do about a target that
+ * THE TOUCH REMEDY's sentence: what the tap's refusal and `scroll_until`'s stop say to do about a target that
  * stands `cut` or `covered` — one function of the standing (ui-tree/standing.ts#TouchRemedied: its kind, its remedy,
  * its cut's `by` and `within`, its cover) and the soft keyboard when it is up (`KeyboardUp`), so the two touch verbs
  * cannot word one target two ways.

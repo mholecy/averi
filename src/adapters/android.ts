@@ -133,8 +133,9 @@ function describeIntent(intent: LaunchIntent): string {
  * in `launch` does the same). Kept, because that advice is
  * what makes the message recoverable: the reader's next move is in
  * averi.yaml or in the call, not in adb. Rejected: a typed AmStartError
- * thrown here and worded by flow/launch.ts's launchApp, which launch_app and
- * the flow's launch step share. As it is, no import crosses the layer — only
+ * thrown here and worded in flow/launch.ts — flow/ would then import a
+ * platform adapter's error class (it reads adapters/ only through
+ * types.ts and ios-node.ts); as it is, no import crosses the layer, only
  * words do.
  *
  * Why a launch is checked at all: `adb()` only rejects on a
@@ -402,9 +403,9 @@ export class AndroidAdapter implements DeviceAdapter {
     }
     // No wait and no note (the foreground wait is iOS's, ios.ts). A link two activities handle, none of them
     // preferred, starts Android's "Open with" chooser, which am reports as `started` (android-start.ts; measured,
-    // batch-9 D55): so ONE focus read
-    // after the start asks whether the chooser is in front (D55, android-chooser.ts; ADR 0041). Only a positive
-    // match names a holder; a failed or unreadable read, or a chooser not in front yet, names none.
+    // batch-9 D55): so ONE focus read after the start asks whether the chooser is in front (D55,
+    // android-chooser.ts; ADR 0041). Only a positive match names a holder; a failed or unreadable read, or a
+    // chooser not in front yet, names none.
     // D55c: the chooser named, one dump of its tree reads its sheet (linkChooserInFront); none is D55's `{ component }`.
     return this.chooserHolder();
   }
