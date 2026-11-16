@@ -542,7 +542,7 @@ describe('fillField — the post-focus re-read, only where focus can change the 
   });
 
   it('kept on-return: a layout that moves on focus (keyboard avoidance) still has its dropped tail typed again — the other inputs are compared as read after focus', async () => {
-    // Review of this branch, scenario A: every rect moves up 100 on focus and the first typing keeps 3 of 9. With the
+    // Every rect moves up 100 on focus and the first typing keeps 3 of 9. With the
     // other inputs taken from the pre-tap tree (keyed by rect), every one reads gone: `unproven`, no retype.
     resetLayout();
     const fake = new FakeAdapter(
@@ -590,7 +590,7 @@ describe('fillField — the post-focus re-read, only where focus can change the 
   const SAID_PLAIN = '(masked field, though its source said it is plain: what it held after focus was not read, so only the typed length passes — retry with clear: true)';
 
   it('skipped: a field said plain that shows BULLETS of another length FAILS, saying so — five autofilled bullets and two dropped keys are no pass', async () => {
-    // Review of this branch, scenario B: the length rule's `held + typed` with a `held` of 0 passed 5 + 6 ≥ 8.
+    // The length rule's `held + typed` with a `held` of 0 passed 5 + 6 ≥ 8.
     const fake = field({ secure: false });
     onFocus(fake, (f) => (f.value = '•'.repeat(5)));
     appendBullets(fake, 2);
@@ -655,7 +655,7 @@ describe('fillField — the post-focus re-read, only where focus can change the 
   });
 
   it('accepted residual (R1, ADR 0028): a field WRONGLY said plain, autofilled with N bullets on focus, dropping exactly N keys, passes silently', async () => {
-    // Review of this branch, scenario K. With the re-read the count would start at 3 and `3 + 5` fail; skipped, the
+    // With the re-read the count would start at 3 and `3 + 5` fail; skipped, the
     // field shows 3 + (5 − 3) = 5 bullets, the typed length — the one reading no read-back can tell from a landed fill.
     // Recorded, not wanted: if this ever fails, the residual is closed and ADR 0028 must say so.
     const fake = field({ secure: false });
@@ -1086,7 +1086,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     const appended = await fillField(fake, 'id:title', 'e', FAST); // "Meno".includes("e") — no proof
     expect(appended).toMatchObject({ role: 'text', readBack: { kind: 'not-taken' }, notInput: { input: expect.objectContaining({ identifier: 'name' }) } });
     const cleared = await fillField(fake, 'id:title', 'abc', { ...FAST, clear: true });
-    expect(fake.deletes).toEqual([]); // m-5: "Meno".length is not the field's
+    expect(fake.deletes).toEqual([]); // "Meno".length is not the field's
     expect(cleared).toMatchObject({ cleared: 'unmeasured', readBack: { kind: 'not-taken' } });
   });
 
@@ -2295,8 +2295,8 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
   };
 
   it('typing that moved the focus to another input is never typed again — it would go there too — and the error names that input', async () => {
-    // Review of this branch: `1234` into otp1 left `1` there, `2` in otp2 and `34` in the note, and the tail `234`
-    // typed again made the note `34234`, the reply saying the field had dropped them.
+    // `1234` into otp1 left `1` there, `2` in otp2 and `34` in the note, and the tail `234` typed again made the note
+    // `34234`, the reply saying the field had dropped them.
     const { fake, otp2, note } = otpFake();
     await expect(fillField(fake, { id: 'otp1' }, '1234', FAST)).rejects.toThrow(
       /^fill: typed 4 characters but the field shows 1 .*; the typing left the field: textfield id:"otp2" \(0,40 100x10\) changed while it typed \(the focus moved\), so nothing was typed again$/,

@@ -431,7 +431,7 @@ describe('an earlier text that vanished — an unnamed placeholder (D29)', () =>
     expect(landingOf('SK31 1200 0000', expecting(e('SK3112000000', '\u2014')))).toBeUndefined();
   });
 
-  // MINOR-3: the earlier text inside the reading, not at its start, did not survive as the earlier text.
+  // The earlier text inside the reading, not at its start, did not survive as the earlier text.
   it('the earlier text inside the reading but not at its start: judged as the value alone', () => {
     expect(landingOf('34 12', expecting(e('3412', '12')))).toEqual({ kind: 'landed', reformatted: { added: 1, respaced: 0 } });
   });

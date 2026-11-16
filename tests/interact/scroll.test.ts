@@ -1041,7 +1041,7 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
 
   // `fully` judges clipping against the whole screen, but the stop also needs the centre
   // below the band — full-bleed content whose ROUNDED centre lies in the band (at y 0: 122 pt or less under 62) never
-  // stops, and says why. The verification round: 123 pt rounds its centre 61.5 to 62, and stops.
+  // stops, and says why. At 123 pt its centre 61.5 rounds to 62, and it stops.
   it('full-bleed content shorter than twice the band (0,0 402x106, centre y 53): no fully: true stop either — the failure names the status bar, no clip', async () => {
     const fake = still({ x: 0, y: 0, width: 402, height: 106 });
     const error = (await scrollUntilVisible(fake, 'id:hero', { ...FAST, fully: true }).catch((e: unknown) => e)) as Error;

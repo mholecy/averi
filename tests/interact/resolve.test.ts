@@ -263,7 +263,7 @@ describe('resolveSettled — appear AND hold still', () => {
       ]);
     });
 
-    // D21 review: the late read is a read like pollTree's — a read no wait cures is thrown as it came, not wrapped in
+    // D21: the late read is a read like pollTree's — a read no wait cures is thrown as it came, not wrapped in
     // a plain timeout (which an `optional:` would skip as an absent element).
     it('the late read meets a PersistentReadError: thrown as it came, not as a timeout', async () => {
       const wedged = new PersistentReadError('wedged until a reboot');
@@ -1139,8 +1139,7 @@ describe('a tap or fill by an id idb\'s read does not list: the timeout says idb
  * D32 K1: idb lists nothing beneath the soft keyboard, so a tap or fill on a field under it waits and ends "not found".
  * Where the keys are read up by shape (draw-order.ts#keyboardBandTop, idb's band: the lab's form-keyboard capture, its
  * band's top at y 590), the timeout names the soft keyboard and the way out first, in one short line — how to hide it,
- * never the adapter's long advice — then idb's reasons as before. A tree with no band keeps today's reply byte for
- * byte.
+ * never the adapter's long advice — then idb's reasons. A tree with no band gets idb's reasons alone.
  */
 describe('a tap or fill that misses under idb with the soft keyboard read up: the timeout names the keyboard', () => {
   const IOS = new URL('../fixtures/truth/ios-iphone17-ios27/', import.meta.url);
@@ -1399,7 +1398,8 @@ describe('iOS\'s status band (2026-10-09)', () => {
     const fake = new FakeAdapter({ form: tree }, 'form');
     fake.platform = platform;
     fake.keyboard = undefined;
-    // What each adapter's viewport reports: the iOS adapter adds the band (adapters/ios-status-band.ts), Android none.
+    // The iOS adapter adds its status band (adapters/ios-status-band.ts); Android reads its own
+    // (adapters/android.ts#systemBands), which this fake leaves out.
     fake.viewportSize = platform === 'ios' ? { width: 402, height: 874, statusBand: 62 } : { width: 402, height: 874 };
     return fake;
   };
@@ -1418,9 +1418,9 @@ describe('iOS\'s status band (2026-10-09)', () => {
   });
 
   /**
-   * The remedy as far as the tree knows it (a button pinned at the top is never told to
-   * `scroll_until it first`, which no scroll does). A WDA-shaped tree has ancestry: a button in no scroll view is
-   * pinned there; one in a `scrollable` is scrolled out. idb's flat list has none, so it says both (above).
+   * The remedy as far as the tree knows it (a button pinned at the top is never told to `scroll_until it first`, which
+   * no scroll does). A WDA-shaped tree has ancestry: a button in no scroll view is pinned there; one in a `scrollable`
+   * or a `webview` is scrolled out. idb's flat list has none, so it says both (above).
    */
   describe('the remedy says what can move it', () => {
     const pinnedAt = (inScrollView: boolean | 'webview') => {

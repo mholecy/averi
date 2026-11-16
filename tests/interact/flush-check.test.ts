@@ -132,7 +132,8 @@ describe('the flush check', () => {
 
   // The proof on every edge: the probe moved the row, which lies flush on the same edge with 60 px more of it showing,
   // its uncut edge carried those 60 px. The reveal's travel: half the room from the uncut edge to the list's far side
-  // (`roomPast`) — 413 px for a row showing 82 of a 495-px list — and, toward a top or left edge, the probe's cap kept.
+  // (`roomPast`: 413 px for a row showing 82 of a 495-px list, so 206), and, toward a top or left edge, the probe's
+  // cap kept.
   it.each([
     ['bottom', 206],
     ['top', CAP],
@@ -234,7 +235,8 @@ describe('the flush check', () => {
 
 /**
  * D62, T11: a reveal that moved nothing is doubted once — the same reveal sent again — and accepted only when that one
- * holds too, however far the stroke that proved the cut carried the match. A first probe that held is accepted at once.
+ * holds too, however far the stroke that proved the cut carried the match. A first probe that held with no proof is
+ * doubted the same way (T12, below).
  */
 describe('the flush check doubts a reveal that held on a proven cut (D62, T11)', () => {
   /** A 74-px probe: the lab's bounded list's (tests/interact/scroll-flush-reveal.test.ts). */

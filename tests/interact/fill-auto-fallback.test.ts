@@ -10,7 +10,7 @@ import { NO_EYES } from '../helpers/eyes.js';
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 
 /**
- * A41a review M2: under `treeSource: auto` the fill's first check of the value runs against WDA_TYPEABLE (no read has
+ * A41a: under `treeSource: auto` the fill's first check of the value runs against WDA_TYPEABLE (no read has
  * made the choice yet); the resolution's read then falls back to idb. A value only WebDriverAgent types is refused
  * there — before the focus tap and the clear — and never reaches `idb ui text`.
  */

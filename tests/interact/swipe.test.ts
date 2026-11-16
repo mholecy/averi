@@ -28,8 +28,9 @@ function device(root: UiNode, viewport: DeviceScreen | Error): FakeAdapter {
   return fake;
 }
 
-// The one reader of the read seam that opts out of its throw (ADR 0036: a swipe's orientation read loses only its
-// witness; ARCHITECTURE.md §2, Interaction): a failure no wait cures still lets the swipe go over the device box, and the note quotes it.
+// The swipe opts out of the read seam's throw (ADR 0036: a swipe's orientation read loses only its witness;
+// ARCHITECTURE.md §2, Interaction): a failure no wait cures still lets the swipe go over the device box, and the note
+// quotes it.
 describe('swipeScreen — a read failure no wait cures', () => {
   it('still swipes, and its note quotes the message', async () => {
     const fake = fresh();
