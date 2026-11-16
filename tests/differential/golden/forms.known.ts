@@ -6,8 +6,8 @@ import { ANDROID, IDB_STROKE, idbUnmarkedTap, IOS, keys, NOT_YET_IN_TREE, twice,
 // Phase 2b's Android form cells. uiautomator lists only the presented window — here the picker's ModalBottomSheet,
 // fully expanded — so the form beneath is not found and scroll_until strokes the sheet: lab note L1, whose fix
 // (d43df5d, round 6) marks the AlertDialog and the half-expanded sheet but not a sheet whose dump carries no scrim.
-// Since the amendment "Android's window by the window manager's word" the window manager types the sheet a Dialog's
-// window, asked on the miss: the three taps say the presented remedy; scroll_until still strokes the sheet's own list
+// The window manager types the sheet a Dialog's window (ADR 0018's amendment "Android's window by the window manager's
+// word"), asked on the miss: the three taps say the presented remedy; scroll_until still strokes the sheet's own list
 // (decision 3: a target inside it, not yet composed, reads alike), the residual narrowed to that.
 const EXPANDED_SHEET = 'residual:ADR 0018 residual 18 — a target beneath a fully expanded sheet is stroked for on the sheet\'s own list';
 /** The Android picker sheet's scroll_until stroke (the sheet fully expanded, 1080x2220). */

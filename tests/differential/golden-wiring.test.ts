@@ -30,7 +30,7 @@ beforeAll(async () => {
   const targets: TargetTruth[] = [
     // A system band on Android swallows the probe: no touch, not reached — consistent only told the platform.
     { ...a, geometry: 'status-band', reached: false, probe: [], visible: a.frame, piece: null },
-    // Off the screen: R-off's three rows and R-direction, live only — never asked.
+    // Off the screen: R-off's three rows are asked; R-direction, live only, is never asked.
     { ...b, frame: { ...b.frame, y: 2300 }, geometry: 'off-screen', reached: false, probe: [], visible: null, piece: null, unprobed: 'its centre (540,2388) lies off the 1080x2220 screen' },
     // Cut by the screen's bottom with its centre (540,2238) past it: never probed there — consistent only told the
     // screen.

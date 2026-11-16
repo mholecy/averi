@@ -41,7 +41,7 @@ describe('codeRoot — a checkout in place with changes of its own', () => {
     try {
       const repo = join(dir, 'repo');
       mkdirSync(join(repo, 'node_modules'), { recursive: true });
-      writeFileSync(join(repo, '.gitignore'), 'node_modules/\n'); // as before d77c1052: the linked node_modules untracked
+      writeFileSync(join(repo, '.gitignore'), 'node_modules/\n'); // so node_modules is no change of the checkout
       writeFileSync(join(repo, 'a.ts'), 'export const a = 1;\n');
       git('init', '-q', repo);
       git('-C', repo, 'add', '.');

@@ -51,9 +51,9 @@ export const presented: KnownFile = {
     }),
     // RESIDUAL #31 (ADR 0018 residual 9): under idb, and in WDA's ungrouped reading-order run, nothing shows the blur
     // menu's backdrop over A, B, D — they read as open. C's centre lies under the menu row W (its probe fires W): C is
-    // refused under W, truly, but not "close it first" (#31's) — since L4's fix (a control listed before it in reading
-    // order, overlapping it, is a cover whose order is not told, ADR 0015's amendment) and, since ADR 0024, seen drawn
-    // over it on the screenshot.
+    // refused under W, truly, but not "close it first" (#31's): a control listed before it in reading order,
+    // overlapping it, is a cover whose order is not told (L4's fix, ADR 0015's amendment), and it is seen drawn over it
+    // on the screenshot (ADR 0024).
     ...beneathTheBlur(`${IOS}/blur-menu.idb.json`, ['A', 'B', 'D']),
     ...beneathTheBlur(`${IOS}/blur-menu.wda.json`, ['A', 'B', 'D']),
     ...beneathTheBlur(`${IOS}/blur-menu-grouped.idb.json`, ['A', 'B', 'D']),
