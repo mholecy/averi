@@ -115,9 +115,9 @@ export function focusOf(r: CallResult): FocusRead {
 /**
  * --check's exits: 0 no lab entry, no chooser; 1 a lab default (a leak: "Always" is never tapped, so it predates the
  * batch or is a defect); 3 not proven (a read failed, no Preferred Activities block, or a lab entry with no mAlways
- * line — one that cannot be compared never triggers a reinstall: code review); 4 a chooser in front; 5 only last-chosen
- * entries, every one accepted; 6 a last-chosen entry not accepted (no default — a WARN, never a RESTORE: no reinstall
- * clears it).
+ * line — one that cannot be compared never triggers a reinstall); 4 a chooser in front; 5 only last-chosen entries,
+ * every one accepted; 6 a last-chosen entry not accepted (no default — a WARN, never a RESTORE: no reinstall clears
+ * it).
  */
 export const CHECK_EXIT = { clean: 0, leak: 1, unproven: 3, chooser: 4, accepted: 5, lastChosen: 6 } as const;
 export type CheckExit = (typeof CHECK_EXIT)[keyof typeof CHECK_EXIT];
@@ -293,7 +293,7 @@ export function treeOf(raw: string): Dump | { why: string } {
     return { why: `the dump did not parse: ${firstLineOf(messageOf(e))}` };
   }
   const nodes = [...everyNode(root)];
-  // Quote-aware: a `>` inside a quoted value ends no tag (review round 2).
+  // Quote-aware: a `>` inside a quoted value ends no tag.
   const tags = [...xml.matchAll(/<node\b(?:[^>"]|"[^"]*")*>/g)].map((m) => m[0]);
   if (tags.length !== nodes.length) return { why: `the dump's ${tags.length} node tags are not the parsed tree's ${nodes.length} nodes` };
   // Paired node for node, or not at all: each tag's resource-id must be its node's identifier (src keeps the last
@@ -386,7 +386,7 @@ function targetOf(nodes: readonly UiNode[], target: TapTarget): { node: UiNode; 
  */
 export function safeTap(dump: Dump, target: TapTarget, at?: Point): SafeTap {
   const tree = dump.root;
-  // src's identifier too (review round 2): a tag read wrong cannot hide an id src read.
+  // src's identifier too: a tag read wrong cannot hide an id src read.
   const isAlwaysNode = (n: UiNode): boolean => n.identifier === 'button_always' || isAlways(dump.attrs(n));
   const all = [...everyNode(tree)];
   const found = targetOf(all, target);
@@ -417,7 +417,7 @@ export function safeTap(dump: Dump, target: TapTarget, at?: Point): SafeTap {
 
 // ------------------------------------------------------------------------------------------------- the fixtures
 
-/** Device paths a captured fixture must not hold, built from parts as the hygiene test's. */
+/** Device paths a captured fixture must not hold, built from parts as tests/helpers/path-hygiene.ts's rules are. */
 const slash = '/';
 const DEVICE_PATHS = ['/data/', '/sdcard', '/storage/', `${slash}Users${slash}`, '/private/', `${slash}tmp${slash}`, 'emulator-'];
 
@@ -445,8 +445,8 @@ export const cellsHand = (b: HandBase, catalog: string, why: string): string =>
   `${adbLine(b.serial, ['uninstall', LAB_PACKAGE])} && ${adbLine(b.serial, ['install', b.apk])}; then: ${b.then}`;
 
 /**
- * No reinstall was done: the probe's state file was not marked dirty (review round 4: a `--restore` with no state does
- * nothing, so the line names the probe's `--state` run — its command when the batch gives one).
+ * No reinstall was done: the probe's state file was not marked dirty (a `--restore` with no state does nothing, so the
+ * line names the probe's `--state` run — its command when the batch gives one).
  */
 export const stateFileHand = (b: HandBase, stateFile: string, why: string, stateCommand?: string): string =>
   `${HAND_PREFIX}no reinstall was done: the probe's state file ${shellQuote(stateFile)} was not marked dirty (${why}); run ` +

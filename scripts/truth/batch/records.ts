@@ -6,7 +6,7 @@ import { plainSegment } from './run-dir.js';
  * A non-live block's records (T2 S6a; S3 keeps `.cases` for live runs): what a run is asked, written before it runs
  * (`<name>.asked.json`), and what it did, once done (`<name>.done.json`), each written once, never overwritten. A run
  * is complete when what it recorded is what it was asked (runner.ts reads every record's gap beside every live run's
- * completeness, one rule on both paths). One kind of record for now; another is a new member of the union.
+ * completeness, one rule on both paths). One kind of record, `runs`; another is a new member of the union.
  */
 
 export interface RunsRecord {

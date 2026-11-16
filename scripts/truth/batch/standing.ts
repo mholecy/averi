@@ -9,9 +9,8 @@ import { shellQuote } from './shell.js';
 import { EXIT, exitCodeOf, parseVerdictLine, refusedLine, verdictLine, type Summary, type Verdict } from './words.js';
 
 /**
- * The standing lab batches' kit (backlog A21, the review's CH3): what lab-run.ts (Android, Gate B) and lab-run-ios.ts
- * (iOS, Gate C) share, in a module of its own so that neither batch leans on the other — either can go without
- * breaking the other. Composed of runBatch alone:
+ * The standing lab batches' kit: what the Android batch (Gate B) and the iOS one (Gate C) share, in a module of its own
+ * so that neither batch leans on the other — either can go without breaking the other. Composed of runBatch alone:
  *
  * - the selection (Standing, groupsOf, onlyWith, noLiveGroup, standingSelection): `--groups` as ONLY= is, every block
  *   staying the batch's, refused with every reason;

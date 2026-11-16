@@ -41,9 +41,9 @@ export const ANDROID_BUILD_NEED = 'android-build';
 export const LAB_BLOCK = 'lab';
 
 /**
- * One platform's build as a device need asks it (T2 S6b review round 1, MAJOR 2): `ensure` runs it once for the run —
- * whoever asks first, the device need or the build need's own check — and `built` is its product once it was met.
- * `builtUnder`: what it was built under, once met, for the device's line (the Android build's JDK, T23).
+ * One platform's build as a device need asks it: `ensure` runs it once for the run — whoever asks first, the device
+ * need or the build need's own check — and `built` is its product once it was met. `builtUnder`: what it was built
+ * under, once met, for the device's line (the Android build's JDK, T23).
  */
 export interface BuildRef {
   ensure(c: NeedCtx): Promise<NeedResult>;
@@ -73,10 +73,9 @@ export interface LabBuild {
 export type BuildAnswer = { built?: string; builtUnder?: string; warning?: string } | { why: string };
 
 /**
- * A device need's build (T2 S6b review round 1, MAJOR 2): asked by the need itself, so the order of a block's needs
- * does not matter. None wanted: nothing to install. Met: its product, what it was built under, and the build's own
- * warning (T23: a JDK source passed over). Failed: not met when the batch requires it, else a warning, the app already
- * installed is used.
+ * A device need's build: asked by the need itself, so the order of a block's needs does not matter. None wanted:
+ * nothing to install. Met: its product, what it was built under, and the build's own warning (T23: a JDK source passed
+ * over). Failed: not met when the batch requires it, else a warning, the app already installed is used.
  */
 export async function askBuild(c: NeedCtx, o: { build?: BuildRef; requireBuild?: boolean }): Promise<BuildAnswer> {
   if (o.build === undefined) return {};
@@ -103,9 +102,9 @@ export interface DeviceCheck<T> {
 }
 
 /**
- * A device need's one shape (code review): the device opened; its build asked (askBuild); met, installed; the installed
- * app's cells.json main's (else not met, the rerun hint); met — with the readying's warning (batch-13: the companion
- * entry's) and the build's when it failed (`LAB …: WARN — …`), joined in that order.
+ * A device need's one shape: the device opened; its build asked (askBuild); met, installed; the installed app's
+ * cells.json main's (else not met, the rerun hint); met — with the readying's warning (batch-13: the companion entry's)
+ * and the build's when it failed (`LAB …: WARN — …`), joined in that order.
  */
 export async function checkDevice<T>(c: NeedCtx, o: { build?: BuildRef; requireBuild?: boolean }, d: DeviceCheck<T>): Promise<NeedResult> {
   const opened = await d.open();
@@ -210,8 +209,8 @@ export function labBuild(o: { secs?: number; jvms?: readonly string[] } = {}): L
     const build = await c.bounded(gradlew, ['--console=plain', 'assembleDebug'], { secs, cwd, env, log });
     // After every build, whatever it did: the daemon leaves the call's group by design (S2), so it is stopped by name.
     const stop = await gradleStop(c.bounded, call);
-    // Only a stop that succeeded clears it: one cut or failed leaves the daemon to the last step (review round 2), its
-    // reason kept for the step's line (code review).
+    // Only a stop that succeeded clears it: one cut or failed leaves the daemon to the last step, its reason kept for
+    // the step's line.
     gradle = failedCall(stop) ? { call, why: `its --stop failed: ${exitText(stop)}` } : undefined;
     if (failedCall(stop)) c.step('WARN', `lab android: gradlew --stop: ${exitText(stop)} — the Gradle daemon may still be running`);
     if (failedCall(build)) return { ok: false, why: failedText('the Android build failed', build, log) };
@@ -233,15 +232,15 @@ export function labBuild(o: { secs?: number; jvms?: readonly string[] } = {}): L
     return c.fs.exists(p) ? { ok: true, how: `${nameInLine(p)} still there` } : { ok: false, why: `this run's build is gone (${nameInLine(p)})` };
   };
   /**
-   * A build run once for the run, its failure kept for failures(). A met build's warning is said once (T23 code
-   * review): the first asker's line keeps it — the build need's own, when the batch lists it first, else the device
-   * need's — and every later answer comes without it, so the SUMMARY never says it twice.
+   * A build run once for the run, its failure kept for failures(). A met build's warning is said once: the first
+   * asker's line keeps it — the build need's own, when the batch lists it first, else the device need's — and every
+   * later answer comes without it, so the SUMMARY never says it twice.
    */
   const once = (need: string, build: (c: NeedCtx) => Promise<NeedResult>) => {
     let run: Promise<NeedResult> | undefined;
     // Said once: the first asker's line carries the warning. If that asker's line then reports its own failure
     // instead (a device need whose install fails), the warning is not repeated on a later line — the run is
-    // unproven then anyway (T23 review round 4, NIT-1).
+    // unproven then anyway.
     let said = false;
     return async (c: NeedCtx): Promise<NeedResult> => {
       const r = await (run ??= build(c).then((r) => {

@@ -14,14 +14,14 @@ import { STATE_FILE, stateOf } from './run-dir.js';
 import { exitText, failedCall, nameInLine, type StepWord } from './words.js';
 
 /**
- * The lab simulator's plumbing around a batch's iOS blocks (T2 S6b): the `ios`
- * need — the lab guard, the reset (boot, health), this run's build installed, the installed cells.json byte-equal to
- * main's catalog, and the finportal key's first read — and its cheap recheck; the health check before each run, the
- * Open-in alert dismissed; the WDA window (the `.cases` first, the backup, the work, the lab's WebDriverAgent ended,
- * the 4 s wait, port 8120 proven free, the restore key by key, the end check, the compare), registered as a dirty
- * window so the abort puts it back the same way; the need's end (the finportal key's second read, its line; T2b);
- * and the run's last step that ends the lab's WebDriverAgent and idb_companion. What is decided and said is
- * lab-lines.ts's and ios-defaults.ts's; here are the calls, through the injected Run, and the files, through io.ts.
+ * The lab simulator's plumbing around a batch's iOS blocks (T2 S6b): the `ios` need — the lab guard, the reset (boot,
+ * health), this run's build installed, the installed cells.json byte-equal to main's catalog, and the finportal key's
+ * first read — and its cheap recheck; the health check before each run, the Open-in alert dismissed; the WDA window
+ * (the `.cases` first, the backup, the work, the lab's WebDriverAgent ended, the 4 s wait, port 8120 proven free, the
+ * restore key by key (an import for a key that is no scalar), the end check, the compare), registered as a dirty window
+ * so the abort puts it back the same way; the need's end (the finportal key's second read, its line; T2b); and the
+ * run's last step that ends the lab's WebDriverAgent and idb_companion. What is decided and said is lab-lines.ts's and
+ * ios-defaults.ts's; here are the calls, through the injected Run, and the files, through io.ts.
  *
  * Every call goes to the lab simulator only: an `IosSim` is had only through ios-domains.ts's LabSim, whose guard is
  * lab-device.ts's (device-check's udid refused before any call, then `averi-lab …` in simctl's list). Processes are
@@ -46,10 +46,10 @@ export const ALERT_TAPS = 2;
 export const HOST_SECS = 10;
 export const IOS_NEED = 'ios';
 /**
- * The need's end's bound (T2b review round 1, BLOCKER): the bounds of its two calls — the guard's `simctl list`, the
- * key's `defaults read`, each xcrun's own (boundFor: any but a boot or an install) — each with its stop (SIGTERM's
- * grace, the pipes' close grace), summed. With every call bounded, the
- * end cannot pass its bound before its calls do, so its read always reaches the SUMMARY.
+ * The need's end's bound: the bounds of its two calls — the guard's `simctl list`, the key's `defaults read`, each
+ * xcrun's own (boundFor: any but a boot or an install) — each with its stop (SIGTERM's grace, the pipes' close grace),
+ * summed. With every call bounded, the end cannot pass its bound before its calls do, so its read always reaches the
+ * SUMMARY.
  */
 export const IOS_END_SECS = 2 * (boundFor('xcrun', [])! + (GRACE_MS + CLOSE_GRACE_MS) / 1000);
 
@@ -430,8 +430,8 @@ export interface WdaWindowOptions {
  * lines, and the window closed only when it verified, else left for RESTORE; the end check; then, with the state clean,
  * the compare (a late writer: its line a verdict line, its hand lines to RESTORE). Whether the work ran, and whether
  * the window was put back — not put back, the block's own verdict is INCONCLUSIVE at once, so no judge's PASS can stand
- * for a run that left the lab's settings changed (T2 S6b review round 2); and the warnings its two checks' resets left
- * (the companion entry's, batch-13), for the block to say.
+ * for a run that left the lab's settings changed; and the warnings its two checks' resets left (the companion entry's,
+ * batch-13), for the block to say.
  */
 export async function wdaWindow(ctx: BlockCtx, lab: IosSim, o: WdaWindowOptions): Promise<{ ran: boolean; putBack: boolean; warnings: string[] }> {
   for (const r of o.runs ?? []) ctx.asksLive(r.name, r.asked);

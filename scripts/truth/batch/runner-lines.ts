@@ -47,8 +47,8 @@ const FALLBACK = { out: 'AVERI_BATCH_OUT', udid: 'AVERI_LAB_UDID', serial: 'AVER
  * The config from a batch's argv (`--out <dir> --udid <sim> --serial <emu> [--repo <checkout>]`), each value falling
  * back to its env variable (an empty one is unset), the repo to `repo` (this module's checkout). No out folder, a
  * relative out or repo, an unknown option, a flag without its value (none, or another flag next) or a flag given twice:
- * refused, every error at once, in order. A device id not given is left out, never empty. The Android SDK: ANDROID_HOME,
- * else the one under `home` (T2 S6b code review: the lab build reads the config, not the home folder).
+ * refused, every error at once, in order. A device id not given is left out, never empty. The Android SDK:
+ * ANDROID_HOME, else the one under `home` (the lab build reads the config, not the home folder).
  */
 export function configOf(argv: readonly string[], env: Env, repo = MODULE_REPO, home = homedir()): ConfigRead {
   const errors: string[] = [];
@@ -99,8 +99,7 @@ export type NeedResult = { ok: true; how: string; warning?: string } | { ok: fal
 
 /**
  * A need's lab line, its first line only: `LAB <need>: OK — <how>`; met with a warning (this run's build failed, the
- * app already installed is used — T2 S6b review round 1), `LAB <need>: WARN — <warning>: <how>`; not met, `LAB <need>:
- * ERROR — <why>`.
+ * app already installed is used), `LAB <need>: WARN — <warning>: <how>`; not met, `LAB <need>: ERROR — <why>`.
  */
 export function labLine(need: string, r: NeedResult): string {
   const label = `LAB ${need}`;
@@ -142,8 +141,8 @@ const cut = (text: string): string => {
  * one JSON object, its fields sorted — the need, the phase, the time, the command's base name, its args, its bound, its
  * exit — and, for a call that failed, its first line (stderr's before stdout's), no more of its output than a step line
  * says; no env. Each argument and that line cut at NEED_CALL_CHARS. The args keep the host paths a call names (the
- * checkout's, a build's): accepted (T2b review round 1) — the file lives in the run's lab folder, outside the checkout,
- * beside the run's other files that name them; the udid and serial are lab facts already there.
+ * checkout's, a build's): accepted — the file lives in the run's lab folder, outside the checkout, beside the run's
+ * other files that name them; the udid and serial are lab facts already there.
  */
 export function needCallLine(c: NeedCall): string {
   const { result: r } = c;
@@ -232,11 +231,11 @@ export interface RunLog {
 const STEP_TIME = /^\d\d:\d\d:\d\d /;
 
 /**
- * This run's ERROR lines, for the SUMMARY (T2 S6a review rounds 1–3, code review): its steps' (steps.log, timed) and
- * its logs', counted across them all first (a step's line by what it says, its time aside), one line per distinct ERROR
- * in first-seen order — said once in one log, bare; else `(×<total>, in <logs>)` — each cut so the whole is at most
- * DETAIL_CHARS; at most ERROR_LINES_SHOWN of them, then `… <n> more distinct ERROR lines (in <logs>)`. Then a NOTE for
- * each log that could not be read, naming its path and what is known of why: never skipped.
+ * This run's ERROR lines, for the SUMMARY: its steps' (steps.log, timed) and its logs', counted across them all first
+ * (a step's line by what it says, its time aside), one line per distinct ERROR in first-seen order — said once in one
+ * log, bare; else `(×<total>, in <logs>)` — each cut so the whole is at most DETAIL_CHARS; at most ERROR_LINES_SHOWN of
+ * them, then `… <n> more distinct ERROR lines (in <logs>)`. Then a NOTE for each log that could not be read, naming its
+ * path and what is known of why: never skipped.
  */
 export function logErrors(logs: readonly RunLog[]): string[] {
   const seen = new Map<string, { first: string; n: number; in: string[] }>();

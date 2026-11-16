@@ -48,7 +48,6 @@ export const A41_GROUPS = ['idb', 'wda'] as const;
 export type A41Group = (typeof A41_GROUPS)[number];
 
 export const A41_REPORT = 'a41-report';
-/** A group's block. */
 export const a41BlockId = (g: A41Group): string => `a41-${g}`;
 export const A41_BLOCK_IDS: readonly string[] = ['lab', ...A41_GROUPS.map(a41BlockId), A41_REPORT];
 
@@ -170,8 +169,8 @@ async function fit(ctx: BlockCtx<StandingKnobs>, sim: IosSim, name: string, warn
 
 /**
  * A block's children in order, each after its health check: a check whose reset failed ends them there — no more
- * checks or resets on the shared simulator (lab-run-ios.ts's way) — what is left said not run. `skip` names a child
- * that cannot run (the hit test with no golden JSON). The whys, in order.
+ * checks or resets on the shared simulator — what is left said not run. `skip` names a child that cannot run (the hit
+ * test with no golden JSON). The whys, in order.
  */
 async function children(
   ctx: BlockCtx<StandingKnobs>,

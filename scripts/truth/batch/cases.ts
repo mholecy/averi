@@ -26,8 +26,8 @@ import { nameInLine, verdictLine } from './words.js';
  */
 
 /**
- * What a live run was asked: the platform, the lab app, its sources and case ids (none: all). A `.cases` that also
- * holds `"kind": "new"` still reads: nothing reads it, and it is not asked for.
+ * What a live run was asked: the platform, the lab app, its sources and case ids (none: all). A field of a `.cases`
+ * not named here (a `"kind": "new"`, say) is ignored.
  */
 export interface Asked {
   platform: LiveSelection['platform'];

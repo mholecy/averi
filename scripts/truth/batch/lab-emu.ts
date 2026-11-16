@@ -278,14 +278,13 @@ export function freshApkOf(fs: BatchFs, dir: string): string {
 
 /**
  * Clear a lab default by reinstalling the pulled APK: the probe's state file marked dirty first — none there, or one
- * that cannot be marked, and nothing is uninstalled (code review: the protocol needs its dirty mark) — the chooser
- * dismissed, then uninstall and install (`progress` started — an abort from here asks `adb get-state` and `pm path`
- * before anything else); proven by `pm path`, the reinstalled APK's cells.json equal to main's catalog and --check
- * after with an exit that proves the lab put back (CHECK_OUTCOME: 0, 5 or 6 — a chooser up or a read that failed proves
- * nothing: review round 1), only then `progress` proven and the probe's state put back (`putBack`), so its state is
- * written clean only after the proof. Refused, nothing done, with no pulled APK or no catalog to compare with too. Each
- * step that fails gets its own hand line. A last-chosen entry is never reinstalled for: no reinstall clears it
- * (batch-11 measured).
+ * that cannot be marked, and nothing is uninstalled (the protocol needs its dirty mark) — the chooser dismissed, then
+ * uninstall and install (`progress` started — an abort from here asks `adb get-state` and `pm path` before anything
+ * else); proven by `pm path`, the reinstalled APK's cells.json equal to main's catalog and --check after with an exit
+ * that proves the lab put back (CHECK_OUTCOME: 0, 5 or 6 — a chooser up or a read that failed proves nothing), only
+ * then `progress` proven and the probe's state put back (`putBack`), so its state is written clean only after the
+ * proof. Refused, nothing done, with no pulled APK or no catalog to compare with too. Each step that fails gets its own
+ * hand line. A last-chosen entry is never reinstalled for: no reinstall clears it (batch-11 measured).
  */
 export async function clearLabEntry(emu: LabEmu, o: ReinstallOptions): Promise<Reinstalled> {
   const { fs } = emu;
@@ -386,12 +385,12 @@ const unknownDuringReinstall = (b: HandBase, why: string): Putback => ({ ok: fal
 /**
  * The chooser's dirty window (abort.ts): its restore this module's, over the abort's detached runner — `adb get-state`
  * first (unreachable: nothing pressed; if the reinstall had started, the install is unknown, never "missing" and never
- * "put back"; if not, nothing could be read or put back, with the check hand line; review round 1); BACK and HOME; when
- * interrupted inside the reinstall, the install read: missing is installed again from the pulled APK, and the lab
- * installed — again or found so — is proven by its cells.json as the reinstall proves it, or not put back; the probe's
- * state put back (`putBack`) whenever its state file is not clean (review round 4); then --check (BACK and HOME again
- * on a chooser), judged by CHECK_OUTCOME: the cleanup's word and words, exit by exit, a WARN put back for 6. Its hand
- * lines name the exact step, and an uninstall only for a default measured.
+ * "put back"; if not, nothing could be read or put back, with the check hand line); BACK and HOME; when interrupted
+ * inside the reinstall, the install read: missing is installed again from the pulled APK, and the lab installed — again
+ * or found so — is proven by its cells.json as the reinstall proves it, or not put back; the probe's state put back
+ * (`putBack`) whenever its state file is not clean; then --check (BACK and HOME again on a chooser), judged by
+ * CHECK_OUTCOME: the cleanup's word and words, exit by exit, a WARN put back for 6. Its hand lines name the exact step,
+ * and an uninstall only for a default measured.
  */
 export function chooserWindow(emu: LabEmu, o: ChooserWindowOptions): WindowSpec {
   const base = handBaseOf(emu, o);
@@ -406,8 +405,8 @@ export function chooserWindow(emu: LabEmu, o: ChooserWindowOptions): WindowSpec 
         if (proof !== undefined) return proof;
       }
       // The probe's restore whenever its state file is not clean: it also undoes what the probe changed itself (it
-      // force-stops the lab, puts its state file back), whatever the reinstall did (review round 4); a note, after it
-      // verified, when no reinstall started: nothing was wiped, the state put back.
+      // force-stops the lab, puts its state file back), whatever the reinstall did; a note, after it verified, when no
+      // reinstall started: nothing was wiped, the state put back.
       let kept = '';
       if (o.putBack !== undefined) {
         if (o.stateFile !== undefined && stateOf(lab.fs, o.stateFile) === 'clean') kept = "; the probe's state file is clean: nothing to put back";
