@@ -5,9 +5,8 @@ import { appHealth } from '../../src/run/app-health.js';
 import { FakeAdapter, node } from '../helpers/fake.js';
 
 /**
- * App health (run/app-health.ts): the `appAlive:` line and the crash scan behind it. The line's
- * callers are pinned with it in tests/run/commands.test.ts and tests/run/verify.test.ts; what is pinned here is the
- * line itself and its one failure policy — every device failure is worded into the line, and nothing else is caught.
+ * App health (run/app-health.ts): the `appAlive:` line and the crash scan behind it. What is pinned here is the line
+ * itself and its one failure policy — every device failure is worded into the line, and nothing else is caught.
  */
 
 const CFG = parseConfig(
@@ -80,7 +79,6 @@ describe('crash scanning is platform-specific', () => {
 });
 
 describe('the crash excerpt', () => {
-  // Until A29 verify/assert.ts's scanForCrashes, tested there on its own; the scan has one reader, this line.
   it('keeps an Android fatal exception with its trailing stack context, and no line before it', async () => {
     const dead = fake('android');
     dead.appRunning = false;
@@ -124,9 +122,9 @@ describe('the crash excerpt', () => {
 });
 
 /**
- * The one failure policy (A29). appHealth's four callers — ensure_state, run_flow, assert and a verify leg — await
- * it bare, because it words every DEVICE failure into the line itself; what it does not catch is an adapter breaking
- * its contract, which fails each caller's call alike (their own tests pin that).
+ * The one failure policy (A29). Its callers await appHealth bare, because it words every DEVICE failure into the line
+ * itself; what it does not catch is an adapter breaking its contract, which fails each caller's call alike (their own
+ * tests pin that).
  */
 describe('one failure policy: the device\'s failures are the line\'s, nothing else is caught', () => {
   it('a question the device cannot answer is `unknown`, on either platform, naming the platform\'s check', async () => {

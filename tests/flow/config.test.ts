@@ -86,8 +86,9 @@ flows:
   });
 
   // Device check, 2026-10-08: a YAML syntax error escaped as the bare
-  // library message, naming no file — the config-policy table promises every
-  // broken averi.yaml fails a call naming it.
+  // library message, naming no file — flow/tool-config.ts's rule is that a
+  // present-but-invalid averi.yaml fails every call that reads it, naming the
+  // file.
   it('a YAML syntax error is `Invalid <source>: …`, naming the file, with the line and column kept and the parser error as cause', () => {
     const broken = 'app: {}\nflows: { f:\n  steps:\n    - tap: x\n}\n';
     let thrown: unknown;
@@ -103,9 +104,9 @@ flows:
   });
 
   // D86: a step is judged by its one key — the kind it names — and that kind's own issues are said with their path.
-  // Under the union of every kind, a wrong TYPE inside a step's object collapsed to "Unrecognized key(s) in object:
-  // 'scroll_until'" at the step: zod's union reported the first member that failed only softly — the platform override,
-  // the last member, its fields all optional — never the member the step's key named.
+  // Under the union of every kind, a wrong TYPE inside a step's object would collapse to "Unrecognized key(s) in
+  // object: 'scroll_until'" at the step: zod's union reports the first member that failed only softly — the platform
+  // override, the last member, its fields all optional — never the member the step's key named.
   describe('a step is judged by its one key, and its own issues are said with their path (D86)', () => {
     const load = (stepYaml: string) => () => parseConfig(`app: {}\nflows:\n  f:\n    steps:\n      ${stepYaml}\n`);
     const only = (line: string) => new RegExp(`^Invalid averi\\.yaml:\\n {2}${line.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
@@ -121,9 +122,9 @@ flows:
       expect(load(stepYaml)).toThrow(only(line));
     });
 
-    // A19: a duration is one schema (util/duration.ts#durationSchema), checked at load. Until A19 `timeout` was any
-    // string — `"5 sec"` loaded clean and parseDuration threw a plain Error when the step ran, which a reach rung
-    // escalated past and an `optional:` logged as skipped. Every step kind that takes a timeout, one row each.
+    // A19: a duration is one schema (util/duration.ts#durationSchema), checked at load. Were `timeout` any string,
+    // `"5 sec"` would load clean and parseDuration throw a plain Error when the step ran, which a reach rung would
+    // escalate past and an `optional:` log as skipped. Every step kind that takes a timeout, one row each.
     const BAD_DURATION = 'Invalid duration "5 sec" — use e.g. 500ms, 15s, 2m';
     it.each([
       ['tap', '- tap: { id: x, timeout: 5 sec }', 'flows.f.steps.0.tap.timeout'],
@@ -181,7 +182,6 @@ flows:
     });
 
     it('beside a platform key, two unknown keys or a kind make a step of several keys', () => {
-      // Two unknown keys beside it, or a kind beside it, is a step of several keys.
       expect(load('- { android: { tap: { id: a } }, iOS: { tap: { id: i } }, web: { tap: { id: w } } }')).toThrow(
         only(`flows.f.steps.0: a step has exactly one key, ${ONE_OF}; this one has 3: android, iOS, web`),
       );
@@ -203,9 +203,10 @@ flows:
       expect(load(stepYaml)).toThrow(only(`flows.f.steps.0: a step is a mapping of one key, ${ONE_OF} — received ${got}`));
     });
 
-    // The repo keeps no averi.yaml of its own; its machine-readable flows are the docs' yaml examples. Every one that
-    // holds whole flows (references/averi-yaml.md's are fragments, `steps: [ … ]`) parses — given an empty `app:` where
-    // the example leaves it out — to the very steps it was written as.
+    // The repo keeps no averi.yaml of its own; its machine-readable flows are the docs' yaml examples. Every one in
+    // README.md, SETUP.md, ARCHITECTURE.md and skill/SKILL.md that holds whole flows (references/averi-yaml.md's are
+    // fragments, `steps: [ … ]`) parses — given an empty `app:` where the example leaves it out — to the very steps it
+    // was written as.
     type FlowExample = { app?: unknown; flows: Record<string, { steps: unknown[] }> };
     /** A yaml example of whole flows: each flow's steps a list of mappings, not a fragment (`steps: [ … ]`). */
     const isWholeFlowsExample = (raw: unknown): raw is FlowExample =>
@@ -425,8 +426,8 @@ flows:
     ).toThrow(/Invalid averi\.yaml/);
   });
 
-  // C3 (2026-10-07): an `assert:` step's match is validated when averi.yaml
-  // is parsed — it used to load clean and throw mid-flow, on a device.
+  // C3: an `assert:` step's match is validated when averi.yaml is parsed —
+  // unchecked, it would load clean and throw mid-flow, on a device.
   it('rejects an assert step whose match is not a valid regex, naming the step\'s path', () => {
     expect(() =>
       parseConfig('app: {}\nflows:\n  f:\n    steps:\n      - assert:\n          - { element: { id: x }, match: "(" }\n'),
@@ -444,8 +445,8 @@ flows:
   });
 
   /**
-   * Stage B (2026-10-07): `app.ios.keyboardDismiss`, the ordered, opt-in
-   * list the keyboard guard taps from (docs/bugs/2026-10-05-ios-tap-lands-
+   * Stage B: `app.ios.keyboardDismiss`, the ordered, opt-in list the
+   * keyboard guard taps from (docs/bugs/2026-10-05-ios-tap-lands-
    * on-soft-keyboard.md, "Fix (stage B)").
    */
   describe('app.ios.keyboardDismiss', () => {
@@ -492,7 +493,7 @@ flows:
       expect(parseConfig(ios('    keyboardDismiss:\n      - tap: { role: text, text: "Login" }\n')).app.ios?.keyboardDismiss).toEqual([{ tap: { role: 'text', text: 'Login' } }]);
     });
 
-    /** Review round 1: the key under the default tree source cannot act — said once at load time (flow/load.ts), decided here. */
+    /** Review round 1: the key under a pinned `treeSource: idb` cannot act — said once at load time (flow/load.ts), decided here. */
     describe('inertKeyboardDismissNote — the key set where the tree marks no keyboard', () => {
       const LIST = '    keyboardDismiss:\n      - accessory: true\n';
       it('treeSource: idb written out: the note names it and the fix', () => {

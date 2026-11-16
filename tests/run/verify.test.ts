@@ -17,19 +17,17 @@ import { boundReads } from '../helpers/terminal-read.js';
 import { Shot } from '../../src/verify/shot.js';
 
 /**
- * These cover the `verify` orchestration, which until this refactor lived
- * inline in mcp/server.ts behind a module-scope stdio connect and so could not
- * be imported at all. The behaviours worth pinning are the CONTAINMENT ones: a
- * device run takes minutes, and no downstream failure may throw its traces,
- * assert results and screenshots away.
+ * These cover the `verify` orchestration. The behaviours worth pinning are
+ * the CONTAINMENT ones: a device run takes minutes, and no downstream failure
+ * may throw its traces, assert results and screenshots away.
  */
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on: a leg's
 // settle wait and a failed tree read's retries are sequences of delays, and
-// the sequence is what the production budget IS (review 2026-10-03, round
-// 2). Yields a macrotask so deadline loops stay cooperative.
+// the sequence is what the production budget IS. Yields a macrotask so
+// deadline loops stay cooperative.
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
-// The one OCR decision of a run is COUNTED, not changed (2026-10-08, C1):
+// The one OCR decision of a run is COUNTED, not changed (C1):
 // the real rule runs, so every other test here sees the behaviour it always
 // did.
 vi.mock('../../src/verify/ocr.js', async (importOriginal) => {
@@ -76,7 +74,7 @@ const request = (over: Partial<Parameters<typeof runVerification>[0]> = {}) => (
   specs: [],
   baselineDir: '/tmp/averi-test-baselines',
   ...over,
-  // Required by the run (a forgotten one reset the count per call); each
+  // Required by the run (a forgotten one would reset the count per call); each
   // request is a session of its own unless the test hands one in.
   session: over.session ?? new EngineSession(),
 });
@@ -110,11 +108,11 @@ describe('runVerification legs', () => {
   });
 
   /**
-   * Until 2026-10-02 the leg took a BARE screenshot after the asserts, so the
-   * frame returned to the caller — and fed to the color and text tables — could
-   * be a mid-animation one, the exact frame the color assert's own doc rules
-   * out as a verdict. The leg now waits for the frame to settle the way the
-   * `screenshot` tool does: two identical consecutive captures.
+   * A BARE screenshot after the asserts — the frame returned to the caller,
+   * and fed to the color and text tables — could be a mid-animation one, the
+   * exact frame the color assert's own doc rules out as a verdict. The leg
+   * waits for the frame to settle the way the `screenshot` tool does: two
+   * identical consecutive captures.
    */
   it('returns the SETTLED frame, not the first capture after the asserts', async () => {
     const adapter = fake('android');
@@ -156,7 +154,7 @@ describe('runVerification legs', () => {
   // The leg's health line speaks for the app at the END of its final frame's
   // settle (an app that dies while the frame settles reads dead), so the
   // question is asked only once the last capture is in — unlike
-  // ensure_state's, which runs beside its frame (D13, 2026-10-31,
+  // ensure_state's, which runs beside its frame (D13,
   // tests/run/commands.test.ts). The answer is held until a capture starts,
   // or a timeout, so a health check run beside the frame would show.
   it('the leg asks whether the app runs only after its final frame is in — the health line speaks for the settled screen', async () => {
@@ -196,8 +194,6 @@ describe('runVerification legs', () => {
     expect(out.screenshots).toHaveLength(1);
   });
 
-  // The same gap the single-platform tools had (review 2026-10-03): nothing
-  // checked that the request's environment reaches the leg's engine.
   it('runs each leg in the environment the request names: the trace opens with it; without one it names none', async () => {
     const cfg = parseConfig(`
 app:
@@ -221,7 +217,7 @@ flows:
     expect((await run()).sections[0]).not.toContain('environment');
   });
 
-  // run/preflight.ts#refuseUnknownEnvironment has the why (2026-10-05).
+  // run/preflight.ts#refuseUnknownEnvironment has the why.
   it('an environment averi.yaml does not declare is refused before ANY adapter is resolved — no leg runs', async () => {
     const cfg = parseConfig(`
 app:
@@ -261,7 +257,7 @@ flows: {}
   });
 });
 
-// D21 review (2026-10-31): a tree read no wait cures (idb's wedged accessibility service) fails the leg's asserts,
+// D21 review: a tree read no wait cures (idb's wedged accessibility service) fails the leg's asserts,
 // each after one read, and the leg keeps its section, its frame's screenshot (idb's capture is unaffected by the wedge)
 // and its health line — it is not rejected whole.
 describe('a leg whose tree read no wait cures', () => {
@@ -334,15 +330,7 @@ describe('parity containment', () => {
 });
 
 /**
- * 2026-10-03: the contract's field VALUES are checked before the legs. The
- * schema leaves them `unknown` so the comparators word the diagnosis; until
- * this, that diagnosis only surfaced as `FAILED:` in a table after both legs
- * had run. Pinned here: the refusal happens before ANY adapter is resolved or
- * touched, lists every problem by dimension, and asks only the dimensions
- * whose table the contract would produce.
- */
-/**
- * The false WITHIN TOLERANCE of the 2026-10-07 parity review (P1). A tree
+ * The false WITHIN TOLERANCE of the parity review (P1). A tree
  * whose content starts inset — a filtered dump, or idb's flat source with no
  * window rect under its 0x0 root — reads its CONTENT width (384) as the
  * screen's. On a 402-pt screen whose card is 368 wide against a contract
@@ -414,6 +402,14 @@ describe('a leg without a tree — the one no-tree wording every table shares', 
   });
 });
 
+/**
+ * The contract's field VALUES are checked before the legs. The schema leaves
+ * them `unknown` so the comparators word the diagnosis; unchecked, that
+ * diagnosis would surface only as `FAILED:` in a table after both legs had
+ * run. Pinned here: the refusal happens before ANY adapter is resolved or
+ * touched, lists every problem by dimension, and asks only the dimensions
+ * whose table the contract would produce.
+ */
 describe('the contract is validated before the legs', () => {
   /** An adapter seam that records being asked for anything at all. */
   const untouched = () => {
@@ -475,10 +471,10 @@ describe('the contract is validated before the legs', () => {
     expect(calls).toEqual([]);
   });
 
-  // 2026-10-03: the run reads the contract itself when handed a PATH, so the
-  // whole pre-flight — exists, parses, carries usable values — has one owner
-  // and happens before any adapter is resolved. The path is also the name the
-  // refusal quotes (it was a separate `contractSource` field before).
+  // The run reads the contract itself when handed a PATH, so the whole
+  // pre-flight — exists, parses, carries usable values — has one owner and
+  // happens before any adapter is resolved. The path is also the name the
+  // refusal quotes.
   describe('given a contractPath, the run loads the file itself', () => {
     const inTempDir = async <T>(run: (dir: string) => Promise<T>): Promise<T> => {
       const dir = await mkdtemp(join(tmpdir(), 'averi-contract-'));
@@ -630,7 +626,7 @@ describe('the contract is validated before the legs', () => {
   // The schema header's decision, honoured: a field is only a reason to refuse
   // if a table this contract PRODUCES would read it. No anchor opts into
   // colour or text here, so neither tolerance is ever parsed — by the run or
-  // by the validation — and the run goes ahead exactly as it did before.
+  // by the validation — and the run goes ahead.
   it('a geometry-only contract is never refused for a colour or text field', async () => {
     const geometryOnly: LayoutContract = {
       screen: 's',
@@ -730,7 +726,7 @@ describe('color parity opt-in', () => {
 
 describe('the device screen behind the pixel tables', () => {
   /**
-   * Both pixel dimensions scale by the device's own screen size now
+   * Both pixel dimensions scale by the device's own screen size
    * (docs/bugs/2026-08-26-png-scale-needs-out-of-tree-screen-size.md). A leg
    * that could not read one still produces its tables — from the tree, saying
    * so, because a table scaled off the tree is the reading both 2026-08-26
@@ -885,10 +881,10 @@ describe('text parity opt-in', () => {
   });
 
   /**
-   * The png scale is now derived inside the leg (verify/capture.ts) rather
-   * than inside the parity tables' containment. A tree the geometry walk
-   * cannot traverse used to be caught by paritySection; it must still cost
-   * only the tables, never the leg's trace, asserts and screenshot.
+   * The png scale is derived inside the leg (verify/capture.ts) rather than
+   * inside the parity tables' containment. A tree the geometry walk cannot
+   * traverse must still cost only the tables, never the leg's trace, asserts
+   * and screenshot.
    */
   it('a tree the scale walk cannot traverse fails the tables, not the leg', async () => {
     const adapter = fake('android');
@@ -913,7 +909,7 @@ describe('text parity opt-in', () => {
     expect(color).toMatch(/FAILED: color parity: android: the png scale could not be derived from this tree/);
     const text = out.sections.find((s) => s.startsWith('## text parity'));
     expect(text).toContain('OCR failed — text parity: the png scale could not be derived from this tree');
-    // The rect table reads the frame's window, which carries the same kind of reason (2026-10-07).
+    // The rect table reads the frame's window, which carries the same kind of reason.
     const rect = out.sections.find((s) => s.startsWith('## rect parity'));
     expect(rect).toMatch(/FAILED: rect parity: android: the window width could not be derived from this tree/);
   });
@@ -921,7 +917,7 @@ describe('text parity opt-in', () => {
 
 describe('paritySection — the containment every table shares', () => {
   /**
-   * `collect` is the one async extension point under the tables (2026-10-04):
+   * `collect` is the one async extension point under the tables:
    * the next dimension's measurement lands there. Today's collectors degrade
    * to notes themselves; this pins that a collector which THROWS still costs
    * only its leg — the other leg's artifact is compared, the section stands,
@@ -990,10 +986,10 @@ describe('the recognizer is decided only for a contract that opts into text', ()
 
 describe('OCR unavailable — one reason, quoted by both callers', () => {
   /**
-   * The `ocr` assert and the text table used to each decide "can OCR run
-   * here" themselves (2026-10-04: one rule, verify/ocr.ts#ocrEngineFor). A
-   * drift between the two would let one caller skip a check the other
-   * refused; so both are pinned to the SAME sentence from the same source.
+   * The `ocr` assert and the text table decide "can OCR run here" by one
+   * rule, verify/ocr.ts#ocrEngineFor. A drift between the two would let one
+   * caller skip a check the other refused; so both are pinned to the SAME
+   * sentence from the same source.
    */
   it('the text table degrades with the note and the ocr assert fails closed, both naming the one reason', async () => {
     const real = Object.getOwnPropertyDescriptor(process, 'platform')!;
@@ -1025,12 +1021,11 @@ describe('OCR unavailable — one reason, quoted by both callers', () => {
 
 describe('one OCR choice per run — the text table and every leg\'s ocr asserts', () => {
   /**
-   * Review 2026-10-07 (assert-capture-ocr C1): `req.ocrEngine` reached only
-   * the text table; each leg's Verifier chose the host's engine itself, so a
-   * run-level fake never reached the ocr asserts and a two-platform run built
-   * up to three VisionOcr instances, each probing `swiftc --version`. The
-   * run now decides once (`ocrEngineFor`, counted through the mock above)
-   * and hands the same choice to the table and to both legs.
+   * C1: the run decides once (`ocrEngineFor`, counted through the mock
+   * above) and hands the same choice to the table and to both legs. Were each
+   * leg's Verifier to choose the host's engine itself, a run-level fake would
+   * never reach the ocr asserts and a two-platform run would build up to
+   * three VisionOcr instances, each probing `swiftc --version`.
    */
   const recording = () => {
     const regionIds: string[] = [];
@@ -1134,12 +1129,12 @@ describe('flow composition', () => {
   });
 
   /**
-   * One leg is ONE engine run (2026-10-07, flow-engine review candidate 1).
-   * Until then the leg called the engine's two entries in turn, each of which
-   * started its own trace: a flow that failed after the state was ensured
-   * threw a FlowError carrying the FLOW's steps only, so the FAILED section
-   * had no `state ready: already active` line — and after a ladder, no
-   * `⚠ clearState` line for the wipe the call had already paid for.
+   * One leg is ONE engine run. Were the leg to call a state entry and a flow
+   * entry in turn, each starting its own trace, a flow that failed after the
+   * state was ensured would throw a FlowError carrying the FLOW's steps only,
+   * so the FAILED section would have no `state ready: already active` line —
+   * and after a ladder, no `⚠ clearState` line for the wipe the call had
+   * already paid for.
    */
   it('a flow that fails after the state was ensured keeps the state\'s lines in the FAILED section', async () => {
     const wiping = parseConfig(
@@ -1257,8 +1252,7 @@ describe('tree read is gated and ordered', () => {
   });
 
   /**
-   * Until 2026-10-02 the leg read the tree and THEN took its screenshot. The
-   * captured frame inverts that: the png first, until it settles, then the
+   * The captured frame takes the png first, until it settles, then the
    * tree. The settled png is the evidence the screen stopped moving, and
    * uiautomator reports LIVE bounds during an animation — a tree read before
    * the wait could carry mid-animation rects against a settled png, and every
@@ -1317,11 +1311,10 @@ describe('color parity per-leg notes', () => {
 });
 
 /**
- * A leg whose final capture THROWS (2026-10-08: the adapter refuses an empty
- * or non-PNG capture, adapters/screenshot-bytes.ts) keeps everything the leg
- * already did — trace, asserts, health — with one `⚠ screenshot:` line and no
- * image (run/run-reply.ts#finalFrame). Until then the throw rejected the leg and
- * the section read only "FAILED: …".
+ * A leg whose final capture THROWS (the adapter refuses an empty or non-PNG
+ * capture, adapters/screenshot-bytes.ts) keeps everything the leg already did
+ * — trace, asserts, health — with one `⚠ screenshot:` line and no image
+ * (run/run-reply.ts#finalFrame).
  */
 describe('a leg whose final screenshot is refused', () => {
   const STATE_CFG = parseConfig(

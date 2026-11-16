@@ -7,9 +7,9 @@ import type { Verdict } from '../../src/ui-tree/verdict.js';
 import { node, screen } from '../helpers/fake.js';
 
 /**
- * flow/condition.ts as a table, no adapter (2026-10-08, flow-engine review
- * candidate 2): the three-valued leaf rule against a rendered and a bare
- * tree, and Kleene's any/all over arms of every value.
+ * flow/condition.ts as a table, no adapter: the three-valued leaf rule
+ * against a rendered and a bare tree, and Kleene's any/all over arms of every
+ * value.
  */
 
 const VIEWPORT = { width: 1000, height: 2000 };

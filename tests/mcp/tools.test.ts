@@ -42,9 +42,9 @@ import { IDB_TYPEABLE, WDA_TYPEABLE } from '../../src/adapters/ios-typing.js';
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 
 // File reads are COUNTED, never changed: the real readFile answers, and the
-// path of every call is kept, so "a tap reads averi.yaml once" (K3,
-// 2026-10-07) can be pinned on the file system rather than on stderr, where
-// the loader's once-per-file memo hides a second load.
+// path of every call is kept, so "a tap reads averi.yaml once" (K3) can be
+// pinned on the file system rather than on stderr, where the loader's
+// once-per-file memo hides a second load.
 const reads = vi.hoisted(() => ({ paths: [] as string[] }));
 vi.mock('node:fs/promises', async (importOriginal) => {
   const real = await importOriginal<typeof import('node:fs/promises')>();
@@ -83,8 +83,8 @@ const booted = (platform: Platform): Device => ({
  * A server built by the module under test, over a registry whose factory
  * hands out the test's fakes, connected to a real SDK client in memory.
  * `factoryCalls` records every adapter the registry asked for and every
- * device listing it made (an entry without a deviceId — the discovery seam,
- * since 2026-10-08) — which is how "no device was touched" is asserted.
+ * device listing it made (an entry without a deviceId — the discovery seam)
+ * — which is how "no device was touched" is asserted.
  *
  * Without arguments both platforms get a `home()` device, returned as
  * `fakes`; a test that needs a particular screen passes its own.
@@ -201,10 +201,10 @@ describe('the server itself', () => {
     expect(TOOL_NAMES).toHaveLength(18);
   });
 
-  // 2026-10-08: the policy table (mcp/config-policy.ts#TOOL_CONFIG) declares
-  // what every config-reading tool reads. A tool given a `configPath` but
-  // missing from the table would choose its own loader again; one in the
-  // table without the argument could not be pointed at a config.
+  // The policy table (mcp/config-policy.ts#TOOL_CONFIG) declares what every
+  // config-reading tool reads. A tool given a `configPath` but missing from
+  // the table would choose its own loader; one in the table without the
+  // argument could not be pointed at a config.
   it('the tools that take a configPath are exactly the ones the config policy table declares', async () => {
     const { client } = await connect();
     const { tools } = await client.listTools();
@@ -323,13 +323,6 @@ describe('ensure_state and run_flow — the flow tools', () => {
     expect(result.text).toContain('environment staging');
   });
 
-  /**
-   * The `⚠ clearState` line's running count is the SESSION's — the server's,
-   * shared by every tool that runs the engine. Until 2026-10-07 it was a
-   * module-level `let` in flow/engine.ts: a second server in the same process
-   * (every test file, and anything that embeds createAveriServer) continued
-   * the first one's count, and the engine's tests reset it by hand.
-   */
   // The pre-flight (run/preflight.ts#refuseUnknownEnvironment) through the
   // protocol: each engine tool answers isError, naming the environment.
   it.each(['run_flow', 'ensure_state', 'verify'])('%s: an `environment` averi.yaml does not declare is an error naming it', async (tool) => {
@@ -347,9 +340,7 @@ describe('ensure_state and run_flow — the flow tools', () => {
     expect(bound()).toEqual([]); // refused before any device
   });
 
-  // `required` + env (flow/tool-config.ts): moved here from
-  // tests/run/commands.test.ts on 2026-10-08, when the read moved up into
-  // the handler.
+  // `required` + env (flow/tool-config.ts).
   it.each([
     ['run_flow', 'missing', async () => missing()],
     ['run_flow', 'invalid', invalidConfig],
@@ -375,6 +366,10 @@ describe('ensure_state and run_flow — the flow tools', () => {
     expect(envReads()).toBe(1);
   });
 
+  /**
+   * The `⚠ clearState` line's running count is the SESSION's — the server's,
+   * shared by every tool that runs the engine.
+   */
   it('the clearState count belongs to the server: its three engine tools share it, both verify legs too, a second server starts at 1', async () => {
     const configPath = await file(
       'averi.yaml',
@@ -418,9 +413,8 @@ describe('ensure_state and run_flow — the flow tools', () => {
     expect(counts(fresh.text)).toEqual([1]);
   });
 
-  // 2026-10-09: launch_app wipes as a flow's launch step does, and until then
-  // it neither said so nor counted — a direct wipe was invisible to the
-  // session's count. Now the one launch (flow/launch.ts) does both for both.
+  // launch_app wipes as a flow's launch step does: the one launch
+  // (flow/launch.ts) says so and counts the wipe for both.
   it('launch_app { clearState: true } is counted in the same session and replies with the flow\'s ⚠ clearState line', async () => {
     const configPath = await file('averi.yaml', VALID_CONFIG + '  wipe:\n    steps:\n      - launch: { clearState: true }\n');
     const { call } = await connect();
@@ -539,11 +533,10 @@ describe('launch_app — the entry activity', () => {
     expect(launches).toEqual([{ appId: 'md.bank.app', clearState: undefined, activity: undefined, intent }]);
   });
 
-  // 2026-10-03: one rule for both ways of launching. Until then a flow step
-  // put app.android.activity beside an intent and the tool did not; what is
-  // pinned is that the adapter cannot tell the two callers apart, in any of
-  // the four cases — not what either hands over (the tests above and
-  // tests/flow/engine.test.ts "launch step" own that).
+  // One rule for both ways of launching: what is pinned is that the adapter
+  // cannot tell the two callers apart, in any of the four cases — not what
+  // either hands over (the tests above and tests/flow/engine.test.ts "launch
+  // step" own that).
   it.each([
     ['neither', {}, '.MainActivity'],
     ['an activity', { activity: '.ShareActivity' }, '.ShareActivity'],
@@ -564,8 +557,8 @@ describe('launch_app — the entry activity', () => {
     expect(byTool).toEqual({ appId: 'md.bank.app', ...entry, activity });
   });
 
-  // 2026-10-09: what the adapter's launch says (AppHolder's `unknown` — iOS's
-  // foreground wait, adapters/ios-foreground.ts) reaches the reply.
+  // What the adapter's launch says (AppHolder's `unknown` — iOS's foreground
+  // wait, adapters/ios-foreground.ts) reaches the reply.
   it("the launch's note reaches the reply as a ⚠ line; a launch with none replies with the one line", async () => {
     const ios = home();
     ios.launchDetail = '3 s after launching md.bank.app, the UI tree was still the app labelled "Contacts"';
@@ -586,7 +579,7 @@ describe('launch_app — the entry activity', () => {
     expect(result.text).toBe(`Launched md.bank.app on ios\n⚠ ${ios.launchDetail}`);
   });
 
-  // D49a (2026-11-02): open_deep_link hands the iOS adapter the project's app — a link to its own scheme waits until it
+  // D49a: open_deep_link hands the iOS adapter the project's app — a link to its own scheme waits until it
   // is in front (adapters/ios.ts#openDeepLink) — and the adapter's note reaches the reply as launch_app's does.
   it("open_deep_link on ios hands the adapter averi.yaml's bundle id, and the link's note reaches the reply as its ⚠ line", async () => {
     const ios = home();
@@ -624,8 +617,8 @@ describe('launch_app — the entry activity', () => {
     expect(launches[0].activity).toBeUndefined();
   });
 
-  // 2026-10-08: until then a catch-all launched here without the activity —
-  // on a debug build bundling LeakCanary, the wrong app, silently.
+  // A catch-all launching here without the activity would start — on a debug
+  // build bundling LeakCanary — the wrong app, silently.
   it('android, nothing named, an INVALID averi.yaml → an error naming the file, nothing launched, no device bound', async () => {
     const { call, fakes, bound } = await connect();
     const configPath = await invalidConfig();
@@ -636,8 +629,8 @@ describe('launch_app — the entry activity', () => {
     expect(bound()).toEqual([]);
   });
 
-  // The same broken file beside a call that would use nothing from it: not read. (iOS reads it since D41, for the
-  // tree source — its own describe below.)
+  // The same broken file beside a call that would use nothing from it: not read. (iOS reads it for the tree source,
+  // D41 — its own describe below.)
   it.each([
     ['android, an activity named', 'android', { activity: '.ShareActivity' }],
     ['android, an intent given', 'android', { intent: { action: 'android.intent.action.SEND' } }],
@@ -809,9 +802,9 @@ describe('type_text on the measured iOS idb floating label (2026-10-08)', () => 
   });
 });
 
-// interact/type-text.ts (code review 2026-10-07): the device check saw the
-// tool's selector tap go out before the Android adapter refused a tab. Now the
-// refusal comes first, on both platforms, with or without a selector.
+// interact/type-text.ts: the device check saw the tool's selector tap go out
+// before the Android adapter refused a tab. The refusal comes first, on both
+// platforms, with or without a selector.
 describe('type_text refuses a control character before anything is sent', () => {
   const form = () => new FakeAdapter({ form: screen(el({ role: 'textfield', identifier: 'amount_input', value: '2.50' })) }, 'form');
 
@@ -1024,10 +1017,10 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
     expect(empty.texts[1]).toMatch(/^⚠ The tree is bare: 1 node, nothing of the app's/);
   });
 
-  // 2026-10-06 (docs/bugs/2026-10-06-ios-idb-empty-tree-persists-on-pin-
-  // screen.md): idb's stuck 0×0 tree is a read error at the source now, so
-  // ui_snapshot no longer shows it as a bare `[]` — the call fails, carrying
-  // the cause and the advice.
+  // docs/bugs/2026-10-06-ios-idb-empty-tree-persists-on-pin-screen.md: idb's
+  // stuck 0×0 tree is a read error at the source, so ui_snapshot does not
+  // show it as a bare `[]` — the call fails, carrying the cause and the
+  // advice.
   it('ui_snapshot: an idb read that returns no tree (IdbEmptyTreeError) is an error result naming the cause and the way out', async () => {
     const stuck = new FakeAdapter({}, 'none');
     stuck.uiTree = async () => {
@@ -1077,8 +1070,8 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
     expect(result.text).toContain("idb cannot read the UI tree: the simulator's accessibility service named no frontmost application");
   });
 
-  // 2026-10-08 (docs/plans/2026-10-08-round3-phase2-device-check.md, finding
-  // 5): ui_snapshot is the one-shot read that asks the adapter to wait out a
+  // docs/plans/2026-10-08-round3-phase2-device-check.md, finding 5:
+  // ui_snapshot is the one-shot read that asks the adapter to wait out a
   // launch transient — Android's null root, iOS idb's empty tree — so it must
   // pass `settle: true`; the retry itself is the adapter's (ios.test.ts,
   // android.test.ts). Both platforms, since the handler does not branch.
@@ -1107,9 +1100,8 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
   /**
    * The same policy for every tool in the group, not only ui_snapshot: each
    * declares it in mcp/config-policy.ts#TOOL_CONFIG and reads through the one
-   * loader (2026-10-08; until then a shared helper, which an `it.each` over
-   * tap, type_text and scroll_until pinned for the ios-invalid row only). `assert` is in the iOS half only — on
-   * android it reads averi.yaml for its health line (its own describe).
+   * loader. `assert` is in the iOS half only — on android it reads averi.yaml
+   * for its health line (its own describe).
    */
   const TREE_CALLS: Record<string, Record<string, unknown>> = {
     ui_snapshot: { filter: 'id:home_root' },
@@ -1161,7 +1153,7 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
     expect(bound).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'wda' }]);
   });
 
-  // Until D41 coordinates read no config, and stroked on another adapter than a direction in a wda project.
+  // Reading no config, coordinates would stroke on another adapter than a direction in a wda project (D41).
   it('ios swipe: a direction and coordinates alike go through the configured source', async () => {
     const harness = await connect();
     const configPath = await file('averi.yaml', 'app:\n  ios: { bundleId: md.bank.app, treeSource: wda }\n');
@@ -1173,15 +1165,15 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
 });
 
 /**
- * D41 (2026-11-01): one adapter per simulator and configured tree source, for EVERY tool. Until then the eight tools
- * below asked the registry without a kind, so in a `treeSource: wda` project they were served by a second, idb-kind
- * adapter — a second idb helper, launch_app's foreground wait and terminate_app's front-app memory on the wrong
- * adapter, a screenshot from another source than assert's frames, a coordinate swipe stroked on another adapter than
- * a direction swipe. Each now reads the project's tree source like the tree tools (ADR 0032, amendment D41).
+ * D41: one adapter per simulator and configured tree source, for EVERY tool. Asking the registry without a kind, the
+ * eight tools below would be served in a `treeSource: wda` project by a second adapter — launch_app's foreground wait
+ * and terminate_app's front-app memory on the wrong adapter, a screenshot from another source than assert's frames, a
+ * coordinate swipe stroked on another adapter than a direction swipe. Each reads the project's tree source like the
+ * tree tools (ADR 0032, amendment D41).
  */
 describe('every tool gets the project\'s adapter — one per simulator and configured tree source (D41)', () => {
   const WDA_PROJECT = 'app:\n  ios: { bundleId: md.bank.app, treeSource: wda }\n';
-  /** The eight tools that once asked kind-less: what an iOS call of each needs, and an Android one where it differs. */
+  /** D41's eight tools: what an iOS call of each needs, and an Android one where it differs. */
   interface DeviceCall {
     tool: string;
     label: string;
@@ -1213,14 +1205,12 @@ describe('every tool gets the project\'s adapter — one per simulator and confi
    * EVERY tool that resolves a device — the policy table's tools, which tests below pin to be exactly the ones whose
    * schema takes a `configPath` — keyed by the table, so a tool added to it fails to typecheck here until it has a
    * call. Each is called in one wda project; the registry must have bound ONE adapter, of the project's kind, and
-   * nothing else. Since A30 this is the D41 invariant's guard, by behaviour: a handler that resolves its device with
-   * the WRONG kind — a `registry.get` with another kind, an aliased registry, a lazy resolver handed the wrong config
-   * — binds an idb adapter here. A second get of the SAME kind is the registry's cached adapter and is not seen: it is
+   * nothing else. This is the D41 invariant's guard, by behaviour (A30): a handler that resolves its device with the
+   * WRONG kind — a `registry.get` with another kind, an aliased registry, a lazy resolver handed the wrong config —
+   * binds a non-wda adapter here. A second get of the SAME kind is the registry's cached adapter and is not seen: it is
    * also not a D41 violation. One call per tool takes one branch of it: `swipe` is called twice, by direction (it
    * reads the tree) and by coordinates (D41's eighth tool); the other branches (tap and type_text with or without a
-   * selector, install_app without a path) resolve through the same call. (Until A30 a textual tripwire,
-   * tests/mcp/registry-gets.test.ts, counted `registry.get(` in src/; ADR 0032, amendment A30.) Folds in D41's
-   * per-tool test of its eight tools.
+   * selector, install_app without a path) resolve through the same call (ADR 0032, amendment A30).
    */
   const EVERY_DEVICE_CALL: Record<keyof typeof TOOL_CONFIG, Record<string, unknown>> = {
     install_app: { platform: 'ios', path: '/builds/Bank.app' },
@@ -1366,10 +1356,10 @@ describe('every tool gets the project\'s adapter — one per simulator and confi
 });
 
 /**
- * Stage B (2026-10-07): the tap and type_text tools hand averi.yaml's
+ * Stage B: the tap and type_text tools hand averi.yaml's
  * `app.ios.keyboardDismiss` to the keyboard guard (flow/tool-config.ts#
  * iosToolSettings over the call's one read, which also gives the tree
- * source; flow/load.ts's `iosToolSettingsFor` until 2026-10-08). The measured iOS login in points: `login_submit` under the band
+ * source). The measured iOS login in points: `login_submit` under the band
  * the WDA source marks, the title above it; the fake plays the app (K5b: a
  * tap on the title hides the keyboard).
  */
@@ -1429,11 +1419,9 @@ describe('tap / type_text pass app.ios.keyboardDismiss to the guard', () => {
   });
 
   /**
-   * K3 (2026-10-07): the tree source and the dismissals come from ONE load
-   * per call. Until then each tool call read and parsed averi.yaml twice —
-   * once for the registry's tree source, once for the guard's dismissals —
-   * and the loader's inert-note memo hid the second load on stderr, which
-   * is why this counts reads of the file itself.
+   * K3: the tree source and the dismissals come from ONE load per call. The
+   * loader's inert-note memo would hide a second load on stderr, which is why
+   * this counts reads of the file itself.
    */
   it('tap and type_text read averi.yaml ONCE per call: the tree source and the dismissals come from one load', async () => {
     const fake = iosLogin();
@@ -1469,9 +1457,8 @@ describe('assert — results always, health only with a loadable averi.yaml', ()
     expect(result.text).toBe(`${bare.text}\nappAlive: true`);
   });
 
-  // 2026-10-08: until then the android call passed and silently dropped the
-  // health line (a catch-all in run/commands.ts#runAsserts) while the ios
-  // call failed — one broken file, two verdicts by platform. Now one.
+  // One broken file, one verdict on both platforms: a catch-all that dropped the health line would pass the android
+  // call while the ios call failed.
   it.each(['android', 'ios'] as const)('%s: an INVALID averi.yaml fails the call naming the file, before a device is bound', async (platform) => {
     const configPath = await invalidConfig();
     const result = await run(configPath, platform);
@@ -1480,8 +1467,8 @@ describe('assert — results always, health only with a loadable averi.yaml', ()
     expect(result.bound).toEqual([]);
   });
 
-  // Device check (2026-10-08): a YAML SYNTAX error used to surface as the
-  // parser's bare message, naming no file.
+  // Device check (2026-10-08): a YAML SYNTAX error surfaced as the parser's
+  // bare message, naming no file.
   it('android: an averi.yaml that is not even YAML → an error naming the file, before a device is bound', async () => {
     const configPath = await file('averi.yaml', 'app: {}\nflows: { f:\n  steps:\n    - tap: x\n}\n');
     const result = await run(configPath);
@@ -1493,7 +1480,7 @@ describe('assert — results always, health only with a loadable averi.yaml', ()
 
   // Review round 1: only a MISSING file means "no averi.yaml". A path the
   // file cannot be read from for another reason (here a directory) fails the
-  // call as it came — until 2026-10-08 the android call's catch-all passed it.
+  // call as it came.
   it('android: a configPath that is a directory → an error (EISDIR), before a device is bound', async () => {
     const configPath = join(dir, 'averi.yaml');
     await mkdir(configPath);
@@ -1504,8 +1491,8 @@ describe('assert — results always, health only with a loadable averi.yaml', ()
   });
 
   // The ios call needs averi.yaml twice — the tree source and the health
-  // line — and until 2026-10-08 read it twice, the second time strictly and
-  // with .env.averi, which the health line has no use for.
+  // line — and reads it once, without .env.averi, which the health line has
+  // no use for.
   it.each(['android', 'ios'] as const)('%s: averi.yaml is read ONCE per call, and .env.averi not at all', async (platform) => {
     const configPath = await file('averi.yaml', `${VALID_CONFIG.replace('ios:     { bundleId: md.bank.app }', 'ios:     { bundleId: md.bank.app, treeSource: wda }')}`);
     await file('.env.averi', 'AVERI_TOOLS_TEST=1\n');
@@ -1520,14 +1507,6 @@ describe('assert — results always, health only with a loadable averi.yaml', ()
   });
 });
 
-/**
- * C3 (architecture review 2026-10-07): a regex field that does not compile is
- * refused with the arguments it came in — or with averi.yaml, at load — and
- * never reaches a device. Before, an element assert's bad `match` threw out of
- * the poll mid-batch, an ocr assert's polled its whole 12 s budget as "OCR
- * failed", a flow's loaded clean and failed mid-run, and get_logs' grep threw
- * after the logs were pulled.
- */
 /**
  * A19: a duration is one schema (util/duration.ts#durationSchema), so a `timeout` parseDuration cannot read is refused
  * where the arguments are parsed — not thrown mid-poll, after a device was bound — in every assert kind that takes one.
@@ -1559,6 +1538,14 @@ describe('a duration that does not parse is refused at parse, before a device is
   });
 });
 
+/**
+ * C3: a regex field that does not compile is refused with the arguments it
+ * came in — or with averi.yaml, at load — and never reaches a device.
+ * Unchecked, an element assert's bad `match` would throw out of the poll
+ * mid-batch, an ocr assert's poll its whole 12 s budget as "OCR failed", a
+ * flow's load clean and fail mid-run, and get_logs' grep throw after the logs
+ * were pulled.
+ */
 describe('a regex that does not compile is refused at parse, before a device is bound', () => {
   it.each([
     ['element match', { element: { id: 'home_root' }, match: '(' }],
@@ -1603,8 +1590,8 @@ describe('scroll_until', () => {
     const { call, fakes } = await connect();
     const fake = fakes.android!;
     // A screen that changes on every swipe (a ticking label): a static one
-    // now fails after 2 swipes that change nothing (2026-10-09, the whole-
-    // tree exhaustion), before any timeout — this test is about the timeout.
+    // fails after 2 swipes that change nothing (the whole-tree exhaustion),
+    // before any timeout — this test is about the timeout.
     const read = fake.uiTree.bind(fake);
     fake.uiTree = async () => {
       const tree = await read();
@@ -1742,8 +1729,8 @@ describe('verify', () => {
     expect(harness.factoryCalls).toEqual([]); // not even a device probe
   });
 
-  // 2026-10-03: a bad field VALUE is the same class of mistake as a typo'd
-  // path, and used to cost both legs before it surfaced as `FAILED:` in the
+  // A bad field VALUE is the same class of mistake as a typo'd path:
+  // unchecked, it would cost both legs before it surfaced as `FAILED:` in the
   // color table. The handler only delegates; what an MCP client sees is pinned.
   it('a contract with an invalid colour field is refused, naming the field, before any device is touched', async () => {
     const harness = await connect();
@@ -1913,8 +1900,8 @@ describe('tap and type_text under the Android soft keyboard', () => {
 });
 
 /**
- * A dead device's capture fails the `screenshot` tool (2026-10-08): before,
- * `adb exec-out screencap -p` exiting 0 with nothing came back as a SETTLED
+ * A dead device's capture fails the `screenshot` tool: unrefused, `adb
+ * exec-out screencap -p` exiting 0 with nothing would come back as a SETTLED
  * 0-byte image with no note. The adapter refuses it, naming its device and
  * command (adapters/screenshot-bytes.ts); the capture refuses an adapter that
  * returns 0 bytes anyway.
@@ -1971,7 +1958,7 @@ describe('ensure_state and verify: a refused final screenshot is a ⚠ line, not
   });
 });
 
-/** The assert tool on a device whose capture is refused: that assert fails closed, the rest is evaluated (2026-10-08, pixel-poll.ts's header). */
+/** The assert tool on a device whose capture is refused: that assert fails closed, the rest is evaluated (pixel-poll.ts's header). */
 describe('assert: a refused capture is one failed assert, not a failed call', () => {
   it('the color assert FAILs with the transport message; the element assert beside it PASSes', async () => {
     const fake = home();

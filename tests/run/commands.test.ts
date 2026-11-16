@@ -20,11 +20,11 @@ import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
  * real averi.yaml in a temp dir, no MCP server. tests/mcp/tools.test.ts pins
  * the same behaviour through the protocol; what is pinned here is what the
  * protocol cannot show cleanly — the ORDER (the environment pre-flight before
- * the adapter is resolved), and what each function returns as a value. Since
- * 2026-10-08 these functions take the config the handler read (once, under
- * the tool's policy — flow/tool-config.ts), not a path: what a missing or
- * broken averi.yaml does to each tool is pinned through the protocol, in
- * tests/mcp/tools.test.ts, where the read now happens.
+ * the adapter is resolved), and what each function returns as a value. These
+ * functions take the config the handler read (once, under the tool's policy
+ * — flow/tool-config.ts), not a path: what a missing or broken averi.yaml
+ * does to each tool is pinned through the protocol, in
+ * tests/mcp/tools.test.ts, where the read happens.
  */
 
 // The one sleep owner is recorded, not waited on (as in tests/verify/capture.test.ts).
@@ -133,7 +133,7 @@ describe('runEnsureState', () => {
   });
 
 
-  // D13 (2026-10-31): neither is an action and neither reads the other's
+  // D13: neither is an action and neither reads the other's
   // result, so the health line's `isAppRunning` (a pidof; its cost on
   // run/commands.ts#runOnEngine) and the final frame (its settle sleep and
   // screencaps) are out at once. The answer is held until the capture starts — or, run one
@@ -269,9 +269,8 @@ describe('runAsserts', () => {
 
   // One failure policy for the health line (run/app-health.ts, A29): appHealth words every device failure into the
   // line itself, and anything else it throws is a broken adapter, which fails the call — here as in ensure_state,
-  // run_flow and a verify leg. Until A29 this call alone swallowed it and dropped the health line; no real adapter
-  // reaches that (their `platform` is a field and their `logs` an array), so no reply changed. The throw is made where
-  // the other two callers' tests make it: a log read that answers with something it cannot scan.
+  // run_flow and a verify leg. The throw is made where the other two callers' tests make it: a log read that answers
+  // with something it cannot scan.
   it('a health check that throws fails the call, as it fails the other three callers', async () => {
     const fake = home();
     fake.appRunning = false;
@@ -301,7 +300,7 @@ describe('baselineDirFor', () => {
 });
 
 /**
- * ensure_state whose final capture throws (2026-10-08, run/run-reply.ts#finalFrame):
+ * ensure_state whose final capture throws (run/run-reply.ts#finalFrame):
  * the state WAS ensured — the trace and health line stand, one `⚠ screenshot:`
  * line says why there is no image, and no shot is returned.
  */
