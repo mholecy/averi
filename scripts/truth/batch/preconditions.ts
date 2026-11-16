@@ -6,13 +6,11 @@ import { firstLineOf, messageOf, nameInLine, verdictLine } from './words.js';
 /**
  * A block's preconditions, each shown or not before the block runs: the checkout is main's clean HEAD; a commit the
  * block needs is an ancestor of it; the live cases and lab cells it uses are main's. One that is not shown makes the
- * block INCONCLUSIVE, naming why (`preconditionLine`) — never a number from a run whose premise does not hold
- * (batch-2-README: "it gives INCONCLUSIVE rather than a number"). batch-12 refused to start on a failed checkout or
- * ancestry instead; runner.ts (T2 S6a) makes the blocks INCONCLUSIVE, batch-11's way; the result is the same.
+ * block INCONCLUSIVE, naming why (`preconditionLine`) — never a number from a run whose premise does not hold.
  *
  * Every answer is git's, read through a bounded call (bounded.ts, git's own 30 s bound): never a grep of a symbol in
- * the sources, and never git run unbounded, as batch-11's was. The cases and cells are read from
- * main's own live-cases.ts table and catalog (live-table.ts#liveTableOf), never grepped.
+ * the sources, and never git run unbounded. The cases and cells are read from main's own live-cases.ts table and
+ * catalog (live-table.ts#liveTableOf), never grepped.
  *
  * A why is one short line an agent can act on: it names the sha, the file or the case id, and git's own first line of
  * stderr when git said something. A name holding a line break is JSON-quoted in it (words.ts#nameInLine): the block's
@@ -132,9 +130,9 @@ function shownPaths(paths: readonly string[]): string {
 /**
  * The checkout runs main as committed: HEAD is the commit refs/heads/main is — a detached HEAD on that commit too,
  * since the code is the same — and no tracked file is modified, staged or not (`git status --porcelain
- * --untracked-files=no`: an untracked file is allowed, as in batch-11 and batch-12). HEAD ≠ main and modified files are
- * both said when both hold (one rerun fixes both). First the repo named must be the top of its checkout; that not
- * shown, or HEAD unreadable, ends it: nothing else is asked.
+ * --untracked-files=no`: an untracked file is allowed). HEAD ≠ main and modified files are both said when both hold
+ * (one rerun fixes both). First the repo named must be the top of its checkout; that not shown, or HEAD unreadable,
+ * ends it: nothing else is asked.
  */
 export async function checkout(g: Git): Promise<CheckoutPrecondition> {
   const outside = await topRefusal(g);
@@ -160,11 +158,10 @@ export async function checkout(g: Git): Promise<CheckoutPrecondition> {
 }
 
 /**
- * A commit the block needs is an ancestor of HEAD (batch-4's first ancestry gate, batch-11's D43 one): its sha's format
- * first, by batch-11's knob rule — no git call for one that breaks it — then, the repo shown to be the top of its
- * checkout, `git cat-file -e <sha>^{commit}` (it names one commit of this repo), then `git merge-base --is-ancestor
- * <sha> HEAD` (exit 1: not an ancestor; any other failure is git's, never "not an ancestor"). `what` names it as the
- * batch does (`M_D43`): `M_D43=<sha> …`, `M_D43 is not set`.
+ * A commit the block needs is an ancestor of HEAD: its sha's format first — no git call for one that breaks it — then,
+ * the repo shown to be the top of its checkout, `git cat-file -e <sha>^{commit}` (it names one commit of this repo),
+ * then `git merge-base --is-ancestor <sha> HEAD` (exit 1: not an ancestor; any other failure is git's, never "not an
+ * ancestor"). `what` names it as the batch does (`M_D43`): `M_D43=<sha> …`, `M_D43 is not set`.
  */
 export async function ancestor(g: Git & { sha: string; what?: string }): Promise<Precondition> {
   const { sha, what } = g;
@@ -188,9 +185,9 @@ const missingOf = (ids: readonly string[], have: ReadonlySet<string>): string[] 
 
 /**
  * The live cases a block runs are main's: selectCases (live-cases.ts) picks each id for the platform, the lab app
- * (native by default) and the groups (forms by default: batch-11's live_run runs `--groups forms`) — the table, never
- * a grep. Every id it does not pick is named. No id is never a pass: a block judged on no case proves nothing. A table
- * that does not load or read is said, never thrown.
+ * (native by default) and the groups (forms by default) — the table, never a grep. Every id it does not pick is named.
+ * No id is never a pass: a block judged on no case proves nothing. A table that does not load or read is said, never
+ * thrown.
  */
 export async function casesOnMain({
   ids,
@@ -213,7 +210,7 @@ export async function casesOnMain({
   return missing.length === 0 ? { ok: true } : { ok: false, why: `live case(s) ${missing.join(', ')} not on main's live-cases.ts (${where})` };
 }
 
-/** The lab cells a block uses are in main's catalog (batch-11's and batch-12's cells_have): every one missing named. */
+/** The lab cells a block uses are in main's catalog: every one missing named. */
 export async function cellsOnMain({ ids, table }: { ids: readonly string[]; table: LiveTable }): Promise<Precondition> {
   if (ids.length === 0) return { ok: false, why: 'no cell id given' };
   const loaded = await loadTable(table);

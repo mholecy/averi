@@ -9,19 +9,18 @@ import { NO_UDID, type NeedResult } from './runner-lines.js';
 import { exitText, failedCall, nameInLine } from './words.js';
 
 /**
- * The lab apps built from the checkout under test (T2 S6b; batch-12.sh:350–375), as two needs a
- * block names — `ios-build`, `android-build` — so a build that fails makes every block needing it INCONCLUSIVE naming
- * why (the runner's need rule), and a block that does not need it runs on the app already installed: main's catalog
- * `--check`ed first, once for both (S3's not-ported row: a stale cells.json builds nothing); the iOS build (xcodegen,
- * xcodebuild) and the Android build (`gradlew assembleDebug` under JDK 17: `jdk17Of` in lab-lines.ts, T23), each a
- * bounded step logged in the lab folder, its product's cells.json main's; then `gradlew --stop`, after every Android
- * build: the Gradle daemon leaves the call's group by design, so S2's group kill cannot reach it. xcodebuild needs no
- * pkill: its group ends with it (S2). The devices' needs (ios-lab.ts, android-lab.ts) install this run's build
- * (`built`) before their cells check; and `labBlock` is batch-11's and batch-12's `lab` block — `ONLY=lab` runs just
- * its needs.
+ * The lab apps built from the checkout under test (T2 S6b), as two needs a block names — `ios-build`, `android-build` —
+ * so a build that fails makes every block needing it INCONCLUSIVE naming why (the runner's need rule), and a block that
+ * does not need it runs on the app already installed: main's catalog `--check`ed first, once for both (S3's not-ported
+ * row: a stale cells.json builds nothing); the iOS build (xcodegen, xcodebuild) and the Android build
+ * (`gradlew assembleDebug` under JDK 17: `jdk17Of` in lab-lines.ts, T23), each a bounded step logged in the lab folder,
+ * its product's cells.json main's; then `gradlew --stop`, after every Android build: the Gradle daemon leaves the
+ * call's group by design, so S2's group kill cannot reach it. xcodebuild needs no pkill: its group ends with it (S2).
+ * The devices' needs (ios-lab.ts, android-lab.ts) install this run's build (`built`) before their cells check; and
+ * `labBlock` is the `lab` block — `ONLY=lab` runs just its needs.
  */
 
-/** A build's bound when the batch names none (batch-11's B_BUILD). */
+/** A build's bound when the batch names none (the B_BUILD knob's default). */
 export const BUILD_SECS = 2400;
 /** catalog.ts --check's bound, and xcodegen's. */
 export const CATALOG_SECS = 120;
@@ -29,16 +28,16 @@ export const CATALOG_SECS = 120;
 export const JAVA_HOME_SECS = 10;
 /** `gradlew --stop`'s bound. */
 export const GRADLE_STOP_SECS = 120;
-/** macOS's JDK finder (batch-11's JAVA_HOME_CMD). */
+/** macOS's JDK finder. */
 export const JAVA_HOME = '/usr/libexec/java_home';
 /** The built lab app in the checkout under test. */
 export const IOS_APP_PATH = 'fixtures/apps/ios/build/Build/Products/Debug-iphonesimulator/AveriLab.app';
-/** The built lab APK: lab-device.ts's since T20a (the live premise's hand line installs it too). */
+/** The built lab APK: lab-device.ts's (the live premise's hand line installs it too). */
 export { APK_PATH } from '../lab-device.js';
 /** The needs' names in a batch's `needs`. */
 export const IOS_BUILD_NEED = 'ios-build';
 export const ANDROID_BUILD_NEED = 'android-build';
-/** batch-11's and batch-12's lab block: its folder is the run's lab folder. */
+/** The `lab` block: its folder is the run's lab folder. */
 export const LAB_BLOCK = 'lab';
 
 /**
@@ -60,7 +59,10 @@ export interface LabBuild {
   android: BuildRef;
   /** Each build that was asked and failed: `<need>: <why>`. */
   failures(): string[];
-  /** The run's last step: `gradlew --stop` when an Android build was started and its own stop never ran (an abort). */
+  /**
+   * The run's last step: `gradlew --stop` when an Android build was started and its own stop did not succeed (an abort
+   * or a failed stop).
+   */
   lastly: LastStep;
 }
 
@@ -73,8 +75,8 @@ export type BuildAnswer = { built?: string; builtUnder?: string; warning?: strin
 /**
  * A device need's build (T2 S6b review round 1, MAJOR 2): asked by the need itself, so the order of a block's needs
  * does not matter. None wanted: nothing to install. Met: its product, what it was built under, and the build's own
- * warning (T23: a JDK source passed over) — lab-run.ts reaches the build only through here. Failed: not met when the
- * batch requires it, else batch-11's way — a warning, the app already installed is used.
+ * warning (T23: a JDK source passed over). Failed: not met when the batch requires it, else a warning, the app already
+ * installed is used.
  */
 export async function askBuild(c: NeedCtx, o: { build?: BuildRef; requireBuild?: boolean }): Promise<BuildAnswer> {
   if (o.build === undefined) return {};
@@ -87,7 +89,7 @@ export async function askBuild(c: NeedCtx, o: { build?: BuildRef; requireBuild?:
   return { warning: `${r.why}; the app already installed is used` };
 }
 
-/** A lab device as its need checks it (ios-lab.ts, android-lab.ts): opened, this run's build installed, its cells. */
+/** A lab device as its need checks it: opened, this run's build installed, its cells. */
 export interface DeviceCheck<T> {
   /** Guarded and readied (the reset, a first read): the device — with a warning the readying left (batch-13) — or why not. */
   open(): Promise<Opened<T> & { warning?: string | undefined }>;
@@ -103,7 +105,7 @@ export interface DeviceCheck<T> {
 /**
  * A device need's one shape (code review): the device opened; its build asked (askBuild); met, installed; the installed
  * app's cells.json main's (else not met, the rerun hint); met — with the readying's warning (batch-13: the companion
- * entry's) and the build's when it failed (batch-11's `LAB …: WARN — …`), joined in that order.
+ * entry's) and the build's when it failed (`LAB …: WARN — …`), joined in that order.
  */
 export async function checkDevice<T>(c: NeedCtx, o: { build?: BuildRef; requireBuild?: boolean }, d: DeviceCheck<T>): Promise<NeedResult> {
   const opened = await d.open();
@@ -272,9 +274,9 @@ export function labBuild(o: { secs?: number; jvms?: readonly string[] } = {}): L
 }
 
 /**
- * batch-11's and batch-12's `lab` block: it runs only its needs (the builds, the devices' checks, as the batch names
- * them) and says they were met — so `ONLY=lab` checks the lab and runs nothing else; a need not met makes it
- * INCONCLUSIVE naming why (the runner's rule), each need's LAB line the details.
+ * The `lab` block: it runs only its needs (the builds, the devices' checks, as the batch names them) and says they were
+ * met — so `ONLY=lab` checks the lab and runs nothing else; a need not met makes it INCONCLUSIVE naming why (the
+ * runner's rule), each need's LAB line the details.
  */
 export function labBlock(needs: readonly Need[], o: { build?: Pick<LabBuild, 'failures'> } = {}): Block {
   return {

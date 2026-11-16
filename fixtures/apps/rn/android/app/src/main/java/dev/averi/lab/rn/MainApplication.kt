@@ -14,7 +14,6 @@ class MainApplication : Application(), ReactApplication {
       context = applicationContext,
       packageList =
         PackageList(this).packages.apply {
-          // The lab's state file (LabStateFile.kt).
           add(LabStatePackage())
         },
     )

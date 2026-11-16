@@ -59,39 +59,6 @@ const PAIRS: ReadonlySet<PairingRule> = new Set(['same identifier below the fiel
 export type FormExpectation = Expectation & { target: string };
 
 /**
- * The form cells' static rows — what a replayed tree can judge, from the truth the app reported:
- *
- * | truth | verb | expected |
- * |---|---|---|
- * | a field shows an error the rules pair (verification.md, Field errors: same identifier below; own `_error` id close under) | `assert {element:{id}, error}` | passes |
- * | Android: a field shows an error, by any identifier (Android sets no `error` on a field: verification.md, Field errors) | `assert {element:{text: message}}` | passes: the message is read as drawn |
- * | a field shows an error named neither way (`IbanError`) | `assert … error` | fails: not seen |
- * | a screen-level message far under the nearest field above it | `assert {element:{id: that field}, error: message}` | fails: pairs with none |
- * | Android: the same message | `assert {element:{text: message}}` | passes |
- * | a field showing NO error, another field's title below it carrying the field's identifier (one component id shared by every field and its floating title: sharedTitleBelow) | `assert {element:{id, role: textfield}, error: that title}` | fails: a title is no error (verification.md, Field errors: a same-identifier text overlapping a same-identifier field is a title) |
- * | iOS: a field whose shown error the rules pair (above) | `ui_snapshot {filter: role:textfield}`, the textfield at its centre | its `error` is that message (whitespace collapsed) |
- * | iOS: any other field — no error shown, or one the rules pair with none (a title of a field sharing its identifier, FE2; `IbanError`) | the same | no `error` |
- * | Android: every field (averi sets no `error` on a field: verification.md's contract, not the truth) | the same | no `error`, or the field's own shown message — never another string |
- * | a field not open (under the keyboard, covered, under the sheet: ControlTruth.situation) that the snapshot does not list | the same | accepted: no error claimed of it (whether it is listed is visibility, judged by the control's rows) |
- * | a field's title (the P5 text sample: ’ “ ” – — … NBSP & diacritics) | `assert {element:{id: titleId}, text: title}` | passes: the tree reads the text as drawn |
- * | a non-secure field the model holds a value in (prefilled) | `assert … text: value` | passes |
- * | a secure field the model holds a value in | `assert … text: value` | fails: a masked field never reads back as its value |
- * | a control open (centre on screen, clear of keyboard and pinned bar; a probe tap reached it) | tap | `Tapped` |
- * | a field sharing its identifier with another field | tap / scroll_until | not asked: `id:` names every field of the component, not this one |
- * | the pinned submit above the keyboard, open | scroll_until | reached with no swipe |
- * | a control wholly under the keyboard (probe tap pressed a key) | tap | refused naming the keyboard, nothing tapped (tools.ts tap: "a target COVERED by the on-screen keyboard … REFUSED"; idb: "a target whose centre lies below that line is REFUSED") |
- * | Android: the same, a raw tap at its centre after one `back` reached it (ControlTruth.afterBack.reached) | tap | `Tapped`, the keyboard hidden by `back` before the one tap, sent inside its frame (tools.ts tap: "On Android a selector target lying under the soft keyboard is not tapped through it: the keyboard is hidden (back) and the element found again first") |
- * | Android: the same, NOT reached by a tap at its centre after one `back` (the bar dropped back over it: afterBack.probe says what fired) | tap | no tap at that centre where it fired another control; refused with nothing sent, or `Tapped` with every tap inside its piece after back (afterBack.piece, its touch target clear of the submit) where a probe there reached it — replayed over the layout after back (CellTruth.afterBack, the fake device's dump once `back` is sent); live only when no such layout was captured |
- * | a control under the keyboard, the colour the screen shows over it captured (ControlTruth.seen: the keyboard's) | colour, asked with that colour | fails: a pass measured the keyboard (tools.ts assert: "A color/ocr assert never samples what lies over its element: one under the soft keyboard … fails closed"; docs/bugs/2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md) |
- * | the same | ocr, asked for the field's own copy (its value, else its title) | fails closed: a reading measured the keyboard (the note's `ocr CONTINUE` read the keyboard's `?123`; golden-spec/text.ts#ocrFailsClosed; skipped where the host has no recognizer) |
- * | the same | scroll_until down | never "reached" without a swipe; every swipe touches down above the keyboard's top (tools.ts scroll_until: "the swipes touch down clear of it") |
- * | a control under the picker sheet | tap / scroll_until | refused / stopped before any swipe: `close it first` (ADR 0018, as presented-over) |
- * | a control partly hidden whose probe tap fired ANOTHER control (a field under the pinned submit's bar: the tap submitted the form) | tap | not tapped, nothing sent (tools.ts tap: "a target whose centre lies under another element of the app drawn over it (a pinned button bar …) … with less showing it is REFUSED, naming the cover, nothing tapped") — or, where a probe at its piece clear of the keyboard and the submit reached it (ControlTruth.atPiece), `Tapped` with every tap inside that piece (ADR 0005: a covered target's tap moved to its piece) |
- * | the same | scroll_until down | never "reached" without a swipe |
- * | a picker row off the screen or not laid out (lazy list) | tap | not tapped, nothing sent — and never the presented remedy without the scroll_until that reaches it (judges.ts#closesItsOwnLayer) |
- * | the same | scroll_until down | swipes for it, every touch-down on the sheet ("a row of the presented sheet itself is still swiped for on the sheet") |
- */
-/**
  * Android's under-keyboard tap (ControlTruth.afterBack.reached): `Tapped`, a `back` (`input keyevent 4`) sent before the
  * tap, and exactly one tap, inside the control's frame.
  */
@@ -197,6 +164,38 @@ function snapshotRow(platform: Platform, fields: readonly FieldTruth[], f: Field
 }
 
 /**
+ * The form cells' static rows — what a replayed tree can judge, from the truth the app reported:
+ *
+ * | truth | verb | expected |
+ * |---|---|---|
+ * | a field shows an error the rules pair (verification.md, Field errors: same identifier below; own `_error` id close under) | `assert {element:{id}, error}` | passes |
+ * | Android: a field shows an error, by any identifier (Android sets no `error` on a field: verification.md, Field errors) | `assert {element:{text: message}}` | passes: the message is read as drawn |
+ * | a field shows an error named neither way (`IbanError`) | `assert … error` | fails: not seen |
+ * | a screen-level message far under the nearest field above it | `assert {element:{id: that field}, error: message}` | fails: pairs with none |
+ * | Android: the same message | `assert {element:{text: message}}` | passes |
+ * | a field showing NO error, another field's title below it carrying the field's identifier (one component id shared by every field and its floating title: sharedTitleBelow) | `assert {element:{id, role: textfield}, error: that title}` | fails: a title is no error (verification.md, Field errors: a same-identifier text overlapping a same-identifier field is a title) |
+ * | iOS: a field whose shown error the rules pair (above) | `ui_snapshot {filter: role:textfield}`, the textfield at its centre | its `error` is that message (whitespace collapsed) |
+ * | iOS: any other field — no error shown, or one the rules pair with none (a title of a field sharing its identifier, FE2; `IbanError`) | the same | no `error` |
+ * | Android: every field (averi sets no `error` on a field: verification.md's contract, not the truth) | the same | no `error`, or the field's own shown message — never another string |
+ * | a field not open (under the keyboard, covered, under the sheet: ControlTruth.situation) that the snapshot does not list | the same | accepted: no error claimed of it (whether it is listed is visibility, judged by the control's rows) |
+ * | a field's title (the P5 text sample: ’ “ ” – — … NBSP & diacritics) | `assert {element:{id: titleId}, text: title}` | passes: the tree reads the text as drawn |
+ * | a non-secure field the model holds a value in (prefilled) | `assert … text: value` | passes |
+ * | a secure field the model holds a value in | `assert … text: value` | fails: a masked field never reads back as its value |
+ * | a control open (centre on screen, clear of keyboard and pinned bar; a probe tap reached it) | tap | `Tapped` |
+ * | a field sharing its identifier with another field | tap / scroll_until | not asked: `id:` names every field of the component, not this one |
+ * | the pinned submit above the keyboard, open | scroll_until | reached with no swipe |
+ * | a control wholly under the keyboard (probe tap pressed a key) | tap | refused naming the keyboard, nothing tapped (tools.ts tap: a target under the soft keyboard is REFUSED where nothing hides it; idb refuses a centre below the keyboard's top line) |
+ * | Android: the same, a raw tap at its centre after one `back` reached it (ControlTruth.afterBack.reached) | tap | `Tapped`, the keyboard hidden by `back` before the one tap, sent inside its frame (tools.ts tap: on Android the keyboard is hidden (back) before a target under it is tapped) |
+ * | Android: the same, NOT reached by a tap at its centre after one `back` (the bar dropped back over it: afterBack.probe says what fired) | tap | no tap at that centre where it fired another control; refused with nothing sent, or `Tapped` with every tap inside its piece after back (afterBack.piece, its touch target clear of the submit) where a probe there reached it — replayed over the layout after back (CellTruth.afterBack, the fake device's dump once `back` is sent); live only when no such layout was captured |
+ * | a control under the keyboard, the colour the screen shows over it captured (ControlTruth.seen: the keyboard's) | colour, asked with that colour | fails: a pass measured the keyboard (tools.ts assert: a color/ocr assert never measures what covers its element, a control under the soft keyboard included: it fails closed; docs/bugs/2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md) |
+ * | the same | ocr, asked for the field's own copy (its value, else its title) | fails closed: a reading measured the keyboard (the note's `ocr CONTINUE` read the keyboard's `?123`; golden-spec/text.ts#ocrFailsClosed; skipped where the host has no recognizer) |
+ * | the same | scroll_until down | never "reached" without a swipe; every swipe touches down above the keyboard's top (tools.ts scroll_until: with the soft keyboard up the viewport is the screen above it) |
+ * | a control under the picker sheet | tap / scroll_until | refused / stopped before any swipe: `close it first` (ADR 0018, as presented-over) |
+ * | a control partly hidden whose probe tap fired ANOTHER control (a field under the pinned submit's bar: the tap submitted the form) | tap | not tapped, nothing sent (tools.ts tap: a centre under another element of the app drawn over it is tapped on an uncovered part when enough shows, else REFUSED naming the cover) — or, where a probe at its piece clear of the keyboard and the submit reached it (ControlTruth.atPiece), `Tapped` with every tap inside that piece (docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md: a covered target's tap moved to its piece) |
+ * | the same | scroll_until down | never "reached" without a swipe |
+ * | a picker row off the screen or not laid out (lazy list) | tap | not tapped, nothing sent — and never the presented remedy without the scroll_until that reaches it (judges.ts#closesItsOwnLayer) |
+ * | the same | scroll_until down | swipes for it, every touch-down on the sheet (a row of the presented sheet itself is still swiped for on the sheet) |
+ *
  * `unlisted`: why the replayed tree may not list the element identified as `id` (golden-spec.ts#unlistedIn), undefined
  * where it lists it — read by the under-keyboard rows (controlRows): idb lists nothing beneath the keyboard.
  */
@@ -343,7 +342,8 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth, unli
         // not reach it — what it fired is the probe's (ControlTruth.afterBack.probe). averi finds the element again in
         // the layout after back: with that layout captured (CellTruth.afterBack, served by the fake device once `back`
         // is sent) the row is replayed — never a tap where the centre's probe fired another control, and Tapped only
-        // inside its piece there where a probe reached it (afterBack.piece); without it, the live golden's (live.ts k5).
+        // inside its piece there where a probe reached it (afterBack.piece); without it, the live golden's
+        // (live-cases.ts k5).
         const fired = otherControlsFired(c.afterBack.probe, c.tag);
         const what = fired.length > 0 ? `fires ${fired.map((e) => `${e.kind} ${e.tag}`).join(', ')}` : 'does not reach it';
         const piece = c.afterBack.piece?.piece;

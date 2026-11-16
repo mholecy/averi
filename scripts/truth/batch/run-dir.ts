@@ -8,18 +8,16 @@ import { firstLineOf, messageOf, NOTHING_DONE, oneLine, refusedLine, stepLine, t
  *
  * Every block writes into `<out>/<block>/run-<RUN_ID>/`, a folder made fresh for this run: never emptied, never reused,
  * never removed. batch-3's B2 lost its raw data on 2026-11-02 when a second run emptied `batch-3/B2` before its
- * prechecks stopped it; since batch-11 every block has a run folder of its own, and an earlier run's are only read.
+ * prechecks stopped it; every block has a run folder of its own, and an earlier run's are only read.
  *
  * A run must not start over state an earlier run did not provably put back: a RESTORE file left, or an earlier run's
- * state file not clean. batch-7 to batch-9 only renamed a leftover RESTORE aside with a WARN; batch-10 refused, since
- * a new run would bury it; batch-11 read the state of every earlier run folder, not only the last.
+ * state file not clean. A leftover RESTORE refuses, since a new run would bury it, and the state of every earlier run
+ * folder is read, not only the last.
  *
- * Ported differently (backlog T2):
- * - batch-11's B2 refused a folder holding more than its own `.cases`. The exclusive mkdir replaces it, and is as
- *   strong for what it guarded: another run's data, since this run's folder is made by this run or the run refuses.
- *   It is weaker only against this run's own earlier step writing into a later block's folder, which no batch does.
- * - batch-12's refusal of a pre-D62 worktree an earlier run left registered stays the batch's own check (it knows its
- *   worktree): its lines go into `refusals` as `batchReasons` and print with the module's.
+ * The exclusive mkdir guards another run's data: this run's folder is made by this run or the run refuses. This guard
+ * does not cover this run's own earlier step writing into a later block's folder, which no batch does. A batch's own
+ * refusals (e.g. a worktree an earlier run left registered) go into `refusals` as `batchReasons` and print with the
+ * module's.
  */
 
 /** A probe's state file: `{dirty: false, …}` once a restore has been verified; anything else is not proven clean. */
@@ -65,7 +63,7 @@ export interface Layout {
   latestOut: string;
   /** This run's own output, in its meta folder. */
   outFile: string;
-  /** The SUMMARY again, alone (batch-12's meta/summary.txt), appended by steps.ts#StepLog.summary. */
+  /** The SUMMARY again, alone, appended by steps.ts#StepLog.summary. */
   summaryFile: string;
 }
 

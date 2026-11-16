@@ -37,7 +37,6 @@ export const PINS_FILE = fileURLToPath(new URL(`../../${PINS_PATH}`, import.meta
 /** The command that rewrites them, as the reports name it. */
 export const REPIN_COMMAND = `golden.ts --pin ${PINS_PATH}`;
 
-/** A reply as pinned. */
 export const pinOf = (reply: string): string[] => reply.split('\n');
 
 /** A known mismatch whose reply is not its pin (`pin` absent: it has none). */
@@ -122,7 +121,6 @@ export function lineDiff(was: readonly string[], now: readonly string[]): string
 /** A re-pin as the reports word it: the key, then its lines against the pin. */
 export const repinLines = (r: Repin): string[] => (r.pin === undefined ? [`- ${r.key}: no pin`] : [`- ${r.key}`, ...lineDiff(r.pin, r.now)]);
 
-/** `n` and its noun, plural but for one — the reports' counts. */
 export const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
 
 /**

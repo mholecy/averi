@@ -31,7 +31,10 @@ export type Direction = 'up' | 'down' | 'left' | 'right';
 
 export interface CatalogTarget {
   tag: string;
-  /** `#RRGGBB`: the target is a solid rectangle of it, nothing else drawn on it. */
+  /**
+   * `#RRGGBB`: the target is a solid rectangle of it — for a text or label target, its control's box, with the text or
+   * icon drawn on it.
+   */
   color: string;
   slot: number;
   /** `layer`: the target lies on the cell's layer (inside the sheet), not on the screen beneath it. */
@@ -98,7 +101,7 @@ export type Family = (typeof FAMILIES)[number];
 export const LAB_APPS = ['native', 'react-native'] as const;
 export type LabApp = (typeof LAB_APPS)[number];
 
-/** A command line's `--app` (capture.ts, live.ts): the native app when not given; anything else not a LabApp refused. */
+/** A command line's `--app`: the native app when not given; anything else not a LabApp refused. */
 export function parseLabApp(value: string | undefined): LabApp {
   const app = value ?? 'native';
   if (!(LAB_APPS as readonly string[]).includes(app)) throw new Error(`no lab app ${app} (${LAB_APPS.join(', ')})`);
@@ -111,7 +114,6 @@ export const appOf = (family: Family | undefined): LabApp => (family === 'react-
 /** A lab target's or form control's identifier: `lab.<cell>.<tag>` (cells.json's note; a picker row's tag `<field>.<code>`). */
 export const labId = (cell: string, tag: string) => `lab.${cell}.${tag}`;
 
-/** The selector of a lab id, as the tools take it: `id:"lab.<cell>.<tag>"`. */
 export const labSelector = (cell: string, tag: string) => `id:"${labId(cell, tag)}"`;
 
 export interface CatalogCell {
@@ -321,7 +323,7 @@ export interface LabState {
   keyboard?: KeyboardState | null;
   submits?: { at: number; valid: boolean; values: Record<string, string> }[];
   // Phase 3's geometry (truth.ts#geometryOf) — optional: an app that writes none (every phase-1/1b/2 capture) has no
-  // measured geometry, and its targets are judged by `declared` alone, as before.
+  // measured geometry, and its targets are judged by `declared` alone.
   /** The window's safe-area insets — the system bands: iOS's status bar and home indicator, Android's system bars. */
   safeArea?: Insets;
   /**
@@ -356,8 +358,8 @@ export interface LabState {
    * Not the app's: Android, a case that measures the floating panel (live-cases.ts Case.measuresPanel) — what averi's
    * touchable query (src/adapters/android-wm.ts#TOUCHABLE_COMMAND, LabDevice.imeTouchable) answered right after the
    * launch (on `launched`) and once the calls were done (on `state`, D69), raw; `{ error }` when the read failed past
-   * the device guard (lab-device.ts#withMeasuredPanel). live-forms.ts#measuredPanel reads it. Absent from captures,
-   * from every other case and from records before D67 (on `state`, before D69).
+   * the device guard (lab-device.ts#withMeasuredPanel). Absent from captures, from every other case and from records
+   * before D67 (on `state`, before D69).
    */
   imeTouchable?: string | { error: string };
 }
@@ -408,7 +410,10 @@ export interface ProbeEvent {
 
 export interface TargetTruth {
   tag: string;
-  /** The selector the target answers to in every tree source: its accessibility identifier. */
+  /**
+   * The target's accessibility identifier, as every tree source lists it (rows ask a text or label target by its text
+   * or label instead: truth.ts#elementOf).
+   */
   id: string;
   /**
    * A text target's text (CatalogTarget.text): its rows ask by it; `drawn` and `seen` are measured over its control's
@@ -679,14 +684,14 @@ export interface FormTruth {
    * over the app above the 132-px strip the app hears of; a control whose centre lies in one is `under-keyboard`.
    */
   keyboard: { frame: Rect; field: string | null; panels?: Rect[] } | null;
-  /** The screen-level message, when shown, and its frame. */
   screenError: (Message & { frame: Rect }) | null;
   submits: { valid: boolean }[];
   /** The picker sheet's frame, when it is presented. */
   sheet?: Rect;
   /**
    * The principal title (CatalogForm.titleId), its frame and its probe: `reached` when a raw tap at its centre ended
-   * the editing (a `focus` event with no field) — the keyboard dismissal a cell's config taps works on the screen.
+   * the editing (a `focus` event with no field) and its touch was logged — the keyboard dismissal a cell's config taps
+   * works on the screen.
    */
   title?: { id: string; frame: Rect; reached: boolean; probe: ProbeEvent[] };
 }

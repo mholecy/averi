@@ -22,25 +22,29 @@ import type { HeldSpec, LabState } from './schema.js';
  * bare phase logged — and a SKIP in this group fails the run (live-cases.ts#summarize).
  *
  * Timing. Welcome is logged before it is drawn, and the hold's reads are stamped when they return (engine.ts#detects;
- * hold-tracker.ts: `heldMs` = the ending read's stamp − the first read's that saw the screen). So a hold on Welcome ends
- * no sooner than Welcome + heldS: a tap earlier than that (less EPS_S) is a hold that began before Welcome — on the
- * spinner, through a tree source that reads it as content — whose rung's tap then waited for Continue. And it ends no
- * later than Welcome + heldS + heldSlackS(source): the first read that saw Welcome returned at most a read in flight, a
- * poll and a whole read after it, and the rung's tap takes at most one more read (to resolve Continue) and the tap.
+ * hold-tracker.ts's observe, carried as engine.ts's Detection.heldMs: the ending read's stamp − the first read's that
+ * saw the screen). So a hold on Welcome ends no sooner than Welcome + heldS: a tap earlier than that (less EPS_S) is a
+ * hold that began before Welcome — on the spinner, through a tree source that reads it as content — whose rung's tap
+ * then waited for Continue. And it ends no later than Welcome + heldS + heldSlackS(source): the first read that saw
+ * Welcome returned at most a read in flight, a poll and a whole read after it, and the rung's tap takes at most one
+ * more read (to resolve Continue) and the tap.
  */
 
 /** Below heldS: the held line's rounding (ms) and the app's timestamps (doubles of seconds). */
 export const EPS_S = 0.05;
-/** The engine's poll interval between a detect's reads (src/flow/engine.ts:526, pollMs 500). */
+/** The engine's poll interval between a detect's reads (src/flow/engine.ts, the pollMs default of 500). */
 export const POLL_S = 0.5;
 /**
  * One tree read, with room: idb `describe-all` ~150 ms and a WDA `/source` 35–90 ms warm, uiautomator's dump ~2.3 s
- * (docs/plans/2026-10-30-performance-backlog.md, the per-verb measurements). To be confirmed by block G's device run.
+ * (docs/plans/2026-10-30-performance-backlog.md, the per-verb measurements). Kept by D30's calibration (the same file,
+ * D30: one run a source in batch-3, 2026-11-02, two more in batch-9, 2026-11-03): every residual under half of
+ * heldSlackS, the thinnest uiautomator's, 5.12 s of 5.25 s; a run past 5.25 s reopens the calibration.
  */
 export const READ_S: Record<Source, number> = { idb: 0.5, wda: 0.5, uiautomator: 3 };
 /** One tap: idb `ui tap` ~185 ms, WDA's alike; adb `input tap` slower — the same measurements, with room. */
 export const TAP_S: Record<Source, number> = { idb: 0.5, wda: 0.5, uiautomator: 1 };
-// Upper bounds with room on purpose: block G's device run measures tap − Welcome − heldS per source and tightens READ_S / TAP_S.
+// Upper bounds with room on purpose: the residual, tap − Welcome − heldS per source, is measured against them (the D30
+// row).
 /** How long after Welcome + heldS Continue may be tapped: a read in flight, a poll and a read to see Welcome; a read and a tap to tap it. */
 export const heldSlackS = (source: Source) => POLL_S + 3 * READ_S[source] + TAP_S[source];
 

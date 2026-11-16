@@ -3,11 +3,10 @@ import { isEexist, type BatchFs } from './io.js';
 import { plainSegment } from './run-dir.js';
 
 /**
- * A non-live block's records (T2 S6a; batch-12's E5 and T6 wrote `{"runs":N}` as a `.cases`, which S3 keeps for live
- * runs): what a run is asked, written before it runs (`<name>.asked.json`), and what it did, once done
- * (`<name>.done.json`), each written once, never overwritten. A run is complete when what it recorded is what it was
- * asked (runner.ts reads every record's gap beside every live run's completeness, one rule on both paths). One kind of
- * record for now; another is a new member of the union.
+ * A non-live block's records (T2 S6a; S3 keeps `.cases` for live runs): what a run is asked, written before it runs
+ * (`<name>.asked.json`), and what it did, once done (`<name>.done.json`), each written once, never overwritten. A run
+ * is complete when what it recorded is what it was asked (runner.ts reads every record's gap beside every live run's
+ * completeness, one rule on both paths). One kind of record for now; another is a new member of the union.
  */
 
 export interface RunsRecord {
@@ -24,7 +23,6 @@ export function recordOf(v: unknown): BlockRecord | undefined {
 
 const ASKED = '.asked.json';
 
-/** A record's two files: what it was asked, written first, and what it did (`.asked.json`, `.done.json`). */
 export const recordFiles = (dir: string, name: string) => ({ asked: join(dir, `${name}${ASKED}`), done: join(dir, `${name}.done.json`) });
 
 const NO_RECORD = 'is no record of runs (kind "runs", runs: a whole number)';

@@ -6,22 +6,21 @@ import type { StepLog } from './steps.js';
 import { EXIT, firstLineOf, messageOf, stepLine, summaryLines, timeOf, twoDigits, verdictLine, type BlockReport } from './words.js';
 
 /**
- * The dirty windows, and what stops a run inside one: batch-6's `on_abort`, batch-7's TRAPEXIT, batch-11's detached
- * restores, batch-12's abort SUMMARY.
+ * The dirty windows, and what stops a run inside one.
  *
  * A **dirty window** is open from before a run's first change to a device until a verified restore closes it (the
  * remembered "Open" answer, the chooser, the simulator settings, a worktree registered in the repo). Whatever stops the
  * run inside one puts it back first:
  * - SIGINT, SIGTERM or SIGHUP (a Ctrl-C, a kill, a closed terminal);
- * - a throw out of the run's body or an uncaught exception or unhandled rejection anywhere — TRAPEXIT's port, which
- *   batch-7 added for a fatal `set -u` inside a window. Never the `exit` event: it is synchronous, and a restore is not.
+ * - a throw out of the run's body or an uncaught exception or unhandled rejection anywhere. Never the `exit` event: it
+ *   is synchronous, and a restore is not.
  *
- * The abort, once: later signals are only noted; the running probes are stopped, each its whole group (they no longer
- * get the terminal's Ctrl-C); each dirty window is put back, the last opened first, by its own restore through
- * detached calls (a second Ctrl-C cannot kill them) and within its bound; what is not provably put back goes to the
- * RESTORE file as hand lines; then the SUMMARY — INTERRUPTED, each block whose records are complete judged now,
- * device-free, the others INTERRUPTED — and exit 130. Everything durable is written before the terminal gets the
- * SUMMARY: a tty paused with Ctrl-S blocks inside that last write (steps.ts#terminalOf), and so holds only the exit.
+ * The abort, once: later signals are only noted; the running probes are stopped, each its whole group (they do not get
+ * the terminal's Ctrl-C); each dirty window is put back, the last opened first, by its own restore through detached
+ * calls (a second Ctrl-C cannot kill them) and within its bound; what is not provably put back goes to the RESTORE file
+ * as hand lines; then the SUMMARY — INTERRUPTED, each block whose records are complete judged now, device-free, the
+ * others INTERRUPTED — and exit 130. Everything durable is written before the terminal gets the SUMMARY: a tty paused
+ * with Ctrl-S blocks inside that last write (steps.ts#terminalOf), and so holds only the exit.
  *
  * What the abort relies on, and what it does not:
  * - The windows it puts back are those open when it began, taken before its first await. The run's body goes on
@@ -30,21 +29,21 @@ import { EXIT, firstLineOf, messageOf, stepLine, summaryLines, timeOf, twoDigits
  * - The log is not relied on: a line it cannot write (ENOSPC, the out folder gone) is dropped, and each window is
  *   put back on its own. When the RESTORE file itself cannot be written, its lines go to stderr once.
  * - A block's own restore, on the normal path, runs as a probe (`bounded`), so the abort may stop it part-way and then
- *   run the window's restore again: every restore must be safe to run twice (batch-12's were).
+ *   run the window's restore again: every restore must be safe to run twice.
  * - A restore that passes its bound is stopped there with the detached calls it started, and its RESTORE lines say
  *   so: the state it left is part-way. Its scope then refuses any further call, so the restore cannot go on to its
  *   next step; a judge past the budget likewise.
  * - A group kill the system refuses (EPERM under load) is said, never thrown: the windows are put back whatever
  *   stopping the probes did.
  * - The running probes are stopped first; the kept groups (a daemon such as idb_companion) only last, after the
- *   restores and the judging, which may need them — as batch-11 pkilled the companion at the end of on_abort. The
- *   normal end (finish) ends them too: a companion lives across blocks, not past the run; a block may end its own
- *   earlier with stopKept(owner), as batch-12 did after each iOS block.
+ *   restores and the judging, which may need them. The normal end (finish) ends them too: a companion lives across
+ *   blocks, not past the run; a block may end its own earlier with stopKept(owner).
  *
  * How long it can take, at worst: the probes' stop (`graceMs`, 2 s), then each dirty window's restore bound (`secs`,
- * 300 s by default) and its stop (2 s), then the judges' one budget (`judgeBudgetSecs`, 120 s) and its stop (2 s),
- * then the kept groups' stop (2 s) — one window at the defaults, about 7 minutes. No block is judged once a restore has
- * passed its bound.
+ * 300 s by default) and its stop (2 s), then the judges' one budget (`judgeBudgetSecs`, 120 s) and its stop (2 s), then
+ * the kept groups' stop (2 s), then the run's last steps (`lastlySecs`, 60 s by default, when a `lastly` is given) and
+ * their stop (2 s) — one window at the defaults, about 8 minutes. No block is judged once a restore has passed its
+ * bound.
  *
  * Should this file grow further, the judging (reports, judged, the budget) and the RESTORE writing (writeRestore,
  * undeliveredHand) are the parts to move into files of their own, each behind the guard.
@@ -61,7 +60,7 @@ export interface WindowSpec {
   restore(run: Run): Promise<Putback>;
   /** The hand commands for when it is not put back, one RESTORE line each: at least one. */
   hand: readonly string[];
-  /** The restore's bound in seconds (batch-12's B_RESTORE, 300 by default). */
+  /** The restore's bound in seconds (300 by default). */
   secs?: number;
   /** The block it belongs to: a block interrupted inside its window is never judged — a leg of it was cut short. */
   block?: string;
@@ -78,11 +77,11 @@ export interface WindowSpec {
 export interface AbortBlock {
   block: string;
   /**
-   * Its records complete, so it can be judged without a device (batch-12's block_complete): true; else false, or why
-   * not (a string, said in its INTERRUPTED line). Its reading may be async; it is read within the judges' budget.
+   * Its records complete, so it can be judged without a device: true; else false, or why not (a string, said in its
+   * INTERRUPTED line). Its reading may be async; it is read within the judges' budget.
    */
   complete(): boolean | string | Promise<boolean | string>;
-  /** Its verdict lines, judged now — device-free, through the detached runner (batch-12's b12-analyze.ts). */
+  /** Its verdict lines, judged now — device-free, through the detached runner. */
   judge(run: Run): Promise<readonly string[]>;
   /** The lines it wrote before the interrupt (its verdict.txt). */
   linesSoFar(): readonly string[];
@@ -103,7 +102,7 @@ export interface AbortGuardOptions {
   clock?: () => Date;
   /** bounded.ts#Calls' grace between SIGTERM and SIGKILL. */
   graceMs?: number;
-  /** bounded.ts#boundFor's install bound (batch-12's B_INSTALL). */
+  /** bounded.ts#boundFor's install bound. */
   installSecs?: number;
   /** The judges' one budget in seconds, for all blocks together (120 by default). */
   judgeBudgetSecs?: number;
@@ -126,11 +125,11 @@ export interface AbortHead {
   errors?: readonly string[];
 }
 
-/** A restore's bound when its window names none (batch-12's B_RESTORE). */
+/** A restore's bound when its window names none. */
 export const RESTORE_SECS = 300;
 /**
- * The judges' budget when none is given: all complete blocks together. batch-12 gave its analyzer 300 s per block;
- * one budget for all keeps the abort's worst case short, and a block not judged in it is INTERRUPTED and rerun.
+ * The judges' budget when none is given: all complete blocks together. One budget for all keeps the abort's worst case
+ * short, and a block not judged in it is INTERRUPTED and rerun.
  */
 export const JUDGE_BUDGET_SECS = 120;
 /** The run's last steps' bound when none is given: a few bounded kills, each with its own bound. */
@@ -236,8 +235,8 @@ export class AbortGuard {
   }
 
   /**
-   * Run the batch's body with the abort installed. A throw out of it aborts the run (TRAPEXIT's port). It returns
-   * only when the body finished and no abort began; else it rejects once the abort is done (the real seam has exited).
+   * Run the batch's body with the abort installed. A throw out of it aborts the run. It returns only when the body
+   * finished and no abort began; else it rejects once the abort is done (the real seam has exited).
    */
   async run<T>(body: () => Promise<T>): Promise<T> {
     this.install();
@@ -291,8 +290,8 @@ export class AbortGuard {
 
   /**
    * End the kept groups (idb_companion) of `owner`'s calls (Call.owner), or all when none is given: a block done with
-   * its companion ends it, as batch-12 did after each iOS block. A kill not delivered is said at once and gets its
-   * RESTORE line at the next write (finish or the abort).
+   * its companion ends it. A kill not delivered is said at once and gets its RESTORE line at the next write (finish or
+   * the abort).
    */
   async stopKept(owner?: string): Promise<void> {
     await this.calls.stopKept(owner);
@@ -386,9 +385,9 @@ export class AbortGuard {
       // The groups that may still be running first: they are killed by hand before anything is put back by hand.
       if (this.writeRestore('interrupted', [...this.undeliveredHand(names), ...hand]).length > 0) this.say('ERROR', `state not provably put back — ${this.options.restoreFile}`);
       const blocks = await this.reports(cut, cleanups, late);
-      // Last, the kept groups (idb_companion): a restore or a judge may have needed them (batch-11 pkilled the
-      // companion only at the end of on_abort). A judge's or a kept group's kill not delivered comes after that
-      // RESTORE: its line is appended. stopKept never rejects (bounded.ts turns every kill failure into a result).
+      // Last, the kept groups (idb_companion): a restore or a judge may have needed them. A judge's or a kept group's
+      // kill not delivered comes after that RESTORE: its line is appended. stopKept never rejects (bounded.ts turns
+      // every kill failure into a result).
       await this.calls.stopKept();
       await this.lastSteps();
       this.writeRestore('interrupted', this.undeliveredHand(names));

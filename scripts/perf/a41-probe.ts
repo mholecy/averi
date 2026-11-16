@@ -71,11 +71,11 @@ import { averiServer, commitOf } from './session.js';
  *   (the first read: WDA's start) and ui_snapshot again (warm), then the server closed (its shutdown stops the WDA it
  *   started and waits for the port). A WDA this server did not start is refused by WdaServer, never measured as cold.
  * - `auto-tap` (A41b, under `treeSource: auto`): `--repeat` fresh servers, each (a41.ts#AutoRun) — launch_app (the
- *   catalog; since A41d WDA's bring-up inside it), the first tap after it (`text:"open"`; leg (a) judges the two
+ *   catalog; WDA's bring-up inside it), the first tap after it (`text:"open"`; leg (a) judges the two
  *   together, a41.ts#legAAnswer); untimed, the open cell waited for
  *   (`openSettled`), two warm taps on its A; launch_app again and the same first tap with WDA up; launch_app a third
  *   time, untimed the catalog waited for (`catalogSettled`), and the same catalog tap warm — the tap the first one is
- *   judged against. Then two more fresh servers each (A41b review r1): launch_app (its time kept per repeat), no read
+ *   judged against. Then two more fresh servers each (A41b): launch_app (its time kept per repeat), no read
  *   until WAITED_GAP_MS after it replied, and the same first tap (leg (b)); and launch_app (a `clearState`
  *   one on the last repeat, a41.ts#clearsStateOn: auto-tap is the WDA block's last child, so no later session runs on
  *   the wiped app — A44) with the first read at once — its root's label and WDA's active bundle, the app in
@@ -210,7 +210,7 @@ async function waitedTap(stop: () => Promise<unknown>, device: string, run: Auto
     s = await session(device, 'auto');
     await stop();
     run.waitedLaunch = await step(s, 'launch_app', { appId: LAB_APP.native.bundle }, (x) => !isError(x));
-    // From the reply, not the call (a41.ts#WAITED_GAP_MS; since A41d WDA is up before the reply, ADR 0046).
+    // From the reply, not the call (a41.ts#WAITED_GAP_MS; WDA is up before the reply, ADR 0046).
     const replied = performance.now();
     await sleep(WAITED_GAP_MS);
     run.waitedGapMs = performance.now() - replied;

@@ -37,8 +37,8 @@ export const LAB_DEVICES = {
 export type LabDeviceId = keyof typeof LAB_DEVICES;
 
 /**
- * A standing lab batch's selection words (lab-run's, lab-run-ios's): its name, the device it runs on, its live groups,
- * the `--groups` value's hint, every block in its order, and the blocks a group selects.
+ * A standing lab batch's selection words: its name, the device it runs on, its live groups, the `--groups` value's
+ * hint, every block in its order, and the blocks a group selects.
  */
 export interface Standing<G extends string = string> {
   batch: string;
@@ -83,7 +83,7 @@ export const KNOBS = {
 } as const;
 export type StandingKnobs = KnobValues<typeof KNOBS>;
 
-/** A standing batch's options: lab-run's and lab-run-ios.ts's (which ignores `jvms`). */
+/** A standing batch's options (lab-run-ios.ts ignores `jvms`). */
 export interface StandingOptions {
   argv: readonly string[];
   env: Env;
@@ -103,8 +103,8 @@ export const cleanStateCommand = (file: string): string => `printf '%s\\n' '{"di
 export const deviceInHand = (device: LabDeviceId, id: string | undefined): string => id ?? `<${LAB_DEVICES[device].what}: ${LAB_DEVICES[device].flags}>`;
 
 /**
- * The hand line for a WebDriverAgent block's state file left dirty (lab-run-ios.ts's and lab-a41-ios.ts's D43
- * window): the domains imported from the backups beside it, the compare by hand, then the file written clean.
+ * The hand line for a WebDriverAgent block's state file left dirty (the D43 window): the domains imported from the
+ * backups beside it, the compare by hand, then the file written clean.
  */
 export function windowStateHand(udid: string | undefined, file: string): string {
   const u = deviceInHand('udid', udid);

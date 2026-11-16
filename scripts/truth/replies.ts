@@ -27,7 +27,7 @@ import { escapeRegExp } from '../../src/util/regex.js';
 /**
  * One tool call through a real MCP client, its reply as the judges read it: the text blocks joined (any other block
  * `[<type>]`), `ERROR ` prefixed when the call was an error, `ERROR (thrown) …` when the client threw (a timeout, a
- * closed transport). The live golden (live.ts) and the performance baseline (scripts/perf/baseline.ts) call through it.
+ * closed transport).
  */
 export async function callReply(client: Client, name: string, args: Record<string, unknown>, timeoutMs = 300_000): Promise<string> {
   try {
@@ -128,9 +128,8 @@ export function hedgeWhy(reply: string): HedgeWhy | undefined {
 export const fullyHedged = (reply: string) => hedgedLead(reply) !== undefined;
 
 /**
- * The hedge covers a cut (`WHOLE`, alone or with `UNCOVERED`): what a flush edge no probe checked leaves unconfirmed.
- * A guard, true only of a lead that hedges a cut — false of no lead and of an UNCOVERED one alike
- * (live-visibility.ts#judgeScroll reads the lead after it).
+ * The hedge covers a cut (`WHOLE`, alone or with `UNCOVERED`): what a flush edge no probe checked leaves unconfirmed. A
+ * guard, true only of a lead that hedges a cut — false of no lead and of an UNCOVERED one alike.
  */
 export const hedgesCut = (lead: HedgedLead | undefined): lead is HedgedLead & { what: Exclude<HedgeWhat, 'UNCOVERED'> } => lead !== undefined && lead.what !== 'UNCOVERED';
 
@@ -139,28 +138,27 @@ export const claimsVisible = (reply: string) => VISIBLE_STOP.test(reply);
 
 /**
  * The reply says the element is not in the tree — no evidence of what covers it: the resolver's timeout (src/interact/
- * resolve.ts:358, "…waiting for element X to appear"), scroll_until's give-up (src/interact/scroll-text.ts:593,
- * "element never appeared in the tree"), the assert poll's (src/verify/poll-verdict.ts:78, "not found within N s"). Not
- * a timeout whose hint says the selector MATCHED nodes, none of them usable (src/interact/resolve.ts#ZERO_AREA_HINT and
- * the clipped-out hint: "it matched only 0×0 nodes …", "it matched only nodes clipped out above its scroll container …")
- * — the target is in the tree, refused for where it lies (edges/scroll-collapsing's A, its uiautomator bounds inverted:
+ * resolve.ts, "…waiting for element X to appear"), scroll_until's give-up (src/interact/scroll-text.ts, "element never
+ * appeared in the tree"), the assert poll's (src/verify/poll-verdict.ts, "not found within N s"). Not a timeout whose
+ * hint says the selector MATCHED nodes, none of them usable (src/ui-tree/miss.ts#ZERO_AREA_HINT and the clipped-out
+ * hint: "it matched only 0×0 nodes …", "it matched only nodes clipped out above its scroll container …") — the target
+ * is in the tree, refused for where it lies (edges/scroll-collapsing's A, its uiautomator bounds inverted:
  * calibration.json #10).
  */
 export const notInTree = (reply: string) => /waiting for element .* to appear(?![\s\S]*\(it matched only )|never appeared in the tree|not found within/.test(reply);
 
 /**
  * The call failed on not finding its target: `notInTree`, or a flow's `wait:` that timed out on it
- * (src/ui-tree/read-tree.ts:192, "Timed out after Nms waiting for element X" — no "to appear", so not `notInTree`, and
- * not a reply kind of its own: the ratchets' kinds stay as recorded). The live forms cases c5–c7 (live-forms.ts#judgeMissUnderSheet) ask it.
+ * (src/ui-tree/read-tree.ts#pollTimeoutMessage, "Timed out after Nms waiting for element X" — no "to appear", so not
+ * `notInTree`, and not a reply kind of its own: the ratchets' kinds stay as recorded).
  */
 export const missedTarget = (reply: string) => notInTree(reply) || /^ERROR Timed out after \d+ms waiting for element /.test(reply);
 
 /**
  * ensure_state's held "no" (D2, docs/adr/0033-a-held-rendered-no-ends-the-second-look-before-a-cheap-rung.md): the trace
- * line a second look the hold ended writes before its rung (src/flow/engine.ts:772, "second look: not detected, the
- * screen held still <s> — running <rung> before the <window> window's end") — how long the screen held and the rung it
- * ran; undefined when the reply has none (a look that ran its full window, or none at all). The live ensure cases
- * (live-ensure.ts) ask it.
+ * line a second look the hold ended writes before its rung (src/flow/engine.ts, "second look: not detected, the screen
+ * held still <s> — running <rung> before the <window> window's end") — how long the screen held and the rung it ran;
+ * undefined when the reply has none (a look that ran its full window, or none at all).
  */
 export function heldStill(reply: string): { heldS: number; flow: string } | undefined {
   const m = /second look: not detected, the screen held still ([\d.]+) s — running (\S+) before /.exec(reply);
@@ -187,10 +185,9 @@ export function bareEntry(reply: string): boolean {
  * `not found` (the target not in the tree: notInTree), `Tapped`, `visible` (scroll_until stopped on it), `PASS` and
  * `FAIL` (an assert's verdict), `refused` (any other ERROR), `other` — in that precedence: `not found` first, so a reply
  * that says the target never appeared is that, whatever else it opens with. The live judges test `Tapped` and `visible`
- * through it since round 5 (they read claimsTap and VISIBLE_STOP before): a `Tapped …` or `Element … visible …` reply
- * that also said "never appeared in the tree" or "waiting for element … to appear" would now count as no claim. No
- * committed live record holds one (the rejudges are unchanged); a claim that also says it never found its target is
- * no claim to hold the app to.
+ * through it: a `Tapped …` or `Element … visible …` reply that also said "never appeared in the tree" or "waiting for
+ * element … to appear" counts as no claim. No committed live record holds one; a claim that also says it never found
+ * its target is no claim to hold the app to.
  */
 export type ReplyKind = 'not found' | 'Tapped' | 'visible' | 'PASS' | 'FAIL' | 'refused' | 'other';
 export function replyKind(reply: string): ReplyKind {
@@ -204,8 +201,8 @@ export function replyKind(reply: string): ReplyKind {
 }
 
 /**
- * A form call claims it did what it was asked: `Filled …`, `Cleared …`, `Tapped …`, and not `NOT verified` (src/mcp/
- * tool-text.ts: a fill whose read-back did not confirm it says so) — the live forms cases' claim (live-forms.ts#holds).
+ * A form call claims it did what it was asked: `Filled …`, `Cleared …`, `Tapped …`, and not `NOT verified` (src/
+ * interact/fill-text.ts#fillReply: a fill whose read-back did not confirm it says so).
  */
 export const claimsDone = (reply: string) => /^(Filled|Cleared|Tapped)/.test(reply) && !/NOT verified/.test(reply);
 
@@ -267,11 +264,11 @@ export const screenChangedSaid = (reply: string) => /stopped after \d+ swipes? �
 
 /**
  * The reply names scroll_until as the remedy (the off-screen, outside-its-scroll-view and sliver refusals do: src/
- * interact/tap-judgement.ts:336, "scroll_until it first") — in its own words, not in a selector it echoes.
+ * interact/tap-judgement.ts, "scroll_until it first") — in its own words, not in a selector it echoes.
  */
 export const scrollAdvice = (reply: string) => /scroll_until/.test(ownWords(reply));
 
-/** The reply names the soft keyboard in its own words — a tap refused under it (golden-spec/forms.ts's under-keyboard row). */
+/** The reply names the soft keyboard in its own words — a tap refused under it. */
 export const namesKeyboard = (reply: string) => /\bsoft keyboard\b/i.test(ownWords(reply));
 
 /**
@@ -281,8 +278,8 @@ export const namesKeyboard = (reply: string) => /\bsoft keyboard\b/i.test(ownWor
 export const keyboardUnlistedSaid = (reply: string) => namesKeyboard(reply) && ownWords(reply).includes(KEYBOARD_UNLISTED.idb);
 
 /**
- * averi's reply for a tap it moved off a node's centre to an uncovered piece (src/interact/tap-judgement.ts:325,
- * `Aim.moved`): `Tapped <selector> at (x,y) — its centre (x,y) is under …; tapped the uncovered part WxH`
+ * averi's reply for a tap it moved off a node's centre to an uncovered piece (src/interact/tap-judgement.ts#Aim.moved):
+ * `Tapped <selector> at (x,y) — its centre (x,y) is under …; tapped the uncovered part WxH`
  * (golden-spec/base.ts#atProbe) — read in its own words.
  */
 const MOVED_TAP = / at \(-?[\d.]+,-?[\d.]+\) — its centre \(-?[\d.]+,-?[\d.]+\) is .*; tapped the uncovered part \d+x\d+/;
@@ -292,12 +289,11 @@ export const movedTap = (reply: string) => MOVED_TAP.test(ownWords(reply));
 const PROBES_HELD = /(a probe swipe|(\d+) probe swipes) toward it moved nothing/;
 
 /**
- * The side of a flush edge the `fully` stop says it probed (src/interact/scroll-text.ts#flushText, the wording since
- * 9c7885e: "its <side> edge lies on its scroll container's (…), and a probe swipe toward it moved nothing" — or, at a
- * node pinned in it (VA1), "its <side> edge lies on the edge of <node> (…), pinned at its scroll container's (…) <side>
- * and drawn after it, and a probe swipe toward it moved nothing"; since T12 "2 probe swipes toward it moved nothing",
- * both read, as records keep the older), or undefined when it says none
- * (golden-spec/rows.ts#flushProbe).
+ * The side of a flush edge the `fully` stop says it probed (src/interact/scroll-text.ts#flushText: "its <side> edge
+ * lies on its scroll container's (…), and a probe swipe toward it moved nothing" — or, at a node pinned in it (VA1),
+ * "its <side> edge lies on the edge of <node> (…), pinned at its scroll container's (…) <side> and drawn after it, and
+ * a probe swipe toward it moved nothing"; since T12 "2 probe swipes toward it moved nothing", both read, as records
+ * keep the older), or undefined when it says none.
  */
 export function flushProbedSide(reply: string): 'top' | 'bottom' | 'left' | 'right' | undefined {
   return new RegExp(`its (top|bottom|left|right) edge lies on (?:its scroll container's|the edge of) .*${PROBES_HELD.source}`).exec(reply)?.[1] as 'top' | 'bottom' | 'left' | 'right' | undefined;
@@ -318,8 +314,7 @@ export function flushProbesSaid(reply: string): number | undefined {
  * bar), `scrollable` (#7's second half: a scroll view shorter than the screen, its frame over the title) — read from the
  * guard's own clause (src/interact/keyboard-in-tree.ts, `none of the configured dismissals is usable on this screen
  * (…)`, each skipped dismissal's `covered by <role> …` from src/interact/keyboard-dismissal.ts), not from any "toolbar"
- * in the reply: its advice names the input-accessory toolbar whatever covered the dismissal
- * (golden-spec/rows.ts#dismissRow). undefined: no such clause.
+ * in the reply: its advice names the input-accessory toolbar whatever covered the dismissal. undefined: no such clause.
  */
 // Errs safe: a `)` inside an earlier part of the clause (a selector's text) ends the match before `covered by`, and
 // the row then names no cover — the mismatch stays red, only its wording loses the role.
@@ -328,7 +323,7 @@ export const dismissalCover = (reply: string): string | undefined => /none of th
 /**
  * A tap refused only after the configured dismissal hid the keyboard (src/interact/keyboard-in-tree.ts: `… was not
  * tapped: after <dismissal> was tapped … to hide the soft keyboard, …`) — the field then refused for where it lies once
- * the keyboard is gone (live-visibility.ts#judgeDismissal).
+ * the keyboard is gone.
  */
 export const refusedAfterDismissal = (reply: string) => /was not tapped: after .* was tapped .* to hide the soft keyboard/.test(reply);
 
@@ -347,8 +342,8 @@ export const MAX_SWIPES = bound.slice(bound.indexOf('('));
  * through a whole ScrollOutcome, or (the held hedge) inside #flushText's sentence around a container's rect — so
  * tests/truth/replies.test.ts holds each one to that file and drives the builders that write them. The unaimable
  * stop's end (D68), the unfit stop's remedy (D52), the flush cut a probe proved (the hedge D62 keeps), the inferred
- * axis (D59), and the hedge on two held reveals (T11). The unchecked flush clause (`it may be cut there`) is no longer
- * keyed on: since T17 a hedged stop's lead says it (`fullyHedged`, which reads the pre-T17 records' `; but` too).
+ * axis (D59), and the hedge on two held reveals (T11). The unchecked flush clause (`it may be cut there`) is not keyed
+ * on: a hedged stop's lead says it (T17; `fullyHedged`, which reads the pre-T17 records' `; but` too).
  */
 export const CAROUSEL_REPLY_WORDS = [
   'more swipes are unlikely to help',
@@ -360,12 +355,12 @@ export const CAROUSEL_REPLY_WORDS = [
 const [UNAIMABLE, UNFIT, PROVEN_CUT, INFERRED_AXIS, HELD_CUT] = CAROUSEL_REPLY_WORDS;
 
 /**
- * What a carousel's `scroll_until … fully: true` replied, from a closed set (T7a; the carousel judges read it): `unaimable`
- * (D68's stop: no swipe can bring it whole, the round sent nothing more — it says "drop fully: true" too, so it is
- * asked first), `unfit` (D52's: as wide as its scroll view), `maxSwipes-hedged` (the bound, with the flush cut a probe
- * proved: "may still be cut there" — D62's honest end and ADR 0021's residual), `fully-visible` (the stop claimed whole,
- * by the tree or the eyes, its lead no hedge — `fullyHedged`, T17 — batch-9's false pass reads so),
- * and `other` (a bound without that hedge, a stuck stop, a plain stop, any other error).
+ * What a carousel's `scroll_until … fully: true` replied, from a closed set (T7a): `unaimable` (D68's stop: no swipe
+ * can bring it whole, the round sent nothing more — it says "drop fully: true" too, so it is asked first), `unfit`
+ * (D52's: as wide as its scroll view), `maxSwipes-hedged` (the bound, with the flush cut a probe proved: "may still be
+ * cut there" — D62's honest end and ADR 0021's residual), `fully-visible` (the stop claimed whole, by the tree or the
+ * eyes, its lead no hedge — `fullyHedged`, T17 — batch-9's false pass reads so), and `other` (a bound without that
+ * hedge, a stuck stop, a plain stop, any other error).
  */
 export type CarouselReply = 'unaimable' | 'unfit' | 'maxSwipes-hedged' | 'fully-visible' | 'other';
 export function carouselReply(reply: string): CarouselReply {
@@ -433,24 +428,24 @@ export const refusedUnsentSaid = (reply: string) => reply.includes(UNSENT);
 
 /**
  * What a fill's error says of a field the typing left as it was (src/interact/fill-text.ts's `unchanged` caveat, "the
- * field did not change: …"): the phrase live-forms.ts#refusedUnchanged and #refusedOnFocus ask. Bare, so it also
- * accepts the deletes' sentence (fill-text.ts, "… that the deletes did not change") and scroll_until's "did not change
- * the screen"; tightening it to "the field did not change" would be a judge change, not this read's move here.
+ * field did not change: …"). Bare, so it also accepts the deletes' sentence (fill-text.ts, "… that the deletes did not
+ * change") and scroll_until's "did not change the screen"; tightening it to "the field did not change" would be a judge
+ * change.
  */
 export const UNCHANGED_SAID = UNCHANGED;
 
-/** A refusal names the remedy for a field under a bar: scroll it out from under, or dismiss the keyboard first (live-forms.ts#judgeNoteFill). */
+/** A refusal names the remedy for a field under a bar: scroll it out from under, or dismiss the keyboard first. */
 export const underBarRemedySaid = (reply: string) => reply.includes(OUT_FROM_UNDER) || reply.includes(DISMISS_FIRST);
 
-/** The eyes' band over a stop's target: "PARTLY UNDER a surface the tree does not list: …" (live-forms.ts#judgePhoneScroll). */
+/** The eyes' band over a stop's target: "PARTLY UNDER a surface the tree does not list: …". */
 const BAND_SAID = new RegExp(`\\b${escapeRegExp(BAND)}\\b`);
 export const bandSaid = (reply: string) => BAND_SAID.test(reply);
 
 /**
- * The reply names `direction` to scroll: `direction: "up"` (live-visibility.ts#judgeAndroidTurn). The producer judged
- * is src/ui-tree/sides.ts#revealText (`scroll_until it with direction: "up"`), the pin's anchor; untriedSideText
- * (src/interact/target-text.ts) and scroll-text.ts's turn-back sentence (`— try direction: "<back>"`) write the
- * fragment too, unpinned. Not derived from revealText: that would narrow the judge.
+ * The reply names `direction` to scroll: `direction: "up"`. The producer judged is src/ui-tree/sides.ts#revealText
+ * (`scroll_until it with direction: "up"`), the pin's anchor; untriedSideText (src/interact/target-text.ts) and
+ * scroll-text.ts's turn-back sentence (`— try direction: "<back>"`) write the fragment too, unpinned. Not derived from
+ * revealText: that would narrow the judge.
  */
 export const directionNamed = (reply: string, direction: Direction) => reply.includes(`${DIRECTION}${direction}"`);
 
@@ -463,11 +458,10 @@ export const scrollVerdictSaid = (reply: string): boolean => /^ERROR scroll_unti
 
 /**
  * A scroll_until failure that names a side it never read: `if it lies above, try direction: "up"` (src/interact/
- * target-text.ts#untriedSideText, each side's sentence built by it, not copied) — false of a list that never moved
- * (live-visibility.ts#judgeAbsentAtEnd). Deliberately exact: A14 asked to derive it, and untriedSideText is its only
- * producer, so the whole sentence is matched. Unlike directionNamed, kept wide (the `direction: "…"` fragment, which
- * three producers write) so as not to narrow its judge: this one derives every word it reads, that one pins a
- * fragment.
+ * target-text.ts#untriedSideText, each side's sentence built by it, not copied) — false of a list that never moved.
+ * Deliberately exact: A14 asked to derive it, and untriedSideText is its only producer, so the whole sentence is
+ * matched. Unlike directionNamed, kept wide (the `direction: "…"` fragment, which three producers write) so as not to
+ * narrow its judge: this one derives every word it reads, that one pins a fragment.
  */
 const UNTRIED_SIDES = EDGES.map(untriedSideText);
 export const untriedSideSaid = (reply: string) => UNTRIED_SIDES.some((words) => reply.includes(words));

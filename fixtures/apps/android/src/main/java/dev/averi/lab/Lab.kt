@@ -26,7 +26,8 @@ import kotlin.math.roundToInt
 /**
  * The layers this app can build. A cell of another layer (one the iOS app gained first) is shown as unsupported.
  * `dialog-fullscreen` and `bottom-sheet-dialog` are Android's own (round 7, Presented.kt): the windows ADR 0018's
- * residual 19 names unmeasured; `dialog-views-fullscreen` (round 1023b) a Views dialog at an activity's shape.
+ * residual 19 covers, closed by its amendment on the window manager's word; `dialog-views-fullscreen` (round 1023b) a
+ * Views dialog at an activity's shape.
  */
 val SUPPORTED_LAYERS = setOf("none", "sheet-medium", "alert", "dialog-fullscreen", "bottom-sheet-dialog", "dialog-views-fullscreen")
 
@@ -37,9 +38,9 @@ val SUPPORTED_LAYERS = setOf("none", "sheet-medium", "alert", "dialog-fullscreen
 data class Target(val tag: String, val color: Long, val slot: Int, val onLayer: Boolean, val text: String? = null, val label: String? = null)
 
 /**
- * `family`: base, presented, forms, edges, bars, false-covers, text, held, views — MainActivity's CellRouter routes by it. `form`: a form
- * cell's catalog entry as it stands (Forms.kt reads it) — a form builds its own picker sheet, so its `sheet-large` is
- * supported where a coloured-target cell's is not. `held`: a held cell's phase lengths as they stand (Held.kt reads them).
+ * `family`: base, presented, forms, edges, bars, false-covers, text, held, views. `form`: a form cell's catalog entry
+ * as it stands — a form builds its own picker sheet, so its `sheet-large` is supported where a coloured-target cell's
+ * is not. `held`: a held cell's phase lengths as they stand.
  */
 data class Cell(val id: String, val layer: String, val targets: List<Target>, val family: String? = null, val form: JSONObject? = null, val held: JSONObject? = null) {
     val supported get() = layer in SUPPORTED_LAYERS || (form != null && layer == "sheet-large")
@@ -181,7 +182,7 @@ class Lab(context: Context, private val screen: Rect) {
 
     /**
      * A value read out under `key` in the state's offsets that is no scroll container's offset and takes no stroke —
-     * L7's carousels' `carousel.index`, the card they rest on (Edges.kt). No cell before L7 writes one.
+     * L7's carousels' `carousel.index`, the card they rest on (Edges.kt).
      */
     fun index(key: String, value: Int) {
         if (offsets[key] == value) return
@@ -270,7 +271,7 @@ class Lab(context: Context, private val screen: Rect) {
     }
 }
 
-// --- phase 3's geometry, read once for every family that reports it (Edges.kt, Bars.kt, Views.kt) ---
+// --- phase 3's geometry, read once for every family that reports it ---
 
 /** A View's unclipped frame on the screen, in pixels. */
 internal fun onScreen(v: View): Rect =

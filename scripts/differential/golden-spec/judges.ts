@@ -7,8 +7,8 @@ import type { StopAsk, TapAsk } from '../../truth/target-contract.js';
 /**
  * The judges every family's rows share (golden-spec.ts, the façade, says what the table is): the verbs, an
  * expectation's shape, what a call SENT (the taps and swipes the fake device logged), and the one classification every
- * row goes through (classed). What a reply SAYS is read by scripts/truth/replies.ts alone — the live judges' reader
- * too; the helpers here that take an Outcome hand it its reply.
+ * row goes through (classed). What a reply SAYS is read by scripts/truth/replies.ts alone (but for closesItsOwnLayer's
+ * own `scroll_until` check); the helpers here that take an Outcome hand it its reply.
  */
 
 /**

@@ -393,7 +393,7 @@ private struct ShortScroll: ViewModifier {
 }
 
 // --- the formats (scripts/truth/schema.ts#FieldFormat, D18; the same rules as Forms.kt's and the React Native app's
-// src/format.ts) ---
+// src/format.ts, `date` aside: only the native apps have it) ---
 
 private func isGap(_ c: Character) -> Bool { c == " " || c == "\u{00A0}" || c == "\u{202F}" }
 

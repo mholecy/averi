@@ -6,12 +6,12 @@ import type { CallResult } from './bounded.js';
  * A batch writes two kinds of line. A **step line** says how one step of the run went, its word first, padded:
  * `OK   kf analyze`, `FAIL E5 restore (exit 3) — see restore.log`. A **verdict line** says what a block found, its label
  * first: `kf live verdict: INCONCLUSIVE — the premise does not hold`. The SUMMARY gathers the run's verdict lines in a
- * fixed order between two markers; whoever waits for a batch waits for `======== SUMMARY` (unchanged since batch-1).
+ * fixed order between two markers; whoever waits for a batch waits for `======== SUMMARY`.
  *
- * The ERROR lines batch-12 collected from each block's logs and analyze.txt are the runner's to read (runner.ts, T2
- * S6a): it knows those files and hands them in with `errors`. The RESTORE block needs no `grep "run $RUN_ID"`
- * filter any more: a run refuses to start while a RESTORE file exists (run-dir.ts#refusals) and only appends to it,
- * so what it prints is what this run wrote (`restore.written`, header line included, as batch-12's `cat`).
+ * The ERROR lines of each block's logs and analyze.txt are the runner's to read (runner.ts, T2 S6a): it knows those
+ * files and hands them in with `errors`. The RESTORE block needs no filter by run: a run refuses to start while a
+ * RESTORE file exists (run-dir.ts#refusals) and only appends to it, so what it prints is what this run wrote
+ * (`restore.written`, header line included).
  */
 
 /** Step words: OK done; DONE ended with a judged exit 1 (steps.ts#stepWordOf); FAIL; WARN; NOTE; SKIP; ERROR. */
@@ -20,10 +20,10 @@ export type StepWord = (typeof STEP_WORDS)[number];
 
 /**
  * Verdict words. A block or one of its parts: PASS, FAIL, INCONCLUSIVE (its precondition not shown, or too few runs
- * judged — never a number from a run that could not set its state up), REPRODUCED (a control side shows the bug the
- * fix removes), OBSERVED (a fact recorded, nothing judged), SKIP (not run, by a knob or a premise). INTERRUPTED: a
- * block the abort SUMMARY could not judge. OK, WARN and ERROR: a cleanup or check line (`E5 cleanup: OK — …`,
- * batch-11's `D43 WDA-window compare: WARN — …`), the lab lines. WARN alone never fails the run (exitCodeOf).
+ * judged — never a number from a run that could not set its state up), REPRODUCED (a control side shows the bug the fix
+ * removes), OBSERVED (a fact recorded, nothing judged), SKIP (not run, by a knob or a premise). INTERRUPTED: a block
+ * the abort SUMMARY could not judge. OK, WARN and ERROR: a cleanup or check line (`E5 cleanup: OK — …`,
+ * `D43 WDA-window compare: WARN — …`), the lab lines. WARN alone never fails the run (exitCodeOf).
  */
 export const VERDICTS = ['PASS', 'FAIL', 'INCONCLUSIVE', 'REPRODUCED', 'OBSERVED', 'SKIP', 'INTERRUPTED', 'OK', 'WARN', 'ERROR'] as const;
 export type Verdict = (typeof VERDICTS)[number];
@@ -55,10 +55,9 @@ export const NOTHING_DONE = ' — nothing was done';
 /** A refusal: `ERROR <text> — nothing was done`. */
 export const refusedLine = (text: string): string => `${stepLine('ERROR', text)}${NOTHING_DONE}`;
 
-/** A number as two digits (`09`): the step times and the RUN_ID. */
 export const twoDigits = (n: number): string => String(n).padStart(2, '0');
 
-/** A time of day as the batch writes it: `HH:MM:SS`, local (the step lines, the INTERRUPTED line, RESTORE's header). */
+/** A time of day as the batch writes it: `HH:MM:SS`, local. */
 export const timeOf = (d: Date): string => `${twoDigits(d.getHours())}:${twoDigits(d.getMinutes())}:${twoDigits(d.getSeconds())}`;
 
 /**
@@ -78,8 +77,8 @@ export const messageOf = (e: unknown): string => (e instanceof Error ? e.message
 export const failedCall = (r: CallResult): boolean => r.code !== 0 || r.timedOut;
 
 /**
- * A failed call in words: `exit n <its first line>`, or that it passed its bound — stderr's first line before stdout's
- * (ios-defaults.ts's, shared from here since T2 S5).
+ * A failed call in words: `exit n <its first line>`, or that it passed its bound — the first line of stderr and stdout
+ * joined (stderr first).
  */
 export const exitText = (r: CallResult): string => {
   const said = firstLineOf(r.err + r.out);
@@ -107,9 +106,9 @@ export function parseVerdictLine(line: string): { label: string; verdict: Verdic
 }
 
 /**
- * Whether a SUMMARY line says FAIL: batch-12's exit rule, `^[^:]+: FAIL( |$)` — FAIL right after the first colon,
- * whatever follows it (`lv-d62 verdict: FAIL 2/3 dropped` too, which parseVerdictLine, strict for the lines this module
- * writes, reads as none) — or a step line whose word is FAIL.
+ * Whether a SUMMARY line says FAIL: the exit rule, `^[^:]+: FAIL( |$)` — FAIL right after the first colon, whatever
+ * follows it (`lv-d62 verdict: FAIL 2/3 dropped` too, which parseVerdictLine, strict for the lines this module writes,
+ * reads as none) — or a step line whose word is FAIL.
  */
 export const failsIn = (line: string): boolean => /^(?:[^:]+: )?FAIL(?: |$)/.test(line);
 
@@ -175,8 +174,8 @@ function bodyOf(s: Summary): string[] {
 
 /**
  * The SUMMARY: the marker; the checkout line; INTERRUPTED when it was; the lab lines; each block's verdict lines; the
- * protected-key lines; RESTORE (none, or its file and what this run wrote into it); this run's ERRORs; the end marker. Each body line
- * once (batch-6's deduplication: an ERROR noted twice prints once).
+ * protected-key lines; RESTORE (none, or its file and what this run wrote into it); this run's ERRORs; the end marker.
+ * Each body line once (an ERROR noted twice prints once).
  */
 export function summaryLines(s: Summary): string[] {
   const end = `${SUMMARY_MARKER} end (run ${s.runId}${s.interrupted === undefined ? '' : ', INTERRUPTED'})`;
@@ -198,9 +197,9 @@ export function exitCodeOf(s: Summary): 0 | 1 | 2 | 130 {
 }
 
 /**
- * A JSON value as one key (T2 S6b review round 1, NIT 8: a run's identity, asked and done; here since T2b-1's code
- * review, so the pure halves need no io): every object's fields sorted, at every depth, so two equal values built in
- * another field order give the same text; arrays keep their order.
+ * A JSON value as one key (T2 S6b review round 1, NIT 8: a run's identity, asked and done; it lives here so the pure
+ * halves need no io): every object's fields sorted, at every depth, so two equal values built in another field order
+ * give the same text; arrays keep their order.
  */
 export function canonicalJson(v: unknown): string {
   if (Array.isArray(v)) return `[${v.map(canonicalJson).join(',')}]`;

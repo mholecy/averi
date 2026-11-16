@@ -31,9 +31,8 @@ function labUdid(udid: string): string {
 }
 
 /**
- * The lab's WebDriverAgent by its exact patterns: its own derived data
- * (lab-device.ts#LAB_WDA_DERIVED_DATA, never device-check's `averi-wda`) and the runner under the lab simulator's
- * folder.
+ * The lab's WebDriverAgent by its exact patterns: its own derived data (lab-device.ts#LAB_WDA_DERIVED_DATA, never
+ * device-check's `averi-wda`) and the runner under the lab simulator's folder.
  */
 export const wdaKillPatterns = (udid: string): string[] => ['DerivedData/averi-wda-lab([/ ]|$)', `Devices/${labUdid(udid)}/.*WebDriverAgentRunner`];
 
@@ -138,7 +137,7 @@ const AX_FRAME = /\{\{([-\d.]+),\s*([-\d.]+)\},\s*\{([-\d.]+),\s*([-\d.]+)\}\}/;
 type Element = Record<string, unknown> | null;
 const text = (v: unknown): string => (v === undefined || v === null ? '' : String(v));
 
-/** An element's centre (open-in-alert.py's centre): its `frame`, else its `AXFrame` string; none without one. */
+/** An element's centre: its `frame`, else its `AXFrame` string; none without one. */
 function centreOf(e: NonNullable<Element>): Point | undefined {
   const f = e.frame as Record<string, unknown> | null | undefined;
   if (typeof f === 'object' && f !== null && ['x', 'y', 'width', 'height'].every((k) => typeof f[k] === 'number')) {
@@ -152,9 +151,9 @@ function centreOf(e: NonNullable<Element>): Point | undefined {
 }
 
 /**
- * `idb ui describe-all --json` read for the alert (open-in-alert.py's find): an element labelled, or valued, "Open in
- * …" is the alert; its buttons; Cancel — a button whose label, trimmed, is "cancel" in any case — and its centre. A
- * read that failed or printed no JSON list is unread, never none.
+ * `idb ui describe-all --json` read for the alert: an element labelled, or valued, "Open in …" is the alert; its
+ * buttons; Cancel — a button whose label, trimmed, is "cancel" in any case — and its centre. A read that failed or
+ * printed no JSON list is unread, never none.
  */
 export function openInAlertOf(r: CallResult): OpenInAlert {
   if (failedCall(r)) return { state: 'unread', why: `idb ui describe-all: ${exitText(r)}` };
@@ -167,7 +166,7 @@ export function openInAlertOf(r: CallResult): OpenInAlert {
   if (!Array.isArray(els)) return { state: 'unread', why: `idb ui describe-all printed no JSON list: ${firstLineOf(r.out)}` };
   // An entry that is no element (null, a number) holds no label: never the alert, never a button.
   const all = els as Element[];
-  // Found only by a label: never a null entry.
+  // Found by a label or a value: never a null entry.
   const alert = all.find((e) => OPEN_IN.test(text(e?.AXLabel)) || OPEN_IN.test(text(e?.AXValue))) as NonNullable<Element> | undefined;
   if (alert === undefined) return { state: 'none' };
   const buttons = all.filter((e): e is NonNullable<Element> => e?.type === 'Button');
@@ -177,7 +176,7 @@ export function openInAlertOf(r: CallResult): OpenInAlert {
 
 // ----------------------------------------------------------------------------------------- the installed lab
 
-/** Why an installed cells.json is not main's catalog byte for byte (batch-11's `cmp -s`), or undefined when it is. */
+/** Why an installed cells.json is not main's catalog byte for byte, or undefined when it is. */
 export function cellsWhy(installed: string | undefined, catalog: string | undefined, where: string): string | undefined {
   if (catalog === undefined) return `main's catalog (${CATALOG_PATH}) could not be read`;
   if (installed === undefined) return `${where}'s cells.json could not be read`;
@@ -209,7 +208,7 @@ export interface Jdk17 {
 /** The JDK the build ran under, for its line: `JDK 17: <home> (from <source>)`. */
 export const jdkLine = (jdk: { home: string; from: JdkFrom }): string => `JDK 17: ${nameInLine(jdk.home)} (from ${jdk.from})`;
 
-/** What the JDK lookup asks (T23), each answer injected: lab-build.ts gives the config's env, the call, the fs. */
+/** What the JDK lookup asks (T23), each answer injected. */
 export interface JdkProbes {
   /** JAVA_HOME as the env says it (empty: unset). */
   javaHomeEnv: string | undefined;

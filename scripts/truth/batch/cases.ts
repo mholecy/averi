@@ -26,8 +26,8 @@ import { nameInLine, verdictLine } from './words.js';
  */
 
 /**
- * What a live run was asked (batch-11's `asked`): the platform, the lab app, its sources and case ids (none: all).
- * batch-11 also wrote `"kind": "new"`, which nothing read: it is not asked for, and a `.cases` holding it still reads.
+ * What a live run was asked: the platform, the lab app, its sources and case ids (none: all). A `.cases` that also
+ * holds `"kind": "new"` still reads: nothing reads it, and it is not asked for.
  */
 export interface Asked {
   platform: LiveSelection['platform'];
@@ -36,11 +36,10 @@ export interface Asked {
   sources: readonly string[];
   /** `--cases`: these ids only; empty: every case of its groups. */
   cases: readonly string[];
-  /** `--groups`; none: forms, as batch-11's live_run ran. */
+  /** `--groups`; none: forms. */
   groups?: readonly string[];
 }
 
-/** A run's five files, by its name: `<name>.cases`, `.json`, `.log`, `.rejudge.txt`, `.rejudge.json`. */
 export const runFiles = (dir: string, name: string) => ({
   cases: join(dir, `${name}.cases`),
   record: join(dir, `${name}.json`),
@@ -57,9 +56,9 @@ const LIVE_SHAPE = 'is not what a live run is asked (platform ios or android, ap
 /**
  * Write `<dir>/<name>.cases`: what the live run is asked, as JSON. Called before anything of the run is done. Only a
  * live run's (`Asked`, checked at run time too: nothing is written for anything else): runsIn and completeness read
- * every `.cases` as one, so a non-live block keeps its own record elsewhere (batch-12's E5 wrote `{"runs":3}`; the
- * runner's asks and record, T2 S6a). Never overwritten (io.ts's exclusive create): a run folder is never reused, so a
- * second .cases of one name is the batch's mistake. Returns its path.
+ * every `.cases` as one, so a non-live block keeps its own record elsewhere (the runner's asks and record, T2 S6a).
+ * Never overwritten (io.ts's exclusive create): a run folder is never reused, so a second .cases of one name is the
+ * batch's mistake. Returns its path.
  */
 export function writeCases(fs: BatchFs, dir: string, name: string, asked: Asked): string {
   plainSegment('run name', name);
@@ -109,7 +108,6 @@ export const selectorOf =
       .filter((c) => c.sources === undefined || c.sources.includes(source))
       .map((c) => c.id);
 
-/** A run: complete, with what it was asked; or why not, every gap at once. */
 export type Completeness = { ok: true; asked: Asked } | { ok: false; why: string };
 
 const isStrings = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === 'string');

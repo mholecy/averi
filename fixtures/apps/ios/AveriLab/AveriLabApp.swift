@@ -49,9 +49,9 @@ struct CellList: View {
 }
 
 /// A cell's screen, by its family (the catalog stamps each cell with it, scripts/truth/catalog.ts). A family adds its
-/// cells in its own file; this switch names every family of scripts/truth/schema.ts#FAMILIES once, so no batch of phase
-/// 3 edits it. A family it does not name (or none) shows an UnbuiltCell, never ready: a capture of it times out naming
-/// the cell.
+/// cells in its own file; this switch names every family of scripts/truth/schema.ts#FAMILIES the native apps build (all
+/// but react-native) once, so a new cell never edits it. A family it does not name (or none) shows an UnbuiltCell,
+/// never ready: a capture of it times out naming the cell.
 enum CellRouter {
     @MainActor @ViewBuilder
     static func screen(for cell: Cell) -> some View {

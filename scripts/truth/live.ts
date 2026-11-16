@@ -35,11 +35,11 @@ import { type CaseRig, runCase } from './run-case.js';
 import { parseLabApp, type LabApp } from './schema.js';
 
 /**
- * The live golden (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 1b — phase 5's mode brought forward for the
- * forms): averi's verbs that CHANGE state — a fill with and without clear, typing into the focused field, a fill on the
- * secure field and on a prefilled one, a tap under the keyboard with and without a dismissal, a picker row reached by
- * scroll_until — run through averi's MCP tools against the REAL lab simulator, and the app's own model (the state
- * file, Forms.swift) is the oracle. A replayed tree cannot judge these: typing changes nothing in it.
+ * The live golden (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 1b): averi's verbs that CHANGE state — a fill
+ * with and without clear, typing into the focused field, a fill on the secure field and on a prefilled one, a tap under
+ * the keyboard with and without a dismissal, a picker row reached by scroll_until — run through averi's MCP tools
+ * against the REAL lab simulator, and the app's own model (the state file, Forms.swift) is the oracle. A replayed tree
+ * cannot judge these: typing changes nothing in it.
  *
  *   node --import tsx scripts/truth/live.ts --udid <lab simulator> [--wda-port 8120] [--sources idb,wda]
  *     [--cases b1,p4] [--shots <dir>]
@@ -292,9 +292,10 @@ if (rejudging !== undefined) {
     });
   }
   // The summary: every case, a known one marked with its note (live-known.ts); exit 1 on an unknown MISMATCH, on a
-  // known case not intermittent that came out ok in a run of this checkout (fixed: strike it off), and on a case whose
-  // app wrote no first state (T10, live-cases.ts#noFirstState); and on a stale chooser premise (T20a). The record's
-  // labels (T16's device label, T20a's premise) as a rejudge reads them (live-cases.ts#summarizeRecord).
+  // known case not intermittent that came out ok in a run of this checkout (fixed: strike it off), on a SKIP of a case
+  // marked skipFails, on a case whose app wrote no first state (T10, live-cases.ts#noFirstState), on a failing hedged
+  // ceiling, and on a stale chooser premise (T20a). The record's labels (T16's device label, T20a's premise) as a
+  // rejudge reads them (live-cases.ts#summarizeRecord).
   const side = values.side ?? THIS_CHECKOUT;
   const { lines, exitCode } = summarizeRecord(record, results, { sources, side });
   console.log(lines.join('\n'));

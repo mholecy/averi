@@ -18,7 +18,8 @@ import { exitText, failedCall } from './words.js';
  *   and installed, its cells.json main's;
  * - `a41-idb`, every call idb's (no WebDriverAgent): the golden's `--json` (device-free, the A41c targets' source),
  *   then — each after the health check (ios-lab.ts#iosCheck) — scripts/perf/baseline.ts `--tree-source idb` (the
- *   A41b table's idb column: one session, BASELINE_REPEAT repeats) and scripts/perf/a41-probe.ts `--mode hit-test`;
+ *   A41b table's idb column: one session, A41_CHILDREN's repeats for it) and scripts/perf/a41-probe.ts
+ *   `--mode hit-test`;
  * - `a41-wda`, one D43 window (ios-lab.ts#wdaWindow: the health check, the three domains backed up, the work, the
  *   lab's WebDriverAgent ended, port 8120 proven free, the domains put back key by key, the end check, the compare),
  *   its work — each child after its own health check, which ends the lab's WebDriverAgent, so each starts from a
@@ -30,11 +31,11 @@ import { exitText, failedCall } from './words.js';
  * Every child is bounded (A41_SECS, each its own process group: a child past its bound goes whole) and logged
  * (`<name>.log` beside its JSON). A block's verdict is PASS when every child exited 0 and wrote its file, else
  * INCONCLUSIVE naming which — a probe measures, its verdict says only whether the measurement is whole. The report
- * block is PASS only with no file missing and no required part unproven (a41.ts#unprovenOf: the cadence, leg (b) of
- * the first tap, the foreground leg — A44). The ios need's end reads the finportal key again; the run's last step ends the lab's
- * WebDriverAgent and idb_companion. A signal puts an open window back and exits 130. What it leaves on the simulator
- * is what Gate C leaves: the WDA window's domains put back and compared; the lab app (and, if installed, the React
- * Native lab app) launched on cells through lab-device.ts, as live.ts launches them.
+ * block is PASS only with no file missing and no required part unproven (a41.ts#unprovenOf: the cadence, legs (a) and
+ * (b) of the first tap, the foreground leg — A44, A41d). The ios need's end reads the finportal key again; the run's
+ * last step ends the lab's WebDriverAgent and idb_companion. A signal puts an open window back and exits 130. What it
+ * leaves on the simulator is what Gate C leaves: the WDA window's domains put back and compared; the lab app (and, if
+ * installed, the React Native lab app) launched on cells through lab-device.ts, as live.ts launches them.
  *
  *     npm run truth:lab:ios:a41 -- --out <dir outside the checkout> --udid <lab simulator> [--groups idb|wda]
  *

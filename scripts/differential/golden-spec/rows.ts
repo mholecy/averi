@@ -12,8 +12,8 @@ import { BUDGET_MS, first, landed, notTapped, passed, passes, pointsText, reache
  * Phase 3's row types (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 3 B1): what each verb must answer of an
  * open target whose MEASURED geometry (truth.ts#geometryOf) is not `whole`, and of the dismissal and the stroke's
  * direction. Shared by the families: edges.ts and bars.ts map a geometry to its rows; B2–B5 wire them to their cells. A
- * target carries a geometry only when its capture's state reported the bands, scroll views or chrome — no capture
- * before phase 3 does — so none of them asks anything of the existing corpus.
+ * target carries a geometry only when its capture's state reported the bands, scroll views or chrome; a capture without
+ * them asks none of these rows.
  *
  * WHAT a row asks — the tap must fire, may refuse, must refuse (and with which remedy); a stop holds where the target
  * lies or not; `fully` asked or not; the target allowed missing from the tree — is the target contract's
@@ -32,7 +32,7 @@ import { BUDGET_MS, first, landed, notTapped, passed, passes, pointsText, reache
  * | R-sliver | sliver | tap | refused naming scroll_until, nothing tapped | ADR 0013; docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-reports-tapped-and-does-nothing.md |
  * | R-sliver | sliver | scroll_until | not reached where it is — the stop fails, whatever it swiped (the plain stop does not stop on a sliver; a replayed tree never moves) | ADR 0013 |
  * | R-land | partly-centre-in (reached) | tap | `Tapped`, every tap sent inside what shows (`visible`) | ADR 0005; docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md |
- * | R-land | centre-out, under-chrome | tap | refused, nothing sent — or `Tapped` inside its piece where the second probe fired (`reachedAtPiece`) | ADR 0005 (a covered target's tap moved to its piece, or refused) |
+ * | R-land | centre-out, under-chrome | tap | refused, nothing sent — or `Tapped` inside its piece where the second probe fired (`reachedAtPiece`) | docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md (a covered target's tap moved to its piece, or refused) |
  * | R-fully (R-absent) | laid out nowhere (CellTruth.absent) | scroll_until `fully: true` toward it | never "visible" (it has no frame), its swipes as R-stroke's (absentFullyRow) | ADR 0021 (D52's `unfit` needs it drawn cut by its clip, which no launch tree shows: R-unfit asks it of carousel-in-list-cut's C, T6d; D59's inferred axis needs a stroke that moved it, live only); ADR 0010 D59b amendment |
  * | R-unfit | partly-centre-in, centre-out, sliver, where src's unfitAlong conditions hold over the truth and the replayed tree (unfitSide: listed whole where its frame lies; cut by its scroll views' drawn frame along an axis, vertical first, both sides on the screen; the smallest of its scroll views along it told that axis by the tree, truth.ts#scrollAxisToldIn, uiautomator only; the drawn frame and the frame each at least that room less 1) — in R-fully's place (edges.ts) | scroll_until `fully: true` toward the cut side | `unfit` after no swipe (replies.ts#carouselReply), with no inferred-axis clause: the tree told the axis | ADR 0021 (D52's `unfit`; the T6d amendment): carousel-in-list-cut's C |
  * | R-fully | partly-centre-in, centre-out, sliver (and R-overlap's) | scroll_until `fully: true` | never "visible" where it is, whatever it swiped: it is cut — but a rect flush with its scroll container's edge, probed with a swipe toward it, may stop when the replayed probe moves nothing (the probe's answer is the device's: replies.ts#flushProbedSide) | ADR 0005 (the `fully` stop judges no sliver: a stop flush with a clipping container is the flush probe's to check, course.ts#PROBE_REACH), ADR 0009 (N-a, `fully`); docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md, docs/bugs/2026-10-09-android-fully-trusts-row-bounds-cut-at-a-sticky-header.md |
@@ -334,8 +334,9 @@ function notReachedStill(platform: Platform, t: TargetTruth, cell: CellTruth, ro
  * where Android's uiautomator cuts a node's bounds, is checked by a probe swipe toward it (ADR 0005, course.ts
  * #PROBE_REACH; docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md, its fix
  * 9c7885e) — on the device the probe moves a cut row and the stop goes on; in a replayed tree nothing moves. So a stop
- * that says it probed a flush edge (replies.ts#flushProbedSide) is accepted only where the TRUTH bears it out (flushProbe): what shows
- * of the target ends on that side exactly at its own scroll view's edge, and a swipe was sent from inside that scroll
+ * that says it probed a flush edge (replies.ts#flushProbedSide) is accepted only where the TRUTH bears it out
+ * (flushProbe): what shows of the target ends on that side within a pixel of its own scroll view's edge (at a top or
+ * left edge also where its piece ends at a pinned chrome's inner edge), and a swipe was sent from inside that scroll
  * view toward that edge. The replay checks only that the probe is sent toward the cut; whether it reveals the row and
  * the stop goes on is live (phase 5). Any other "visible" is red.
  */
@@ -441,10 +442,8 @@ export function unfitRow(platform: Platform, t: TargetTruth, ask: StopAsk, side:
 
 const NOT_PROBED = 'no flush probe said';
 
-/** A side a flush probe names (replies.ts#flushProbedSide). */
 type Side = NonNullable<ReturnType<typeof flushProbedSide>>;
 const edgeOf = (r: Rect, side: Side): number => ({ top: r.y, bottom: r.y + r.height, left: r.x, right: r.x + r.width })[side];
-/** Within a pixel/point. */
 const withinPixel = (a: number, b: number) => Math.abs(a - b) <= 1;
 
 /**

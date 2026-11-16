@@ -12,7 +12,8 @@ package dev.averi.lab
 //   bare phase and Welcome.
 //
 // Each element is identified lab.<cell>.<tag> (welcome, continue, home). Every phase change is logged (`phase`, `bare`
-// / `spinner` / `welcome` / `home`) before it is drawn, Continue's press as the `tap` `continue` — the judges' clock.
+// / `spinner` / `welcome` / `home`, or `unconfigured`) before it is drawn, Continue's press as the `tap` `continue` —
+// the judges' clock.
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement

@@ -10,11 +10,11 @@ import { LAB_WDA_DERIVED_DATA, LAB_WDA_PORT } from '../truth/lab-device.js';
 import { callReply } from '../truth/replies.js';
 
 /**
- * What the performance harnesses share (scripts/perf/baseline.ts, scripts/perf/a41-probe.ts): the checkout's commit, and
- * an averi server driven the way an agent drives it — its MCP tools through a real MCP client over the SDK's in-memory
- * transport (scripts/differential/connection.ts), on src/mcp/tools.ts#createAveriServer over a real AdapterRegistry:
- * Android's own adapter; on iOS the registry's own wiring (iosAdapterFor, the idb helper with it), with WebDriverAgent on
- * the lab's port and derived data (LAB_WDA_PORT, never 8100, which another session's WDA may hold).
+ * What the performance harnesses share: the checkout's commit, and an averi server driven the way an agent drives it —
+ * its MCP tools through a real MCP client over the SDK's in-memory transport (scripts/differential/connection.ts), on
+ * src/mcp/tools.ts#createAveriServer over a real AdapterRegistry: Android's own adapter; on iOS the registry's own
+ * wiring (iosAdapterFor, the idb helper with it), with WebDriverAgent on the lab's port and derived data (LAB_WDA_PORT,
+ * never 8100, which another session's WDA may hold).
  */
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));

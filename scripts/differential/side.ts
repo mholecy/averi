@@ -20,8 +20,8 @@ import { RecordedTreeSource } from './recorded-source.js';
  *   src/mcp/tools.ts            createAveriServer (the tool handlers)
  *   src/mcp/registry.ts         AdapterRegistry, defaultFactory (the live wiring) — the registry built through
  *                               `registry` below, which also takes the constructor an older side had; iosAdapterFor,
- *                               when the side has it (since D7a, 2026-10-31) — the live golden's iOS adapter (`liveIos`)
- *   src/adapters/discovery.ts   discoveryOver, when the side has it (since A3) — its discovery over the harness's listing
+ *                               when the side has it (D7a) — the live golden's iOS adapter (`liveIos`)
+ *   src/adapters/discovery.ts   discoveryOver, when the side has it (A3) — its discovery over the harness's listing
  *   src/adapters/ios.ts         IosAdapter (takes any IosTreeSource)
  *   src/adapters/wda-source.ts  parseWdaSourceValue (WdaTreeSource's parser)
  *   src/adapters/idb-helper.ts  idbHelperDisabled, when the side has it — the kill switch `liveIos` reports
@@ -43,21 +43,21 @@ export interface Side {
    */
   asksWdaBundle: boolean;
   /**
-   * The side's registry over `deps`, whichever constructor the side has: since 8413120 (2026-10-08) it takes
-   * `{ factory, discovery }`; before, the factory alone, and devices were listed by an UNBOUND adapter's
-   * `listDevices()` — so an older side gets a factory that answers an unbound call with the listing. Which one is
-   * told by the constructor's own behaviour (`takesDeps`), not by what else the module exports. The harness hands a
-   * listing; each side gets it as the discovery it reads (`discoveryFor`).
+   * The side's registry over `deps`, whichever constructor the side has: from 8413120 on it takes
+   * `{ factory, discovery }`; an older one takes the factory alone and lists devices through an UNBOUND adapter's
+   * `listDevices()` — so it gets a factory that answers an unbound call with the listing. Which one is told by the
+   * constructor's own behaviour (`takesDeps`), not by what else the module exports. The harness hands a listing; each
+   * side gets it as the discovery it reads (`discoveryFor`).
    */
   registry(deps: { factory: AdapterFactory; discovery: Listing }): AdapterRegistry;
   /**
    * The side's iOS adapter for a real simulator — what the live golden (scripts/truth/live.ts, `--side` or not) drives
-   * the lab simulator with; the replay does not use it. A side with src/mcp/registry.ts#iosAdapterFor (D7a, 2026-10-31)
-   * gets the server's own wiring, its idb helper included (ADR 0032, A23), so Gate C runs the transport users get. An
-   * older side gets the construction the live golden had before A23: its IosAdapter over its
-   * src/adapters/ios-tree-source.ts#createIosTreeSource, no helper (every idb call the CLI). `wiring` tags which, and
-   * for the server's wiring whether the kill switch (`AVERI_IDB_HELPER=off`, read when the side is loaded) puts every
-   * idb call on the CLI as well; `liveIosLine` words it for the run's log. A side with neither has none.
+   * the lab simulator with; the replay does not use it. A side with src/mcp/registry.ts#iosAdapterFor (D7a) gets the
+   * server's own wiring, its idb helper included (ADR 0032, A23), so Gate C runs the transport users get. An older side
+   * gets its IosAdapter over its src/adapters/ios-tree-source.ts#createIosTreeSource, no helper (every idb call the
+   * CLI). `wiring` tags which, and for the server's wiring whether the kill switch (`AVERI_IDB_HELPER=off`, read when
+   * the side is loaded) puts every idb call on the CLI as well; `liveIosLine` words it for the run's log. A side with
+   * neither has none.
    */
   liveIos?: LiveIos;
 }
@@ -125,10 +125,9 @@ export type Listing = DeviceDiscovery['list'];
 type DiscoveryOver = typeof import('../../src/adapters/discovery.js').discoveryOver;
 
 /**
- * A side's discovery over the harness's listing, read by every constructor since 8413120: callable as the listing
- * (until A3, 2026-11-01, discovery was a function), and an object with `list` and `check` (since). `check` is the
- * side's own `discoveryOver`'s, built without a proof — no host file is read, and the bound check lists, as before A3
- * when the harness passed no proof. A side without `discoveryOver` never asks `check`.
+ * A side's discovery over the harness's listing, read by every constructor: callable as the listing (a side before A3
+ * takes a function), and an object with `list` and `check` (A3 on). `check` is the side's own `discoveryOver`'s, built
+ * without a proof — no host file is read, and the bound check lists. A side without `discoveryOver` never asks `check`.
  * Delete this shim (and pass `over(listing)` straight) once no replayed side predates A3.
  */
 function discoveryFor(listing: Listing, over: DiscoveryOver | undefined): Listing & DeviceDiscovery {

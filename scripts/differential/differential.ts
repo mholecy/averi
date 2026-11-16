@@ -17,7 +17,7 @@ import type { CellConfig } from '../truth/schema.js';
  *
  *  1. per DEVICE VARIANT (what the fake device answers — the screen, the
  *     frame's scale, the Android keyboard and display, an iOS dismissal list
- *     in averi.yaml; VARIANTS below), one MCP server
+ *     in averi.yaml; `variantsOf` below), one MCP server
  *     per side, built by the side's own `createAveriServer` over a registry
  *     whose factory hands out the side's adapter over the recording
  *     (side.ts#recordedAdapter) — as tests/mcp/tools.test.ts builds one,
@@ -29,7 +29,7 @@ import type { CellConfig } from '../truth/schema.js';
  *     id:`); no value holding `"` — the grammar has no escape for it. A
  *     text more than one node carries is asked once too (`tap text:`), for
  *     the tools' many-matches path;
- *  3. the variant's calls (PLAN below) with the same arguments on each side,
+ *  3. the variant's calls (`plan` below) with the same arguments on each side,
  *     one at a time — the virtual clock and the fake device reset before
  *     each, a colour assert's target painted its own colour in the frame —
  *     and per call the reply (text blocks, image sizes and content hashes,
@@ -79,7 +79,7 @@ export interface RecordingResult {
 export interface Options {
   /** At most this many targets per tree (default: every one). */
   cap?: number;
-  /** Which tools to call (default: all of PLAN's). */
+  /** Which tools to call (default: `EVERY`). */
   tools?: ReadonlySet<ToolName>;
   /** Keep every call's result, not only the diffs. */
   keepAll?: boolean;
@@ -210,9 +210,9 @@ function tally(values: (string | null | undefined)[]): Map<string, number> {
 }
 
 /**
- * The targets of one side's tree, in tree order: each node by the first selector that names it alone — its
- * identifier, else its text (label or value), else its label, else its value, else its role and text, else its role
- * and identifier.
+ * The targets of one side's tree, in tree order: each node by the first selector that names it alone — its identifier,
+ * else its text (its label, when no other node's label or value reads the same), else its label (unique among labels),
+ * else its value, else its role and text, else its role and identifier.
  */
 function targetsOf(tree: SnapNode): { targets: Target[]; shared: string[]; keyboard: boolean; neutral?: string } {
   const nodes = [...walk(tree)];

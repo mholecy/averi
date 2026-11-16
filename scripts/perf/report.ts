@@ -30,8 +30,8 @@ export function stallLine(o: StallCounts, thresholdMs: number, label: string): s
 }
 
 /**
- * The run's stall lines: one per capture it took (D26b — `simctl io screenshot` first, then `idb screenshot`), so a run
- * that took one kind has the one line it always had; one that took none says so.
+ * The run's stall lines: one per capture it took (D26b: `simctl io screenshot` first, then `idb screenshot`); one that
+ * took none says so.
  */
 export function stallLines(o: OverallStalls): string[] {
   const lines = SCREENSHOT_LABELS.flatMap((label) => {
@@ -48,8 +48,8 @@ export function stallCells(s: ScenarioStalls): [string, string] {
 
 /**
  * The text table under the run's header line: a row per scenario, the median and range of the wall clock and the
- * medians of the rest. When the run took any screenshot (D26: simctl's or, D26b, idb's), two more columns —
- * screenshots/stalls and the stall-free wall median — and the stall lines under the table; otherwise the columns it always had.
+ * medians of the rest. When the run took any screenshot (D26, D26b), two more columns — screenshots/stalls and the
+ * stall-free wall median — and the stall lines under the table.
  */
 export function reportTable(reports: readonly { id: string; summary: Summary; stalls: ScenarioStalls }[], stalls: OverallStalls): string[] {
   const shots = stalls.screenshots > 0;

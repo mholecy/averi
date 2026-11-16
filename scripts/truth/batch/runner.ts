@@ -62,8 +62,8 @@ import { canonicalJson, EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parse
  * 4. the AbortGuard armed (abort.ts): a signal, a throw out of a block or an uncaught error from here on puts the dirty
  *    windows back and prints the abort SUMMARY, exit 130;
  * 5. the preconditions (preconditions.ts): the checkout, then each wanted block's own, all before the first block runs.
- *    One not shown makes its block INCONCLUSIVE naming why, never a refusal (the S3 choice: batch-11's way); a failed
- *    checkout does so for every block, and the SUMMARY is still written;
+ *    One not shown makes its block INCONCLUSIVE naming why, never a refusal (the S3 choice); a failed checkout does so
+ *    for every block, and the SUMMARY is still written;
  * 6. each wanted block, in the batch's order: its needs (each checked in full by the first block that names it, then
  *    rechecked before each later one — NeedSpec; S6b supplies the checks — the lab simulator, the lab emulator), a
  *    failed one making it INCONCLUSIVE, not run; then its `run(ctx)`;
@@ -223,8 +223,8 @@ export interface BlockCtx<K = unknown> {
   /** A live run (S3): its `.cases` first, then live.ts with its record, then the rejudge, each a bounded step. */
   liveRun(name: string, asked: Asked, o: { secs: number; rejudgeSecs?: number }): Promise<LiveOutcome>;
   /**
-   * A live run's `.cases` now, before a stretch that may never reach it (batch-11's WDA window wrote its runs' before
-   * its backup): a later liveRun of that name, asked the same, writes none again; asked otherwise, it throws.
+   * A live run's `.cases` now, before a stretch that may never reach it (a WDA window writes its runs' before its
+   * backup): a later liveRun of that name, asked the same, writes none again; asked otherwise, it throws.
    */
   asksLive(name: string, asked: Asked): void;
   /** What a non-live run is asked, written before it runs (never overwritten). */
@@ -250,8 +250,8 @@ export interface Block<K = unknown> {
    */
   judge?(j: BlockFiles & { run: Run }): Promise<readonly string[]>;
   /**
-   * Whether it is complete — judged only then, at the normal end and by the abort (batch-12's block_complete); none:
-   * every live run's completeness and every record's gap (assess), or for a `noRecords` block, its run returned.
+   * Whether it is complete — judged only then, at the normal end and by the abort; none: every live run's completeness
+   * and every record's gap (assess), or for a `noRecords` block, its run returned.
    */
   complete?(j: BlockFiles): boolean;
   /** It asks no run and records none (a probe judged from its own files): complete once its run returned. */
@@ -436,7 +436,6 @@ class BatchRun<K> {
     for (const b of blocks) this.lines.set(b.id, []);
   }
 
-  /** Each last step in order; one that throws an ERROR line, and the next still run. */
   private async lastSteps(steps: readonly LastStep[], run: Run): Promise<void> {
     for (const [i, step] of steps.entries()) {
       try {
@@ -644,7 +643,6 @@ class BatchRun<K> {
     return needObjectOf(this.needs[need]);
   }
 
-  /** What a need's check, alive and end get: each bounded call recorded, `phase` its part. */
   private needCtx(need: string, phase: NeedCall['phase']): NeedCtx {
     const bounded: Run = async (cmd, args, call = {}) => {
       const result = await this.guard.bounded(cmd, args, call);
@@ -734,7 +732,7 @@ class BatchRun<K> {
     };
   }
 
-  /** batch-11's live_run: the `.cases` first, live.ts with its record, then its rejudge — each a bounded step. */
+  /** The `.cases` first, live.ts with its record, then its rejudge — each a bounded step. */
   private async liveRun(b: Block<K>, bounded: Run, name: string, asked: Asked, o: LiveBounds, preAsked: ReadonlyMap<string, string>): Promise<LiveOutcome> {
     const { fs } = this.io;
     const { repo } = this.config;

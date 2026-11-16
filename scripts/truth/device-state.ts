@@ -82,7 +82,6 @@ export interface DeviceRead {
   hostLoad: string;
 }
 
-/** Which read: before the run's cases, or after them. */
 export type Side = 'before' | 'after';
 
 /**

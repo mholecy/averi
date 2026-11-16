@@ -4,9 +4,8 @@ import { oneLine, stepLine, timeOf, type StepWord } from './words.js';
 
 /**
  * A run's own output. The runner writes its `<name>.out` and steps.log itself, never through `| tee`: batch-11's tee
- * died with the Ctrl-C and took the run's output with it (its on_abort had to switch to steps.log). The terminal gets
- * two things only — the .out's path at the start and the SUMMARY at the end — and when it is gone the run goes on
- * writing its files.
+ * died with the Ctrl-C and took the run's output with it. The terminal gets two things only — the .out's path at the
+ * start and the SUMMARY at the end — and when it is gone the run goes on writing its files.
  *
  * The terminal is safe only if it writes synchronously: `process.stdout.write` into a pipe whose reader has gone
  * reports EPIPE later, as an `'error'` event that kills the process unless handled — perhaps in the middle of a
@@ -145,7 +144,6 @@ export class StepLog {
     this.note(stepLine('NOTE', `the terminal is gone (${why}): this run writes only to ${this.options.outFile} and ${this.options.stepsFile} now`));
   }
 
-  /** A line to the .out only (a step's banner, a detail). */
   print(line: string): void {
     this.fs.append(this.options.outFile, `${oneLine(line)}\n`);
   }

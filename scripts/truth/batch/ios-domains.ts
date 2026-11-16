@@ -39,11 +39,10 @@ import { shellQuote } from './shell.js';
 import { exitText, firstLineOf, messageOf, nameInLine, stepLine, verdictLine } from './words.js';
 
 /**
- * The lab simulator's settings around the WDA window (batch-10's D43 gate, batch-11's WDA window), over the
- * simulator: the three domains a WebDriverAgent runner's exit changes, backed up before the window's first change
- * and put back KEY BY KEY after, verified; and the schemeapproval domain, which no batch writes, its finportal key
- * only read. What is decided and said is ios-defaults.ts's; here are the calls, through the injected Run, and the
- * files, through io.ts.
+ * The lab simulator's settings around the WDA window (batch-10's D43 gate), over the simulator: the three domains a
+ * WebDriverAgent runner's exit changes, backed up before the window's first change and put back KEY BY KEY after,
+ * verified; and the schemeapproval domain, which no batch writes, its finportal key only read. What is decided and
+ * said is ios-defaults.ts's; here are the calls, through the injected Run, and the files, through io.ts.
  *
  * The state-file protocol: `backup` writes `{dirty: true, udid, port, domains}` before the
  * window's first change, the backups beside it; `restore` clears `dirty` only after every domain's read-back equals
@@ -54,8 +53,9 @@ import { exitText, firstLineOf, messageOf, nameInLine, stepLine, verdictLine } f
  * Every call goes to the lab simulator only: a `LabSim` is had only through lab-device.ts's guard (its udid listed as
  * `averi-lab …`, never device-check's), and every `defaults` argv is built by ios-defaults.ts's `defaultsArgv`, which
  * lets anything but a read name only the window's three domains, by their exact names: the schemeapproval domain is
- * only ever read. Nothing here names a port. Files are never overwritten: each read of a domain is a fresh file
- * beside the state file, kept as evidence.
+ * only ever read. No call here uses a port; the state file only records LAB_WDA_PORT. A domain's read and backup files
+ * are never overwritten: each read is a fresh file beside the state file, kept as evidence; the state file itself is
+ * replaced whole.
  *
  * What S6 adds around it: the WDA kill and the 4 s wait before the restore, the steps, the SUMMARY assembly.
  */
@@ -153,9 +153,9 @@ export type Backup = { ok: true; state: DomainsState; line: string } | { ok: fal
 /**
  * Before the window's first change: each domain exported beside `stateFile` and read typed (a plist plistlib cannot
  * read as a dictionary fails the backup), or proven absent; then the state file created, dirty, in one exclusive
- * write. A failure writes no state, so nothing may be changed: the window does not run (batch-11's "no wda run
- * (nothing changed)"). An earlier state file or backup there is never overwritten: refused. Its line's label the
- * window's (`labels`: the WDA window's unless given; T2b).
+ * write. A failure writes no state, so nothing may be changed: the window does not run. An earlier state file or
+ * backup there is never overwritten: refused. Its line's label the window's (`labels`: the WDA window's unless given;
+ * T2b).
  */
 export async function backup(sim: LabSim, stateFile: string, labels: DomainLabels = D43_LABELS): Promise<Backup> {
   if (sim.fs.exists(stateFile)) return { ok: false, why: `${nameInLine(stateFile)} is there already: a state file is never overwritten — no state written` };

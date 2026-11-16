@@ -62,7 +62,6 @@ export interface GoldenDiff {
   repin: Repin[];
 }
 
-/** A check's verdict as the report words it. */
 const checkVerdictText = (c: GoldenCheck) => (c.skipped !== undefined ? `skipped (${c.skipped})` : c.mismatch === undefined ? 'ok' : `MISMATCH ${c.mismatch}`);
 
 /** The checks of `results` by key, a key asked again suffixed with its occurrence (` #2`). */

@@ -20,27 +20,28 @@ export const DOMAINS = ['com.apple.keyboard.preferences', 'com.apple.Preferences
 export const LAB_WDA_PORT = 8120;
 
 /**
- * The read-only key: the remembered "Open in" answer for finportal's scheme. No batch writes its
- * domain at all since batch-11; batch-5's one backup of it stays unopened.
+ * The read-only key: the remembered "Open in" answer for finportal's scheme. No batch writes its domain at all;
+ * batch-5's one backup of it stays unopened.
  */
 export const PROTECTED = { domain: 'com.apple.launchservices.schemeapproval', key: 'com.apple.CoreSimulator.CoreSimulatorBridge-->sk.finportal.myport' } as const;
 
 /** The key as the lines name it: `-->sk.finportal.myport`. */
 const PROTECTED_SHORT = PROTECTED.key.slice(PROTECTED.key.indexOf('-->'));
 
-/** A RESTORE line's start (batch-11's `D43 (iOS): …`). */
+/** A RESTORE line's start. */
 export const HAND_PREFIX = 'D43 (iOS): ';
 /** A late writer's RESTORE line's start: a domain changed after the restore had verified it. */
 export const LATE_HAND_PREFIX = 'D43 (iOS, changed after the restore — a late writer): ';
 
-/** The restore's verdict label (batch-11 copied `D43 restore:` into verdict.txt as `D43 WDA-window restore:`). */
+/** The restore's verdict label. */
 export const RESTORE_LABEL = 'D43 WDA-window restore';
-/** The compare's verdict label (batch-11's `D43 WDA-window compare:` line). */
+/** The compare's verdict label. */
 export const COMPARE_LABEL = 'D43 WDA-window compare';
 /**
  * What a domains window's lines call it (T2b, batch-13 gap 3): its restore's and its compare's verdict labels, its
  * backup's step, its RESTORE lines' starts (`hand`, and `lateHand` for a late writer's). The WDA window's are
- * D43_LABELS; another block's window (batch-13's D65) takes domainLabels(its id), so no line of it says D43.
+ * D43_LABELS; another block's window would take domainLabels(its id), so no line of it says D43 (none in scripts/;
+ * tests/truth/batch/ios-domains-sim.test.ts exercises it).
  */
 export interface DomainLabels {
   restore: string;
@@ -49,9 +50,9 @@ export interface DomainLabels {
   hand: string;
   lateHand: string;
 }
-/** The WDA window's labels (batch-11's): the default of every domains-window function. */
+/** The WDA window's labels: the default of every domains-window function. */
 export const D43_LABELS: DomainLabels = { restore: RESTORE_LABEL, compare: COMPARE_LABEL, backup: 'D43 backup', hand: HAND_PREFIX, lateHand: LATE_HAND_PREFIX };
-/** Another block's domains-window labels, as batch-13 wrote D65's: `<id> window restore`, `<id> (iOS): `, …. */
+/** Another block's domains-window labels: `<id> window restore`, `<id> (iOS): `, …. */
 export const domainLabels = (id: string): DomainLabels => ({
   restore: `${id} window restore`,
   compare: `${id} window compare`,
@@ -96,7 +97,6 @@ export function diffMaps(want: DomainMap, got: DomainMap): KeyDiff[] {
   return out;
 }
 
-/** `<key> <kind>` each, as the lines name them. */
 export const differText = (d: readonly KeyDiff[]): string => d.map((x) => `${x.key} ${x.kind}`).join(', ');
 
 /**
@@ -162,8 +162,8 @@ const WRITTEN: ReadonlySet<string> = new Set(DOMAINS);
  * The argv of `xcrun simctl spawn <udid> defaults <args>` — the only place one is built. It throws for a verb it does
  * not run (rename, an option first), and for any verb but a read whose domain is not exactly one of the window's three
  * (an allowlist: another case, a long s, a plist path, a prefix — refused alike). A read may name any domain: it is how
- * the schemeapproval key is watched. The batches no longer write that domain at all; a future need for it is a new
- * decision, not a new call.
+ * the schemeapproval key is watched. No batch writes that domain; a future need for it is a new decision, not a new
+ * call.
  */
 export function defaultsArgv(udid: string, args: readonly string[]): string[] {
   const verb = args[0] ?? '';
@@ -351,7 +351,7 @@ export interface DomainsState {
 /** `<state dir>/<state stem>.<domain>` — the base of a domain's files beside the state file. */
 export const baseOf = (stateFile: string, domain: string): string => join(dirname(stateFile), `${basename(stateFile).replace(/\.json$/, '')}.${domain}`);
 
-/** The backup's path beside the state file (sim-domains.ts's). */
+/** The backup's path beside the state file. */
 export const backupPathOf = (stateFile: string, domain: string): string => `${baseOf(stateFile, domain)}.backup.plist`;
 
 /** The state file's text as a DomainsState, or why not. */
@@ -431,8 +431,8 @@ const shown = (p: ProtectedRead): string => (p.state === 'value' ? nameInLine(p.
 /**
  * The SUMMARY's protected-key line, from the reads at the iOS stretch's start and end:
  * `OK … unchanged` only when both were read (a value, or absent) and are the same; CHANGED a FAIL — the run exits 1
- * (words.ts#exitCodeOf: a FAIL step line; T2b, batch-13 gap 4: an ERROR before, and a changed key exited 0); unread an
- * ERROR — never unchanged, and not the batch's failure: the SUMMARY says it, exit 0 alone.
+ * (words.ts#exitCodeOf: a FAIL step line; T2b, batch-13 gap 4); unread an ERROR — never unchanged, and not the batch's
+ * failure: the SUMMARY says it, exit 0 alone.
  */
 export function protectedLine(start: ProtectedRead, end: ProtectedRead): string {
   const what = `${PROTECTED.domain}'s ${PROTECTED_SHORT}`;

@@ -5,7 +5,7 @@
  * caught — an idb keyboard band under a field, covered slivers at a scroll
  * container's edge, a pinned bottom bar, a flush last row, a screen with no
  * size. Each is a RAW payload, so it goes through the parser like a capture.
- * Keyed by file name; `run` is the corpus run they are written into.
+ * Keyed by file name.
  */
 
 type IdbEl = { type: string; AXLabel: string | null; AXUniqueId: string | null; frame: { x: number; y: number; width: number; height: number } };

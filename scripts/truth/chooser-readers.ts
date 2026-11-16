@@ -2,16 +2,14 @@ import { shellQuote } from '../../src/adapters/adb-shell.js';
 import { LAB_APP } from './lab-device.js';
 
 /**
- * The lab emulator's "Open with" chooser as text read and lines said, pure: what the device batches
- * (batch/lab-chooser.ts, batch/lab-emu.ts) and the live golden's chooser premise (chooser-premise.ts, T20a) both
- * need, moved here from lab-chooser.ts, which re-exports it. A leaf: it imports src's shellQuote and lab-device.ts's
- * LAB_APP, nothing of batch/ and nothing live-*, so a batch loads no live module through it. The preferred-activities
- * text (only its `Preferred Activities User N:` block), a lab default (`mAlways=true`, a leak) told from the
- * last-chosen entry "Just once" writes (`mAlways=false`), a link's handler query and its count, the focused activity
- * and whether it is the platform's chooser (the chooser group's own reader, live-chooser.ts's, moved here so --check
- * reads the focus with it: TL5), an entry as a line quotes it, and the hand lines that clear a default or read the
- * chooser back. A failed call is the caller's to tell, its words worded here (preferredUnread, handlersUnread):
- * lab-chooser.ts#preferredOf and #handlersOf give a batch's exit, chooser-premise.ts adb's error.
+ * The lab emulator's "Open with" chooser as text read and lines said, pure: what the device batches and the live
+ * golden's chooser premise (T20a) both need. A leaf: it imports src's shellQuote and lab-device.ts's LAB_APP, nothing
+ * of batch/ and nothing live-*, so a batch loads no live module through it. The preferred-activities text (only its
+ * `Preferred Activities User N:` block), a lab default (`mAlways=true`, a leak) told from the last-chosen entry "Just
+ * once" writes (`mAlways=false`), a link's handler query and its count, the focused activity and whether it is the
+ * platform's chooser (the chooser group's own reader, live-chooser.ts's, here so --check reads the focus with it: TL5),
+ * an entry as a line quotes it, and the hand lines that clear a default or read the chooser back. A failed call is the
+ * caller's to tell, its words worded here (preferredUnread, handlersUnread).
  */
 
 /**
@@ -20,13 +18,10 @@ import { LAB_APP } from './lab-device.js';
  */
 export const LAB_PACKAGE = LAB_APP.native.package;
 
-/** A RESTORE line's start (batch-11's `D55 (Android): …`): every hand line of the chooser's. */
+/** A RESTORE line's start: every hand line of the chooser's. */
 export const HAND_PREFIX = 'D55 (Android): ';
 
-/**
- * The preferred read: `dumpsys package preferred` (batch-10's and batch-11's; batch-9's `preferred-activities` reads
- * alike).
- */
+/** The preferred read: `dumpsys package preferred` (`preferred-activities` reads alike, batch-9). */
 export const PREFERRED_ARGV = ['dumpsys', 'package', 'preferred'] as const;
 
 // --------------------------------------------------------------------------------------- the preferred activities
@@ -74,10 +69,10 @@ function labEntryOf(e: OpenEntry): LabEntry | undefined {
 }
 
 /**
- * The preferred read's text (a call that answered): only the `Preferred Activities User N:`
- * block(s), each running to the next top-level line; in a block, each entry is its first line (a hash and a component)
- * and every line after it indented deeper, or blank. A dump with no such block (API 33's whole dump cut short, another
- * command's output) is unread.
+ * The preferred read's text (a call that answered): only the `Preferred Activities User N:` block(s), each running to
+ * the next top-level line; in a block, each entry is its first line (a hash and a component) and every line after it
+ * indented deeper, or blank. A dump with no such block (API 33's whole dump cut short, another command's output) is
+ * unread.
  */
 export function preferredIn(out: string): PreferredRead {
   let users = 0;
@@ -115,13 +110,10 @@ export const preferredUnread = (why: string): PreferredRead => ({
   why: `${PREFERRED_ARGV.join(' ')}: ${why}`,
 });
 
-/** How much of an entry's text a line quotes, before `…`. */
 export const ENTRY_CHARS = 200;
-/** An entry's text as a line quotes it: ENTRY_CHARS at most, then `…`. */
 export const entryText = (e: LabEntry): string =>
   e.text.length > ENTRY_CHARS ? `${e.text.slice(0, ENTRY_CHARS)}…` : e.text;
 
-/** The leaks: the lab's defaults (`mAlways=true`). */
 export const leaksOf = (p: { lab: readonly LabEntry[] }): LabEntry[] => p.lab.filter((e) => e.always === true);
 /** Entries with no mAlways line: neither a default nor last-chosen as read — they cannot be compared, so unproven. */
 export const unflaggedOf = (p: { lab: readonly LabEntry[] }): LabEntry[] => p.lab.filter((e) => e.always === undefined);
@@ -150,7 +142,7 @@ export function handlersIn(text: string): number | { why: string } {
   const out = text.replace(/\r/g, '');
   if (/^No activities found\s*$/m.test(out)) return 0;
   const said = /^(\d+) activit(?:y|ies) found:\s*$/m.exec(out);
-  // The first line, trimmed (`out` holds no \r: words.ts#firstLineOf's line).
+  // The first line, trimmed (`out` holds no \r: batch/words.ts#firstLineOf's line).
   const first = out.split('\n', 1)[0].trim();
   if (said === null) return { why: `query-activities printed no \`N activities found:\` line: ${first}` };
   const listed = out.split('\n').filter((l) => /^\s*[\w.]+\/[\w.$]+\s*$/.test(l)).length;
@@ -231,8 +223,8 @@ export interface DefaultCause {
 }
 
 /**
- * A lab default left: what clears it (batch-12's hand line; the uninstall wipes the lab's data), then `then`. A batch
- * gives no cause: `the batch`, its line as before.
+ * A lab default left: what clears it (the uninstall wipes the lab's data), then `then`. A batch gives no cause:
+ * `the batch`.
  */
 export const defaultHand = (b: HandBase, { predates = 'the batch', build }: DefaultCause = {}): string =>
   `${HAND_PREFIX}a lab default (mAlways=true) is set — "Always" is never tapped, so it predates ${predates} or is a ` +
