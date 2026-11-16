@@ -32,7 +32,7 @@ interface FillSpec extends ElementSpec {
 }
 
 /**
- * One entry of `app.ios.keyboardDismiss` (stage B): how the guard may hide
+ * One entry of `app.ios.keyboardDismiss`: how the guard may hide
  * the iOS soft keyboard when it covers a tap target, and how `fill {
  * dismissKeyboard: true }` hides it after typing. Either a `tap` on an
  * element of the app's that hides the keyboard without a side effect — the
@@ -444,8 +444,8 @@ const configSchema = z
             treeSource: z.enum(IOS_TREE_SOURCE_SETTINGS).optional(),
             /**
              * How to hide the soft keyboard when it covers a tap target, in
-             * order of preference (stage B; see KeyboardDismissStrategy).
-             * Without it a covered target is refused (stage A) and `fill {
+             * order of preference (see KeyboardDismissStrategy).
+             * Without it a covered target is refused and `fill {
              * dismissKeyboard: true }` leaves the keyboard up with a
              * warning. Read under every tree source, but inert under
              * `treeSource: idb` — idb's tree marks no node as the keyboard
@@ -514,10 +514,11 @@ export const appIdOf = (cfg: AveriConfig, platform: Platform): string | undefine
  * (interact/keyboard.ts#KeyboardDismissal) — the one conversion, so no
  * config type crosses into interact/ and no interact type is spelled in
  * YAML. `undefined` when the config, its iOS section or the key is absent:
- * the guard then has nothing to tap, exactly stage A. Not platform-gated
- * here: the engine passes it to every tap and fill, and interact/ reads it
- * only on the oracle-less branch, which Android never takes — the same
- * shape as `treeSource`, which the registry reads for the iOS adapter only.
+ * the guard then has nothing to tap, and a covered target is refused. Not
+ * platform-gated here: the engine passes it to every tap and fill, and
+ * interact/ reads it only on the oracle-less branch, which Android never
+ * takes — the same shape as `treeSource`, which the registry reads for the
+ * iOS adapter only.
  */
 export function keyboardDismissals(cfg: AveriConfig | undefined): readonly KeyboardDismissal[] | undefined {
   const configured = cfg?.app.ios?.keyboardDismiss;
@@ -578,13 +579,13 @@ export class SetupError extends Error {
  * The steps nested inside a step, or `undefined` if this kind holds none.
  *
  * The single place the recursive walks learn which kinds are containers.
- * Three walks over Step need that: the engine's dispatcher, the reference
- * check below, and `stepsAreDestructive`. The dispatcher must stay
- * hand-written and names the kinds itself — it is a discriminated switch with
- * a different return per kind, and it throws on an unhandled one — but the
- * two recursive walks are pure structure, and having
- * them re-derive the nesting independently is how a container kind added later
- * gets covered in one of them and silently skipped in the other.
+ * Two walks over Step depend on that: the reference check below and
+ * `stepsAreDestructive`. The engine's dispatcher names the container kinds
+ * itself and must stay hand-written — it is a discriminated switch with a
+ * different return per kind, and it throws on an unhandled one — but the two
+ * recursive walks are pure structure, and having them re-derive the nesting
+ * independently is how a container kind added later gets covered in one of
+ * them and silently skipped in the other.
  */
 export function childSteps(step: Step): Step[] | undefined {
   if ('android' in step || 'ios' in step) {

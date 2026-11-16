@@ -42,7 +42,7 @@
  *   typeText keeps it.
  *
  * What this means for the adapter's callers, and what is not yet measured:
- * - typeText: each character is one quoted word. The argv `input text`
+ * - typeText: each character is one word through shellQuote. The argv `input text`
  *   receives for `'`, `\` and the other shell metacharacters is UNVERIFIED
  *   on a device (the per-char typing and its pacing were measured in
  *   e594a21 / 00db84c / 2070647).
@@ -76,9 +76,9 @@ export function shellQuote(word: string): string {
 /**
  * The argv as one command line for the device's `sh -c`: each word through
  * shellQuote (quoted only where `sh` would interpret it), joined with a
- * space — which is also what adb's own join produces from the
- * quoted words, so passing `argv.map(shellQuote)` as separate adb arguments
- * and passing this one string are the same bytes on the device.
+ * space — which is also what adb's own join produces from the quoted words,
+ * so passing `argv.map(shellQuote)` as separate adb arguments and passing
+ * this one string are the same bytes on the device.
  */
 export function shellCommandLine(argv: readonly string[]): string {
   return argv.map(shellQuote).join(' ');

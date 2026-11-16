@@ -64,8 +64,8 @@ const ADB_LINE = new RegExp(`^(\\S+)\\s+(${Object.keys(ADB_STATES).join('|')})\\
  * there. Default: the versions are read.
  *
  * Why the flag: the bound device's per-call check (`discoveryOver`) asks
- * only "is it still booted?", and a getprop is a
- * full `adb shell` round trip — ≈30–35 ms, up to ~70 ms, per device in
+ * only "is it still booted?", and a getprop is a full `adb shell` round
+ * trip — ≈30–35 ms, up to ~70 ms, per device in
  * adb's `device` state, on every tool call
  * (docs/plans/2026-10-30-performance-backlog.md, D13 note (2026-10-31,
  * averi_lab API 33)) — for a version only select_device's reply and the

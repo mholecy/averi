@@ -316,8 +316,9 @@ const IME_SHOWING_LINE_RE = /^[ \t]*mIsImeShowing=(true|false)[ \t]*$/gm;
  * What the measurements force:
  * - `visible=` decides, never the frame alone: a hidden keyboard keeps a
  *   non-empty `visibleFrame` (the nav-bar strip) and, while it animates out,
- *   its full `frame`. `visibleFrame` is not read at all (the API 34+ layout
- *   above, AOSP's and not captured, has none).
+ *   its full `frame`. `visibleFrame` is not read at all (the API 34+ line is
+ *   not measured here and its layout is AOSP's; API <= 33 prints it, see the
+ *   table above).
  * - Only the `InsetsSource …` lines that START a line are read — the state
  *   list. The same text recurs as `mSource=InsetsSource …` under each
  *   provider, and `InsetsSourceControl …` is a different object.

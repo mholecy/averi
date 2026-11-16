@@ -1188,7 +1188,10 @@ function besideText({ strokedOver, at, landed, axis, others }: StrokedBeside, re
   return `${went}; the tree shows ${some} ${axis}ly, ${UNTRIED_LEAD}${names}${UNTRIED_END}${way}`;
 }
 
-/** `besideText`'s words around the scroll views it names — exported so the truth reader finds the names between them. */
+/**
+ * `besideText`'s words around the scroll views it names — exported so the truth reader finds the names between
+ * them.
+ */
 export const UNTRIED_LEAD = 'which the swipes did not go over: ';
 export const UNTRIED_END = ' — if the element lies in ';
 

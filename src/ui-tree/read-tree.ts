@@ -381,8 +381,8 @@ export interface PollRound {
  *   projecting the previous round's cost shortens every caller's timeout
  *   (a static element threw after one read at 615 ms of 1500), and
  *   refusing a round after a pause that crossed the deadline turns
- *   found-late cases into timeouts AT the deadline (two of them; the cases
- *   and the rule are pinned in tests/ui-tree/read-tree.test.ts).
+ *   found-late cases into timeouts AT the deadline (two of them;
+ *   tests/ui-tree/read-tree.test.ts states the cases and pins the rule).
  * - The pause after a round is `pauseAfterRead` of the round's READ
  *   (docs/adr/0029-poll-cadence-counts-the-read.md), timed on `Date.now()`,
  *   the clock the deadline already uses, so a test that fakes Date

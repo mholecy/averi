@@ -107,7 +107,10 @@ export async function loadForCall(policy: ConfigPolicy, configPath?: string): Pr
 export interface IosToolSettings {
   /** `app.ios.treeSource` — the registry's default (`auto`) when undefined. */
   treeSource: IosTreeSourceSetting | undefined;
-  /** `app.ios.keyboardDismiss` in the guard's vocabulary (flow/config.ts#keyboardDismissals) — a covered target is refused when it is undefined. */
+  /**
+   * `app.ios.keyboardDismiss` in the guard's vocabulary (flow/config.ts#keyboardDismissals) — a covered target is
+   * refused when it is undefined.
+   */
   dismissals: readonly KeyboardDismissal[] | undefined;
 }
 

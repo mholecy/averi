@@ -1269,7 +1269,10 @@ function inStopFrame(judged: Judged, box: Rect, bands: JudgedBoxes | undefined, 
   return { facts, outside: { facts, kind: 'offScreen', at: centre, visible: 0 } };
 }
 
-/** THE ORDER (`ordered`) past the frame, for both stops — the tap has its own (`tapStanding`); the line is one no guard acts on. */
+/**
+ * THE ORDER (`ordered`) past the frame, for both stops — the tap has its own (`tapStanding`); the line is one no guard
+ * acts on.
+ */
 function stopOrdered(facts: StandingFacts, placed: PointPlace, cut: TouchJudgement | undefined, cover: Cover | undefined, line: KeyboardLine | undefined): TouchJudgement {
   return ordered<TouchJudgement>(
     pointPlaced(facts, placed, facts.visible),

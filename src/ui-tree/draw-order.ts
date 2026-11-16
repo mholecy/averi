@@ -1724,7 +1724,10 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
     return after(found).flatMap((p) => (rectIntersection(p.node.rect, container) !== undefined && draws(p) ? [p.node] : []));
   };
 
-  /** `paintsOver`'s two exemptions (`DrawOrder.paintsOver`): the cover hangs off one of `target`'s own branches — the nearest ancestor of it holding the cover is at most half the screen (OWN_BRANCH_SCREEN_FRACTION). */
+  /**
+   * `paintsOver`'s two exemptions (`DrawOrder.paintsOver`): the cover hangs off one of `target`'s own branches — the
+   * nearest ancestor of it holding the cover is at most half the screen (OWN_BRANCH_SCREEN_FRACTION).
+   */
   const ownBranch = (target: Placed, cover: Placed): boolean => {
     let shared = target.parent;
     while (shared !== undefined && !within(cover, shared)) shared = shared.parent;

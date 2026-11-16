@@ -812,8 +812,8 @@ export class FlowEngine {
         // warm path stays one read), and both of these are what a cold
         // launch looks like for a while — an agent may call ensure_state
         // right after launch_app (skill/references/averi-yaml.md says it is
-        // safe). Measured 2026-10-06 on
-        // finportal (Android 13 emulator, RN debug build): null root to
+        // safe). Measured 2026-10-06 on finportal (Android 13 emulator, RN
+        // debug build): null root to
         // ~+3 s, the decor alone (android:id/content, action_bar_root)
         // +5.3…+13.8 s, `login_screen` at +18.3 s; through WDA the 7-node
         // splash is read at +0.3 s. A window of the settle budget

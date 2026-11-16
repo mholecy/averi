@@ -1042,8 +1042,8 @@ export class AndroidAdapter implements DeviceAdapter {
   /**
    * The IME window's touchable region, and `mInputShown` beside it, in ONE
    * adb call (the floating-Gboard device checks of 2026-10-08 in the bug
-   * note below; emulator-5554, API 33, 1080x2220). Why: a
-   * floating Gboard keeps an IME inset of only its 132-px collapse strip
+   * note below; emulator-5554, API 33, 1080x2220). Why: a floating Gboard
+   * keeps an IME inset of only its 132-px collapse strip
    * (`ITYPE_IME frame=[0,2088][1080,2220] visible=true`), so keyboardState's
    * band missed the panel drawn at x 359–1040, y 1269–1912 — a guarded tap on
    * a field there pressed Gboard's `d` key, and `scroll_until … fully` called

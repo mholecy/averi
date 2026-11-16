@@ -177,9 +177,9 @@ export async function loadConfigIfPresent(path: string): Promise<AveriConfig | u
  *
  * No state is kept between calls: the result is a function of the file's
  * text and `processEnv`, and reading `.env.averi` is its only I/O.
- * `contributed` is the file's names that made it into `env`
- * (not shadowed by the real environment), for the caller's stderr line
- * (`announce`, above).
+ * `contributed` is the file's names that made it into `env` (not shadowed
+ * by the real environment), for the caller's stderr line (`announce`,
+ * above).
  *
  * Format: `KEY=value` per line; `export KEY=value`, blank lines, `#` comments
  * and single/double quotes around the value are tolerated.
