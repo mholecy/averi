@@ -29,8 +29,7 @@ import { keyboardMayCoverText } from './target-text.js';
  * Layering: interact sits between flow and verify (ARCHITECTURE.md §2). It
  * imports ui-tree, adapters and util only; it knows no averi.yaml type (the
  * engine converts its YAML spec — `timeout: 2s` — before calling), and no
- * MCP schema. Options are plain milliseconds with the defaults the callers
- * had.
+ * MCP schema. Options are plain milliseconds.
  */
 
 // What a caller points at, and every match of it: ui-tree/selectors.ts's (a miss asks of the target too, ui-tree/miss.ts);
@@ -46,8 +45,6 @@ export const describeTarget = (target: Target): string =>
  * interactive one wins (preferInteractive, with its note). `chosen` when
  * that leaves one node — the node a tap acts on whatever its Ambiguity —
  * else the `survivors`: none, or several for the Ambiguity to decide.
- * One owner: `resolveNow` and
- * `scroll_until`'s judgement (`matchesToJudge`) both read it.
  */
 export function preferred(found: readonly UiNode[]): { chosen: UiNode; note?: string } | { survivors: UiNode[] } {
   const survivors = found.filter(hasArea);
@@ -135,14 +132,13 @@ export class AmbiguityRefusal extends Error {}
  * knows, as a class of its own so a caller that must tell "absent" from
  * "found, then something went wrong" reads it instead of guessing.
  *
- * Its one reader is the flow engine's `optional:` block, the only place
- * where absence is not a failure. Absence deduced from missing evidence
- * would log a fill whose field was found and tapped, but whose text never
- * landed, as "skipped step (not present)". An optional step is "(not
- * present)" exactly when this is what it threw, and anything else is
- * skipped with its own headline — save an error carrying the
- * RefusedOnPresentElement marker (`isRefusedOnPresentElement`), which fails
- * the flow.
+ * A flow's `optional:` block is where absence is not a failure. Absence
+ * deduced from missing evidence would log a fill whose field was found and
+ * tapped, but whose text never landed, as "skipped step (not present)". An
+ * optional step is "(not present)" exactly when this is what it threw, and
+ * anything else is skipped with its own headline — save an error carrying
+ * the RefusedOnPresentElement marker (`isRefusedOnPresentElement`), which
+ * fails the flow.
  *
  * Deliberately narrow:
  * - A wait whose LAST read failed does not throw it — neither one that read
@@ -183,10 +179,10 @@ export interface SettleOptions extends ResolveOptions {
    */
   pollMs?: number;
   /**
-   * A read handed on from the step before (ui-tree/read-handoff.ts; the flow engine's taps and fills after a `wait:`,
-   * an assert or a detect, docs/adr/0030-a-read-is-handed-on-only-as-a-first-sample-or-a-positive-verdict.md). Asked
-   * once, by resolveSettled only, as the FIRST of the two samples the settle compares: the second is always a fresh
-   * read. resolvePresent ignores it.
+   * A read handed on from the step before (ui-tree/read-handoff.ts;
+   * docs/adr/0030-a-read-is-handed-on-only-as-a-first-sample-or-a-positive-verdict.md). Asked once, by resolveSettled
+   * only, as the FIRST of the two samples the settle compares: the second is always a fresh read. resolvePresent
+   * ignores it.
    */
   first?: FirstSample;
 }
@@ -283,14 +279,14 @@ export interface ResolvedSettled extends Resolved {
  * The read error, when the last round could not read a tree, rides beneath
  * either so a dead device never looks like a slow screen.
  *
- * The reads' cadence is settleCadence's (since 2026-11-02; the rule is its doc).
+ * The reads' cadence is settleCadence's (the rule is its doc).
  *
- * `opts.first` (since 2026-10-31, ADR 0030): a handed-on read is the first
- * sample and nothing else. Its rect is the one the first fresh read must
- * match; it is not a sighting, not a run and never the tree returned — so
- * the settle needs one fresh read that agrees with it, a handed read that
- * did not resolve the target costs nothing but its round, and every wording
- * above (a not-found, a run of one) is about the fresh reads alone.
+ * `opts.first` (ADR 0030): a handed-on read is the first sample and nothing
+ * else. Its rect is the one the first fresh read must match; it is not a
+ * sighting, not a run and never the tree returned — so the settle needs one
+ * fresh read that agrees with it, a handed read that did not resolve the
+ * target costs nothing but its round, and every wording above (a not-found,
+ * a run of one) is about the fresh reads alone.
  * Ambiguity in the handed tree throws nothing: pollTree discards a handed
  * round's throw, and the fresh read refuses for itself.
  * docs/bugs/2026-10-09-hold-still-timeout-after-one-read-blames-a-moving-element.md
@@ -370,14 +366,13 @@ export interface WaitEvidence {
 }
 
 /**
- * THE rule for when a wait that gave up is absence (one owner
- * for resolveSettled, resolvePresent and scroll.ts's scroll_until):
- * ElementNotFoundError when no round matched the target, at least one tree
- * was read and the last read succeeded; a plain Error with the same
- * message otherwise — the element was seen, or nobody could see the screen
- * at the end (see ElementNotFoundError). The caller words the message (with
- * `seen.miss`'s note in it, ui-tree/miss.ts), and the absence carries that
- * miss for a one-line reader.
+ * THE rule for when a wait that gave up is absence: ElementNotFoundError
+ * when no round matched the target, at least one tree was read and the last
+ * read succeeded; a plain Error with the same message otherwise — the
+ * element was seen, or nobody could see the screen at the end (see
+ * ElementNotFoundError). The caller words the message (with `seen.miss`'s
+ * note in it, ui-tree/miss.ts), and the absence carries that miss for a
+ * one-line reader.
  */
 export function absenceError(message: string, seen: WaitEvidence): Error {
   return !seen.sighted && seen.treesRead > 0 && seen.readError === undefined ? new ElementNotFoundError(message, seen.miss ?? { of: 'none' }) : new Error(message);
@@ -416,14 +411,14 @@ async function notFound(
 
 /**
  * The soft keyboard, when it may be why a wait found nothing (D32 K1): the tree's source lists nothing beneath the
- * keyboard (ui-tree/dialect.ts#TreeDialect's `topLayerOnly`: idb's flat list; ADR 0018), and its keys are read up by their shape — the band's
- * line (ui-tree/keyboard-position.ts#KeyboardPosition.line, over draw-order.ts#keyboardBandTop: a position, never a
- * reading of the keyboard shown, K5d). Then `keyboardMayCoverText`, with the adapter's own remedy, short
- * (ui-tree/keyboard-cover.ts#readKeyboard: how it hides it, said briefly). Undefined on any other tree — WDA and
- * uiautomator list what lies beneath the keyboard, so a miss there is not the keyboard's — and on an idb read with no
- * band: today's reply, unchanged. Not said where the target matched only at 0×0 (`zeroArea`: it IS in the tree),
- * after a failed last read (`unread`: the hints are dropped) nor beneath a presented layer's own headline. Asked of
- * the last read only, on a miss only: one draw-order walk.
+ * keyboard (ui-tree/dialect.ts#TreeDialect's `topLayerOnly`: idb's flat list; ADR 0018), and its keys are read up by
+ * their shape — the band's line (ui-tree/keyboard-position.ts#KeyboardPosition.line, over
+ * draw-order.ts#keyboardBandTop: a position, never a reading of the keyboard shown, K5d). Then `keyboardMayCoverText`,
+ * with the adapter's own remedy, short (ui-tree/keyboard-cover.ts#readKeyboard: how it hides it, said briefly).
+ * Undefined on any other tree — WDA and uiautomator list what lies beneath the keyboard, so a miss there is not the
+ * keyboard's — and on an idb read with no band. Not said where the target matched only at 0×0 (`zeroArea`: it IS in the
+ * tree), after a failed last read (`unread`: the hints are dropped) nor beneath a presented layer's own headline. Asked
+ * of the last read only, on a miss only: one draw-order walk.
  */
 function keyboardMissNote(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdvice'>, tree: UiNode): string | undefined {
   const source = dialectOf(tree).topLayerOnly;
@@ -440,10 +435,9 @@ function keyboardMissNote(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdv
  * sighting. Throws ElementNotFoundError (or, when the last read failed, a plain
  * Error) in resolveSettled's never-found wording.
  *
- * The flow engine's optional tap is its caller (here, so the "found" fact
- * has one owner): its budget bounds the presence check only, because a
- * settle needs two reads and one Android dump alone can outlast the
- * optional budget.
+ * It lives here so the "found" fact has one owner. Its budget bounds the
+ * presence check only, because a settle needs two reads and one Android dump
+ * alone can outlast an optional step's budget.
  * pollTree always completes one read before its deadline is checked, so a
  * budget shorter than one read still gets one honest look.
  */
@@ -468,20 +462,19 @@ export async function resolvePresent(
  * ElementNotFoundError, as the found/absent contract the flow engine reads.
  * Carried by:
  * - the tap rules' refusals on a resolved node (tap-judgement.ts, one base
- *   class): OffScreenRefusal, CoveredRefusal and ClippedRefusal (behind `tapElement` and
- *   `fillField`'s focus tap). These may follow the keyboard guard's own
- *   `back` or dismissal tap — the target was resolved again after it, and
- *   it is still there.
+ *   class): OffScreenRefusal, CoveredRefusal and ClippedRefusal. These may
+ *   follow the keyboard guard's own `back` or dismissal tap — the target was
+ *   resolved again after it, and it is still there.
  * - The keyboard guard's refusals that sent NOTHING with the target resolved
  *   on both looks: KeyboardStateDisagreement (keyboard-window.ts) and
  *   KeyboardWithoutDismissal (keyboard-in-tree.ts) — but not the latter when
  *   its second look did not resolve the target again (its flag is false).
  *
- * Its one reader is the flow engine's `optional:` block (the bug note's
- * item 3, below): an optional step is skipped only when its element is absent, and
- * one refused on a present element FAILS the flow — the interstitial is
- * there, and skipping it ran the flow on into the ladder's destructive rung
- * (on iOS the same with the keyboard up over LOGIN and no dismissal).
+ * In a flow's `optional:` block (the bug note's item 3, below), an optional
+ * step is skipped only when its element is absent, and one refused on a
+ * present element FAILS the flow — the interstitial is there, and skipping
+ * it ran the flow on into the ladder's destructive rung (on iOS the same
+ * with the keyboard up over LOGIN and no dismissal).
  * docs/bugs/2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md
  *
  * Deliberately NOT carried by:

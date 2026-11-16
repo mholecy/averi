@@ -23,9 +23,9 @@ import { coverName, cutSliverText } from './target-text.js';
  *
  * 1. THE CONFIGURED ones (`configuredStrategies`: `app.ios.keyboardDismiss`, flow/config.ts), in the config's order: a
  *    `tap` on an app element the author named as neutral (a title), and the input-accessory toolbar's trailing button
- *    (`accessory`). Judged as the picker judged them since stage B (ADR 0016: the tap's standing, the explicit
- *    refusal), each its own entry — so a second configured dismissal is tried when the first, tapped, left the
- *    keyboard up. The guard and the post-fill dismissal both walk them.
+ *    (`accessory`). Judged as the picker judges them (stage B, ADR 0016: the tap's standing, the explicit refusal),
+ *    each its own entry — so a second configured dismissal is tried when the first, tapped, left the keyboard up. The
+ *    guard and the post-fill dismissal both walk them.
  * 2. AVERI'S OWN (`AVERIS_OWN`, docs/adr/0022-averi-hides-the-keyboard-when-the-configured-dismissal-does-not.md):
  *    walked by the guard only, and only after a configured strategy PERFORMED a move that its looks confirmed left the
  *    keyboard up — the author opted into touching this screen to hide the keyboard, and the configured touch was not
@@ -76,13 +76,11 @@ export interface DismissalStrategy {
   choose(ground: DismissalGround): Promise<DismissalMove | { readonly skipped: string }>;
 }
 
-/** The configured dismissals as strategies, in the config's order. */
 export const configuredStrategies = (configured: readonly KeyboardDismissal[]): readonly DismissalStrategy[] => configured.map(configuredStrategy);
 
 /** What walking a list on one ground found: the first move and the strategies after its own, or none; and one skip line per strategy passed over on the way, `<name>: <why>`. */
 export type NextMove = { readonly move?: { readonly move: DismissalMove; readonly rest: readonly DismissalStrategy[] }; readonly skipped: readonly string[] };
 
-/** The first strategy of `strategies` that chooses a move on `ground`, and why each one before it passed. */
 export async function nextMove(strategies: readonly DismissalStrategy[], ground: DismissalGround): Promise<NextMove> {
   const skipped: string[] = [];
   for (const [i, strategy] of strategies.entries()) {
@@ -96,7 +94,6 @@ export async function nextMove(strategies: readonly DismissalStrategy[], ground:
   return { skipped };
 }
 
-/** The move, sent: one tap, or one drag at DRAG_SPEED (`dismissalDragMs`). */
 export function perform(adapter: Pick<DeviceAdapter, 'tap' | 'swipe'>, move: DismissalMove): Promise<void> {
   return move.kind === 'tap' ? adapter.tap(move.at.x, move.at.y) : adapter.swipe(move.from, move.to, dismissalDragMs(move));
 }
@@ -120,7 +117,6 @@ export interface MoveWords {
   readonly passive: string;
 }
 
-/** The words of `m` (`MoveWords`). */
 export function wordsOf(m: DismissalMove): MoveWords {
   if (m.kind === 'tap') {
     const at = `at ${pointText(m.at)}`;
@@ -142,7 +138,6 @@ const pointText = ({ x, y }: Point): string => `(${x},${y})`;
 
 // ─── The configured strategies ────────────────────────────────────────────────
 
-/** A dismissal as a skip line names it: `tap id:"login_title"`, `accessory`. */
 const describeDismissal = (d: KeyboardDismissal): string => (d.kind === 'tap' ? `tap ${describeTarget(d.target)}` : 'accessory');
 
 /**
@@ -228,7 +223,6 @@ function configuredStrategy(d: KeyboardDismissal): DismissalStrategy {
  * (ui-tree/remedy-text.ts#presentedRemedy: the alert named, close it first), whatever else keeps it from a tap.
  */
 function whyNotTapped(standing: TapStanding, node: UiNode): string | undefined {
-  // Beneath a presented layer the tree marks (an alert), whatever the kind: the alert's words, as the tap refuses it.
   if (standing.kind !== 'reachable' && standing.remedy.of === 'presented' && standing.remedy.layer !== undefined) return presentedRemedy('touch', standing.remedy.layer);
   switch (standing.kind) {
     case 'reachable': {

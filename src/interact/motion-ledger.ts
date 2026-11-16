@@ -183,10 +183,10 @@ interface Memory {
   /** The stroke the streaks were last counted for (`sameStroke`). */
   readonly streakDrawn: Stroke | undefined;
   /**
-   * The last stroke drawn — a probe's too — as the driver handed it back: set by the round after it, kept through
-   * every round until the next one is drawn (a stroke held for a presented screen's confirming read is not drawn, and
-   * changes nothing); undefined until the first. The streaks', the probe's, `touchedOn`'s, and the side it pushed the
-   * content toward is the one the region's band holds besides `way` (motion-shown.ts#carriedUnder).
+   * The last stroke drawn — a probe's too — as the driver handed it back: set by the round after it, kept through every
+   * round until the next one is drawn (a stroke held for a presented screen's confirming read is not drawn, and changes
+   * nothing); undefined until the first. The side it pushed the content toward is the one the region's band holds
+   * besides `way` (motion-shown.ts#carriedUnder).
    */
   readonly lastDrawn: Stroke | undefined;
   /** How far the judged match moved over the settle pause before the last read that read (`motionOf`), the same node at both reads — undefined when that read followed no settle, or did not find it so. */
@@ -204,7 +204,6 @@ interface Memory {
 const open = (l: MotionLedger): Memory => l as unknown as Memory;
 const close = (m: Memory): MotionLedger => m as unknown as MotionLedger;
 
-/** The ledger before round 0: nothing read, nothing drawn. */
 export function startLedger(): MotionLedger {
   return close({
     rects: undefined,
@@ -282,7 +281,6 @@ export function seeMotion(ledger: MotionLedger, { drawn, read }: { readonly draw
     since === 'stroke' && carryToward !== undefined && judged !== undefined && before !== undefined && sameNode && sameSizeWithinPixel(before.rect, judged.rect) && lastDrawn !== undefined
       ? { moved: motionToward(before.rect, judged.rect, carryToward), drawn: lastDrawn }
       : undefined;
-  // The card move (`CardMove`): a read after a stroke that found the same node moved along one axis.
   const along = since === 'stroke' && judged !== undefined && before !== undefined && sameNode && lastDrawn !== undefined ? cardMoved(before.rect, judged.rect) : undefined;
   const moves = along === undefined || lastDrawn === undefined ? m.moves : [...m.moves, { drawn: lastDrawn, along }];
   // The region (motion-shown.ts): seen only on a read that found the target, and only where its tree tells no scroll

@@ -26,25 +26,23 @@ import { resolveSettled, type RefusedOnPresentElement } from './resolve.js';
  * `dumpsys window displays`) and, independently, whether the input method
  * says one is shown at all (`witness()`); `back` hides it. This module owns
  * everything that follows from those facts — the bounded re-check a veto
- * starts, the one look after the key, the blind dismissal after a fill,
- * and the words — one adapter at the seam `keyboard-model.ts` describes,
- * beside the in-tree model. It never asks the oracle itself (since
- * 2026-10-09): every question goes to a reading
- * (ui-tree/keyboard-cover.ts#readKeyboard), which owns the call order, the
- * floating panel and the veto (`witnessDenies`) — this module acts on the
- * verdicts. Chosen by `keyboard.ts#keyboardModel` for an adapter WITH the
- * oracle; the platform label is never read.
+ * starts, the one look after the key, the blind dismissal after a fill, and
+ * the words — one adapter at the seam `keyboard-model.ts` describes, beside
+ * the in-tree model. It never asks the oracle itself: every question goes
+ * to a reading (ui-tree/keyboard-cover.ts#readKeyboard), which owns the
+ * call order, the floating panel and the veto (`witnessDenies`) — this
+ * module acts on the verdicts. Chosen by `keyboard.ts#keyboardModel` for an
+ * adapter WITH the oracle; the platform label is never read.
  */
 
 /**
- * The vetoed path's bounded re-check (2026-10-04, after review): when the
- * window state says a keyboard covers the tap point and the input method
- * says none is shown, NOTHING is sent on that one disagreeing sample. Both
- * sources are asked again every KEYBOARD_DISAGREEMENT_POLL_MS for at most
- * KEYBOARD_DISAGREEMENT_BUDGET_MS.
+ * The vetoed path's bounded re-check: when the window state says a keyboard
+ * covers the tap point and the input method says none is shown, NOTHING is
+ * sent on that one disagreeing sample. Both sources are asked again every
+ * KEYBOARD_DISAGREEMENT_POLL_MS for at most KEYBOARD_DISAGREEMENT_BUDGET_MS.
  *
  * The figures come from the one measurement there is (Pixel_3a AVD, API 33,
- * that day): after a tap that navigated away, the window state went on
+ * 2026-10-04): after a tap that navigated away, the window state went on
  * reporting the keyboard, full frame, for "a few seconds" — it had cleared
  * by the third of three samples taken a second apart — while the input
  * method already said not shown. Three seconds covers that; half a second
@@ -57,18 +55,18 @@ export const KEYBOARD_DISAGREEMENT_POLL_MS = 500;
 export const KEYBOARD_DISAGREEMENT_BUDGET_MS = 3_000;
 
 /**
- * Anything that went wrong AFTER `back` was pressed (review 2026-10-03). The
- * key press is a side effect that cannot be taken back and cannot be made
- * conditional — `input keyevent 4` has no "only if the IME is up" form — so
- * between the adapter saying "shown" and the key landing, a keyboard that
- * hid by itself (or a wrong "shown") turns `back` into a NAVIGATION. The
- * race cannot be removed; it can be reported. (Seen for real the same day,
- * by hand: a system search screen that had raised its keyboard on two
- * earlier visits did not on the third, and the `back` meant for the keyboard
- * sent the app beneath it to the background.) Every failure past the key
- * press is therefore this class: its message says back was pressed, and
- * `backPressed` (its `traceLine`) carries the trace-sized sentence for the
- * flow engine. The original error is the `cause`.
+ * Anything that went wrong AFTER `back` was pressed. The key press is a side
+ * effect that cannot be taken back and cannot be made conditional — `input
+ * keyevent 4` has no "only if the IME is up" form — so between the adapter
+ * saying "shown" and the key landing, a keyboard that hid by itself (or a
+ * wrong "shown") turns `back` into a NAVIGATION. The race cannot be removed;
+ * it can be reported. (Seen for real on 2026-10-03, by hand: a system search
+ * screen that had raised its keyboard on two earlier visits did not on the
+ * third, and the `back` meant for the keyboard sent the app beneath it to the
+ * background.) Every failure past the key press is therefore this class: its
+ * message says back was pressed, and `backPressed` (its `traceLine`) carries
+ * the trace-sized sentence for the flow engine. The original error is the
+ * `cause`.
  */
 export class AfterKeyboardDismissal extends KeyboardGuardError {
   /** `the soft keyboard covered <target>; back pressed` — the trace line, under the name that says what it records. */
@@ -81,13 +79,12 @@ export class AfterKeyboardDismissal extends KeyboardGuardError {
 }
 
 /**
- * The two sources would not agree within the budget (2026-10-04): the window
- * state kept a keyboard over the tap point, the input method kept saying
- * none is shown. NOT an AfterKeyboardDismissal — no `back` was pressed, and
- * no tap was sent either: `back` would navigate if the input method is
- * right, the tap would press a keyboard key if the window state is. A
- * refusal, because acting on either guess is the harm this guard exists to
- * prevent.
+ * The two sources would not agree within the budget: the window state kept
+ * a keyboard over the tap point, the input method kept saying none is
+ * shown. NOT an AfterKeyboardDismissal — no `back` was pressed, and no tap
+ * was sent either: `back` would navigate if the input method is right, the
+ * tap would press a keyboard key if the window state is. A refusal, because
+ * acting on either guess is the harm this guard exists to prevent.
  */
 export class KeyboardStateDisagreement extends KeyboardGuardError implements RefusedOnPresentElement {
   /** Nothing sent, the target resolved: a refusal on a present element (resolve.ts#RefusedOnPresentElement) — an `optional:` does not skip it. */
@@ -100,52 +97,43 @@ export class KeyboardStateDisagreement extends KeyboardGuardError implements Ref
 
 // ─── The decisions ───────────────────────────────────────────────────────────
 //
-// 2026-10-05 (verification pass, V1). Until this date the four moments at
-// which the guard and the dismissal decide — the first look, a re-check
-// round, the look after the one `back`, the post-fill dismissal — were ONE
-// table over one union of samples, returning one four-way action. The table
-// was honest about the rows but dishonest about the shape: each phase can
-// produce only a subset of the four answers (the first look never `refuse`s,
-// the look after the back never `back`s again), so every call site switched
-// over answers its phase could not get, five `unexpected()` throws guarded
-// arms no input could reach (and no test did), a `judge` helper rebuilt the
-// sample from loose fields, `hold` meant "wait and ask again" in the guard
-// and "do nothing" in the dismissal, and the budget rule lived in the loop
-// while the `last` flag it fed lived in the table. The guard read worse than
-// before the table existed. So each phase became its own pure, synchronous
-// decision with its own result type, and the compiler — not a runtime throw
-// — ruled out the impossible arms.
+// The four moments at which the guard and the dismissal decide — the first
+// look, a re-check round, the look after the one `back`, the post-fill
+// dismissal — are NOT one table over one union of samples returning one
+// four-way action: each moment can produce only a subset of the four answers
+// (the first look never `refuse`s, the look after the back never `back`s
+// again). With one table, every call site switches over answers its moment
+// cannot get, runtime throws guard arms no input reaches, and one word means
+// two things (`hold`: "wait and ask again" in the guard, "do nothing" in the
+// dismissal). So each moment is its own decision with its own result type,
+// and the compiler — not a runtime throw — rules out the impossible arms.
 //
-// 2026-10-07 (the keyboard-model review): two of the four — `firstLook`
-// (witness hidden → hold, else back) and `afterBack` (covering → refuse,
-// else proceed) — were one ternary each over one input, and their row
-// tests tested the ternary while the bugs that bit lived in the
-// orchestration around it; they failed the deletion test. `firstLook` is
-// the `denied` verdict's branch in `windowModel.guard` below (the veto
-// itself is the reading's, ui-tree/keyboard-cover.ts#witnessDenies), its
-// rows beside it; `afterBack`'s branch is the skeleton's one shared ternary
-// over the confirming look (keyboard.ts#resolveClearOfKeyboard, the same
-// for both models), and its rows — the reasons behind proceed and refuse
-// on THIS model — sit on the window `Hiding` that supplies the words.
-// The two that carry a RULE stay functions: `recheck` holds the budget rule
+// Two of the four are one ternary each over one input, so they are written
+// where they are used, not as functions whose row tests would test the
+// ternary while the bugs live in the orchestration around it: the first
+// look's is the `denied` verdict's branch in `windowModel.guard` below (the
+// veto itself is the reading's, ui-tree/keyboard-cover.ts#witnessDenies),
+// its rows beside it; the look after `back` is the skeleton's one shared
+// ternary over the confirming look (keyboard.ts#resolveClearOfKeyboard, the
+// same for both models), and its rows — the reasons behind proceed and
+// refuse on THIS model — sit on the window `Hiding` that supplies the words.
+// The two that carry a RULE are functions: `recheck` holds the budget rule
 // beside the answer it shapes, `dismissal` the one `unknown → back` row in
-// the codebase. What the table got right stays too: one `pressKey('back')`
-// in the codebase (`pressBack`, below), one `unknown → back` rule (the
-// dismissal's) and one `unknown → proceed` rule (the guard's, in
-// keyboard.ts), each with its reason beside it. Proven unchanged by an
-// old-vs-new differential over seeded window/witness/back-effect sequences
-// (the same harness that proved the table on 2026-10-04).
+// the codebase. There is one `pressKey('back')` in the codebase
+// (`pressBack`, below), one `unknown → back` rule (the dismissal's) and one
+// `unknown → proceed` rule (the guard's, in keyboard.ts), each with its
+// reason beside it.
 
 /**
- * What `dismissal` decides for ONE call: press `back`, press nothing, or —
- * since 2026-10-08 — press nothing and SAY that the input method reports a
- * keyboard the window state gives no area (`unlocated`, the
- * `dismissal` row below). A decision, not a capability — `DismissalMeans`
- * (ui-tree/soft-keyboard.ts, `'back' | 'none'`) says what the ADAPTER has to
- * hide a keyboard with, fixed per adapter, and an adapter with `back` in hand
- * still decides `nothing` here when the state is hidden or the witness denies
- * the keyboard. Two literal sets on purpose: `none` is "no means", `nothing`
- * is "do nothing this time".
+ * What `dismissal` decides for ONE call: press `back`, press nothing, or
+ * press nothing and SAY that the input method reports a keyboard the window
+ * state gives no area (`unlocated`, the `dismissal` row below). A decision,
+ * not a capability — `DismissalMeans` (ui-tree/soft-keyboard.ts,
+ * `'back' | 'none'`) says what the ADAPTER has to hide a keyboard with,
+ * fixed per adapter, and an adapter with `back` in hand still decides
+ * `nothing` here when the state is hidden or the witness denies the
+ * keyboard. Two literal sets on purpose: `none` is "no means", `nothing` is
+ * "do nothing this time".
  */
 export type DismissalDecision = 'back' | 'nothing' | 'unlocated';
 
@@ -177,24 +165,22 @@ export function recheck(now: Covering, waitedMs: number): 'back' | 'hold' | 'ref
  * The dismissal after a fill — no point, no second look; `covering` here
  * means shown anywhere (the reading's `anywhere`), and the input method's
  * word is asked through the reading: `corroborated` for a shown one (the
- * veto, `witnessDenies`), `unlocated` for a hidden one. Async since
- * 2026-10-09, over the reading, so the rows below are this function's and
- * the witness is never handed out raw; the rows are pinned through a
- * scripted oracle, one per row.
+ * veto, `witnessDenies`), `unlocated` for a hidden one. Async, over the
+ * reading, so the rows below are this function's and the witness is never
+ * handed out raw; the rows are pinned through a scripted oracle, one per
+ * row.
  *
  *   window clear (hidden) · witness hidden / unknown → nothing
  *     Nothing to dismiss — back with no keyboard up NAVIGATES (the
  *     2026-10-03 finding: a custom PIN pad, a hardware keyboard, a picker).
  *   window clear (hidden) · witness shown            → unlocated (nothing pressed, said)
- *     The row that did not exist until 2026-10-08
- *     (docs/bugs/2026-10-05-android-floating-gboard-keyboard.md): the input
- *     method says a keyboard is shown, the window manager gives it no area.
- *     It was written for a floating Gboard, inferred to contribute no IME
- *     insets; the device check the same evening MEASURED otherwise on API 33:
- *     a floating Gboard keeps a 132-px inset band (`covering` here, `back`
- *     by the row below — which hid it and left the form, measured), its
- *     panel being a second rect of the IME window's region that the tap
- *     guard, the pixel poll and `scroll_until` now read beside the band
+ *     The row of docs/bugs/2026-10-05-android-floating-gboard-keyboard.md:
+ *     the input method says a keyboard is shown, the window manager gives it
+ *     no area. It was written for a floating Gboard, inferred to contribute
+ *     no IME insets; the device check MEASURED otherwise on API 33: a
+ *     floating Gboard keeps a 132-px inset band (`covering` here, `back` by
+ *     the row below — which hid it and left the form, measured), its panel
+ *     being a second rect of the IME window's region, read beside the band
  *     (`panels`, ui-tree/keyboard-cover.ts#panelsBeyond). The row stays, for
  *     the disagreement it names — the one window-hidden read seen with an IME
  *     on screen was the panel still coming up, right after the focus tap, and
@@ -204,25 +190,23 @@ export function recheck(now: Covering, waitedMs: number): 'back' | 'hold' | 'ref
  *     is not known NOT to lag a navigation — and a `back` on a screen with
  *     no keyboard pops it (the same note, step 2: the form was popped). So
  *     nothing is pressed and the caller is told (`UNLOCATED_KEYBOARD`), as
- *     the note's "at minimum, surface it" direction asks, instead of the
- *     silent success this row was before.
+ *     the note's "at minimum, surface it" direction asks.
  *   window unknown                            → back
- *     The ONE place unknown means back, exactly as before 2026-10-03: the
- *     adapter could not tell (the command failed, or printed a format it does
- *     not recognise), and after a fill a keyboard left up over the next tap
- *     is the likelier harm. No witness is asked: there is no window state
- *     for it to contradict.
+ *     The ONE place unknown means back: the adapter could not tell (the
+ *     command failed, or printed a format it does not recognise), and after
+ *     a fill a keyboard left up over the next tap is the likelier harm. No
+ *     witness is asked: there is no window state for it to contradict.
  *   covering · witness shown / unknown        → back
  *   covering · witness hidden                 → nothing
  *     As the guard's first look: the veto applies to the dismissal too (the
  *     stale window state after a navigation is where it was measured), and
  *     with nothing to wait for, a denied keyboard is simply left alone.
  *
- * The witness is asked for `clear` too since that date — one more filtered
+ * The witness is asked for `clear` too — one more filtered
  * `dumpsys input_method` per dismissal whose window reads hidden (its cost:
- * AndroidAdapter's keyboardWitness). It can only ADD a sentence there, never
- * a key. The window state is read without its region (`anywhere`): with no
- * point, a floating panel changes nothing here.
+ * AndroidAdapter's keyboardWitness). It can only ADD a sentence there,
+ * never a key. The window state is read without its region (`anywhere`):
+ * with no point, a floating panel changes nothing here.
  *
  * The WINDOW model's alone: its `unknown → back` row assumes an oracle that
  * could not answer. A reading without one (the in-tree model) also reads
@@ -239,9 +223,9 @@ export async function dismissal(reading: KeyboardReading): Promise<DismissalDeci
 // ─── The model ───────────────────────────────────────────────────────────────
 
 /**
- * THE ONE `back` averi sends for keyboard reasons (2026-10-04): the guard's
- * dismissal and `dismissKeyboard` both come through here, and only after a
- * decision has said `back` — on a witness asked immediately before, or on
+ * THE ONE `back` averi sends for keyboard reasons: the guard's dismissal
+ * and `dismissKeyboard` both come through here, and only after a decision
+ * has said `back` — on a witness asked immediately before, or on
  * `dismissal`'s one `unknown → back` row (no witness: there is no window
  * state for it to contradict) — never after the key, never on a path that
  * presses nothing.
@@ -303,14 +287,13 @@ export function windowModel(adapter: KeyboardAdapter): KeyboardModel {
       // not-covering case never reaches this model — keyboard.ts's one
       // fail-open rule):
       //   witness shown / unknown                   → back
-      //     The decision the window state alone made before the veto existed
-      //     (2026-10-04): a witness that cannot be asked — adb failure, an
-      //     Android version that does not print `mInputShown` (unverified
-      //     outside API 33; the stale-window hazard REMAINS there) — leaves
-      //     it standing.
+      //     The window state's own decision: a witness that cannot be asked —
+      //     adb failure, an Android version that does not print `mInputShown`
+      //     (unverified outside API 33; the stale-window hazard REMAINS
+      //     there) — leaves it standing.
       //   witness hidden (`denied`)                 → hold
       //     The veto (the reading's `witnessDenies`). The window state can be
-      //     stale for seconds after a navigation (measured that day: full
+      //     stale for seconds after a navigation (measured 2026-10-04: full
       //     frame reported, input method already said not shown); `back` then
       //     navigates, a tap then presses a key. Nothing is sent on one
       //     disagreeing sample; the re-check rounds follow.
@@ -320,9 +303,9 @@ export function windowModel(adapter: KeyboardAdapter): KeyboardModel {
           await sleep(KEYBOARD_DISAGREEMENT_POLL_MS);
           // A fresh reading each round, read WHOLE — band and panels: the
           // first look may have found the point under a floating panel, and
-          // the band alone would read it clear here and tap a key (review
-          // 2026-10-08). No tree and no subject: the oracle answers, and the
-          // first look already ruled out the keyboard's own UI.
+          // the band alone would read it clear here and tap a key. No tree and
+          // no subject: the oracle answers, and the first look already ruled
+          // out the keyboard's own UI.
           const now = readKeyboard(adapter);
           let window = await now.over(judged);
           if (window.kind === 'clear' || window.kind === 'unknown') {
@@ -351,7 +334,7 @@ export function windowModel(adapter: KeyboardAdapter): KeyboardModel {
           last = window;
           const round = recheck(window, waited);
           if (round === 'back') {
-            confirmedAfterMs = waited; // confirmed: the normal dismissal below
+            confirmedAfterMs = waited;
             break;
           }
           if (round === 'refuse') {
@@ -428,15 +411,13 @@ export function windowModel(adapter: KeyboardAdapter): KeyboardModel {
               : confirmedAfterMs === undefined
                 ? `${covered}; hidden before tapping`
                 : `${covered}; hidden before tapping (after waiting ${confirmedAfterMs}ms for the input method to confirm it)`,
-          // Honest advice only (review 2026-10-03): scroll_until stopped as
-          // soon as the target intersected the viewport, which a node under
-          // the keyboard already did — since 2026-10-08 it judges above the
-          // keyboard, but still cannot lift a target the keyboard covers at
-          // the end of the content, the case this refusal is; tapping outside a field does not close the
-          // Android IME; `enter` may submit the form; and a flow has neither a
-          // key step nor a coordinate tap.
+          // Honest advice only: scroll_until judges above the keyboard but
+          // cannot lift a target the keyboard covers at the end of the
+          // content, the case this refusal is; tapping outside a field does
+          // not close the Android IME; `enter` may submit the form; and a flow
+          // has neither a key step nor a coordinate tap.
           //
-          // A deliberate exception, 2026-10-03, of the kind launchRefused's comment
+          // A deliberate exception, of the kind launchRefused's comment
           // records in adapters/android.ts: this string names MCP tools
           // (ui_snapshot, press_key) and speaks of "a flow", vocabulary of the
           // two layers ABOVE interact. Kept, as in verify/capture.ts and
@@ -457,18 +438,17 @@ export function windowModel(adapter: KeyboardAdapter): KeyboardModel {
     },
 
     /**
-     * The dismissal after a fill, since 2026-10-03: `back` is pressed only
-     * if the window state does not say the keyboard is HIDDEN. Before that
-     * date it was pressed blindly, and `back` with no keyboard up NAVIGATES
-     * BACK — a field that raises no keyboard (a custom PIN pad, a hardware
-     * keyboard, a picker) turned `dismissKeyboard: true` into leaving the
-     * screen. The rows (and their reasons) are `dismissal`'s:
-     * - shown   → back — unless, since 2026-10-04, the independent witness
-     *   denies the keyboard: then nothing is pressed, and nothing is waited for;
-     * - hidden  → nothing: there is nothing to dismiss — unless, since
-     *   2026-10-08, the witness says a keyboard IS shown: still nothing
-     *   pressed, and a `warning` saying so (the `unlocated` row);
-     * - unknown → back, exactly as before, the witness not asked.
+     * The dismissal after a fill: `back` is pressed only if the window state
+     * does not say the keyboard is HIDDEN, because `back` with no keyboard up
+     * NAVIGATES BACK — a field that raises no keyboard (a custom PIN pad, a
+     * hardware keyboard, a picker) would turn `dismissKeyboard: true` into
+     * leaving the screen. The rows (and their reasons) are `dismissal`'s:
+     * - shown   → back — unless the independent witness denies the
+     *   keyboard: then nothing is pressed, and nothing is waited for;
+     * - hidden  → nothing: there is nothing to dismiss — unless the witness
+     *   says a keyboard IS shown: still nothing pressed, and a `warning`
+     *   saying so (the `unlocated` row);
+     * - unknown → back, the witness not asked.
      * One oracle query per dismissal (its cost: AndroidAdapter's
      * keyboardState), and the witness query when that query says shown or
      * hidden — a reading with no tree, asked `anywhere`, then `corroborated`

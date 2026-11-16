@@ -1,8 +1,5 @@
 /**
- * The device-log excerpt `get_logs` returns: a grep, the tail, and a header saying what both did. A leaf of its own
- * since A29 (docs/plans/2026-10-30-performance-backlog.md): until then it sat in run/verify.ts, the `verify` tool's
- * orchestration, and A29's first cut put it beside the health line (run/app-health.ts), which never reads it. Its one
- * reader is mcp/'s get_logs, which validates the pattern under LOG_GREP_FLAGS and quotes LOG_MAX_LINES.
+ * The device-log excerpt `get_logs` returns: a grep, the tail, and a header saying what both did.
  */
 
 /**
@@ -19,8 +16,6 @@ export const LOG_GREP_FLAGS = 'i';
  * How many matching lines a log excerpt keeps when the caller names no
  * budget — the tail, where the failure is. Owned here, where the limit is
  * applied; the MCP get_logs tool's schema default and description quote it.
- * (Until 2026-10-08 this function defaulted to 2000 while the tool's schema
- * said 400, two defaults for one limit.)
  */
 export const LOG_MAX_LINES = 400;
 

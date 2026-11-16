@@ -55,7 +55,7 @@ export function installShutdownHandlers(hooks: ShutdownHooks): void {
   }
 }
 
-/** One shutdown: dispose within budget, flush the transport, exit 0. Exported for tests. */
+/** Exported for tests. */
 export async function shutdown(hooks: ShutdownHooks, exit: (code: number) => void): Promise<void> {
   await withinBudget(hooks.dispose().catch(() => undefined), hooks.budgetMs ?? SHUTDOWN_BUDGET_MS);
   if (hooks.close) await withinBudget(hooks.close().catch(() => undefined), CLOSE_BUDGET_MS);

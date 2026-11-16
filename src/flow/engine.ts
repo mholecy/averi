@@ -54,9 +54,9 @@ export interface TraceEntry {
 
 /**
  * The one rendering of a trace. It lives here, beside the TraceEntry it
- * renders, because a FAILING flow now carries its own trace in the error
- * message (FlowError) — so the formatter has to be reachable from the engine
- * itself, not from the run layer that imports the engine.
+ * renders, because a FAILING flow carries its own trace in the error message
+ * (FlowError) — so the formatter has to be reachable from the engine itself,
+ * not from the run layer that imports the engine.
  */
 export const formatTrace = (trace: TraceEntry[]): string =>
   trace.map((t) => (t.detail === undefined ? t.action : `${t.action}: ${t.detail}`)).join('\n');
@@ -64,11 +64,11 @@ export const formatTrace = (trace: TraceEntry[]): string =>
 /**
  * A flow failure that carries the steps that DID run.
  *
- * A successful run returns its trace; a failing one used to return nothing but
- * the final message ("Timed out after 20000ms waiting for state logged_in") —
- * which is exactly when the trace is worth most. It is the only way to see
- * which reach flows ran, how far each got, and, with `clearState` in the mix,
- * what the attempt already cost. The trace is appended to `message` (MCP
+ * A successful run returns its trace; a failing one carries it too, beside
+ * the final message ("Timed out after 20000ms waiting for state logged_in"),
+ * because that is exactly when the trace is worth most. It is the only way to
+ * see which reach flows ran, how far each got, and, with `clearState` in the
+ * mix, what the attempt already cost. The trace is appended to `message` (MCP
  * surfaces only the message) and kept structured on `trace` for callers that
  * want the entries.
  */
@@ -87,24 +87,23 @@ export class FlowError extends Error {
  * read failed, the probe never saw the device — or `bare` — every tree it
  * read was bare (ui-tree/bare-tree.ts: only wrappers and unlabeled
  * decoration, a launch's decor or splash), so a miss in it says nothing
- * about the state (2026-10-07). `shape` is the last bare tree's shape
- * (`treeShape`), for the line that says so. Exported because the refusal
- * below is built from two of them.
+ * about the state. `shape` is the last bare tree's shape (`treeShape`), for
+ * the line that says so. Exported because the refusal below is built from
+ * two of them.
  */
 export type UnreadProbe = { answer: 'unknown'; readError: Error } | { answer: 'bare'; shape: string };
 
 /**
  * What the probe before a destructive rung and its second look learned
- * TOGETHER — the refusal's cause. Until the 2026-10-07 review the cause was
- * the second look alone, and both mixed orders were worded wrong: a bare
- * entry read followed by a second look whose every read failed said "never
- * read a UI tree" (the entry had read one), and a failed entry read followed
- * by a bare second look said "every read was bare" (the entry's had failed).
- * So: if the second look read a tree it was bare, and it is the latest one
- * (`bare` — "every UI TREE read was bare" stays true of a failed entry read,
- * which read no tree); if only the entry read one, the cause is that shape
- * AND the second look's failure (`bare-then-failed`); only when neither read
- * any tree is it `unknown`, worded as before.
+ * TOGETHER — the refusal's cause. The second look alone would word both
+ * mixed orders wrong: a bare entry read followed by a second look whose every
+ * read failed would say "never read a UI tree" (the entry had read one), and
+ * a failed entry read followed by a bare second look "every read was bare"
+ * (the entry's had failed). So: if the second look read a tree it was bare,
+ * and it is the latest one (`bare` — "every UI TREE read was bare" stays true
+ * of a failed entry read, which read no tree); if only the entry read one,
+ * the cause is that shape AND the second look's failure (`bare-then-failed`);
+ * only when neither read any tree is it `unknown`.
  */
 type UnreadCause = UnreadProbe | { answer: 'bare-then-failed'; shape: string; readError: Error };
 
@@ -130,18 +129,18 @@ const describeUnreadCause = (cause: UnreadCause): string => {
 
 /**
  * The ladder declined to run a DESTRUCTIVE rung because the detect probe
- * right before it never read a UI tree (2026-10-06, docs/bugs/2026-10-06-ios-
- * idb-empty-tree-persists-on-pin-screen.md: idb returned a 0×0 Application
- * for minutes on a rendered screen, and every probe read that as "not in
- * state") — or, since 2026-10-07, read only BARE trees (docs/bugs/2026-10-06-
- * second-look-reads-android-decor-as-not-in-state.md: Android's decor-only
- * tree for ~9 s of a cold launch, WDA's 7-node splash). On such a device
- * "not in state" is not knowledge, and the rung's cost — a wiped app and
- * its device registration — is not undone by the tree coming back a minute
- * later. Not a SetupError: the descriptor is fine, the device was not read.
- * Terminal like one (`isTerminal`). The cause is what that probe and its
- * second look learned together (`UnreadCause`), so each kind is worded with
- * what was read and the kinds cannot be confused.
+ * right before it never read a UI tree (docs/bugs/2026-10-06-ios-idb-empty-
+ * tree-persists-on-pin-screen.md: idb returned a 0×0 Application for minutes
+ * on a rendered screen, and every probe read that as "not in state") — or
+ * read only BARE trees (docs/bugs/2026-10-06-second-look-reads-android-
+ * decor-as-not-in-state.md: Android's decor-only tree for ~9 s of a cold
+ * launch, WDA's 7-node splash). On such a device "not in state" is not
+ * knowledge, and the rung's cost — a wiped app and its device registration
+ * — is not undone by the tree coming back a minute later. Not a SetupError:
+ * the descriptor is fine, the device was not read. Terminal like one
+ * (`isTerminal`). The cause is what that probe and its second look learned
+ * together (`UnreadCause`), so each kind is worded with what was read and
+ * the kinds cannot be confused.
  */
 export class UnreadTreeRefusal extends Error {
   /** Why, without the headline — the ladder's `⛔ reach` trace line is this, so the two cannot drift apart. */
@@ -151,8 +150,8 @@ export class UnreadTreeRefusal extends Error {
     const cause = unreadCause(before, secondLook);
     const lead = 'the rung is DESTRUCTIVE (it wipes app state, and any device registration with it), and the detect probe before it ';
     // The two kinds share every clause but the cause's and the retry's, in
-    // a different order: the unread wording predates the bare one and is
-    // pinned, so the parts are spelled once and each kind arranges them.
+    // a different order: the unread wording is pinned, so the parts are
+    // spelled once and each kind arranges them.
     const unknownState = `so whether the app is in "${state}" is unknown`;
     const retry = (once: string) => `Compare with screenshot; retry once ${once}`;
     const reason =
@@ -182,7 +181,7 @@ export class UnreadTreeRefusal extends Error {
  * — a state is on the `ensuring` stack at most once — but the bound is the
  * product of the loop's rung counts, not their sum: every rung of every
  * state on the loop is tried at every depth (measured: n states each with
- * two rungs requiring the next costs 2^(n+1)−3 reads, 253 at n = 6). No
+ * two rungs requiring the next costs 2^(n+2)−3 reads, 253 at n = 6). No
  * step runs in a re-entry subtree — each rung fails on its `requires:`
  * before its first step — so it costs reads only, never a tap.
  */
@@ -195,7 +194,7 @@ class ReentryError extends Error {
 
 /**
  * An `optional:` step whose element was PRESENT and which the interaction
- * module refused to tap (2026-10-09, owner's decision —
+ * module refused to tap (owner's decision —
  * docs/bugs/2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md,
  * item 3): an error carrying interact's RefusedOnPresentElement marker (the
  * target's centre off the screen or under a node drawn over it; the soft
@@ -214,18 +213,17 @@ class ReentryError extends Error {
  * owner chose "never escalate past a present-but-refused element". The refusal is the
  * `cause`; the message says why it was not skipped, then quotes it.
  *
- * Since 2026-11-11 (D81 review round 1, the coordinator's decision) a `scroll_until` whose `within` names no
- * scroll view for any reason but `absent` (interact/within.ts#WithinRefusedError): several matches, a match in no
- * scroll view, one that scrolls only across the stroke, a tree that lists no scroll view (idb) — an authoring error
- * no screen cures, terminal like a config refusal. An `absent` one is skipped: the list, like the interstitial, may
- * not be on this screen. Since D80 one whose named scroll view has no room for a swipe (`noRoom`: the keyboard over
- * it, too little of it on screen) is terminal too, with its own reason: the list IS on this screen, so skipping would
- * run on as if it had been scrolled — the room is an earlier step's to make (hide the keyboard), as a refused tap's
- * cover is.
+ * It is raised too (D81) for a `scroll_until` whose `within` names no scroll view for any reason but `absent`
+ * (interact/within.ts#WithinRefusedError): several matches, a match in no scroll view, one that scrolls only across
+ * the stroke, a tree that lists no scroll view (idb) — an authoring error no screen cures, terminal like a config
+ * refusal. An `absent` one is skipped: the list, like the interstitial, may not be on this screen. One whose named
+ * scroll view has no room for a swipe (`noRoom`: the keyboard over it, too little of it on screen, D80) is terminal
+ * too, with its own reason: the list IS on this screen, so skipping would run on as if it had been scrolled — the room
+ * is an earlier step's to make (hide the keyboard), as a refused tap's cover is.
  *
  * Only an `optional:` raises it. The same refusal outside one is the step's
- * plain failure and a rung that throws it escalates as before — the owner's
- * decision is about what `optional:` may swallow.
+ * plain failure and a rung that throws it escalates — the owner's decision is
+ * about what `optional:` may swallow.
  */
 class OptionalNotSkipped extends Error {
   constructor(refusal: NotSkippable) {
@@ -237,10 +235,10 @@ class OptionalNotSkipped extends Error {
 /**
  * Why OptionalNotSkipped's step was not skipped, said before the refusal it
  * quotes. A fill that failed on its value (interact/fill.ts#FillValueFailure;
- * 2026-10-09, owner's decision) is the same finding as a refused tap: its
- * text did not land after the focus tap (a half-typed login must not run on),
- * or averi refused its value before anything was typed (a broken value, not an
- * absent field — the field was never even looked for).
+ * owner's decision) is the same finding as a refused tap: its text did not
+ * land after the focus tap (a half-typed login must not run on), or averi
+ * refused its value before anything was typed (a broken value, not an absent
+ * field — the field was never even looked for).
  */
 const notSkippedWhy = (e: NotSkippable): string =>
   e instanceof WithinRefusedError
@@ -267,19 +265,13 @@ const notSkippable = (e: unknown): e is NotSkippable =>
  * SetupError is a broken descriptor; an UnreadTreeRefusal is a nested ladder
  * (a rung's `requires:`) that already refused — escalating the OUTER ladder
  * past it would run the wipe the inner one declined; an OptionalNotSkipped
- * (since 2026-10-09) is a rung's interstitial that is on screen and could
- * not be tapped — the next rung would run on the screen the cheap one was
- * written for. The ladder's catch asks
- * (the final wait never enters a ladder, so it can see a SetupError — an
- * unknown state in a condition — but never a refusal), and since 2026-10-08
- * so does `optional:` (runOptionalSteps), which rethrows instead of
- * skipping, and runStep, which then gives such an error its ✗ line even
- * inside an `optional:`. Since 2026-10-31 (D21) a PersistentReadError
- * (adapters/types.ts) too — a tree read no wait cures, idb's wedged
- * accessibility service: not an absent element for `optional:` to skip, and
- * nothing a rung, a re-run or the next rung can cure (a relaunch was measured
- * 0 of 5), so the ladder stops on it, and the final wait's recovery pass
- * does not run on it either.
+ * is a rung's interstitial that is on screen and could not be tapped — the
+ * next rung would run on the screen the cheap one was written for. A
+ * PersistentReadError (D21, adapters/types.ts) too — a tree read no wait cures,
+ * idb's wedged accessibility service: not an absent element for `optional:`
+ * to skip, and nothing a rung, a re-run or the next rung can cure (a relaunch
+ * was measured 0 of 5), so the ladder stops on it, and the final wait's
+ * recovery pass does not run on it either.
  */
 const isTerminal = (e: unknown): boolean =>
   e instanceof SetupError ||
@@ -290,12 +282,10 @@ const isTerminal = (e: unknown): boolean =>
 /**
  * What one detect probe learned. `unknown` is "every read failed — the probe
  * never saw the device"; `bare` is "every tree read was bare" (UnreadProbe).
- * Callers that only need a boolean fold both into "not detected" by
- * comparing against `'yes'` (salvage, the recovery pass); the ladder alone
- * tells them apart (ensureStateLadder). `readError` is set exactly when it is
- * unknown, `shape` exactly when it is bare. `heldMs` is set exactly when a
- * `no` ended the window early on a rendered tree that held still (D2,
- * `detects`' `holdMs`): how long that tree held, for the ladder's trace line.
+ * `readError` is set exactly when it is unknown, `shape` exactly when it is
+ * bare. `heldMs` is set exactly when a `no` ended the window early on a
+ * rendered tree that held still (D2, `detects`' `holdMs`): how long that tree
+ * held, for the ladder's trace line.
  */
 type Detection = { answer: 'yes' } | { answer: 'no'; heldMs?: number } | UnreadProbe;
 
@@ -328,11 +318,10 @@ const FLOW_AMBIGUITY: Ambiguity = 'first';
 export type RunRequest = { state: string; flow?: string } | { state?: undefined; flow: string };
 
 /**
- * The request a caller holding two OPTIONAL names makes — `verify`'s state
- * and flow — or undefined when it names neither (nothing for the engine to
- * do). An empty string is "none", as `verify` always read it. The one place
- * the union is built from optional strings, so no caller spells the
- * narrowing by hand.
+ * The request a caller holding two OPTIONAL names makes, or undefined when
+ * it names neither (nothing for the engine to do). An empty string is
+ * "none". The one place the union is built from optional strings, so no
+ * caller spells the narrowing by hand.
  */
 export const runRequestOf = (state?: string, flow?: string): RunRequest | undefined => {
   const s = state || undefined;
@@ -343,19 +332,17 @@ export const runRequestOf = (state?: string, flow?: string): RunRequest | undefi
 /**
  * How long a state may take to appear when the caller names no
  * `ensureTimeoutMs`: the wait after the reach flows AND the second look
- * before a destructive rung (see the refusal comment in ensureStateInner).
- * Exported for the `ensure_state` tool's description, which quotes it.
+ * before a destructive rung (see the refusal comment in ensureStateLadder).
  */
 export const DEFAULT_ENSURE_TIMEOUT_MS = 20_000;
 
 export interface EngineOptions {
   /**
-   * Poll interval for waits — and ONLY that (2026-10-05). It is handed to the
-   * Verifier the inline `assert:` steps use as its poll interval too; the
-   * stability wait before a pixel reading is verify/capture.ts's own budget,
-   * which this knob no longer touches (it used to be forwarded as the delay
-   * between stability captures, so asserts inside flows waited 500 ms where
-   * the MCP `assert` tool waited 300). Tests use a few ms.
+   * Poll interval for waits — and ONLY that. It is handed to the Verifier the
+   * inline `assert:` steps use as its poll interval too; the stability wait
+   * before a pixel reading is verify/capture.ts's own budget, which this knob
+   * does not touch, so the stability wait of an assert inside a flow is the
+   * MCP `assert` tool's. Tests use a few ms.
    */
   pollMs?: number;
   tapTimeoutMs?: number;
@@ -370,7 +357,7 @@ export interface EngineOptions {
    * with verify/element-assert.ts#elementAssertSchema, so no color, ocr or
    * rect assert reaches this — and set, it replaces their tree-assert
    * default; unset, the Verifier's `ASSERT_TIMEOUT_MS` (3 s, verify/assert.ts)
-   * applies. Only the engine's tests set it; the server's runs leave it unset.
+   * applies.
    */
   assertTimeoutMs?: number;
   /** Pause between type_pin keystrokes (auto-advancing inputs drop bulk text). */
@@ -390,28 +377,25 @@ export interface EngineOptions {
   /**
    * The environment `${VAR}` values resolve from — the loader's
    * (flow/load.ts, `ProjectConfig.env`: the real environment over the
-   * project's `.env.averi`). REQUIRED, not defaulted to `process.env`, since
-   * 2026-10-04: the engine used to read `process.env` at step time, so it
-   * silently depended on the right loader having written the file into it
-   * first; now a caller that has not loaded the environment cannot build an
-   * engine. Tests pass a plain object.
+   * project's `.env.averi`). REQUIRED, not defaulted to `process.env`: read
+   * at step time, `process.env` would silently depend on the right loader
+   * having written the file into it first; required, a caller that has not
+   * loaded the environment cannot build an engine.
    */
   env: EnvValues;
   /**
    * The session this run counts toward (see `EngineSession`). REQUIRED, like
-   * `env`: optional, a caller that forgot it silently reset the "N this
-   * session" count on every call — the leak this type exists to close, just
-   * moved (code review, 2026-10-07). The MCP layer passes the server's; a
-   * test passes `new EngineSession()`.
+   * `env`: optional, a caller that forgot it would silently reset the "N this
+   * session" count on every call — the leak this type exists to close.
    */
   session: EngineSession;
 }
 
 /**
  * What a run-layer request carries for the engine beyond the config and the
- * adapter: the credential environment and the session. One type, so
- * run/commands.ts and run/verify.ts declare (and document) them once — the
- * comments are EngineOptions' own.
+ * adapter: the credential environment and the session. One type, so the run
+ * layer declares (and documents) them once — the comments are
+ * EngineOptions' own.
  */
 export type EngineContext = Pick<EngineOptions, 'environment' | 'session'>;
 
@@ -422,7 +406,6 @@ export type EngineContext = Pick<EngineOptions, 'environment' | 'session'>;
  */
 const headline = (e: unknown): string => errorMessage(e).split('\n')[0];
 
-/** A wait's explanation, asked at its timeout of the last tree it read (undefined when it read none): its probable-cause note, and the miss it carries. */
 /**
  * What a wait says of its last read at a timeout (`waitTimeoutHint`): `missing` — the element whose not-found it words,
  * which the window manager's word is asked about (ui-tree/window-mark.ts#markedForMiss) — and `say`, the words.
@@ -441,15 +424,16 @@ class WaitMissedError extends MissedError {}
 /**
  * An optional step's skip reason when it is not "(not present)": the
  * headline, and — when the error is a poll timeout carrying a read error —
- * that parenthesis too, joined onto it as one line (review 2026-10-08;
- * read-tree.ts#readErrorLine owns the shape, beside pollTimeoutMessage). The headline alone of a wait whose
- * last read failed is "Timed out … waiting for element X to appear", which
- * reads exactly like a slow screen; ElementNotFoundError is never thrown in that
- * case, so the skip line is the one place that tells a dead device from an
- * absent interstitial. Only that line: a FlowError's later lines are its
- * trace, and a skip line is one line. A timeout that says what its last
- * read saw (a `wait:` on an element, `WaitMissedError`; ui-tree/miss.ts)
- * says its note after the headline the same way — the note it says beneath.
+ * that parenthesis too, joined onto it as one line (read-tree.ts#readErrorLine
+ * owns the shape, beside pollTimeoutMessage). The headline alone of a wait
+ * whose last read failed is "Timed out … waiting for element X to appear",
+ * which reads exactly like a slow screen; ElementNotFoundError is never
+ * thrown in that case, so the skip line is the one place that tells a dead
+ * device from an absent interstitial. Only that line: a FlowError's later
+ * lines are its trace, and a skip line is one line. A timeout that says what
+ * its last read saw (a `wait:` on an element, `WaitMissedError`;
+ * ui-tree/miss.ts) says its note after the headline the same way — the note
+ * it says beneath.
  */
 const skipReason = (e: unknown): string => {
   const readError = readErrorLine(errorMessage(e));
@@ -502,9 +486,8 @@ export class FlowEngine {
   private readonly pinKeyDelayMs: number;
   private readonly credentials: Credentials;
   /**
-   * How this engine acts on an element, given once (2026-10-09; until then
-   * each call site spelled it out): FLOW_AMBIGUITY, the poll interval only when
-   * EngineOptions.pollMs pins one (since 2026-11-02, ADR 0040: otherwise a
+   * How this engine acts on an element, given once: FLOW_AMBIGUITY, the poll
+   * interval only when EngineOptions.pollMs pins one (ADR 0040: otherwise a
    * settle runs at the adapter's cadence, interact/resolve.ts#settleCadence,
    * and the presence probe at resolve.ts#DEFAULT_POLL_MS), and
    * `app.ios.keyboardDismiss` in interact/'s vocabulary (flow/config.ts#
@@ -512,13 +495,12 @@ export class FlowEngine {
    * and post-fill dismissal gets it; a site adds only what is its own (a
    * timeout, a clear). Each callee reads its own part: the presence probe
    * (resolvePresent) only `ambiguous` and `pollMs` — it acts on nothing, so
-   * the dismissals are carried, not used — and the dismissal only
-   * `ambiguous` and `dismissals`. The engine never branches on the platform for the
+   * the dismissals are carried, not used — and the dismissal only `ambiguous`
+   * and `dismissals`. The engine never branches on the platform for the
    * dismissals: interact/ reads the list only where the adapter has no
    * keyboard oracle, so on Android it is carried and never read. And the
-   * eyes' order question (`eyes`, ADR 0024), which a tap's
-   * judgement asks only of a centre covered by a control the listing does
-   * not order.
+   * eyes' order question (`eyes`, ADR 0024), which a tap's judgement asks
+   * only of a centre covered by a control the listing does not order.
    */
   private readonly acting: Omit<TapOptions, 'timeoutMs'>;
   /**
@@ -552,8 +534,8 @@ export class FlowEngine {
     // Resolved once per engine so a run cannot type one environment's username
     // and another's password; resolved before any STEP, so a bad name never
     // fails mid-login. The refusal BEFORE any device is the run layer's
-    // pre-flight (run/preflight.ts#refuseUnknownEnvironment, 2026-10-05) — the
-    // engine is built after the adapter and cannot give that guarantee itself.
+    // pre-flight (run/preflight.ts#refuseUnknownEnvironment) — the engine is
+    // built after the adapter and cannot give that guarantee itself.
     this.credentials = resolveCredentials(cfg, opts.env, opts.environment);
     this.pollMs = opts.pollMs ?? 500;
     this.tapTimeoutMs = opts.tapTimeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
@@ -584,15 +566,14 @@ export class FlowEngine {
    * private: the per-run state below cannot outlive the run or be shared
    * with another, because nothing outside can hold an engine.
    *
-   * 2026-10-07 (flow-engine review, candidate 1). There used to be two
-   * instance entries, `ensureState` and `runFlow`, and an unwritten rule: one
-   * instance, one entry. Each entry reset the trace and the recovery budget
-   * and logged the environment, and `verify` called both in turn on one
-   * instance — so a flow that failed after its state was ensured threw a
+   * One entry, not one per request kind on a shared instance: with separate
+   * entries for the state and the flow, each resetting the trace and the
+   * recovery budget and logging the environment, a `verify` that calls both in
+   * turn would throw, for a flow that failed after its state was ensured, a
    * FlowError holding the flow's steps only (the `state … already active`
-   * line, and after a ladder the `⚠ clearState` line, were gone from the
-   * FAILED section), the environment line was printed twice, and "one
-   * recovery pass per tool call" held twice. The rule is now the shape.
+   * line, and after a ladder the `⚠ clearState` line, gone from the FAILED
+   * section), print the environment line twice, and hold "one recovery pass
+   * per tool call" twice.
    */
   static run(cfg: AveriConfig, adapter: DeviceAdapter, opts: EngineOptions, request: RunRequest): Promise<TraceEntry[]> {
     // Async so a constructor throw (an unknown environment) is a rejection,
@@ -659,8 +640,8 @@ export class FlowEngine {
    * ReentryError, NOT terminal: it fails the one rung whose `requires:`
    * closed the loop, and the ladder that rung belongs to escalates to its
    * next rung as for any failed rung (see ReentryError). A terminal error
-   * here killed a declared fallback (`reach: [login, hard_login]` never
-   * tried `hard_login`) for a protection the ladder already has: a
+   * here would kill a declared fallback (`reach: [login, hard_login]` would
+   * never try `hard_login`) for a protection the ladder already has: a
    * destructive next rung still faces the never-wipes-blind check.
    *
    * Checked after the entry probe, so a state that IS detected on re-entry
@@ -670,10 +651,9 @@ export class FlowEngine {
    * in the plain shape, and a WIPE when the unwinding rung is destructive
    * (`login_screen.reach: [reset]`, reset requiring logged_in and launching
    * with clearState: home rendering mid-way makes reset wipe a logged-in
-   * app). That is no worse than fb171ef, which behaved identically there.
-   * `node` is this entry's own, already on top of the
-   * stack (ensureStateInner pushed it), so an EARLIER copy is the re-entry,
-   * and the loop runs from it to the top.
+   * app). `node` is this entry's own, already on top of the stack
+   * (ensureStateInner pushed it), so an EARLIER copy is the re-entry, and the
+   * loop runs from it to the top.
    */
   private refuseReentry(name: string, node: string, probe: Detection): void {
     const at = this.ensuring.indexOf(node);
@@ -744,42 +724,38 @@ export class FlowEngine {
       // `flowItselfIsDestructive` for why the two predicates must stay apart.
       const destructive = flowItselfIsDestructive(this.cfg, flow);
       // The SECOND LOOK (below, at length): before a destructive rung on any
-      // probe that learned nothing, and — since 2026-10-08 — before ANY rung
-      // on a BARE probe. A bare probe read a window that has not rendered
-      // yet; until then a cheap rung ran on it at once, and since the same
-      // date an `absent:` detect is bare there rather than "yes" (flow/
-      // condition.ts), so a state like `no_prompt: { detect: { id: prompt,
-      // absent: true }, reach: [dismiss] }` — "already active" on the decor
-      // until 2026-10-08 — would tap `later` on a screen with nothing on it and
-      // fail with that tap's timeout once the decor outlasted tapTimeoutMs.
-      // Looking again first: rendered and detected ends the call; rendered
-      // and not detected runs the rung on a tree that means something;
-      // still bare runs a cheap rung as before (it is how a ladder gets a
+      // probe that learned nothing, and before ANY rung on a BARE probe. A
+      // bare probe read a window that has not rendered yet, and an `absent:`
+      // detect is bare there rather than "yes" (flow/condition.ts), so a
+      // state like `no_prompt: { detect: { id: prompt, absent: true }, reach:
+      // [dismiss] }` would otherwise tap `later` on a screen with nothing on
+      // it and fail with that tap's timeout once the decor outlasted
+      // tapTimeoutMs. Looking again first: rendered and detected ends the
+      // call; rendered and not detected runs the rung on a tree that means
+      // something; still bare runs a cheap rung (it is how a ladder gets a
       // tree to read) and refuses a destructive one. An `unknown` probe —
-      // every read FAILED — keeps the old path for a cheap rung: a device
-      // that cannot be read is not a screen still drawing, and a relaunch
-      // may be its cure. The cost: a screen that is bare by bare-tree.ts's
-      // accepted miss (a map, a camera, an identified-only icon screen)
-      // delays a cheap rung by up to ensureTimeoutMs.
+      // every read FAILED — runs a cheap rung at once: a device that cannot
+      // be read is not a screen still drawing, and a relaunch may be its
+      // cure. The cost: a screen that is bare by bare-tree.ts's accepted miss
+      // (a map, a camera, an identified-only icon screen) delays a cheap rung
+      // by up to ensureTimeoutMs.
       //
-      // 2026-10-31 (D2, docs/adr/0033-a-held-rendered-no-ends-the-second-
-      // look-before-a-cheap-rung.md): "rendered and not detected runs the
-      // rung" used to mean "after the whole window" — the look ended only on
-      // `yes`, so a cold launch whose decor turned into a settled screen
-      // outside the state (a login screen for `logged_in`) polled the full
-      // 20 s before its cheap rung. Now the look also ends, answering `no`,
-      // once one rendered tree outside the state has held the same fingerprint
-      // across reads spanning reachRecheckMs (2 s, the grace a rung's own
-      // re-check already gives a screen to land; flow/hold-tracker.ts) — but
-      // only when no wipe lies ahead (flow/wipes-ahead.ts#WipesAhead). A tree
-      // that shows a spinner (read-tree.ts#showsProgress) never holds — it is
-      // a screen saying it still loads — and a held "no" says so in one
-      // `state` line before the rung. The accepted risk: a rendered loading
-      // screen WITHOUT a progress indicator (on iOS through WDA a React
-      // Native ActivityIndicator was one until backlog row D27, 2026-10-31,
-      // made its type `progress`) that holds for 2 s costs a cheap rung run
-      // on it, or an escalation to the next cheap one. Bare and unknown
-      // answers are unchanged — a bare or a failed read restarts the hold.
+      // The look also ends, answering `no` (D2), once one rendered tree
+      // outside the state has held the same fingerprint across reads
+      // spanning reachRecheckMs (2 s, the grace a rung's own re-check already
+      // gives a screen to land; flow/hold-tracker.ts) — but only when no wipe
+      // lies ahead (flow/wipes-ahead.ts#WipesAhead; docs/adr/0033-a-held-
+      // rendered-no-ends-the-second-look-before-a-cheap-rung.md). Ending only
+      // on `yes`, a cold launch whose decor turned into a settled screen
+      // outside the state (a login screen for `logged_in`) would poll the
+      // full 20 s before its cheap rung. A tree that shows a spinner
+      // (read-tree.ts#showsProgress) never holds — it is a screen saying it
+      // still loads — and a held "no" says so in one `state` line before the
+      // rung. The accepted risk: a rendered loading screen whose indicator
+      // the tree source does not report as `progress` (through WDA a React
+      // Native ActivityIndicator is one it does report, D27) that holds for
+      // 2 s costs a cheap rung run on it, or an escalation to the next cheap
+      // one. A bare or a failed read restarts the hold.
       //
       // The rung's re-detect below (the grace window after a rung) gets no
       // hold: it is not a second look. Its window IS reachRecheckMs, so a
@@ -814,24 +790,23 @@ export class FlowEngine {
         }
       }
       if (destructive) {
-        // ...unless the probe right before it never read a tree (2026-10-06,
-        // docs/bugs/2026-10-06-ios-idb-empty-tree-persists-on-pin-screen.md)
-        // or read only BARE ones (2026-10-07, docs/bugs/2026-10-06-second-
-        // look-reads-android-decor-as-not-in-state.md). Then "not in state"
-        // is not knowledge — the measured cases are idb returning a 0×0
-        // Application for minutes on a RENDERED screen, where mp-native's
-        // ladder would have wiped a registered app, and a cold launch's
-        // decor or splash read as "not logged out" on an app whose login
-        // screen was seconds away — so the rung is refused rather than
-        // announced. Only the probe immediately before counts: a later probe
-        // that READ a rendered tree and missed is real knowledge, and an
-        // earlier readable one is stale. Cheap rungs still run on an unknown
-        // probe at once, and on a bare one after the same second look (since
-        // 2026-10-08, above) — they are how a ladder gets a tree to read —
-        // and only a ladder applies the rule: `run_flow` never refuses the
-        // flow's OWN body (the caller's own decision), though a `requires:`
-        // inside it runs a ladder that does; the recovery pass never runs a
-        // destructive rung at all.
+        // ...unless the probe right before it never read a tree
+        // (docs/bugs/2026-10-06-ios-idb-empty-tree-persists-on-pin-screen.md)
+        // or read only BARE ones (docs/bugs/2026-10-06-second-look-reads-
+        // android-decor-as-not-in-state.md). Then "not in state" is not
+        // knowledge — the measured cases are idb returning a 0×0 Application
+        // for minutes on a RENDERED screen, where mp-native's ladder would
+        // have wiped a registered app, and a cold launch's decor or splash
+        // read as "not logged out" on an app whose login screen was seconds
+        // away — so the rung is refused rather than announced. Only the probe
+        // immediately before counts: a later probe that READ a rendered tree
+        // and missed is real knowledge, and an earlier readable one is stale.
+        // Cheap rungs still run on an unknown probe at once, and on a bare one
+        // after the same second look (above) — they are how a ladder gets a
+        // tree to read — and only a ladder
+        // applies the rule: `run_flow` never refuses the flow's OWN body (the
+        // caller's own decision), though a `requires:` inside it runs a ladder
+        // that does; the recovery pass never runs a destructive rung at all.
         //
         // One SECOND LOOK first: the entry probe is a single read (so the
         // warm path stays one read), and both of these are what a cold
@@ -840,28 +815,26 @@ export class FlowEngine {
         // finportal (Android 13 emulator, RN debug build): null root to
         // ~+3 s, the decor alone (android:id/content, action_bar_root)
         // +5.3…+13.8 s, `login_screen` at +18.3 s; through WDA the 7-node
-        // splash is read at +0.3 s. Until 2026-10-07 the window was the
-        // settle budget (`tapTimeoutMs`, 5 s) and only an unknown probe got
-        // it: it ended on the decor, read that as "no", and wiped an app
-        // that was already logged out — three runs of three; under WDA the
-        // ENTRY probe read the splash as "no" and the wipe ran with no
-        // second look at all. Now the window is `ensureTimeoutMs` (20 s by
-        // default), the budget that already means "how long a state may take
-        // to appear" — the final wait below uses it — and one loop with one
-        // deadline rides out null root → decor → rendered as the one
-        // transient it is. A second look that reads the state ends the call;
-        // one whose window held a rendered tree outside the state runs the
-        // rung, warning as usual (it polls to its deadline first, as every
-        // detect window does — at most 20 s, only after a cold-launch probe,
-        // in front of a rung that costs a wipe and a login; since 2026-10-31
-        // a look with no wipe ahead ends on a held rendered "no" instead,
-        // ADR 0033, but this one — and any before a cheap rung with a wipe
-        // after it — keeps the whole window); one that still
-        // read nothing rendered is refused. It cannot outlast the measured
-        // idb episode (minutes), so that is still refused; a transient longer
-        // than the window is refused too, and retrying the call — or
-        // run_flow of the rung — is the fix. (The look itself is above, shared
-        // with the bare probe before a cheap rung.)
+        // splash is read at +0.3 s. A window of the settle budget
+        // (`tapTimeoutMs`, 5 s) ended on the decor, read that as "no", and
+        // wiped an app that was already logged out — three runs of three; and
+        // with no second look, under WDA the ENTRY probe read the splash as
+        // "no". So the window is `ensureTimeoutMs` (20 s by default), the
+        // budget that already means "how long a state may take to appear" —
+        // the final wait below uses it — and one loop with one deadline rides
+        // out null root → decor → rendered as the one transient it is. A
+        // second look that reads the state ends the call; one whose window
+        // held a rendered tree outside the state runs the rung, warning as
+        // usual (it polls to its deadline first, as every detect window does —
+        // at most 20 s, only after a cold-launch probe, in front of a rung
+        // that costs a wipe and a login; a look with no wipe ahead ends on a
+        // held rendered "no" instead, ADR 0033, but this one — and any before
+        // a cheap rung with a wipe after it — keeps the whole window); one
+        // that still read nothing rendered is refused. It cannot outlast the
+        // measured idb episode (minutes), so that is still refused; a
+        // transient longer than the window is refused too, and retrying the
+        // call — or run_flow of the rung — is the fix. (The look itself is
+        // above, shared with the bare probe before a cheap rung.)
         this.log(
           `⚠ reach ${flow}`,
           'this rung is DESTRUCTIVE — it wipes app state, and any device registration with it. ' +
@@ -879,15 +852,15 @@ export class FlowEngine {
         // A nested ladder's refusal (this rung's `requires:`) is terminal for
         // the same reason: escalating past it runs the wipe it declined.
         //
-        // An OptionalNotSkipped (2026-10-09) is terminal too, but it is a
-        // finding about the SCREEN, not the descriptor: the rung may have
-        // reached the state before a trailing optional tap was refused. So
-        // the ladder's own post-failure probe runs first — reached, the call
-        // passes (the ✗ line stays in the trace); not reached, it stops
-        // here, never escalating past an interstitial that is on screen. A
-        // SetupError and an UnreadTreeRefusal get no probe: a broken
-        // descriptor must fail the call even on a screen that happens to be
-        // in the state, and a nested refusal already looked.
+        // An OptionalNotSkipped is terminal too, but it is a finding about
+        // the SCREEN, not the descriptor: the rung may have reached the state
+        // before a trailing optional tap was refused. So the ladder's own
+        // post-failure probe runs first — reached, the call passes (the ✗
+        // line stays in the trace); not reached, it stops here, never
+        // escalating past an interstitial that is on screen. A SetupError and
+        // an UnreadTreeRefusal get no probe: a broken descriptor must fail the
+        // call even on a screen that happens to be in the state, and a nested
+        // refusal already looked.
         if (e instanceof OptionalNotSkipped && (await this.detects(state.detect, 0)).answer === 'yes') {
           this.log(`⚠ reach ${flow}`, `failed — ${headline(e)} — state reached anyway`);
           this.log(`state ${name}`, `reached after ${flow}`);
@@ -917,7 +890,7 @@ export class FlowEngine {
       // destructive escalation this loop exists to prevent.
       // The rung's last read may answer it (ADR 0030): a rung that ended in a `wait:` or an assert, with no action
       // since, read the screen it left — D0's cold ensure read the same screen again 2.2 s later. Taken only as a
-      // `yes`, never on a detect that asks an absence; anything else reads fresh as before.
+      // `yes`, never on a detect that asks an absence; anything else reads fresh.
       probe = await this.detects(state.detect, grace, { first: this.handedFor(state.detect) });
       if (probe.answer === 'yes') {
         this.log(`state ${name}`, `reached after ${flow}`);
@@ -941,8 +914,9 @@ export class FlowEngine {
       // recoveryPass logs the rung that got there, so there is no second
       // "reached" line here. A SetupError is exempt for the same reason the
       // ladder exempts it: re-running flows cannot fix a broken descriptor.
-      // Since 2026-10-31 (D21) the same holds for an error no rung can cure — `isTerminal`, whose other members the
-      // final wait cannot raise (it never enters a ladder or an `optional:`).
+      // The same holds (D21) for an error no rung can cure — `isTerminal`,
+      // whose other members the final wait cannot raise (it never enters a
+      // ladder or an `optional:`).
       if (isTerminal(e) || !(await this.recoveryPass(name, state, 'timed out'))) throw e;
       return;
     }
@@ -951,18 +925,19 @@ export class FlowEngine {
 
   /**
    * The last rung threw, so the ladder has nothing left to escalate to — but
-   * a throw is a verdict about the FLOW, not about the state, and the rethrow
-   * used to jump over both checks every other rung gets.
+   * a throw is a verdict about the FLOW, not about the state, and a bare
+   * rethrow would jump over both checks every other rung gets.
    *
    * The detect first: a rung can reach the state and then die on a later step,
    * which is exactly why the ladder re-checks after a failed rung instead of
-   * escalating blind. The last rung alone never got that check.
+   * escalating blind. Without this the last rung alone would never get that
+   * check.
    *
    * Then the recovery pass, for the shape that motivated it in the first
    * place. Real configs spell a login flow's success criterion as the flow's
    * own trailing `wait: { state: ... }`, so a late interstitial makes the LAST
    * RUNG THROW rather than the ladder's final wait time out — and that wait
-   * was the only place the pass armed. Measured on device against 0.5.0: the
+   * alone would never arm the pass. Measured on device against 0.5.0: the
    * original incident failed exactly as it had pre-fix, with no `↻ recovery`
    * line in the trace. The pass is safe here for the same reason it is safe on
    * a timeout: it re-runs only provably repeatable rungs, so by construction
@@ -1009,17 +984,17 @@ export class FlowEngine {
   ): Promise<boolean> {
     // Per run — per tool call — not per state: `requires` can nest a state
     // inside a reach flow, and a run can ensure a state and then run a flow
-    // whose `requires` ladders again (verify with both, 2026-10-07). One
-    // bounded retry for the whole call is the honest read of "at most once" —
-    // neither nesting nor a second leg of the run may multiply it.
+    // whose `requires` ladders again (verify with both). One bounded retry
+    // for the whole call is the honest read of "at most once" — neither
+    // nesting nor a second leg of the run may multiply it.
     // `reach` is non-empty here — ensureStateLadder threw if it was not.
     const rungs = (state.reach ?? []).slice(0, -1).filter((f) => !flowIsDestructive(this.cfg, f));
     if (rungs.length === 0) return false;
     if (this.recoverySpentOn !== undefined) {
-      // Said, not silent (code review, 2026-10-07): a second ladder in the
-      // run — a flow's `requires:` after verify's state — that WOULD have
-      // had a pass otherwise fails without one, and the trace must say why,
-      // or it reads as the recovery rule not applying to `requires`.
+      // Said, not silent: a second ladder in the run — a flow's `requires:`
+      // after verify's state — that WOULD have had a pass otherwise fails
+      // without one, and the trace must say why, or it reads as the recovery
+      // rule not applying to `requires`.
       this.log(
         `↻ no recovery ${name}`,
         `${why} — the run's one recovery pass was already spent on ${this.recoverySpentOn}`,
@@ -1078,43 +1053,41 @@ export class FlowEngine {
    *
    * An unreadable tree is not "in this state", and must not throw either:
    * right after a cold launch/reinstall (no window yet) is exactly when the
-   * reach flows are needed. The one exception, since 2026-10-31 (D21): a read
-   * no wait cures (adapters/types.ts#PersistentReadError — idb's wedged
-   * accessibility service) throws out of the probe, from pollTree's first
-   * round that met it — no reach flow can cure it, and `isTerminal` stops
-   * the ladder on it. But it is not "not in this state" either: a
-   * probe that never read a tree answers `unknown` (Detection), and one
-   * that read only bare trees answers `bare` — the ladder alone tells either
-   * from `no`, and refuses a destructive rung on them. The window is a
-   * grace window (`reachRecheckMs`) after a rung, and since 2026-10-07 the
-   * second look (`ensureTimeoutMs`) before a destructive one.
+   * reach flows are needed. The one exception (D21): a read no wait cures
+   * (adapters/types.ts#PersistentReadError — idb's wedged accessibility
+   * service) throws out of the probe, from pollTree's first round that met
+   * it — no reach flow can cure it, and `isTerminal` stops the ladder on it.
+   * But it is not "not in this state" either: a probe that never read a tree
+   * answers `unknown` (Detection), and one that read only bare trees answers
+   * `bare` — the ladder alone tells either from `no`, and refuses a
+   * destructive rung on them. The window is a grace window (`reachRecheckMs`)
+   * after a rung, and the second look (`ensureTimeoutMs`) before a
+   * destructive one.
    *
    * `look` names a probe whose `⚠ detect` line would otherwise repeat the
    * one before it word for word: the second look after a bare or unread
-   * entry probe reads the same decor and said the same sentence, so a
-   * reader saw two identical lines and could not tell the entry read from
-   * the window behind it (round-3 device check, 2026-10-08). Its line now
-   * says `(second look over 20 s)` — the window it polled, which an
-   * unanswered look spent whole.
+   * entry probe reads the same decor and would say the same sentence, two
+   * identical lines that do not tell the entry read from the window behind
+   * it (round-3 device check, 2026-10-08). Its line says `(second look over
+   * 20 s)` — the window it polled, which an unanswered look spent whole.
    *
    * `first` is a read handed on to the probe (ADR 0030; the ladder's
    * re-detect after a rung passes `handedFor`): it may answer `yes` and
    * nothing else, see below.
    *
-   * `holdMs` (since 2026-10-31, D2, docs/adr/0033-a-held-rendered-no-ends-
-   * the-second-look-before-a-cheap-rung.md; passed only by the second look
-   * when no wipe lies ahead, as reachRecheckMs) ends the window early on a
-   * settled "no": every fresh read that is not `yes` goes to a
-   * `holdTracker(holdMs)` (flow/hold-tracker.ts — same fingerprint across
-   * reads spanning `holdMs`; a fingerprint change, a bare tree, a spinner or
-   * a failed read starts it over), and once it says held the probe answers
-   * `no` without polling to its deadline. A spinner's or a bare tree's other
-   * counting is unchanged (a spinner tree still counts as rendered). A
-   * handed-on read is never shown to it (it may only answer `yes`); a failed
-   * read is, through pollTree's observer below (pollTree shows the predicate
-   * trees only): the same tree on both sides of reads that saw nothing did not
-   * provably hold (code review, 2026-10-31). Without
-   * `holdMs` a `no` still waits for the deadline. A held `no` carries
+   * `holdMs` (D2, docs/adr/0033-a-held-rendered-no-ends-the-second-look-
+   * before-a-cheap-rung.md; passed only by the second look when no wipe lies
+   * ahead, as reachRecheckMs) ends the window early on a settled "no": every
+   * fresh read that is not `yes` goes to a `holdTracker(holdMs)`
+   * (flow/hold-tracker.ts — same fingerprint across reads spanning `holdMs`;
+   * a fingerprint change, a bare tree, a spinner or a failed read starts it
+   * over), and once it says held the probe answers `no` without polling to
+   * its deadline. A spinner or a bare tree is otherwise counted as it is
+   * without `holdMs` (a spinner tree still counts as rendered). A handed-on
+   * read is never shown to it (it may only answer `yes`); a failed read is,
+   * through pollTree's observer below (pollTree shows the predicate trees
+   * only): the same tree on both sides of reads that saw nothing did not
+   * provably hold. Without `holdMs` a `no` still waits for the deadline. A held `no` carries
    * `heldMs`, how long its tree held, for the ladder's trace line.
    */
   private async detects(
@@ -1124,16 +1097,15 @@ export class FlowEngine {
   ): Promise<Detection> {
     const subject = `${describeCondition(cond)} treated as not detected${look === undefined ? '' : ` (${look} over ${formatSeconds(windowMs)})`}`;
     // Trees that held something rendered, and the last bare one's shape —
-    // asked only of a round that is not `yes`. Since 2026-10-08 `yes` is
-    // the condition module's three-valued answer (flow/condition.ts), which
-    // gives an `absent: true` leaf `unknown` on a bare tree rather than
-    // `yes` — until then "nothing in the decor matches" made an absent
-    // detect "already active" on a cold launch, the one hole this probe's
-    // bare answer left. A round that is not `yes` on a bare tree counts as
-    // bare whether the module said `unknown` or `no` (an absent leaf whose
-    // element the decor does show, `absent: { id: content }`): the probe's
-    // rule since 2026-10-07 is that a bare tree is not knowledge, and it is
-    // the side that never wipes.
+    // asked only of a round that is not `yes`. `yes` is the condition
+    // module's three-valued answer (flow/condition.ts), which gives an
+    // `absent: true` leaf `unknown` on a bare tree rather than `yes`, so
+    // "nothing in the decor matches" does not make an absent detect "already
+    // active" on a cold launch. A round that is not `yes` on a bare tree
+    // counts as bare whether the module said `unknown` or `no` (an absent
+    // leaf whose element the decor does show, `absent: { id: content }`): the
+    // probe's rule is that a bare tree is not knowledge, and it is the side
+    // that never wipes.
     let rendered = 0;
     let lastBareTree: UiNode | undefined;
     const hold = holdMs === undefined ? undefined : holdTracker(holdMs);
@@ -1155,8 +1127,8 @@ export class FlowEngine {
           timeoutMs: windowMs,
           pollMs: this.pollMs,
           ...(first !== undefined && { first }),
-          // A failed read restarts the hold (HoldTracker.observe, code review 2026-10-31): pollTree shows the predicate
-          // only the reads that returned a tree, and tells its observer of the others (A31, ui-tree/read-tree.ts#PollObserver).
+          // A failed read restarts the hold (HoldTracker.observe): pollTree shows the predicate only the reads that
+          // returned a tree, and tells its observer of the others (A31, ui-tree/read-tree.ts#PollObserver).
           ...(hold !== undefined && {
             observer: {
               read: ({ endedAt, error }) => {
@@ -1173,29 +1145,29 @@ export class FlowEngine {
     // (below), and its line says so — a read error on a later round is not
     // the answer then, so it gets no line of its own.
     const allBareTree = rendered === 0 ? lastBareTree : undefined;
-    // Until 2026-10-03 this probe swallowed the read error (`.catch(() =>
-    // undefined)`), so an adb that had gone away looked exactly like "not in
-    // this state" and the ladder escalated — possibly into a wipe — with no
-    // line saying the device had never been asked. The answer is still not
-    // "yes" (an unreadable tree is not "in state"), and the trace says why.
-    // Right after a cold launch (no window yet) it is the normal case.
+    // Not swallowed: a silent read error makes an adb that has gone away look
+    // exactly like "not in this state", and the ladder escalate — possibly
+    // into a wipe — with no line saying the device was never asked. The
+    // answer is still not "yes" (an unreadable tree is not "in state"), and
+    // the trace says why. Right after a cold launch (no window yet) it is the
+    // normal case.
     if (outcome.readError !== undefined && allBareTree === undefined) {
       this.log('⚠ detect', `${subject} — ${readFailed(outcome.readError)}`);
     }
-    // The 2026-10-03 follow-up, done 2026-10-06 with its measured incident
-    // (the idb 0×0 tree): a probe that read NO tree in any round is unknown,
-    // not "no" — the ladder refuses a destructive rung on it. One good read
-    // makes it "no" even if a later read failed: that tree was knowledge.
+    // A probe that read NO tree in any round is unknown, not "no" (the
+    // measured incident of 2026-10-06: the idb 0×0 tree) — the ladder refuses
+    // a destructive rung on it. One good read makes it "no" even if a later
+    // read failed: that tree was knowledge.
     // `treesRead === 0` means every round's read failed, so the last one's
     // error is set; the second test only narrows the type.
     if (outcome.treesRead === 0 && outcome.readError !== undefined) return { answer: 'unknown', readError: outcome.readError };
-    // 2026-10-07 (docs/bugs/2026-10-06-second-look-reads-android-decor-as-
-    // not-in-state.md): a tree is not knowledge either when it is BARE — the
-    // decor Android shows for ~9 s of a cold launch, WDA's splash. "One good
-    // read makes it 'no'" now means one RENDERED read: a probe whose every
-    // tree was bare answers `bare`, and says so in the trace the way an
-    // unreadable one does. `treesRead > 0` here, so `allBareTree` is set
-    // exactly when nothing rendered was read.
+    // A tree is not knowledge either when it is BARE (docs/bugs/2026-10-06-
+    // second-look-reads-android-decor-as-not-in-state.md) — the decor Android
+    // shows for ~9 s of a cold launch, WDA's splash. "One good read makes it
+    // 'no'" means one RENDERED read: a probe whose every tree was bare
+    // answers `bare`, and says so in the trace the way an unreadable one does.
+    // `treesRead > 0` here, so `allBareTree` is set exactly when nothing
+    // rendered was read.
     if (allBareTree !== undefined) {
       const probe: UnreadProbe = { answer: 'bare', shape: treeShape(allBareTree) };
       this.log('⚠ detect', `${subject} — ${describeUnreadCause(probe)}`);
@@ -1219,7 +1191,7 @@ export class FlowEngine {
     try {
       await this.dispatchStep(step);
     } catch (e) {
-      // Steps log only once they SUCCEED, so a failing flow's trace used to end
+      // Steps log only once they SUCCEED, so a failing flow's trace would end
       // on the step BEFORE the culprit (measured 2026-09-17: the last line read
       // `fill: id:"login_username" = ***` while the PASSWORD fill was failing,
       // and the first hypothesis went after username resolution). Name it —
@@ -1229,14 +1201,14 @@ export class FlowEngine {
       // line says on WHICH step.
       // One ✗ per failure: the innermost step logs it; the enclosing `branch` /
       // platform-override / nested-flow steps that rethrow the SAME error add
-      // only a vaguer label (review 2026-09-18).
+      // only a vaguer label.
       // A terminal error (a config refusal) is never swallowed, even inside
       // an `optional:` (runOptionalSteps rethrows it), so it gets its ✗ on
       // the step that raised it, not on the enclosing `optional`. Nor is a
-      // tap refused on a PRESENT element inside one (2026-10-09): it becomes
-      // the terminal OptionalNotSkipped here, on the innermost step — a
-      // platform override's tap, a fill's focus tap, a tap in a `branch:` —
-      // nor a fill whose value did not land or was refused (FillValueFailure).
+      // tap refused on a PRESENT element inside one: it becomes the terminal
+      // OptionalNotSkipped here, on the innermost step — a platform
+      // override's tap, a fill's focus tap, a tap in a `branch:` — nor a fill
+      // whose value did not land or was refused (FillValueFailure).
       throw this.failed(step, this.swallowDepth > 0 && notSkippable(e) ? new OptionalNotSkipped(e) : e);
     }
   }
@@ -1312,15 +1284,14 @@ export class FlowEngine {
     // PIN/OTP inputs are numeric; formatting in the credential ("111-111-111")
     // is display convention, not keystrokes.
     const pin = raw.replace(/\D/g, '');
-    // Zero digits is refused before the first key (2026-10-08, after-ios-idb
-    // review #4): it typed nothing, logged "0 digits" and passed, and the
-    // PIN screen — or the bank, one screen later — rejected it. An empty
-    // SECRET never gets here (flow/credentials.ts owns "a secret is never
-    // empty"); what this catches is the PIN-specific half: a value with no
-    // digit in it (`value: "abc"`, a literal "", a credential holding a
-    // label instead of a code). The value itself is not quoted — it may be
-    // a secret — only what the author wrote (`$pin`, `${OTP}`, or the
-    // literal).
+    // Zero digits is refused before the first key: it would type nothing, log
+    // "0 digits" and pass, and the PIN screen — or the bank, one screen later
+    // — would reject it. An empty SECRET never gets here (flow/credentials.ts
+    // owns "a secret is never empty"); what this catches is the PIN-specific
+    // half: a value with no digit in it (`value: "abc"`, a literal "", a
+    // credential holding a label instead of a code). The value itself is not
+    // quoted — it may be a secret — only what the author wrote (`$pin`,
+    // `${OTP}`, or the literal).
     if (pin === '') {
       throw new SetupError(
         `type_pin ${JSON.stringify(spec.value)} has no digits — a PIN is typed digit by digit and everything ` +
@@ -1371,12 +1342,9 @@ export class FlowEngine {
     const { element, timeout, ...rest } = spec;
     // The YAML's `timeout: 2s` is this layer's vocabulary; interact takes ms.
     // The pause after each swipe is interact/scroll.ts's own (400 ms): it is
-    // a gesture-settle wait, not this engine's poll interval. Until 2026-10-05
-    // `pollMs` (500) was passed as `settleMs` — the same one-knob-two-meanings
-    // habit that made the stability budget 500 ms inside flows (capture.ts).
-    // That is a production timing change (500 → 400 ms between a swipe and
-    // the next tree read in flows) nobody has measured on a device yet: the
-    // next device run should look at `scroll_until` steps.
+    // a gesture-settle wait, not this engine's poll interval. Inside flows
+    // that pause is not measured on a device (it was the 500 ms poll
+    // interval before): a device run should check `scroll_until` steps.
     const result = await scrollUntilVisible(this.adapter, element, {
       ...rest,
       // A flow names a scroll view by element spec, never by rect (D81): a failure's way into one asks for a spec.
@@ -1385,17 +1353,17 @@ export class FlowEngine {
       eyes: this.eyes,
       timeoutMs: timeout === undefined ? undefined : parseDuration(timeout),
     });
-    // ⚠ for a clipped stop, and (2026-10-08) for one the `unlocated`
-    // row qualifies: the input method says a keyboard is up that nothing
-    // could place, so "fully visible" is not established either — nor
-    // (T17) on a flush edge no probe checked: both open NOT CONFIRMED
-    // (scroll-text.ts#stopHedges). The `unlocated` row is asked again on its
-    // own, defensively: stopHedges says nothing of a stop with a surface the
-    // eyes saw, and such a stop never carries it (under fully: true a surface
-    // is no stop, and the row is asked of fully: true stops only —
-    // tests/interact/scroll-eyes.test.ts pins it), but the ⚠ must not hang on
-    // that. A stop judged above a docked keyboard is not ⚠ on its own: the
-    // judgement already excluded it, and the line says so.
+    // ⚠ for a clipped stop, and for one the `unlocated` row qualifies: the
+    // input method says a keyboard is up that nothing could place, so "fully
+    // visible" is not established either — nor (T17) on a flush edge no
+    // probe checked: both open NOT CONFIRMED (scroll-text.ts#stopHedges). The
+    // `unlocated` row is asked again on its own, defensively: stopHedges says
+    // nothing of a stop with a surface the eyes saw, and such a stop never
+    // carries it (under fully: true a surface is no stop, and the row is
+    // asked of fully: true stops only — tests/interact/scroll-eyes.test.ts
+    // pins it), but the ⚠ must not hang on that. A stop judged above a docked
+    // keyboard is not ⚠ on its own: the judgement already excluded it, and
+    // the line says so.
     const warned = result.clipped.length > 0 || result.covered !== undefined || stopHedges(result) !== undefined || result.keyboard?.state === 'unlocated';
     this.log(
       warned ? '⚠ scroll_until' : 'scroll_until',
@@ -1420,7 +1388,7 @@ export class FlowEngine {
       }),
     );
     // The words and their layout are interact/fill-text.ts's, the MCP
-    // reply's beside it: what was DONE, never what was asked (2026-10-08) —
+    // reply's beside it: what was DONE, never what was asked —
     // `(cleared N characters first)` only when a delete was sent, and a
     // read-back with nothing to compare makes the line itself `⚠ fill … —
     // NOT verified: …` (docs/bugs/2026-10-08-ios-fill-unverified-reports-
@@ -1433,17 +1401,17 @@ export class FlowEngine {
     // keyboard) must not take them down with it. The keyboard line
     // (tracingDismissal's) comes first: it happened first, before the focus tap.
     for (const caveat of said.caveats) this.log(caveat.action, caveat.text);
-    // What the dismissal did (stage B, 2026-10-07): on the in-tree model it
-    // may tap a configured element — said on the fill line, since the step
-    // did it — or leave the keyboard up with a reason, a `⚠ fill` line like
-    // the masked-append one, so the next step's refusal is not a surprise.
-    // On the oracle model `hiddenBy` is always absent, and `warning` is set
-    // only by its `unlocated` row (2026-10-08: the input method says
-    // shown, the window state gives no area, nothing was pressed). A
-    // dismissal that THROWS after tapping (AfterDismissalTap) gets its `⚠
-    // fill` line before the `✗` through the guard's one catch
-    // (tracingGuardFailure) — not tracingDismissal: the result has no
-    // `keyboardHidden` to trace, only `hiddenBy` for the fill line.
+    // What the dismissal did (stage B): on the in-tree model it may tap a
+    // configured element — said on the fill line, since the step did it — or
+    // leave the keyboard up with a reason, a `⚠ fill` line like the
+    // masked-append one, so the next step's refusal is not a surprise. On the
+    // oracle model `hiddenBy` is always absent, and `warning` is set only by
+    // its `unlocated` row (the input method says shown, the window state
+    // gives no area, nothing was pressed). A dismissal that THROWS after
+    // tapping (AfterDismissalTap) gets its `⚠ fill` line before the `✗`
+    // through the guard's one catch (tracingGuardFailure) — not
+    // tracingDismissal: the result has no `keyboardHidden` to trace, only
+    // `hiddenBy` for the fill line.
     let closed: DismissResult = {};
     if (closeKeyboard) {
       closed = await this.tracingGuardFailure('⚠ fill', () =>
@@ -1491,9 +1459,7 @@ export class FlowEngine {
    * cannot decide it) might win once the app renders, so that round decides
    * nothing — not even a later arm that is `yes` on the same tree (an arm
    * on the decor's own `content` is) — and the poll goes on; the timeout
-   * says when that was the last tree. Since 2026-10-08; until then an
-   * `absent: true` arm was taken on a cold launch's decor, where nothing
-   * matches anything.
+   * says when that was the last tree.
    */
   private async runBranch(arms: StepPayload<'branch'>): Promise<void> {
     const arm = await this.pollUntil(
@@ -1531,14 +1497,13 @@ export class FlowEngine {
    * budget: the element is already sighted by then, so appearance latency is
    * paid; only settling remains.
    *
-   * Since 2026-10-08 the presence check is the interaction module's
-   * (resolvePresent), and so is the verdict on it: a skip reads "(not
-   * present)" when the step threw ElementNotFoundError, whatever kind of
-   * step it was (runOptionalSteps) — and for a tap, only when the presence
-   * check itself threw it. An element resolvePresent sighted that then
-   * leaves for the whole committed tap budget WAS there: the failure came
-   * after finding, so the skip quotes the tap's own timeout (the spec card:
-   * "found" failures stay other errors; code review 2026-10-08).
+   * The presence check is the interaction module's (resolvePresent), and so
+   * is the verdict on it: a skip reads "(not present)" when the step threw
+   * ElementNotFoundError, whatever kind of step it was (runOptionalSteps) —
+   * and for a tap, only when the presence check itself threw it. An element
+   * resolvePresent sighted that then leaves for the whole committed tap
+   * budget WAS there: the failure came after finding, so the skip quotes the
+   * tap's own timeout ("found" failures stay other errors).
    */
   private async runOptional(steps: StepPayload<'optional'>): Promise<void> {
     this.swallowDepth++;
@@ -1573,26 +1538,24 @@ export class FlowEngine {
         }
       } catch (e) {
         // The optional tap is not dispatched through runStep, so its refusal
-        // on a PRESENT element (2026-10-09, OptionalNotSkipped) gets its ✗
-        // here, on the tap — as runStep gives it to a nested step's.
+        // on a PRESENT element (OptionalNotSkipped) gets its ✗ here, on the
+        // tap — as runStep gives it to a nested step's.
         if (tap && isRefusedOnPresentElement(e)) throw this.failed(s, new OptionalNotSkipped(e));
-        // A config refusal is not an absent interstitial (2026-10-08, review
-        // of after-ios-idb #4): an empty secret, a `type_pin` value with no
-        // digits, an undeclared credential (a malformed `timeout:` was one
-        // too, until A19 refused it at load). Skipping it would let the flow
-        // run on with the login half-typed and fail a screen later, the shape
-        // flow/credentials.ts exists to prevent. `isTerminal` is the ladder's
-        // own "re-running cannot fix this" set: a SetupError, and an
-        // UnreadTreeRefusal, which no step inside an `optional:` can raise
-        // today (only the ladder does, and no step runs one) — were one ever
-        // to, a declined destructive rung is not an absence either. Since
-        // 2026-10-09 it holds an OptionalNotSkipped too: an element that was
-        // there and was refused a tap (interact's RefusedOnPresentElement —
-        // off screen, under something drawn over it, or under a keyboard
-        // with nothing sent) is the interstitial
-        // itself, so the step fails the flow instead of being skipped; so
-        // is a fill whose value did not land or was refused (FillValueFailure,
-        // wrapped by runStep).
+        // A config refusal is not an absent interstitial: an empty secret, a
+        // `type_pin` value with no digits, an undeclared credential (a
+        // malformed `timeout:` never gets here: it is refused at load, A19).
+        // Skipping it would let the flow run on with the login half-typed and
+        // fail a screen later, the shape flow/credentials.ts exists to prevent.
+        // `isTerminal` is the ladder's own "re-running cannot fix this" set: a
+        // SetupError, and an UnreadTreeRefusal, which no step inside an
+        // `optional:` can raise today (only the ladder does, and no step runs
+        // one) — were one ever to, a declined destructive rung is not an
+        // absence either. It holds an OptionalNotSkipped too: an element that
+        // was there and was refused a tap (interact's RefusedOnPresentElement
+        // — off screen, under something drawn over it, or under a keyboard
+        // with nothing sent) is the interstitial itself, so the step fails the
+        // flow instead of being skipped; so is a fill whose value did not land
+        // or was refused (FillValueFailure, wrapped by runStep).
         if (isTerminal(e)) throw e;
         // Why it was skipped: "(not present)" only when the interaction
         // module says the element was never found (ElementNotFoundError,
@@ -1611,16 +1574,14 @@ export class FlowEngine {
         // window presented on top … — close it first" (interact/resolve.ts
         // #notFound) — and the step is skipped with it, not "(not present)".
         //
-        // Until 2026-10-08 the engine deduced this from missing evidence: a
-        // `present` flag set by the tap's presence poll, and for the other
-        // steps `instanceof KeyboardGuardError` as the one failure known to
-        // have found the element (review 2026-10-03, stage B review) — so a
-        // fill whose field was found and tapped, but whose text never
-        // landed, and a fill refused for a control character, both read
-        // "skipped step (not present)". A KeyboardGuardError still quotes
-        // its headline, now because it is not ElementNotFoundError — even
-        // when a target that did not come back is its `cause`: something was
-        // sent.
+        // Asked of interact, not deduced from missing evidence (a `present`
+        // flag, `instanceof KeyboardGuardError` as the one failure known to
+        // have found the element, stage B): that reads a fill whose field was
+        // found and tapped, but whose text never landed, and a fill refused
+        // for a control character, as "skipped step (not present)". A
+        // KeyboardGuardError quotes its headline because it is not
+        // ElementNotFoundError — even when a target that did not come back is
+        // its `cause`: something was sent.
         // An absence says what its last read saw after "(not present)", the note its message says (ui-tree/miss.ts
         // #missNote): on a tree that lists the active window only the interstitial may be beneath a sheet it does not list.
         const absent = e instanceof ElementNotFoundError && !sighted;
@@ -1637,15 +1598,15 @@ export class FlowEngine {
    * the spec the author wrote, and which of several nodes carried it is the
    * tool's concern, not the trace reader's.
    *
-   * One exception, 2026-10-03: when the soft keyboard covered the target and
-   * had to be hidden first (interact/keyboard.ts), a `⚠ tap` line says so —
-   * even for a quiet tap (a `type_pin` keypad digit: the first digit under a
-   * keyboard gets the one `⚠ tap` and the one `back`; the keyboard is then
-   * gone, so the following digits are plain taps — unless the screen raises
-   * the keyboard again). That is not a detail of which node was chosen: the
-   * flow pressed `back` and the screen re-laid-out, and an author debugging
-   * the next step needs to see it. A tap that met no keyboard traces exactly
-   * what it did before.
+   * One exception: when the soft keyboard covered the target and had to be
+   * hidden first (interact/keyboard.ts), a `⚠ tap` line says so — even for a
+   * quiet tap (a `type_pin` keypad digit: the first digit under a keyboard
+   * gets the one `⚠ tap` and the one `back`; the keyboard is then gone, so
+   * the following digits are plain taps — unless the screen raises the
+   * keyboard again). That is not a detail of which node was chosen: the flow
+   * pressed `back` and the screen re-laid-out, and an author debugging the
+   * next step needs to see it. A tap that met no keyboard gets no keyboard
+   * line.
    *
    * Likewise, D66: a tapped node the tree marks disabled gets a `⚠ tap` line
    * in the MCP reply's words (interact/tap.ts#DISABLED_TAP), after the
@@ -1664,17 +1625,17 @@ export class FlowEngine {
 
   /**
    * The ONE place the keyboard guard's work reaches the trace, for both
-   * steps that go through it (2026-10-03). Either way the line precedes
-   * whatever the step logs next:
+   * steps that go through it. Either way the line precedes whatever the step
+   * logs next:
    * - the step succeeded after the guard pressed `back`: the sentence the
    *   result carries ("…; hidden before tapping", or "…; back pressed; the
    *   keyboard's state afterwards could not be read") — or, on the in-tree
-   *   model since stage B (2026-10-07), after it tapped a configured
-   *   dismissal ("…; hidden by tapping id:"login_title" before tapping");
+   *   model (stage B), after it tapped a configured dismissal ("…; hidden by
+   *   tapping id:"login_title" before tapping");
    * - the step FAILED after it: the attempt ("…; back pressed"), BEFORE the
    *   step's `✗` line — the key press happened whether or not the step
    *   survived it, and if no keyboard was really up it navigated. Without
-   *   the line the trace showed a bare timeout. The same path carries the
+   *   the line the trace would show a bare timeout. The same path carries the
    *   refusal when the two keyboard sources would not agree ("…; nothing
    *   sent") — any KeyboardGuardError, its `traceLine`.
    * A step that met no keyboard logs nothing here.
@@ -1687,19 +1648,18 @@ export class FlowEngine {
     const result = await this.tracingGuardFailure(action, run);
     if (result.keyboardHidden !== undefined) this.log(action, result.keyboardHidden);
     // The tap went off the target's centre, a node of the app being drawn
-    // over it (2026-10-09, interact/tap-judgement.ts#TapJudge.aim): said like
+    // over it (interact/tap-judgement.ts#TapJudge.aim): said like
     // the keyboard's line — the author's next step may depend on where.
     if (result.moved !== undefined) this.log(action, movedTapText(what, result.moved));
     return result;
   }
 
   /**
-   * The failure half of `tracingDismissal`, on its own (2026-10-07, review
-   * of the stage B branch): any KeyboardGuardError's `traceLine`, logged as
-   * `action` BEFORE the error goes on to the step's `✗` line. The one catch
-   * for the guard's two steps above and for the post-fill `dismissKeyboard`
-   * (runFill), whose result has no `keyboardHidden` to trace — until then
-   * runFill carried a second copy of the catch.
+   * The failure half of `tracingDismissal`, on its own (stage B): any
+   * KeyboardGuardError's `traceLine`, logged as `action` BEFORE the error
+   * goes on to the step's `✗` line. The one catch for the guard's two steps
+   * above and for the post-fill `dismissKeyboard` (runFill), whose result has
+   * no `keyboardHidden` to trace.
    */
   private async tracingGuardFailure<T>(action: '⚠ tap' | '⚠ fill', run: () => Promise<T>): Promise<T> {
     try {
@@ -1731,8 +1691,7 @@ export class FlowEngine {
    * unknown name is the descriptor's fault, a SetupError, for a config
    * parseConfig did not validate) and the viewport, memoized by the adapter
    * (adapters/types.ts) — one device read per adapter, however many
-   * conditions ask. Until 2026-10-08 this was `matches`, a boolean, and its
-   * `absent` was absentFromViewport alone, `yes` on a bare tree.
+   * conditions ask.
    */
   private evaluate(cond: Condition, tree: UiNode): Promise<Verdict> {
     return evaluateCondition(cond, tree, {
@@ -1744,9 +1703,9 @@ export class FlowEngine {
   /**
    * Wait for `cond` to be `yes`. `no` and `unknown` both keep polling: the
    * screen may still change either way, and a wait on a state detected by
-   * an absence must not pass on a cold launch's decor (it did until
-   * 2026-10-08). A timeout whose last tree could not decide the condition
-   * says so beneath its headline (pollUntil), in place of `hint`.
+   * an absence must not pass on a cold launch's decor. A timeout whose last
+   * tree could not decide the condition says so beneath its headline
+   * (pollUntil), in place of `hint`.
    */
   private async waitFor(cond: Condition, timeoutMs: number, what: string, hint?: TimeoutHint): Promise<void> {
     await this.pollUntil(
@@ -1768,8 +1727,8 @@ export class FlowEngine {
    * asked at the timeout and handed over as is — whether it
    * shows beneath a failed read is pollTimeoutMessage's rule, not this one's.
    *
-   * Since 2026-10-08 the predicate is three-valued like the conditions it
-   * polls (flow/condition.ts): a value (done), `undefined` (the tree said
+   * The predicate is three-valued like the conditions it polls
+   * (flow/condition.ts): a value (done), `undefined` (the tree said
    * no) or `Undecided` (the tree was bare and could not say; pollTree keeps
    * that tree as `undecidedTree` while it is the last one read). Both misses
    * keep polling. On a timeout, when the LAST tree read was undecided, the hint
@@ -1825,7 +1784,6 @@ export class FlowEngine {
     return out;
   }
 
-  /** All errors leave the engine redacted, and carrying the partial trace. */
   private async guard<T>(fn: () => Promise<T>): Promise<T> {
     try {
       return await fn();

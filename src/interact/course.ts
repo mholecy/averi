@@ -39,30 +39,29 @@ import { axisOf, OPPOSITE, TOUCH_SLOP, type Direction } from './swipe.js';
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 /**
- * THE END TURN (the owner's decision of 2026-10-17, lab note LV4, below;
- * docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md): the strokes went the caller's way first and the read after
- * one of them proved the content exhausted that way — the stroke moved no match, and the tree shows the content of the
- * scroll view it went over ENDING at the edge that way (scroll-rounds.ts#Observed.ends, interact/stroke-plan.ts#strokedContent) — while
- * the tree places the target wholly past the OPPOSITE (far) edge of that same scroll view, inside it. Then the strokes
- * turn ONCE toward the target, at full reach (no fling carried it past: it was never near), and every reply and failure
- * says so (the proof — the caller's way, the scroll view named, the strokes that moved nothing — `to`, and the swipes
- * sent `after` which). Measured (the lab app's `scroll-bounded`, WDA): `direction: "up"` for F at content y 1380 of
- * `lower` (0,380 402x180) at its top stroked up three times, moved nothing and failed advising `down`.
+ * THE END TURN (the owner's decision, lab note LV4, below; docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md):
+ * the strokes went the caller's way first and the read after one of them proved the content exhausted that way — the
+ * stroke moved no match, and the tree shows the content of the scroll view it went over ENDING at the edge that way
+ * (scroll-rounds.ts#Observed.ends, interact/stroke-plan.ts#strokedContent) — while the tree places the target wholly
+ * past the OPPOSITE (far) edge of that same scroll view, inside it. Then the strokes turn ONCE toward the target, at
+ * full reach (no fling carried it past: it was never near), and every reply and failure says so (the proof — the
+ * caller's way, the scroll view named, the strokes that moved nothing — `to`, and the swipes sent `after` which).
+ * Measured (the lab app's `scroll-bounded`, WDA): `direction: "up"` for F at content y 1380 of `lower` (0,380 402x180)
+ * at its top stroked up three times, moved nothing and failed advising `down`.
  *
- * Until then a target never sighted short of the far edge was "the caller's direction to honour" (`beyondFarEdgeIn`,
- * `nextStroke`): nothing is guessed from a screen no stroke changed. The decision refines that rule, it does not drop
- * it: the caller's direction is still stroked first; the turn needs PROOF from the reads — strokes that changed
- * nothing are no proof on their own (they may not have been taken: scroll-rounds.ts#UNMOVED_STROKES_EXHAUST), the tree's own listing
- * of where the content ends is — and a tree that lists the target past that scroll view's far edge, which is no
- * guess either. Why turn rather than fail with the advice: the reply already knew the way, and a caller who asked the
- * wrong way gets the row at the cost of the one stroke that proved it.
+ * Until a stroke proves the end, a target never sighted short of the far edge is "the caller's direction to honour"
+ * (`beyondFarEdgeIn`, `nextStroke`): nothing is guessed from a screen no stroke changed. The caller's direction is
+ * stroked first; the turn needs PROOF from the reads — strokes that changed nothing are no proof on their own (they may
+ * not have been taken: scroll-rounds.ts#UNMOVED_STROKES_EXHAUST), the tree's own listing of where the content ends is —
+ * and a tree that lists the target past that scroll view's far edge, which is no guess either. Why turn rather than
+ * fail with the advice: the reply already knew the way, and a caller who asked the wrong way gets the row at the cost
+ * of the one stroke that proved it.
  *
- * Decidable on WDA's trees only (unclipped frames: ui-tree/geometry.ts#Clips.contentToward). Not on uiautomator's: its rects
- * are cut to the scroll container, so where the content ends is not listed — content past the edge reads flush with
- * it, or (Compose) is not listed at all — and the reads can prove the end only by strokes that changed nothing, which
- * a stroke not taken also does; so Android keeps the caller's direction and fails with the advice, as before. Nor on
- * idb's flat list, which lists no scroll view (lab note LE2): the strokes go over the screen, and the failure names the
- * side as before.
+ * Decidable on WDA's trees only (unclipped frames: ui-tree/geometry.ts#Clips.contentToward). Not on uiautomator's: its
+ * rects are cut to the scroll container, so where the content ends is not listed — content past the edge reads flush
+ * with it, or (Compose) is not listed at all — and the reads can prove the end only by strokes that changed nothing,
+ * which a stroke not taken also does; so Android keeps the caller's direction and fails with the advice. Nor on idb's
+ * flat list, which lists no scroll view (lab note LE2): the strokes go over the screen, and the failure names the side.
  * docs/bugs/2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md
  */
 export interface EndTurn extends EndProof {
@@ -95,7 +94,7 @@ export interface PastSide {
 /**
  * The REACH of the flush check's probe (flush-check.ts has when a stop is probed, and over what): a
  * quarter of the stroke — over the container, 15 % of its side (swipe.ts#SWIPE_REACH_FRACTION, 60 % of the side,
- * × 0.25) — and never more than PROBE_MAX_TRAVEL_FRACTION of the screen's long side: 178 px on the Pixel_3a, more than
+ * × 0.25) — and never more than PROBE_MAX_TRAVEL_FRACTION of the screen's long side: 177 px on the Pixel_3a, more than
  * the 51 px the SWIFT form's Fees row was cut by; a cut larger than what the probe moved is left flush again, with more
  * of it showing, and the next stroke is a REVEAL (`Revealing`). Short so it cannot carry the row out of a container of
  * any ordinary height.
@@ -136,8 +135,8 @@ const REVEAL_ROOM_FRACTION = 0.5;
  * at density 2, a reload of the app's data for a first row at rest. The
  * density is not read (it would be one more adb call per scroll); a screen's
  * long side runs to about 1400 dp on the largest tablets, so 0.08 of it is
- * at most ≈ 112 dp, under both thresholds, on any density: 178 px (65 dp)
- * on the Pixel_3a, 205 px (102 dp) on a 2560-px tablet at density 2. Cost:
+ * at most ≈ 112 dp, under both thresholds, on any density: 177 px (64 dp)
+ * on the Pixel_3a, 204 px (102 dp) on a 2560-px tablet at density 2. Cost:
  * a cut deeper than the probe moves the row takes another probe. A REVEAL keeps it at a top or left edge only — the
  * pull lies at the content's start, and a bottom or right edge has no such gesture (`REVEAL_ROOM_FRACTION`).
  */
@@ -180,21 +179,20 @@ function beyondFarEdge(rect: Rect, direction: Direction, frame: Rect): boolean {
 /**
  * `beyondFarEdge` in every frame judged — or the target was dumped CLIPPED
  * OUT past that edge of its scroll container (UiNode.clippedOut, the note
- * below): uiautomator inverts the bounds of a node scrolled
- * wholly past its container, the parser clamps it to zero size AT the
- * container's edge — inside the frame, past neither of its edges — and the
- * mark is all that says which way it went. Settings' `Apps` under the
- * collapsing app bar read `126x-132` and was neither beyond the far edge
- * nor in the frame. Beyond, a target a read saw short of the far edge
- * turns the next stroke (`carriedPast`), and one lost after it was there
- * is not `dropped`. Not a stroke turned on the FIRST read (the owner's
- * call, iOS parity — a target read wholly beyond the far edge
- * before any read saw it short is the caller's direction to honour, as
- * `nextStroke` says; a node clipped out has nothing in the frame, so
- * `atFarEdge`, which needs some, never fires for it), nor on any read
- * after until a stroke the caller's way proves the content exhausted
- * that way — the end turn (`EndTurn`, the owner's decision of 2026-10-17,
- * which refines this call).
+ * below): uiautomator inverts the bounds of a node scrolled wholly past its
+ * container, the parser clamps it to zero size AT the container's edge —
+ * inside the frame, past neither of its edges — and the mark is all that
+ * says which way it went. Settings' `Apps` under the collapsing app bar
+ * read `126x-132` and was neither beyond the far edge nor in the frame.
+ * Beyond, a target a read saw short of the far edge turns the next stroke
+ * (`carriedPast`), and one lost after it was there is not `dropped`. Not a
+ * stroke turned on the FIRST read (the owner's call, iOS parity — a target
+ * read wholly beyond the far edge before any read saw it short is the
+ * caller's direction to honour, as `nextStroke` says; a node clipped out
+ * has nothing in the frame, so `atFarEdge`, which needs some, never fires
+ * for it), nor on any read after until a stroke the caller's way proves the
+ * content exhausted that way — the end turn (`EndTurn`, the owner's
+ * decision, which refines this call).
  * docs/bugs/2026-10-09-android-inverted-uiautomator-bounds-pass-through-as-negative-heights.md
  *
  * Or CUT to a sliver at that edge of its scroll container (`FarFacts
@@ -232,7 +230,6 @@ interface FarFacts {
   readonly listedWhereItLies?: true;
 }
 
-/** A judged match's `FarFacts`, its rect copied. */
 const farFacts = ({ node, standing: { facts } }: Judged): FarFacts => ({
   rect: { ...node.rect },
   ...(node.clippedOut !== undefined && { clippedOut: node.clippedOut }),
@@ -415,13 +412,14 @@ interface Memory {
    */
   readonly carriedPast: boolean;
   /**
-   * The far edge of the caller's direction when the last read that found
-   * the target found it wholly beyond it — dumped clipped out past it, or
-   * past it in every frame, nothing of it in the frame (Settings' `Apps`
-   * clipped out above the list, four strokes down, read "off the viewport,
-   * or under the soft keyboard … (a fling?)" without it) —
-   * undefined when that read had it anywhere else. Kept across reads that
-   * do not find it: the failure's `past` (`courseFacts`, scroll-rounds.ts#shortfall).
+   * The far edge of the course's direction (`courseOf`) when the last read
+   * that found the target found it wholly beyond it — dumped clipped out
+   * past it, or past it in every frame, nothing of it in the frame
+   * (Settings' `Apps` clipped out above the list, four strokes down, read
+   * "off the viewport, or under the soft keyboard … (a fling?)" without it)
+   * — undefined when that read had it anywhere else. Kept across reads that
+   * do not find it: the failure's `past` (`courseFacts`,
+   * scroll-rounds.ts#shortfall).
    */
   readonly lastPast: PastSide | undefined;
   /** The last read that read: the judged match's far facts and the frames it was judged in — undefined when it found no match. */
@@ -468,7 +466,6 @@ const close = (m: Memory): Course => m as unknown as Course;
  */
 const courseOf = (m: Memory): Direction => m.endTurn?.to ?? m.direction;
 
-/** The course before the first read: the caller's way, nothing seen, nothing sent. */
 export function startCourse(direction: Direction): Course {
   return close({
     direction,
@@ -514,19 +511,19 @@ export interface Sighting {
  */
 export function seeTarget(course: Course, { since, judged, frames, uncutFrames, heldBackAt }: Sighting): { course: Course; answersBack: boolean } {
   const m: Mutable<Memory> = { ...open(course), carriedPast: false };
-  // Dropped (the lazy-list note, scroll-rounds.ts#UNMOVED_STROKES_EXHAUST's): the last read had the target SHORT of the far
-  // edge of the content's last motion — inside the frame, under the
-  // keyboard, or not yet in — and this read, after a stroke or a settle
-  // since one, has no match. A lazy list (RecyclerView, LazyColumn) keeps a
-  // row in the tree only while it intersects the list, and on Android a
-  // row's bounds never pass the list's edge (they are cut to it), so
-  // `carriedPast` — which needs a read to FIND the target beyond the far
-  // edge — can never fire there: the row is in one read and absent from
-  // the next. It can only have left through the edge the content moved
-  // toward: measured, Contacts' `Last name` clipped by the IME, one stroke
-  // down, gone, and four more strokes down into the end of the editor.
-  // The strokes go back (`dropped`, `nextStroke`) — a turn, halving
-  // the reach like any — until a read finds it.
+  // Dropped: the last read had the target SHORT of the far edge of the
+  // content's last motion — inside the frame, under the keyboard, or not
+  // yet in — and this read, after a stroke or a settle since one, has no
+  // match. A lazy list (RecyclerView, LazyColumn) keeps a row in the tree
+  // only while it intersects the list, and on Android a row's bounds never
+  // pass the list's edge (they are cut to it), so `carriedPast` — which
+  // needs a read to FIND the target beyond the far edge — can never fire
+  // there: the row is in one read and absent from the next. It can only
+  // have left through the edge the content moved toward: measured,
+  // Contacts' `Last name` clipped by the IME, one stroke down, gone, and
+  // four more strokes down into the end of the editor. The strokes go back
+  // (`dropped`, `nextStroke`) — a turn, halving the reach like any — until
+  // a read finds it.
   if (judged === undefined && since !== 'start' && m.lastFound !== undefined && m.lastSent !== undefined) {
     if (!beyondFarEdgeIn(m.lastFound, m.lastSent, m.lastFound.frames)) m.dropped = OPPOSITE[m.lastSent];
   }
@@ -560,8 +557,8 @@ export function seeTarget(course: Course, { since, judged, frames, uncutFrames, 
     // screen's bottom, so the row flung to 776–828 has it over its far
     // (bottom) side — its frame, 780–824, is over neither edge.
     const overFar = (cover: Rect) => frames.every((f) => overFarSide(judged.node.rect, way, cover, f));
-    // Only the covers the draw order found (cover.ts#drawOrderFound), as before the overlaid edge was a cover: the overlaid
-    // one (`overlaid`, known by the cut alone) lies over a target in no scroll view, and does not turn the strokes.
+    // Only the covers the draw order found (cover.ts#drawOrderFound): the overlaid one (`overlaid`, known by the cut
+    // alone) lies over a target in no scroll view, and does not turn the strokes.
     // Or held back by the region its motion showed at that edge (`Sighting.heldBackAt`: in its band, or past it toward
     // chrome): under a header there, the strokes turn to bring it in, as for a target across the edge.
     const { facts } = judged.standing;
@@ -590,28 +587,30 @@ export interface NextStroke {
 }
 
 /**
- * The next stroke (the WDA device check): toward the caller's
- * direction — unless the last read that read found a fling carried the
- * target across the frame since a read saw it short of the far edge
- * (`seeTarget`; measured 613 → -357 in one swipe, then five more swipes DOWN
- * into exhausted content). Then the other way, to bring it back; a stroke
- * that throws it back past the near edge leaves it short again, and the
- * next stroke goes the caller's way. A target read wholly beyond the far
- * edge before any read saw it short of it — above the screen on round 0 of
- * a scroll down, and every round after while it stays there — is the
- * caller's direction to honour — until a stroke that way proves the
- * content exhausted: the end turn (`EndTurn`) turns the course itself,
- * which this reads in place of the caller's direction, at full reach; one
- * any of which lies in the frame is not (`seeTarget`'s `atFarEdge`, below). That needs the target to
- * STAY in the tree once off the frame; a lazy list (Android
- * RecyclerView/LazyColumn, iOS List/UITableView under WDA) drops it, and
- * on Android its bounds never pass the list's edge anyway. A read that LOSES the target it last read short of the far
- * edge of the content's last motion turns the strokes too (`dropped`,
- * recorded by `seeTarget`): back the way the content came, until a read
- * finds it — a turn like this one, the reach halved. What is left: a
- * target no read ever had (the stroke must not carry it across the list
- * between two reads — the drag speed, adapters/android.ts#dragSpeed, is
- * what keeps that from happening on Android; iOS strokes at its default).
+ * The next stroke (the WDA device check): toward the caller's direction —
+ * unless the last read that read found a fling carried the target across
+ * the frame since a read saw it short of the far edge (`seeTarget`;
+ * measured 613 → -357 in one swipe, then five more swipes DOWN into
+ * exhausted content). Then the other way, to bring it back; a stroke that
+ * throws it back past the near edge leaves it short again, and the next
+ * stroke goes the caller's way. A target read wholly beyond the far edge
+ * before any read saw it short of it — above the screen on round 0 of a
+ * scroll down, and every round after while it stays there — is the caller's
+ * direction to honour — until a stroke that way proves the content
+ * exhausted: the end turn (`EndTurn`) turns the course itself, which this
+ * reads in place of the caller's direction, at full reach. One across that
+ * far edge, some of it in the frame, is not: the strokes turn at once
+ * (`seeTarget`'s `atFarEdge`, below). Turning back needs the target to STAY
+ * in the tree once off the frame; a lazy list (Android
+ * RecyclerView/LazyColumn, iOS List/UITableView under WDA) drops it, and on
+ * Android its bounds never pass the list's edge anyway. A read that LOSES
+ * the target it last read short of the far edge of the content's last
+ * motion turns the strokes too (`dropped`, recorded by `seeTarget`): back
+ * the way the content came, until a read finds it — a turn like this one,
+ * the reach halved. What is left: a target no read ever had (the stroke
+ * must not carry it across the list between two reads — the drag speed,
+ * adapters/android.ts#dragSpeed, is what keeps that from happening on
+ * Android; iOS strokes at its default).
  *
  * Converging is deliberate: every direction change
  * halves the reach of every stroke after it (`reach`, applied with
@@ -667,7 +666,6 @@ export function nextStroke(course: Course): NextStroke {
   return { toward, reach: 0.5 ** (turn ? m.turns + 1 : m.turns), turn, ...(still !== undefined && { still }) };
 }
 
-/** The course after `stroke` (its `nextStroke`) was sent: a turn counted, the way stroked, the last stroke's and the last sent's way. */
 export function sent(course: Course, { toward, turn }: Pick<NextStroke, 'toward' | 'turn'>): Course {
   const m = open(course);
   return close({

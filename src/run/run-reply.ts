@@ -3,20 +3,17 @@ import type { AssertResult } from '../verify/assert.js';
 import { captureFrame, captureRefusal, type Frame } from '../verify/capture.js';
 
 /**
- * The pieces a run's reply is built from, shared by the `verify` legs (run/verify.ts) and the single-platform tools
- * (run/commands.ts): the final frame or the one line saying why there is none, and the asserts' verdict and lines.
- * Its own module since A29 (docs/plans/2026-10-30-performance-backlog.md): until then they sat in run/verify.ts, so
- * `ensure_state`, `run_flow` and `assert` imported the `verify` tool's orchestration for four words-and-frame helpers.
- * The step trace is the engine's (flow/engine.ts#formatTrace), imported from there; the health line is
- * run/app-health.ts's.
+ * The pieces a run's reply is built from: the final frame or the one line saying why there is none, and the asserts'
+ * verdict and lines. The step trace is the engine's (flow/engine.ts#formatTrace), imported from there; the health
+ * line is run/app-health.ts's.
  */
 
 /**
  * The final capture of a run that has already done its work — a `verify`
- * leg, `ensure_state` — or the one line saying why there is none
- * (2026-10-08). Since the adapters refuse a capture that is not a PNG as a
- * transport error (adapters/screenshot-bytes.ts), `captureFrame` can throw
- * for a device that died AFTER the run, and a throw here would discard the
+ * leg, `ensure_state` — or the one line saying why there is none. Since the
+ * adapters refuse a capture that is not a PNG as a transport error
+ * (adapters/screenshot-bytes.ts), `captureFrame` can throw for a device that
+ * died AFTER the run, and a throw here would discard the
  * trace, the assert results, the health line and the ⚠ lines of a run that
  * took minutes — the same loss run/verify.ts's leg forbids for a tree or
  * screen read. So it is caught here, for this one capture, and the run

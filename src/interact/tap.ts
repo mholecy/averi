@@ -13,37 +13,34 @@ export type TapAdapter = KeyboardAdapter;
 /**
  * What a tap takes: the keyboard guard's options (keyboard-model.ts#GuardOptions), eyes REQUIRED (A30; ADR 0024,
  * amendment A30) — the order question a centre covered by a control the listing does not order asks
- * (tap-judgement.ts#TapAsks). The composition roots wire verify/eyes.ts#eyesOn (mcp/tools.ts, flow/engine.ts), a test
- * a fake: no caller can forget them and typecheck.
+ * (tap-judgement.ts#TapAsks): no caller can forget them and typecheck.
  */
 export type TapOptions = GuardOptions;
 
 /**
  * The warning on a tap whose node the tree marks disabled (adapters/types.ts#UiNode.disabled) — warned, never refused:
- * the MCP reply's ⚠ line (mcp/tool-text.ts#tapText) and the flow's `⚠ tap` line (flow/engine.ts#tapSpec), in the same
- * words. docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md
+ * the MCP reply and the flow trace say it in the same words.
+ * docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md
  */
 export const DISABLED_TAP = 'The tree marks the target disabled, the tap may do nothing; read again before relying on it.';
 
-/** What a tap by selector says of itself (tapElement): the resolution note, the keyboard's sentence, where it went, the mark. */
 export interface Tapped {
   note?: string;
-  /** The keyboard guard's sentence alone, for the one caller that prints no notes (the flow trace's `⚠ tap`). */
+  /** The keyboard guard's sentence alone, for a caller that prints no notes (the flow trace's `⚠ tap`). */
   keyboardHidden?: string;
   moved?: string;
   /** The tapped node's own mark (adapters/types.ts#UiNode.disabled). */
   disabled?: true;
 }
 
-/** What the MCP reply prints of a tap (mcp/tool-text.ts#tapText). */
 export type TapMarks = Pick<Tapped, 'note' | 'moved' | 'disabled'>;
 
 /**
  * Wait for the target to appear and settle (resolveSettled: one policy for
- * the flow engine's `tap:` step and the MCP `tap` tool), then tap the chosen
- * node at the guard's point. Returns the resolution note, if any, for the caller to
- * surface — the engine's trace does not print it, the MCP tool does. The
- * settle's cadence: resolve.ts#settleCadence.
+ * the flow engine's `tap:` step and the MCP `tap` tool), then tap the
+ * chosen node at the guard's point. Returns the resolution note, if any,
+ * for the caller to surface. The settle's cadence:
+ * resolve.ts#settleCadence.
  *
  * The node comes from resolveClearOfKeyboard (keyboard.ts): on an adapter
  * with a keyboard oracle (Android) a target under the soft keyboard is not
@@ -52,7 +49,7 @@ export type TapMarks = Pick<Tapped, 'note' | 'moved' | 'disabled'>;
  * target is refused, or hidden with one of the caller's `dismissals`
  * (GuardOptions) first. This function knows nothing of how that is decided.
  * When that happened the note says so, and `keyboardHidden` carries the
- * sentence alone for the one caller that prints no notes (the flow trace's
+ * sentence alone for a caller that prints no notes (the flow trace's
  * `⚠ tap`).
  *
  * The same call refuses a node whose centre lies off the screen — an
@@ -72,9 +69,9 @@ export type TapMarks = Pick<Tapped, 'note' | 'moved' | 'disabled'>;
  *
  * The poll is the retry, so the adapter's `settle` is not asked for
  * (adapters/types.ts: pollers leave it off). A free function rather than a
- * DeviceAdapter method: nothing in it is platform-specific, and as a method
- * both adapters implemented it identically, which forced the platform layer
- * to import the selector layer above it (ARCHITECTURE.md §3).
+ * DeviceAdapter method: nothing in it is platform-specific. As a method,
+ * both adapters would implement it identically and the platform layer would
+ * import the selector layer above it (ARCHITECTURE.md §2).
  *
  * `disabled` is the tapped node's own mark (adapters/types.ts#UiNode.disabled,
  * D66) — the node the guard handed back, after any re-resolve: the tap is sent

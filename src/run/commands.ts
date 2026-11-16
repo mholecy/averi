@@ -14,31 +14,21 @@ import { claimed, claimedError } from './claims.js';
  * The single-platform tool compositions: what one `ensure_state`, `run_flow`
  * or `assert` call DOES, below the MCP layer.
  *
- * 2026-10-03. They are here for the reason run/verify.ts is: each composes
- * the flow engine, the verifier and the config for one tool call, and
- * ARCHITECTURE.md §2 gives the MCP layer schemas, descriptions and one
- * delegation — not sequences. Until this step the sequences were written out
- * in the handlers (mcp/tools.ts): ensure_state and run_flow carried the same
- * four lines twice, the assert handler held the health line's catch, and
- * launch_app held the "when to consult averi.yaml" guard. They could be
- * drained without changing behaviour because tests/mcp/tools.test.ts already
- * pinned each response through the protocol; these functions are now also
- * tested at their own level (tests/run/commands.test.ts), with a FakeAdapter
- * and no server.
+ * They are here for the reason run/verify.ts is: each composes the flow
+ * engine, the verifier and the config for one tool call, and ARCHITECTURE.md
+ * §2 gives the MCP layer schemas, descriptions and one delegation — not
+ * sequences.
  *
- * What does NOT come down here: the registry, and — since 2026-10-08 — the
- * config read. The registry is the MCP session's state (which device a
- * platform is pinned to), so each function takes either a resolved adapter
- * or a callback that resolves one — the shape `runVerification` already has
- * with `resolveAdapter`. The config arrives already read, once, by the
- * handler under the tool's declared policy (flow/tool-config.ts#loadForCall):
- * until that date runAsserts and the launch-activity lookup each loaded
- * averi.yaml again under a catch-all of their own, so an iOS `assert` read
- * the file twice under two policies and a broken file was judged by the
- * platform. The order "config before device" is still behaviour, and still
- * holds: the handler reads before it calls in here, and the engine tools
- * resolve their adapter through the callback only after the environment
- * pre-flight.
+ * What does NOT come down here: the registry, and the config read. The
+ * registry is the MCP session's state (which device a platform is pinned
+ * to), so each function takes either a resolved adapter or a callback that
+ * resolves one — the shape `runVerification` already has with
+ * `resolveAdapter`. The config arrives already read, once, by the handler
+ * under the tool's declared policy (flow/tool-config.ts#loadForCall), so a
+ * file is never read twice under two policies. The order "config before
+ * device" is behaviour: the handler reads before it calls in here, and the
+ * engine tools resolve their adapter through the callback only after the
+ * environment pre-flight.
  */
 
 /** Resolves the adapter for a call once its config is loaded (the config names the iOS tree source). */
@@ -63,23 +53,22 @@ interface EngineCall extends EngineContext {
  * The sequence ensure_state and run_flow share: the loaded config, the environment
  * pre-flight (`refuseUnknownEnvironment`), adapter, ONE engine run, the
  * trace — in that order, each step only if the one before it succeeded (a
- * failing flow throws its own trace; there is no health line on a failure,
- * as there never was). The run is handed in as what to run, not as a
- * callback over an engine (2026-10-07): the engine has one entry, and every
- * tool that runs it — these two and verify's legs — names a state, a flow or
- * both.
+ * failing flow throws its own trace; there is no health line on a failure).
+ * The run is handed in as what to run, not as a callback over an engine: the
+ * engine has one entry, and every tool that runs it — these two and verify's
+ * legs — names a state, a flow or both.
  *
- * The health line is the callers' since D13 (2026-10-31): until then it was
- * computed here, so ensure_state asked the app's health and only THEN took
- * its final frame. Neither is an action and neither reads the other —
- * `appHealth` asks `isAppRunning` (and, for a dead app, the logs);
- * `finalFrame` reads the raw adapter, outside the engine's read hand-off
+ * The health line is the callers' (D13): computed here, ensure_state would
+ * ask the app's health and only THEN take its final frame. Neither is an
+ * action and neither reads the other — `appHealth` asks `isAppRunning` (and,
+ * for a dead app, the logs); `finalFrame` reads the raw adapter, outside the
+ * engine's read hand-off
  * (docs/adr/0030-a-read-is-handed-on-only-as-a-first-sample-or-a-positive-verdict.md),
- * which dies with the run — so ensure_state now runs them side by side, and
- * the pidof (44–48 ms; docs/plans/2026-10-30-performance-backlog.md, D13
- * note (2026-10-31, averi_lab API 33)) hides under the frame's settle sleep
- * and screencaps. run_flow takes no frame and asks the health alone. A
- * verify leg keeps them in sequence (run/verify.ts).
+ * which dies with the run — so ensure_state runs them side by side, and the
+ * pidof (44–48 ms; docs/plans/2026-10-30-performance-backlog.md, D13 note
+ * (2026-10-31, averi_lab API 33)) hides under the frame's settle sleep and
+ * screencaps. run_flow takes no frame and asks the health alone. A verify leg
+ * keeps them in sequence (run/verify.ts).
  */
 async function runOnEngine(
   call: EngineCall,
@@ -102,14 +91,14 @@ async function runOnEngine(
 /**
  * `ensure_state`: the trace and health line, and the frame the state was left
  * in — settled, as `screenshot` settles it. No `shot` when the capture itself
- * failed (2026-10-08, run/run-reply.ts#finalFrame): the state WAS ensured, so the
- * trace stands, with one `⚠ screenshot:` line where an unsettled frame's note goes.
+ * failed (run/run-reply.ts#finalFrame): the state WAS ensured, so the trace
+ * stands, with one `⚠ screenshot:` line where an unsettled frame's note goes.
  *
  * The health check and the capture run together (D13, see runOnEngine); the
- * reply is laid out as before — trace, health line, then the frame's one
- * note line, if any. Neither rejects for the device: appHealth words its
- * failures into the line (run/app-health.ts, the one policy) and finalFrame
- * catches its own capture failure.
+ * reply is laid out trace, health line, then the frame's one note line, if
+ * any. Neither rejects for the device: appHealth words its failures into the
+ * line (run/app-health.ts, the one policy) and finalFrame catches its own
+ * capture failure.
  */
 export async function runEnsureState(
   call: EngineCall & { state: string },
@@ -154,17 +143,13 @@ export interface AssertCall {
  * `assert`: the verdict line, one line per assert, and the health line when
  * averi.yaml says which app to ask about.
  *
- * Until 2026-10-08 this loaded averi.yaml itself (strictly, with .env.averi)
- * inside a catch-all, which dropped the health line for a present-but-invalid
- * file on android and for anything appHealth threw. The config is now the
- * handler's single read, under which a broken file fails the call on both
- * platforms. The catch was narrowed that day to the health check alone, and
- * removed by A29: appHealth words every device failure into the line itself
- * (run/app-health.ts, one policy for its four callers), so the catch could only
- * be reached by an adapter that breaks its contract — a `platform` that throws,
- * or `logs` resolving to no array; both real adapters hold `platform` in a
- * readonly field and return `logs` from a `split`. Such a throw now fails the
- * call, as it fails ensure_state, run_flow and a verify leg.
+ * The config is the handler's single read, under which a broken file fails
+ * the call on both platforms. appHealth is awaited bare (A29): it words
+ * every device failure into the line itself (run/app-health.ts, one policy),
+ * so only an adapter that breaks its contract — a `platform` that throws, or
+ * `logs` resolving to no array; both real adapters hold `platform` in a
+ * readonly field and return `logs` from a `split` — throws here, and that
+ * fails the call, as it fails ensure_state, run_flow and a verify leg.
  */
 export async function runAsserts({ adapter, specs, baselineDir, cfg }: AssertCall): Promise<string> {
   // persistentRead: 'fail' — the reply IS the assert results: a read no wait cures (D21) is each assert's FAIL line,

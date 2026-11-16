@@ -6,19 +6,16 @@ import { clippedOutText, SIDES } from '../ui-tree/sides.js';
 
 /**
  * The phrases a target cut to a sliver, lying past a side, or lying under
- * the soft keyboard, is said in —
- * one wording for every verb that says it: the tap's refusal (tap-judgement.ts),
- * `scroll_until`'s failures (scroll-text.ts) and the dismissal picker's skip lines
- * (keyboard-dismissal.ts#whyNotTapped) — and the picker's short name for a
- * cover (`coverName`), kept beside geometry.ts#nodeText as a choice, not as
- * the shared wording. Phrases, not policies: what counts as cut is
- * geometry.ts#Clips.cutSliver's, and which phrase a reply says is its
- * caller's switch. The touch remedy's sentence, which composes these with a
- * standing's remedy (ui-tree/standing.ts#Remedy), is touch-remedy.ts's; the
- * clauses every verb quotes (a presented screen's, a no-scroll cover's) are
- * ui-tree/remedy-text.ts's. Shallow by
- * design, like ui-tree/system-bar.ts: delete it and each shared sentence
- * reappears in its two or three callers.
+ * the soft keyboard, is said in — one wording for every verb that says it —
+ * and the picker's short name for a cover (`coverName`), kept beside
+ * geometry.ts#nodeText as a choice, not as the shared wording. Phrases, not
+ * policies: what counts as cut is geometry.ts#Clips.cutSliver's, and which
+ * phrase a reply says is its caller's switch. The touch remedy's sentence,
+ * which composes these with a standing's remedy (ui-tree/standing.ts#Remedy),
+ * is touch-remedy.ts's; the clauses every verb quotes (a presented screen's,
+ * a no-scroll cover's) are ui-tree/remedy-text.ts's. Shallow by design, like
+ * ui-tree/system-bar.ts: delete it and each shared sentence reappears in its
+ * two or three callers.
  *
  * Its words for a side come from ui-tree/sides.ts#SIDES — `past` and `lies`
  * (where a node past a side lies) and `reveals` (the `scroll_until` direction
@@ -34,24 +31,21 @@ import { clippedOutText, SIDES } from '../ui-tree/sides.js';
  * container` when Android dumped it so (UiNode.clippedOut), `above the
  * viewport` when its rect lies there — or `above its scroll view <node>` when
  * it lies past the edge of what that scroll view draws, on the screen
- * (`scrollView`, the drawn frame's: a WDA row where it lies, or an Android rect uiautomator dumped past its scroll
- * view) — the one wording of it, for `scroll_until`'s failure (scroll-text.ts); its clipped-out phrase is
- * ui-tree/sides.ts#clippedOutText, which a miss's zero-area note says too (ui-tree/miss.ts).
+ * (`scrollView`, the drawn frame's: a WDA row where it lies, or an Android
+ * rect uiautomator dumped past its scroll view) — the one wording of it; its
+ * clipped-out phrase is ui-tree/sides.ts#clippedOutText, which a miss's
+ * zero-area note says too (ui-tree/miss.ts).
  */
 export function pastSideText(side: Edge, clippedOut: boolean, scrollView?: UiNode): string {
   if (clippedOut) return clippedOutText([side]);
-  // Past the edge of what its scroll view draws, that scroll view on the screen (ui-tree/standing.ts, the drawn frame).
   return scrollView === undefined ? `${SIDES[side].past} the viewport` : outsideScrollViewText(scrollView, SIDES[side].past);
 }
 
 /**
- * Where a target whose centre lies under the soft keyboard stands —
- * `under the soft keyboard: its centre (201,661) lies below the keyboard's
- * top edge at y 573` — the one wording of that point, for the tap's
- * refusal (tap-judgement.ts#judgeTap, which goes on to say a tap there
- * presses the keyboard) and `scroll_until`'s presented stop
- * (scroll-text.ts#notInViewportText, which says it of "element"). `centre`
- * is the target's tap point, `lineY` the keyboard line's y
+ * Where a target whose centre lies under the soft keyboard stands — `under
+ * the soft keyboard: its centre (201,661) lies below the keyboard's top
+ * edge at y 573` — the one wording of that point. `centre` is the target's
+ * tap point, `lineY` the keyboard line's y
  * (ui-tree/keyboard-position.ts#KeyboardLine).
  */
 export function underKeyboardText(centre: Point, lineY: number): string {
@@ -64,16 +58,13 @@ export function untriedSideText(side: Edge): string {
 }
 
 /**
- * THE sentence for a node cut to a sliver (`Clips.cutSliver`'s answer, `cut`, of a
- * node whose rect is `shown`): `cut at its scroll container's bottom edge
- * (container 0,242 1080x1736); only a 948x55 part of it shows, 55 deep across
- * that edge, under the 65 a tap needs`; a cut inherited from what the node
- * lies in (`Cut.within`) says so after the container — `…(container
+ * THE sentence for a node cut to a sliver (`Clips.cutSliver`'s answer,
+ * `cut`, of a node whose rect is `shown`): `cut at its scroll container's
+ * bottom edge (container 0,242 1080x1736); only a 948x55 part of it shows, 55
+ * deep across that edge, under the 65 a tap needs`; a cut inherited from what
+ * the node lies in (`Cut.within`) says so after the container — `…(container
  * 0,242 1080x1736), as is the 66,1924 948x55 it lies in; only a 948x42
- * part…`. Said by the tap's refusal
- * (tap-judgement.ts#judgeTap), by `scroll_until`'s sliver failures
- * (scroll-text.ts) and by the picker's skip line — one wording. A cut by a
- * node drawn after it (`Cut.by`) is `cutByText`'s.
+ * part…`. A cut by a node drawn after it (`Cut.by`) is `cutByText`'s.
  */
 export function cutSliverText(cut: Cut, shown: Rect, minPiece: number, lineY?: number): string {
   if (cut.by !== undefined) return cutByText(cut.by, cut, shown, minPiece, lineY);
@@ -119,11 +110,9 @@ const A_TAP_STEP = ' — a tap: step';
 /**
  * HOW to hide the soft keyboard, by what the adapter hides it with (`KeyboardRemedy.dismissal`): `press_key back from
  * the MCP tools; \`dismissKeyboard: true\` on the fill before this step in a flow`, or `tap a neutral element such as
- * the screen title — a tap: step in a flow`. The one wording of the clause for `scroll_until`'s whole-screen advice
- * (scroll-text.ts#hideToJudgeWholeScreen), the cut-by remedy (`dismissKeyboardFirstText`) and the tap's refusal of a
- * centre under idb's band (tap-judgement.ts#hideIt); each says the adapter's `cannotHide` where its sentence puts it.
- * Names MCP tools and "a flow", the exception keyboard-window.ts records. Its short form, with no flow clause, is
- * `hideKeyboardBriefly`.
+ * the screen title — a tap: step in a flow`. The one wording of the clause; each caller says the adapter's `cannotHide`
+ * where its sentence puts it. Names MCP tools and "a flow", the exception keyboard-window.ts records. Its short form,
+ * with no flow clause, is `hideKeyboardBriefly`.
  */
 export const hideKeyboardHow = (remedy: KeyboardRemedy): string =>
   remedy.dismissal === 'back' ? `${hideKeyboardBriefly(remedy)} from the MCP tools; ${hideKeyboardInFlow(remedy)} in a flow` : `${NEUTRAL_TAP}${A_TAP_STEP} in a flow`;
@@ -135,23 +124,19 @@ export const hideKeyboardHow = (remedy: KeyboardRemedy): string =>
 export const hideKeyboardBriefly = ({ dismissal }: KeyboardRemedy): string => (dismissal === 'back' ? 'press_key back' : NEUTRAL_TAP);
 
 /**
- * `hideKeyboardHow`'s FLOW form alone, for a reply only a flow reads (scroll-text.ts#WITHIN_REMEDY's `spec`, D80):
- * `` `dismissKeyboard: true` on the fill before this step ``, or `tap a neutral element such as the screen title — a
- * tap: step before this one` — keyed on the same `dismissal` as the MCP tools' `hideKeyboardBriefly`.
+ * `hideKeyboardHow`'s FLOW form alone, for a reply only a flow reads (D80): `` `dismissKeyboard: true` on the fill
+ * before this step ``, or `tap a neutral element such as the screen title — a tap: step before this one` — keyed on the
+ * same `dismissal` as the MCP tools' `hideKeyboardBriefly`.
  */
 export const hideKeyboardInFlow = ({ dismissal }: KeyboardRemedy): string =>
   dismissal === 'back' ? '`dismissKeyboard: true` on the fill before this step' : `${NEUTRAL_TAP}${A_TAP_STEP} before this one`;
 
-/** `the soft keyboard is up (its top edge at y 590)`: the one phrase of `dismissKeyboardFirstText` and `keyboardMayCoverText`. */
 export const keyboardUpText = (lineY: number): string => `the soft keyboard is up (its top edge at y ${lineY})`;
 
 /**
  * `clause` — the sentence that says how to hide the soft keyboard, `hideKeyboardHow`'s words alone by default — then,
- * unless the adapter hides it with `back`, the adapter's `cannotHide` with its advice: the one composition of the cut-by
- * remedy (`dismissKeyboardFirstText`, inside its parentheses), `scroll_until`'s whole-screen advice
- * (scroll-text.ts#hideToJudgeWholeScreen, after "and scroll again") and the tap's refusal under idb's band
- * (tap-judgement.ts#hideIt). Both branches are reached: `back` on Android, the other on iOS (WDA's and idb's remedy is
- * `none`: the whole-screen advice and the band's refusal).
+ * unless the adapter hides it with `back`, the adapter's `cannotHide` with its advice. Both branches are reached:
+ * `back` on Android, the other on iOS (WDA's and idb's remedy is `none`).
  */
 export function hideClause(remedy: KeyboardRemedy, clause: string = hideKeyboardHow(remedy)): string {
   return remedy.dismissal === 'back' ? clause : `${clause}; ${cannotHide(remedy.advice)}`;
@@ -202,20 +187,17 @@ export function ridingKeyboard(by: UiNode, keyboard: KeyboardUp | undefined, min
  */
 export const wholeThinWayPast = (by: UiNode): string => `only if a screenshot shows it whole — a control that thin laid flush against that ${by.role} — no scroll shows more: tap by coordinates`;
 
-/** The remedy for a target cut at `edge`: a scroll toward where the rest of it lies (ui-tree/sides.ts#SIDES) — down, `scroll_until`'s default (scroll.ts), needs no word. The touch remedy's for a container's cut (touch-remedy.ts#touchRemedyText). */
+/** The remedy for a target cut at `edge`: a scroll toward where the rest of it lies (ui-tree/sides.ts#SIDES) — down, `scroll_until`'s default (scroll.ts), needs no word. */
 export function cutRemedy(edge: Edge): string {
   const direction = SIDES[edge].reveals;
   return direction === 'down' ? 'scroll_until it first' : `scroll_until it with direction: ${direction} first`;
 }
 
 /**
- * A cover as the dismissal strategies' skip lines name it (keyboard-dismissal.ts
- * #whyNotTapped): `button "Sign in"`, `toolbar` — its role and its label
- * quoted, an empty label as `""`; nothing else.
- *
- * Not geometry.ts#nodeText (`button "Sign in" (24,780 354x44)`, its id when
- * it has no label, an empty label skipped), on purpose: the skip line names a
- * cover in a list of reasons, where a rect adds length and not a decision.
+ * A cover's name is not geometry.ts#nodeText
+ * (`button "Sign in" (24,780 354x44)`, its id when it has no label, an empty
+ * label skipped), on purpose: the skip line names a cover in a list of
+ * reasons, where a rect adds length and not a decision.
  * The two phrasings are a choice, kept side by side: one phrasing would
  * change the skip lines `KeyboardWithoutDismissal` and the `dismiss()`
  * warning quote, words an agent may match on.

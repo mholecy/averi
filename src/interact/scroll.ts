@@ -34,10 +34,9 @@ export interface ScrollOptions {
   settleMs?: number;
   /**
    * The eyes a `fully visible` claim is confirmed with, and the order question asked of two controls listed in reading
-   * order (ui-tree/eyes.ts; verify/eyes.ts#eyesOn, which the composition roots hand in — mcp/tools.ts,
-   * flow/engine.ts). REQUIRED (A30; ADR 0024, amendment A30): until then absent was allowed, and a caller that forgot
-   * them typechecked and said every such claim as the tree's, unchecked ("… a screenshot could not tell (no screenshot
-   * was taken)"). A test hands a fake (tests/helpers/eyes.ts).
+   * order (ui-tree/eyes.ts; verify/eyes.ts#eyesOn, which the composition roots hand in). REQUIRED (A30; ADR 0024,
+   * amendment A30): were it optional, a caller that forgot them would typecheck and say every such claim as the tree's,
+   * unchecked ("… a screenshot could not tell (no screenshot was taken)"). A test hands a fake (tests/helpers/eyes.ts).
    */
   eyes: Eyes;
   /**
@@ -56,13 +55,10 @@ export interface ScrollOptions {
 }
 
 /**
- * What a scroll needs of a device: the tree, the screen's size,
- * the stroke and how fast it may be drawn (`dragSpeed`), whether its read waits for the screen at rest
- * (`treeReadSettles`), and the keyboard's oracle and advice for the round's reading
- * (`readKeyboard`) — nothing it does not use, so a caller with a narrower
- * adapter can scroll, and a reader sees what a scroll can touch. Every
- * reader the driver hands it to takes a `Pick` of its own
- * (`readTreeOrMiss`, `screenBox`, `readKeyboard`).
+ * What a scroll needs of a device: the tree, the screen's size, the stroke and how fast it may be drawn (`dragSpeed`),
+ * whether its read waits for the screen at rest (`treeReadSettles`), and the keyboard's oracle and advice for the
+ * round's reading (`readKeyboard`) — nothing it does not use, so a caller with a narrower adapter can scroll, and a
+ * reader sees what a scroll can touch.
  */
 export type ScrollAdapter = Pick<
   DeviceAdapter,
@@ -70,9 +66,10 @@ export type ScrollAdapter = Pick<
 >;
 
 /**
- * Swipe until the element is present AND visibly inside the viewport
- * (ARCHITECTURE.md §2, Scroll; §5, the tool surface). Throws with a
- * diagnosis of the last tree.
+ * Swipe until the element is present AND visibly in the viewport —
+ * overlapping it, or with `fully: true` entirely inside it (ARCHITECTURE.md
+ * §2, Scroll; §5, the tool surface). Throws with a diagnosis of the last
+ * tree.
  *
  * THE DRIVER: the production
  * adapter of interact/scroll-rounds.ts#round. It owns every I/O of the
@@ -85,12 +82,12 @@ export type ScrollAdapter = Pick<
  * device behaviour that shaped those rules is recorded below.
  *
  * `fully: true` raises the bar from "intersects" to "entirely inside", and
- * keeps swiping until it is — then fails naming the shortfall when the content
- * runs out first. That failure message IS the app bug in the measured case:
- * a scroll container with no clearance for the floating bottom-nav bar can
- * never fully reveal its last row, however far it scrolls. Default stays
- * `false`: the stop condition is unchanged, only the REPORT gains the truth.
- * Both bars also count what the app draws over the element
+ * keeps swiping until it is — then fails naming the shortfall when the
+ * content runs out first. That failure message IS the app bug in the measured
+ * case: a scroll container with no clearance for the floating bottom-nav bar
+ * can never fully reveal its last row, however far it scrolls. Absent,
+ * `fully` is `false`: the element need only intersect the viewport. Both bars
+ * also count what the app draws over the element
  * (ui-tree/standing.ts#Scene.standing owns the rule): `fully: true` with
  * nothing drawn over any of it, the default with nothing drawn over its
  * centre — the point the next tap presses.
@@ -144,39 +141,26 @@ export type ScrollAdapter = Pick<
  * construction; the band's `above` box stays the chosen one. Unmeasured on
  * a device held sideways.
  *
- * The band is APPLIED only when it changes the round — the two judgements
- * differ, or the round ends in a stroke or a failure rather than a clean
- * stop — and only once the input method has not denied it
- * (the reading's `corroborated`: the guard's veto, its one owner
- * `witnessDenies` in ui-tree/keyboard-cover.ts). The window state was measured
- * stale for seconds after a navigating tap, and a phantom band would score
- * an on-screen target 0, send a stroke through the next screen and report
- * a keyboard that is gone. The witness is asked on EVERY round a band
- * matters and its answer is not kept: a
- * stale window on round 0 can be followed by a real keyboard — a new
- * screen that auto-focuses a field — and a confirmed keyboard can be hidden
- * by the scroll itself (a list that dismisses it on drag) and leave the
- * window state stale-shown behind it. What a round asks the device is
- * counted on ui-tree/keyboard-cover.ts (WHAT A READING ASKS), the one place
- * it is. The rounds — strokes and confirming reads alike — number at most
- * 1 + (1 + SETTLE_CONFIRM_READS) × `maxSwipes`, 25 at the defaults, besides a
- * slowing fling's reads (scroll-rounds.ts#SETTLE_CONFIRM_READS), bounded by the
- * deadline — and stop at the bound or the deadline, whichever comes first.
- * Where the tree read waits for the screen at rest (Android,
- * `DeviceAdapter.treeReadSettles`) the bound is the same and seldom
- * approached: a stroke's read confirms nothing of its motion, and the
- * confirming reads left are a presented screen's hold, a read that failed and
- * a probe's read that moved. A failed or `fully: true`
- * stop may add one more query, the `unlocated` row's (below). A band that does not change the round is not reported
- * either: the result carries `keyboard: shown` only when the stop was
- * judged under one this round — a clip at its edge, or another of several
- * matches judged. The witness is no longer remembered, so one that times
- * out costs its timeout (KEYBOARD_WITNESS_TIMEOUT_MS in adapters/android.ts,
- * 2 s) on each round where the band matters; the deadline is checked once
- * a round, after it, so the last round can run past `timeoutMs` by that
- * wait on top of its reads. A band that leaves nothing above
- * it (its top at y ≤ 0 — a full-screen extract-mode IME, unmeasured) scores
- * every non-keyboard node 0 and fails at once, no stroke, naming it.
+ * The band is APPLIED only when it changes the round — the two judgements differ, or the round ends in a stroke or a
+ * failure rather than a clean stop — and only once the input method has not denied it (the reading's `corroborated`:
+ * the guard's veto, its one owner `witnessDenies` in ui-tree/keyboard-cover.ts). The window state was measured stale
+ * for seconds after a navigating tap, and a phantom band would score an on-screen target 0, send a stroke through the
+ * next screen and report a keyboard that is gone. The witness is asked on EVERY round a band matters and its answer is
+ * not kept: a stale window on round 0 can be followed by a real keyboard — a new screen that auto-focuses a field — and
+ * a confirmed keyboard can be hidden by the scroll itself (a list that dismisses it on drag) and leave the window state
+ * stale-shown behind it. What a round asks the device is counted on ui-tree/keyboard-cover.ts (WHAT A READING ASKS),
+ * the one place it is. The rounds — strokes and confirming reads alike — number at most 1 + (1 + SETTLE_CONFIRM_READS)
+ * × `maxSwipes`, 25 at the defaults, besides a slowing fling's reads (scroll-rounds.ts#SETTLE_CONFIRM_READS), bounded
+ * by the deadline — and stop at the bound or the deadline, whichever comes first. Where the tree read waits for the
+ * screen at rest (Android, `DeviceAdapter.treeReadSettles`) the bound is the same and seldom approached: a stroke's
+ * read confirms nothing of its motion, and the confirming reads left are a presented screen's hold, a read that failed
+ * and a probe's read that moved. A failed or `fully: true` stop may add one more query, the `unlocated` row's (below).
+ * A band that does not change the round is not reported either: the result carries `keyboard: shown` only when the stop
+ * was judged under one this round — a clip at its edge, or another of several matches judged. The witness is not
+ * remembered, so one that times out costs its timeout (KEYBOARD_WITNESS_TIMEOUT_MS in adapters/android.ts, 2 s) on each
+ * round where the band matters; the deadline is checked once a round, after it, so the last round can run past
+ * `timeoutMs` by that wait on top of its reads. A band that leaves nothing above it (its top at y ≤ 0 — a full-screen
+ * extract-mode IME, unmeasured) scores every non-keyboard node 0 and fails at once, no stroke, naming it.
  *
  * Chosen over hiding the keyboard first (the other direction the note
  * offered): that is a `back` on Android — witness-vetoed, but on its
@@ -223,27 +207,25 @@ export type ScrollAdapter = Pick<
  *   rather than "never".
  * - The fling itself:
  *   docs/bugs/2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md
- *   A 1332-px Android stroke in 300 ms moved
- *   Settings' 1417-px list ≈ 2190 px, so a row could pass from below it to
- *   above it between two reads, in none — `Display` two rows below the fold
- *   was never reached. Each stroke is drawn over the target's scroll
- *   container (the screen's largest before the target is read in one;
- *   the round decides the box through its stroke plan, interact/stroke-plan.ts, above the keyboard
- *   and, for content below, above a node drawn over the
- *   container's lower part — a floating tab bar took the touch-down),
- *   its length the container's, and on an adapter
- *   with a `dragSpeed` (Android) at that speed (swipe.ts#dragMs) — the
- *   time it costs against the 15 s default is on adapters/android.ts
- *   #dragSpeed; the default is unchanged. On idb's flat list a full
- *   stroke is paced by its plan (stroke-plan.ts#PACED, 524 pt in 1.5 s;
- *   D20) — estimated, not measured: a round ≈ 2.2–2.5 s (the stroke, the
- *   400 ms settle, an idb read, overhead) against ~1 s before, so six
- *   rounds ≈ 13–15 s and the 15 s timeout may fire before `maxSwipes`; a
- *   call may end up to ~2.2 s past the timeout (judged before a stroke:
- *   the stroke, the settle and the read after it), ~1.2 s more than
- *   before; and six paced strokes reach ~3 400 pt, not the ~6 200 pt the
- *   fling did (ADR 0018, "idb's presented layer", Decision 4). The
- *   limits are unchanged until the owner's device run.
+ *   A 1332-px Android stroke in 300 ms moved Settings' 1417-px list ≈ 2190
+ *   px, so a row could pass from below it to above it between two reads, in
+ *   none — `Display` two rows below the fold was never reached. Each stroke
+ *   is drawn over the target's scroll container (the screen's largest before
+ *   the target is read in one; the round decides the box through its stroke
+ *   plan, interact/stroke-plan.ts, above the keyboard and, for content below,
+ *   above a node drawn over the container's lower part — a floating tab bar
+ *   took the touch-down), its length the container's, and on an adapter with
+ *   a `dragSpeed` (Android) at that speed (swipe.ts#dragMs) — the time it
+ *   costs against the 15 s default is on adapters/android.ts#dragSpeed. On
+ *   idb's flat list a full stroke is paced by its plan (stroke-plan.ts#PACED,
+ *   524 pt in 1.5 s; D20) — estimated, not measured: a round ≈ 2.2–2.5 s (the
+ *   stroke, the 400 ms settle, an idb read, overhead) against ~1 s before, so
+ *   six rounds ≈ 13–15 s and the 15 s timeout may fire before `maxSwipes`; a
+ *   call may end up to ~2.2 s past the timeout (judged before a stroke: the
+ *   stroke, the settle and the read after it), ~1.2 s more than before; and
+ *   six paced strokes reach ~3 400 pt, not the ~6 200 pt the fling did (ADR
+ *   0018, "idb's presented layer", Decision 4). The limits stay at their
+ *   defaults until the owner's device run.
  * - Exhausted (scroll-rounds.ts#UNMOVED_STROKES_EXHAUST): a
  *   target in the tree, off the frame, with a non-zero rect, that two
  *   identical strokes in a row left — with every other match — where it was,
@@ -267,18 +249,13 @@ export type ScrollAdapter = Pick<
  * has the rule and its cost; interact/stroke-plan.ts the box).
  * Only the screen box comes from here — the round decides the stroke's.
  *
- * The unlocated keyboard (ui-tree/keyboard-cover.ts#UNLOCATED_KEYBOARD — the input
- * method says shown, the window state gives it no area: one still coming
- * up? not measured. Not the floating keyboard any more: measured on API 33,
- * a floating Gboard keeps a band and its panel is read from the window's
- * touchable region, `offeredKeyboard`): on a failed stop, and on a
- * `fully: true` stop — where the answer changes what the reader does next —
- * a window reading `hidden` is checked once against the input method
- * (the reading's `unlocated`); when it says shown, the report says the keyboard
- * could not be placed.
- * Nothing is judged against it — there is no frame — and nothing is
- * pressed. Not on a default clean stop: a witness query on every one buys a
- * sentence nobody acts on.
+ * The unlocated keyboard (ui-tree/keyboard-cover.ts#UNLOCATED_KEYBOARD — the input method says shown, the window state
+ * gives it no area: one still coming up? not measured. Not the floating keyboard: measured on API 33, a floating Gboard
+ * keeps a band and its panel is read from the window's touchable region, `offeredKeyboard`): on a failed stop, and on a
+ * `fully: true` stop — where the answer changes what the reader does next — a window reading `hidden` is checked once
+ * against the input method (the reading's `unlocated`); when it says shown, the report says the keyboard could not be
+ * placed. Nothing is judged against it — there is no frame — and nothing is pressed. Not on a default clean stop: a
+ * witness query on every one buys a sentence nobody acts on.
  *
  * The eyes (ui-tree/eyes.ts; live case k7, ADR 0013): a stop about to say
  * "fully visible" on a target laid flush with a node drawn after it outside
@@ -326,7 +303,6 @@ export async function scrollUntilVisible(
     const readStarted = Date.now();
     const read = await readTreeOrMiss(adapter);
     const readMs = Date.now() - readStarted;
-    // This round's read with the window manager's mark on its tree; a miss as it came.
     const markedRead = read.tree === undefined ? read : { tree: await window.mark(read.tree, () => matched || matchesToJudge(read.tree, target).length > 0) };
     // The round's screen box (swipe.ts#screenBox), read once and handed to
     // the round whole (`RoundSeen.screen`): the frame it judges in and the
@@ -398,22 +374,19 @@ export async function scrollUntilVisible(
       throw scrollFailure(outcome, describe, opts.remedy);
     }
     if (step.do === 'stroke') {
-      // The stroke is the round's, made by its plan (`step.points`, interact/stroke-plan.ts#planStroke, or
-      // #planProbe for the flush check): over the target's scroll view met with this round's screen box and kept
-      // above the keyboard and what is drawn over that scroll view, or the screen box whole — decided once, there,
-      // with the points the plan asked the scene about at their touch-down; here they are only sent, as they are, and
-      // handed back as the next round's `drawn`. No points: this round had no screen box to stroke in. `toward`
-      // names where the CONTENT lies — the finger moves the other way (content below → finger up; swipe.ts#swipeVector).
-      // Under a cover the stroke is swipe.ts#swipeVectorAbove's (the iOS device check): the uncovered box's stroke,
-      // its touch-down never inside the keyboard clearance nor higher than without a keyboard — the stroke over the
-      // box above it alone touched down in the app's top bar for a content-up scroll. A 0×0 viewport does not throw
-      // above (pre-existing): the stroke then falls back to the tree's window while the stop still judges against
-      // 0×0.
-      // Drawn at the adapter's drag speed when it has one (Android:
-      // adapters/android.ts#dragSpeed has the measured fling and
-      // the time it costs), so one stroke moves the content about its own
-      // length and a row cannot cross the list between two reads; else at
-      // the adapter's default duration (iOS). A feeler or a paced stroke over the time its plan gives it
+      // The stroke is the round's, made by its plan (`step.points`, interact/stroke-plan.ts#planStroke, or #planProbe
+      // for the flush check): over the target's scroll view met with this round's screen box and kept above the
+      // keyboard and what is drawn over that scroll view, or the screen box whole — decided once, there, with the
+      // points the plan asked the scene about at their touch-down; here they are only sent, as they are, and handed
+      // back as the next round's `drawn`. No points: this round had no screen box to stroke in. `toward` names where
+      // the CONTENT lies — the finger moves the other way (content below → finger up; swipe.ts#swipeVector). Under a
+      // cover the stroke is swipe.ts#swipeVectorAbove's (the iOS device check): the uncovered box's stroke, its
+      // touch-down never inside the keyboard clearance nor higher than without a keyboard — the stroke over the box
+      // above it alone touched down in the app's top bar for a content-up scroll. A 0×0 viewport does not throw above:
+      // the stroke then falls back to the tree's window while the stop still judges against 0×0. Drawn at the adapter's
+      // drag speed when it has one (Android: adapters/android.ts#dragSpeed has the measured fling and the time it
+      // costs), so one stroke moves the content about its own length and a row cannot cross the list between two reads;
+      // else at the adapter's default duration (iOS). A feeler or a paced stroke over the time its plan gives it
       // (`step.durationMs`, interact/stroke-plan.ts#FEELER, #PACED), whatever the adapter's: slow, so a sheet the tree
       // does not list springs back, and on idb's flat list a full stroke does not fling past every row it listed (D20).
       const { points, durationMs } = step;

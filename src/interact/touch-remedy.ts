@@ -9,9 +9,7 @@ import { cutRemedy, dismissKeyboardFirstText, hideClause, keyboardUpText, riding
  * THE TOUCH REMEDY's sentence (A26): what the tap's refusal and `scroll_until`'s stop say to do about a target that
  * stands `cut` or `covered` — one function of the standing (ui-tree/standing.ts#TouchRemedied: its kind, its remedy,
  * its cut's `by` and `within`, its cover) and the soft keyboard when it is up (`KeyboardUp`), so the two touch verbs
- * cannot word one target two ways. Before A26 the tap (tap-judgement.ts#tapOutcome), `scroll_until`'s `overlapped`
- * stop and its sliver failures (scroll-text.ts) each routed (kind, remedy, cut.by, keyboard) to a sentence, and the
- * failure's quote of the tap ("a tap refuses it so cut …") had drifted from it: a container's cut lacked its way past.
+ * cannot word one target two ways.
  *
  * The cases, the remedy decided by ui-tree/standing.ts#Remedy (THE PRECEDENCE), worded here:
  * - `presented` (any kind): that screen's (ui-tree/remedy-text.ts#presentedOr).
@@ -60,9 +58,7 @@ const INHERITED_CUT_WAY_PAST =
   'if what it lies in is whole and only its content runs to that edge, no scroll shows more: tap something in it that lies clear of that edge, or tap by coordinates';
 
 /**
- * THE WAY PAST a cut, should the node only READ cut — what no scroll changes, so what a tap does instead: the clause
- * the touch remedy puts in parentheses after its scroll (`touchRemedyText`), and the one `scroll_until`'s stuck failure
- * quotes of the tap when the content is exhausted and the scroll half is moot (scroll-text.ts#failureText).
+ * THE WAY PAST a cut, should the node only READ cut — what no scroll changes, so what a tap does instead.
  * - At a clipping container's edge (`Cut.by` absent): the node that is whole, its own content running to the edge
  *   (geometry.ts#evidentCut's residual) — a child that lies CLEAR of that edge, or a coordinate tap: a child flush
  *   with it inside a sliver cut there is refused too (geometry.ts#Clips.cutSliver's inherited cut, `Cut.within`;
@@ -79,8 +75,8 @@ export const cutWayPast = (cut: Cut): string =>
  * The remedy for a node cut (`cut`) by a node drawn after it (`Cut.by`, here `by`) whose standing's remedy is `scroll`
  * (ui-tree/standing.ts#Remedy): with the soft keyboard up and that node riding on it (target-text.ts#ridingKeyboard),
  * dismiss it first, or scroll the list (target-text.ts#dismissKeyboardFirstText); else scroll the list — `scroll_until
- * it out from under that container first`, with the cut's way past (`cutWayPast`). Not target-text.ts#cutRemedy's
- * scroll toward the edge: the rest lies under the node, not past the edge of anything that scrolls.
+ * it out from under that <role> first`, with the cut's way past (`cutWayPast`). Not target-text.ts#cutRemedy's scroll
+ * toward the edge: the rest lies under the node, not past the edge of anything that scrolls.
  */
 function cutByRemedy(cut: Cut, by: UiNode, up: KeyboardUp | undefined, minPiece: number): string {
   const way = `scroll_until it out from under that ${by.role} first (${cutWayPast(cut)})`;
@@ -116,13 +112,12 @@ function stackedOnKeyboard(by: UiNode, { lineY }: KeyboardUp): boolean {
   return gap >= 0 && gap <= by.rect.height;
 }
 
-/** `the soft keyboard is up (its top edge at y 1398): hiding it may move that button (press_key back …)` — `cutByPinnedRemedy`'s for a node not read as riding on it. */
+/** `the soft keyboard is up (its top edge at y 1398): hiding it may move that button (press_key back …)`, for a node not read as riding on it. */
 const keyboardMayMoveText = ({ lineY, remedy }: KeyboardUp, by: UiNode): string => `${keyboardUpText(lineY)}: hiding it may move that ${by.role} (${hideClause(remedy)})`;
 
 /**
  * THE riding-keyboard choice of every cut-by sentence: `riding`, told "dismiss it first" (target-text.ts#dismissKeyboardFirstText),
- * when `by` rides on the soft keyboard (target-text.ts#ridingKeyboard); else `not`. The tap's remedy and the stuck
- * failure's (`stuckCutText`) word the two cases around it.
+ * when `by` rides on the soft keyboard (target-text.ts#ridingKeyboard); else `not`.
  */
 function ridingFirst(by: UiNode, up: KeyboardUp | undefined, minPiece: number, riding: (dismiss: string) => string, not: string): string {
   const keyboard = ridingKeyboard(by, up, minPiece);
@@ -156,12 +151,12 @@ const SMALL_CHILD_FRACTION = 0.25;
 
 /**
  * The remedy for a target under a WRAPPER that may only position its one child: a structural node (`container`,
- * `other`) whose only child is a control (selectors.ts#isInteractive) of some area, at most `SMALL_CHILD_FRACTION` of its own —
- * Android's floating action button host (Clock's `fab_container` 1080x352 holding its 264x264 FAB, 18 % of it). Such a
- * wrapper still counts as drawn over its whole rect (draw-order.ts's `structural` row: the tree cannot tell it from a
- * tab bar's host that swallows touches), so the refusal stands; this says what to do instead of only scrolling. A host
- * of several children — a tab bar's — gets none. Undefined when the cover is no such wrapper. Said by the tap only
- * today: `scroll_until` scrolls a target its cover's `scroll` remedy may free.
+ * `other`) whose only child is a control (selectors.ts#isInteractive) of some area, at most `SMALL_CHILD_FRACTION` of
+ * its own — Android's floating action button host (Clock's `fab_container` 1080x352 holding its 264x264 FAB, 18 % of
+ * it). Such a wrapper still counts as drawn over its whole rect (draw-order.ts's `structural` row: the tree cannot tell
+ * it from a tab bar's host that swallows touches), so the refusal stands; this says what to do instead of only
+ * scrolling. A host of several children — a tab bar's — gets none. Undefined when the cover is no such wrapper. Not
+ * said by `scroll_until`: it scrolls a target its cover's `scroll` remedy may free.
  * The trade-off as the agent reads it: skill/references/tools.md, the `tap` section.
  */
 function positionerRemedy(cover: UiNode): string | undefined {

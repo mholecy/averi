@@ -1,8 +1,6 @@
 /**
- * The field found again on a fresh read — every read a fill makes of its field after the focus tap (A28: until then
- * a closure in fill.ts, its twin fallback a function beside it, and why the field was lost a mutable variable the
- * read-back read off it while the clear got `{ lost }` explicitly). One answer a read (fill-facts.ts#FieldRead): the
- * node, or why it was not found (`LostWhy`).
+ * The field found again on a fresh read — every read a fill makes of its field after the focus tap (A28). One answer
+ * a read (fill-facts.ts#FieldRead): the node, or why it was not found (`LostWhy`).
  *
  * Interface: `fieldRefetch(…) → FieldRefetch` — `read()`, `typingStarts()`, `lastTree()`. The rules it owns:
  * - by the selector first (resolveNow on the fresh tree: the one-shot mode of the policy that chose the field);
@@ -37,18 +35,18 @@ export type TwinGuard =
  * The node chosen at focus, found again in a fresh tree by identity — same
  * role, identifier and rect, exactly one such node. The read-back's
  * fallback when the selector no longer matches: a `value:"…"` selector
- * stops matching the moment the clear or the typing changes the value, and
- * until 2026-10-08 that read as "nothing there" (a clear counted as done,
- * a read-back as unverifiable). A field that MOVED (the keyboard pushed the
- * form up) is not found this way and stays unverifiable, as before.
+ * stops matching the moment the clear or the typing changes the value, which
+ * would otherwise read as "nothing there" (a clear counted as done, a
+ * read-back as unverifiable). A field that MOVED (the keyboard pushed the
+ * form up) is not found this way and stays unverifiable.
  *
  * Identity is not screen identity: RN forms share one id across fields
  * (`TextFieldWithComponentStyle`), so a NEXT screen with a field at the same
- * rect is a twin too (review 2026-10-08: typing that navigated read the next
- * screen's field). After typing it is therefore asked only while the
- * screen's identity (ui-tree/read-tree.ts#ScreenIdentity) is still the
- * last pre-typing read's (`sameScreen`) — and not at all when nothing was read
- * before typing (`TwinGuard`). The limit: a next screen with the very same set of
+ * rect is a twin too (typing that navigated read the next screen's field).
+ * After typing it is therefore asked only while the screen's identity
+ * (ui-tree/read-tree.ts#ScreenIdentity) is still the last pre-typing read's
+ * (`sameScreen`) — and not at all when nothing was read before typing
+ * (`TwinGuard`). The limit: a next screen with the very same set of
  * identified nodes still passes.
  */
 export function sameField(tree: UiNode, chosen: UiNode): UiNode | undefined {

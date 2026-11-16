@@ -8,13 +8,12 @@ import { usableScreenOf, type UsableScreen } from '../ui-tree/usable-screen.js';
 // the stroke and its sentences read the way from here, the words (`SIDES`) from there.
 export type { Direction } from '../ui-tree/sides.js';
 
-/** Each direction's opposite — the finger's way for a content-meaning swipe, the stroke that brings back a target a fling carried past, the status-bar failure's hint. One map, read by every module that turns a direction round. */
+/** Each direction's opposite. One map, read by every module that turns a direction round. */
 export const OPPOSITE: Readonly<Record<Direction, Direction>> = { up: 'down', down: 'up', left: 'right', right: 'left' };
 
 /**
  * The edge past which lies the content a scroll toward `direction` (where the content lies) brings in — its top for
- * `up`: `SIDES[…].reveals` read the other way (pinned against it in tests/interact/swipe.test.ts). Read by the end
- * proof (stroke-plan.ts#strokedContent) and its sentences (scroll-text.ts).
+ * `up`: `SIDES[…].reveals` read the other way (pinned against it in tests/interact/swipe.test.ts).
  */
 export const EDGE_TOWARD: Readonly<Record<Direction, Edge>> = { up: 'top', down: 'bottom', left: 'left', right: 'right' };
 
@@ -41,11 +40,6 @@ export type SwipeMeaning = 'finger' | 'content';
  */
 export const SWIPE_REACH_FRACTION = 0.3;
 
-/**
- * The from/to points of a swipe across `box`, `SWIPE_REACH_FRACTION` of the
- * box either side of centre. Pure; `swipeScreen` and the scroll loop both
- * call it.
- */
 export function swipeVector(box: Rect, direction: Direction, meaning: SwipeMeaning): Stroke {
   const cx = Math.round(box.x + box.width / 2);
   const cy = Math.round(box.y + box.height / 2);
@@ -199,10 +193,8 @@ export function dragMs(stroke: Stroke, speed: number, screen: { width: number; h
 }
 
 /**
- * The same stroke: the same touch-down and the same lift-off, point for
- * point. For `scroll_until`'s "the same stroke twice" (interact/scroll-rounds.ts#
- * UNMOVED_STROKES_EXHAUST) — points, not the strokes' spelling (a
- * `JSON.stringify` comparison would read key order too).
+ * Compares points, not the strokes' spelling (a `JSON.stringify` comparison would read key order too), for
+ * `scroll_until`'s "the same stroke twice" (interact/scroll-rounds.ts#UNMOVED_STROKES_EXHAUST).
  */
 export const sameStroke = (a: Stroke, b: Stroke): boolean =>
   a.from.x === b.from.x && a.from.y === b.from.y && a.to.x === b.to.x && a.to.y === b.to.y;
@@ -259,8 +251,7 @@ export interface ScreenBox {
  * note saying so.
  *
  * With no usable screen it THROWS, naming both causes; nothing is swiped.
- * `read` is the read the caller already made: `swipeScreen` makes one, the
- * scroll loop hands in its round's.
+ * `read` is the read the caller already made.
  */
 export async function screenBox(adapter: Pick<DeviceAdapter, 'viewport'>, read: TreeRead): Promise<ScreenBox> {
   let device: DeviceScreen | undefined;
@@ -307,7 +298,6 @@ export interface SwipeOptions {
   durationMs?: number;
 }
 
-/** What `swipeScreen` drew, for the caller's report. */
 export interface ScreenSwipe extends Stroke {
   /** `ScreenBox.note` — set only when the box was not witnessed as the screen. */
   note?: string;

@@ -7,24 +7,14 @@ import { loadConfig, loadConfigIfPresent, loadProjectConfig, projectConfigPath, 
 
 /**
  * What one MCP tool call reads of averi.yaml — declared once per tool, and
- * carried out by one function, at most once per call (2026-10-08, MCP-surface
- * review candidate 1).
- *
- * Until then each handler picked its loader by hand, and there were four
- * policies on the surface: none, the lenient iOS-only lookup
- * (`iosToolSettingsFor`), the strict project load (averi.yaml plus
- * `.env.averi`), and that strict load under a catch-all. Two of them could
- * meet in one call: an iOS `assert` read the file through the lenient lookup
- * for its tree source and then again, strictly and with `.env.averi`, for
- * its health line — which needs no credentials. And the catch-alls judged one
- * broken file two ways: an iOS `assert` beside an invalid averi.yaml failed
- * (the lookup threw before a device was bound) while an Android `assert`
- * beside the same file passed and silently dropped the health line; a
- * `launch_app` beside it silently lost `app.android.activity` — the
- * LeakCanary case the tool's description warns about — while `install_app`
- * without a path failed loudly on the same file. Both catch-alls carried a
- * dated note naming their narrowing as a follow-up that "belongs together";
- * this module is where it is written once.
+ * carried out by one function, at most once per call. With a loader picked
+ * per handler, two reads could meet in one call (an iOS `assert` reading the
+ * file for its tree source and again, strictly and with `.env.averi`, for its
+ * health line — which needs no credentials), and one broken file would be
+ * judged differently from tool to tool and platform to platform: one call
+ * would fail on it while another would silently drop what it came for (a
+ * `launch_app` losing `app.android.activity` — the LeakCanary case the
+ * tool's description warns about).
  *
  * The rule, for every tool and both platforms:
  *
@@ -34,17 +24,17 @@ import { loadConfig, loadConfigIfPresent, loadProjectConfig, projectConfigPath, 
  *   flows. A call that would use nothing reads nothing, so a broken file
  *   beside it is not its business (`tap` on Android, `launch_app` with an
  *   activity named on Android, `install_app` with a path on Android). On iOS
- *   every tool that touches the device uses the tree source (D41, 2026-11-01;
- *   see mcp/config-policy.ts).
+ *   every tool that touches the device uses the tree source (D41; see
+ *   mcp/config-policy.ts).
  * - Whatever a call reads, a present-but-invalid file FAILS it, naming the
  *   file — under `optional` as under `required`. Silently ignoring a broken
  *   config would lose the very setting the call came for.
- * - `optional` (the tools that predate averi.yaml and keep working without
- *   one): a MISSING file is no config, and the call proceeds on the defaults.
- *   `required`: a missing file fails the call too.
- * - `.env.averi` is read only by the tools that resolve credentials (the
- *   engine tools: ensure_state, run_flow, verify) — `env: true`, only with
- *   `required`, since credentials without a config have nothing to fill.
+ * - `optional` (the tools that predate averi.yaml, so must keep working
+ *   without one): a MISSING file is no config, and the call proceeds on the
+ *   defaults. `required`: a missing file fails the call too.
+ * - `.env.averi` is read only by the tools that resolve credentials —
+ *   `env: true`, only with `required`, since credentials without a config
+ *   have nothing to fill.
  *
  * Android and iOS differ only where the tool uses different values on them —
  * the tree tools read the tree source and dismissals, which exist on iOS
@@ -54,13 +44,11 @@ import { loadConfig, loadConfigIfPresent, loadProjectConfig, projectConfigPath, 
  * Where each half lives: the policy VOCABULARY (`ConfigPolicy` and its four
  * values), the one read it drives (`loadForCall`) and the pure settings over
  * what was read (`iosToolSettings`) are here, because which file is read and
- * when its absence is tolerated is config policy — the reason
- * `iosToolSettingsFor` moved down from the MCP layer on 2026-10-03. The
- * MAPPING from tool to policy is keyed by MCP tool names, so it lives beside
- * the registrations, in mcp/config-policy.ts#TOOL_CONFIG (review round 1);
- * a tool that is not in that table never reads averi.yaml, and
- * tests/mcp/tools.test.ts pins that the table's tools are exactly the ones
- * whose schema takes a `configPath`.
+ * when its absence is tolerated is config policy. The MAPPING from tool to
+ * policy is keyed by MCP tool names, so it lives beside the registrations, in
+ * mcp/config-policy.ts#TOOL_CONFIG; a tool that is not in that table never
+ * reads averi.yaml, and tests/mcp/tools.test.ts pins that the table's tools
+ * are exactly the ones whose schema takes a `configPath`.
  */
 
 /**
@@ -93,8 +81,8 @@ interface MaybeConfig {
  *
  * Typed by the policy, so a `required` caller gets a config it need not
  * check and an `env: true` caller an environment. The result is handed down
- * as a value — runAsserts, runEnsureState and runNamedFlow take it rather
- * than a path — so nothing below the handler reads the file a second time.
+ * as a value, not a path, so nothing below the handler reads the file a
+ * second time.
  */
 export function loadForCall(policy: typeof REQUIRED_CONFIG_AND_ENV, configPath?: string): Promise<ProjectConfig>;
 export function loadForCall(policy: typeof REQUIRED_CONFIG, configPath?: string): Promise<{ cfg: AveriConfig; env: undefined }>;
@@ -125,11 +113,7 @@ export interface IosToolSettings {
 
 /**
  * The iOS settings of a config the call has already read — pure, so the read
- * stays the policy's (`loadForCall`) and happens once. Until 2026-10-08 this
- * was `iosToolSettingsFor(platform, configPath)`, which read the file itself
- * under its own copy of the lenient policy; K3 (2026-10-07) had already made
- * it one read for tap and type_text, and the `assert` tool's second read, for
- * the health line, is why the read moved out of it altogether.
+ * stays the policy's (`loadForCall`) and happens once.
  *
  * Android gets neither field even from a config that names them: it has no
  * tree source, and its keyboard guard is the oracle's and never looks at a

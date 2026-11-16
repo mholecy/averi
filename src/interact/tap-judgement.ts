@@ -17,9 +17,7 @@ import { touchRemedyText } from './touch-remedy.js';
 
 /**
  * THE tap judgement of a resolved node — the rule every tap on one shares,
- * applied by keyboard.ts#resolveClearOfKeyboard (behind `tapElement`, the
- * flow `tap:` step and the MCP `tap` tool, and `fillField`'s focus tap), one
- * `judgeTap` per look: where the node stands for a tap is the scene's
+ * one `judgeTap` per look: where the node stands for a tap is the scene's
  * (ui-tree/standing.ts#Scene.standing, `{ of: 'tap' }`), and what the tap
  * does about each kind of standing is ONE switch (`tapOutcome`): on the
  * screen, then cut, cover, keyboard.
@@ -107,11 +105,9 @@ import { touchRemedyText } from './touch-remedy.js';
  * pressed …`, `id:"login_title" was tapped …` (`Hiding.sent`) — fronts every
  * refusal's headline: the target was not tapped, but something was.
  *
- * Its interface: `judgeTap` (and its `TapJudge`), `tapStandings` (the
- * dismissal picker asks it too, keyboard-dismissal.ts#configuredStrategy), the
- * three refusals, `Aim` and `movedTapText`. What it judges is found and
- * settled by resolve.ts; the cut and side phrases it shares with
- * `scroll_until` and the picker are target-text.ts's.
+ * What it judges is found and settled by resolve.ts; the cut and side
+ * phrases it shares with `scroll_until` and the picker are
+ * target-text.ts's.
  */
 
 // ─── The refusals ────────────────────────────────────────────────────────────
@@ -195,16 +191,13 @@ export type TapReading = LookReading & Pick<KeyboardReading, 'remedy'>;
  * - `full()`, judged with the reading's line merged in
  *   (`KeyboardPosition.readingLine`, asked once per position) — `first`
  *   itself when the merge changes no line (the same `y` and `witnessed`).
- * The one expression of "the tap's standing with the reading's line": the
- * tap asks `full()` only when its centre is covered (`judgeTap`), the
- * dismissal picker always (keyboard-dismissal.ts#configuredStrategy).
+ * The one expression of "the tap's standing with the reading's line".
  */
 export interface TapStandings {
   readonly first: TapStanding;
   full(): Promise<TapStanding>;
 }
 
-/** The tap's two standings of `node` (`TapStandings`) on `screen`, over `look`'s scene, its keyboard line the look's keyboard position's. */
 export function tapStandings(look: Pick<Look, 'scene' | 'keyboard'>, node: UiNode, screen: UsableScreen | undefined): TapStandings {
   const { scene, keyboard } = look;
   const own = keyboard.line(node);
@@ -279,7 +272,6 @@ export async function judgeTap(adapter: Pick<DeviceAdapter, 'viewport'>, target:
   const judge = (on: UsableScreen | undefined, standings: TapStandings): TapJudge => ({
     screen: on,
     async aim() {
-      // The reading's line only for a covered centre of a target on the screen and not cut.
       const judged = async ({ first, full }: TapStandings): Promise<TapStanding> => (!offTheScreen(first) && first.kind !== 'cut' && first.facts.centreCover !== undefined ? full() : first);
       // Covered by a control the listing does not order: the eyes, once, then judged again on the order they saw (ADR 0024).
       // judgedWithOrder judges `look` itself first — the untold look, whose standings are already built — and then, only
@@ -324,15 +316,16 @@ interface JudgedScreen {
 }
 
 /**
- * THE switch — what a tap does on each kind of standing (the module's
- * doc): the point it goes to (`Aim`), or the refusal it throws. One
- * exhaustive switch over `TapStanding`: a new kind fails to compile here.
- * `judgeTap` acts on the first row itself, before the guard; every other
- * row is `TapJudge.aim`'s, after it. `judgedScreen` is asked on the first
- * row only — which `aim` never reaches at runtime — its standing passed the
- * on-screen rule, and `full()` changes only the keyboard line — only the
- * type admits it. `keyboard`: the soft keyboard when it is up, asked by
- * `aim` only for a cut by a node drawn after it, whose remedy names it.
+ * THE switch — what a tap does on each kind of standing (the module's doc):
+ * the point it goes to (`Aim`), or the refusal it throws. One exhaustive
+ * switch over `TapStanding`: a new kind fails to compile here. `judgeTap`
+ * acts on the first row itself, before the guard; every other row is
+ * `TapJudge.aim`'s, after it. `aim` reaches the first row only for a centre
+ * outside its scroll view (any other off-screen standing was refused by
+ * `judgeTap`, and `full()` changes only the keyboard line), whose refusal
+ * does not read the screen: `judgedScreen` is called there and its answer
+ * unused. `keyboard`: the soft keyboard when it is up, asked by `aim` only
+ * for a cut by a node drawn after it, whose remedy names it.
  */
 function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => JudgedScreen, keyboard?: KeyboardUp): Aim {
   const { centre } = standing.facts;
@@ -389,7 +382,6 @@ function offScreenRefusal(standing: OffTheScreen, { node, refusal }: Told, { jud
   }
   const { at, visible } = standing;
   if (outsideItsScrollView(standing)) {
-    // On the screen, but outside what its scroll view draws: that scroll view's edge is the edge.
     const drawn =
       visible > 0
         ? `only ${Math.round(visible * 100)}% of it (rect ${rectText(node.rect)}) is drawn, and a tap goes to its centre — ${presentedOr(standing.remedy, 'touch', () => 'scroll_until it with fully: true first')}`
@@ -409,14 +401,14 @@ function offScreenRefusal(standing: OffTheScreen, { node, refusal }: Told, { jud
  * What to do about a target whose centre lies under a system bar (the bar
  * at `edge`), said as far as the tree knows it — the standing's remedy
  * (ui-tree/standing.ts#Remedy, which asks the tree's scroll ancestry,
- * geometry.ts#Clips.inScroller), rendered: the refusal had said
- * `scroll_until it first` of a button pinned at the top, which no scroll
- * moves. In a scroll view (`scroll`), `scroll_until` moves it out from
- * under the bar; in none (`pinned`), it is pinned there — a layout that
- * does not keep clear of the bar — and no step reaches it; where the tree
- * cannot say (`stuck`: idb's flat list), both. The refusal stays a refusal
- * either way — the safe direction, and terminal in an `optional:` step
- * (flow/engine.ts). Only these three: beneath a presented screen
+ * geometry.ts#Clips.inScroller), rendered, so a button pinned at the top,
+ * which no scroll moves, is not told `scroll_until it first`. In a scroll
+ * view (`scroll`), `scroll_until` moves it out from under the bar; in none
+ * (`pinned`), it is pinned there — a layout that does not keep clear of the
+ * bar — and no step reaches it; where the tree cannot say (`stuck`: idb's
+ * flat list), both. The refusal stays a refusal either way — the safe
+ * direction, and terminal in an `optional:` step (flow/engine.ts). Only
+ * these three: beneath a presented screen
  * ui-tree/remedy-text.ts#presentedOr says that screen's remedy instead.
  */
 function systemBarRemedy(edge: SystemBar['edge'], remedy: ScrollableRemedy): string {

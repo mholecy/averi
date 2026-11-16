@@ -5,21 +5,13 @@
  * its types — fill.ts measures (and imports fill-text.ts for the words of
  * the errors it throws, `fillFailureText` over a `FillFailure` here),
  * fill-landing.ts judges a reading, fill-verdict.ts judges the result,
- * fill-text.ts says. Until
- * 2026-10-09 these types lived in fill.ts, which imported fill-verdict.ts
- * by value while fill-verdict.ts imported them back as types: no runtime
- * cycle, but a cycle in the module graph all the same (code review of the
- * deepening series, S8).
+ * fill-text.ts says.
  *
- * Two functions live here beside the types, `heldText` and `shownText`: not
- * judgements but the DEFINITIONS every measurement of a field is taken in —
- * what it shows of a node (`shownText`, A28: fill.ts's and the typing's one
- * rule), and what it holds as opposed to what it shows (`heldText`) — so the
- * driver (fill.ts), the clear's rules
- * (fill-clear.ts) and the mismatch's classifier
- * (fill-landing.ts#readingOf) count the same characters (2026-10-09,
- * the fill-clear deepening; it was a closure inside fillField until then,
- * and only fillField could ask it).
+ * Beside the types live `heldText` and `shownText` (and the small `isPoint`
+ * and `hasPoint` guards): not judgements but the DEFINITIONS every
+ * measurement of a field is taken in — what it shows of a node (`shownText`,
+ * A28), and what it holds as opposed to what it shows (`heldText`) — so
+ * every module that measures a field counts the same characters.
  */
 
 import type { Rect, UiNode } from '../adapters/types.js';
@@ -57,20 +49,18 @@ export interface NearbyInput {
  * (verified or not, and why; the head verb; what the clear sent) is decided
  * once by interact/fill-verdict.ts#judgeFill, and every sentence about them
  * is interact/fill-text.ts's, the one renderer of the MCP reply and the flow
- * line, and neither restates the request. Until 2026-10-08 both printed the REQUESTED
- * `clear` ("cleared first", "(cleared)") and an unreadable read-back passed
- * as landed: on iOS idb a floating-label `text` node was "Filled … (22
- * characters, cleared first)" with nothing cleared and nothing typed
- * (docs/bugs/2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md).
- * Until 2026-10-09 the masked-append finding was a sentence here
- * (`warning`), and the typed length was glued on by each caller.
+ * line, and neither restates the request: a reply that printed the REQUESTED
+ * `clear` ("cleared first", "(cleared)") and passed an unreadable read-back
+ * as landed said "Filled … (22 characters, cleared first)" of a
+ * floating-label `text` node on iOS idb, with nothing cleared and nothing
+ * typed (docs/bugs/2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md).
  */
 export interface FillResult {
   /** How the field was chosen when several nodes matched (see resolveNow). */
   note?: string;
   /** The soft keyboard covered the field and was hidden before the focus tap (keyboard.ts: `back`, or a configured dismissal tapped) — the sentence, also in `note`. */
   keyboardHidden?: string;
-  /** The focus tap went elsewhere than the field's centre, a node of the app being drawn over it (tap-judgement.ts#TapJudge.aim, 2026-10-09) — the clause, also in `note` as `focus tap <moved>`. */
+  /** The focus tap went elsewhere than the field's centre, a node of the app being drawn over it (tap-judgement.ts#TapJudge.aim) — the clause, also in `note` as `focus tap <moved>`. */
   moved?: string;
   /**
    * The fill was legal but suspicious: a masked field already held `held`
@@ -86,13 +76,13 @@ export interface FillResult {
    * With `clear` only (absent otherwise): how many characters the input held
    * when the clear began — what clearText deleted, the field verified empty
    * after unless `readBack` is `lost` (the read after a delete did not find
-   * the field: nothing then says the field is empty — review 2026-10-08,
-   * m-1, a field the keyboard moved still held `XX` behind "cleared 7
-   * characters first"); 0 when it held none (an input's null value is an empty one: the
-   * adapters turn "" into null), or when the first round of deletes changed
-   * nothing (fill-clear.ts#ClearFacts, `clearUnchanged`). `unmeasured` when the matched node is not
-   * an input: its length is not the field's — a label's text, or no value
-   * at all — so no delete was sent (review 2026-10-08: deletes counted off a
+   * the field: nothing then says the field is empty — a field the keyboard
+   * moved still held `XX` behind "cleared 7 characters first"); 0 when it
+   * held none (an input's null value is an empty one: the adapters turn ""
+   * into null), or when the first round of deletes changed nothing
+   * (fill-clear.ts#ClearFacts, `clearUnchanged`). `unmeasured` when the
+   * matched node is not an input: its length is not the field's — a label's
+   * text, or no value at all — so no delete was sent (deletes counted off a
    * WDA label's text went into whatever had focus, and a label with no value
    * read as an empty field).
    */
@@ -104,16 +94,15 @@ export interface FillResult {
    * placeholder as its value (every tree source does, measured 2026-10-09:
    * docs/bugs/2026-10-09-android-clear-reads-edittext-hint-as-content.md),
    * or it ignores deletes (read-only, an IME that drops them); the tree
-   * cannot tell the two apart. Until 2026-10-09 the loop threw `field still
-   * shows N characters after clearing twice` here — on every hinted stock
-   * EditText and every iOS field reporting a placeholder, after the field
-   * had in fact emptied. With a value typed after it, the exact read-back
-   * decides (a field that ignores deletes fails there); judgeFill makes it
-   * a reason only when the read-back did not land. `deletes`: every delete
-   * the clear sent, all rounds — the unchanged one included, which deleted
-   * nothing anyone saw (so when it was the FIRST round, `cleared` is 0:
-   * review of this branch, probe J — "cleared 9 characters first" of an
-   * empty hinted field). Never set on a MASKED reading: bullets are no
+   * cannot tell the two apart. Throwing `field still shows N characters after
+   * clearing twice` here would fail every hinted stock EditText and every iOS
+   * field reporting a placeholder, after the field had in fact emptied. With
+   * a value typed after it, the exact read-back decides (a field that ignores
+   * deletes fails there); judgeFill makes it a reason only when the read-back
+   * did not land. `deletes`: every delete the clear sent, all rounds — the
+   * unchanged one included, which deleted nothing anyone saw (so when it was
+   * the FIRST round, `cleared` is 0: probe J — "cleared 9 characters first"
+   * of an empty hinted field). Never set on a MASKED reading: bullets are no
    * hint, and an unchanged masked field fails as clear-twice
    * (fill-clear.ts, `deletesChangedNothing`).
    */
@@ -130,18 +119,17 @@ export interface FillResult {
    * - `other`: they went into one that did not — only an empty field
    *   shows the placeholder then.
    * A fact, not a verdict: judgeFill makes `shown` and `prefix` the
-   * `placeholder` reason of a clear alone (2026-10-09; until then fill.ts
-   * decided it and reported a `placeholder` read-back).
+   * `placeholder` reason of a clear alone.
    */
   clearPlaceholder?: ClearPlaceholder;
   /** How the typed text was checked (`ReadBack`). */
   readBack: ReadBack;
   /**
    * The read-back landed only after the field's DROPPED TAIL was typed again
-   * (interact/fill-type.ts, 2026-10-19): each retyped tail by its length, in
-   * order; absent when nothing was typed again. A field that keeps a strict
-   * prefix of the typing — React Native's controlled single-line TextInput
-   * under `idb ui text`, docs/bugs/2026-10-19-ios-fill-loses-the-tail-of-its-
+   * (interact/fill-type.ts): each retyped tail by its length, in order;
+   * absent when nothing was typed again. A field that keeps a strict prefix
+   * of the typing — React Native's controlled single-line TextInput under
+   * `idb ui text`, docs/bugs/2026-10-19-ios-fill-loses-the-tail-of-its-
    * text-in-a-react-native-single-line-field.md. A length, never content.
    */
   retyped?: number[];
@@ -213,24 +201,25 @@ export type ClearPlaceholder = 'shown' | 'prefix' | 'other';
  * - `screen-changed`: after typing, the screen's set of identified nodes
  *   (ui-tree/read-tree.ts#ScreenIdentity) was no longer the one read before typing, so the
  *   identity fallback refused — the measured case (an inline error label
- *   going away, a notice or the keyboard's own ids arriving).
+ *   going away, a notice or the keyboard's own ids arriving); or, with
+ *   nothing read before typing, no longer the one the field was resolved on.
  * - `unmatched`: the selector no longer matches and no single node of the
  *   field's role, id and rect is on the screen (the field moved, or has a
- *   twin), or nothing was read before typing to compare the screen with.
+ *   twin), or nothing was read before typing and the screen is not shown to
+ *   differ from the one the field was resolved on.
  */
 export type LostWhy = 'screen-changed' | 'unmatched';
 
 /**
  * One read of the field after the focus tap (interact/fill-refetch.ts): the node, found by the selector or by
- * identity, or why it was not found (`LostWhy`) — one answer, read by the clear and by the typing alike (A28: until
- * then the typing got the text alone and fill.ts kept the why aside).
+ * identity, or why it was not found (`LostWhy`) — one answer, read by the clear and by the typing alike (A28).
  */
 export type FieldRead = { node: UiNode; lost?: undefined } | { node?: undefined; lost: LostWhy };
 
 /**
  * The text a field's node shows, as the fill compares it. An input's null value is EMPTY (types.ts#UiNode.value —
  * both parsers map "" to null), so a field that dropped every typed character reads "" and fails as a mismatch
- * (`shows 0`), never as `no-value` (2026-10-09, docs/bugs/2026-10-09-android-fill-into-a-field-that-drops-everything-
+ * (`shows 0`), never as `no-value` (docs/bugs/2026-10-09-android-fill-into-a-field-that-drops-everything-
  * reads-exposes-no-value.md: an Android digits-only field fed `abc` passed `optional:`). On any other role null is
  * withheld text: undefined. `isInput`: the matched node's role, as resolved before the tap, is INPUT_ROLE — the
  * field's, whichever read found it.
@@ -239,19 +228,18 @@ export const shownText = (n: Pick<UiNode, 'value'>, isInput: boolean): string | 
 
 /**
  * How the typed text was checked — one fact per kind, the reason carried
- * by the one kind that has one (code review of round 2, 2026-10-08: `lost`
- * was a separate optional field beside `readBack: 'lost'`, so the two could
- * be set apart — a `lost` without its reason was rendered, and pinned, as
- * a sentence with none):
+ * by the one kind that has one (a separate `lost` field beside
+ * `readBack: 'lost'` could be set apart from it, and a `lost` without its
+ * reason rendered as a sentence with none):
  * - `landed`: a fresh tree showed it in the field (see `landed` in fillField).
  * - `no-value`: the node WAS found (by the selector or by identity), is not
  *   an input, and exposed no value on the last read (the poll stops on the
  *   second read that shows none, whether or not a read before it missed the
  *   field) — the text may or may not be there; nothing was compared. An
  *   input with no value is EMPTY (UiNode.value) and compared as "" — never
- *   this kind (2026-10-09). Not to
- *   be confused with `lost` (the last read found no field at all) or with a
- *   read that showed a value (`landed`, `not-taken`, or the mismatch error).
+ *   this kind. Not to be confused with `lost` (the last read found no field
+ *   at all) or with a read that showed a value (`landed`, `not-taken`, or the
+ *   mismatch error).
  * - `not-taken`: the node is not an input and its value does not show the
  *   text — it never moved from what it showed before the tap (a WDA
  *   StaticText echoing its label), or it moved without taking the typing
@@ -262,21 +250,19 @@ export const shownText = (n: Pick<UiNode, 'value'>, isInput: boolean): string | 
  *   fallback (sameField) found no single twin or was not asked; `why` says
  *   which (`LostWhy`). Also set when the clear's own read after a delete
  *   did not find the field and nothing was typed (a clear alone, value
- *   ""): the delete went out, nothing saw the field empty (review
- *   2026-10-08, m-1). Nothing was read, so nothing is known about the
- *   node's value either way. Until 2026-10-08 (iOS device check of the bug
- *   note below) this read as `no-value`, and a textfield that had just had
- *   7 characters deleted and then held the typed text was said to "expose
- *   no value": the refusal was right, the reason blamed the node.
+ *   ""): the delete went out, nothing saw the field empty. Nothing was read,
+ *   so nothing is known about the node's value either way. Not `no-value`:
+ *   on the iOS device check of 2026-10-08, a textfield that had just had 7
+ *   characters deleted and then held the typed text was said to "expose no
+ *   value" — the refusal was right, the reason blamed the node.
  * - `nothing-typed`: the value was empty — a focus (and clear) alone.
- * - `placeholder` (2026-10-09): the read-back's reading is EXACTLY the
- *   field's named placeholder (UiNode.placeholder) and nothing shows more
- *   — the value typed was that very text. Empty, or holding the text: the
- *   tree cannot tell (review of the hint-aware clear, probe B), so it is not
- *   verified. Typed fills only since 2026-10-09 (the fill-clear deepening):
- *   a clear alone that ends on the placeholder is `nothing-typed` with the
- *   fact `clearPlaceholder`, and judgeFill decides whether that is the
- *   `placeholder` reason (probes C and K).
+ * - `placeholder`: the read-back's reading is EXACTLY the field's named
+ *   placeholder (UiNode.placeholder) and nothing shows more — the value
+ *   typed was that very text. Empty, or holding the text: the tree cannot
+ *   tell (review of the hint-aware clear, probe B), so it is not verified.
+ *   Typed fills only: a clear alone that ends on the placeholder is
+ *   `nothing-typed` with the fact `clearPlaceholder`, and judgeFill decides
+ *   whether that is the `placeholder` reason (probes C and K).
  */
 export type ReadBack =
   | { kind: 'landed' }
@@ -289,12 +275,11 @@ export type ReadBack =
 
 /**
  * Why a fill THREW, as facts — the three failures fillField raises, worded
- * by interact/fill-text.ts#fillFailureText like every other fill sentence
- * (until 2026-10-09 they were template strings inline in fill.ts, the last
- * fill sentences outside fill-text.ts). Lengths and counts only, never
- * content: a value may be a credential.
+ * by interact/fill-text.ts#fillFailureText like every other fill sentence.
+ * Lengths and counts only, never the typed value or the field's text: a
+ * value may be a credential.
  * - `reread-failed`: the tree could not be read mid-fill — a dead device,
- *   not a screen settling (fill.ts, `refetch`); `target` is the selector as
+ *   not a screen settling (fill-refetch.ts); `target` is the selector as
  *   the caller wrote it, `cause` the adapter's message. Never a
  *   PersistentReadError: see ui-tree/read-tree.ts#readTreeOrThrow.
  * - `clear-twice`: the delete rounds each CHANGED the field and none emptied
@@ -310,10 +295,9 @@ export type ReadBack =
  *   read-back, in order (`SentAgain`: a dropped tail, the clear's retype —
  *   `wiped` when it deleted what the field held first, else it only typed
  *   again, the field showing nothing or its placeholder), so the error says
- *   the read-back is not the first (round 8's D3 nit, 2026-10-12; until
- *   2026-10-19 the clear's retype alone, `retried`); `elsewhere` another input
- *   that changed while typing — the focus left the field, and nothing was
- *   sent again into it.
+ *   the read-back is not the first (D3); `elsewhere` another input that
+ *   changed while typing — the focus left the field, and nothing was sent
+ *   again into it.
  */
 export type FillFailure =
   | { code: 'reread-failed'; target: string; cause: string }
@@ -352,9 +336,7 @@ export interface OtherInput {
  * it, without carrying either string — classified in ONE module,
  * interact/fill-landing.ts (`readingOf`: all eight kinds of a reading that did
  * not land; `landingOf`'s final `said-plain` carries its `masked-said-plain`
- * itself; until 2026-10-09 fill.ts chose `unchanged`, `masked` and a partly
- * masked `length` in a ternary at the throw, and a helper of its own the
- * rest):
+ * itself):
  * - `masked`: the field shows bullets, compared by length only; `held` the
  *   bullets it held after focus, without `clear` (undefined with it).
  * - `masked-said-plain`: the field shows bullets, though its source said it
@@ -374,9 +356,8 @@ export interface OtherInput {
  *   punctuation, a mask.
  * - `unchanged`: the field shows exactly what it showed when typing began
  *   — the typing did not reach it (a focus tap that missed, a field that
- *   ignores input), or the field refused it (already at its maxLength).
- *   Review of this branch: probes D and D2 were told "the app transformed
- *   the input".
+ *   ignores input), or the field refused it (already at its maxLength) —
+ *   not "the app transformed the input" (probes D and D2).
  * - `dropped-tail` (D28): the field holds the first `landed` characters of
  *   the typing, reformatted (interact/fill-landing.ts#NotLanded): `grouped`
  *   when the field added separators of its own, else it only showed its typed
@@ -386,22 +367,21 @@ export interface OtherInput {
  *   the reading cannot tell which), not an input it transformed. iOS React Native's rf2 held
  *   `1 234 567,` for `1234567,89` and was told "as many characters as were
  *   typed, 9 differing: the app transformed the input" (2026-10-31). An
- *   EXACT prefix stays `length`, as it always was. `wholeToo` (D64 review
- *   round 2): the reading is a whole landing as well — a select-all field's
- *   value with a mark of its own, a caret inside the text
- *   (interact/fill-landing.ts#wholeLandingToo) — so nothing was typed again,
- *   and the reply names that reading and its remedy. A `length` carries it
- *   too: an exact strict prefix that is a whole landing as well (`-5-` for
- *   `-5` after `-5`, `xaa` for `aa` after `xa`). `equal` (D79): the
- *   field's count is the typed one, and why the two equal numbers are no
- *   match (`EqualCount`; docs/bugs/2026-10-09-fill-mismatch-error-says-
+ *   EXACT prefix stays `length`. `wholeToo` (D64): the reading is a whole
+ *   landing as well — a select-all field's value with a mark of its own, a
+ *   caret inside the text (interact/fill-landing.ts#wholeLandingToo) — so
+ *   nothing was typed again, and the reply names that reading and its
+ *   remedy. A `length` carries it too: an exact strict prefix that is a
+ *   whole landing as well (`-5-` for `-5` after `-5`, `xaa` for `aa` after
+ *   `xa`). `equal` (D79): the field's count is the typed one, and why the two
+ *   equal numbers are no match (`EqualCount`; docs/bugs/2026-10-09-fill-mismatch-error-says-
  *   equal-counts-when-app-transforms-text.md's class).
  * - `separated` (D53): every typed character is there, in order, with
  *   `added` separators (interact/fill-reformat.ts#SEPARATORS) and nothing
  *   else — separators ADR 0034's rules refuse as the field's grouping (a
  *   cents mask's `12.34` for `1234`, a sign, mixed or trailing marks, groups
- *   of one, autocorrect's `a lot` for `alot`). Read `typed 4 characters but
- *   the field shows 5` and no remedy until D53 (2026-11-02).
+ *   of one, autocorrect's `a lot` for `alot`), which would otherwise read
+ *   `typed 4 characters but the field shows 5` and no remedy (D53).
  * - `length`: none of these — the lengths are all that can be said (also
  *   a partly masked reading, `•••••t`, whose content is not comparable).
  * Still a FAILURE in every case: a field that shows `Hello` for `hello` does

@@ -42,7 +42,6 @@ export interface MarginMemo {
 const open = (memo: MarginMemo): readonly MarginAnswer[] => memo as unknown as readonly MarginAnswer[];
 const close = (answers: readonly MarginAnswer[]): MarginMemo => answers as unknown as MarginMemo;
 
-/** The memo before a call's first read: nothing seen. */
 export function startMargin(): MarginMemo {
   return close([]);
 }
@@ -54,7 +53,7 @@ interface PairAt {
   readonly scrollView: Rect | undefined;
 }
 
-/** How far a node moved, in the source's frame units: across (`dx`) and down (`dy`). */
+/** How far a node moved, in the source's frame units. */
 export interface Offset {
   readonly dx: number;
   readonly dy: number;
