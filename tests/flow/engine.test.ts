@@ -2103,7 +2103,8 @@ flows:
 
   it('the ⚠ fill warning is in the trace even when dismissing the keyboard then throws (review 2026-10-03)', async () => {
     const fake = formFake('•'.repeat(20));
-    fake.attachKeyboard(); // an Android fake (window state unknown → back): the in-tree model presses no key (stage B)
+    // An Android fake (window state unknown → back): the in-tree model presses no key (stage B)
+    fake.attachKeyboard();
     appendBullets(fake);
     fake.pressKey = async () => {
       throw new Error('idb ui key: timed out');
@@ -2449,7 +2450,8 @@ flows:
       expect(fake.taps).toEqual([]);
     });
 
-    // Owner decision (docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-…): a target cut to a sliver by its scroll container's edge is a refusal on a present element — terminal in an optional:.
+    // Owner decision (docs/bugs/2026-10-09-android-tap-on-a-sliver-at-scroll-container-edge-…): a target cut to a
+    // sliver by its scroll container's edge is a refusal on a present element — terminal in an optional:.
     it('a tap on an element cut to a sliver at its scroll container\'s edge: refused, the flow fails — not skipped, nothing tapped', async () => {
       const fake = formFake();
       const toggle = node({ role: 'container', identifier: 'details_toggle', rect: { x: 40, y: 1950, width: 900, height: 50 }, children: [node({ role: 'button', rect: { x: 40, y: 1962, width: 900, height: 38 } })] });
@@ -3728,7 +3730,8 @@ flows:
   });
 
   // The remedy after back is judged in the tree that holds the node handed
-  // back (the guard's second look) — in the first read's tree it is not found, and the wording would fall back to "both".
+  // back (the guard's second look) — in the first read's tree it is not found, and the wording would fall back to
+  // "both".
   it('an optional tap: whose target the re-layout after back pinned under a status band: the remedy reads the second look\'s tree — pinned, no scroll_until', async () => {
     const fake = loginFake();
     fake.viewportSize = { width: 1080, height: 2220, statusBand: 62 };

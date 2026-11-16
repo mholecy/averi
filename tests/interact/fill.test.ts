@@ -2305,7 +2305,7 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
     expect([otp2.value, note.value]).toEqual(['2', '34']);
   });
 
-  // D64 round 3: `11 ` after `1` and `-5-` after `-5` read as whole landings too, and say so (select-all, `clear: true`);
+  // D64: `11 ` after `1` and `-5-` after `-5` read as whole landings too, and say so (select-all, `clear: true`);
   // keys proven typed elsewhere are no select-all, so the reply says where they went and not that.
   it.each([
     [

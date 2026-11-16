@@ -6,7 +6,8 @@ import { ANDROID, IDB_STROKE, idbUnmarkedTap, IOS, keys, NO_CLOSE_IT_FIRST, NOT_
 // bottom-sheet-dialog and dialog-fullscreen (round 7, Android); dialog-views-fullscreen (Android); blur-menu-stacked and blur-menu-unhidden (round 16,
 // ADR 0018 residual 9's probes, iOS).
 // Struck off (no row here): L1, LW1, L3, NI1, and L4 (fixed by
-// docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md) — see scripts/truth/calibration.json.
+// docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md) — see
+// scripts/truth/calibration.json.
 
 const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay idb or a reading-order run does not show is not seen';
 /** A modal row listed before the content drawn under it, a content control holding its centre (ADR 0015's 2026-10-22 amendment), that the eyes cannot tell: white on white. */

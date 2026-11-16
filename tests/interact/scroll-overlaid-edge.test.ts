@@ -26,7 +26,8 @@ const failure = async (cell: string, selector: string, fully: boolean): Promise<
 const RUNS_ON = "drawn after it — the dump (Compose's, on Android) leaves out of a node's bounds what a later node covers, so the rest of it may lie under that container";
 
 describe('scroll_until on a node cut at an overlay', () => {
-  // Neither P nor Continue lies in a scroll view (the cell lists none): no scroll moves either, so no swipe is sent (D87).
+  // Neither P nor Continue lies in a scroll view (the cell lists none): no scroll moves either, so no swipe is sent
+  // (D87).
   it('pinned-bar P, fully: true — no "fully visible": stops before any swipe naming Continue, with no share of it said to show', async () => {
     const fake = fakeOf('pinned-bar');
     const e = (await scrollUntilVisible(fake, 'id:"lab.pinned-bar.P"', { ...FAST, fully: true }).catch((err: unknown) => err)) as Error;

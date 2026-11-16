@@ -192,7 +192,7 @@ describe('AndroidAdapter — every user value reaches the device command as one 
     },
   );
 
-  // Worded as interact/type-text.ts (round 7): ENTER for a newline and a return only.
+  // Worded as interact/type-text.ts: ENTER for a newline and a return only.
   it.each([
     ['ab\ncd', /\(a newline into ENTER, which submits the form mid-fill\)/],
     ['ab\rcd', /\(a return into ENTER, which submits the form mid-fill\)/],

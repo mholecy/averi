@@ -384,7 +384,10 @@ export class FakeKeyboard implements KeyboardOracle {
     return this.witnessAnswers.next();
   }
 
-  /** The keyboard window's touchable region with the input method's word. Default: the witness could not be asked and no region read — no panel, the band alone. */
+  /**
+   * The keyboard window's touchable region with the input method's word. Default: the witness could not be asked and no
+   * region read — no panel, the band alone.
+   */
   readonly touchableAnswers = new ScriptedAnswer<KeyboardTouchable>({ witness: 'unknown', region: undefined });
 
   async touchable(): Promise<KeyboardTouchable> {
@@ -392,10 +395,16 @@ export class FakeKeyboard implements KeyboardOracle {
   }
 }
 
-/** The guard's settle options, fast: `first` on ambiguity, a 200 ms budget, a 2 ms poll, eyes that see nothing (NO_EYES: the verbs require them, A30). */
+/**
+ * The guard's settle options, fast: `first` on ambiguity, a 200 ms budget, a 2 ms poll, eyes that see nothing (NO_EYES:
+ * the verbs require them, A30).
+ */
 export const FAST = { ambiguous: 'first' as const, timeoutMs: 200, pollMs: 2, eyes: NO_EYES };
 
-/** One ordered log of everything the keyboard guard and dismissal do to the device — and ask of its keyboard oracle, when it has one: `read`, `keyboard?`, `witness?`, `touchable?`, `key:back`, `tap:x,y`. */
+/**
+ * One ordered log of everything the keyboard guard and dismissal do to the device — and ask of its keyboard oracle,
+ * when it has one: `read`, `keyboard?`, `witness?`, `touchable?`, `key:back`, `tap:x,y`.
+ */
 export function recorded(fake: FakeAdapter): string[] {
   const events: string[] = [];
   const wrap = <T extends object, K extends keyof T>(on: T, name: K, label: (...args: never[]) => string) => {

@@ -353,7 +353,7 @@ describe('WdaServer.ensureRunning', () => {
     const err = await server.ensureRunning().then(() => undefined, (e: Error) => e);
     expect(err?.message).toContain(server.logPath);
     expect(err?.message).toContain('first WDA build per Xcode version takes minutes');
-    // The budget in util/duration.ts#formatSeconds's spelling (round 4):
+    // The budget in util/duration.ts#formatSeconds's spelling:
     // Math.round(ms / 1000) + "s" would say "within 0s" for this one.
     expect(err?.message).toMatch(/\/status on port \d+ within 0\.04 s —/);
     expect(spawner.kills).toContain('SIGTERM'); // no orphaned xcodebuild
@@ -874,8 +874,8 @@ describe('WdaServer.shutdown — the process-shutdown form of stop()', () => {
   }, 5_000);
 
   it('a WEDGED listener (probe times out) is not "quiet": shutdown() waits, then kills it', async () => {
-    // The state a shutdown mid-/source most often meets; the first cut read any
-    // fetch failure as a free port and returned in 1 ms.
+    // The state a shutdown mid-/source most often meets; a check that read any
+    // fetch failure as a free port would return in 1 ms.
     const killed: number[] = [];
     const { dd } = await tempDerivedData(true);
     const spawner = fakeSpawn();

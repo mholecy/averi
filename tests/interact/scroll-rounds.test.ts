@@ -538,7 +538,8 @@ describe('round — after the device check', () => {
   });
 
   it('a zero-area rect carries no position — it is not called exhausted, the scroll runs to its bound', () => {
-    // An unchanged tree too (without a fingerprint the whole-tree rule could not fire here, so it did not prove the match rule's).
+    // An unchanged tree too (without a fingerprint the whole-tree rule could not fire here, so it would not prove the
+    // match rule's).
     const field: Row = { ...lastField({ x: 66, y: 1769, width: 948, height: 0 }), rest: 'f' };
     expect(failureOf(play(ANDROID, [field, field, field, field, field]), 'id:my_note_input').message).toMatch(/failed after 4 swipes \(maxSwipes\)/);
   });
@@ -980,9 +981,9 @@ describe('round — the flush check across nested clipping containers, and a pro
     expect(describeScrollResult(result)).toMatch(/every scroll container around it from that one outward scrolls only sideways, so no probe swipe can move its bottom edge into view to check it — it may be cut there/);
   });
 
-  // The stroke box judged twice (deep/r3-scroll, 2026-10-09): were the round to judge room over the screen and the driver
-  // over the screen ABOVE the keyboard, falling back to the whole screen when that had none, a probe touching down off
-  // the container would move nothing, and be reported "nothing of it is cut there".
+  // The stroke box judged twice (deep/r3-scroll, 2026-10-09): were the round to judge room over the screen and the
+  // driver over the screen ABOVE the keyboard, falling back to the whole screen when that had none, a probe touching
+  // down off the container would move nothing, and be reported "nothing of it is cut there".
   it('a probe whose container has room on the screen but not above the keyboard is not sent — `room`, never `checked` — and an outer ancestor with room above it is probed instead', () => {
     // A list running on under the IME from y 1340: 800 px on the screen, 58 above the keyboard's top (1398).
     const UNDER: Rect = { x: 0, y: 1340, width: 1080, height: 800 };
@@ -2658,8 +2659,8 @@ describe('round — a WDA target\'s strokes go over its own scroll view', () => 
   // frame) under the transactions list (0,180 402x694, listed after it, no ancestor of the carousel): a card right of
   // the carousel, scrolled for `down`, has no scroll view that scrolls along the stroke, and the stroke plan falls back
   // to the nearest, the carousel — a vertical 52-pt stroke touching down where the list is drawn over it
-  // (stroke-plan.ts#strokeRoom). A carousel nested IN the list gives way to the list (tests/interact/stroke-plan.test.ts,
-  // "the axis").
+  // (stroke-plan.ts#strokeRoom). A carousel nested IN the list gives way to the list
+  // (tests/interact/stroke-plan.test.ts, "the axis").
   it('a card of a horizontal carousel no list holds, scrolled for `down`: no scroll view along the stroke, so the vertical stroke goes inside the carousel (the fallback), and the failure names the list drawn over its touch-down', () => {
     const CAROUSEL: Rect = { x: 24, y: 138, width: 354, height: 85 };
     const card = node({ role: 'other', label: 'My Account', rect: { x: 378, y: 138, width: 354, height: 85 } });

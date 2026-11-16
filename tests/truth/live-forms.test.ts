@@ -666,8 +666,8 @@ describe('p7 and p7w (D43): refused under idb and uiautomator, typed under WDA',
 
 /**
  * f11–f14 (D37): form-format's `date` (schema.ts#FieldFormat, placeholder `__.__.____`) and `phone` (no format,
- * placeholder `+421`) — at D37, ADR 0034's dotted date and its D29 gaps. Judged here over D40's f1 record (iOS WDA), its
- * final state set to what each fill would leave; batch-3's device records are rejudged in live-rejudge.test.ts.
+ * placeholder `+421`) — at D37, ADR 0034's dotted date and its D29 gaps. Judged here over D40's f1 record (iOS WDA),
+ * its final state set to what each fill would leave; batch-3's device records are rejudged in live-rejudge.test.ts.
  */
 describe('f11–f14 (D37): a dotted date and a `+421` phone in form-format', () => {
   const IDS = ['f11', 'f12', 'f13', 'f14'];

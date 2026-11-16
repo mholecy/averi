@@ -177,8 +177,8 @@ describe('IosAdapter.launch waits until the tree is the launched app\'s', () => 
    * CASE: the session's first launch, the bank app in front since before the server started (never launched by it, so its
    * names are unknown here); the screenshot showed Contacts while idb served "Skeleton Internal" >= 4.5 s after the launch and
    * Contacts' only by ~15 s. The old note said "If the screenshot shows com.apple.MobileAddressBook … this can be ignored":
-   * the screenshot did, and ignoring it was the wrong-app read. The note: the previous app's until proven otherwise, and
-   * the localized reading only past a 20 s re-read — never on the screenshot alone.
+   * the screenshot did, and ignoring it was the wrong-app read. The note: the previous app's until proven otherwise,
+   * and the localized reading only past a 20 s re-read — never on the screenshot alone.
    */
   it('never in front, the label no app averi launched (the measured case): reads until the bound and no longer, then a note: the previous app\'s tree until a read says otherwise, a localized name only past 20 s', async () => {
     const d = device([BANK]);

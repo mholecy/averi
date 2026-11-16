@@ -106,10 +106,11 @@ describe('P2 the same run in Compose AndroidView interop: unmarked, tapped at th
  * cover (the slot widened 20 dp left and right, 10 dp up and down), so no bound is clipped: a slot as small as its
  * target would clip the cover's dumped bounds to it (View#getBoundsOnScreen clips to each parent) and fail the location
  * check on its own — the cell would not tell the role rule from the clip. Were the slot a provider's host
- * (android-tree-dialect.ts#providesNodes), the run would be unmarked and each target `Tapped` at the centre, on its cover
- * (LR4's lie, ADR 0015's residual 5, captured so 2026-11-11). The slot's direct children are React Native's ViewGroups,
- * which no node provider lists: it is no provider's host, its run is marked, and the slot reads as views-banner's run
- * does (P1) — each cover an untold peer, refused with the eyes or without (ADR 0015's residual 5, narrowed).
+ * (android-tree-dialect.ts#providesNodes), the run would be unmarked and each target `Tapped` at the centre, on its
+ * cover (LR4's lie, ADR 0015's residual 5, captured so 2026-11-11). The slot's direct children are React Native's
+ * ViewGroups, which no node provider lists: it is no provider's host, its run is marked, and the slot reads as
+ * views-banner's run does (P1) — each cover an untold peer, refused with the eyes or without (ADR 0015's residual 5,
+ * narrowed).
  */
 describe('P3 rn-banner-role: the slot container dumps as android.view.View with ViewGroup children — marked, each cover an untold peer, refused', () => {
   const cell = 'rn-banner-role';

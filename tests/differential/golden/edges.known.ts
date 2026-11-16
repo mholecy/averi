@@ -36,8 +36,8 @@ export const edges: KnownFile = {
     // under the clip listed AFTER it and holding its centre (the truth probe at (201,652) fires Continue). A control past
     // the reading-order break that holds the target's centre is a cover whose order is not told (ui-tree/draw-order.ts,
     // ADR 0015 amended): the colour assert fails closed, the plain stop refuses before any swipe, and the tap is moved
-    // clear of Continue to (201,670). What stays is the residual: the tap still says Tapped, on the background below the
-    // clip, and no scroll_until swipe is sent.
+    // clear of Continue to (201,670). What stays is the residual: the tap still says Tapped, on the background below
+    // the clip, and no scroll_until swipe is sent.
     ...keys(`${IOS}/scroll-bounded-footer.idb.json`, ['O'], ['tap'], { cls: 'Tapped', kind: 'Tapped', calls: ['idb ui tap 201 670'], note: 'idb lists no scroll view — moved clear of Continue, Tapped on the background beneath the clip', as: IDB_NO_SCROLL_VIEW }),
     ...keys(`${IOS}/scroll-bounded-footer.idb.json`, ['O'], ['scroll_until'], { cls: 'no swipe', kind: 'refused', calls: [], note: 'idb lists no scroll view — refused before any swipe: Continue overlaps its centre, the order not told', as: IDB_NO_SCROLL_VIEW }),
     // LAB FINDING VA1 — Compose cuts a row (and its content) at a sticky header that is one accessibility element,

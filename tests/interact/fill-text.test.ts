@@ -422,7 +422,7 @@ describe('fillFailureText — every error a fill throws', () => {
     );
   });
 
-  // D64 round 3 (NIT): keys proven typed elsewhere are no select-all — fill-type.ts takes the hedge off first
+  // D64: keys proven typed elsewhere are no select-all — fill-type.ts takes the hedge off first
   // (fill-landing.ts#withoutWholeToo; pinned there, in fill-type.test.ts, and in bytes in fill.test.ts); here, the clause
   it('a typing that left the field says where it went, after what the Difference says', () => {
     const elsewhere = { role: 'textfield', identifier: 'o', rect: { x: 0, y: 40, width: 100, height: 20 } };

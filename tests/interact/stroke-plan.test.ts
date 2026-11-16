@@ -18,7 +18,8 @@ import { stackedLayers } from '../helpers/stacked-layers.js';
  * a read's facts and the course's direction in, the stroke as the driver sends it out — its scroll view, box, cover
  * and points — with the presented surface at its touch-down and the node a sent stroke touched down on. The stroke
  * decisions of a single read are asked here of the plan; what spans reads and the course (a turn, a failed read, a
- * remembered scroll view across the round's own reads) stays the round's to test (tests/interact/scroll-rounds.test.ts).
+ * remembered scroll view across the round's own reads) stays the round's to test
+ * (tests/interact/scroll-rounds.test.ts).
  */
 
 /** The Pixel_3a's screen, the gesture box the tests stroke in. */

@@ -135,7 +135,8 @@ describe('the newline: in idb\'s key map, not Android\'s — and refused on both
 
 /**
  * D43a's defensive check: a caller that bypasses interact/ (assertTypeable) must not half-type a value on Android —
- * `input text` types `Jan ` and then exits 255 on `Š` (docs/bugs/2026-10-16-lab-android-type-text-types-a-prefix-then-fails-on-non-ascii.md).
+ * `input text` types `Jan ` and then exits 255 on `Š`
+ * (docs/bugs/2026-10-16-lab-android-type-text-types-a-prefix-then-fails-on-non-ascii.md).
  */
 describe('AndroidAdapter.typeText refuses an untypeable character before any exec', () => {
   it.each(UNTYPEABLE)('%j (%s): throws, nothing sent to the device', async (ch, code) => {

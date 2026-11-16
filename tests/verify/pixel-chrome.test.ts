@@ -125,7 +125,8 @@ describe('Scene.standing for the pixel assert over every fixture node (round 8)'
       'button "Continue to summary" (24,512 354x44, reaching 24,512 354x77)': 1,
       'button "Continue to summary" (24,780 354x44, reaching 24,780 354x94)': 19,
       // idb's Application node, judged as an element: every node of the flat list after it lies over its sample.
-      // …twice: it is also a cover of the chooser's SWIFT row, listed after it and holding its centre (ADR 0015's amendment; the eyes tell the order).
+      // …twice: it is also a cover of the chooser's SWIFT row, listed after it and holding its centre (ADR 0015's
+      // amendment; the eyes tell the order).
       'button "Loan repayment, 17.07.2026, +602,00 EUR" (24,435 354x52)': 2,
       'button "Priority*, Standard" (24,390 354x52)': 1,
       'button "Priority*, Standard" (24,399 354x52)': 1,
@@ -359,7 +360,8 @@ describe('the screen without the device: the window the tree vouches for (ui-tre
     const pay = n('button', rect(24, 600, 354, 52), { label: 'Pay' });
     const window = n('application', rect(0, 0, 402, 874), { children: [n('scrollable', rect(0, 0, 402, 1300)), element, pay] });
     const tree = n('container', rect(0, 0, 0, 0), { children: [window] });
-    // Judged in the tree's screen (screenOf: the 402x1300 content), the page would be no screen-sized element and would be offered a scroll.
+    // Judged in the tree's screen (screenOf: the 402x1300 content), the page would be no screen-sized element and would
+    // be offered a scroll.
     expect(await over(silent, tree, element)).toMatch(
       /^button "Pay" \(24,600 354x52\) is drawn over the element \(element 0,40 402x834\) — the capture would show it, not the element — assert something in it that lies clear of that; no scroll moves the screen itself/,
     );

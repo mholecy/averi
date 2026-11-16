@@ -157,8 +157,9 @@ describe('pollTree — the one deadline loop', () => {
   });
 
   // D21: a read error that no wait cures — idb's wedged accessibility service — ends the poll at once, thrown as it
-  // came; polled instead, D20's scroll read it 133 times in 90 s. Even after good reads: it says the device's state, not
-  // the screen's, and the next read would say it again. Bounded to the two reads (D38, tests/helpers/terminal-read.ts).
+  // came; polled instead, D20's scroll read it 133 times in 90 s. Even after good reads: it says the device's state,
+  // not the screen's, and the next read would say it again. Bounded to the two reads (D38,
+  // tests/helpers/terminal-read.ts).
   it('a PersistentReadError is thrown at once, not polled to the deadline — even after a tree was read', async () => {
     let reads = 0;
     const wedged = new PersistentReadError('wedged until a reboot');

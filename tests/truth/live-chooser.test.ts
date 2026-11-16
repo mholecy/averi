@@ -27,7 +27,10 @@ const AT_LAUNCHER: FocusRead = { window: windowOf(LAUNCHER), activities: hist(LA
 const AT_LAB: FocusRead = { window: windowOf(MAIN), activities: hist(MAIN, 6235) + hist(LAUNCHER, 4862, '      ') };
 /** Recorded (T7b's first run, lc4''): the window mid-transition, `mCurrentFocus=null`, `component` already mFocusedApp. */
 const UNSETTLED = (component: string) => `  mCurrentFocus=null\n  mFocusedApp=ActivityRecord{d0a6cbc u0 ${component}} t6245}\n`;
-/** Recorded: `am start -p dev.averi.lab -a VIEW -d averilab://shared/x` over the lab: the chooser in front, in a task of its own. */
+/**
+ * Recorded: `am start -p dev.averi.lab -a VIEW -d averilab://shared/x` over the lab: the chooser in front, in a task of
+ * its own.
+ */
 const AT_CHOOSER: FocusRead = { window: windowOf(RESOLVER, RESOLVER), activities: hist(RESOLVER, 6236) + hist(MAIN, 6235) + hist(LAUNCHER, 4862, '      ') };
 
 describe('frontOf: what one read says is in front, and on the stack', () => {

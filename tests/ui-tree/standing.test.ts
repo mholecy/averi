@@ -66,7 +66,10 @@ const labFormKeyboardIdb = async (): Promise<UiNode> => parseIdbDescribeAll(awai
 
 /** A screen's boxes and bands as a test writes them, before `usable` makes it the one screen type a standing takes. */
 type Bare = Omit<UsableScreen, 'oriented' | 'from'>;
-/** A usable screen (ui-tree/usable-screen.ts#UsableScreen) of the device's size, `oriented` its box: what every purpose is handed — the pixel assert judges `oriented`, the touches `box`/`boxes`. */
+/**
+ * A usable screen (ui-tree/usable-screen.ts#UsableScreen) of the device's size, `oriented` its box: what every purpose
+ * is handed — the pixel assert judges `oriented`, the touches `box`/`boxes`.
+ */
 const usable = (screen: Bare): UsableScreen => ({ ...screen, oriented: screen.box, from: 'device' });
 const IPHONE = usable({ box: box(402, 874), boxes: [box(402, 874)], statusBand: 62 });
 const PIXEL = usable({ box: box(1080, 2220), boxes: [box(1080, 2220)], statusBand: 66 });
@@ -257,8 +260,8 @@ describe('Scene.standing — the Android navigation band (D7): a centre in it is
     ['Settings title flush with the band, tap: reachable', async () => parseDump(SETTINGS_FLUSH), 'title', PIXEL_NAV, TAP, { kind: 'reachable', at: { x: 412, y: 2130 } }],
     // `fully` judges the bands as a REGION (ADR 0009): accountDetail's row_30 66,2088 948x99 — its
     // centre (540,2138) clear of the band, its bottom 33 px into it. The pixel assert fails it closed under the bar and
-    // advises `fully: true`, which on the centre rule would stop at once; `fully` strokes on, the plain stop and the tap
-    // keep the centre rule.
+    // advises `fully: true`, which on the centre rule would stop at once; `fully` strokes on, the plain stop and the
+    // tap keep the centre rule.
     ['accountDetail row_30 reaching 33 px into the band, fully: true: under the navigation bar, as a region', () => compose('accountDetail'), 'transactions.list.row_30', PIXEL_NAV, FULLY, { kind: 'systemBar', at: { x: 540, y: 2138 }, bar: { edge: 'bottom', top: 2154 }, band: { x: 0, y: 2154, width: 1080, height: 66 } }],
     ['…plain stop: reachable (its centre clear)', () => compose('accountDetail'), 'transactions.list.row_30', PIXEL_NAV, PLAIN, { kind: 'reachable', at: { x: 540, y: 2138 } }],
     ['…tap: reachable', () => compose('accountDetail'), 'transactions.list.row_30', PIXEL_NAV, TAP, { kind: 'reachable', at: { x: 540, y: 2138 } }],

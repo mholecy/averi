@@ -272,7 +272,7 @@ describe("IosAdapter.openDeepLink — a link to the project's own scheme waits l
 // D54 (D49b, 2026-11-02; ADR 0032's D54 amendment): when iOS's "Open in “AveriLab”?" is what holds the link, the
 // reply names it — its title and its buttons at their centres — instead of the vague note. Batch-5 D49A's captures
 // (E2): idb lists the alert alone under SpringBoard; WDA's activeAppInfo names com.apple.springboard while it is up,
-// and its /source holds the Alert. The happy path's device calls are unchanged on both sources.
+// and its /source holds the Alert. On either source the happy path makes no device call the alert check would add.
 const OPEN_IN = {
   title: 'Open in “AveriLab”?',
   buttons: [
@@ -408,7 +408,7 @@ describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)",
 // D56 (2026-11-02; ADR 0032's D56 amendment): a launch behind iOS's system alert — an unanswered "Open in “AveriLab”?"
 // keeps every launch behind it (batch-2) — names it and its buttons' centres in its ⚠ note, from the same reads as a
 // link's (D54): on idb the label read that lists it, on WDA one short /source at the bound. The launch still never
-// fails, and its happy path makes no call a launch without the check would not.
+// fails, and its happy path makes no call the alert check would add.
 describe("IosAdapter.launch — the system alert it waits behind, named in its note (D56)", () => {
   const LAUNCH = 'xcrun simctl launch AAAA-1111 dev.averi.lab';
   const APPINFO = 'xcrun simctl appinfo AAAA-1111 dev.averi.lab';

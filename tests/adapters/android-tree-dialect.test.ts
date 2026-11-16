@@ -763,8 +763,9 @@ describe('parseUiautomatorXml — the dialect\'s rules, one by one', () => {
   });
 });
 
-// The parser's marks on its root (A27; the verbs' cases over them are tests/adapters/android-presented-window.test.ts's):
-// what the dump shows of the one window it lists (ADR 0018, "Android's presented window").
+// The parser's marks on its root (A27; the verbs' cases over them are
+// tests/adapters/android-presented-window.test.ts's): what the dump shows of the one window it lists (ADR 0018,
+// "Android's presented window").
 
 type Cell = 'alert-dim' | 'sheet-medium' | 'bottom-sheet-dialog' | 'dialog-fullscreen' | 'form-picker' | 'open';
 

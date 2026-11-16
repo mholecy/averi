@@ -620,7 +620,7 @@ describe('typeAndConfirm — an earlier text that holds the value is no landing 
     expect(s.typed).toEqual(['55']);
   });
 
-  // D64 round 3: keys proven typed elsewhere are no select-all, so the reading's whole-landing hedge goes with them
+  // D64: keys proven typed elsewhere are no select-all, so the reading's whole-landing hedge goes with them
   // (fill-landing.ts#withoutWholeToo) — the reply must not say both.
   it.each([
     ['11 ', '11', '1', '1', { kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true }],

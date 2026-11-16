@@ -1960,7 +1960,10 @@ describe('ensure_state and verify: a refused final screenshot is a ⚠ line, not
   });
 });
 
-/** The assert tool on a device whose capture is refused: that assert fails closed, the rest is evaluated (pixel-poll.ts's header). */
+/**
+ * The assert tool on a device whose capture is refused: that assert fails closed, the rest is evaluated
+ * (pixel-poll.ts's header).
+ */
 describe('assert: a refused capture is one failed assert, not a failed call', () => {
   it('the color assert FAILs with the transport message; the element assert beside it PASSes', async () => {
     const fake = home();

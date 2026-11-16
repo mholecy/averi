@@ -681,8 +681,8 @@ describe('scrollUntilVisible — strokes that drag, not fling, over the scroll c
 
 /**
  * uiautomator cuts every rect to its scroller, so a node cut to a
- * sliver at the scroller's edge has its centre on the screen, and a plain stop there would stop on exactly the strip the
- * next tap refuses (tap-judgement.ts#TapJudge.aim). The plain stop scrolls on.
+ * sliver at the scroller's edge has its centre on the screen, and a plain stop there would stop on exactly the strip
+ * the next tap refuses (tap-judgement.ts#TapJudge.aim). The plain stop scrolls on.
  */
 describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap refuses (2026-10-10)', () => {
   const FORM: Rect = { x: 0, y: 242, width: 1080, height: 1736 };
@@ -765,7 +765,8 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
     expect(fake.swipes).toEqual([]);
   });
 
-  // A26: the bound's quote of the tap is the tap's own remedy, word for word (interact/touch-remedy.ts#touchRemedyText).
+  // A26: the bound's quote of the tap is the tap's own remedy, word for word
+  // (interact/touch-remedy.ts#touchRemedyText).
   it('at the bound, the quote of the tap is the tap\'s own refusal\'s remedy, word for word — the way past included', async () => {
     const fake = new SwiftForm(1000);
     const failed = await scrollUntilVisible(fake, 'id:details_toggle', { ...FAST, maxSwipes: 0 }).catch((e: Error) => e.message);
@@ -1096,8 +1097,8 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
   });
 
   // CONTINUE's FRAME (780–824) lies over neither edge of the row at 776–828, so with the far
-  // side read off it the scroll would swipe up twice more, unmoved, before the stuck turn; idb's list pins CONTINUE, whose
-  // reach runs to the screen's bottom (draw-order.ts#bottomPinned) — over the row's far (bottom) side.
+  // side read off it the scroll would swipe up twice more, unmoved, before the stuck turn; idb's list pins CONTINUE,
+  // whose reach runs to the screen's bottom (draw-order.ts#bottomPinned) — over the row's far (bottom) side.
   it('direction up, fully: true, from -20 flung to 776 — its top under CONTINUE, and CONTINUE\'s reach (down to 874) over its bottom: turned at once, the stroke back reveals it — not "a layout defect"', async () => {
     const fake = await following(-20, (travel, y) => (travel > 0 ? 776 : y + travel));
     expect(await scrollUntilVisible(fake, 'id:swift_payment.form.priority_select', { ...FAST, maxSwipes: 6, direction: 'up', fully: true })).toEqual({ swipes: 2, visible: 1, clipped: [] });
@@ -1110,7 +1111,8 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
  * idb's keyboard band in the stroke box (round 7, 2026-10-10; docs/bugs/2026-10-09-ios-idb-scroll-stroke-starts-on-the-
  * soft-keyboard.md): idb marks no keyboard node, so the reading saw none and every stroke was `201 699 201 175` — a
  * touch-down on the keys (`Z X C V`, `5`), the form never scrolled, and the reply said "content exhausted". The band's
- * line (ui-tree/keyboard-position.ts#KeyboardPosition.line) ends the stroke box, and (owner decision D2) the judgement is made above it.
+ * line (ui-tree/keyboard-position.ts#KeyboardPosition.line) ends the stroke box, and (owner decision D2) the judgement
+ * is made above it.
  */
 describe('scroll_until over idb\'s soft keyboard (round 7)', () => {
   const NO_STROKE_ON_KEYS = 'never on the keys';
