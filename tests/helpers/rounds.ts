@@ -101,7 +101,7 @@ export interface Row {
 /**
  * The stroke a row hands back when it names none: the step's own `points`,
  * the ones the driver sends (interact/stroke-plan.ts makes them once, the
- * touch-down question asked at them — A1 of the round-21 architecture pass),
+ * touch-down question asked at them),
  * so nothing here re-derives geometry: a stand-in built from the step's
  * shape would not see the driver's own judgement of the box (the probe drawn
  * off its container under the IME would pass through it). A row that means

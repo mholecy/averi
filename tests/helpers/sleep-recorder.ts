@@ -10,11 +10,11 @@ import { vi } from 'vitest';
  * fake that reacts on a real timer. Under a faked Date (vi.useFakeTimers
  * with Date ONLY — faking setTimeout would hang the yield) each sleep moves
  * the clock by its own length, so a deadline plays out in virtual time,
- * deterministically. fill.test.ts and the two keyboard-*.test.ts keep a
- * no-yield recorder of their own on purpose (their fakes never react on a
- * timer), but share this clock rule: they fake Date for every test and
- * their recorders advance it, so a fake read takes exactly 0 ms and
- * pollTree's pause after it (ui-tree/read-tree.ts#pauseAfterRead, ADR 0029)
+ * deterministically. fill.test.ts, keyboard-window.test.ts and
+ * keyboard-in-tree.test.ts keep a no-yield recorder of their own on purpose
+ * (their fakes never react on a timer), but share this clock rule: they
+ * fake Date for every test and their recorders advance it, so a fake read
+ * takes exactly 0 ms and pollTree's pause after it (ui-tree/read-tree.ts#pauseAfterRead, ADR 0029)
  * is exact.
  */
 export const sleeps: number[] = [];

@@ -2,10 +2,9 @@ import type { Point, Rect, UiNode } from '../../src/adapters/types.js';
 import { FakeAdapter, node } from './fake.js';
 
 /**
- * An Android scroll container as uiautomator reports it (2026-10-09, the
- * two bugs of that day: docs/bugs/2026-10-09-android-scroll-until-fully-
- * trusts-bounds-clipped-to-scroll-container.md and …-scroll-until-fling-
- * skips-target-in-lazy-list.md): a list node marked `clipsDescendants`
+ * An Android scroll container as uiautomator reports it (2026-10-09, the two bugs of that day:
+ * docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md and
+ * docs/bugs/2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md): a list node marked `clipsDescendants`
  * (what the parser makes of `scrollable="true"`) holding rows of equal
  * height, each in the tree only while it intersects the container (a
  * RecyclerView / LazyColumn recycles the rest) and each with its bounds
