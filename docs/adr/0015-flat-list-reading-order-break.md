@@ -296,8 +296,9 @@ Decided (owner, 2026-10-25, round 9):
    #ownLabelOf: a text spanning the height of the text input the target is — rn-field's M label `69,491 175x23` before
    its field's wrapper `69,492 264x20`).
 2. **Under WDA, a childless node the app named (an identifier) is drawn** — no structural excuse (placed.ts
-   `FRAME_EXCUSES.structural`, `inWdaRun`) — unless it holds a sibling of its own whole: WDA's flattening of an RN View
-   lists its content as its siblings (myport's `login_username_field 36,339 330x80` and the field row it wraps).
+   `FRAME_EXCUSES.structural`, which asks `listsNestedReadingOrder` and `flattenedWrapper`) — unless it holds a
+   sibling of its own whole: WDA's flattening of an RN View lists its content as its siblings (myport's
+   `login_username_field 36,339 330x80` and the field row it wraps).
 
 Golden: rn-banner's six WDA rows green (T and U refused "drawn over it as a screenshot shows", C refused "drawn over
 it"); nothing else changed over the corpus; calibrate: LR3 CALIBRATED. Live on the lab simulator, twice: under WDA T, U

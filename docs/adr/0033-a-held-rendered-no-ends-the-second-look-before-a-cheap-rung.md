@@ -52,7 +52,8 @@ full window, exactly as before.**
   went back to decor — it did not hold); so does a FAILED read (the code review, 2026-10-31: the same tree before and
   after reads that saw nothing did not provably hold across them — "held across reads spanning `holdMs`" means reads
   that each saw it). `pollTree` never shows its predicate a failed read, so with a hold `detects` reads through a thin
-  wrapper of the adapter that shows the tracker each read that threw.
+  wrapper of the adapter that shows the tracker each read that threw. (Superseded by A31, the section "A poll
+  observer": the hold learns of a failed read from `pollTree`'s observer, and the wrapper is gone.)
 - A rendered tree that shows a progress indicator (`ui-tree/read-tree.ts#showsProgress`: a `progress` node with area —
   Android's ProgressBar, Compose's progress indicators, an iOS `ProgressIndicator`, through WDA an iOS
   `ActivityIndicator` since D27, and through idb an unlabelled `GenericElement` that updates frequently since D50)

@@ -70,7 +70,7 @@ every call it cannot take, is the CLI as before.**
   that fails exits before `ready`: a failed start.
 - Node side: `adapters/idb-helper.ts#IdbHelper`, one per iOS adapter, created by `mcp/registry.ts#iosAdapterFor` and
   shared by `IosAdapter` (which owns and disposes it) and `IdbTreeSource`, as `exec` is. `runIdb` offers it an
-  allowlisted argv (`HELPER_ARGV`); the helper answers or declines.
+  argv on an allowlist (`READ_ARGV` or `HID_ARGV`, adapters/idb.ts); the helper answers or declines.
 - Lifecycle: the first allowlisted call starts it in the background and runs on the CLI — no call waits for it. Until
   `ready`, while busy (one request at a time: concurrent reads of an iOS leg go to the CLI), and when off, the CLI
   serves. A failure is a start that never says ready (exit, spawn error, 10 s) or a helper that dies before it has
@@ -286,7 +286,8 @@ for the project's kind: each handler goes through one resolver, `mcp/tools.ts#de
 `app.ios.treeSource` of the config the call loaded, and the registry's `get` takes that kind as a required argument
 (`undefined` is the default, idb): the kind-less overload is gone, and the one resolver plus
 `tests/mcp/registry-gets.test.ts`, which pins it as the only `registry.get` in `src/`, keep every call on the
-project's kind. Eight tools (`install_app`, `launch_app`, `terminate_app`, `open_deep_link`, `screenshot`, a
+project's kind (that regex test is gone: A30's behavioural test in `tests/mcp/tools.test.ts` replaced it, the A30
+amendment below). Eight tools (`install_app`, `launch_app`, `terminate_app`, `open_deep_link`, `screenshot`, a
 coordinate `swipe`, `press_key`, `get_logs`) used to ask without the kind, and several of them could not know it,
 because their policy read no averi.yaml on iOS. Each now takes `configPath`, and on iOS each reads the file under the
 `optional` policy.

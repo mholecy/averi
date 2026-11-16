@@ -548,9 +548,9 @@ swipes, with the wall time against batch-3's.
 ## Amendment: an untold scroll view's axis from the call's own evidence (2026-11-05, performance backlog D59)
 
 **Context.** D52's `unfit` stop needs the room-giving scroll view to scroll on the axis the match is judged along "as
-the tree tells it". On Android the tree tells an axis by class only (adapters/android.ts's AXIS_BY_CLASS:
-ScrollView, ListView, GridView vertical; HorizontalScrollView, ViewPager horizontal). A Compose LazyRow dumps as a
-plain `android.view.View`, a RecyclerView or a ViewPager2 by its own class, and none of them carries an axis. Measured
+the tree tells it". On Android the tree tells an axis by class only (AXIS_BY_CLASS, adapters/android-tree-dialect.ts
+today: ScrollView, ListView, GridView vertical; HorizontalScrollView, ViewPager horizontal). A Compose LazyRow dumps as
+a plain `android.view.View`, a RecyclerView or a ViewPager2 by its own class, and none of them carries an axis. Measured
 on batch-9 (Android API 33, main e734fedf, the lab's `carousel-lazy-free`, `left fully: true` after a 440-px pre-drag,
 3 runs): C is 948 px wide in the 948-px LazyRow (66–1014), the case D52 stops on. Run 0 ran 6 strokes and 3 turns to
 maxSwipes in 16.5 s and ended "stayed CLIPPED at left, 99 % … turned round 3 times", with C at 64 and both its sides

@@ -35,7 +35,7 @@ registry hands out the adapter without a listing. Anything short of proof lists 
   wires the real reader (`defaultIosBooted`; scripts/perf/baseline.ts passes it too, so D0 measures the server's path);
   a caller that injects its seams and names no proof gets one that proves nothing — its bound iOS calls list as before
   and no host file is read. That keeps the "both seams or neither" rule's point: a test cannot touch the host by
-  omission.
+  omission. (Superseded by A3, the amendment below: the proof is discovery's check, and `defaultIosBooted` is gone.)
 - The proof is no cache: it is read afresh on every call, as the listing was.
 
 ## Why it is safe enough
