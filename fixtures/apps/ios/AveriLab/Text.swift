@@ -1,10 +1,10 @@
 import SwiftUI
 import UIKit
 
-// The text family (fixtures/apps/cells/text.json, phase 4): text targets carrying P5's sample strings — each a box of
-// its colour with the string drawn on it in black, the box the target: a button whose label is the string (so every
-// tree reads the string as its label), identified lab.<cell>.<tag>, its frame reported as `<tag>` and `<tag>.box` (the
-// one `drawn` is measured over: scripts/truth/capture-run.ts). A tap on it logs the target's `tap`.
+// The text family (fixtures/apps/cells/text.json): text targets carrying P5's sample strings — each a box of its colour
+// with the string drawn on it in black, the box the target: a button whose label is the string (so every tree reads the
+// string as its label), identified lab.<cell>.<tag>, its frame reported as `<tag>` and `<tag>.box` (the one `drawn` is
+// measured over: scripts/truth/capture-run.ts). A tap on it logs the target's `tap`.
 //
 // - `text-sample`: ten open strings down the screen, 380×64 pt, the string 16 pt.
 // - `text-under-bar`: S centred in the status band (the whole width, 20 pt), W in the open, P under a button pinned

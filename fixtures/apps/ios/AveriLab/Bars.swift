@@ -55,7 +55,7 @@ struct BarTarget: View {
     }
 }
 
-/// The screen of the four drawn cells: white, edge to edge (the window fills the screen), laid out once the window's
+/// The screen of the drawn cells: white, edge to edge (the window fills the screen), laid out once the window's
 /// insets are known; the insets reported, then ready.
 struct BarsHost: View {
     @EnvironmentObject var lab: Lab
@@ -140,11 +140,10 @@ struct PinnedBar: View {
 /// pill's surface takes a tap (`button tabBar.surface`) and is no accessibility element (as the measured app's: no node
 /// has its rect), an item logs `tab <name>`. T lies in the open; R at 24,721 354x52 on the iPhone 17, its centre in the
 /// strip of the pill above its items (calibration.json #14); F far below the fold (#11's neighbour).
-/// `tabbar-dense` (round 14, LV3's review): the same header, list and tab bar over 40 grey rows every 60 pt (52 tall,
-/// from 100 pt into the content, each a listed button `lab.tabbar-dense.row.<k>` that logs `row <k>`), R the eighth —
-/// and L the last, at 24,680 when the list is at its end, above the tab bar —
-/// at 24,720 354x52 on the iPhone 17, as tabbar-floating's R — so a stroke that carries R under the header carries rows
-/// there too, which idb lists where they would lie.
+/// `tabbar-dense` (lab note LV3): the same header, list and tab bar over 40 grey rows every 60 pt (52 tall, from 100 pt
+/// into the content, each a listed button `lab.tabbar-dense.row.<k>` that logs `row <k>`), R the eighth, at 24,720
+/// 354x52 on the iPhone 17 as tabbar-floating's R, and L the last, at 24,680 when the list is at its end, above the tab
+/// bar — so a stroke that carries R under the header carries rows there too, which idb lists where they would lie.
 struct TabbarFloating: View {
     @EnvironmentObject var lab: Lab
     let cell: Cell

@@ -30,12 +30,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
-// The Android lab app (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 2): the iOS app's cells
-// (fixtures/apps/ios/AveriLab) in Compose. One cell per launch — the intent extra `cell` or averilab://cell/<id>; with
-// neither, the catalog as a list, for a person poking at the app. One file per cell family
-// (fixtures/apps/cells/<family>.json): Base.kt, Presented.kt, Forms.kt, Edges.kt, Bars.kt, FalseCovers.kt, Text.kt, Held.kt; CellRouter
-// below sends a cell to its family's screen — but the views family (Views.kt), whose classic Views the activity hosts
-// itself (`host`), outside Compose.
+// The Android lab app (docs/plans/2026-10-15-ground-truth-lab-app.md): the iOS app's cells (fixtures/apps/ios/AveriLab)
+// in Compose. One cell per launch — the intent extra `cell` or averilab://cell/<id>; with neither, the catalog as a
+// list, for a person poking at the app. One file per cell family (fixtures/apps/cells/<family>.json): Base.kt,
+// Presented.kt, Forms.kt, Edges.kt, Bars.kt, FalseCovers.kt, Text.kt, Held.kt; CellRouter below sends a cell to its
+// family's screen — but the views family (Views.kt), whose classic Views the activity hosts itself (`host`), outside
+// Compose.
 
 class MainActivity : ComponentActivity() {
     private lateinit var lab: Lab

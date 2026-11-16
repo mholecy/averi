@@ -188,13 +188,13 @@ struct LabState: Codable {
     var focus: String?
     var keyboard: KeyboardState?
     var submits: [Submit]?
-    // Phase 3's geometry (scripts/truth/truth.ts#geometryOf, scripts/truth/schema.ts#LabState), written only by the
-    // cells that measure it; nil (absent from the file) on every other cell.
+    // The geometry (scripts/truth/truth.ts#geometryOf, scripts/truth/schema.ts#LabState), written only by the cells
+    // that measure it; nil (absent from the file) on every other cell.
     var safeArea: Insets?
     var scrollViews: [String: Frame]?
     var chrome: [String: Frame]?
-    // Phase 5's live oracle (scripts/truth/live.ts): each scroll view's content offset now, and each stroke it took —
-    // nil (absent from the file) on a cell with no scroll view that reports them.
+    // The live oracle (scripts/truth/live.ts): each scroll view's content offset now, and each stroke it took — nil
+    // (absent from the file) on a cell with no scroll view that reports them.
     var offsets: [String: Double]?
     var strokes: [Stroke]?
 }
@@ -274,7 +274,7 @@ final class Lab: ObservableObject {
         write()
     }
 
-    // --- phase 3's geometry: what a target's measured geometry is measured against (truth.ts#geometryOf) ---
+    // --- geometry: what a target's measured geometry is measured against (truth.ts#geometryOf) ---
 
     /// The key window's safe-area insets (windowInsets): iOS's status bar and home indicator.
     func safeArea() {
@@ -302,7 +302,7 @@ final class Lab: ObservableObject {
         write()
     }
 
-    // --- phase 5's live oracle: where each scroll view is, and each stroke it took ---
+    // --- the live oracle: where each scroll view is, and each stroke it took ---
 
     /// The content offset each moving scroll view had when it left rest.
     private var strokeFrom: [String: Double] = [:]

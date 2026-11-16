@@ -25,9 +25,9 @@ import kotlin.math.roundToInt
 
 /**
  * The layers this app can build. A cell of another layer (one the iOS app gained first) is shown as unsupported.
- * `dialog-fullscreen` and `bottom-sheet-dialog` are Android's own (round 7, Presented.kt): the windows ADR 0018's
- * residual 19 covers, closed by its amendment on the window manager's word; `dialog-views-fullscreen` (round 1023b) a
- * Views dialog at an activity's shape.
+ * `dialog-fullscreen` and `bottom-sheet-dialog` are Android's own (Presented.kt): the windows ADR 0018's residual 19
+ * covers, closed by its amendment on the window manager's word; `dialog-views-fullscreen` a Views dialog at an
+ * activity's shape.
  */
 val SUPPORTED_LAYERS = setOf("none", "sheet-medium", "alert", "dialog-fullscreen", "bottom-sheet-dialog", "dialog-views-fullscreen")
 
@@ -87,12 +87,12 @@ class Lab(context: Context, private val screen: Rect) {
     private var ready = false
     private val frames = linkedMapOf<String, Rect>()
     private val events = mutableListOf<JSONObject>()
-    // Phase 3's geometry (scripts/truth/schema.ts#LabState): absent from the file on a cell that reports none.
+    // The geometry (scripts/truth/schema.ts#LabState): absent from the file on a cell that reports none.
     private var safeArea: Rect? = null
     private val scrollViews = linkedMapOf<String, Rect>()
     private val chrome = linkedMapOf<String, Rect>()
-    // Phase 5's live oracle (scripts/truth/live.ts; schema.ts#LabState's offsets, strokes): absent from the file on a
-    // cell with no scroll container that reports them.
+    // The live oracle (scripts/truth/live.ts; schema.ts#LabState's offsets, strokes): absent from the file on a cell
+    // with no scroll container that reports them.
     private val offsets = linkedMapOf<String, Int>()
     private val strokes = JSONArray()
     private val strokeFrom = mutableMapOf<String, Int>()
@@ -159,7 +159,7 @@ class Lab(context: Context, private val screen: Rect) {
         write()
     }
 
-    // --- phase 5's live oracle: where each scroll container is, and each stroke it took ---
+    // --- the live oracle: where each scroll container is, and each stroke it took ---
 
     /**
      * A scroll container's state, read in one snapshot: its content offset (pixels down its content, 0 its top) and
@@ -271,7 +271,7 @@ class Lab(context: Context, private val screen: Rect) {
     }
 }
 
-// --- phase 3's geometry, read once for every family that reports it ---
+// --- geometry, read once for every family that reports it ---
 
 /** A View's unclipped frame on the screen, in pixels. */
 internal fun onScreen(v: View): Rect =

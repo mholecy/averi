@@ -31,7 +31,7 @@ import type { Cell, Lab, Target } from './lab';
 // (`format`, src/format.ts: G an IBAN grouped in fours, A an amount's thousands) — the model holds the formatted text,
 // set back into the controlled TextInput, as a banking app's React Native form does.
 //
-// `rn-banner` (round 9, lab note LR3: docs/bugs/2026-10-19-lab-ios-wda-lists-react-native-views-by-their-frames-top-not-
+// `rn-banner` (lab note LR3: docs/bugs/2026-10-19-lab-ios-wda-lists-react-native-views-by-their-frames-top-not-
 // in-draw-order.md): each target a coloured Pressable filling its slot (a press logs its `tap`), and after it, its LATER
 // JSX sibling, an opaque cover over its centre (`COVERS`, reported as `<tag>.cover`) — React Native draws it over the
 // target, and it has no touch handler, so a touch on it reaches no target. T's and U's covers start 10 pt ABOVE the

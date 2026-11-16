@@ -157,7 +157,7 @@ private fun SplitBox(cell: Cell, t: Target, lab: Lab, modifier: Modifier = Modif
 }
 
 /**
- * scroll-sticky-view (round 4, calibration.json #9): a SplitBox whose content is an Android View (AndroidView), not a
+ * scroll-sticky-view (calibration.json #9): a SplitBox whose content is an Android View (AndroidView), not a
  * Compose node — the container (the target's id, a Compose node) neither clickable nor merging, its content a
  * clickable android.view.View of the target's colour labelled `Target <tag>`. Compose's accessibility takes what the
  * merged sticky header covers out of the container's bounds, as on scroll-sticky-cut; the View's bounds are the View
@@ -389,7 +389,7 @@ private fun CarouselInList(cell: Cell, lab: Lab, screenWidth: Dp, screenHeight: 
     }
 }
 
-/** A carousel card: EdgeBox at the card's size. */
+/** A carousel card: EdgeBox's target (its tag, label, colour, tap and frame) at the size its modifier gives. */
 @Composable
 private fun CardBox(cell: Cell, t: Target, lab: Lab, modifier: Modifier) {
     val view = LocalView.current

@@ -2,13 +2,13 @@ import SwiftUI
 import UIKit
 
 // The presented family (fixtures/apps/cells/presented.json): a layer presented over the coloured-target host
-// (Base.swift) — a sheet at the medium detent with its own target, an alert (phase 1); phase 3's cells: the medium sheet
-// over a scrolled host whose targets lie at its edges (sheet-medium-edges), a large sheet whose bare background lies
-// over the targets (sheet-background), a large sheet holding a UIKit table longer than the screen (sheet-long-list; cut
-// short of the sheet's foot, a footer under it: sheet-long-list-short), a
-// transparent full-screen cover dimming the screen (dim-cover, an RN transparent Modal's shape) and an in-screen menu
-// over a blurred, dimmed backdrop that no tree lists (blur-menu), and mp-native's payment-type chooser — a white card
-// of option rows over a dimmed list, listed before it (chooser).
+// (Base.swift) — a sheet at the medium detent with its own target, an alert; the medium sheet over a scrolled host
+// whose targets lie at its edges (sheet-medium-edges), a large sheet whose bare background lies over the targets
+// (sheet-background), a large sheet holding a UIKit table longer than the screen (sheet-long-list; cut short of the
+// sheet's foot, a footer under it: sheet-long-list-short), a transparent full-screen cover dimming the screen
+// (dim-cover, an RN transparent Modal's shape) and an in-screen menu over a blurred, dimmed backdrop that no tree lists
+// (blur-menu), and mp-native's payment-type chooser — a white card of option rows over a dimmed list, listed before it
+// (chooser).
 
 /// A presented cell's screen, by its layer: the scrolled host, the blur menu, the chooser, else the slot host (Base.swift#CellScreen)
 /// with the layer raised over it (PresentedLayer).
@@ -301,7 +301,7 @@ final class LongListController: UITableViewController {
 /// reading order — the card's rows between the targets above and below them; grouped (`blur-menu-grouped`), the card
 /// and the screen beneath are each an accessibility container of the screen's size, the card's declared first: its rows
 /// listed before every target beneath, which starts above them (mp-native's chooser under idb, ADR 0015).
-/// ADR 0018 residual 9's probes (round 16), each grouped: `blur-menu-stacked` declares the three in the order they are
+/// ADR 0018 residual 9's probes, each grouped: `blur-menu-stacked` declares the three in the order they are
 /// drawn (the screen beneath, the backdrop, the card; no zIndex) — with blur-menu-grouped's reverse declaration it
 /// tells whether WDA lists the backdrop and the screen beneath, both at 0,0 the screen's size, in draw order or in
 /// declaration order; `blur-menu-unhidden` is blur-menu-grouped with the backdrop not `.accessibilityHidden`.
