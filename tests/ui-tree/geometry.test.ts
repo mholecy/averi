@@ -96,7 +96,7 @@ describe('inferScreenSize', () => {
    * The shape gate keeps a bar from being CROWNED, but a bar that is never a
    * candidate still reaches the walk — which, unchecked, would hand `reliable`
    * to any origin-anchored maximum. Pixel-scale junk in a point tree would then
-   * read as an 804pt screen, in silence: hole 1, third appearance.
+   * read as an 804pt screen, in silence.
    */
   it('refuses a walked width that the tree\'s own screen-shaped rects contradict', () => {
     const tree = node({ x: 0, y: 0, width: 0, height: 0 }, null, [
@@ -183,7 +183,7 @@ describe('inferScreenSize', () => {
   });
 
   /**
-   * The other direction, also from review: a non-edge-to-edge uiautomator dump
+   * The other direction: a non-edge-to-edge uiautomator dump
    * whose app window starts BELOW the status bar leaves the bar as the only
    * origin-anchored root. Crowning it would scale a 2400px capture by 30x down
    * and fail closed on a capture 0.5.0 read correctly.
@@ -492,7 +492,7 @@ describe('Clips.cutSliver at any depth, synthetic shapes — a node cut at a cli
     // Clipped out the OTHER way, or clamped at an edge that is not this one (an inner clip 13 px down): no evidence of a cut at the top.
     expect(cutOf(row(out({ x: 198, y: 297, width: 126, height: 0 }, 'bottom')), [list])).toBeUndefined();
     expect(cutOf(row(out({ x: 198, y: 310, width: 126, height: 0 }, 'top')), [list])).toBeUndefined();
-    // A plain zero-area descendant (no mark) stays none, as before.
+    // A plain zero-area descendant (no mark) stays none.
     expect(cutOf(row(at({ x: 198, y: 297, width: 126, height: 0 })), [list])).toBeUndefined();
   });
   it('equal depths: the NEAREST ancestor\'s edge wins (the chain is walked nearest first; a later edge must be shallower)', () => {

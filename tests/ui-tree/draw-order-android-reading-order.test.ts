@@ -69,7 +69,8 @@ describe('the lab\'s form-shared-id (Compose, in location order by chance, unmar
  * D75: marking is not monotone-cautious. A control listed AFTER the target in a classic
  * run, over its centre, was a cover by the draw order (`drawn`: the tap refused); in a marked run it is a peer whose
  * order is untold — still a cover with no screenshot, but LIFTED when the eyes see the target on top (ADR 0024's
- * judgement, on Android frames). Unmeasured live in that direction (ADR 0015's D75 residual; backlog D77).
+ * judgement, on Android frames). Measured live in that direction by backlog D84 (ADR 0015's D84 amendment; the cell
+ * is pinned in tests/verify/eyes-views-drawn-over.test.ts).
  */
 describe('a later-listed control over the target\'s centre in a classic run: drawn unmarked, untold marked, lifted by the eyes', () => {
   const OVERLAP = `<hierarchy rotation="0">

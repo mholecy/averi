@@ -336,8 +336,8 @@ describe('the order a screenshot saw, handed to the draw order', () => {
 /**
  * idb's TOP BAR against its content in reading order (reading-order.ts#peersOf, `contentFrom`; ADR 0004, chrome before
  * content): the bar's controls are no peers whose order is untold — of a content row scrolled under them, nor, for a
- * bar control, a content row listed after it, which the draw order judges as before (drawn over it when it reaches past
- * the bar's band).
+ * bar control, a content row listed after it, which the draw order judges (drawn over it when it reaches past the bar's
+ * band).
  */
 describe('idb\'s top bar and its content: no reading-order peers of each other', () => {
   const el = (identifier: string, rect: UiNode['rect'], role = 'button'): UiNode => node({ role, identifier, rect });
