@@ -374,11 +374,10 @@ flows:
     ).toThrow(/Invalid averi\.yaml/);
   });
 
-  // The selector fields live once, in element-spec.ts, and step schemas extend
-  // them. Both halves of that need pinning: extending must not loosen `strict`
-  // (a typo'd key has to stay an error), and the extra fields a step adds must
-  // not satisfy "names at least one selector" — the two ways the shared shape
-  // could silently go wrong for every step at once.
+  // The selector fields live once, in src/ui-tree/element-spec.ts, and step schemas extend them. Both halves of that
+  // need pinning: extending must not loosen `strict` (a typo'd key has to stay an error), and the extra fields a step
+  // adds must not satisfy "names at least one selector" — the two ways the shared shape could silently go wrong for
+  // every step at once.
   it('extended step specs keep strict keys and do not count their own fields as selectors', () => {
     for (const step of ['tap: { id: a, timeoutt: 10s }', 'fill: { id: a, value: "1", clera: true }']) {
       expect(() => parseConfig(`app: {}\nflows:\n  f:\n    steps:\n      - ${step}\n`)).toThrow(
