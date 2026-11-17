@@ -10,7 +10,7 @@ import type { FirstSample, HandedRead } from './read-tree.js';
  * and the re-detect read the same screen again at 10.7 s), an assert after an assert, the first sample of a tap
  * after a `wait:`. This object keeps that last read and gives it to the next poll as its FIRST round — never as
  * anything else. `pollTree` (read-tree.ts) owns what a handed round may decide: only a value ends the poll on it; a
- * miss, an undecided round, a PollMiss detail or a predicate's throw is discarded and the next round reads fresh,
+ * miss, an undecided round or a predicate's throw is discarded and the next round reads fresh,
  * without the deadline being checked. So a handed read is a positive verdict or a first sample whose fresh second
  * read must agree (resolveSettled), never a stability proof, never an absence.
  *

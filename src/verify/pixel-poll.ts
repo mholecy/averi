@@ -5,8 +5,7 @@ import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
 import { judgedWithOrder, type OrderEyes, type PairQuestion } from '../ui-tree/eyes.js';
 import { lookOn, type Look } from '../ui-tree/look.js';
 import type { OrderSeen } from '../ui-tree/seen-order.js';
-import { pollTree, treeFingerprint } from '../ui-tree/read-tree.js';
-import { markedForMiss } from '../ui-tree/window-mark.js';
+import { treeFingerprint } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import type { PixelRegionOf } from '../ui-tree/standing.js';
@@ -15,7 +14,7 @@ import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, ty
 import { apartOfFrame, orderOfFrame, untoldAll } from './eyes.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
 import { formatSeconds } from '../util/duration.js';
-import { notFound, verdictToPoll, type PixelMeasureInput, type PollVerdict } from './poll-verdict.js';
+import { asRound, notFound, pollVerdicts, type PixelMeasureInput, type PollVerdict, type RoundVerdict, type TimedOut, type Withdraw } from './poll-verdict.js';
 import { keyboardOver, pixelMissText } from './pixel-text.js';
 
 /**
@@ -58,11 +57,12 @@ import { keyboardOver, pixelMissText } from './pixel-text.js';
  *   found … (last UI tree read failed: …)"), so a `verify` leg keeps its
  *   trace and results and a flow's `assert:` step fails with this reason.
  *   Only a png that came back and does not decode is a miss, and the poll
- *   goes on. A `measure` verdict marked `final` (poll-verdict.ts) ends the
+ *   goes on. A `measure` verdict marked `final` (poll-verdict.ts#FinalVerdict) ends the
  *   assert the same way with its own sentence — the ocr assert's, for a
  *   recognizer that will never read (no `swiftc`, a recognizer that did not
  *   compile).
- * - the memory and the wording at the deadline (`PixelPollMemory`, private).
+ * - the memory and the wording at the deadline (`PixelPollMemory`, private); the last
+ *   finding is the verifier's poll's (poll-verdict.ts#LastFinding).
  *
  * The round hands the capture the first match's rect as its `region`, so
  * "settled" means the ELEMENT'S pixels held still across two captures
@@ -104,8 +104,8 @@ import { keyboardOver, pixelMissText } from './pixel-text.js';
  * WHAT LIES OVER THE ELEMENT (`overElement`), before anything is captured —
  * a miss naming it, never a measurement, and a finding like any other: the
  * poll goes on, a later round that finds the element clear withdraws it
- * (`PixelPollMemory.uncovered`), and when every round was covered it is the
- * timeout's wording.
+ * (`pollPixels`, through poll-verdict.ts#Withdraw), and when every
+ * round was covered it is the timeout's wording.
  * - The soft keyboard, first: the round's reading
  *   (ui-tree/keyboard-cover.ts#readKeyboard — the adapter's oracle when it
  *   has one, else the round's own tree, shared with the tap guard) asked
@@ -237,18 +237,6 @@ class PixelPollMemory {
    */
   private slowestRoundMs = 0;
   private lastRect: Rect | undefined;
-  /**
-   * The covered sentence the last covered round recorded, and whether an
-   * oracle answer SINCE then said the keyboard no longer covers the element.
-   * pollTree keeps the last PollMiss detail and is not
-   * this module's to change, so a covered miss cannot be withdrawn there;
-   * `timeoutDetail` skips it instead when it is still the last detail and a
-   * later round saw the element clear — "dismiss the keyboard" is false once
-   * the last look found it hidden. A round cut BEFORE the query leaves both
-   * alone: it saw nothing, and the last finding still outranks silence.
-   */
-  private lastCovered: string | undefined;
-  private coverCleared = false;
 
   constructor(private readonly unchecked: PixelPollSpec['unchecked']) {}
 
@@ -342,21 +330,11 @@ class PixelPollMemory {
    * (`timeoutDetail`: the last finding outranks the silent rounds and
    * not-found), and a later round cut by the deadline before its query
    * does not erase it; a later round that finds the element clear
-   * withdraws it (`uncovered`).
+   * withdraws it (`PixelMiss.covered`) — "dismiss the keyboard" is false
+   * once the last look found it hidden.
    */
-  coveredMiss(reason: string): PollVerdict {
-    const detail = failClosed(reason, this.unchecked);
-    this.lastCovered = detail;
-    this.coverCleared = false;
-    return { pass: false, detail };
-  }
-
-  /**
-   * The round found nothing over the element — no keyboard (or no oracle),
-   * no cover, no status band: an earlier covered miss is no longer the truth.
-   */
-  uncovered(): void {
-    if (this.lastCovered !== undefined) this.coverCleared = true;
+  coveredMiss(reason: string): RoundVerdict<PixelMiss> {
+    return { pass: false, miss: { detail: failClosed(reason, this.unchecked), covered: true } };
   }
 
   /** The frame is not a verdict: a miss with the reason when it was seen moving, silence when nothing could be judged. */
@@ -370,16 +348,15 @@ class PixelPollMemory {
   }
 
   /**
-   * The timeout wording: the last finding, else found-but-no-time (cut or
+   * The timeout wording: the last finding that stands, else found-but-no-time (cut or
    * unconfirmed, whichever silenced the last such round), which outranks
    * not-found — said where neither is left (`wordsNotFound`, the one rule of
-   * it). A covered miss that a later query contradicted is not a finding any
-   * more (`lastCovered`): the silent round after it speaks.
+   * it). A covered miss that a later round withdrew is no finding: the silent round after it speaks.
    * Not-found is asked with the assert's `element` (poll-verdict.ts#notFound).
    */
-  timeoutDetail(timeoutMs: number, last: { detail?: string; readError?: Error; lastTree?: UiNode }, element: ElementSpec): string {
-    if (this.wordsNotFound(last.detail)) return notFound(timeoutMs, last, element);
-    if (this.findingStands(last.detail)) return last.detail!;
+  timeoutDetail(timeoutMs: number, last: TimedOut<PixelMiss>, element: ElementSpec): string {
+    if (this.wordsNotFound(last.miss)) return notFound(timeoutMs, last, element);
+    if (last.miss !== undefined) return last.miss.detail;
     const roundCost = `the slowest round — a tree read and its captures — took ${formatSeconds(this.slowestRoundMs)} here`;
     if (this.foundSilently === 'unconfirmed') {
       return (
@@ -390,19 +367,26 @@ class PixelPollMemory {
     return `element found, but no time was left within ${formatSeconds(timeoutMs)} to capture a settled frame (${roundCost}) — raise this assert timeout`;
   }
 
-  /** The last finding is what the timeout says (`timeoutDetail`): there is one, and no later query contradicted it. */
-  private findingStands(detail: string | undefined): boolean {
-    return detail !== undefined && !(this.coverCleared && detail === this.lastCovered);
-  }
-
   /**
    * The timeout words a not-found (`timeoutDetail`): no finding stands, and the element was never found silently — the
    * one case the window manager's word is asked for (`pollPixels`).
    */
-  wordsNotFound(detail: string | undefined): boolean {
-    return !this.findingStands(detail) && this.foundSilently === undefined;
+  wordsNotFound(miss: PixelMiss | undefined): boolean {
+    return miss === undefined && this.foundSilently === undefined;
   }
 }
+
+/** A pixel poll's miss: its fail-closed sentence, and `covered` when it names what lies over the element — the one miss a later round withdraws. */
+interface PixelMiss {
+  detail: string;
+  covered?: true;
+}
+
+/** A verdict the round words as a `PollVerdict`, as the poll's round (poll-verdict.ts#asRound), its detail a miss that names no cover. */
+const pixelRound = (verdict: PollVerdict | undefined): RoundVerdict<PixelMiss> | undefined => {
+  const round = asRound(verdict);
+  return round === undefined || round.pass || round.final ? round : { pass: false, miss: { detail: round.miss } };
+};
 
 /**
  * What lies over the element in this round's look (ui-tree/look.ts#Look,
@@ -543,18 +527,6 @@ function blendsUntold(look: Look, element: UiNode, frame: MeasuredFrame, region:
 }
 
 /**
- * A miss no later round can change, carried out of the tree poll to end it
- * at once — a capture the adapter refused (header, "A capture the ADAPTER
- * refuses"), or a `measure` verdict marked `final` (poll-verdict.ts). Private:
- * this module is the one place that turns "final" into control flow; a
- * measurement says it with a value. `detail` is already the whole
- * fail-closed sentence.
- */
-class FinalMiss {
-  constructor(readonly detail: string) {}
-}
-
-/**
  * The fail-closed sentence of a refused capture — the pixel asserts' and the baseline diff's. The adapter's
  * sentence ends with a full stop; failClosed drops it (fail-closed.ts) rather than printing
  * `attention.; failing closed` (seen on device).
@@ -577,7 +549,7 @@ export async function pollPixels(
 ): Promise<PollVerdict> {
   const { element, timeoutMs, pollMs, unchecked, measure } = spec;
   const memory = new PixelPollMemory(unchecked);
-  const round = async (tree: UiNode, deadline: number): Promise<PollVerdict | undefined> => {
+  const round = async (tree: UiNode, deadline: number, finding: Withdraw<PixelMiss>): Promise<RoundVerdict<PixelMiss> | undefined> => {
     const found = findBySpec(tree, element);
     if (found.length === 0) {
       memory.forgetRect();
@@ -601,35 +573,39 @@ export async function pollPixels(
     const eyes: OrderEyes = { order: (question) => orderOnCapture(question, memory.keptOrder(tree), capture) };
     const over = await overElement(adapter, look, found[0], { ...(spec.reads !== undefined && { reads: spec.reads }), glyphs: spec.glyphs === true, judgedOn, eyes });
     if (over !== undefined) return memory.coveredMiss(over);
-    memory.uncovered();
-    // A refused capture leaves the poll at once — header, "A capture the ADAPTER refuses".
-    const frame = await capture().catch((e: unknown) => {
-      throw new FinalMiss(screenshotFailed(captureRefusal(e), unchecked));
-    });
-    if (frame.stability !== 'settled') return memory.unsettled(frame);
+    // Nothing over the element — no keyboard (or no oracle), no cover, no band: an earlier covered miss is no longer the truth.
+    finding.withdraw((miss) => miss.covered === true);
+    // A refused capture ends the poll at once, a final miss — header, "A capture the ADAPTER refuses".
+    let frame: TreeRequestedFrame;
+    try {
+      frame = await capture();
+    } catch (e) {
+      return { pass: false, detail: screenshotFailed(captureRefusal(e), unchecked), final: true };
+    }
+    if (frame.stability !== 'settled') return pixelRound(memory.unsettled(frame));
     // Only the element's region held still: measure only at a rect two consecutive reads agree on (header).
-    if (frame.settledOver === 'region' && (previous === undefined || !sameRect(previous, rect))) return memory.unconfirmed(previous, rect);
+    if (frame.settledOver === 'region' && (previous === undefined || !sameRect(previous, rect))) return pixelRound(memory.unconfirmed(previous, rect));
     const { shot, measured } = frame;
     // The supplied-tree arm is never treeless: an error here is a png that did not decode.
-    if (measured.error !== undefined) return { pass: false, detail: failClosed(measured.error, unchecked) };
+    if (measured.error !== undefined) return pixelRound({ pass: false, detail: failClosed(measured.error, unchecked) });
     // Measured on THE region the standing judged over (Scene.pixelRegion): the part its scroll views draw.
     const region = look.scene.pixelRegion(found[0], screen);
     // Where the tree cannot tell that (idb's flat list), a colour read on the screen beside it is no measurement of it.
     const blends = spec.glyphs === true ? undefined : blendsUntold(look, found[0], measured, region);
-    if (blends !== undefined) return { pass: false, detail: failClosed(blends, unchecked) };
-    const verdict = await measure({ rect: region, shot, measured });
-    // A failure no later round can change leaves the poll at once, as a refused capture does.
-    if (verdict.final) throw new FinalMiss(verdict.detail);
-    return verdict;
+    if (blends !== undefined) return pixelRound({ pass: false, detail: failClosed(blends, unchecked) });
+    // A verdict marked final ends the poll at once, as a refused capture does.
+    return pixelRound(await measure({ rect: region, shot, measured }));
   };
   // Each round is timed from the start of its read, for the timeout wording: pollTree's observer sets this before every
   // predicate call, so the initial value only satisfies definite assignment.
   let readStarted = Date.now();
-  const outcome = await pollTree(
+  // A throw propagates — a read no wait cures (adapters/types.ts#PersistentReadError, D21) included: whether it fails
+  // the assert or is thrown is the Verifier's (VerifierOptions.persistentRead), not the round's.
+  return pollVerdicts<PixelMiss>(
     adapter,
-    async (tree, { deadline }) => {
+    async (tree, { deadline }, finding) => {
       try {
-        return verdictToPoll(await round(tree, deadline));
+        return await round(tree, deadline, finding);
       } finally {
         memory.roundTook(Date.now() - readStarted);
       }
@@ -642,19 +618,9 @@ export async function pollPixels(
           readStarted = startedAt;
         },
       },
+      // The window manager's word is asked only where the timeout words a not-found: a standing finding is the detail instead.
+      missing: (miss) => (memory.wordsNotFound(miss) ? element : undefined),
+      timeoutDetail: (last) => memory.timeoutDetail(timeoutMs, last, element),
     },
-  ).catch((e: unknown) => {
-    // pollTree propagates the predicate's own errors; only a final miss — a
-    // refused capture, or a verdict `measure` marked final — is ours to turn into the verdict.
-    if (e instanceof FinalMiss) return e;
-    // Anything else propagates — a read no wait cures (adapters/types.ts#PersistentReadError, D21) included: whether
-    // it fails the assert or is thrown is the Verifier's (VerifierOptions.persistentRead), not the round's.
-    throw e;
-  });
-  if (outcome instanceof FinalMiss) return { pass: false, detail: outcome.detail };
-  if (!outcome.timedOut) return { pass: true, detail: outcome.value.detail };
-  // The window manager's word on the last tree's window, asked now the poll has given up on an element it never found
-  // (ui-tree/window-mark.ts): only where the timeout words a not-found — a standing finding is the detail instead.
-  const lastTree = await markedForMiss(adapter, outcome, memory.wordsNotFound(outcome.detail) ? element : undefined);
-  return { pass: false, detail: memory.timeoutDetail(timeoutMs, { ...outcome, lastTree }, element) };
+  );
 }

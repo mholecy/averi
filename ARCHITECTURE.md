@@ -256,7 +256,8 @@ Asserts, the layout contract, rect/colour/text parity, OCR and screenshot diffin
   (`pngScale`, `windowWidth`). `shot.ts` (a capture as pixels or PNG, ADR 0035), `png.ts` (the one decoder).
 - **Asserts** — `assert.ts` (the `Verifier`; three tiers, cheapest first), `element-assert.ts` (exists / absent / text
   / match / error, shared with averi.yaml's inline `assert:`), `pixel-poll.ts` (`pollPixels`: the colour and OCR
-  asserts' one round, budget and deadline), `pixel-text.ts` (the pixel verb's words), `poll-verdict.ts`,
+  asserts' one round, budget and deadline), `pixel-text.ts` (the pixel verb's words), `poll-verdict.ts`
+  (`pollVerdicts`: the verifier's one poll — its last finding, final misses and the one timeout tail),
   `fail-closed.ts` (the one sentence of a check not done: never a pass), `text-hint.ts` (why an exact text missed while
   on screen).
 - **OCR** — `ocr.ts` (anchored OCR: what the user sees inside an element's rect, macOS Vision), `ocr-fold.ts`

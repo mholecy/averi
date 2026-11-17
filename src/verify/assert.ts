@@ -4,9 +4,8 @@ import pixelmatch from 'pixelmatch';
 import { z } from 'zod';
 import { PersistentReadError, type DeviceAdapter, type UiNode } from '../adapters/types.js';
 import { describeElementSpec, elementSpecSchema, type ElementSpec } from '../ui-tree/element-spec.js';
-import { pollOnVerdict, pollTree, Undecided, type FirstSample, type PollRound } from '../ui-tree/read-tree.js';
+import { pollOnVerdict, Undecided, type FirstSample, type PollRound } from '../ui-tree/read-tree.js';
 import { ReadHandOff } from '../ui-tree/read-handoff.js';
-import { markedForMiss } from '../ui-tree/window-mark.js';
 import { durationSchema, formatSeconds, parseDuration } from '../util/duration.js';
 import { regexSource } from '../util/regex.js';
 import { elementAssertSchema } from './element-assert.js';
@@ -23,7 +22,7 @@ import {
 } from './capture.js';
 import { failClosed } from './fail-closed.js';
 import { pollPixels, screenshotFailed } from './pixel-poll.js';
-import { notFound, verdictToPoll, type PollVerdict } from './poll-verdict.js';
+import { asRound, notFound, pollVerdicts, type PollVerdict, type RoundVerdict, type TimedOut } from './poll-verdict.js';
 import { colorSampleRect, DEFAULT_TOLERANCE_DE, evaluateColorAssert, normalizeHex, type ColorExpectation } from './color-parity.js';
 import { ocrEngineFor, type OcrEngineChoice } from './ocr.js';
 import { decodePng } from './png.js';
@@ -31,7 +30,7 @@ import { DEFAULT_TOLERANCE_PCT, evaluateRectAssert, type RectExpectation } from 
 import { measureOcrAssert, type OcrExpectation } from './text-parity.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { absenceVerdict, bareTimeoutNote } from '../ui-tree/verdict.js';
-import { flattenTree, textHint } from './text-hint.js';
+import { textHint } from './text-hint.js';
 
 /**
  * Declarative checks (ARCHITECTURE.md §5, the `assert` tool), cheapest
@@ -251,26 +250,33 @@ interface PlannedAssert {
   run: () => Promise<PollVerdict>;
 }
 
-interface PollSpec {
+interface PollSpec<M = never> {
   timeoutMs: number;
   /**
-   * Detail for the failing result at the deadline, from the last non-passing
-   * detail an evaluation produced and the last tree-read error. Each assert
-   * words this itself, and they deliberately ORDER the two differently: an
-   * element assert prefers the read error (a tree it never read explains the
-   * miss), a rect assert prefers the measurement (it did read the tree, and
-   * the numbers are the finding) — as the pixel poll does for the color and
-   * ocr asserts (verify/pixel-poll.ts), which word theirs there.
+   * Detail for the failing result at the deadline, from the miss that stands and the last tree-read error. Each assert
+   * words this itself, and they deliberately ORDER the two differently: an element assert prefers the read error (a tree
+   * it never read explains the miss), a rect assert prefers the measurement (it did read the tree, and the numbers are
+   * the finding) — as the pixel poll does for the color and ocr asserts (verify/pixel-poll.ts), which word theirs there.
    */
-  timeoutDetail: (last: { detail?: string; readError?: Error; undecidedTree?: UiNode; lastTree?: UiNode }) => string;
+  timeoutDetail: (last: TimedOut<M>) => string;
   /**
-   * The element whose not-found `timeoutDetail` words when no evaluation left a detail — what the window manager's word
+   * The element whose not-found `timeoutDetail` words when no miss stands — what the window manager's word
    * is asked about at the deadline (ui-tree/window-mark.ts#markedForMiss). Absent for an assert that words no
    * not-found (`absent`: "still visible").
    */
   missing?: ElementSpec;
   /** Where this assert may take a handed-on read as its first round — the element assert only (see `assert`). */
   first?: FirstSample;
+}
+
+/**
+ * The element assert's miss, one record: the element found saying the wrong thing — its `content` line, and the nodes
+ * the spec matched in that read, its `subject`, which the hint quotes (text-hint.ts#textHint). Set together by the one
+ * round that found them, so the hint can only ever explain the content line it follows.
+ */
+interface ElementMiss {
+  content: string;
+  subject: UiNode[];
 }
 
 export class Verifier {
@@ -384,42 +390,38 @@ export class Verifier {
     // explain a failure that did not happen.
     const exactText =
       text ?? (match === undefined && error === undefined ? (element.text ?? element.label) : undefined);
-    // The hint is scoped to the nodes the SPEC matched in the fresh read that left the content line, when one did —
-    // an id-addressed assert must not be explained by an unrelated node elsewhere on screen — and widens to the last
-    // tree read only when the spec found nothing to talk about (text-hint.ts#HintScope). A handed-on tree's miss is
-    // discarded (ADR 0030), so its nodes are no subject.
-    let subject: UiNode[] | undefined;
+    // The hint is scoped to the nodes the SPEC matched in the round whose miss stands, when one does — an
+    // id-addressed assert must not be explained by an unrelated node elsewhere on screen — and widens to the last tree
+    // read only when the spec found nothing to talk about. The miss carries both, and only a fresh read's miss is kept
+    // (poll-verdict.ts#pollVerdicts, ADR 0030), so a handed-on tree's nodes are never a subject.
     const run = (): Promise<PollVerdict> =>
-      this.treePoll(
-        (tree, round) => {
+      this.treePoll<ElementMiss>(
+        (tree) => {
           const found = findBySpec(tree, element);
-          if (found.length > 0 && round.handedOn === undefined) subject = found;
           if (found.some(contentMatches)) return { pass: true };
           if (found.length === 0) return undefined;
           // The element is there but says the wrong thing — worth reporting at
           // the deadline, not worth ending the poll for.
-          return {
-            pass: false,
-            detail: found
-              .slice(0, 3)
-              .map((n) => JSON.stringify(error !== undefined ? (n.error ?? null) : (n.label ?? n.value)))
-              .join(', '),
-          };
+          const content = found
+            .slice(0, 3)
+            .map((n) => JSON.stringify(error !== undefined ? (n.error ?? null) : (n.label ?? n.value)))
+            .join(', ');
+          return { pass: false, miss: { content, subject: found } };
         },
         {
           timeoutMs,
           missing: element,
           first: this.handOff,
-          timeoutDetail: ({ detail, readError, lastTree }) => {
+          timeoutDetail: ({ miss, readError, lastTree }) => {
             if (readError !== undefined) return notFound(timeoutMs, { readError }, element);
             const base =
-              detail !== undefined ?
-                `element found but ${error !== undefined ? 'error' : 'content'} was: ${detail}`
+              miss !== undefined ?
+                `element found but ${error !== undefined ? 'error' : 'content'} was: ${miss.content}`
               : notFound(timeoutMs, { lastTree }, element);
             const hint =
               exactText === undefined ? undefined
-              : subject !== undefined ? textHint(subject, exactText, 'subject')
-              : lastTree !== undefined ? textHint(flattenTree(lastTree), exactText, 'others')
+              : miss !== undefined ? textHint(exactText, { subject: miss.subject })
+              : lastTree !== undefined ? textHint(exactText, { tree: lastTree })
               : undefined;
             return hint === undefined ? base : `${base}\n  ${hint}`;
           },
@@ -450,16 +452,16 @@ export class Verifier {
     // poll's reads meet the persistentRead policy here.
     const run = async (): Promise<PollVerdict> => {
       const witness = await ScreenWitness.read(this.adapter);
-      return this.treePoll(
+      return this.treePoll<string>(
         async (tree) => {
           // First occurrence wins — the same duplicate-id rule as rect-parity.
           const found = findBySpec(tree, element);
-          return found.length === 0 ? undefined : evaluateRectAssert(found[0].rect, expected, await witness.judge(tree));
+          return found.length === 0 ? undefined : asRound(evaluateRectAssert(found[0].rect, expected, await witness.judge(tree)));
         },
         {
           timeoutMs,
           missing: element,
-          timeoutDetail: ({ detail, ...last }) => detail ?? notFound(timeoutMs, last, element),
+          timeoutDetail: ({ miss, ...last }) => miss ?? notFound(timeoutMs, last, element),
         },
       );
     };
@@ -538,12 +540,12 @@ export class Verifier {
    * sleeps"): read the tree, evaluate it, stop on a pass, otherwise remember
    * what it said and retry until the deadline. The color and ocr asserts
    * poll through `pollPixels` (verify/pixel-poll.ts), on the same loop and
-   * the same verdict translation (verify/poll-verdict.ts).
+   * the same verifier's poll (verify/poll-verdict.ts#pollVerdicts).
    *
    * The loop itself is `pollTree` (ui-tree/read-tree.ts), written once
-   * rather than copied per assert. What stays here
-   * is the verifier's vocabulary: an evaluator's verdict in, the poll's PollVerdict out, and
-   * the per-assert timeout wording. A read no wait cures propagates from here
+   * rather than copied per assert, and the verifier's poll around it, which
+   * keeps the round's miss and owns the timeout tail. What stays here is the
+   * not-found target and the per-assert timeout wording. A read no wait cures propagates from here
    * as from the pixel poll: `decided` alone applies the policy (A20).
    *
    * `pollMs` is the cadence of the rounds (reads start at least pollMs
@@ -573,29 +575,19 @@ export class Verifier {
    * no capture budget is spent on top of it, and no verdict comes from a
    * frame that was still moving.
    */
-  private async treePoll(
-    evaluate: (
-      tree: UiNode,
-      round: PollRound,
-    ) => PollVerdict | typeof Undecided | undefined | Promise<PollVerdict | typeof Undecided | undefined>,
-    spec: PollSpec,
+  private treePoll<M = never>(
+    evaluate: (tree: UiNode, round: PollRound) => RoundVerdict<M> | typeof Undecided | undefined | Promise<RoundVerdict<M> | typeof Undecided | undefined>,
+    spec: PollSpec<M>,
   ): Promise<PollVerdict> {
-    const outcome = await pollTree(this.adapter, async (tree, round) => {
-      const verdict = await evaluate(tree, round);
-      return verdict === Undecided ? Undecided : verdictToPoll(verdict);
-    }, {
+    const { missing } = spec;
+    return pollVerdicts(this.adapter, evaluate, {
       timeoutMs: spec.timeoutMs,
       pollMs: this.pollMs,
       ...(spec.first !== undefined && { first: spec.first }),
+      // A standing miss is the finding, and no not-found is worded beside it.
+      ...(missing !== undefined && { missing: (miss: M | undefined) => (miss === undefined ? missing : undefined) }),
+      timeoutDetail: spec.timeoutDetail,
     });
-    if (!outcome.timedOut) return { pass: true, detail: outcome.value.detail };
-    // The window manager's word on the last tree's window, asked now the poll has given up on a target it never found
-    // (ui-tree/window-mark.ts): a detail is the finding, and no not-found is worded beside it.
-    const lastTree = await markedForMiss(this.adapter, outcome, outcome.detail === undefined ? spec.missing : undefined);
-    return {
-      pass: false,
-      detail: spec.timeoutDetail({ detail: outcome.detail, readError: outcome.readError, undecidedTree: outcome.undecidedTree, lastTree }),
-    };
   }
 
   /**
