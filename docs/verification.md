@@ -29,6 +29,9 @@ the crash) or a `screenshot`.
 Added 2026-08-05, dogfooded on a real cross-platform payment form:
 
 ```yaml
+states:
+  payment_form:
+    detect: { element: { id: amount_input } }
 flows:
   check_validation:
     requires: payment_form
