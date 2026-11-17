@@ -121,7 +121,7 @@ describe('round — the end turn: the caller\'s way first, proven exhausted, the
     expect(message).toMatch(/; 1 swipe up did not move it — the tree lists the content of scrollable \(0,380 402x180\) ending at its top — so averi turned down, as the tree places the element below it$/);
   });
 
-  it('a stroke that moved nothing over a scroll view whose content runs on that way is no proof (a stroke not taken): the caller\'s way twice, no turn, the failure advising the other way as before', () => {
+  it('a stroke that moved nothing over a scroll view whose content runs on that way is no proof (a stroke not taken): the caller\'s way twice, no turn, the failure advising the other way', () => {
     // `lower` scrolled 300: 300 pt of its content lies above its top; F (now at 1080) still below.
     const played = play(IPHONE, [at(300), at(300), at(300)]);
     expect(strokesToward(played)).toEqual(['up', 'up']);
@@ -131,7 +131,7 @@ describe('round — the end turn: the caller\'s way first, proven exhausted, the
     );
   });
 
-  it('a stroke that touched down on a node drawn over its scroll view proves nothing in one: that node may have taken it — two strokes, the failure naming it first, as before', () => {
+  it('a stroke that touched down on a node drawn over its scroll view proves nothing in one: that node may have taken it — two strokes, the failure naming it first', () => {
     const bar = node({ role: 'other', label: 'bar', rect: { x: 0, y: 400, width: 402, height: 40 } });
     const covered = (row: Row): Row => {
       const tree = row.tree as UiNode;
@@ -158,7 +158,7 @@ describe('round — the end turn: the caller\'s way first, proven exhausted, the
     expect(played.outcome).toMatchObject({ kind: 'bound', by: { of: 'exhausted', lastStroke: 'down' }, endTurn: { way: 'up', to: 'down' } });
   });
 
-  it('a target not in the tree: no scroll view of its own is known — on WDA no node clips, so no largest scroller either — and a stroke over the screen box proves no end: two unmoved strokes, as before; the stop names `lower`, the listed scroll view along the stroke the swipes did not go over (D76: re-pinned — the generic causes now follow it after the else; D78: re-pinned — its rect is the next call\'s `within`)', () => {
+  it('a target not in the tree: no scroll view of its own is known — on WDA no node clips, so no largest scroller either — and a stroke over the screen box proves no end: two unmoved strokes; the stop names `lower`, the listed scroll view along the stroke the swipes did not go over, with its rect as the next call\'s `within` and the generic causes after the else', () => {
     const played = play(IPHONE, [at(0, 'nope'), at(0, 'nope'), at(0, 'nope')]);
     expect(strokesToward(played)).toEqual(['up', 'up']);
     expect(failureOf(played, 'id:"nope"').message).toContain(
@@ -199,7 +199,7 @@ describe('round — the end turn: the caller\'s way first, proven exhausted, the
     expect(strokesToward(play(IPHONE, [at(0), at(-2), at(-2), at(260)])).slice(0, 3)).toEqual(['up', 'up', 'down']);
   });
 
-  it('uiautomator (Android): a target dumped clipped out past the far edge of a list the strokes do not move — no turn, the tree cannot list where the content ends; the strokes go the caller\'s way to the bound and the failure names the side, as before', () => {
+  it('uiautomator (Android): a target dumped clipped out past the far edge of a list the strokes do not move — no turn, the tree cannot list where the content ends; the strokes go the caller\'s way to the bound and the failure names the side', () => {
     const list: Rect = { x: 0, y: 297, width: 1080, height: 1923 };
     const out: Row = { found: [{ ...node({ role: 'button', identifier: 'apps', rect: { x: 198, y: 2220, width: 126, height: 0 } }), clippedOut: 'bottom' }], scroller: list };
     const played = play({ ...IPHONE, maxSwipes: 3, screen: { width: 1080, height: 2220 } }, [out, out, out, out]);

@@ -205,7 +205,7 @@ describe('`fully: true` on a card as wide as its carousel (D52): fails at the fi
     expect(failureOf(played, 'C').message).not.toMatch(/layout defect/);
   });
 
-  it('a 900-wide card (48 px of room) is not unfit: it is stroked for, as before', () => {
+  it('a 900-wide card (48 px of room) is not unfit: it is stroked for', () => {
     expect(play(FULLY_LEFT, [cAt(45, 900)]).steps.map((s) => s.do)).toEqual(['stroke']);
   });
 

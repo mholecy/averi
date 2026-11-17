@@ -657,7 +657,7 @@ describe('without clear, the value must be in the typing past the earlier text (
     ['ear', 'ear', 'Search', "idb's unnamed placeholder vanished"],
     ['Searchear', 'ear', 'Search', "idb's unnamed placeholder kept"],
     ['+421 421', '421', '+421 ', 'an earlier text that holds the value, the typing after it'],
-  ])('`%s` typed `%s` after `%s` lands as before (%s)', (shown, value, before) => {
+  ])('`%s` typed `%s` after `%s` lands (%s)', (shown, value, before) => {
     expect(landingOf(shown, e(value, before))).toEqual({ kind: 'landed' });
   });
 

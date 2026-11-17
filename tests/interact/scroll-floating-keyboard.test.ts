@@ -96,7 +96,7 @@ describe('scrollUntilVisible — a floating keyboard\'s panel covers as the band
     expect(fake.swipes).toEqual([]);
   });
 
-  it('DOCKED: the region is the band — the stroke and the stop exactly as before this date', async () => {
+  it('DOCKED: the region is the band — the first stroke over the box above it, the stop after 3 swipes', async () => {
     const { fake } = form({ startY: 2900, window: { state: 'shown', frame: DOCKED }, touchable: touchableOf(GBOARD.docked.touchable), covered: [DOCKED] });
     const result = await scrollUntilVisible(fake, 'id:message_for_payee_input', FAST);
     expect(result).toEqual({ swipes: 3, visible: 1, clipped: [] });

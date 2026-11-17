@@ -130,7 +130,7 @@ describe('judgeFill — what the facts mean', () => {
       caveats: [{ code: 'masked-append', held: 20 }],
       note: 'a note',
     });
-    // Both at once — not produced by fillField; the order is still fixed.
+    // Both at once (a node of another role that showed bullets after focus): the order is fixed.
     expect(
       judgeFill(fact({ typed: 1, role: 'text', readBack: { kind: 'not-taken' }, notInput: { input: 'none' }, maskedAppend: { held: 2 } })).caveats.map((c) => c.code),
     ).toEqual(['not-input', 'masked-append']);

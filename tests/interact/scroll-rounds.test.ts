@@ -1855,7 +1855,7 @@ describe('round — a target uiautomator dumped CLIPPED OUT of its scroll contai
     expect(strokesToward(played)).toEqual(['down', 'down', 'down']);
   });
 
-  it('measured (round 8\'s B1 gap, re-run at 35d5997): plain from `Apps` clipped out past the top, four strokes down, dropped, the screen then unchanged — the failure says where it lay and the way back, not "off the viewport, or under the soft keyboard … (a fling?)"', () => {
+  it('measured at 35d5997: plain from `Apps` clipped out past the top, four strokes down, dropped, the screen then unchanged — the failure says where it lay and the way back, not "off the viewport, or under the soft keyboard … (a fling?)"', () => {
     // The list still lists its other rows (`mainScroller`'s default row): a read of it shows the content's motion.
     const gone = (rest: string): Row => ({ found: [], mainScroller: scroller, rest });
     const played = play(SETTINGS, [clippedOut('top'), gone('a'), gone('b'), gone('b'), gone('b')]);

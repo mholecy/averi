@@ -640,7 +640,7 @@ describe('fillField — the focus tap goes through the same guard', () => {
   });
 });
 
-describe('the two decisions that carry a rule — recheck (the budget) and dismissal (unknown → back) — row by row (2026-10-05; since 2026-10-07 firstLook and afterBack are rows at their one call site, pinned through the guard above; since 2026-10-09 recheck takes the round\'s verdict and dismissal asks a reading)', () => {
+describe('the two decisions that carry a rule — recheck (the budget, over the round\'s verdict) and dismissal (unknown → back, asking a reading) — row by row', () => {
   const FRAME = { x: 0, y: 1285, width: 1080, height: 935 };
   /** The round's verdict over a covered point, as a reading gives it for each word of the input method (ui-tree/keyboard-cover.ts#over). */
   const verdict = (witness: KeyboardWitness): Covering =>
@@ -677,7 +677,7 @@ describe('the two decisions that carry a rule — recheck (the budget) and dismi
   });
 });
 
-describe('dismissKeyboard — the `dismissal` decision, witness-vetoed (moved here from fill.ts 2026-10-04)', () => {
+describe('dismissKeyboard — the `dismissal` decision, witness-vetoed', () => {
   const FRAME = { x: 0, y: 1285, width: 1080, height: 935 };
   /** The policy the dismissals would be judged under — none is configured here, and the oracle path reads neither. */
   const FIRST = { ambiguous: 'first' as const };
@@ -820,7 +820,7 @@ describe('tapElement — a target under a FLOATING keyboard\'s panel, above its 
     expect(fake.keys).toEqual([]);
   });
 
-  it('the input method not saying shown in the region\'s own call: no panel — the band alone, as before this date (fail open)', async () => {
+  it('the input method not saying shown in the region\'s own call: no panel — the band alone (fail open)', async () => {
     const fake = sepaFake();
     fake.attachedKeyboard.touchableAnswers.current = { ...FLOATING_REGION, witness: 'unknown' };
     await tapElement(fake, 'id:message_for_payee_input', FAST);

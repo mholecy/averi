@@ -838,7 +838,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
     expect(fake.keys).toEqual([]);
   });
 
-  it('the band STAYS but the target has moved above it by the second look (the keyboard-avoiding layout re-flowed): the `clear` row — the target is tapped where it is now, no strategy tapped, and the note says the keyboard is still up (review round 1 of the keyboard-model refactor: "LEAVES" above drops the band and so pins `unknown`, not `clear`)', async () => {
+  it('the band STAYS but the target has moved above it by the second look (the keyboard-avoiding layout re-flowed): the `clear` row — the target is tapped where it is now, no strategy tapped, and the note says the keyboard is still up (the LEAVES case above drops the band and so pins `unknown`, not `clear`)', async () => {
     const fake = iosFake();
     onRead(fake, 3, (live) => {
       live.children[2].rect.y = 400; // centre (107,424): above the band at 539, which is still in the tree
@@ -948,7 +948,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
     expect(result).toEqual({ note: undefined, keyboardHidden: undefined });
   });
 
-  it('no band in the tree (no keyboard on screen, or an idb tree): exactly what happened before — the tap lands on the centre', async () => {
+  it('no band in the tree (no keyboard on screen, or an idb tree): the tap lands on the centre, nothing else', async () => {
     const fake = iosFake(null);
     const events = recorded(fake);
     const result = await tapElement(fake, 'id:login_submit', FAST);
@@ -1193,7 +1193,7 @@ describe('dismissKeyboard — the in-tree model (no oracle), stage B', () => {
     expect(sleeps).toEqual([KEYBOARD_HIDE_DELAY_MS, KEYBOARD_HIDE_DELAY_MS]); // two confirming reads, then the refusal
   });
 
-  it('a confirming read that THROWS after the strategy tap (WDA or idb gone): AfterDismissalTap — the guard\'s one wrap — saying what was tapped, the read\'s error as the cause, no second read or tap (review 2026-10-07 #1)', async () => {
+  it('a confirming read that THROWS after the strategy tap (WDA or idb gone): AfterDismissalTap — the guard\'s one wrap — saying what was tapped, the read\'s error as the cause, no second read or tap', async () => {
     const fake = withBand();
     let reads = 0;
     const real = fake.uiTree.bind(fake);

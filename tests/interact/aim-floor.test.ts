@@ -37,7 +37,7 @@ describe('aimFloor: the stop when the shortest measured stroke would carry the m
     expect(aimFloor({ room: 26, next: 48, strokes: [{ drawn: 48, moved: 27 }] })).toBeUndefined();
   });
 
-  it('no measured stroke: no stop — as today', () => {
+  it('no measured stroke: no stop', () => {
     expect(aimFloor({ room: 0, next: 48, strokes: [] })).toBeUndefined();
   });
 
