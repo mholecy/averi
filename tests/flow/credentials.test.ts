@@ -68,7 +68,10 @@ describe('resolveCredentials', () => {
 
   it('rejects a defaultEnvironment that is not declared', () => {
     expect(() => parseConfig(MULTI_ENV.replace('environments:', 'defaultEnvironment: typo\nenvironments:'))).toThrow(
-      /defaultEnvironment "typo" is not declared/,
+      /: Unknown environment "typo" \(from defaultEnvironment\) — known: \w/,
+    );
+    expect(() => parseConfig('app:\n  android: { package: a.b }\ndefaultEnvironment: typo\n')).toThrow(
+      /: Unknown environment "typo" \(from defaultEnvironment\) — averi.yaml defines no environments$/,
     );
   });
 

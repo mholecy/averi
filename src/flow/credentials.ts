@@ -55,19 +55,35 @@ export interface Credentials {
 }
 
 /**
- * The line refusing the environment a run would select (`requested`, else `AVERI_ENV`, else `defaultEnvironment:` —
- * resolveCredentials' precedence), naming where the name came from; undefined when it is declared or none is
- * selected. An own key of `environments:` only. Worded as flow/config.ts#unknownLine words every unknown name, so the
- * run layer's pre-flight (run/preflight.ts#preflight) lists it beside the state and flow names.
+ * The environment a run selects and where its name came from — THE precedence, most specific first: explicit
+ * `requested` (tool argument) → `AVERI_ENV` (settable from `.env.averi`, so switching backend is one line in an
+ * already-gitignored file) → `defaultEnvironment:`. Undefined when none is selected: base credentials only.
+ */
+export function selectedEnvironment(
+  cfg: AveriConfig,
+  env: EnvValues,
+  requested?: string,
+): { name: string; source: 'requested' | 'AVERI_ENV' | 'defaultEnvironment' } | undefined {
+  if (requested !== undefined) return { name: requested, source: 'requested' };
+  if (env.AVERI_ENV !== undefined) return { name: env.AVERI_ENV, source: 'AVERI_ENV' };
+  if (cfg.defaultEnvironment !== undefined) return { name: cfg.defaultEnvironment, source: 'defaultEnvironment' };
+  return undefined;
+}
+
+/**
+ * The line refusing the environment a run would select (selectedEnvironment), naming where the name came from;
+ * undefined when it is declared or none is selected. An own key of `environments:` only. Worded as
+ * flow/config.ts#unknownLine words every unknown name, so the run layer's pre-flight (run/preflight.ts#preflight)
+ * lists it beside the state and flow names.
  */
 export function unknownEnvironment(cfg: AveriConfig, env: EnvValues, requested?: string): string | undefined {
-  const name = requested ?? env.AVERI_ENV ?? cfg.defaultEnvironment;
-  if (name === undefined || Object.hasOwn(cfg.environments ?? {}, name)) return undefined;
-  const source =
-    requested !== undefined ? 'requested'
-    : env.AVERI_ENV !== undefined ? 'AVERI_ENV'
-    : 'defaultEnvironment';
-  return unknownLine(`environment "${name}" (from ${source})`, 'environment', Object.keys(cfg.environments ?? {}));
+  const selected = selectedEnvironment(cfg, env, requested);
+  if (selected === undefined || Object.hasOwn(cfg.environments ?? {}, selected.name)) return undefined;
+  return unknownLine(
+    `environment "${selected.name}" (from ${selected.source})`,
+    'environment',
+    Object.keys(cfg.environments ?? {}),
+  );
 }
 
 /**
@@ -78,16 +94,15 @@ export function unknownEnvironment(cfg: AveriConfig, env: EnvValues, requested?:
  * pre-flight so the refusal lands before any device is touched
  * (run/preflight.ts#preflight), and the engine resolves here, before any STEP.
  *
- * Precedence, most specific first: explicit `requested` (tool argument) →
- * `AVERI_ENV` (settable from `.env.averi`, so switching backend is one line in
- * an already-gitignored file) → `defaultEnvironment:` → base only.
+ * Which environment, if any: selectedEnvironment's precedence; none selected
+ * is base only.
  *
  * Why this exists: one username for two backends caused an hour's
  * misdiagnosis — the wrong login name is rejected by the bank one screen AFTER
  * it is typed, so an environment mix-up presents as a credentials problem.
  */
 export function resolveCredentials(cfg: AveriConfig, env: EnvValues, requested?: string): Credentials {
-  const name = requested ?? env.AVERI_ENV ?? cfg.defaultEnvironment;
+  const name = selectedEnvironment(cfg, env, requested)?.name;
   const base = cfg.credentials ?? {};
   let templates: Readonly<Record<string, string>> = base;
   let overriddenNames: readonly string[] = [];

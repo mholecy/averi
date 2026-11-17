@@ -19,10 +19,11 @@ import type { ProjectConfig } from '../flow/load.js';
  */
 export function preflight(project: ProjectConfig, request: RunRequest | undefined, environment: string | undefined): void {
   const { cfg, env } = project;
+  const envLine = unknownEnvironment(cfg, env, environment);
   const unknown = [
     ...(request?.state !== undefined && !defines('state', request.state, cfg) ? [unknownName('state', request.state, cfg)] : []),
     ...(request?.flow !== undefined && !defines('flow', request.flow, cfg) ? [unknownName('flow', request.flow, cfg)] : []),
-    ...[unknownEnvironment(cfg, env, environment)].filter((line): line is string => line !== undefined),
+    ...(envLine !== undefined ? [envLine] : []),
   ];
   if (unknown.length > 0) throw new SetupError(`${unknown.join('\n')}\nNothing was run on a device.`);
 }

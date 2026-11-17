@@ -587,9 +587,10 @@ export function defines(kind: 'state' | 'flow', name: string, cfg: AveriConfig):
 /**
  * The line for a name averi.yaml does not declare: the known names, or plainly that it declares none of that kind
  * rather than an empty list. One wording for states, flows (unknownName) and environments
- * (flow/credentials.ts#unknownEnvironment), so the pre-flight's one refusal reads alike line by line.
+ * (flow/credentials.ts#unknownEnvironment, and validateReferences' `defaultEnvironment:` at load), so every unknown
+ * name reads alike — the pre-flight's one refusal line by line.
  */
-export function unknownLine(what: string, kind: string, known: string[]): string {
+export function unknownLine(what: string, kind: 'state' | 'flow' | 'environment', known: string[]): string {
   return `Unknown ${what} — ${known.length === 0 ? `averi.yaml defines no ${kind}s` : `known: ${known.join(', ')}`}`;
 }
 
@@ -789,8 +790,11 @@ function validateReferences(cfg: AveriConfig, source: string): void {
   };
   if (cfg.defaultEnvironment !== undefined && !Object.hasOwn(cfg.environments ?? {}, cfg.defaultEnvironment)) {
     fail(
-      `defaultEnvironment "${cfg.defaultEnvironment}" is not declared under environments: ` +
-        `(known: ${Object.keys(cfg.environments ?? {}).join(', ') || 'none'})`,
+      unknownLine(
+        `environment "${cfg.defaultEnvironment}" (from defaultEnvironment)`,
+        'environment',
+        Object.keys(cfg.environments ?? {}),
+      ),
     );
   }
   for (const [name, state] of Object.entries(cfg.states)) {
