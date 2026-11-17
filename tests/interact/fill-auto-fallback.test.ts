@@ -6,6 +6,7 @@ import { IdbTreeSource } from '../../src/adapters/ios-tree-source.js';
 import { fillField, FillValueFailure } from '../../src/interact/fill.js';
 import { typeIntoFocused } from '../../src/interact/type-text.js';
 import { NO_EYES } from '../helpers/eyes.js';
+import { WDA_TYPEABLE } from '../../src/adapters/ios-typing.js';
 
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 
@@ -33,7 +34,8 @@ function fallenBack() {
     buildCached: async () => true,
     read: () => Promise.reject(new Error('never read')),
     applicationLabel: () => Promise.reject(new Error('never asked')),
-    typeText: () => Promise.reject(new Error('never typed')),
+    typeable: WDA_TYPEABLE,
+    typeWide: () => Promise.reject(new Error('never typed')),
     dispose: () => Promise.resolve(),
   };
   const adapter = new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: new AutoTreeSource({ wda, idb: new IdbTreeSource({ udid: 'AAAA-1111', exec }) }) });
@@ -57,7 +59,7 @@ describe('a fill under treeSource auto whose first read falls back to idb (A41a 
     errors.mockRestore();
   });
 
-  it('the adapter\'s backstop: a text that needs WDA reaching typeText after the fallback is refused as ADR 0037 words it, nothing sent', async () => {
+  it('a text that needs WDA reaching typeText after the fallback is the source\'s refusal, as ADR 0037 words it, with the note once, nothing sent', async () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const { adapter, calls } = fallenBack();
     await adapter.uiTree(); // the choice: idb

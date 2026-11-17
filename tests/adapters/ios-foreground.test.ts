@@ -11,6 +11,7 @@ import { appinfo } from '../helpers/simctl-appinfo.js';
 import { launchText } from '../../src/mcp/tool-text.js';
 import { appHolderText } from '../../src/interact/app-holder-text.js';
 import { launchTextOf } from '../helpers/app-holder.js';
+import { IDB_TYPING } from '../helpers/ios-typing.js';
 
 // The one sleep owner, recorded and not waited on; under a Date-only fake
 // clock each recorded sleep moves the clock by its length, so the wait's
@@ -106,6 +107,7 @@ function wdaDevice(answers: Array<ApplicationLabel | Error>) {
       return a;
     },
     dispose: () => Promise.resolve(),
+    ...IDB_TYPING,
   };
   const exec: ExecFn = async (cmd, args) => {
     calls.push([cmd, ...args].join(' '));
@@ -287,6 +289,7 @@ describe('IosAdapter.launch — the wait fails open: it never fails a launch and
       read: () => Promise.reject(new Error('unused')),
       applicationLabel: () => Promise.reject(new Error('idb: connection refused\nstack…')),
       dispose: () => Promise.resolve(),
+      ...IDB_TYPING,
     };
     const outcome = await new IosAdapter({ udid: 'AAAA-1111', exec: async () => ({ stdout: Buffer.alloc(0), stderr: '' }), treeSource: source }).launch('com.app');
     expect(launchTextOf(outcome)).toBe(

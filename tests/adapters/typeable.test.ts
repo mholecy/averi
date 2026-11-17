@@ -8,6 +8,7 @@ import { IDB_TYPEABLE, WDA_TYPEABLE } from '../../src/adapters/ios-typing.js';
 import { refusalOf, type Typeable } from '../../src/adapters/typeable.js';
 import type { DeviceAdapter } from '../../src/adapters/types.js';
 import { drawnOverStrip } from '../helpers/android-dumps.js';
+import { IDB_TYPING } from '../helpers/ios-typing.js';
 
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 
@@ -17,7 +18,7 @@ vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'))
  * read by one function (adapters/typeable.ts#refusalOf).
  * - iOS over a source that does not type (idb's, the differential harness's recorded one): printable ASCII and `\n` —
  *   idb's KEY_MAP (fb-idb idb/common/hid.py), anything else fails the whole call with a Python trace, the field
- *   untouched. Over a source that types (IosTreeSource.typeText: WDA's, D43): WDA_TYPEABLE (ios-typing.test.ts).
+ *   untouched. Over a source that types (IosTreeSource.typeable: WDA's, D43): WDA_TYPEABLE (ios-typing.test.ts).
  * - Android: printable ASCII — `input text` NPEs (exit 255) on a character outside the virtual key map, after every
  *   earlier one landed. Conservative: an extended letter the key map may hold (é) is unmeasured, refused too.
  */
@@ -33,13 +34,13 @@ const recordingExec = () => {
   return { fn, calls };
 };
 
-/** A tree source of `kind` — with a typer (IosTreeSource.typeText: WDA's, D43) only when `types`. */
+/** A tree source of `kind` — typing WDA's set (IosTreeSource.typeable, D43) only when `types`, else idb's. */
 const treeSource = (kind: 'idb' | 'wda', types = false): IosTreeSource => ({
   kind,
   read: () => Promise.reject(new Error('this test reads no tree')),
   applicationLabel: () => Promise.reject(new Error('this test reads no tree')),
   dispose: () => Promise.resolve(),
-  ...(types && { typeText: () => Promise.resolve() }),
+  ...(types ? { typeable: WDA_TYPEABLE, typeWide: () => Promise.resolve() } : IDB_TYPING),
 });
 
 const ios = (kind: 'idb' | 'wda', types = false): DeviceAdapter => new IosAdapter({ udid: 'AAAA-1111', exec: recordingExec().fn, treeSource: treeSource(kind, types) });
@@ -73,14 +74,14 @@ describe('IosAdapter.typeable comes from the tree source', () => {
     expect(ios('wda', true).typeable).toBe(WDA_TYPEABLE);
   });
 
-  it('auto (A41a): WDA_TYPEABLE until its first read chose idb, IDB_TYPEABLE from then on; its claim note forwarded', async () => {
+  it('auto (A41a): WDA_TYPEABLE until its first read chose idb, IDB_TYPEABLE with the claim note from then on; the note forwarded', async () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const wda = { ...treeSource('wda', true), bringUp: () => Promise.reject(new Error('no WebDriverAgent')), buildCached: async () => true };
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: recordingExec().fn, treeSource: new AutoTreeSource({ wda, idb: { ...treeSource('idb'), read: async () => parseIdbDescribeAll('[]') } }) });
     expect(adapter.typeable).toBe(WDA_TYPEABLE);
     expect(adapter.claimNote).toBeUndefined();
     await adapter.uiTree();
-    expect(adapter.typeable).toBe(IDB_TYPEABLE);
+    expect(adapter.typeable).toEqual({ ...IDB_TYPEABLE, note: idbFallbackNote('no WebDriverAgent') });
     expect(adapter.claimNote).toBe(idbFallbackNote('no WebDriverAgent'));
     errors.mockRestore();
   });

@@ -2,6 +2,7 @@ import { errorMessage } from '../util/error-message.js';
 import { WdaServer, type WdaServerOptions } from './wda.js';
 import { parseWdaSourceValue } from './wda-source.js';
 import { alertInWda } from './ios-system-alert.js';
+import { WDA_TYPEABLE } from './ios-typing.js';
 import type { ApplicationLabel, IosTreeSource } from './ios-tree-source.js';
 import type { SystemAlert, UiNode } from './types.js';
 
@@ -62,6 +63,7 @@ class TreeSourceReleasedError extends Error {}
 export class WdaTreeSource implements IosTreeSource {
   readonly kind = 'wda' as const;
   readonly settleCadenceMs = WDA_SETTLE_CADENCE_MS;
+  readonly typeable = WDA_TYPEABLE;
   private readonly udid: string;
   private readonly server: WdaServer;
   private disposed = false;
@@ -212,7 +214,7 @@ export class WdaTreeSource implements IosTreeSource {
    * Starts WDA when it is not up, as read() does. Released → the released error, nothing sent; a failure after dispose
    * is the release, as read()'s.
    */
-  async typeText(text: string): Promise<void> {
+  async typeWide(text: string): Promise<void> {
     if (this.disposed) throw this.released();
     try {
       await this.server.keys(text);

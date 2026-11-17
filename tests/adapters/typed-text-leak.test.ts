@@ -10,6 +10,7 @@ import { IdbHelperTimeout, type IdbHelper, type IdbHelperReply } from '../../src
 import { IosAdapter } from '../../src/adapters/ios.js';
 import type { IosTreeSource } from '../../src/adapters/ios-tree-source.js';
 import { drawnOverStrip } from '../helpers/android-dumps.js';
+import { IDB_TYPING } from '../helpers/ios-typing.js';
 
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 
@@ -21,9 +22,12 @@ vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'))
 // the helper off, and D24's split, failing on either of its two calls — and no piece of the text may stand in the
 // error's command, message or stack, in anything `inspect` prints of it, or in what the helper's channel published.
 
-/** iOS's text: each piece a string nothing else prints, so D24's first key alone ('Ж') is as findable as the rest. */
-const IOS_TEXT = 'ЖЩ§hunter2Ђ';
-const IOS_PIECES = ['Ж', 'Щ', '§', 'hunter2', 'Ђ'];
+/**
+ * iOS's text: each piece a string nothing else prints, so D24's first key alone ('^') is as findable as the rest.
+ * ASCII, idb's set: a text idb cannot type goes to the tree source (IosTreeSource.typeWide), never to idb.
+ */
+const IOS_TEXT = '^|hunter2~';
+const IOS_PIECES = ['^', '|', 'hunter2', '~'];
 /** Android's: ASCII (`input text`'s), one call per character, each a mark no message or stack holds. */
 const ANDROID_TEXT = '^|~';
 const ANDROID_PIECES = ['^', '|', '~'];
@@ -91,6 +95,7 @@ const NO_TREE: IosTreeSource = {
   systemAlert: () => Promise.reject(new Error('unused')),
   applicationLabel: () => Promise.reject(new Error('unused')),
   dispose: () => Promise.resolve(),
+  ...IDB_TYPING,
 };
 
 /** What the helper's channel published while `run` ran. */

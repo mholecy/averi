@@ -8,6 +8,8 @@ import { deviceCalls, installFakeDevice, paintFrame } from '../../scripts/differ
 import { loadSide, recordedAdapter, type Side } from '../../scripts/differential/side.js';
 import { RecordedTreeSource } from '../../scripts/differential/recorded-source.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
+import { IDB_TYPEABLE } from '../../src/adapters/ios-typing.js';
+import { refusalOf } from '../../src/adapters/typeable.js';
 
 // The recorded device: a side's own adapter over a recorded payload — the iOS tree-source seam (RecordedTreeSource
 // for WDA, the side's IdbTreeSource over the fake device for idb) and Android's exec (the side's AndroidAdapter, its
@@ -83,6 +85,14 @@ describe("a recorded WDA source answers the launch's foreground question as the 
     await recordedAdapter(older, await wdaRaw(), { platform: 'ios', screen: IPHONE, frame: IPHONE }).launch('differential.app');
     await expect(label.mock.results[0].value).resolves.toEqual({ kind: 'declined' });
     label.mockRestore();
+  });
+});
+
+describe('a recorded source types nothing: idb\'s set, and a text only WebDriverAgent types refused', () => {
+  it.each([['wda', 'raw', 'wda-source-skeleton-login.json']] as const)('a recorded %s source: typeable IDB_TYPEABLE, typeWide refuses in idb\'s words', async (source, form, file) => {
+    const recorded = new RecordedTreeSource(recording({ platform: 'ios', source, form, payload: await fixture(file) }), side.parseWdaSourceValue);
+    expect(recorded.typeable).toBe(IDB_TYPEABLE);
+    await expect(recorded.typeWide('Šťastný')).rejects.toThrow(new Error(refusalOf('Šťastný', IDB_TYPEABLE)));
   });
 });
 

@@ -11,6 +11,8 @@ import type { IdbHelper } from './idb-helper.js';
 import { PersistentReadError, rectArea, rectIntersection, zeroRect, type Rect, type SystemAlert, type UiNode } from './types.js';
 import { alertShapeInIdb } from './ios-system-alert.js';
 import { countOf } from '../util/count.js';
+import { IDB_TYPEABLE, idbTypingRefusal } from './ios-typing.js';
+import type { Typeable } from './typeable.js';
 
 /**
  * The iOS tree-source seam. `simctl` cannot read the accessibility tree,
@@ -97,12 +99,19 @@ export interface IosTreeSource {
    */
   systemAlert?(): Promise<SystemAlert | undefined>;
   /**
-   * Types `text` into whatever holds keyboard focus — WDA's only (WdaTreeSource: `POST /session/:id/wda/keys`, D43;
-   * ADR 0037's D43 amendment). IosAdapter sends it only what idb cannot type (ios-typing.ts#typingPathOf), and declares
-   * WDA_TYPEABLE when it is present. Absent on idb and on the differential harness's recorded source: their adapter
-   * types through idb alone.
+   * What an IosAdapter over this source types (DeviceAdapter.typeable, ios-typing.ts, ADR 0037's D43 amendment) — the
+   * source's fact, since only WebDriverAgent's types beyond idb: WDA_TYPEABLE on WDA; IDB_TYPEABLE on idb and on the
+   * differential harness's recorded source (of kind `wda` too, typing nothing); under `auto` WDA's until a fallback,
+   * then idb's with the claim note's line on every refusal (AutoTreeSource).
    */
-  typeText?(text: string): Promise<void>;
+  readonly typeable: Typeable;
+  /**
+   * Types a text idb cannot type (ios-typing.ts#typingPathOf: IosAdapter.typeText sends this source every such text,
+   * whole, and no other) into whatever holds keyboard focus — or refuses it, nothing sent. WDA types it (WdaTreeSource:
+   * `POST /session/:id/wda/keys`, D43); idb and the recorded source refuse it in idb's words (ios-typing.ts#
+   * idbTypingRefusal); `auto` makes its choice and hands it on, adding the claim note's line after a fallback.
+   */
+  typeWide(text: string): Promise<void>;
   dispose(): Promise<void>;
 }
 
@@ -530,6 +539,7 @@ export const IDB_SETTLE_CADENCE_MS = 300;
 export class IdbTreeSource implements IosTreeSource {
   readonly kind = 'idb' as const;
   readonly settleCadenceMs = IDB_SETTLE_CADENCE_MS;
+  readonly typeable = IDB_TYPEABLE;
   private readonly udid: string;
   private readonly exec: ExecFn;
   /**
@@ -586,6 +596,11 @@ export class IdbTreeSource implements IosTreeSource {
     // Area on the NORMALIZED rects (rounded, a missing frame zeroed); the raw types only name the shape.
     if (!tree.children.some((el) => rectArea(el.rect) > 0)) throw new IdbEmptyTreeError(this.udid, elements.map((el) => el.type));
     return { elements, tree };
+  }
+
+  /** idb types no text this is sent: refused in idb's words (ADR 0037), nothing sent — never idb's Python trace. */
+  typeWide(text: string): Promise<void> {
+    return Promise.reject(new Error(idbTypingRefusal(text)));
   }
 
   dispose(): Promise<void> {

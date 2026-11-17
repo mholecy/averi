@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { WDA_SETTLE_CADENCE_MS, WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
 import { SYSTEM_ALERT_SOURCE_TIMEOUT_MS, type FetchFn } from '../../src/adapters/wda.js';
 import { findAll } from '../../src/ui-tree/selectors.js';
+import { WDA_TYPEABLE } from '../../src/adapters/ios-typing.js';
 import { fakeExec, fakeFetch, fakeSpawn, tempDerivedData, WDA_STATUS } from '../helpers/fake-wda.js';
 
 // Raw /source envelope as WdaServer.source() returns it — the host-view
@@ -506,7 +507,7 @@ describe('WdaTreeSource.systemAlert — one short /source read, never a start or
 });
 
 // D43 (ADR 0037's D43 amendment): the source also types what idb cannot — WdaServer.keys, on the one server it owns.
-describe('WdaTreeSource.typeText — WdaServer.keys on the source\'s own server (D43)', () => {
+describe('WdaTreeSource.typeWide — WdaServer.keys on the source\'s own server (D43)', () => {
   async function typingSetup(keys: () => 'refused' | { status: number; body?: unknown } = () => ({ status: 200, body: { value: null } })) {
     const { dd } = await tempDerivedData(true);
     const spawner = fakeSpawn();
@@ -521,10 +522,14 @@ describe('WdaTreeSource.typeText — WdaServer.keys on the source\'s own server 
     return { source, spawner, fetcher, keyBodies };
   }
 
+  it('typeable is WDA_TYPEABLE: what /wda/keys types', () => {
+    expect(new WdaTreeSource({ udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fakeFetch(() => 'refused').fn, spawnFn: fakeSpawn().fn }).typeable).toBe(WDA_TYPEABLE);
+  });
+
   it('types the text through the one server it owns: a session, then /wda/keys with the text — after a read, no second spawn', async () => {
     const { source, spawner, keyBodies } = await typingSetup();
     await source.read();
-    await source.typeText('Jan Šťastný');
+    await source.typeWide('Jan Šťastný');
     expect(keyBodies()).toEqual(['Jan Šťastný']);
     expect(spawner.spawns).toHaveLength(1);
     await source.dispose();
@@ -532,7 +537,7 @@ describe('WdaTreeSource.typeText — WdaServer.keys on the source\'s own server 
 
   it('a failure is WDA\'s, in its words', async () => {
     const { source } = await typingSetup(() => ({ status: 500, body: { value: { error: 'invalid element state', message: 'no focus' } } }));
-    await expect(source.typeText('Šťastný')).rejects.toThrow(/^WDA \/wda\/keys failed: HTTP 500 invalid element state on port/);
+    await expect(source.typeWide('Šťastný')).rejects.toThrow(/^WDA \/wda\/keys failed: HTTP 500 invalid element state on port/);
     await source.dispose();
   });
 
@@ -541,7 +546,7 @@ describe('WdaTreeSource.typeText — WdaServer.keys on the source\'s own server 
     await source.read();
     await source.dispose();
     const before = fetcher.urls.length;
-    const err = (await source.typeText('Šťastný').catch((e: unknown) => e)) as Error;
+    const err = (await source.typeWide('Šťastný').catch((e: unknown) => e)) as Error;
     expect(err.message).toMatch(/deselected or averi is shutting down/);
     expect(err.cause).toBeUndefined(); // released before the server is asked: no WdaServer error behind it
     expect(fetcher.urls.slice(before)).toEqual([]);
@@ -550,7 +555,7 @@ describe('WdaTreeSource.typeText — WdaServer.keys on the source\'s own server 
   it('disposed while typing: the released error, WdaServer\'s words only as its cause', async () => {
     const { source } = await typingSetup(() => 'refused');
     await source.read();
-    const typing = source.typeText('Šťastný').catch((e: Error) => e);
+    const typing = source.typeWide('Šťastný').catch((e: Error) => e);
     const disposing = source.dispose();
     const err = (await typing) as Error;
     expect(err.message).toMatch(/deselected or averi is shutting down/);

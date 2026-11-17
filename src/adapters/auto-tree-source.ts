@@ -1,7 +1,7 @@
 import { errorMessage } from '../util/error-message.js';
 import { withNoteLine } from '../util/note-line.js';
 import type { IosTreeSourceKind } from './ios-node.js';
-import { idbTypingRefusal } from './ios-typing.js';
+import type { Typeable } from './typeable.js';
 import { mayStartBeforeLaunch } from './wda-tree-source.js';
 import type { ApplicationLabel, IosTreeSource } from './ios-tree-source.js';
 import type { SystemAlert, UiNode } from './types.js';
@@ -49,11 +49,11 @@ export type WdaSide = IosTreeSource & { bringUp(): Promise<void>; buildCached():
  *   switch to idb.
  * - It did not → the reason is said once on stderr, WDA is shut down, every read is idb's, and `claimNote` is set: the
  *   tools add it to each reply that claims what it read (idbFallbackNote). No read is refused for it; a text idb
- *   cannot type is refused as under `treeSource: idb` (typeText).
+ *   cannot type is refused as under `treeSource: idb`, with the note's line (typeable, typeWide).
  *
  * Before the choice, what is asked without a tree read is idb's: a launch's application label (WDA's would be
  * `declined` — it is not up), `kind` (the label's wording) and no settle cadence (the default 500). Typing waits for
- * the choice (typeText).
+ * the choice (typeWide).
  *
  * The choice may be made before the first read (startBeforeLaunch): a launch awaits it before it touches the app,
  * when WDA's build is cached. It is the same choice — one attempt, which a read joins, and whose outcome is the one that
@@ -95,21 +95,27 @@ export class AutoTreeSource implements IosTreeSource {
   }
 
   /**
-   * WDA's typer while WDA is or may be chosen; none once idb was, so a fallback refuses what idb cannot type before
-   * anything is sent (ADR 0037). Before the choice it makes it: a text sent here is one idb cannot type, and if WDA
-   * does not come up it is refused as idb refuses it, with the claim note's line (the reason, the retry) — nothing
-   * typed.
+   * WDA's set while WDA is or may be chosen; idb's once idb was, its every refusal ending with the claim note's line
+   * (Typeable.note: the reason, the retry), so a fallback refuses what idb cannot type before anything is sent (ADR
+   * 0037) and says why that set applies.
    */
-  get typeText(): ((text: string) => Promise<void>) | undefined {
-    return this.chosen === this.idb ? undefined : this.typeThroughWda;
+  get typeable(): Typeable {
+    return this.chosen === this.idb ? { ...this.idb.typeable, note: this.claimNote } : this.wda.typeable;
   }
 
-  private readonly typeThroughWda = async (text: string): Promise<void> => {
-    if ((await this.source()) !== this.wda || this.wda.typeText === undefined) {
-      throw new Error(withNoteLine(idbTypingRefusal(text), this.claimNote));
+  /**
+   * Makes the choice (a text sent here is one idb cannot type) and hands the text to the chosen source: WDA types it;
+   * after a fallback idb refuses it, and the refusal gets the claim note's line here, once — nothing typed.
+   */
+  async typeWide(text: string): Promise<void> {
+    const chosen = await this.source();
+    if (chosen === this.wda) return this.wda.typeWide(text);
+    try {
+      await chosen.typeWide(text);
+    } catch (err) {
+      throw new Error(withNoteLine(errorMessage(err), this.claimNote), { cause: err });
     }
-    return this.wda.typeText(text);
-  };
+  }
 
   async read(): Promise<UiNode> {
     return (await this.source()).read();

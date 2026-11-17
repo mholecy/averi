@@ -5,6 +5,8 @@ import { WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
 import { IOS_TREE_SOURCE_SETTINGS, DEFAULT_IOS_TREE_SOURCE } from '../../src/adapters/ios-node.js';
 import { zeroRect, type UiNode } from '../../src/adapters/types.js';
 import { fakeExec, fakeFetch, fakeSpawn, tempDerivedData } from '../helpers/fake-wda.js';
+import { IDB_TYPEABLE, WDA_TYPEABLE } from '../../src/adapters/ios-typing.js';
+import { refusalOf } from '../../src/adapters/typeable.js';
 
 /**
  * `treeSource: auto` (A41a, docs/adr/0046-the-ios-tree-source-is-webdriveragent-when-it-comes-up.md): one source per
@@ -48,7 +50,8 @@ function fakeWda(bringUp: () => Promise<void> = async () => undefined, cached: (
     async systemAlert() {
       return { title: 'from wda', buttons: [] } as never;
     },
-    async typeText(text: string) {
+    typeable: WDA_TYPEABLE,
+    async typeWide(text: string) {
       wda.typed.push(text);
     },
     async dispose() {
@@ -71,6 +74,10 @@ function fakeIdb(): IosTreeSource & { reads: number; labels: number } {
     async applicationLabel(): Promise<ApplicationLabel> {
       idb.labels++;
       return { kind: 'label', label: 'Lab' };
+    },
+    typeable: IDB_TYPEABLE,
+    async typeWide(text: string) {
+      throw new Error(`idb refuses ${text}`);
     },
     async dispose() {},
   };
@@ -97,7 +104,7 @@ describe('AutoTreeSource — WebDriverAgent when it comes up, idb when it does n
     expect(auto.fellBack).toBe(false);
     expect(auto.claimNote).toBeUndefined();
     expect(auto.settleCadenceMs).toBeUndefined();
-    expect(auto.typeText).toBeDefined();
+    expect(auto.typeable).toBe(WDA_TYPEABLE);
   });
 
   it('WDA does not come up: every read is idb\'s, said once on stderr, WDA released, and each claim carries the note', async () => {
@@ -121,7 +128,7 @@ describe('AutoTreeSource — WebDriverAgent when it comes up, idb when it does n
         'and idb lists no presented layer or scroll clip — a layer over the target or a clip cutting it was not judged',
     );
     expect(auto.settleCadenceMs).toBe(300);
-    expect(auto.typeText).toBeUndefined();
+    expect(refusalOf('Šťastný', auto.typeable)).toBe(`${refusalOf('Šťastný', IDB_TYPEABLE)}\n⚠ ${auto.claimNote}`);
   });
 
   it('WDA chosen, then failing: the failure is WDA\'s — never a switch to idb', async () => {
@@ -152,20 +159,35 @@ describe('AutoTreeSource — WebDriverAgent when it comes up, idb when it does n
     expect(idb.labels).toBe(1);
   });
 
-  it('typing before the first read makes the choice: WDA up types through it; WDA down types nothing and says why', async () => {
+  it('typeWide before the first read makes the choice: WDA up types through it; WDA down is idb\'s refusal with the note, once', async () => {
     const up = fakeWda();
     const typedUp = new AutoTreeSource({ wda: up, idb: fakeIdb() });
-    await typedUp.typeText?.('Šťastný');
+    await typedUp.typeWide('Šťastný');
     expect(up.typed).toEqual(['Šťastný']);
 
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const gone = fakeWda(down);
     const fallen = new AutoTreeSource({ wda: gone, idb: fakeIdb() });
-    await expect(fallen.typeText?.('Šťastný')).rejects.toThrow(
-      /^cannot type U\+0160 .*Refused before anything was sent.*\n⚠ read through idb: WebDriverAgent did not come up \(WebDriverAgent requires the appium-webdriveragent package; select_device again to retry\) and idb lists/s,
-    );
+    const note =
+      'read through idb: WebDriverAgent did not come up (WebDriverAgent requires the appium-webdriveragent package; select_device again to retry) ' +
+      'and idb lists no presented layer or scroll clip — a layer over the target or a clip cutting it was not judged';
+    await expect(fallen.typeWide('Šťastný')).rejects.toThrow(new Error(`idb refuses Šťastný\n⚠ ${note}`));
+    await expect(fallen.typeWide('Šťastný')).rejects.toThrow(new Error(`idb refuses Šťastný\n⚠ ${note}`));
     expect(gone.typed).toEqual([]);
-    expect(fallen.typeText).toBeUndefined();
+  });
+
+  it('typeable: WDA\'s before the choice and once WDA was chosen; after a fallback idb\'s, each refusal ending with the note', async () => {
+    const chosen = new AutoTreeSource({ wda: fakeWda(), idb: fakeIdb() });
+    expect(chosen.typeable).toBe(WDA_TYPEABLE);
+    await chosen.read();
+    expect(chosen.typeable).toBe(WDA_TYPEABLE);
+
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const fallen = new AutoTreeSource({ wda: fakeWda(down), idb: fakeIdb() });
+    await fallen.read();
+    const note = fallen.claimNote!;
+    for (const text of ['Šťastný', 'a😀']) expect(refusalOf(text, fallen.typeable)).toBe(`${refusalOf(text, IDB_TYPEABLE)}\n⚠ ${note}`);
+    expect(refusalOf('Novak', fallen.typeable)).toBeUndefined();
   });
 
   it('released while choosing: the release is the answer, not a fallback to idb', async () => {

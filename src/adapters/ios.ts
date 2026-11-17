@@ -20,8 +20,7 @@ import { iosStatusBand } from './ios-status-band.js';
 import { isAppDataContainer, resetDataContainer } from './ios-data-container.js';
 import { sleep } from '../util/sleep.js';
 import type { Typeable } from './typeable.js';
-import { withNoteLine } from '../util/note-line.js';
-import { IDB_TYPEABLE, idbTypingRefusal, typingPathOf, WDA_TYPEABLE } from './ios-typing.js';
+import { typingPathOf } from './ios-typing.js';
 
 /**
  * How long uiTree({ settle: true }) waits before its one re-read of an idb
@@ -175,13 +174,11 @@ export class IosAdapter implements DeviceAdapter {
   /** `idb ui text` delivers its HID events before it returns (types.ts#TypingDelivery, measured 2026-10-19). */
   readonly typingDelivery = 'on-return' as const;
   /**
-   * What this adapter types (ios-typing.ts, ADR 0037's D43 amendment): WDA_TYPEABLE over a tree source that types
-   * (IosTreeSource.typeText — WDA's), else IDB_TYPEABLE. Decided by the source's typer, not its kind: the differential
-   * harness's recorded source is of kind `wda` and types nothing. Asked of the source per call: fixed for idb and wda,
-   * and under `auto` (A41a) WDA's until its first read chose idb, IDB_TYPEABLE from then on.
+   * What this adapter types (ios-typing.ts, ADR 0037's D43 amendment): the tree source's fact (IosTreeSource.typeable),
+   * asked of it per call — under `auto` (A41a) it changes once, at the choice.
    */
   get typeable(): Typeable {
-    return this.treeSource.typeText !== undefined ? WDA_TYPEABLE : IDB_TYPEABLE;
+    return this.treeSource.typeable;
   }
 
   /** The source's line for every claiming reply (DeviceAdapter.claimNote): `auto`'s, once it fell back (A41a). */
@@ -758,32 +755,23 @@ export class IosAdapter implements DeviceAdapter {
     // Guarded here, once, because the refusal is idb's, a platform fact no
     // caller owns, and every caller hands its text through unexamined.
     if (text === '') return;
-    // D43 (ios-typing.ts): a text idb cannot type goes whole to the source's typer — WDA's `/wda/keys`, which delivers
-    // on return (batch-10's G1: 20/20), so `typingDelivery` holds for it too. No D24 split there: batch-10's G5 typed
-    // 10/10 into the RN field with no tail dropped, and the fill's retype stays the net. Every text idb can type stays
-    // on idb, byte for byte; over a source without a typer every text does.
-    if (this.treeSource.typeText !== undefined && typingPathOf(text) === 'wda') {
-      await this.treeSource.typeText(text);
+    // D43 (ios-typing.ts): a text idb cannot type goes whole to the source (IosTreeSource.typeWide), which types it
+    // or refuses it, nothing sent. WDA's types through `/wda/keys`, which delivers on return (batch-10's G1: 20/20), so
+    // `typingDelivery` holds for it too. No D24 split there: batch-10's G5 typed 10/10 into the RN field with no tail
+    // dropped, and the fill's retype stays the net. Every text idb can type stays on idb, byte for byte.
+    if (typingPathOf(text) === 'wda') {
+      await this.treeSource.typeWide(text);
       return;
     }
-    // A backstop, not a path: a source that fell back (IosTreeSource.fellBack — `auto` whose WebDriverAgent did not
-    // come up) lost its typer after a caller checked `typeable`. A text only WDA types gets ADR 0037's refusal, nothing
-    // sent, instead of idb's trace. Over idb and the recorded source (never fallen back) nothing changes.
-    if (this.fellBack && typingPathOf(text) === 'wda') {
-      throw new Error(withNoteLine(idbTypingRefusal(text), this.treeSource.claimNote));
-    }
-    // An app seen dropping a tail (D24, FIRST_KEY_ALONE_MS): its first character alone, a wait, then the rest. The
-    // first character is a grapheme (Intl.Segmenter), so a surrogate pair or a letter with its combining mark is never
-    // split between two idb calls. A one-character text has no rest: one call, no wait.
+    // An app seen dropping a tail (D24, FIRST_KEY_ALONE_MS): its first character alone, a wait, then the rest. A text
+    // here is idb's (typingPathOf: printable ASCII and `\n`), one UTF-16 unit a character, so the first unit is the
+    // first character whole. A one-character text has no rest: one call, no wait.
     const key = appKey(this.front);
-    if (key !== undefined && this.dropsTail.has(key)) {
-      const [first] = new Intl.Segmenter().segment(text);
-      if (first !== undefined && first.segment.length < text.length) {
-        await this.idbText(first.segment);
-        await sleep(FIRST_KEY_ALONE_MS);
-        await this.idbText(text.slice(first.segment.length));
-        return;
-      }
+    if (key !== undefined && this.dropsTail.has(key) && text.length > 1) {
+      await this.idbText(text[0]);
+      await sleep(FIRST_KEY_ALONE_MS);
+      await this.idbText(text.slice(1));
+      return;
     }
     await this.idbText(text);
   }

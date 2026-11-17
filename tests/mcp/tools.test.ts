@@ -1312,8 +1312,9 @@ describe('every tool gets the project\'s adapter — one per simulator and confi
     expect(result.text.split('read through idb: the note'), result.text).toHaveLength(2);
   });
 
-  // A flow's `fill:` of a value the fallen-back adapter cannot type is refused WITH the note
-  // (interact/type-text.ts#assertTypeableOn); the FlowError, the run's error and verify's reply must not add it again.
+  // A flow's `fill:` of a value the fallen-back adapter cannot type is refused WITH the note (its set's own,
+  // adapters/typeable.ts#Typeable.note, as AutoTreeSource.typeable's); the FlowError, the run's error and verify's reply
+  // must not add it again.
   const FILL_WDA_ONLY = `${VALID_CONFIG.replace('states:\n', 'states:\n  filled:\n    detect: { element: { id: nowhere } }\n    reach: [fill_wda_only]\n')}  fill_wda_only:\n    steps:\n      - tap: { id: home_root }\n      - fill: { id: home_root, value: "Šťastný" }\n`;
 
   it.each([
@@ -1322,7 +1323,7 @@ describe('every tool gets the project\'s adapter — one per simulator and confi
     ['verify', { platforms: ['ios'], flow: 'fill_wda_only' }, false],
   ] as const)('ios %s: a refused fill: after a fallback carries the claim note exactly once (review r3-1)', async (tool, args, isError) => {
     const rendered = new FakeAdapter({ home: screen(el({ role: 'container', identifier: 'home_root' }), el({ role: 'button', label: 'Settings' })) }, 'home');
-    const ios = Object.assign(rendered, { claimNote: 'read through idb: the note' });
+    const ios = Object.assign(rendered, { claimNote: 'read through idb: the note', typeable: { ...rendered.typeable, note: 'read through idb: the note' } });
     const harness = await connect({ android: home(), ios });
     const result = await harness.call(tool, { configPath: await file('averi.yaml', FILL_WDA_ONLY), ...args });
     expect(result.isError, result.text).toBe(isError);

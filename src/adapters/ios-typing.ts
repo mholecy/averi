@@ -2,13 +2,13 @@ import { PRINTABLE_ASCII, refusalOf, type Typeable } from './typeable.js';
 
 /**
  * What iOS types, and through which path (D43, docs/adr/0037-a-value-the-adapter-cannot-type-is-refused-before-any-
- * device-call.md, the D43 amendment). Pure: no device, no adapter. IosAdapter declares one of the two sets
- * (`typeable`) by its tree source and routes each `typeText` call by `typingPathOf`.
+ * device-call.md, the D43 amendment). Pure: no device, no adapter. Each tree source declares one of the two sets
+ * (IosTreeSource.typeable), which IosAdapter forwards, and IosAdapter routes each `typeText` call by `typingPathOf`.
  *
  * - **idb** (`idb ui text`, every project): printable ASCII and `\n`.
- * - **WebDriverAgent** (`POST /session/:id/wda/keys`, a project with `ios.treeSource: wda` only): what idb cannot type
- *   of the set below. idb keeps every text it can type, byte for byte — WDA costs ~300 ms + ~16 ms a character where
- *   idb is flat at ~200 ms (batch-10's G3), so only the text idb refuses pays it.
+ * - **WebDriverAgent** (`POST /session/:id/wda/keys`, under `ios.treeSource: wda`, and under `auto` once WebDriverAgent
+ *   came up): what idb cannot type of the set below. idb keeps every text it can type, byte for byte — WDA costs
+ *   ~300 ms + ~16 ms a character where idb is flat at ~200 ms (batch-10's G3), so only the text idb refuses pays it.
  */
 
 const IDB_REFUSES = new RegExp(`[^${PRINTABLE_ASCII}\\n]`, 'u');
@@ -66,14 +66,14 @@ export const IDB_TYPEABLE: Typeable = {
 };
 
 /**
- * idb's refusal of `text` (IDB_TYPEABLE, refusalOf) — for a text only WebDriverAgent types that reached a typer after
- * `treeSource: auto` fell back to idb (A41a: adapters/auto-tree-source.ts, IosAdapter.typeText's backstop). Built here
- * once; the fallback wording is for a text idb types, which no caller sends.
+ * idb's refusal of `text` (IDB_TYPEABLE, refusalOf) — for a text only WebDriverAgent types that reached a source that
+ * types nothing beyond idb (IosTreeSource.typeWide: idb's, the differential harness's recorded one, and `auto`'s after a
+ * fallback, which adds its note). Built here once; the fallback wording is for a text idb types, which no caller sends.
  */
 export const idbTypingRefusal = (text: string): string =>
   refusalOf(text, IDB_TYPEABLE) ?? `cannot type it: ${IDB_TYPEABLE.says}`;
 
-/** What an IosAdapter over a source that types (IosTreeSource.typeText: WDA's) types — the module doc. */
+/** What an IosAdapter over WebDriverAgent's source types (IosTreeSource.typeable: WDA's) — the module doc. */
 export const WDA_TYPEABLE: Typeable = {
   refuses: WDA_REFUSES,
   says:

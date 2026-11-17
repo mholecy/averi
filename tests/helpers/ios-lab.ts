@@ -7,6 +7,7 @@ import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import { alertInWda } from '../../src/adapters/ios-system-alert.js';
 import type { UiNode } from '../../src/adapters/types.js';
 import { appinfo } from './simctl-appinfo.js';
+import { IDB_TYPING } from './ios-typing.js';
 
 /**
  * The lab app (dev.averi.lab, scheme `averilab`) on an IosAdapter with a fake exec — the D49a/D54/D56 foreground-wait
@@ -70,6 +71,7 @@ export function lab(
       return a;
     },
     dispose: () => Promise.resolve(),
+    ...IDB_TYPING,
   };
   const exec: ExecFn = async (cmd, args): Promise<ExecResult> => {
     const full = [cmd, ...args].join(' ');

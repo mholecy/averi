@@ -5,19 +5,21 @@ import type { DeviceAdapter } from '../../src/adapters/types.js';
 import { assertTypeable } from '../../src/interact/type-text.js';
 import { drawnOverStrip } from '../helpers/android-dumps.js';
 import { FakeAdapter } from '../helpers/fake.js';
+import { IDB_TYPING } from '../helpers/ios-typing.js';
+import { WDA_TYPEABLE } from '../../src/adapters/ios-typing.js';
 
 const noExec = () => Promise.reject(new Error('this test sends nothing'));
 const IOS = new IosAdapter({
   udid: 'AAAA-1111',
   exec: noExec,
-  treeSource: { kind: 'idb', read: noExec, applicationLabel: noExec, dispose: () => Promise.resolve() },
+  treeSource: { kind: 'idb', read: noExec, applicationLabel: noExec, dispose: () => Promise.resolve(), ...IDB_TYPING },
 });
 const ANDROID = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: noExec });
-/** An iOS adapter over a source that types (IosTreeSource.typeText — WDA's, D43). */
+/** An iOS adapter over a source that types WDA's set (IosTreeSource.typeable — WDA's, D43). */
 const IOS_WDA = new IosAdapter({
   udid: 'AAAA-1111',
   exec: noExec,
-  treeSource: { kind: 'wda', read: noExec, applicationLabel: noExec, dispose: () => Promise.resolve(), typeText: () => Promise.resolve() },
+  treeSource: { kind: 'wda', read: noExec, applicationLabel: noExec, dispose: () => Promise.resolve(), typeable: WDA_TYPEABLE, typeWide: () => Promise.resolve() },
 });
 
 /** The refusal's text, or a failure when nothing was refused. */

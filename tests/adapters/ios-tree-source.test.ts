@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { createIosTreeSource, IdbEmptyTreeError, IdbNoFrontmostError, IdbTreeSource, parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { rebootSimulatorAdvice } from '../../src/adapters/simulator-reboot.js';
+import { IDB_TYPEABLE } from '../../src/adapters/ios-typing.js';
+import { refusalOf } from '../../src/adapters/typeable.js';
 import { recordedSpinner } from '../helpers/live-records.js';
 import { fakeFetch, fakeSpawn, tempDerivedData, WDA_STATUS } from '../helpers/fake-wda.js';
 import { IOS_ROLE_MAP, type RawIosElement } from '../../src/adapters/ios-node.js';
@@ -343,6 +345,20 @@ describe('IdbTreeSource — the idb adapter at the seam', () => {
     await source.dispose();
     expect(calls).toEqual([]);
     expect((await source.read()).children).toHaveLength(3);
+  });
+});
+
+describe('IdbTreeSource — types what idb types: IDB_TYPEABLE, and a text only WebDriverAgent types refused (typeWide)', () => {
+  it('typeable is IDB_TYPEABLE', () => {
+    expect(new IdbTreeSource({ udid: 'AAAA-1111', exec: fakeExec({}).fn }).typeable).toBe(IDB_TYPEABLE);
+  });
+
+  it('typeWide refuses in idb\'s words (ADR 0037), with no note — nothing sent to the device', async () => {
+    const { fn, calls } = fakeExec({});
+    await expect(new IdbTreeSource({ udid: 'AAAA-1111', exec: fn }).typeWide('Šťastný')).rejects.toThrow(
+      new Error(refusalOf('Šťastný', IDB_TYPEABLE)),
+    );
+    expect(calls).toEqual([]);
   });
 });
 
