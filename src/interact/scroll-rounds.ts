@@ -13,7 +13,7 @@ import { noScrollStanding, outsideItsScrollView, type NoScrollStanding } from '.
 import { SIDES } from '../ui-tree/sides.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { Target, WaitEvidence } from './resolve.js';
-import { fullyClaimed, judgeRead, scrollViewsOf, shortOf, stops, strokeLine, unfitAlong, type AppliedKeyboard, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type Since, type TreeFacts, type Unfit } from './scroll-read.js';
+import { fullyClaimed, judgeRead, scrollViewsOf, shortOf, stops, unfitAlong, upOf, type AppliedKeyboard, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type Since, type TreeFacts, type Unfit } from './scroll-read.js';
 import { cardMoves, heldBack as heldBackBy, lastDrawn, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved, type Streaks, type StrokePhysics, type UnseenStrokes } from './motion-ledger.js';
 import { carriedCover, seeMargin, startMargin, type MarginMemo, type Offset } from './margin-memo.js';
 import { carried, nameScrollView, planStroke, seeRead, startStrokes, strokedAcross, strokedBeside, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StrokedAcross, type StrokedBeside, type StrokeKind, type StrokeMemory, type StrokePlan, type TouchedOn } from './stroke-plan.js';
@@ -941,12 +941,12 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // that does.
   const motion = seeMotion(s.motion, { drawn: seen.drawn, ...(judged !== undefined && { read: ledgerRead(s, current, afterProbe, judged.facts, found, best, seen.screen, listed) }) });
   s.motion = motion.ledger;
-  // What the strokes after this read keep of it (interact/stroke-plan.ts#seeRead): the line its strokes stay above
-  // (`ReadJudgement.strokeLine`) — a round whose tree did not read keeps the last read round's, as its cover — and,
+  // What the strokes after this read keep of it (interact/stroke-plan.ts#seeRead): the keyboard its strokes stay above
+  // (`ReadJudgement.strokeKeyboard`) — a round whose tree did not read keeps the last read round's, as its cover — and,
   // when it found the target, the target's scroll views with what this read draws over each — on a tree that tells none
   // (idb's), the region the ledger saw its content moving through (interact/motion-ledger.ts#regionOf).
   const region = regionOf(s.motion);
-  if (judged !== undefined) s.strokes = seeRead(s.strokes, { facts: judged.facts, line: judged.strokeLine, target: best?.node, ...(region !== undefined && { region }) });
+  if (judged !== undefined) s.strokes = seeRead(s.strokes, { facts: judged.facts, keyboard: judged.strokeKeyboard, target: best?.node, ...(region !== undefined && { region }) });
   // A stop the region its content was seen moving through holds back (interact/motion-ledger.ts#heldBack): no stop,
   // the strokes go on — turned toward it at the far edge (course.ts#seeTarget) — and the stuck and bound failures name it
   // (`under`). After the last stroke drawn, not this read's `seen.drawn`: a stop is claimed only on a confirming read,
@@ -1043,7 +1043,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
           // Never under `fully: true`, which does not stop on a match past its frame (`clipped`) — as one cut at the screen's edge is.
           return centreStroke(s, visible, { gesture, facts: now.facts, elapsedMs: seen.elapsedMs });
         } else {
-          unlisted = { of: 'unlisted', judged: best, finding, ...(offered !== undefined && { offered: { lineY: offered.line.y, remedy: offered.remedy } }) };
+          unlisted = { of: 'unlisted', judged: best, finding, ...(offered !== undefined && { offered: upOf(offered) }) };
           if (question !== undefined) s.eyesRefused = { asked: askedOf(question), short: unlisted };
         }
       }
@@ -1262,16 +1262,11 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // A round whose tree did not read holds for one read rather than stop on the last read's keyboard line: a terminal
   // stop rests on a read that read, as the presented stop's does; with no confirming read left it stops on the last
   // read that read — never the stroke over the gesture box whole.
-  // Said before the presented hold: no stroke is sent either way. The keyboard's remedy is the applied cover's
-  // (`lastCover`, set at the read whose line the plan kept).
+  // Said before the presented hold: no stroke is sent either way. The keyboard is the plan's, its line with its remedy
+  // (interact/stroke-plan.ts#NamedNoRoom).
   if (plan.noRoom !== undefined && s.rules.within !== undefined) {
     if (read === undefined && mayConfirm(s, seen.elapsedMs)) return confirm(s);
-    const { keyboardTop, ...noRoom } = plan.noRoom;
-    // `lastCover` is set whenever `keyboardTop` is: a band-only line (no cover applied) is idb's alone
-    // (ui-tree/draw-order.ts), and idb's `within` is refused `untold` before any plan — a band on WDA or Android
-    // would break that.
-    const keyboard = keyboardTop === undefined || s.lastCover === undefined ? undefined : { lineY: keyboardTop, remedy: s.lastCover.remedy };
-    return stop(s, { kind: 'within', swipes: s.swipes, within: s.rules.within, refused: { of: 'noRoom', ...noRoom, ...(keyboard !== undefined && { keyboard }) } });
+    return stop(s, { kind: 'within', swipes: s.swipes, within: s.rules.within, refused: { of: 'noRoom', ...plan.noRoom } });
   }
   if (plan.presented !== undefined) {
     return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, viewport, next: plan.presented }, current === 'settle' && presentedBefore, seen.elapsedMs);

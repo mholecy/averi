@@ -2,9 +2,9 @@ import { rectArea, sameRect, type Point, type Rect, type ScrollAxis, type Stroke
 import { containsPoint, isUntold, rectIntersection, toldFrame, type ListedContent, type ScrollAxes } from '../ui-tree/geometry.js';
 import { quoted, type QuotedNode } from '../ui-tree/node-words.js';
 import type { PresentedPress } from '../ui-tree/presentation.js';
-import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
 import type { TreeFacts } from './scroll-read.js';
 import type { StillNeeds } from './course.js';
+import type { KeyboardUp } from './target-text.js';
 import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION, swipeVector, swipeVectorAbove, TOUCH_SLOP, type Direction } from './swipe.js';
 
 /**
@@ -15,7 +15,7 @@ import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION,
  *
  * The interface, which is also the test surface (tests/interact/stroke-plan.test.ts):
  * - `startStrokes()` — the plan's memory before any read; `seeRead(memory, read)` — what one read that read leaves
- *   for the strokes after it: the keyboard line its strokes stay above, and, when it found the target, the target's
+ *   for the strokes after it: the keyboard its strokes stay above, and, when it found the target, the target's
  *   scroll views with what that read draws over each — on a tree that tells none, the region the target's motion
  *   showed, as the round's motion ledger tells it (`SeenRead.region`, interact/motion-ledger.ts#regionOf). One call a
  *   read that read; the round holds the memory and reads none of it.
@@ -148,8 +148,8 @@ interface Memory {
   readonly row: TargetRow | undefined;
   /** The candidates the last plan judged its stroke's scroll view from, for the stroke of a round whose tree did not read — judged again with that round's gesture box, cut by the rects they carry. */
   readonly last: readonly ScrollView[];
-  /** The keyboard line the last read that READ stroked above (scroll-read.ts#strokeLine: the cover it applied — none when it applied none — and idb's band), for the stroke of a round whose tree did not read. */
-  readonly line: KeyboardLine | undefined;
+  /** The keyboard the last read that READ stroked above (scroll-read.ts#ReadJudgement.strokeKeyboard: its line, scroll-read.ts#strokeLine, with its remedy), for the stroke of a round whose tree did not read and for `noRoom`'s keyboard. */
+  readonly keyboard: KeyboardUp | undefined;
   /** The scroll view the last stroke SENT went over, a probe's included — undefined when it went over the gesture box whole — for `touchedOn`. */
   readonly strokedOver: Rect | undefined;
   /** The scroll view the last plan chose (undefined: the gesture box whole), which `strokeSent` makes `strokedOver`. */
@@ -180,7 +180,7 @@ const open = (m: StrokeMemory): Memory => m as unknown as Memory;
 const close = (m: Memory): StrokeMemory => m as unknown as StrokeMemory;
 
 export function startStrokes(): StrokeMemory {
-  return close({ target: undefined, named: undefined, row: undefined, last: [], line: undefined, strokedOver: undefined, chosen: undefined, chosenAt: undefined, touchDowns: [], roomless: [], carry: undefined });
+  return close({ target: undefined, named: undefined, row: undefined, last: [], keyboard: undefined, strokedOver: undefined, chosen: undefined, chosenAt: undefined, touchDowns: [], roomless: [], carry: undefined });
 }
 
 /**
@@ -193,10 +193,10 @@ export function nameScrollView(memory: StrokeMemory, facts: Pick<TreeFacts, 'sce
   return close({ ...open(memory), named: scrollViewOn(facts, { ...rect }) });
 }
 
-/** One read that read, as the plan keeps it (`seeRead`): its facts, the line its strokes stay above (scroll-read.ts#ReadJudgement.strokeLine), the target's node when it judged one, and the region the target's motion showed, read only on a tree that tells no scroll view of it (`ScrollRegion`). */
+/** One read that read, as the plan keeps it (`seeRead`): its facts, the keyboard its strokes stay above (scroll-read.ts#ReadJudgement.strokeKeyboard), the target's node when it judged one, and the region the target's motion showed, read only on a tree that tells no scroll view of it (`ScrollRegion`). */
 export interface SeenRead {
   readonly facts: Pick<TreeFacts, 'scene'>;
-  readonly line: KeyboardLine | undefined;
+  readonly keyboard: KeyboardUp | undefined;
   readonly target: UiNode | undefined;
   readonly region?: ScrollRegion;
 }
@@ -208,7 +208,7 @@ export interface ScrollRegion {
 }
 
 /**
- * What a read that read leaves for the strokes after it: its keyboard line, and — when it found the target — every
+ * What a read that read leaves for the strokes after it: its keyboard, and — when it found the target — every
  * scroll view of the target (`targetScrollers`) with what this read draws over each. Their room is judged by each
  * plan, for the stroke as drawn — `toward`, which a fling past the target or a dropped target turns against the
  * caller's direction — and with that round's cover (judged for the caller's direction alone, a strip whose lower half
@@ -221,16 +221,16 @@ export interface ScrollRegion {
  * (`region`, the round's motion ledger's: interact/motion-ledger.ts#regionOf): none until two reads saw the target
  * carried — the screen box.
  */
-export function seeRead(memory: StrokeMemory, { facts, line, target, region }: SeenRead): StrokeMemory {
+export function seeRead(memory: StrokeMemory, { facts, keyboard, target, region }: SeenRead): StrokeMemory {
   const m = open(memory);
   // A read that found no target keeps the target's scroll views of the last read that did.
-  if (target === undefined) return close({ ...m, line });
+  if (target === undefined) return close({ ...m, keyboard });
   if (!isUntold(facts.scene.clips.drawnIn(target))) {
-    return close({ ...m, line, target: targetScrollers(facts, target).map((rect) => scrollViewOn(facts, { ...rect })) });
+    return close({ ...m, keyboard, target: targetScrollers(facts, target).map((rect) => scrollViewOn(facts, { ...rect })) });
   }
   // Nothing is listed over it (idb lists no draw order over a scroll view), and nothing nested in it.
   const row = { y: target.rect.y, height: target.rect.height };
-  return close({ ...m, line, row, target: region === undefined ? [] : [untoldView(region.rect, region.axis)] });
+  return close({ ...m, keyboard, row, target: region === undefined ? [] : [untoldView(region.rect, region.axis)] });
 }
 
 /** What a round asks of the plan for its stroke toward the target. */
@@ -354,9 +354,9 @@ export interface NoRoomFacts {
   readonly room: number;
 }
 
-/** `NoRoomFacts` as the plan knows them: with the keyboard's top (`keyboardTop`) only when the keyboard cuts that part. */
+/** `NoRoomFacts` as the plan knows them: with the keyboard (`Memory.keyboard`, its line and its remedy) only when the keyboard cuts that part. */
 export interface NamedNoRoom extends NoRoomFacts {
-  readonly keyboardTop?: number;
+  readonly keyboard?: KeyboardUp;
 }
 
 /**
@@ -380,7 +380,7 @@ export interface NamedNoRoom extends NoRoomFacts {
 export function planStroke(memory: StrokeMemory, { toward, reach: turnsReach, gesture, read, still, screenBox, kind }: StrokeAsk): StrokePlan {
   const m = open(memory);
   const candidates = candidatesOf(m, read?.facts, toward);
-  const kept = m.line?.y;
+  const kept = m.keyboard?.lineY;
   // On a tree that tells no scroll view, only a stroke carrying content back over where it was seen moving goes over
   // that region; one moving it the way it was first seen moving keeps the screen box (`screenBox`).
   // A sideways stroke there with no room among them (none before its motion is seen) goes over the target's own row.
@@ -412,7 +412,7 @@ export function planStroke(memory: StrokeMemory, { toward, reach: turnsReach, ge
   };
   const chosenAt = points === undefined ? undefined : { ...points.from };
   // D80: no room in the named scroll view nor any nested in it — the gesture box whole is no stroke of the one named.
-  const noRoom = room === undefined && gesture !== undefined && screenBox !== true && m.target === undefined && m.named !== undefined ? roomOfNamed(m.named.rect, gesture, toward, kept) : undefined;
+  const noRoom = room === undefined && gesture !== undefined && screenBox !== true && m.target === undefined && m.named !== undefined ? roomOfNamed(m.named.rect, gesture, toward, m.keyboard) : undefined;
   return { stroke, presented, memory: close({ ...planned, chosen: room === undefined ? undefined : { ...room.scrollView }, chosenAt, roomless: room?.roomless ?? [] }), noRoom };
 }
 
@@ -424,7 +424,7 @@ export function planStroke(memory: StrokeMemory, { toward, reach: turnsReach, ge
  * wherever the screen's middle is. Only where the stroke lands: nothing is drawn over it, nothing nested (the tree
  * tells neither), its axis the stroke's own, and every claim is still judged from the reads.
  *
- * Above the keyboard line `keyboardTop` (the plan's kept line, `Memory.line`), as every stroke: a row at or below
+ * Above the keyboard line `keyboardTop` (the plan's kept line, `Memory.keyboard`'s), as every stroke: a row at or below
  * it is none — the screen box above the keyboard strokes — and one it cuts or touches is cut at it; what the cut
  * leaves under TOUCH_SLOP is none either (too thin to hold the stroke's line). A row no keyboard cuts is kept however
  * thin: the target's centre line lies inside the scroller holding it. A stroke on the keys may swipe-type a word,
@@ -441,15 +441,15 @@ function rowOf(row: TargetRow | undefined, gesture: Rect | undefined, toward: Di
   return [untoldView({ x: gesture.x, y: top, width: gesture.width, height }, 'horizontal')];
 }
 
-/** `StrokePlan.noRoom` of the named scroll view `rect`: its length along a stroke `toward` on `gesture`, above a keyboard whose top is `keyboardTop` (vertical strokes only, as `roomIn` judges). */
-function roomOfNamed(rect: Rect, gesture: Rect, toward: Direction, keyboardTop: number | undefined): NamedNoRoom {
+/** `StrokePlan.noRoom` of the named scroll view `rect`: its length along a stroke `toward` on `gesture`, above `keyboard`'s line (vertical strokes only, as `roomIn` judges). */
+function roomOfNamed(rect: Rect, gesture: Rect, toward: Direction, keyboard: KeyboardUp | undefined): NamedNoRoom {
   const said = { rect: { ...rect }, toward };
   const met = rectIntersection(gesture, rect);
   if (met === undefined) return { ...said, room: 0 };
   if (axisOf(toward) !== 'vertical') return { ...said, room: met.width };
   const bottom = met.y + met.height;
-  if (keyboardTop === undefined || keyboardTop >= bottom) return { ...said, room: met.height };
-  return { ...said, room: Math.max(0, keyboardTop - met.y), keyboardTop };
+  if (keyboard === undefined || keyboard.lineY >= bottom) return { ...said, room: met.height };
+  return { ...said, room: Math.max(0, keyboard.lineY - met.y), keyboard };
 }
 
 /**

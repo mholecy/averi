@@ -54,7 +54,7 @@ describe('the region the motion showed — a target whose tree tells no scroll v
         const t = target(tree);
         const next = seeMotion(ledger, { drawn: undefined, read: { since: 'start', found: t === undefined ? [] : [t], judged: t, facts: { ...factsOf(tree), fingerprint: '', loading: false }, gesture: shows } }).ledger;
         const region = regionOf(next);
-        return { ledger: next, memory: seeRead(memory, { facts: factsOf(tree), line: undefined, target: t, ...(region !== undefined && { region }) }) };
+        return { ledger: next, memory: seeRead(memory, { facts: factsOf(tree), keyboard: undefined, target: t, ...(region !== undefined && { region }) }) };
       },
       { ledger: startLedger(), memory: startStrokes() },
     );

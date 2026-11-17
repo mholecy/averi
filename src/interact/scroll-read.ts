@@ -8,6 +8,7 @@ import { lookAt, lookTold, type Look } from '../ui-tree/look.js';
 import { sheetDetent, showsProgress, treeFingerprint, type SheetDetent } from '../ui-tree/read-tree.js';
 import type { SeenOrder } from '../ui-tree/seen-order.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
+import { keyboardUp, type KeyboardUp } from './target-text.js';
 import type { CarriedUnder } from './motion-ledger.js';
 import { inferredAlong, type CallMotion } from './unfit-axis.js';
 import { bandRect, farEdgeFrames, type ScrollViewCut, type Standing, type StandingFacts, type SystemBar, type TouchPurpose } from '../ui-tree/standing.js';
@@ -28,7 +29,7 @@ import type { UsableScreen } from '../ui-tree/usable-screen.js';
  *   (`judgeOver`), and judged again above the cover when one applies;
  * - the frames the far edge is judged in, and the frames the short-of test
  *   reads;
- * - the line this read's strokes stay above (`strokeLine`).
+ * - the keyboard this read's strokes stay above, its line `strokeLine`'s.
  * What it means ACROSS reads — motion, settle, the probe, stuck, the bound
  * and the next stroke — is interact/scroll-rounds.ts#round's, which calls
  * this once per read that read and keeps nothing of it but what the next
@@ -217,6 +218,9 @@ export interface AppliedKeyboard {
   line: KeyboardLine;
 }
 
+/** The applied keyboard as a remedy names it (target-text.ts#KeyboardUp): its line's `y` and its `remedy`. */
+export const upOf = ({ line, remedy }: AppliedKeyboard): KeyboardUp => keyboardUp(line, remedy);
+
 /**
  * One match as judged: the keyboard cover it was judged under (none for a
  * whole-screen judgement, a keyboard-side node or a clean stop in the panel
@@ -253,8 +257,8 @@ export interface ReadJudgement {
   readonly frames: readonly Rect[];
   /** `frames` uncut at the navigation band — the frames short of the far edge is judged in. */
   readonly uncutFrames: readonly Rect[];
-  /** The line this read's strokes stay above (`strokeLine` of the applied cover and idb's band). */
-  readonly strokeLine: KeyboardLine | undefined;
+  /** The keyboard this read's strokes stay above: its line `strokeLine`'s, of the applied cover and idb's band; its remedy the applied cover's, else the read's (idb's band carries the read's, `bandKeyboardOf`). */
+  readonly strokeKeyboard: KeyboardUp | undefined;
 }
 
 /**
@@ -314,9 +318,9 @@ export function judgeRead(read: RoundRead, screen: UsableScreen, fully: boolean,
   // (ui-tree/standing.ts#farEdgeFrames), which reads the best standing's
   // band for the navigation cut.
   const { frames, uncutFrames } = farEdgeFrames(screen, best?.standing, cover?.above);
-  // The line this read's strokes stay above — its cover's and idb's band,
+  // The keyboard this read's strokes stay above — its line the cover's and idb's band's,
   // whether or not the read applied the band (`strokeLine`).
-  return { facts, best, cover, offered, frames, uncutFrames, strokeLine: strokeLine(cover, facts) };
+  return { facts, best, cover, offered, frames, uncutFrames, strokeKeyboard: keyboardUp(strokeLine(cover, facts), cover?.remedy ?? read.remedy) };
 }
 
 /** The cover a reading offers, its line the cover's (ui-tree/keyboard-position.ts#coverLine), or none: not shown, or a band whose top lies at or below the screen's bottom (it covers nothing on it). */
@@ -558,7 +562,7 @@ export type InFrameShort =
       judged: Judged;
       finding: SurfaceFinding;
       /** The round's keyboard reading's cover as offered — applied or not, the witness not asked (the band was moot: the match lies above it) — for the remedy's "if it is up". */
-      offered?: { lineY: number; remedy: KeyboardRemedy };
+      offered?: KeyboardUp;
     }
   /** A stop on a tree that tells no scroll view (idb) held back by the region its content was seen moving through — in its band, or past it toward a node that held still (interact/motion-shown.ts#CarriedUnder) — never `shortOf`'s, the round's (scroll-rounds.ts#round). */
   | { of: 'carriedUnder'; judged: Judged; under: CarriedUnder };
