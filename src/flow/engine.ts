@@ -26,6 +26,8 @@ import { BARE_TREE_CONTENTS, treeShape } from '../ui-tree/bare-tree.js';
 import { missCarried, MissedError, missNote, missOf, withMissNote, type Miss } from '../ui-tree/miss.js';
 import { bareTimeoutNote, isBareTreeMemo, type Verdict } from '../ui-tree/verdict.js';
 import { formatSeconds, parseDuration } from '../util/duration.js';
+// The engine quotes a thrown error by its first line (errorHeadline): a trace entry is a headline, and the rest of a
+// FlowError's message is the trace it already carries — repeating it inside itself reads as a second failure.
 import { errorHeadline, errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { resultText, Verifier } from '../verify/assert.js';
@@ -1209,11 +1211,7 @@ export class FlowEngine {
     }
   }
 
-  /**
-   * runStep's ✗ line for `e` on `step`, once per failure (see there), and `e` back for the caller to throw. The line
-   * quotes the error's first line only: a trace entry is a headline, and the rest of a FlowError's message is the
-   * trace it already carries — repeating it inside itself reads as a second failure.
-   */
+  /** runStep's ✗ line for `e` on `step`, once per failure (see there), and `e` back for the caller to throw. */
   private failed(step: Step, e: unknown): unknown {
     const seen = typeof e === 'object' && e !== null && this.loggedFailures.has(e);
     if ((this.swallowDepth === 0 || isTerminal(e)) && !seen) {

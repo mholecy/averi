@@ -15,9 +15,9 @@ import { captureFrame, isMoving, unsettledReason, type Frame, type MeasuredFrame
 import { apartOfFrame, orderOfFrame, screenshotUntold, untoldAll } from './eyes.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
 import { formatSeconds } from '../util/duration.js';
+import { errorHeadline } from '../util/error-message.js';
 import { asRound, notFound, pollVerdicts, type PixelMeasureInput, type PollVerdict, type RoundVerdict, type TimedOut, type Withdraw } from './poll-verdict.js';
 import { keyboardOver, pixelMissText } from './pixel-text.js';
-import { errorHeadline } from '../util/error-message.js';
 
 /**
  * The pixel poll: what a polling pixel assert does, owned once. A pixel

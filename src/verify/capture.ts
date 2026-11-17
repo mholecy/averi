@@ -480,11 +480,10 @@ type CaptureOptions = {
  * will not say its screen size, and a scale walk that throws on a malformed
  * tree all land on the frame as a reason, so every consumer's own fail-closed
  * policy applies instead of a lost leg. (The screenshot must throw — without
- * bytes there is no frame to carry a reason on.) A caller that catches it
- * quotes the error's first line (util/error-message.ts#errorHeadline), the
+ * bytes there is no frame to carry a reason on.) What it throws is quoted by
+ * its first line (util/error-message.ts#errorHeadline): that line is the
  * adapter's own sentence naming its device and command
- * (adapters/screenshot-bytes.ts): as a fail-closed reason, or as a run's
- * `⚠ screenshot:` line.
+ * (adapters/screenshot-bytes.ts), the rest is detail no one-line reason needs.
  *
  * Order, when the tree is READ here (`readTree`): the png first — its
  * stability is the evidence the screen stopped moving — then the tree, so

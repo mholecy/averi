@@ -12,7 +12,7 @@ tool description changes.
   `tests/fixtures/idb-ui-text-no-keycode-traceback-b1d-stderr.txt`).
 - The readers of an `ExecError`, grepped 2026-11-06. By `stderr`, `exitCode`, `timedOut`, `stdout`: `pgrepVerdict`,
   `pgrepReason`, `NO_FRONTMOST`, `PLUTIL_NO_SUCH_KEY`, the dump's and `get-state`'s diagnosis, `runStart`, `writeBuildLog`,
-  OCR's `timedOut`. By `message`: words quoted on (`headline` and `captureRefusal`, one helper since A78:
+  OCR's `timedOut`. By `message`: words quoted on (a capture's caller and the flow's lines, through
   `util/error-message.ts#errorHeadline`; wrapped `new Error(…: ${errorMessage(e)})`,
   `failedLookMessage`, `idbScreenshot`'s first line) and one detector, OCR's `/\bEAGAIN\b/` on a spawn failure, which holds
   no traceback, typed text or host path. **No detector parses what changes.** So the seam can be the message itself.
