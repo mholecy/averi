@@ -40,7 +40,7 @@ No earlier baseline: the latest, in scope.json, is its first.
 
 ## src/interact/fill-refetch.ts
 
-No earlier baseline: the latest, in scope.json, is its first.
+- 100 % on 2026-11-11 (A28, joined; The full cold core group run is recorded at merge, on main, in the `docs: A28 done` commit; the figures here are narrowed cold runs of this branch. `npm run mutate -- --force --mutate src/interact/fill-refetch.ts,src/interact/fill-landing.ts,src/interact/fill-type.ts --tempDirName reports/mutation/stryker-tmp-a28`, cold, with fill-landing.ts and fill-type.ts, 68 s at load 50–51, other agents' runs overlapping): 64 mutants, 64 killed, 0 survived — after review's findAgain as one switch over the guard's phase; before it 98.75 % (80 mutants, 1 equivalent survivor: the double phase test, gone with it). The floor two points under the score's whole number
 
 ## src/interact/unfit-axis.ts
 

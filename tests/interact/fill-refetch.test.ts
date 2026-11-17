@@ -139,9 +139,9 @@ describe('fieldRefetch — the reads, and the guard typing sets', () => {
 
   it('a second match on a re-read refused: every label said by its length and rect, none quoted', async () => {
     const LABEL = 'ZQ7VXK2§, Password'; // not the field's value, so the own-text rule alone would quote it
-    const below = { ...AT, y: 200 };
+    const secondAt = { ...AT, y: 200 };
     const reads = fieldRefetch({
-      adapter: reading(tree([field('typed', { label: LABEL }), field('other', { rect: below })])),
+      adapter: reading(tree([field('typed', { label: LABEL }), field('other', { rect: secondAt })])),
       target: 'role:textfield id:f',
       resolve: { ambiguous: 'refuse' },
       chosen,
