@@ -203,3 +203,19 @@ own declaration and its own rows there.
   AXValue the text), the old argv's `-h` as the control (exit 0, the usage, the field unchanged), then through averi's
   typeText (`type-via-averi.ts`) with the helper on and with `AVERI_IDB_HELPER=off`. Android's `input text -`, and `-h`
   as averi sends it, are read back by `android-input-dash.sh` beside it, when the emulator is up.
+
+## Amendment: what a fill must not say is what was typed, not its selector (2026-11-17, backlog A54)
+
+A fill's errors and replies carry the typed value's length only, and the field's text as lengths (after the focus tap;
+before it, a label the app built is quoted, as in every tool's list). Two texts are the
+author's own and are shown as written: the selector, a `value:"…"` included, and the flow's fill line's value, which the
+engine shows as the author wrote it, `***` for a secret (it redacts a flow's secrets from every line, the selector's
+included). An ambiguity's list of candidates (`resolve.ts#resolveNow`, every verb's) names an input whose label is its
+own text — an Android EditText with no content-desc — by that text's length and its rect, `label=<its text, 8
+characters> at 0,40 100x10`: a second match appearing while a fill re-reads its field quoted the value just typed. That
+covers averi's own derivation; a label the app built around the text (another case, the first keys, digits regrouped)
+is not recognisable, so once the focus tap has landed a re-read's refusal lists every label by its length and rect,
+`label=<18 characters> at 0,60 100x10` (`ResolveOptions.labelsByLength`, passed by `fill-refetch.ts`). The cost: an
+agent loses the label words of a refusal mid-fill, and keeps the ids and rects to tell the candidates apart.
+`tests/interact/fill-leak.test.ts` sweeps fillField's errors, `fillReply` and `fillStepText`, under `ambiguous: refuse`
+and `first`, for the typed value and the field's text, a level above `typed-text-leak.test.ts`.

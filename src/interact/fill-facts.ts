@@ -70,7 +70,7 @@ export interface FillResult {
   maskedAppend?: { held: number };
   /** The matched node's role (the one tapped, typed into and read back). */
   role: string;
-  /** The length of the value typed — a length, never content (values may be credentials). 0 for a focus or a clear alone. */
+  /** The length of the value typed — never the value, which may be a credential. 0 for a focus or a clear alone. */
   typed: number;
   /**
    * With `clear` only (absent otherwise): how many characters the input held
@@ -280,8 +280,10 @@ export type ReadBack =
  * value may be a credential.
  * - `reread-failed`: the tree could not be read mid-fill — a dead device,
  *   not a screen settling (fill-refetch.ts); `target` is the selector as
- *   the caller wrote it, `cause` the adapter's message. Never a
- *   PersistentReadError: see ui-tree/read-tree.ts#readTreeOrThrow.
+ *   the caller wrote it — the caller's own text, a `value:"…"` included,
+ *   from which the flow engine redacts a secret — `cause` the adapter's
+ *   message. Never a PersistentReadError: see
+ *   ui-tree/read-tree.ts#readTreeOrThrow.
  * - `clear-twice`: the delete rounds each CHANGED the field and none emptied
  *   it — deletes landing short — or a MASKED field the deletes did not
  *   change; `left` what it still shows, `rounds` how many were sent (2, or

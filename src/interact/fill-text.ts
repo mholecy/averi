@@ -271,8 +271,9 @@ const CAVEAT_SENTENCE: SentenceTable<Caveat> = {
  * The message of each did-not-land error fillField throws (a refused value
  * keeps type-text.ts's words), worded here with the rest
  * (fill-facts.ts#FillFailure). Lengths and counts only: no row is handed the
- * typed value or the field's text — the reread-failed row echoes the
- * caller's selector as written.
+ * typed value or the field's text, either of which may be a credential. The
+ * reread-failed row echoes the caller's selector as written: the caller's
+ * own text, from which the flow engine redacts a secret.
  */
 export function fillFailureText(f: FillFailure): string {
   return (FAILURE_SENTENCE[f.code] as (f: FillFailure) => string)(f);
