@@ -28,7 +28,7 @@ import { bareTimeoutNote, isBareTreeMemo, type Verdict } from '../ui-tree/verdic
 import { formatSeconds, parseDuration } from '../util/duration.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
-import { Verifier } from '../verify/assert.js';
+import { resultText, Verifier } from '../verify/assert.js';
 import {
   appIdOf,
   flowIsDestructive,
@@ -1432,12 +1432,12 @@ export class FlowEngine {
       handOff: this.handOff,
     });
     const results = await verifier.assertAll(specs);
-    for (const r of results) this.log(r.pass ? 'assert PASS' : 'assert FAIL', r.description + (r.detail ? ` — ${r.detail}` : ''));
+    for (const r of results) this.log(r.pass ? 'assert PASS' : 'assert FAIL', resultText(r));
     const failed = results.filter((r) => !r.pass);
     if (failed.length > 0) {
       throw new Error(
         `${failed.length}/${results.length} flow asserts failed:\n` +
-          failed.map((r) => `  FAIL ${r.description}${r.detail ? ` — ${r.detail}` : ''}`).join('\n'),
+          failed.map((r) => `  FAIL ${resultText(r)}`).join('\n'),
       );
     }
   }

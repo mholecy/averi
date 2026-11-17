@@ -7,10 +7,10 @@ import { preflight } from './preflight.js';
 import { formatTrace, FlowEngine, runRequestOf, type EngineContext, type TraceEntry } from '../flow/engine.js';
 import { Verifier, type AssertResult, type AssertSpec } from '../verify/assert.js';
 import { appHealth } from './app-health.js';
-import { assertSummary, finalFrame, formatAsserts, screenshotFailedLine, type FinalFrame } from './run-reply.js';
+import { finalFrame, legText, type FinalFrame } from './run-reply.js';
 import { ReadHandOff } from '../ui-tree/read-handoff.js';
 import { errorMessage } from '../util/error-message.js';
-import { unsettledNote, type MeasuredFrame, type TreeFrame } from '../verify/capture.js';
+import type { MeasuredFrame, TreeFrame } from '../verify/capture.js';
 import {
   compareColorParity,
   contractHasColorAnchors,
@@ -91,17 +91,18 @@ export interface VerificationOutput {
 }
 
 /**
- * What one platform's leg produced. `frame` is the settled frame the leg
+ * What one platform's leg produced. `final.frame` is the settled frame the leg
  * ended on — the png returned to the caller and, with a contract, the tree
  * and the one scale the parity tables measure against; absent parts carry
- * their reason (verify/capture.ts). Absent altogether, with `failed`, when
+ * their reason (verify/capture.ts). Absent altogether, with `final.failed`, when
  * the capture itself threw (run/run-reply.ts#finalFrame).
  */
 type VerificationLeg = {
   trace: TraceEntry[];
   results: AssertResult[];
   health: string;
-} & FinalFrame;
+  final: FinalFrame;
+};
 
 /**
  * Every parity dimension opens the same way — no tree, no contribution — and
@@ -121,11 +122,12 @@ const noTreeNote = (p: Platform, reason: string): string =>
  * types cannot rule out.
  */
 const withTree = (leg: VerificationLeg, p: Platform): Contribution<TreeFrame> => {
-  if (leg.frame === undefined) return { note: `(${p}: no screenshot — ${leg.failed} — compared without it)` };
-  const m = leg.frame.measured;
+  const { frame, failed } = leg.final;
+  if (frame === undefined) return { note: `(${p}: no screenshot — ${failed} — compared without it)` };
+  const m = frame.measured;
   // The frame is spread, not re-spelled, so what it says about itself
   // (`stability`, `captures`, whatever comes next) reaches every table.
-  if (m?.tree !== undefined) return { value: { ...leg.frame, measured: m } };
+  if (m?.tree !== undefined) return { value: { ...frame, measured: m } };
   return { note: noTreeNote(p, m?.error ?? 'no UI tree was read for this leg') };
 };
 
@@ -437,7 +439,7 @@ export async function runVerification(
     // cost on run/commands.ts#runOnEngine).
     const final = await finalFrame(adapter, { readTree: contract !== undefined });
     const health = await appHealth(adapter, cfg);
-    return { trace, results, health, ...final };
+    return { trace, results, health, final };
   };
 
   const runs = await Promise.allSettled(platforms.map(runOne));
@@ -451,15 +453,19 @@ export async function runVerification(
       sections.push(`## ${p}\nFAILED: ${errorMessage(run.reason)}`);
       return;
     }
-    const { trace, results, frame, failed, health } = run.value;
-    const verdict = specs.length === 0 ? '' : `\n${assertSummary(results)}`;
-    // One line when the leg's frame did not settle: the picture below may be
-    // mid-animation, and the tables that read it say nothing. In the same
-    // place, one line when there is no frame at all.
-    const note = frame === undefined ? screenshotFailedLine(failed) : unsettledNote(frame);
-    const frameLine = note === undefined ? '' : `\n${note}`;
-    sections.push(`## ${p}\n${formatTrace(trace)}${verdict}\n${formatAsserts(results)}${frameLine}${health}`);
-    if (frame !== undefined) screenshots.push(frame.shot.png());
+    const { trace, results, health, final } = run.value;
+    // The frame's one note line says the picture below may be mid-animation (the tables that read it say nothing), or
+    // that there is no picture at all.
+    sections.push(
+      legText({
+        head: `## ${p}`,
+        trace: formatTrace(trace),
+        asserts: specs.length === 0 ? undefined : results,
+        final,
+        health,
+      }),
+    );
+    if (final.frame !== undefined) screenshots.push(final.frame.shot.png());
   });
 
   if (contract !== undefined) {

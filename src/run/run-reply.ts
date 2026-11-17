@@ -1,11 +1,11 @@
 import type { DeviceAdapter } from '../adapters/types.js';
-import type { AssertResult } from '../verify/assert.js';
-import { captureFrame, captureRefusal, type Frame } from '../verify/capture.js';
+import { resultText, type AssertResult } from '../verify/assert.js';
+import { captureFrame, captureRefusal, unsettledNote, type Frame } from '../verify/capture.js';
 
 /**
- * The pieces a run's reply is built from: the final frame or the one line saying why there is none, and the asserts'
- * verdict and lines. The step trace is the engine's (flow/engine.ts#formatTrace), imported from there; the health
- * line is run/app-health.ts's.
+ * A run's reply: the final frame or the one line saying why there is none, the asserts' verdict and lines, and the
+ * order every run lays them out in (legText). The step trace is the engine's (flow/engine.ts#formatTrace), handed in
+ * by the callers; the health line is run/app-health.ts's.
  */
 
 /**
@@ -34,23 +34,56 @@ export async function finalFrame(
 }
 
 /** The line a run prints when its final capture failed — where the `⚠ frame:` note of an unsettled one goes. */
-export const screenshotFailedLine = (failed: string): string => `⚠ screenshot: ${failed} — no image is returned`;
+const screenshotFailedLine = (failed: string): string => `⚠ screenshot: ${failed} — no image is returned`;
 
-export const formatAsserts = (results: AssertResult[]): string =>
-  results
-    .map((r) => `${r.pass ? 'PASS' : 'FAIL'}  ${r.description}${r.detail ? ` — ${r.detail}` : ''}`)
-    .join('\n');
+/** The frame's one note line: why there is no image, or that the image may be mid-animation; none for a settled frame. */
+const frameNote = (final: FinalFrame): string | undefined =>
+  final.frame === undefined ? screenshotFailedLine(final.failed) : unsettledNote(final.frame);
+
+const formatAsserts = (results: AssertResult[]): string =>
+  results.map((r) => `${r.pass ? 'PASS' : 'FAIL'}  ${resultText(r)}`).join('\n');
 
 /**
- * The one-line verdict over a set of asserts. It lives beside formatAsserts
- * for the reason describeElementSpec has one owner: this is user-facing
- * wording that appears in BOTH the single-platform `assert` tool and every leg
- * of a `verify` report, and two tools describing the same failure differently
- * is the drift this prevents.
+ * The one-line verdict over a set of asserts — the same words in the `assert` tool and in every leg of a `verify`
+ * report, so two tools never describe the same failure differently.
  */
-export const assertSummary = (results: AssertResult[]): string => {
+const assertSummary = (results: AssertResult[]): string => {
   const failed = results.filter((r) => !r.pass).length;
   return failed === 0
     ? `All ${results.length} asserts passed`
     : `${failed}/${results.length} asserts FAILED`;
 };
+
+/**
+ * What one run's reply is made of. Each single-platform tool's reply (ensure_state, run_flow, assert) is laid out as a
+ * verify leg's section is, without the head. A part a caller has nothing for, left out or empty, takes no line.
+ */
+interface Leg {
+  /** A verify leg's `## <platform>` line. */
+  head?: string;
+  /** The engine's trace, as flow/engine.ts#formatTrace prints it. */
+  trace?: string;
+  /**
+   * The asserts the call named, headed by the verdict over them. Left out of a verify leg whose call named none; the
+   * `assert` tool always passes its list, an empty one included.
+   */
+  asserts?: AssertResult[];
+  /** The final capture, for its one note line. */
+  final?: FinalFrame;
+  /** run/app-health.ts#appHealth's line, or '' when there is no app to ask about. */
+  health: string;
+}
+
+/**
+ * The reply of ensure_state, run_flow, assert and each verify leg, in the one order they share: the head, the trace,
+ * the verdict, the assert lines, the frame's note, and the health line last, before the caller's claim note
+ * (ARCHITECTURE.md §8). An empty part takes no line: a verify leg with no state, flow or asserts is its head and health
+ * line. The verdict and its lines are one part, so the `assert` tool's reply to an empty list keeps the line break
+ * after `All 0 asserts passed`.
+ */
+export function legText({ head, trace, asserts, final, health }: Leg): string {
+  const assertBlock = asserts === undefined ? undefined : `${assertSummary(asserts)}\n${formatAsserts(asserts)}`;
+  const note = final === undefined ? undefined : frameNote(final);
+  const parts = [head, trace, assertBlock, note, health];
+  return parts.filter((p): p is string => p !== undefined && p !== '').join('\n');
+}

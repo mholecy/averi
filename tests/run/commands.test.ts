@@ -109,7 +109,7 @@ describe('runEnsureState', () => {
     expect(resolvedWith.map((cfg) => cfg.app.android?.package)).toEqual(['md.bank.app']);
   });
 
-  it('a frame that never settled is returned with ONE note line after the health line; a settled one adds nothing (2026-10-05)', async () => {
+  it('a frame that never settled is returned with ONE note line before the health line, which ends the reply (2026-10-05)', async () => {
     const fake = home();
     let i = 0;
     fake.screenshot = async () => {
@@ -118,8 +118,10 @@ describe('runEnsureState', () => {
       return shot;
     };
     const out = await runEnsureState({ session: new EngineSession(), state: 'home', project: await validProject() }, resolver(fake).resolve);
-    expect(out.text).toMatch(/\nappAlive: true\n⚠ frame: /);
-    expect(out.text.split('\n').at(-1)).toBe('⚠ frame: the screen did not settle: 6 captures, each different from the last, before the stability budget or the deadline ran out — an animation or live content; wait for it to finish or hide the live content and re-run — the last capture is returned as the best available');
+    expect(out.text.split('\n').slice(-2)).toEqual([
+      '⚠ frame: the screen did not settle: 6 captures, each different from the last, before the stability budget or the deadline ran out — an animation or live content; wait for it to finish or hide the live content and re-run — the last capture is returned as the best available',
+      'appAlive: true',
+    ]);
     expect(out.shot).toEqual(frame('moving 5'));
   });
 
@@ -339,6 +341,27 @@ describe('runAsserts', () => {
     expect(await run((await validProject()).cfg)).toBe(`${bare}\nappAlive: true`);
   });
 
+  it('the whole reply, line for line: verdict, one line per assert, health line', async () => {
+    expect(await run((await validProject()).cfg)).toBe(
+      '1/2 asserts FAILED\n' +
+        'PASS  element id:"home_root" exists\n' +
+        'FAIL  element id:"nope" exists — not found within 0 s\n' +
+        'appAlive: true',
+    );
+  });
+
+  // The tool's schema takes an empty list (tools.ts#assertsInput sets no minimum). Its reply keeps the line the
+  // missing assert lines leave, before the health line.
+  it('no asserts → the vacuous verdict, an empty line, then the health line', async () => {
+    const text = await runAsserts({
+      adapter: home(),
+      specs: [],
+      baselineDir: baselineDirFor(missing()),
+      cfg: (await validProject()).cfg,
+    });
+    expect(text).toBe('All 0 asserts passed\n\nappAlive: true');
+  });
+
   // One failure policy for the health line (run/app-health.ts, A29): appHealth words every device failure into the
   // line itself, and anything else it throws is a broken adapter, which fails the call — here as in ensure_state,
   // run_flow and a verify leg. The throw is made where the other two callers' tests make it: a log read that answers
@@ -384,9 +407,10 @@ describe('runEnsureState — a refused final screenshot', () => {
     };
     const out = await runEnsureState({ session: new EngineSession(), state: 'home', project: await validProject() }, resolver(fake).resolve);
     expect(out.shot).toBeUndefined();
-    expect(out.text).toMatch(/home[\s\S]*\nappAlive: true\n⚠ screenshot: /);
-    expect(out.text.split('\n').at(-1)).toBe(
+    expect(out.text).toMatch(/home[\s\S]*\n⚠ screenshot: [^\n]*\nappAlive: true$/);
+    expect(out.text.split('\n').slice(-2)).toEqual([
       '⚠ screenshot: `adb -s emulator-5554 exec-out screencap -p` on device emulator-5554 returned 0 bytes — not a PNG — no image is returned',
-    );
+      'appAlive: true',
+    ]);
   });
 });
