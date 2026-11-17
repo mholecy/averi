@@ -492,7 +492,7 @@ flows:
       expect(parseConfig(ios('    keyboardDismiss:\n      - tap: { role: text, text: "Login" }\n')).app.ios?.keyboardDismiss).toEqual([{ tap: { role: 'text', text: 'Login' } }]);
     });
 
-    /** Review round 1: the key under a pinned `treeSource: idb` cannot act — said once at load time (flow/load.ts), decided here. */
+    /** The key under a pinned `treeSource: idb` cannot act — said once at load time (flow/load.ts), decided here. */
     describe('inertKeyboardDismissNote — the key set where the tree marks no keyboard', () => {
       const LIST = '    keyboardDismiss:\n      - accessory: true\n';
       it('treeSource: idb written out: the note names it and the fix', () => {

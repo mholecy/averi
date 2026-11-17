@@ -442,7 +442,7 @@ describe('fillField — masked fields verify by length', () => {
   });
 
   // The pre-tap read is stale for both shapes below, and a
-  // `preLen` taken from it failed two correct fills.
+  // length taken from it failed two correct fills.
   it('autofill that POPULATES a masked field on focus does not fail the fill (pre-fill re-read after focus)', async () => {
     const fake = formFake(null);
     const origTap = fake.tap.bind(fake);

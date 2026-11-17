@@ -192,7 +192,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // round 7's React Native lab app (rn-field, `--app react-native`, the record keeping its app): the forms cases
     // rn1–rn6 and the label and icon taps; LOUD where WDA (LR1) and uiautomator (LR2) refuse a label under its own field,
     // and where a fill into an RN single-line field lost the tail of its text (averi said so: "the field shows 8").
-    // 055c666: M's field laid to the box's foot (before review round 1); 97de1b9: laid as N's, the bar over its label.
+    // 055c666: M's field laid to the box's foot (before round 7's review round 1); 97de1b9: laid as N's, the bar over its label.
     ['ios-rn-field-055c666.json', 'forms,visibility', { cases: 18, ok: 13, loud: 5, mismatches: 0 }],
     ['android-rn-field-055c666.json', 'forms,visibility', { cases: 9, ok: 6, loud: 3, mismatches: 0 }],
     ['ios-rn-field-97de1b9.json', 'forms,visibility', { cases: 18, ok: 11, loud: 7, mismatches: 0 }],
@@ -203,7 +203,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-wda-stop-carousel-r23-2.json', 'visibility', { cases: 2, ok: 2, loud: 0, mismatches: 0 }],
     ['ios-wda-stop-carousel-r23-3.json', 'visibility', { cases: 2, ok: 2, loud: 0, mismatches: 0 }],
     ['ios-wda-stop-carousel-r23-4.json', 'visibility', { cases: 2, ok: 2, loud: 0, mismatches: 0 }],
-    // …the keyboard forms under WDA at A1's src and at arch/round-23 before it (review round 1, MAJOR-1): the same
+    // …the keyboard forms under WDA at A1's src and at arch/round-23 before it (asked by A1's review round 1): the same
     ['ios-wda-forms-r23-ios-stop.json', 'forms', { cases: 23, ok: 18, loud: 5, mismatches: 0, preD43Wda: true }],
     ['ios-wda-forms-r23.json', 'forms', { cases: 23, ok: 18, loud: 5, mismatches: 0, preD43Wda: true }],
     // …the visibility cells whose replayed first stroke the unmeasured carry cuts, at both srcs: 16 of 16 ok

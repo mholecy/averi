@@ -458,7 +458,7 @@ export const scrollVerdictSaid = (reply: string): boolean => /^ERROR scroll_unti
 /**
  * A scroll_until failure that names a side it never read: `if it lies above, try direction: "up"` (src/interact/
  * target-text.ts#untriedSideText, each side's sentence built by it, not copied) — false of a list that never moved.
- * Deliberately exact: A14 asked to derive it, and untriedSideText is its only producer, so the whole sentence is
+ * Deliberately exact: A14 asked to derive it, and untriedSideText builds the whole sentence, so the whole sentence is
  * matched. Unlike directionNamed, kept wide (the `direction: "…"` fragment, which three producers write) so as not to
  * narrow its judge: this one derives every word it reads, that one pins a fragment.
  */

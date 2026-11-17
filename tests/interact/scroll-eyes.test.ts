@@ -191,7 +191,7 @@ function pngOf(rects: [number, number, number, number, number[]][]): Buffer {
   return PNG.sync.write(png);
 }
 
-describe('scroll_until — the eyes against what the tree already rules (the reviewer\'s shapes)', () => {
+describe('scroll_until — the eyes against what the tree already rules', () => {
   const GREY = [0xf2, 0xf2, 0xf7];
   const PURPLE = [0x67, 0x50, 0xa4];
   const TITLE = 'id:"lab.form-keyboard.note.title"';

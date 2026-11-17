@@ -159,7 +159,7 @@ describe('judgeEyes — the band of the surface around the neighbour, read row b
   });
 
   it('the screen beside the target the surface\'s colour too (a grouped background, the target\'s own touch margin over it) — unjudged, never a band', () => {
-    // The reviewer's shape over the real k7 tree: #F2F2F7 everywhere, phone's field white 1129–1228, no bar padding —
+    // A shape over the real k7 tree: #F2F2F7 everywhere, phone's field white 1129–1228, no bar padding —
     // Continue drawn on the background; the dumped node's 10-px margin below the field reads the background's grey.
     const tree = parseDump(K7_XML);
     const q = eyesQuestion(sceneOf(tree), tree, byId(tree, 'lab.form-keyboard.phone'), undefined, 'stop') as EyesQuestion;

@@ -702,7 +702,7 @@ export class AndroidAdapter implements DeviceAdapter {
    * into ViewportMemo (weighed and left): an
    * invalidate hook for `launch` would be clean — ViewportMemo's identity
    * check (`#pending === attempt`) already keeps a superseded read from
-   * landing, so a `forget()` would do what `#bandEpoch` does — and the
+   * landing, so a forget hook would do what `#bandEpoch` does — and the
    * three outcomes could be mapped onto it (a timeout resolved as none and
    * kept, a fast failure rejected and dropped, the caller catching it). What
    * does not map is a FRESH read: here the last answer stands until the

@@ -108,7 +108,7 @@ describe('loadForCall — the one read of a tool call, judged by its policy', ()
     expect(said()).toContain('averi: loaded AVERI_TOOL_CONFIG_TEST from .env.averi');
   });
 
-  /** Review round 1 of stage B: the key under a pinned `treeSource: idb` is inert — said on stderr once per file, by every loader. */
+  /** The key under a pinned `treeSource: idb` is inert — said on stderr once per file, by every loader. */
   describe('the inert-key note', () => {
     const INERT = 'app:\n  ios: { bundleId: md.bank.app, treeSource: idb, keyboardDismiss: [{ accessory: true }] }\n';
     const notes = () => said().filter((line) => line.includes('keyboardDismiss'));

@@ -12,8 +12,8 @@ import { judged, rejudgedResults, selectCases, type Case, type CaseRecord, type 
 const DIR = new URL('../../docs/truth/live-records/t7b-chooser/', import.meta.url);
 const read = (f: string) => JSON.parse(readFileSync(new URL(f, DIR), 'utf8')) as RunRecord;
 /**
- * The first three settled runs (no first window read kept, no HOME read), then review round 1's three (both kept, at the
- * read's top: the `settle` field came after them). The records without a HOME read — the first run and the first three
+ * The first three settled runs (no first window read kept, no HOME read), then the three of T7b's review round 1 (both
+ * kept, at the read's top: the `settle` field came after them). The records without a HOME read — the first run and the first three
  * settled runs — are judged under the weaker launcher premise (live-chooser.ts#launcherPremise: no package of the
  * platform's chooser in front, no lab or chooser record), not "the HOME activity in front".
  */
