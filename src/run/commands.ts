@@ -109,7 +109,7 @@ export async function runEnsureState(
   // A broken adapter's throw from appHealth fails the call; the frame's reads then finish unawaited — reads only.
   const [health, final] = await Promise.all([appHealth(adapter, cfg), finalFrame(adapter)]);
   // The claim note (claims.ts) closes the reply, after the health line.
-  const text = claimed([adapter], legText({ trace, frame: final, health }));
+  const text = claimed([adapter], legText({ trace, final, health }));
   return final.frame === undefined ? { text } : { text, shot: await final.frame.shot.png() };
 }
 

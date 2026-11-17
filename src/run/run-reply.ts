@@ -68,9 +68,9 @@ interface Leg {
    * `assert` tool always passes its list, an empty one included.
    */
   asserts?: AssertResult[];
-  /** The final frame, for its one note line. */
-  frame?: FinalFrame;
-  /** run/app-health.ts#appHealth's line (it comes with its leading newline), or '' when there is no app to ask about. */
+  /** The final capture, for its one note line. */
+  final?: FinalFrame;
+  /** run/app-health.ts#appHealth's line, or '' when there is no app to ask about. */
   health: string;
 }
 
@@ -81,10 +81,9 @@ interface Leg {
  * line. The verdict and its lines are one part, so the `assert` tool's reply to an empty list keeps the line break
  * after `All 0 asserts passed`.
  */
-export function legText({ head, trace, asserts, frame, health }: Leg): string {
+export function legText({ head, trace, asserts, final, health }: Leg): string {
   const assertBlock = asserts === undefined ? undefined : `${assertSummary(asserts)}\n${formatAsserts(asserts)}`;
-  const note = frame === undefined ? undefined : frameNote(frame);
-  // appHealth's line comes with its leading newline; the join gives every part its own.
-  const parts = [head, trace, assertBlock, note, health.slice(1)];
+  const note = final === undefined ? undefined : frameNote(final);
+  const parts = [head, trace, assertBlock, note, health];
   return parts.filter((p): p is string => p !== undefined && p !== '').join('\n');
 }

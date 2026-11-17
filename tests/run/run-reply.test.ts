@@ -4,7 +4,7 @@ import type { Frame } from '../../src/verify/capture.js';
 
 const pass = { description: 'a', pass: true };
 const fail = { description: 'b', pass: false, detail: 'not found' };
-const HEALTH = '\nappAlive: true';
+const HEALTH = 'appAlive: true';
 
 /** Only what the note reads off a frame: whether it held still, and over how many captures. */
 const frameOf = (stability: Frame['stability']): Frame => ({ stability, captures: 6 }) as Frame;
@@ -36,7 +36,7 @@ describe('legText', () => {
   });
 
   it('a health line with a crash excerpt is carried whole, below the rest', () => {
-    expect(legText({ trace: 't', health: '\nappAlive: false\n  E/AndroidRuntime: FATAL' })).toBe(
+    expect(legText({ trace: 't', health: 'appAlive: false\n  E/AndroidRuntime: FATAL' })).toBe(
       't\nappAlive: false\n  E/AndroidRuntime: FATAL',
     );
   });
@@ -55,18 +55,18 @@ describe('legText', () => {
         head: '## android',
         trace: 'state home: already active',
         asserts: [pass],
-        frame: { frame: frameOf('moving') },
+        final: { frame: frameOf('moving') },
         health: HEALTH,
       }),
     ).toBe(`## android\nstate home: already active\nAll 1 asserts passed\nPASS  a\n${MOVING_NOTE}\nappAlive: true`);
   });
 
   it('the frame note: one ⚠ line for a capture that failed or a frame that moved, nothing for a settled one', () => {
-    expect(legText({ trace: 't', frame: { failed: 'adb returned 0 bytes' }, health: HEALTH })).toBe(
+    expect(legText({ trace: 't', final: { failed: 'adb returned 0 bytes' }, health: HEALTH })).toBe(
       't\n⚠ screenshot: adb returned 0 bytes — no image is returned\nappAlive: true',
     );
-    expect(legText({ trace: 't', frame: { frame: frameOf('moving') }, health: HEALTH })).toBe(`t\n${MOVING_NOTE}\nappAlive: true`);
-    expect(legText({ trace: 't', frame: { frame: frameOf('settled') }, health: HEALTH })).toBe('t\nappAlive: true');
-    expect(legText({ trace: 't', frame: { frame: frameOf('unjudged') }, health: HEALTH })).toBe('t\nappAlive: true');
+    expect(legText({ trace: 't', final: { frame: frameOf('moving') }, health: HEALTH })).toBe(`t\n${MOVING_NOTE}\nappAlive: true`);
+    expect(legText({ trace: 't', final: { frame: frameOf('settled') }, health: HEALTH })).toBe('t\nappAlive: true');
+    expect(legText({ trace: 't', final: { frame: frameOf('unjudged') }, health: HEALTH })).toBe('t\nappAlive: true');
   });
 });

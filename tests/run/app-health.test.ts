@@ -21,7 +21,7 @@ function fake(platform: Platform): FakeAdapter {
 
 describe('appHealth', () => {
   it('reports a live app', async () => {
-    expect(await appHealth(fake('android'), CFG)).toBe('\nappAlive: true');
+    expect(await appHealth(fake('android'), CFG)).toBe('appAlive: true');
   });
 
   // Measured 2026-09-17 (finportal, host load avg 28): a timed-out `adb shell pidof`
@@ -89,7 +89,7 @@ describe('the crash excerpt', () => {
       '07-08 11:00:01.002  5678  5678 E AndroidRuntime:   at md.bank.app.MainActivity.onCreate',
     ];
     expect(await appHealth(dead, CFG)).toBe(
-      '\nappAlive: false — com.example.app is not running!\nCrash excerpt:\n' + dead.logLines.slice(1).join('\n'),
+      'appAlive: false — com.example.app is not running!\nCrash excerpt:\n' + dead.logLines.slice(1).join('\n'),
     );
   });
 
@@ -115,7 +115,7 @@ describe('the crash excerpt', () => {
     dead.appRunning = false;
     dead.logLines = ['all quiet', 'Terminating app due to uncaught exception NSRangeException'];
     expect(await appHealth(dead, CFG)).toBe(
-      '\nappAlive: false — com.example.app is not running!\nCrash excerpt:\n' +
+      'appAlive: false — com.example.app is not running!\nCrash excerpt:\n' +
         'Terminating app due to uncaught exception NSRangeException',
     );
   });
@@ -137,7 +137,7 @@ describe('one failure policy: the device\'s failures are the line\'s, nothing el
         throw new Error('Command timed out\nsecond line');
       };
       expect(await appHealth(loaded, CFG)).toBe(
-        '\nappAlive: unknown — could not ask the device whether com.example.app runs (Command timed out); ' +
+        'appAlive: unknown — could not ask the device whether com.example.app runs (Command timed out); ' +
           `the device is unreachable or under load. NOT evidence that the app died — ${check}, then retry.`,
       );
     }
@@ -150,7 +150,7 @@ describe('one failure policy: the device\'s failures are the line\'s, nothing el
       throw new Error('adb: device offline');
     };
     expect(await appHealth(dead, CFG)).toBe(
-      '\nappAlive: false — com.example.app is not running!\n(no crash signature in the last 60s of logs)',
+      'appAlive: false — com.example.app is not running!\n(no crash signature in the last 60s of logs)',
     );
   });
 
@@ -163,7 +163,7 @@ describe('one failure policy: the device\'s failures are the line\'s, nothing el
       throw new Error('adb: device offline');
     };
     expect(await appHealth(dead, CFG)).toBe(
-      '\nappAlive: false — com.example.app is not running!\n(no crash signature in the last 60s of logs)',
+      'appAlive: false — com.example.app is not running!\n(no crash signature in the last 60s of logs)',
     );
   });
 

@@ -47,9 +47,10 @@ function scanForCrashes(lines: string[], platform: Platform): string[] {
 }
 
 /**
- * The health line, opening with its own newline, or '' when averi.yaml names no app for the adapter's platform. When
- * the app died, a crash excerpt from the last 60 s of logs follows, so a run that ended on a blank screen says why.
- * Which replies carry it is the callers' call; what it does on a failure is this module's (above).
+ * The health line, or '' when averi.yaml names no app for the adapter's platform. When the app died, a crash excerpt
+ * from the last 60 s of logs follows, so a run that ended on a blank screen says why. Which replies carry it is the
+ * callers' call, and where it sits in them is run/run-reply.ts#legText's; what it does on a failure is this module's
+ * (above).
  */
 export async function appHealth(adapter: DeviceAdapter, cfg: AveriConfig): Promise<string> {
   const appId = appIdOf(cfg, adapter.platform);
@@ -66,18 +67,18 @@ export async function appHealth(adapter: DeviceAdapter, cfg: AveriConfig): Promi
       ? 'check `adb devices` and host load'
       : 'check `xcrun simctl list devices booted` and host load (reboot the simulator if it does not answer)';
     return (
-      `\nappAlive: unknown — could not ask the device whether ${appId} runs (${why}); ` +
+      `appAlive: unknown — could not ask the device whether ${appId} runs (${why}); ` +
       `the device is unreachable or under load. NOT evidence that the app died — ${check}, then retry.`
     );
   }
-  if (running) return '\nappAlive: true';
+  if (running) return 'appAlive: true';
   // Inside a promise, so a read that throws before it returns one costs the excerpt as a rejected one does.
   const lines = await Promise.resolve()
     .then(() => adapter.logs(Date.now() - 60_000))
     .catch(() => [] as string[]);
   const crashes = scanForCrashes(lines, adapter.platform).slice(0, 24);
   return (
-    `\nappAlive: false — ${appId} is not running!` +
+    `appAlive: false — ${appId} is not running!` +
     (crashes.length > 0 ? `\nCrash excerpt:\n${crashes.join('\n')}` : '\n(no crash signature in the last 60s of logs)')
   );
 }
