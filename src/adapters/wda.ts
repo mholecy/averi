@@ -642,7 +642,7 @@ export class WdaServer {
           `simulator — adopting it could silently deliver another device's UI tree. Likely a stale ` +
           `WDA from a previous session: a server that was still busy when the host closed it took a SIGTERM; averi ` +
           `then stops its WebDriverAgent and waits for the port to go quiet, but a SIGKILL, or a second signal ` +
-          `during that wait, still leaves it. ` +
+          `during that wait, or a server older than 0.8.1, still leaves it. ` +
           `Recover: \`pkill -f WebDriverAgentRunner\` or ${rebootSimulatorAdvice(this.udid)}.`,
       );
     }

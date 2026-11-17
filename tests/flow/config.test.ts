@@ -205,8 +205,8 @@ flows:
 
     // The repo keeps no averi.yaml of its own; its machine-readable flows are the docs' yaml examples. Every one in
     // README.md, SETUP.md, ARCHITECTURE.md, skill/SKILL.md and docs/verification.md that holds whole flows
-    // (references/averi-yaml.md's are fragments, `steps: [ … ]`) parses — given an empty `app:` where the example leaves
-    // it out — to the very steps it was written as.
+    // (references/averi-yaml.md's are fragments, `steps: [ … ]`) parses — given an empty `app:` where the example
+    // leaves it out — to the very steps it was written as.
     type FlowExample = { app?: unknown; flows: Record<string, { steps: unknown[] }> };
     /** A yaml example of whole flows: each flow's steps a list of mappings, not a fragment (`steps: [ … ]`). */
     const isWholeFlowsExample = (raw: unknown): raw is FlowExample =>

@@ -135,7 +135,7 @@ describe('IosAdapter interactions', () => {
     });
   });
 
-  it('has no drag speed (decided 2026-10-09, adapters/ios.ts#swipe): a stroke keeps its 300-ms default unless scroll_until passes a duration of its own', () => {
+  it('has no drag speed (decided 2026-10-09, adapters/ios.ts#swipe): dragSpeed is undefined', () => {
     const adapter: DeviceAdapter = new IosAdapter({ udid: 'AAAA-1111', exec: fakeExec({}).fn, treeSource: NO_TREE });
     expect(adapter.dragSpeed).toBeUndefined();
   });

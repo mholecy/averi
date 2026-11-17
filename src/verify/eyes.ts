@@ -94,8 +94,8 @@ export type ApartSeen = { readonly seen: 'apart' } | { readonly seen: 'blends'; 
  * of pixels at 3x. A screenshot is pixel-exact (EYES_APART_DE), so what lies beneath a clip shows exactly zero; the one
  * point's allowance is for a stray pixel, not for noise. Measured over every node idb lists in the 32 iOS lab captures
  * of 2026-10-20 (all 393, not only the lab's ids), the strip beside it its colour: O and C 0 px off their dominant
- * (#FFFFFF, #EEEEEE); every other node at least 777 px (own-parts' I; the white `sheet-long-list` rows labelled "Row N",
- * 25728 pt², 1674 px and more).
+ * (#FFFFFF, #EEEEEE); every other node at least 777 px (own-parts' I; the white `sheet-long-list` rows labelled
+ * "Row N", 25728 pt², 1674 px and more).
  */
 const OWN_PIXELS_MAX = 1;
 
