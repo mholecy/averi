@@ -137,6 +137,21 @@ describe('fieldRefetch — the reads, and the guard typing sets', () => {
     expect(await reads.read()).toEqual({ node: field('') });
   });
 
+  it('a second match on a re-read refused: every label said by its length and rect, none quoted', async () => {
+    const LABEL = 'ZQ7VXK2§, Password'; // not the field's value, so the own-text rule alone would quote it
+    const below = { ...AT, y: 200 };
+    const reads = fieldRefetch({
+      adapter: reading(tree([field('typed', { label: LABEL }), field('other', { rect: below })])),
+      target: 'role:textfield id:f',
+      resolve: { ambiguous: 'refuse' },
+      chosen,
+      unreadable,
+    });
+    const refused = reads.read();
+    await expect(refused).rejects.toThrow('textfield id=f label=<18 characters> at 0,100 300x40\n  textfield id=f label=null at 0,200 300x40');
+    await expect(refused).rejects.not.toThrow('ZQ7VXK2');
+  });
+
   it("a tree that cannot be read throws the caller's error", async () => {
     const reads = fieldRefetch({ adapter: { uiTree: async () => Promise.reject(new Error('device gone')) }, target: VALUE, resolve: OPTS, chosen, unreadable });
     await expect(reads.read()).rejects.toThrow('wrapped: ');
