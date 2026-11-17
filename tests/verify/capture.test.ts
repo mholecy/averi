@@ -66,6 +66,15 @@ function device(frames: Buffer[]): FakeAdapter {
   return fake;
 }
 
+/**
+ * A frame whose tree was read here (`readTree: true`) always carries its measured half, though it may say the read
+ * failed; `captureFrame`'s one signature for every arm without a supplied tree leaves `measured` optional, so a test
+ * asserts it is there before reading it.
+ */
+function expectMeasured(got: Frame): asserts got is Frame & { measured: NonNullable<Frame['measured']> } {
+  expect(got.measured).toBeDefined();
+}
+
 describe('captureFrame — the stability wait', () => {
   it('returns the first frame that repeats, and nothing captured before it', async () => {
     const fake = device([frame('a'), frame('b'), frame('b'), frame('c')]);
@@ -420,6 +429,7 @@ describe('captureFrame — the tree beside the png', () => {
       return orig();
     };
     const got = await captureFrame(fake, { readTree: true });
+    expectMeasured(got);
     expect(got.measured.tree?.children[0]?.identifier).toBe('card');
     expect(failures).toBe(-1); // succeeded on the 2nd attempt
     // The stability wait, then one retry at the tree-read budget's 300 ms —
@@ -439,6 +449,7 @@ describe('captureFrame — the tree beside the png', () => {
       throw new PersistentReadError('wedged until a reboot\nthe cure');
     };
     const got = await captureFrame(fake, { readTree: true });
+    expectMeasured(got);
     expect(reads).toBe(1);
     expect(got.shot.equals(Shot.ofPng(png(1000, 2000)))).toBe(true);
     expect(got.measured.error).toBe('UI tree read failed: wedged until a reboot\nthe cure');
@@ -451,6 +462,7 @@ describe('captureFrame — the tree beside the png', () => {
       throw new Error('null root node');
     };
     const got = await captureFrame(fake, { readTree: true });
+    expectMeasured(got);
     expect(got.shot.equals(Shot.ofPng(png(1000, 2000)))).toBe(true);
     expect(got.measured.tree).toBeUndefined();
     expect(got.measured.error).toMatch(/^UI tree read failed after 5 attempts: null root node$/);
@@ -473,6 +485,7 @@ describe('captureFrame — the tree beside the png', () => {
   it('an undecodable png keeps the tree and reports the reason; nothing is measured', async () => {
     const fake = device([Buffer.from('not a png')]);
     const got = await captureFrame(fake, { readTree: true });
+    expectMeasured(got);
     expect(got.measured.tree).toBeDefined();
     expect(got.measured.image).toBeUndefined();
     // The frame's one sentence: pngjs's own words, then how to recover.
@@ -488,6 +501,7 @@ describe('captureFrame — the one scale', () => {
     const fake = device([png(1000, 2000)]);
     fake.viewportSize = { width: 500, height: 1000 }; // the tree reads 1000 wide
     const got = await captureFrame(fake, { readTree: true });
+    expectMeasured(got);
     expect(got.measured.scale).toMatchObject({ scale: 2, width: 500 });
     expect(got.measured.scale?.note).toMatch(/500x1000 DEVICE screen; the tree reads 1000/);
   });
@@ -498,6 +512,7 @@ describe('captureFrame — the one scale', () => {
       throw new Error('idb describe returned no screen_dimensions');
     };
     const got = await captureFrame(fake, { readTree: true });
+    expectMeasured(got);
     expect(got.measured.scale).toMatchObject({ scale: 1, width: 1000 });
     expect(got.measured.scale?.note).toMatch(/scaled from the UI tree/);
   });
@@ -572,6 +587,7 @@ describe('measuredFrameFor — the pure tail captureFrame and the comparator fix
       return opts?.fresh === true ? { width: 1000, height: 2000 } : { width: 500, height: 1000 };
     };
     const got = await captureFrame(fake, { readTree: true });
+    expectMeasured(got);
     expect(reads).toEqual([undefined, true]);
     expect(got.measured).toMatchObject({ window: { width: 1000 }, scale: { scale: 1, width: 1000 } });
     expect(got.measured).not.toHaveProperty('window.note');
