@@ -1454,6 +1454,16 @@ stands out to a grep; a new root mark is added to the parser, adapters/types.ts 
 smaller slice): splitting `ancestry`'s remaining meanings into their own fields, and replacing `cutsAtLater`'s inference
 by a mark the uiautomator parser sets.
 
+## Amendment: a backdrop's evidence by its listing order, not its source (2026-11-17, A67)
+
+A backdrop's words named its source — "an empty element WDA lists over the whole screen, after the screen's content",
+"… idb lists …, before …" — and took the source from `MarkedLayer.listedAhead`, reasoning that only idb's tree is a
+flat list. The mark says where the backdrop was listed, not who listed it, so the words now say that alone: "an empty
+element the tree lists over the whole screen, after (before) the screen's content" (ui-tree/remedy-text.ts). The
+skill's references quote the new words. The golden corpus's 51 tap, colour and `scroll_until` rows over a backdrop
+(blur-menu-grouped, blur-menu-stacked and blur-menu-unhidden on WDA, blur-menu-unhidden on idb, chooser-over-list) change
+in that phrase only; no verdict moves.
+
 ## Residuals accepted
 
 (Numbered as before; 8 replaced by the sheet's bare dim after the full-screen leaf condition removed the Android background case.)

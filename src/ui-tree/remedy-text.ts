@@ -75,14 +75,13 @@ export const presentedLayerName = (layer: MarkedLayer | undefined): string => {
  */
 const BACKDROP = "a menu's backdrop";
 /**
- * The evidence a `backdrop` rests on, as its source lists it: WDA's in-window backdrop is listed AFTER the screen's
- * content (adapters/wda-source.ts#inWindowBackdrops); idb's, in its flat list, BEFORE it, after the menu's card
- * (`MarkedLayer.listedAhead`, adapters/ios-tree-source.ts#backdropOf). The flag names idb because only idb's tree is a
- * flat list (dialect.ts#TreeDialect.ancestry false: the mark adapters/ios-tree-source.ts#markIdbDialect alone sets), so a backdrop listed ahead
- * is idb's.
+ * The evidence a `backdrop` rests on, by where the tree lists it (`MarkedLayer.listedAhead`): AFTER the screen's content
+ * (adapters/wda-source.ts#inWindowBackdrops), or, in a flat list, BEFORE it, after the menu's card
+ * (adapters/ios-tree-source.ts#backdropOf). Its listing order, not its source: the mark says where it was listed, and
+ * which source listed it is no fact of these words.
  */
 const backdropEvidence = (layer: MarkedLayer): string =>
-  layer.listedAhead === true ? "an empty element idb lists over the whole screen, before the screen's content" : "an empty element WDA lists over the whole screen, after the screen's content";
+  `an empty element the tree lists over the whole screen, ${layer.listedAhead === true ? 'before' : 'after'} the screen's content`;
 
 /**
  * The `backdrop` remedy over the node (`purpose`'s pronoun), its way out (`wayOut`: what to do by coordinates or on the screenshot) in a

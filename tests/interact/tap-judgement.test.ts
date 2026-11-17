@@ -360,7 +360,7 @@ describe('judgeTap(…).aim() — a later stacked screen layer over the target (
     const { outcome } = await judge(tree, 'lab.blur-menu-grouped.A', { first: IPHONE });
     expect(said(outcome)).toBe(
       'CoveredRefusal: lab.blur-menu-grouped.A is under container (0,0 402x874) at its centre (201,142), drawn over it; nothing of it shows — ' +
-        "a menu's backdrop is presented over it (an empty element WDA lists over the whole screen, after the screen's content) — close it first " +
+        "a menu's backdrop is presented over it (an empty element the tree lists over the whole screen, after the screen's content) — close it first " +
         '(if a screenshot shows no menu up, the backdrop is an overlay that lets touches through: tap the target by its coordinates (its centre from ui_snapshot)); no scroll moves it out from under that backdrop; nothing was tapped',
     );
   });
@@ -386,7 +386,7 @@ describe('judgeTap(…).aim() — a later stacked screen layer over the target (
     const tree = parseIdbDescribeAll(await readFile(new URL('../fixtures/truth/ios-iphone17-ios27/blur-menu-unhidden.idb.json', import.meta.url), 'utf8'));
     expect(said((await judge(tree, 'lab.blur-menu-unhidden.A', { first: IPHONE })).outcome)).toBe(
       'CoveredRefusal: lab.blur-menu-unhidden.A is under other (0,0 402x874) at its centre (201,142), drawn over it; nothing of it shows — ' +
-        "a menu's backdrop is presented over it (an empty element idb lists over the whole screen, before the screen's content) — close it first " +
+        "a menu's backdrop is presented over it (an empty element the tree lists over the whole screen, before the screen's content) — close it first " +
         '(if a screenshot shows no menu up, the backdrop is an overlay that lets touches through: tap the target by its coordinates (its centre from ui_snapshot)); no scroll moves it out from under that backdrop; nothing was tapped',
     );
     expect(said((await judge(tree, 'lab.blur-menu-unhidden.K', { first: IPHONE })).outcome)).toBe('{"point":{"x":201,"y":412}}');

@@ -2028,7 +2028,7 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
     expect(strokesToward(played)).toEqual([]);
     expect(failureOf(played, 'id:lab.blur-menu-grouped.A').message).toBe(
       'scroll_until id:lab.blur-menu-grouped.A stopped before any swipe — element is in the viewport but under container (0,0 402x874) at its centre (201,142), drawn over it — 0% of it shows — ' +
-        "a menu's backdrop is presented over it (an empty element WDA lists over the whole screen, after the screen's content) — close it first " +
+        "a menu's backdrop is presented over it (an empty element the tree lists over the whole screen, after the screen's content) — close it first " +
         '(if a screenshot shows no menu up, the backdrop is an overlay that lets touches through: swipe, then tap the target, by coordinates); no scroll moves it out from under that backdrop, ' +
         'and a swipe on it may close the menu, so none was sent. Last rect {"x":51,"y":110,"width":300,"height":64} in a 402x874 viewport',
     );
