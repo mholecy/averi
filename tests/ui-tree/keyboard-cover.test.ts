@@ -174,7 +174,7 @@ describe('over — the input method\'s word over a covered point: the veto (witn
 
   it.each([
     ['witness shown: covered, confirmed', 'shown', { kind: 'covered', frame: FRAME, confirmed: true }],
-    ['witness unknown: covered, not confirmed — the window state alone stands, as before the veto existed', 'unknown', { kind: 'covered', frame: FRAME, confirmed: false }],
+    ['witness unknown: covered, not confirmed — the window state alone stands', 'unknown', { kind: 'covered', frame: FRAME, confirmed: false }],
     ['witness hidden: denied — the stale window state, act on neither guess', 'hidden', { kind: 'denied', frame: FRAME }],
   ] as const)('%s', async (_name, witness, expected) => {
     const { fake, oracle } = withOracle({ state: 'shown', frame: FRAME }, witness);

@@ -81,7 +81,7 @@ describe('a later-listed control over the target\'s centre in a classic run: dra
 </hierarchy>`;
   const at = (t: UiNode) => [byLabel(t, 'A'), byLabel(t, 'B')] as const;
 
-  it('before D75 (the run unmarked): B, listed later, is drawn over A — the tap refused', () => {
+  it('no reading order marked on the run: B, listed later, is drawn over A — the tap refused', () => {
     const t = parseDump(OVERLAP);
     for (const n of everyNode(t)) delete n.readingOrder;
     const [a, b] = at(t);

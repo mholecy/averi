@@ -473,7 +473,7 @@ flows:
       ['a tap without a selector field', '    keyboardDismiss:\n      - tap: { timeout: 2s }\n', /keyboardDismiss\.0\.tap: Unrecognized key/],
       ['a tap with no field at all', '    keyboardDismiss:\n      - tap: {}\n', /keyboardDismiss\.0\.tap: tap needs at least one of: id, text, role, label/],
       ['a tap with a non-selector key', '    keyboardDismiss:\n      - tap: { id: x, value: y }\n', /keyboardDismiss\.0\.tap: Unrecognized key/],
-      ['a tap naming an interactive role (it would press a control — review round 1)', '    keyboardDismiss:\n      - tap: { role: button }\n', /keyboardDismiss\.0\.tap: a keyboard dismissal must be a non-interactive element \(a title, a label\) — role: button\/textfield\/switch\/checkbox\/radiobutton\/slider names a control the tap would press/],
+      ['a tap naming an interactive role (it would press a control)', '    keyboardDismiss:\n      - tap: { role: button }\n', /keyboardDismiss\.0\.tap: a keyboard dismissal must be a non-interactive element \(a title, a label\) — role: button\/textfield\/switch\/checkbox\/radiobutton\/slider names a control the tap would press/],
       ['a tap naming textfield', '    keyboardDismiss:\n      - tap: { id: x, role: textfield }\n', /a keyboard dismissal must be a non-interactive element/],
       ['a tap given as a selector string', '    keyboardDismiss:\n      - tap: "id:x"\n', /keyboardDismiss\.0\.tap: Expected object, received string/],
       ['accessory: false (opt-in only; false reads like an override and would be none)', '    keyboardDismiss:\n      - accessory: false\n', /keyboardDismiss\.0\.accessory: accessory takes only true/],

@@ -186,7 +186,7 @@ describe('line — every source combination, every kind of subject (one look, on
     ['idb\'s band only, an ordinary node: the band\'s', undefined, BAND(589), ROW, { y: 589, witnessed: false }],
     ['idb\'s band only, a key of the band: none', undefined, BAND(589), KEY, undefined],
     ['idb\'s band only, a WDA-marked key (not the band\'s): the band\'s', undefined, BAND(589), WDA_KEY, { y: 589, witnessed: false }],
-    ['both (never today; a synthetic order), the reading higher: the reading\'s', READ, BAND(589), ROW, READ],
+    ['both (a synthetic order no source gives), the reading higher: the reading\'s', READ, BAND(589), ROW, READ],
     ['both, the band higher: the band\'s', { y: 700, witnessed: true }, BAND(589), ROW, { y: 589, witnessed: false }],
     ['both at one height: the reading\'s (a tie keeps the reading)', { y: 589, witnessed: true }, BAND(589), ROW, { y: 589, witnessed: true }],
     ['both, a key of the band: the reading\'s alone', { y: 700, witnessed: true }, BAND(589), KEY, { y: 700, witnessed: true }],

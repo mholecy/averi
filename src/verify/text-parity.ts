@@ -212,9 +212,9 @@ export function renderedTextFromTree(tree: UiNode, id: string): string[] {
  *   fail the run.
  * - TRUNCATION. An ellipsized TextView renders 'Select credit acc…' where the
  *   tree holds the full string, so the reading is a PREFIX of the tree value.
- * - JOINING PUNCTUATION. A COMBINED accessibility label — the shape
- *   a multi-part row is required to take ('{label}, {value}', one
- *   node, not two) — is built by joining its parts with ', '. That separator is
+ * - JOINING PUNCTUATION. A COMBINED accessibility label — one node for a
+ *   multi-part row ('{label}, {value}', not two nodes, as iOS's
+ *   `.accessibilityElement(children: .combine)` makes it) — is built by joining its parts with ', '. That separator is
  *   BY CONSTRUCTION never rendered, so a literal containment test marks every
  *   combined row UNREAD. Measured 2026-08-27 on `user_settings.overview`: the
  *   tree holds 'Phone, +123 456 789 1' and the screenshot reads
@@ -225,8 +225,8 @@ export function renderedTextFromTree(tree: UiNode, id: string): string[] {
  *   vanished, for two reasons no separator rule can reach:
  *     · A part is NEVER RENDERED. ', visible' states the position of a toggle
  *       GRAPHIC; there is no text on screen for OCR to read, at any contrast.
- *       The switch state is REQUIRED in the label, so this is
- *       the mandated shape, not a defect.
+ *       A combined row's label carries its switch's state, so this is
+ *       the label's own shape, not a defect.
  *     · OCR edits the remaining parts. It read '*5433' where the tree holds
  *       '* 5433', and on product_row_0 it INSERTED a '€' recognised from the
  *       leading currency avatar — an image, not text.

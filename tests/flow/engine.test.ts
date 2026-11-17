@@ -3647,7 +3647,7 @@ flows:
     expect(fake.taps).toEqual([]);
   });
 
-  it('a guarded dismissal the witness CONFIRMS traces exactly what it did before the veto existed', async () => {
+  it('a guarded dismissal the witness CONFIRMS: back pressed, the ⚠ tap line, then the tap, byte for byte', async () => {
     const fake = loginFake();
     fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     fake.attachedKeyboard.witnessAnswers.current = 'shown';
@@ -4186,7 +4186,7 @@ ${steps}
       ]);
     });
 
-    it('fill … dismissKeyboard: true with the band up and nothing configured: a ⚠ fill line that the keyboard was left up, the fill line, and NO enter (the blind key submitted)', async () => {
+    it('fill … dismissKeyboard: true with the band up and nothing configured: a ⚠ fill line that the keyboard was left up, the fill line, and NO enter (the blind key submitted, K5d)', async () => {
       const fake = iosFake();
       const trace = await FlowEngine.run(flow('      - fill: { id: login_password, value: secret, dismissKeyboard: true }'), fake, FAST, { flow: 'f' });
       expect(trace).toEqual([

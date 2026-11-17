@@ -635,7 +635,7 @@ describe('runIdb with an IdbHelper — input (D7b)', () => {
     expect(logged).toEqual(['averi: idb helper off for this process (2 requests in a row timed out) — the idb CLI serves every call']);
   });
 
-  it('runs an input the helper never took once on the CLI when the adapter is disposed under it — as a CLI call in flight before D7 would', async () => {
+  it('runs an input the helper never took once on the CLI when the adapter is disposed under it, as a plain CLI call', async () => {
     const { helper, s, cli } = await readyHelper();
     const tap = runIdb(cli.exec, UDID, ['ui', 'tap', '120', '640'], { helper });
     await settle();

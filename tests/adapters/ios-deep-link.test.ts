@@ -323,7 +323,7 @@ describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)",
     expect(d.reads()).toBe(0);
   });
 
-  it('WebDriverAgent reads SpringBoard to the bound: the same asks, then exactly one /source — the alert, no note', async () => {
+  it('WebDriverAgent reads SpringBoard to the bound: one ask per poll to the bound, then exactly one /source — the alert, no note', async () => {
     const d = lab([SPRINGBOARD], { tree: WDA_ALERT });
     expect(await d.adapter.openDeepLink('averilab://d54', { appId: LAB })).toEqual(ALERT);
     expect(d.asks()).toBe(FOREGROUND_WAIT_MS / FOREGROUND_POLL_MS);
@@ -344,13 +344,13 @@ describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)",
     'SpringBoard (the home screen, the launch animation or a system alert) as the active app — a ui_snapshot now ' +
     "reads that app's tree, on which an absent check passes. Read again; if it repeats, take a screenshot";
 
-  it('the /source read fails: fails open — exactly the note of before D54', async () => {
+  it('the /source read fails: fails open — exactly the SpringBoard note', async () => {
     const d = lab([SPRINGBOARD], { tree: new Error('WDA /source request failed: ECONNRESET') });
     expect(linkTextOf(await d.adapter.openDeepLink('averilab://d54', { appId: LAB }))).toBe(SAW_SPRINGBOARD);
     expect(d.reads()).toBe(1);
   });
 
-  it('/source holds no alert (the home screen): the note of before D54', async () => {
+  it('/source holds no alert (the home screen): the SpringBoard note', async () => {
     const home = structuredClone(WDA_ALERT);
     const unmark = (n: UiNode): void => {
       delete n.presentation;

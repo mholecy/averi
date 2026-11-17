@@ -662,9 +662,9 @@ describe('the two decisions that carry a rule — recheck (the budget, over the 
 
   it.each([
     ['window clear (hidden) · witness hidden: nothing to dismiss — back would navigate', ['clear', 'hidden'], 'nothing'],
-    ['window clear (hidden) · witness unknown: nothing, as before 2026-10-08', ['clear', 'unknown'], 'nothing'],
+    ['window clear (hidden) · witness unknown: nothing', ['clear', 'unknown'], 'nothing'],
     ['window clear (hidden) · witness shown: the `unlocated` row — nothing pressed, said (2026-10-08)', ['clear', 'shown'], 'unlocated'],
-    ['window unknown: back, as before 2026-10-03 — the witness is not asked', ['unknown'], 'back'],
+    ['window unknown: back — the witness is not asked', ['unknown'], 'back'],
     ['covering · witness shown', ['covering', 'shown'], 'back'],
     ['covering · witness unknown', ['covering', 'unknown'], 'back'],
     ['covering · witness hidden: the veto, nothing pressed', ['covering', 'hidden'], 'nothing'],
@@ -687,7 +687,7 @@ describe('dismissKeyboard — the `dismissal` decision, witness-vetoed', () => {
     return fake;
   };
 
-  it('an adapter WITHOUT the oracle reads ONE tree and, with no band in it, presses and taps nothing — never the blind `enter` it pressed before stage B (measured to submit, K5d) — whatever the platform label says', async () => {
+  it('an adapter WITHOUT the oracle reads ONE tree and, with no band in it, presses and taps nothing — never the blind `enter` (measured to submit, K5d) — whatever the platform label says', async () => {
     for (const platform of ['ios', 'android'] as const) {
       const fake = new FakeAdapter({ s: screen() }, 's');
       fake.platform = platform;

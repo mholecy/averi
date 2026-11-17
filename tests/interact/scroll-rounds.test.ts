@@ -1459,7 +1459,7 @@ describe('round — a target resting in the frame at the edge the strokes push i
     expect(failureOf(played, 'id:priority').message).toContain('swiping down no longer moves it. The app draws that over it at the end of the content — a layout defect');
   });
 
-  it('a cover over the far side at the TOP (a bar over the row\'s top, the default direction down): turned at once — not stroked on under it (an accepted cost)', () => {
+  it('a cover over the far side at the TOP (a bar over the row\'s top, the default direction down): turned at once — not stroked on under it', () => {
     const bar = node({ role: 'other', label: 'Header', rect: { x: 0, y: 62, width: 402, height: 60 } });
     const row = (y: number): Row => ({ found: [match({ x: 24, y, width: 354, height: 52 }, 'priority')], over: [bar] });
     const played = play({ ...IPHONE, fully: true }, [row(100), row(300), row(300)]);
@@ -3215,7 +3215,7 @@ describe('round — the scroll views the strokes did not go over, before the tar
     );
   });
 
-  it('the lab tree at maxSwipes and at the timeout, the target never read: the stop names `lower` (raising the bound would stroke `upper` again)', () => {
+  it('the lab tree at maxSwipes and at the timeout, the target never read: the stop names `lower`', () => {
     const tree = parseDump(BOUNDED);
     const capped = play({ ...ANDROID, maxSwipes: 1, timeoutMs: 15_000 }, [{ tree }, { tree }]);
     expect(capped.outcome).toMatchObject({ kind: 'bound', by: { of: 'maxSwipes', beside: { strokedOver: UPPER, others: [lower] } } });

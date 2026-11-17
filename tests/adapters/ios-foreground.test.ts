@@ -610,7 +610,7 @@ describe('awaitForeground — the one alert read, at the bound with SpringBoard 
     expect(c.reads()).toBe(0);
   });
 
-  it("a launch with no alert read wired, SpringBoard to the bound: D48's note, as before", async () => {
+  it("a launch with no alert read wired, SpringBoard to the bound: D48's note", async () => {
     const c = check(undefined, { alert: null });
     expect(launchTextOf(await awaitForeground(c.check))).toBe(D48_SPRINGBOARD);
   });
