@@ -231,5 +231,6 @@ its value. One module names a node, `ui-tree/node-words.ts`: `QuotedNode` carrie
 `listedText` are forms of one function, so the input is said `textfield <its text, 8 characters> (0,40 100x10)` where
 the sentence gives the rect itself and `<its text, 8 characters> at 0,40 100x10` in a list. A fill's every-label refusal
 is that module's `NamingPolicy` (`every-label`), which `ResolveOptions.naming` carries. `tests/interact/node-words-leak.test.ts`
-sweeps the tap's, the pixel assert's, `scroll_until`'s and the dismissal's sentences; the keyboard's accessory button
-is no case, `accessoryDismissButton` taking a button only.
+sweeps the tap's, the pixel assert's, `scroll_until`'s and the dismissal's sentences. The keyboard's accessory button
+is named through `labelWords` too, and can never take the own-text form: `accessoryDismissButton` takes a button only,
+and only an input's label can be its own text.

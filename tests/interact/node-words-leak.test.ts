@@ -3,10 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import type { RoundRules } from '../../src/interact/scroll-rounds.js';
+import { describeScrollResult, scrollUntilVisible } from '../../src/interact/scroll.js';
 import { tapElement } from '../../src/interact/tap.js';
 import { Verifier } from '../../src/verify/assert.js';
 import { FAST, FakeAdapter, iosLoginFake, node } from '../helpers/fake.js';
-import { failureOf, play, type Row } from '../helpers/rounds.js';
+import { NO_EYES } from '../helpers/eyes.js';
+import { parseDump } from '../helpers/android-dumps.js';
+import { failureOf, play, resultOf, type Row } from '../helpers/rounds.js';
 
 // The LEAK SWEEP of the sentences that NAME A NODE (A67), in the style of fill-leak.test.ts and assert-leak.test.ts:
 // an input labelled by its own text — an Android EditText with no content-desc, whose label is its value, which may be
@@ -15,7 +18,8 @@ import { failureOf, play, type Row } from '../helpers/rounds.js';
 // configured dismissal from a tap, as a cover over a pixel assert's element. It is said by its length
 // (ui-tree/node-words.ts#nodeText, the A54 rule of ADR 0043). Each case's sentence is asserted first, so a case that
 // stops reaching its path fails as such. The keyboard's accessory button is no case: accessoryDismissButton
-// (ui-tree/soft-keyboard.ts) takes a `button` only, never an input.
+// (ui-tree/soft-keyboard.ts) takes a `button` only, never an input; nor is a margin neighbour (`seenClear`),
+// which ui-tree/cover.ts#marginText takes only of a `text` leaf.
 
 /** The input's own text: a string no sentence of averi holds, nor any four characters of it in a row. */
 const OWN = 'zq7vXk2§';
@@ -95,6 +99,49 @@ describe('a sentence that names an input labelled by its own text says its lengt
       const message = failureOf(play({ ...ANDROID, within }, [{ tree }]), 'id:target').message;
       expect(message).toContain(`within ${within} ${words}`);
       noRun(message);
+    });
+
+    const SCROLL = { eyes: NO_EYES, maxSwipes: 0, timeoutMs: 2_000, settleMs: 1 };
+    /** A row in a clipping list (to 2000) on a 1080x2220 screen, `over` laid after the list. */
+    const listWith = (over: UiNode, row: Rect = { x: 40, y: 1700, width: 1000, height: 132 }): FakeAdapter => {
+      const fake = new FakeAdapter(
+        {
+          s: node({
+            role: 'container',
+            rect: { x: 0, y: 0, ...PIXEL },
+            children: [node({ role: 'container', clipsDescendants: true, rect: { x: 0, y: 0, width: 1080, height: 2000 }, children: [node({ role: 'button', identifier: 'row', rect: row })] }), over],
+          }),
+        },
+        's',
+      );
+      fake.viewportSize = { ...PIXEL };
+      return fake;
+    };
+
+    it('a stop partly under it, its centre clear: `PARTLY UNDER`', async () => {
+      const said = describeScrollResult(await scrollUntilVisible(listWith(ownInput({ x: 900, y: 1710, width: 100, height: 40 })), 'id:row', SCROLL));
+      expect(said).toContain(`PARTLY UNDER textfield ${OWN_WORDS} (900,1710 100x40), drawn over it`);
+      noRun(said);
+    });
+
+    it('a stop under it at its centre: the failure names it', async () => {
+      const message = await scrollUntilVisible(listWith(ownInput({ x: 0, y: 1690, width: 1080, height: 160 })), 'id:row', SCROLL).then(
+        (r) => describeScrollResult(r),
+        (e: unknown) => (e as Error).message,
+      );
+      expect(message).toContain(`textfield ${OWN_WORDS} (0,1690 1080x160)`);
+      noRun(message);
+    });
+
+    it('a `fully: true` stop flush with it, pinned at its scroll container\'s edge: the flush neighbour', () => {
+      // tests/interact/scroll-rounds.test.ts's sticky header, the header an EditText with no content-desc.
+      const header = `<node class="android.widget.EditText" text="${OWN}" resource-id="header" bounds="[0,303][1080,457]" />`;
+      const list = `<node class="android.view.View" scrollable="true" resource-id="list" bounds="[0,303][1080,1541]"><node class="android.view.View" clickable="true" resource-id="row" bounds="[128,457][953,1541]" />${header}</node>`;
+      const tree = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">${list}</node></hierarchy>`);
+      const row: Row = { tree, found: [[...everyNode(tree)].find((x) => x.identifier === 'row')!] };
+      const said = describeScrollResult(resultOf(play({ ...ANDROID, fully: true }, [row])));
+      expect(said).toContain(`from the edge of textfield ${OWN_WORDS} (0,303 1080x154), pinned at the container's top`);
+      noRun(said);
     });
 
     it('the node the strokes touched down on, drawn over their list', () => {

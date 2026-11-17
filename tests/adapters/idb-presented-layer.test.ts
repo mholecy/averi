@@ -254,7 +254,7 @@ describe('scroll_until for a target not in the tree on blur-menu-unhidden (idb):
   });
 });
 
-describe('the words: idb\'s backdrop names idb\'s evidence, WDA\'s keeps its own', () => {
+describe('the words: a backdrop listed ahead is said listed before the screen\'s content, any other after it — its listing order, not its source', () => {
   const IDB = { kind: 'backdrop', listedAhead: true } as const;
   it('the tap, the pixel assert and scroll_until\'s stop', () => {
     expect(presentedRemedy('touch', IDB)).toBe(
