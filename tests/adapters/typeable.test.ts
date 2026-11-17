@@ -65,9 +65,9 @@ const adapters: [string, () => DeviceAdapter][] = [
 ];
 
 /**
- * D43: the set follows the source's typer, not its kind — an IosAdapter over a source with `typeText` (WDA's) declares
- * WDA_TYPEABLE; over one without it (idb's, and the differential harness's RecordedTreeSource, kind `wda` but no
- * typer) IDB_TYPEABLE.
+ * D43: the set is the source's fact (IosTreeSource.typeable), not its kind's — an IosAdapter over WDA's source declares
+ * WDA_TYPEABLE; over idb's, and the differential harness's RecordedTreeSource (kind `wda`, typing nothing beyond idb),
+ * IDB_TYPEABLE.
  */
 describe('IosAdapter.typeable comes from the tree source', () => {
   it('a source that types (WDA\'s): WDA_TYPEABLE', () => {
@@ -86,7 +86,7 @@ describe('IosAdapter.typeable comes from the tree source', () => {
     errors.mockRestore();
   });
 
-  it.each([['idb'], ['wda']] as const)('a source of kind %s without a typer: IDB_TYPEABLE', (kind) => {
+  it.each([['idb'], ['wda']] as const)('a source of kind %s that types idb\'s set: IDB_TYPEABLE', (kind) => {
     expect(ios(kind).typeable).toBe(IDB_TYPEABLE);
   });
 
@@ -125,7 +125,7 @@ describe.each(adapters)('%s declares what its typeText types: printable ASCII', 
 });
 
 describe('the newline: in idb\'s key map, not Android\'s — and refused on both before typing as a control character (type-text.ts)', () => {
-  it.each([['idb', false], ['wda', false], ['wda', true]] as const)('iOS (%s tree source, a typer: %s): an ASCII value with \\n is in the adapter\'s typeable set', (kind, types) => {
+  it.each([['idb', false], ['wda', false], ['wda', true]] as const)('iOS (%s tree source, WDA\'s set: %s): an ASCII value with \\n is in the adapter\'s typeable set', (kind, types) => {
     expect(refused('line one\nline two', ios(kind, types).typeable)).toBeUndefined();
   });
 

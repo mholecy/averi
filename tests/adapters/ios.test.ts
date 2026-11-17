@@ -1014,13 +1014,13 @@ describe('IosAdapter.typeText — routed per call: idb for what idb types, the s
     return { adapter, log: () => [...log.splice(0), ...sleeps.splice(0)] };
   }
 
-  it('an ASCII text goes to idb ui text and never to the source\'s typer', async () => {
+  it('an ASCII text goes to idb ui text and never to the source\'s typeWide', async () => {
     const { adapter, log } = routed();
     await adapter.typeText('Jan Novak');
     expect(log()).toEqual(['idb ui text --udid AAAA-1111 -- Jan Novak']);
   });
 
-  it('a text idb cannot type goes to the source\'s typer once, whole, and no idb ui text is sent', async () => {
+  it('a text idb cannot type goes to the source\'s typeWide once, whole, and no idb ui text is sent', async () => {
     const { adapter, log } = routed();
     await adapter.typeText('Jan Šťastný');
     expect(log()).toEqual(['wda Jan Šťastný']);

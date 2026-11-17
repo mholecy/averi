@@ -63,7 +63,9 @@ describe('a fill under treeSource auto whose first read falls back to idb (A41a 
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const { adapter, calls } = fallenBack();
     await adapter.uiTree(); // the choice: idb
-    await expect(adapter.typeText('Šťastný')).rejects.toThrow(/^cannot type U\+0160 .*Refused before anything was sent.*\n⚠ read through idb: /s);
+    const err = (await adapter.typeText('Šťastný').catch((e: unknown) => e)) as Error;
+    expect(err.message).toMatch(/^cannot type U\+0160 .*Refused before anything was sent.*\n⚠ read through idb: /s);
+    expect(err.message.split('⚠')).toHaveLength(2);
     await expect(typeIntoFocused(adapter, 'Šťastný')).rejects.toThrow(/^cannot type U\+0160 .*\n⚠ read through idb: /s);
     expect(calls.filter((c) => c.startsWith('idb ui text'))).toEqual([]);
     errors.mockRestore();
