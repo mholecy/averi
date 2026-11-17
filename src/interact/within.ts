@@ -14,15 +14,14 @@ import { axisOf, type Direction } from './swipe.js';
  * (interact/stroke-plan.ts#candidatesOf), so a row of a SIBLING list (the lab's `scroll-bounded`: O and F, rows of
  * `lower`, beside the larger `upper`) is never reached. Named here as the caller can name it (ADR 0010's D78
  * amendment):
- * - a SELECTOR of exactly one node with area — a selector string (the MCP tool's), or an element spec (a flow's
- *   `scroll_until`, D81: matched as a step's `element` is, ui-tree/selectors.ts#findTarget, every field exact); a
- *   zero-area match is never named, as the tap's resolve.ts#preferred names none, and no interactive match is
- *   preferred (several are refused, listed) — by one rule: the scroll view of that node's very rect
- *   (ui-tree/scroll-containers.ts#isScrollViewOf, through `Clips.axesOf` — the node itself when it scrolls, the list a
- *   wrapper is laid exactly over, and so too the list an unrelated overlay of its rect lies over: the rect is that
- *   scroll view's), else the NEAREST scroll view of the node, by the rule that takes a found target's
- *   (stroke-plan.ts#targetScrollers: Android's clipping chain, else the scrolling ancestors); a node under none is
- *   refused;
+ * - a SELECTOR of exactly one node — a selector string (the MCP tool's), or an element spec (a flow's `scroll_until`,
+ *   D81: matched as a step's `element` is, ui-tree/selectors.ts#findTarget, every field exact) — by one rule: the
+ *   scroll view of that node's very rect (ui-tree/scroll-containers.ts#isScrollViewOf, through `Clips.axesOf` — the
+ *   node itself when it scrolls, the list a wrapper is laid exactly over, and so too the list an unrelated overlay of
+ *   its rect lies over: the rect is that scroll view's), else the NEAREST scroll view of the node, by the rule that
+ *   takes a found target's (stroke-plan.ts#targetScrollers: Android's clipping chain, else the scrolling ancestors); a
+ *   node under none is refused; its matches are the tap's, zero-area ones never named (interact/resolve.ts#preferred),
+ *   with no interactive match preferred: several are refused, listed, and only 0×0 ones are absent, said so;
  * - a RECT, as ui_snapshot and a failure reply quote one: the listed scroll view of exactly that rect
  *   (ui-tree/geometry.ts#Clips.axesOf finds it by scroll-containers.ts#isScrollViewOf, the test every remembered scroll
  *   view is found again by), so a rect a pixel off is none.
@@ -58,8 +57,8 @@ export interface OfferedScrollView {
 export type WithinRefusal =
   /** The selector matches several nodes with area, listed in tree order. */
   | { readonly of: 'ambiguous'; readonly matches: readonly QuotedNode[] }
-  /** The selector matches no node with area. */
-  | { readonly of: 'absent' }
+  /** The selector matches no node with area: `zeroArea` when it matches nodes, every one of them 0×0. */
+  | { readonly of: 'absent'; readonly zeroArea?: true }
   /** The selector's one match neither scrolls nor lies in anything that scrolls. */
   | { readonly of: 'unscrolled'; readonly node: QuotedNode }
   /**
@@ -138,8 +137,9 @@ export function resolveWithin(facts: Pick<TreeFacts, 'tree' | 'scene' | 'reading
       return { refused: { of: 'stale', axis: way, views, across: listed.length - views.length } };
     }
   } else {
-    const found = findTarget(facts.tree, within).filter(hasArea);
-    if (found.length === 0) return { refused: { of: 'absent' } };
+    const matched = findTarget(facts.tree, within);
+    const found = matched.filter(hasArea);
+    if (found.length === 0) return { refused: { of: 'absent', ...(matched.length > 0 && { zeroArea: true as const }) } };
     if (found.length > 1) return { refused: { of: 'ambiguous', matches: found.map(quoted) } };
     const [node] = found;
     // One rule: a scroll view of the match's very rect — the match itself, a wrapper laid exactly over its list, an

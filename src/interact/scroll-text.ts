@@ -4,7 +4,7 @@ import { coverText, labelWords, nodeText, outsideScrollViewText, quoted, type Qu
 import { CLIP_LINE, type EyesFinding, type SurfaceFinding } from '../ui-tree/eyes.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
-import { TOP_LAYER_ONLY_HINT, withMissNote } from '../ui-tree/miss.js';
+import { ONLY_ZERO_AREA, TOP_LAYER_ONLY_HINT, withMissNote } from '../ui-tree/miss.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { coverClause, marginBand, type Cover } from '../ui-tree/cover.js';
 import { presentedRemedy, presentedStop } from '../ui-tree/remedy-text.js';
@@ -898,7 +898,7 @@ function withinText(within: Within, refused: WithinRefusal, remedy: WithinRemedy
   const w = `within ${withinSaid(within)}`;
   switch (refused.of) {
     case 'absent':
-      return `${w} matches nothing in the tree, so it names no scroll view — ${remedy.absent}`;
+      return `${w} matches ${refused.zeroArea === true ? ONLY_ZERO_AREA : 'nothing in the tree'}, so it names no scroll view — ${remedy.absent}`;
     case 'ambiguous':
       return `${w} matches ${refused.matches.length} elements: ${refused.matches.map(nodeText).join(', ')} — narrow it so exactly one matches${remedy.ambiguous}`;
     case 'unscrolled':
