@@ -204,9 +204,13 @@ own declaration and its own rows there.
   typeText (`type-via-averi.ts`) with the helper on and with `AVERI_IDB_HELPER=off`. Android's `input text -`, and `-h`
   as averi sends it, are read back by `android-input-dash.sh` beside it, when the emulator is up.
 
-## Amendment: A54 — what a fill must not say is what was typed, not its selector (2026-11-17)
+## Amendment: what a fill must not say is what was typed, not its selector (2026-11-17, backlog A54)
 
-A fill's errors and replies carry the typed value's length only, and the field's text as lengths. The selector is echoed
-as the caller wrote it, a `value:"…"` included: it is the caller's own text, and the engine redacts a flow's secrets from
-it as from every line. `tests/interact/fill-leak.test.ts` sweeps fillField's errors, `fillReply` and `fillStepText` for
-both, a level above `typed-text-leak.test.ts`.
+A fill's errors and replies carry the typed value's length only, and the field's text as lengths. Two texts are the
+author's own and are shown as written: the selector, a `value:"…"` included, and the flow's fill line's value, which the
+engine shows as the author wrote it, `***` for a secret (it redacts a flow's secrets from every line, the selector's
+included). An ambiguity's list of candidates (`resolve.ts#resolveNow`, every verb's) names an input whose label is its
+own text — an Android EditText with no content-desc — by that text's length, `label=<its text, 8 characters>`: a second
+match appearing while a fill re-reads its field quoted the value just typed. `tests/interact/fill-leak.test.ts` sweeps
+fillField's errors, `fillReply` and `fillStepText` for both, under `ambiguous: refuse` and `first`, a level above
+`typed-text-leak.test.ts`.
