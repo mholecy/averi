@@ -31,7 +31,7 @@ import {
 } from './geometry.js';
 import type { KeyboardLine } from './keyboard-position.js';
 import { isInteractive, tapPoint } from './selectors.js';
-import { treeScreen, type UsableScreen } from './usable-screen.js';
+import { failsOpen, judgedScreen, type UsableScreen } from './usable-screen.js';
 
 /**
  * THE SCENE of one tree: its draw order (draw-order.ts) and its clip facts
@@ -65,8 +65,9 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
  *   box by box, interact/scroll-read.ts#judgeRead); the pixel assert the
  *   usable screen's single `oriented` box (`singleBox`, D6), whatever
  *   `box` is. With no screen, every purpose reads ONE definition,
- *   usable-screen.ts#treeScreen: the tree's own screen is the one box; on
- *   a root of no area (its `failsOpen`) a touch — the tap, either stop —
+ *   usable-screen.ts#judgedScreen: the tree's own screen is the one box; on
+ *   a root of no area (its `failsOpen`, which a tree's own screen handed in
+ *   carries too) a touch — the tap, either stop —
  *   leaves every point on the screen and judges in the node's own rect,
  *   and the pixel assert judges on the largest node (`treeScreen`'s box).
  * - THE DRAWN FRAME, every purpose: a scroll view draws none of its
@@ -312,11 +313,11 @@ export interface Scene {
   standing(node: UiNode, screen: UsableScreen | undefined, purpose: TouchPurpose): Standing;
   standing(node: UiNode, screen: UsableScreen | undefined, purpose: Purpose): Standing | PixelStanding;
   /**
-   * THE region of the node a pixel measurement is asked of, on the screen the pixel purpose is judged on (`screen`,
-   * else the tree's own): the part of its rect its scroll views draw (the drawn frame, geometry.ts#drawnPart) — the
-   * whole rect where nothing cuts it, and on a root of no area (treeScreen's `failsOpen`: nothing is judged off its
-   * box). The pixel standing judges over it and the sampler reads it (verify/pixel-poll.ts#pollPixels): one function,
-   * so the two cannot diverge.
+   * THE region of the node a pixel measurement is asked of, on the screen the pixel purpose is judged on
+   * (usable-screen.ts#judgedScreen: `screen`, else the tree's own): the part of its rect its scroll views draw (the
+   * drawn frame, geometry.ts#drawnPart) — the whole rect where nothing cuts it, and on a root of no area
+   * (usable-screen.ts#TreeUsableScreen.failsOpen: nothing is judged off its box). The pixel standing judges over it
+   * and the sampler reads it (verify/pixel-poll.ts#pollPixels): one function, so the two cannot diverge.
    */
   pixelRegion(node: UiNode, screen: UsableScreen | undefined): Rect;
   /**
@@ -701,7 +702,7 @@ export function sceneOf(tree: UiNode, seen?: SeenOrder): Scene {
       return (clips ??= clipsOf(tree, { ancestry: dialect.ancestry, unclipped: dialect.framesUnclipped, cutAtScreen: dialect.cutsAtScreen }));
     },
     standing,
-    pixelRegion: (node, screen) => pixelDrawn(node, pixelScreen(screen)).rect,
+    pixelRegion: (node, screen) => pixelDrawn(node, judgedScreen(screen, tree)).rect,
     flushNeighbours: (node) => laterOf(node).flushNeighbours(),
     pinnedEdges: (node) => laterOf(node).pinned(),
     presentedAt(point, target) {
@@ -711,12 +712,9 @@ export function sceneOf(tree: UiNode, seen?: SeenOrder): Scene {
   };
   // The flush later node at each of a node's edges, classified once (later-edges.ts): the cut's, the overlay's and the flush neighbour's evidence.
   const laterOf = laterEdgesIn(tree, scene);
-  function pixelScreen(screen: UsableScreen | undefined): UsableScreen & { readonly failsOpen?: boolean } {
-    return screen ?? treeScreen(tree);
-  }
   /** `Scene.pixelRegion`, with the drawn frame it was cut by (undefined on a root of no area: nothing is cut there). */
-  function pixelDrawn(node: UiNode, usable: UsableScreen & { readonly failsOpen?: boolean }): { readonly drawn: Drawn | undefined; readonly rect: Rect } {
-    const drawn = usable.failsOpen === true ? undefined : scene.clips.drawnIn(node);
+  function pixelDrawn(node: UiNode, usable: UsableScreen): { readonly drawn: Drawn | undefined; readonly rect: Rect } {
+    const drawn = failsOpen(usable) ? undefined : scene.clips.drawnIn(node);
     return { drawn, rect: drawnPart(node.rect, drawn) ?? node.rect };
   }
   function standing(node: UiNode, screen: UsableScreen | undefined, purpose: PixelPurpose): PixelStanding;
@@ -725,18 +723,19 @@ export function sceneOf(tree: UiNode, seen?: SeenOrder): Scene {
   function standing(node: UiNode, screen: UsableScreen | undefined, purpose: Purpose): Standing | PixelStanding;
   function standing(node: UiNode, screen: UsableScreen | undefined, purpose: Purpose): Standing | PixelStanding {
     const judged: Judged = { scene, node, centre: tapPoint(node), later: laterOf(node) };
+    const usable = judgedScreen(screen, tree);
+    // On a root of no area (usable-screen.ts#TreeUsableScreen.failsOpen) the box is only the largest node: nothing is judged off it.
+    const open = failsOpen(usable);
     if (purpose.of === 'pixel') {
-      const usable = pixelScreen(screen);
       const single = singleBox(usable);
-      // On a root of no area (treeScreen's `failsOpen`) the box is only the largest node: nothing is judged off it.
-      const failsOpen = usable.failsOpen === true;
       // What it reads is asked of THE region (`pixelRegion`): what is judged over it is what its sampler reads.
       const { drawn, rect } = pixelDrawn(node, usable);
-      const read: PixelRead = { ...purpose, reads: purpose.reads(rect, failsOpen ? rect : single.box) };
-      const pixel = pixelStanding(judged, regionPlace(node.rect, read, single.box, single, failsOpen, toldFrame(drawn)), single.box, single, read, !dialect.ancestry);
+      const read: PixelRead = { ...purpose, reads: purpose.reads(rect, open ? rect : single.box) };
+      const pixel = pixelStanding(judged, regionPlace(node.rect, read, single.box, single, open, toldFrame(drawn)), single.box, single, read, !dialect.ancestry);
       return pixel.kind === 'reachable' ? pixel : remedied({ pixel, box: single.box, bands: single }, judged);
     }
-    const touch = touchScreen(screen, tree);
+    // A touch judges on no box where it fails open: every point on the screen, the node in its own rect.
+    const touch = open ? undefined : usable;
     if (purpose.of === 'tap') {
       const tap = tapStanding(judged, drawnPlace(placeOf(judged.centre, touch?.boxes, touch), judged), touch === undefined ? node.rect : chosenBox(judged.centre, touch), touch?.boxes ?? [], touch, purpose.keyboardTop);
       return tap.kind === 'reachable' ? tap : remedied({ touch: tap }, judged);
@@ -907,18 +906,6 @@ type RegionPlace =
   | { readonly keyboard: KeyboardLine; readonly band: Rect };
 
 /**
- * The screen a touch (the tap, either stop) is judged on: the one handed
- * in, else the tree's own (usable-screen.ts#treeScreen, THE "no device
- * screen") — or none when that fails open (a root of no area): every point
- * on the screen, the node judged in its own rect.
- */
-function touchScreen(screen: UsableScreen | undefined, tree: UiNode): UsableScreen | undefined {
-  if (screen !== undefined) return screen;
-  const own = treeScreen(tree);
-  return own.failsOpen ? undefined : own;
-}
-
-/**
  * Where `point` lies against `boxes` (none: on, failing open) and their
  * system bands (`systemBands`): on, in the top band, in the bottom band (in
  * that order), or off. THE on-screen rule for a point about to be tapped —
@@ -926,7 +913,7 @@ function touchScreen(screen: UsableScreen | undefined, tree: UiNode): UsableScre
  * (interact/keyboard-dismissal.ts#configuredStrategy asks the tap's standing,
  * docs/adr/0016-the-dismissal-picker-asks-the-tap-standing.md).
  * With no screen (no usable device size and no window in the tree), the
- * tree's own screen is the one box (`touchScreen`); on a root of no area,
+ * tree's own screen is the one box (usable-screen.ts#judgedScreen); on a root of no area,
  * none, and every point is on — the rule exists to stop a false "Tapped", and must never be why a
  * tap on a device that could not report its size did not happen. The point
  * is the one SENT — `tapPoint` rounds — so a centre at x 401.5 on a
@@ -1109,7 +1096,7 @@ export function farEdgeFrames(screen: UsableScreen, best: Standing | undefined, 
   return { frames: regionAtBottom ? uncutFrames.map((f) => aboveNavigationBand(f, screen, box)) : uncutFrames, uncutFrames };
 }
 
-/** The tap's box: the box that holds the centre, else `touchScreen`'s box (the node's own rect when it fails open). */
+/** The tap's box: the box that holds the centre, else the first (`Scene.standing` asks it only where the touch does not fail open). */
 const chosenBox = (centre: Point, screen: JudgedBoxes): Rect => screen.boxes.find((b) => containsPoint(b, centre)) ?? screen.box;
 
 /**

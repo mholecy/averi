@@ -7,7 +7,7 @@ import { farEdgeFrames, sceneOf, type PixelPurpose, type PixelStanding, type Pur
 import type { Cover } from '../../src/ui-tree/cover.js';
 import { drawnPart, toldFrame } from '../../src/ui-tree/geometry.js';
 import { keyboardPosition, type KeyboardLine } from '../../src/ui-tree/keyboard-position.js';
-import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
+import { judgedScreen, type DeviceUsableScreen, type UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { node } from '../helpers/fake.js';
 import { stackedLayers } from '../helpers/stacked-layers.js';
@@ -65,12 +65,12 @@ const idbAt = async (name: string, ...path: string[]): Promise<UiNode> =>
 const labFormKeyboardIdb = async (): Promise<UiNode> => parseIdbDescribeAll(await fixture('truth/ios-iphone17-ios27/form-keyboard.idb.json'));
 
 /** A screen's boxes and bands as a test writes them, before `usable` makes it the one screen type a standing takes. */
-type Bare = Omit<UsableScreen, 'oriented' | 'from'>;
+type Bare = Omit<DeviceUsableScreen, 'oriented' | 'from'>;
 /**
  * A usable screen (ui-tree/usable-screen.ts#UsableScreen) of the device's size, `oriented` its box: what every purpose
  * is handed — the pixel assert judges `oriented`, the touches `box`/`boxes`.
  */
-const usable = (screen: Bare): UsableScreen => ({ ...screen, oriented: screen.box, from: 'device' });
+const usable = (screen: Bare): DeviceUsableScreen => ({ ...screen, oriented: screen.box, from: 'device' });
 const IPHONE = usable({ box: box(402, 874), boxes: [box(402, 874)], statusBand: 62 });
 const PIXEL = usable({ box: box(1080, 2220), boxes: [box(1080, 2220)], statusBand: 66 });
 const PLAIN = { of: 'stop' } as const;
@@ -652,6 +652,15 @@ describe('Scene.standing with no screen — one "no device screen" for the tap, 
   it('a root of no area: the pixel assert judges on the largest node (402x874), never failing open', () => {
     const s = judgedAt(150, 300, box(0, 0), (n) => OCR(n));
     expect([said(s), s.facts.screen]).toEqual([{ kind: 'reachable', at: { x: 200, y: 350 } }, box(402, 874)]);
+  });
+  it('the judged screen handed in — usable-screen.ts#judgedScreen of no usable screen, or a spread copy of it — judges as no screen: on a root of no area the tap fails open and the pixel assert measures past the largest node', () => {
+    const n = node({ role: 'button', identifier: 'n', rect: { x: 150, y: 1000, width: 100, height: 100 } });
+    const t = node({ role: 'container', rect: box(0, 0), children: [node({ role: 'other', rect: box(402, 874) }), n] });
+    const judged = judgedScreen(undefined, t);
+    for (const screen of [judged, { ...judged }]) {
+      expect(said(sceneOf(t).standing(n, screen, TAP))).toEqual({ kind: 'reachable', at: { x: 200, y: 1050 } });
+      expect(sceneOf(t).standing(n, screen, { of: 'pixel', reads: (r) => r, glyphs: false }).kind).toBe('reachable');
+    }
   });
 });
 

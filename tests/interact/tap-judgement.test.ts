@@ -150,6 +150,16 @@ describe('judgeTap — the on-screen rule, before the guard', () => {
     const { freshReads } = await judge(sheet(), 'next', { first: PIXEL });
     expect(freshReads).toEqual([]);
   });
+  it('idb\'s 0x0 root and no device size, no window vouched for: the tap fails open — tapped at the centre past the largest node, never refused against it', async () => {
+    const ok = node({ role: 'button', identifier: 'ok', rect: { x: 100, y: 1500, width: 100, height: 40 } });
+    const tree = node({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 }, children: [node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 1300 } }), ok] });
+    const silent = { viewport: async (): Promise<DeviceScreen> => Promise.reject(new Error('idb describe: no screen_dimensions')) };
+    const look = lookWith(tree, reading(undefined));
+    const outcome = await judgeTap(silent, 'ok', { node: ok, look }, await usableScreen(silent, look))
+      .then((j) => j.aim())
+      .catch((e: unknown) => e as Error);
+    expect(said(outcome)).toBe('{"point":{"x":150,"y":1520}}');
+  });
   it.each([
     [
       'under the navigation bar, in no scroll view: pinned',
