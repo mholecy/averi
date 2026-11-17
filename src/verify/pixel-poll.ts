@@ -10,7 +10,7 @@ import { findBySpec } from '../ui-tree/selectors.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import type { PixelRegionOf } from '../ui-tree/standing.js';
 import { judgedScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
-import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame, type TreeRequestedFrame } from './capture.js';
+import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame, type TreeFrame } from './capture.js';
 import { apartOfFrame, orderOfFrame, untoldAll } from './eyes.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
 import { formatSeconds } from '../util/duration.js';
@@ -488,17 +488,17 @@ interface KeptOrder {
  * the round measures). Judged only on a frame settled over the WHOLE screen: the bands and the
  * strips around the two lie outside the element's region, which a region-settled frame does not vouch for.
  */
-async function orderOnCapture(question: PairQuestion, kept: KeptOrder, capture: () => Promise<TreeRequestedFrame>): Promise<readonly OrderSeen[]> {
+async function orderOnCapture(question: PairQuestion, kept: KeptOrder, capture: () => Promise<TreeFrame>): Promise<readonly OrderSeen[]> {
   const known = kept.answer(question);
   if (known !== undefined) return known;
-  let frame: TreeRequestedFrame;
+  let frame: TreeFrame;
   try {
     frame = await capture();
   } catch (e) {
     return untoldAll(question, `the screenshot failed: ${captureRefusal(e)}`);
   }
   if (frame.stability !== 'settled') return untoldAll(question, 'the screen did not settle');
-  if (frame.settledOver !== 'screen') return untoldAll(question, 'only the element held still, not the screen around it');
+  if (frame.settledOver === 'region') return untoldAll(question, 'only the element held still, not the screen around it');
   if (frame.measured.error !== undefined) return untoldAll(question, frame.measured.error);
   const seen = orderOfFrame(frame.measured, question);
   kept.keep(question, seen);
@@ -568,15 +568,15 @@ export async function pollPixels(
     };
     // The round's one capture, taken on first need: for the eyes' order question (an element covered by a control the
     // listing does not order, ADR 0024) before the standing is decided, else after it — never a second one.
-    let captured: Promise<TreeRequestedFrame> | undefined;
-    const capture = (): Promise<TreeRequestedFrame> => (captured ??= captureFrame(adapter, { tree, deadline, region: rect }));
+    let captured: Promise<TreeFrame> | undefined;
+    const capture = (): Promise<TreeFrame> => (captured ??= captureFrame(adapter, { tree, deadline, region: rect }));
     const eyes: OrderEyes = { order: (question) => orderOnCapture(question, memory.keptOrder(tree), capture) };
     const over = await overElement(adapter, look, found[0], { ...(spec.reads !== undefined && { reads: spec.reads }), glyphs: spec.glyphs === true, judgedOn, eyes });
     if (over !== undefined) return memory.coveredMiss(over);
     // Nothing over the element — no keyboard (or no oracle), no cover, no band: an earlier covered miss is no longer the truth.
     finding.withdraw((miss) => miss.covered === true);
     // A refused capture ends the poll at once, a final miss — header, "A capture the ADAPTER refuses".
-    let frame: TreeRequestedFrame;
+    let frame: TreeFrame;
     try {
       frame = await capture();
     } catch (e) {
@@ -586,7 +586,7 @@ export async function pollPixels(
     // Only the element's region held still: measure only at a rect two consecutive reads agree on (header).
     if (frame.settledOver === 'region' && (previous === undefined || !sameRect(previous, rect))) return pixelRound(memory.unconfirmed(previous, rect));
     const { shot, measured } = frame;
-    // The supplied-tree arm is never treeless: an error here is a png that did not decode.
+    // An error here is `Undecoded` (capture.ts#TreeFrame).
     if (measured.error !== undefined) return pixelRound({ pass: false, detail: failClosed(measured.error, unchecked) });
     // Measured on THE region the standing judged over (Scene.pixelRegion): the part its scroll views draw.
     const region = look.scene.pixelRegion(found[0], screen);
