@@ -127,9 +127,9 @@ export class AutoTreeSource implements IosTreeSource {
    * A WDA that does not come up is the fallback (choose): the start resolves, with the stderr line and the claim note
    * the first read would have met. Released: nothing; released mid-choice: the read's released error.
    */
-  async startBeforeLaunch(): Promise<void> {
+  async startBeforeLaunch(bundleId: string): Promise<void> {
     if (this.disposed) return;
-    if (this.chosen !== undefined) return this.chosen === this.wda ? this.wda.startBeforeLaunch?.() : undefined;
+    if (this.chosen !== undefined) return this.chosen === this.wda ? this.wda.startBeforeLaunch?.(bundleId) : undefined;
     if (this.choosing === undefined && !(await mayStartBeforeLaunch(this.wda, () => this.disposed))) return;
     await this.source();
   }

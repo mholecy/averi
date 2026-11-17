@@ -1,3 +1,4 @@
+import { errorMessage } from '../util/error-message.js';
 import { WdaServer, type WdaServerOptions } from './wda.js';
 import { parseWdaSourceValue } from './wda-source.js';
 import { alertInWda } from './ios-system-alert.js';
@@ -22,9 +23,9 @@ export async function mayStartBeforeLaunch(wda: { buildCached(): Promise<boolean
 
 /**
  * The error of a call on a released WebDriverAgent source (a select_device deselected the simulator, or averi is
- * shutting down): a release, never a WDA that "did not come up" — IosAdapter.launch passes it on unchanged.
+ * shutting down): a release, never a WDA that "did not come up" — WdaTreeSource.startBeforeLaunch passes it on unchanged.
  */
-export class TreeSourceReleasedError extends Error {}
+class TreeSourceReleasedError extends Error {}
 
 /**
  * The WebDriverAgent adapter at the iOS tree-source seam (ios-tree-source.ts):
@@ -111,16 +112,24 @@ export class WdaTreeSource implements IosTreeSource {
   }
 
   /**
-   * Brings WebDriverAgent up before a launch and resolves once it is up (IosTreeSource.startBeforeLaunch, ADR 0046's
-   * A41d amendment), so the first read after the launch finds it up. WdaServer.ensureRunning — its own bounds (/status
-   * within the ready timeout) and single-flight, so a read starting WDA is joined. WDA up (WdaServer.upGeneration) →
-   * nothing: a launch sends no `/status` probe and restarts nothing. Not mayStartBeforeLaunch (no cached build, or
-   * released) → nothing: a build is minutes, and the first read runs it. A start that fails rejects with WDA's own
-   * error (bringUp) and is not kept: the next start or read tries again.
+   * Brings WebDriverAgent up before the launch of `bundleId` and resolves once it is up (IosTreeSource.
+   * startBeforeLaunch, ADR 0046's A41d amendment), so the first read after the launch finds it up. WdaServer.
+   * ensureRunning — its own bounds (/status within the ready timeout) and single-flight, so a read starting WDA is
+   * joined. WDA up (WdaServer.upGeneration) → nothing: a launch sends no `/status` probe and restarts nothing. Not
+   * mayStartBeforeLaunch (no cached build, or released) → nothing: a build is minutes, and the first read runs it.
+   * A start that fails rejects saying the launch touched nothing, WDA's own error (bringUp) quoted and kept as its
+   * cause, and is not kept: the next start or read tries again. Released during the start → the released error as it
+   * is, never a WDA that did not come up.
    */
-  async startBeforeLaunch(): Promise<void> {
+  async startBeforeLaunch(bundleId: string): Promise<void> {
     if (this.disposed || this.server.upGeneration() !== undefined) return;
-    if (await mayStartBeforeLaunch(this, () => this.disposed)) await this.bringUp();
+    if (!(await mayStartBeforeLaunch(this, () => this.disposed))) return;
+    try {
+      await this.bringUp();
+    } catch (err) {
+      if (err instanceof TreeSourceReleasedError) throw err;
+      throw new Error(`WebDriverAgent did not come up before launching ${bundleId} — nothing was wiped or launched: ${errorMessage(err)}`, { cause: err });
+    }
   }
 
   /** Whether WDA's build is cached, so a start runs no `xcodebuild build-for-testing` (WdaServer.isBuilt). */

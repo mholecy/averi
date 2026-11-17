@@ -214,7 +214,7 @@ describe('AutoTreeSource.startBeforeLaunch — the choice made before a launch, 
     const idb = fakeIdb();
     const auto = new AutoTreeSource({ wda, idb });
     let done = false;
-    const starting = auto.startBeforeLaunch().then(() => (done = true));
+    const starting = auto.startBeforeLaunch('com.app').then(() => (done = true));
     await drain();
     expect([wda.bringUps, done]).toEqual([1, false]); // awaited: not done while WDA comes up
     up.settle();
@@ -230,8 +230,8 @@ describe('AutoTreeSource.startBeforeLaunch — the choice made before a launch, 
     const wda = fakeWda(() => up.promise);
     const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
     const reading = auto.read();
-    const first = auto.startBeforeLaunch();
-    const second = auto.startBeforeLaunch();
+    const first = auto.startBeforeLaunch('com.app');
+    const second = auto.startBeforeLaunch('com.app');
     await drain();
     expect(wda.bringUps).toBe(1);
     expect(wda.cachedAsks).toBe(0); // a choice in flight is joined, whatever the build
@@ -245,7 +245,7 @@ describe('AutoTreeSource.startBeforeLaunch — the choice made before a launch, 
     const wda = fakeWda(() => Promise.reject(new Error('WDA build failed (xcodebuild build-for-testing) — output: /tmp/x.log')));
     const idb = fakeIdb();
     const auto = new AutoTreeSource({ wda, idb });
-    await expect(auto.startBeforeLaunch()).resolves.toBeUndefined();
+    await expect(auto.startBeforeLaunch('com.app')).resolves.toBeUndefined();
     expect(auto.fellBack).toBe(true);
     expect(auto.claimNote).toBe(idbFallbackNote('WDA build failed'));
     expect(said).toHaveBeenCalledTimes(1);
@@ -256,7 +256,7 @@ describe('AutoTreeSource.startBeforeLaunch — the choice made before a launch, 
   it('WebDriverAgent not built: nothing is started or awaited — the first read makes the choice, the build inside it', async () => {
     const wda = fakeWda(undefined, async () => false);
     const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
-    await auto.startBeforeLaunch();
+    await auto.startBeforeLaunch('com.app');
     expect([wda.cachedAsks, wda.bringUps]).toEqual([1, 0]);
     expect((await auto.read()).identifier).toBe('wda');
     expect(wda.bringUps).toBe(1);
@@ -265,7 +265,7 @@ describe('AutoTreeSource.startBeforeLaunch — the choice made before a launch, 
   it('a build check that throws is no build: nothing started, the start resolves', async () => {
     const wda = fakeWda(undefined, () => Promise.reject(new Error('EACCES')));
     const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
-    await expect(auto.startBeforeLaunch()).resolves.toBeUndefined();
+    await expect(auto.startBeforeLaunch('com.app')).resolves.toBeUndefined();
     expect(wda.bringUps).toBe(0);
   });
 
@@ -273,7 +273,7 @@ describe('AutoTreeSource.startBeforeLaunch — the choice made before a launch, 
     const wda = fakeWda();
     const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
     await auto.read();
-    await auto.startBeforeLaunch();
+    await auto.startBeforeLaunch('com.app');
     expect([wda.cachedAsks, wda.bringUps]).toEqual([0, 1]);
 
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -281,25 +281,25 @@ describe('AutoTreeSource.startBeforeLaunch — the choice made before a launch, 
     const failing = Object.assign(fakeWda(down), { startBeforeLaunch: async () => void wdaStarts++ });
     const fellBack = new AutoTreeSource({ wda: failing, idb: fakeIdb() });
     await fellBack.read();
-    await fellBack.startBeforeLaunch();
+    await fellBack.startBeforeLaunch('com.app');
     expect([failing.cachedAsks, failing.bringUps, wdaStarts]).toEqual([0, 1, 0]); // a fallback's WDA is not started again
   });
 
   it('WDA chosen and since gone: WDA\'s own start runs before the launch — restarted, and its failure is WDA\'s error', async () => {
-    let starts = 0;
+    const starts: string[] = [];
     let fail: Error | undefined;
     const wda: FakeWda = Object.assign(fakeWda(), {
-      async startBeforeLaunch() {
-        starts++;
+      async startBeforeLaunch(bundleId: string) {
+        starts.push(bundleId);
         if (fail !== undefined) throw fail;
       },
     });
     const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
     await auto.read();
-    await auto.startBeforeLaunch();
-    expect([starts, wda.bringUps]).toEqual([1, 1]);
+    await auto.startBeforeLaunch('com.app');
+    expect([starts, wda.bringUps]).toEqual([['com.app'], 1]);
     fail = new Error('WDA did not answer /status on port 8100 within 60 s');
-    await expect(auto.startBeforeLaunch()).rejects.toBe(fail);
+    await expect(auto.startBeforeLaunch('com.app')).rejects.toBe(fail);
     expect(auto.kind).toBe('wda'); // never a switch to idb
   });
 
@@ -312,7 +312,7 @@ describe('AutoTreeSource.startBeforeLaunch — the choice made before a launch, 
       derivedDataPath: dd, readyTimeoutMs: 40, pollIntervalMs: 5,
     });
     const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
-    await expect(auto.startBeforeLaunch()).resolves.toBeUndefined();
+    await expect(auto.startBeforeLaunch('com.app')).resolves.toBeUndefined();
     expect(auto.fellBack).toBe(true);
     expect(auto.claimNote).toMatch(/WebDriverAgent did not come up \(WDA did not answer \/status on port \d+ within 0\.04 s;/);
     expect(spawner.kills).toContain('SIGTERM');
@@ -323,14 +323,14 @@ describe('AutoTreeSource.startBeforeLaunch — the choice made before a launch, 
     const later = fakeWda();
     const released = new AutoTreeSource({ wda: later, idb: fakeIdb() });
     await released.dispose();
-    await released.startBeforeLaunch();
+    await released.startBeforeLaunch('com.app');
     expect([later.cachedAsks, later.bringUps]).toEqual([0, 0]);
 
     const said = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const up = deferred();
     const wda = fakeWda(() => up.promise);
     const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
-    const starting = auto.startBeforeLaunch();
+    const starting = auto.startBeforeLaunch('com.app');
     starting.catch(() => undefined);
     await drain();
     await auto.dispose();
@@ -343,7 +343,7 @@ describe('AutoTreeSource.startBeforeLaunch — the choice made before a launch, 
     const cached = deferred();
     const wda = fakeWda(undefined, () => cached.promise.then(() => true));
     const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
-    const starting = auto.startBeforeLaunch();
+    const starting = auto.startBeforeLaunch('com.app');
     await drain();
     await auto.dispose();
     cached.settle();

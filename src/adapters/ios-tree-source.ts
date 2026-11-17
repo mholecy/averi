@@ -70,12 +70,13 @@ export interface IosTreeSource {
   readonly settleCadenceMs?: number;
   read(): Promise<UiNode>;
   /**
-   * Does what this source's first read would otherwise start, and resolves when that is done — or decides to start
-   * nothing (the implementations say when). Rejects only where a read would fail for the same reason. Awaited by
-   * IosAdapter.launch before it touches the app (ADR 0046's A41d amendment). Absent on idb and on the recorded source:
-   * nothing to start.
+   * Does what this source's first read would otherwise start, before the launch of `bundleId`, and resolves when that
+   * is done — or decides to start nothing (the implementations say when). Rejects only where a read would fail for the
+   * same reason, with an error the launch passes on as it is: the source words it (WdaTreeSource's names the bundle and
+   * says nothing was wiped or launched; a release is the released error). Awaited by IosAdapter.launch before it
+   * touches the app (ADR 0046's A41d amendment). Absent on idb and on the recorded source: nothing to start.
    */
-  startBeforeLaunch?(): Promise<void>;
+  startBeforeLaunch?(bundleId: string): Promise<void>;
   /**
    * Which app a fresh read is OF. idb: the label of the payload's
    * `Application` element — its display name ("Skeleton Internal",
