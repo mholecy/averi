@@ -498,7 +498,7 @@ async function orderOnCapture(question: PairQuestion, kept: KeptOrder, capture: 
     return untoldAll(question, `the screenshot failed: ${captureRefusal(e)}`);
   }
   if (frame.stability !== 'settled') return untoldAll(question, 'the screen did not settle');
-  if (frame.settledOver !== 'screen') return untoldAll(question, 'only the element held still, not the screen around it');
+  if (frame.settledOver === 'region') return untoldAll(question, 'only the element held still, not the screen around it');
   if (frame.measured.error !== undefined) return untoldAll(question, frame.measured.error);
   const seen = orderOfFrame(frame.measured, question);
   kept.keep(question, seen);
