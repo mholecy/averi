@@ -6,7 +6,7 @@ import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { nodeText } from '../../src/ui-tree/node-words.js';
 import { sceneOf, type PixelRegionOf as Reads, type PixelStanding } from '../../src/ui-tree/standing.js';
 import { lookOn } from '../../src/ui-tree/look.js';
-import { treeScreen, usableScreen } from '../../src/ui-tree/usable-screen.js';
+import { judgedScreen, usableScreen } from '../../src/ui-tree/usable-screen.js';
 import { overElement } from '../../src/verify/pixel-poll.js';
 import { colorSampleRect } from '../../src/verify/color-parity.js';
 import { stackedLayers } from '../helpers/stacked-layers.js';
@@ -54,7 +54,7 @@ async function sweep(androidBand?: number, reads: Reads = (r) => r, androidNavig
   let judged = 0;
   for (const [name, tree, device] of await fixtureTrees(androidBand, androidNavigation)) {
     const { scene } = lookOn({}, tree);
-    const usable = (await usableScreen({ viewport: async () => device }, { tree })) ?? treeScreen(tree);
+    const usable = judgedScreen(await usableScreen({ viewport: async () => device }, { tree }), tree);
     for (const n of everyNode(tree)) {
       if (n === tree || n.ofKeyboard === true || !(n.rect.width * n.rect.height > 0)) continue;
       judged++;
@@ -371,6 +371,12 @@ describe('the screen without the device: the window the tree vouches for (ui-tre
     const element = n('container', rect(0, 0, 402, 200), { identifier: 'row' });
     const tree = n('container', rect(0, 0, 0, 0), { children: [n('other', rect(0, 0, 402, 1300), { children: [element] }), n('other', rect(0, 150, 402, 100), { label: 'Bar' })] });
     expect(await over(silent, tree, element)).toMatch(/^other "Bar" \(0,150 402x100\) is drawn over the element \(element 0,0 402x200\)/);
+  });
+
+  it('idb\'s 0x0 root with no window vouched for: the box is only the largest node, so an element laid past it is measured, never judged off the screen', async () => {
+    const element = n('button', rect(24, 1500, 354, 52), { identifier: 'pay' });
+    const tree = n('container', rect(0, 0, 0, 0), { children: [n('other', rect(0, 0, 402, 1300)), element] });
+    expect(await over(silent, tree, element)).toBeUndefined();
   });
 
   it('a banner crowned as the window turns the screen the pixel assert judges its single box over (`oriented`, D6), not the judged panel as built: a landscape box, no band — measured', async () => {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { TreeRead } from '../../src/ui-tree/read-tree.js';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
 import type { ScreenSize } from '../../src/ui-tree/geometry.js';
-import { treeScreen, usableScreen, usableScreenOf } from '../../src/ui-tree/usable-screen.js';
+import { judgedScreen, treeScreen, usableScreen, usableScreenOf } from '../../src/ui-tree/usable-screen.js';
 import { el, FakeAdapter, node, screen } from '../helpers/fake.js';
 
 /** A read that failed, as the read seam returns it (a TreeRead): usableScreen asks only its tree. */
@@ -241,12 +241,23 @@ describe('usableScreen — `fresh`: the device read again first (the tap\'s re-r
   });
 });
 
-describe('treeScreen — THE "no device screen": the tree\'s own screen, no band, and whether a touch fails open', () => {
+describe('treeScreen — THE "no device screen": the tree\'s own screen, no band, and whether a judgement fails open (a touch, and the pixel assert)', () => {
   it('a root with a rect is that rect; a touch judges in it', () => {
     expect(treeScreen(node({ rect: box(402, 874) }))).toEqual({ box: box(402, 874), boxes: [box(402, 874)], oriented: box(402, 874), from: 'tree', failsOpen: false });
   });
   it('a root of no area (idb\'s synthetic 0x0 root): the largest node is the box, and a touch fails open', () => {
     const tree = node({ rect: box(0, 0), children: [node({ rect: { x: 0, y: 100, width: 300, height: 50 } }), node({ rect: box(402, 874) })] });
     expect(treeScreen(tree)).toEqual({ box: box(402, 874), boxes: [box(402, 874)], oriented: box(402, 874), from: 'tree', failsOpen: true });
+  });
+});
+
+describe('judgedScreen — the usable screen, else the tree\'s own', () => {
+  const tree = node({ rect: box(0, 0), children: [node({ rect: box(402, 874) })] });
+  it('a usable screen is judged on as it is', () => {
+    const usable = usableScreenOf({ width: 1080, height: 2220, statusBand: 66 }, undefined);
+    expect(judgedScreen(usable, tree)).toBe(usable);
+  });
+  it('none: the tree\'s own, carrying `failsOpen` — and a copy of it carries it too', () => {
+    expect({ ...judgedScreen(undefined, tree) }).toEqual({ box: box(402, 874), boxes: [box(402, 874)], oriented: box(402, 874), from: 'tree', failsOpen: true });
   });
 });

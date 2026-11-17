@@ -5,7 +5,7 @@ import { lookTold, type Look, type LookReading } from './look.js';
 import { seenOrderOf, type OrderSeen, type SeenOrder } from './seen-order.js';
 import type { FlushNeighbour } from './later-edges.js';
 import type { PixelStanding, Scene, Standing } from './standing.js';
-import { treeScreen, type UsableScreen } from './usable-screen.js';
+import { judgedScreen, type UsableScreen } from './usable-screen.js';
 
 /**
  * THE EYES — two questions a screenshot answers where the tree cannot, one capture each: does a surface the tree does
@@ -119,7 +119,7 @@ export interface Eyes {
  * clip line to look for (a `fully` claim on a node whose tree cannot tell where it is drawn, geometry.ts#DrawnUntold).
  */
 export function eyesQuestion(scene: Scene, tree: UiNode, node: UiNode, screen: UsableScreen | undefined, claim: 'stop' | 'fully'): EyesQuestion | undefined {
-  const box = (screen ?? treeScreen(tree)).oriented;
+  const box = judgedScreen(screen, tree).oriented;
   const flush: readonly EyesEdge[] = scene.flushNeighbours(node).filter((f) => !spansScreen(f, box));
   const clipLines = claim === 'fully' && isUntold(scene.clips.drawnIn(node)) ? EDGES.map((edge): EyesEdge => ({ edge, by: CLIP_LINE })) : [];
   const edges = [...flush, ...clipLines];

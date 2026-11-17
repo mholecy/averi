@@ -27,7 +27,10 @@ import { inferScreenSize, SCREEN_AGREEMENT_PCT, screenOf, windowTurnsScreen, typ
  *   usable screen (undefined). What that means is the caller's: the gesture
  *   box throws and nothing is swiped, the scroll keeps the last round's
  *   screen, and every judgement takes `treeScreen`, THE "no device screen"
- *   (a touch fails open on a root of no area).
+ *   (`judgedScreen`; a touch fails open on a root of no area).
+ * - `from` — which of the three it is, the union's tag: the device's size
+ *   (the only arm with bands), a window the tree vouches for, or the tree's
+ *   own screen, which alone carries `failsOpen` — so a copy keeps it.
  * - `boxes` — the boxes a point or a rect is judged ON SCREEN in, so the
  *   scroll and the tap after it agree by construction (the rule is
  *   `judgedBoxes`): the oriented box alone when a window witnessed the
@@ -39,7 +42,7 @@ import { inferScreenSize, SCREEN_AGREEMENT_PCT, screenOf, windowTurnsScreen, typ
  *   built, not `oriented`, when the turn is no evidence.
  * - `statusBand`, `navigationBand` — the device's system bands
  *   (adapters/types.ts#DeviceScreen), carried only when the device's size
- *   is the screen: with the tree's window standing in, no band (the
+ *   is the screen (`from: 'device'`): with the tree's window standing in, no band (the
  *   judgements fail open, as the rest of that path does). The tap, the
  *   stop and the pixel assert judge both (standing.ts#Scene).
  *
@@ -57,19 +60,45 @@ import { inferScreenSize, SCREEN_AGREEMENT_PCT, screenOf, windowTurnsScreen, typ
  *   cost, geometry.ts#windowTurnsScreen) but not `boxes`; the pixel assert
  *   judges its single box over `oriented`.
  */
-export interface UsableScreen {
+export type UsableScreen = DeviceUsableScreen | WindowUsableScreen | TreeUsableScreen;
+
+/** What every usable screen holds, whatever `from` says it came from. */
+interface ScreenBoxes {
   /** The first of `boxes` — what a reply quotes. */
   readonly box: Rect;
   /** The boxes a point or a rect is judged on screen in: one, or the box either way up when a turn is suggested but not witnessed. */
   readonly boxes: readonly Rect[];
   /** The device's screen turned as the tree's window says (else the window, else the tree's screen): the box a gesture strokes in, and the pixel assert's single box. */
   readonly oriented: Rect;
-  /** Where the box came from: the device's size, a window the tree vouches for, or (`treeScreen`, the "no device screen") the tree's own screen. */
-  readonly from: 'device' | 'window' | 'tree';
-  /** adapters/types.ts#DeviceScreen.statusBand, when `from` is the device. */
+}
+
+/** The device's size is the screen: the one arm that carries the system bands. */
+export interface DeviceUsableScreen extends ScreenBoxes {
+  readonly from: 'device';
+  /** adapters/types.ts#DeviceScreen.statusBand. */
   readonly statusBand?: number;
-  /** adapters/types.ts#DeviceScreen.navigationBand (the band's TOP line), when `from` is the device. */
+  /** adapters/types.ts#DeviceScreen.navigationBand (the band's TOP line). */
   readonly navigationBand?: number;
+}
+
+/** A window the tree vouches for stands in for the device's size: no band. */
+export interface WindowUsableScreen extends ScreenBoxes {
+  readonly from: 'window';
+  readonly statusBand?: undefined;
+  readonly navigationBand?: undefined;
+}
+
+/** THE "no device screen" (`treeScreen`): the tree's own screen, no band, and whether a judgement fails open on it. */
+export interface TreeUsableScreen extends ScreenBoxes {
+  readonly from: 'tree';
+  /**
+   * The root has no area (idb's synthetic 0x0 root): `box` is only the largest node, and nothing is refused as off it
+   * (`treeScreen`) — a touch judges no point off it, and the pixel assert reads the node's own rect uncut and places
+   * no region off it.
+   */
+  readonly failsOpen: boolean;
+  readonly statusBand?: undefined;
+  readonly navigationBand?: undefined;
 }
 
 /**
@@ -132,19 +161,34 @@ export function usableScreenOf(device: DeviceScreen | undefined, size: ScreenSiz
  * one draw-order.ts sizes its hosts against — the root's rect, or the
  * largest node's when the root has no area) as a usable screen,
  * `from: 'tree'`, with no band. Every judgement with no usable screen reads
- * it, and nothing else.
+ * it (`judgedScreen`), and nothing else.
  *
  * `failsOpen`: the root has no area (idb's synthetic 0x0 root). A TOUCH
  * purpose — the tap, either stop — then places every point on the screen
  * and judges in the node's own rect: the on-screen rule exists to stop a
  * false "Tapped", and must never be why a tap on a device that could not
- * report its size did not happen. The pixel assert judges on `box`, the
- * largest node, as ever: it reads a region, and fails closed.
+ * report its size did not happen. The pixel assert refuses nothing as off
+ * `box` either: it reads the node's own rect, uncut by its scroll views,
+ * and its keyboard band and covers are judged only on the part on `box`
+ * (standing.ts#Scene).
  */
-export function treeScreen(tree: UiNode): UsableScreen & { readonly failsOpen: boolean } {
+export function treeScreen(tree: UiNode): TreeUsableScreen {
   const box = screenOf(tree);
   return { box, boxes: [box], oriented: box, from: 'tree', failsOpen: !(rectArea(tree.rect) > 0) };
 }
+
+/**
+ * THE JUDGED SCREEN of `tree`: `usable` when there is one, else the tree's own (`treeScreen`) — the one fallback every
+ * judgement takes. Pure, and asked where the tree is in hand: a usable screen travels from look to look, a tree's own
+ * screen belongs to the tree it was read from.
+ */
+export const judgedScreen = (usable: UsableScreen | undefined, tree: UiNode): UsableScreen => usable ?? treeScreen(tree);
+
+/**
+ * A judgement fails open on `screen`: the tree's own, on a root of no area (`TreeUsableScreen.failsOpen`) — a touch
+ * judges no point off its box, and the pixel assert reads the node's rect uncut and places no region off it.
+ */
+export const failsOpen = (screen: UsableScreen): boolean => screen.from === 'tree' && screen.failsOpen;
 
 /**
  * How far a window's width may fall short of (or pass) the panel's long

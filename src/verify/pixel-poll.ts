@@ -9,7 +9,7 @@ import { treeFingerprint } from '../ui-tree/read-tree.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import type { PixelRegionOf } from '../ui-tree/standing.js';
-import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
+import { judgedScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame, type TreeRequestedFrame } from './capture.js';
 import { apartOfFrame, orderOfFrame, untoldAll } from './eyes.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
@@ -443,7 +443,7 @@ export async function overElement(
  * 0001). The screen is the usable screen's single `oriented` box, of the
  * look's tree (ui-tree/usable-screen.ts#usableScreen, which owns the derivation; the
  * pixel purpose picks it, ui-tree/standing.ts#Scene; D6, ADR 0012), with
- * the device's system bands — else the tree's own screen (ui-tree/usable-screen.ts#treeScreen), with no
+ * the device's system bands — else the tree's own screen (ui-tree/usable-screen.ts#judgedScreen), with no
  * band: a window the tree vouches for is the screen, as it is for the
  * gesture, so under a rectless root whose largest node is a scroll view's
  * tall content (402x2000 under a 402x874 window) a window-sized element is
@@ -458,7 +458,7 @@ async function judgeOver(
   element: UiNode,
   { reads, glyphs, judgedOn, eyes, keyboard }: { reads: PixelRegionOf; glyphs: boolean; judgedOn: (screen: UsableScreen) => void; eyes: OrderEyes | undefined; keyboard: { line: KeyboardLine | undefined; remedy: KeyboardRemedy } },
 ): Promise<string | undefined> {
-  const usable = (await usableScreen(adapter, look)) ?? treeScreen(look.tree);
+  const usable = judgedScreen(await usableScreen(adapter, look), look.tree);
   judgedOn(usable);
   // What the measurement reads is asked of the box the standing judges (ui-tree/standing.ts#PixelRegionOf).
   const purpose = { of: 'pixel', reads, glyphs, ...(keyboard.line !== undefined && { keyboardTop: keyboard.line }) } as const;

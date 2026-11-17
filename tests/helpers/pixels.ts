@@ -1,6 +1,6 @@
 import { PNG } from 'pngjs';
 import type { Rect } from '../../src/adapters/types.js';
-import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
+import type { DeviceUsableScreen, UsableScreen } from '../../src/ui-tree/usable-screen.js';
 
 /** An opaque colour, 0–255 a channel. */
 export type Rgb = readonly [number, number, number];
@@ -24,7 +24,7 @@ export function paint(size: { readonly width: number; readonly height: number },
 }
 
 /** The whole `screen` usable, as the device reports it — what a test of a phone with nothing cut from it hands a standing. */
-export const usableOf = (screen: Rect): UsableScreen => ({ box: { ...screen }, boxes: [{ ...screen }], oriented: { ...screen }, from: 'device' });
+export const usableOf = (screen: Rect): DeviceUsableScreen => ({ box: { ...screen }, boxes: [{ ...screen }], oriented: { ...screen }, from: 'device' });
 
 /** The iPhone 17 (402x874 pt) as the device reports it, its status band to 62 pt: the usable screen the iOS standing tests judge on. */
 export const IPHONE_17: UsableScreen = { ...usableOf({ x: 0, y: 0, width: 402, height: 874 }), statusBand: 62 };

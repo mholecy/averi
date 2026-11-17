@@ -1,6 +1,5 @@
 import { everyNode, rectArea, rectIntersection, type DeviceAdapter, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { dialectOf } from '../ui-tree/dialect.js';
-import { screenOf } from '../ui-tree/geometry.js';
 import { coverName, labelWords, outsideScrollViewText } from '../ui-tree/node-words.js';
 import type { Look } from '../ui-tree/look.js';
 import { isUnnamedWrapper } from '../ui-tree/placed.js';
@@ -9,7 +8,7 @@ import { isInteractive, tapPoint } from '../ui-tree/selectors.js';
 import { accessoryDismissButton } from '../ui-tree/soft-keyboard.js';
 import { presentedRemedy } from '../ui-tree/remedy-text.js';
 import { outsideItsScrollView, type TapStanding } from '../ui-tree/standing.js';
-import type { UsableScreen } from '../ui-tree/usable-screen.js';
+import { judgedScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import type { KeyboardDismissal } from './keyboard-model.js';
 import { describeTarget, findTarget, type Ambiguity } from './resolve.js';
 import { tapStandings } from './tap-judgement.js';
@@ -351,8 +350,10 @@ async function blankPoint({ look, screen, target }: DismissalGround): Promise<Bl
   const scroller = path[at];
   const standing = await tapStandings(look, target, screen).full();
   if (standing.kind !== 'reachable') return { skipped: `the target cannot be tapped where it stands (${whyNotTapped(standing, target) ?? standing.kind})` };
-  const box = screen?.box ?? screenOf(look.tree);
-  const top = Math.max(box.y, screen?.statusBand ?? box.y);
+  // The area is bounded by the judged screen's box even where the touch fails open (a root of no area: the largest node).
+  const judged = judgedScreen(screen, look.tree);
+  const box = judged.box;
+  const top = Math.max(box.y, judged.statusBand ?? box.y);
   const cover = await look.reading.cover();
   const area = rectIntersection(scroller.rect, {
     x: box.x + SCREEN_EDGE,

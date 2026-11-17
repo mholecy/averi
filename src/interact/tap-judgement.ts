@@ -9,7 +9,7 @@ import { coverClause } from '../ui-tree/cover.js';
 import { presentedOr } from '../ui-tree/remedy-text.js';
 import { outsideItsScrollView, type Scene, type ScrollableRemedy, type SystemBar, type TapStanding } from '../ui-tree/standing.js';
 import { pinnedUnder, underSystemBar } from '../ui-tree/system-bar.js';
-import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
+import { judgedScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { describeTarget, type RefusedOnPresentElement, type Target } from './resolve.js';
 import type { SeenLook } from './keyboard-model.js';
@@ -280,7 +280,7 @@ export async function judgeTap(adapter: Pick<DeviceAdapter, 'viewport'>, target:
       const standing = await judgedWithOrder(look, node, eyes, (onLook) => judged(onLook === look ? standings : tapStandings(onLook, node, on)));
       // A cut by a node drawn after it: whether the soft keyboard is up, which its remedy names (touch-remedy.ts) — the reading's line, asked on that path only.
       const line = standing.kind === 'cut' && standing.cut.by !== undefined ? await look.keyboard.readingLine() : undefined;
-      return tapOutcome(standing, told, () => ({ judged: on ?? treeScreen(look.tree) }), keyboardUp(line, look.reading.remedy));
+      return tapOutcome(standing, told, () => ({ judged: judgedScreen(on, look.tree) }), keyboardUp(line, look.reading.remedy));
     },
   });
   const first = tapStandings(look, node, screen);
@@ -291,7 +291,7 @@ export async function judgeTap(adapter: Pick<DeviceAdapter, 'viewport'>, target:
   const secondStanding = second.first;
   if (!offTheScreen(secondStanding)) return judge(again, second);
   // Refused on the screen read again; on the first look's when none could be read again.
-  const [judged, refused] = again === undefined && screen !== undefined ? [screen, firstStanding] : [again ?? treeScreen(look.tree), secondStanding];
+  const [judged, refused] = again === undefined && screen !== undefined ? [screen, firstStanding] : [judgedScreen(again, look.tree), secondStanding];
   const reread =
     again !== undefined && screen !== undefined && (again.box.width !== screen.box.width || again.box.height !== screen.box.height)
       ? ` (read again before refusing; it was ${screen.box.width}x${screen.box.height})`
@@ -323,16 +323,16 @@ interface JudgedScreen {
  * `TapJudge.aim`'s, after it. `aim` reaches the first row only for a centre
  * outside its scroll view (any other off-screen standing was refused by
  * `judgeTap`, and `full()` changes only the keyboard line), whose refusal
- * does not read the screen: `judgedScreen` is called there and its answer
+ * does not read the screen: `refusedOn` is called there and its answer
  * unused. `keyboard`: the soft keyboard when it is up, asked by `aim` only
  * for a cut by a node drawn after it, whose remedy names it.
  */
-function tapOutcome(standing: TapStanding, told: Told, judgedScreen: () => JudgedScreen, keyboard?: KeyboardUp): Aim {
+function tapOutcome(standing: TapStanding, told: Told, refusedOn: () => JudgedScreen, keyboard?: KeyboardUp): Aim {
   const { centre } = standing.facts;
   switch (standing.kind) {
     case 'offScreen':
     case 'systemBar':
-      throw offScreenRefusal(standing, told, judgedScreen());
+      throw offScreenRefusal(standing, told, refusedOn());
     case 'cut': {
       const cut = cutSliverText(standing.cut, told.node.rect, standing.minPiece, keyboard?.lineY);
       // The touch remedy, `scroll_until`'s words for the same target (touch-remedy.ts).
