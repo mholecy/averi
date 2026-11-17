@@ -87,7 +87,7 @@ export class WdaTreeSource implements IosTreeSource {
   /**
    * Brings WebDriverAgent up without reading a tree — WdaServer.ensureRunning, within its own bounds (the package, a
    * first build, /status). A failure here is "WDA cannot be brought up", unlike a failed /source on a WDA that is up.
-   * Released → the released error (guarded).
+   * Released → the released error, as `guarded`.
    */
   bringUp(): Promise<void> {
     return this.guarded(() => this.server.ensureRunning());
@@ -150,18 +150,19 @@ export class WdaTreeSource implements IosTreeSource {
    *   The bundle id is matched exactly by the wait (ios-foreground.ts): WDA
    *   reports the app's canonical CFBundleIdentifier, the id `simctl launch`
    *   was given — no case folding, by design.
-   * - released → the released error, as read() (checked first: a shut-down
-   *   server is not up, and `declined` would hide the release).
+   * - released → the released error (checked first: a shut-down server is
+   *   not up, and `declined` would hide the release), as `guarded`.
    */
   async applicationLabel(): Promise<ApplicationLabel> {
     if (this.disposed) throw this.released();
     const generation = this.server.upGeneration();
     if (generation === undefined) return { kind: 'declined' };
     if (this.failedAsk?.generation === generation) throw this.failedAsk.error;
-    const payload = await this.guarded(() => this.server.activeAppInfo().catch((err: unknown) => {
-      this.failedAsk = { generation, error: err };
+    const remember = (err: unknown): never => {
+      if (!this.disposed) this.failedAsk = { generation, error: err };
       throw err;
-    }));
+    };
+    const payload = await this.guarded(() => this.server.activeAppInfo().catch(remember));
     const bundleId = (payload as { value?: { bundleId?: unknown } } | null | undefined)?.value?.bundleId;
     return typeof bundleId === 'string' && bundleId !== '' ? { kind: 'bundle', bundleId } : { kind: 'unlabelled' };
   }
@@ -181,7 +182,7 @@ export class WdaTreeSource implements IosTreeSource {
    * Types `text` into whatever holds keyboard focus through WebDriverAgent (D43, ADR 0037's D43 amendment):
    * WdaServer.keys — a session per WDA start, one retry on a lost session, none after a request that did not complete.
    * Starts WDA when it is not up, as read() does. Released → the released error, nothing sent; a failure after dispose
-   * is the release (guarded).
+   * is the release, as `guarded`.
    */
   typeWide(text: string): Promise<void> {
     return this.guarded(() => this.server.keys(text));
