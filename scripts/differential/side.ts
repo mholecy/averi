@@ -87,7 +87,7 @@ export type LiveIosDeps = Pick<IosTreeSourceDeps, 'port' | 'derivedDataPath'>;
 export function liveIosLine(live: LiveIos | undefined): string {
   if (live === undefined) return 'none — no registry.ts#iosAdapterFor nor src/adapters/ios-tree-source.ts#createIosTreeSource in this side';
   if (live.wiring === 'fallback') {
-    return 'no registry.ts#iosAdapterFor in this side — IosAdapter over its createIosTreeSource, no idb helper: every idb call the CLI (the live golden before A23)';
+    return 'no registry.ts#iosAdapterFor in this side — IosAdapter over its createIosTreeSource, no idb helper: every idb call the CLI';
   }
   const reader = live.switchReadBy === 'side' ? "the side's idb-helper.ts#idbHelperDisabled" : 'AVERI_IDB_HELPER read by side.ts: the side has no idbHelperDisabled';
   return live.wiring === 'registry-helper-off'
