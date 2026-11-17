@@ -7,7 +7,6 @@ import { recordFiles, recordGap, recordGapIn, recordOf, recordsIn, writeAsked, w
 
 // scripts/truth/batch/records.ts: a non-live block's records — what a run is asked, then what it did — and each
 // one's gap. Real files in a temp dir; runner.test.ts runs them inside runBatch, beside the live runs' completeness.
-// The titles name the fix and the batch or review that found it.
 
 let dir: string;
 beforeEach(() => {

@@ -51,23 +51,23 @@ export type Outcome = 'ok' | 'LOUD' | 'MISMATCH' | 'SKIP';
  * ratchet pins a row's class: a known case failing by another rule is not known. `stop-claim` "visible" where the app
  * does not bear the stop out; `tap-claim` `Tapped` with nothing or something else fired, or anything fired in an
  * absent-at-end case (on any reply but `visible`); `tap-refused-fired` a refusal while something fired; `tap-refused`
- * (LOUD) a refusal of a target its probe reached; `unchanged-claim` "the last N
- * swipes did not change the screen" against the app's strokes; `R-direction` the strokes broke it; `failed-holds` a
- * failure where the app shows the stop; `not-reached` (LOUD) an honest failure; `presented-stop`, `presented-fired`,
- * `presented-stroke` a scroll_until beneath a presented layer that stopped, fired or stroked; `presented-changed`
- * (LOUD) one whose stroke changed the screen — the layer dismissed — and that said so, claiming nothing; `presented-pass` a colour
- * assert beneath a presented layer that passed (it measured the layer); `dismissal` the dismissal's judge; `end-unread`
- * a scroll_until for a row not there, at its list's end, that spent more strokes than UNMOVED_STROKES_EXHAUST before
- * failing (the end read as more to come, ABSENT_AT_END). A fill's rules (live-forms.ts#holds): `loud-untouched` (LOUD)
- * the value not held and the field as the launch left it; `loud-changed` (LOUD) not held and the field changed — a part
- * typed, or cleared; `fill-claim` a fill that claims done while the app holds another value (`fill-claim-unfocused`
- * where its tap never focused the field, live-forms.ts#refusedOnFocus); `failed-holds`, the same rule as the visibility
- * group's, where the app holds the value but averi failed. The ensure group's (live-ensure.ts):
- * `ensure-claim` ensure_state did not fail while the app never reached the state; `held-early` Continue tapped sooner
- * after Welcome than the held line's heldS − EPS_S (the hold began before Welcome — on the spinner); `held-late` no
- * wipe ahead and the tap later than the hold allows (the look ran on); `held-unsaid` in time, the held line missing;
- * `held-said` a held line where a wipe lies ahead; `window-cut` a wipe ahead and the look ended before its window's
- * end; `entry-not-bare` the reply shows no bare entry probe, so no second look was earned.
+ * (LOUD) a refusal of a target its probe reached; `unchanged-claim` "the last N swipes did not change the screen"
+ * against the app's strokes; `R-direction` the strokes broke it; `failed-holds` a failure where the app shows the stop;
+ * `not-reached` (LOUD) an honest failure; `presented-stop`, `presented-fired`, `presented-stroke` a scroll_until
+ * beneath a presented layer that stopped, fired or stroked; `presented-changed` (LOUD) one whose stroke changed the
+ * screen — the layer dismissed — and that said so, claiming nothing; `presented-pass` a colour assert beneath a
+ * presented layer that passed (it measured the layer); `dismissal` the dismissal's judge; `end-unread` a scroll_until
+ * for a row not there, at its list's end, that spent more strokes than UNMOVED_STROKES_EXHAUST before failing (the end
+ * read as more to come, ABSENT_AT_END). A fill's rules (live-forms.ts#holds): `loud-untouched` (LOUD) the value not
+ * held and the field as the launch left it; `loud-changed` (LOUD) not held and the field changed — a part typed, or
+ * cleared; `fill-claim` a fill that claims done while the app holds another value (`fill-claim-unfocused` where its tap
+ * never focused the field, live-forms.ts#refusedOnFocus); `failed-holds`, the same rule as the visibility group's,
+ * where the app holds the value but averi failed. The ensure group's (live-ensure.ts): `ensure-claim` ensure_state did
+ * not fail while the app never reached the state; `held-early` Continue tapped sooner after Welcome than the held
+ * line's heldS − EPS_S (the hold began before Welcome — on the spinner); `held-late` no wipe ahead and the tap later
+ * than the hold allows (the look ran on); `held-unsaid` in time, the held line missing; `held-said` a held line where a
+ * wipe lies ahead; `window-cut` a wipe ahead and the look ended before its window's end; `entry-not-bare` the reply
+ * shows no bare entry probe, so no second look was earned.
  */
 export type VerdictClass =
   | 'stop-claim'

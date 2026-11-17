@@ -45,7 +45,7 @@ describe('frontOf: what one read says is in front, and on the stack', () => {
     expect(frontOf({ ...AT_LAB, settle: { firstWindow: '  mCurrentFocus=null\n', waitedMs: 300 } })).toEqual({ why: 'the first focus read holds no mFocusedApp line' });
   });
 
-  it("review round 1's records kept `waitedMs` and `firstWindow` at the read's top: read the same", () => {
+  it("a record that kept `waitedMs` and `firstWindow` at the read's top: read the same", () => {
     const legacy = { ...AT_LAB, firstWindow: UNSETTLED(LAUNCHER), waitedMs: 300 } as FocusRead;
     expect(frontOf(legacy)).toEqual({ focusedFirst: LAUNCHER, focusedSettled: MAIN, settle: 'settled', records: [MAIN, LAUNCHER] });
     expect(frontOf({ window: UNSETTLED(MAIN), activities: hist(MAIN, 1), waitedMs: 5_000 } as FocusRead)).toMatchObject({ focusedFirst: MAIN, settle: 'ran-out' });

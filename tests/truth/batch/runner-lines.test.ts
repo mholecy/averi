@@ -44,8 +44,8 @@ import { exitCodeOf, failsIn, type Summary } from '../../../scripts/truth/batch/
 
 // scripts/truth/batch/runner-lines.ts: the runner's pure half — its config from argv and env, every line it writes of
 // its own (the checkout, the lab lines, a block not run, the backstop), the non-live records' rule, the ERROR lines
-// it collects, the details printout and live.ts's argv. Strings in, strings out. The titles name the fix and the batch
-// that found it; tests/truth/batch/runner.test.ts runs them inside runBatch.
+// it collects, the details printout and live.ts's argv. Strings in, strings out; tests/truth/batch/runner.test.ts
+// runs them inside runBatch.
 
 const env = (over: Record<string, string> = {}) => ({ ...over });
 

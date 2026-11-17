@@ -35,7 +35,7 @@ describe('casesOnMain over the real live-cases table: kf1–kf3 on Android, p7w/
 });
 
 describe('cellsOnMain over the real catalog', () => {
-  it('the lab block\'s cells are main\'s; a made-up one is named', async () => {
+  it('six real lab cells are main\'s; a made-up one is named', async () => {
     const table = liveTableOf(ROOT);
     expect(await cellsOnMain({ ids: ['open', 'form-basic', 'form-prefilled', 'form-keyboard-floating', 'carousel-lazy-free', 'carousel-recycler-free'], table })).toEqual({ ok: true });
     expect(await cellsOnMain({ ids: ['open', 'no-such-cell'], table })).toEqual({ ok: false, why: "cell(s) no-such-cell not in main's catalog (fixtures/apps/cells.json)" });

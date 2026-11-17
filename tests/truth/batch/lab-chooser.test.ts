@@ -571,7 +571,7 @@ describe('sanitizeFixture — no device path or serial in a fixture', () => {
   });
 });
 
-describe('the hand lines — each names the exact step and its commands, every word quoted as a shell reads it back (adb-shell.ts#shellQuote)', () => {
+describe('the hand lines — each names the exact step and its commands, every word quoted as a shell reads it back (adb words by adb-shell.ts#shellQuote, through chooser-readers.ts#adbLine; host words by shell.ts#shellQuote)', () => {
   const B: HandBase = { serial: 'LAB-1', apk: 'lab dir/installed.apk', then: 'node probe.ts --restore' };
 
   it('a lab default: uninstall && install of the pulled APK, then the command given (--check\'s exit 1)', () => {

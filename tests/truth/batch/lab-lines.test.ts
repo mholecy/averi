@@ -29,7 +29,7 @@ import {
 
 // scripts/truth/batch/lab-lines.ts: the lab plumbing's pure half (T2 S6b) — what the port, pkill, the Open-in alert,
 // an installed cells.json and a JDK read say, the WDA window's restore line with its port part, the patterns the lab's
-// processes are ended by. Strings in, strings out. The titles name the batch and the fix that found each rule.
+// processes are ended by. Strings in, strings out.
 
 const ok = (out = ''): CallResult => ({ code: 0, timedOut: false, signal: null, out, err: '' });
 const exit = (code: number, err = '', out = ''): CallResult => ({ code, timedOut: false, signal: null, out, err });

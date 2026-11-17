@@ -440,7 +440,7 @@ describe('Calls.scope — the detached calls of one restore, stopped together wh
   });
 });
 
-describe('a group kill that is not delivered never rejects: a kill refused with EPERM under load must not stop what is put back', () => {
+describe('a group kill that is not delivered never rejects: an EPERM is retried, then kept as unproven', () => {
   it('EPERM once: tried again EPERM_RETRY_MS later, then sent', async () => {
     const seam = new FakeSeam();
     seam.refuse = { SIGKILL: [{ notSent: 'EPERM' }] };

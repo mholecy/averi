@@ -729,7 +729,7 @@ describe("domainsWindow — the WDA window as abort.ts's dirty window (the abort
   });
 });
 
-describe('a domains window of another block: its own labels on every line, none says D43 (each block\'s window labels are its own)', () => {
+describe('a domains window of another block: its own labels on every line, none says D43', () => {
   const L = domainLabels('D65');
   // D43 as a label (a word of its own), never inside a word: a line naming a temp folder such as `…/hCD435…` says no D43.
   const noD43 = (lines: readonly string[]) => expect(lines.filter((l) => /(?<![A-Za-z0-9])D43(?![A-Za-z0-9])/.test(l))).toEqual([]);

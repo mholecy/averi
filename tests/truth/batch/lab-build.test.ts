@@ -12,7 +12,7 @@ import { CATALOG, LAB_UDID, labWorld, runOf, type LabWorld, type WorldOptions } 
 // scripts/truth/batch/lab-build.ts over the fake host (lab-fakes.ts: catalog.ts --check, xcodegen, xcodebuild,
 // java_home, gradlew, unzip — each answered, nothing built): the two build needs, main's catalog checked once before
 // either, each build a bounded step logged in the lab folder, gradlew --stop after every Android build, and the lab
-// block. Real files in a temp dir. The titles name the batch and the fix each rule comes from.
+// block. Real files in a temp dir.
 
 let dir: string;
 let repo: string;

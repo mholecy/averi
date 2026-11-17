@@ -23,7 +23,7 @@ import {
 } from '../../../scripts/truth/batch/words.js';
 
 // scripts/truth/batch/words.ts: the words a device batch speaks — its step words, its verdicts, the verdict line, the
-// SUMMARY and the exit code. Pure: strings in, strings out. The titles name the fix and the batch that found it.
+// SUMMARY and the exit code. Pure: strings in, strings out.
 
 const base: Summary = {
   name: 'batch-n',

@@ -17,7 +17,7 @@ import { BATCH_FAKE_MS, advanceUntil, onFakeTime } from './fake-time.js';
 // A fake two-block batch (one iOS block, one Android) yields the whole SUMMARY; then each rule of the order: the
 // refusals, the lab folder, the preconditions and needs (INCONCLUSIVE, never refused), the backstop, the ERROR lines,
 // RESTORE and the exit code, the abort, the non-live records and live_run. The real signals are
-// tests/truth/batch/runner-proc.test.ts. The titles name the fix and the batch or review that found it.
+// tests/truth/batch/runner-proc.test.ts.
 
 const HEAD = 'a'.repeat(40);
 const OTHER = 'b'.repeat(40);
