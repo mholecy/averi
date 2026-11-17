@@ -419,7 +419,7 @@ export class IdbEmptyTreeError extends Error {
 
   constructor(udid: string, types: readonly (string | undefined)[], opts: { reread?: number } = {}) {
     // The cause on the first line, the advice after a newline: a trace entry
-    // quotes only the first line (flow/engine.ts `headline`), so a probe
+    // quotes only the first line (util/error-message.ts#errorHeadline), so a probe
     // that fails every round repeats the cause, not a paragraph of advice.
     // The first line is the same in both forms for that reason.
     super(
@@ -472,7 +472,7 @@ const describeEmptyPayload = (types: readonly (string | undefined)[]): string =>
  * the boot completes, or the WDA tree source, which does not read through idb.
  *
  * The first line carries the cause AND that it lasts until a reboot: a trace line, the launch's foreground note
- * (ios-foreground.ts `headline`) and the flow engine's `readFailed` quote only the first line, and here the
+ * (adapters/ios-foreground.ts#unchecked) and the flow engine's `readFailed` quote only the first line, and here the
  * first line alone must already keep a reader from waiting it out. The measurement and the cure follow beneath it.
  * Matched on idb's stderr — the CLI's and the helper's alike (runIdb throws the helper's nonzero answer as the same
  * ExecError) — on the words of the measured message, not its first word's case; the ExecError is kept as `cause`.

@@ -3,11 +3,17 @@ import { axisOfEdge, PIXEL_OVERLAP_SLACK, type Edge } from '../ui-tree/geometry.
 import type { FlushNeighbour } from '../ui-tree/later-edges.js';
 import { CLIP_LINE, unseen, type AroundStrip, type ClearPair, type Eyes, type EyesAnswer, type EyesQuestion, type OrderPair, type PairQuestion } from '../ui-tree/eyes.js';
 import type { OrderSeen, PairSeen } from '../ui-tree/seen-order.js';
-import { errorMessage } from '../util/error-message.js';
+import { errorHeadline } from '../util/error-message.js';
 import { measuredFrameFor, pngRegion, witnessScreen, type EdgeBounds, type MeasuredFrame, type RgbaImage } from './capture.js';
 import { ciede2000, rgbToHex, srgbToLab, type Rgb } from './ciede2000.js';
 import { DEFAULT_TOLERANCE_DE, sampleDominant } from './color-parity.js';
 import { captureShot, type Shot } from './shot.js';
+
+/** Why a pair is `untold` when the screenshot threw: its first line, as every capture caller quotes it. */
+export const screenshotUntold = (e: unknown): string => `the screenshot failed: ${errorHeadline(e)}`;
+
+/** Why a pair is `untold` when the tree refused to scale the screenshot (verify/capture.ts#measuredFrameFor). */
+const scaleRefused = (error: string): string => `the screenshot could not be scaled to the tree: ${error}`;
 
 /**
  * THE EYES' production adapter (ui-tree/eyes.ts has the concept and the triggers): for either question one screenshot,
@@ -22,16 +28,16 @@ export const eyesOn = (adapter: Pick<DeviceAdapter, 'screenshot' | 'capture' | '
     try {
       shot = await captureShot(adapter);
     } catch (e) {
-      return { why: `the screenshot failed: ${errorMessage(e).split('\n')[0]}` };
+      return { why: screenshotUntold(e) };
     }
     let png: RgbaImage;
     try {
       png = shot.decode();
     } catch (e) {
-      return { why: `the screenshot did not decode: ${errorMessage(e).split('\n')[0]}` };
+      return { why: `the screenshot did not decode: ${errorHeadline(e)}` };
     }
     const { scale } = measuredFrameFor(tree, png, await witnessScreen(adapter));
-    return scale.error !== undefined ? { why: `the screenshot could not be scaled to the tree: ${scale.error}` } : { png, scale: scale.scale };
+    return scale.error !== undefined ? { why: scaleRefused(scale.error) } : { png, scale: scale.scale };
   };
   return {
     async fully(question) {
@@ -53,7 +59,7 @@ export const eyesOn = (adapter: Pick<DeviceAdapter, 'screenshot' | 'capture' | '
  * pair `untold`, said why.
  */
 export const orderOfFrame = (frame: MeasuredFrame, question: PairQuestion): readonly OrderSeen[] =>
-  frame.scale.error !== undefined ? untoldAll(question, `the screenshot could not be scaled to the tree: ${frame.scale.error}`) : judgeOrder(frame.image, frame.scale.scale, question);
+  frame.scale.error !== undefined ? untoldAll(question, scaleRefused(frame.scale.error)) : judgeOrder(frame.image, frame.scale.scale, question);
 
 /**
  * THE EYES' THIRD QUESTION — does the colour assert's region read as THE SCREEN BESIDE IT? Asked of an element whose
@@ -108,7 +114,7 @@ const BESIDE_DEPTH = 8;
 
 /** The colour assert's region against the screen beside it, on a frame already captured (`ApartSeen`). */
 export function apartOfFrame(frame: MeasuredFrame, region: Rect): ApartSeen {
-  if (frame.scale.error !== undefined) return { seen: 'untold', why: `the screenshot could not be scaled to the tree: ${frame.scale.error}` };
+  if (frame.scale.error !== undefined) return { seen: 'untold', why: scaleRefused(frame.scale.error) };
   const { image } = frame;
   const { scale } = frame.scale;
   /** `r` on the png, when FLANK_MIN_PX wide and tall at least there — else too little of it to tell a colour by. */

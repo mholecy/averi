@@ -26,7 +26,7 @@ import { BARE_TREE_CONTENTS, treeShape } from '../ui-tree/bare-tree.js';
 import { missCarried, MissedError, missNote, missOf, withMissNote, type Miss } from '../ui-tree/miss.js';
 import { bareTimeoutNote, isBareTreeMemo, type Verdict } from '../ui-tree/verdict.js';
 import { formatSeconds, parseDuration } from '../util/duration.js';
-import { errorMessage } from '../util/error-message.js';
+import { errorHeadline, errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { resultText, Verifier } from '../verify/assert.js';
 import {
@@ -114,7 +114,7 @@ const unreadCause = (before: UnreadProbe, secondLook: UnreadProbe): UnreadCause 
     { answer: 'bare-then-failed', shape: before.shape, readError: secondLook.readError }
   : secondLook;
 
-const readFailed = (e: unknown): string => `last UI tree read failed: ${headline(e)}`;
+const readFailed = (e: unknown): string => `last UI tree read failed: ${errorHeadline(e)}`;
 
 /**
  * What an unread probe (or the refusal's cause) learned, as one clause:
@@ -402,13 +402,6 @@ export interface EngineOptions {
 export type EngineContext = Pick<EngineOptions, 'environment' | 'session'>;
 
 /**
- * First line only: a trace entry is a headline, and the rest of a FlowError's
- * message is the trace it already carries — repeating it inside itself reads
- * as a second failure.
- */
-const headline = (e: unknown): string => errorMessage(e).split('\n')[0];
-
-/**
  * What a wait says of its last read at a timeout (`waitTimeoutHint`): `missing` — the element whose not-found it words,
  * which the window manager's word is asked about (ui-tree/window-mark.ts#markedForMiss) — and `say`, the words.
  */
@@ -439,8 +432,8 @@ class WaitMissedError extends MissedError {}
  */
 const skipReason = (e: unknown): string => {
   const readError = readErrorLine(errorMessage(e));
-  if (readError !== undefined) return `${headline(e)} ${readError}`;
-  return withMissNote(headline(e), missCarried(e));
+  if (readError !== undefined) return `${errorHeadline(e)} ${readError}`;
+  return withMissNote(errorHeadline(e), missCarried(e));
 };
 
 /**
@@ -865,12 +858,12 @@ export class FlowEngine {
         // call even on a screen that happens to be in the state, and a nested
         // refusal already looked.
         if (e instanceof OptionalNotSkipped && (await this.detects(state.detect, 0)).answer === 'yes') {
-          this.log(`⚠ reach ${flow}`, `failed — ${headline(e)} — state reached anyway`);
+          this.log(`⚠ reach ${flow}`, `failed — ${errorHeadline(e)} — state reached anyway`);
           this.log(`state ${name}`, `reached after ${flow}`);
           return;
         }
         if (isTerminal(e)) throw e;
-        const why = headline(e);
+        const why = errorHeadline(e);
         // A throwing LAST rung is not the end of the ladder's obligations, it
         // is only the end of what the ladder can escalate to. Hand it to
         // salvage, which owes the caller the same two chances the loop gives
@@ -1041,7 +1034,7 @@ export class FlowEngine {
     try {
       return await fn();
     } catch (e) {
-      this.log(`⚠ ${label}`, `failed — ${headline(e)}`);
+      this.log(`⚠ ${label}`, `failed — ${errorHeadline(e)}`);
       return undefined;
     }
   }
@@ -1216,11 +1209,15 @@ export class FlowEngine {
     }
   }
 
-  /** runStep's ✗ line for `e` on `step`, once per failure (see there), and `e` back for the caller to throw. */
+  /**
+   * runStep's ✗ line for `e` on `step`, once per failure (see there), and `e` back for the caller to throw. The line
+   * quotes the error's first line only: a trace entry is a headline, and the rest of a FlowError's message is the
+   * trace it already carries — repeating it inside itself reads as a second failure.
+   */
   private failed(step: Step, e: unknown): unknown {
     const seen = typeof e === 'object' && e !== null && this.loggedFailures.has(e);
     if ((this.swallowDepth === 0 || isTerminal(e)) && !seen) {
-      this.log(`✗ ${stepSummary(step, this.adapter.platform)}`, `failed — ${headline(e)}`);
+      this.log(`✗ ${stepSummary(step, this.adapter.platform)}`, `failed — ${errorHeadline(e)}`);
       if (typeof e === 'object' && e !== null) this.loggedFailures.add(e);
     }
     return e;

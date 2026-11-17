@@ -10,7 +10,7 @@
 import { ExecError } from './exec.js';
 import { withoutHostPaths } from './failure-text.js';
 import type { AppBinary } from './simctl-appinfo.js';
-import { errorMessage } from '../util/error-message.js';
+import { errorHeadline } from '../util/error-message.js';
 
 /**
  * The POSIX-ERE pattern `pgrep -f` matches the app's process by: the
@@ -73,7 +73,7 @@ export function pgrepVerdict(error: unknown): 'yes' | 'no' | 'timeout' | 'unread
  * caller's, as this leaf reads nothing.
  */
 export function pgrepReason(error: unknown, home: string): string {
-  if (!(error instanceof ExecError)) return errorMessage(error).split('\n')[0];
+  if (!(error instanceof ExecError)) return errorHeadline(error);
   const last = error.stderr
     .split('\n')
     .map((l) => l.trim())

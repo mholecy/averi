@@ -7,7 +7,7 @@ import { runIdb } from './idb.js';
 import type { IdbHelper } from './idb-helper.js';
 import { screenshotPng } from './screenshot-bytes.js';
 import { rebootSimulatorAdvice } from './simulator-reboot.js';
-import { errorMessage } from '../util/error-message.js';
+import { errorHeadline } from '../util/error-message.js';
 import { DESCRIBE_ALL_TIMEOUT_MS, IdbEmptyTreeError, type IosTreeSource } from './ios-tree-source.js';
 import type { AppHolder, DeepLinkOptions, DeviceAdapter, DeviceScreen, Key, LaunchOptions, Point, TreeSourceFallback, UiNode } from './types.js';
 import { awaitForeground, type ForegroundCheck } from './ios-foreground.js';
@@ -467,7 +467,7 @@ export class IosAdapter implements DeviceAdapter {
     const failed = writes.findIndex((w) => w.status === 'rejected');
     const write = writes[failed];
     if (write?.status === 'rejected') {
-      const reason = errorMessage(write.reason).split('\n')[0];
+      const reason = errorHeadline(write.reason);
       console.error(
         `averi: could not set com.apple.Accessibility ${keys[failed]} on ${this.udid} before ${what} (${reason}) — ` +
           'idb may read an empty tree after an earlier WebDriverAgent session on this simulator; ' +
@@ -505,7 +505,7 @@ export class IosAdapter implements DeviceAdapter {
       this.schemeApprovals.set(key, 'failed');
       console.error(
         `averi: could not pre-approve ${scheme} links to ${bundleId} for simctl openurl on ${this.udid} ` +
-          `(${errorMessage(result.reason).split('\n')[0]}) — iOS may ask "Open in “…”?" first, and the reply names the ` +
+          `(${errorHeadline(result.reason)}) — iOS may ask "Open in “…”?" first, and the reply names the ` +
           'alert if it does; not tried again until the app is installed again',
       );
       return;
@@ -602,7 +602,7 @@ export class IosAdapter implements DeviceAdapter {
     if (this.urlSchemesCache.has(bundleId)) return this.urlSchemesCache.get(bundleId);
     const unread = (e: unknown, then: string): undefined => {
       console.error(
-        `averi: could not read ${bundleId}'s URL schemes (${errorMessage(e).split('\n')[0]}) — ` +
+        `averi: could not read ${bundleId}'s URL schemes (${errorHeadline(e)}) — ` +
           `opening ${url} without waiting for ${bundleId} to come forward${then}`,
       );
       return undefined;

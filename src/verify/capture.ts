@@ -480,7 +480,11 @@ type CaptureOptions = {
  * will not say its screen size, and a scale walk that throws on a malformed
  * tree all land on the frame as a reason, so every consumer's own fail-closed
  * policy applies instead of a lost leg. (The screenshot must throw — without
- * bytes there is no frame to carry a reason on.)
+ * bytes there is no frame to carry a reason on.) A caller that catches it
+ * quotes the error's first line (util/error-message.ts#errorHeadline), the
+ * adapter's own sentence naming its device and command
+ * (adapters/screenshot-bytes.ts): as a fail-closed reason, or as a run's
+ * `⚠ screenshot:` line.
  *
  * Order, when the tree is READ here (`readTree`): the png first — its
  * stability is the evidence the screen stopped moving — then the tree, so
@@ -823,15 +827,6 @@ async function stableScreenshot(
   return { shot: previous, stability: captures < 2 ? 'unjudged' : 'moving', captures };
 }
 
-
-/**
- * Why a capture threw, in one line: the first line of the error — the
- * adapter's own sentence naming its device and command
- * (adapters/screenshot-bytes.ts). `captureFrame` throws for nothing else (its
- * doc), so a caller that catches it quotes this — as a fail-closed reason,
- * or as a run's `⚠ screenshot:` line.
- */
-export const captureRefusal = (e: unknown): string => errorMessage(e).split('\n')[0];
 
 /** The caller's element for a region-judged wait: its rect, and the tree that rect (and, when the device will not say, the scale) comes from. */
 interface StabilityRegion {
