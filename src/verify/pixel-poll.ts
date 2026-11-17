@@ -586,7 +586,7 @@ export async function pollPixels(
     // Only the element's region held still: measure only at a rect two consecutive reads agree on (header).
     if (frame.settledOver === 'region' && (previous === undefined || !sameRect(previous, rect))) return pixelRound(memory.unconfirmed(previous, rect));
     const { shot, measured } = frame;
-    // A supplied tree is never read, so `TreeFrame` has no treeless arm: an error here is a png that did not decode.
+    // An error here is `Undecoded` (capture.ts#TreeFrame).
     if (measured.error !== undefined) return pixelRound({ pass: false, detail: failClosed(measured.error, unchecked) });
     // Measured on THE region the standing judged over (Scene.pixelRegion): the part its scroll views draw.
     const region = look.scene.pixelRegion(found[0], screen);

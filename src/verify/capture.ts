@@ -271,9 +271,9 @@ interface FrameFacts {
  * `settledOver` is HOW a `settled` frame settled. It is a union arm rather
  * than an optional field so that a settled frame always says it and any
  * other frame never does: a consumer comparing it against one value has no
- * missing case to pick a default for. Readers rely on that and keep no
- * fallback: pixel-poll.ts's `=== 'region'` would read a settled frame without
- * `settledOver` as screen-settled, so a frame is built, never cast.
+ * missing case to pick a default for. Readers keep no fallback for a settled
+ * frame without `settledOver`, so a frame is built by `stableScreenshot`,
+ * never cast.
  * - `screen`: two whole captures were byte-identical — the fast path, and
  *   the only answer a caller without a `region` can get;
  * - `region`: the whole captures differed and only the caller's region
@@ -282,12 +282,12 @@ interface FrameFacts {
  *   left (the header), so a consumer measuring at that rect must confirm
  *   it first — the pixel poll does, with a second tree read.
  */
-export type Stability =
+type Stability =
   | { stability: 'settled'; settledOver: 'screen' | 'region' }
   | { stability: 'moving' | 'unjudged'; settledOver?: undefined };
 
 /** What `stableScreenshot` returns: the frame before any tree is in play. */
-type Wait = FrameFacts & Stability;
+type StableShot = FrameFacts & Stability;
 
 /**
  * A frame as `captureFrame` returns it to a caller that may not have asked for
@@ -301,7 +301,7 @@ type Wait = FrameFacts & Stability;
  * png-only frame (the `screenshot` and `ensure_state` tools), which asked for
  * nothing more and so has nothing to report — not even a reason.
  */
-export type Frame = Wait & { measured?: FrameMeasurement };
+export type Frame = StableShot & { measured?: FrameMeasurement };
 
 /**
  * The one sentence for a frame that did not settle, worded here because the
@@ -426,16 +426,16 @@ export const unconfirmedReason = (frame: Pick<Frame, 'captures'>): string =>
  * A frame whose tree was READ here (`readTree: true`): its measured half is
  * always there, though it may say the read failed (`Treeless`).
  */
-export type TreeRequestedFrame = Wait & { measured: FrameMeasurement };
+export type TreeRequestedFrame = StableShot & { measured: FrameMeasurement };
 
 /**
  * A frame that HAS a tree: what `captureFrame` returns to a caller that
  * supplied one (`tree`). That arm never reads a tree, so it has no read to
  * fail and its `measured` has no treeless arm; an `error` on it is a png that
- * did not decode (`Undecoded`). Built from `Wait`, as `Frame` is, so a field
+ * did not decode (`Undecoded`). Built from `StableShot`, as `Frame` is, so a field
  * added to the frame reaches every consumer without an edit here.
  */
-export type TreeFrame = Wait & { measured: MeasuredFrame | Undecoded };
+export type TreeFrame = StableShot & { measured: MeasuredFrame | Undecoded };
 
 /**
  * Where the tree comes from, as three states a caller cannot mix: read it
@@ -796,7 +796,7 @@ async function stableScreenshot(
   adapter: Pick<DeviceAdapter, 'screenshot' | 'capture' | 'viewport'>,
   deadline?: number,
   region?: SizedRegion,
-): Promise<Wait> {
+): Promise<StableShot> {
   let previous = await captureShot(adapter);
   let captures = 1;
   let recaptureMs = 0; // measured cost of the last re-capture (delay + screencap); 0 until one has run
