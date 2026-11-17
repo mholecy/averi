@@ -567,7 +567,7 @@ header as pinned, and an Android ScrollView's single child looks the same.
 
 A new remedy case, `bothPinned`, sits 5th in THE PRECEDENCE: after `fixed` and before `pinned`, `stuck` and `scroll`. It
 is the remedy of a `covered` target whose cover's order the tree tells (`drawn` or `overlaid`; `untold` and `seenOver`
-take 2.) when NEITHER the target NOR its cover lies in a scroll view as the tree says (geometry.ts#Clips.inScroller false
+take 2.) when NEITHER the target NOR its cover lies in a scroll view as the tree says (scroll-clips.ts#Clips.inScroller false
 for both). With no scroll view above either, no scroll moves either. This is the backlog's candidate narrowed on
 ancestry and widened on kind and relation: it fires for `drawn` and `overlaid` covers alike, and for any cover outside
 every scroll view, not only a sibling of the target's run (a bar laid in another branch, a scroll container listed after
@@ -634,7 +634,7 @@ verb".
 ### Decision
 
 `bothPinned` (5. of THE PRECEDENCE) now also decides a touch's `cut` whose `Cut.by` is set (a node drawn after it) when
-neither the target nor that node lies in a scroll view (geometry.ts#Clips.inScroller false for both). The test is
+neither the target nor that node lies in a scroll view (scroll-clips.ts#Clips.inScroller false for both). The test is
 ui-tree/standing.ts#bothPinned, which D87's `covered` case already asks, now given the other node directly. A cut at a
 clipping container's edge (`Cut.by` absent) keeps `scroll`. A container that clips also scrolls
 (ui-tree/scroll-containers.ts#scrolls), so such a node always lies in a scroll view, and the explicit `Cut.by` guard only

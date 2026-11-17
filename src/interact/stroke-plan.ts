@@ -1,5 +1,6 @@
 import { rectArea, sameRect, type Point, type Rect, type ScrollAxis, type Stroke, type UiNode } from '../adapters/types.js';
-import { containsPoint, isUntold, rectIntersection, toldFrame, type ListedContent, type ScrollAxes } from '../ui-tree/geometry.js';
+import { containsPoint, rectIntersection } from '../ui-tree/geometry.js';
+import { isUntold, toldFrame, type ListedContent, type ScrollAxes } from '../ui-tree/scroll-clips.js';
 import { quoted, type QuotedNode } from '../ui-tree/node-words.js';
 import type { PresentedPress } from '../ui-tree/presentation.js';
 import type { TreeFacts } from './scroll-read.js';
@@ -45,7 +46,7 @@ import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION,
  * largest scrolls across the stroke — a carousel in a vertical page, stroked `right` for a card not laid out yet, is
  * stroked inside, not across the page's centre row, ADR 0010's D59b amendment); none (the screen box) when the target
  * was found in none. Once a read has found the target the named scroll view counts no more. Each is remembered with its
- * AXIS and its nested scroll views' (`ScrollView.axes`, asked of the read's tree: ui-tree/geometry.ts#Clips.axesOf, per
+ * AXIS and its nested scroll views' (`ScrollView.axes`, asked of the read's tree: ui-tree/scroll-clips.ts#Clips.axesOf, per
  * source ui-tree/scroll-containers.ts#scrollAxis — Android's class, WDA's `Table`, else on WDA the content's extent
  * past the frame; unknown for a Compose lazy list, a RecyclerView and on idb, which lists no scroll view). The stroke
  * box (`strokeRoom`) takes the first with room for the stroke as drawn (`toward`) above the keyboard and what is drawn
@@ -76,7 +77,7 @@ import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION,
  * `307 181 → 181 181` (UNMEASURED_CARRY). ADR 0010 (docs/adr/0010-pixel-assert-keyboard-first.md) records both stroke
  * rules: the candidates — the target's own scroll views, nearest first — and their axis.
  *
- * A THIRD DIALECT, MOTION: idb's flat list tells no scroll view at all (ui-tree/geometry.ts#DrawnUntold), so its
+ * A THIRD DIALECT, MOTION: idb's flat list tells no scroll view at all (ui-tree/scroll-clips.ts#DrawnUntold), so its
  * strokes went over the screen box, and a content-up stroke touched down at the screen's 0.2 — on
  * `tabbar-floating`, y 175, in the 200-pt header above the list: it moved nothing (lab note LV3). There the scroll
  * view is what the reads SHOW: once two reads see the target carried, the nodes carried with it by the same delta were
@@ -112,7 +113,7 @@ import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION,
 interface ScrollView {
   rect: Rect;
   over: readonly Rect[];
-  /** Its axis and its nested scroll views' (ui-tree/geometry.ts#Clips.axesOf), at the read that chose it — kept and refreshed as `over` is: a later read that lost the rect keeps these. Undefined when no read held it. */
+  /** Its axis and its nested scroll views' (ui-tree/scroll-clips.ts#Clips.axesOf), at the read that chose it — kept and refreshed as `over` is: a later read that lost the rect keeps these. Undefined when no read held it. */
   axes: ScrollAxes | undefined;
 }
 
@@ -507,7 +508,7 @@ export function planProbe(memory: StrokeMemory, { toward, reach, maxTravel, gest
  * (`acrossOnly`): no probe along the flush edge can move any of them, so none is sent — `planProbe` answers no room
  * for them — and the flush check (interact/flush-check.ts) reports the stop unchecked for that reason (`flush.why: 'axis'`), not for want of
  * room. False when there are none. Android only in practice: the probe's scroll views are the CLIPPING chain
- * (ui-tree/geometry.ts#Clips.scrollersOf), empty on every WDA tree, and of Android's scrollers only a class that fixes
+ * (ui-tree/scroll-clips.ts#Clips.scrollersOf), empty on every WDA tree, and of Android's scrollers only a class that fixes
  * the axis says it (`HorizontalScrollView`, a Compose `horizontalScroll`; a lazy row's axis is unknown).
  */
 export function probeAcrossOnly({ toward, facts, scrollViews }: Pick<ProbeAsk, 'toward' | 'facts' | 'scrollViews'>): boolean {
@@ -565,7 +566,7 @@ export interface StrokedAcross {
  * The scroll view the last stroke SENT went over (`strokedOver`) when THIS read's tree tells its axis and it is the
  * other one than `toward`'s — the stroke went across it, which `strokeRoom` does only when no candidate along the
  * stroke (or of unknown axis) had room — with the largest scroll view of the WHOLE tree told to scroll that way, when
- * there is one (ui-tree/geometry.ts#Clips.toldOn: a chips row beside the page is no candidate, and "the tree shows
+ * there is one (ui-tree/scroll-clips.ts#Clips.toldOn: a chips row beside the page is no candidate, and "the tree shows
  * none" would be false of it) — of those meeting `screen`, the usable screen less its system bands, and none of the
  * keyboard's own. For the exhausted stop's sentence (scroll-text.ts#boundText): what the strokes did is said, not only
  * "content exhausted" — batch-11's carousel the dump marked as nothing that scrolls would read so. Undefined when the
@@ -601,13 +602,13 @@ export interface StrokedBeside {
   readonly others: readonly QuotedNode[];
 }
 
-/** Every scroll view of the tree told to scroll on `way` (ui-tree/geometry.ts#Clips.toldOn: meeting `screen`, none of the keyboard's own), largest first. */
+/** Every scroll view of the tree told to scroll on `way` (ui-tree/scroll-clips.ts#Clips.toldOn: meeting `screen`, none of the keyboard's own), largest first. */
 const toldLargestFirst = (facts: Pick<TreeFacts, 'scene' | 'reading'>, way: ScrollAxis, screen: Rect): UiNode[] =>
   [...facts.scene.clips.toldOn(way, screen, facts.reading.ofKeyboard)].sort((a, b) => rectArea(b.rect) - rectArea(a.rect));
 
 /**
  * Before any read found the target (`Memory.target` unset), every scroll view of the WHOLE tree told to scroll along
- * the stroke (ui-tree/geometry.ts#Clips.toldOn: text inputs and the keyboard's own left out, those off the usable
+ * the stroke (ui-tree/scroll-clips.ts#Clips.toldOn: text inputs and the keyboard's own left out, those off the usable
  * `screen` too) that the strokes did not go over — none holding a touch-down of ANY stroke sent this call
  * (`Memory.touchDowns`: an earlier stroke inside a nested list and the last over the page holding it leave out both;
  * the scroll view each stroke went over holds its touch-down, so it is left out with it) — largest first. Before the
@@ -634,7 +635,7 @@ export function strokedBeside(memory: StrokeMemory, facts: Pick<TreeFacts, 'scen
 
 /**
  * What THIS read's tree lists of the content of the scroll view the last stroke sent went over (`strokedOver`), toward the
- * edge `toward` reveals (ui-tree/geometry.ts#Clips.contentToward: for content that lies up, its top): `ends` when
+ * edge `toward` reveals (ui-tree/scroll-clips.ts#Clips.contentToward: for content that lies up, its top): `ends` when
  * nothing of it lies that way, so no stroke toward `toward` over it can move anything in — the content is exhausted
  * that way by what the tree lists, not by strokes that changed nothing (scroll-rounds.ts#UNMOVED_STROKES_EXHAUST,
  * which cannot tell a list at its end from strokes not taken); never on a tree that does not list content past its
@@ -760,7 +761,7 @@ const overIn = (facts: Pick<TreeFacts, 'scene'>, rect: Rect): Rect[] | undefined
 
 /**
  * The target's scroll views, nearest first, as rects — what its strokes may go over (`seeRead`). Each tree names
- * them in its own dialect: its clipping ancestors (ui-tree/geometry.ts#Clips.scrollersOf — Android's, to which
+ * them in its own dialect: its clipping ancestors (ui-tree/scroll-clips.ts#Clips.scrollersOf — Android's, to which
  * uiautomator cuts most rects), else the ancestors that scroll (`Clips.drawnIn`'s `scrollers` — WDA's, which marks no
  * node as clipping, so its `scrollersOf` is empty for every node; on Android the two name the same scroll views where
  * every one clips, and the chain, asked first, also names one of no area). Both empty — a target under none — is the
@@ -786,7 +787,7 @@ export function targetScrollers(facts: Pick<TreeFacts, 'scene'>, node: UiNode): 
  * what this read draws over it, or by what it carried, when this read has lost its rect — none when it was found in
  * none (the screen box); else the scroll view the caller named (`Memory.named`, D78) or, none named, the screen's
  * largest scroller, then the scroll views nested in it — those the tree tells scroll along `toward` first, then the
- * rest, each largest first (its `ScrollAxes.nested`, text inputs left out: ui-tree/geometry.ts#Clips.axesOf) — or none.
+ * rest, each largest first (its `ScrollAxes.nested`, text inputs left out: ui-tree/scroll-clips.ts#Clips.axesOf) — or none.
  * Told along before unknown: a chips row (a HorizontalScrollView) above a larger feed of unknown axis (a RecyclerView,
  * most likely vertical) is the one a sideways stroke is for.
  *

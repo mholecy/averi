@@ -105,7 +105,7 @@ export interface DrawOrder {
    * found by its rect: the outermost node that scrolls (scroll-containers.ts#scrolls —
    * Android's clipping scrollers, and WDA's scroll views, which clip nothing in its tree)
    * with that rect outside the keyboard, since the round carries containers
-   * as rects (interact/stroke-plan.ts#targetScrollers, geometry.ts#largestScroller). UNDEFINED when this
+   * as rects (interact/stroke-plan.ts#targetScrollers, scroll-clips.ts#largestScroller). UNDEFINED when this
    * tree has no such container (a rect of another read — the list has moved
    * since), so the caller can tell "nothing over it" from "not asked of this
    * tree".

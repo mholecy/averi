@@ -1,7 +1,8 @@
 import { rectArea, sameRect, type Rect, type UiNode } from '../adapters/types.js';
 import { dialectOf } from './dialect.js';
 import type { DrawOrder } from './draw-order.js';
-import { across, EDGES, flushEdges, rectWithin, type Clips, type Edge } from './geometry.js';
+import { across, EDGES, flushEdges, rectWithin, type Edge } from './geometry.js';
+import { type Clips } from './scroll-clips.js';
 
 /**
  * THE EDGE EVIDENCE OF COMPOSE'S CUT AT A LATER NODE: on a tree whose source cuts a node's bounds at a node drawn after

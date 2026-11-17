@@ -1,6 +1,7 @@
 import type { Point, Rect, UiNode } from '../adapters/types.js';
 import { cutAtLaterText } from '../ui-tree/cover.js';
-import { rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
+import { rectText, type Edge } from '../ui-tree/geometry.js';
+import { type Cut } from '../ui-tree/scroll-clips.js';
 import { outsideScrollViewText } from '../ui-tree/node-words.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
@@ -10,7 +11,7 @@ import { clippedOutText, SIDES } from '../ui-tree/sides.js';
  * The phrases a target cut to a sliver, lying past a side, or lying under
  * the soft keyboard, is said in — one wording for every verb that says it;
  * a node's name in them is ui-tree/node-words.ts's. Phrases, not policies:
- * what counts as cut is geometry.ts#Clips.cutSliver's, and which phrase a
+ * what counts as cut is scroll-clips.ts#Clips.cutSliver's, and which phrase a
  * reply says is its caller's switch. The touch remedy's sentence,
  * which composes these with a standing's remedy (ui-tree/standing.ts#Remedy),
  * is touch-remedy.ts's; the clauses every verb quotes (a presented screen's,

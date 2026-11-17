@@ -6,7 +6,8 @@ import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { heldBack, overRegion, regionOf, seeMotion, startLedger, type MotionLedger } from '../../src/interact/motion-ledger.js';
 import { planStroke, seeRead, startStrokes, type StrokeMemory } from '../../src/interact/stroke-plan.js';
 import type { Direction } from '../../src/interact/swipe.js';
-import { containsPoint, largestScroller, rectIntersection } from '../../src/ui-tree/geometry.js';
+import { containsPoint, rectIntersection } from '../../src/ui-tree/geometry.js';
+import { largestScroller } from '../../src/ui-tree/scroll-clips.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
 import { node } from '../helpers/fake.js';
 

@@ -58,7 +58,7 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
  * fail with the advice: the reply already knew the way, and a caller who asked the wrong way gets the row at the cost
  * of the one stroke that proved it.
  *
- * Decidable on WDA's trees only (unclipped frames: ui-tree/geometry.ts#Clips.contentToward). Not on uiautomator's: its
+ * Decidable on WDA's trees only (unclipped frames: ui-tree/scroll-clips.ts#Clips.contentToward). Not on uiautomator's: its
  * rects are cut to the scroll container, so where the content ends is not listed — content past the edge reads flush
  * with it, or (Compose) is not listed at all — and the reads can prove the end only by strokes that changed nothing,
  * which a stroke not taken also does; so Android keeps the caller's direction and fails with the advice. Nor on idb's
@@ -236,7 +236,7 @@ interface FarFacts {
 const farFacts = ({ node, standing: { facts } }: Judged): FarFacts => ({
   rect: { ...node.rect },
   ...(node.clippedOut !== undefined && { clippedOut: node.clippedOut }),
-  // A container's cut only: the rest of a node cut by a node drawn after it lies under that node, not past the far edge (geometry.ts#Cut.by).
+  // A container's cut only: the rest of a node cut by a node drawn after it lies under that node, not past the far edge (scroll-clips.ts#Cut.by).
   ...(facts.sliver !== undefined && facts.sliver.by === undefined && { slicedAt: facts.sliver.edge }),
   ...(facts.drawn !== undefined && { drawn: { ...facts.drawn } }),
   ...(facts.listedWhereItLies === true && { listedWhereItLies: true as const }),

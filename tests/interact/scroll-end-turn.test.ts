@@ -5,7 +5,7 @@ import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import type { RoundRules } from '../../src/interact/scroll-rounds.js';
 import { describeScrollResult } from '../../src/interact/scroll-text.js';
 import { planStroke, seeRead, startStrokes, strokedContent, strokeSent } from '../../src/interact/stroke-plan.js';
-import { largestScroller } from '../../src/ui-tree/geometry.js';
+import { largestScroller } from '../../src/ui-tree/scroll-clips.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
 import { node } from '../helpers/fake.js';
 import { decided, failureOf, play, resultOf, strokesToward, type Row } from '../helpers/rounds.js';
@@ -13,7 +13,7 @@ import { decided, failureOf, play, resultOf, strokesToward, type Row } from '../
 /**
  * The END TURN (interact/course.ts#EndTurn; lab note LV4,
  * docs/bugs/2026-10-17-lab-ios-scroll-until-never-turns-toward-a-target-past-the-far-edge-when-no-stroke-moved-the-list.md)
- * and the end proof it rests on (#Observed.ends, interact/stroke-plan.ts#strokedContent, ui-tree/geometry.ts#Clips.contentToward),
+ * and the end proof it rests on (#Observed.ends, interact/stroke-plan.ts#strokedContent, ui-tree/scroll-clips.ts#Clips.contentToward),
  * over the real WDA capture of the lab app's `scroll-bounded` at rest: `lower` (0,380 402x180) at its top, its content
  * listed at 0,380 402x1300, F at 51,1380 300x64 — 820 pt below what `lower` shows. A moved read is that capture with
  * `lower`'s content shifted up by the offset, as WDA lists a scrolled UIScrollView's content.

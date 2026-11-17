@@ -1,6 +1,7 @@
 import { type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
-import { isUntold, rectText, sameRect } from '../ui-tree/geometry.js';
+import { rectText, sameRect } from '../ui-tree/geometry.js';
+import { isUntold } from '../ui-tree/scroll-clips.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
 import { judgedWithOrder, type OrderEyes, type PairQuestion } from '../ui-tree/eyes.js';
 import { lookOn, type Look } from '../ui-tree/look.js';
@@ -149,7 +150,7 @@ import { keyboardOver, pixelMissText } from './pixel-text.js';
  * fallback), one `drawOrder` walk (the keyboard edge's, every round that
  * reaches the check), and — on every round the reading leaves clear — the
  * element's `exposure` (the standing's facts) and the clip facts' walks of
- * the whole tree (ui-tree/geometry.ts#clipsOf's own, for an ocr element
+ * the whole tree (ui-tree/scroll-clips.ts#clipsOf's own, for an ocr element
  * ending on the navigation bar's top, or a miss's, and on a miss
  * `Clips.inScroller`'s: whether a scroll may cure it), and, unless a band
  * already failed the round, `exposure` once more (`paintsOver`). The verify
@@ -506,7 +507,7 @@ async function orderOnCapture(question: PairQuestion, kept: KeptOrder, capture: 
 }
 
 /**
- * THE COLOUR ASSERT'S REGION ON AN UNTOLD TREE (ui-tree/geometry.ts#DrawnUntold: idb's flat list, which lists no
+ * THE COLOUR ASSERT'S REGION ON AN UNTOLD TREE (ui-tree/scroll-clips.ts#DrawnUntold: idb's flat list, which lists no
  * scroll view): the eyes' third question asked of the frame the round measures (verify/eyes.ts#apartOfFrame, no
  * capture added) — a region that reads as the screen beside it is a miss naming what it read, failed closed: idb
  * cannot say the element is drawn there, and what the capture shows there may be the background beneath a scroll

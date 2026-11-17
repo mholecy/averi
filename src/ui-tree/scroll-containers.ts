@@ -8,15 +8,15 @@ import { rectArea, sameRect, type Rect, type ScrollAxis, type UiNode } from '../
  * - `clips` — the tree source cut this node's descendants' rects to its own
  *   (`UiNode.clipsDescendants`). A fact about RECT TRUTHFULNESS: it is what
  *   makes a clip chain, a flush edge and a sliver's evidence
- *   (geometry.ts#clipsOf) and the largest scroller (geometry.ts#largestScroller).
+ *   (scroll-clips.ts#clipsOf) and the largest scroller (scroll-clips.ts#largestScroller).
  *   Only Android supplies it; iOS
  *   frames are unclipped, so no iOS node clips and no iOS clip chain is
  *   invented. Not what marks a tree's frames unclipped: the source says
- *   that on the root (dialect.ts#TreeDialect.framesUnclipped, geometry.ts#Clips.axesOf) —
+ *   that on the root (dialect.ts#TreeDialect.framesUnclipped, scroll-clips.ts#Clips.axesOf) —
  *   an Android tree with no scroller flagged is cut all the same.
  * - `scrolls` — this node's content moves under its frame. A fact about
  *   REACHABILITY and DRAW ORDER: whether `scroll_until` can move a node
- *   (geometry.ts#Clips.inScroller), and, for draw order, a node's nearest
+ *   (scroll-clips.ts#Clips.inScroller), and, for draw order, a node's nearest
  *   scroller (`Placed.scroller`). A node that clips scrolls (Android's
  *   flag means "scrolls now"); so does a node of a `SCROLLING_ROLES` role,
  *   with or without the flag: a scroll view, and a web view, whose page
@@ -25,7 +25,7 @@ import { rectArea, sameRect, type Rect, type ScrollAxis, type UiNode } from '../
  *   "scroll_until it first" over it is answered honestly by scroll_until's
  *   exhaustion. And, on every tree that lists ancestry, where a node is
  *   DRAWN: its frame cut by every ancestor that scrolls
- *   (geometry.ts#Clips.drawnIn — a scroll view draws none of its content
+ *   (scroll-clips.ts#Clips.drawnIn — a scroll view draws none of its content
  *   outside its frame, while WDA lists that content at its laid-out rect,
  *   and uiautomator sometimes past it) — and so the scroll views a WDA target's strokes go over
  *   (interact/stroke-plan.ts#targetScrollers). And the container a
@@ -33,7 +33,7 @@ import { rectArea, sameRect, type Rect, type ScrollAxis, type UiNode } from '../
  *   clipping scroller on Android, a scroll view on WDA.
  *
  * And a third, of a node that scrolls: `scrollAxis` — the one axis it scrolls on, when the tree can tell
- * (`scroll_until`'s stroke plan reads it through geometry.ts#Clips.axesOf).
+ * (`scroll_until`'s stroke plan reads it through scroll-clips.ts#Clips.axesOf).
  *
  * So `clips(n) ⇒ scrolls(n)`, never the other way. One predicate would
  * either give iOS clip chains that do not exist or take scrolling away from

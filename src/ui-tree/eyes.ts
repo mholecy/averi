@@ -1,5 +1,6 @@
 import { rectIntersection, type Point, type Rect, type UiNode } from '../adapters/types.js';
-import { axisOfEdge, EDGES, isUntold, sameRectWithinPixel, type Edge } from './geometry.js';
+import { axisOfEdge, EDGES, sameRectWithinPixel, type Edge } from './geometry.js';
+import { isUntold } from './scroll-clips.js';
 import { marginText, MARGIN_BESIDE_MIN } from './cover.js';
 import { lookTold, type Look, type LookReading } from './look.js';
 import { seenOrderOf, type OrderSeen, type SeenOrder } from './seen-order.js';
@@ -38,7 +39,7 @@ import { judgedScreen, type UsableScreen } from './usable-screen.js';
  * surface AROUND that neighbour rather than its own — every edge on ONE screenshot, judged by verify/eyes.ts over THE
  * region a pixel measurement reads (ui-tree/standing.ts#Scene.pixelRegion).
  *
- * AND A CLIP LINE (`ClipLine`), on a tree that cannot tell where the target is drawn (ui-tree/geometry.ts#DrawnUntold:
+ * AND A CLIP LINE (`ClipLine`), on a tree that cannot tell where the target is drawn (ui-tree/scroll-clips.ts#DrawnUntold:
  * idb's flat list, which lists no scroll view) — only for a `fully: true` claim (`claim`), the one that promises every
  * edge drawn: every edge of the target is asked whether a band of it reads as THE SCREEN BESIDE IT, row for row, where
  * beside its drawn rows the screen reads otherwise — a scroll view's clip, past which what lies beneath shows. The
@@ -116,7 +117,7 @@ export interface Eyes {
 /**
  * The question a `fully visible` claim on `node` asks — `claim`, the stop that would make it: the plain stop's or
  * `fully: true`'s — or undefined when the trigger does not apply: no flush neighbour narrower than the screen, and no
- * clip line to look for (a `fully` claim on a node whose tree cannot tell where it is drawn, geometry.ts#DrawnUntold).
+ * clip line to look for (a `fully` claim on a node whose tree cannot tell where it is drawn, scroll-clips.ts#DrawnUntold).
  */
 export function eyesQuestion(scene: Scene, tree: UiNode, node: UiNode, screen: UsableScreen | undefined, claim: 'stop' | 'fully'): EyesQuestion | undefined {
   const box = judgedScreen(screen, tree).oriented;

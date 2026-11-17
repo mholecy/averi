@@ -604,7 +604,7 @@ const pinnedSubmit = (s: LabState, form: CatalogForm, own: { tag: string }) => (
 /**
  * The edges of `frame` its scroll view's clip cuts — the clip's edge is where what shows of it ends, and the frame runs
  * on past it — each with what shows of the frame ACROSS that edge (`visible.height` at the top or bottom, its width at
- * a side): ADR 0013's sliver is `ui-tree/geometry.ts#Clips.cutSliver`'s, "what shows of the node across that edge"
+ * a side): ADR 0013's sliver is `ui-tree/scroll-clips.ts#Clips.cutSliver`'s, "what shows of the node across that edge"
  * under the minimum, and only at a clipping container's edge (its `scrollersOf` chain). A cut by the screen's edge
  * alone is not one: src judges such a target by its centre (on the screen: tapped; off it: off the screen). On iOS no
  * tree marks a clipping ancestor (`scrollersOf` is empty there), so src refuses no sliver: an iOS cell's R-sliver rows

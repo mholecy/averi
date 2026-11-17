@@ -50,12 +50,12 @@ export interface Row {
   scrollers?: readonly Rect[];
   /** The matches lie in no scroll view at all (no `scroller(s)` with it): content no scroll moves — a hero, an app bar, a sheet laid in the screen. Default false. */
   unscrolled?: boolean;
-  /** Another clipping container in the tree, beside the matches' (the screen's own list, for geometry.ts#largestScroller); default none. */
+  /** Another clipping container in the tree, beside the matches' (the screen's own list, for scroll-clips.ts#largestScroller); default none. */
   mainScroller?: Rect;
   /**
    * What `mainScroller` lists of its content; default one fixed row (`mainRow`) whose bottom lies inside it, so a
    * stroke over it that leaves the tree unchanged reads as one that moved nothing — the content shows motion
-   * (ui-tree/geometry.ts#Clips.contentToward). `[]`: the list shows none of its content (blank space), and a read of
+   * (ui-tree/scroll-clips.ts#Clips.contentToward). `[]`: the list shows none of its content (blank space), and a read of
    * it is no evidence either way.
    */
   mainContent?: readonly UiNode[];

@@ -22,7 +22,7 @@ export const edges: KnownFile = {
   family: 'edges',
   known: Object.fromEntries([
     // LAB FINDING LE2 — idb lists no scroll view (docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md):
-    // the drawn frame is UNTOLD on idb's flat list (ui-tree/geometry.ts#DrawnUntold), and the eyes look where a claim
+    // the drawn frame is UNTOLD on idb's flat list (ui-tree/scroll-clips.ts#DrawnUntold), and the eyes look where a claim
     // rests on it: O's and C's colour, which read as the screen beside them, fail closed (verify/eyes.ts#apartOfFrame);
     // P's and S's `fully: true` stops see the clip line (ui-tree/eyes.ts#eyesQuestion). The rest is ADR 0010's
     // residual 5, accepted: S and O Tapped, S and O reached by the plain stop, F's strokes over the screen. WDA answers

@@ -1,5 +1,6 @@
 import type { DeviceScreen, Rect, ScrollAxis, UiNode } from '../adapters/types.js';
-import { axisOfEdge, largestScroller, rectIntersection, rectWithin, toldFrame, type Clips, type Edge } from '../ui-tree/geometry.js';
+import { axisOfEdge, rectIntersection, rectWithin, type Edge } from '../ui-tree/geometry.js';
+import { largestScroller, toldFrame, type Clips } from '../ui-tree/scroll-clips.js';
 import type { Cover } from '../ui-tree/cover.js';
 import type { SurfaceFinding } from '../ui-tree/eyes.js';
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
@@ -105,7 +106,7 @@ export interface RoundRead {
  * of the tree. Of the look:
  * - its `scene`, once a round: the judgement (`judge`, `Scene.standing`); a match's clipping ancestors, nearest first
  *   (`clips.scrollersOf`) — Android's scroll containers, to whose edges uiautomator cuts the match's bounds (most
- *   of the time: ui-tree/geometry.ts#Clips.drawnIn judges a rect past them); empty when it has none (every node of
+ *   of the time: ui-tree/scroll-clips.ts#Clips.drawnIn judges a rect past them); empty when it has none (every node of
  *   an iOS tree) — for the `fully: true` stop's flush check (flush-check.ts) and the box the strokes are drawn in (interact/stroke-plan.ts#planStroke); what is drawn OVER a
  *   clipping container (the floating tab bar) — `order.drawnOver`, what a stroke over it keeps clear of
  *   (stroke-plan.ts#strokeRoom cuts the box above them), and `order.drawnOverAt`, the one a stroke that still touched
@@ -119,7 +120,7 @@ export interface RoundRead {
  */
 export interface TreeFacts extends Look<Pick<RoundRead, 'ofKeyboard'>> {
   /**
-   * The largest clipping container (ui-tree/geometry.ts#largestScroller) —
+   * The largest clipping container (ui-tree/scroll-clips.ts#largestScroller) —
    * the screen's own scroll view, for a stroke while the target's own
    * container is not known (it has not been read yet). Undefined when the
    * tree has none (iOS).
@@ -451,20 +452,20 @@ export const fullyClaimed = ({ clipped, covered }: { readonly clipped: readonly 
 /**
  * How much less than its scroll view's room a target may be along an axis and still count as filling it (`unfitAlong`),
  * and how much less than that room the drawn frame may be and still count as the scroll view's own: a pixel, a rounding
- * of the source's bounds — as geometry.ts's MOTION_EDGE_SLACK reads an edge flush with a frame's; the same pixel is how
+ * of the source's bounds — as scroll-clips.ts's MOTION_EDGE_SLACK reads an edge flush with a frame's; the same pixel is how
  * far a card must shift to count as moved by a stroke (motion-ledger.ts#cardMoved, D59). A target with more room than
  * that fits at a range of offsets, however narrow, and is stroked for; one with a little more (under about the shortest
  * stroke's carry, ~53 px) can still run to the bound (ADR 0021, residual 3).
  */
 export const FIT_ROOM_PX = 1;
 
-/** One of a target's scroll views as `unfitAlong` asks of it: the node, and the axis the tree tells it scrolls on (geometry.ts#Clips.axesOf), undefined where it cannot tell. */
+/** One of a target's scroll views as `unfitAlong` asks of it: the node, and the axis the tree tells it scrolls on (scroll-clips.ts#Clips.axesOf), undefined where it cannot tell. */
 export interface ScrollViewOf {
   readonly node: UiNode;
   readonly axis: ScrollAxis | undefined;
 }
 
-/** A node's scroll views, nearest first (geometry.ts#Clips.drawnIn's `scrollers`), each with its axis (`Clips.axesOf`); none on a tree that tells none. */
+/** A node's scroll views, nearest first (scroll-clips.ts#Clips.drawnIn's `scrollers`), each with its axis (`Clips.axesOf`); none on a tree that tells none. */
 export function scrollViewsOf(clips: Pick<Clips, 'drawnIn' | 'axesOf'>, node: UiNode): ScrollViewOf[] {
   return (toldFrame(clips.drawnIn(node))?.scrollers ?? []).map((scroller) => ({ node: scroller, axis: clips.axesOf(scroller.rect)?.axis }));
 }
