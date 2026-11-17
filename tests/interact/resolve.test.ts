@@ -113,6 +113,21 @@ describe('resolveNow — the one resolution policy, applied to one tree', () => 
       expect(resolveNow(tree, 'id:dup', FIRST)?.note).toBe(`7 matches, none uniquely interactive; picked the first (${listed.join('; ')}; …and 2 more)`);
     });
 
+    // A54: an Android EditText with no content-desc is labelled by its own text (android-tree-dialect.ts), which may be a
+    // password typed a moment ago; a fill's re-read lists it when a second match appears mid-fill.
+    it('an input labelled by its own text is listed by the length of that text, in both modes; any other label as it is', () => {
+      resetLayout();
+      const tree = screen(
+        el({ role: 'textfield', identifier: 'dup', label: 'zq7vXk2§', value: 'zq7vXk2§' }),
+        el({ role: 'textfield', identifier: 'dup', label: ' 1 ', value: '1' }),
+        el({ role: 'textfield', identifier: 'dup', label: 'Amount', value: '12' }),
+        el({ role: 'text', identifier: 'dup', label: 'Accounts', value: 'Accounts' }),
+      );
+      const listed = 'textfield id=dup label=<its text, 8 characters>; textfield id=dup label=<its text, 1 character>; textfield id=dup label="Amount"; text id=dup label="Accounts"';
+      expect(resolveNow(tree, 'id:dup', FIRST)?.note).toBe(`4 matches, none uniquely interactive; picked the first (${listed})`);
+      expect(() => resolveNow(tree, 'id:dup', REFUSE)).toThrow(`Selector matches 4 elements: id:dup\n  ${listed.split('; ').join('\n  ')}\n`);
+    });
+
     it('a refusal is not a miss: resolveSettled propagates it at once instead of waiting out the budget', async () => {
       const { tree } = twoButtons();
       const fake = new FakeAdapter({ s: tree }, 's');

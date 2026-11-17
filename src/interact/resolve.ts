@@ -1,4 +1,4 @@
-import type { DeviceAdapter, UiNode } from '../adapters/types.js';
+import { INPUT_ROLE, type DeviceAdapter, type UiNode } from '../adapters/types.js';
 import { describeElementSpec } from '../ui-tree/element-spec.js';
 import { lookOn } from '../ui-tree/look.js';
 import { dialectOf } from '../ui-tree/dialect.js';
@@ -6,6 +6,7 @@ import { KEYBOARD_UNLISTED, MissedError, missNote, missOf, presentedAloneHeadlin
 import { pollTimeoutMessage, pollTree, readTreeOrMiss, type FirstSample } from '../ui-tree/read-tree.js';
 import { findTarget, hasArea, preferInteractive, type Target } from '../ui-tree/selectors.js';
 import { markedForMiss } from '../ui-tree/window-mark.js';
+import { charactersText } from '../util/count.js';
 import { keyboardMayCoverText } from './target-text.js';
 
 /**
@@ -210,7 +211,7 @@ export function resolveNow(tree: UiNode, target: Target, opts: ResolveOptions): 
   const more = candidates.length - SHOWN;
   const summary = (sep: string) =>
     [
-      ...candidates.slice(0, SHOWN).map((n) => `${n.role} id=${n.identifier} label=${JSON.stringify(n.label)}`),
+      ...candidates.slice(0, SHOWN).map((n) => `${n.role} id=${n.identifier} label=${candidateLabel(n)}`),
       ...(more > 0 ? [`…and ${more} more`] : []),
     ].join(sep);
   if (opts.ambiguous === 'refuse') {
@@ -223,6 +224,16 @@ export function resolveNow(tree: UiNode, target: Target, opts: ResolveOptions): 
     node: candidates[0],
     note: `${candidates.length} matches, none uniquely interactive; picked the first (${summary('; ')})`,
   };
+}
+
+/**
+ * A candidate's label as an ambiguity lists it: quoted, unless it is an input's own text — an Android EditText with no
+ * content-desc is labelled by its text (android-tree-dialect.ts), which may be a password typed a moment ago, and a
+ * fill's re-read lists it when a second match appears mid-fill. That text is said by its length, as a fill says it.
+ */
+function candidateLabel(n: UiNode): string {
+  const text = n.role === INPUT_ROLE ? n.value?.trim() : undefined;
+  return text && n.label?.trim() === text ? `<its text, ${charactersText(text.length)}>` : JSON.stringify(n.label);
 }
 
 /**

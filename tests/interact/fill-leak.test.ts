@@ -22,17 +22,20 @@ afterEach(() => {
 // The LEAK SWEEP one level above tests/adapters/typed-text-leak.test.ts (A54): what a fill says — the error fillField
 // throws, the MCP type_text reply (fillReply), the flow line (fillStepText) — never carries the typed value, which may
 // be a credential, nor the field's text other than as lengths or bullets. A selector is echoed as the caller wrote it,
-// so text inside the selector is the one exception: it is the caller's own, and the flow engine redacts a secret from
-// it (the last describe). Each case below is a fill whose field the fake drives to one FillFailure, Difference,
+// so text inside the selector is one exception: it is the caller's own, and the flow engine redacts a secret from it
+// (the last describe). The flow line's value is the other: the engine shows it as the author wrote it, `***` for a
+// secret. An ambiguity's list of candidates names an input whose label is its own text by a length. Each case below is a fill whose field the fake drives to one FillFailure, Difference,
 // refusal, verdict or caveat; its sentence is asserted first, so a case that stops reaching its path fails as such.
 
-/** The typed value and the field's own text: strings no sentence of averi holds. */
-const TYPED = 'hunter2§';
+/** The typed value and the field's own text: strings no sentence of averi holds, nor any run of four of their characters. */
+const TYPED = 'zq7vXk2§';
 const PREFILL = 'PREFILL¤';
 /** A digit value, for the fields that group or mark what they are typed. */
 const DIGITS = '73198462';
 
-const FAST: FillOptions = { eyes: NO_EYES, ambiguous: 'first', timeoutMs: 200, pollMs: 2 };
+/** Without its ambiguity policy: each sweep runs under the MCP type_text's `refuse` and the flow's `first`. */
+const FAST: Omit<FillOptions, 'ambiguous'> = { eyes: NO_EYES, timeoutMs: 200, pollMs: 2 };
+const POLICIES = ['refuse', 'first'] as const;
 const ID: Target = { id: 'field' };
 const SELECTOR = 'id:field';
 
@@ -78,19 +81,32 @@ function onFocus(fake: FakeAdapter, then: (f: UiNode) => void): void {
   };
 }
 
+/** What a sentence must not hold: `whole` in any letter case, `parts` as they are. */
+interface Forbidden {
+  whole: string[];
+  parts: string[];
+}
+
 /**
  * Every piece of content a sentence must not hold: the typed value (in any letter case), the sentinels, and every
- * reading of the field but bullets. A reading of one character is too short to look for.
+ * reading of the field but bullets — a reading of one character is too short to look for — and, so that a partial leak
+ * is caught too, every run of four characters of the value and of the sentinels, in their own case (`FILL` of
+ * `PREFILL¤` is no `fill:`).
  */
-function forbidden(value: string, readings: Set<string>): string[] {
-  return [...new Set([value, TYPED, PREFILL, ...readings])].filter((t) => t.length >= 2 && !isMaskedValue(t));
+function forbidden(value: string, readings: Set<string>): Forbidden {
+  const runs = (t: string) => Array.from({ length: Math.max(0, t.length - 3) }, (_, i) => t.slice(i, i + 4));
+  return {
+    whole: [...new Set([value, TYPED, PREFILL, ...readings])].filter((t) => t.length >= 2 && !isMaskedValue(t)),
+    parts: [...new Set([value, TYPED, PREFILL].flatMap(runs))],
+  };
 }
 
 /** No forbidden piece in any of `shown`, once the caller's own selector is taken out of it. */
-function expectNoContent(shown: Record<string, string>, pieces: readonly string[], selector: string): void {
+function expectNoContent(shown: Record<string, string>, pieces: Forbidden, selector: string): void {
   for (const [where, text] of Object.entries(shown)) {
-    const said = text.split(selector).join('<selector>').toLowerCase();
-    for (const piece of pieces) expect(said.includes(piece.toLowerCase()), `${JSON.stringify(piece)} in ${where}: ${text}`).toBe(false);
+    const said = text.split(selector).join('<selector>');
+    for (const piece of pieces.whole) expect(said.toLowerCase().includes(piece.toLowerCase()), `${JSON.stringify(piece)} in ${where}: ${text}`).toBe(false);
+    for (const piece of pieces.parts) expect(said.includes(piece), `${JSON.stringify(piece)} in ${where}: ${text}`).toBe(false);
   }
 }
 
@@ -196,7 +212,7 @@ const FAILURES: Record<string, FailureCase> = {
   'mismatch: same-length': {
     build: () => {
       const f = fieldFake({ value: PREFILL });
-      typing(f.fake, (held, typed) => held + typed.replace('u', 'v'));
+      typing(f.fake, (held, typed) => held + typed.replace('q', 'j'));
       return f;
     },
     says: /as many characters as were typed, 1 differing/,
@@ -278,6 +294,40 @@ const FAILURES: Record<string, FailureCase> = {
     },
     says: /; the typing left the field: textfield id:"other" .* changed while it typed/,
   },
+  'mismatch: a matched node that is not an input': {
+    build: () => {
+      const f = fieldFake({ role: 'text', value: null });
+      const field = () => f.fake.live().children[0];
+      f.fake.typeText = async (text: string) => {
+        f.fake.typed.push(text);
+        field().value = (field().value ?? '') + text + '!'; // it takes the text, and decorates it
+      };
+      f.fake.clearText = async (count: number) => {
+        f.fake.deletes.push(count);
+        field().value = (field().value ?? '').slice(0, -count) || null;
+      };
+      return f;
+    },
+    opts: { clear: true },
+    says: /\(content withheld from this error\); the matched node is role text, not a textfield — .* the nearest input is textfield id:"other"/,
+  },
+  'a second match appearing mid-fill (ambiguous: refuse)': {
+    // Android: an EditText with no content-desc is labelled by its own text (android-tree-dialect.ts).
+    build: () => {
+      const f = fieldFake();
+      const live = f.fake.live();
+      f.fake.typeText = async (text: string) => {
+        f.fake.typed.push(text);
+        const field = live.children[0];
+        field.value = (field.value ?? '') + text;
+        field.label = field.value;
+        live.children.push(el({ role: 'textfield', identifier: 'field', label: PREFILL, value: PREFILL }));
+      };
+      return f;
+    },
+    opts: { ambiguous: 'refuse' },
+    says: /^Selector matches 2 elements: id:"field"\n {2}textfield id=field label=<its text, 8 characters>\n {2}textfield id=field label=<its text, 8 characters>\n/,
+  },
   'refused: a character the adapter cannot type': {
     build: () => {
       const f = fieldFake({ value: PREFILL });
@@ -294,12 +344,12 @@ const FAILURES: Record<string, FailureCase> = {
   },
 };
 
-describe('the leak sweep: every error a fill throws', () => {
+describe.each(POLICIES)('the leak sweep: every error a fill throws (ambiguous: %s)', (ambiguous) => {
   it.each(Object.keys(FAILURES))('%s: its own words, and no piece of the value or the field\'s text', async (name) => {
     const c = FAILURES[name];
     const { fake, readings } = c.build();
     const value = c.value ?? TYPED;
-    const error = await rejection(fillField(fake, ID, value, { ...FAST, ...c.opts }));
+    const error = await rejection(fillField(fake, ID, value, { ...FAST, ambiguous, ...c.opts }));
     expect(error.message).toMatch(c.says);
     expectNoContent(errorShown(error), forbidden(value, readings), 'id:"field"');
   });
@@ -370,12 +420,12 @@ const VERDICTS: Record<string, VerdictCase> = {
   },
 };
 
-describe('the leak sweep: every verdict and caveat, in both media', () => {
+describe.each(POLICIES)('the leak sweep: every verdict and caveat, in both media (ambiguous: %s)', (ambiguous) => {
   it.each(Object.keys(VERDICTS))('%s: its own words, and no piece of the value or the field\'s text', async (name) => {
     const c = VERDICTS[name];
     const { fake, readings } = c.build();
     const value = c.value ?? TYPED;
-    const result = await fillField(fake, ID, value, { ...FAST, ...c.opts });
+    const result = await fillField(fake, ID, value, { ...FAST, ambiguous, ...c.opts });
     const reply = fillReply(result, SELECTOR);
     expect(reply).toMatch(c.says);
     const step = fillStepText(result, { step: SELECTOR, shown: '***' });
@@ -393,9 +443,23 @@ describe('the rule\'s one exception: the selector is echoed as the caller wrote 
   it('reread-failed under a `value:"PREFILL¤"` selector quotes the selector verbatim, and nothing else of the field', async () => {
     const { fake, readings } = FAILURES['reread-failed'].build();
     const selector = `value:"${PREFILL}"`;
-    const error = await rejection(fillField(fake, selector, TYPED, { ...FAST, clear: true }));
+    const error = await rejection(fillField(fake, selector, TYPED, { ...FAST, ambiguous: 'refuse', clear: true }));
     expect(error.message).toMatch(/^fill: could not re-read value:"PREFILL¤" after focusing it — adb: device offline\./);
     expectNoContent(errorShown(error), forbidden(TYPED, readings), selector);
+  });
+
+  it('a flow: a value that is no secret is the author\'s own text, and the fill line shows it as written', async () => {
+    const plain = parseConfig(`
+app:
+  android: { package: md.bank.app }
+flows:
+  f:
+    steps:
+      - fill: { id: field, value: "${TYPED}" }
+`);
+    const { fake } = fieldFake();
+    const trace = await FlowEngine.run(plain, fake, { pollMs: 5, tapTimeoutMs: 200, env: {}, session: new EngineSession() }, { flow: 'f' });
+    expect(trace).toContainEqual({ action: 'fill', detail: `id:"field" = ${TYPED}` });
   });
 
   describe('a flow: a secret written into a `text:` selector is redacted by the engine, `***` on every line', () => {
