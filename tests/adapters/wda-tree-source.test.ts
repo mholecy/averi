@@ -122,6 +122,19 @@ describe('WdaTreeSource — the WebDriverAgent adapter at the seam', () => {
     expect(spawner.spawns).toEqual([]);
   });
 
+  it('after dispose no call reaches the server: read, bringUp, systemAlert and typeWide refuse before asking it', async () => {
+    const { source } = await setup();
+    await source.read();
+    await source.dispose();
+    const server = (source as unknown as { server: Record<'source' | 'ensureRunning' | 'quickSourceIfUp' | 'keys', () => Promise<unknown>> }).server;
+    const spies = (['source', 'ensureRunning', 'quickSourceIfUp', 'keys'] as const).map((m) => vi.spyOn(server, m));
+    for (const call of [() => source.read(), () => source.bringUp(), () => source.systemAlert(), () => source.typeWide('x')]) {
+      await expect(call()).rejects.toThrow(/select the device again/);
+    }
+    expect(spies.map((s) => s.mock.calls.length)).toEqual([0, 0, 0, 0]);
+    spies.forEach((s) => s.mockRestore());
+  });
+
   it('dispose is idempotent — a second dispose signals nothing more', async () => {
     const { source, spawner } = await setup();
     await source.read();
@@ -571,6 +584,18 @@ describe('WdaTreeSource.systemAlert — one short /source read, never a start or
     const before = fetcher.urls.length;
     await expect(source.systemAlert()).rejects.toThrow(/deselected or averi is shutting down/);
     expect(sources(fetcher.urls.slice(before))).toEqual([]);
+  });
+
+  it('leaves a failed ask alone: after a /source it read, the same child still gets the remembered error, unasked', async () => {
+    let answer: 'refused' | { status: number; body?: unknown } = 'refused';
+    const { source, fetcher } = await setup(() => answer);
+    await source.read();
+    const first = await source.applicationLabel().then(() => undefined, (e: unknown) => e as Error);
+    expect(first?.message).toMatch(/activeAppInfo request failed/);
+    answer = { status: 200, body: ACTIVE_LAB };
+    await source.systemAlert();
+    expect(await source.applicationLabel().then(() => undefined, (e: unknown) => e)).toBe(first);
+    expect(fetcher.urls.filter((u) => u.endsWith('/wda/activeAppInfo'))).toHaveLength(1);
   });
 
   it('disposed while reading: the released error, WDA\'s words only as its cause', async () => {
