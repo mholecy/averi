@@ -131,7 +131,7 @@ describe('scroll_until for a target the tree cannot list beneath the presented w
     expect(failureOf(play(RULES, [row, row]), 'id:"lab.alert-dim.D"')).not.toBeInstanceOf(ElementNotFoundError);
   });
 
-  it('the expanded picker (form-picker), unmarked, strokes as before: its touch-down lies on the sheet\'s own list anyway', () => {
+  it('the expanded picker (form-picker), unmarked, strokes: its touch-down lies on the sheet\'s own list anyway', () => {
     const row: Row = { tree: capture('form-picker'), found: [] };
     const played = play(RULES, [row, row, row]);
     expect(played.steps.some((s) => s.do === 'stroke')).toBe(true);
@@ -448,7 +448,7 @@ describe('a miss on an unmarked uiautomator tree asks the window manager', () =>
     expect(asked).toHaveLength(1);
   });
 
-  it('scroll_until on dialog-fullscreen with no word: strokes as before, the hint said', async () => {
+  it('scroll_until on dialog-fullscreen with no word: strokes, the hint said', async () => {
     const { fake } = device(lab('dialog-fullscreen'), { of: 'unknown' });
     const error = await fails(scrollUntilVisible(fake, 'id:"lab.dialog-fullscreen.D"', { eyes: NO_EYES, settleMs: 1, timeoutMs: 5_000 }));
     expect(fake.swipes.length).toBeGreaterThan(0);

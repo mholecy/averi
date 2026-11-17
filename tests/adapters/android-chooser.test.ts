@@ -182,7 +182,7 @@ describe('chooserInFocus — an app, the launcher or no focus in front is no cho
     expect(chooserInFocus(await fixture('dumpsys-window-displays-api36-no-ime-source.txt'))).toBeUndefined();
   });
 
-  it('the launcher\'s window alone, the race the link may lose (the chooser not in front yet): undefined — today\'s reply', () => {
+  it('the launcher\'s window alone, the race the link may lose (the chooser not in front yet): undefined, the fail-open reply', () => {
     expect(chooserInFocus(LAUNCHER_FOCUS)).toBeUndefined();
   });
 

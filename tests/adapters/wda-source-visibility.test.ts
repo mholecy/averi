@@ -285,7 +285,7 @@ describe('PARKED cell content of a SCROLLED table — the parked frame lies abov
     });
   });
 
-  it('the sweep: over every raw /source payload in tests/fixtures (wda-*.json), the parser moves exactly the parked elements — the Contacts sheet\'s and the long list\'s at rest, the long list\'s scrolled — and nothing else; of the payloads moving nothing only the lab\'s form-picker holds cells (15, all on screen), so the rest guard only that no content outside a cell moves (the scroll-view shape and the above-the-view clause are pinned by the synthetic trees above)', async () => {
+  it('the sweep: over every raw /source payload in tests/fixtures (wda-*.json), the parser moves exactly the parked elements — the Contacts sheet\'s and the long list\'s at rest, the long list\'s scrolled — and nothing else; of the payloads moving nothing only the lab\'s form-picker (15 cells) and Contacts after the “Open in” Cancel (12) hold cells, all on screen, so the rest guard only that no content outside a cell moves (the scroll-view shape and the above-the-view clause are pinned by the synthetic trees above)', async () => {
     const dir = new URL('../fixtures/', import.meta.url);
     const counts: Record<string, number> = {};
     for (const file of (await readdir(dir)).filter((f) => /^wda-.*\.json$/.test(f)).sort()) {

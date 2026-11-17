@@ -126,7 +126,7 @@ describe('IosAdapter interactions', () => {
       expect(sleeps).toEqual([300]);
     });
 
-    it('a source with no fact (WDA): the unchanged 500', async () => {
+    it('a source that declares no settle cadence (a WDA-kind stub): the default 500', async () => {
       const { fn } = fakeExec({});
       const wda: IosTreeSource = { ...WDA_NO_TREE, read: async () => parseIdbDescribeAll(IDB_DESCRIBE_ALL) };
       const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda });
@@ -135,7 +135,7 @@ describe('IosAdapter interactions', () => {
     });
   });
 
-  it('has no drag speed (decided 2026-10-09, adapters/ios.ts#swipe): scroll_until strokes it at its 300-ms default, as before', () => {
+  it('has no drag speed (decided 2026-10-09, adapters/ios.ts#swipe): a stroke keeps its 300-ms default unless scroll_until passes a duration of its own', () => {
     const adapter: DeviceAdapter = new IosAdapter({ udid: 'AAAA-1111', exec: fakeExec({}).fn, treeSource: NO_TREE });
     expect(adapter.dragSpeed).toBeUndefined();
   });
@@ -1046,7 +1046,7 @@ describe('IosAdapter.typeText — routed per call: idb for what idb types, the s
     expect(log()).toEqual(['wda Jan Šťastný']);
   });
 
-  it('over a source without a typer (idb\'s, the recorded one), a non-ASCII text still goes to idb — as before D43', async () => {
+  it('over a source without a typer (a WDA-kind stub with no typeText), a non-ASCII text goes to idb', async () => {
     const { fn, calls } = fakeExec({});
     await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: WDA_NO_TREE }).typeText('Šťastný');
     expect(calls.at(-1)?.full).toBe('idb ui text --udid AAAA-1111 -- Šťastný');

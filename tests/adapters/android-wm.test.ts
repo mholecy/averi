@@ -95,7 +95,7 @@ const displayZero = (dump: string): string => {
   return dump.slice(at, next === -1 ? undefined : next);
 };
 
-describe('the census: every captured one-display dump is display 0\'s, whole — the rule reads it as before A35', () => {
+describe('the census: every captured one-display dump is display 0\'s, whole', () => {
   it('the fixtures are there', () => {
     expect(DISPLAYS.length).toBeGreaterThanOrEqual(30);
     expect(WINDOWS.length).toBeGreaterThanOrEqual(25);
@@ -185,7 +185,7 @@ describe('the one rule on synthetic two-display dumps (what the capture did not 
   const one = header(1) + frames + status('[0,0][1080,80]') + ime('[0,0][0,0]', false);
   const SHOWN = { state: 'shown', frame: { x: 0, y: 1398, width: 1080, height: 822 } };
 
-  it("a keyboard and a 66 band on display 0, neither on display 1: display 0's answer, whichever display is listed first (before A35: no answer)", () => {
+  it("a keyboard and a 66 band on display 0, neither on display 1: display 0's answer, whichever display is listed first", () => {
     expect(parseImeInsets(zero + one)).toEqual(SHOWN);
     expect(parseStatusBand(zero + one)).toBe(66);
     expect(parseImeInsets(one + zero)).toEqual(SHOWN);
@@ -194,7 +194,7 @@ describe('the one rule on synthetic two-display dumps (what the capture did not 
     expect(parseImeInsets(header(0) + frames + status('[0,0][1080,66]') + ime('[0,0][0,0]', false) + header(1) + ime('[0,1398][1080,2220]', true))).toEqual({ state: 'hidden' });
   });
 
-  it('a dump of displays none of which is display 0 reads nothing (before A35 the chooser read the first display\'s)', () => {
+  it('a dump of displays none of which is display 0 reads nothing', () => {
     const focus = (window: string): string => `  mCurrentFocus=Window{56b9ca0 u0 ${window}}\n`;
     const chooser = 'android/com.android.internal.app.ResolverActivity';
     expect(defaultDisplayFocus(header(1) + focus(chooser) + header(2))).toEqual({});
@@ -212,7 +212,7 @@ describe('the one rule on synthetic two-display dumps (what the capture did not 
     expect(defaultDisplayFocus(header(0) + focus(lab) + header(1) + focus(chooser))).toEqual({ window: lab });
   });
 
-  it("the focus read: another display's focus line, listed before display 0's or after it, is not read (before A35 the first decided)", () => {
+  it("the focus read: another display's focus line, listed before display 0's or after it, is not read", () => {
     const dump = dumpOf('dialog-fullscreen');
     const other = '  mCurrentFocus=Window{2222222 u0 other.app/.Main}\n  DisplayFrames w=720 h=1280 r=0\n';
     expect(parseFocusedWindow(dump.replace('  mCurrentFocus=', `${other}  mCurrentFocus=`))).toEqual(STACKED);
@@ -552,7 +552,7 @@ describe('parseStatusBand — the status band, out of `dumpsys window displays` 
     ['a frame that does not start at the screen\'s top', lines(STATUS_36('[0,2154][1080,2220]'))],
     ['no display header, two bars that disagree (66 and hidden)', lines(STATUS_33('[0,0][1080,66]')) + lines(STATUS_33('[0,0][1080,66]', 'false'))],
     ['no display header, two bars that disagree (66 and 80)', lines(STATUS_36('[0,0][1080,66]')) + lines(STATUS_36('[0,0][1920,80]'))],
-  ])('no band — fail open, as before the band existed — on %s', (_name, dump) => {
+  ])('no band (fail open) on %s', (_name, dump) => {
     expect(parseStatusBand(dump)).toBeUndefined();
   });
 
@@ -576,7 +576,7 @@ describe('parseNavigationBand — the visible navigation bar\'s top, out of `dum
     expect(parseNavigationBand(await dumpsys('api33-keyboard-shown'))).toBe(2154);
   });
 
-  it('API 14+\'s `type=navigationBars` reads alike; a taller 3-button bar reads its own top; the provider\'s `mSource=` copy is no second entry', () => {
+  it('API 34+\'s `type=navigationBars` reads alike; a taller 3-button bar reads its own top; the provider\'s `mSource=` copy is no second entry', () => {
     expect(parseNavigationBand(lines(STATUS_33, NAV_36('[0,2154][1080,2220]')))).toBe(2154);
     expect(parseNavigationBand(lines(NAV_36('[0,2094][1080,2220]')))).toBe(2094);
     expect(parseNavigationBand(`${lines(NAV_33('[0,2154][1080,2220]'))}        mSource=InsetsSource type=ITYPE_NAVIGATION_BAR frame=[0,2000][1080,2220] visible=true\n`)).toBe(2154);
@@ -678,7 +678,7 @@ describe('parseTouchableRegion — the IME window\'s touchable region (the parse
   });
 });
 
-describe('the keyboard reads\' shell lines, as sent (until A27 pinned only through the adapter\'s calls, android.test.ts)', () => {
+describe('the keyboard reads\' shell lines, as sent', () => {
   it('the witness: the input method\'s first `mInputShown` word, filtered on the device', () => {
     expect(INPUT_SHOWN_COMMAND).toBe('dumpsys input_method | grep -m1 -w mInputShown');
   });

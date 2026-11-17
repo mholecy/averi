@@ -1439,7 +1439,7 @@ describe('AndroidAdapter.capture — the raw frame, `screencap -p` where the dev
     }
   });
 
-  it('any other answer that is not gzip, on a live device, costs that call a `-p` and pins nothing (MINOR-1)', async () => {
+  it('any other answer that is not gzip, on a live device, costs that call a `-p` and pins nothing', async () => {
     const said = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       for (const answer of ["/system/bin/sh: can't fork: Try again\n", 'Killed\n', '\x1f', gzipSync(Buffer.alloc(0))]) {

@@ -96,7 +96,7 @@ describe('the stand-in device sh (tests/helpers/device-sh.ts) runs nothing but i
 });
 
 describe('shellQuote — the spelling', () => {
-  it('leaves a plain word bare, so command lines in errors and tests read as before', () => {
+  it('leaves a plain word bare, so command lines in errors and tests read plainly', () => {
     for (const plain of ['input', 'tap', '540', '%s', 'md.bank.app', 'md.bank.app/.MainActivity',
       'android.intent.action.VIEW', '-n', '--es', 'bank://pay', 'user@bank.md', 'a,b+c']) {
       expect(shellQuote(plain)).toBe(plain);
