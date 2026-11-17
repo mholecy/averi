@@ -72,7 +72,7 @@ const adapterOver = async (xml: string | ((offset: number) => string)) => {
 const OPTS = { eyes: NO_EYES, ambiguous: 'refuse' as const, pollMs: 1, timeoutMs: 50 };
 
 describe('Android\'s status band through AndroidAdapter and adb', () => {
-  it('tap text:"All contacts" at (256,3), under the status bar: REFUSED, nothing tapped (was `Tapped`, `input tap 256 3`)', async () => {
+  it('tap text:"All contacts" at (256,3), under the status bar: REFUSED, nothing tapped', async () => {
     const { adapter, calls } = await adapterOver(contacts(ROWS));
     const refusal = await tapElement(adapter, 'text:"All contacts"', OPTS).catch((e: unknown) => e);
     expect(refusal).toBeInstanceOf(OffScreenRefusal);

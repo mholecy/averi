@@ -27,7 +27,7 @@ const byId = (tree: UiNode, id: string): UiNode => {
   return found;
 };
 
-describe('the trigger — a flush neighbour (Scene.flushNeighbours), the only shape the eyes are asked of', () => {
+describe('the trigger — a flush neighbour (Scene.flushNeighbours), the shape a plain stop asks the eyes of', () => {
   it('k7: phone flush with the submit bar drawn after it, outside its scroll view — asked at its bottom edge, over its pixel region', async () => {
     const tree = await k7Tree();
     const q = eyesQuestion(sceneOf(tree), tree, byId(tree, 'lab.form-keyboard.phone'), undefined, 'stop');

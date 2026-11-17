@@ -793,7 +793,7 @@ describe('ocr asserts (what the element RENDERS)', () => {
     expect(result.detail).toMatch(/1000x2000 DEVICE screen; the tree reads 1416 \(content width\)/);
   });
 
-  it('…and the same tree WITHOUT a device screen still fails closed, as 0.5.0 does', async () => {
+  it('…and the same tree WITHOUT a device screen still fails closed', async () => {
     const fake = sheetFake();
     fake.viewport = async () => {
       throw new Error('idb describe: no such device');
@@ -1306,7 +1306,7 @@ describe('screenshot baseline asserts — a frame that did not settle is never a
     await expect(readFile(join(dir, 'android', 'dash.png'))).rejects.toThrow();
   });
 
-  it('an unsettled DIFF still compares the last frame and keeps its verdict, carrying the ⚠ frame note (2026-10-05, review)', async () => {
+  it('an unsettled DIFF still compares the last frame and keeps its verdict, carrying the ⚠ frame note (2026-10-05)', async () => {
     const still = dashboardFake();
     still.nextScreenshot = png(50, 50);
     await new Verifier(still, { ...FAST, baselineDir: dir }).assert({ screenshot: { baseline: 'dash' } });
@@ -1660,7 +1660,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     expect(fake.screenshots).toHaveLength(10);
   });
 
-  it('a resize is a move: the same origin with a growing card is never confirmed, and the timeout quotes both sizes (review 2026-10-06)', async () => {
+  it('a resize is a move: the same origin with a growing card is never confirmed, and the timeout quotes both sizes', async () => {
     const { fake, probe } = clockScreen((read) => ({ ...CARD, width: 700 + 10 * read }));
     const result = await new Verifier(fake, { pollMs: 300, timeoutMs: 3000 }).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
     expect(result.pass).toBe(false);
@@ -1673,7 +1673,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     );
   });
 
-  it('a poll that ends after ONE region-only round — nothing to confirm it against — says the region held still and there was no time to confirm the position (review 2026-10-06)', async () => {
+  it('a poll that ends after ONE region-only round — nothing to confirm it against — says the region held still and there was no time to confirm the position', async () => {
     const { fake, probe } = clockScreen(() => CARD);
     // Round 1 takes its two captures (one 300 ms wait) and ends exactly at
     // the 300 ms deadline, so there is no second round to confirm the rect.
@@ -1688,7 +1688,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     expect(fake.screenshots).toHaveLength(2);
   });
 
-  it('a round CUT after the unconfirmed one decides the wording: the poll ran out before capturing, and the cut sentence says so (review 2026-10-06)', async () => {
+  it('a round CUT after the unconfirmed one decides the wording: the poll ran out before capturing, and the cut sentence says so', async () => {
     const { fake, probe } = clockScreen(() => CARD);
     // Round 1 is unconfirmed and ends at 300 ms, inside a 500 ms deadline;
     // after the 300 ms poll pause, round 2 reads at 600 ms, finds the card,
@@ -1701,7 +1701,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     expect(fake.screenshots).toHaveLength(2);
   });
 
-  it('a read that does not find the element breaks the confirmation: found at A, gone, back at A is not two agreeing reads (review 2026-10-06)', async () => {
+  it('a read that does not find the element breaks the confirmation: found at A, gone, back at A is not two agreeing reads', async () => {
     // A bottom CTA with the same id at the same rect on consecutive wizard
     // screens, with a read between them that saw neither.
     const { fake, probe } = clockScreen((read) => (read === 2 ? undefined : CARD));
@@ -2566,7 +2566,7 @@ describe('pixel asserts under chrome drawn over the element (round 8)', async ()
     );
   });
 
-  it('a screen-sized element is judged too (review of fix/r8-pixel, round 2): a colour assert on a root under a near-fullscreen dialog, and an ocr assert on a root reading the status bar\'s "Contacts", fail closed', async () => {
+  it('a screen-sized element is judged too: a colour assert on a root under a near-fullscreen dialog, and an ocr assert on a root reading the status bar\'s "Contacts", fail closed', async () => {
     resetLayout();
     const full = { x: 0, y: 0, width: 1080, height: 2220 };
     const root = node({ identifier: 'root', rect: { ...full }, children: [node({ role: 'text', label: 'Content', rect: { x: 66, y: 300, width: 900, height: 100 } })] });
@@ -2611,7 +2611,7 @@ describe('pixel asserts under chrome drawn over the element (round 8)', async ()
     expect(c.detail).toContain('sampled #FFFFFF');
   });
 
-  it('a container element: its own descendants are never covers — measured as before', async () => {
+  it('a container element: its own descendants are never covers', async () => {
     resetLayout();
     const card = node({
       identifier: 'card',
@@ -2658,7 +2658,7 @@ describe('pixel asserts under chrome drawn over the element (round 8)', async ()
     expect(c.detail).toContain('listed in reading order: which is drawn on top is not told');
   });
 
-  it('no status band (Android today, a landscape window, or a device size that cannot be read): an element at the top is measured as before', async () => {
+  it('no status band (an Android screen that reports none, a landscape window, or a device size that cannot be read): an element at the top is measured', async () => {
     for (const shape of ['android', 'landscape', 'unread'] as const) {
       const fake = swiftFormIn(shape === 'landscape' ? { ...FORM[0], frame: { x: 0, y: 0, width: 874, height: 402 } } : FORM[0], VALUE_DATE);
       // The device reports its panel as built; a window held sideways turns it (geometry.ts#windowTurnsScreen), and a landscape screen has no band.

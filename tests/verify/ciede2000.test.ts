@@ -81,7 +81,7 @@ describe('color conversion primitives', () => {
     expect(lb).toBeCloseTo(0, 4);
   });
 
-  it('srgbToLab matches the Python port for the bug hex (#CFCFD3 → 83.2284, 0.7343, -1.9789)', () => {
+  it('srgbToLab matches the superrepo\'s color-parity.py for the bug hex (#CFCFD3 → 83.2284, 0.7343, -1.9789)', () => {
     const [l, a, b] = srgbToLab(0xcf, 0xcf, 0xd3);
     expect(l).toBeCloseTo(83.2284, 3);
     expect(a).toBeCloseTo(0.7343, 3);

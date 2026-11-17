@@ -338,7 +338,7 @@ describe('a cold launch\'s bare trees are not "not in state": the ladder looks a
     expect(before.filter((t) => t.detail?.includes('every UI tree read was bare') === true)).toHaveLength(1);
   });
 
-  it('a CHEAP rung on a probe still bare after the second look runs (since 2026-10-08 it waits for that look first) — and the ladder goes on from there', async () => {
+  it('a CHEAP rung on a probe still bare after the second look runs — and the ladder goes on from there', async () => {
     // Decor until the cheap rung relaunches, the login after it.
     let relaunched = false;
     const { fake, state } = timeline(() => (relaunched ? ANDROID_LOGIN : ANDROID_DECOR));
@@ -432,7 +432,7 @@ describe('the second look before a CHEAP rung ends on a held rendered "no" (D2)'
     const trace = await FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 150 }, { state: 'logged_out' });
     expect(trace.filter((t) => t.detail?.startsWith('second look:') === true)).toEqual([]);
   });
-  it('the same before a DESTRUCTIVE rung: the full window, as before D2 — a still loading screen must not lead to a wipe', async () => {
+  it('the same before a DESTRUCTIVE rung: the full window — a still loading screen must not lead to a wipe', async () => {
     const { fake, seen } = relaunching((ms) => (ms < 30 ? ANDROID_DECOR : ANDROID_HOME));
     const trace = await FlowEngine.run(CFG, fake, FAST, { state: 'logged_out' });
     expect(clearStateLaunches(fake)).toHaveLength(1);
@@ -440,7 +440,7 @@ describe('the second look before a CHEAP rung ends on a held rendered "no" (D2)'
     expect(trace).toContainEqual({ action: 'state logged_out', detail: 'reached after fresh_launch' });
   });
 
-  it('ONE rendered read among bare ones is no hold: the cheap rung waits for the whole window, as before D2', async () => {
+  it('ONE rendered read among bare ones is no hold: the cheap rung waits for the whole window', async () => {
     // Entry: decor. Second look: decor, decor, the home screen once, decor to the deadline.
     const { fake, seen } = relaunching((_, read) => (read === 3 ? ANDROID_HOME : ANDROID_DECOR));
     await FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 300 }, { state: 'logged_out_cheap_only' });

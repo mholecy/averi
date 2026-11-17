@@ -216,7 +216,7 @@ describe('R-stroke along the axis it scrolls: a card right of its carousel is as
   it.each([
     ['across the carousel, the finger moving left', ['idb ui swipe 336 180 66 180 --duration 0.3'], undefined],
     ['a turn back across it is along the axis too', ['idb ui swipe 66 180 336 180 --duration 0.3'], undefined],
-    ['vertical, inside the carousel (today\'s stroke for `down`: 201 207 → 155)', ['idb ui swipe 201 207 201 155 --duration 0.3'], 'swiped across the x axis it scrolls right along, from (201,207): x'],
+    ['vertical, inside the carousel (the stroke for `down`: 201 207 → 155)', ['idb ui swipe 201 207 201 155 --duration 0.3'], 'swiped across the x axis it scrolls right along, from (201,207): x'],
     ['diagonal, its larger leg vertical', ['idb ui swipe 300 200 260 150 --duration 0.3'], 'swiped across the x axis it scrolls right along, from (300,200): x'],
   ])('%s', (_n, device, expected) => {
     expect(verdict(rs, 'scroll_until', out('x', device))).toBe(expected);

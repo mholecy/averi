@@ -65,7 +65,7 @@ describe('ocrEngineFor', () => {
     }));
 });
 
-describe('VisionOcr — which failures are permanent (2026-10-08, review 2026-10-07 assert-capture-ocr C2)', () => {
+describe('VisionOcr — which failures are permanent (2026-10-08)', () => {
   /**
    * The ocr assert ends at once on an `OcrUnavailableError` and polls on any
    * other throw (text-parity.ts#measureOcrAssert), so the class is the
