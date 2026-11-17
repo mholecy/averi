@@ -1,0 +1,87 @@
+> averi@0.9.0 mutate
+> node --import tsx scripts/mutation/mutate.ts --force
+                                  | % Mutation score |          |           |            |          |          |
+File                              |  total | covered | # killed | # timeout | # survived | # no cov | # errors |
+All files                         |  97.20 |   97.41 |     7180 |        65 |        193 |       16 |        1 |
+scripts/truth/batch/abort.ts: 98.89 % (floor 96 %)
+scripts/truth/batch/bounded.ts: 99.13 % (floor 97 %)
+scripts/truth/batch/cases.ts: 99.64 % (floor 97 %)
+scripts/truth/batch/io.ts: 96.43 % (floor 93 %)
+scripts/truth/batch/live-table.ts: 100.00 % (floor 98 %)
+scripts/truth/batch/preconditions.ts: 100.00 % (floor 98 %)
+scripts/truth/batch/records.ts: 100.00 % (floor 98 %)
+scripts/truth/batch/run-dir.ts: 99.40 % (floor 97 %)
+scripts/truth/batch/runner-lines.ts: 100.00 % (floor 98 %)
+scripts/truth/batch/runner.ts: 99.46 % (floor 97 %)
+scripts/truth/batch/select.ts: 99.44 % (floor 97 %)
+scripts/truth/batch/shell.ts: 100.00 % (floor 98 %)
+scripts/truth/batch/steps.ts: 99.25 % (floor 97 %)
+scripts/truth/batch/words.ts: 100.00 % (floor 98 %)
+src/adapters/android-accessibility-order.ts: 100.00 % (floor 98 %)
+src/adapters/failure-text.ts: 98.98 % (floor 97 %)
+src/adapters/ios-data-container.ts: 100.00 % (floor 98 %)
+src/adapters/ios-link-failure.ts: 100.00 % (floor 98 %)
+src/adapters/ios-liveness.ts: 100.00 % (floor 98 %)
+src/adapters/ios-typing.ts: 100.00 % (floor 98 %)
+src/adapters/typeable.ts: 89.74 % (floor 88 %)
+src/flow/wipes-ahead.ts: 100.00 % (floor 98 %)
+src/interact/aim-floor.ts: 96.77 % (floor 94 %)
+src/interact/app-holder-text.ts: 96.80 % (floor 95 %)
+src/interact/fill-landing.ts: 99.53 % (floor 96 %)
+src/interact/fill-refetch.ts: 100.00 % (floor 98 %)
+src/interact/fill-reformat.ts: 97.98 % (floor 92 %)
+src/interact/fill-type.ts: 93.83 % (floor 91 %)
+src/interact/fill-verdict.ts: 99.35 % (floor 97 %)
+src/interact/flush-check.ts: 96.57 % (floor 94 %)
+src/interact/unfit-axis.ts: 100.00 % (floor 98 %)
+src/interact/within.ts: 100.00 % (floor 98 %)
+src/ui-tree/dialect.ts: 100.00 % (floor 95 %)
+src/ui-tree/draw-order.ts: 90.38 % (floor 84 %)
+src/ui-tree/geometry.ts: 97.09 % (floor 95 %)
+src/ui-tree/scroll-clips.ts: 92.90 % (floor 90 %)
+src/util/regex.ts: 100.00 % (floor 98 %)
+                         | % Mutation score |          |           |            |          |          |
+File                     |  total | covered | # killed | # timeout | # survived | # no cov | # errors |
+All files                |  97.58 |   97.66 |     1212 |         0 |         29 |        1 |        1 |
+src/adapters/android-bounds.ts: 100.00 % (floor 98 %)
+src/adapters/android-chooser.ts: 100.00 % (floor 98 %)
+src/adapters/android-tree-dialect.ts: 98.23 % (floor 96 %)
+src/adapters/android-wm.ts: 96.59 % (floor 95 %)
+                   | % Mutation score |          |           |            |          |          |
+File               |  total | covered | # killed | # timeout | # survived | # no cov | # errors |
+All files          |  94.96 |   95.42 |     1574 |        10 |         76 |        8 |        0 |
+src/interact/touch-remedy.ts: 97.06 % (floor 95 %)
+src/ui-tree/later-edges.ts: 97.28 % (floor 95 %)
+src/ui-tree/reading-order.ts: 87.98 % (floor 86 %)
+src/ui-tree/remedy-text.ts: 98.47 % (floor 96 %)
+src/ui-tree/standing.ts: 95.20 % (floor 93 %)
+                      | % Mutation score |          |           |            |          |          |
+File                  |  total | covered | # killed | # timeout | # survived | # no cov | # errors |
+All files             |  98.79 |   99.14 |     7513 |        11 |         65 |       27 |        6 |
+scripts/differential/connection.ts: 91.30 % (floor 89 %)
+scripts/release/clean-log.ts: 79.66 % (floor 77 %)
+scripts/release/pack-files.ts: 98.06 % (floor 96 %)
+scripts/truth/batch/android-lab.ts: 100.00 % (floor 98 %)
+scripts/truth/batch/ios-defaults.ts: 99.81 % (floor 97 %)
+scripts/truth/batch/ios-domains.ts: 100.00 % (floor 98 %)
+scripts/truth/batch/ios-lab.ts: 99.75 % (floor 98 %)
+scripts/truth/batch/lab-build.ts: 100.00 % (floor 98 %)
+scripts/truth/batch/lab-chooser.ts: 99.85 % (floor 97 %)
+scripts/truth/batch/lab-emu.ts: 99.74 % (floor 98 %)
+scripts/truth/batch/lab-lines.ts: 100.00 % (floor 98 %)
+scripts/truth/batch/lab-run-ios.ts: 85.29 % (floor 84 %)
+scripts/truth/batch/lab-run.ts: 93.41 % (floor 93 %)
+scripts/truth/batch/standing.ts: 99.00 % (floor 97 %)
+scripts/truth/chooser-premise.ts: 100.00 % (floor 98 %)
+scripts/truth/chooser-readers.ts: 100.00 % (floor 98 %)
+scripts/truth/device-state.ts: 100.00 % (floor 98 %)
+scripts/truth/live-carousel.ts: 99.24 % (floor 97 %)
+scripts/truth/live-finish.ts: 100.00 % (floor 98 %)
+scripts/truth/live-visibility.ts: 98.24 % (floor 96 %)
+scripts/truth/rejudge-failures.ts: 94.12 % (floor 92 %)
+scripts/truth/replies.ts: 98.08 % (floor 96 %)
+scripts/truth/run-case.ts: 100.00 % (floor 98 %)
+npm run mutate: core passed in 417 s
+npm run mutate: android passed in 24 s
+npm run mutate: scene passed in 144 s
+npm run mutate: lab passed in 314 s

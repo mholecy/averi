@@ -1,0 +1,20 @@
+
+> averi@0.9.0 release:smoke
+> node --import tsx scripts/release/pack-smoke.ts
+
+release smoke: averi@0.9.0, bin dist/mcp/server.js
+pack: averi-0.9.0.tgz, 476 files, 1421 kB packed, 4824 kB unpacked; top level: LICENSE, README.md, SETUP.md, dist, package.json, skill
+files: ok
+imports: 7 bare specifiers, all declared
+server: averi@0.9.0, 18 tools: list_devices, select_device, install_app, launch_app, terminate_app, open_deep_link, screenshot, ui_snapshot, tap, swipe, type_text, scroll_until, press_key, ensure_state, run_flow, assert, verify, get_logs
+release smoke: PASS
+
+> averi@1.0.0 release:smoke
+> node --import tsx scripts/release/pack-smoke.ts
+
+release smoke: averi@1.0.0, bin dist/mcp/server.js
+pack: averi-1.0.0.tgz, 476 files, 1421 kB packed, 4824 kB unpacked; top level: LICENSE, README.md, SETUP.md, dist, package.json, skill
+files: ok
+imports: 7 bare specifiers, all declared
+server: averi@1.0.0, 18 tools: list_devices, select_device, install_app, launch_app, terminate_app, open_deep_link, screenshot, ui_snapshot, tap, swipe, type_text, scroll_until, press_key, ensure_state, run_flow, assert, verify, get_logs
+release smoke: PASS

@@ -1,0 +1,5 @@
+# Golden: 1715 checks, 107 mismatches (107 known, 0 new), 0 broken targets, 96 skipped (no OCR on this host: Vision answers nilError (it does not run here: a sandbox))
+
+## android-averi_lab-api33/alert-dim.xml
+- ok A tap: refused: close it first, nothing tapped
+- ok A colour: fails, even asked for the colour the screen shows there (#5C1715), with the element in the tree: close it first; or (the replayed uiautomator tree lists no node lab.alert-dim.A) not found, naming the presented remedy

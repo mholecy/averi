@@ -45,14 +45,13 @@ const startsSome = (ctx: Checkout, prefix: string): boolean => {
 const MINIATURE = 'a file of the miniature checkout tests/truth/side-cache.test.ts writes to a temporary folder';
 /**
  * Paths not in this checkout that its comments and titles name on purpose: the superrepo's scripts the parity code
- * ports, a batch kept with its evidence, the folder a release makes, a test's made-up checkout. An entry nothing
+ * ports, a batch kept with its evidence, a test's made-up checkout. An entry nothing
  * names any more, or that the checkout holds now, is a stale line.
  */
 const OUT_OF_REPO: ReadonlyMap<string, string> = new Map([
   ['scripts/color-parity.py', "the superrepo's colour math, which src/verify/color-parity.ts and ciede2000.ts port"],
   ['scripts/rect-parity.py', "the superrepo's rect parity, which src/verify/rect-parity.ts ports"],
   ['batch-13.ts', 'a lab batch kept with its evidence, outside the repo (scripts/truth/batch/runner.ts says so)'],
-  ['docs/releases', "the release records' folder, which the first release makes (docs/release.md)"],
   ['src/a.ts', MINIATURE],
   ['src/a2.ts', MINIATURE],
   ['src/b.ts', MINIATURE],
@@ -265,12 +264,12 @@ describe('the comment rules, each on what it names and what it keeps', () => {
     expect(unknownNames("`clipThenInset`, `Modifier.clickable`, UIKit's `UIScrollView`, `a value with spaces`, `JJan `", PIN_CTX)).toEqual([]);
   });
 
-  it('a list entry is stale once nothing cites it or the checkout holds it — a file, a folder (docs/releases), a code word', () => {
+  it('a list entry is stale once nothing cites it or the checkout holds it — a file, a code word', () => {
     const cites: Line[] = [...OUT_OF_REPO.keys(), ...EXTERNAL].map((p, i) => ({ file: 'x.ts', line: i + 1, text: `see ${p} and \`${p}\`` }));
     expect(staleEntries(cites, checkoutOf([], new Set()))).toEqual([]);
     // Cited by the guard's own text alone, an entry is cited nowhere.
     expect(staleEntries(cites.map((l) => ({ ...l, file: 'tests/docs/comments.test.ts' })), checkoutOf([], new Set()))).toEqual([...OUT_OF_REPO.keys(), ...EXTERNAL]);
-    expect(staleEntries(cites.slice(1), checkoutOf(['docs/releases/v1.0.0.md', 'batch-13.ts'], new Set(['rootDir'])))).toEqual(['scripts/color-parity.py', 'batch-13.ts', 'docs/releases', 'rootDir']);
+    expect(staleEntries(cites.slice(1), checkoutOf(['batch-13.ts'], new Set(['rootDir'])))).toEqual(['scripts/color-parity.py', 'batch-13.ts', 'rootDir']);
   });
 
   it('(d) a bare review label and a caller phrase are named; a label an id owns is kept', () => {
