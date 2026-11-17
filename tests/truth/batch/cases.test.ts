@@ -292,8 +292,8 @@ describe('completeness — a run counts only when complete (b11-analyze.ts:1–2
   });
 
   it('a name that is no plain path segment is a gap, never a throw: nothing of it is read (review round 1)', async () => {
-    expect(await judge('../x')).toEqual({ ok: false, why: "../x.cases: its name is no plain path segment (letters, digits, _ and -), not read as a run" });
-    expect(await judge('a\nb')).toEqual({ ok: false, why: '"a\\nb.cases": its name is no plain path segment (letters, digits, _ and -), not read as a run' });
+    expect(await judge('../x')).toEqual({ ok: false, why: "../x.cases: its name is no plain path segment (a letter or digit, then letters, digits, _ and -), not read as a run" });
+    expect(await judge('a\nb')).toEqual({ ok: false, why: '"a\\nb.cases": its name is no plain path segment (a letter or digit, then letters, digits, _ and -), not read as a run' });
   });
 
   it('a stray .cases (".cases", "x.y.cases") in a block\'s folder: listed as a run, judged a named gap, the others still judged (review round 1)', async () => {
@@ -303,7 +303,7 @@ describe('completeness — a run counts only when complete (b11-analyze.ts:1–2
     const runs = await Promise.all(runsIn(nodeFs, dir).map(async (name) => ({ name, result: await judge(name) })));
     expect(runs.map((r) => r.name)).toEqual(['', 'kf-1', 'x.y']);
     expect(incompleteLine('kf live verdict', runs)).toBe(
-      'kf live verdict: INCONCLUSIVE — 2 of 3 run(s) incomplete: "" — .cases: its name is no plain path segment (letters, digits, _ and -), not read as a run | x.y — x.y.cases: its name is no plain path segment (letters, digits, _ and -), not read as a run',
+      'kf live verdict: INCONCLUSIVE — 2 of 3 run(s) incomplete: "" — .cases: its name is no plain path segment (a letter or digit, then letters, digits, _ and -), not read as a run | x.y — x.y.cases: its name is no plain path segment (a letter or digit, then letters, digits, _ and -), not read as a run',
     );
   });
 
