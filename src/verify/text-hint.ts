@@ -1,6 +1,6 @@
 import { everyNode, type UiNode } from '../adapters/types.js';
 import { escapeRegExp } from '../util/regex.js';
-import { listedText } from '../ui-tree/listed-text.js';
+import { listedText } from '../ui-tree/node-words.js';
 import { namePairs, readingDifference, type RecognizerDifference } from './ocr-fold.js';
 import { normalizeText } from './text-parity.js';
 
@@ -73,7 +73,7 @@ export function flattenTree(root: UiNode): UiNode[] {
 /**
  * Whose nodes a hint lists: the assert's `subject` (the nodes its element spec matched), quoted, as the assert's own
  * content line quotes them; or `others` (the whole tree, when the spec matched nothing), each given as a list of other
- * nodes gives it (ui-tree/listed-text.ts#listedText: an input's own text by its length and rect).
+ * nodes gives it (ui-tree/node-words.ts#listedText: an input's own text by its length and rect).
  */
 export type HintScope = 'subject' | 'others';
 

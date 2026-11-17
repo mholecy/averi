@@ -1,5 +1,6 @@
 import type { DeviceScreen, Point, Rect, ScrollAxis, UiNode } from '../adapters/types.js';
-import { axisOfEdge, containsPoint, coverText, frameText, nodeText, OPPOSITE_EDGE, outsideScrollViewText, quoted, rectText, wholePast, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
+import { axisOfEdge, containsPoint, frameText, OPPOSITE_EDGE, rectText, wholePast, type Edge } from '../ui-tree/geometry.js';
+import { coverText, labelWords, nodeText, outsideScrollViewText, quoted, type QuotedNode } from '../ui-tree/node-words.js';
 import { CLIP_LINE, type EyesFinding, type SurfaceFinding } from '../ui-tree/eyes.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
@@ -167,7 +168,7 @@ export function scrollResult(o: Extract<ScrollOutcome, { kind: 'visible' }>): Sc
     ...(keyboard !== undefined && { keyboard }),
     ...(!o.settled && { settled: false as const }),
     ...(o.flush !== undefined && { flush: o.flush }),
-    ...(by !== undefined && { covered: { by: { role: by.role, label: by.label, identifier: by.identifier, rect: { ...by.rect } }, shows: facts.shows } }),
+    ...(by !== undefined && { covered: { by: quoted(by), shows: facts.shows } }),
     ...(o.eyes !== undefined && { eyes: o.eyes }),
     ...(seenClear.length > 0 && { seenClear }),
     ...(o.detent !== undefined && { detent: o.detent }),
@@ -1198,9 +1199,9 @@ export const UNTRIED_END = ' — if the element lies in ';
 /** The most scroll views `besideText` names, the largest; the rest are counted. */
 const BESIDE_NAMED = 3;
 
-/** The node the strokes touched down on, drawn over their list: `they touched down at x,y on <role> "<label>" (id <id>) at <rect>, drawn over the list <rect>, which may have taken them`. */
+/** The node the strokes touched down on, drawn over their list: `they touched down at x,y on <role> "<label>" (id <id>) at <rect>, drawn over the list <rect>, which may have taken them` — the label as ui-tree/node-words.ts#labelWords says it. */
 function touchedText({ at, on, container }: TouchedOn): string {
-  const label = on.label !== null && on.label !== '' ? ` ${JSON.stringify(on.label)}` : '';
+  const label = on.label !== null && on.label !== '' ? ` ${labelWords(on)}` : '';
   const id = on.identifier !== null ? ` (id ${on.identifier})` : '';
   return `they touched down at ${at.x},${at.y} on ${on.role}${label}${id} at ${rectText(on.rect)}, drawn over the list ${rectText(container)}, which may have taken them`;
 }

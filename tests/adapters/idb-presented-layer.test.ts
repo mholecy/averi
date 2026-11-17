@@ -254,17 +254,17 @@ describe('scroll_until for a target not in the tree on blur-menu-unhidden (idb):
   });
 });
 
-describe('the words: idb\'s backdrop names idb\'s evidence, WDA\'s keeps its own', () => {
+describe('the words: a backdrop listed ahead is said listed before the screen\'s content, any other after it — its listing order, not its source', () => {
   const IDB = { kind: 'backdrop', listedAhead: true } as const;
   it('the tap, the pixel assert and scroll_until\'s stop', () => {
     expect(presentedRemedy('touch', IDB)).toBe(
-      "a menu's backdrop is presented over it (an empty element idb lists over the whole screen, before the screen's content) — close it first " +
+      "a menu's backdrop is presented over it (an empty element the tree lists over the whole screen, before the screen's content) — close it first " +
         '(if a screenshot shows no menu up, the backdrop is an overlay that lets touches through: tap the target by its coordinates (its centre from ui_snapshot)); no scroll moves it out from under that backdrop',
     );
-    expect(presentedRemedy('pixel', IDB)).toContain("over the element (an empty element idb lists over the whole screen, before the screen's content) — close it first (");
-    expect(presentedStop(IDB)).toContain("(an empty element idb lists over the whole screen, before the screen's content) — close it first (");
+    expect(presentedRemedy('pixel', IDB)).toContain("over the element (an empty element the tree lists over the whole screen, before the screen's content) — close it first (");
+    expect(presentedStop(IDB)).toContain("(an empty element the tree lists over the whole screen, before the screen's content) — close it first (");
     expect(presentedStop(IDB)).toMatch(/swipe, then tap the target, by coordinates\); no scroll moves it out from under that backdrop, and a swipe on it may close the menu$/);
-    expect(presentedRemedy('touch', { kind: 'backdrop' })).toContain("(an empty element WDA lists over the whole screen, after the screen's content)");
-    expect(presentedStop({ kind: 'backdrop' })).toContain("(an empty element WDA lists over the whole screen, after the screen's content)");
+    expect(presentedRemedy('touch', { kind: 'backdrop' })).toContain("(an empty element the tree lists over the whole screen, after the screen's content)");
+    expect(presentedStop({ kind: 'backdrop' })).toContain("(an empty element the tree lists over the whole screen, after the screen's content)");
   });
 });

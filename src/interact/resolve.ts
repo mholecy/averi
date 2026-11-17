@@ -1,14 +1,12 @@
 import { type DeviceAdapter, type UiNode } from '../adapters/types.js';
 import { describeElementSpec } from '../ui-tree/element-spec.js';
-import { rectText } from '../ui-tree/geometry.js';
 import { lookOn } from '../ui-tree/look.js';
-import { listedText } from '../ui-tree/listed-text.js';
+import { listedText, type NamingPolicy } from '../ui-tree/node-words.js';
 import { dialectOf } from '../ui-tree/dialect.js';
 import { KEYBOARD_UNLISTED, MissedError, missNote, missOf, presentedAloneHeadline, type Miss } from '../ui-tree/miss.js';
 import { pollTimeoutMessage, pollTree, readTreeOrMiss, type FirstSample } from '../ui-tree/read-tree.js';
 import { findTarget, hasArea, preferInteractive, type Target } from '../ui-tree/selectors.js';
 import { markedForMiss } from '../ui-tree/window-mark.js';
-import { charactersText } from '../util/count.js';
 import { keyboardMayCoverText } from './target-text.js';
 
 /**
@@ -171,12 +169,11 @@ export class ElementNotFoundError extends MissedError {}
 export interface ResolveOptions {
   ambiguous: Ambiguity;
   /**
-   * An ambiguity lists every candidate's label by its length and rect, never its words: a fill's re-reads after the
-   * focus tap (fill-refetch.ts), when any label may hold the field's text — typed, or held before a clear — in any form
-   * an app makes of it (another case, the first keys, digits regrouped). Absent: `ui-tree/listed-text.ts#listedText`'s
-   * rule, an input's own text by its length.
+   * How an ambiguity's list names its candidates' labels (ui-tree/node-words.ts#NamingPolicy): `every-label` by their
+   * length and rect, never their words, on a fill's re-reads after the focus tap (fill-refetch.ts), when any label may
+   * hold the field's text — typed, or held before a clear. Absent: `own-text`, an input's own text by its length.
    */
-  labelsByLength?: true;
+  naming?: NamingPolicy;
 }
 
 export interface SettleOptions extends ResolveOptions {
@@ -220,7 +217,7 @@ export function resolveNow(tree: UiNode, target: Target, opts: ResolveOptions): 
   const more = candidates.length - SHOWN;
   const summary = (sep: string) =>
     [
-      ...candidates.slice(0, SHOWN).map((n) => `${n.role} id=${n.identifier} label=${opts.labelsByLength ? labelByLength(n) : listedText(n, n.label)}`),
+      ...candidates.slice(0, SHOWN).map((n) => `${n.role} id=${n.identifier} label=${listedText(n, n.label, opts.naming)}`),
       ...(more > 0 ? [`…and ${more} more`] : []),
     ].join(sep);
   if (opts.ambiguous === 'refuse') {
@@ -233,11 +230,6 @@ export function resolveNow(tree: UiNode, target: Target, opts: ResolveOptions): 
     node: candidates[0],
     note: `${candidates.length} matches, none uniquely interactive; picked the first (${summary('; ')})`,
   };
-}
-
-/** A label by its length and the candidate's rect, no words (`null` when it has none). */
-function labelByLength(n: UiNode): string {
-  return `${n.label === null ? 'null' : `<${charactersText(n.label.trim().length)}>`} at ${rectText(n.rect)}`;
 }
 
 /**

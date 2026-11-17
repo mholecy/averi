@@ -1,5 +1,6 @@
 import type { Rect, Stroke } from '../adapters/types.js';
-import { axisOfEdge, EDGES, flushEdges, quoted, sameRectWithinPixel, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
+import { axisOfEdge, EDGES, flushEdges, sameRectWithinPixel, type Edge } from '../ui-tree/geometry.js';
+import { quoted, type QuotedNode } from '../ui-tree/node-words.js';
 import type { PinnedEdge } from '../ui-tree/later-edges.js';
 import { aimFloor, type Overshoot, type StrokeCarry } from './aim-floor.js';
 import { probeOf } from './course.js';

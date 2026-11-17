@@ -1371,6 +1371,7 @@ export function largestScroller(tree: UiNode): Rect | undefined {
  *   dismissal's messages on either model, and `scroll_until`'s keyboard
  *   clauses — so a guard sentence reads like the window state it is checked
  *   against.
+ * A node's name around its rect (its role and its label) is ui-tree/node-words.ts's.
  */
 
 /**
@@ -1380,39 +1381,6 @@ export function largestScroller(tree: UiNode): Rect | undefined {
 export function rectText(r: Rect): string {
   return `${r.x},${r.y} ${r.width}x${r.height}`;
 }
-
-/** A node as a sentence quotes it (`nodeText`): its role, label, id and rect — not its subtree, which is no fact of a sentence. */
-export type QuotedNode = Pick<UiNode, 'role' | 'label' | 'identifier' | 'rect'>;
-
-export const quoted = ({ role, label, identifier, rect }: QuotedNode): QuotedNode => ({ role, label, identifier, rect: { ...rect } });
-
-/**
- * How a sentence names the scroll view a node lies outside of — `outside its scroll view scrollable id:form (0,0
- * 402x780)` — or past one edge of (`where`: `below its scroll view …`, interact/target-text.ts#pastSideText), when
- * nothing of the node, or not its centre, is drawn there (ui-tree/standing.ts, the drawn frame, `Clips.drawnIn`). The
- * pixel assert's miss heads (verify/pixel-text.ts#OUTSIDE_ITS_SCROLL_VIEW, #TOO_THIN_IN_ITS_SCROLL_VIEW) end with the
- * same words.
- */
-export const outsideScrollViewText = (scroller: QuotedNode, where = 'outside'): string =>
-  `${where} its scroll view ${nodeText(scroller)}`;
-
-/**
- * How a sentence names a NODE drawn over another — `button "Continue to
- * summary" (24,780 354x44)`: its role, its label quoted (else its id), its
- * rect (`rectText`). A cover a dismissal skips is named shorter, on
- * purpose (interact/target-text.ts#coverName).
- */
-export const nodeText = (n: QuotedNode): string =>
-  `${n.role}${n.label ? ` ${JSON.stringify(n.label)}` : n.identifier ? ` id:${n.identifier}` : ''} (${rectText(n.rect)})`;
-
-/**
- * A cover as a sentence names it, with where it presses when that is not its rect (cover.ts#Cover.reach: a
- * pinned bar run down to the screen's bottom, a tab bar's item raised by its lift, an alert over the whole screen):
- * `container "Exit confirmation" (41,365 320x172, reaching 0,0 402x874)` — so a point the sentence names off the
- * cover's own rect still lies on what it names.
- */
-export const coverText = (cover: QuotedNode, reach?: Rect): string =>
-  reach === undefined || sameRect(reach, cover.rect) ? nodeText(cover) : `${nodeText(cover).slice(0, -1)}, reaching ${rectText(reach)})`;
 
 /**
  * How a sentence quotes the KEYBOARD's frame: `[x,y][x2,y2]`, as dumpsys

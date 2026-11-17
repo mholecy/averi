@@ -1,5 +1,6 @@
 import type { Rect, UiNode } from '../adapters/types.js';
-import { coverText, nodeText, rectText } from '../ui-tree/geometry.js';
+import { rectText } from '../ui-tree/geometry.js';
+import { coverText, nodeText } from '../ui-tree/node-words.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { coverClause } from '../ui-tree/cover.js';
 import { noScrollRemedyText, presentedOr, presentedRemedy } from '../ui-tree/remedy-text.js';
@@ -161,7 +162,7 @@ export const TOO_THIN_ON_THE_SCREEN = 'only a sliver of the element lies on the 
  * The head of the miss for an element on the screen NOTHING of which is drawn there: it lies outside the scroll view
  * it is listed in, which draws none of it (ui-tree/standing.ts's pixel `offScreen` with its `scroller`, the drawn
  * frame — a WDA tree's): what the capture shows there is not the element. The words end as
- * ui-tree/geometry.ts#outsideScrollViewText's begin, the tap's and `scroll_until`'s. Measured: the at-rest SWIFT form's
+ * ui-tree/node-words.ts#outsideScrollViewText's begin, the tap's and `scroll_until`'s. Measured: the at-rest SWIFT form's
  * `payee_street_input` `24,869 354x52`, 5 pt of it on the screen below its form's `0,0 402x780`, passed a colour assert
  * on the bare background. A sentence names the scroll view after these words; its remedy is the off-screen one. The
  * one sentence head the full tool reference and the troubleshooting reference quote.

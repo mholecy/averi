@@ -1,5 +1,6 @@
 import { rectArea, sameRect, type Point, type Rect, type ScrollAxis, type Stroke, type UiNode } from '../adapters/types.js';
-import { containsPoint, isUntold, quoted, rectIntersection, toldFrame, type ListedContent, type QuotedNode, type ScrollAxes } from '../ui-tree/geometry.js';
+import { containsPoint, isUntold, rectIntersection, toldFrame, type ListedContent, type ScrollAxes } from '../ui-tree/geometry.js';
+import { quoted, type QuotedNode } from '../ui-tree/node-words.js';
 import type { PresentedPress } from '../ui-tree/presentation.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
 import type { TreeFacts } from './scroll-read.js';

@@ -179,7 +179,7 @@ export interface DrawOrder {
    * draw order asks beside its rows. The verbs' one view of the tree source's mark is its `press`: a surface
    * `presentedAt`, `presentedOver` or `markedAt` named, as a sentence quotes it — where it presses (the reach
    * `presentedAt` holds its point against: the whole screen for a marked presented layer's cover, else its rect,
-   * geometry.ts#coverText quotes it) and that marked layer, which the remedy names (ui-tree/remedy-text.ts#presentedRemedy).
+   * node-words.ts#coverText quotes it) and that marked layer, which the remedy names (ui-tree/remedy-text.ts#presentedRemedy).
    */
   readonly presentation: Presentation;
   /**

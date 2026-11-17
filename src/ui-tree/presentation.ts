@@ -86,8 +86,9 @@ export interface MarkedLayer {
   readonly label?: string;
   /**
    * The layer is LISTED AHEAD of what it covers: it covers what its flat list lists after it, never what is listed
-   * before it (`byMarks`: idb's backdrop, listed between the menu's card and the screen beneath) — so its words name
-   * where it is listed. Absent on every other layer.
+   * before it (`byMarks`: a backdrop a flat list lists between the menu's card and the screen beneath) — so its words
+   * say it is listed before the screen's content (ui-tree/remedy-text.ts), whichever source listed it. Absent on every
+   * other layer.
    */
   readonly listedAhead?: true;
 }

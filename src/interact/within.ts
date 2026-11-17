@@ -1,6 +1,7 @@
 import type { Rect, ScrollAxis } from '../adapters/types.js';
 import { dialectOf } from '../ui-tree/dialect.js';
-import { quoted, type QuotedNode, type ScrollAxes } from '../ui-tree/geometry.js';
+import { type ScrollAxes } from '../ui-tree/geometry.js';
+import { quoted, type QuotedNode } from '../ui-tree/node-words.js';
 import { findTarget, parseSelector, type Target } from '../ui-tree/selectors.js';
 import type { TreeFacts } from './scroll-read.js';
 import { targetScrollers, type NoRoomFacts } from './stroke-plan.js';

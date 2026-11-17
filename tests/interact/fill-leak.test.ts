@@ -335,7 +335,7 @@ const FAILURES: Record<string, FailureCase> = {
     says: /\(content withheld from this error\); the matched node is role text, not a textfield — .* the nearest input is textfield id:"other"/,
   },
   // Once the focus tap has landed, a re-read's refusal says every label by its length and rect: an app's label may hold
-  // the field's text in any form (resolve.ts, ResolveOptions.labelsByLength).
+  // the field's text in any form (resolve.ts, ResolveOptions.naming).
   'a second match appearing mid-fill, labelled by its own text (ambiguous: refuse)': {
     // Android: an EditText with no content-desc is labelled by its own text (android-tree-dialect.ts).
     build: () => midFill(() => ({ label: PREFILL, value: PREFILL, ownLabel: true })),

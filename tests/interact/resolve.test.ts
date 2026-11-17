@@ -132,7 +132,7 @@ describe('resolveNow — the one resolution policy, applied to one tree', () => 
     });
 
     // A54: a fill's re-reads after the focus tap, when any label may hold the field's text in any form an app makes of it.
-    it('labelsByLength: every label by its length and rect, none in words, in both modes', () => {
+    it('naming every-label: every label by its length and rect, none in words, in both modes', () => {
       resetLayout();
       const tree = screen(
         el({ role: 'textfield', identifier: 'dup', label: 'ZQ7VXK2§, Password', value: '••••••••' }),
@@ -140,8 +140,8 @@ describe('resolveNow — the one resolution policy, applied to one tree', () => 
         el({ role: 'textfield', identifier: 'dup', label: null, value: 'Card 73 198 462' }),
       );
       const listed = 'textfield id=dup label=<18 characters> at 0,20 100x10; textfield id=dup label=<5 characters> at 0,40 100x10; textfield id=dup label=null at 0,60 100x10';
-      expect(resolveNow(tree, 'id:dup', { ...FIRST, labelsByLength: true })?.note).toBe(`3 matches, none uniquely interactive; picked the first (${listed})`);
-      expect(() => resolveNow(tree, 'id:dup', { ...REFUSE, labelsByLength: true })).toThrow(`Selector matches 3 elements: id:dup\n  ${listed.split('; ').join('\n  ')}\n`);
+      expect(resolveNow(tree, 'id:dup', { ...FIRST, naming: 'every-label' })?.note).toBe(`3 matches, none uniquely interactive; picked the first (${listed})`);
+      expect(() => resolveNow(tree, 'id:dup', { ...REFUSE, naming: 'every-label' })).toThrow(`Selector matches 3 elements: id:dup\n  ${listed.split('; ').join('\n  ')}\n`);
       // Without it, the same candidates as every verb lists them: the app's label quoted.
       expect(resolveNow(tree, 'id:dup', FIRST)?.note).toContain('label="ZQ7VXK2§, Password"');
     });

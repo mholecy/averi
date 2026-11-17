@@ -1,5 +1,6 @@
 import type { Rect, UiNode } from '../adapters/types.js';
-import { quoted, sameRectWithinPixel, sameSizeWithinPixel, type QuotedNode } from '../ui-tree/geometry.js';
+import { sameRectWithinPixel, sameSizeWithinPixel } from '../ui-tree/geometry.js';
+import { quoted, type QuotedNode } from '../ui-tree/node-words.js';
 import type { ClearQuestion } from '../ui-tree/eyes.js';
 import type { OrderSeen, PairSeen } from '../ui-tree/seen-order.js';
 import type { Judged, TreeFacts } from './scroll-read.js';

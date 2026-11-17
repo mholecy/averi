@@ -12,7 +12,7 @@
  * The guard's states are `findAgain`'s, pure. A tree that cannot be read throws the caller's error: the app has a
  * window by then (the focus tap landed), so an unreadable tree is a dead device, not a screen settling. A refusal from
  * resolveNow (a second match appearing mid-fill) keeps its own wording and class, every label it lists said by its
- * length and rect (ResolveOptions.labelsByLength): an app's label may hold the field's text, and that may be a password.
+ * length and rect (ResolveOptions.naming `every-label`): an app's label may hold the field's text, and that may be a password.
  */
 
 import { everyNode, sameRect, type DeviceAdapter, type UiNode } from '../adapters/types.js';
@@ -106,7 +106,7 @@ export interface RefetchOf {
 /** The reads of the field `chosen` (see the module doc). */
 export function fieldRefetch({ adapter, target, resolve, chosen, resolvedOn, unreadable }: RefetchOf): FieldRefetch {
   // Every re-read follows the focus tap: a label may hold the field's text, so a refusal says none (resolve.ts).
-  const policy: ResolveOptions = { ...resolve, labelsByLength: true };
+  const policy: ResolveOptions = { ...resolve, naming: 'every-label' };
   let last: UiNode | undefined;
   let guard: TwinGuard = { phase: 'before-typing' };
   return {

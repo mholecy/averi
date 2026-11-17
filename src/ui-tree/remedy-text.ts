@@ -1,4 +1,5 @@
 import { isTyped, type TypedPresentationKind } from '../adapters/types.js';
+import { layerLabelWords } from './node-words.js';
 import type { MarkedLayer } from './presentation.js';
 import type { NoScrollRemedy, Remedy, RemedyCase } from './standing.js';
 
@@ -14,7 +15,7 @@ import type { NoScrollRemedy, Remedy, RemedyCase } from './standing.js';
  * interact/touch-remedy.ts's; the pixel verb's is verify/pixel-text.ts's.
  *
  * A leaf of the UI-tree layer: it imports standing.ts's types (and presentation.ts's `MarkedLayer`, adapters/types.ts's
- * `isTyped`), no verb, so the decision and its words are two modules, and either changes alone.
+ * `isTyped`, a layer's label as node-words.ts#layerLabelWords says it), no verb, so the decision and its words are two modules, and either changes alone.
  *
  * One `purpose` names whose sentence a clause sits in — `touch` (the tap, `scroll_until`) or `pixel` (the pixel assert)
  * — and the node's pronoun follows from it (`pronoun`): `it` in a touch's sentence, `the element` in the pixel
@@ -61,12 +62,12 @@ const typedWords = (layer: MarkedLayer | undefined): TypedWords | undefined => (
 export const presentedLayerName = (layer: MarkedLayer | undefined): string => {
   if (layer?.kind === 'backdrop') return BACKDROP;
   const typed = typedWords(layer);
-  return typed === undefined ? 'a sheet or modal' : `${typed.article} ${typed.noun}${layer?.label ? ` ${JSON.stringify(layer.label)}` : ''}`;
+  return typed === undefined ? 'a sheet or modal' : `${typed.article} ${typed.noun}${layer?.label ? ` ${layerLabelWords(layer.label)}` : ''}`;
 };
 
 /**
  * A `backdrop` layer's words (adapters/types.ts#PresentationKind): what it is taken for, the evidence it rests on —
- * one empty element WDA lists over the whole screen, which a hidden overlay that lets touches through (a decorative
+ * one empty element the tree lists over the whole screen, which a hidden overlay that lets touches through (a decorative
  * tint, `.allowsHitTesting(false)`, RN `pointerEvents="none"`) matches too (ADR 0018, the amendment "an in-window
  * backdrop", its residual) — and the way out then: a screenshot shows whether a menu is up; with none, what is beneath
  * the overlay takes a touch by coordinates (the tap and swipe tools' x/y, which judge nothing), or is judged on that
@@ -75,14 +76,13 @@ export const presentedLayerName = (layer: MarkedLayer | undefined): string => {
  */
 const BACKDROP = "a menu's backdrop";
 /**
- * The evidence a `backdrop` rests on, as its source lists it: WDA's in-window backdrop is listed AFTER the screen's
- * content (adapters/wda-source.ts#inWindowBackdrops); idb's, in its flat list, BEFORE it, after the menu's card
- * (`MarkedLayer.listedAhead`, adapters/ios-tree-source.ts#backdropOf). The flag names idb because only idb's tree is a
- * flat list (dialect.ts#TreeDialect.ancestry false: the mark adapters/ios-tree-source.ts#markIdbDialect alone sets), so a backdrop listed ahead
- * is idb's.
+ * The evidence a `backdrop` rests on, by where the tree lists it (`MarkedLayer.listedAhead`): AFTER the screen's content
+ * (adapters/wda-source.ts#inWindowBackdrops), or, in a flat list, BEFORE it, after the menu's card
+ * (adapters/ios-tree-source.ts#backdropOf). Its listing order, not its source: the mark says where it was listed, and
+ * which source listed it is no fact of these words.
  */
 const backdropEvidence = (layer: MarkedLayer): string =>
-  layer.listedAhead === true ? "an empty element idb lists over the whole screen, before the screen's content" : "an empty element WDA lists over the whole screen, after the screen's content";
+  `an empty element the tree lists over the whole screen, ${layer.listedAhead === true ? 'before' : 'after'} the screen's content`;
 
 /**
  * The `backdrop` remedy over the node (`purpose`'s pronoun), its way out (`wayOut`: what to do by coordinates or on the screenshot) in a
@@ -113,7 +113,7 @@ export const presentedRemedy = (purpose: RemedyPurpose, layer?: MarkedLayer): st
   const what = pronoun(purpose);
   const typed = typedWords(layer);
   return typed !== undefined
-    ? `${typed.article} ${typed.noun} is presented over ${what}${layer?.label ? ` (${JSON.stringify(layer.label)})` : ''} — close it first`
+    ? `${typed.article} ${typed.noun} is presented over ${what}${layer?.label ? ` (${layerLabelWords(layer.label)})` : ''} — close it first`
     : `a screen is presented over ${what} (a modal or a sheet) — close it first; no scroll moves ${what} out from under that screen`;
 };
 
