@@ -92,8 +92,8 @@ export interface WindowUsableScreen extends ScreenBoxes {
 export interface TreeUsableScreen extends ScreenBoxes {
   readonly from: 'tree';
   /**
-   * The root has no area (idb's synthetic 0x0 root): `box` is only the largest node, and nothing is judged off it
-   * (`treeScreen`) — a touch judges no point off it, and the pixel assert reads the node's own rect uncut and judges
+   * The root has no area (idb's synthetic 0x0 root): `box` is only the largest node, and nothing is refused as off it
+   * (`treeScreen`) — a touch judges no point off it, and the pixel assert reads the node's own rect uncut and places
    * no region off it.
    */
   readonly failsOpen: boolean;
@@ -167,9 +167,10 @@ export function usableScreenOf(device: DeviceScreen | undefined, size: ScreenSiz
  * purpose — the tap, either stop — then places every point on the screen
  * and judges in the node's own rect: the on-screen rule exists to stop a
  * false "Tapped", and must never be why a tap on a device that could not
- * report its size did not happen. The pixel assert judges nothing off
- * `box` either: it reads the node's own rect, uncut, and only its keyboard
- * band is judged on `box`.
+ * report its size did not happen. The pixel assert refuses nothing as off
+ * `box` either: it reads the node's own rect, uncut by its scroll views,
+ * and its keyboard band and covers are judged only on the part on `box`
+ * (standing.ts#Scene).
  */
 export function treeScreen(tree: UiNode): TreeUsableScreen {
   const box = screenOf(tree);
@@ -185,7 +186,7 @@ export const judgedScreen = (usable: UsableScreen | undefined, tree: UiNode): Us
 
 /**
  * A judgement fails open on `screen`: the tree's own, on a root of no area (`TreeUsableScreen.failsOpen`) — a touch
- * judges no point off its box, and the pixel assert reads the node's rect uncut and judges no region off it.
+ * judges no point off its box, and the pixel assert reads the node's rect uncut and places no region off it.
  */
 export const failsOpen = (screen: UsableScreen): boolean => screen.from === 'tree' && screen.failsOpen;
 

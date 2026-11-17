@@ -69,8 +69,9 @@ import { failsOpen, judgedScreen, type UsableScreen } from './usable-screen.js';
  *   a root of no area (its `failsOpen`, which a tree's own screen handed in
  *   carries too) a touch — the tap, either stop — leaves every point on
  *   the screen and judges in the node's own rect, and the pixel assert
- *   judges nothing off the box (the largest node): it reads the node's own
- *   rect, uncut, and only its keyboard band is judged on the box.
+ *   refuses nothing as off the box (the largest node): it reads the node's
+ *   own rect, uncut by its scroll views, and its keyboard band and covers
+ *   are judged only on the part on the box (`regionPlace`, `pixelStanding`).
  * - THE DRAWN FRAME, every purpose: a scroll view draws none of its
  *   content outside its own frame, while WDA lists the content at its
  *   laid-out rect and uiautomator sometimes past the frame too
@@ -725,7 +726,7 @@ export function sceneOf(tree: UiNode, seen?: SeenOrder): Scene {
   function standing(node: UiNode, screen: UsableScreen | undefined, purpose: Purpose): Standing | PixelStanding {
     const judged: Judged = { scene, node, centre: tapPoint(node), later: laterOf(node) };
     const usable = judgedScreen(screen, tree);
-    // On a root of no area (usable-screen.ts#TreeUsableScreen.failsOpen) the box is only the largest node: nothing is judged off it.
+    // On a root of no area (usable-screen.ts#TreeUsableScreen.failsOpen) the box is only the largest node: nothing is refused as off it.
     const open = failsOpen(usable);
     if (purpose.of === 'pixel') {
       const single = singleBox(usable);
@@ -982,8 +983,8 @@ function drawnFrame({ scene, node }: Judged, frame: Rect): Rect {
  * reads overlaps one past PIXEL_OVERLAP_SLACK (geometry.ts#overlapsPastSlack);
  * else on the screen.
  */
-function regionPlace(rect: Rect, { reads, keyboardTop }: PixelRead, box: Rect, bands: JudgedBoxes | undefined, failsOpen: boolean, drawn: DrawnFrame | undefined): RegionPlace {
-  const on = !failsOpen && rectArea(reads) > 0 ? rectIntersection(reads, box) : box;
+function regionPlace(rect: Rect, { reads, keyboardTop }: PixelRead, box: Rect, bands: JudgedBoxes | undefined, open: boolean, drawn: DrawnFrame | undefined): RegionPlace {
+  const on = !open && rectArea(reads) > 0 ? rectIntersection(reads, box) : box;
   if (on === undefined) return { off: 'wholly' };
   // Outside its scroll view next: on the box, but nothing of it drawn there — what lies there is not the element.
   const onBox = rectIntersection(rect, box) ?? rect;

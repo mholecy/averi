@@ -241,7 +241,7 @@ describe('usableScreen — `fresh`: the device read again first (the tap\'s re-r
   });
 });
 
-describe('treeScreen — THE "no device screen": the tree\'s own screen, no band, and whether a touch fails open', () => {
+describe('treeScreen — THE "no device screen": the tree\'s own screen, no band, and whether a judgement fails open (a touch, and the pixel assert)', () => {
   it('a root with a rect is that rect; a touch judges in it', () => {
     expect(treeScreen(node({ rect: box(402, 874) }))).toEqual({ box: box(402, 874), boxes: [box(402, 874)], oriented: box(402, 874), from: 'tree', failsOpen: false });
   });

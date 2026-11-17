@@ -628,7 +628,7 @@ describe('Scene.standing for the tap — the on-screen point rule (the in-tree k
  * With no device screen, every purpose reads one definition (ui-tree/usable-screen.ts#judgedScreen): a rooted tree is
  * judged in its root rect; on a root of no area a touch fails open (every point on the screen, judged in the node's
  * own rect — the stops adopt the tap's fallback, unreachable from `scroll_until`, whose round always holds a frame),
- * and the pixel assert's box is the largest node, nothing judged off it.
+ * and the pixel assert's box is the largest node, nothing refused as off it.
  */
 describe('Scene.standing with no screen — one "no device screen" for the tap, both stops and the pixel assert', () => {
   /** A 100x100 node at (x,y) in a root of `rect`, with a 402x874 node beside it when the root has no area (idb's flat list's Application). */
