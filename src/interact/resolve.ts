@@ -2,7 +2,7 @@ import { type DeviceAdapter, type UiNode } from '../adapters/types.js';
 import { describeElementSpec } from '../ui-tree/element-spec.js';
 import { rectText } from '../ui-tree/geometry.js';
 import { lookOn } from '../ui-tree/look.js';
-import { quotedText } from '../ui-tree/own-text.js';
+import { listedText } from '../ui-tree/listed-text.js';
 import { dialectOf } from '../ui-tree/dialect.js';
 import { KEYBOARD_UNLISTED, MissedError, missNote, missOf, presentedAloneHeadline, type Miss } from '../ui-tree/miss.js';
 import { pollTimeoutMessage, pollTree, readTreeOrMiss, type FirstSample } from '../ui-tree/read-tree.js';
@@ -173,7 +173,7 @@ export interface ResolveOptions {
   /**
    * An ambiguity lists every candidate's label by its length and rect, never its words: a fill's re-reads after the
    * focus tap (fill-refetch.ts), when any label may hold the field's text — typed, or held before a clear — in any form
-   * an app makes of it (another case, the first keys, digits regrouped). Absent: `ui-tree/own-text.ts#quotedText`'s
+   * an app makes of it (another case, the first keys, digits regrouped). Absent: `ui-tree/listed-text.ts#listedText`'s
    * rule, an input's own text by its length.
    */
   labelsByLength?: true;
@@ -220,7 +220,7 @@ export function resolveNow(tree: UiNode, target: Target, opts: ResolveOptions): 
   const more = candidates.length - SHOWN;
   const summary = (sep: string) =>
     [
-      ...candidates.slice(0, SHOWN).map((n) => `${n.role} id=${n.identifier} label=${opts.labelsByLength ? labelByLength(n) : quotedText(n, n.label)}`),
+      ...candidates.slice(0, SHOWN).map((n) => `${n.role} id=${n.identifier} label=${opts.labelsByLength ? labelByLength(n) : listedText(n, n.label)}`),
       ...(more > 0 ? [`…and ${more} more`] : []),
     ].join(sep);
   if (opts.ambiguous === 'refuse') {

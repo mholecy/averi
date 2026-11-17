@@ -31,7 +31,7 @@ import { DEFAULT_TOLERANCE_PCT, evaluateRectAssert, type RectExpectation } from 
 import { measureOcrAssert, type OcrExpectation } from './text-parity.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { absenceVerdict, bareTimeoutNote } from '../ui-tree/verdict.js';
-import { flattenTree, textHint } from './text-hint.js';
+import { flattenTree, textHint, type HintScope } from './text-hint.js';
 
 /**
  * Declarative checks (ARCHITECTURE.md §5, the `assert` tool), cheapest
@@ -388,13 +388,14 @@ export class Verifier {
     // no longer has a tree. The hint is scoped to the nodes the SPEC matched
     // whenever it matched any — an id-addressed assert must not be explained
     // by an unrelated node elsewhere on screen — and widens to the whole tree
-    // only when the spec found nothing to talk about.
-    let hintScope: UiNode[] | undefined;
+    // only when the spec found nothing to talk about: then it lists other
+    // nodes, an input's own text by its length (text-hint.ts#HintScope).
+    let hintScope: { nodes: UiNode[]; scope: HintScope } | undefined;
     const run = (): Promise<PollVerdict> =>
       this.treePoll(
         (tree) => {
           const found = findBySpec(tree, element);
-          hintScope = found.length > 0 ? found : flattenTree(tree);
+          hintScope = found.length > 0 ? { nodes: found, scope: 'subject' } : { nodes: flattenTree(tree), scope: 'others' };
           if (found.some(contentMatches)) return { pass: true };
           if (found.length === 0) return undefined;
           // The element is there but says the wrong thing — worth reporting at
@@ -420,7 +421,7 @@ export class Verifier {
             const hint =
               exactText === undefined || hintScope === undefined ?
                 undefined
-              : textHint(hintScope, exactText);
+              : textHint(hintScope.nodes, exactText, hintScope.scope);
             return hint === undefined ? base : `${base}\n  ${hint}`;
           },
         },

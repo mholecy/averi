@@ -1,6 +1,6 @@
 import { everyNode, type UiNode } from '../adapters/types.js';
 import { escapeRegExp } from '../util/regex.js';
-import { quotedText } from '../ui-tree/own-text.js';
+import { listedText } from '../ui-tree/listed-text.js';
 import { namePairs, readingDifference, type RecognizerDifference } from './ocr-fold.js';
 import { normalizeText } from './text-parity.js';
 
@@ -71,19 +71,26 @@ export function flattenTree(root: UiNode): UiNode[] {
 }
 
 /**
+ * Whose nodes a hint lists: the assert's `subject` (the nodes its element spec matched), quoted, as the assert's own
+ * content line quotes them; or `others` (the whole tree, when the spec matched nothing), each given as a list of other
+ * nodes gives it (ui-tree/listed-text.ts#listedText: an input's own text by its length and rect).
+ */
+export type HintScope = 'subject' | 'others';
+
+/**
  * The hint, or undefined when there is nothing honest to say.
  *
  * `candidates` is scoped by the caller: the nodes the element spec actually
  * matched when it matched any, so an id-addressed assert cannot be explained
  * by an unrelated node elsewhere on screen — and the whole tree only when the
- * spec found nothing at all.
+ * spec found nothing at all. `scope` says which of the two it is.
  */
-export function textHint(candidates: UiNode[], expected: string): string | undefined {
-  return containsTextHint(candidates, expected) ?? foldedTextHint(candidates, expected);
+export function textHint(candidates: UiNode[], expected: string, scope: HintScope): string | undefined {
+  return containsTextHint(candidates, expected, scope) ?? foldedTextHint(candidates, expected);
 }
 
 /** A node whose text CONTAINS the expected string as a whole segment (a combined label). */
-function containsTextHint(candidates: UiNode[], expected: string): string | undefined {
+function containsTextHint(candidates: UiNode[], expected: string, scope: HintScope): string | undefined {
   if (expected === '') return undefined;
   const hits = candidates.filter((n) =>
     [n.label, n.value]
@@ -95,7 +102,10 @@ function containsTextHint(candidates: UiNode[], expected: string): string | unde
   if (hits.length === 0) return undefined;
   const shown = hits
     .slice(0, 3)
-    .map((n) => `    id=${n.identifier ?? '(none)'} label=${quotedText(n, n.label ?? n.value)}`)
+    .map((n) => {
+      const shown = n.label ?? n.value;
+      return `    id=${n.identifier ?? '(none)'} label=${scope === 'subject' ? JSON.stringify(shown) : listedText(n, shown)}`;
+    })
     .join('\n');
   return (
     `no node has this exact text, but ${hits.length} node(s) CONTAIN it as a whole segment:\n${shown}\n` +
@@ -116,7 +126,8 @@ function containsTextHint(candidates: UiNode[], expected: string): string | unde
  * NBSP separator is a space here too. The tree carries the app's characters
  * exactly, so the assert stays exact and still fails — a `’` → `'` change in
  * the app is a copy change the tree can see; the hint only names the node, so
- * the reader need not dump the tree.
+ * the reader need not dump the tree. It quotes an input's text in either scope: a folded hit differs from the
+ * expected string only in recognizer readings, which the hint names, so it says nothing the caller did not write.
  */
 function foldedTextHint(candidates: UiNode[], expected: string): string | undefined {
   const hits: { node: UiNode; field: 'label' | 'value'; text: string; difference: RecognizerDifference }[] = [];

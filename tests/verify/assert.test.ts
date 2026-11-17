@@ -421,9 +421,10 @@ describe('exact-text misses hint at a combined accessibility element', () => {
     }
   });
 
-  it("says an input's own text by its length and rect, and quotes a control's label (A66)", async () => {
-    // An input's text may be what a fill typed a moment ago, a password included: the hint names the input by id and
-    // rect and says its text by length, as an ambiguity lists it (resolve.ts). A sentinel the hint must never hold.
+  it("over the whole tree, says another input's own text by its length and rect, and quotes a control's label (A66)", async () => {
+    // An input's text may be what a fill typed a moment ago, a password included: a hint over the whole tree lists
+    // other nodes, so it names the input by id and rect and says its text by length, as an ambiguity lists it
+    // (resolve.ts). A sentinel the hint must never hold.
     const OWN = 'zq7vXk2§';
     resetLayout();
     const fake = new FakeAdapter(
@@ -456,6 +457,29 @@ describe('exact-text misses hint at a combined accessibility element', () => {
     const copy = new FakeAdapter({ s: screen(el({ role: 'text', identifier: 'memo', label: `${OWN}, 1 of 13 selected` })) }, 's');
     const quoted = await new Verifier(copy, FAST).assert({ element: { text: '1 of 13 selected' } });
     expect(quoted.detail).toContain(`    id=memo label=${JSON.stringify(`${OWN}, 1 of 13 selected`)}\n`);
+  });
+
+  it("quotes the assert's own subject, an input included, in its content line and its hint (A66)", async () => {
+    // The content of the element the caller asked about is what the assert reports; only other nodes are listed by
+    // length. One reply never gives the same node both ways.
+    resetLayout();
+    const fake = new FakeAdapter(
+      { s: screen(el({ role: 'textfield', identifier: 'memo', label: 'Ref 7, 1 of 13 selected', value: 'Ref 7, 1 of 13 selected' })) },
+      's',
+    );
+    const verifier = new Verifier(fake, FAST);
+    const byText = await verifier.assert({ element: { id: 'memo' }, text: '1 of 13 selected' });
+    expect(byText.pass).toBe(false);
+    expect(byText.detail).toBe(
+      'element found but content was: "Ref 7, 1 of 13 selected"\n' +
+        '  no node has this exact text, but 1 node(s) CONTAIN it as a whole segment:\n' +
+        '    id=memo label="Ref 7, 1 of 13 selected"\n' +
+        '    (iOS combines a container\'s children into one accessibility element — use match: "1 of 13 selected" for a cross-platform assert)',
+    );
+    const byMatch = await verifier.assert({ element: { id: 'memo' }, match: '^1 of 13' });
+    expect(byMatch.pass).toBe(false);
+    // A match is containment already: no hint, the content line alone.
+    expect(byMatch.detail).toBe('element found but content was: "Ref 7, 1 of 13 selected"');
   });
 
   it('names a node whose text differs only in typographic punctuation or diacritics, and still fails', async () => {
