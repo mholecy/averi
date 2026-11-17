@@ -314,8 +314,9 @@ Composes the two engines; its own layer because it needs BOTH and neither may de
 - `preflight.ts` — `preflight`: the request's state and flow names and its environment, refused before any adapter
   is resolved.
 - `app-health.ts` (`appHealth`, the `appAlive:` line, §8), `log-excerpt.ts` (`get_logs`' grep and tail),
-  `run-reply.ts` (the final frame and the asserts' verdict), `claims.ts` (the claim note's `⚠` line on a reply that
-  claims what it read, and on a failed engine run's error; ADR 0046) — leaves of the replies (A29).
+  `run-reply.ts` (the final frame, the asserts' verdict, and `legText`: the one line order of every run's reply, the
+  health line last), `claims.ts` (the claim note's `⚠` line on a reply that claims what it read, and on a failed
+  engine run's error; ADR 0046) — leaves of the replies (A29).
 
 Vocabulary: **leg** — one platform's part of a `verify` run; **parity table** — a per-anchor comparison across legs
 and against the contract.

@@ -1966,7 +1966,7 @@ describe('ensure_state and verify: a refused final screenshot is a ⚠ line, not
     const result = await call('ensure_state', { platform: 'android', state: 'home', configPath: await validConfig() });
     expect(result.isError).toBe(false);
     expect(result.shape).toEqual([['text']]);
-    expect(result.text).toContain('appAlive: true\n⚠ screenshot: `adb -s emulator-5554 exec-out screencap -p`');
+    expect(result.text).toMatch(/\n⚠ screenshot: `adb -s emulator-5554 exec-out screencap -p`[^\n]*\nappAlive: true$/);
   });
 
   it('verify: the leg\'s section with the ⚠ line, and no image for it', async () => {

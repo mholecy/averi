@@ -95,10 +95,10 @@ async function runOnEngine(
  * stands, with one `⚠ screenshot:` line where an unsettled frame's note goes.
  *
  * The health check and the capture run together (D13, see runOnEngine); the
- * reply is laid out trace, health line, then the frame's one note line, if
- * any. Neither rejects for the device: appHealth words its failures into the
- * line (run/app-health.ts, the one policy) and finalFrame catches its own
- * capture failure.
+ * reply is laid out as every run's is (run/run-reply.ts#legText): the trace,
+ * the frame's one note line if any, then the health line. Neither rejects for
+ * the device: appHealth words its failures into the line (run/app-health.ts,
+ * the one policy) and finalFrame catches its own capture failure.
  */
 export async function runEnsureState(
   call: EngineCall & { state: string },
@@ -108,11 +108,9 @@ export async function runEnsureState(
   const { cfg } = call.project;
   // A broken adapter's throw from appHealth fails the call; the frame's reads then finish unawaited — reads only.
   const [health, final] = await Promise.all([appHealth(adapter, cfg), finalFrame(adapter)]);
-  const text = legText({ trace, health });
-  const note = legText({ frame: final, health: '' });
-  const reply = note === '' ? text : `${text}\n${note}`;
-  // The claim note (claims.ts) closes the reply, after the frame's line.
-  return { text: claimed([adapter], reply), ...(final.frame === undefined ? {} : { shot: await final.frame.shot.png() }) };
+  // The claim note (claims.ts) closes the reply, after the health line.
+  const text = claimed([adapter], legText({ trace, frame: final, health }));
+  return final.frame === undefined ? { text } : { text, shot: await final.frame.shot.png() };
 }
 
 /** `run_flow`: the trace and health line. */
