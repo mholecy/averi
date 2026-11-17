@@ -33,7 +33,7 @@
     "group": "core",
     "tests": ["tests/interact/fill-refetch.test.ts"],
     "floor": 98,
-    "baseline": "100 % on 2026-11-11 (A28, joined; The full cold core group run is recorded at merge, on main, in the `docs: A28 done` commit; the figures here are narrowed cold runs of this branch. `npm run mutate -- --force --mutate src/interact/fill-refetch.ts,src/interact/fill-landing.ts,src/interact/fill-type.ts --tempDirName reports/mutation/stryker-tmp-a28`, cold, with fill-landing.ts and fill-type.ts, 68 s at load 50–51, other agents' runs overlapping): 64 mutants, 64 killed, 0 survived — after review's findAgain as one switch over the guard's phase; before it 98.75 % (80 mutants, 1 equivalent survivor: the double phase test, gone with it). The floor two points under the score's whole number"
+    "baseline": "100 % on 2026-11-17 (A81: release Gate A's cold core run had it at 96.97 %, under its floor — A54/A67 had added fieldRefetch's `naming: 'every-label'`, held only by tests outside this module's mutation scope (resolve.test.ts, fill-leak.test.ts), and its 2 mutants survived; fill-refetch.test.ts now refuses a second match on a re-read, every label said by its length and rect. `npm run mutate -- --force --mutate src/interact/fill-refetch.ts --tempDirName reports/mutation/stryker-tmp-a81`, cold, alone, 14 s at load 2–3; exit 1 by design, the other core modules unmutated, ADR 0038): 66 mutants, 66 killed, 0 survived. The floor stays"
   },
   "src/interact/unfit-axis.ts": {
     "group": "core",
