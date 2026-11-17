@@ -23,7 +23,7 @@ import type { Typeable } from './typeable.js';
  * Two real adapters behind one small interface is what makes this a seam and
  * not a flag.
  *
- * The interface is deliberately small: three methods. `read()` returns a
+ * At its core three methods. `read()` returns a
  * fresh normalized tree per call (the layers above mutate nodes — field-error
  * pairing writes `error` — so no source may hand out a cached graph).
  * `applicationLabel()` answers the one question the normalized tree cannot —
@@ -36,11 +36,12 @@ import type { Typeable } from './typeable.js';
  * alias is resolved by whoever constructs the source — the registry, which
  * only ever binds concrete device ids.
  *
- * Only the tree read lives behind this seam. Taps, typing, install and launch
- * stay on idb/simctl whichever source is configured (plan, decision 4): WDA
- * frames are points, the same units idb rects use, so the coordinates agree.
- * One exception: WDA's source types what idb cannot (`typeText`, optional,
- * as `systemAlert`), on the WebDriverAgent it already owns.
+ * Beside the tree read the seam holds what follows from which backend reads it, so that IosAdapter asks the source
+ * and never decides by backend: the source's lifecycle (`startBeforeLaunch`, whose failure the source words;
+ * `dispose`), its fallback (`fallback`, `auto`'s), the text it types beyond idb (`typeable`, `typeWide`: WDA's
+ * `/wda/keys`, on the WebDriverAgent it already owns; the others refuse), and its measured facts (`settleCadenceMs`,
+ * `systemAlert`). Taps, idb's typing, install and launch stay on idb/simctl whichever source is configured (plan,
+ * decision 4): WDA frames are points, the same units idb rects use, so the coordinates agree.
  */
 export interface IosTreeSource {
   /**

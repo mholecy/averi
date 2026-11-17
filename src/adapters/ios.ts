@@ -166,8 +166,11 @@ function appKey(front: FrontApp): AppKey | undefined {
  * injected IosTreeSource for the accessibility tree (ios-tree-source.ts —
  * idb's describe-all or WebDriverAgent's /source, chosen by the registry from
  * averi.yaml). Everything idb-specific for INPUT stays in the `idb*` methods;
- * the tree read belongs to the source, so swapping the tree backend touches
- * no line of this class (ARCHITECTURE.md §3, §10).
+ * the tree read belongs to the source, and so does whatever follows from its
+ * backend — its start before a launch and that start's failure, its fallback,
+ * the text only WebDriverAgent types — and this class asks it rather than
+ * deciding by backend; only words that name the source read its `kind`
+ * (keyboardAdvice, the foreground wait's notes) (ARCHITECTURE.md §3, §10).
  */
 export class IosAdapter implements DeviceAdapter {
   readonly platform = 'ios' as const;
@@ -236,7 +239,7 @@ export class IosAdapter implements DeviceAdapter {
     return simctl(this.exec, args, timeoutMs);
   }
 
-  // --- idb boundary (input only — the tree read is the source's) ---
+  // --- idb boundary (input only — the tree read, and the text only WebDriverAgent types, are the source's) ---
 
   private idb(args: string[], timeoutMs?: number) {
     return runIdb(this.exec, this.udid, args, { timeoutMs, helper: this.idbHelper });
