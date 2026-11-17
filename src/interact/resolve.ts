@@ -5,6 +5,7 @@ import { dialectOf } from '../ui-tree/dialect.js';
 import { KEYBOARD_UNLISTED, MissedError, missNote, missOf, presentedAloneHeadline, type Miss } from '../ui-tree/miss.js';
 import { pollTimeoutMessage, pollTree, readTreeOrMiss, type FirstSample } from '../ui-tree/read-tree.js';
 import { findTarget, hasArea, preferInteractive, type Target } from '../ui-tree/selectors.js';
+import { rectText } from '../ui-tree/geometry.js';
 import { markedForMiss } from '../ui-tree/window-mark.js';
 import { charactersText } from '../util/count.js';
 import { keyboardMayCoverText } from './target-text.js';
@@ -229,11 +230,14 @@ export function resolveNow(tree: UiNode, target: Target, opts: ResolveOptions): 
 /**
  * A candidate's label as an ambiguity lists it: quoted, unless it is an input's own text — an Android EditText with no
  * content-desc is labelled by its text (android-tree-dialect.ts), which may be a password typed a moment ago, and a
- * fill's re-read lists it when a second match appears mid-fill. That text is said by its length, as a fill says it.
+ * fill's re-read lists it when a second match appears mid-fill. That text is said by its length, as a fill says it, and
+ * the input by its rect, so two without an id are still told apart. The limit: this covers averi's own derivation
+ * only; a label the app built around the text (a content-desc holding it) is quoted, and mid-fill the fill's re-read
+ * says the typed value inside it by its length (fill-refetch.ts#withoutTyped).
  */
 function candidateLabel(n: UiNode): string {
   const text = n.role === INPUT_ROLE ? n.value?.trim() : undefined;
-  return text && n.label?.trim() === text ? `<its text, ${charactersText(text.length)}>` : JSON.stringify(n.label);
+  return text && n.label?.trim() === text ? `<its text, ${charactersText(text.length)}> at ${rectText(n.rect)}` : JSON.stringify(n.label);
 }
 
 /**

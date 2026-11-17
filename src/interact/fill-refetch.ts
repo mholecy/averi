@@ -10,14 +10,16 @@
  * - lost: `screen-changed` when the screen is provably another (the pre-typing read's, or — without one, the post-focus
  *   read skipped — the screen the field was resolved on, for the wording only), else `unmatched`.
  * The guard's states are `findAgain`'s, pure. A tree that cannot be read throws the caller's error: the app has a
- * window by then (the focus tap landed), so an unreadable tree is a dead device, not a screen settling. Only the read
- * is wrapped: a refusal from resolveNow (a second match appearing mid-fill) keeps its own wording.
+ * window by then (the focus tap landed), so an unreadable tree is a dead device, not a screen settling. A refusal from
+ * resolveNow (a second match appearing mid-fill) keeps its own wording and class, the typed value inside any label it
+ * lists said by its length (`withoutTyped`): an app's label may hold the field's text, and that may be a password.
  */
 
 import { everyNode, sameRect, type DeviceAdapter, type UiNode } from '../adapters/types.js';
 import { readTreeOrThrow, sameScreen, screenIdentity, type ScreenIdentity } from '../ui-tree/read-tree.js';
 import type { FieldRead } from './fill-facts.js';
-import { resolveNow, type ResolveOptions, type Target } from './resolve.js';
+import { charactersText } from '../util/count.js';
+import { AmbiguityRefusal, resolveNow, type ResolveOptions, type Target } from './resolve.js';
 
 /**
  * Where the identity fallback stands:
@@ -100,17 +102,40 @@ export interface RefetchOf {
   resolvedOn?: ScreenIdentity;
   /** The error a tree that cannot be read throws, of the read's own. */
   unreadable: (e: Error) => Error;
+  /** The value the fill types — said by its length inside a refusal's labels (`withoutTyped`). */
+  typed: string;
+}
+
+/**
+ * The refusal with every occurrence of `typed` inside a listed label (`label="…"`) said as `<the typed value, N
+ * characters>`. Only inside the labels: the selector on the first line is the caller's own, and a short value would
+ * otherwise be replaced inside counts and rects. A new error of the same class, carrying nothing of the old one.
+ */
+export function withoutTyped(refusal: AmbiguityRefusal, typed: string): AmbiguityRefusal {
+  if (typed === '') return refusal;
+  const said = `<the typed value, ${charactersText(typed.length)}>`;
+  const message = refusal.message.replace(/label=("(?:[^"\\]|\\.)*")/g, (whole, quoted: string) => {
+    const label = JSON.parse(quoted) as string;
+    return label.includes(typed) ? `label=${JSON.stringify(label.split(typed).join(said))}` : whole;
+  });
+  return message === refusal.message ? refusal : new AmbiguityRefusal(message);
 }
 
 /** The reads of the field `chosen` (see the module doc). */
-export function fieldRefetch({ adapter, target, resolve, chosen, resolvedOn, unreadable }: RefetchOf): FieldRefetch {
+export function fieldRefetch({ adapter, target, resolve, chosen, resolvedOn, unreadable, typed }: RefetchOf): FieldRefetch {
   let last: UiNode | undefined;
   let guard: TwinGuard = { phase: 'before-typing' };
   return {
     read: async () => {
       const tree = await readTreeOrThrow(adapter, unreadable);
       last = tree;
-      return findAgain(tree, resolveNow(tree, target, resolve)?.node, chosen, guard);
+      let found: UiNode | undefined;
+      try {
+        found = resolveNow(tree, target, resolve)?.node;
+      } catch (e) {
+        throw e instanceof AmbiguityRefusal ? withoutTyped(e, typed) : e;
+      }
+      return findAgain(tree, found, chosen, guard);
     },
     typingStarts: () => {
       if (guard.phase !== 'before-typing') return;

@@ -24,10 +24,15 @@ afterEach(() => {
 // be a credential, nor the field's text other than as lengths or bullets. A selector is echoed as the caller wrote it,
 // so text inside the selector is one exception: it is the caller's own, and the flow engine redacts a secret from it
 // (the last describe). The flow line's value is the other: the engine shows it as the author wrote it, `***` for a
-// secret. An ambiguity's list of candidates names an input whose label is its own text by a length. Each case below is a fill whose field the fake drives to one FillFailure, Difference,
-// refusal, verdict or caveat; its sentence is asserted first, so a case that stops reaching its path fails as such.
+// secret. An ambiguity's list of candidates names an input whose label is its own text by a length, and a fill's
+// re-read says the typed value inside any other label by its length too. Each case below is a fill whose field the
+// fake drives to one FillFailure, Difference, refusal, verdict or caveat; its sentence is asserted first, so a case
+// that stops reaching its path fails as such.
 
-/** The typed value and the field's own text: strings no sentence of averi holds, nor any run of four of their characters. */
+/**
+ * The typed value and the field's own text: strings no sentence of averi holds, nor any four characters of them in a
+ * row.
+ */
 const TYPED = 'zq7vXk2§';
 const PREFILL = 'PREFILL¤';
 /** A digit value, for the fields that group or mark what they are typed. */
@@ -326,7 +331,23 @@ const FAILURES: Record<string, FailureCase> = {
       return f;
     },
     opts: { ambiguous: 'refuse' },
-    says: /^Selector matches 2 elements: id:"field"\n {2}textfield id=field label=<its text, 8 characters>\n {2}textfield id=field label=<its text, 8 characters>\n/,
+    says: /^Selector matches 2 elements: id:"field"\n {2}textfield id=field label=<its text, 8 characters> at 0,20 100x10\n {2}textfield id=field label=<its text, 8 characters> at 0,60 100x10\n/,
+  },
+  'a second match labelled with the typed value and more, appearing mid-fill (ambiguous: refuse)': {
+    // An app-built content-desc that holds the field's text: no derivation of averi's, so the fill's re-read says it.
+    build: () => {
+      const f = fieldFake();
+      const live = f.fake.live();
+      f.fake.typeText = async (text: string) => {
+        f.fake.typed.push(text);
+        const field = live.children[0];
+        field.value = (field.value ?? '') + text;
+        live.children.push(el({ role: 'textfield', identifier: 'field', label: `${field.value}, Password`, value: '••••••••' }));
+      };
+      return f;
+    },
+    opts: { ambiguous: 'refuse' },
+    says: /^Selector matches 2 elements: id:"field"\n {2}textfield id=field label=null\n {2}textfield id=field label="<the typed value, 8 characters>, Password"\n/,
   },
   'refused: a character the adapter cannot type': {
     build: () => {
