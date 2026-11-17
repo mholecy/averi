@@ -58,6 +58,13 @@ describe('pollVerdicts', () => {
     expect(verdict).toEqual({ pass: false, detail: 'timed out on wrong content' });
   });
 
+  it('a later miss replaces an earlier one: the deadline reports the most recent observation', async () => {
+    const { fake } = counted();
+    let round = 0;
+    const verdict = await pollVerdicts<string>(fake, () => ({ pass: false, miss: `seen ${round++}` }), { ...FAST, timeoutDetail: wording });
+    expect(verdict).toEqual({ pass: false, detail: `timed out on seen ${round - 1}` });
+  });
+
   it('a later round withdraws a covered miss: the timeout words the silence after it', async () => {
     const { fake } = counted();
     type Miss = { detail: string; covered: boolean };

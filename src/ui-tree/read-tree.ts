@@ -126,18 +126,6 @@ export async function readTreeOrThrow(adapter: Pick<DeviceAdapter, 'uiTree'>, wr
 }
 
 /**
- * A poll round that has NOT concluded but has something to say. Returned by a
- * predicate in place of `undefined` to keep polling while remembering a
- * detail for the timeout report ("element found but content was: …" must
- * survive the element vanishing again before the deadline). A class rather
- * than a tagged union so the predicate's success value needs no wrapping: a
- * poller that only ever hits or misses returns `T | undefined`.
- */
-export class PollMiss {
-  constructor(readonly detail: string) {}
-}
-
-/**
  * A poll round whose tree could not DECIDE the question (ui-tree/verdict.ts:
  * the tree is bare, and a selector's miss or an absence on it says
  * nothing). Returned by a predicate in place of `undefined`: the poll goes
@@ -206,8 +194,6 @@ export type PollOutcome<T> =
   | { timedOut: false; value: T }
   | {
       timedOut: true;
-      /** The last PollMiss detail a round produced, if any. A round with nothing to say never erases it. */
-      detail?: string;
       /** The LAST read's error — set when the final round could not read a tree, cleared by any successful read. */
       readError?: Error;
       /**
@@ -220,8 +206,8 @@ export type PollOutcome<T> =
       treesRead: number;
       /**
        * The last tree read, when its round returned `Undecided`. Cleared by
-       * any round that read a tree and decided — a value, `undefined` or a
-       * PollMiss — so it describes the LAST tree only; a round whose read
+       * any round that read a tree and decided — a value or `undefined` — so
+       * it describes the LAST tree only; a round whose read
        * failed leaves it standing (it is still the last TREE), and
        * `readError` says that read failed — which fact a caller puts first
        * is its own wording.
@@ -356,9 +342,10 @@ export interface PollRound {
  *   the rounds that read a tree (`treesRead`), so a caller can tell "never
  *   matched" from "never read".
  * - The predicate runs only on a tree it could read. A value ends the poll;
- *   `undefined` continues it; a `PollMiss` continues it and records a detail
- *   that a later silent round does not overwrite; `Undecided` continues it and
- *   keeps the tree for the timeout while it is the last one read.
+ *   `undefined` continues it; `Undecided` continues it and keeps the tree for
+ *   the timeout while it is the last one read. What a round found short of a
+ *   value is the caller's to remember: a value of `T` can be a final miss as
+ *   well as a pass (verify/poll-verdict.ts#pollVerdicts).
  * - At least one read happens BEFORE the deadline is checked, so a
  *   `timeoutMs` of 0 is a single probe, and a budget shorter than one device
  *   read still gets one honest look (the optional-tap finding of 2026-08-19).
@@ -394,8 +381,8 @@ export interface PollRound {
  * - A handed-on read (`opts.first`, docs/adr/0030-a-read-
  *   is-handed-on-only-as-a-first-sample-or-a-positive-verdict.md) is round
  *   zero, asked before any device read. It may only END the poll: a value
- *   returns it; anything else — a miss, a PollMiss (its detail is not kept),
- *   `Undecided`, a predicate's throw — is discarded, nothing of it reaches the
+ *   returns it; anything else — a miss, `Undecided`, a predicate's throw —
+ *   is discarded, nothing of it reaches the
  *   outcome (`treesRead`, `lastTree`, `undecidedTree` count fresh reads only),
  *   the deadline is not checked, and the first fresh read follows the pause
  *   `pauseAfterRead` gives after the handed read, counted from when it ended.
@@ -416,24 +403,23 @@ export async function pollTree<T>(
   predicate: (
     tree: UiNode,
     round: PollRound,
-  ) => Promise<T | PollMiss | typeof Undecided | undefined> | T | PollMiss | typeof Undecided | undefined,
+  ) => Promise<T | typeof Undecided | undefined> | T | typeof Undecided | undefined,
   opts: PollOptions,
 ): Promise<PollOutcome<T>> {
   const deadline = Date.now() + opts.timeoutMs;
-  let detail: string | undefined;
   let readError: Error | undefined;
   let treesRead = 0;
   let undecidedTree: UiNode | undefined;
   let lastTree: UiNode | undefined;
   const handed = opts.first?.take();
   if (handed !== undefined) {
-    let verdict: T | PollMiss | typeof Undecided | undefined;
+    let verdict: T | typeof Undecided | undefined;
     try {
       verdict = await predicate(handed.tree, { deadline, handedOn: true });
     } catch {
       verdict = undefined;
     }
-    if (verdict !== undefined && verdict !== Undecided && !(verdict instanceof PollMiss)) {
+    if (verdict !== undefined && verdict !== Undecided) {
       return { timedOut: false, value: verdict };
     }
     // The fresh read starts as if the handed read had been this poll's previous round: pauseAfterRead of its read,
@@ -453,10 +439,9 @@ export async function pollTree<T>(
       lastTree = read.tree;
       const verdict = await predicate(read.tree, { deadline });
       undecidedTree = verdict === Undecided ? read.tree : undefined;
-      if (verdict instanceof PollMiss) detail = verdict.detail;
-      else if (verdict !== undefined && verdict !== Undecided) return { timedOut: false, value: verdict };
+      if (verdict !== undefined && verdict !== Undecided) return { timedOut: false, value: verdict };
     }
-    if (Date.now() >= deadline) return { timedOut: true, detail, readError, treesRead, undecidedTree, lastTree };
+    if (Date.now() >= deadline) return { timedOut: true, readError, treesRead, undecidedTree, lastTree };
     await sleep(pauseAfterRead(opts.pollMs, readMs));
   }
 }

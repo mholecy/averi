@@ -6,7 +6,6 @@ import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { boundReads } from '../helpers/terminal-read.js';
 import { PersistentReadError, type UiNode } from '../../src/adapters/types.js';
 import {
-  PollMiss,
   Undecided,
   type HandedRead,
   pollTimeoutMessage,
@@ -190,25 +189,8 @@ describe('pollTree — the one deadline loop', () => {
       () => undefined, // never satisfied
       FAST,
     );
-    expect(outcome).toMatchObject({ timedOut: true, detail: undefined, readError: undefined });
+    expect(outcome).toMatchObject({ timedOut: true, readError: undefined });
     if (outcome.timedOut) expect(outcome.treesRead).toBeGreaterThan(0);
-  });
-
-  it('a PollMiss detail survives later rounds that have nothing to say', async () => {
-    let round = 0;
-    const outcome = await pollTree(
-      { uiTree: async () => tree },
-      () => (round++ === 0 ? new PollMiss('element found but content was: WRONG') : undefined),
-      FAST,
-    );
-    expect(outcome).toMatchObject({ timedOut: true, detail: 'element found but content was: WRONG' });
-  });
-
-  it('a later PollMiss replaces an earlier one — the deadline reports the most recent observation', async () => {
-    let round = 0;
-    const outcome = await pollTree({ uiTree: async () => tree }, () => new PollMiss(`seen ${round++}`), FAST);
-    expect(outcome.timedOut).toBe(true);
-    if (outcome.timedOut) expect(outcome.detail).toBe(`seen ${round - 1}`);
   });
 
   // The optional-tap finding: a budget shorter than one device read must
@@ -620,20 +602,19 @@ describe('pollTree — a handed-on first sample (ADR 0030)', () => {
     expect(h.asked()).toBe(1); // asked once, never again on later rounds
   });
 
-  it('a PollMiss, an Undecided or a throw on the handed tree leaves nothing in the outcome', async () => {
+  it('an Undecided or a throw on the handed tree leaves nothing in the outcome', async () => {
     const { adapter } = counting();
     const now = Date.now();
     const throwing = () => {
       throw new Error('handed throw');
     };
-    for (const handedSays of [() => new PollMiss('handed detail'), () => Undecided, throwing]) {
+    for (const handedSays of [() => Undecided, throwing]) {
       const outcome = await pollTree(adapter, (_t, round) => (round.handedOn ? handedSays() : undefined), {
         timeoutMs: 0,
         pollMs: 5,
         first: handing({ tree: marked('handed'), startedAt: now, endedAt: now }).first,
       });
       expect(outcome).toMatchObject({ timedOut: true, treesRead: 1 });
-      expect(outcome.timedOut && outcome.detail).toBeUndefined();
       expect(outcome.timedOut && outcome.undecidedTree).toBeUndefined();
     }
   });

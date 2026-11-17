@@ -8,29 +8,27 @@ import type { MeasuredFrame } from './capture.js';
 import type { Shot } from './shot.js';
 
 /**
- * The verifier's poll vocabulary, shared by the tree-only asserts' poll and the
+ * The verifier's poll and its vocabulary, shared by the tree-only asserts' poll and the
  * pixel poll (verify/pixel-poll.ts, the color and ocr asserts). Its own module
  * below assert.ts, importing no assert code, for the reason fail-closed.ts is
  * one: both need it and assert.ts imports the other. The tree poll
- * (ui-tree/read-tree.ts) does not learn any of this: it speaks
- * value-or-`PollMiss`, and the translation is the verifier's.
+ * (ui-tree/read-tree.ts) does not learn any of this: it ends on a value and
+ * remembers no miss; what a round missed is the verifier's to keep (`pollVerdicts`).
  */
 
 /**
- * What one poll round concluded. `undefined` (not this type) means "nothing to
- * say, keep polling" — the element isn't there yet. `pass: true` stops the
- * poll; `pass: false` carries a detail worth reporting IF the deadline is
- * reached, without ending the poll: mid-animation geometry may legitimately be
- * wrong for a frame, so only the state at timeout is the verdict.
+ * A verdict in sentences: an assert's result, and what a measurement concludes of one round. `pass: true` stops the
+ * poll; `pass: false` carries a detail worth reporting IF the deadline is reached, without ending the poll (a round's
+ * miss, `asRound`) — unless it is final.
  */
 export type PollVerdict = { pass: boolean; detail?: string; final?: undefined } | FinalVerdict;
 
 /**
  * A miss no later round can change: the poll ends at once with this verdict
  * instead of polling to the deadline, which would only repeat it and bury it
- * under the timeout wording. Only the pixel poll honours it — for the ocr
- * assert's engine that will never read (text-parity.ts#measureOcrAssert, on
- * an `OcrUnavailableError`). The tree-only asserts never set it. Its own
+ * under the timeout wording. Every poll honours it (`pollVerdicts`); the ocr
+ * assert's measurement sets it, for an engine that will never read (text-parity.ts#measureOcrAssert, on
+ * an `OcrUnavailableError`), and the pixel poll for a capture the adapter refused. Its own
  * member of the union because a final verdict ENDS the assert and its detail
  * IS the failure sentence, so one that does not fail, or fails without its
  * sentence, does not type-check.
