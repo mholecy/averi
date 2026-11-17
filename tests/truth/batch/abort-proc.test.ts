@@ -85,7 +85,7 @@ async function ready(run: Run): Promise<number[]> {
 
 const summary = () => text('summary.txt').split('\n');
 
-describe('SIGINT on the real process seam: restores run, RESTORE for the failed one, exit 130 (b11-dry int.sh)', () => {
+describe('SIGINT on the real process seam: restores run, RESTORE for the failed one, exit 130', () => {
   it('int-d55: Ctrl-C inside a dirty window — the probe\'s group stopped (grandchild too), the restore run and verified, the abort SUMMARY on the terminal, exit 130', async () => {
     const run = start('int');
     const [probe, grandchild] = await ready(run);

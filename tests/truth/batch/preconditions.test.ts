@@ -42,7 +42,7 @@ const clean: [string, CallResult][] = [
   ['status', ok('')],
 ];
 
-describe('checkout — main\'s HEAD, no modified tracked file (batch-11.sh:209–219, batch-12.sh:117–121)', () => {
+describe('checkout — main\'s HEAD, no modified tracked file', () => {
   it('HEAD = main, clean: ok, with the HEAD commit; every call git -C <repo>, in order, through the Run given', async () => {
     const g = fakeGit(clean);
     expect(await checkout({ repo: 'the/repo', run: g.run })).toEqual({ ok: true, head: HEAD });
@@ -50,7 +50,7 @@ describe('checkout — main\'s HEAD, no modified tracked file (batch-11.sh:209�
     expect(g.said()).toEqual([TOP, 'rev-parse --verify HEAD^{commit}', 'rev-parse --verify refs/heads/main^{commit}', '--no-optional-locks status --porcelain -z --untracked-files=no']);
   });
 
-  it('HEAD ≠ main: both named by their short shas, and what to do (batch-11\'s "git switch main, then rerun")', async () => {
+  it('HEAD ≠ main: both named by their short shas, and what to do ("git switch main, then rerun")', async () => {
     const g = fakeGit([['refs/heads/main', ok(`${MAIN}\n`)], ...clean]);
     expect(await checkout({ repo: 'r', run: g.run })).toEqual({ ok: false, why: "the checkout's HEAD (aaaaaaaa) is not main's (bbbbbbbb) — git switch main, then rerun" });
   });
@@ -71,7 +71,7 @@ describe('checkout — main\'s HEAD, no modified tracked file (batch-11.sh:209�
     expect(SHOWN_PATHS).toBe(3);
   });
 
-  it('a path holding a line break is named JSON-quoted, and the block\'s line is still one line, never a throw (review round 1)', async () => {
+  it('a path holding a line break is named JSON-quoted, and the block\'s line is still one line, never a throw', async () => {
     const g = fakeGit([['status', ok(' M a\nb\0 M c\rd.ts\0')], ...clean]);
     const r = await checkout({ repo: 'r', run: g.run });
     expect(r).toEqual({ ok: false, why: 'the checkout has 2 modified tracked file(s) ("a\\nb", "c\\rd.ts") — the batch runs main as committed' });
@@ -83,7 +83,7 @@ describe('checkout — main\'s HEAD, no modified tracked file (batch-11.sh:209�
     expect(await checkout({ repo: 'r', run: g.run })).toEqual({ ok: false, why: 'the checkout has 1 modified tracked file(s) (a b/Šť.ts) — the batch runs main as committed' });
   });
 
-  it('HEAD ≠ main and modified files: both said, HEAD first (one rerun fixes both, T2 S3)', async () => {
+  it('HEAD ≠ main and modified files: both said, HEAD first (one rerun fixes both)', async () => {
     const g = fakeGit([['refs/heads/main', ok(`${MAIN}\n`)], ['status', ok(' M a.ts\0')], ...clean]);
     expect(await checkout({ repo: 'r', run: g.run })).toEqual({
       ok: false,
@@ -108,7 +108,7 @@ describe('checkout — main\'s HEAD, no modified tracked file (batch-11.sh:209�
     expect(g.said()).toEqual([TOP]);
   });
 
-  it('the repo named is no top of a checkout (a folder inside another one): said with the top git found, nothing else asked (review round 1)', async () => {
+  it('the repo named is no top of a checkout (a folder inside another one): said with the top git found, nothing else asked', async () => {
     const g = fakeGit([[TOP, ok('/else/where\n')], ...clean]);
     expect(await checkout({ repo: 'r', run: g.run })).toEqual({ ok: false, why: 'r is not the top of a git checkout (top is /else/where)' });
     expect(g.said()).toEqual([TOP]);
@@ -116,7 +116,7 @@ describe('checkout — main\'s HEAD, no modified tracked file (batch-11.sh:209�
     expect(await checkout({ repo: 'r\nx', run: odd.run })).toEqual({ ok: false, why: '"r\\nx" is not the top of a git checkout (top is /else/a)' });
   });
 
-  it('the top compared through the fs given (BatchFs.real), never the real one behind its back (T2 S3 code review)', async () => {
+  it('the top compared through the fs given (BatchFs.real), never the real one behind its back', async () => {
     const fs = { ...nodeFs, real: (p: string) => (p === 'r' ? '/repo/r' : p) };
     expect(await checkout({ repo: 'r', run: fakeGit([[TOP, ok('/repo/r\n')], ...clean]).run, fs })).toEqual({ ok: true, head: HEAD });
     expect(await checkout({ repo: 'r', run: fakeGit([[TOP, ok(`${nodeFs.real('r')}\n`)], ...clean]).run, fs })).toEqual({ ok: false, why: `r is not the top of a git checkout (top is ${nodeFs.real('r')})` });
@@ -176,7 +176,7 @@ describe('gitEnv — the repo-locating variables dropped, everything else kept, 
     expect(env.GIT_DIR).toBe('.git');
   });
 
-  it('drops config given through the env too: GIT_CONFIG_PARAMETERS, GIT_CONFIG_COUNT and every GIT_CONFIG_KEY_n / GIT_CONFIG_VALUE_n; the config files\' own variables kept (review round 1)', () => {
+  it('drops config given through the env too: GIT_CONFIG_PARAMETERS, GIT_CONFIG_COUNT and every GIT_CONFIG_KEY_n / GIT_CONFIG_VALUE_n; the config files\' own variables kept', () => {
     const env = { GIT_CONFIG_PARAMETERS: 'x', GIT_CONFIG_COUNT: '2', GIT_CONFIG_KEY_0: 'a', GIT_CONFIG_VALUE_0: 'b', GIT_CONFIG_KEY_12: 'c', GIT_CONFIG_VALUE_12: 'd', GIT_CONFIG_GLOBAL: 'g', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_KEYS: 'k', XGIT_CONFIG_KEY_0: 'y', GIT_CONFIG_PARAMETERSX: 'z', GIT_CONFIG_KEY_0X: 'w' };
     expect(gitEnv(env)).toEqual({ GIT_CONFIG_GLOBAL: 'g', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_KEYS: 'k', XGIT_CONFIG_KEY_0: 'y', GIT_CONFIG_PARAMETERSX: 'z', GIT_CONFIG_KEY_0X: 'w' });
   });
@@ -186,7 +186,7 @@ describe('gitEnv — the repo-locating variables dropped, everything else kept, 
   });
 });
 
-describe('ancestor — a required commit by ancestry, never by a symbol (batch-4.sh:200 → batch-11.sh:238–242, batch-11-README:101)', () => {
+describe('ancestor — a required commit by ancestry, never by a symbol', () => {
   const SHA = 'abc1234';
   const known: [string, CallResult][] = [
     ['cat-file -e', ok()],
@@ -199,7 +199,7 @@ describe('ancestor — a required commit by ancestry, never by a symbol (batch-4
     expect(g.said()).toEqual([TOP, `cat-file -e ${SHA}^{commit}`, `merge-base --is-ancestor ${SHA} HEAD`]);
   });
 
-  it('the sha format first, batch-11\'s knob rule exactly (7–40 lowercase hex digits): no git call for one that breaks it', async () => {
+  it('the sha format first (7–40 lowercase hex digits): no git call for one that breaks it', async () => {
     for (const bad of ['abc123', 'ABC1234', 'abc1234 ', 'g'.repeat(7), 'a'.repeat(41), 'HEAD', 'main', 'abc1234^']) {
       const g = fakeGit(known);
       expect(await ancestor({ repo: 'r', run: g.run, sha: bad }), bad).toEqual({ ok: false, why: `${JSON.stringify(bad)} is not a commit sha (7–40 hex digits)` });
@@ -208,7 +208,7 @@ describe('ancestor — a required commit by ancestry, never by a symbol (batch-4
     expect([SHA_FORMAT.test('a'.repeat(7)), SHA_FORMAT.test('0'.repeat(40))]).toEqual([true, true]);
   });
 
-  it('`what` names the commit the way the batch does (`M_D43=<sha>`); unset, it says so (batch-11\'s "M_D43 is not set")', async () => {
+  it('`what` names the commit the way the batch does (`M_D43=<sha>`); unset, it says so ("M_D43 is not set")', async () => {
     const g = fakeGit([['merge-base', exit(1)], ...known]);
     expect(await ancestor({ repo: 'r', run: g.run, sha: SHA, what: 'M_D43' })).toEqual({ ok: false, why: `M_D43=${SHA} is not an ancestor of HEAD (not merged into main yet)` });
     expect(await ancestor({ repo: 'r', run: g.run, sha: '', what: 'M_D43' })).toEqual({ ok: false, why: 'M_D43 is not set' });
@@ -224,13 +224,13 @@ describe('ancestor — a required commit by ancestry, never by a symbol (batch-4
     expect(await ancestor({ repo: 'r', run: quiet.run, sha: SHA })).toEqual({ ok: false, why: `${SHA} names no commit of this repo` });
   });
 
-  it('a repo that is no top of a checkout: said before any commit is looked for (review round 1)', async () => {
+  it('a repo that is no top of a checkout: said before any commit is looked for', async () => {
     const g = fakeGit([[TOP, ok('/else/where\n')], ...known]);
     expect(await ancestor({ repo: 'r', run: g.run, sha: SHA })).toEqual({ ok: false, why: 'r is not the top of a git checkout (top is /else/where)' });
     expect(g.said()).toEqual([TOP]);
   });
 
-  it('`what` holding a line break is named JSON-quoted in every why, and the block\'s line is made (T2 S3 code review)', async () => {
+  it('`what` holding a line break is named JSON-quoted in every why, and the block\'s line is made', async () => {
     const what = 'M\nD43';
     const whys = [
       await ancestor({ repo: 'r', run: fakeGit(known).run, sha: '', what }),
@@ -242,7 +242,7 @@ describe('ancestor — a required commit by ancestry, never by a symbol (batch-4
     expect(() => preconditionLine('D43 live verdict', whys)).not.toThrow();
   });
 
-  it('not an ancestor of HEAD (exit 1): batch-11\'s words', async () => {
+  it('not an ancestor of HEAD (exit 1): "not merged into main yet"', async () => {
     const g = fakeGit([['merge-base', exit(1)], ...known]);
     expect(await ancestor({ repo: 'r', run: g.run, sha: SHA })).toEqual({ ok: false, why: `${SHA} is not an ancestor of HEAD (not merged into main yet)` });
   });
@@ -281,8 +281,8 @@ function fakeLive(cases: { id: string; platforms?: string[]; group?: string }[],
   return { table, asked };
 }
 
-describe('casesOnMain — the live cases a block runs, read from main\'s live-cases.ts table, never grepped (batch-11.sh:228 grepped `id: \'kf1\'`)', () => {
-  it('all there: ok; selectCases asked for these ids, the platform, the native app and the forms group by default (live_run\'s --groups forms)', async () => {
+describe('casesOnMain — the live cases a block runs, read from main\'s live-cases.ts table, never grepped', () => {
+  it('all there: ok; selectCases asked for these ids, the platform, the native app and the forms group by default', async () => {
     const { table, asked } = fakeLive([{ id: 'kf1' }, { id: 'kf2' }, { id: 'kf3' }]);
     expect(await casesOnMain({ ids: ['kf1', 'kf2'], platform: 'android', table })).toEqual({ ok: true });
     expect(asked).toEqual([{ platform: 'android', app: 'native', groups: ['forms'], only: ['kf1', 'kf2'] }]);
@@ -306,7 +306,7 @@ describe('casesOnMain — the live cases a block runs, read from main\'s live-ca
     expect(asked).toEqual([]);
   });
 
-  it('a table that cannot be read: said, never thrown — its selectCases failing, or the table not loading at all (a missing file, a syntax error: review round 1)', async () => {
+  it('a table that cannot be read: said, never thrown — its selectCases failing, or the table not loading at all (a missing file, a syntax error)', async () => {
     const live: LiveCases = { selectCases: () => Promise.reject(new Error('catalog: held cell x has no `held`\nstack')), catalogOf: () => Promise.reject(new Error('no')) };
     expect(await casesOnMain({ ids: ['kf1'], platform: 'android', table: async () => live })).toEqual({ ok: false, why: "main's live cases could not be read: catalog: held cell x has no `held`" });
     const unloadable: LiveTable = () => Promise.reject(new SyntaxError("Unexpected token ')'\n    at live-cases.ts:3"));
@@ -314,7 +314,7 @@ describe('casesOnMain — the live cases a block runs, read from main\'s live-ca
     expect(await casesOnMain({ ids: ['kf1'], platform: 'android', table: () => Promise.reject('ENOENT') })).toEqual({ ok: false, why: "main's live cases could not be read: ENOENT" });
   });
 
-  it('an app or a group holding a line break is named JSON-quoted too, and the block\'s line is made (T2 S3 code review)', async () => {
+  it('an app or a group holding a line break is named JSON-quoted too, and the block\'s line is made', async () => {
     const { table } = fakeLive([]);
     const r = await casesOnMain({ ids: ['kf1'], platform: 'android', app: 'na\ntive', groups: ['fo\nrms', 'ensure'], table });
     expect(r).toEqual({ ok: false, why: "live case(s) kf1 not on main's live-cases.ts (android, \"na\\ntive\" app, groups \"fo\\nrms\", ensure)" });
@@ -327,7 +327,7 @@ describe('casesOnMain — the live cases a block runs, read from main\'s live-ca
   });
 });
 
-describe('cellsOnMain — the lab cells a block uses, in main\'s catalog (batch-11.sh:223–234 and batch-12.sh:282, :343\'s cells_have)', () => {
+describe('cellsOnMain — the lab cells a block uses, in main\'s catalog', () => {
   it('all there: ok; one missing or more named, in order, each once', async () => {
     const { table } = fakeLive([], ['open', 'form-basic', 'carousel-recycler-free']);
     expect(await cellsOnMain({ ids: ['open', 'carousel-recycler-free'], table })).toEqual({ ok: true });
@@ -344,7 +344,7 @@ describe('cellsOnMain — the lab cells a block uses, in main\'s catalog (batch-
   });
 });
 
-describe('preconditionLine — a precondition not shown makes the block INCONCLUSIVE, naming why (batch-2 on; batch-11.sh:441–442)', () => {
+describe('preconditionLine — a precondition not shown makes the block INCONCLUSIVE, naming why', () => {
   it('all ok: no line', () => {
     expect(preconditionLine('D43 live verdict', [{ ok: true }, { ok: true, head: HEAD } as never])).toBeUndefined();
     expect(preconditionLine('D43 live verdict', [])).toBeUndefined();

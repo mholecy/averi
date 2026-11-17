@@ -39,7 +39,7 @@ const builtRef = (apk: string) => ({ ensure: async () => ({ ok: true as const, h
 type Spec = { check(c: NeedCtx): Promise<unknown>; alive(c: NeedCtx): Promise<unknown> };
 const settle = async () => {};
 
-describe('the android need (batch-11.sh:427–450): guard, this run\'s build installed, the APK pulled and its cells.json main\'s, the handlers counted', () => {
+describe('the android need: guard, this run\'s build installed, the APK pulled and its cells.json main\'s, the handlers counted', () => {
   it('met: its how; the APK pulled into the lab folder, its cells.json and the handler counts kept beside it', async () => {
     const android = androidLab({ settle });
     const r = await (android.need as Spec).check(needCtx());
@@ -78,7 +78,7 @@ describe('the android need (batch-11.sh:427–450): guard, this run\'s build ins
     expect(android.pulled()).toBe(join(dir, 'lab', 'installed-2.apk'));
   });
 
-  it('no serial given: not met, nothing called; an emulator not the lab AVD: the guard\'s why (b11-dry noandroid)', async () => {
+  it('no serial given: not met, nothing called; an emulator not the lab AVD: the guard\'s why', async () => {
     const check = (androidLab({ settle }).need as Spec).check;
     expect(await check(needCtx(runOf(world), null))).toEqual({ ok: false, why: 'no lab emulator serial given (--serial or AVERI_LAB_SERIAL)' });
     expect(world.calls).toEqual([]);
@@ -118,7 +118,7 @@ describe('the android need (batch-11.sh:427–450): guard, this run\'s build ins
     expect(bad).toEqual({ ok: false, why: `this run's build not installed (adb install -r: exit 1 adb: failed to stat ${join(dir, 'none.apk')}: No such file or directory)` });
   });
 
-  it('this run\'s build failed: a WARN, the APK already installed used (batch-11); required by the batch: not met (review round 1, MAJOR 2)', async () => {
+  it('this run\'s build failed: a WARN, the APK already installed used; required by the batch: not met', async () => {
     const failed = { ensure: async () => ({ ok: false as const, why: 'the Android build failed (exit 1; android-build.log)' }), built: () => undefined };
     const r = await (androidLab({ settle, build: failed }).need as Spec).check(needCtx());
     expect(r).toMatchObject({ ok: true, warning: 'the Android build failed (exit 1; android-build.log); the app already installed is used', how: expect.stringMatching(/^averi_lab emulator LAB-SERIAL; not rebuilt;/) });
@@ -144,7 +144,7 @@ describe('the android need (batch-11.sh:427–450): guard, this run\'s build ins
   });
 });
 
-describe('the handlers\' need: the counts a block expects (batch-11.sh:445: expected 2 and 1, else D55 skipped)', () => {
+describe('the handlers\' need: the counts a block expects', () => {
   it('as expected: met; one off: not met naming each; read again each time it is asked', async () => {
     const android = androidLab({ settle });
     const ok = android.handlersNeed({ 'averilab://shared/open': 2, 'averilab://cell/open': 1 }) as Spec;
@@ -155,7 +155,7 @@ describe('the handlers\' need: the counts a block expects (batch-11.sh:445: expe
     expect(await off.check(needCtx(runOf(world), null))).toMatchObject({ ok: false });
   });
 
-  it('its recheck reads the counts again: a handler gone since the check is seen before the next block (hand mutant H43)', async () => {
+  it('its recheck reads the counts again: a handler gone since the check is seen before the next block', async () => {
     const n = androidLab({ settle }).handlersNeed({ 'averilab://shared/open': 2 }) as Spec;
     expect(await n.check(needCtx())).toMatchObject({ ok: true });
     const one = fixture('query-activities-api33-b10-cell.txt');
@@ -235,7 +235,7 @@ describe('a tree kept: evidence in the block\'s folder, its fitness as a fixture
   });
 });
 
-describe('the probe\'s own state put back (S5\'s StateRestore: batch-11\'s `d55-b11.ts --restore`)', () => {
+describe('the probe\'s own state put back (S5\'s StateRestore: the probe\'s `--restore`)', () => {
   const stateFile = () => join(dir, 'D55-state.json');
   const restoreOf = (stateCommand?: string) => probeRestore({ repo: join(dir, 'repo'), probe: '/probes/d55-b13.ts', args: ['--serial', LAB_SERIAL, '--apk', '/runs/lab/installed.apk'], stateFile: stateFile(), secs: 300, fs: nodeFs, stateCommand });
 
@@ -263,7 +263,7 @@ describe('the probe\'s own state put back (S5\'s StateRestore: batch-11\'s `d55-
   });
 });
 
-describe('the chooser\'s stretch (batch-11\'s D55, batch-12\'s E5): the window, the work, the cleanup\'s line and hand lines, the window closed', () => {
+describe('the chooser\'s stretch: the window, the work, the cleanup\'s line and hand lines, the window closed', () => {
   it('a clean lab: the window opened with its cleanup label and block, the work, the cleanup OK, closed', async () => {
     const { ctx, events, windows } = blockCtx();
     let spec: WindowSpec | undefined;
@@ -277,7 +277,7 @@ describe('the chooser\'s stretch (batch-11\'s D55, batch-12\'s E5): the window, 
     expect(events).toEqual([`open ${CHOOSER_WINDOW}`, 'work', expect.stringMatching(/^verdict D55 cleanup: OK — /), `close ${CHOOSER_WINDOW}`]);
   });
 
-  it('its own cleanup label, one for both paths: the cleanup\'s line and the window\'s (the abort\'s) carry it (T2b batch-13 gap 2)', async () => {
+  it('its own cleanup label, one for both paths: the cleanup\'s line and the window\'s (the abort\'s) carry it', async () => {
     const { ctx, events, windows } = blockCtx();
     let spec: WindowSpec | undefined;
     await chooserStretch(ctx, await emuOf(), { apk: join(dir, 'lab', 'installed.apk'), catalog: join(dir, 'repo', 'fixtures', 'apps', 'cells.json'), dir: ctx.dir, accepted: [], progress: reinstallProgress(), stateFile: join(ctx.dir, 'state.json'), cleanup: 'E5 cleanup' }, async () => {

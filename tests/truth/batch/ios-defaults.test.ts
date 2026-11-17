@@ -69,7 +69,7 @@ describe('diffMaps — typed, by key (batch-10: a WDA runner exit flips Accessib
   });
 });
 
-describe("decideRestore over batch-10's real exports (d43-gate.ts:296–338; batch-10-analysis.md:326–345)", () => {
+describe("decideRestore over batch-10's real exports", () => {
   it('the three domains G4 read around the session are equal before and after it: nothing to do', () => {
     for (const d of DOMAINS) expect(decideRestore(input({ domain: d, backup: exported(d, 'g4-before'), now: exported(d, 'g4-after') })).verdict).toBe('equal');
   });
@@ -115,7 +115,7 @@ describe("decideRestore over batch-10's real exports (d43-gate.ts:296–338; bat
   });
 });
 
-describe('decideRestore — the rule, stage by stage (d43-gate.ts, batch-10 review)', () => {
+describe('decideRestore — the rule, stage by stage', () => {
   it('an extra key is deleted, a key — `defaults delete <domain> <key>` — never the domain', () => {
     const plan = decideRestore(input({ backup: { a: int(1) }, now: { a: int(1), x: str('late') } }));
     expect(plan.actions).toEqual([{ op: 'delete-key', key: 'x' }]);
@@ -193,7 +193,7 @@ describe('decideRestore — the rule, stage by stage (d43-gate.ts, batch-10 revi
   });
 });
 
-describe('restoreDomain — decideRestore driven to its end (d43-gate.ts:722)', () => {
+describe('restoreDomain — decideRestore driven to its end', () => {
   it('a write refused: recorded as refused, then the import, read back equal; each stage once', async () => {
     const backup = { a: int(1) };
     const reads: DomainMap[] = [{ a: int(2) }, backup];
@@ -215,7 +215,7 @@ describe('restoreDomain — decideRestore driven to its end (d43-gate.ts:722)', 
     expect(r.equal).toBe(true);
   });
 
-  it("the fallback's two exits each where it ran: its delete's and its import's, told apart (T2 S4 code review: one table of the actions)", async () => {
+  it("the fallback's two exits each where it ran: its delete's and its import's, told apart", async () => {
     const backup = { a: int(1) };
     let imports = 0;
     const r = await restoreDomain(input({ backup, now: { a: int(1), x: int(9) } }), {
@@ -245,7 +245,7 @@ describe('restoreDomain — decideRestore driven to its end (d43-gate.ts:722)', 
   });
 });
 
-describe('defaultsArgv — the only `defaults` builder; only the three domains written, the schemeapproval domain read only (batch-11, b11-dry shims/xcrun:21, :26; T2 S4 review round 1: an allowlist)', () => {
+describe('defaultsArgv — the only `defaults` builder; only the three domains written, the schemeapproval domain read only (an allowlist)', () => {
   const UDID = 'LAB-SIMULATOR-UDID';
   const refused = (verb: string, domain: string) => `defaults ${verb} ${JSON.stringify(domain)}: refused — only ${DOMAINS.join(', ')} are exported or written, each by its exact name; ${PROTECTED.domain} is read only`;
 
@@ -291,7 +291,7 @@ describe('defaultsArgv — the only `defaults` builder; only the three domains w
   });
 });
 
-describe('protectedLine — the finportal key, unchanged | CHANGED | unread (batch-11.sh:584–585; batch-8 run 1 VOID)', () => {
+describe('protectedLine — the finportal key, unchanged | CHANGED | unread (batch-8 run 1 VOID)', () => {
   const v = (value: string) => ({ state: 'value' as const, value });
   const absent = { state: 'absent' as const };
   const unreadable = { state: 'unreadable' as const, why: `past its bound (exit ${TIMED_OUT})` };
@@ -301,11 +301,11 @@ describe('protectedLine — the finportal key, unchanged | CHANGED | unread (bat
     expect(protectedLine(v('1'), v('1'))).toBe(`OK   ${what} unchanged (1; read only)`);
   });
 
-  it('absent at both ends is unchanged too — an absent key is a read, not a failure (batch-8.sh:356–361)', () => {
+  it('absent at both ends is unchanged too — an absent key is a read, not a failure', () => {
     expect(protectedLine(absent, absent)).toBe(`OK   ${what} unchanged (absent; read only)`);
   });
 
-  it('a value that changed, appeared or went: a FAIL saying CHANGED (T2b batch-13 gap 4: was an ERROR, exit 0); a value "absent" is no absent key', () => {
+  it('a value that changed, appeared or went: a FAIL saying CHANGED; a value "absent" is no absent key', () => {
     const tail = "— no batch writes it: read it by hand (batch-5's backup stays read only)";
     expect(protectedLine(v('1'), v('2'))).toBe(`FAIL ${what} CHANGED: 1 at the start, 2 at the end ${tail}`);
     expect(protectedLine(absent, v('1'))).toBe(`FAIL ${what} CHANGED: absent at the start, 1 at the end ${tail}`);
@@ -323,7 +323,7 @@ describe('protectedLine — the finportal key, unchanged | CHANGED | unread (bat
     expect(protectedLine(v('a\nb'), v('a\nb'))).toBe(`OK   ${what} unchanged ("a\\nb"; read only)`);
   });
 
-  it('the line is a step line: an unchanged key exits 0; a CHANGED one fails the run, exit 1 (T2b batch-13 gap 4); an unread one is an ERROR the SUMMARY shows, exit 0 alone — not OK, not FAIL', () => {
+  it('the line is a step line: an unchanged key exits 0; a CHANGED one fails the run, exit 1; an unread one is an ERROR the SUMMARY shows, exit 0 alone — not OK, not FAIL', () => {
     const summary = (line: string): Summary => ({ name: 'b', runId: 'r', checkout: 'OK   checkout', labs: [], blocks: [], protectedLines: [line], restore: { file: 'R', written: [] }, errors: [] });
     expect(exitCodeOf(summary(protectedLine(v('1'), v('1'))))).toBe(0);
     expect(exitCodeOf(summary(protectedLine(v('1'), v('2'))))).toBe(1);
@@ -333,7 +333,7 @@ describe('protectedLine — the finportal key, unchanged | CHANGED | unread (bat
   });
 });
 
-describe('TYPED_PY and the file names, as d43-gate.ts read and named them', () => {
+describe('TYPED_PY and the file names', () => {
   it("plistlib's bool is asked before its int (a Python bool is an int): bool true is never int 1; the top level must be a dictionary", () => {
     expect(TYPED_PY.indexOf('if isinstance(v,bool): return "bool"')).toBeGreaterThan(0);
     expect(TYPED_PY.indexOf('if isinstance(v,bool): return "bool"')).toBeLessThan(TYPED_PY.indexOf('if isinstance(v,int): return "int"'));
@@ -342,14 +342,14 @@ describe('TYPED_PY and the file names, as d43-gate.ts read and named them', () =
     expect(TYPED_PY).toContain('print(json.dumps(out,sort_keys=True))');
   });
 
-  it("a backup lies beside its state file as d43-gate.ts names it, the state's .json dropped from its end only", () => {
+  it("a backup lies beside its state file, the state's .json dropped from its end only", () => {
     expect(backupPathOf('/o/D43/state.json', A11Y)).toBe(`/o/D43/state.${A11Y}.backup.plist`);
     expect(backupPathOf('/o/a.json.x.json', A11Y)).toBe(`/o/a.json.x.${A11Y}.backup.plist`);
     expect(backupPathOf('/o/a.jsonl', A11Y)).toBe(`/o/a.jsonl.${A11Y}.backup.plist`);
   });
 });
 
-describe('the typed read and the state file, read strictly (sim-domains.ts review round 2: unreadable is no empty map)', () => {
+describe('the typed read and the state file, read strictly: unreadable is no empty map', () => {
   it('typedMapOf: a map of typed values, or why it is none', () => {
     expect(typedMapOf('{"a": {"t": "int", "c": "1", "v": "1"}, "d": {"t": "dict", "c": "{}"}}')).toEqual({ a: int(1), d: dict('{}') });
     const every = ['bool', 'int', 'float', 'string', 'data', 'date', 'dict', 'array'].map((t) => [t, { t, c: '0' }]);
@@ -362,7 +362,7 @@ describe('the typed read and the state file, read strictly (sim-domains.ts revie
     }
   });
 
-  it("stateIn: d43-gate.ts's state shape, its domains the window's three, each once (T2 S4 review round 1: none, one missing, a duplicate or another refused whole), or why not", () => {
+  it("stateIn: the state file's shape, its domains the window's three, each once (none, one missing, a duplicate or another refused whole), or why not", () => {
     const three = [{ name: A11Y, backup: '/b' }, { name: 'com.apple.Preferences', backup: null }, { name: 'com.apple.keyboard.preferences', backup: '/k' }];
     const ok = { dirty: true, udid: 'U', port: 8120, domains: three };
     expect(stateIn(JSON.stringify(ok))).toEqual(ok);

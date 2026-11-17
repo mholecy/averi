@@ -71,7 +71,7 @@ describe("TYPED_PY on the host's plistlib (batch-10: bool true read int 0 after 
     expect(decideRestore({ domain: 'com.apple.Accessibility', backupPath: '/b', backup: before, now: after })).toMatchObject({ verdict: 'act', actions: [{ op: 'write', key: 'k', flag: '-bool', value: 'false' }] });
   });
 
-  it("the host's export of a domain not there (an empty dictionary, exit 0) reads as an empty map — so it proves nothing absent (T2 S4 review round 2)", () => {
+  it("the host's export of a domain not there (an empty dictionary, exit 0) reads as an empty map — so it proves nothing absent", () => {
     const r = typedRead('m.plist', readFileSync(join(import.meta.dirname, '..', '..', 'fixtures', 'batch', 'defaults-host-export-missing-domain.plist'), 'utf8'));
     expect([r.code, typedMapOf(r.out)]).toEqual([0, {}]);
   });

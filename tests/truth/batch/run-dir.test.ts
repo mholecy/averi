@@ -186,7 +186,7 @@ describe('openRun — one fresh run-<RUN_ID> folder per block, never emptied or 
     expect(readdirSync(out).sort()).toEqual(['E5', 'lab', 'meta']);
   });
 
-  it("an earlier run's folders and files are left as they were (b11-dry: run-OLD/marker.txt intact)", () => {
+  it("an earlier run's folders and files are left as they were (run-OLD/marker.txt intact)", () => {
     for (const b of [...BLOCKS, 'meta']) put(`${b}/run-OLD/marker.txt`, `old ${b}`);
     put('steps.log', 'old steps\n');
     openRun(nodeFs, { out, runId: 'NEW', blocks: BLOCKS, wanted: BLOCKS });

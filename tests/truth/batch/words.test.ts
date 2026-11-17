@@ -157,7 +157,7 @@ describe('summaryLines — the SUMMARY, its marker unchanged so the waiting rule
     ]);
   });
 
-  it('interrupted: the INTERRUPTED line after the checkout, a finished block\'s verdicts as judged, an unfinished one INTERRUPTED with its lines so far marked (batch-12\'s on_abort)', () => {
+  it('interrupted: the INTERRUPTED line after the checkout, a finished block\'s verdicts as judged, an unfinished one INTERRUPTED with its lines so far marked', () => {
     const lines = summaryLines({
       ...base,
       interrupted: { at: '10:12:00' },

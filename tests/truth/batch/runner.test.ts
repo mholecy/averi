@@ -242,7 +242,7 @@ const d43Block = (over: Partial<Block> = {}): Block => ({
   ...over,
 });
 
-describe('a fake two-block batch, one Android and one iOS block: the whole SUMMARY (spec T2 S6; batch-11.sh:718–735)', () => {
+describe('a fake two-block batch, one Android and one iOS block: the whole SUMMARY (spec T2 S6)', () => {
   it('checkout, lab lines in the order checked, each block\'s verdicts, the protected-key line, RESTORE, this run\'s ERRORs; exit 1 for the RESTORE', async () => {
     seam.rules = [git(), probes, live({ logExtra: 'ERROR the lab app did not launch on the first try\n' })];
     const code = await go([kfBlock(), d43Block()]);
@@ -289,7 +289,7 @@ describe('a fake two-block batch, one Android and one iOS block: the whole SUMMA
     expect(at('======== SUMMARY')).toBeGreaterThan(at('================================ details'));
   });
 
-  it('the details before the SUMMARY: this run\'s steps and each block\'s detail lines (batch-11.sh:698–716)', async () => {
+  it('the details before the SUMMARY: this run\'s steps and each block\'s detail lines', async () => {
     await go([kfBlock(), d43Block()]);
     const o = outText().split('\n');
     const from = o.indexOf('================================ details ================================');
@@ -319,7 +319,7 @@ describe('a fake two-block batch, one Android and one iOS block: the whole SUMMA
     expect(exitCodeOf(r.summary)).toBe(r.exit);
   });
 
-  it('each block\'s verdict lines kept in its verdict.txt too, as batch-11\'s verdict() tee\'d them', async () => {
+  it('each block\'s verdict lines kept in its verdict.txt too', async () => {
     await go([kfBlock(), d43Block()]);
     expect(text(join(dirOf('D43'), 'verdict.txt'))).toBe(`${COMPARE_WARN}\nD43 live verdict: PASS — p7w ok under wda\n`);
     expect(text(join(dirOf('kf'), 'verdict.txt'))).toBe('kf live kf1: PASS\nkf live verdict: PASS — kf1, kf2, kf3 ok\n');
@@ -360,7 +360,7 @@ describe('refused to start: exit 2, nothing done — no folder, no call (batch-1
     expect(existsSync(dirOf('kf'))).toBe(false);
   });
 
-  it('a RESTORE left by an earlier run: refused with its hand lines (batch-10.sh:86–94)', async () => {
+  it('a RESTORE left by an earlier run: refused with its hand lines', async () => {
     mkdirSync(out);
     writeFileSync(join(out, 'RESTORE.txt'), 'D55 (Android): adb -s emulator-5554 install x.apk\n');
     expect(await go([plain('kf')])).toBe(2);
@@ -371,7 +371,7 @@ describe('refused to start: exit 2, nothing done — no folder, no call (batch-1
     expect(existsSync(join(out, 'meta'))).toBe(false);
   });
 
-  it('an earlier run\'s state file not clean: refused with the block\'s own hand lines (batch-11.sh:111–112)', async () => {
+  it('an earlier run\'s state file not clean: refused with the block\'s own hand lines', async () => {
     mkdirSync(join(out, 'E5', 'run-old'), { recursive: true });
     writeFileSync(join(out, 'E5', 'run-old', 'state.json'), '{"dirty":true}');
     const stateful = { what: 'E5 not put back', hand: (f: string) => [`  → node e5.ts --restore --state ${f}`] };
@@ -425,7 +425,7 @@ describe('refused to start: exit 2, nothing done — no folder, no call (batch-1
   });
 });
 
-describe('the run\'s folders: one fresh run-<id> per wanted block, and the lab folder on every run (batch-11.sh:116–121)', () => {
+describe('the run\'s folders: one fresh run-<id> per wanted block, and the lab folder on every run', () => {
   it('with no clock or pid given, the run\'s id is now\'s and this process\'s (`date +%Y%m%d-%H%M%S`-$$)', async () => {
     await runBatch({ name: 'batch-t', blocks: [plain('kf')], config: { ok: true, config: configFrom(['--out', out, '--repo', repo], {}) }, io: { seam, terminal: (t) => void terminal.push(t), table, graceMs: 5 } });
     const [run] = nodeFs.list(join(out, 'meta'));
@@ -544,7 +544,7 @@ describe('preconditions: a failed one makes the block INCONCLUSIVE, never a refu
 });
 
 describe('needs: each checked once, when the first wanted block needing it comes; a failed one makes the block INCONCLUSIVE, not run (spec S6a)', () => {
-  it('a failed need: `<label>: INCONCLUSIVE — <need>: <why>`, its LAB line ERROR, the block not run (b11-dry noandroid, b2-noios)', async () => {
+  it('a failed need: `<label>: INCONCLUSIVE — <need>: <why>`, its LAB line ERROR, the block not run', async () => {
     const ran: string[] = [];
     await go([kfBlock({ run: async () => void ran.push('kf') }), d43Block()], { needs: { ...needs, android: async () => ({ ok: false, why: 'adb unreachable (get-state exit 1)' }) } });
     expect(summary()).toContain('LAB android: ERROR — adb unreachable (get-state exit 1)');
@@ -830,7 +830,7 @@ describe('a need\'s calls recorded in lab/<need>-calls.jsonl, appended through t
 
 // ------------------------------------------------------------------------------------------------ the backstop
 
-describe('the backstop: a wanted block with no verdict line of its label gets one (batch-10/11; b11-dry d43-backupfail, noandroid)', () => {
+describe('the backstop: a wanted block with no verdict line of its label gets one', () => {
   it('a block that wrote nothing: "not run (see the ERROR lines)"', async () => {
     await go([plain('D62', { run: async (ctx) => ctx.err('D62: the lab is not main\'s — skipped') })]);
     expect(summary()).toContain('D62 verdict: INCONCLUSIVE — not run (see the ERROR lines)');
@@ -973,7 +973,7 @@ describe('the backstop: a wanted block with no verdict line of its label gets on
 
 // ------------------------------------------------------------------------------------------------ ERROR lines
 
-describe('the ERROR lines: this run\'s steps and every ERROR line of its blocks\' logs and analyze.txt, each once (batch-6, batch-12.sh:667–668)', () => {
+describe('the ERROR lines: this run\'s steps and every ERROR line of its blocks\' logs and analyze.txt, each once', () => {
   it('a block\'s .log and analyze.txt and the lab folder\'s logs read; another file, and an earlier run\'s logs, not; a line twice printed once, with its count (review round 2)', async () => {
     mkdirSync(join(out, 'kf', 'run-old'), { recursive: true });
     writeFileSync(join(out, 'kf', 'run-old', 'probe.log'), 'ERROR an earlier run\'s\n');
@@ -1402,7 +1402,7 @@ describe('a non-live block\'s record: what it was asked, then what it did — co
 
 // ------------------------------------------------------------------------------------------------ live_run
 
-describe('liveRun: the .cases first, live.ts with its record, then its rejudge — each a bounded step (batch-11.sh:459–481, S3\'s stepOutcome)', () => {
+describe('liveRun: the .cases first, live.ts with its record, then its rejudge — each a bounded step (stepOutcome)', () => {
   it('the .cases written before live.ts starts; live.ts run from the checkout under test, its log and record in the block\'s folder', async () => {
     seam.watch = [join(dirOf('kf'), 'android-kf-1.cases')];
     let got: unknown;
@@ -1449,7 +1449,7 @@ describe('liveRun: the .cases first, live.ts with its record, then its rejudge �
     expect(got).toMatchObject({ live: { word: 'FAIL' } });
   });
 
-  it('no record written: FAIL naming it, and no rejudge (batch-11.sh:480)', async () => {
+  it('no record written: FAIL naming it, and no rejudge', async () => {
     seam.rules = [git(), probes, live({ noRecord: true })];
     let got: unknown;
     await go([kfBlock({ run: async (ctx) => void (got = await ctx.liveRun('android-kf-1', KF, { secs: 60 })) })]);
@@ -1474,7 +1474,7 @@ describe('liveRun: the .cases first, live.ts with its record, then its rejudge �
   });
 });
 
-describe('asksLive: a live run\'s .cases written before a stretch that may never reach it (T2 S6b: batch-11\'s WDA window wrote its .cases before its backup, 625–627)', () => {
+describe('asksLive: a live run\'s .cases written before a stretch that may never reach it', () => {
   it('the .cases written at once; liveRun of that name and the same asked later runs without writing it again', async () => {
     seam.watch = [join(dirOf('kf'), 'android-kf-1.cases')];
     await go([kfBlock({ run: async (ctx) => {
@@ -1487,7 +1487,7 @@ describe('asksLive: a live run\'s .cases written before a stretch that may never
     expect(summary()).toContain('kf live verdict: PASS — kf1, kf2, kf3 ok');
   });
 
-  it('asked and never run: the backstop says so (b11-dry d43-backupfail: "asked but never ran", never a missing line)', async () => {
+  it('asked and never run: the backstop says so ("asked but never ran", never a missing line)', async () => {
     await go([kfBlock({ judge: undefined, run: async (ctx) => ctx.asksLive('android-kf-1', KF) })]);
     expect(summary()).toContain('kf live verdict: INCONCLUSIVE — 1 of 1 run(s) incomplete: android-kf-1 — asked but never ran (no record, log or summary beside its .cases)');
   });
@@ -1517,7 +1517,7 @@ describe('the run\'s fs in a block\'s and a need\'s ctx: the lab plumbing reads 
   });
 });
 
-describe('the run\'s last steps (lastly): each after the kept groups, on both ends, through detached calls (T2 S6b: batch-11.sh:660, 205–206)', () => {
+describe('the run\'s last steps (lastly): each after the kept groups, on both ends, through detached calls', () => {
   const pkill: NonNullable<RunBatchOptions<KnobSpec>['lastly']>[number] = async ({ run, step }) => {
     const r = await run('probe', ['pkill-wda'], { secs: 5 });
     step('NOTE', `the lab's WebDriverAgent: probe exit ${r.code}`);

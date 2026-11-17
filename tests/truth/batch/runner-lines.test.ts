@@ -122,7 +122,7 @@ describe('configOf — the out folder and the device ids from argv, then env; no
   });
 });
 
-describe('checkoutLine — the SUMMARY\'s first line (batch-11.sh:254–256)', () => {
+describe('checkoutLine — the SUMMARY\'s first line', () => {
   it('shown: OK, main\'s HEAD by its short sha, clean', () => {
     expect(checkoutLine({ ok: true, head: 'f7ea6e07'.padEnd(40, '0') })).toBe("OK checkout: main's HEAD f7ea6e07, clean");
   });
@@ -152,7 +152,7 @@ describe('labLine and needsLine — a need checked once, its lab line in the SUM
     expect(labLine('ios', { ok: true, how: 'booted\r\nmore' })).toBe('LAB ios: OK — booted');
   });
 
-  it('INCONCLUSIVE naming each failed need and its why, `; ` between, in the block\'s order (batch-11\'s "noandroid", "b2-noios")', () => {
+  it('INCONCLUSIVE naming each failed need and its why, `; ` between, in the block\'s order', () => {
     expect(needsLine('kf live verdict', [{ need: 'android', why: 'adb unreachable' }])).toBe('kf live verdict: INCONCLUSIVE — android: adb unreachable');
     expect(needsLine('B2 verdict', [{ need: 'ios', why: 'a' }, { need: 'android', why: 'b\nc' }])).toBe('B2 verdict: INCONCLUSIVE — ios: a; android: b');
   });
@@ -162,8 +162,8 @@ describe('labLine and needsLine — a need checked once, its lab line in the SUM
   });
 });
 
-describe('backstopLine — a wanted block with no verdict line says why (batch-10/11, batch-11.sh:689–696)', () => {
-  it('nothing asked: batch-11\'s words, "not run (see the ERROR lines)"', () => {
+describe('backstopLine — a wanted block with no verdict line says why', () => {
+  it('nothing asked: "not run (see the ERROR lines)"', () => {
     expect(backstopLine('D62 verdict', [])).toBe('D62 verdict: INCONCLUSIVE — not run (see the ERROR lines)');
     expect(NOT_RUN).toBe('not run (see the ERROR lines)');
   });
@@ -181,7 +181,7 @@ describe('backstopLine — a wanted block with no verdict line says why (batch-1
   });
 });
 
-describe('hasVerdictOf — the backstop\'s test: a line of the block\'s own label (batch-11\'s `grep -q \'^D62 verdict:\'`)', () => {
+describe('hasVerdictOf — the backstop\'s test: a line of the block\'s own label', () => {
   it('a line starting `<label>:` counts, whatever follows (an analyzer\'s `FAIL 2/3 dropped` too)', () => {
     expect(hasVerdictOf(['D62 verdict: PASS'], 'D62 verdict')).toBe(true);
     expect(hasVerdictOf(['lv-d62 verdict: FAIL 2/3 dropped'], 'lv-d62 verdict')).toBe(true);
@@ -193,7 +193,7 @@ describe('hasVerdictOf — the backstop\'s test: a line of the block\'s own labe
   });
 });
 
-describe('errorLinesIn — the ERROR lines a block\'s log or analyze.txt holds (batch-12.sh:668, `grep -h \'^ERROR\'`)', () => {
+describe('errorLinesIn — the ERROR lines a block\'s log or analyze.txt holds', () => {
   it('every line starting with ERROR, in order, CR dropped; an ERROR inside a line is not one (S1: a step line\'s word)', () => {
     expect(errorLinesIn('ok\nERROR a\r\n  ERROR not at the start\nE5 cleanup: ERROR — x\nERROR b\nERRORS c\n')).toEqual(['ERROR a', 'ERROR b', 'ERRORS c']);
     expect(errorLinesIn('')).toEqual([]);
@@ -216,7 +216,7 @@ describe('logErrors — this run\'s ERROR lines from its logs, counted across th
     expect(logErrors([log('a.log', times(2, 'ERROR x'))])).toEqual(['ERROR x (×2, in a.log)']);
   });
 
-  it('only steps.log\'s lines are timed: in another log a line starting with a time is no ERROR line (batch-12\'s `^ERROR`, review round 5)', () => {
+  it('only steps.log\'s lines are timed: in another log a line starting with a time is no ERROR line', () => {
     expect(logErrors([{ ...log('p.log', '12:00:00 ERROR x\nERROR y'), timed: false }, { ...log('steps.log', '12:00:00 ERROR z'), timed: true }])).toEqual(['ERROR y', '12:00:00 ERROR z']);
     expect(logErrors([log('p.log', '12:00:00 ERROR x')])).toEqual([]);
   });
@@ -255,8 +255,8 @@ describe('logErrors — this run\'s ERROR lines from its logs, counted across th
   });
 });
 
-describe('liveCalls — live.ts\'s and its rejudge\'s calls: each bounded, from the checkout, logged beside the run (batch-11.sh:473–481)', () => {
-  it('live.ts by the secs given, the rejudge by rejudgeSecs, else REJUDGE_SECS (120 s: batch-11 ran it unbounded)', () => {
+describe('liveCalls — live.ts\'s and its rejudge\'s calls: each bounded, from the checkout, logged beside the run', () => {
+  it('live.ts by the secs given, the rejudge by rejudgeSecs, else REJUDGE_SECS (120 s)', () => {
     const files = { log: '/d/a.log', summary: '/d/a.rejudge.txt' };
     expect(REJUDGE_SECS).toBe(120);
     expect(liveCalls({ repo: '/r', secs: 60, files })).toEqual({ live: { secs: 60, cwd: '/r', log: '/d/a.log' }, rejudge: { secs: 120, cwd: '/r', log: '/d/a.rejudge.txt' } });
@@ -280,7 +280,7 @@ describe('linesOf and linesIn — what a probe, a judge or an analyzer hands in,
   });
 });
 
-describe('stepsOfRun — this run\'s part of steps.log (batch-11.sh:700, `sed -n "/ batch-11 run $RUN_ID,/,$p"`)', () => {
+describe('stepsOfRun — this run\'s part of steps.log', () => {
   const steps = ['09:00:00 ---- batch-n run 1, blocks kf', '09:00:01 OK   old', '09:44:26 ---- batch-n run 2, blocks kf,E5', '09:44:27 OK   kf live x', '09:44:28 ERROR y', ''].join('\n');
   it('from this run\'s header to the end; an earlier run\'s steps left out', () => {
     expect(stepsOfRun(steps, 'batch-n', '2')).toEqual(['09:44:26 ---- batch-n run 2, blocks kf,E5', '09:44:27 OK   kf live x', '09:44:28 ERROR y']);
@@ -292,7 +292,7 @@ describe('stepsOfRun — this run\'s part of steps.log (batch-11.sh:700, `sed -n
   });
 });
 
-describe('detailLines and detailsLines — the details printout before the SUMMARY (batch-11.sh:698–716)', () => {
+describe('detailLines and detailsLines — the details printout before the SUMMARY', () => {
   it('a file\'s lines, those starting `==` left out (step banners), empty ones too, each indented and cut at 700 code points', () => {
     expect(DETAIL_CHARS).toBe(700);
     const long = `E5 ${'x'.repeat(800)}`;
@@ -335,7 +335,7 @@ describe('detailLines and detailsLines — the details printout before the SUMMA
   });
 });
 
-describe('deviceArgs, liveArgs and rejudgeArgs — live_run\'s argv (batch-11.sh:473–481): live.ts with its record, then its rejudge', () => {
+describe('deviceArgs, liveArgs and rejudgeArgs — the live run\'s argv: live.ts with its record, then its rejudge', () => {
   const kf: Asked = { platform: 'android', app: 'native', sources: ['uiautomator'], cases: ['kf1', 'kf2', 'kf3'] };
   const p7w: Asked = { platform: 'ios', app: 'native', sources: ['wda', 'idb'], cases: ['p7w'], groups: ['forms', 'ensure'] };
 
@@ -365,7 +365,7 @@ describe('deviceArgs, liveArgs and rejudgeArgs — live_run\'s argv (batch-11.sh
     expect(rejudgeArgs({ repo: '/r', asked: p7w, record: '/d/p.json', failures: '/d/f' }).slice(-4, -2)).toEqual(['--groups', 'forms,ensure']);
   });
 
-  it('the step\'s text: OK bare; DONE and FAIL with why and the log to read (batch-11.sh:234–237)', () => {
+  it('the step\'s text: OK bare; DONE and FAIL with why and the log to read', () => {
     expect(liveStepText('kf live a', { word: 'OK', why: 'exit 0' }, '/d/a.log')).toBe('kf live a');
     expect(liveStepText('kf live a', { word: 'DONE', why: 'exit 1: judged' }, '/d/a.log')).toBe('kf live a (exit 1: judged) — see /d/a.log');
     expect(liveStepText('kf live a', { word: 'FAIL', why: 'exit 2' }, '/d/a.log')).toBe('kf live a (exit 2) — see /d/a.log');

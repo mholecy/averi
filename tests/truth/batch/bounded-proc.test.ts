@@ -59,7 +59,7 @@ describe('bounded over real processes: a call past its bound is gone with its gr
     expect(await until(() => !alive(child) && !alive(grandchild))).toBe(true);
   }, 10_000);
 
-  it('killGroup never throws: a live group "sent", a group gone "gone" (review round 2)', async () => {
+  it('killGroup never throws: a live group "sent", a group gone "gone"', async () => {
     const pidfile = join(dir, 'tree.pids');
     const calls = new Calls(nodeProcess, { graceMs: 200 });
     const r = calls.bounded(node, [HELPER, 'tree', pidfile], { secs: 20 });
@@ -94,13 +94,13 @@ describe('bounded over real processes: a call past its bound is gone with its gr
     expect((await calls.detached(node, [HELPER, 'stdin'], { secs: 5 })).out).toBe('stdin 0');
   }, 10_000);
 
-  it('a kept call whose group is empty once its leader ended is not kept: stopKept has nothing to stop (review round 3)', async () => {
+  it('a kept call whose group is empty once its leader ended is not kept: stopKept has nothing to stop', async () => {
     const calls = new Calls(nodeProcess, { graceMs: 200 });
     expect(await calls.bounded(node, [HELPER, 'echo', 'x'], { secs: 5, keepGroup: true })).toMatchObject({ code: 0 });
     expect(await calls.stopKept()).toEqual({ stopped: 0, notSent: [] });
   }, 10_000);
 
-  it('a call that exits leaving a grandchild: the grandchild is killed with its group, and the result comes at once (review round 1)', async () => {
+  it('a call that exits leaving a grandchild: the grandchild is killed with its group, and the result comes at once', async () => {
     const calls = new Calls(nodeProcess);
     const pidfile = join(dir, 'left.pid');
     const started = Date.now();

@@ -169,7 +169,7 @@ async function interruptFaked(guard: AbortGuard, body: () => void | Promise<void
 
 const summaryText = () => text(join(out, 'meta', 'summary.txt'));
 
-describe('the abort on SIGINT, SIGTERM or SIGHUP — the dirty windows put back, verified; exit 130 (batch-6\'s on_abort: an interrupted run must not leave the remembered answer deleted)', () => {
+describe('the abort on SIGINT, SIGTERM or SIGHUP — the dirty windows put back, verified; exit 130 (an interrupted run must not leave the remembered answer deleted)', () => {
   it('int-d55: a dirty window\'s restore runs and is verified; no RESTORE; the abort SUMMARY; exit 130', async () => {
     const guard = guardOf();
     const ran: string[] = [];
@@ -219,13 +219,13 @@ describe('the abort on SIGINT, SIGTERM or SIGHUP — the dirty windows put back,
     expect(seam.installs).toBe(1);
   });
 
-  it.each(['SIGTERM', 'SIGHUP'] as const)('%s aborts the same way (trap on_abort INT TERM HUP)', async (sig) => {
+  it.each(['SIGTERM', 'SIGHUP'] as const)('%s aborts the same way', async (sig) => {
     const guard = guardOf();
     expect(await interrupt(guard, () => guard.open('E5', window()), sig)).toBe(130);
     expect(summaryText()).toContain(`ERROR batch-n interrupted (run 1) by ${sig}`);
   });
 
-  it('d55-chooser / d43-restorefail: a restore that fails writes its hand lines to RESTORE — "RESTORE: state not provably put back" (b11-dry check.sh:20)', async () => {
+  it('d55-chooser / d43-restorefail: a restore that fails writes its hand lines to RESTORE — "RESTORE: state not provably put back"', async () => {
     const guard = guardOf();
     await interrupt(guard, () => guard.open('E5', window({ restore: async () => ({ ok: false, why: 'check exit 3', hand: ['E5 (Android): not proven clean (check exit 3) — node e5.ts --check'] }) })));
     expect(text(restoreFile())).toBe('batch-n run 1 interrupted at 2026-11-04 09:44:26; state to put back by hand:\nE5 (Android): not proven clean (check exit 3) — node e5.ts --check\n');
@@ -463,7 +463,7 @@ describe('a group kill that throws EPERM stops no restore (review round 2, BLOCK
   });
 });
 
-describe('kept groups live through the abort\'s restores and judging, and are ended last (code review: batch-11 pkilled the companion at the end of on_abort)', () => {
+describe('kept groups live through the abort\'s restores and judging, and are ended last', () => {
   /** A run whose idb call leaves its group (idb_companion), then opens E5; resolves once E5 is open. */
   async function keptThenWindow(guard: AbortGuard, restore: WindowSpec['restore']) {
     seam.leftGroups.add(100);
@@ -1143,7 +1143,7 @@ describe('head\'s errors — the abort SUMMARY\'s ERROR section when the runner 
   });
 });
 
-describe('the run\'s last steps (`lastly`): after the kept groups, on both ends, through detached calls (T2 S6b: batch-11 pkilled the lab\'s WebDriverAgent and idb_companion at its end and at the end of on_abort)', () => {
+describe('the run\'s last steps (`lastly`): after the kept groups, on both ends, through detached calls', () => {
   it('finish(): the kept groups ended first, then the last steps with a detached runner; a kill of its calls not delivered gets its RESTORE line', async () => {
     const guard = guardOf(undefined, {
       lastly: async (run) => {

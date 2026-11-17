@@ -199,7 +199,7 @@ const STATE_CMD = 'node --import tsx d55-probe.ts --state state.json';
 const restoreOf = (restore: StateRestore['restore']): StateRestore => ({ restore, command: RESTORE_CMD, stateCommand: STATE_CMD });
 const readState = (o: ReinstallOptions) => JSON.parse(readFileSync(o.stateFile, 'utf8')) as { dirty: boolean };
 
-describe("LabEmu.open — lab-device.ts's Android guard before any other call (batch-11.sh's android_guard)", () => {
+describe("LabEmu.open — lab-device.ts's Android guard before any other call", () => {
   it("batch-10's `emu avd name` (averi_lab, CRLF and OK after it): the lab emulator; its calls all name its serial", async () => {
     const fake = fakeEmu();
     const emu = await emuOf(fake);
@@ -237,7 +237,7 @@ describe("LabEmu.open — lab-device.ts's Android guard before any other call (b
   });
 });
 
-describe("readCheck — --check, read only (d55-b11.ts --check; batch-12's e5_check)", () => {
+describe("readCheck — --check, read only", () => {
   it("the focus by src's CHOOSER_FOCUS_COMMAND (one word, its pipe for the device's sh), the block by `dumpsys package preferred`", async () => {
     const fake = fakeEmu();
     const c = await readCheck(await emuOf(fake), []);
@@ -255,7 +255,7 @@ describe("readCheck — --check, read only (d55-b11.ts --check; batch-12's e5_ch
   });
 });
 
-describe('dismissChooser — BACK while a chooser is in front, at most 3, then HOME (d55-b11.ts restore, batch-12 on_abort)', () => {
+describe('dismissChooser — BACK while a chooser is in front, at most 3, then HOME', () => {
   it('one BACK per chooser read, then HOME, each followed by its settle wait', async () => {
     const fake = fakeEmu({ chooser: 2 });
     const waits: number[] = [];
@@ -277,7 +277,7 @@ describe('dismissChooser — BACK while a chooser is in front, at most 3, then H
   });
 });
 
-describe('labInstalled — `adb get-state` first: unreachable is unknown, never "missing" (batch-12.sh, e5_installed)', () => {
+describe('labInstalled — `adb get-state` first: unreachable is unknown, never "missing"', () => {
   it('installed with its path; missing on `pm path` exit 1 with nothing said', async () => {
     expect(await labInstalled(await emuOf(fakeEmu()))).toEqual({ state: 'installed', path: DEVICE_APK });
     expect(await labInstalled(await emuOf(fakeEmu({ installed: false })))).toEqual({ state: 'missing' });
@@ -299,7 +299,7 @@ describe('labInstalled — `adb get-state` first: unreachable is unknown, never 
   });
 });
 
-describe('readRoleHolders, readClipboard and handlers — the tri-state reads over the device (batch-9 D55 and D43; batch-11.sh, handlers)', () => {
+describe('readRoleHolders, readClipboard and handlers — the tri-state reads over the device', () => {
   it("API 33's role holder and clipboard reads are unread, never unchanged; averilab://shared/open has 2 handlers", async () => {
     const emu = await emuOf(fakeEmu());
     expect(await readRoleHolders(emu)).toEqual({ state: 'unread', why: 'exit 255 Unknown command: get-role-holders' });
@@ -339,7 +339,7 @@ describe('tapSafely — the one tap a batch makes on the chooser, at safeTap\'s 
   });
 });
 
-describe('clearLabEntry — the abort-safe reinstall that clears a lab default (batch-11.sh d55_reinstall, `pm path` after)', () => {
+describe('clearLabEntry — the abort-safe reinstall that clears a lab default (`pm path` after)', () => {
   it("BACK/HOME, the state marked dirty BEFORE the uninstall, uninstall, install of the pulled APK, `pm path`, its cells.json the catalog's, --check: proven", async () => {
     const o = files();
     let dirtyAtUninstall: boolean | undefined;
@@ -414,7 +414,7 @@ describe('clearLabEntry — the abort-safe reinstall that clears a lab default (
     }
   });
 
-  it('no probe state to mark dirty: refused, nothing uninstalled — the protocol needs its dirty mark first (T2 S5 code review)', async () => {
+  it('no probe state to mark dirty: refused, nothing uninstalled — the protocol needs its dirty mark first', async () => {
     const o = files(null);
     const fake = fakeEmu({ entries: [{ flag: 'true' }] });
     const r = await clearLabEntry(await emuOf(fake), { ...o, putBack: restoreOf(async () => ({ ok: true, how: 'never asked' })) });
@@ -437,7 +437,7 @@ describe('clearLabEntry — the abort-safe reinstall that clears a lab default (
     expect(o.progress.step).toBe('started');
   });
 
-  it("adb gone after the install: unknown — never \"missing\", never \"put back\" — its hand line `pm path` first (b11-dry int-reinstall-noadb)", async () => {
+  it("adb gone after the install: unknown — never \"missing\", never \"put back\" — its hand line `pm path` first", async () => {
     const o = files();
     const fake = fakeEmu({ entries: [{ flag: 'true' }], writes: true, rules: [(w) => (w[0] === 'get-state' ? exit(1, 'error: device offline') : undefined)] });
     const r = await clearLabEntry(await emuOf(fake), o);
@@ -510,14 +510,14 @@ describe('clearLabEntry — the abort-safe reinstall that clears a lab default (
     expect(await clearLabEntry(emu.using(run), files())).toMatchObject({ ok: false, why: expect.stringMatching(/^the reinstall not proven: after the reinstall, D55 check: ERROR — /), hand: [expect.stringMatching(/^D55 \(Android\): the chooser and the preferred activities not proven/)] });
   });
 
-  it('a last-chosen entry not accepted left after the reinstall (exit 6) is no default: proven (hand mutant)', async () => {
+  it('a last-chosen entry not accepted left after the reinstall (exit 6) is no default: proven', async () => {
     const o = files();
     const fake = fakeEmu({ entries: [{ flag: 'true' }, { flag: 'false', authority: 'pair' }], writes: true });
     expect(await clearLabEntry(await emuOf(fake), o)).toMatchObject({ ok: true, check: { exit: 6 } });
     expect(o.progress.step).toBe('proven');
   });
 
-  it("a chooser that stays over a preferred read that fails (exit 4) proves nothing: not proven, never \"cleared\" (T2 S5 review round 1, its repro)", async () => {
+  it("a chooser that stays over a preferred read that fails (exit 4) proves nothing: not proven, never \"cleared\"", async () => {
     const o = files();
     let reinstalled = false;
     const fake = fakeEmu({
@@ -555,19 +555,19 @@ describe('clearLabEntry — the abort-safe reinstall that clears a lab default (
   });
 });
 
-describe("cleanUp — the block's cleanup by --check's exit (batch-11.sh:539–583; batch-12's e5_check)", () => {
+describe("cleanUp — the block's cleanup by --check's exit", () => {
   it('0: OK, nothing reinstalled, no hand line', async () => {
     const fake = fakeEmu();
     const c = await cleanUp(await emuOf(fake), files());
     expect(c).toMatchObject({ verdict: 'OK', line: 'D55 cleanup: OK — chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0)', hand: [] });
   });
 
-  it('its label: `D55 cleanup` unless one is given (T2b batch-13 gap 2: E5 said D55 before)', async () => {
+  it('its label: `D55 cleanup` unless one is given', async () => {
     const c = await cleanUp(await emuOf(fakeEmu()), { ...files(), label: 'E5 cleanup' });
     expect(c.line).toBe('E5 cleanup: OK — chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0)');
   });
 
-  it("5, the accepted last-chosen entry: OK, never \"cleared\" by a reinstall (batch-12 fixed batch-11's defect 1/2)", async () => {
+  it("5, the accepted last-chosen entry: OK, never \"cleared\" by a reinstall", async () => {
     const fake = fakeEmu({ entries: [{ flag: 'false' }] });
     const c = await cleanUp(await emuOf(fake), files());
     expect(c).toMatchObject({ verdict: 'OK', hand: [] });
@@ -582,7 +582,7 @@ describe("cleanUp — the block's cleanup by --check's exit (batch-11.sh:539–5
     expect(c.hand).toEqual([]);
   });
 
-  it("1, a lab default: FAIL even after a clean reinstall cleared it (b11-dry d55-left; review round 1's FAIL-naming)", async () => {
+  it("1, a lab default: FAIL even after a clean reinstall cleared it", async () => {
     const o = files();
     const fake = fakeEmu({ entries: [{ flag: 'true' }], writes: true });
     const c = await cleanUp(await emuOf(fake), o);
@@ -612,7 +612,7 @@ describe("cleanUp — the block's cleanup by --check's exit (batch-11.sh:539–5
     expect(c.line).toMatch(/^D55 cleanup: ERROR — the chooser is still in front after BACK and HOME: chooser yes /);
   });
 
-  it('an entry with no mAlways line: ERROR, unproven, its hand line the check — never a reinstall (T2 S5 code review)', async () => {
+  it('an entry with no mAlways line: ERROR, unproven, its hand line the check — never a reinstall', async () => {
     const fake = fakeEmu({ entries: [{ flag: 'none' }] });
     const c = await cleanUp(await emuOf(fake), files());
     expect(c.verdict).toBe('ERROR');
@@ -629,7 +629,7 @@ describe("cleanUp — the block's cleanup by --check's exit (batch-11.sh:539–5
   });
 });
 
-describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.sh:163–177; batch-12 on_abort; b11-dry int-reinstall*)', () => {
+describe('chooserWindow — the chooser\'s dirty window for the abort', () => {
   const windowOf = async (fake: ReturnType<typeof fakeEmu>, o: Partial<Parameters<typeof chooserWindow>[1]> = {}) =>
     chooserWindow(await emuOf(fake), { apk: join(dir, 'installed.apk'), catalog: join(dir, 'cells.json'), dir, accepted: [SHARED_TWIN], progress: reinstallProgress(), ...o });
 
@@ -651,7 +651,7 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     expect(fake.words().filter((x) => /get-state|pm path|^install|^pull/.test(x))).toEqual(['get-state', 'get-state', 'shell pm path dev.averi.lab', `install ${join(dir, 'installed.apk')}`, 'get-state', 'shell pm path dev.averi.lab', `pull ${DEVICE_APK} ${join(dir, 'reinstalled.apk')}`]);
   });
 
-  it("outside a reinstall, adb unreachable: unknown at once — no key pressed, nothing called put back (T2 S5 review round 1)", async () => {
+  it("outside a reinstall, adb unreachable: unknown at once — no key pressed, nothing called put back", async () => {
     const fake = fakeEmu();
     const w = await windowOf(fake);
     fake.st.reachable = false;
@@ -659,7 +659,7 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     expect(fake.words()).toEqual(['emu avd name', 'get-state']);
   });
 
-  it('inside the reinstall, the lab installed again or found installed is proven by its cells.json, or not put back (T2 S5 review round 1)', async () => {
+  it('inside the reinstall, the lab installed again or found installed is proven by its cells.json, or not put back', async () => {
     files();
     const other = fakeEmu({ installed: false, writes: true, cells: '{"cells":[]}\n' });
     expect(await (await windowOf(other, { progress: { step: 'started' } })).restore(other.run)).toMatchObject({
@@ -741,7 +741,7 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     expect(await w2.restore(ok2.run)).toEqual({ ok: true, how: "chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0); nothing was wiped; the probe's state put back" });
   });
 
-  it("outside a reinstall, a dirty state file is put back by the probe's restore — it also undoes the probe's own changes; the note that nothing was wiped added (T2 S5 review round 4: the code review's decision reversed)", async () => {
+  it("outside a reinstall, a dirty state file is put back by the probe's restore — it also undoes the probe's own changes; the note that nothing was wiped added", async () => {
     const o = files({ dirty: true, serial: SERIAL });
     const fake = fakeEmu();
     let asked = 0;
@@ -761,7 +761,7 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     expect(await failed.restore(fakeEmu().run)).toEqual({ ok: false, why: 'NOT VERIFIED', hand: ['h'] });
   });
 
-  it('a state file already clean needs no restore: none run, said (T2 S5 review round 4)', async () => {
+  it('a state file already clean needs no restore: none run, said', async () => {
     const o = files({ dirty: false, serial: SERIAL });
     let asked = 0;
     const w = await windowOf(fakeEmu(), { stateFile: o.stateFile, progress: { step: 'started' }, putBack: restoreOf(async () => (asked++, { ok: true, how: 'x' })) });
@@ -774,7 +774,7 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     expect(asked).toBe(1);
   });
 
-  it('after the restore: the window\'s words are the cleanup\'s, exit by exit (T2 S5 code review: one table)', async () => {
+  it('after the restore: the window\'s words are the cleanup\'s, exit by exit', async () => {
     for (const opts of [{}, { entries: [{ flag: 'false' as const }] }, { entries: [{ flag: 'false' as const, authority: 'pair' }] }, { entries: [{ flag: 'none' as const }] }, { chooser: Infinity, rules: [(w: readonly string[]) => (w.join(' ').endsWith('KEYCODE_HOME') ? ok() : undefined)] }]) {
       const c = await cleanUp(await emuOf(fakeEmu(opts)), files());
       const p = await (await windowOf(fakeEmu(opts))).restore(fakeEmu(opts).run);
@@ -783,7 +783,7 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     }
   });
 
-  it('after the restore: the accepted last-chosen entry is put back, its check said (T2 S5 mutation round)', async () => {
+  it('after the restore: the accepted last-chosen entry is put back, its check said', async () => {
     const accepted = fakeEmu({ entries: [{ flag: 'false' }] });
     expect(await (await windowOf(accepted)).restore(accepted.run)).toMatchObject({ ok: true, how: expect.stringMatching(/^chooser no; preferred read \(1 user\); lab entries 1 \(defaults 0, last-chosen 1, accepted 1\)/) });
   });
@@ -803,7 +803,7 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     expect(await (await windowOf(stays)).restore(stays.run)).toMatchObject({ ok: false, why: expect.stringMatching(/^the chooser is still in front after BACK and HOME: /) });
   });
 
-  it('its hand lines name the exact step: inside the reinstall the install read first; never an uninstall no default was measured for (T2 S5 code review); its options carried to the abort', async () => {
+  it('its hand lines name the exact step: inside the reinstall the install read first; never an uninstall no default was measured for; its options carried to the abort', async () => {
     const fake = fakeEmu();
     const progress = reinstallProgress();
     const w = await windowOf(fake, { progress, stateFile: join(dir, 'state.json'), block: 'D55', cleanup: 'D55 cleanup', secs: 60 });

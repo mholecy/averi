@@ -230,7 +230,7 @@ describe('a fake lab batch under runBatch: the lab lines from the needs, the rea
     expect(outText()).toContain(`NOTE the lab's WebDriverAgent (port 8120 free) and idb_companion of ${LAB_UDID} ended`);
   });
 
-  it('T23 code review: a JDK source passed over is said once — on the first LAB line asking the build, the build need\'s here', async () => {
+  it('a JDK source passed over is said once — on the first LAB line asking the build, the build need\'s here', async () => {
     fresh({ buildFails: 'java' });
     const jvms = join(root, 'jvms');
     const zulu = join(jvms, 'zulu-17.jdk', 'Contents', 'Home');
@@ -248,7 +248,7 @@ describe('a fake lab batch under runBatch: the lab lines from the needs, the rea
     expect(summary().find((l) => l.startsWith('lab check:'))).toMatch(/^lab check: PASS/);
   });
 
-  it('a late writer after the restore: the compare WARN, its hand lines in RESTORE, exit 1; the finportal key CHANGED a FAIL line, from the ios need\'s end (T2b batch-13 gap 4)', async () => {
+  it('a late writer after the restore: the compare WARN, its hand lines in RESTORE, exit 1; the finportal key CHANGED a FAIL line, from the ios need\'s end', async () => {
     fresh({ lateFlip: true, finportal: '1', finportalEnd: '2' });
     expect(await go(batch())).toBe(1);
     const s = summary();
@@ -268,7 +268,7 @@ describe('a fake lab batch under runBatch: the lab lines from the needs, the rea
   });
 });
 
-describe('the work\'s own health check inside the WDA window (T2b batch-13: never at batch level before, only in the dry harness)', () => {
+describe('the work\'s own health check inside the WDA window', () => {
   it('not fit ({ok: false}: sick, and its reset cannot boot): the block INCONCLUSIVE naming why, no wda run, the window still put back and compared; exit 0', async () => {
     const b = batch({ beforeWork: () => ((world.st.sick = 'describe-all'), (seam.fails = 'simctl boot')) });
     expect(await go(b)).toBe(0);
@@ -282,7 +282,7 @@ describe('the work\'s own health check inside the WDA window (T2b batch-13: neve
   });
 });
 
-describe('the finportal key CHANGED fails the run by itself: the ios need\'s end reads it, no block of the batch\'s own judges it (T2b batch-13 gap 4)', () => {
+describe('the finportal key CHANGED fails the run by itself: the ios need\'s end reads it, no block of the batch\'s own judges it', () => {
   it('a clean run whose key changed: exit 1, its FAIL line in the protected-key slot, after the blocks\' lines', async () => {
     fresh({ finportal: '1', finportalEnd: '2' });
     expect(await go(batch())).toBe(1);
@@ -301,7 +301,7 @@ describe('the finportal key CHANGED fails the run by itself: the ios need\'s end
   });
 });
 
-describe('needs not met make their blocks INCONCLUSIVE, the others run (b11-dry noandroid, b2-noios)', () => {
+describe('needs not met make their blocks INCONCLUSIVE, the others run', () => {
   it('an emulator that is not the lab\'s: the lab block and D55 INCONCLUSIVE naming the guard; D43 runs', async () => {
     fresh({ avd: 'Pixel_7' });
     expect(await go(batch())).toBe(0);
@@ -328,7 +328,7 @@ describe('needs not met make their blocks INCONCLUSIVE, the others run (b11-dry 
     expect(seam.words.filter((w) => w.includes('assembleDebug'))).toHaveLength(1);
   });
 
-  it('the lab block naming only the device need: the build failed is a WARN, never "every lab need met" (review round 1, MAJOR 2)', async () => {
+  it('the lab block naming only the device need: the build failed is a WARN, never "every lab need met"', async () => {
     fresh({ buildFails: 'gradlew' });
     expect(await go(batch({ labNeeds: ['android'] }))).toBe(0);
     expect(summary().find((l) => l.startsWith('lab check:'))).toBe(`lab check: WARN — the lab devices checked, but this run's build failed (android-build: the Android build failed (exit 1; ${join(dirOf('lab'), 'android-build.log')})): the app already installed is used`);
@@ -344,7 +344,7 @@ describe('needs not met make their blocks INCONCLUSIVE, the others run (b11-dry 
   });
 });
 
-describe('this run\'s build installed once, whatever the order of the needs or the blocks (review round 1, MAJOR 2)', () => {
+describe('this run\'s build installed once, whatever the order of the needs or the blocks', () => {
   const once = () => {
     expect(seam.words.filter((w) => w.includes('assembleDebug'))).toHaveLength(1);
     expect(seam.words.filter((w) => w.includes(' install -r '))).toHaveLength(1);
@@ -360,7 +360,7 @@ describe('this run\'s build installed once, whatever the order of the needs or t
   });
 });
 
-describe('ONLY=lab runs just the lab check: its needs, no other block (batch-11, batch-12)', () => {
+describe('ONLY=lab runs just the lab check: its needs, no other block', () => {
   it('the build and the Android check only; no iOS need asked, no other block run; exit 0', async () => {
     expect(await go(batch(), { ONLY: 'lab' })).toBe(0);
     expect(summary().filter((l) => /^(LAB|lab check|D55|D43)/.test(l)).map((l) => l.split(':')[0])).toEqual(['LAB android-build', 'LAB android', 'lab check']);
@@ -368,7 +368,7 @@ describe('ONLY=lab runs just the lab check: its needs, no other block (batch-11,
   });
 });
 
-describe('the Gradle daemon after an abort inside the Android build (review round 1, MINOR 6)', () => {
+describe('the Gradle daemon after an abort inside the Android build', () => {
   it('SIGINT during assembleDebug: the build stopped, its own --stop refused, then the kit\'s last step runs `gradlew --stop`; exit 130', async () => {
     seam.hang = 'assembleDebug';
     const done = go(batch());
@@ -380,7 +380,7 @@ describe('the Gradle daemon after an abort inside the Android build (review roun
   });
 });
 
-describe('an abort landing during the build\'s own --stop (review round 2, MINOR 2)', () => {
+describe('an abort landing during the build\'s own --stop', () => {
   it('its --stop cut: the marker kept, the last step runs --stop again', async () => {
     seam.hang = 'gradlew --stop';
     const done = go(batch());
@@ -393,7 +393,7 @@ describe('an abort landing during the build\'s own --stop (review round 2, MINOR
   });
 });
 
-describe('the abort inside the WDA window: the WDA ended, the wait, the restore; RESTORE hand lines when it is not put back (S2 window, batch-11.sh:195–203)', () => {
+describe('the abort inside the WDA window: the WDA ended, the wait, the restore; RESTORE hand lines when it is not put back', () => {
   it('SIGINT during the wda live run: the lab\'s WDA ended, the domains put back, verified by the abort; the lab\'s processes ended last; exit 130', async () => {
     seam.hang = '--sources wda';
     const done = go(batch());
@@ -419,7 +419,7 @@ describe('the abort inside the WDA window: the WDA ended, the wait, the restore;
     ].join('\n');
   };
 
-  it('a listener of 8120 that stays, interrupted: nothing restored, the state dirty; RESTORE the WDA\'s kill, each domain, the compare; exit 130 (review round 1, BLOCKER)', async () => {
+  it('a listener of 8120 that stays, interrupted: nothing restored, the state dirty; RESTORE the WDA\'s kill, each domain, the compare; exit 130', async () => {
     fresh({ stickyListener: true });
     seam.hang = '--sources wda';
     const done = go(batch());
@@ -432,7 +432,7 @@ describe('the abort inside the WDA window: the WDA ended, the wait, the restore;
     expect(JSON.parse(readFileSync(join(dirOf('D43'), 'state.json'), 'utf8')).dirty).toBe(true);
   });
 
-  it('the port free but the key-by-key restore failing, interrupted: the same hand lines, from the one builder (code review, MAJOR 1)', async () => {
+  it('the port free but the key-by-key restore failing, interrupted: the same hand lines, from the one builder', async () => {
     fresh({ restoreFails: true });
     seam.hang = '--sources wda';
     const done = go(batch());
@@ -442,14 +442,14 @@ describe('the abort inside the WDA window: the WDA ended, the wait, the restore;
     expect(readFileSync(join(out, 'RESTORE.txt'), 'utf8')).toBe(blockedRestore('interrupted'));
   });
 
-  it('…and on the normal path: the window left open, RESTORE at the end the same lines; the block INCONCLUSIVE (code review, MAJOR 1)', async () => {
+  it('…and on the normal path: the window left open, RESTORE at the end the same lines; the block INCONCLUSIVE', async () => {
     fresh({ restoreFails: true });
     expect(await go(batch())).toBe(1);
     expect(readFileSync(join(out, 'RESTORE.txt'), 'utf8')).toBe(blockedRestore('ended'));
     expect(summary()).toContain("D43 verdict: INCONCLUSIVE — the lab's settings not put back (see RESTORE)");
   });
 
-  it('the same on the normal path: the window left open, its hand lines in RESTORE at the end, in the same order; exit 1 (review round 1, BLOCKER)', async () => {
+  it('the same on the normal path: the window left open, its hand lines in RESTORE at the end, in the same order; exit 1', async () => {
     fresh({ stickyListener: true });
     expect(await go(batch())).toBe(1);
     expect(readFileSync(join(out, 'RESTORE.txt'), 'utf8')).toBe(blockedRestore('ended'));

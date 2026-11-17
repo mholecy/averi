@@ -141,7 +141,7 @@ async function windowRun(fake: ReturnType<typeof fakeSim>, labels = D43_LABELS):
   return sim;
 }
 
-describe("LabSim.open — lab-device.ts's guard, before any defaults call (batch-11 lab_guard, b11-dry check.sh:9–10)", () => {
+describe("LabSim.open — lab-device.ts's guard, before any defaults call", () => {
   it("device-check's simulator is refused before any call at all, in any case", async () => {
     for (const udid of [DEVICE_CHECK_SIMULATOR, DEVICE_CHECK_SIMULATOR.toLowerCase()]) {
       const calls: string[] = [];
@@ -179,7 +179,7 @@ describe("LabSim.open — lab-device.ts's guard, before any defaults call (batch
   });
 });
 
-describe("backup — the state file written dirty before the window's first change (sim-domains.ts, batch-11.sh:567–570)", () => {
+describe("backup — the state file written dirty before the window's first change", () => {
   it('each domain exported beside the state file and read typed; the state {dirty: true, udid, port 8120, domains}', async () => {
     const fake = fakeSim();
     const r = await backup(await labOf(fake), stateFile());
@@ -200,7 +200,7 @@ describe("backup — the state file written dirty before the window's first chan
     expect(py.every((c) => c.call?.secs === PLIST_SECS && c.args[0] === '-I' && c.args[1] === '-c' && c.args[2] === TYPED_PY)).toBe(true);
   });
 
-  it("a domain not there exports an empty dictionary (the host's defaults): absent only when `defaults read <domain>` says \"Domain '<it>' not found.\" (T2 S4 review round 2)", async () => {
+  it("a domain not there exports an empty dictionary (the host's defaults): absent only when `defaults read <domain>` says \"Domain '<it>' not found.\"", async () => {
     const domains = before();
     delete domains['com.apple.Preferences'];
     const fake = fakeSim({ domains });
@@ -215,14 +215,14 @@ describe("backup — the state file written dirty before the window's first chan
     ]);
   });
 
-  it('a domain there but empty is no absent one: its empty backup recorded, so the restore may import it (T2 S4 review round 2)', async () => {
+  it('a domain there but empty is no absent one: its empty backup recorded, so the restore may import it', async () => {
     const fake = fakeSim({ domains: { ...before(), 'com.apple.Preferences': {} } });
     const r = await backup(await labOf(fake), stateFile());
     expect(r.ok && r.line).toContain('com.apple.Preferences exported');
     expect(readState().domains[1]).toEqual({ name: 'com.apple.Preferences', backup: backupPathOf(stateFile(), 'com.apple.Preferences') });
   });
 
-  it('an empty export whose read cannot tell absent from empty fails the backup: another domain named, other words, past its bound (T2 S4 review round 2)', async () => {
+  it('an empty export whose read cannot tell absent from empty fails the backup: another domain named, other words, past its bound', async () => {
     const domains = before();
     delete domains['com.apple.Preferences'];
     for (const [said, why] of [
@@ -239,12 +239,12 @@ describe("backup — the state file written dirty before the window's first chan
     }
   });
 
-  it("an export that fails is a failure whatever it says, the host's not-found words too: absent is only the read's answer (T2 S4 review round 2)", async () => {
+  it("an export that fails is a failure whatever it says, the host's not-found words too: absent is only the read's answer", async () => {
     const r = await backup(await labOf(fakeSim({ rules: [(_, a) => (a[4] === 'export' ? exit(1, notFound(a[5])) : undefined)] })), stateFile());
     expect(r).toEqual({ ok: false, why: "defaults export com.apple.keyboard.preferences: exit 1 Error: Domain 'com.apple.keyboard.preferences' not found. — no state written" });
   });
 
-  it('an export that fails, passes its bound, or writes no file: no state written — so the window changes nothing (exit 0 with no file, or past its bound with one: T2 S4 review round 1)', async () => {
+  it('an export that fails, passes its bound, or writes no file: no state written — so the window changes nothing (exit 0 with no file, or past its bound with one)', async () => {
     const cases: [Rule, string][] = [
       [(_, a) => (a[4] === 'export' && a[5] === A11Y ? exit(5, 'boom') : undefined), `defaults export ${A11Y}: exit 5 boom — no state written`],
       [(_, a) => (a[4] === 'export' ? timedOut : undefined), 'defaults export com.apple.keyboard.preferences: past its bound (exit 142) — no state written'],
@@ -258,7 +258,7 @@ describe("backup — the state file written dirty before the window's first chan
     }
   });
 
-  it('a backup plistlib cannot read as a dictionary fails it, never read as an empty domain (sim-domains.ts:49–53)', async () => {
+  it('a backup plistlib cannot read as a dictionary fails it, never read as an empty domain', async () => {
     const r = await backup(await labOf(fakeSim({ unreadable: new Set([backupPathOf(stateFile(), 'com.apple.Preferences')]) })), stateFile());
     expect(r).toEqual({ ok: false, why: 'plistlib could not read state.com.apple.Preferences.backup.plist: exit 1 plistlib.InvalidFileException: Invalid file — no state written' });
     expect(existsSync(stateFile())).toBe(false);
@@ -284,7 +284,7 @@ describe("backup — the state file written dirty before the window's first chan
   });
 });
 
-describe("restore — key by key, verified, the state cleared only then (d43-gate.ts --restore; batch-10's D43 run)", () => {
+describe("restore — key by key, verified, the state cleared only then (batch-10's D43 run)", () => {
   it("batch-10's run: Accessibility's three flipped keys written back typed, the others equal; the state clean", async () => {
     const fake = fakeSim();
     const sim = await windowRun(fake);
@@ -349,7 +349,7 @@ describe("restore — key by key, verified, the state cleared only then (d43-gat
     expect(readState().dirty).toBe(true);
   });
 
-  it('a read-back plistlib cannot read is NOT VERIFIED, never an empty (so "equal") domain (sim-domains.ts review round 2)', async () => {
+  it('a read-back plistlib cannot read is NOT VERIFIED, never an empty (so "equal") domain', async () => {
     const fake = fakeSim({ unreadable: new Set([join(dir, `state.${A11Y}.readback.plist`)]) });
     const sim = await windowRun(fake);
     const r = await restore(sim, stateFile());
@@ -438,7 +438,7 @@ describe("restore — key by key, verified, the state cleared only then (d43-gat
     expect(fake.calls).toHaveLength(1);
   });
 
-  it('a state naming no domain, or a domain twice, is never "every domain equals its backup": NOT VERIFIED, nothing done, still dirty (T2 S4 review round 1)', async () => {
+  it('a state naming no domain, or a domain twice, is never "every domain equals its backup": NOT VERIFIED, nothing done, still dirty', async () => {
     const fake = fakeSim();
     const sim = await labOf(fake);
     for (const domains of [[], [...threeDomains(), threeDomains()[0]], threeDomains().slice(1)]) {
@@ -463,7 +463,7 @@ describe("restore — key by key, verified, the state cleared only then (d43-gat
   });
 });
 
-describe("compare — a late writer after the restore (batch-11 review round 1: sim-domains --compare; b11-dry d43-latediff, full-pass)", () => {
+describe("compare — a late writer after the restore", () => {
   const LATE = 'D43 (iOS, changed after the restore — a late writer): ';
   const marked = ' — the state file marked dirty again; the hand lines are in RESTORE';
   /** backup, the runner's flip, the restore (verified: the state clean) — where batch-11 compared. */
@@ -473,7 +473,7 @@ describe("compare — a late writer after the restore (batch-11 review round 1: 
     return sim;
   }
 
-  it("every domain equal after the end check: batch-11's `D43 WDA-window compare: OK` line, no hand line, the state left clean", async () => {
+  it("every domain equal after the end check: the `D43 WDA-window compare: OK` line, no hand line, the state left clean", async () => {
     const fake = fakeSim();
     const sim = await restored(fake);
     expect(await compare(sim, stateFile())).toEqual({ domains: DOMAINS.map((name) => ({ name, outcome: 'unchanged' })), line: 'D43 WDA-window compare: OK — every domain still equals its backup after the end check', hand: [] });
@@ -498,7 +498,7 @@ describe("compare — a late writer after the restore (batch-11 review round 1: 
     expect(fake.defaults().filter((d) => !d.startsWith('export'))).toEqual(['AccessibilityEnabled', 'ApplicationAccessibilityEnabled', 'AutomationEnabled'].map((k) => `write ${A11Y} ${k} -bool true`));
   });
 
-  it("a value shown bounded and on one line: cut at COMPARE_VALUE_CHARS with … (by code points: T2 S4 review round 2); a key with a line break quoted; a key gone shows absent", async () => {
+  it("a value shown bounded and on one line: cut at COMPARE_VALUE_CHARS with … (by code points); a key with a line break quoted; a key gone shows absent", async () => {
     const fake = fakeSim();
     const sim = await restored(fake);
     const long = 'x'.repeat(200);
@@ -585,7 +585,7 @@ describe("compare — a late writer after the restore (batch-11 review round 1: 
     expect(fake.calls).toHaveLength(1);
   });
 
-  it('a domain absent before that gained a key, a domain that went: before → after names absent on its side (T2 S4 review round 1)', async () => {
+  it('a domain absent before that gained a key, a domain that went: before → after names absent on its side', async () => {
     const domains = before();
     delete domains['com.apple.Preferences'];
     const fake = fakeSim({ domains });
@@ -600,7 +600,7 @@ describe("compare — a late writer after the restore (batch-11 review round 1: 
     expect((c.domains[0] as { changes: string[] }).changes).toContain('AutomaticMinimizationEnabled bool false → absent');
   });
 
-  it('a state file that is gone when it is to be marked dirty: said, the hand lines kept (T2 S4 review round 1)', async () => {
+  it('a state file that is gone when it is to be marked dirty: said, the hand lines kept', async () => {
     const fake = fakeSim();
     const sim = await restored(fake);
     const opened = await LabSim.open(LAB, fake.run, { ...nodeFs, exists: () => false });
@@ -621,7 +621,7 @@ describe("compare — a late writer after the restore (batch-11 review round 1: 
   });
 });
 
-describe("readProtected — the finportal key, read only: a value, absent or unreadable (batch-11.sh:337–340; batch-8 run 1 VOID)", () => {
+describe("readProtected — the finportal key, read only: a value, absent or unreadable (batch-8 run 1 VOID)", () => {
   const reading = (r: CallResult) => fakeSim({ rules: [(_, a) => (a[4] === 'read' ? r : undefined)] });
 
   it('read with `defaults read <schemeapproval> <finportal key>` and nothing else; its value, the trailing line break dropped', async () => {
@@ -636,20 +636,20 @@ describe("readProtected — the finportal key, read only: a value, absent or unr
     expect(await readProtected(await labOf(reading(exit(1, protectedNotFound()))))).toEqual({ state: 'absent' });
   });
 
-  it("batch-8's own stderr, naming another key (`-->averilab`), is unreadable: a not-found for a key not asked is unexpected (T2 S4 code review)", async () => {
+  it("batch-8's own stderr, naming another key (`-->averilab`), is unreadable: a not-found for a key not asked is unexpected", async () => {
     const said = readFileSync(join(FIXTURES, 'schemeapproval-absent-b8-read.txt'), 'utf8');
     expect(await readProtected(await labOf(reading(exit(1, said))))).toEqual({ state: 'unreadable', why: `exit 1 ${said.trim()}` });
     expect(await readProtected(await labOf(reading(exit(1, keyNotFound(`${PROTECTED.key}x`)))))).toMatchObject({ state: 'unreadable' });
     expect(await readProtected(await labOf(reading(exit(1, keyNotFound(PROTECTED.key.replaceAll('.', 'X'))))))).toMatchObject({ state: 'unreadable' });
   });
 
-  it("batch-9's delete variant (the same error, then \"Defaults have not been changed.\") for the protected key reads absent too; so does the host's `Domain '<it>' not found.` (T2 S4 review round 2)", async () => {
+  it("batch-9's delete variant (the same error, then \"Defaults have not been changed.\") for the protected key reads absent too; so does the host's `Domain '<it>' not found.`", async () => {
     const said = readFileSync(join(FIXTURES, 'schemeapproval-absent-b9-delete.txt'), 'utf8').replaceAll(B8_KEY, PROTECTED.key);
     expect(await readProtected(await labOf(reading(exit(1, said))))).toEqual({ state: 'absent' });
     expect(await readProtected(await labOf(reading({ ...exit(1), out: notFound(PROTECTED.domain) })))).toEqual({ state: 'absent' });
   });
 
-  it('the unverified `Domain <it> does not exist` wording is no absent (T2 S4 review round 2: never seen from defaults): unreadable', async () => {
+  it('the unverified `Domain <it> does not exist` wording is no absent (never seen from defaults): unreadable', async () => {
     expect(await readProtected(await labOf(reading(exit(1, `Domain ${PROTECTED.domain} does not exist`))))).toEqual({ state: 'unreadable', why: `exit 1 Domain ${PROTECTED.domain} does not exist` });
   });
 
@@ -674,7 +674,7 @@ describe("readProtected — the finportal key, read only: a value, absent or unr
   });
 });
 
-describe("domainsWindow — the WDA window as abort.ts's dirty window (batch-11.sh:158–164, the abort path)", () => {
+describe("domainsWindow — the WDA window as abort.ts's dirty window (the abort path)", () => {
   it('its restore runs over the Run the abort hands it (detached), and says how; its state file and its hand line given', async () => {
     const fake = fakeSim();
     const sim = await windowRun(fake);
@@ -690,7 +690,7 @@ describe("domainsWindow — the WDA window as abort.ts's dirty window (batch-11.
     expect(readState().dirty).toBe(false);
   });
 
-  it("its hand lines read from the state file when asked: a domain absent before gets key deletes, never an import (d43-gate.ts's rule); no state, one line saying both", async () => {
+  it("its hand lines read from the state file when asked: a domain absent before gets key deletes, never an import (the restore's rule); no state, one line saying both", async () => {
     const domains = before();
     delete domains['com.apple.Preferences'];
     const fake = fakeSim({ domains });
@@ -708,7 +708,7 @@ describe("domainsWindow — the WDA window as abort.ts's dirty window (batch-11.
     expect(w.hand.join('\n')).not.toContain('import com.apple.Preferences');
   });
 
-  it('a state file there but unreadable when the abort asks: said first, with why, then the line saying both (T2 S4 review round 2)', async () => {
+  it('a state file there but unreadable when the abort asks: said first, with why, then the line saying both', async () => {
     const sim = await labOf(fakeSim());
     writeFileSync(stateFile(), '{"dirty": tr');
     const w = domainsWindow(sim, stateFile());
@@ -729,7 +729,7 @@ describe("domainsWindow — the WDA window as abort.ts's dirty window (batch-11.
   });
 });
 
-describe('a domains window of another block: its own labels on every line, none says D43 (T2b batch-13 gap 3: batch-13\'s D65 relabelled them by regex)', () => {
+describe('a domains window of another block: its own labels on every line, none says D43 (each block\'s window labels are its own)', () => {
   const L = domainLabels('D65');
   // D43 as a label (a word of its own), never inside a word: a line naming a temp folder such as `…/hCD435…` says no D43.
   const noD43 = (lines: readonly string[]) => expect(lines.filter((l) => /(?<![A-Za-z0-9])D43(?![A-Za-z0-9])/.test(l))).toEqual([]);

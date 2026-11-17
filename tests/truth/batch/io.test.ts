@@ -122,7 +122,7 @@ describe('nodeFs.withAppend: a child\'s log, opened for append and handed over a
   });
 });
 
-describe('a kept file is never overwritten (T2 S6b; moved here in its code review: a run\'s evidence is never replaced)', () => {
+describe('a kept file is never overwritten (T2 S6b: a run\'s evidence is never replaced)', () => {
   it('freshIn: the name itself, or the next free -2, -3 before its extension', () => {
     const dir = mkdtempSync(join(tmpdir(), 'batch-lab-lines-'));
     try {
