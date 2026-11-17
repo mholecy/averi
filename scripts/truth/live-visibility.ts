@@ -49,8 +49,9 @@ export type Outcome = 'ok' | 'LOUD' | 'MISMATCH' | 'SKIP';
 /**
  * Why a case is not ok, by the judge's rule — what the live KNOWN pins beside the note (live-known.ts), as the static
  * ratchet pins a row's class: a known case failing by another rule is not known. `stop-claim` "visible" where the app
- * does not bear the stop out; `tap-claim` `Tapped` with nothing or something else fired; `tap-refused-fired` a refusal
- * while something fired; `tap-refused` (LOUD) a refusal of a target its probe reached; `unchanged-claim` "the last N
+ * does not bear the stop out; `tap-claim` `Tapped` with nothing or something else fired, or anything fired in an
+ * absent-at-end case (on any reply but `visible`); `tap-refused-fired` a refusal while something fired; `tap-refused`
+ * (LOUD) a refusal of a target its probe reached; `unchanged-claim` "the last N
  * swipes did not change the screen" against the app's strokes; `R-direction` the strokes broke it; `failed-holds` a
  * failure where the app shows the stop; `not-reached` (LOUD) an honest failure; `presented-stop`, `presented-fired`,
  * `presented-stroke` a scroll_until beneath a presented layer that stopped, fired or stroked; `presented-changed`

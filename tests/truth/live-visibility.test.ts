@@ -539,12 +539,14 @@ describe('the live KNOWN pins the rule a case fails by and the kind of reply it 
     expect(knownLive('android', 'uiautomator', 'tap:scroll-bounded.S', 'tap-refused-fired', 'refused')).toBeUndefined();
     expect(knownLive('ios', 'wda', 'scroll:no-such.case', 'stop-claim', 'visible')).toBeUndefined();
   });
-  // A consistency check of the data, not a second judge: live-visibility.ts produces `stop-claim` only on a `visible`
-  // reply, so an entry pinning it on another kind could never match; `tap-claim` on a `Tapped` reply (judgeTap), and
-  // in judgeAbsentAtEnd on any reply but `visible` once the app logged something since the launch. The tap-claim half
-  // below is stricter than the producer: an absent-at-end tap-claim on another kind would be rejected here.
-  it('a claim pins the kind it claims on: a stop claimed on `visible`, a tap claimed on `Tapped`', () => {
-    const bad = Object.entries(LIVE_KNOWN).filter(([, e]) => (e.cls === 'stop-claim' && e.kind !== 'visible') || (e.cls === 'tap-claim' && e.kind !== 'Tapped'));
+  // A consistency check of the data, not a second judge: an entry pinning a class on a kind its rule never gives it
+  // could never match. live-visibility.ts produces `stop-claim` only on a `visible` reply; `tap-claim` on a `Tapped`
+  // reply (judgeTap), and in an absent-at-end case (`absent:<cell>`, judgeAbsentAtEnd) on any reply but `visible` once
+  // the app logged something since the launch.
+  it('a claim pins a kind its rule claims on: a stop on `visible`; a tap on `Tapped`, or in an absent-at-end case on any kind but `visible`', () => {
+    const absentAtEnd = (key: string) => key.split(' ')[2]?.startsWith('absent:') === true;
+    const tapClaimable = (key: string, kind: string) => kind === 'Tapped' || (absentAtEnd(key) && kind !== 'visible');
+    const bad = Object.entries(LIVE_KNOWN).filter(([k, e]) => (e.cls === 'stop-claim' && e.kind !== 'visible') || (e.cls === 'tap-claim' && !tapClaimable(k, e.kind)));
     expect(bad).toEqual([]);
   });
   // Its notes (a bug note of docs/bugs, a residual of a decision) are checked in tests/truth/lab-notes.test.ts.
