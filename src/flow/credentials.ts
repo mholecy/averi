@@ -1,4 +1,4 @@
-import { SetupError, unknownLine, type AveriConfig } from './config.js';
+import { defines, namesOf, SetupError, unknownLine, type AveriConfig } from './config.js';
 
 /**
  * Credentials: which values a flow's `$name` and `${VAR}` stand for.
@@ -54,6 +54,11 @@ export interface Credentials {
   resolve(raw: string): ResolvedValue;
 }
 
+interface SelectedEnvironment {
+  name: string;
+  source: 'requested' | 'AVERI_ENV' | 'defaultEnvironment';
+}
+
 /**
  * The environment a run selects and where its name came from — THE precedence, most specific first: explicit
  * `requested` (tool argument) → `AVERI_ENV` (settable from `.env.averi`, so switching backend is one line in an
@@ -63,36 +68,38 @@ export function selectedEnvironment(
   cfg: AveriConfig,
   env: EnvValues,
   requested?: string,
-): { name: string; source: 'requested' | 'AVERI_ENV' | 'defaultEnvironment' } | undefined {
+): SelectedEnvironment | undefined {
   if (requested !== undefined) return { name: requested, source: 'requested' };
   if (env.AVERI_ENV !== undefined) return { name: env.AVERI_ENV, source: 'AVERI_ENV' };
   if (cfg.defaultEnvironment !== undefined) return { name: cfg.defaultEnvironment, source: 'defaultEnvironment' };
   return undefined;
 }
 
+/** The line refusing a selected environment averi.yaml does not declare, naming where its name came from. */
+const unknownSelected = (cfg: AveriConfig, selected: SelectedEnvironment): string =>
+  unknownLine(
+    `environment "${selected.name}" (from ${selected.source})`,
+    'environment',
+    Object.keys(namesOf('environment', cfg)),
+  );
+
 /**
- * The line refusing the environment a run would select (selectedEnvironment), naming where the name came from;
- * undefined when it is declared or none is selected. An own key of `environments:` only. Worded as
- * flow/config.ts#unknownLine words every unknown name, so the run layer's pre-flight (run/preflight.ts#preflight)
- * lists it beside the state and flow names.
+ * The line refusing the environment a run would select (selectedEnvironment), or undefined when it is declared or
+ * none is selected. Worded as flow/config.ts#unknownLine words every unknown name, so it can stand in one list with
+ * unknown state and flow names; resolveCredentials throws the same line.
  */
 export function unknownEnvironment(cfg: AveriConfig, env: EnvValues, requested?: string): string | undefined {
   const selected = selectedEnvironment(cfg, env, requested);
-  if (selected === undefined || Object.hasOwn(cfg.environments ?? {}, selected.name)) return undefined;
-  return unknownLine(
-    `environment "${selected.name}" (from ${selected.source})`,
-    'environment',
-    Object.keys(cfg.environments ?? {}),
-  );
+  if (selected === undefined || defines('environment', selected.name, cfg)) return undefined;
+  return unknownSelected(cfg, selected);
 }
 
 /**
  * Pick the credential set for a run: base `credentials:` overlaid per-key with
  * `environments.<name>.credentials`, resolved ONCE so a run cannot type one
- * environment's username and another's password. An unknown name throws here
- * (unknownEnvironment's line); the run layer asks unknownEnvironment as a
- * pre-flight so the refusal lands before any device is touched
- * (run/preflight.ts#preflight), and the engine resolves here, before any STEP.
+ * environment's username and another's password. An unknown name throws here,
+ * in unknownEnvironment's words, before any STEP; unknownEnvironment asks the
+ * same question without throwing, so the refusal can come before any device.
  *
  * Which environment, if any: selectedEnvironment's precedence; none selected
  * is base only.
@@ -102,14 +109,14 @@ export function unknownEnvironment(cfg: AveriConfig, env: EnvValues, requested?:
  * it is typed, so an environment mix-up presents as a credentials problem.
  */
 export function resolveCredentials(cfg: AveriConfig, env: EnvValues, requested?: string): Credentials {
-  const name = selectedEnvironment(cfg, env, requested)?.name;
+  const selected = selectedEnvironment(cfg, env, requested);
+  const name = selected?.name;
   const base = cfg.credentials ?? {};
   let templates: Readonly<Record<string, string>> = base;
   let overriddenNames: readonly string[] = [];
-  if (name !== undefined) {
-    const unknown = unknownEnvironment(cfg, env, requested);
-    if (unknown !== undefined) throw new SetupError(unknown);
-    const environmentEntry = cfg.environments![name];
+  if (selected !== undefined) {
+    const environmentEntry = defines('environment', selected.name, cfg) ? cfg.environments?.[selected.name] : undefined;
+    if (environmentEntry === undefined) throw new SetupError(unknownSelected(cfg, selected));
     templates = { ...base, ...environmentEntry.credentials };
     overriddenNames = Object.freeze(Object.keys(environmentEntry.credentials ?? {}));
   }

@@ -1683,7 +1683,7 @@ export class FlowEngine {
 
   /** A state's detect, by name — a SetupError for a name the config does not declare. */
   private detectOf(name: string): Condition {
-    if (!defines('state', name, this.cfg)) throw new SetupError(`Unknown state "${name}"`);
+    if (!defines('state', name, this.cfg)) throw new SetupError(unknownName('state', name, this.cfg));
     return this.cfg.states[name].detect;
   }
 

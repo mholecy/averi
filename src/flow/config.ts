@@ -575,28 +575,35 @@ export class SetupError extends Error {
   }
 }
 
+/** The kinds of name averi.yaml declares and a request or a reference names. */
+export type NameKind = 'state' | 'flow' | 'environment';
+
+/** The names averi.yaml declares of one kind, as the record they are the keys of. */
+export function namesOf(kind: NameKind, cfg: AveriConfig): Readonly<Record<string, unknown>> {
+  return kind === 'state' ? cfg.states : kind === 'flow' ? cfg.flows : (cfg.environments ?? {});
+}
+
 /**
- * Whether averi.yaml defines a state or flow of this name: its OWN key, so `constructor` or `__proto__` is never a
- * state or flow, as `in` or an index would make it. The one predicate for the load-time references
- * (validateReferences), the run layer's pre-flight (run/preflight.ts#preflight) and the engine's lookups.
+ * Whether averi.yaml declares a state, flow or environment of this name: its OWN key, so `constructor` or
+ * `__proto__` is never one, as `in` or an index would make it. One predicate, so a name is defined or not alike at
+ * load, before a device and inside the engine.
  */
-export function defines(kind: 'state' | 'flow', name: string, cfg: AveriConfig): boolean {
-  return Object.hasOwn(kind === 'state' ? cfg.states : cfg.flows, name);
+export function defines(kind: NameKind, name: string, cfg: AveriConfig): boolean {
+  return Object.hasOwn(namesOf(kind, cfg), name);
 }
 
 /**
  * The line for a name averi.yaml does not declare: the known names, or plainly that it declares none of that kind
- * rather than an empty list. One wording for states, flows (unknownName) and environments
- * (flow/credentials.ts#unknownEnvironment, and validateReferences' `defaultEnvironment:` at load), so every unknown
- * name reads alike — the pre-flight's one refusal line by line.
+ * rather than an empty list. One wording for every kind, so every unknown name reads alike, and several of them listed
+ * together read as one list.
  */
-export function unknownLine(what: string, kind: 'state' | 'flow' | 'environment', known: string[]): string {
+export function unknownLine(what: string, kind: NameKind, known: string[]): string {
   return `Unknown ${what} — ${known.length === 0 ? `averi.yaml defines no ${kind}s` : `known: ${known.join(', ')}`}`;
 }
 
-/** The line for a state or flow name a request asks for and averi.yaml does not define (unknownLine). */
+/** The line for a state or flow name averi.yaml does not define (unknownLine). */
 export function unknownName(kind: 'state' | 'flow', name: string, cfg: AveriConfig): string {
-  return unknownLine(`${kind} "${name}"`, kind, Object.keys(kind === 'state' ? cfg.states : cfg.flows));
+  return unknownLine(`${kind} "${name}"`, kind, Object.keys(namesOf(kind, cfg)));
 }
 
 /**
@@ -788,12 +795,12 @@ function validateReferences(cfg: AveriConfig, source: string): void {
       if (children !== undefined) checkSteps(children, where);
     }
   };
-  if (cfg.defaultEnvironment !== undefined && !Object.hasOwn(cfg.environments ?? {}, cfg.defaultEnvironment)) {
+  if (cfg.defaultEnvironment !== undefined && !defines('environment', cfg.defaultEnvironment, cfg)) {
     fail(
       unknownLine(
         `environment "${cfg.defaultEnvironment}" (from defaultEnvironment)`,
         'environment',
-        Object.keys(cfg.environments ?? {}),
+        Object.keys(namesOf('environment', cfg)),
       ),
     );
   }
