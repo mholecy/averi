@@ -273,17 +273,17 @@ describe('a leg section, line for line', () => {
 
   it('a state and no asserts: the trace, then the health line', async () => {
     const out = await one({ cfg: STATEFUL, state: 'home' });
-    expect(out.sections).toEqual(['## android\nstate home: already active\n\nappAlive: true']);
+    expect(out.sections).toEqual(['## android\nstate home: already active\nappAlive: true']);
   });
 
   it('asserts and no state: the verdict, then one line per assert, then the health line', async () => {
     const out = await one({ specs: [{ element: { id: 'card' } }] });
-    expect(out.sections).toEqual(['## android\n\nAll 1 asserts passed\nPASS  element id:"card" exists\nappAlive: true']);
+    expect(out.sections).toEqual(['## android\nAll 1 asserts passed\nPASS  element id:"card" exists\nappAlive: true']);
   });
 
   it('neither: the head, then the health line', async () => {
     const out = await one({});
-    expect(out.sections).toEqual(['## android\n\n\nappAlive: true']);
+    expect(out.sections).toEqual(['## android\nappAlive: true']);
   });
 
   it('a frame that never settled: its note sits after the asserts and before the health line', async () => {

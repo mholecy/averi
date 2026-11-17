@@ -29,6 +29,15 @@ describe('legText', () => {
     expect(legText({ trace: 't', asserts: { results: [fail], verdict: false }, health: '' })).toBe('t\nFAIL  b — not found');
   });
 
+  it('an empty part takes no line: a verify leg that ran nothing and asserted nothing is its head and health line', () => {
+    expect(legText({ head: '## ios', trace: '', asserts: { results: [], verdict: false }, health: HEALTH })).toBe(
+      '## ios\nappAlive: true',
+    );
+    expect(legText({ head: '## ios', trace: '', asserts: { results: [pass], verdict: true }, health: HEALTH })).toBe(
+      '## ios\nAll 1 asserts passed\nPASS  a\nappAlive: true',
+    );
+  });
+
   it('run_flow: the trace, then the health line', () => {
     expect(legText({ trace: 'flow f: start\ntap: x', health: HEALTH })).toBe('flow f: start\ntap: x\nappAlive: true');
   });

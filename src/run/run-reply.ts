@@ -54,7 +54,7 @@ const assertSummary = (results: AssertResult[]): string => {
     : `${failed}/${results.length} asserts FAILED`;
 };
 
-/** What one run's reply is made of; a part a caller has nothing for is left out. */
+/** What one run's reply is made of. A part a caller has nothing for, left out or empty, takes no line. */
 interface Leg {
   /** A verify leg's `## <platform>` line. */
   head?: string;
@@ -73,9 +73,9 @@ interface Leg {
 
 /**
  * The reply of ensure_state, run_flow, assert and each verify leg, in the one order they share: the head, the trace,
- * the verdict, the assert lines, the frame's note, and the health line last (ARCHITECTURE.md §8). A verdict keeps its
- * line break even over no assert lines, so the `assert` tool's reply to an empty list ends `passed\n` before the
- * health line.
+ * the verdict, the assert lines, the frame's note, and the health line last (ARCHITECTURE.md §8). An empty part takes
+ * no line: a verify leg with no state, flow or asserts is its head and health line. The verdict and its lines are one
+ * part, so the `assert` tool's reply to an empty list keeps the line break after `All 0 asserts passed`.
  */
 export function legText({ head, trace, asserts, frame, health }: Leg): string {
   const assertBlock =
@@ -83,6 +83,6 @@ export function legText({ head, trace, asserts, frame, health }: Leg): string {
     : asserts.verdict ? `${assertSummary(asserts.results)}\n${formatAsserts(asserts.results)}`
     : formatAsserts(asserts.results);
   const note = frame === undefined ? undefined : frameNote(frame);
-  const parts = [head, trace, assertBlock, note].filter((p): p is string => p !== undefined);
+  const parts = [head, trace, assertBlock, note].filter((p): p is string => p !== undefined && p !== '');
   return parts.join('\n') + health;
 }
