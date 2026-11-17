@@ -79,21 +79,7 @@ export class WdaTreeSource implements IosTreeSource {
   }
 
   async read(): Promise<UiNode> {
-    if (this.disposed) throw this.released();
-    let payload: unknown;
-    try {
-      payload = await this.server.source();
-    } catch (err) {
-      // The common case during run_flow: the read is INSIDE /source (hundreds
-      // of ms) or still bringing the server up when a select_device disposes
-      // this source. WdaServer then fails the read in its own words — "the
-      // process is exiting", "stopped during startup" — neither of which
-      // names the deselection or how to recover. The flag decides: a failure
-      // after dispose is the release, whatever the server called it; before
-      // it, the server's wording stands.
-      if (this.disposed) throw this.released(err);
-      throw err;
-    }
+    const payload = await this.guarded(() => this.server.source());
     this.failedAsk = undefined; // WDA answered a read: the launch's wait may ask it again
     return parseWdaSourceValue(payload);
   }
@@ -101,16 +87,10 @@ export class WdaTreeSource implements IosTreeSource {
   /**
    * Brings WebDriverAgent up without reading a tree — WdaServer.ensureRunning, within its own bounds (the package, a
    * first build, /status). A failure here is "WDA cannot be brought up", unlike a failed /source on a WDA that is up.
-   * Released → the released error, as read().
+   * Released → the released error, as `guarded`.
    */
-  async bringUp(): Promise<void> {
-    if (this.disposed) throw this.released();
-    try {
-      await this.server.ensureRunning();
-    } catch (err) {
-      if (this.disposed) throw this.released(err);
-      throw err;
-    }
+  bringUp(): Promise<void> {
+    return this.guarded(() => this.server.ensureRunning());
   }
 
   /**
@@ -170,22 +150,19 @@ export class WdaTreeSource implements IosTreeSource {
    *   The bundle id is matched exactly by the wait (ios-foreground.ts): WDA
    *   reports the app's canonical CFBundleIdentifier, the id `simctl launch`
    *   was given — no case folding, by design.
-   * - released → the released error, as read() (checked first: a shut-down
-   *   server is not up, and `declined` would hide the release).
+   * - released → the released error (checked first: a shut-down server is
+   *   not up, and `declined` would hide the release), as `guarded`.
    */
   async applicationLabel(): Promise<ApplicationLabel> {
     if (this.disposed) throw this.released();
     const generation = this.server.upGeneration();
     if (generation === undefined) return { kind: 'declined' };
     if (this.failedAsk?.generation === generation) throw this.failedAsk.error;
-    let payload: unknown;
-    try {
-      payload = await this.server.activeAppInfo();
-    } catch (err) {
-      if (this.disposed) throw this.released(err);
-      this.failedAsk = { generation, error: err };
+    const remember = (err: unknown): never => {
+      if (!this.disposed) this.failedAsk = { generation, error: err };
       throw err;
-    }
+    };
+    const payload = await this.guarded(() => this.server.activeAppInfo().catch(remember));
     const bundleId = (payload as { value?: { bundleId?: unknown } } | null | undefined)?.value?.bundleId;
     return typeof bundleId === 'string' && bundleId !== '' ? { kind: 'bundle', bundleId } : { kind: 'unlabelled' };
   }
@@ -197,14 +174,7 @@ export class WdaTreeSource implements IosTreeSource {
    * error. Leaves `failedAsk` alone: this read proves nothing about the ask.
    */
   async systemAlert(): Promise<SystemAlert | undefined> {
-    if (this.disposed) throw this.released();
-    let payload: unknown;
-    try {
-      payload = await this.server.quickSourceIfUp();
-    } catch (err) {
-      if (this.disposed) throw this.released(err);
-      throw err;
-    }
+    const payload = await this.guarded(() => this.server.quickSourceIfUp());
     return payload === undefined ? undefined : alertInWda(parseWdaSourceValue(payload));
   }
 
@@ -212,12 +182,24 @@ export class WdaTreeSource implements IosTreeSource {
    * Types `text` into whatever holds keyboard focus through WebDriverAgent (D43, ADR 0037's D43 amendment):
    * WdaServer.keys — a session per WDA start, one retry on a lost session, none after a request that did not complete.
    * Starts WDA when it is not up, as read() does. Released → the released error, nothing sent; a failure after dispose
-   * is the release, as read()'s.
+   * is the release, as `guarded`.
    */
-  async typeWide(text: string): Promise<void> {
+  typeWide(text: string): Promise<void> {
+    return this.guarded(() => this.server.keys(text));
+  }
+
+  /**
+   * `call` on the server, unless the source is released: released → the released error, and `call` never runs, so a
+   * released source starts no WdaServer for a deselected simulator (the 0.8.1 orphan). A failure of `call` after a
+   * dispose is the release, its error kept only as the cause: a select_device during run_flow lands while a read is
+   * inside /source or still bringing the server up, and WdaServer then words the failure as its own ("the process is
+   * exiting", "stopped during startup"), naming neither the deselection nor how to recover. A failure before any
+   * dispose is WDA's, thrown as it is.
+   */
+  private async guarded<T>(call: () => Promise<T>): Promise<T> {
     if (this.disposed) throw this.released();
     try {
-      await this.server.keys(text);
+      return await call();
     } catch (err) {
       if (this.disposed) throw this.released(err);
       throw err;
