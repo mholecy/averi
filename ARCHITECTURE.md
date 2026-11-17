@@ -142,8 +142,8 @@ question:
   the grammar's own matcher), `verdict.ts` (an element question against one tree: `yes` / `no` / `unknown`, `unknown`
   only on a bare tree), `bare-tree.ts` (`isBareTree`: does the tree hold anything a user could read or act on;
   `treeShape` names one that does not), `miss.ts` (`missOf`: why a target is not in the tree — the one decision behind
-  every not-found reply), `masked-value.ts` (mask characters), `own-text.ts` (`quotedText`: a node's text as a list
-  of candidates quotes it, an input's own text by its length and rect).
+  every not-found reply), `masked-value.ts` (mask characters), `listed-text.ts` (`listedText`: a node's text as a list
+  of other nodes gives it, an input's own text by its length and rect).
 - **Reading and waiting** — `read-tree.ts`: the read seam (`readTreeOrMiss`, `readTreeOrThrow`; a failure no wait cures
   is `PersistentReadError`, thrown at once, ADR 0036) and `pollTree`, the one owner of the deadline loop (its pause
   counts the read, ADR 0029; a `PollObserver` is told each fresh read's timing); `read-handoff.ts` (`ReadHandOff`: the
