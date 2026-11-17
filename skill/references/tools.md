@@ -204,11 +204,20 @@ Arguments:
 - Idempotent — always prefer this over manual login taps.
 - If the UI tree cannot be read (e.g. iOS idb stuck on a 0×0 tree) or holds nothing rendered (a cold launch's decor or splash) for the whole ~20 s second look, a destructive reach flow (clearState, or destructive: true) is refused rather than run blind: the call fails with "Refused to run reach flow …" and a ⛔ line in the trace — nothing was wiped; compare with screenshot and retry once the screen has rendered, or run_flow the rung deliberately.
 - Returns the step trace and a final screenshot, settled the same way `screenshot` settles it.
-- A `state` or `environment` averi.yaml does not declare is refused before any device, naming the known ones (run_flow likewise for its `flow`).
+- A `state` or `environment` averi.yaml does not declare is refused before any device, in one refusal naming the known ones (or saying averi.yaml defines none); an empty `state` is such a name.
 
 Arguments:
 
 - `state`: State name from averi.yaml
+
+## `run_flow`
+
+- Run a named flow from averi.yaml (e.g. "goto_transfers"). Honors the flow's `requires:` state. Returns the step trace.
+- A `flow` or `environment` averi.yaml does not declare is refused before any device, in one refusal naming the known ones (or saying averi.yaml defines none); an empty `flow` is such a name.
+
+Arguments:
+
+- `flow`: Flow name from averi.yaml
 
 ## `assert`
 
