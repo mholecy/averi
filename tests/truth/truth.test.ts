@@ -87,7 +87,7 @@ describe('directionOf — toward the target, along its scroll view\'s axis', () 
     expect(axisOf('right')).toBe('x');
     expect(axisOf('down')).toBe('y');
   });
-  it('anything else up or down by its centre, as before: in no scroll view, or one the state does not report, or beside the clip but off its rows', () => {
+  it('anything else up or down by its centre: in no scroll view, or one the state does not report, or beside the clip but off its rows', () => {
     expect(at(rect(378, 138, 354, 85))).toBe('up');
     expect(at(rect(378, 138, 354, 85), 'other')).toBe('up');
     expect(at(rect(378, 900, 354, 85), 'carousel')).toBe('down');

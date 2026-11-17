@@ -39,7 +39,7 @@ describe('T7b: the chooser group\'s records, rejudged', () => {
     expect(pp.focus!.after).not.toHaveProperty('waitedMs');
   });
 
-  it("review round 1's runs: lc4' and lc4'''s first read after monkey mid-transition (mCurrentFocus=null) with the lab's .MainActivity already mFocusedApp, settled 300 ms later; the HOME activity the launcher in front before", () => {
+  it("review1-run-*.json: lc4' and lc4'''s first read after monkey mid-transition (mCurrentFocus=null) with the lab's .MainActivity already mFocusedApp, settled 300 ms later; the HOME activity the launcher in front before", () => {
     for (const f of REVIEW_RUNS) {
       const byId = new Map(read(f).results.map((r) => [r.id, r]));
       for (const id of ["lc4'", "lc4''"]) {
