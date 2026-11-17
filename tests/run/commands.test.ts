@@ -19,7 +19,7 @@ import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
  * The single-platform tool compositions at their own level: a FakeAdapter, a
  * real averi.yaml in a temp dir, no MCP server. tests/mcp/tools.test.ts pins
  * the same behaviour through the protocol; what is pinned here is what the
- * protocol cannot show cleanly — the ORDER (the environment pre-flight before
+ * protocol cannot show cleanly — the ORDER (the pre-flight of names and environment before
  * the adapter is resolved), and what each function returns as a value. These
  * functions take the config the handler read (once, under the tool's policy
  * — flow/tool-config.ts), not a path: what a missing or broken averi.yaml
@@ -208,7 +208,7 @@ describe('runNamedFlow', () => {
   });
 
   // run_flow and ensure_state share runOnEngine, so the pre-flight below is
-  // theirs alike; run/preflight.ts#refuseUnknownEnvironment has the why.
+  // theirs alike; run/preflight.ts#preflight has the why.
   it('an environment averi.yaml does not declare is refused, naming the known ones — before the adapter is resolved', async () => {
     const r = resolver(home());
     await expect(
@@ -222,6 +222,32 @@ describe('runNamedFlow', () => {
     await expect(
       runEnsureState({ session: new EngineSession(), state: 'home', environment: 'nope', project: await validProject() }, r.resolve),
     ).rejects.toThrow('Unknown environment "nope" (from requested) — known: staging');
+    expect(r.resolvedWith).toEqual([]);
+  });
+
+  // run/preflight.ts#preflight: a name averi.yaml does not define costs no device.
+  it('a flow averi.yaml does not define is refused, naming the known ones — before the adapter is resolved', async () => {
+    const r = resolver(home());
+    await expect(
+      runNamedFlow({ session: new EngineSession(), flow: 'open_menuu', project: await validProject() }, r.resolve),
+    ).rejects.toThrow('Unknown flow "open_menuu" — known: open_menu\nNothing was run on a device.');
+    expect(r.resolvedWith).toEqual([]);
+  });
+
+  it('ensure_state: a state averi.yaml does not define is refused before the adapter is resolved', async () => {
+    const r = resolver(home());
+    await expect(
+      runEnsureState({ session: new EngineSession(), state: 'hom', project: await validProject() }, r.resolve),
+    ).rejects.toThrow('Unknown state "hom" — known: home\nNothing was run on a device.');
+    expect(r.resolvedWith).toEqual([]);
+  });
+
+  it('with no states defined the refusal says so, rather than an empty list', async () => {
+    const r = resolver(home());
+    const project = await loadForCall(REQUIRED_CONFIG_AND_ENV, await file('bare.yaml', 'app:\n  android: { package: a.b }\n'));
+    await expect(runEnsureState({ session: new EngineSession(), state: 'home', project }, r.resolve)).rejects.toThrow(
+      'Unknown state "home" — averi.yaml defines no states\nNothing was run on a device.',
+    );
     expect(r.resolvedWith).toEqual([]);
   });
 

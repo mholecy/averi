@@ -3,8 +3,8 @@ import { resolve } from 'node:path';
 import type { DeviceAdapter, Platform } from '../adapters/types.js';
 import type { AveriConfig } from '../flow/config.js';
 import type { EnvValues } from '../flow/credentials.js';
-import { refuseUnknownEnvironment } from './preflight.js';
-import { formatTrace, FlowEngine, runRequestOf, type EngineContext, type TraceEntry } from '../flow/engine.js';
+import { preflight } from './preflight.js';
+import { formatTrace, FlowEngine, type EngineContext, type TraceEntry } from '../flow/engine.js';
 import { Verifier, type AssertResult, type AssertSpec } from '../verify/assert.js';
 import { appHealth } from './app-health.js';
 import { assertSummary, finalFrame, formatAsserts, screenshotFailedLine, type FinalFrame } from './run-reply.js';
@@ -370,9 +370,10 @@ export async function runVerification(
     const problems = contractProblems(contract);
     if (problems.length > 0) throw new Error(contractRefusal(problems, req.contractPath));
   }
-  // Same rule for the environment — run/preflight.ts#refuseUnknownEnvironment
-  // has the why: a thrown refusal here, before any leg.
-  refuseUnknownEnvironment(cfg, env, req.environment);
+  // Same rule for the state and flow names and the environment — run/preflight.ts#preflight
+  // has the why: ONE thrown refusal here, before any leg, for what every leg would have failed on.
+  // Neither named (or both empty): no run, an empty trace per leg.
+  const request = preflight({ cfg, env }, req, req.environment);
 
   // The run's ONE OCR decision: the text table and every leg's Verifier read
   // with the same engine, or fail closed on the same reason. A Verifier that
@@ -391,8 +392,6 @@ export async function runVerification(
     // ONE engine run per leg: the state and the flow share its trace,
     // environment line and recovery budget, so a flow that fails after the
     // state was ensured fails with the state's lines too.
-    // Neither named (or both empty): no run, an empty trace.
-    const request = runRequestOf(req.state, req.flow);
     // One hand-off of the last read for the leg's run and its asserts (ui-tree/read-handoff.ts, docs/adr/0030-a-read-
     // is-handed-on-only-as-a-first-sample-or-a-positive-verdict.md): the state's detect that answered `yes`, or the
     // flow's closing `wait:`, is the screen the first element assert judges — taken as a pass only, fresh otherwise.

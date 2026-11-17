@@ -35,6 +35,7 @@ import {
   flowItselfIsDestructive,
   keyboardDismissals,
   SetupError,
+  unknownName,
   type AveriConfig,
   type Condition,
   type ScrollUntilSpec,
@@ -534,7 +535,7 @@ export class FlowEngine {
     // Resolved once per engine so a run cannot type one environment's username
     // and another's password; resolved before any STEP, so a bad name never
     // fails mid-login. The refusal BEFORE any device is the run layer's
-    // pre-flight (run/preflight.ts#refuseUnknownEnvironment) — the engine is
+    // pre-flight (run/preflight.ts#preflight) — the engine is
     // built after the adapter and cannot give that guarantee itself.
     this.credentials = resolveCredentials(cfg, opts.env, opts.environment);
     this.pollMs = opts.pollMs ?? 500;
@@ -670,7 +671,7 @@ export class FlowEngine {
 
   private async ensureStateLadder(name: string, node: string): Promise<void> {
     const state = this.cfg.states[name];
-    if (!state) throw new SetupError(`Unknown state "${name}" — known: ${Object.keys(this.cfg.states).join(', ')}`);
+    if (!state) throw new SetupError(unknownName('state', name, this.cfg));
     // The probe immediately before the next rung: this entry check for rung
     // 0, then each rung's own re-check. Its answer gates a destructive rung.
     let probe = await this.detects(state.detect, 0);
@@ -1179,7 +1180,7 @@ export class FlowEngine {
 
   private async runFlowInner(name: string): Promise<void> {
     const flow = this.cfg.flows[name];
-    if (!flow) throw new SetupError(`Unknown flow "${name}" — known: ${Object.keys(this.cfg.flows).join(', ')}`);
+    if (!flow) throw new SetupError(unknownName('flow', name, this.cfg));
     const requires = flow.requires;
     if (requires) await this.within(`flows.${name}`, () => this.ensureStateInner(requires));
     this.log(`flow ${name}`, 'start');

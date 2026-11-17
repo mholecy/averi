@@ -217,7 +217,7 @@ flows:
     expect((await run()).sections[0]).not.toContain('environment');
   });
 
-  // run/preflight.ts#refuseUnknownEnvironment has the why.
+  // run/preflight.ts#preflight has the why.
   it('an environment averi.yaml does not declare is refused before ANY adapter is resolved — no leg runs', async () => {
     const cfg = parseConfig(`
 app:
@@ -1121,11 +1121,51 @@ describe('flow composition', () => {
   });
 
   it('reports a flow failure as a failed leg rather than throwing', async () => {
+    const adapter = fake('android');
+    adapter.launch = async () => {
+      throw new Error('launch failed');
+    };
     const out = await runVerification(
-      request({ platforms: ['android'], cfg: FLOW_CFG, flow: 'nonexistent' }),
-      async () => fake('android'),
+      request({
+        platforms: ['android'],
+        cfg: parseConfig('app:\n  android: { package: com.example.app }\nflows:\n  relaunch:\n    steps:\n      - launch: {}\n'),
+        flow: 'relaunch',
+      }),
+      async () => adapter,
     );
-    expect(out.sections[0]).toContain('FAILED: Unknown flow "nonexistent"');
+    expect(out.sections[0]).toContain('FAILED:');
+    expect(out.sections[0]).toContain('launch failed');
+  });
+
+  // run/preflight.ts#preflight: one refusal for the whole call, before any leg binds a device.
+  it('an unknown state or flow is ONE refusal naming each, before any adapter is resolved', async () => {
+    const calls: Platform[] = [];
+    const resolve = async (p: Platform) => {
+      calls.push(p);
+      return fake(p);
+    };
+    const refused = await runVerification(request({ cfg: FLOW_CFG, state: 'nirvana', flow: 'nonexistent' }), resolve).catch(
+      (e: unknown) => e as Error,
+    );
+    expect(refused).toBeInstanceOf(Error);
+    expect((refused as Error).message).toBe(
+      'Unknown state "nirvana" — known: ready\n' +
+        'Unknown flow "nonexistent" — known: open_card\n' +
+        'Nothing was run on a device.',
+    );
+    expect(calls).toEqual([]);
+  });
+
+  it('with no flows defined the refusal says so, rather than an empty list', async () => {
+    const calls: Platform[] = [];
+    const none = parseConfig('app:\n  android: { package: com.example.app }\n');
+    await expect(
+      runVerification(request({ cfg: none, flow: 'touch_card' }), async (p) => {
+        calls.push(p);
+        return fake(p);
+      }),
+    ).rejects.toThrow('Unknown flow "touch_card" — averi.yaml defines no flows\nNothing was run on a device.');
+    expect(calls).toEqual([]);
   });
 
   /**
@@ -1149,6 +1189,9 @@ describe('flow composition', () => {
         '  cold:',
         '    steps:',
         '      - launch: { clearState: true }',
+        '  relaunch:',
+        '    steps:',
+        '      - launch: {}',
       ].join('\n'),
     );
     // Not in the state until the wipe: the leg's run climbs the ladder first.
@@ -1163,17 +1206,19 @@ describe('flow composition', () => {
     adapter.platform = 'android';
     adapter.nextScreenshot = whitePng();
     const launch = adapter.launch.bind(adapter);
+    // The ladder's wipe lands on the card; the flow's own launch, after it, fails.
     adapter.launch = async (appId, opts) => {
+      if (opts?.clearState !== true) throw new Error('launch failed');
       const launched = await launch(appId, opts);
       adapter.current = 's';
       return launched;
     };
     const out = await runVerification(
-      request({ platforms: ['android'], cfg: wiping, state: 'ready', flow: 'nonexistent' }),
+      request({ platforms: ['android'], cfg: wiping, state: 'ready', flow: 'relaunch' }),
       async () => adapter,
     );
     const section = out.sections[0];
-    expect(section).toContain('FAILED: Unknown flow "nonexistent"');
+    expect(section).toContain('FAILED: launch failed');
     expect(section).toContain('Steps that ran before the failure:');
     expect(section).toContain('⚠ clearState: app state wiped');
     expect(section).toContain('state ready: reached');

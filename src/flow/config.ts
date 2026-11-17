@@ -576,6 +576,16 @@ export class SetupError extends Error {
 }
 
 /**
+ * The words for a state or flow name a request asks for and averi.yaml does not define: the known names, or plainly
+ * that there are none rather than an empty list. One owner for the run layer's pre-flight (run/preflight.ts#preflight)
+ * and the engine's own check, so the refusal before a device and the engine's invariant read alike.
+ */
+export function unknownName(kind: 'state' | 'flow', name: string, cfg: AveriConfig): string {
+  const known = Object.keys(kind === 'state' ? cfg.states : cfg.flows);
+  return `Unknown ${kind} "${name}" — ${known.length === 0 ? `averi.yaml defines no ${kind}s` : `known: ${known.join(', ')}`}`;
+}
+
+/**
  * The steps nested inside a step, or `undefined` if this kind holds none.
  *
  * The single place the recursive walks learn which kinds are containers.

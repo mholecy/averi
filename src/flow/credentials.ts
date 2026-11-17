@@ -59,7 +59,7 @@ export interface Credentials {
  * `environments.<name>.credentials`, resolved ONCE so a run cannot type one
  * environment's username and another's password. An unknown name throws here;
  * the run layer calls this as a pre-flight so the refusal lands before any
- * device is touched (run/preflight.ts#refuseUnknownEnvironment), and the
+ * device is touched (run/preflight.ts#preflight), and the
  * engine resolves for itself once more, before any STEP.
  *
  * Precedence, most specific first: explicit `requested` (tool argument) →

@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 import type { DeviceAdapter, Platform } from '../adapters/types.js';
 import type { AveriConfig } from '../flow/config.js';
 import { configDir, projectConfigPath, type ProjectConfig } from '../flow/load.js';
-import { refuseUnknownEnvironment } from './preflight.js';
+import { preflight } from './preflight.js';
 import { FlowEngine, formatTrace, type EngineContext, type RunRequest } from '../flow/engine.js';
 import { DEFAULT_BASELINE_DIR, Verifier, type AssertSpec } from '../verify/assert.js';
 import { unsettledNote } from '../verify/capture.js';
@@ -28,7 +28,7 @@ import { claimed, claimedError } from './claims.js';
  * file is never read twice under two policies. The order "config before
  * device" is behaviour: the handler reads before it calls in here, and the
  * engine tools resolve their adapter through the callback only after the
- * environment pre-flight.
+ * pre-flight of the names and the environment.
  */
 
 /** Resolves the adapter for a call once its config is loaded (the config names the iOS tree source). */
@@ -50,8 +50,8 @@ interface EngineCall extends EngineContext {
 }
 
 /**
- * The sequence ensure_state and run_flow share: the loaded config, the environment
- * pre-flight (`refuseUnknownEnvironment`), adapter, ONE engine run, the
+ * The sequence ensure_state and run_flow share: the loaded config, the
+ * pre-flight of the names and the environment (run/preflight.ts#preflight), adapter, ONE engine run, the
  * trace — in that order, each step only if the one before it succeeded (a
  * failing flow throws its own trace; there is no health line on a failure).
  * The run is handed in as what to run, not as a callback over an engine: the
@@ -77,11 +77,11 @@ async function runOnEngine(
   request: RunRequest,
 ): Promise<{ adapter: DeviceAdapter; trace: string }> {
   const { cfg, env } = call.project;
-  refuseUnknownEnvironment(cfg, env, call.environment);
+  const run = preflight(call.project, request, call.environment);
   const adapter = await resolveAdapter(cfg);
   try {
     const context = { env, environment: call.environment, session: call.session };
-    const trace = await FlowEngine.run(cfg, adapter, context, request);
+    const trace = await FlowEngine.run(cfg, adapter, context, run);
     return { adapter, trace: formatTrace(trace) };
   } catch (e) {
     // A failed run's error lists the steps it claimed before the failure: it carries the claim note too (claims.ts).

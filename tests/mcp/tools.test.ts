@@ -324,7 +324,7 @@ describe('ensure_state and run_flow — the flow tools', () => {
     expect(result.text).toContain('environment staging');
   });
 
-  // The pre-flight (run/preflight.ts#refuseUnknownEnvironment) through the
+  // The pre-flight (run/preflight.ts#preflight) through the
   // protocol: each engine tool answers isError, naming the environment.
   it.each(['run_flow', 'ensure_state', 'verify'])('%s: an `environment` averi.yaml does not declare is an error naming it', async (tool) => {
     const { call, bound } = await connect();
@@ -339,6 +339,21 @@ describe('ensure_state and run_flow — the flow tools', () => {
     expect(result.isError).toBe(true);
     expect(result.text).toContain('Unknown environment "nope"');
     expect(bound()).toEqual([]); // refused before any device
+  });
+
+  it.each(['run_flow', 'ensure_state', 'verify'])('%s: a state or flow averi.yaml does not define is an error naming it, before any device', async (tool) => {
+    const { call, bound } = await connect();
+    const result = await call(tool, {
+      platform: 'android',
+      platforms: ['android'],
+      flow: 'touch_hom',
+      state: 'hom',
+      configPath: await validConfig(),
+    });
+    expect(result.isError).toBe(true);
+    expect(result.text).toMatch(/Unknown (state "hom"|flow "touch_hom")/);
+    expect(result.text).toContain('Nothing was run on a device.');
+    expect(bound()).toEqual([]);
   });
 
   // `required` + env (flow/tool-config.ts).
