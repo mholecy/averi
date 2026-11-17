@@ -257,6 +257,49 @@ flows: {}
   });
 });
 
+/** A leg's section, whole: the head, the trace, the verdict and its lines, the frame's note, the health line. */
+describe('a leg section, line for line', () => {
+  const STATEFUL = parseConfig(
+    [
+      'app:',
+      '  android: { package: com.example.app }',
+      'states:',
+      '  home:',
+      '    detect: { element: { id: card } }',
+    ].join('\n'),
+  );
+  const one = (over: Partial<Parameters<typeof runVerification>[0]>) =>
+    runVerification(request({ platforms: ['android'], ...over }), async () => fake('android'));
+
+  it('a state and no asserts: the trace, then the health line', async () => {
+    const out = await one({ cfg: STATEFUL, state: 'home' });
+    expect(out.sections).toEqual(['## android\nstate home: already active\n\nappAlive: true']);
+  });
+
+  it('asserts and no state: the verdict, then one line per assert, then the health line', async () => {
+    const out = await one({ specs: [{ element: { id: 'card' } }] });
+    expect(out.sections).toEqual(['## android\n\nAll 1 asserts passed\nPASS  element id:"card" exists\nappAlive: true']);
+  });
+
+  it('neither: the head, then the health line', async () => {
+    const out = await one({});
+    expect(out.sections).toEqual(['## android\n\n\nappAlive: true']);
+  });
+
+  it('a frame that never settled: its note sits after the asserts and before the health line', async () => {
+    const adapter = fake('android');
+    let i = 0;
+    adapter.screenshot = async () => Buffer.from(`frame ${i++}`);
+    const out = await runVerification(
+      request({ platforms: ['android'], cfg: STATEFUL, state: 'home', specs: [{ element: { id: 'card' } }] }),
+      async () => adapter,
+    );
+    expect(out.sections[0]).toMatch(
+      /^## android\nstate home: already active\nAll 1 asserts passed\nPASS {2}element id:"card" exists\n⚠ frame: the screen did not settle: [^\n]*\nappAlive: true$/,
+    );
+  });
+});
+
 // D21: a tree read no wait cures (idb's wedged accessibility service) fails the leg's asserts,
 // each after one read, and the leg keeps its section, its frame's screenshot (idb's capture is unaffected by the wedge)
 // and its health line — it is not rejected whole.

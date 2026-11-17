@@ -171,7 +171,7 @@ export interface AssertResult {
 
 /**
  * What one assert said: its description, and its detail after a dash. Every line that reports an assert carries it —
- * the `assert` tool's and a verify leg's (run/run-reply.ts#formatAsserts), a flow's `assert PASS:` trace entry and its
+ * the `assert` tool's and a verify leg's (run/run-reply.ts#legText), a flow's `assert PASS:` trace entry and its
  * `FAIL` error line (flow/engine.ts) — each with its own verdict word around it. It lives here, not in run/, because
  * flow/ may not import run/.
  */
