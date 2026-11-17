@@ -72,9 +72,14 @@ function commentRanges(sf: ts.SourceFile): ts.CommentRange[] {
  * A source's comment lines, lead and closing `*\/` dropped, a wrapped line (see wrapped) joined to its continuation in
  * the same comment; blank lines left out.
  */
-export function commentsOf(file: string, source: string): Line[] {
+export const commentsOf = (file: string, source: string): Line[] => {
   const sf = parse(file, source);
-  return commentRanges(sf).flatMap((r) => {
+  return commentLines(file, sf, commentRanges(sf));
+};
+
+function commentLines(file: string, sf: ts.SourceFile, ranges: readonly ts.CommentRange[]): Line[] {
+  const source = sf.text;
+  return ranges.flatMap((r) => {
     const first = sf.getLineAndCharacterOfPosition(r.pos).line + 1;
     const body = source
       .slice(r.pos, r.end)
@@ -88,10 +93,16 @@ export function commentsOf(file: string, source: string): Line[] {
 }
 
 /** A source with its comments blanked (same length, line breaks kept): its code and strings. */
-export function codeOf(file: string, source: string): string {
-  const chars = source.split('');
-  for (const r of commentRanges(parse(file, source))) for (let i = r.pos; i < r.end; i++) if (chars[i] !== '\n') chars[i] = ' ';
-  return chars.join('');
+export const codeOf = (file: string, source: string): string => blanked(source, commentRanges(parse(file, source)));
+
+function blanked(source: string, ranges: readonly ts.CommentRange[]): string {
+  let out = '';
+  let at = 0;
+  for (const r of ranges) {
+    out += source.slice(at, r.pos) + source.slice(r.pos, r.end).replace(/[^\n]/g, ' ');
+    at = r.end;
+  }
+  return out + source.slice(at);
 }
 
 const TEST_CALL = /^(?:describe|it|test)(?:\.(?:skip|only|todo|concurrent|sequential|fails|runIf\(.*\)|skipIf\(.*\)))*$/s;
@@ -105,8 +116,9 @@ const titleText = (n: ts.StringLiteral | ts.NoSubstitutionTemplateLiteral | ts.T
  * A test file's titles: the first argument of describe/it/test (and their .skip, .only, …), and of `X.each(rows)(title)`
  * the title and each inline row's first string (a row's title part, `%s`), each at the line it starts on.
  */
-export function titlesOf(file: string, source: string): Line[] {
-  const sf = parse(file, source);
+export const titlesOf = (file: string, source: string): Line[] => titlesIn(file, parse(file, source));
+
+function titlesIn(file: string, sf: ts.SourceFile): Line[] {
   const out: Line[] = [];
   const at = (n: ts.Node, text: string) => out.push({ file, line: sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1, text });
   const visit = (n: ts.Node) => {
@@ -171,9 +183,11 @@ export function corpus(): Corpus {
   const fixtureWords = new Set<string>();
   for (const f of sources) {
     const source = readFileSync(join(ROOT, f), 'utf8');
-    comments.push(...commentsOf(f, source));
-    if (f.startsWith('tests/')) titles.push(...titlesOf(f, source));
-    codeWords.set(f, wordsOf(codeOf(f, source)));
+    const sf = parse(f, source);
+    const ranges = commentRanges(sf);
+    comments.push(...commentLines(f, sf, ranges));
+    if (f.startsWith('tests/')) titles.push(...titlesIn(f, sf));
+    codeWords.set(f, wordsOf(blanked(source, ranges)));
   }
   for (const f of files.filter(textFixture)) {
     const text = readFileSync(join(ROOT, f), 'utf8');
