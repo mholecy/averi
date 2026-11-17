@@ -635,7 +635,7 @@ interface State {
   /** The last cover any round applied, and how many rounds applied one — for the failure text. */
   readonly lastCover: AppliedKeyboard | undefined;
   readonly coveredRounds: number;
-  /** What the strokes remember across reads — the target's scroll views, the last keyboard line, the scroll view the last stroke went over (interact/stroke-plan.ts#StrokeMemory): the plan's, which `round` holds and reads none of. */
+  /** What the strokes remember across reads — the target's scroll views, the last keyboard (its line with its remedy), the scroll view the last stroke went over (interact/stroke-plan.ts#StrokeMemory): the plan's, which `round` holds and reads none of. */
   readonly strokes: StrokeMemory;
 
   // How the target moved, read for read: a swipe that does not move the element is the only honest

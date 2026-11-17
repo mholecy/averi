@@ -89,7 +89,7 @@ export interface RoundRead {
   cover?: KeyboardCover;
   /** The reading's `ofKeyboard`: is this node the keyboard's own UI (judged against the whole screen, never under the band)? */
   ofKeyboard: (node: UiNode) => boolean;
-  /** The reading's `remedy` — what the adapter can do about a covering keyboard — for the sentences of a round that applied idb's band, which no `cover` carries. */
+  /** The reading's `remedy` — what the adapter can do about a covering keyboard — for a round under idb's band, applied or moot (its sentences, and `ReadJudgement.strokeKeyboard`), which no `cover` carries. */
   remedy: KeyboardRemedy;
   /**
    * The order a screenshot saw of controls `tree` lists in reading order (ui-tree/seen-order.ts) — the round's answer to

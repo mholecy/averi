@@ -219,7 +219,7 @@ const seenClearText = ({ by, edge, depth }: NonNullable<ScrollUntilResult['seenC
 
 const stoppedWhen = (swipes: number): string => (swipes === 0 ? 'before any swipe' : `after ${swipesText(swipes)}, without swiping further`);
 
-const keyboardUp = ({ under }: Judged): KeyboardUp | undefined => (under === undefined ? undefined : upOf(under));
+const underOf = ({ under }: Judged): KeyboardUp | undefined => (under === undefined ? undefined : upOf(under));
 
 /** A plain stop's sliver (InFrameShort's `sliver`, or the `overlapped` stop's cut), in the tap's refusal's own words (target-text.ts#cutSliverText). */
 function sliverText({ judged, standing }: Pick<Extract<Shortfall, { of: 'sliver' }>, 'judged' | 'standing'>): string {
@@ -621,7 +621,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
         return {
           message:
             `scroll_until ${describe} failed after ${n} — element is in the viewport but ${sliverText(short)} — and the content is exhausted: ` +
-              `swiping ${o.lastStroke} no longer moves it${neither}. ${stuckCutText(short.standing, keyboardUp(judged))}. ${last}`,
+              `swiping ${o.lastStroke} no longer moves it${neither}. ${stuckCutText(short.standing, underOf(judged))}. ${last}`,
         };
       }
       // A band of a surface the tree does not list, the eyes saw (ui-tree/eyes.ts), at the end of the content: the rest
@@ -771,7 +771,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       // cut's riding keyboard first).
       const { judged, viewport, standing } = o;
       const what = standing.kind === 'covered' ? underText({ judged, cover: standing.cover }) : sliverText({ judged, standing });
-      const way = touchRemedyText(standing, keyboardUp(judged));
+      const way = touchRemedyText(standing, underOf(judged));
       return {
         message:
           `scroll_until ${describe} stopped ${stoppedWhen(o.swipes)} — element is in the viewport but ${what}; ` +
@@ -1258,7 +1258,7 @@ function shortText(short: Shortfall): string {
     }
     case 'sliver': {
       // The tap's refusal quoted word for word (touch-remedy.ts#touchRemedyText).
-      const remedy = touchRemedyText(short.standing, keyboardUp(short.judged));
+      const remedy = touchRemedyText(short.standing, underOf(short.judged));
       return `element reached the viewport but stayed ${sliverText(short)} (last rect ${JSON.stringify(short.judged.node.rect)}) — a tap refuses it so cut: ${remedy}`;
     }
     case 'absent':

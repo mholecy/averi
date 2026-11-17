@@ -16,7 +16,8 @@ import { clippedOutText, SIDES } from '../ui-tree/sides.js';
  * is touch-remedy.ts's; the clauses every verb quotes (a presented screen's,
  * a no-scroll cover's) are ui-tree/remedy-text.ts's. Shallow by design, like
  * ui-tree/system-bar.ts: delete it and each shared sentence reappears in its
- * two or three callers.
+ * two or three callers. It also owns the keyboard fact its remedies name
+ * (`KeyboardUp`, built by `keyboardUp` alone).
  *
  * Its words for a side come from ui-tree/sides.ts#SIDES — `past` and `lies`
  * (where a node past a side lies) and `reveals` (the `scroll_until` direction
@@ -102,11 +103,7 @@ export interface KeyboardUp {
   readonly remedy: KeyboardRemedy;
 }
 
-/**
- * The soft keyboard up at `line` (its `y`), hidden with `remedy`; none when there is no line. The one place a
- * `KeyboardUp` is built: a tap's or a miss's reading line with the reading's remedy, and scroll-read.ts#upOf for the
- * cover `scroll_until`'s round applies.
- */
+/** The soft keyboard up at `line` (its `y`), hidden with `remedy`; none when there is no line. The one builder of a `KeyboardUp`. */
 export function keyboardUp(line: KeyboardLine, remedy: KeyboardRemedy): KeyboardUp;
 export function keyboardUp(line: KeyboardLine | undefined, remedy: KeyboardRemedy): KeyboardUp | undefined;
 export function keyboardUp(line: KeyboardLine | undefined, remedy: KeyboardRemedy): KeyboardUp | undefined {
