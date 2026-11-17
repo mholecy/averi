@@ -203,3 +203,10 @@ own declaration and its own rows there.
   AXValue the text), the old argv's `-h` as the control (exit 0, the usage, the field unchanged), then through averi's
   typeText (`type-via-averi.ts`) with the helper on and with `AVERI_IDB_HELPER=off`. Android's `input text -`, and `-h`
   as averi sends it, are read back by `android-input-dash.sh` beside it, when the emulator is up.
+
+## Amendment: A54 — what a fill must not say is what was typed, not its selector (2026-11-17)
+
+A fill's errors and replies carry the typed value's length only, and the field's text as lengths. The selector is echoed
+as the caller wrote it, a `value:"…"` included: it is the caller's own text, and the engine redacts a flow's secrets from
+it as from every line. `tests/interact/fill-leak.test.ts` sweeps fillField's errors, `fillReply` and `fillStepText` for
+both, a level above `typed-text-leak.test.ts`.
