@@ -170,6 +170,14 @@ export interface AssertResult {
 }
 
 /**
+ * What one assert said: its description, and its detail after a dash. Every line that reports an assert carries it —
+ * the `assert` tool's and a verify leg's (run/run-reply.ts#formatAsserts), a flow's `assert PASS:` trace entry and its
+ * `FAIL` error line (flow/engine.ts) — each with its own verdict word around it. It lives here, not in run/, because
+ * flow/ may not import run/.
+ */
+export const resultText = (r: AssertResult): string => r.description + (r.detail ? ` — ${r.detail}` : '');
+
+/**
  * Where screenshot baselines live, relative to the project root. Kept relative
  * (resolved by the caller) so the value is one string in one place and the
  * default resolves against the cwd at access time.

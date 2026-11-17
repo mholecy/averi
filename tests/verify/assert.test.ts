@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { assertSpecSchema, Verifier } from '../../src/verify/assert.js';
+import { assertSpecSchema, resultText, Verifier } from '../../src/verify/assert.js';
 import { elementAssertSchema } from '../../src/verify/element-assert.js';
 import type { z } from 'zod';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
@@ -2941,5 +2941,16 @@ describe('a capture the adapter refuses fails that assert closed, and the batch 
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('resultText', () => {
+  it('is the description, then the detail after a dash when there is one', () => {
+    expect(resultText({ description: 'element id:"a" exists', pass: true })).toBe('element id:"a" exists');
+    expect(resultText({ description: 'element id:"a" exists', pass: false, detail: 'not found' })).toBe(
+      'element id:"a" exists — not found',
+    );
+    // An empty detail says nothing, so it adds no dash.
+    expect(resultText({ description: 'd', pass: false, detail: '' })).toBe('d');
   });
 });

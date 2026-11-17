@@ -1,5 +1,5 @@
 import type { DeviceAdapter } from '../adapters/types.js';
-import type { AssertResult } from '../verify/assert.js';
+import { resultText, type AssertResult } from '../verify/assert.js';
 import { captureFrame, captureRefusal, type Frame } from '../verify/capture.js';
 
 /**
@@ -37,9 +37,7 @@ export async function finalFrame(
 export const screenshotFailedLine = (failed: string): string => `⚠ screenshot: ${failed} — no image is returned`;
 
 export const formatAsserts = (results: AssertResult[]): string =>
-  results
-    .map((r) => `${r.pass ? 'PASS' : 'FAIL'}  ${r.description}${r.detail ? ` — ${r.detail}` : ''}`)
-    .join('\n');
+  results.map((r) => `${r.pass ? 'PASS' : 'FAIL'}  ${resultText(r)}`).join('\n');
 
 /**
  * The one-line verdict over a set of asserts. It lives beside formatAsserts
