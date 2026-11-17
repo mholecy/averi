@@ -68,6 +68,32 @@ async function setup(
   return { source, spawner, fetcher, exec };
 }
 
+/** What `p` rejects with; undefined when it resolves. */
+const rejection = (p: Promise<unknown>) => p.then(() => undefined, (e: unknown) => e as Error);
+
+/**
+ * A source that read once, then a `call` whose request to a URL ending in `route` is held open: the source is
+ * disposed while it waits, then the socket dies (ECONNRESET). Returns what `call` rejected with.
+ */
+async function disposedMidCall(route: string, call: (source: WdaTreeSource) => Promise<unknown>) {
+  let hold = false;
+  let fail!: (err: Error) => void;
+  const held: string[] = [];
+  const { source, fetcher } = await setup(undefined, undefined, (fn) => (url, init) => {
+    if (!hold || !url.endsWith(route)) return fn(url, init);
+    fetcher.urls.push(url);
+    held.push(url);
+    return new Promise((_ok, reject) => { fail = reject; });
+  });
+  await source.read();
+  hold = true;
+  const calling = rejection(call(source));
+  while (held.length === 0) await new Promise((r) => setTimeout(r, 2));
+  await source.dispose();
+  fail(new Error('ECONNRESET'));
+  return { err: await calling, source, fetcher };
+}
+
 describe('WdaTreeSource — the WebDriverAgent adapter at the seam', () => {
   it('read brings ONE WebDriverAgent up for the bound UDID and returns the nested tree normalized', async () => {
     const { source, spawner, fetcher } = await setup();
@@ -360,7 +386,7 @@ describe('WdaTreeSource.applicationLabel — which app WebDriverAgent reads, ask
     const { source, spawner, fetcher } = await setup(answer);
     await source.read();
     const before = fetcher.urls.length;
-    const err = await source.applicationLabel().then(() => undefined, (e: unknown) => e as Error);
+    const err = await rejection(source.applicationLabel());
     expect(err?.message).toMatch(words);
     expect(err?.message).toMatch(/xcodebuild log: .*averi-wda-AAAA-1111\.log/);
     expect(asked(fetcher.urls)).toHaveLength(1); // one ask, no retry
@@ -373,11 +399,11 @@ describe('WdaTreeSource.applicationLabel — which app WebDriverAgent reads, ask
     let answer: 'refused' | { status: number; body?: unknown } = 'refused';
     const { source, fetcher } = await setup(() => answer);
     await source.read();
-    const first = await source.applicationLabel().then(() => undefined, (e: unknown) => e as Error);
+    const first = await rejection(source.applicationLabel());
     expect(first?.message).toMatch(/activeAppInfo request failed/);
     answer = { status: 200, body: ACTIVE_LAB }; // even an answering server: this child is not asked again until a read proves it
     for (let i = 0; i < 2; i++) {
-      const again = await source.applicationLabel().then(() => undefined, (e: unknown) => e as Error);
+      const again = await rejection(source.applicationLabel());
       expect(again).toBe(first); // the remembered error, so the launch's note still says it could not check
     }
     expect(asked(fetcher.urls)).toHaveLength(1);
@@ -425,20 +451,7 @@ describe('WdaTreeSource.applicationLabel — which app WebDriverAgent reads, ask
   });
 
   it('disposed while asking: the released error, WDA\'s words only as its cause', async () => {
-    let hold = false;
-    let fail!: (err: Error) => void;
-    const { source, fetcher } = await setup(undefined, undefined, (fn) => (url, init) => {
-      if (!hold || !url.endsWith('/wda/activeAppInfo')) return fn(url, init);
-      fetcher.urls.push(url);
-      return new Promise((_ok, reject) => { fail = reject; });
-    });
-    await source.read();
-    hold = true;
-    const asking = source.applicationLabel().then(() => undefined, (e: unknown) => e as Error);
-    while (asked(fetcher.urls).length === 0) await new Promise((r) => setTimeout(r, 2));
-    await source.dispose();
-    fail(new Error('ECONNRESET'));
-    const err = await asking;
+    const { err, source, fetcher } = await disposedMidCall('/wda/activeAppInfo', (s) => s.applicationLabel());
     expect(err?.message).toMatch(/deselected or averi is shutting down; select the device again/);
     expect((err?.cause as Error | undefined)?.message).toMatch(/activeAppInfo request failed .*ECONNRESET/);
     await expect(source.applicationLabel()).rejects.toThrow(/select the device again/);
@@ -450,7 +463,7 @@ describe('WdaTreeSource.applicationLabel — which app WebDriverAgent reads, ask
     await source.read();
     await expect(source.applicationLabel()).rejects.toThrow(/activeAppInfo request failed/);
     await source.dispose();
-    const err = await source.applicationLabel().then(() => undefined, (e: unknown) => e as Error);
+    const err = await rejection(source.applicationLabel());
     expect(err?.message).toMatch(/deselected or averi is shutting down; select the device again/);
     expect(err?.cause).toBeUndefined();
     expect(asked(fetcher.urls)).toHaveLength(1);
@@ -461,13 +474,13 @@ describe('WdaTreeSource.applicationLabel — which app WebDriverAgent reads, ask
     let source500 = false;
     const { source, spawner, fetcher } = await setup(() => answer, () => (source500 ? { status: 500 } : { status: 200, body: WDA_ENVELOPE }));
     await source.read();
-    const first = await source.applicationLabel().then(() => undefined, (e: unknown) => e as Error);
+    const first = await rejection(source.applicationLabel());
     expect(first?.message).toMatch(/activeAppInfo request failed/);
     source500 = true;
     answer = { status: 200, body: ACTIVE_LAB };
     await expect(source.read()).rejects.toThrow(/HTTP 500/);
     expect(spawner.spawns).toHaveLength(1); // the same child: a 500 on /source restarts nothing
-    expect(await source.applicationLabel().then(() => undefined, (e: unknown) => e)).toBe(first);
+    expect(await rejection(source.applicationLabel())).toBe(first);
     expect(asked(fetcher.urls)).toHaveLength(1);
   });
 
@@ -590,30 +603,16 @@ describe('WdaTreeSource.systemAlert — one short /source read, never a start or
     let answer: 'refused' | { status: number; body?: unknown } = 'refused';
     const { source, fetcher } = await setup(() => answer);
     await source.read();
-    const first = await source.applicationLabel().then(() => undefined, (e: unknown) => e as Error);
+    const first = await rejection(source.applicationLabel());
     expect(first?.message).toMatch(/activeAppInfo request failed/);
     answer = { status: 200, body: ACTIVE_LAB };
     await source.systemAlert();
-    expect(await source.applicationLabel().then(() => undefined, (e: unknown) => e)).toBe(first);
+    expect(await rejection(source.applicationLabel())).toBe(first);
     expect(fetcher.urls.filter((u) => u.endsWith('/wda/activeAppInfo'))).toHaveLength(1);
   });
 
   it('disposed while reading: the released error, WDA\'s words only as its cause', async () => {
-    let hold = false;
-    let fail!: (err: Error) => void;
-    const { source, fetcher } = await setup(undefined, undefined, (fn) => (url, init) => {
-      if (!hold || !url.includes('/source')) return fn(url, init);
-      fetcher.urls.push(url);
-      return new Promise((_ok, reject) => { fail = reject; });
-    });
-    await source.read();
-    hold = true;
-    const before = fetcher.urls.length;
-    const reading = source.systemAlert().then(() => undefined, (e: unknown) => e as Error);
-    while (sources(fetcher.urls.slice(before)).length === 0) await new Promise((r) => setTimeout(r, 2));
-    await source.dispose();
-    fail(new Error('ECONNRESET'));
-    const err = await reading;
+    const { err } = await disposedMidCall('/source?format=json', (s) => s.systemAlert());
     expect(err?.message).toMatch(/deselected or averi is shutting down; select the device again/);
     expect((err?.cause as Error | undefined)?.message).toMatch(/\/source request failed .*ECONNRESET/);
   });
@@ -711,7 +710,7 @@ describe('WdaTreeSource — a read already in flight when the source is disposed
       while (!sourceRequested()) await sleep(2);
       await source.dispose();
       fail(new Error('ECONNRESET'));
-      const err = await inflight.then(() => undefined, (e: unknown) => e as Error);
+      const err = await rejection(inflight);
       expect(err?.message).toMatch(/deselected or averi is shutting down; select the device again/);
       expect(err?.message).not.toMatch(/process is exiting/);
       expect((err?.cause as Error)?.message).toMatch(/has been shut down/); // the server's reason is kept, underneath
@@ -726,7 +725,7 @@ describe('WdaTreeSource — a read already in flight when the source is disposed
     const inflight = source.read();
     while (spawner.spawns.length === 0) await sleep(2);
     await source.dispose();
-    const err = await inflight.then(() => undefined, (e: unknown) => e as Error);
+    const err = await rejection(inflight);
     expect(err?.message).toMatch(/select the device again/);
     expect(err?.message).not.toMatch(/stopped during startup/);
     expect((err?.cause as Error)?.message).toMatch(/stopped during startup/);
