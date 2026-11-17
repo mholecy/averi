@@ -311,7 +311,7 @@ describe('captureFrame — stability over the caller\'s region', () => {
  * The frame's types hold only the states `stableScreenshot` can produce, so a
  * consumer reading `settledOver` or `measured` has no impossible state to pick
  * a default for. The `@ts-expect-error` lines fail `npm run lint`
- * (tsconfig.test.json) as soon as a type admits the state again.
+ * (tsconfig.test.json) as soon as a type admits the state.
  */
 describe('Frame — the types admit only producible states', () => {
   it('`settledOver` is present exactly when the frame settled', () => {
@@ -322,7 +322,7 @@ describe('Frame — the types admit only producible states', () => {
     const movingOverRegion: Frame = { shot, stability: 'moving', settledOver: 'region', captures: 6 };
     // @ts-expect-error — a settled frame says what it settled over
     const settledOverNothing: Frame = { shot, stability: 'settled', captures: 2 };
-    expect([screen, moving, movingOverRegion, settledOverNothing].map((f) => f.stability)).toEqual(['settled', 'moving', 'moving', 'settled']);
+    void [screen, moving, movingOverRegion, settledOverNothing];
   });
 
   it('a supplied tree comes back on the frame: the `{tree}` arm has no treeless frame', async () => {
@@ -331,7 +331,7 @@ describe('Frame — the types admit only producible states', () => {
     // @ts-expect-error — the frame `captureFrame(…, { tree })` returns has no measured arm without a tree
     const treeless: Extract<typeof got.measured, { tree?: undefined }> = { error: 'the tree read failed' };
     expect(treeFrame.measured.tree).toBe(SCREEN);
-    expect(treeless).toEqual({ error: 'the tree read failed' });
+    void treeless;
   });
 });
 

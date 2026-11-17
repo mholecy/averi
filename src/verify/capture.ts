@@ -271,7 +271,9 @@ interface FrameFacts {
  * `settledOver` is HOW a `settled` frame settled. It is a union arm rather
  * than an optional field so that a settled frame always says it and any
  * other frame never does: a consumer comparing it against one value has no
- * missing case to pick a default for.
+ * missing case to pick a default for. Readers rely on that and keep no
+ * fallback: pixel-poll.ts's `=== 'region'` would read a settled frame without
+ * `settledOver` as screen-settled, so a frame is built, never cast.
  * - `screen`: two whole captures were byte-identical — the fast path, and
  *   the only answer a caller without a `region` can get;
  * - `region`: the whole captures differed and only the caller's region
@@ -290,8 +292,10 @@ type Wait = FrameFacts & Stability;
 /**
  * A frame as `captureFrame` returns it to a caller that may not have asked for
  * a tree. A type alias over the `Stability` union, not an interface: an
- * interface cannot extend a union, and `Omit`/`Pick` over it would drop the
- * pairing of `stability` with `settledOver`.
+ * interface cannot extend a union, and `Omit` over it would drop the
+ * pairing of `stability` with `settledOver`. A reader that needs only one
+ * field (`unsettledReason`, `isMoving`) still takes a `Pick` of it: it reads
+ * no pairing to lose.
  *
  * `measured` is present whenever a tree was read or supplied; absent for a
  * png-only frame (the `screenshot` and `ensure_state` tools), which asked for
