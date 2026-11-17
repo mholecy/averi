@@ -530,6 +530,16 @@ states:
   });
 });
 
+describe('a reference names a state or flow averi.yaml defines — its own key, never an inherited one', () => {
+  it.each([
+    ['requires', 'flows:\n  f:\n    requires: constructor\n    steps:\n      - launch: {}\n', 'flows.f.requires references unknown state "constructor"'],
+    ['reach', 'states:\n  s:\n    detect: { element: { id: x } }\n    reach: [toString]\n', 'states.s.reach references unknown flow "toString"'],
+    ['a detect', 'states:\n  s:\n    detect: { state: __proto__ }\n', 'states.s.detect references unknown state "__proto__"'],
+  ])('%s naming an Object.prototype key is refused at load', (_where, body, message) => {
+    expect(() => parseConfig(`app:\n  android: { package: a.b }\n${body}`)).toThrow(message);
+  });
+});
+
 describe('detect cycles are config errors, rejected at parse', () => {
   // A state's detect evaluating another state's detect (`matches`) on a cycle
   // never finished at run time (a stack overflow, measured 2026-10-07). The

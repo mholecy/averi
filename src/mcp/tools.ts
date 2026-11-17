@@ -667,7 +667,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'THE verification tool: run the same sequence — optional ensure_state, optional flow, then asserts — on the requested platforms (default both android and ios) and return per-platform results plus screenshots. ' +
         'The legs run concurrently and are reported android-then-ios regardless of input order, one image per leg that returned a screenshot (a leg whose section says FAILED or `⚠ screenshot:` has none). ' +
         'Single-platform work passes platforms: ["android"] or ["ios"]; for cross-platform tasks, run the default (both) before declaring the task done. ' +
-        'contract appends rect, color and text parity tables (see contract). A contract field a requested table cannot read, or an environment averi.yaml does not declare, REFUSES the call before any device is touched, listing each.',
+        'contract appends rect, color and text parity tables (see contract). A contract field a requested table cannot read, or a state, flow or environment averi.yaml does not declare, REFUSES the call before any device is touched, listing each.',
       inputSchema: {
         platforms: z
           .array(platform)

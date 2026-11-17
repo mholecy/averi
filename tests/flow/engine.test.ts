@@ -2899,6 +2899,17 @@ describe('failure modes', () => {
       /Unknown flow "fly" — known: login, goto_transfers/,
     );
   });
+
+  it('an unknown name in a config that defines none says so, rather than an empty list', async () => {
+    const bare = parseConfig('app:\n  android: { package: com.example.app }\n');
+    const fake = new FakeAdapter(buildScreens(), 'dashboard');
+    await expect(FlowEngine.run(bare, fake, FAST, { flow: 'fly' })).rejects.toThrow(
+      /^Unknown flow "fly" — averi.yaml defines no flows$/,
+    );
+    await expect(FlowEngine.run(bare, fake, FAST, { state: 'nirvana' })).rejects.toThrow(
+      /^Unknown state "nirvana" — averi.yaml defines no states$/,
+    );
+  });
 });
 
 /**

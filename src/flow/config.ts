@@ -575,6 +575,37 @@ export class SetupError extends Error {
   }
 }
 
+/** The kinds of name averi.yaml declares and a request or a reference names. */
+export type NameKind = 'state' | 'flow' | 'environment';
+
+/** The names averi.yaml declares of one kind, as the record they are the keys of. */
+export function namesOf(kind: NameKind, cfg: AveriConfig): Readonly<Record<string, unknown>> {
+  return kind === 'state' ? cfg.states : kind === 'flow' ? cfg.flows : (cfg.environments ?? {});
+}
+
+/**
+ * Whether averi.yaml declares a state, flow or environment of this name: its OWN key, so `constructor` or
+ * `__proto__` is never one, as `in` or an index would make it. One predicate, so a name is defined or not alike at
+ * load, before a device and inside the engine.
+ */
+export function defines(kind: NameKind, name: string, cfg: AveriConfig): boolean {
+  return Object.hasOwn(namesOf(kind, cfg), name);
+}
+
+/**
+ * The line for a name averi.yaml does not declare: the known names, or plainly that it declares none of that kind
+ * rather than an empty list. One wording for every kind, so every unknown name reads alike, and several of them listed
+ * together read as one list.
+ */
+export function unknownLine(what: string, kind: NameKind, known: string[]): string {
+  return `Unknown ${what} — ${known.length === 0 ? `averi.yaml defines no ${kind}s` : `known: ${known.join(', ')}`}`;
+}
+
+/** The line for a state or flow name averi.yaml does not define (unknownLine). */
+export function unknownName(kind: 'state' | 'flow', name: string, cfg: AveriConfig): string {
+  return unknownLine(`${kind} "${name}"`, kind, Object.keys(namesOf(kind, cfg)));
+}
+
 /**
  * The steps nested inside a step, or `undefined` if this kind holds none.
  *
@@ -748,12 +779,12 @@ function validateReferences(cfg: AveriConfig, source: string): void {
     throw new Error(`Invalid ${source}: ${msg}`);
   };
   const checkCondition = (c: Condition, where: string): void => {
-    const unknown = conditionStateRefs(c).find((ref) => !(ref in cfg.states));
+    const unknown = conditionStateRefs(c).find((ref) => !defines('state', ref, cfg));
     if (unknown !== undefined) fail(`${where} references unknown state "${unknown}"`);
   };
   const checkSteps = (steps: Step[], where: string): void => {
     for (const s of steps) {
-      if ('wait' in s && s.wait.state !== undefined && !(s.wait.state in cfg.states)) {
+      if ('wait' in s && s.wait.state !== undefined && !defines('state', s.wait.state, cfg)) {
         fail(`${where} waits for unknown state "${s.wait.state}"`);
       }
       // Branch arms carry a condition of their own; the nested STEPS of every
@@ -764,20 +795,23 @@ function validateReferences(cfg: AveriConfig, source: string): void {
       if (children !== undefined) checkSteps(children, where);
     }
   };
-  if (cfg.defaultEnvironment !== undefined && !(cfg.defaultEnvironment in (cfg.environments ?? {}))) {
+  if (cfg.defaultEnvironment !== undefined && !defines('environment', cfg.defaultEnvironment, cfg)) {
     fail(
-      `defaultEnvironment "${cfg.defaultEnvironment}" is not declared under environments: ` +
-        `(known: ${Object.keys(cfg.environments ?? {}).join(', ') || 'none'})`,
+      unknownLine(
+        `environment "${cfg.defaultEnvironment}" (from defaultEnvironment)`,
+        'environment',
+        Object.keys(namesOf('environment', cfg)),
+      ),
     );
   }
   for (const [name, state] of Object.entries(cfg.states)) {
     checkCondition(state.detect, `states.${name}.detect`);
     for (const flow of state.reach ?? []) {
-      if (!(flow in cfg.flows)) fail(`states.${name}.reach references unknown flow "${flow}"`);
+      if (!defines('flow', flow, cfg)) fail(`states.${name}.reach references unknown flow "${flow}"`);
     }
   }
   for (const [name, flow] of Object.entries(cfg.flows)) {
-    if (flow.requires !== undefined && !(flow.requires in cfg.states)) {
+    if (flow.requires !== undefined && !defines('state', flow.requires, cfg)) {
       fail(`flows.${name}.requires references unknown state "${flow.requires}"`);
     }
     checkSteps(flow.steps, `flows.${name}`);
