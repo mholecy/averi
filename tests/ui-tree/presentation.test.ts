@@ -140,7 +140,7 @@ describe('by marks: a layer typed by its element', () => {
     expect(presentationOf(withIt).press(unlabelled).layer).toEqual({ kind: 'alert' });
   });
 
-  it('measured, the WDA alert over the SWIFT form: the alert, reaching the whole screen, named by its title', async () => {
+  it('the WDA alert over the SWIFT form (a synthetic tree in the measured shape): the alert, reaching the whole screen, named by its title', async () => {
     const tree = parseWdaSource(await readFile(new URL('../fixtures/wda-synthetic-alert-over-form.json', import.meta.url), 'utf8'));
     const alert = [...everyNode(tree)].find((n) => n.presentationElement === true)!;
     expect(presentationOf(tree).press(alert)).toEqual({ surface: alert, reach: IPHONE, layer: { kind: 'alert', label: 'Leave the form' } });

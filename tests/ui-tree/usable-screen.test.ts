@@ -121,7 +121,7 @@ describe('usableScreen — the oriented box: the device screen, turned only when
   });
 });
 
-describe('usableScreen — the boxes a point is judged in, by the window\'s own sides (moved from the tap\'s off-screen tests)', () => {
+describe('usableScreen — the boxes a point is judged in, by the window\'s own sides', () => {
   /** idb's rectless root over `children`. */
   const idbRoot = (...children: UiNode[]) => node({ role: 'container', rect: box(0, 0), children });
   const PORTRAIT = { width: 402, height: 874 };

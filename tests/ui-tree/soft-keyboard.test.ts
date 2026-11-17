@@ -98,7 +98,7 @@ describe('accessoryDismissButton — the input-accessory toolbar\'s trailing but
  * idb's keyboard band, by its shape. Known outside draw-order as a LINE only — the keyboard edge
  * (ui-tree/keyboard-position.ts#KeyboardPosition.line) — never as "the keyboard is shown": the in-tree reading stays `unknown` on idb (K5d).
  */
-describe('keyboardBandTop — the top edge of idb\'s keyboard band, and nothing more (round 7)', () => {
+describe('keyboardBandTop — the top edge of idb\'s keyboard band, and nothing more', () => {
   /** Read off the draw order: `DrawOrder.keyboardBandTop`, the one derivation. */
   const keyboardBandTop = (tree: UiNode) => drawOrder(tree).keyboardBandTop;
   /** run2-ios #250: the SWIFT form with the number pad up, as idb lists it (`Keyboard 0,589 402x285` last, after `1`…`Delete`). */
@@ -151,12 +151,12 @@ describe('keyboardBandTop — the top edge of idb\'s keyboard band, and nothing 
     expect(keyboardBandTop(parseDump(CLASSIC_VIEWS.loginImeUp))).toBeUndefined();
   });
 
-  it('a band top is not a keyboard reading: keyboardInTree still says `unknown` of both idb keyboards — the in-tree dismissal presses nothing there (K5d)', async () => {
+  it('a band top is not a keyboard reading: keyboardInTree still says `unknown` of both idb keyboards — the in-tree dismissal presses nothing there', async () => {
     expect(keyboardInTree(await pad())).toEqual({ state: 'unknown' });
     expect(keyboardInTree(contacts())).toEqual({ state: 'unknown' });
   });
 
-  it('a bottom sheet\'s unlabelled background with NO keyboard on screen (code review of round 7, MAJOR 1): listed before its own rows, so no node before it lies inside it — no band', () => {
+  it('a bottom sheet\'s unlabelled background with NO keyboard on screen: listed before its own rows, so no node before it lies inside it — no band', () => {
     const sheet = flat(
       node({ role: 'text', label: 'Behind', rect: r(20, 200, 300, 40) }),
       node({ role: 'other', rect: r(0, 400, 402, 474) }),

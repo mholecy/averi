@@ -270,10 +270,10 @@ describe('findBySpec — derived from the selector matcher, pinned against its d
 
   it('DOCUMENTED DEVIATION: a runtime null field matches nothing (the pre-2026-10-04 `===` matched null-fielded nodes); the zod string schemas make it unreachable', () => {
     const nullId = { id: null } as unknown as ElementSpec;
-    expect(leaves.some((n) => n.identifier === null), 'the tree has null-id nodes the old matcher would have returned').toBe(true);
+    expect(leaves.some((n) => n.identifier === null), 'the tree has null-id nodes a `===` matcher would return').toBe(true);
     expect(findBySpec(combinatorial, nullId)).toEqual([]);
     const nullText = { text: null } as unknown as ElementSpec;
-    expect(leaves.some((n) => n.label === null || n.value === null), 'the tree has null-text nodes the old matcher would have returned').toBe(true);
+    expect(leaves.some((n) => n.label === null || n.value === null), 'the tree has null-text nodes a `===` matcher would return').toBe(true);
     expect(findBySpec(combinatorial, nullText)).toEqual([]);
   });
 

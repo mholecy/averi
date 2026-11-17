@@ -247,13 +247,13 @@ describe('Scene.standing for the tap — measured cases, fixture × purpose → 
   });
 });
 
-describe('Scene.standing — the Android navigation band (D7): a centre in it is under the navigation bar, for the tap and both stops; for `fully: true`, any of it past the slack', () => {
+describe('Scene.standing — the Android navigation band: a centre in it is under the navigation bar, for the tap and both stops; for `fully: true`, any of it past the slack', () => {
   it.each([
     // mp-native's Account Detail at its top, drawn edge to edge: row_4 66,2152 948x68 lies under the bar; the tap went to (540,2186).
     ['accountDetailTop row_4, tap', () => compose('accountDetailTop'), 'transactions.list.row_4', PIXEL_NAV, TAP, { kind: 'systemBar', at: { x: 540, y: 2186 }, bar: { edge: 'bottom', top: 2154 } }],
     ['…plain stop', () => compose('accountDetailTop'), 'transactions.list.row_4', PIXEL_NAV, PLAIN, { kind: 'systemBar', at: { x: 540, y: 2186 }, bar: { edge: 'bottom', top: 2154 } }],
     ['…fully: true', () => compose('accountDetailTop'), 'transactions.list.row_4', PIXEL_NAV, FULLY, { kind: 'systemBar', at: { x: 540, y: 2186 }, bar: { edge: 'bottom', top: 2154 } }],
-    ['…with no navigation band read (an immersive app, a dump that does not say): tapped as before', () => compose('accountDetailTop'), 'transactions.list.row_4', PIXEL, TAP, { kind: 'reachable', at: { x: 540, y: 2186 } }],
+    ['…with no navigation band read (an immersive app, a dump that does not say): tapped', () => compose('accountDetailTop'), 'transactions.list.row_4', PIXEL, TAP, { kind: 'reachable', at: { x: 540, y: 2186 } }],
     // Contacts' Create contact: "Add fields" 198,2106 180x48 ends flush with the band (its flush case is the pixel assert's); its centre (288,2130) clears it.
     ['contactsCreateStaged "Add fields", tap: reachable', () => compose('contactsCreateStaged'), 'Add fields', PIXEL_NAV, TAP, { kind: 'reachable', at: { x: 288, y: 2130 } }],
     ['…plain stop: reachable', () => compose('contactsCreateStaged'), 'Add fields', PIXEL_NAV, PLAIN, { kind: 'reachable', at: { x: 288, y: 2130 } }],
@@ -446,7 +446,7 @@ describe('Scene.standing for the pixel assert — measured cases, fixture × rea
 });
 
 /** D3: scroll_until's exposure box is cut below the status band, as the tap's and the pixel assert's are. */
-describe('Scene.standing for the stop — its covers judged below the status band (D3)', () => {
+describe('Scene.standing for the stop — its covers judged below the status band', () => {
   const tree = () => {
     // The row reaches 2 pt into the band — within the slack, so `fully` judges no band (its region rule).
     const row = node({ role: 'button', identifier: 'row', rect: { x: 0, y: 60, width: 402, height: 100 } });
@@ -475,7 +475,7 @@ describe('Scene.standing for the stop — its covers judged below the status ban
     expect(s.facts.screen).toEqual({ x: 0, y: 0, width: 402, height: 300 });
     expect(said(s)).toEqual({ kind: 'reachable', at: { x: 201, y: 110 } });
   });
-  it('with no band read, it covers as before', () => {
+  it('with no band read, a node in the band covers the row', () => {
     const { t, row } = tree();
     const s = sceneOf(t).standing(row, usable({ box: box(402, 874), boxes: [box(402, 874)] }), FULLY);
     expect(said(s)).toEqual({ kind: 'covered', cover: 'in_band' });
@@ -496,7 +496,7 @@ describe('Scene.standing — a side uiautomator cut at the screen\'s edge (D17):
     return { t, c };
   };
 
-  it("C dumped `[586,380][1080,614]`: its right side unknown, 428 of its 494 listed px drawn in the carousel — at most that share", async () => {
+  it("C moved to `[586,380][1080,614]`: its right side unknown, 428 of its 494 listed px drawn in the carousel — at most that share", async () => {
     const { t, c } = await carousel({ x: 586, y: 380, width: 494, height: 234 });
     const s = sceneOf(t).standing(c, PIXEL, PLAIN);
     expect(s.facts.unknownPast).toEqual(['right']);
@@ -655,7 +655,7 @@ describe('Scene.standing with no screen — one "no device screen" for the tap, 
   });
 });
 
-describe('Scene.standing for the pixel assert — it takes the usable screen and judges its single `oriented` box (D6)', () => {
+describe('Scene.standing for the pixel assert — it takes the usable screen and judges its single `oriented` box', () => {
   it('a crowned child turning `oriented` but not `boxes` (402x874 as built, 874x402 oriented): judged on the turned box, not `box`', () => {
     const n = node({ role: 'text', identifier: 'n', rect: { x: 500, y: 100, width: 200, height: 50 } });
     const t = node({ role: 'container', rect: box(874, 402), children: [n] });
@@ -789,7 +789,7 @@ const swiftIdbWith = async (y: number, height: number, ...extra: UiNode[]): Prom
   return t;
 };
 
-describe('Scene.standing for the tap — the screen\'s edges, the status band and the keyboard line (moved from the tap\'s tests)', () => {
+describe('Scene.standing for the tap — the screen\'s edges, the status band and the keyboard line', () => {
   it.each([
     // Off the screen at every edge (the SWIFT form's street label moved): above the top, a carousel page right of it, one left of it.
     ['above the top: off the screen', () => on(box(402, 874), node({ identifier: 'n', rect: { x: 42, y: -40, width: 103, height: 20 } })), 'n', IPHONE_BARE, { kind: 'offScreen', at: { x: 94, y: -30 }, visible: 0 }],
@@ -818,7 +818,7 @@ describe('Scene.standing for the tap — the screen\'s edges, the status band an
   });
 });
 
-describe('Scene.standing for the tap — idb\'s chrome and its keyboard band, as the tap asks (its tree\'s own line) (moved from the tap\'s tests)', () => {
+describe('Scene.standing for the tap — idb\'s chrome and its keyboard band, as the tap asks (its tree\'s own line)', () => {
   it.each([
     // The pinned CONTINUE itself, and the row clear of it (the manual swipe put it at 452): tapped at their centres.
     ['idb SWIFT form: CONTINUE itself, reachable', () => swiftIdb(), 'swift_payment.form.continue_button', { kind: 'reachable', at: { x: 201, y: 802 } }],
@@ -908,7 +908,7 @@ describe('Scene.standing for the tap — idb\'s chrome and its keyboard band, as
   });
 });
 
-describe('Scene.standing for the tap — the cut sliver\'s edges (synthetic SWIFT form, moved from the tap\'s tests)', () => {
+describe('Scene.standing for the tap — the cut sliver\'s edges (synthetic SWIFT form)', () => {
   it.each([
     ['the toggle wholly on screen (66,1793 948x132): reachable at its centre', () => swiftClipped(toggleAt(1793, 132)), 'swift_payment.form.details_toggle', { kind: 'reachable', at: { x: 540, y: 1859 } }],
     ['…its leaf label, the toggle whole: reachable', () => swiftClipped(dumpedToggleAt(1793, 132)), 'Payment details', { kind: 'reachable', at: { x: 540, y: 1859 } }],
@@ -945,7 +945,7 @@ describe('Scene.standing for the tap — the cut sliver\'s edges (synthetic SWIF
   });
 });
 
-describe('Scene.standing — Compose labels under their own control, the bug note\'s snapshots (moved from the tap\'s tests)', () => {
+describe('Scene.standing — Compose labels under their own control, the snapshots of docs/bugs/2026-10-09-android-compose-button-text-refused-as-under-its-own-button.md', () => {
   it.each([
     ['login dump', () => parseDump(COMPOSE.login), 'LOGIN', { x: 540, y: 1463 }],
     ['signIn dump', () => parseDump(COMPOSE.signIn), 'SIGN IN', { x: 541, y: 1869 }],
@@ -983,7 +983,7 @@ describe('Scene.standing — Compose labels under their own control, the bug not
   });
 });
 
-describe('Scene.standing for the stop — the status band and a keyboard line (moved from scroll_until\'s tests)', () => {
+describe('Scene.standing for the stop — the status band and a keyboard line', () => {
   it.each([
     // A row reaching into the band with its centre below it (36–88, centre (201,62)): the plain stop judges the centre and
     // stops; `fully` judges the band as a region (ADR 0009), and 26 pt of it lie under the bar.
@@ -1186,12 +1186,12 @@ describe('Scene.standing — a centre under idb\'s band line is under the keyboa
     expect(tap.facts.screen).toEqual({ x: 0, y: 62, width: 402, height: 527 });
     expect(said(sceneOf(t).standing(row, IPHONE, { ...PLAIN, keyboardTop: idb(589) }))).toEqual({ kind: 'underKeyboard', top: 589, witnessed: false });
   });
-  it('the same centre under a WITNESSED line: the plain stop stays on it (the guard hides the keyboard); the tap is judged as before', async () => {
+  it('the same centre under a WITNESSED line: the plain stop stays on it (the guard hides the keyboard); the tap is judged as with no line', async () => {
     const { t, row } = await pad(565);
     expect(said(sceneOf(t).standing(row, IPHONE, { ...PLAIN, keyboardTop: wda(589) }))).toEqual({ kind: 'reachable', at: { x: 201, y: 591 } });
     expect(said(sceneOf(t).standing(row, IPHONE, { ...TAP, keyboardTop: wda(589) }))).toEqual(said(sceneOf(t).standing(row, IPHONE, TAP)));
   });
-  it('a centre above the line, covered by the lifted CONTINUE (M-1.4): covered, nothing above the keyboard shows — as when the line came only with the cover', async () => {
+  it('a centre above the line, covered by the lifted CONTINUE: covered, nothing above the keyboard shows', async () => {
     const { t, row } = await pad(545);
     const s = sceneOf(t).standing(row, IPHONE, { ...TAP, keyboardTop: idb(589) });
     expect(said(s)).toEqual({ kind: 'covered', cover: 'swift_payment.form.continue_button' });
@@ -1578,8 +1578,8 @@ describe('Scene.standing — a sliver cut by a node drawn after it (Compose\'s b
     ['note after back: cut at its top, 14 deep — tap', afterBack, 'lab.form-keyboard.note', TAP, { kind: 'cut', edge: 'top', depth: 14, by: SUBMIT }],
     ['…the plain stop', afterBack, 'lab.form-keyboard.note', PLAIN, { kind: 'cut', edge: 'top', depth: 14, by: SUBMIT }],
     // What the rule leaves alone, on the same trees.
-    ['phone\'s title, cut to 14 px at Continue\'s top, is no control: tapped as before', keyboardUp, 'lab.form-keyboard.phone.title', TAP, { kind: 'reachable', at: { x: 193, y: 1231 } }],
-    ['postcode\'s title, 56 px on its field\'s top, is no control: tapped as before', keyboardUp, 'lab.form-keyboard.postcode.title', TAP, { kind: 'reachable', at: { x: 132, y: 1070 } }],
+    ['phone\'s title, cut to 14 px at Continue\'s top, is no control: tapped', keyboardUp, 'lab.form-keyboard.phone.title', TAP, { kind: 'reachable', at: { x: 193, y: 1231 } }],
+    ['postcode\'s title, 56 px on its field\'s top, is no control: tapped', keyboardUp, 'lab.form-keyboard.postcode.title', TAP, { kind: 'reachable', at: { x: 132, y: 1070 } }],
     ['postcode, whole above the bar: reachable', keyboardUp, 'lab.form-keyboard.postcode', TAP, { kind: 'reachable', at: { x: 540, y: 1164 } }],
     ['phone after back, whole: reachable', afterBack, 'lab.form-keyboard.phone', TAP, { kind: 'reachable', at: { x: 540, y: 1346 } }],
     ['Continue itself, after back: reachable', afterBack, SUBMIT, TAP, { kind: 'reachable', at: { x: 540, y: 2060 } }],
@@ -1654,7 +1654,7 @@ describe('Scene.standing — a text in a control\'s touch margin, seen clear or 
     expect(scene.standing(phone, PIXEL, COLOUR(phone)).kind).toBe('reachable');
   });
 
-  it('told the eyes saw it drawn over, or could not tell: covered as before, the answer kept in the facts', async () => {
+  it('told the eyes saw it drawn over, or could not tell: covered, the answer kept in the facts', async () => {
     const t = await afterBack();
     const phone = byId(t, PHONE);
     for (const seen of [{ seen: 'under', overlap: '#000000', own: '#FFFFFF', other: '#000000' }, { seen: 'untold', why: 'no plain strip beside it' }] as const) {
@@ -1827,7 +1827,7 @@ describe('Scene.standing — a strip under a later overlay: which node is a sliv
     return sceneOf(t).standing(byId(t, 'strip'), PIXEL, TAP);
   };
 
-  it('a role-less node 22 px tall is cut by the bar — its container the bar\'s rect; a control the same; a text is tapped as before', () => {
+  it('a role-less node 22 px tall is cut by the bar — its container the bar\'s rect; a control the same; a text is tapped', () => {
     const bar = { x: 66, y: 1956, width: 948, height: 154 };
     for (const cls of ['android.view.View', 'android.widget.Button']) {
       const s = tapOn(cls, 1934);

@@ -147,7 +147,7 @@ describe('readingLine — a reading\'s line, only when it stands by a shown cove
     const tree = screen(node({ role: KEYBOARD_ROLE, rect: { x: 0, y: 539, width: 402, height: 335 } }));
     expect(await readingLineOf(readKeyboard(new FakeAdapter({ s: tree }, 's'), tree))).toEqual({ y: 539, witnessed: true });
   });
-  it('the in-tree model with no mark (every idb tree): none — idb\'s band is `line`\'s, never the reading\'s (K5d)', async () => {
+  it('the in-tree model with no mark (every idb tree): none — idb\'s band is `line`\'s, never the reading\'s', async () => {
     const tree = screen(node({ role: 'other', rect: { x: 0, y: 589, width: 402, height: 285 } }));
     expect(await readingLineOf(readKeyboard(new FakeAdapter({ s: tree }, 's'), tree))).toBeUndefined();
   });

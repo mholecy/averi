@@ -308,7 +308,7 @@ describe('rectsOverlap — positive-area overlap only (the pixel poll\'s soft-ke
   });
 });
 
-describe('rectIntersection — the rect two rects share (moved here from swipe.ts, 2026-10-09)', () => {
+describe('rectIntersection — the rect two rects share', () => {
   const list = { x: 0, y: 200, width: 1080, height: 1800 };
   it('the shared rect, in either order; containment gives the inner rect', () => {
     const carousel = { x: -100, y: 1900, width: 1300, height: 400 }; // cut by the list's bottom and both sides
@@ -325,7 +325,7 @@ describe('rectIntersection — the rect two rects share (moved here from swipe.t
   });
 });
 
-describe('rectWithin — rect-in-rect, edges included (touchedOn\'s wrapper rule, here since the code review of fix/r4)', () => {
+describe('rectWithin — rect-in-rect, edges included (touchedOn\'s wrapper rule)', () => {
   const list = { x: 0, y: 825, width: 1080, height: 1395 };
   it('a rect equal to or inside the outer one is within it; one past any edge is not', () => {
     expect(rectWithin(list, list)).toBe(true);
@@ -358,7 +358,7 @@ describe('containsPoint — the tap guard\'s point-in-rect', () => {
   });
 });
 
-describe('rect equality — one owner, two questions (code review of round 2, 2026-10-08)', () => {
+describe('rect equality — one owner, two questions', () => {
   const r = { x: 10, y: 20, width: 30, height: 40 };
   it('sameRect is exact: a one-unit or a sub-unit change is a change', () => {
     expect(sameRect(r, { ...r })).toBe(true);
@@ -395,7 +395,7 @@ describe('clipsOf(tree).scrollersOf — each node\'s clipping ancestors, nearest
   });
 });
 
-describe('flushEdges — a rect\'s edges on its container\'s, within a pixel (moved here from scroll-rounds.ts, 2026-10-10)', () => {
+describe('flushEdges — a rect\'s edges on its container\'s, within a pixel', () => {
   const form = { x: 0, y: 242, width: 1080, height: 1736 };
   it('both axes by default, in clippedEdges\' order; one axis when asked; none for a container of no area', () => {
     expect(flushEdges({ x: 66, y: 1924, width: 948, height: 55 }, form)).toEqual(['bottom']); // 1979 against 1978: within a pixel
@@ -448,7 +448,7 @@ describe('Clips.cutSliver at any depth, synthetic shapes — a node cut at a cli
     expect(cutOf(toggleWith(1936, 1977), [form])?.edge).toBe('bottom');
     expect(cutOf(toggleWith(1936, 1976), [form])).toBeUndefined();
   });
-  it('inside evidence needs MIN_INSIDE_EVIDENCE (8) along y (code review round 3): a 7-px divider or focus line at the cut is none, 8 px is; past the edge, any thickness counts', () => {
+  it('inside evidence needs MIN_INSIDE_EVIDENCE (8) along y: a 7-px divider or focus line at the cut is none, 8 px is; past the edge, any thickness counts', () => {
     expect(cutOf(toggleWith(1971, 1978), [form])).toBeUndefined();
     expect(cutOf(toggleWith(1970, 1978), [form])?.edge).toBe('bottom');
     expect(cutOf(at({ x: 66, y: 1924, width: 948, height: 55 }, at({ x: 66, y: 1977, width: 948, height: 3 })), [form])?.edge).toBe('bottom'); // 2 px past
@@ -466,13 +466,13 @@ describe('Clips.cutSliver at any depth, synthetic shapes — a node cut at a cli
     expect(cutOf(at(whole, at({ x: 66, y: 1978, width: 948, height: 0 })), [form])).toBeUndefined();
     expect(cutOf(toggleWith(1936, 1978), [])).toBeUndefined();
   });
-  it('at a SIDE only content past the edge counts (code review item 4): a whole 60-px tile flush left with its icon flush left reads whole; a full-bleed row\'s flush content too', () => {
+  it('at a SIDE only content past the edge counts: a whole 60-px tile flush left with its icon flush left reads whole; a full-bleed row\'s flush content too', () => {
     const list = { x: 0, y: 200, width: 1080, height: 1800 };
     expect(cutOf(at({ x: 0, y: 500, width: 60, height: 60 }, at({ x: 0, y: 510, width: 40, height: 40 })), [list])).toBeUndefined();
     expect(cutOf(at({ x: 132, y: 600, width: 948, height: 175 }, at({ x: 948, y: 625, width: 132, height: 132 })), [list])).toBeUndefined();
     expect(cutOf(at({ x: 1030, y: 900, width: 50, height: 60 }, at({ x: 1030, y: 900, width: 82, height: 60 })), [list])).toEqual({ edge: 'right', container: list, depth: 50 });
   });
-  it('the SHALLOWEST evidenced edge over the whole chain (code review item 2): a card cut to 50 px at a carousel\'s right with an image at its top is judged at the right', () => {
+  it('the SHALLOWEST evidenced edge over the whole chain: a card cut to 50 px at a carousel\'s right with an image at its top is judged at the right', () => {
     const carousel = { x: 0, y: 600, width: 1080, height: 300 };
     const card = at({ x: 1030, y: 600, width: 50, height: 300 }, at({ x: 1046, y: 600, width: 34, height: 200 }), at({ x: 1040, y: 650, width: 200, height: 40 }));
     expect(cutOf(card, [carousel])).toEqual({ edge: 'right', container: carousel, depth: 50 });
@@ -481,7 +481,7 @@ describe('Clips.cutSliver at any depth, synthetic shapes — a node cut at a cli
     const outerCard = at({ x: 1030, y: 600, width: 50, height: 300 }, at({ x: 1046, y: 600, width: 34, height: 200 }), at({ x: 1040, y: 650, width: 200, height: 40 }));
     expect(cutOf(outerCard, [{ x: 0, y: 600, width: 2000, height: 300 }, page])).toEqual({ edge: 'right', container: page, depth: 50 });
   });
-  it('a descendant dumped CLIPPED OUT past the flush edge is evidence there (code review of round 7, P1): Settings\' row cut to 33 px at the list\'s top, its texts clamped to zero area at 297 — cut, 33 deep', () => {
+  it('a descendant dumped CLIPPED OUT past the flush edge is evidence there: Settings\' row cut to 33 px at the list\'s top, its texts clamped to zero area at 297 — cut, 33 deep', () => {
     const list = { x: 0, y: 297, width: 1080, height: 1857 };
     const out = (rect: UiNode['rect'], side: NonNullable<UiNode['clippedOut']>): UiNode => ({ ...node(rect), clippedOut: side });
     const row = (...texts: UiNode[]) => at({ x: 0, y: 297, width: 1080, height: 33 }, at({ x: 66, y: 297, width: 66, height: 33 }), ...texts);
@@ -844,7 +844,7 @@ describe('clipsOf(tree).drawnIn — the frame a node is drawn in, cut by every a
   });
 });
 
-describe('subtract, largestRect, rectCentre — the cover arithmetic draw-order.ts#exposure asks (code review S3, S5)', () => {
+describe('subtract, largestRect, rectCentre — the cover arithmetic draw-order.ts#exposure asks', () => {
   const r = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
 
   it('a rect less a cut inside it: the bands above and below, full width, and the parts beside it between them', () => {

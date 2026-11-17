@@ -195,7 +195,7 @@ describe('LaterEdges — the two complements its readers ask', () => {
       { edge: 'bottom', by: byId(both, 'bar') },
     ]);
   });
-  it('each edge asked once and kept; a node in a scroll view asks no edge for `overlaid`, one in none none for `flushNeighbours`', async () => {
+  it('each edge asked once and kept; a node in a scroll view asks no edge for `overlaid`, one in no scroll view asks none for `flushNeighbours`', async () => {
     const t = await lab('pinned-bar');
     const scene = sceneOf(t);
     const asked: Rect[] = [];
