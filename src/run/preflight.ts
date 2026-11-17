@@ -8,8 +8,8 @@ import type { ProjectConfig } from '../flow/load.js';
  * a WDA connect, or a multi-minute build, and on a verify one device per leg, spent on a typo. It refuses every name
  * the request carries that averi.yaml does not define, exactly as given, and the environment the run would select;
  * `undefined` names neither state nor flow, leaving only the environment. What counts as named is decided before:
- * an empty state or flow given to verify means none, its documented asserts-only run (run/verify.ts#runVerification),
- * while ensure_state's and run_flow's name is refused as given, `""` included.
+ * an empty state or flow given to verify means that one is not named (both empty: asserts only), not an unknown name
+ * (run/verify.ts#runVerification), while ensure_state's and run_flow's name is refused as given, `""` included.
  *
  * Everything wrong is in ONE refusal, one line each with what averi.yaml does declare (or that it declares none of
  * that kind), so a verify answers once rather than with a FAILED section per leg. Thrown — a SetupError, like the
