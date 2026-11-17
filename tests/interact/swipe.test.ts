@@ -263,7 +263,7 @@ describe('shortenStroke — the touch-down kept, the reach scaled, never a tap',
   });
 });
 
-describe('sameStroke — the same touch-down and lift-off, point for point (code review of round 2, 2026-10-08)', () => {
+describe('sameStroke — the same touch-down and lift-off, point for point', () => {
   const s = { from: { x: 540, y: 1118 }, to: { x: 540, y: 280 } };
   it('compares points, not spelling: key order does not matter, any coordinate does', () => {
     expect(sameStroke(s, { to: { y: 280, x: 540 }, from: { y: 1118, x: 540 } })).toBe(true);

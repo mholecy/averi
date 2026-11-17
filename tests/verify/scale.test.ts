@@ -486,7 +486,7 @@ describe('windowWidth — an Android window beside its system bars (A1, A2)', ()
     expect(windowWidth(root(node({ x: 0, y: 0, width: 2400, height: 1080 })), ANDROID)).toEqual({ width: 2274, left: 126 });
   });
 
-  it('needs the device witness: with no screen, or an iOS one, the inset window is a CONTENT width as before', () => {
+  it('needs the device witness: with no screen, or an iOS one, the inset window is a CONTENT width', () => {
     expect(windowWidth(appWindow(110, 2290)).error).toMatch(/^screen width 2400 is a CONTENT width/);
     expect(windowWidth(appWindow(110, 2290), { width: 1080, height: 2400 }).error).toMatch(/CONTENT width/);
   });

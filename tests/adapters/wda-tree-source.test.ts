@@ -199,7 +199,7 @@ describe('WdaTreeSource.startBeforeLaunch — WebDriverAgent brought up before a
     expect(probes()).toBeGreaterThan(before);
   });
 
-  it('WebDriverAgent not built: nothing at all — no build, no /status, no spawn; the first read builds as before', async () => {
+  it('WebDriverAgent not built: nothing at all — no build, no /status, no spawn; the first read builds', async () => {
     const { dd } = await tempDerivedData(false);
     const spawner = fakeSpawn();
     const fetcher = fakeFetch(() => 'refused');

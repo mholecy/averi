@@ -65,7 +65,7 @@ describe('round — a list\'s end that rebounds under a fling (iOS)', () => {
     expect(failureOf(played, 'text:"No Such Row"').message).not.toMatch(/lies above/);
   });
 
-  it('where strokes drag (Android) the tree\'s test stays exact: a point is a change, as before', () => {
+  it('where strokes drag (Android) the tree\'s test stays exact: a point is a change', () => {
     const played = play({ ...DRAGS, maxSwipes: 3 }, [general(247), general(246), general(246), general(246)]);
     expect(played.outcome).toMatchObject({ kind: 'bound', swipes: 3, by: { of: 'exhausted', unchanged: 'tree' } });
     expect(failureOf(played, 'text:"No Such Row"').message).toMatch(/lies above/);
@@ -89,7 +89,7 @@ describe('round — a list\'s end that rebounds under a fling (iOS)', () => {
     expect(steps(played)).toEqual(['stroke', 'stroke', 'stop']);
   });
 
-  it('no settled read past the deadline: the bound, as before', () => {
+  it('no settled read past the deadline: the bound', () => {
     const played = play(IOS, [general(247), { ...general(74), elapsedMs: 15_000 }]);
     expect(steps(played)).toEqual(['stroke', 'stop']);
     expect(played.outcome).toMatchObject({ kind: 'bound', by: { of: 'timeout' } });

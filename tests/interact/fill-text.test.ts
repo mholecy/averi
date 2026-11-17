@@ -458,7 +458,7 @@ describe('fillFailureText — every error a fill throws', () => {
     expect(mismatch({ kind: 'separated', added: 1 })).toContain(`(spaces or ${marks.join(' ')})`);
   });
 
-  it('a mismatch after the clear-fill\'s one retry says so — a wipe and a retype, or a retype alone when the field held nothing (round 8\'s D3 nit: "typed 3 but shows 4" read as the first typing)', () => {
+  it('a mismatch after the clear-fill\'s one retry says so — a wipe and a retype, or a retype alone when the field held nothing ("typed 3 but shows 4" would read as the first typing)', () => {
     expect(fillFailureText({ code: 'mismatch', typed: 3, shows: 4, differs: { kind: 'length' }, again: [{ kind: 'whole', wiped: true }] })).toBe(
       'fill: typed 3 characters (after one wipe and retype) but the field shows 4 (content withheld from this error)',
     );

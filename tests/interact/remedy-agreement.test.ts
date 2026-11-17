@@ -131,8 +131,6 @@ const PRESENTED_FOR_THE_ELEMENT = presentedRemedy('pixel');
 const PRESENTED_OVER = presentedRemedy('touch');
 
 describe('one remedy for a target beneath a presented screen — the tap, the pixel assert and scroll_until agree', () => {
-  /** The action sheet WDA types in the discard popover's layer, as the remedy names it. */
-  const DISCARD_SHEET: MarkedLayer = { kind: 'actionSheet', label: 'Are you sure you want to discard this new contact?' };
   /** The cases: the probe, and the real ui_snapshots' targets on which the verbs disagreed. */
   const cases = async (): Promise<[string, UiNode, UiNode, MarkedLayer?][]> => {
     const screens = await stacked();

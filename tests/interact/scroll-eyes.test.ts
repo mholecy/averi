@@ -98,7 +98,7 @@ describe('scroll_until — the eyes confirm a fully claim', () => {
     expect(fake.screenshots).toHaveLength(1);
   });
 
-  it('k7, the eyes see its own colour to the edge: "fully visible", as before', async () => {
+  it('k7, the eyes see its own colour to the edge: "fully visible"', async () => {
     const fake = await k7();
     const own: Eyes = { fully: async () => ({ sees: 'own' }), order: async () => [] };
     expect(describeScrollResult(await scrollUntilVisible(fake, PHONE, { ...FAST, fully: true, eyes: own }))).toBe('fully visible after 0 swipes');
@@ -170,13 +170,13 @@ describe('scroll_until — no screenshot on an ordinary stop (the trigger is nar
     expect(asked).toBe(1);
   });
 
-  it('a bar as wide as the screen flush with a row as wide: not asked, the tree\'s claim as before (no screen beside the bar to read its surface from, and no end of the bar past the row\'s)', async () => {
+  it('a bar as wide as the screen flush with a row as wide: not asked, the tree\'s claim stands (no screen beside the bar to read its surface from, and no end of the bar past the row\'s)', async () => {
     const fake = barOver({ x: 0, width: 1080 });
     expect(describeScrollResult(await scrollUntilVisible(fake, 'id:row', { ...FAST, fully: true, eyes: eyesOn(fake) }))).toBe('fully visible after 0 swipes');
     expect(fake.screenshots).toHaveLength(0);
   });
 
-  it('the same bar over an INSET row, reaching past it at both ends: not asked either — in a scroll view a flush bar is no overlay (ui-tree/later-edges.ts#OverlaidEdge: at rest the last row lies whole on it, the same tree), the tree\'s claim as before', async () => {
+  it('the same bar over an INSET row, reaching past it at both ends: not asked either — in a scroll view a flush bar is no overlay (ui-tree/later-edges.ts#OverlaidEdge: at rest the last row lies whole on it, the same tree), the tree\'s claim stands', async () => {
     const fake = barOver({ x: 40, width: 1000 });
     expect(describeScrollResult(await scrollUntilVisible(fake, 'id:row', { ...FAST, fully: true, eyes: eyesOn(fake) }))).toBe('fully visible after 0 swipes');
     expect(fake.screenshots).toHaveLength(0);
@@ -282,7 +282,7 @@ describe('scroll_until — fully: true on a field under a text in its touch marg
     expect(failure.message).toContain('drawn over it — 99% of it shows — a screenshot could not tell whether it draws over it (the screenshot failed: offline)');
   });
 
-  it('no eyes handed in: today\'s failure, word for word, and no screenshot', async () => {
+  it('no eyes handed in: the tree\'s failure, word for word, and no screenshot', async () => {
     const fake = await afterBack(pngOf([]));
     const failure = (await scrollUntilVisible(fake, PHONE, { ...FAST, fully: true }).catch((e: unknown) => e)) as Error;
     expect(failure.message).toContain('element is in the viewport but under text "Variable symbol" (55,1406 258x56), drawn over it — 99% of it shows — and the content is exhausted');
@@ -356,7 +356,7 @@ describe('scroll_until — what was seen of a margin text, kept across the reads
     expect(outcome).toMatch(/^fully visible after \d+ swipes? — text "Variable symbol"/);
   });
 
-  it('seen drawn over it, then carried with it by a stroke (both 300 px up): no stroke can clear it — the call fails at once, today\'s words, one question', async () => {
+  it('seen drawn over it, then carried with it by a stroke (both 300 px up): no stroke can clear it — the call fails at once, one question', async () => {
     const { outcome, asked, swipes } = await play((base) => [base, scrolled(base, -300)], ['under']);
     expect(outcome).toContain(
       'failed after 1 swipe (the text drawn over it moved with it, both by 0,-300 since a screenshot saw it there: it scrolls with the element, so no swipe brings the element out from under it) — ' +

@@ -48,7 +48,7 @@ describe('a control listed after a target, past a reading-order break, that hold
   });
 
   // A control listed after the target that holds its centre is untold in any listing in reading order, break or none.
-  it('Continue 16,640 listed after O: its top is below O\'s, no break — a cover as before', async () => {
+  it('Continue 16,640 listed after O: its top is below O\'s, no break — a cover', async () => {
     const t = await tree('after', 640);
     const seen = drawOrder(t).exposure(byId(t, 'lab.scroll-bounded.O'), IPHONE);
     expect(tagged(seen.covers)).toEqual([{ node: byId(t, 'lab.scroll-bounded.continue'), order: 'untold', presented: false }]);

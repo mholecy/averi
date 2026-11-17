@@ -96,7 +96,7 @@ describe('parseWdaSource — the on-screen keyboard\'s band carries KEYBOARD_ROL
 
   it.each([
     ['nothing focused, no Keyboard node (K3)', LOGIN_NONE],
-    ['parked keyboard: isVisible=0 at y 891 on an 874 pt screen; the accessory toolbar still on screen is NOT a band (stage A residual)', TWOFA_PARKED],
+    ['parked keyboard: isVisible=0 at y 891 on an 874 pt screen; the accessory toolbar still on screen is NOT a band (a known residual)', TWOFA_PARKED],
   ])('%s → no keyboard node, the tree reads unknown', (_name, tree) => {
     expect(bands(tree)).toEqual([]);
     expect(keyboardInTree(tree)).toEqual({ state: 'unknown' });
@@ -149,7 +149,7 @@ describe('parseWdaSource — the on-screen keyboard\'s band carries KEYBOARD_ROL
       }
     });
 
-    it('2FA parked: the Toolbar is on screen (826–874) but its Window holds no inputView and is not ofKeyboard (the stage A residual) → nothing; with no band there is nothing to dismiss either', () => {
+    it('2FA parked: the Toolbar is on screen (826–874) but its Window holds no inputView and is not ofKeyboard (a known residual) → nothing; with no band there is nothing to dismiss either', () => {
       expect(accessoryDismissButton(TWOFA_PARKED)).toBeUndefined();
       expect(ofKeyboard(TWOFA_PARKED, only(TWOFA_PARKED, 'label:Done'))).toBe(false);
       expect(keyboardInTree(TWOFA_PARKED)).toEqual({ state: 'unknown' });
@@ -165,7 +165,7 @@ describe('parseWdaSource — the on-screen keyboard\'s band carries KEYBOARD_ROL
     for (const key of keys) expect(key.role).toBe('other');
   });
 
-  it('the measured bug: login_submit resolves as before, and its centre lies inside the band WITH the bar and WITHOUT it', () => {
+  it('the measured bug: login_submit resolves, and its centre lies inside the band WITH the bar and WITHOUT it', () => {
     for (const tree of [LOGIN_BAR, LOGIN_NO_BAR]) {
       const submit = resolveNow(tree, 'id:login_submit', { ambiguous: 'refuse' });
       expect(submit?.node).toMatchObject({ role: 'button', rect: { x: 36, y: 547, width: 141, height: 48 } });
@@ -236,8 +236,8 @@ describe('keyboardMarks — the band rule on synthetic shapes', () => {
     expect(bands(tree).map((n) => n.rect)).toEqual([{ x: 0, y: 500, width: 402, height: 374 }]);
   });
 
-  describe('the fail-safe (review 2026-10-07): a wrapper merely smaller than its Window is walked past, never crowned', () => {
-    it('the bound is 60 % of the window height; the measured bands are 38–41 %', () => {
+  describe('the fail-safe: a wrapper merely smaller than its Window is walked past, never crowned', () => {
+    it('the bound is 60 % of the window height; the measured bands are 35–41 %', () => {
       expect(MAX_BAND_FRACTION).toBe(0.6);
       for (const tree of [LOGIN_BAR, LOGIN_NO_BAR, TWOFA_TOOLBAR]) expect(bands(tree)[0].rect.height / 874).toBeLessThan(0.42);
     });
@@ -355,7 +355,7 @@ describe('keyboardMarks — the band rule on synthetic shapes', () => {
     const appWindow = (...children: Record<string, unknown>[]) => el('Window', { children: [el('Other', { children })] });
     const submit = () => el('Button', { rawIdentifier: 'submit', rect: { x: 36, y: 547, width: 141, height: 48 } });
 
-    it('the K1 dump with login_card renamed to inputView (the reviewer\'s case): the app\'s Window stays unmarked, login_submit is not the keyboard\'s, the band is as before', async () => {
+    it('the K1 dump with login_card renamed to inputView: the app\'s Window stays unmarked, login_submit is not the keyboard\'s, the band is K1\'s', async () => {
       const renamed = (await fixture('login-keyboard-bar')).replace('"rawIdentifier":"login_card"', '"rawIdentifier":"inputView"');
       const tree = parseWdaSource(renamed);
       expect(findAll(tree, 'id:inputView').map((n) => n.rect)).toEqual([

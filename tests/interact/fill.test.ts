@@ -580,7 +580,7 @@ describe('fillField — the post-focus re-read, only where focus can change the 
     expect(maskedAppend).toEqual({ held: 4 });
   });
 
-  it('kept: a plain field that is NOT empty is read as before — not at all (`includes` needs no count)', async () => {
+  it('kept: a plain field that is NOT empty is not read at all (`includes` needs no count)', async () => {
     const fake = field({ secure: false, value: '9.99' });
     const log = logged(fake);
     await fillField(fake, { id: 'amount_input' }, '12', FAST);
@@ -1146,7 +1146,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     expect(fake.deletes).toEqual([4]); // the retry's wipe of what it showed: "abc!"
   });
 
-  it('M-1: a clear ALONE on a label with no value sends no delete and says so — not an empty field', async () => {
+  it('a clear ALONE on a label with no value sends no delete and says so — not an empty field', async () => {
     const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
     const result = await fillField(fake, 'text:"IBAN*"', '', { ...FAST, clear: true });
     expect(fake.deletes).toEqual([]);
@@ -1285,7 +1285,7 @@ describe('fillField — what it did, not what was asked (measured iOS idb shapes
     });
   });
 
-  it('a lost read-back carries its reason into the verdict — a lost without one does not compile (code review of round 2)', () => {
+  it('a lost read-back carries its reason into the verdict — a lost without one does not compile', () => {
     expect(judgeFill({ role: 'textfield', typed: 3, readBack: { kind: 'lost', why: 'unmatched' } }).reasons).toEqual([{ code: 'lost', why: 'unmatched' }]);
     expect(judgeFill({ role: 'textfield', typed: 3, readBack: { kind: 'lost', why: 'screen-changed' } }).reasons).toEqual([{ code: 'lost', why: 'screen-changed' }]);
     // @ts-expect-error — the reason is part of the kind: a `lost` read-back cannot be built without it.

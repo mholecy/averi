@@ -753,7 +753,7 @@ describe('type_text on the measured iOS idb floating label (2026-10-08)', () => 
     expect(fake.deletes).toEqual([]);
   });
 
-  it('M-1: an empty text with clear on the label (the documented way to empty a field) is NOT verified, not "Filled … (0 characters)"', async () => {
+  it('an empty text with clear on the label (the documented way to empty a field) is NOT verified, not "Filled … (0 characters)"', async () => {
     const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
     const { call } = await connect({ ios: fake });
     const result = await call('type_text', { platform: 'ios', selector: 'text:"IBAN*"', text: '', clear: true, configPath: missing() });
@@ -1852,7 +1852,7 @@ describe('tap and type_text under the Android soft keyboard', () => {
     expect(fake.tapPoints).toEqual([{ x: 120, y: 210 }]);
   });
 
-  it('tap by selector on an unmarked node: the one-line reply, as before', async () => {
+  it('tap by selector on an unmarked node: the one-line reply', async () => {
     const fake = new FakeAdapter({ s: screen(node({ role: 'button', identifier: 'go', rect: { x: 100, y: 200, width: 40, height: 20 } })) }, 's');
     const { call } = await connect({ android: fake });
     expect((await call('tap', { platform: 'android', selector: 'id:go', configPath: missing() })).text).toBe('Tapped id:go');

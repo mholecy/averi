@@ -62,7 +62,7 @@ describe('scroll_until: a stroke that changed the screen stops the scroll, the t
 });
 
 describe('…and not a stroke that moved content', () => {
-  it('an id the read before listed is still listed: the content moved, the stop is judged as before', () => {
+  it('an id the read before listed is still listed: the content moved, the stop is judged on it', () => {
     const before = host();
     const without = { ...before, children: before.children.filter((n) => n.identifier !== 'lab.sheet-background.A') };
     const after = host();

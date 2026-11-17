@@ -204,9 +204,9 @@ flows:
     });
 
     // The repo keeps no averi.yaml of its own; its machine-readable flows are the docs' yaml examples. Every one in
-    // README.md, SETUP.md, ARCHITECTURE.md and skill/SKILL.md that holds whole flows (references/averi-yaml.md's are
-    // fragments, `steps: [ … ]`) parses — given an empty `app:` where the example leaves it out — to the very steps it
-    // was written as.
+    // README.md, SETUP.md, ARCHITECTURE.md, skill/SKILL.md and docs/verification.md that holds whole flows
+    // (references/averi-yaml.md's are fragments, `steps: [ … ]`) parses — given an empty `app:` where the example
+    // leaves it out — to the very steps it was written as.
     type FlowExample = { app?: unknown; flows: Record<string, { steps: unknown[] }> };
     /** A yaml example of whole flows: each flow's steps a list of mappings, not a fragment (`steps: [ … ]`). */
     const isWholeFlowsExample = (raw: unknown): raw is FlowExample =>
@@ -216,7 +216,7 @@ flows:
       Object.values((raw as { flows: Record<string, { steps: unknown }> }).flows).every(
         (f) => Array.isArray(f.steps) && f.steps.every((st) => typeof st === 'object'),
       );
-    it.each(['README.md', 'SETUP.md', 'ARCHITECTURE.md', 'skill/SKILL.md'])(
+    it.each(['README.md', 'SETUP.md', 'ARCHITECTURE.md', 'skill/SKILL.md', 'docs/verification.md'])(
       'every flow example in %s parses to the steps it was written as',
       (doc) => {
         const md = readFileSync(new URL(`../../${doc}`, import.meta.url), 'utf8');
@@ -473,7 +473,7 @@ flows:
       ['a tap without a selector field', '    keyboardDismiss:\n      - tap: { timeout: 2s }\n', /keyboardDismiss\.0\.tap: Unrecognized key/],
       ['a tap with no field at all', '    keyboardDismiss:\n      - tap: {}\n', /keyboardDismiss\.0\.tap: tap needs at least one of: id, text, role, label/],
       ['a tap with a non-selector key', '    keyboardDismiss:\n      - tap: { id: x, value: y }\n', /keyboardDismiss\.0\.tap: Unrecognized key/],
-      ['a tap naming an interactive role (it would press a control — review round 1)', '    keyboardDismiss:\n      - tap: { role: button }\n', /keyboardDismiss\.0\.tap: a keyboard dismissal must be a non-interactive element \(a title, a label\) — role: button\/textfield\/switch\/checkbox\/radiobutton\/slider names a control the tap would press/],
+      ['a tap naming an interactive role (it would press a control)', '    keyboardDismiss:\n      - tap: { role: button }\n', /keyboardDismiss\.0\.tap: a keyboard dismissal must be a non-interactive element \(a title, a label\) — role: button\/textfield\/switch\/checkbox\/radiobutton\/slider names a control the tap would press/],
       ['a tap naming textfield', '    keyboardDismiss:\n      - tap: { id: x, role: textfield }\n', /a keyboard dismissal must be a non-interactive element/],
       ['a tap given as a selector string', '    keyboardDismiss:\n      - tap: "id:x"\n', /keyboardDismiss\.0\.tap: Expected object, received string/],
       ['accessory: false (opt-in only; false reads like an override and would be none)', '    keyboardDismiss:\n      - accessory: false\n', /keyboardDismiss\.0\.accessory: accessory takes only true/],

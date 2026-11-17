@@ -510,7 +510,7 @@ describe('compareRectParity — missing anchors and duplicates', () => {
     const out = formatRectParity(r);
     expect(out).toContain('MISSING on ios');
     expect(out).toContain('MISSING ANCHORS — these are not parity findings yet');
-    expect(out).toContain('accessibility.md §2'); // the three-cause explanation
+    expect(out).toContain('that IS a finding: the element needs its id on\n  both platforms'); // the three-cause explanation
   });
 
   it('first occurrence of a duplicated id wins', () => {

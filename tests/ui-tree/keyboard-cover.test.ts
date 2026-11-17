@@ -23,7 +23,7 @@ const calls = (oracle: FakeKeyboard): [number, number, number] => [oracle.window
 /** What the adapter's touchable() returns for a measured fixture — its own parsers over the real text, the input method's word overridable. */
 const touchableOf = (out: string, witness: KeyboardWitness = parseInputShown(out)): KeyboardTouchable => ({ witness, region: parseTouchableRegion(out) });
 
-describe('readKeyboard — the one switch between the oracle and the tree (review 2026-10-07)', () => {
+describe('readKeyboard — the one switch between the oracle and the tree', () => {
   const BAND = { x: 0, y: 539, width: 402, height: 335 };
   const submit = node({ role: 'button', identifier: 'submit', rect: { x: 36, y: 547, width: 141, height: 48 } });
   const key = node({ role: 'other', label: 'q', rect: { x: 4, y: 590, width: 40, height: 54 } });
@@ -102,7 +102,7 @@ describe('readKeyboard — the one switch between the oracle and the tree (revie
   });
 });
 
-describe('ofKeyboard — is the node the keyboard\'s own UI (review 2026-10-07; one walk a reading since 2026-10-08)', () => {
+describe('ofKeyboard — is the node the keyboard\'s own UI', () => {
   const key = node({ role: 'other', label: 'q', rect: { x: 4, y: 590, width: 40, height: 54 } });
   const done = node({ role: 'button', label: 'Done', rect: { x: 317, y: 523, width: 64, height: 38 } });
   const submit = node({ role: 'button', identifier: 'submit', rect: { x: 36, y: 547, width: 141, height: 48 } });
@@ -174,7 +174,7 @@ describe('over — the input method\'s word over a covered point: the veto (witn
 
   it.each([
     ['witness shown: covered, confirmed', 'shown', { kind: 'covered', frame: FRAME, confirmed: true }],
-    ['witness unknown: covered, not confirmed — the window state alone stands, as before the veto existed', 'unknown', { kind: 'covered', frame: FRAME, confirmed: false }],
+    ['witness unknown: covered, not confirmed — the window state alone stands', 'unknown', { kind: 'covered', frame: FRAME, confirmed: false }],
     ['witness hidden: denied — the stale window state, act on neither guess', 'hidden', { kind: 'denied', frame: FRAME }],
   ] as const)('%s', async (_name, witness, expected) => {
     const { fake, oracle } = withOracle({ state: 'shown', frame: FRAME }, witness);
@@ -213,7 +213,7 @@ describe('anywhere / corroborated / unlocated — the questions with no point: t
     ['shown · witness shown', { state: 'shown', frame: FRAME }, 'shown', true, false, [1, 0, 1]],
     ['shown · witness unknown: no veto', { state: 'shown', frame: FRAME }, 'unknown', true, false, [1, 0, 1]],
     ['shown · witness hidden: the veto', { state: 'shown', frame: FRAME }, 'hidden', false, false, [1, 0, 1]],
-    ['hidden · witness shown: the `unlocated` row (2026-10-08)', { state: 'hidden' }, 'shown', false, true, [1, 0, 1]],
+    ['hidden · witness shown: the `unlocated` row', { state: 'hidden' }, 'shown', false, true, [1, 0, 1]],
     ['hidden · witness hidden', { state: 'hidden' }, 'hidden', false, false, [1, 0, 1]],
     ['hidden · witness unknown', { state: 'hidden' }, 'unknown', false, false, [1, 0, 1]],
     ['unknown: nothing to stand by and nothing to contradict — the witness not asked', { state: 'unknown' }, 'shown', false, false, [1, 0, 0]],

@@ -22,7 +22,7 @@ describe('parseDuration', () => {
   });
 });
 
-describe('durationSchema — the one duration every timeout field parses with (A19)', () => {
+describe('durationSchema — the one duration every timeout field parses with', () => {
   it.each([0, 250, '500ms', '15s', '2m'])('accepts %s and keeps it as written', (v) => {
     expect(durationSchema.parse(v)).toBe(v);
   });

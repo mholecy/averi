@@ -202,7 +202,7 @@ describe('visibleFractionInViewport — how much of a rect a box holds, as a fra
   });
 });
 
-describe('clearOfSystemBands — a portrait box less both system bands (D59b code review: the one helper)', () => {
+describe('clearOfSystemBands — a portrait box less both system bands', () => {
   it('the status band off its top and the navigation band off its bottom, each as its own helper cuts it; a landscape box keeps both', () => {
     const box: Rect = { x: 0, y: 0, width: 1080, height: 2220 };
     expect(clearOfSystemBands(box, { statusBand: 66, navigationBand: 2088 })).toEqual({ x: 0, y: 66, width: 1080, height: 2022 });

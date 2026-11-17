@@ -352,7 +352,7 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth, unli
           says: `never a tap at its centre (after one back a tap there ${what}); Tapped only inside its piece after back${piece === undefined ? '' : ` ${pointsText([{ x: piece.x, y: piece.y }])} ${piece.width}x${piece.height}`}, where a probe reached it`,
           call: tap,
           judge: tapAfterBackOnPiece(probePoint(c.frame!), fired.length > 0 ? what : undefined, c.afterBack.piece?.reached === true ? piece : undefined),
-          ...(truth.afterBack === undefined && { live: 'no layout after back captured: averi finds the element again in the new tree, which a replayed tree (the IME-up layout) does not hold; live.ts k5 judges it on the model' }),
+          ...(truth.afterBack === undefined && { live: 'no layout after back captured: averi finds the element again in the new tree, which a replayed tree (the IME-up layout) does not hold; live-cases.ts k5 judges it on the model' }),
         });
       }
       if (c.seen !== undefined) {

@@ -427,7 +427,7 @@ describe('an earlier text that vanished — an unnamed placeholder (D29)', () =>
   // D29 (the owner's decision): an earlier text with no letters or digits (a dash) keeps the
   // pre-D29 judgment — a false mismatch, never a wrong pass; deliberately not loosened. A `_` mask template: D51,
   // below.
-  it('an earlier text with no letters or digits: judged after it alone, as before D29', () => {
+  it('an earlier text with no letters or digits: judged after it alone', () => {
     expect(landingOf('SK31 1200 0000', expecting(e('SK3112000000', '\u2014')))).toBeUndefined();
   });
 
@@ -604,7 +604,7 @@ describe('a reading unchanged since typing began has not landed (D63)', () => {
     expect(landingOf('1 234', expecting(e('1234', '1 234', true)))).toEqual({ kind: 'landed', reformatted: { added: 1, respaced: 0 } });
   });
 
-  it('landingOf: a masked reading unchanged since typing began is judged by its length, as before', () => {
+  it('landingOf: a masked reading unchanged since typing began is judged by its length', () => {
     expect(landingOf('•••••', expecting({ value: '•••', before: '•••••', held: 5 }))).toBeUndefined();
     expect(notLandedDiffers('•••••', expecting({ value: '•••', before: '•••••', held: 5 }))).toEqual({ kind: 'unchanged' });
   });
@@ -657,7 +657,7 @@ describe('without clear, the value must be in the typing past the earlier text (
     ['ear', 'ear', 'Search', "idb's unnamed placeholder vanished"],
     ['Searchear', 'ear', 'Search', "idb's unnamed placeholder kept"],
     ['+421 421', '421', '+421 ', 'an earlier text that holds the value, the typing after it'],
-  ])('`%s` typed `%s` after `%s` lands as before (%s)', (shown, value, before) => {
+  ])('`%s` typed `%s` after `%s` lands (%s)', (shown, value, before) => {
     expect(landingOf(shown, e(value, before))).toEqual({ kind: 'landed' });
   });
 

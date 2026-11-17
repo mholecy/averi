@@ -282,7 +282,7 @@ async function syntheticRuns(repo: string): Promise<{ ios: Built; android: Built
   const fx = join(repo, 'tests/fixtures');
   const ios = run('ios', IPHONE, 'synthetic (iPhone 17 layout)');
   const android = run('android', PIXEL, 'synthetic (Pixel_3a layout)');
-  ios.manifest.note = android.manifest.note = 'hand-made raw trees (synthetic.ts), the shapes the scratch harness built inline';
+  ios.manifest.note = android.manifest.note = 'hand-made raw trees (synthetic.ts) for shapes no device check caught';
   const pad = (JSON.parse(await readFile(join(fx, 'idb-swift-form-number-pad.json'), 'utf8')) as { elements: Parameters<typeof syntheticIdb>[0] }).elements;
   for (const [f, body] of Object.entries(syntheticIdb(pad))) add(ios, f, body, { source: 'idb', form: 'raw' });
   add(ios, 'zero-root.wda-source-myport-login-keyboard.json', zeroRootWda(await readFile(join(fx, 'wda-source-myport-login-keyboard.json'), 'utf8')), { source: 'wda', form: 'raw' });

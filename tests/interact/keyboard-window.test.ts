@@ -146,7 +146,7 @@ describe('tapElement — a target under the Android soft keyboard is not tapped 
     expect(fake.tapPoints).toEqual([{ x: 249, y: 1466 }]);
   });
 
-  it.each([['hidden'], ['unknown']] as const)('keyboard %s: one query, no back, the tap as before', async (state) => {
+  it.each([['hidden'], ['unknown']] as const)('keyboard %s: one query, no back, the plain tap', async (state) => {
     const fake = loginFake();
     fake.attachedKeyboard.windowAnswers.current = { state };
     const result = await tapElement(fake, 'id:login_submit', FAST);
@@ -360,7 +360,7 @@ describe('the independent witness vetoes the back — and a disagreement is re-c
     expect([POLL, KEYBOARD_DISAGREEMENT_BUDGET_MS]).toEqual([500, 3_000]);
   });
 
-  it('window shown + covered + witness SHOWN: back, re-resolve, tap, the note as before', async () => {
+  it('window shown + covered + witness SHOWN: back, re-resolve, tap, the note', async () => {
     const fake = loginFake();
     const events = recorded(fake);
     const result = await tapElement(fake, 'id:login_submit', FAST);
@@ -519,7 +519,7 @@ describe('the independent witness vetoes the back — and a disagreement is re-c
     expect(events).toEqual(['read', 'read', 'keyboard?', 'touchable?', 'witness?', ...Array(6).fill(['keyboard?', 'touchable?', 'witness?']).flat()]);
   });
 
-  it('witness CANNOT TELL at the first ask: back as before the veto existed (the fallback), asked once and before the key', async () => {
+  it('witness CANNOT TELL at the first ask: back (the fallback), asked once and before the key', async () => {
     const fake = loginFake();
     fake.attachedKeyboard.witnessAnswers.current = 'unknown';
     const events = recorded(fake);
@@ -640,7 +640,7 @@ describe('fillField — the focus tap goes through the same guard', () => {
   });
 });
 
-describe('the two decisions that carry a rule — recheck (the budget) and dismissal (unknown → back) — row by row (2026-10-05; since 2026-10-07 firstLook and afterBack are rows at their one call site, pinned through the guard above; since 2026-10-09 recheck takes the round\'s verdict and dismissal asks a reading)', () => {
+describe('the two decisions that carry a rule — recheck (the budget, over the round\'s verdict) and dismissal (unknown → back, asking a reading) — row by row', () => {
   const FRAME = { x: 0, y: 1285, width: 1080, height: 935 };
   /** The round's verdict over a covered point, as a reading gives it for each word of the input method (ui-tree/keyboard-cover.ts#over). */
   const verdict = (witness: KeyboardWitness): Covering =>
@@ -662,9 +662,9 @@ describe('the two decisions that carry a rule — recheck (the budget) and dismi
 
   it.each([
     ['window clear (hidden) · witness hidden: nothing to dismiss — back would navigate', ['clear', 'hidden'], 'nothing'],
-    ['window clear (hidden) · witness unknown: nothing, as before 2026-10-08', ['clear', 'unknown'], 'nothing'],
+    ['window clear (hidden) · witness unknown: nothing', ['clear', 'unknown'], 'nothing'],
     ['window clear (hidden) · witness shown: the `unlocated` row — nothing pressed, said (2026-10-08)', ['clear', 'shown'], 'unlocated'],
-    ['window unknown: back, as before 2026-10-03 — the witness is not asked', ['unknown'], 'back'],
+    ['window unknown: back — the witness is not asked', ['unknown'], 'back'],
     ['covering · witness shown', ['covering', 'shown'], 'back'],
     ['covering · witness unknown', ['covering', 'unknown'], 'back'],
     ['covering · witness hidden: the veto, nothing pressed', ['covering', 'hidden'], 'nothing'],
@@ -677,7 +677,7 @@ describe('the two decisions that carry a rule — recheck (the budget) and dismi
   });
 });
 
-describe('dismissKeyboard — the `dismissal` decision, witness-vetoed (moved here from fill.ts 2026-10-04)', () => {
+describe('dismissKeyboard — the `dismissal` decision, witness-vetoed', () => {
   const FRAME = { x: 0, y: 1285, width: 1080, height: 935 };
   /** The policy the dismissals would be judged under — none is configured here, and the oracle path reads neither. */
   const FIRST = { ambiguous: 'first' as const };
@@ -687,7 +687,7 @@ describe('dismissKeyboard — the `dismissal` decision, witness-vetoed (moved he
     return fake;
   };
 
-  it('an adapter WITHOUT the oracle reads ONE tree and, with no band in it, presses and taps nothing — never the blind `enter` it pressed before stage B (measured to submit, K5d) — whatever the platform label says', async () => {
+  it('an adapter WITHOUT the oracle reads ONE tree and, with no band in it, presses and taps nothing — never the blind `enter` (measured to submit, K5d) — whatever the platform label says', async () => {
     for (const platform of ['ios', 'android'] as const) {
       const fake = new FakeAdapter({ s: screen() }, 's');
       fake.platform = platform;
@@ -718,13 +718,13 @@ describe('dismissKeyboard — the `dismissal` decision, witness-vetoed (moved he
     expect(sleeps).toEqual([]);
   });
 
-  it('window shown, witness cannot tell: back, as before the veto existed', async () => {
+  it('window shown, witness cannot tell: back (the fallback)', async () => {
     const fake = withOracle({ state: 'shown', frame: FRAME }, 'unknown');
     await dismissKeyboard(fake, FIRST);
     expect(fake.keys).toEqual(['back']);
   });
 
-  it('window unknown: the witness is not asked, and back is pressed, as before 2026-10-03', async () => {
+  it('window unknown: the witness is not asked, and back is pressed', async () => {
     const fake = withOracle({ state: 'unknown' }, 'hidden');
     expect(await dismissKeyboard(fake, FIRST)).toEqual({});
     expect(fake.keys).toEqual(['back']);
@@ -796,7 +796,7 @@ describe('tapElement — a target under a FLOATING keyboard\'s panel, above its 
     expect(result.keyboardHidden).toBe('the soft keyboard covered id:message_for_payee_input; hidden before tapping');
   });
 
-  it('a witness VETO on a point under the panel: the re-check reads the panel too — it waits, and backs once the input method confirms, never taps a key (review 2026-10-08)', async () => {
+  it('a witness VETO on a point under the panel: the re-check reads the panel too — it waits, and backs once the input method confirms, never taps a key', async () => {
     const fake = sepaFake();
     fake.attachedKeyboard.witnessAnswers.queue = ['hidden', 'shown'];
     const events = recorded(fake);
@@ -820,7 +820,7 @@ describe('tapElement — a target under a FLOATING keyboard\'s panel, above its 
     expect(fake.keys).toEqual([]);
   });
 
-  it('the input method not saying shown in the region\'s own call: no panel — the band alone, as before this date (fail open)', async () => {
+  it('the input method not saying shown in the region\'s own call: no panel — the band alone (fail open)', async () => {
     const fake = sepaFake();
     fake.attachedKeyboard.touchableAnswers.current = { ...FLOATING_REGION, witness: 'unknown' };
     await tapElement(fake, 'id:message_for_payee_input', FAST);

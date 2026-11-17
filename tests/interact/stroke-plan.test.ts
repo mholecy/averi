@@ -131,7 +131,7 @@ describe('a node drawn over the scroll view (docs/bugs/2026-10-09-android-scroll
     expect(planOn(listUnder(LIST, [BAR, { x: 0, y: 1700, width: 1080, height: 100 }]), 'down').stroke.coverTop).toBe(1700);
   });
 
-  it('the lower half the cut looks in is the box\'s ABOVE the keyboard (code review of fix/r4, P3): a bar sitting on the keyboard is cut for — until then the touch-down, 1206, was on the bar', () => {
+  it('the lower half the cut looks in is the box\'s ABOVE the keyboard: a bar sitting on the keyboard is cut for, the touch-down kept off it', () => {
     const onKeyboard = listUnder(LIST, [{ x: 0, y: 1150, width: 1080, height: 150 }]);
     const cut = planOn(onKeyboard, 'down', { keyboardTop: 1300 }).stroke;
     expect(cut).toMatchObject({ box: LIST, coverTop: 1150 });
@@ -172,7 +172,7 @@ describe('a node drawn over the scroll view (docs/bugs/2026-10-09-android-scroll
 });
 
 describe('which scroll view — the target\'s own, nearest first; the screen\'s largest before the target is read; never a stranger', () => {
-  it('before a read finds the target: the screen\'s largest scroller; a target found in NO scroll view: the screen box, not the largest scroller beside it (P5)', () => {
+  it('before a read finds the target: the screen\'s largest scroller; a target found in NO scroll view: the screen box, not the largest scroller beside it', () => {
     expect(planOn(listUnder(LIST), 'down').stroke.box).toEqual(LIST);
     const loose = node({ role: 'button', identifier: 'row', rect: { x: 66, y: 2300, width: 948, height: 40 } });
     expect(planOn(screenOf([scroller(LIST), loose]), 'down', { target: loose }).stroke.box).toEqual(BOX);
@@ -265,7 +265,7 @@ describe('the axis — a stroke goes over a scroll view that scrolls along it, a
     expect(Math.max(stroke.points!.from.y, stroke.points!.to.y)).toBeLessThan(400);
   });
 
-  it('a nested scroll view whose axis the tree cannot tell (its cards fit its frame: no content past it) is not kept off — the stroke is the page\'s as before', () => {
+  it('a nested scroll view whose axis the tree cannot tell (its cards fit its frame: no content past it) is not kept off — the stroke is the page\'s', () => {
     const row = ROW();
     const tree = wdaScreen([wdaScroll(PAGE, [wdaScroll(CAROUSEL, [node({ role: 'button', rect: { ...CAROUSEL } })]), row])]);
     expect(planOn(tree, 'down', { target: row, gesture: PHONE }).stroke).toMatchObject({ box: PAGE, points: swipeVector(PAGE, 'down', 'content') });
@@ -278,7 +278,7 @@ describe('the axis — a stroke goes over a scroll view that scrolls along it, a
     expect(planOn(tree, 'down', { target: row, gesture: PHONE }).stroke).toMatchObject({ box: PAGE, points: swipeVector(PAGE, 'down', 'content') });
   });
 
-  it('no stretch clear of it with room (a full-width carousel across a short page, 50 px either side): the fallback — the stroke as before the rule, over the carousel', () => {
+  it('no stretch clear of it with room (a full-width carousel across a short page, 50 px either side): the fallback — the page\'s stroke, over the carousel', () => {
     const short: Rect = { x: 0, y: 180, width: 402, height: 200 };
     const wide: Rect = { x: 0, y: 230, width: 402, height: 100 };
     const row = node({ role: 'button', identifier: 'row', rect: { x: 24, y: 900, width: 354, height: 52 } });
@@ -286,7 +286,7 @@ describe('the axis — a stroke goes over a scroll view that scrolls along it, a
     expect(planOn(tree, 'down', { target: row, gesture: PHONE }).stroke).toMatchObject({ box: short, points: swipeVector(short, 'down', 'content') });
   });
 
-  it('a clear stretch the cut for what is drawn over it leaves without room (a bar over the stretch above a carousel filling the page below): judged as before the rule — the page\'s stroke, over the carousel — never the screen box', () => {
+  it('a clear stretch the cut for what is drawn over it leaves without room (a bar over the stretch above a carousel filling the page below): the fallback — the page\'s stroke, over the carousel — never the screen box', () => {
     const row = ROW();
     const low: Rect = { x: 0, y: 280, width: 402, height: 594 };
     const bar = node({ role: 'other', label: 'bar', rect: { x: 0, y: 240, width: 402, height: 30 } });
@@ -321,7 +321,7 @@ describe('the axis — a stroke goes over a scroll view that scrolls along it, a
     expect(stroke.points).toEqual({ from: { x: 372, y: 450 }, to: { x: 280, y: 450 } });
   });
 
-  it('mp-native Account Detail as captured: the carousel is no child of the list — a card right of it, stroked for `down`, has no scroll view along the stroke, and the plan falls back to the nearest, the carousel, as before (the stated fallback); for `right`, the carousel', async () => {
+  it('mp-native Account Detail as captured: the carousel is no child of the list — a card right of it, stroked for `down`, has no scroll view along the stroke, and the plan falls back to the nearest, the carousel (the stated fallback); for `right`, the carousel', async () => {
     const tree = parseWdaSource(await readFile(new URL('../fixtures/wda-capture-account-detail-bar-shown.json', import.meta.url), 'utf8'));
     const card = [...everyNode(tree)].find((x) => x.identifier === 'accounts.detail.header' && x.rect.x === 378)!;
     const carousel: Rect = { x: 24, y: 138, width: 354, height: 85 };
@@ -401,7 +401,7 @@ describe('before a read finds the target, a sideways stroke goes inside a nested
     expect(planOn(recycler, 'left').stroke).toMatchObject({ box: CAROUSEL, points: swipeVector(CAROUSEL, 'left', 'content') });
   });
 
-  it('unchanged: `down` and `up` over the same trees stroke the page as before — the page first, along its axis', () => {
+  it('`down` and `up` over the same trees stroke the page — the page first, along its axis', () => {
     for (const tree of [lazy, recycler]) {
       for (const toward of ['down', 'up'] as const) expect(planOn(tree, toward).stroke).toMatchObject({ box: PAGE, points: swipeVector(PAGE, toward, 'content') });
     }
@@ -412,18 +412,18 @@ describe('before a read finds the target, a sideways stroke goes inside a nested
     expect(planOn(tree, 'right').stroke).toMatchObject({ box: CAROUSEL, points: swipeVector(CAROUSEL, 'right', 'content') });
   });
 
-  it('no nested scroll view along the stroke or of unknown axis — only a told-vertical list, or none: the page, the fallback as today', () => {
+  it('no nested scroll view along the stroke or of unknown axis — only a told-vertical list, or none: the page, the fallback', () => {
     const list: Rect = { x: 0, y: 800, width: 1080, height: 900 };
     expect(planOn(page(node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'vertical', rect: { ...list } })), 'right').stroke).toMatchObject({ box: PAGE, points: swipeVector(PAGE, 'right', 'content') });
     expect(planOn(page(), 'right').stroke).toMatchObject({ box: PAGE, points: swipeVector(PAGE, 'right', 'content') });
   });
 
-  it('a page of no told axis is stroked whole, as before — first, and along (unknown is not across)', () => {
+  it('a page of no told axis is stroked whole — first, and along (unknown is not across)', () => {
     const tree = screenOf([scroller(PAGE, [unknown(CAROUSEL)])]);
     expect(planOn(tree, 'right').stroke).toMatchObject({ box: PAGE, points: swipeVector(PAGE, 'right', 'content') });
   });
 
-  it('a nested one TOLD along the stroke outranks a larger one of unknown axis (review round 1): a chips row (a HorizontalScrollView) above a feed (a RecyclerView) — the chips row', () => {
+  it('a nested one TOLD along the stroke outranks a larger one of unknown axis: a chips row (a HorizontalScrollView) above a feed (a RecyclerView) — the chips row', () => {
     const chips: Rect = { x: 0, y: 200, width: 1080, height: 150 };
     const feed: Rect = { x: 0, y: 400, width: 1080, height: 1800 };
     const tree = page(node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { ...chips } }), node({ role: 'scrollable', clipsDescendants: true, rect: { ...feed } }));
@@ -438,7 +438,7 @@ describe('before a read finds the target, a sideways stroke goes inside a nested
     expect(planOn(page(unknown(CAROUSEL), unknown(small)), 'right', { gesture }).stroke.box).toEqual(small);
   });
 
-  it('a form page whose only nested "scroll view" is a Compose text field (role textfield, it clips): never chosen — the page, as today', () => {
+  it('a form page whose only nested "scroll view" is a Compose text field (role textfield, it clips): never chosen — the page', () => {
     const field = node({ role: 'textfield', identifier: 'username', clipsDescendants: true, rect: { x: 66, y: 600, width: 948, height: 160 } });
     expect(planOn(page(field), 'right').stroke).toMatchObject({ box: PAGE, points: swipeVector(PAGE, 'right', 'content') });
   });
@@ -456,7 +456,7 @@ describe('before a read finds the target, a sideways stroke goes inside a nested
     expect(planOn(page(carousel), 'right').stroke.box).toEqual({ ...CAROUSEL, x: 400, width: 614 });
   });
 
-  it('iOS unchanged: WDA marks no node clipping, so no largest scroller — the screen box, as before; idb\'s flat list the same', async () => {
+  it('iOS: WDA marks no node clipping, so no largest scroller — the screen box; idb\'s flat list the same', async () => {
     const wda = parseWdaSource(await readFile(new URL('../fixtures/wda-capture-lab-carousel-in-list.json', import.meta.url), 'utf8'));
     expect(largestScroller(wda)).toBeUndefined();
     expect(planOn(wda, 'right', { gesture: PHONE }).stroke).toMatchObject({ box: PHONE, points: swipeVector(PHONE, 'right', 'content') });
@@ -475,7 +475,7 @@ describe('before a read finds the target, a sideways stroke goes inside a nested
     expect(strokedAcross(strokeSent(planOn(none, 'right').memory), factsOf(none), 'right', BOX)).toBeUndefined();
   });
 
-  it('strokedAcross asks the WHOLE tree for a scroll view told along the stroke (review round 1): a chips row beside the page, never a candidate, is named — the swipes did not go over it', () => {
+  it('strokedAcross asks the WHOLE tree for a scroll view told along the stroke: a chips row beside the page, never a candidate, is named — the swipes did not go over it', () => {
     const chips = node({ role: 'scrollable', identifier: 'feed.chips', clipsDescendants: true, scrollAxis: 'horizontal', rect: { x: 0, y: 2000, width: 1080, height: 150 } });
     const small = node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { x: 0, y: 2160, width: 500, height: 60 } });
     const tree = screenOf([node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'vertical', rect: { ...PAGE } }), small, chips]);
@@ -483,7 +483,7 @@ describe('before a read finds the target, a sideways stroke goes inside a nested
     expect(strokedAcross(sent, factsOf(tree), 'right', BOX)).toEqual({ rect: PAGE, axis: 'vertical', along: { view: { role: 'scrollable', label: null, identifier: 'feed.chips', rect: chips.rect } } });
   });
 
-  it('…but only one that meets the usable screen (review round 2): a chips row below the screen is not named; on a screen tall enough to show it, it is', () => {
+  it('…but only one that meets the usable screen: a chips row below the screen is not named; on a screen tall enough to show it, it is', () => {
     const below = node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { x: 0, y: 2300, width: 1080, height: 150 } });
     const tree = screenOf([node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'vertical', rect: { ...PAGE } }), below]);
     const sent = strokeSent(planOn(tree, 'right').memory);
@@ -575,7 +575,7 @@ describe('strokedBeside — the listed scroll views along the stroke the swipes 
     expect(strokedBeside(into.memory, factsOf(nested), 'up', BOX)).toMatchObject({ landed: inner, others: [{ identifier: 'a' }] });
   });
 
-  it('leaves out a list ANY swipe of the call touched down in, not only the last (code review): an earlier swipe inside a nested list, the last over the page holding it', () => {
+  it('leaves out a list ANY swipe of the call touched down in, not only the last: an earlier swipe inside a nested list, the last over the page holding it', () => {
     const PAGE: Rect = { x: 0, y: 0, width: 1080, height: 1800 };
     const NESTED: Rect = { x: 0, y: 200, width: 1080, height: 400 };
     const SIBLING: Rect = { x: 0, y: 1850, width: 1080, height: 300 };
@@ -714,7 +714,7 @@ describe('a named scroll view (`within`, D78) — the one the strokes go over un
     expect(planStroke(first.memory, { ...ask(bounded), read: undefined }).noRoom).toEqual({ rect: LOWER, toward: 'down', room: 54, keyboardTop: 1100 });
   });
 
-  it('…once a read has found the target, `within` counts no more, nor its room: the target\'s own scroll views, their fallback as before', () => {
+  it('…once a read has found the target, `within` counts no more, nor its room: the target\'s own scroll views, their fallback', () => {
     const p = [...everyNode(bounded)].find((n) => n.identifier === 'lab.scroll-bounded.P')!;
     const named = nameScrollView(startStrokes(), factsOf(bounded), LOWER);
     const found = seeRead(named, { facts: factsOf(bounded), line: { y: 305, witnessed: true }, target: p });
@@ -953,7 +953,7 @@ describe('the target\'s row — on a tree that tells no scroll view, a sideways 
     expect(planStroke(memory, { ...ask, toward: 'right', screenBox: true }).stroke.box).toEqual(ROW);
   });
 
-  it('a tree that tells the target\'s scroll view is untouched: WDA\'s carousel-in-list strokes inside the carousel, as before', async () => {
+  it('a tree that tells the target\'s scroll view is untouched: WDA\'s carousel-in-list strokes inside the carousel', async () => {
     const wda = parseWdaSource(await readFile(new URL('../fixtures/wda-capture-lab-carousel-in-list.json', import.meta.url), 'utf8'));
     const c = [...everyNode(wda)].find((n) => n.identifier === 'lab.carousel-in-list.C');
     expect(c).toBeDefined();

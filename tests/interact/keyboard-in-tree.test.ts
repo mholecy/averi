@@ -565,7 +565,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
 
       // A pin of UNCHANGED words: every skip clause the picker gave before ADR 0016 reads the same, each in the place it
       // comes in the warning — the keyboard's own control (asked first, by the reading's `ofKeyboard`) among them.
-      it('unchanged — every existing skip clause reads as before, in the order the strategies were configured', async () => {
+      it('every skip clause reads in the order the strategies were configured', async () => {
         const text = (identifier: string, y: number, extra: Partial<UiNode> = {}) => node({ role: 'text', identifier, rect: { x: 36, y, width: 330, height: 24 }, ...extra });
         const screen = screenOf(
           node({ role: 'button', label: 'Submit', rect: { x: 36, y: 100, width: 330, height: 44 } }),
@@ -611,7 +611,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
 
       // A pin of UNCHANGED behaviour (ADR 0016, row 10): a centre in a system band is skipped as `off screen at (x,y)`,
       // and the same title clear of any band is tapped.
-      it('unchanged — its centre in a system band reads as off the screen, as before — iOS\'s status band (62 pt): "off screen at (x,y)", where a tap would press the status bar', async () => {
+      it('its centre in a system band reads as off the screen — iOS\'s status band (62 pt): "off screen at (x,y)", where a tap would press the status bar', async () => {
         const screen = screenOf(loginTitle({ x: 36, y: 20, width: 330, height: 24 })); // centre (201,32)
         expect(await pickOn(screen, 'login_title', { width: 402, height: 874, statusBand: 62 })).toBe('off screen at (201,32)');
         expect(await pickOn(screenOf(loginTitle({ x: 36, y: 20, width: 330, height: 24 })), 'login_title', { width: 402, height: 874 })).toBe('tapped (201,32)');
@@ -838,7 +838,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
     expect(fake.keys).toEqual([]);
   });
 
-  it('the band STAYS but the target has moved above it by the second look (the keyboard-avoiding layout re-flowed): the `clear` row — the target is tapped where it is now, no strategy tapped, and the note says the keyboard is still up (review round 1 of the keyboard-model refactor: "LEAVES" above drops the band and so pins `unknown`, not `clear`)', async () => {
+  it('the band STAYS but the target has moved above it by the second look (the keyboard-avoiding layout re-flowed): the `clear` row — the target is tapped where it is now, no strategy tapped, and the note says the keyboard is still up (the LEAVES case above drops the band and so pins `unknown`, not `clear`)', async () => {
     const fake = iosFake();
     onRead(fake, 3, (live) => {
       live.children[2].rect.y = 400; // centre (107,424): above the band at 539, which is still in the tree
@@ -939,7 +939,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
     expect(error.message).toContain('the band it draws over [0,539][402,874] contains the tap point (107,571)');
   });
 
-  it('a target clear of the band (the title) is tapped as before: two reads, no delay, no note', async () => {
+  it('a target clear of the band (the title) is tapped: two reads, no delay, no note', async () => {
     const fake = iosFake();
     const events = recorded(fake);
     const result = await tapElement(fake, 'id:login_title', FAST);
@@ -948,7 +948,7 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
     expect(result).toEqual({ note: undefined, keyboardHidden: undefined });
   });
 
-  it('no band in the tree (no keyboard on screen, or an idb tree): exactly what happened before — the tap lands on the centre', async () => {
+  it('no band in the tree (no keyboard on screen, or an idb tree): the tap lands on the centre, nothing else', async () => {
     const fake = iosFake(null);
     const events = recorded(fake);
     const result = await tapElement(fake, 'id:login_submit', FAST);
@@ -1152,7 +1152,7 @@ describe('dismissKeyboard — the in-tree model (no oracle), stage B', () => {
     expect(sleeps).toEqual([]);
   });
 
-  it('idb\'s number pad (run2-ios #250) — its band\'s TOP is known since round 7 (ui-tree/draw-order.ts#DrawOrder.keyboardBandTop), the keyboard is NOT: one read, nothing tapped, nothing pressed, an empty result (a blind key submitted, K5d)', async () => {
+  it('idb\'s number pad (run2-ios #250) — its band\'s TOP is known (ui-tree/draw-order.ts#DrawOrder.keyboardBandTop), the keyboard is NOT: one read, nothing tapped, nothing pressed, an empty result (a blind key submitted, K5d)', async () => {
     const tree = parseIdbDescribeAll(JSON.stringify(JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')).elements));
     const fake = new FakeAdapter({ form: tree }, 'form');
     fake.keyboard = undefined;
@@ -1193,7 +1193,7 @@ describe('dismissKeyboard — the in-tree model (no oracle), stage B', () => {
     expect(sleeps).toEqual([KEYBOARD_HIDE_DELAY_MS, KEYBOARD_HIDE_DELAY_MS]); // two confirming reads, then the refusal
   });
 
-  it('a confirming read that THROWS after the strategy tap (WDA or idb gone): AfterDismissalTap — the guard\'s one wrap — saying what was tapped, the read\'s error as the cause, no second read or tap (review 2026-10-07 #1)', async () => {
+  it('a confirming read that THROWS after the strategy tap (WDA or idb gone): AfterDismissalTap — the guard\'s one wrap — saying what was tapped, the read\'s error as the cause, no second read or tap', async () => {
     const fake = withBand();
     let reads = 0;
     const real = fake.uiTree.bind(fake);

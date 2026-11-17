@@ -212,9 +212,9 @@ export function renderedTextFromTree(tree: UiNode, id: string): string[] {
  *   fail the run.
  * - TRUNCATION. An ellipsized TextView renders 'Select credit acc…' where the
  *   tree holds the full string, so the reading is a PREFIX of the tree value.
- * - JOINING PUNCTUATION. A COMBINED accessibility label — the shape
- *   accessibility.md §8 requires for a multi-part row ('{label}, {value}', one
- *   node, not two) — is built by joining its parts with ', '. That separator is
+ * - JOINING PUNCTUATION. A COMBINED accessibility label — one node for a
+ *   multi-part row ('{label}, {value}', not two nodes, as iOS's
+ *   `.accessibilityElement(children: .combine)` makes it) — is built by joining its parts with ', '. That separator is
  *   BY CONSTRUCTION never rendered, so a literal containment test marks every
  *   combined row UNREAD. Measured 2026-08-27 on `user_settings.overview`: the
  *   tree holds 'Phone, +123 456 789 1' and the screenshot reads
@@ -225,8 +225,8 @@ export function renderedTextFromTree(tree: UiNode, id: string): string[] {
  *   vanished, for two reasons no separator rule can reach:
  *     · A part is NEVER RENDERED. ', visible' states the position of a toggle
  *       GRAPHIC; there is no text on screen for OCR to read, at any contrast.
- *       accessibility.md §8 REQUIRES the switch state in the label, so this is
- *       the mandated shape, not a defect.
+ *       A combined row's label carries its switch's state, so this is
+ *       the label's own shape, not a defect.
  *     · OCR edits the remaining parts. It read '*5433' where the tree holds
  *       '* 5433', and on product_row_0 it INSERTED a '€' recognised from the
  *       leading currency avatar — an image, not text.
@@ -291,8 +291,8 @@ function survivesWhole(treeString: string, got: string): boolean {
  * for itself, not a consumer's house style: iOS
  * `.accessibilityElement(children: .combine)` merges children with ', '
  * whatever the app does — the tile recorded in skill/SKILL.md arrives as
- * 'Select transaction type, 1 of 13 selected'. The consuming repo's
- * accessibility.md §8 requiring the same shape corroborates it; it is not the
+ * 'Select transaction type, 1 of 13 selected'. The consuming repo's own
+ * accessibility rules requiring the same shape corroborate it; they are not the
  * authority for it.
  *
  * Split on the RAW string, before `looseForm` drops the commas it is made of.
@@ -652,7 +652,7 @@ function measure(
   const note =
     measurement.ocr !== undefined && measurement.ocr !== '' && !hasAccessibleName(capture.tree, id)
       ? `${id} [${platform}]: renders ${JSON.stringify(measurement.ocr)} but carries no label, value or text ` +
-        `node — the copy is invisible to assistive technology (accessibility.md §2).`
+        `node — the copy is invisible to assistive technology.`
       : undefined;
 
   return { measurement, note };

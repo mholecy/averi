@@ -64,7 +64,7 @@ const dropKeyboard = (live: UiNode): void => {
 
 const COVERED = 'the soft keyboard covered id:lab.form-keyboard.vs';
 
-describe('the guard: when the configured dismissal leaves the keyboard up, averi drags the target\'s scroll view up (the lab form-keyboard capture, k2)', () => {
+describe('the guard: when the configured dismissal leaves the keyboard up, averi drags the target\'s scroll view up (the lab form-keyboard capture)', () => {
   it('a scroll view that keeps its keyboard: the title tapped, then the form dragged UP at 240 pt/s from its blank point nearest the keyboard, far enough to lift vs\'s centre to that point (135 pt) — vs tapped where it now is; the note says where the drag went', async () => {
     const fake = labFake({ lifts: true });
     const result = await tapElement(fake, VS, { ...FAST, dismissals: [TITLE] });
@@ -83,7 +83,7 @@ describe('the guard: when the configured dismissal leaves the keyboard up, averi
     );
   });
 
-  it('a target deeper under the keyboard (note, centre 843): the drag lifts its centre to its own start — the lowest point nothing lies over, above the pinned Continue bar — plus the pan\'s slop: 357 pt, not only DRAG_LENGTH — at the same speed, so it takes longer (k3)', async () => {
+  it('a target deeper under the keyboard (note, centre 843): the drag lifts its centre to its own start — the lowest point nothing lies over, above the pinned Continue bar — plus the pan\'s slop: 357 pt, not only DRAG_LENGTH — at the same speed, so it takes longer', async () => {
     const fake = labFake();
     await tapElement(fake, 'id:lab.form-keyboard.note', { ...FAST, dismissals: [TITLE] }).catch(() => undefined);
     expect(fake.moves.at(-1)).toBe('drag (201,502)→(201,145) 1488ms'); // 843 − 502 + 16 = 357 pt at 240 pt/s
@@ -111,7 +111,7 @@ describe('the guard: when the configured dismissal leaves the keyboard up, averi
     expect(error.traceLine).toBe(`${COVERED}; tapped text:"Transfer details", dragged the target's scroll view up to hide it, still covered`);
   });
 
-  it('no dismissal configured: today\'s refusal, nothing moved (k1)', async () => {
+  it('no dismissal configured: the plain refusal, nothing moved', async () => {
     const fake = labFake({ hides: 'drag' });
     const error = (await tapElement(fake, VS, FAST).catch((e: unknown) => e)) as KeyboardWithoutDismissal;
     expect(error).toBeInstanceOf(KeyboardWithoutDismissal);

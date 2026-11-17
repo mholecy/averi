@@ -124,7 +124,7 @@ describe.each(adapters)('%s declares what its typeText types: printable ASCII', 
 });
 
 describe('the newline: in idb\'s key map, not Android\'s — and refused on both before typing as a control character (type-text.ts)', () => {
-  it.each([['idb', false], ['wda', false], ['wda', true]] as const)('iOS (%s tree source, a typer: %s): an ASCII value with \\n is typeable by the adapter', (kind, types) => {
+  it.each([['idb', false], ['wda', false], ['wda', true]] as const)('iOS (%s tree source, a typer: %s): an ASCII value with \\n is in the adapter\'s typeable set', (kind, types) => {
     expect(refused('line one\nline two', ios(kind, types).typeable)).toBeUndefined();
   });
 

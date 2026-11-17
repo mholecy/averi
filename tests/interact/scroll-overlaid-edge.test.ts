@@ -43,7 +43,7 @@ describe('scroll_until on a node cut at an overlay', () => {
   });
   // The plain stop is the next tap's point (its centre clear, the probe there fired P): it stops — a stated residual
   // (ADR 0013, refined 2026-10-20): its reply does not say the row may run on under the button.
-  it('pinned-bar P, the plain stop: its centre clear — stops, as before', async () => {
+  it('pinned-bar P, the plain stop: its centre clear — stops', async () => {
     expect(describeScrollResult(await scrollUntilVisible(fakeOf('pinned-bar'), 'id:"lab.pinned-bar.P"', FAST))).toBe('fully visible after 0 swipes');
   });
   it('text-under-bar P (a role-less strip under Continue), the plain stop: no stop on the strip — cut by Continue', async () => {

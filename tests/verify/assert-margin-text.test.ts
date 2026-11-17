@@ -52,7 +52,7 @@ describe('the ocr assert on phone after back', () => {
     expect(screenshots).toBe(2);
   });
 
-  it('ink in the band: the title is drawn over it — failed closed, naming it, as before the eyes', async () => {
+  it('ink in the band: the title is drawn over it — failed closed, naming it', async () => {
     const { r } = await ocrOnPhone([pngWith([60, 1406, 300, 1412])]);
     expect(r.pass).toBe(false);
     expect(r.detail).toContain('text "Variable symbol" (55,1406 258x56) is drawn over the element');

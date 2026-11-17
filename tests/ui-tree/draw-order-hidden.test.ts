@@ -77,7 +77,7 @@ describe('a hidden subtree is no cover of a target', () => {
   });
 });
 
-describe('…except the surface of a screen presented over the target\'s, which covers as before', () => {
+describe('…except the surface of a screen presented over the target\'s, which covers', () => {
   it('the Contacts New Contact sheet under the discard popover, as WDA judged it: the sheet\'s layer is a marked presented screen over the list, so its hidden form `Table` (scrollable 0,62 402x812) need not cover — the layer reaches the whole screen, its visible controls are named where they lie, and the action sheet is on top', async () => {
     const tree = await capture('contacts-discard-popover');
     const table = [...everyNode(tree)].find((n) => n.role === 'scrollable' && desc(n) === 'scrollable 0,62 402x812')!;

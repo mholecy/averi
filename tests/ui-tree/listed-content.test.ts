@@ -71,7 +71,7 @@ describe('Clips.contentToward — blank: the scroll view lists none of its conte
     expect(sceneOf(noCard).clips.contentToward(carousel, 'top')).toEqual({ kind: 'listed' });
   });
 
-  it('every committed Android capture\'s largest scroller (where a stroke for a target not in the tree goes) lists content that shows motion, along either axis — the fix changes no replayed reply, and a sideways stroke over a list still ends on its two unchanged reads', () => {
+  it('every committed Android capture\'s largest scroller (where a stroke for a target not in the tree goes) lists content that shows motion, along either axis', () => {
     const dirs = ['../fixtures/truth/android-averi_lab-api33/', '../fixtures/truth/android-rn-averi_lab-api33/', '../fixtures/'].map((d) => new URL(d, import.meta.url));
     const read: string[] = [];
     const blank: string[] = [];

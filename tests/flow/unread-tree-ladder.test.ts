@@ -302,7 +302,7 @@ describe('Android: the cost of the rule on uiautomator\'s cold-launch null root'
     );
   });
 
-  it('a device that recovers inside the second look runs the rung, as before the rule', async () => {
+  it('a device that recovers inside the second look runs the rung', async () => {
     const fake = settlingAndroid(2);
     const error = await failure(FlowEngine.run(CFG, fake, FAST, { state: 'login_only' }));
     expect(clearStateLaunches(fake)).toHaveLength(1);

@@ -50,7 +50,7 @@ const IDB_STROKE = 'idb ui swipe 201 699 201 175 --duration 0.3';
 const ADB_SWIPE = 'adb shell input swipe 201 600 201 300 300';
 
 describe('the rows ask nothing of a capture with no measured geometry', () => {
-  it('an open target with no geometry or a whole one: the open rows, as before; one cut but unmeasured: none', () => {
+  it('an open target with no geometry or a whole one: the open rows; one cut but unmeasured: none', () => {
     expect(rows(target(undefined)).map((r) => r.verb)).toEqual(['tap', 'colour', 'scroll_until']);
     expect(says(rows(target('whole')))).toEqual(says(rows(target(undefined))));
     expect(rows(target(undefined, { drawn: 0.5 }))).toEqual([]);
@@ -216,12 +216,12 @@ describe('R-stroke along the axis it scrolls: a card right of its carousel is as
   it.each([
     ['across the carousel, the finger moving left', ['idb ui swipe 336 180 66 180 --duration 0.3'], undefined],
     ['a turn back across it is along the axis too', ['idb ui swipe 66 180 336 180 --duration 0.3'], undefined],
-    ['vertical, inside the carousel (today\'s stroke for `down`: 201 207 → 155)', ['idb ui swipe 201 207 201 155 --duration 0.3'], 'swiped across the x axis it scrolls right along, from (201,207): x'],
+    ['vertical, inside the carousel (the stroke for `down`: 201 207 → 155)', ['idb ui swipe 201 207 201 155 --duration 0.3'], 'swiped across the x axis it scrolls right along, from (201,207): x'],
     ['diagonal, its larger leg vertical', ['idb ui swipe 300 200 260 150 --duration 0.3'], 'swiped across the x axis it scrolls right along, from (300,200): x'],
   ])('%s', (_n, device, expected) => {
     expect(verdict(rs, 'scroll_until', out('x', device))).toBe(expected);
   });
-  it('a row below the fold is stroked vertically, as before: a sideways stroke for it is across its axis', () => {
+  it('a row below the fold is stroked vertically: a sideways stroke for it is across its axis', () => {
     const below = expectations('ios', target('off-screen', { frame: rect(51, 1100, 300, 64), reached: false, probe: [], visible: null, scrollView: 'page' }), cell, 'wda');
     expect(verdict(below, 'scroll_until', out('x', [IDB_STROKE]))).toBeUndefined();
     expect(verdict(below, 'scroll_until', out('x', ['idb ui swipe 336 180 66 180 --duration 0.3']))).toBe('swiped across the y axis it scrolls down along, from (336,180): x');
@@ -586,7 +586,7 @@ describe('R-stroke of a FRAMED target its tree does not list: a touch-down besid
     expect(rs.find((r) => r.verb === 'scroll_until')!.says).toBe('R-off, R-stroke: swipes down for it, every touch-down clear of the bands and the chrome and inside its scroll view list');
     expect(verdict(rs, 'scroll_until', out(NAMED, [BESIDE]))).toMatch(/^touched down outside its scroll view list at \(201,699\): ERROR/);
   });
-  it('the list not listed a scroller (or no tree given): the screen\'s region only, as before', () => {
+  it('the list not listed a scroller (or no tree given): the screen\'s region only', () => {
     for (const rs of [expectations('android', off, cell, 'uiautomator', '<hierarchy><node scrollable="false" bounds="[0,380][402,560]" /></hierarchy>'), expectations('android', off, cell, 'uiautomator')]) {
       expect(rs.find((r) => r.verb === 'scroll_until')!.says).toBe('R-off, R-stroke: swipes down for it, every touch-down clear of the bands and the chrome');
       expect(verdict(rs, 'scroll_until', out(NEVER, [BESIDE]))).toBeUndefined();

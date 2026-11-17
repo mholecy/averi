@@ -548,7 +548,7 @@ describe('the Android form rows (phase 2b)', () => {
     // Live only where no layout after back was captured — keyed on the truth's afterBack, not on the piece: a captured
     // layout with no piece after back is replayed (no Tapped admitted).
     const noLayout = formExpectations('android', { ...ANDROID_FORM, afterBack: undefined }, 'uiautomator');
-    expect(pick(noLayout, 'tap', 'note').live).toMatch(/live\.ts k5/);
+    expect(pick(noLayout, 'tap', 'note').live).toMatch(/live-cases\.ts k5/);
     const noPiece = formExpectations('android', { ...ANDROID_FORM, form: { ...ANDROID_FORM.form!, controls: ANDROID_FORM.form!.controls.map((c) => (c.tag === 'note' ? { ...c, afterBack: { ...c.afterBack!, piece: undefined } } : c)) } }, 'uiautomator');
     expect(pick(noPiece, 'tap', 'note').live).toBeUndefined();
     check(pick(noPiece, 'tap', 'note').judge, [['Tapped id:"lab.f.note"', [BACK, KEY(2133)], /^Tapped, where no tap after back reached it/]]);

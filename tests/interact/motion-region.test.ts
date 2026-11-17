@@ -84,7 +84,7 @@ describe('the region the motion showed — a target whose tree tells no scroll v
     expect(on(IDB_LIST, stroke.points?.from)).toBe(true);
   });
 
-  it('one read — nothing seen moving yet: the screen box, the first stroke as today (201,699 → 201,175); two reads of R unmoved: the screen box too', async () => {
+  it('one read — nothing seen moving yet: the screen box, the first stroke over it (201,699 → 201,175); two reads of R unmoved: the screen box too', async () => {
     const at = parseIdbDescribeAll(await load('tabbar-floating.idb.json'));
     const first = planAfter([at], 'down', 1);
     expect(first.box).toEqual(PHONE);
@@ -171,7 +171,7 @@ describe('the region the motion showed — a target whose tree tells no scroll v
     expect(heldBackAfter(seen([untitled, shifted(untitled, 1108), shifted(untitled, 607)], PHONE), rAt(114), 'stop')).toMatchObject({ by: 'band', edge: 'top', line: 391 });
   });
 
-  it('the band on the side the last stroke drawn before the read pushed the content toward, too: after the turned stroke over the region (391 → 528, pushing it down), R short of the bottom line (665) is held; with no stroke before, or the flinging one (pushing it up), the bottom is as before — claimed', async () => {
+  it('the band on the side the last stroke drawn before the read pushed the content toward, too: after the turned stroke over the region (391 → 528, pushing it down), R short of the bottom line (665) is held; with no stroke before, or the flinging one (pushing it up), the bottom is claimed', async () => {
     const at = parseIdbDescribeAll(await load('tabbar-floating.idb.json'));
     const region = seen([at, shifted(at, 1108), shifted(at, 607)], PHONE);
     expect(heldBackAfter(region, rAt(650), 'stop', TURNED)).toEqual({ by: 'band', edge: 'bottom', region: SHOWN, line: 665, band: { x: 24, y: 665, width: 354, height: 90 }, part: false });
@@ -237,7 +237,7 @@ describe('the region the motion showed — a target whose tree tells no scroll v
     expect(heldBackAfter(seen([aside(shifted(at, 400)), aside(at)], PHONE), badge, 'stop')).toBeUndefined();
   });
 
-  it('a short list — the target under the tab bar: the first motion carried the content up, and the last stroke pushed it up again (the list at its end, flung back), R carried past the region\'s bottom under the tab bar, on a side neither covers, is held by the tab bar\'s buttons, which held still; with no tab bar, claimed as before', async () => {
+  it('a short list — the target under the tab bar: the first motion carried the content up, and the last stroke pushed it up again (the list at its end, flung back), R carried past the region\'s bottom under the tab bar, on a side neither covers, is held by the tab bar\'s buttons, which held still; with no tab bar, claimed', async () => {
     const at = parseIdbDescribeAll(await load('tabbar-floating.idb.json'));
     const region = seen([at, shifted(at, 1108), shifted(at, 607)], PHONE);
     expect(heldBackAfter(region, rAt(790), 'stop', FLUNG)).toMatchObject({ by: 'still', edge: 'bottom', still: { identifier: 'lab.tabbar-floating.tab.home', rect: { y: 755 } }, part: false });
@@ -370,7 +370,7 @@ describe('the region the motion showed — a target whose tree tells no scroll v
     expect(planAfter([at, twice(shifted(at, 500)), shifted(at, 1108)], 'up', 0.5).box).toEqual(SHOWN);
   });
 
-  it('only where the tree tells no scroll view: WDA\'s twin strokes over its list as before; a told tree with the target in no scroll view, moved, keeps the screen box', async () => {
+  it('only where the tree tells no scroll view: WDA\'s twin strokes over its list stay; a told tree with the target in no scroll view, moved, keeps the screen box', async () => {
     const wda = parseWdaSource(await load('tabbar-floating.wda.json'));
     const list = [...everyNode(wda)].find((n) => n.role === 'scrollable')!.rect;
     expect(planAfter([wda, shifted(wda, 1108)], 'up', 0.5).box).toEqual(rectIntersection(list, PHONE));

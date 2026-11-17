@@ -15,7 +15,7 @@ describe('seenOrderOf — either way round', () => {
     expect(seen.between(title, field)).toEqual({ seen: 'under', overlap: '#111111', own: '#222222', other: '#111111' });
   });
 
-  it("clear is the peer's nothing painted over the node — from the peer's side it says nothing (no excuse of the node as the peer's cover)", () => {
+  it("clear is the peer's nothing painted over the node — from the peer's side it says nothing", () => {
     const seen = seenOrderOf(field, [{ peer: title, seen: 'clear', overlap: '#FFFFFF', beside: '#FFFFFF' }]);
     expect(seen.between(field, title)).toEqual({ seen: 'clear', overlap: '#FFFFFF', beside: '#FFFFFF' });
     expect(seen.between(title, field)).toBeUndefined();

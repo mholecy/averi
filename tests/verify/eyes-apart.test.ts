@@ -99,7 +99,7 @@ describe('apartOfFrame — a small mark of its own on a large element is its own
     expect(await seen(mark(white(), 950, 1000, 15, 20), { x: 51, y: 300, width: 300, height: 120 })).toEqual({ seen: 'apart' });
   });
 
-  it('the same card with nothing but one point of stray pixels (3x3 px): blends — nothing of its own', async () => {
+  it('the same card with nothing but a 1-pt stray mark (3x3 px): blends — nothing of its own', async () => {
     expect(await seen(mark(white(), 950, 1000, 3, 3), { x: 51, y: 300, width: 300, height: 120 })).toEqual({ seen: 'blends', colour: '#FFFFFF' });
   });
 });

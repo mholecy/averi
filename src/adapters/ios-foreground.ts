@@ -401,8 +401,9 @@ function notInFront(check: ForegroundCheck, label: string, names: readonly strin
   if (owner !== undefined) {
     return (
       head +
-      `"${label}" is the name of ${owner}, which averi launched earlier, not of ${bundleId}: the tree is still that app's, ` +
-      `even if the screenshot already shows ${bundleId} (it switches before idb's tree does) — read again before trusting what the tree says`
+      `"${label}" is the name of ${owner}, which averi launched, opened a link to or checked the liveness of ` +
+      `earlier, not of ${bundleId}: the tree is still that app's, even if the screenshot already shows ${bundleId} ` +
+      `(it switches before idb's tree does) — read again before trusting what the tree says`
     );
   }
   return (

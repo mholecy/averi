@@ -114,13 +114,13 @@ describe('scroll_until under idb — a `fully: true` claim the eyes see cut', ()
     expect(fake.screenshots).toHaveLength(1);
   });
 
-  it('P, the plain stop: "fully visible" as before, no screenshot (ADR 0010\'s residual 5)', async () => {
+  it('P, the plain stop: "fully visible", no screenshot (ADR 0010\'s residual 5)', async () => {
     const fake = await fakeOf();
     expect(describeScrollResult(await scrollUntilVisible(fake, 'id:"lab.scroll-bounded.P"', { ...FAST, eyes: eyesOn(fake) }))).toBe('fully visible after 0 swipes');
     expect(fake.screenshots).toHaveLength(0);
   });
 
-  it('P, fully: true with no eyes handed in: "fully visible", as before the eyes — no clause on a clip line not looked for', async () => {
+  it('P, fully: true with no eyes handed in: "fully visible" — no clause on a clip line not looked for', async () => {
     const fake = await fakeOf();
     expect(describeScrollResult(await scrollUntilVisible(fake, 'id:"lab.scroll-bounded.P"', { eyes: NO_EYES, ...FAST, fully: true }))).toBe('fully visible after 0 swipes');
   });
@@ -142,7 +142,7 @@ describe('scroll_until under idb — a `fully: true` claim the eyes see cut', ()
  */
 describe('judgeEyes — no clip line where nothing cuts the target', () => {
   // Every lab capture's PNG decoded and judged (about 4–5 s alone): close to vitest's 5-s default under a loaded run.
-  it('over the 32 lab captures, only scroll-bounded P and S read cut', { timeout: 30_000 }, async () => {
+  it('over every iOS lab capture (ios-iphone17-ios27), only scroll-bounded P and S read cut', { timeout: 30_000 }, async () => {
     const { readdir } = await import('node:fs/promises');
     const cells = (await readdir(IOS)).filter((f) => f.endsWith('.idb.json')).map((f) => f.replace('.idb.json', '')).sort();
     expect(cells.length).toBeGreaterThanOrEqual(32);

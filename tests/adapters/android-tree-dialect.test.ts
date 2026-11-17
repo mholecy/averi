@@ -71,7 +71,7 @@ describe('parseUiautomatorXml', () => {
       expect(field).toMatchObject({ role: 'textfield', value: 'Jan ', label: 'Jan' });
     });
 
-    it('a label drawn from text, a content-desc and a resource-id are trimmed as before', () => {
+    it('a label drawn from text, a content-desc and a resource-id are trimmed', () => {
       const tree = parseDump(`<hierarchy><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
         <node class="android.widget.TextView" text=" Close " bounds="[0,0][100,100]" />
         <node class="android.widget.Button" content-desc=" Send " resource-id=" app:id/send " bounds="[0,100][100,200]" />
@@ -351,7 +351,7 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
     expect(of('overhang')).toMatchObject({ rect: { x: 0, y: 1850, width: 1080, height: 210 }, cutBounds: { x: 0, y: 1900, width: 1080, height: 160 } });
   });
 
-  it('…and with nothing listed after it on the strip gained, not even that row: its own overflow, not an overlay\'s cut (code review P3)', () => {
+  it('…and with nothing listed after it on the strip gained, not even that row: its own overflow, not an overlay\'s cut', () => {
     expect([...everyNode(listOf(ROWS, false))].filter((n) => 'cutBounds' in n)).toEqual([]);
   });
 
@@ -442,7 +442,7 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
     expect(marked).toEqual([true, true]); // one tree per dump, the root's mark set before the judge reads it
   });
 
-  it('the residual, pinned (review round 2): a card cut at BOTH ends — between the sticky header and the floating tab bar, dumped 66,480 948x1360 over its own 66,420 948x1480 — is not widened and reads whole', () => {
+  it('the residual, pinned: a card cut at BOTH ends — between the sticky header and the floating tab bar, dumped 66,480 948x1360 over its own 66,420 948x1480 — is not widened and reads whole', () => {
     const t = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
 <node class="android.view.View" scrollable="true" bounds="[0,401][1080,2154]">
  <node class="android.view.View" resource-id="card" bounds="[66,480][1014,1840]"><node class="android.widget.Button" bounds="[66,420][1014,1900]" /></node>
@@ -456,7 +456,7 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
     expect(drawOrder(t).exposure(card, PIXEL).shows).toBe(1);
   });
 
-  it('code review P1: a card whose carousel breaks out of its padding is not widened sideways — its own button still spans it, and the button\'s label shows whole (the round-6 own-button refusal stays fixed)', () => {
+  it('a card whose carousel breaks out of its padding is not widened sideways — its own button still spans it, and the button\'s label shows whole', () => {
     const t = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
 <node class="android.view.View" scrollable="true" bounds="[0,400][1080,2000]">
  <node class="android.view.View" resource-id="card" bounds="[66,500][1014,900]">
@@ -472,7 +472,7 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
     expect(drawOrder(t).exposure(label, PIXEL)).toMatchObject({ covers: [], shows: 1 });
   });
 
-  it('code review P3: a full-width child overflowing its row by 10 px each side does not widen the row over the next one — row_a is not covered by row_b', () => {
+  it('a full-width child overflowing its row by 10 px each side does not widen the row over the next one — row_a is not covered by row_b', () => {
     const t = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
 <node class="android.view.View" scrollable="true" bounds="[0,400][1080,2000]">
  <node class="android.view.View" resource-id="row_a" bounds="[0,600][1080,705]">
@@ -607,7 +607,7 @@ describe('parseUiautomatorXml — character references in attribute values', () 
     expect(literal.label).toBe('&#10; is how XML spells a newline');
   });
 
-  it('the XML named entities decode as before', () => {
+  it('the XML named entities decode', () => {
     expect(named.label).toBe('Wallpaper & style <new>');
   });
 });

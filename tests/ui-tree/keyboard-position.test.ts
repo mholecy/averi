@@ -147,7 +147,7 @@ describe('readingLine — a reading\'s line, only when it stands by a shown cove
     const tree = screen(node({ role: KEYBOARD_ROLE, rect: { x: 0, y: 539, width: 402, height: 335 } }));
     expect(await readingLineOf(readKeyboard(new FakeAdapter({ s: tree }, 's'), tree))).toEqual({ y: 539, witnessed: true });
   });
-  it('the in-tree model with no mark (every idb tree): none — idb\'s band is `line`\'s, never the reading\'s (K5d)', async () => {
+  it('the in-tree model with no mark (every idb tree): none — idb\'s band is `line`\'s, never the reading\'s', async () => {
     const tree = screen(node({ role: 'other', rect: { x: 0, y: 589, width: 402, height: 285 } }));
     expect(await readingLineOf(readKeyboard(new FakeAdapter({ s: tree }, 's'), tree))).toBeUndefined();
   });
@@ -186,7 +186,7 @@ describe('line — every source combination, every kind of subject (one look, on
     ['idb\'s band only, an ordinary node: the band\'s', undefined, BAND(589), ROW, { y: 589, witnessed: false }],
     ['idb\'s band only, a key of the band: none', undefined, BAND(589), KEY, undefined],
     ['idb\'s band only, a WDA-marked key (not the band\'s): the band\'s', undefined, BAND(589), WDA_KEY, { y: 589, witnessed: false }],
-    ['both (never today; a synthetic order), the reading higher: the reading\'s', READ, BAND(589), ROW, READ],
+    ['both (a synthetic order no source gives), the reading higher: the reading\'s', READ, BAND(589), ROW, READ],
     ['both, the band higher: the band\'s', { y: 700, witnessed: true }, BAND(589), ROW, { y: 589, witnessed: false }],
     ['both at one height: the reading\'s (a tie keeps the reading)', { y: 589, witnessed: true }, BAND(589), ROW, { y: 589, witnessed: true }],
     ['both, a key of the band: the reading\'s alone', { y: 700, witnessed: true }, BAND(589), KEY, { y: 700, witnessed: true }],

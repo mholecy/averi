@@ -83,7 +83,7 @@ const coversNamed = (misses: readonly string[]): Record<string, number> => {
  */
 const OCR: Reads = (r: Rect): Rect => r; // the ocr assert reads the whole rect
 
-describe('Scene.standing for the pixel assert over every fixture node (round 8)', () => {
+describe('Scene.standing for the pixel assert over every fixture node', () => {
   it('the ocr reader (the whole rect): the covers named are chrome only — nothing that takes a touch and hides no pixel', async () => {
     const { judged, misses } = await sweep(undefined, OCR);
     expect(judged).toBe(1846);
@@ -173,7 +173,7 @@ describe('Scene.standing for the pixel assert over every fixture node (round 8)'
     }
   });
 
-  it('with a 66-px Android status band (fix/r8-band): an ocr crop of a root reads the bar and fails; a colour sample of one starts 12 % down and only the two top bars laid under the bar fail', async () => {
+  it('with a 66-px Android status band: an ocr crop of a root reads the bar and fails; a colour sample of one starts 12 % down and only the two top bars laid under the bar fail', async () => {
     const androidBand = (misses: readonly string[]) => misses.filter((m) => m.startsWith('android') && m.endsWith(' — the status bar')).map((m) => m.slice(0, m.indexOf(' — ')));
     const ocr = androidBand((await sweep(66, OCR)).misses);
     expect(ocr).toHaveLength(61);
@@ -184,7 +184,7 @@ describe('Scene.standing for the pixel assert over every fixture node (round 8)'
 });
 
 /** The owner's 2-unit edge (geometry.ts#PIXEL_OVERLAP_SLACK): ≤ 2 on the thin side is no cover, 3 is — for a cover and for the band alike. */
-describe('the 2-unit edge (round 8, the owner\'s decision)', async () => {
+describe('the 2-unit edge (the owner\'s decision)', async () => {
   const pos4 = (await json('idb-swift-form-scrolled-under-top-bar.json')).positions.pos4 as { AXLabel?: string; frame: { y: number } }[];
   const formWith = (label: string, y: number) => parseIdbDescribeAll(JSON.stringify(pos4.map((e) => (e.AXLabel === label ? { ...e, frame: { ...e.frame, y } } : e))));
   const judge = (tree: UiNode, label: string) => over({ viewport: async () => IPHONE }, tree, [...everyNode(tree)].find((n) => n.label === label)!);
@@ -387,7 +387,7 @@ describe('the screen without the device: the window the tree vouches for (ui-tre
  * kept — and the advice leads with what to assert instead: its title, which lies clear of the band and is judged on
  * its own.
  */
-describe('a full-bleed Android app bar under the 66-px band (round 8, P2)', () => {
+describe('a full-bleed Android app bar under the 66-px band', () => {
   const rect = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
   const n = (role: string, r: Rect, extra: Partial<UiNode> = {}): UiNode => ({ role, label: null, identifier: null, value: null, rect: r, children: [], ...extra });
   const adapter = { viewport: async (): Promise<DeviceScreen> => ({ ...PIXEL_3A, statusBand: 66 }) };

@@ -640,9 +640,9 @@ export class WdaServer {
         `A WebDriverAgent answers /status on port ${this.port}, but this session did not start it ` +
           `(udid ${this.udid}). /status carries no UDID, so it cannot be verified as serving THIS ` +
           `simulator — adopting it could silently deliver another device's UI tree. Likely a stale ` +
-          `WDA from a previous session: a server that was still busy when the host closed it took a SIGTERM, and ` +
-          `before 0.8.1 nothing then stopped its WebDriverAgent (0.8.1 stops it and waits for the port to go quiet; ` +
-          `a SIGKILL, or a second signal during that wait, still leaves it). ` +
+          `WDA from a previous session: a server that was still busy when the host closed it took a SIGTERM; averi ` +
+          `then stops its WebDriverAgent and waits for the port to go quiet, but a SIGKILL, or a second signal ` +
+          `during that wait, or a server older than 0.8.1, still leaves it. ` +
           `Recover: \`pkill -f WebDriverAgentRunner\` or ${rebootSimulatorAdvice(this.udid)}.`,
       );
     }

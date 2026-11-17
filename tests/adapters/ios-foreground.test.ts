@@ -211,8 +211,9 @@ describe('IosAdapter.launch waits until the tree is the launched app\'s', () => 
     expect(launchTextOf(outcome)).toBe(
       '3 s after launching com.apple.MobileAddressBook ("Contacts"), the UI tree was still the app labelled "Skeleton Internal" — ' +
         "iOS can hand idb the previous app's tree for a second or more after an app switch, so a read now may judge the wrong app " +
-        '(an absent check passes on it). "Skeleton Internal" is the name of com.finshape.dbosbanking, which averi launched ' +
-        "earlier, not of com.apple.MobileAddressBook: the tree is still that app's, even if the screenshot already shows " +
+        '(an absent check passes on it). "Skeleton Internal" is the name of com.finshape.dbosbanking, which averi ' +
+        "launched, opened a link to or checked the liveness of earlier, not of com.apple.MobileAddressBook: the tree is " +
+        "still that app's, even if the screenshot already shows " +
         "com.apple.MobileAddressBook (it switches before idb's tree does) — read again before trusting what the tree says",
     );
     expect(launchTextOf(outcome)).not.toMatch(/localized|can be ignored/);
@@ -221,7 +222,10 @@ describe('IosAdapter.launch waits until the tree is the launched app\'s', () => 
   it('a known name is matched by any of that app\'s names — its CFBundleName too', async () => {
     const d = device([BANK.replace('Skeleton Internal', 'Runner')], perBundle);
     await d.adapter.launch('com.finshape.dbosbanking'); // "Runner" is its CFBundleName: a match, names cached
-    expect(launchTextOf(await d.adapter.launch('com.apple.MobileAddressBook'))).toMatch(/"Runner" is the name of com\.finshape\.dbosbanking, which averi launched earlier/);
+    expect(launchTextOf(await d.adapter.launch('com.apple.MobileAddressBook'))).toContain(
+      '"Runner" is the name of com.finshape.dbosbanking, which averi launched, opened a link to or checked the liveness ' +
+        'of earlier',
+    );
   });
 
   it('reads that take time: no read STARTS at or after the deadline', async () => {
@@ -249,7 +253,7 @@ describe('IosAdapter.launch waits until the tree is the launched app\'s', () => 
     );
   });
 
-  it('a check whose names() lists none (the ForegroundCheck contract allows it): the note quotes no empty name — "labelled with one of its names", never "labelled :" (code review of fix/r4, S11)', async () => {
+  it('a check whose names() lists none (the ForegroundCheck contract allows it): the note quotes no empty name — "labelled with one of its names", never "labelled :"', async () => {
     const note = launchTextOf(await awaitForeground({
       bundleId: 'com.apple.MobileAddressBook',
       label: async () => ({ kind: 'label', label: 'Skeleton Internal' }),
@@ -435,7 +439,7 @@ describe('IosAdapter.launch on the WDA source waits until WebDriverAgent names t
     expect(main.runs.every((r) => r.labTree && r.root === '"AveriLab"' && r.asks >= 1)).toBe(true);
   });
 
-  it('today, on the asks a switch like it gives (Contacts, then the lab): the wait, then batch-4 main\'s reply byte for byte', async () => {
+  it('on the asks a switch like it gives (Contacts, then the lab): the wait, then batch-4 main\'s reply byte for byte', async () => {
     const d = wdaDevice([CONTACTS_APP, LAB]);
     const outcome = await d.adapter.launch('dev.averi.lab');
     expect(outcome).toEqual({ holder: 'none' });
@@ -606,7 +610,7 @@ describe('awaitForeground — the one alert read, at the bound with SpringBoard 
     expect(c.reads()).toBe(0);
   });
 
-  it("a launch with no alert read wired, SpringBoard to the bound: D48's note, as before", async () => {
+  it("a launch with no alert read wired, SpringBoard to the bound: D48's note", async () => {
     const c = check(undefined, { alert: null });
     expect(launchTextOf(await awaitForeground(c.check))).toBe(D48_SPRINGBOARD);
   });

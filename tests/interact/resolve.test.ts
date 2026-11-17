@@ -348,7 +348,7 @@ describe('resolveSettled — appear AND hold still', () => {
       ]);
     });
 
-    it('an element that moves on every read within the budget gets NO extra read: the old sentence', async () => {
+    it('an element that moves on every read within the budget gets NO extra read: the timeout says found, but never at the same position in two consecutive reads', async () => {
       // It moves on every read the poll makes, the last of them a slow one
       // that outlasts the budget; any read after that finds it where that
       // one did — so an extra read here would wrongly settle it.
@@ -556,7 +556,7 @@ describe('a tap target off the screen (2026-10-08)', () => {
     expect(fake.taps).toEqual(['amount']);
   });
 
-  it('partly on screen: the centre decides — on screen, tapped at the centre as before; off, refused with how much shows', async () => {
+  it('partly on screen: the centre decides — on screen, tapped at the centre; off, refused with how much shows', async () => {
     const fake = swiftForm();
     const street = () => fake.live().children[1];
     street().rect = { x: 42, y: 860, width: 103, height: 20 }; // centre (94,870): on screen, 14 of 20 pt visible
@@ -569,7 +569,7 @@ describe('a tap target off the screen (2026-10-08)', () => {
     expect(fake.tapPoints).toEqual([{ x: 94, y: 870 }]);
   });
 
-  it('no screen to judge by — the device size unreadable and no window in the tree: the tap goes ahead as before (fail open)', async () => {
+  it('no screen to judge by — the device size unreadable and no window in the tree: the tap goes ahead (fail open)', async () => {
     resetLayout();
     const fake = new FakeAdapter({ s: node({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 }, children: [node({ role: 'button', identifier: 'go', rect: { x: 40, y: 3000, width: 100, height: 20 } })] }) }, 's');
     fake.viewport = async () => {
@@ -663,7 +663,7 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     );
   });
 
-  it('a pinned footer\'s text inside a row, after it in idb\'s flat list (code review P4, repro E): a cover — the tap moves off it, never onto the footer', async () => {
+  it('a pinned footer\'s text inside a row, after it in idb\'s flat list: a cover — the tap moves off it, never onto the footer', async () => {
     const fake = new FakeAdapter(
       {
         s: node({
@@ -699,7 +699,7 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     expect(result.note).toBe(`focus tap at (201,767) — its centre (201,780) is under ${CONTINUE}, drawn over it; tapped the uncovered part 354x26`);
   });
 
-  it('idb, M-1.4 of the round-6b device check (round 7): value_date_select under the lifted CONTINUE — refused naming it, and no "part that shows" inside the keyboard band (its strip 589–596 lies under the band, top 589)', async () => {
+  it('idb, value_date_select under the lifted CONTINUE — refused naming it, and no "part that shows" inside the keyboard band (its strip 589–596 lies under the band, top 589)', async () => {
     const tree = parseIdbDescribeAll(JSON.stringify(JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')).elements));
     const fake = new FakeAdapter({ form: tree }, 'form');
     fake.keyboard = undefined;
@@ -728,7 +728,7 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     await expect(tapElement(fake, 'text:"5"', OPTS)).rejects.toThrow('FakeAdapter: nothing tappable at (204,677)');
   });
 
-  it('idb, a strip of the band with no key listed over it (the number pad\'s keys 30 pt lower — a suggestion bar\'s shape; synthetic): a row under the lifted CONTINUE is never tapped inside the band — refused; with no background in the tree (an app\'s PIN pad\'s shape) nothing is lifted and the row is tapped at its centre, as before', async () => {
+  it('idb, a strip of the band with no key listed over it (the number pad\'s keys 30 pt lower — a suggestion bar\'s shape; synthetic): a row under the lifted CONTINUE is never tapped inside the band — refused; with no background in the tree (an app\'s PIN pad\'s shape) nothing is lifted and the row is tapped at its centre', async () => {
     const tree = parseIdbDescribeAll(JSON.stringify(JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')).elements));
     for (const n of tree.children) if (n.role === 'button' && n.rect.y >= 596) n.rect = { ...n.rect, y: n.rect.y + 30 };
     tree.children.splice(tree.children.findIndex((n) => n.identifier === 'swift_payment.form.continue_button'), 0, node({ role: 'button', identifier: 'fees', label: 'Fees', rect: { x: 24, y: 540, width: 354, height: 80 } }));
@@ -742,7 +742,7 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     expect(fake.tapPoints).toEqual([{ x: 201, y: 580 }]);
   });
 
-  it('idb, a row scrolled up under the top bar (code review P1, repro C — since device check C3-3 the chrome-before-content rule): BackButton and the title are tapped at their centres, and scroll_until stops on them', async () => {
+  it('idb, a row scrolled up under the top bar: BackButton and the title are tapped at their centres, and scroll_until stops on them', async () => {
     const tree = parseIdbDescribeAll(await readFile(new URL('../fixtures/idb-swift-form-continue.json', import.meta.url), 'utf8'));
     const debit = tree.children.find((n) => n.identifier === 'swift_payment.form.debit_select')!;
     debit.rect = { x: 24, y: 40, width: 354, height: 72 };
@@ -758,7 +758,7 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     await expect(tapElement(fake, PRIORITY, OPTS)).rejects.toBeInstanceOf(CoveredRefusal);
   });
 
-  it('WDA, a React Native view whose texts it lists as the view\'s siblings (tests/fixtures/wda-source-rn-myport.json — verification of P4): scroll_until stops on placeholder_screen and the tap lands on its centre — as at 13d68a2', async () => {
+  it('WDA, a React Native view whose texts it lists as the view\'s siblings (tests/fixtures/wda-source-rn-myport.json): scroll_until stops on placeholder_screen and the tap lands on its centre', async () => {
     const tree = parseWdaSource(await readFile(new URL('../fixtures/wda-source-rn-myport.json', import.meta.url), 'utf8'));
     const fake = new FakeAdapter({ rn: tree }, 'rn');
     fake.keyboard = undefined;
@@ -882,7 +882,7 @@ describe('a Compose label under its own control (2026-10-09)', () => {
   it.each([
     // One integration case; the other labels and snapshots are rows of tests/ui-tree/standing.test.ts.
     ['LOGIN', COMPOSE.login, { x: 540, y: 1463 }],
-  ])('tap text:"%s" presses the button at the text\'s centre, nothing said — as at 86eb42d', async (label, xml, centre) => {
+  ])('tap text:"%s" presses the button at the text\'s centre, nothing said', async (label, xml, centre) => {
     const fake = compose(xml);
     expect(await tapElement(fake, `text:"${label}"`, OPTS)).toEqual({ note: undefined, keyboardHidden: undefined, moved: undefined });
     expect(fake.tapPoints).toEqual([centre]);
@@ -917,7 +917,7 @@ describe('a Compose label under its own control (2026-10-09)', () => {
     expect([fake.tapPoints, fake.swipes]).toEqual([[{ x: 782, y: 1836 }], []]);
   });
 
-  it('a classic View\'s pinned CTA over a text in the same layout (review of fix/r6) stays a cover: tap text:"Forgot password?" is refused, never pressing LOG IN; scroll_until to the terms under CONTINUE stops before any swipe, no scroll advised — neither lies in a scroll view (D87)', async () => {
+  it('a classic View\'s pinned CTA over a text in the same layout stays a cover: tap text:"Forgot password?" is refused, never pressing LOG IN; scroll_until to the terms under CONTINUE stops before any swipe, no scroll advised — neither lies in a scroll view (D87)', async () => {
     const login = compose(CLASSIC_VIEWS.loginImeUp);
     await expect(tapElement(login, 'text:"Forgot password?"', OPTS)).rejects.toBeInstanceOf(CoveredRefusal);
     expect(login.tapPoints).toEqual([]);
@@ -986,7 +986,7 @@ describe('a tap target cut to a sliver at its scroll container\'s edge (2026-10-
     });
   };
 
-  it('the cut toggle\'s leaf label "Payment details" 66,1936 948x42, flush with the edge the toggle is a sliver at (round 8, A2 residual: tapped at (540,1957), nothing expanded): refused like its toggle, naming it', async () => {
+  it('the cut toggle\'s leaf label "Payment details" 66,1936 948x42, flush with the edge the toggle is a sliver at (on the device a tap at (540,1957) expanded nothing): refused like its toggle, naming it', async () => {
     const fake = swiftForm(dumpedToggle(1924, 55));
     const error = await tapElement(fake, 'label:"Payment details"', OPTS).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ClippedRefusal);
@@ -999,7 +999,7 @@ describe('a tap target cut to a sliver at its scroll container\'s edge (2026-10-
     expect(fake.tapPoints).toEqual([]);
   });
 
-  it('a classic-View row cut to 33 px at the list\'s TOP whose texts were dumped inverted (code review of round 7, P1: SETTINGS_ROW_SLIVER) — their clippedOut is the evidence: refused, nothing tapped', async () => {
+  it('a classic-View row cut to 33 px at the list\'s TOP whose texts were dumped inverted (SETTINGS_ROW_SLIVER) — their clippedOut is the evidence: refused, nothing tapped', async () => {
     const fake = new FakeAdapter({ s: parseDump(SETTINGS_ROW_SLIVER) }, 's');
     fake.viewportSize = { width: 1080, height: 2220 };
     await expect(tapElement(fake, 'id:apps_row', OPTS)).rejects.toThrow(
@@ -1182,7 +1182,7 @@ describe('a tap or fill that misses under idb with the soft keyboard read up: th
     expect((error as Error).message).toBe(`Timed out after 20ms waiting for element ${VS} to appear\n${KEYBOARD}\n  (${missNote(VS_MISS)})`);
   });
 
-  it('the same tree with the band\'s background dropped (no keyboard read up): today\'s reply, byte-equal — tap and fill', async () => {
+  it('the same tree with the band\'s background dropped (no keyboard read up): the plain timeout, no keyboard line — tap and fill', async () => {
     const today = `Timed out after 20ms waiting for element ${VS} to appear\n  (${missNote(VS_MISS)})`;
     const tapped = await tapElement(await fakeOf('form-keyboard', { band: false }), VS, OPTS).catch((e: unknown) => e);
     expect((tapped as Error).message).toBe(today);
@@ -1214,7 +1214,7 @@ describe('a tap or fill that misses under idb with the soft keyboard read up: th
     expect((error as Error).message).toBe(`Timed out after 20ms waiting for element id:"lab.form-keyboard.zero" to appear\n  (${missNote(miss)})`);
   });
 
-  it('a tree source that lists beneath the keyboard (WDA, the same screen): no keyboard line — unchanged', async () => {
+  it('a tree source that lists beneath the keyboard (WDA, the same screen): no keyboard line', async () => {
     const fake = new FakeAdapter({ s: parseWdaSource(await readFile(new URL('../fixtures/wda-capture-lab-form-keyboard.json', import.meta.url), 'utf8')) }, 's');
     fake.keyboard = undefined;
     fake.keyboardAdvice = 'ADVICE';
@@ -1225,7 +1225,7 @@ describe('a tap or fill that misses under idb with the soft keyboard read up: th
 });
 
 /** Review of the off-screen refusal (2026-10-08): the probes it measured the first cut against. */
-describe('the off-screen rule — review round 1 (2026-10-08)', () => {
+describe('the off-screen rule (2026-10-08)', () => {
   const OPTS = { eyes: NO_EYES, ...REFUSE, timeoutMs: 60, pollMs: 2 };
   /** An iOS fake whose device reports `device` and whose tree is `tree` (idb: a rectless root unless the test gives it a rect). */
   const ios = (tree: UiNode, device: { width: number; height: number }) => {
@@ -1238,7 +1238,7 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
   const idbRoot = (...children: UiNode[]) => node({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 }, children });
   const PORTRAIT = { width: 402, height: 874 };
 
-  describe('B1 — a turn suggested but witnessed by no window refuses only a point outside the screen BOTH ways up', () => {
+  describe('a turn suggested but witnessed by no window refuses only a point outside the screen BOTH ways up', () => {
     // Probe A: an idb landscape tree whose Application window a carousel card
     // straddling the right edge makes unreliable — the box is not turned.
     const landscapeWithCard = (...extra: UiNode[]) =>
@@ -1264,7 +1264,7 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
 
   });
 
-  describe('M3 — the memoized screen size is read again before a refusal', () => {
+  describe('the memoized screen size is read again before a refusal', () => {
     /** A device whose memo holds `stale` until a fresh read, which answers `now`. */
     const folding = (tree: UiNode, stale: { width: number; height: number }, now: { width: number; height: number }) => {
       const fake = new FakeAdapter({ s: tree }, 's');
@@ -1278,7 +1278,7 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
       return { fake, fresh };
     };
 
-    it('probe B: an unfold the memo missed (1080x2400 kept, the tree 2208x1840) — re-read, then id:ok at (1600,1650) is TAPPED', async () => {
+    it('an unfold the memo missed (1080x2400 kept, the tree 2208x1840) — re-read, then id:ok at (1600,1650) is TAPPED', async () => {
       const tree = node({ role: 'container', rect: { x: 0, y: 0, width: 2208, height: 1840 }, children: [node({ role: 'button', identifier: 'ok', rect: { x: 1550, y: 1630, width: 100, height: 40 } })] });
       const { fake, fresh } = folding(tree, { width: 1080, height: 2400 }, { width: 2208, height: 1840 });
       await tapElement(fake, 'id:ok', OPTS);
@@ -1303,7 +1303,7 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
     });
   });
 
-  it('m1 — the in-tree guard handed the node back clear (the keyboard gone on the second look), nothing sent: the plain refusal', async () => {
+  it('the in-tree guard handed the node back clear (the keyboard gone on the second look), nothing sent: the plain refusal', async () => {
     const fake = iosLoginFake();
     fake.viewportSize = PORTRAIT;
     let reads = 0;
@@ -1321,9 +1321,9 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
     expect(fake.taps).toEqual([]);
   });
 
-  describe('code review round 2: only a WINDOW\'s own sides suggest a turn (2026-10-08)', () => {
+  describe('only a WINDOW\'s own sides suggest a turn (2026-10-08)', () => {
 
-    it('P1: a portrait idb tree with no window, a carousel walked to x 1500 — the walk suggests nothing: (450,100) refused, scroll_until swipes', async () => {
+    it('a portrait idb tree with no window, a carousel walked to x 1500 — the walk suggests nothing: (450,100) refused, scroll_until swipes', async () => {
       const cells = [0, 300, 600, 900, 1200].map((x) => node({ role: 'cell', rect: { x, y: 80, width: 300, height: 40 } }));
       const rows = [200, 400, 600, 800].map((y) => node({ role: 'text', rect: { x: 0, y, width: 402, height: 40 } }));
       const fake = ios(idbRoot(...cells, ...rows, node({ role: 'button', identifier: 'item', rect: { x: 425, y: 80, width: 50, height: 40 } })), PORTRAIT);
@@ -1349,7 +1349,7 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
     });
   });
 
-  it('review round 2 — probe J: on a box no window witnessed (a walked width turns 393x852 to 852x393), scroll_until judges both ways up, as the tap does: y 600 is visible, and tapped', async () => {
+  it('on a box no window witnessed (a walked width turns 393x852 to 852x393), scroll_until judges both ways up, as the tap does: y 600 is visible, and tapped', async () => {
     const rows = [0, 400, 800, 1200, 1600, 2000, 2400, 2950].map((y) => node({ role: 'text', rect: { x: 0, y, width: 852, height: 50 } }));
     const fake = ios(idbRoot(...rows, node({ role: 'button', identifier: 'go', rect: { x: 50, y: 580, width: 200, height: 40 } })), { width: 393, height: 852 });
     expect((await usableScreen(fake, { tree: await fake.uiTree() }))?.oriented).toEqual({ x: 0, y: 0, width: 852, height: 393 });
@@ -1361,14 +1361,14 @@ describe('the off-screen rule — review round 1 (2026-10-08)', () => {
     await expect(scrollUntilVisible(fake, 'id:go', { eyes: NO_EYES, maxSwipes: 0 })).rejects.toThrow('element in tree but never intersected the 852x393 viewport either way up');
   });
 
-  it('M2 — probe I: scroll_until judges on the tap\'s screen, turned in landscape (WDA root 874x402 on a 402x874 panel): y 500 is NOT visible', async () => {
+  it('scroll_until judges on the tap\'s screen, turned in landscape (WDA root 874x402 on a 402x874 panel): y 500 is NOT visible', async () => {
     const tree = node({ role: 'container', rect: { x: 0, y: 0, width: 874, height: 402 }, children: [node({ role: 'button', identifier: 'pay', rect: { x: 50, y: 500, width: 100, height: 40 } })] });
     const fake = ios(tree, PORTRAIT);
     await expect(scrollUntilVisible(fake, 'id:pay', { eyes: NO_EYES, maxSwipes: 0 })).rejects.toThrow('element in tree but never intersected the 874x402 viewport');
     await expect(tapElement(fake, 'id:pay', OPTS)).rejects.toThrow('id:pay is off screen at (100,520) on a 874x402 screen');
   });
 
-  it('review round 1 (2026-10-08): the turn after a fling is judged in EVERY box that counts — a target beyond the far edge one way up but clipped at both edges the other is not turned for', async () => {
+  it('the turn after a fling is judged in EVERY box that counts — a target beyond the far edge one way up but clipped at both edges the other is not turned for', async () => {
     const rows = [0, 400, 800, 1200, 1600, 2000, 2400, 2950].map((y) => node({ role: 'text', rect: { x: 0, y, width: 852, height: 50 } }));
     const fake = ios(idbRoot(...rows, node({ role: 'button', identifier: 'go', rect: { x: 300, y: 900, width: 450, height: 40 } })), { width: 393, height: 852 });
     expect((await usableScreen(fake, { tree: await fake.uiTree() }))?.boxes).toHaveLength(2);

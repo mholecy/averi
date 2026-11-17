@@ -321,7 +321,7 @@ describe('pollTree — the one deadline loop', () => {
     }
   });
 
-  it('a pause that crosses the deadline still gets one last read — the slack HEAD always had, kept (2026-10-05)', async () => {
+  it('a pause that crosses the deadline still gets one last read', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     try {
       let reads = 0;

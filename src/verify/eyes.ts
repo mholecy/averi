@@ -79,7 +79,7 @@ export const orderOfFrame = (frame: MeasuredFrame, question: PairQuestion): read
  * What it costs: an element genuinely drawn in the colour of the screen around it with nothing at all of its own (an
  * empty, unbordered white card on a white page) fails closed under idb too — it is told apart from the background by
  * nothing in the frame either; under WDA, which lists the scroll views, it is measured. Measured over every node idb
- * lists in the 32 iOS lab captures: only O and C blend (tests/verify/eyes-apart.test.ts). What it does not see is
+ * lists in every iOS lab capture: only O and C blend (tests/verify/eyes-apart.test.ts). What it does not see is
  * measured, so it can PASS on what lies beneath the clip: anything of that beneath in the region (a separator, a
  * shadow, text: more than a point of it reads `apart`), and no plain strip beside it (`untold`). Asked on a frame
  * settled over the region only too (verify/pixel-poll.ts#blendsUntold): a strip beside still moving is no plain strip.
@@ -93,9 +93,9 @@ export type ApartSeen = { readonly seen: 'apart' } | { readonly seen: 'blends'; 
  * listed shows something: a label, a placeholder, a border, an outline's antialiasing — glyphs and strokes are hundreds
  * of pixels at 3x. A screenshot is pixel-exact (EYES_APART_DE), so what lies beneath a clip shows exactly zero; the one
  * point's allowance is for a stray pixel, not for noise. Measured over every node idb lists in the 32 iOS lab captures
- * (all 393, not only the lab's ids), the strip beside it its colour: O and C 0 px off their dominant (#FFFFFF,
- * #EEEEEE); every other node at least 777 px (own-parts' I; the white `sheet-long-list` rows labelled "Row N", 25728
- * pt², 1674 px and more).
+ * of 2026-10-20 (all 393, not only the lab's ids), the strip beside it its colour: O and C 0 px off their dominant
+ * (#FFFFFF, #EEEEEE); every other node at least 777 px (own-parts' I; the white `sheet-long-list` rows labelled
+ * "Row N", 25728 pt², 1674 px and more).
  */
 const OWN_PIXELS_MAX = 1;
 
@@ -234,8 +234,8 @@ function judgeEdge(png: RgbaImage, scale: number, regionRect: Rect, { edge, by: 
  *    the screen changes at the line as the target does, to what a scroll view's background is. Else `own`: a target
  *    whose own margin is the colour of a page that runs on beside all of it (a label's padding) is no cut, nor one in
  *    a row of drawn neighbours whose rows beside it mix their fills with that margin's colour (a keyboard's keys, each
- *    rect holding the gap below its cap; a row of padded chips) — measured over every node idb lists in the 32 lab
- *    captures, only P and S read cut (tests/verify/eyes-clip-line.test.ts).
+ *    rect holding the gap below its cap; a row of padded chips) — measured over every node idb lists in every iOS
+ *    lab capture, only P and S read cut (tests/verify/eyes-clip-line.test.ts).
  * Measured, the lab's `scroll-bounded` under idb: P's bottom 24 pt (330–354) and S's 56 (560–616) #FFFFFF across their
  * columns and beside them; beside their drawn rows `upper`'s and `lower`'s #EEEEEE.
  * docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md

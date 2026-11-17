@@ -83,7 +83,7 @@ describe('a heading listed before a target it overlaps, in a reading-order listi
     expect(drawOrder(run([h, r])).exposure(r, box).covers).toEqual([]);
   });
 
-  it('a heading listed AFTER the target is judged as before: by the draw order', () => {
+  it('a heading listed AFTER the target is judged by the draw order', () => {
     const r = row(142);
     const h = heading(110);
     expect(tagged(drawOrder(run([r, h])).exposure(r, box).covers)).toEqual([{ node: h, order: 'drawn', presented: false }]);

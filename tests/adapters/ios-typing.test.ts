@@ -113,7 +113,7 @@ describe('the refusals\' remedies', () => {
   it.each([
     ['a value WDA types only in part (Š, then an emoji)', 'Šťastný 😀', "U+0160 'Š'", "U+1F600 '😀'"],
     ['© followed by a variation selector (U+FE0F, a combining mark)', '\u00a9\ufe0f', "U+00A9 '©'", 'U+FE0F'],
-  ])('idb, %s: no wda claim — and the character that blocks WDA too is named (review rounds 1 and 2)', (_name, text, first, blocking) => {
+  ])('idb, %s: no wda claim — and the character that blocks WDA too is named', (_name, text, first, blocking) => {
     const msg = refusalOf(text, IDB_TYPEABLE)!;
     expect(msg).toMatch(new RegExp(`^cannot type ${first.replace(/[+]/g, '\\+')}: `));
     expect(msg).not.toContain('ios.treeSource: wda');

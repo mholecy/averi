@@ -68,7 +68,7 @@ describe('screencapRaw — the raw frame, or why not', () => {
 
   // screencap's stderr goes to /dev/null and its stdout into gzip, so what can come ahead of the stream is the shell's
   // own word (exec-out merges its stderr), or a stream cut short.
-  it('any other answer that is not gzip is refused for this call only: no evidence the device lacks gzip (MINOR-1)', () => {
+  it('any other answer that is not gzip is refused for this call only: no evidence the device lacks gzip', () => {
     for (const answer of ['Killed\n', "/system/bin/sh: can't fork: Try again\n", '\x1f']) {
       expect(screencapRaw(Buffer.from(answer, 'latin1'), SOURCE), JSON.stringify(answer)).toMatchObject({ lasting: false });
     }
