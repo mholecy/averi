@@ -246,7 +246,7 @@ describe('compareColorParity — missing anchors and off-png rects', () => {
     expect(r.rows[0].deAc).toBe(0); // vs-contract still ran for android
     const out = formatColorParity(r);
     expect(out).toContain('MISSING ANCHORS — these are not color findings yet');
-    expect(out).toContain('accessibility.md §2');
+    expect(out).toContain('that IS a finding: the element needs its id on both platforms');
   });
 
   it('a rect fully outside the png is MISSING (off-screen in this capture)', () => {

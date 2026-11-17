@@ -652,7 +652,7 @@ function measure(
   const note =
     measurement.ocr !== undefined && measurement.ocr !== '' && !hasAccessibleName(capture.tree, id)
       ? `${id} [${platform}]: renders ${JSON.stringify(measurement.ocr)} but carries no label, value or text ` +
-        `node — the copy is invisible to assistive technology (accessibility.md §2).`
+        `node — the copy is invisible to assistive technology.`
       : undefined;
 
   return { measurement, note };

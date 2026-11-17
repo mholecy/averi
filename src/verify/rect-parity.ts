@@ -653,7 +653,7 @@ export function formatRectParity(r: RectParityResult): string {
     lines.push(
       '  Causes, in order of likelihood: the element is off-screen (scroll, then re-read);',
       '  iOS does not surface plain containers (use a labeled/interactive child id); the id',
-      '  was never applied on that platform (that IS a finding — accessibility.md §2).',
+      '  was never applied on that platform (that IS a finding: the element needs its id on both platforms).',
       '',
     );
   }

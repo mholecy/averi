@@ -673,7 +673,7 @@ export function formatColorParity(r: ColorParityResult): string {
       '  Causes, in order of likelihood: the element is off-screen in this capture (scroll, then',
       '  re-run so tree AND screenshot come from the same state); iOS does not surface plain',
       '  containers (use a labeled/interactive child id); the id was never applied on that',
-      '  platform (that IS a finding — accessibility.md §2).',
+      '  platform (that IS a finding: the element needs its id on both platforms).',
       '',
     );
   }

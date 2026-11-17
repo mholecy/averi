@@ -211,8 +211,8 @@ describe('IosAdapter.launch waits until the tree is the launched app\'s', () => 
     expect(launchTextOf(outcome)).toBe(
       '3 s after launching com.apple.MobileAddressBook ("Contacts"), the UI tree was still the app labelled "Skeleton Internal" — ' +
         "iOS can hand idb the previous app's tree for a second or more after an app switch, so a read now may judge the wrong app " +
-        '(an absent check passes on it). "Skeleton Internal" is the name of com.finshape.dbosbanking, which averi launched ' +
-        "earlier, not of com.apple.MobileAddressBook: the tree is still that app's, even if the screenshot already shows " +
+        '(an absent check passes on it). "Skeleton Internal" is the name of com.finshape.dbosbanking, which averi launched, opened a link to or ' +
+        "checked earlier, not of com.apple.MobileAddressBook: the tree is still that app's, even if the screenshot already shows " +
         "com.apple.MobileAddressBook (it switches before idb's tree does) — read again before trusting what the tree says",
     );
     expect(launchTextOf(outcome)).not.toMatch(/localized|can be ignored/);
@@ -221,7 +221,7 @@ describe('IosAdapter.launch waits until the tree is the launched app\'s', () => 
   it('a known name is matched by any of that app\'s names — its CFBundleName too', async () => {
     const d = device([BANK.replace('Skeleton Internal', 'Runner')], perBundle);
     await d.adapter.launch('com.finshape.dbosbanking'); // "Runner" is its CFBundleName: a match, names cached
-    expect(launchTextOf(await d.adapter.launch('com.apple.MobileAddressBook'))).toMatch(/"Runner" is the name of com\.finshape\.dbosbanking, which averi launched earlier/);
+    expect(launchTextOf(await d.adapter.launch('com.apple.MobileAddressBook'))).toMatch(/"Runner" is the name of com\.finshape\.dbosbanking, which averi launched, opened a link to or checked earlier/);
   });
 
   it('reads that take time: no read STARTS at or after the deadline', async () => {
@@ -249,7 +249,7 @@ describe('IosAdapter.launch waits until the tree is the launched app\'s', () => 
     );
   });
 
-  it('a check whose names() lists none (the ForegroundCheck contract allows it): the note quotes no empty name — "labelled with one of its names", never "labelled :" (code review of fix/r4, S11)', async () => {
+  it('a check whose names() lists none (the ForegroundCheck contract allows it): the note quotes no empty name — "labelled with one of its names", never "labelled :"', async () => {
     const note = launchTextOf(await awaitForeground({
       bundleId: 'com.apple.MobileAddressBook',
       label: async () => ({ kind: 'label', label: 'Skeleton Internal' }),
