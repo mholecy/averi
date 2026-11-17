@@ -292,7 +292,7 @@ describe('isBareTree: a status bar is not a reason to call a loaded screen bare'
     expect(isBareTree(idb(ax('StaticText', '18:29', { x: 40, y: 400, width: 100, height: 30 })))).toBe(false);
   });
 
-  it('the Android decor is bare as before (it holds no clock, so neither clause applies)', () => {
+  it('the Android decor is bare (it holds no clock, so neither clause applies)', () => {
     expect(isBareTree(parseDump(androidXml('')))).toBe(true);
   });
 

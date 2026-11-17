@@ -620,7 +620,7 @@ describe('AndroidAdapter interactions', () => {
       expect(sleeps).toEqual([]);
     });
 
-    it('a focus read that fails (grep found neither line, adb gone, a timeout) or says nothing: `{}`, today\'s reply', async () => {
+    it('a focus read that fails (grep found neither line, adb gone, a timeout) or says nothing: `{}`, the fail-open reply', async () => {
       const failed = execErrorLikeExec('adb -s e shell dumpsys', 1, '');
       for (const focus of [failed, new Error('timed out'), {}, { stdout: 'garbage\n' }]) {
         const { adapter, argvs } = scripted({ stdout: STARTED }, focus);
@@ -789,7 +789,7 @@ describe('AndroidAdapter interactions', () => {
       expect(argvs).toEqual([MONKEY, FOCUS]);
     });
 
-    it('the `-p` start with an app in front (batch-10\'s one-handler control read): `{}`, today\'s "Launched" byte for byte', async () => {
+    it('the `-p` start with an app in front (batch-10\'s one-handler control read): `{}`, the plain "Launched" byte for byte', async () => {
       const { adapter, argvs } = scripted({ start: STARTED, focus: await fixtureText('dumpsys-window-focus-api33-b10-lab-window-null.txt') });
       const answer = await adapter.launch('dev.averi.lab', { intent: INTENT });
       expect(answer).toEqual({ holder: 'none' });

@@ -423,7 +423,7 @@ describe('the flush check doubts a first probe that held (T12)', () => {
     expect(said(heldOnce({ budget: false }))).toEqual({ of: 'flush', flush: { edge: 'bottom', container: LIST, checked: false, why: 'budget' } });
   });
 
-  it('a first probe drawn too short to tell from a tap: `tap`, as before — no second probe', () => {
+  it('a first probe drawn too short to tell from a tap: `tap` — no second probe', () => {
     expect(said(heldOnce({ drawn: TAP }))).toEqual({ of: 'flush', flush: { edge: 'bottom', container: LIST, checked: false, why: 'tap' } });
   });
 
@@ -459,13 +459,13 @@ describe('the flush check stops a proven cut no swipe can bring whole (D68)', ()
     }
   });
 
-  it('the same read after a 100-px stroke (longer than the next, 48): no measured stroke as short — the reveal, or the cut at the bound, as before', () => {
+  it('the same read after a 100-px stroke (longer than the next, 48): no measured stroke as short — the reveal, or the cut at the bound', () => {
     const proved = provedAt(200, 100, 142);
     expect(said(seeFlush(sent(proved.verdict), shown(right(80), stroke(100))))).toEqual({ of: 'probe', toward: 'right', reach: 1, maxTravel: 7 });
     expect(seeFlush(sent(proved.verdict), shown(right(80), stroke(100), { budget: false })).verdict).toMatchObject({ of: 'cut', cut: { why: 'budget', revealed: 20 } });
   });
 
-  it('room enough for the least carry: 19 px left after a 48-px stroke carried 20 — the reveal, as before', () => {
+  it('room enough for the least carry: 19 px left after a 48-px stroke carried 20 — the reveal', () => {
     expect(said(seeFlush(sent(provedAt(200, 105, 142).verdict), shown(right(85), stroke(48))))).toEqual({ of: 'probe', toward: 'right', reach: 1, maxTravel: 9 });
   });
 

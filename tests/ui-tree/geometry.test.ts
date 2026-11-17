@@ -556,7 +556,7 @@ describe('clipsOf(tree).cutSliver — evidentCut under the minimum piece', () =>
   });
 });
 
-describe('clipsOf — the chain through plain containers to the outermost clip (round 8)', () => {
+describe('clipsOf — the chain through plain containers to the outermost clip', () => {
   const rect = (y: number, height: number) => ({ x: 0, y, width: 1080, height });
   it('a node under plain containers inside the clip has the clip\'s chain; nodes above it and outside have none', () => {
     const label = node(rect(1936, 42), 'label');
@@ -571,7 +571,7 @@ describe('clipsOf — the chain through plain containers to the outermost clip (
   });
 });
 
-describe('cutSliver — inherited from an ancestor cut to a sliver at the edge the node lies flush with (round 8)', () => {
+describe('cutSliver — inherited from an ancestor cut to a sliver at the edge the node lies flush with', () => {
   const form = { x: 0, y: 242, width: 1080, height: 1736 };
   /** The node `n` inside `parent` inside the form, as the tree has them; the tree's cutSliver asked of `n`. */
   const sliverOf = (n: UiNode, parent: UiNode, minPiece = 65) => {

@@ -1040,7 +1040,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       expect(coverNodes(drawOrder(tree).exposure(row, IPHONE).covers)).toEqual([tip]);
     });
 
-    it('…the same shapes with no flat-list mark (a WDA or Android tree, or any tree its source did not mark) are judged as before: the row under the bar covers BackButton', () => {
+    it('…the same shapes with no flat-list mark (a WDA or Android tree, or any tree its source did not mark): the row under the bar covers BackButton', () => {
       const back = uiNode({ role: 'button', label: 'BackButton', rect: rect(30, 70, 28, 28) });
       const debit = uiNode({ role: 'button', label: 'Debit account', rect: rect(24, 40, 354, 72) });
       const shape = (flatList?: true) => uiNode({ role: 'container', rect: rect(0, 0, 0, 0), ...(flatList && { flatList }), children: [uiNode({ role: 'other', rect: IPHONE }), back, debit] });
@@ -1213,7 +1213,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
         expect(coverNodes(drawOrder(flat(bar, row, low)).exposure(row, IPHONE).covers)).toEqual([]);
       });
 
-      it('a tree that is not a flat list has no break: the same shapes judged as before', () => {
+      it('a tree that is not a flat list has no break: the same shapes judged by draw order alone', () => {
         const above = uiNode({ role: 'text', label: 'Above', rect: rect(24, 300, 354, 20) });
         const cover = uiNode({ role: 'button', label: 'Cover', rect: rect(24, 410, 354, 40) });
         expect(coverNodes(drawOrder(uiNode({ role: 'container', rect: IPHONE, children: [row, above, cover] })).exposure(row, IPHONE).covers)).toEqual([cover]);
@@ -1276,7 +1276,7 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
         expect(coverNodes(drawOrder(uiNode({ role: 'container', rect: IPHONE, children: [under, bar] })).exposure(under, IPHONE).covers)).toEqual([]);
       });
 
-      it('a node listed BEFORE it is the only kind it reaches: the bar itself and what is listed after it are judged as before', () => {
+      it('a node listed BEFORE it is the only kind it reaches: the bar itself has no cover and is tapped at its centre', () => {
         const bar = uiNode({ role: 'button', label: 'Go', rect: rect(24, 780, 354, 44) });
         const order = drawOrder(flat(bar));
         expect(order.exposure(bar, IPHONE)).toMatchObject({ covers: [], tapAt: { point: { x: 201, y: 802 }, moved: false } });
@@ -1607,7 +1607,7 @@ describe('exposure — a later stacked screen layer covers the screen beneath th
       expect(covers(tree, image)).toEqual([]);
     });
 
-    it('not two screens: a target with no screen-sized layer of its own below the node holding both (a bar\'s button, a backdrop directly in it) — the later layer\'s frame is judged as before', () => {
+    it('not two screens: a target with no screen-sized layer of its own below the node holding both (a bar\'s button, a backdrop directly in it) — the later layer\'s frame covers nothing', () => {
       const back = uiNode({ role: 'button', label: 'Back', rect: rect(16, 62, 44, 44) });
       const bar = uiNode({ role: 'container', rect: rect(0, 62, 402, 54), children: [back] });
       const content = uiNode({ role: 'container', rect: IPHONE, children: [card()] });

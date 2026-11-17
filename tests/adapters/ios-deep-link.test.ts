@@ -40,7 +40,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("IosAdapter.openDeepLink — a link nothing expects is opened exactly as before (no read, no wait)", () => {
+describe("IosAdapter.openDeepLink — a link nothing expects is opened alone (no read, no wait)", () => {
   it('no project app: the writes and openurl, nothing else — no appinfo, no plutil, no ask', async () => {
     const d = lab([bundle(LAB)]);
     expect(await d.adapter.openDeepLink('averilab://d49')).toEqual({ holder: 'none' });
@@ -110,7 +110,7 @@ const notYetRead = (why: string) =>
   `averi: could not read dev.averi.lab's URL schemes (${why}) — opening averilab://d49 without waiting for dev.averi.lab ` +
   'to come forward; asked again on the next link';
 
-describe('IosAdapter.openDeepLink — the schemes could not be read: opened as before, one stderr line, the failure cached until install()', () => {
+describe('IosAdapter.openDeepLink — the schemes could not be read: opened, one stderr line, the failure cached until install()', () => {
   it('an unreadable Info.plist (any other plutil failure): one lookup and one line for two links; install() asks again', async () => {
     const d = lab([bundle(LAB)], { types: execErrorLikeExec(PLUTIL, 1, `${LAB_PATH}/Info.plist: (The file couldn’t be opened.)\n`) });
     expect(await d.adapter.openDeepLink('averilab://d49', { appId: LAB })).toEqual({ holder: 'none' });
@@ -310,7 +310,7 @@ describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)",
     expect(d.describeAlls()).toBe(1);
   });
 
-  it('idb: an alert shape whose title neither names the app nor reads "Open in “…”?": no alert — the note at the bound, as before', async () => {
+  it('idb: an alert shape whose title neither names the app nor reads "Open in “…”?": no alert — the note at the bound', async () => {
     const d = idbLab([IDB_ALERT.replace('Open in “AveriLab”?', 'Allow notifications?')]);
     expect(linkTextOf(await d.adapter.openDeepLink('averilab://d54', { appId: LAB }))).toMatch(/^averi did not see dev\.averi\.lab come forward/);
     expect(d.describeAlls()).toBe(FOREGROUND_WAIT_MS / FOREGROUND_POLL_MS);
@@ -323,7 +323,7 @@ describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)",
     expect(d.reads()).toBe(0);
   });
 
-  it('WebDriverAgent reads SpringBoard to the bound: the same asks as before, then exactly one /source — the alert, no note', async () => {
+  it('WebDriverAgent reads SpringBoard to the bound: the same asks, then exactly one /source — the alert, no note', async () => {
     const d = lab([SPRINGBOARD], { tree: WDA_ALERT });
     expect(await d.adapter.openDeepLink('averilab://d54', { appId: LAB })).toEqual(ALERT);
     expect(d.asks()).toBe(FOREGROUND_WAIT_MS / FOREGROUND_POLL_MS);
@@ -390,7 +390,7 @@ describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)",
     expect(sleeps).toEqual([]);
   });
 
-  it("idb, the app's names unreadable and a localised title that needs them: \"could not check\" at once, as before", async () => {
+  it("idb, the app's names unreadable and a localised title that needs them: \"could not check\" at once", async () => {
     const d = idbLab([IDB_ALERT.replace('Open in “AveriLab”?', 'In „AveriLab“ öffnen?')], NO_NAMES);
     const outcome = await d.adapter.openDeepLink('averilab://d54', { appId: LAB });
     expect(outcome.holder).toBe('unknown');
@@ -398,7 +398,7 @@ describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)",
     expect(d.describeAlls()).toBe(1);
   });
 
-  it("idb, the app's names unreadable and no alert shape (the lab's tree): \"could not check\", as before", async () => {
+  it("idb, the app's names unreadable and no alert shape (the lab's tree): \"could not check\"", async () => {
     const d = idbLab([IDB_LAB], NO_NAMES);
     expect(linkTextOf(await d.adapter.openDeepLink('averilab://d54', { appId: LAB }))).toMatch(/^averi could not check that dev\.averi\.lab came forward/);
   });
@@ -419,7 +419,7 @@ describe("IosAdapter.launch — the system alert it waits behind, named in its n
     'Read again; if it repeats, take a screenshot';
   const NO_NAMES = appinfo(undefined, undefined, { path: LAB_PATH });
 
-  it('idb, the lab in front: one describe-all, then the names, no note — the same calls as before D56', async () => {
+  it('idb, the lab in front: one describe-all, then the names, no note', async () => {
     const d = idbLab([IDB_LAB]);
     expect(await d.adapter.launch(LAB)).toEqual({ holder: 'none' });
     expect(d.calls).toEqual([...WRITES, LAUNCH, DESCRIBE_ALL, APPINFO]);
@@ -440,7 +440,7 @@ describe("IosAdapter.launch — the system alert it waits behind, named in its n
     expect(sleeps).toEqual([FOREGROUND_POLL_MS]);
   });
 
-  it("idb: a SpringBoard prompt titled \"Allow notifications?\": no alert — D48's SpringBoard note at the bound, as before", async () => {
+  it("idb: a SpringBoard prompt titled \"Allow notifications?\": no alert — D48's SpringBoard note at the bound", async () => {
     const d = idbLab([IDB_ALERT.replace('Open in “AveriLab”?', 'Allow notifications?')]);
     expect(worded(await d.adapter.launch(LAB))).toEqual({ note: expect.stringMatching(/^3 s after launching dev\.averi\.lab \("AveriLab"\), the UI tree was still SpringBoard's/) });
     expect(d.describeAlls()).toBe(FOREGROUND_WAIT_MS / FOREGROUND_POLL_MS);
@@ -453,13 +453,13 @@ describe("IosAdapter.launch — the system alert it waits behind, named in its n
     expect(d.calls.filter((c) => c.includes('appinfo'))).toHaveLength(1);
   });
 
-  it("idb, the app's names unreadable and a localised title that needs them: \"could not check\" at once, as before", async () => {
+  it("idb, the app's names unreadable and a localised title that needs them: \"could not check\" at once", async () => {
     const d = idbLab([IDB_ALERT.replace('Open in “AveriLab”?', 'In „AveriLab“ öffnen?')], NO_NAMES);
     expect(worded(await d.adapter.launch(LAB))).toEqual({ note: expect.stringMatching(/^could not check that dev\.averi\.lab is in front/) });
     expect(d.describeAlls()).toBe(1);
   });
 
-  it('WebDriverAgent names the app at once: the same calls as before — no /source, no appinfo', async () => {
+  it('WebDriverAgent names the app at once — no /source, no appinfo', async () => {
     const d = lab([bundle(LAB)], { tree: WDA_ALERT });
     expect(await d.adapter.launch(LAB)).toEqual({ holder: 'none' });
     expect(d.calls).toEqual([...WRITES, LAUNCH]);
@@ -514,7 +514,7 @@ describe("IosAdapter.launch — the system alert it waits behind, named in its n
     expect(d.reads()).toBe(0);
   });
 
-  it('another app to the bound (not SpringBoard): no /source read — its note as before', async () => {
+  it('another app to the bound (not SpringBoard): no /source read — its own note', async () => {
     const d = lab([bundle('com.apple.MobileAddressBook')], { tree: WDA_ALERT });
     expect(launchTextOf(await d.adapter.launch(LAB))).toMatch(/^3 s after launching dev\.averi\.lab, WebDriverAgent still read com\.apple\.MobileAddressBook as the active app/);
     expect(d.reads()).toBe(0);
@@ -644,7 +644,7 @@ describe("IosAdapter.openDeepLink — the project's own scheme pre-approved for 
     expect(d.calls.filter((c) => c.includes('schemeapproval'))).toEqual([]);
   });
 
-  it('the write fails: openurl and the wait run as before, one stderr line, not tried again until install()', async () => {
+  it('the write fails: openurl and the wait still run, one stderr line, not tried again until install()', async () => {
     const d = lab([bundle(LAB)], { approval: new Error('simctl spawn: defaults write failed\nmore') });
     expect(await d.adapter.openDeepLink('averilab://d58', { appId: LAB })).toEqual({ holder: 'none' });
     expect(await d.adapter.openDeepLink('averilab://d58', { appId: LAB })).toEqual({ holder: 'none' });

@@ -333,7 +333,7 @@ describe('scrollUntilVisible — the soft keyboard', () => {
   it.each([
     ['hidden, witness hidden', { state: 'hidden' } as SoftKeyboard, 'hidden' as const, 1],
     ['unknown (fail open, the witness not asked)', { state: 'unknown' } as SoftKeyboard, 'shown' as const, 0],
-  ])('Android, window %s: judged and swiped over the whole screen, the result as before', async (_name, window, witness, witnessQueries) => {
+  ])('Android, window %s: judged and swiped over the whole screen', async (_name, window, witness, witnessQueries) => {
     const { fake } = androidForm({ startY: 1906, window, witness });
     const result = await scrollUntilVisible(fake, 'id:priority_select', { ...FAST, fully: true });
     expect(result).toEqual({ swipes: 0, visible: 1, clipped: [] });
@@ -428,7 +428,7 @@ describe('scrollUntilVisible — after the device check', () => {
     ['symmetric 729/729', 729 / 344, 729 / 283, 2],
     // The reviewer's 681 / −729 down, 650 up: full strokes reach it only on the 6th swipe.
     ['681/−729 down, 650 up', 729 / 344, 650 / 283, 2],
-  ])('convergence (review round 2), %s: the turned stroke is halved, so the distance left shrinks whatever the app flings', async (_name, down, up, swipes) => {
+  ])('convergence, %s: the turned stroke is halved, so the distance left shrinks whatever the app flings', async (_name, down, up, swipes) => {
     const fake = wdaForm(681, flinging(down, up));
     const result = await scrollUntilVisible(fake, 'id:row', { eyes: NO_EYES, fully: true, settleMs: 1, maxSwipes: 6 });
     expect(result).toEqual({ swipes, visible: 1, clipped: [] });
@@ -544,14 +544,14 @@ describe('scrollUntilVisible — a list\'s end that rebounds (docs/bugs/2026-10-
     expect(fake.swipes).toHaveLength(2);
   });
 
-  it('a platform whose strokes drag (Android\'s drag speed): no settled read, the strokes run to maxSwipes as before', async () => {
+  it('a platform whose strokes drag (Android\'s drag speed): no settled read, the strokes run to maxSwipes', async () => {
     const fake = bouncing(0.45);
     const error = await scrollUntilVisible(fake, 'text:"No Such Row"', { eyes: NO_EYES, settleMs: 0 }).catch((e: unknown) => e);
     expect((error as Error).message).toContain('failed after 6 swipes (maxSwipes)');
   });
 });
 
-describe('scrollUntilVisible — the round bound (code review of round 2, 2026-10-08)', () => {
+describe('scrollUntilVisible — the round bound', () => {
   it('at the defaults the rounds number at most 1 + (1 + SETTLE_CONFIRM_READS) × maxSwipes = 25: a target that leaves the frame every fourth read after a stroke', async () => {
     resetLayout();
     const target = node({ role: 'button', identifier: 't', rect: { x: 0, y: 3000, width: 100, height: 40 } });
@@ -671,7 +671,7 @@ describe('scrollUntilVisible — strokes that drag, not fling, over the scroll c
     );
   });
 
-  it('an adapter with no drag speed (iOS) strokes at its own default duration, as before — none is passed', async () => {
+  it('an adapter with no drag speed (iOS) strokes at its own default duration — none is passed', async () => {
     const fake = new LazyList(settingsLabels, 198, SETTINGS);
     await scrollUntilVisible(fake, 'text:"Display"', { eyes: NO_EYES, maxSwipes: 6, timeoutMs: 5_000, settleMs: 1 });
     expect(fake.swipes.length).toBeGreaterThan(0);
@@ -733,7 +733,7 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
     expect(fake.tapPoints).toEqual([{ x: 540, y: 990 }]);
   });
 
-  it('the toggle\'s leaf label "Payment details" 66,1936 948x42, flush with the cut the toggle is a sliver at (round 8): the plain stop scrolls on for it too, and the tap then goes through', async () => {
+  it('the toggle\'s leaf label "Payment details" 66,1936 948x42, flush with the cut the toggle is a sliver at: the plain stop scrolls on for it too, and the tap then goes through', async () => {
     const fake = new SwiftForm(1000);
     fake.tap = async (x, y) => {
       fake.tapPoints.push({ x, y });
@@ -815,7 +815,7 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
     }
   }
 
-  it('a sliver at the form\'s TOP under a default (down) scroll (code review round 2): it lies at the far edge, so the first stroke turns at once — one swipe, the row whole', async () => {
+  it('a sliver at the form\'s TOP under a default (down) scroll: it lies at the far edge, so the first stroke turns at once — one swipe, the row whole', async () => {
     const fake = new TopForm(1000, 132, [12, 120], 1000 + 132 - 242 - 40); // its bottom 40 px showing
     expect((await fake.uiTree()).children[0].children[0].rect).toEqual({ x: 66, y: 242, width: 948, height: 40 });
     expect(await scrollUntilVisible(fake, 'id:row', FAST)).toEqual({ swipes: 1, visible: 1, clipped: [] });
@@ -838,7 +838,7 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
     expect(fake.offset).toBe(0);
   });
 
-  it('a classic-View row cut to 33 px at the list\'s TOP, its texts dumped inverted (code review of round 7, P1: SETTINGS_ROW_SLIVER): their clippedOut is the evidence — the plain stop does not stop on it', async () => {
+  it('a classic-View row cut to 33 px at the list\'s TOP, its texts dumped inverted (SETTINGS_ROW_SLIVER): their clippedOut is the evidence — the plain stop does not stop on it', async () => {
     const fake = new FakeAdapter({ s: parseDump(SETTINGS_ROW_SLIVER) }, 's');
     fake.viewportSize = { width: 1080, height: 2220 };
     await expect(scrollUntilVisible(fake, 'id:apps_row', { ...FAST, maxSwipes: 0 })).rejects.toThrow(
@@ -848,7 +848,7 @@ describe('scrollUntilVisible — a plain stop does not stop on a sliver the tap 
 
 });
 
-describe('scrollUntilVisible — nested clipping containers and a loading list (code review of fix/r3-scroll, 2026-10-09)', () => {
+describe('scrollUntilVisible — nested clipping containers and a loading list', () => {
   const LIST: Rect = { x: 0, y: 242, width: 1080, height: 1736 };
   /** A list holding a horizontal carousel cut by the list's bottom to `strip` px, a card in it flush with its bottom. */
   function carouselTree(strip: number): UiNode {
@@ -909,7 +909,7 @@ describe('scrollUntilVisible — nested clipping containers and a loading list (
  * scroll_until on the match more of which showed (the container, its centre clear) would be refused by the next tap,
  * which acts on the button (resolveNow's preference for a sole interactive match). The scroll judges the tap's match.
  */
-describe('scrollUntilVisible — the match the next tap acts on (code review P2)', () => {
+describe('scrollUntilVisible — the match the next tap acts on', () => {
   const ios = (children: UiNode[]) => {
     // idb's flat list, as the 0×0 root says: no ancestry told.
     const fake = new FakeAdapter({ s: node({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 }, flatList: true, children }) }, 's');
@@ -933,7 +933,7 @@ describe('scrollUntilVisible — the match the next tap acts on (code review P2)
     );
   });
 
-  it('…and with no one match the tap prefers (two non-interactive nodes), every match is judged as before: the one that stops wins', async () => {
+  it('…and with no one match the tap prefers (two non-interactive nodes), every match is judged: the one that stops wins', async () => {
     const fake = ios([
       APP,
       node({ role: 'text', identifier: 'prio', label: 'Priority', rect: { x: 24, y: 700, width: 354, height: 40 } }),
@@ -1090,7 +1090,7 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
     return fake;
   }
 
-  it.each([785, 790])('a row coming in from below whose top is under CONTINUE (24,780 354x44) at y %d, direction down: one stroke on, as before — CONTINUE lies in the near half, no turn', async (start) => {
+  it.each([785, 790])('a row coming in from below whose top is under CONTINUE (24,780 354x44) at y %d, direction down: one stroke on — CONTINUE lies in the near half, no turn', async (start) => {
     const fake = await following(start, (travel, y) => y + travel);
     expect(await scrollUntilVisible(fake, 'id:swift_payment.form.priority_select', { ...FAST, maxSwipes: 6 })).toEqual({ swipes: 1, visible: 1, clipped: [] });
     expect(fake.swipes).toEqual([{ from: { x: 201, y: 699 }, to: { x: 201, y: 175 } }]);
@@ -1114,7 +1114,7 @@ describe('scroll_until and iOS\'s status band (2026-10-09)', () => {
  * line (ui-tree/keyboard-position.ts#KeyboardPosition.line) ends the stroke box, and (owner decision D2) the judgement
  * is made above it.
  */
-describe('scroll_until over idb\'s soft keyboard (round 7)', () => {
+describe('scroll_until over idb\'s soft keyboard', () => {
   const NO_STROKE_ON_KEYS = 'never on the keys';
   /** `tree` on an idb-shaped fake (no oracle, 402x874), its `target` moved 300 pt up by a stroke that touches down above `bandTop` and left where it is by one on the keys. */
   function idbForm(tree: UiNode, target: UiNode, bandTop: number) {
@@ -1231,7 +1231,7 @@ describe('scroll_until over idb\'s soft keyboard (round 7)', () => {
     expect(fake.swipes.every(({ from }) => from.y < 590), NO_STROKE_ON_KEYS).toBe(true);
   });
 
-  it('WDA and Android unchanged: the same nodes in a tree that is not idb\'s flat list are stroked over the whole screen, as before (`201 699 201 175`)', async () => {
+  it('WDA and Android unchanged: the same nodes in a tree that is not idb\'s flat list are stroked over the whole screen (`201 699 201 175`)', async () => {
     const { tree, street } = await numberPad();
     delete tree.flatList;
     tree.rect = { x: 0, y: 0, width: 402, height: 874 };
@@ -1240,7 +1240,7 @@ describe('scroll_until over idb\'s soft keyboard (round 7)', () => {
     expect(fake.swipes).toEqual([{ from: { x: 201, y: 699 }, to: { x: 201, y: 175 } }]);
   });
 
-  it('a bottom sheet\'s unlabelled background with NO keyboard (code review of round 7, MAJOR 1 — `Other 0,400 402x474` listed before its rows): no band — the strokes are the whole screen\'s, and the sheet\'s target is reached', async () => {
+  it('a bottom sheet\'s unlabelled background with NO keyboard (`Other 0,400 402x474` listed before its rows): no band — the strokes are the whole screen\'s, and the sheet\'s target is reached', async () => {
     const { parseIdbDescribeAll } = await import('../../src/adapters/ios-tree-source.js');
     const el = (type: string, AXLabel: string | null, x: number, y: number, width: number, height: number) => ({ type, AXLabel, AXUniqueId: null, frame: { x, y, width, height } });
     const tree = parseIdbDescribeAll(
@@ -1302,7 +1302,7 @@ describe('scroll_until over idb\'s soft keyboard (round 7)', () => {
     ]);
   });
 
-  it('an app\'s PIN pad (no background listed — run5-ios #81\'s shape) is content: the stroke box is the whole screen, as before', async () => {
+  it('an app\'s PIN pad (no background listed — run5-ios #81\'s shape) is content: the stroke box is the whole screen', async () => {
     const { tree, street } = await numberPad();
     tree.children.splice(tree.children.findIndex((n) => n.role === 'other' && n.rect.y === 589), 1);
     const fake = idbForm(tree, street, 589);

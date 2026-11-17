@@ -976,7 +976,7 @@ flows:
     expect(fake.launches).toHaveLength(2);
   });
 
-  it('is bounded: a still-stuck run fails as before, with the pass in the trace', async () => {
+  it('is bounded: a still-stuck run fails, with the pass in the trace', async () => {
     const screens = () => {
       resetLayout();
       return {
@@ -1928,7 +1928,7 @@ flows:
     expect(row?.detail).not.toContain('100% of it is in the viewport');
   });
 
-  it('the NEGATIVE half: a genuinely off-screen element still fails as before', async () => {
+  it('the NEGATIVE half: a genuinely off-screen element still fails', async () => {
     const fake = scrollingFake(50_000, 10);
     await expect(FlowEngine.run(cfgFully, fake, FAST, { flow: 'to_submit' })).rejects.toThrow(
       /never intersected the 1000x2000 viewport/,
@@ -2756,7 +2756,7 @@ flows:
       expect(trace.some((t) => (t.detail ?? '').includes('(cleared'))).toBe(false);
     });
 
-    it('M-1: a clear-only fill on the label is a ⚠ fill line, NOT verified', async () => {
+    it('a clear-only fill on the label is a ⚠ fill line, NOT verified', async () => {
       const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
       const trace = await FlowEngine.run(iosCfg('{ text: "IBAN*", value: "", clear: true }'), fake, FAST, { flow: 'f' });
       expect(trace).toContainEqual({
@@ -3187,7 +3187,7 @@ flows:
         expect(fake.tapPoints).toEqual([]);
       });
 
-      it('an ABSENT optional element is skipped as before, and the ladder escalates as before', async () => {
+      it('an ABSENT optional element is skipped, and the ladder escalates', async () => {
         const fake = ladderFake(754);
         fake.live().children = fake.live().children?.filter((c) => c.identifier !== 'priority');
         await FlowEngine.run(ladder, fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' }).catch(() => undefined);
@@ -3198,7 +3198,7 @@ flows:
       // is refused fails the rung, and the ladder escalates as it always has.
       // Pins both halves — `isTerminal` NOT listing interact's refusal, and
       // runStep wrapping it only at `swallowDepth > 0`.
-      it('the same refusal on a NON-optional tap fails the rung, and the ladder escalates to the next rung as before', async () => {
+      it('the same refusal on a NON-optional tap fails the rung, and the ladder escalates to the next rung', async () => {
         const plain = parseConfig(`
 app: { android: { package: md.bank.app } }
 states:
@@ -3371,7 +3371,7 @@ ${head}
           ]);
         });
 
-        it('an optional fill on an ABSENT field is still skipped (not present), and the ladder escalates as before', async () => {
+        it('an optional fill on an ABSENT field is still skipped (not present), and the ladder escalates', async () => {
           const fake = ladderFake(700);
           const trace = await FlowEngine.run(fillLadder('      - optional: [ { fill: { id: nope, value: "x" } } ]'), fake, { ...FAST, reachRecheckMs: 20 }, { state: 'logged_in' }).catch(
             (e: unknown) => (e as FlowError).trace,
@@ -3454,7 +3454,7 @@ flows:
     expect(fake.taps).toEqual(['k1', 'k2']);
   });
 
-  it('a tap on an unmarked node: the trace as before, no ⚠ line', async () => {
+  it('a tap on an unmarked node: the plain trace, no ⚠ line', async () => {
     const fake = new FakeAdapter({ s: screen(node({ role: 'button', identifier: 'go', rect: { x: 100, y: 200, width: 40, height: 20 } })) }, 's');
     const trace = await FlowEngine.run(flow('tap: { id: go }'), fake, FAST, { flow: 'f' });
     expect(trace.map((t) => t.action)).toEqual(['flow f', 'tap', 'flow f']);
@@ -3502,7 +3502,7 @@ flows:
     expect(fake.typed).toEqual(['123456']);
   });
 
-  it('a fill: clear of the keyboard traces the one fill line, as before', async () => {
+  it('a fill: clear of the keyboard traces the one fill line', async () => {
     const fake = loginFake();
     fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
     const trace = await FlowEngine.run(flow('fill: { id: login_password, value: "123456" }'), fake, FAST, { flow: 'f' });
@@ -4186,7 +4186,7 @@ ${steps}
       ]);
     });
 
-    it('fill … dismissKeyboard: true with the band up and nothing configured: a ⚠ fill line that the keyboard was left up, the fill line as before, and NO enter (the blind key submitted, K5d)', async () => {
+    it('fill … dismissKeyboard: true with the band up and nothing configured: a ⚠ fill line that the keyboard was left up, the fill line, and NO enter (the blind key submitted)', async () => {
       const fake = iosFake();
       const trace = await FlowEngine.run(flow('      - fill: { id: login_password, value: secret, dismissKeyboard: true }'), fake, FAST, { flow: 'f' });
       expect(trace).toEqual([
@@ -4199,7 +4199,7 @@ ${steps}
       expect(fake.taps).toEqual(['login_password']);
     });
 
-    it('fill … dismissKeyboard: true with no band (the HID typing parked the keyboard, or an idb tree): nothing pressed, nothing tapped, the fill line as before', async () => {
+    it('fill … dismissKeyboard: true with no band (the HID typing parked the keyboard, or an idb tree): nothing pressed, nothing tapped, the plain fill line', async () => {
       const fake = iosFake(false);
       const trace = await FlowEngine.run(configured('      - fill: { id: login_password, value: secret, dismissKeyboard: true }'), fake, FAST, { flow: 'f' });
       expect(trace.map((t) => t.action)).toEqual(['flow f', 'fill', 'flow f']);
@@ -4259,14 +4259,14 @@ flows:
       if (id === 'logout_btn') self.current = 'login';
     });
 
-  it('works from the login screen, as before', async () => {
+  it('works from the login screen', async () => {
     const fake = loopFake('login');
     const trace = await FlowEngine.run(LOOP, fake, FAST, { state: 'logged_in' });
     expect(fake.taps).toEqual(['login_btn']);
     expect(trace.at(-1)).toEqual({ action: 'state logged_in', detail: 'reached after login' });
   });
 
-  it('works from the logged-in side, as before', async () => {
+  it('works from the logged-in side', async () => {
     const fake = loopFake('home');
     const trace = await FlowEngine.run(LOOP, fake, FAST, { state: 'login_screen' });
     expect(fake.taps).toEqual(['logout_btn']);

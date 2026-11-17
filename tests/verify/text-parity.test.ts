@@ -1300,7 +1300,7 @@ describe('measureOcrAssert — the ocr assert\'s one measurement, every "not rea
     });
   });
 
-  it('a final verdict carries its failure sentence by type — a final pass, or a final miss without its detail, does not compile (round 4, 2026-10-08)', () => {
+  it('a final verdict carries its failure sentence by type — a final pass, or a final miss without its detail, does not compile', () => {
     const ended: PollVerdict = { pass: false, final: true, detail: 'OCR failed: …; failing closed, rendered text unchecked' };
     // @ts-expect-error — a final verdict ends the assert, so it must say why
     const silent: PollVerdict = { pass: false, final: true };

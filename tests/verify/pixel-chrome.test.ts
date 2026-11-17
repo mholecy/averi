@@ -83,7 +83,7 @@ const coversNamed = (misses: readonly string[]): Record<string, number> => {
  */
 const OCR: Reads = (r: Rect): Rect => r; // the ocr assert reads the whole rect
 
-describe('Scene.standing for the pixel assert over every fixture node (round 8)', () => {
+describe('Scene.standing for the pixel assert over every fixture node', () => {
   it('the ocr reader (the whole rect): the covers named are chrome only — nothing that takes a touch and hides no pixel', async () => {
     const { judged, misses } = await sweep(undefined, OCR);
     expect(judged).toBe(1846);
@@ -184,7 +184,7 @@ describe('Scene.standing for the pixel assert over every fixture node (round 8)'
 });
 
 /** The owner's 2-unit edge (geometry.ts#PIXEL_OVERLAP_SLACK): ≤ 2 on the thin side is no cover, 3 is — for a cover and for the band alike. */
-describe('the 2-unit edge (round 8, the owner\'s decision)', async () => {
+describe('the 2-unit edge (the owner\'s decision)', async () => {
   const pos4 = (await json('idb-swift-form-scrolled-under-top-bar.json')).positions.pos4 as { AXLabel?: string; frame: { y: number } }[];
   const formWith = (label: string, y: number) => parseIdbDescribeAll(JSON.stringify(pos4.map((e) => (e.AXLabel === label ? { ...e, frame: { ...e.frame, y } } : e))));
   const judge = (tree: UiNode, label: string) => over({ viewport: async () => IPHONE }, tree, [...everyNode(tree)].find((n) => n.label === label)!);

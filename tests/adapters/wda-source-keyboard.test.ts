@@ -165,7 +165,7 @@ describe('parseWdaSource — the on-screen keyboard\'s band carries KEYBOARD_ROL
     for (const key of keys) expect(key.role).toBe('other');
   });
 
-  it('the measured bug: login_submit resolves as before, and its centre lies inside the band WITH the bar and WITHOUT it', () => {
+  it('the measured bug: login_submit resolves, and its centre lies inside the band WITH the bar and WITHOUT it', () => {
     for (const tree of [LOGIN_BAR, LOGIN_NO_BAR]) {
       const submit = resolveNow(tree, 'id:login_submit', { ambiguous: 'refuse' });
       expect(submit?.node).toMatchObject({ role: 'button', rect: { x: 36, y: 547, width: 141, height: 48 } });

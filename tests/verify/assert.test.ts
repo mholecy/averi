@@ -1255,7 +1255,7 @@ describe('screenshot baseline asserts — the iOS status band is left out of the
     expect(await diffOn('android', island)).toMatchObject({ pass: false, detail: '5.40% of pixels differ' });
   });
 
-  it('diffs the whole iOS frame, as before, when the viewport cannot be read', async () => {
+  it('diffs the whole iOS frame when the viewport cannot be read', async () => {
     expect(await diffOn('ios', island, { viewport: 'fails' })).toMatchObject({ pass: false, detail: '5.40% of pixels differ' });
   });
 
@@ -2232,7 +2232,7 @@ describe('pixel asserts under the Android soft keyboard (2026-10-06)', () => {
     }
   });
 
-  it('a hidden keyboard, or an oracle that cannot tell, changes nothing — asked once, then the round goes on as before', async () => {
+  it('a hidden keyboard, or an oracle that cannot tell, changes nothing — asked once, then the round goes on', async () => {
     for (const state of ['hidden', 'unknown'] as const) {
       const fake = cardFake();
       fake.attachKeyboard({ state });
@@ -2452,7 +2452,7 @@ describe('pixel asserts under the iOS in-tree keyboard (2026-10-07)', () => {
  * `value_date_select` at 24,30 PASSED on the status bar's #EFF1F4, its ocr read the bar's "Contacts"; one under
  * CONTINUE sampled CONTINUE's #91919A. The same shapes, through the idb parser.
  */
-describe('pixel asserts under chrome drawn over the element (round 8)', async () => {
+describe('pixel asserts under chrome drawn over the element', async () => {
   const FORM = JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-continue.json', import.meta.url), 'utf8')) as Record<string, unknown>[];
   const MODAL = JSON.parse(await readFile(new URL('../fixtures/idb-modal-listed-before-content.json', import.meta.url), 'utf8')).screens as Record<string, unknown[]>;
   /** CONTINUE as the miss names it: its frame, and its reach — the pinned bar's, run down to the screen's bottom (draw-order.ts#pinnedReach). */

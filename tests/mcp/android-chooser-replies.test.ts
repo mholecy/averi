@@ -317,7 +317,7 @@ describe("tap's reply on Android's chooser (D66): warned on a disabled button, n
     expect(tapText(selector, tapped)).toBe(`Tapped ${selector}\n${WARN}`);
   });
 
-  it('a row\'s app name (enabled): the reply is the one Tapped line, byte for byte as before D66', async () => {
+  it('a row\'s app name (enabled): the reply is the one Tapped line, nothing more', async () => {
     const { adapter, taps } = await chooserTree();
     const tapped = await tapElement(adapter, 'text:"AveriLab twin"', { eyes: NO_EYES, ambiguous: 'refuse', timeoutMs: 200, pollMs: 2 });
     expect(taps).toHaveLength(1);

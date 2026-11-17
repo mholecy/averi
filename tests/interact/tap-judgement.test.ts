@@ -336,7 +336,7 @@ describe('judgeTap(…).aim() — a later stacked screen layer over the target (
     );
   });
 
-  it('the remedy is the presented screen\'s only where the cover lies on it: a row of the sheet under another of the sheet\'s rows (`add address` under `add field`, both scrolled to the form\'s top) is refused as before — scroll_until it first', async () => {
+  it('the remedy is the presented screen\'s only where the cover lies on it: a row of the sheet under another of the sheet\'s rows (`add address` under `add field`, both scrolled to the form\'s top) is refused — scroll_until it first', async () => {
     const { outcome } = await judge((await screens()).contactsSheet, 'add address', { first: IPHONE });
     expect(said(outcome)).toMatch(/ — scroll_until it first; nothing was tapped$/);
   });

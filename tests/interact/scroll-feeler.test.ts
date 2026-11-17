@@ -147,7 +147,7 @@ describe('the unmoved stop for a target never seen under idb says what idb does 
     expect(message.split('close that first')).toHaveLength(2);
   });
 
-  it('not once a stroke has moved the tree: the list ran to its end, the cause as before', () => {
+  it('not once a stroke has moved the tree: the list ran to its end, the plain cause', () => {
     const played = play(UP, [{ tree: rows(20, 62) }, { tree: rows(20, 222) }, { tree: rows(20, 222) }, { tree: rows(20, 222) }]);
     expect(failureOf(played, 'label:"Z"').message).not.toContain('idb lists only');
   });

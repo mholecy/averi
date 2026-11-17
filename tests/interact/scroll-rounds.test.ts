@@ -101,7 +101,7 @@ describe('round — the judgement and the stop', () => {
     expect(failureOf(stuck, 'id:submit_button').message).toMatch(/content is exhausted[\s\S]*cannot be fully revealed — that is a layout defect/);
   });
 
-  it('fully: true, clipped: ONE stroke that does not move it is a transient, not the layout defect — the next one scrolls (review round 2)', () => {
+  it('fully: true, clipped: ONE stroke that does not move it is a transient, not the layout defect — the next one scrolls', () => {
     // 1980–2020 clipped; the first stroke is not taken, the second moves it to 1380.
     expect(resultOf(play({ ...SCROLLING, fully: true }, reads([1980, 1980, 1380, 1380], (y) => button(y))))).toEqual({ swipes: 2, visible: 1, clipped: [] });
   });
@@ -141,7 +141,7 @@ describe('round — the judgement and the stop', () => {
     );
   });
 
-  it('once a read has read, a failed read later in the call strokes on as before: the read before it is the evidence, and the next read is compared with it', () => {
+  it('once a read has read, a failed read later in the call strokes on: the read before it is the evidence, and the next read is compared with it', () => {
     const failed: Row = { error: 'WDA /source timed out' };
     const played = play(SCROLLING, [{ found: [button(50_000)] }, failed, { found: [button(49_980)] }, { found: [button(49_970)] }, { found: [button(49_960)] }]);
     expect(played.steps.map((st) => st.do)).toEqual(['stroke', 'stroke', 'stroke', 'stroke', 'stop']);
@@ -200,7 +200,7 @@ describe('round — the soft keyboard', () => {
     );
   });
 
-  it('Android, two matches — one under the IME, one above it: the band changes WHICH is judged, so the clean stop says it was judged above the keyboard (review round 3)', () => {
+  it('Android, two matches — one under the IME, one above it: the band changes WHICH is judged, so the clean stop says it was judged above the keyboard', () => {
     const result = resultOf(play(ANDROID, [{ found: [formRow(1906), formRow(500)], cover: UP_IME }]));
     expect(result).toEqual({ swipes: 0, visible: 1, clipped: [], keyboard: { state: 'shown', frame: IME } });
     expect(describeScrollResult(result)).toBe('fully visible after 0 swipes, judged above the soft keyboard over [0,1398][1080,2220]');
@@ -212,7 +212,7 @@ describe('round — the soft keyboard', () => {
     expect(played.asks).toEqual([]);
   });
 
-  it('Android, a STALE window state (review 2026-10-08: frame shown, input method says hidden — measured for seconds after a navigating tap) is vetoed: the on-screen target is not scored 0, no stroke is sent, no keyboard reported', () => {
+  it('Android, a STALE window state (frame shown, input method says hidden — measured for seconds after a navigating tap) is vetoed: the on-screen target is not scored 0, no stroke is sent, no keyboard reported', () => {
     const played = play({ ...ANDROID, fully: true }, [{ found: [formRow(1906)], cover: UP_IME, corroborated: false }]);
     expect(resultOf(played)).toEqual({ swipes: 0, visible: 1, clipped: [] });
     expect(played.steps.map((s) => s.do)).toEqual(['stop']);
@@ -235,7 +235,7 @@ describe('round — the soft keyboard', () => {
     expect(played.asks.filter((a) => a === 'witness')).toHaveLength(4);
   });
 
-  it('Android, a denial followed by a real keyboard (review round 1: a stale window on round 0, then a new screen auto-focuses a field) — asked again, so the row under the IME is not "fully visible after 1 swipe"', () => {
+  it('Android, a denial followed by a real keyboard (a stale window on round 0, then a new screen auto-focuses a field) — asked again, so the row under the IME is not "fully visible after 1 swipe"', () => {
     const played = play({ ...ANDROID, fully: true }, [
       { found: [formRow(2506)], cover: UP_IME, corroborated: false }, // denied once…
       { found: [formRow(1906)], cover: UP_IME }, // …then confirmed: inside the IME, the band applied, one more swipe
@@ -351,7 +351,7 @@ describe('round — the soft keyboard', () => {
     );
   });
 
-  it('the `unlocated` row on a DEFAULT clean stop: not asked (review 2026-10-08 — a witness query on every clean stop buys a sentence nobody acts on)', () => {
+  it('the `unlocated` row on a DEFAULT clean stop: not asked (a witness query on every clean stop buys a sentence nobody acts on)', () => {
     const played = play(ANDROID, [{ found: [formRow(500)], unlocated: true }]);
     expect(resultOf(played)).toEqual({ swipes: 0, visible: 1, clipped: [] });
     expect(played.asks).toEqual([]);
@@ -548,7 +548,7 @@ describe('round — after the device check', () => {
     expect(resultOf(play({ ...SCROLLING, maxSwipes: 6 }, reads([3100, 3100, 2500, 1900, 1900], (y) => button(y))))).toEqual({ swipes: 3, visible: 1, clipped: [] });
   });
 
-  it('several matches off the frame: exhausted only when NO match moved — a static duplicate first in tree order is not the target the strokes move (review round 1)', () => {
+  it('several matches off the frame: exhausted only when NO match moved — a static duplicate first in tree order is not the target the strokes move', () => {
     const ghost = () => match({ x: 5000, y: 100, width: 100, height: 40 }, 'submit_button'); // another page
     const rows = [3700, 3100, 2500, 1900, 1900].map((y): Row => ({ found: [ghost(), button(y)] }));
     expect(resultOf(play(SCROLLING, rows))).toEqual({ swipes: 3, visible: 1, clipped: [] }); // 3700 → 1900
@@ -637,7 +637,7 @@ describe('round — after the device check', () => {
   });
 });
 
-describe('round — the round bound (code review of round 2, 2026-10-08)', () => {
+describe('round — the round bound', () => {
   it(`at the defaults the rounds number at most 1 + (1 + SETTLE_CONFIRM_READS) × maxSwipes = 25: a target that leaves the frame every fourth read after a stroke`, () => {
     // Round 0 below the fold; after any stroke, three reads in the frame each at a new y (a stop that never confirms), then one off it.
     const ys = [3000, ...Array.from({ length: 24 }, (_, i) => (i % 4 === 3 ? 3000 : 100 + i * 10))];
@@ -766,7 +766,7 @@ describe('round — a fully: true stop flush with its clipping scroll container 
     expect(resultOf(played).flush).toBeUndefined();
   });
 
-  it('flush with BOTH edges along the scroll — a row taller than its list, cut at both ends, reads the list\'s rect: NOT probed (one probe cannot tell which side is cut), reported unchecked, `fills`, and the reply says so (code review of round 3)', () => {
+  it('flush with BOTH edges along the scroll — a row taller than its list, cut at both ends, reads the list\'s rect: NOT probed (one probe cannot tell which side is cut), reported unchecked, `fills`, and the reply says so', () => {
     const played = play(FULLY_ANDROID, [formRead(242, 1736)]);
     expect(played.steps.map((s) => s.do)).toEqual(['stop']);
     const result = resultOf(played);
@@ -848,7 +848,7 @@ describe('round — a lazy list that drops the target, and a screen strokes no l
     expect(error).not.toBeInstanceOf(ElementNotFoundError);
   });
 
-  it('a failed read is not a drop: the round strokes the caller\'s way, as before; the read after it, without the target, is', () => {
+  it('a failed read is not a drop: the round strokes the caller\'s way; the read after it, without the target, is', () => {
     const played = play({ ...FULLY_ANDROID, maxSwipes: 2 }, [lastName(1317), { error: 'uiautomator dump returned no XML' }, imeGone]);
     expect(strokesToward(played)).toEqual(['down', 'down']);
     const after = play({ ...FULLY_ANDROID, maxSwipes: 3 }, [lastName(1317), { error: 'uiautomator dump returned no XML' }, imeGone, imeGone]);
@@ -916,7 +916,7 @@ describe('round — a lazy list that drops the target, and a screen strokes no l
   });
 });
 
-describe('round — the flush check across nested clipping containers, and a probe that may have been a tap (code review of fix/r3-scroll, 2026-10-09)', () => {
+describe('round — the flush check across nested clipping containers, and a probe that may have been a tap', () => {
   const FULLY_ANDROID: Rules = { ...ANDROID, fully: true };
   /** The vertical list, `[0,242][1080,1978]`. */
   const LIST: Rect = { x: 0, y: 242, width: 1080, height: 1736 };
@@ -1023,7 +1023,7 @@ describe('round — the flush check across nested clipping containers, and a pro
     expect(decided(down.steps[0])).toEqual({ do: 'stroke', kind: 'full', toward: 'down', reach: 1, box: UNDER });
   });
 
-  it('a read that finds the target in no container with room drops the last read\'s container — stale, maybe another list — and strokes over the screen box (code review of deep/r3-scroll, P5)', () => {
+  it('a read that finds the target in no container with room drops the last read\'s container — stale, maybe another list — and strokes over the screen box', () => {
     const OTHER: Rect = { x: 0, y: 300, width: 1080, height: 300 };
     const UNDER: Rect = { x: 0, y: 1340, width: 1080, height: 800 };
     const played = play({ ...ANDROID, maxSwipes: 2 }, [
@@ -1045,7 +1045,7 @@ describe('round — the flush check across nested clipping containers, and a pro
     ]);
   });
 
-  it('a lone strip under a band the moot rule left unasked: no room even over the whole screen — `room` at once, the witness NOT asked (room is judged first without the band, so the ask order is as before deep/r3-scroll)', () => {
+  it('a lone strip under a band the moot rule left unasked: no room even over the whole screen — `room` at once, the witness NOT asked (room is judged first without the band)', () => {
     const LOW_BAND = coverOver({ x: 0, y: 2000, width: 1080, height: 220 }); // the card ends at 1978, above it: moot
     const played = play(FULLY_ANDROID, [{ found: [card(1978 - 30 + 4)], scrollers: [carousel(30)], cover: LOW_BAND }]);
     expect(played.steps.map((st) => st.do)).toEqual(['stop']);
@@ -1111,7 +1111,7 @@ describe('round — a node drawn over the stroke\'s container (docs/bugs/2026-10
   const BAR = node({ role: 'container', rect: { x: 66, y: 1840, width: 948, height: 248 }, children: ['home', 'accounts', 'cards', 'more'].map(tab) });
   const strokes = (played: ReturnType<typeof play>) => played.steps.flatMap((st) => (st.do === 'stroke' ? [drawnFor(st)] : []));
 
-  it('the measured shape both ways (code review of fix/r4, P1): the uncut stroke touches down at 1942 on the bar\'s rect; the cut one at 1638, above 1840, and an exhausted run then names no bar', () => {
+  it('the measured shape both ways: the uncut stroke touches down at 1942 on the bar\'s rect; the cut one at 1638, above 1840, and an exhausted run then names no bar', () => {
     const row = (rest: string): Row => ({ found: [], mainScroller: LIST, over: [BAR], rest });
     const played = play(ANDROID, [row('a'), row('a'), row('a')]);
     // The uncut stroke — as it was drawn on the device — touched down at 1942 on the bar's host (tests/interact/stroke-plan.test.ts). With the cut: above the host, on the list — and so the exhausted fail has no node drawn over the list to name.
@@ -1154,7 +1154,7 @@ describe('round — a node drawn over the stroke\'s container (docs/bugs/2026-10
     expect(steps[1]).toMatchObject({ toward: 'down', box: LIST, coverTop: 1826 });
   });
 
-  it('…judged every round, with that round\'s cover: the IME gone, the strip the target lies in has room again and is stroked — its nearest container, no longer the list around it (D1, code review of fix/r5-stroke)', () => {
+  it('…judged every round, with that round\'s cover: the IME gone, the strip the target lies in has room again and is stroked — its nearest container, no longer the list around it (D1)', () => {
     const STRIP: Rect = { x: 0, y: 1350, width: 1080, height: 200 }; // 48 px above the IME at 1398
     // Read above the frame (beyond the far edge of a scroll down), so losing it turns nothing: both strokes content-down.
     const played = play({ ...ANDROID, maxSwipes: 2 }, [
@@ -1168,7 +1168,7 @@ describe('round — a node drawn over the stroke\'s container (docs/bugs/2026-10
     ]);
   });
 
-  it('a wrapper drawn over the WHOLE list (its rect holds the list\'s) is no evidence of a cover at the touch-down: not named — the exhausted words as before (review round 1)', () => {
+  it('a wrapper drawn over the WHOLE list (its rect holds the list\'s) is no evidence of a cover at the touch-down: not named — the plain exhausted words', () => {
     const WRAPPER = node({ role: 'container', rect: { ...LIST }, children: [node({ role: 'text', label: 'Empty state', rect: { x: 0, y: 300, width: 1080, height: 80 } })] });
     const row = (rest: string): Row => ({ found: [], mainScroller: LIST, over: [WRAPPER], rest });
     expect(failureOf(play(ANDROID, [row('a'), row('a'), row('a')]), 'id:t').message).toBe(
@@ -1228,7 +1228,7 @@ describe('round — strokes drawn across the scroll view they went over (D59b)',
     );
   });
 
-  it('the lab tree as batch-11 read it: every stroke now goes inside the carousel (of unknown axis), none across the page — and with a carousel that lists no content (the derived tree, no card), no stroke is proven unmoved: the stop is maxSwipes, saying its motion was not shown (review round 1)', () => {
+  it('the lab tree as batch-11 read it: every stroke now goes inside the carousel (of unknown axis), none across the page — and with a carousel that lists no content (the derived tree, no card), no stroke is proven unmoved: the stop is maxSwipes, saying its motion was not shown', () => {
     const tree = parseDump(LAZY);
     const played = play(RIGHT, [{ tree }, { tree }, { tree }, { tree }, { tree }]);
     expect(played.steps.map((st) => st.do)).toEqual(['stroke', 'stroke', 'stroke', 'stroke', 'stop']);
@@ -1240,7 +1240,7 @@ describe('round — strokes drawn across the scroll view they went over (D59b)',
     );
   });
 
-  it('a scroll view told along the stroke beside the page (review round 1\'s probe: a chips row, a sibling of the page, never a candidate): named, with the way into it — not "the tree shows none"', () => {
+  it('a scroll view told along the stroke beside the page (a chips row, a sibling of the page, never a candidate): named, with the way into it — not "the tree shows none"', () => {
     const row = node({ role: 'other', rect: { x: 0, y: 0, width: 1080, height: 1100 } });
     const chips = node({ role: 'scrollable', identifier: 'feed.chips', clipsDescendants: true, scrollAxis: 'horizontal', rect: { x: 0, y: 2000, width: 1080, height: 150 } });
     const tree = node({ role: 'container', rect: { ...PAGE }, children: [node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'vertical', rect: { ...PAGE }, children: [row] }), chips] });
@@ -1256,7 +1256,7 @@ describe('round — strokes drawn across the scroll view they went over (D59b)',
     );
   });
 
-  it('…but not one wholly under the status or the navigation band (review round 2): the usable screen less its bands is where a swipe can reach', () => {
+  it('…but not one wholly under the status or the navigation band: the usable screen less its bands is where a swipe can reach', () => {
     const row = node({ role: 'other', rect: { x: 0, y: 0, width: 1080, height: 1100 } });
     const run = (chips: Rect, bands: { statusBand?: number; navigationBand?: number }) => {
       const tree = node({ role: 'container', rect: { ...PAGE }, children: [node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'vertical', rect: { ...PAGE }, children: [row] }), node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { ...chips } })] });
@@ -1278,7 +1278,7 @@ describe('round — strokes drawn across the scroll view they went over (D59b)',
     );
   });
 
-  it('a stroke along the page (`down`) over the same tree: no across clause — the exhausted words as before', () => {
+  it('a stroke along the page (`down`) over the same tree: no across clause — the plain exhausted words', () => {
     const tree = parseDump(LAZY);
     expect(failureOf(play(ANDROID, [{ tree }, { tree }, { tree }]), 'id:t').message).toMatch(
       'scroll_until id:t failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree',
@@ -1371,14 +1371,14 @@ describe('round — a target under the app\'s chrome (2026-10-09)', () => {
     expect(resultOf(played)).toEqual({ swipes: 0, visible: 1, clipped: [] });
   });
 
-  it('of two matches, one that stops the round wins over one more of which shows but whose centre is under the bar (review round 1)', () => {
+  it('of two matches, one that stops the round wins over one more of which shows but whose centre is under the bar', () => {
     const big = match({ x: 24, y: 720, width: 200, height: 120 }, 'priority'); // 76 of 120 pt show (63 %), centre (124,780) on the bar
     const small = match({ x: 230, y: 755, width: 148, height: 40 }, 'priority'); // beside it: 25 of 40 show (62.5 %), centre (304,775) clear
     const played = play(IPHONE, [{ found: [big, small], over: [CONTINUE] }]);
     expect(played.steps.map((st) => st.do)).toEqual(['stop']);
   });
 
-  it('without fully, the centre must lie on the SCREEN — the frame the next tap\'s on-screen rule judges (code review P3, repro B): a row whose centre is off the bottom edge is scrolled on, and stops once it is on', () => {
+  it('without fully, the centre must lie on the SCREEN — the frame the next tap\'s on-screen rule judges: a row whose centre is off the bottom edge is scrolled on, and stops once it is on', () => {
     const row = (y: number): Row => ({ found: [match({ x: 0, y, width: 402, height: 60 }, 'r')] });
     const played = play(IPHONE, [row(850), row(600), row(600)]);
     expect(played.steps.map((st) => st.do)).toEqual(['stroke', 'confirm', 'stop']);
@@ -1398,7 +1398,7 @@ describe('round — a target under the app\'s chrome (2026-10-09)', () => {
     expect(play(IPHONE, [row(850), row(500), row(500)]).steps.map((st) => st.do)).toEqual(['stroke', 'confirm', 'stop']);
   });
 
-  it('stuck without fully, the row clipped AND its centre under a bar: the bar leads, as at the bound — not "cannot be fully revealed" (code review S1)', () => {
+  it('stuck without fully, the row clipped AND its centre under a bar: the bar leads, as at the bound — not "cannot be fully revealed"', () => {
     const bar = node({ role: 'button', label: 'Bar', rect: { x: 0, y: 800, width: 402, height: 74 } });
     const row: Row = { found: [match({ x: 0, y: 840, width: 402, height: 60 }, 'r')], over: [bar] };
     const played = play(IPHONE, [row, row, row, row]);
@@ -1459,7 +1459,7 @@ describe('round — a target resting in the frame at the edge the strokes push i
     expect(failureOf(played, 'id:priority').message).toContain('swiping down no longer moves it. The app draws that over it at the end of the content — a layout defect');
   });
 
-  it('a cover over the far side at the TOP (a bar over the row\'s top, the default direction down): turned at once — not stroked on under it (code review P7\'s accepted cost)', () => {
+  it('a cover over the far side at the TOP (a bar over the row\'s top, the default direction down): turned at once — not stroked on under it (an accepted cost)', () => {
     const bar = node({ role: 'other', label: 'Header', rect: { x: 0, y: 62, width: 402, height: 60 } });
     const row = (y: number): Row => ({ found: [match({ x: 24, y, width: 354, height: 52 }, 'priority')], over: [bar] });
     const played = play({ ...IPHONE, fully: true }, [row(100), row(300), row(300)]);
@@ -1496,7 +1496,7 @@ describe('round — a target resting in the frame at the edge the strokes push i
   // Review of the first cut (2026-10-09): the edge test alone would turn a row coming in from below whose top a bottom
   // bar covers — the bar is over its far edge, but it sits in the near half of the frame. Only a cover in the far half
   // counts.
-  it('a snackbar low on the screen (0,1700 1000x80) over the top of a row coming in from below (1720): stroked on down, as before — not turned away', () => {
+  it('a snackbar low on the screen (0,1700 1000x80) over the top of a row coming in from below (1720): stroked on down — not turned away', () => {
     const snack = node({ role: 'button', identifier: 'snack', label: 'Undo', rect: { x: 0, y: 1700, width: 1000, height: 80 } });
     const row = (y: number): Row => ({ found: [match({ x: 0, y, width: 1000, height: 100 })], over: [snack] });
     const played = play(SCROLLING, [row(1720), row(1120), row(1120)]);
@@ -1601,7 +1601,7 @@ describe('round — a target resting in the frame at the edge the strokes push i
     expect(resultOf(played)).toEqual({ swipes: 4, visible: 1, clipped: [] });
   });
 
-  describe('under idb\'s flat list, the far side is where a cover PRESSES — CONTINUE pinned at the bottom reaches the screen\'s bottom (draw-order.ts#bottomPinned; code review of round 6b P1)', () => {
+  describe('under idb\'s flat list, the far side is where a cover PRESSES — CONTINUE pinned at the bottom reaches the screen\'s bottom (draw-order.ts#bottomPinned)', () => {
     /** The same read as idb gives it: a flat list, CONTINUE listed last and pinned. */
     const idb = (y: number): Row => ({ ...form(y), flatList: true });
 
@@ -1640,21 +1640,21 @@ describe('round — a target resting in the frame at the edge the strokes push i
     });
   });
 
-  it('the stuck turn is ONE stroke, once: a stroke back that moves it, and a second stuck, fail as before — no third direction change for the stuck test', () => {
+  it('the stuck turn is ONE stroke, once: a stroke back that moves it, and a second stuck, fail — no third direction change for the stuck test', () => {
     // The stroke back stops it at 300; the confirming read finds it flung back to 776 (a bounce), and up twice moves it no more.
     const played = play({ ...MEASURED, direction: 'up', fully: true, maxSwipes: 10 }, [form(-20), form(776), form(776), form(776), form(300), form(776), form(776), form(776)]);
     expect(strokesToward(played)).toEqual(['up', 'up', 'up', 'down', 'up', 'up']);
     expect(played.outcome).toMatchObject({ kind: 'stuck', lastStroke: 'up', otherWay: 'stroked' });
   });
 
-  it('no swipe left for the stuck turn: stuck at once, as before, and the status-bar sentence still advises the way not tried', () => {
+  it('no swipe left for the stuck turn: stuck at once, and the status-bar sentence still advises the way not tried', () => {
     const played = play({ ...MEASURED, direction: 'up', maxSwipes: 2 }, [form(10), form(10), form(10)]);
     expect(strokesToward(played)).toEqual(['up', 'up']);
     expect(played.outcome).toMatchObject({ kind: 'stuck', otherWay: 'untried' });
     expect(failureOf(played, 'id:priority').message).toContain('swiping up no longer moves it out from under the status bar — try direction: "down"');
   });
 
-  it('a row clipped at the NEAR edge (the bottom, scrolling down) is stroked on the caller\'s way, as before', () => {
+  it('a row clipped at the NEAR edge (the bottom, scrolling down) is stroked on the caller\'s way', () => {
     const played = play({ ...MEASURED, fully: true }, [form(850), form(400), form(400)]);
     expect(strokesToward(played)).toEqual(['down']);
     expect(reaches(played)).toEqual([1]);
@@ -1673,7 +1673,7 @@ describe('round — the Android navigation band (Spec B, D7): a centre in it is 
     expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] });
   });
 
-  it('…and with no band read: the stop at 0 swipes, as before the band was read', () => {
+  it('…and with no band read: the stop at 0 swipes', () => {
     const unread: UsableScreen = { box: PIXEL_BOX, boxes: [PIXEL_BOX], oriented: PIXEL_BOX, from: 'device', statusBand: 66 };
     const played = play(ANDROID, [row(2152, unread)]);
     expect(resultOf(played)).toEqual({ swipes: 0, visible: 1, clipped: [] });
@@ -1888,7 +1888,7 @@ describe('round — a target uiautomator dumped CLIPPED OUT of its scroll contai
   });
 });
 
-describe('round — a target read wholly past the far edge on iOS, and one never found by strokes that ran to the end of the content (round 8\'s B1 gap)', () => {
+describe('round — a target read wholly past the far edge on iOS, and one never found by strokes that ran to the end of the content', () => {
   /** A 354x52 row at y under WDA, read where it is (iOS keeps a scrolled-past node, its rect off the screen). */
   const row = (y: number): Row => ({ found: [match({ x: 24, y, width: 354, height: 52 }, 'row')] });
   const tree = (rest: string): Row => ({ found: [], rest });
@@ -1905,7 +1905,7 @@ describe('round — a target read wholly past the far edge on iOS, and one never
     expect(failureOf(play({ ...IPHONE, direction: 'up' }, ranToEnd), 'id:t').message).toMatch(/— element never appeared in the tree — if it lies below, try direction: "down"$/);
   });
 
-  it('never in the tree, and NO stroke ever changed the screen (review round 1 of fix/r8-wording): nothing says the content ran to its end — the swipes may not have been taken — so no side is named', () => {
+  it('never in the tree, and NO stroke ever changed the screen: nothing says the content ran to its end — the swipes may not have been taken — so no side is named', () => {
     expect(failureOf(play(IPHONE, [tree('a'), tree('a'), tree('a')]), 'id:t').message).toBe(
       'scroll_until id:t failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree',
     );
@@ -2430,7 +2430,7 @@ describe('round — `fully: true` on a row as tall as its list (D52, WDA)', () =
     expect(played.steps.map((s) => s.do)).toEqual(['stroke']);
   });
 
-  it('a row 352 tall (48 of room): stroked for, as before', () => {
+  it('a row 352 tall (48 of room): stroked for', () => {
     expect(play(FULLY, [tallRow(190, 352)]).steps.map((s) => s.do)).toEqual(['stroke']);
   });
 
@@ -3052,14 +3052,14 @@ describe('round — a read that lists none of the stroked scroll view\'s content
     expect(describeScrollResult(resultOf(played))).toMatch(/visible after 5 swipes/);
   });
 
-  it('a stroke across a vertical list of full-width rows (direction right): the rows show no sideways motion, yet the list scrolls on y alone — two unchanged reads end it, as before', () => {
+  it('a stroke across a vertical list of full-width rows (direction right): the rows show no sideways motion, yet the list scrolls on y alone — two unchanged reads end it', () => {
     const list = tabRead(tabDump('android.widget.ScrollView', undefined, [[300, 500, 'A'], [900, 1100, 'B']]));
     const played = play({ ...DEFAULTS, direction: 'right' }, [list, list, list]);
     expect(played.outcome).toMatchObject({ kind: 'bound', by: { of: 'exhausted', unchanged: 'tree' } });
     expect(touchDowns(played)).toHaveLength(2);
   });
 
-  it('the real form-picker list (14 full-width rows, its axis unnamed by its class), stroked sideways: the rows show no x motion, yet they are its content — two unchanged reads end it, as before', () => {
+  it('the real form-picker list (14 full-width rows, its axis unnamed by its class), stroked sideways: the rows show no x motion, yet they are its content — two unchanged reads end it', () => {
     const tree = parseDump(readFileSync(new URL('../fixtures/truth/android-averi_lab-api33/form-picker.xml', import.meta.url), 'utf8'));
     for (const direction of ['right', 'left'] as const) {
       const played = play({ ...DEFAULTS, direction }, [read(tree), read(tree), read(tree)]);
@@ -3147,7 +3147,7 @@ describe('round — the scroll views the strokes did not go over, before the tar
     );
   });
 
-  it('boundText, the clause order: a node named under the touch-down, then the strokes across their scroll view, then the scroll views beside — said in that order, the node and the scroll views beside both said (review round 1); an end the tree proves outranks all', () => {
+  it('boundText, the clause order: a node named under the touch-down, then the strokes across their scroll view, then the scroll views beside — said in that order, the node and the scroll views beside both said; an end the tree proves outranks all', () => {
     const touched = { at: { x: 540, y: 788 }, on: { role: 'text', label: 'Banner', identifier: null, rect: { x: 0, y: 700, width: 1080, height: 200 } }, container: UPPER };
     const across = { rect: UPPER, axis: 'horizontal' as const };
     const beside = { axis: 'vertical' as const, strokedOver: UPPER, others: [lower] };
@@ -3161,7 +3161,7 @@ describe('round — the scroll views the strokes did not go over, before the tar
     expect(boundText({ of: 'exhausted', lastStroke: 'down', unchanged: 'matches', beside, ends }, 1)).not.toContain('did not go over');
   });
 
-  it('boundText, more than 3: the 3 largest named, then how many more (review round 1)', () => {
+  it('boundText, more than 3: the 3 largest named, then how many more', () => {
     const more = [0, 1, 2, 3, 4].map((i) => ({ role: 'scrollable', label: null, identifier: `l${i}`, rect: { x: 0, y: 1000 + i * 100, width: 1080, height: 90 } }));
     expect(boundText({ of: 'exhausted', lastStroke: 'down', unchanged: 'tree', beside: { axis: 'vertical', strokedOver: UPPER, others: more } }, 2)).toContain(
       'the tree shows 5 other scroll views that scroll vertically, which the swipes did not go over: scrollable id:l0 (0,1000 1080x90) as within: {"x":0,"y":1000,"width":1080,"height":90}, scrollable id:l1 (0,1100 1080x90) as within: {"x":0,"y":1100,"width":1080,"height":90}, scrollable id:l2 (0,1200 1080x90) as within: {"x":0,"y":1200,"width":1080,"height":90} and 2 more — if the element lies in one of them,',
@@ -3200,14 +3200,14 @@ describe('round — the scroll views the strokes did not go over, before the tar
     }
   });
 
-  it('boundText over the screen box names the touch-down, and the scroll view it lies in when the tree lists one (review round 1)', () => {
+  it('boundText over the screen box names the touch-down, and the scroll view it lies in when the tree lists one', () => {
     expect(boundText({ of: 'exhausted', lastStroke: 'up', unchanged: 'tree', beside: { axis: 'vertical', at: { x: 201, y: 437 }, landed: { x: 0, y: 100, width: 402, height: 200 }, others: [lower] } }, 2)).toContain(
       'did not change the screen: the swipes were drawn over the screen whole (aimed at no scroll view), touching down at 201,437 inside the scroll view 0,100 402x200; the tree shows a scroll view',
     );
     expect(boundText({ of: 'exhausted', lastStroke: 'up', unchanged: 'tree', beside: { axis: 'vertical', at: { x: 201, y: 437 }, others: [lower] } }, 2)).toContain('(aimed at no scroll view), touching down at 201,437; the tree shows a scroll view');
   });
 
-  it('boundText at maxSwipes and at the timeout: the scroll views beside said too, then the bound\'s own way out (review round 1)', () => {
+  it('boundText at maxSwipes and at the timeout: the scroll views beside said too, then the bound\'s own way out', () => {
     const beside = { axis: 'vertical' as const, strokedOver: UPPER, others: [lower] };
     expect(boundText({ of: 'maxSwipes', beside }, 1)).toBe(`after 1 swipe (maxSwipes: ${BESIDE}; else: raise maxSwipes or timeoutMs)`);
     expect(boundText({ of: 'timeout', timeoutMs: 15_000, elapsedMs: 16_000, reads: { count: 2, totalMs: 900, lastMs: 450 }, beside }, 1)).toBe(
@@ -3215,7 +3215,7 @@ describe('round — the scroll views the strokes did not go over, before the tar
     );
   });
 
-  it('the lab tree at maxSwipes and at the timeout, the target never read: the stop names `lower` (review round 1: raising the bound strokes `upper` again)', () => {
+  it('the lab tree at maxSwipes and at the timeout, the target never read: the stop names `lower` (raising the bound would stroke `upper` again)', () => {
     const tree = parseDump(BOUNDED);
     const capped = play({ ...ANDROID, maxSwipes: 1, timeoutMs: 15_000 }, [{ tree }, { tree }]);
     expect(capped.outcome).toMatchObject({ kind: 'bound', by: { of: 'maxSwipes', beside: { strokedOver: UPPER, others: [lower] } } });
@@ -3380,7 +3380,7 @@ describe('round — `within`, the scroll view named for the strokes until the ta
     );
   });
 
-  it('…the same keyboard with no `within`: the largest scroller (`upper`, clear of it) is stroked as before — nothing stops', () => {
+  it('…the same keyboard with no `within`: the largest scroller (`upper`, clear of it) is stroked — nothing stops', () => {
     const tree = parseDump(BOUNDED);
     const played = play({ ...ANDROID, maxSwipes: 1, timeoutMs: 15_000 }, [{ tree, cover: HIGH_IME }, { tree, cover: HIGH_IME }]);
     expect(strokesOf(played).map((st) => st.box)).toEqual([UPPER]);
@@ -3395,7 +3395,7 @@ describe('round — `within`, the scroll view named for the strokes until the ta
     expect(failureOf(played, 'id:lab.scroll-bounded.O').message).toMatch(/^scroll_until id:lab\.scroll-bounded\.O stopped after 1 swipe, without swiping further — within \{"x":0,"y":1046,"width":1080,"height":495\} names the scroll view 0,1046 1080x495, which has no room/);
   });
 
-  it('…the adapter\'s KeyboardRemedy words the way out (review round 1, MAJOR-1): a cover no key hides (`none`, iOS-shaped) — a neutral tap, then its advice', () => {
+  it('…the adapter\'s KeyboardRemedy words the way out: a cover no key hides (`none`, iOS-shaped) — a neutral tap, then its advice', () => {
     const tree = parseDump(BOUNDED);
     const played = play({ ...ANDROID, maxSwipes: 6, timeoutMs: 15_000, within: LOWER }, [{ tree, cover: coverOver({ x: 0, y: 1100, width: 1080, height: 1120 }, NO_BACK) }]);
     expect(played.outcome).toMatchObject({ kind: 'within', refused: { of: 'noRoom', keyboard: { lineY: 1100, remedy: NO_BACK } } });

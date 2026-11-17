@@ -556,7 +556,7 @@ describe('a tap target off the screen (2026-10-08)', () => {
     expect(fake.taps).toEqual(['amount']);
   });
 
-  it('partly on screen: the centre decides — on screen, tapped at the centre as before; off, refused with how much shows', async () => {
+  it('partly on screen: the centre decides — on screen, tapped at the centre; off, refused with how much shows', async () => {
     const fake = swiftForm();
     const street = () => fake.live().children[1];
     street().rect = { x: 42, y: 860, width: 103, height: 20 }; // centre (94,870): on screen, 14 of 20 pt visible
@@ -569,7 +569,7 @@ describe('a tap target off the screen (2026-10-08)', () => {
     expect(fake.tapPoints).toEqual([{ x: 94, y: 870 }]);
   });
 
-  it('no screen to judge by — the device size unreadable and no window in the tree: the tap goes ahead as before (fail open)', async () => {
+  it('no screen to judge by — the device size unreadable and no window in the tree: the tap goes ahead (fail open)', async () => {
     resetLayout();
     const fake = new FakeAdapter({ s: node({ role: 'container', rect: { x: 0, y: 0, width: 0, height: 0 }, children: [node({ role: 'button', identifier: 'go', rect: { x: 40, y: 3000, width: 100, height: 20 } })] }) }, 's');
     fake.viewport = async () => {
@@ -728,7 +728,7 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     await expect(tapElement(fake, 'text:"5"', OPTS)).rejects.toThrow('FakeAdapter: nothing tappable at (204,677)');
   });
 
-  it('idb, a strip of the band with no key listed over it (the number pad\'s keys 30 pt lower — a suggestion bar\'s shape; synthetic): a row under the lifted CONTINUE is never tapped inside the band — refused; with no background in the tree (an app\'s PIN pad\'s shape) nothing is lifted and the row is tapped at its centre, as before', async () => {
+  it('idb, a strip of the band with no key listed over it (the number pad\'s keys 30 pt lower — a suggestion bar\'s shape; synthetic): a row under the lifted CONTINUE is never tapped inside the band — refused; with no background in the tree (an app\'s PIN pad\'s shape) nothing is lifted and the row is tapped at its centre', async () => {
     const tree = parseIdbDescribeAll(JSON.stringify(JSON.parse(await readFile(new URL('../fixtures/idb-swift-form-number-pad.json', import.meta.url), 'utf8')).elements));
     for (const n of tree.children) if (n.role === 'button' && n.rect.y >= 596) n.rect = { ...n.rect, y: n.rect.y + 30 };
     tree.children.splice(tree.children.findIndex((n) => n.identifier === 'swift_payment.form.continue_button'), 0, node({ role: 'button', identifier: 'fees', label: 'Fees', rect: { x: 24, y: 540, width: 354, height: 80 } }));

@@ -580,7 +580,7 @@ describe('fillField — the post-focus re-read, only where focus can change the 
     expect(maskedAppend).toEqual({ held: 4 });
   });
 
-  it('kept: a plain field that is NOT empty is read as before — not at all (`includes` needs no count)', async () => {
+  it('kept: a plain field that is NOT empty is not read at all (`includes` needs no count)', async () => {
     const fake = field({ secure: false, value: '9.99' });
     const log = logged(fake);
     await fillField(fake, { id: 'amount_input' }, '12', FAST);

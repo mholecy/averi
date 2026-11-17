@@ -89,7 +89,7 @@ describe("a card cut at the screen's edge (D17): its centre unknown — one more
     expect(play(RULES, [cAt(66 + UNKNOWN_CENTRE_MIN_GAP, 1000), cAt(66)]).steps.map((s) => s.do)).toEqual(['stroke', 'stop']);
   });
 
-  it("never as a turn: content asked LEFT, C's unknown side on the right — a stroke toward it would turn the course: the stop as before, \"at most\"", () => {
+  it("never as a turn: content asked LEFT, C's unknown side on the right — a stroke toward it would turn the course: the plain stop, \"at most\"", () => {
     const played = play({ ...RULES, direction: 'left' }, [cAt(382)]);
     expect(played.steps.map((s) => s.do)).toEqual(['stop']);
     expect(describeScrollResult(resultOf(played))).toMatch(/at most 91% of it is in the viewport — uiautomator does not say how far it runs past the screen's right edge/);
@@ -115,7 +115,7 @@ describe("a card cut at the screen's edge (D17): its centre unknown — one more
     expect(travels(played)).toEqual([SHORT_60]);
   });
 
-  it('a card whose right side is known (inside the screen) is stopped on as before: no "at most"', () => {
+  it('a card whose right side is known (inside the screen) is stopped on: no "at most"', () => {
     const played = play(RULES, [cAt(1014), cAt(40)]);
     expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stop']);
     expect(describeScrollResult(resultOf(played))).not.toMatch(/at most/);
@@ -213,7 +213,7 @@ describe('`fully: true` on a card as wide as its carousel (D52): fails at the fi
     expect(play(FULLY_LEFT, [cAt(90, 900)]).outcome).toMatchObject({ kind: 'visible', swipes: 0 });
   });
 
-  it('`fully: false`: the plain stop on C at 45, as before (D17)', () => {
+  it('`fully: false`: the plain stop on C at 45 (D17)', () => {
     expect(play({ ...FULLY_LEFT, fully: false }, [cAt(45)]).outcome).toMatchObject({ kind: 'visible', swipes: 0 });
   });
 
@@ -432,12 +432,12 @@ describe('`fully: true` on a card as wide as a carousel of untold axis (D59): un
     expect(played.outcome).toBeUndefined();
   });
 
-  it('a 900-wide card (48 px of room), moved by a stroke: not unfit — stroked for, as before', () => {
+  it('a 900-wide card (48 px of room), moved by a stroke: not unfit — stroked for', () => {
     const played = play(FULLY_LEFT, [lazyAt(231, 900), lazyAt(45, 900)]);
     expect(played.outcome).toBeUndefined();
   });
 
-  it('the RecyclerView (View-cut: its card listed cut to the carousel, never clipped past it): no unfit — the flush rule as before (D68\'s slice)', () => {
+  it('the RecyclerView (View-cut: its card listed cut to the carousel, never clipped past it): no unfit — the flush rule (D68\'s slice)', () => {
     const RECYCLER = readFileSync(new URL('../fixtures/uiautomator-lab-carousel-recycler-free-launch.xml', import.meta.url), 'utf8');
     const RC = 'lab.carousel-recycler-free.C';
     /** C at app x `cx`, listed as a View child is: cut to the carousel's 66..1014. */
@@ -470,7 +470,7 @@ describe('`fully: true` on a card as wide as a carousel of untold axis (D59): un
     expect(vertical.outcome?.kind).not.toBe('unfit');
   });
 
-  it("scroll-sticky-cut (a LazyColumn, axis untold, its merged sticky header — VA1) in the D59 shape: `fully: true` along the list's axis; R growing out from under the header is no move (a size change), and R carried up through the list's bottom, moved along it, is 110 tall in 1238 — no unfit either way, the outcomes as before", () => {
+  it("scroll-sticky-cut (a LazyColumn, axis untold, its merged sticky header — VA1) in the D59 shape: `fully: true` along the list's axis; R growing out from under the header is no move (a size change), and R carried up through the list's bottom, moved along it, is 110 tall in 1238 — no unfit either way", () => {
     const STICKY = readFileSync(new URL('../fixtures/truth/android-averi_lab-api33/scroll-sticky-cut.xml', import.meta.url), 'utf8');
     const rAt = (bounds: string): Row => {
       const tree = parseDump(STICKY.replaceAll('bounds="[128,457][953,567]"', `bounds="${bounds}"`));
@@ -597,7 +597,7 @@ describe('`fully: true` on a View-cut card no swipe can bring whole (D68): the s
     }
   });
 
-  it('room left no smaller than the least measured carry (run 0: 24 px, carried 24 and 27): with swipes left, the next reveal is sent, as before', () => {
+  it('room left no smaller than the least measured carry (run 0: 24 px, carried 24 and 27): with swipes left, the next reveal is sent', () => {
     const played = play({ ...FULLY_LEFT, maxSwipes: 10 }, run(0).cardX.map(recyclerAt));
     expect(played.outcome).toBeUndefined();
     expect(travels(played)).toEqual([...run(0).strokes.map((s) => s.from.x - s.to.x), 48]);
@@ -609,7 +609,7 @@ describe('`fully: true` on a View-cut card no swipe can bring whole (D68): the s
     expect(travels(played)).toEqual([142, 188, 89, 48]);
   });
 
-  it('no stroke measured at all: at the bound before any probe, the stop unchecked as before — never this one', () => {
+  it('no stroke measured at all: at the bound before any probe, the stop unchecked — never this one', () => {
     const played = play({ ...FULLY_LEFT, maxSwipes: 0 }, [recyclerAt(81)]);
     expect(played.outcome).toMatchObject({ kind: 'visible', flush: { checked: false, why: 'budget' } });
   });
