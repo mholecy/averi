@@ -447,11 +447,11 @@ tests/interact/scroll-rounds.test.ts (the across clause, its order and wordings,
 of the derived tree), tests/ui-tree/scroll-clips.test.ts (the text input left out, `toldOn` and its filters),
 tests/ui-tree/geometry-viewport.test.ts (`clearOfSystemBands`). Hand mutants, each from a saved copy, each killed:
 - M1 page only → the lazy-free stroke; M2 nested smallest first → "two nested of unknown axis"; M3 nested before the
-  page → the `down`/`up` control; M4 text-input filter removed → geometry's text-input test; M5 unknown axis as
-  across → the carousel `down` group; M6 `strokedAcross` on an unknown axis and M7 `===` for `!==` → its test; M8 the
-  across clause before `touched` → `boundText`'s order; M9 `across` dropped from the bound and M13 the bound asked
-  for `down` → the across reply; M10 nested `over` emptied → the pager `down` under a bar; M11 nested axes undefined →
-  the told-vertical-list control; M12 the axis word fixed → `boundText`'s horizontal-page case.
+  page → the `down`/`up` control; M4 text-input filter removed → scroll-clips.test.ts's text-input test; M5 unknown axis
+  as across → the carousel `down` group; M6 `strokedAcross` on an unknown axis and M7 `===` for `!==` → its test; M8 the
+  across clause before `touched` → `boundText`'s order; M9 `across` dropped from the bound and M13 the bound asked for
+  `down` → the across reply; M10 nested `over` emptied → the pager `down` under a bar; M11 nested axes undefined → the
+  told-vertical-list control; M12 the axis word fixed → `boundText`'s horizontal-page case.
 - Round 1: N1 ranking dropped and N2 inverted → chips before feed; N3 `toldOn` keeps text inputs and N4 its flat-list
   guard removed → `toldOn`'s test; N5 `along` never set, N6 smallest picked, N7 `noRoom` inverted, N9 asked of the
   page's own axis → `strokedAcross`' tests; N8 the two wordings swapped → the rounds replies.
