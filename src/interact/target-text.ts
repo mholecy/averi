@@ -2,6 +2,7 @@ import type { Point, Rect, UiNode } from '../adapters/types.js';
 import { cutAtLaterText } from '../ui-tree/cover.js';
 import { rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { outsideScrollViewText } from '../ui-tree/node-words.js';
+import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { clippedOutText, SIDES } from '../ui-tree/sides.js';
 
@@ -99,6 +100,17 @@ function cutByText(by: UiNode, cut: Cut, rect: Rect, minPiece: number, lineY: nu
 export interface KeyboardUp {
   readonly lineY: number;
   readonly remedy: KeyboardRemedy;
+}
+
+/**
+ * The soft keyboard up at `line` (its `y`), hidden with `remedy`; none when there is no line. The one place a
+ * `KeyboardUp` is built: a tap's or a miss's reading line with the reading's remedy, and scroll-read.ts#upOf for the
+ * cover `scroll_until`'s round applies.
+ */
+export function keyboardUp(line: KeyboardLine, remedy: KeyboardRemedy): KeyboardUp;
+export function keyboardUp(line: KeyboardLine | undefined, remedy: KeyboardRemedy): KeyboardUp | undefined;
+export function keyboardUp(line: KeyboardLine | undefined, remedy: KeyboardRemedy): KeyboardUp | undefined {
+  return line === undefined ? undefined : { lineY: line.y, remedy };
 }
 
 /** What hides the soft keyboard where no key does (`KeyboardRemedy.dismissal` `none`): every wording below says it. */

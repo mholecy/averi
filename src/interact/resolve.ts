@@ -7,7 +7,7 @@ import { KEYBOARD_UNLISTED, MissedError, missNote, missOf, presentedAloneHeadlin
 import { pollTimeoutMessage, pollTree, readTreeOrMiss, type FirstSample } from '../ui-tree/read-tree.js';
 import { findTarget, hasArea, preferInteractive, type Target } from '../ui-tree/selectors.js';
 import { markedForMiss } from '../ui-tree/window-mark.js';
-import { keyboardMayCoverText } from './target-text.js';
+import { keyboardMayCoverText, keyboardUp } from './target-text.js';
 
 /**
  * The interaction module (interact/): what it takes to ACT on an element —
@@ -430,8 +430,8 @@ function keyboardMissNote(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdv
   const source = dialectOf(tree).topLayerOnly;
   if (source === undefined) return undefined;
   const look = lookOn(adapter, tree);
-  const line = look.keyboard.line();
-  return line === undefined ? undefined : keyboardMayCoverText({ lineY: line.y, remedy: look.reading.remedy }, KEYBOARD_UNLISTED[source]);
+  const keyboard = keyboardUp(look.keyboard.line(), look.reading.remedy);
+  return keyboard === undefined ? undefined : keyboardMayCoverText(keyboard, KEYBOARD_UNLISTED[source]);
 }
 
 /**
