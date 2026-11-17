@@ -212,8 +212,11 @@ author's own and are shown as written: the selector, a `value:"…"` included, a
 engine shows as the author wrote it, `***` for a secret (it redacts a flow's secrets from every line, the selector's
 included). An ambiguity's list of candidates (`resolve.ts#resolveNow`, every verb's) names an input whose label is its
 own text — an Android EditText with no content-desc — by that text's length and its rect, `label=<its text, 8
-characters> at 0,40 100x10`: a second match appearing while a fill re-reads its field quoted the value just typed. That
-covers averi's own derivation; a label the app built around the text (another case, the first keys, digits regrouped)
+characters> at 0,40 100x10`: a second match appearing while a fill re-reads its field quoted the value just typed. An
+assert's contains-hint over the whole tree (its spec matched nothing, `verify/text-hint.ts`) lists other nodes by the
+same rule (`ui-tree/listed-text.ts#listedText`, backlog A66); an assert quotes its own subject, in its content line and
+its hint, since that content is what it was asked about. A folded hint (`foldedTextHint`) quotes in either scope: its
+node differs from the expected text only in recognizer readings, which the hint names. That covers averi's own derivation; a label the app built around the text (another case, the first keys, digits regrouped)
 is not recognisable, so once the focus tap has landed a re-read's refusal lists every label by its length and rect,
 `label=<18 characters> at 0,60 100x10` (`ResolveOptions.labelsByLength`, passed by `fill-refetch.ts`). The cost: an
 agent loses the label words of a refusal mid-fill, and keeps the ids and rects to tell the candidates apart.
