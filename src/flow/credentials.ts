@@ -1,4 +1,4 @@
-import { SetupError, type AveriConfig } from './config.js';
+import { SetupError, unknownLine, type AveriConfig } from './config.js';
 
 /**
  * Credentials: which values a flow's `$name` and `${VAR}` stand for.
@@ -55,12 +55,28 @@ export interface Credentials {
 }
 
 /**
+ * The line refusing the environment a run would select (`requested`, else `AVERI_ENV`, else `defaultEnvironment:` —
+ * resolveCredentials' precedence), naming where the name came from; undefined when it is declared or none is
+ * selected. An own key of `environments:` only. Worded as flow/config.ts#unknownLine words every unknown name, so the
+ * run layer's pre-flight (run/preflight.ts#preflight) lists it beside the state and flow names.
+ */
+export function unknownEnvironment(cfg: AveriConfig, env: EnvValues, requested?: string): string | undefined {
+  const name = requested ?? env.AVERI_ENV ?? cfg.defaultEnvironment;
+  if (name === undefined || Object.hasOwn(cfg.environments ?? {}, name)) return undefined;
+  const source =
+    requested !== undefined ? 'requested'
+    : env.AVERI_ENV !== undefined ? 'AVERI_ENV'
+    : 'defaultEnvironment';
+  return unknownLine(`environment "${name}" (from ${source})`, 'environment', Object.keys(cfg.environments ?? {}));
+}
+
+/**
  * Pick the credential set for a run: base `credentials:` overlaid per-key with
  * `environments.<name>.credentials`, resolved ONCE so a run cannot type one
- * environment's username and another's password. An unknown name throws here;
- * the run layer calls this as a pre-flight so the refusal lands before any
- * device is touched (run/preflight.ts#preflight), and the
- * engine resolves for itself once more, before any STEP.
+ * environment's username and another's password. An unknown name throws here
+ * (unknownEnvironment's line); the run layer asks unknownEnvironment as a
+ * pre-flight so the refusal lands before any device is touched
+ * (run/preflight.ts#preflight), and the engine resolves here, before any STEP.
  *
  * Precedence, most specific first: explicit `requested` (tool argument) →
  * `AVERI_ENV` (settable from `.env.averi`, so switching backend is one line in
@@ -76,17 +92,9 @@ export function resolveCredentials(cfg: AveriConfig, env: EnvValues, requested?:
   let templates: Readonly<Record<string, string>> = base;
   let overriddenNames: readonly string[] = [];
   if (name !== undefined) {
-    const known = Object.keys(cfg.environments ?? {});
-    const environmentEntry = cfg.environments?.[name];
-    if (!environmentEntry) {
-      const source =
-        requested !== undefined ? 'requested'
-        : env.AVERI_ENV !== undefined ? 'AVERI_ENV'
-        : 'defaultEnvironment';
-      throw new SetupError(
-        `Unknown environment "${name}" (from ${source}) — known: ${known.join(', ') || '(none declared)'}`,
-      );
-    }
+    const unknown = unknownEnvironment(cfg, env, requested);
+    if (unknown !== undefined) throw new SetupError(unknown);
+    const environmentEntry = cfg.environments![name];
     templates = { ...base, ...environmentEntry.credentials };
     overriddenNames = Object.freeze(Object.keys(environmentEntry.credentials ?? {}));
   }

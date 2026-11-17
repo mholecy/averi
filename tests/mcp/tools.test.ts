@@ -351,7 +351,9 @@ describe('ensure_state and run_flow — the flow tools', () => {
       configPath: await validConfig(),
     });
     expect(result.isError).toBe(true);
-    expect(result.text).toMatch(/Unknown (state "hom"|flow "touch_hom")/);
+    // run_flow names only its flow and ensure_state only its state; verify takes both, in one refusal.
+    if (tool !== 'run_flow') expect(result.text).toContain('Unknown state "hom"');
+    if (tool !== 'ensure_state') expect(result.text).toContain('Unknown flow "touch_hom"');
     expect(result.text).toContain('Nothing was run on a device.');
     expect(bound()).toEqual([]);
   });

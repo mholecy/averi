@@ -34,6 +34,7 @@ import {
   flowIsDestructive,
   flowItselfIsDestructive,
   keyboardDismissals,
+  defines,
   SetupError,
   unknownName,
   type AveriConfig,
@@ -670,8 +671,8 @@ export class FlowEngine {
   }
 
   private async ensureStateLadder(name: string, node: string): Promise<void> {
+    if (!defines('state', name, this.cfg)) throw new SetupError(unknownName('state', name, this.cfg));
     const state = this.cfg.states[name];
-    if (!state) throw new SetupError(unknownName('state', name, this.cfg));
     // The probe immediately before the next rung: this entry check for rung
     // 0, then each rung's own re-check. Its answer gates a destructive rung.
     let probe = await this.detects(state.detect, 0);
@@ -1179,8 +1180,8 @@ export class FlowEngine {
   }
 
   private async runFlowInner(name: string): Promise<void> {
+    if (!defines('flow', name, this.cfg)) throw new SetupError(unknownName('flow', name, this.cfg));
     const flow = this.cfg.flows[name];
-    if (!flow) throw new SetupError(unknownName('flow', name, this.cfg));
     const requires = flow.requires;
     if (requires) await this.within(`flows.${name}`, () => this.ensureStateInner(requires));
     this.log(`flow ${name}`, 'start');
@@ -1682,9 +1683,8 @@ export class FlowEngine {
 
   /** A state's detect, by name — a SetupError for a name the config does not declare. */
   private detectOf(name: string): Condition {
-    const state = this.cfg.states[name];
-    if (!state) throw new SetupError(`Unknown state "${name}"`);
-    return state.detect;
+    if (!defines('state', name, this.cfg)) throw new SetupError(`Unknown state "${name}"`);
+    return this.cfg.states[name].detect;
   }
 
   /**

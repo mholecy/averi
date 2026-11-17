@@ -576,13 +576,26 @@ export class SetupError extends Error {
 }
 
 /**
- * The words for a state or flow name a request asks for and averi.yaml does not define: the known names, or plainly
- * that there are none rather than an empty list. One owner for the run layer's pre-flight (run/preflight.ts#preflight)
- * and the engine's own check, so the refusal before a device and the engine's invariant read alike.
+ * Whether averi.yaml defines a state or flow of this name: its OWN key, so `constructor` or `__proto__` is never a
+ * state or flow, as `in` or an index would make it. The one predicate for the load-time references
+ * (validateReferences), the run layer's pre-flight (run/preflight.ts#preflight) and the engine's lookups.
  */
+export function defines(kind: 'state' | 'flow', name: string, cfg: AveriConfig): boolean {
+  return Object.hasOwn(kind === 'state' ? cfg.states : cfg.flows, name);
+}
+
+/**
+ * The line for a name averi.yaml does not declare: the known names, or plainly that it declares none of that kind
+ * rather than an empty list. One wording for states, flows (unknownName) and environments
+ * (flow/credentials.ts#unknownEnvironment), so the pre-flight's one refusal reads alike line by line.
+ */
+export function unknownLine(what: string, kind: string, known: string[]): string {
+  return `Unknown ${what} — ${known.length === 0 ? `averi.yaml defines no ${kind}s` : `known: ${known.join(', ')}`}`;
+}
+
+/** The line for a state or flow name a request asks for and averi.yaml does not define (unknownLine). */
 export function unknownName(kind: 'state' | 'flow', name: string, cfg: AveriConfig): string {
-  const known = Object.keys(kind === 'state' ? cfg.states : cfg.flows);
-  return `Unknown ${kind} "${name}" — ${known.length === 0 ? `averi.yaml defines no ${kind}s` : `known: ${known.join(', ')}`}`;
+  return unknownLine(`${kind} "${name}"`, kind, Object.keys(kind === 'state' ? cfg.states : cfg.flows));
 }
 
 /**
@@ -758,12 +771,12 @@ function validateReferences(cfg: AveriConfig, source: string): void {
     throw new Error(`Invalid ${source}: ${msg}`);
   };
   const checkCondition = (c: Condition, where: string): void => {
-    const unknown = conditionStateRefs(c).find((ref) => !(ref in cfg.states));
+    const unknown = conditionStateRefs(c).find((ref) => !defines('state', ref, cfg));
     if (unknown !== undefined) fail(`${where} references unknown state "${unknown}"`);
   };
   const checkSteps = (steps: Step[], where: string): void => {
     for (const s of steps) {
-      if ('wait' in s && s.wait.state !== undefined && !(s.wait.state in cfg.states)) {
+      if ('wait' in s && s.wait.state !== undefined && !defines('state', s.wait.state, cfg)) {
         fail(`${where} waits for unknown state "${s.wait.state}"`);
       }
       // Branch arms carry a condition of their own; the nested STEPS of every
@@ -774,7 +787,7 @@ function validateReferences(cfg: AveriConfig, source: string): void {
       if (children !== undefined) checkSteps(children, where);
     }
   };
-  if (cfg.defaultEnvironment !== undefined && !(cfg.defaultEnvironment in (cfg.environments ?? {}))) {
+  if (cfg.defaultEnvironment !== undefined && !Object.hasOwn(cfg.environments ?? {}, cfg.defaultEnvironment)) {
     fail(
       `defaultEnvironment "${cfg.defaultEnvironment}" is not declared under environments: ` +
         `(known: ${Object.keys(cfg.environments ?? {}).join(', ') || 'none'})`,
@@ -783,11 +796,11 @@ function validateReferences(cfg: AveriConfig, source: string): void {
   for (const [name, state] of Object.entries(cfg.states)) {
     checkCondition(state.detect, `states.${name}.detect`);
     for (const flow of state.reach ?? []) {
-      if (!(flow in cfg.flows)) fail(`states.${name}.reach references unknown flow "${flow}"`);
+      if (!defines('flow', flow, cfg)) fail(`states.${name}.reach references unknown flow "${flow}"`);
     }
   }
   for (const [name, flow] of Object.entries(cfg.flows)) {
-    if (flow.requires !== undefined && !(flow.requires in cfg.states)) {
+    if (flow.requires !== undefined && !defines('state', flow.requires, cfg)) {
       fail(`flows.${name}.requires references unknown state "${flow.requires}"`);
     }
     checkSteps(flow.steps, `flows.${name}`);

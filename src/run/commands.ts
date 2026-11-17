@@ -77,11 +77,11 @@ async function runOnEngine(
   request: RunRequest,
 ): Promise<{ adapter: DeviceAdapter; trace: string }> {
   const { cfg, env } = call.project;
-  const run = preflight(call.project, request, call.environment);
+  preflight(call.project, request, call.environment);
   const adapter = await resolveAdapter(cfg);
   try {
     const context = { env, environment: call.environment, session: call.session };
-    const trace = await FlowEngine.run(cfg, adapter, context, run);
+    const trace = await FlowEngine.run(cfg, adapter, context, request);
     return { adapter, trace: formatTrace(trace) };
   } catch (e) {
     // A failed run's error lists the steps it claimed before the failure: it carries the claim note too (claims.ts).

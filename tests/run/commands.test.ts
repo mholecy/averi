@@ -242,6 +242,52 @@ describe('runNamedFlow', () => {
     expect(r.resolvedWith).toEqual([]);
   });
 
+  // runRequestOf reads "" as "none"; a call that names "" names a state or flow that cannot exist.
+  it.each([
+    ['ensure_state', 'state', (project: Awaited<ReturnType<typeof validProject>>, r: ReturnType<typeof resolver>) =>
+      runEnsureState({ session: new EngineSession(), state: '', project }, r.resolve)],
+    ['run_flow', 'flow', (project: Awaited<ReturnType<typeof validProject>>, r: ReturnType<typeof resolver>) =>
+      runNamedFlow({ session: new EngineSession(), flow: '', project }, r.resolve)],
+  ] as const)('%s: an empty %s name is refused as unknown, before the adapter is resolved', async (_tool, kind, run) => {
+    const r = resolver(home());
+    const known = kind === 'state' ? 'home' : 'open_menu';
+    await expect(run(await validProject(), r)).rejects.toThrow(`Unknown ${kind} "" — known: ${known}\nNothing was run on a device.`);
+    expect(r.resolvedWith).toEqual([]);
+  });
+
+  // Object.hasOwn, not `in` (flow/config.ts#defines): an inherited key is no state.
+  it('a state named `constructor` is unknown, not inherited — refused before the adapter is resolved', async () => {
+    const r = resolver(home());
+    await expect(
+      runEnsureState({ session: new EngineSession(), state: 'constructor', project: await validProject() }, r.resolve),
+    ).rejects.toThrow('Unknown state "constructor" — known: home');
+    expect(r.resolvedWith).toEqual([]);
+  });
+
+  it('an unknown flow and an unknown environment are ONE refusal naming both', async () => {
+    const r = resolver(home());
+    await expect(
+      runNamedFlow({ session: new EngineSession(), flow: 'nope', environment: 'prod', project: await validProject() }, r.resolve),
+    ).rejects.toThrow(
+      'Unknown flow "nope" — known: open_menu\n' +
+        'Unknown environment "prod" (from requested) — known: staging\n' +
+        'Nothing was run on a device.',
+    );
+    expect(r.resolvedWith).toEqual([]);
+  });
+
+  it('with no environments declared the refusal says so in the same words', async () => {
+    const r = resolver(home());
+    const project = await loadForCall(
+      REQUIRED_CONFIG_AND_ENV,
+      await file('noenv.yaml', 'app:\n  android: { package: a.b }\nflows:\n  f:\n    steps:\n      - launch: {}\n'),
+    );
+    await expect(runNamedFlow({ session: new EngineSession(), flow: 'f', environment: 'prod', project }, r.resolve)).rejects.toThrow(
+      'Unknown environment "prod" (from requested) — averi.yaml defines no environments\nNothing was run on a device.',
+    );
+    expect(r.resolvedWith).toEqual([]);
+  });
+
   it('with no states defined the refusal says so, rather than an empty list', async () => {
     const r = resolver(home());
     const project = await loadForCall(REQUIRED_CONFIG_AND_ENV, await file('bare.yaml', 'app:\n  android: { package: a.b }\n'));

@@ -4,7 +4,7 @@ import type { DeviceAdapter, Platform } from '../adapters/types.js';
 import type { AveriConfig } from '../flow/config.js';
 import type { EnvValues } from '../flow/credentials.js';
 import { preflight } from './preflight.js';
-import { formatTrace, FlowEngine, type EngineContext, type TraceEntry } from '../flow/engine.js';
+import { formatTrace, FlowEngine, runRequestOf, type EngineContext, type TraceEntry } from '../flow/engine.js';
 import { Verifier, type AssertResult, type AssertSpec } from '../verify/assert.js';
 import { appHealth } from './app-health.js';
 import { assertSummary, finalFrame, formatAsserts, screenshotFailedLine, type FinalFrame } from './run-reply.js';
@@ -373,7 +373,8 @@ export async function runVerification(
   // Same rule for the state and flow names and the environment — run/preflight.ts#preflight
   // has the why: ONE thrown refusal here, before any leg, for what every leg would have failed on.
   // Neither named (or both empty): no run, an empty trace per leg.
-  const request = preflight({ cfg, env }, req, req.environment);
+  const request = runRequestOf(req.state, req.flow);
+  preflight({ cfg, env }, request, req.environment);
 
   // The run's ONE OCR decision: the text table and every leg's Verifier read
   // with the same engine, or fail closed on the same reason. A Verifier that
