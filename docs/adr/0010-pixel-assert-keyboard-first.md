@@ -597,7 +597,13 @@ and holds none nested that is told along it or of unknown axis (the other axis' 
 offered; unknown axis proceeds); or the tree lists no scroll view at all (idb's flat list: `set app.ios.treeSource:
 wda, or swipe inside it by coordinates`). Never a silent fallback to the largest scroller: a caller who named a list
 and had another stroked would read the exhausted reply as that list's. It is refused even when the first read already
-shows the target: the option is checked where it is resolved, not only when a swipe needs it.
+shows the target: the option is checked where it is resolved, not only when a swipe needs it. **Amended 2026-11-17
+(A76)**: a selector's matches are those of area, as the tap's (`resolve.ts#preferred`): a zero-area node is never
+named, so a 0x0 twin beside the list leaves the list the one match, and a selector whose only matches are zero-area
+matches nothing (`absent`; WDA's springboard lists the icon `Maps` twice, both 0x0 at 0,0, and was refused as
+ambiguous, asking to narrow a selector no narrowing could make name a target). The tap's preference for the sole
+interactive match is not taken, on purpose: `within` has no note to say which match it chose, and a title in one
+list and a button in another under one selector would have the button's list stroked silently.
 
 (e) D76's reply cites it: `— if the element lies in it, scroll_until it again with within: {"x":0,"y":1046,"width":1080,"height":495}`
 (several: each named `<node> as within: {…}`, as the stale refusal lists them, then `— if the element lies in one of
