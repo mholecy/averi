@@ -543,16 +543,25 @@ describe('the live KNOWN pins the rule a case fails by and the kind of reply it 
   // could never match. live-visibility.ts produces `stop-claim` only on a `visible` reply; `tap-claim` on a `Tapped`
   // reply (judgeTap), and in an absent-at-end case (`absent:<cell>`, judgeAbsentAtEnd) on any reply but `visible` once
   // the app logged something since the launch.
+  const absentAtEnd = (key: string) => key.split(' ')[2]?.startsWith('absent:') === true;
+  const tapClaimable = (key: string, kind: string) => kind === 'Tapped' || (absentAtEnd(key) && kind !== 'visible');
+  const pinsAKindOfItsRule = ([k, e]: readonly [string, { cls: string; kind: string }]) =>
+    !((e.cls === 'stop-claim' && e.kind !== 'visible') || (e.cls === 'tap-claim' && !tapClaimable(k, e.kind)));
   it('a claim pins a kind its rule claims on: a stop on `visible`; a tap on `Tapped`, or in an absent-at-end case on any kind but `visible`', () => {
-    const absentAtEnd = (key: string) => key.split(' ')[2]?.startsWith('absent:') === true;
-    const tapClaimable = (key: string, kind: string) => kind === 'Tapped' || (absentAtEnd(key) && kind !== 'visible');
-    const bad = Object.entries(LIVE_KNOWN).filter(([k, e]) => (e.cls === 'stop-claim' && e.kind !== 'visible') || (e.cls === 'tap-claim' && !tapClaimable(k, e.kind)));
-    expect(bad).toEqual([]);
+    expect(Object.entries(LIVE_KNOWN).filter((entry) => !pinsAKindOfItsRule(entry))).toEqual([]);
+  });
+  it('an absent-at-end entry with a tap-claim: on `not found` it pins a kind its rule gives; on `visible`, or on a tap case\'s `not found`, it does not', () => {
+    expect(pinsAKindOfItsRule(['ios wda absent:scroll-top-edge-end', { cls: 'tap-claim', kind: 'not found' }])).toBe(true);
+    expect(pinsAKindOfItsRule(['ios wda absent:scroll-top-edge-end', { cls: 'tap-claim', kind: 'visible' }])).toBe(false);
+    expect(pinsAKindOfItsRule(['ios wda tap:scroll-top-edge-end.T', { cls: 'tap-claim', kind: 'not found' }])).toBe(false);
   });
   // Its notes (a bug note of docs/bugs, a residual of a decision) are checked in tests/truth/lab-notes.test.ts.
-  // A visibility case's id names its kind (`tap:<cell>.<target>`, …); a forms case's is live-cases.ts's own (b1d, p5, rf4: D31).
+  // A visibility case's id names its kind (`tap:<cell>.<target>`, `absent:<cell>`, …); a forms case's is live-cases.ts's
+  // own (b1d, p5, rf4: D31).
   it('every entry is keyed `<platform> <source> <case id>` and names a rule', () => {
-    for (const [k, e] of Object.entries(LIVE_KNOWN)) expect(`${k} ${e.cls}`).toMatch(/^(android|ios) \w+ ((tap|scroll|turn|carry):\S+|[a-z]+\d+[a-z]*) \S+$/);
+    const KEY = /^(android|ios) \w+ ((tap|scroll|turn|carry|absent):\S+|[a-z]+\d+[a-z]*) \S+$/;
+    for (const [k, e] of Object.entries(LIVE_KNOWN)) expect(`${k} ${e.cls}`).toMatch(KEY);
+    expect('ios wda absent:scroll-top-edge-end tap-claim').toMatch(KEY);
   });
 });
 
