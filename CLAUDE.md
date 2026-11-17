@@ -4,6 +4,13 @@ An MCP server (stdio, `bin` dist/mcp/server.js) that lets coding agents verify m
 Android emulators. TypeScript, Node 20+; `npm run lint`, `npm test`, `npm run build`. README.md for users,
 ARCHITECTURE.md for the design, docs/adr/ for the decisions behind it.
 
+## Comments
+
+A diff that changes code re-reads the comments on and above what it changed and fixes what no longer holds. Comments
+name code as `path.ts#symbol`: no line numbers, caller lists, bare review labels or history told as today;
+tests/docs/comments.test.ts and references.test.ts refuse the mechanical kinds. A comment audit reads only the diff
+since the commit the last audit record names.
+
 ## Releasing: binding
 
 Any request to release averi, publish it, tag it, or bump its version, however it is worded, means following
