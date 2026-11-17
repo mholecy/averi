@@ -1,5 +1,6 @@
-import type { Rect, UiNode } from '../adapters/types.js';
-import { PollMiss } from '../ui-tree/read-tree.js';
+import type { DeviceAdapter, Rect, UiNode } from '../adapters/types.js';
+import { pollTree, Undecided, type FirstSample, type PollObserver, type PollRound } from '../ui-tree/read-tree.js';
+import { markedForMiss } from '../ui-tree/window-mark.js';
 import { missOf, withMissNote } from '../ui-tree/miss.js';
 import type { Target } from '../ui-tree/selectors.js';
 import { formatSeconds } from '../util/duration.js';
@@ -60,16 +61,118 @@ export interface PixelMeasureInput {
 }
 
 /**
- * A verdict in the tree poll's terms, written once: a passing verdict is the
- * poll's value and carries its detail; a non-passing one with a detail is a
- * `PollMiss`, which is how "element found but content was: …" survives the
- * element vanishing again before the deadline; one with nothing to say
- * continues the poll without erasing an earlier detail.
+ * What a round of the verifier's poll concludes, in the poll's own miss type `M`: a pass or a final miss, which end the
+ * poll (`pollVerdicts`), or a miss, which the poll keeps (`LastFinding`) while polling goes on — mid-animation geometry
+ * may legitimately be wrong for a frame, so only the state at the deadline is the verdict. `undefined` says nothing (the
+ * element is not there yet) and erases nothing; `Undecided` is the tree poll's (ui-tree/read-tree.ts#Undecided).
  */
-export const verdictToPoll = (verdict: PollVerdict | undefined): { detail?: string } | PollMiss | undefined => {
-  if (verdict?.pass) return { detail: verdict.detail };
-  return verdict?.detail === undefined ? undefined : new PollMiss(verdict.detail);
+export type RoundVerdict<M> = { pass: true; detail?: string } | FinalVerdict | Missed<M>;
+
+/** A miss of one round, kept for the timeout until a later round replaces or withdraws it (`LastFinding`). */
+export interface Missed<M> {
+  pass: false;
+  miss: M;
+  final?: undefined;
+}
+
+/**
+ * A measurement's verdict as a round's (`RoundVerdict`), its detail the miss: a non-passing one with no detail has
+ * nothing to say, so it continues the poll without erasing an earlier miss.
+ */
+export const asRound = (verdict: PollVerdict | undefined): RoundVerdict<string> | undefined => {
+  if (verdict === undefined) return undefined;
+  if (verdict.pass) return { pass: true, detail: verdict.detail };
+  if (verdict.final) return verdict;
+  return verdict.detail === undefined ? undefined : { pass: false, miss: verdict.detail };
 };
+
+/**
+ * The verifier's memory of a poll's last finding: the miss the last round that missed reported, until a later one
+ * replaces it, or a later round finds it no longer true and withdraws it (the pixel poll's covered miss, once a round
+ * finds the element clear). A round with nothing to say leaves it standing.
+ */
+export class LastFinding<M> {
+  private miss: M | undefined;
+
+  /** The miss that stands, if any. */
+  get last(): M | undefined {
+    return this.miss;
+  }
+
+  found(miss: M): void {
+    this.miss = miss;
+  }
+
+  /** Withdraw the standing miss when it is one `which` names; a miss it does not name stands. */
+  withdraw(which: (miss: M) => boolean): void {
+    if (this.miss !== undefined && which(this.miss)) this.miss = undefined;
+  }
+}
+
+/** What a poll that timed out leaves for its wording: the miss that stands, the last read's error, and its trees. */
+export interface TimedOut<M> {
+  miss?: M;
+  readError?: Error;
+  undecidedTree?: UiNode;
+  lastTree?: UiNode;
+}
+
+export interface VerdictPollOptions<M> {
+  timeoutMs: number;
+  pollMs: number;
+  /** A handed-on read (ui-tree/read-tree.ts#PollOptions.first): only a pass ends the poll on it. */
+  first?: FirstSample;
+  observer?: PollObserver;
+  /**
+   * The target whose not-found the timeout words, given the miss that stands — what the window manager's word is asked
+   * about at the deadline (ui-tree/window-mark.ts#markedForMiss). Absent, or undefined, for a timeout that words no
+   * not-found.
+   */
+  missing?: (miss: M | undefined) => Target | undefined;
+  /** The timeout wording, each assert's own. */
+  timeoutDetail: (last: TimedOut<M>) => string;
+}
+
+/**
+ * The verifier's poll, owned once for the tree-only asserts and the pixel poll: `round` on every tree the tree poll reads
+ * (ui-tree/read-tree.ts#pollTree), until a pass or a final miss, which is the verdict; else, at the deadline, the one
+ * timeout tail — the last tree marked by the window manager's word for a not-found (`missing`), then the assert's own
+ * wording of the miss that stands. A round's miss goes to the poll's `LastFinding`, which the round is handed so that it
+ * can withdraw one. A handed-on tree's miss or final miss is discarded, nothing of it kept (ADR 0030: a handed read is
+ * a positive verdict or a first sample), so a miss is only ever a fresh read's.
+ */
+export async function pollVerdicts<M>(
+  adapter: Pick<DeviceAdapter, 'uiTree' | 'focusedWindow'>,
+  round: (
+    tree: UiNode,
+    poll: PollRound,
+    finding: LastFinding<M>,
+  ) => Promise<RoundVerdict<M> | typeof Undecided | undefined> | RoundVerdict<M> | typeof Undecided | undefined,
+  { timeoutMs, pollMs, first, observer, missing, timeoutDetail }: VerdictPollOptions<M>,
+): Promise<PollVerdict> {
+  const finding = new LastFinding<M>();
+  const outcome = await pollTree(
+    adapter,
+    async (tree, poll): Promise<{ pass: true; detail?: string } | FinalVerdict | typeof Undecided | undefined> => {
+      const verdict = await round(tree, poll, finding);
+      if (verdict === undefined || verdict === Undecided || verdict.pass) return verdict;
+      if (poll.handedOn !== undefined) return undefined;
+      if (verdict.final) return verdict;
+      finding.found(verdict.miss);
+      return undefined;
+    },
+    { timeoutMs, pollMs, ...(first !== undefined && { first }), ...(observer !== undefined && { observer }) },
+  );
+  if (!outcome.timedOut) return outcome.value.pass ? { pass: true, detail: outcome.value.detail } : { pass: false, detail: outcome.value.detail };
+  const miss = finding.last;
+  // The window manager's word on the last tree's window, asked now the poll has given up on a target it never found
+  // (ui-tree/window-mark.ts): a standing miss is the finding, and no not-found is worded beside it.
+  const lastTree = await markedForMiss(adapter, outcome, missing?.(miss));
+  return {
+    pass: false,
+    detail: timeoutDetail({ ...(miss !== undefined && { miss }), readError: outcome.readError, undecidedTree: outcome.undecidedTree, lastTree }),
+  };
+}
 
 /**
  * Every assert's "not found within N s" (formatSeconds), of the poll's last round: the last tree-read error when that
