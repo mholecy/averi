@@ -290,8 +290,8 @@ type Stability =
 type StableShot = FrameFacts & Stability;
 
 /**
- * A frame as `captureFrame` returns it to a caller that may not have asked for
- * a tree. A type alias over the `Stability` union, not an interface: an
+ * A frame as `captureFrame` returns it to a caller that did not supply a
+ * tree. A type alias over the `Stability` union, not an interface: an
  * interface cannot extend a union, and `Omit` over it would drop the
  * pairing of `stability` with `settledOver`. A reader that needs only one
  * field (`unsettledReason`, `isMoving`) still takes a `Pick` of it: it reads
