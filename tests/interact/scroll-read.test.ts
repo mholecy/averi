@@ -38,14 +38,14 @@ const judged = (j: ReturnType<typeof judgeRead>): ReadJudgement => {
   return j;
 };
 
-/** What a judgement says, as one plain value: the best match's id, its standing's kind, whether it was judged under the cover; the cover applied and the one offered (their tops); the frames; the stroke line. */
+/** What a judgement says, as one plain value: the best match's id, its standing's kind, whether it was judged under the cover; the cover applied and the one offered (their tops); the frames; the keyboard the strokes stay above. */
 const said = (j: ReadJudgement) => ({
   best: j.best === undefined ? undefined : { id: j.best.node.identifier, kind: j.best.standing.kind, under: j.best.under !== undefined },
   cover: j.cover?.topCover.y,
   offered: j.offered?.topCover.y,
   frames: j.frames,
   uncutFrames: j.uncutFrames,
-  strokeLine: j.strokeLine,
+  strokeKeyboard: j.strokeKeyboard,
 });
 
 /** The Android window model's band over the bottom quarter of the phone. */
@@ -54,7 +54,7 @@ const IME = { x: 0, y: 1500, width: 1000, height: 500 };
 describe('judgeRead — what one read means, row by row', () => {
   it('no keyboard: the match judged over the whole screen, nothing asked, no cover, no line; the frames the box', () => {
     const j = judged(judgeRead(readOf({ found: [match({ x: 0, y: 500, width: 100, height: 100 })] }), AS_BUILT, false));
-    expect(said(j)).toEqual({ best: { id: 't', kind: 'reachable', under: false }, cover: undefined, offered: undefined, frames: [PHONE], uncutFrames: [PHONE], strokeLine: undefined });
+    expect(said(j)).toEqual({ best: { id: 't', kind: 'reachable', under: false }, cover: undefined, offered: undefined, frames: [PHONE], uncutFrames: [PHONE], strokeKeyboard: undefined });
   });
 
   it('no match: no best, the frames still the box', () => {
@@ -64,7 +64,7 @@ describe('judgeRead — what one read means, row by row', () => {
 
   it('a reading cover that is moot — the match stops the round either way, on the same judgement: no witness asked, no cover applied, the cover still offered', () => {
     const j = judgeRead(readOf({ found: [match({ x: 0, y: 500, width: 100, height: 100 })], cover: coverOver(IME) }), AS_BUILT, false);
-    expect(said(judged(j))).toEqual({ best: { id: 't', kind: 'reachable', under: false }, cover: undefined, offered: 1500, frames: [PHONE], uncutFrames: [PHONE], strokeLine: undefined });
+    expect(said(judged(j))).toEqual({ best: { id: 't', kind: 'reachable', under: false }, cover: undefined, offered: 1500, frames: [PHONE], uncutFrames: [PHONE], strokeKeyboard: undefined });
   });
 
   describe('a reading cover that is not moot — the match\'s centre under it', () => {
@@ -79,7 +79,7 @@ describe('judgeRead — what one read means, row by row', () => {
         offered: 1500,
         frames: [box(1000, 1500)],
         uncutFrames: [box(1000, 1500)],
-        strokeLine: { y: 1500, witnessed: true },
+        strokeKeyboard: { lineY: 1500, remedy: BACK },
       });
     });
     it('denied: the whole-screen judgement stands, no cover applied, offered still, no line', () => {
@@ -89,7 +89,7 @@ describe('judgeRead — what one read means, row by row', () => {
         offered: 1500,
         frames: [PHONE],
         uncutFrames: [PHONE],
-        strokeLine: undefined,
+        strokeKeyboard: undefined,
       });
     });
   });
@@ -104,7 +104,7 @@ describe('judgeRead — what one read means, row by row', () => {
     const all = { x: 0, y: 0, width: 1000, height: 2000 };
     const j = judged(judgeRead(readOf({ found: [match({ x: 0, y: 500, width: 100, height: 100 })], cover: coverOver(all) }), AS_BUILT, false, true));
     expect(j.cover?.above).toBeUndefined();
-    expect(said(j)).toMatchObject({ cover: 0, frames: [PHONE], strokeLine: { y: 0, witnessed: true } });
+    expect(said(j)).toMatchObject({ cover: 0, frames: [PHONE], strokeKeyboard: { lineY: 0, remedy: BACK } });
   });
 
   it('a reading cover whose top lies at or below the screen\'s bottom offers nothing', () => {
@@ -125,12 +125,13 @@ describe('judgeRead — what one read means, row by row', () => {
         offered: undefined,
         frames: [box(402, 590)],
         uncutFrames: [box(402, 590)],
-        strokeLine: { y: 590, witnessed: false },
+        strokeKeyboard: { lineY: 590, remedy: NO_BACK },
       });
+      expect(judged(j).cover?.line).toEqual({ y: 590, witnessed: false });
     });
-    it('a row above it: the band moot and not applied, but the strokes still stay above it', () => {
+    it('a row above it: the band moot and not applied, but the strokes still stay above it, with the read\'s remedy', () => {
       const j = judgeRead(readOf(bandRow({ x: 20, y: 200, width: 362, height: 50 }), box(402, 874)), IDB, false);
-      expect(said(judged(j))).toMatchObject({ best: { kind: 'reachable', under: false }, cover: undefined, frames: [box(402, 874)], strokeLine: { y: 590, witnessed: false } });
+      expect(said(judged(j))).toMatchObject({ best: { kind: 'reachable', under: false }, cover: undefined, frames: [box(402, 874)], strokeKeyboard: { lineY: 590, remedy: NO_BACK } });
     });
   });
 

@@ -86,7 +86,7 @@ describe('the end proof — the tree lists where a scroll view\'s content ends (
   it('strokedContent asks it of the scroll view the last stroke SENT went over, the edge the stroke\'s direction brings content in through', () => {
     const facts = { tree: CAPTURE, scene: sceneOf(CAPTURE), mainScroller: largestScroller(CAPTURE) };
     const f = [...everyNode(CAPTURE)].find((n) => n.identifier === F);
-    const seen = seeRead(startStrokes(), { facts, line: undefined, target: f });
+    const seen = seeRead(startStrokes(), { facts, keyboard: undefined, target: f });
     const plan = planStroke(seen, { kind: 'full', toward: 'up', reach: 1, gesture: { x: 0, y: 0, width: 402, height: 874 }, read: { facts, target: f } });
     expect(plan.stroke.box).toEqual(LOWER);
     // Planned, not sent: no stroke went over anything yet.

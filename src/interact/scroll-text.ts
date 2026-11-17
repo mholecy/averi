@@ -14,7 +14,7 @@ import { revealText, SIDES } from '../ui-tree/sides.js';
 import { countOf } from '../util/count.js';
 import { CHECKED_AFTER_HOLDS } from './flush-check.js';
 import { absenceError, describeTarget, type WaitEvidence } from './resolve.js';
-import { fullyClaimed, shortOf, unfitRoom, type AppliedKeyboard, type Judged, type Unfit } from './scroll-read.js';
+import { fullyClaimed, shortOf, unfitRoom, keyboardUpOf, type AppliedKeyboard, type Judged, type Unfit } from './scroll-read.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type FlushCut, type FlushPlace, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 import type { CarriedUnder, UnseenStrokes } from './motion-ledger.js';
 import { MIN_STROKE_BOX, type PresentedTouchDown, type StrokedAcross, type StrokedBeside, type TouchedOn } from './stroke-plan.js';
@@ -219,7 +219,7 @@ const seenClearText = ({ by, edge, depth }: NonNullable<ScrollUntilResult['seenC
 
 const stoppedWhen = (swipes: number): string => (swipes === 0 ? 'before any swipe' : `after ${swipesText(swipes)}, without swiping further`);
 
-const keyboardUp = ({ under }: Judged): KeyboardUp | undefined => (under === undefined ? undefined : { lineY: under.line.y, remedy: under.remedy });
+const keyboardUnder = ({ under }: Judged): KeyboardUp | undefined => (under === undefined ? undefined : keyboardUpOf(under));
 
 /** A plain stop's sliver (InFrameShort's `sliver`, or the `overlapped` stop's cut), in the tap's refusal's own words (target-text.ts#cutSliverText). */
 function sliverText({ judged, standing }: Pick<Extract<Shortfall, { of: 'sliver' }>, 'judged' | 'standing'>): string {
@@ -621,7 +621,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
         return {
           message:
             `scroll_until ${describe} failed after ${n} — element is in the viewport but ${sliverText(short)} — and the content is exhausted: ` +
-              `swiping ${o.lastStroke} no longer moves it${neither}. ${stuckCutText(short.standing, keyboardUp(judged))}. ${last}`,
+              `swiping ${o.lastStroke} no longer moves it${neither}. ${stuckCutText(short.standing, keyboardUnder(judged))}. ${last}`,
         };
       }
       // A band of a surface the tree does not list, the eyes saw (ui-tree/eyes.ts), at the end of the content: the rest
@@ -771,7 +771,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       // cut's riding keyboard first).
       const { judged, viewport, standing } = o;
       const what = standing.kind === 'covered' ? underText({ judged, cover: standing.cover }) : sliverText({ judged, standing });
-      const way = touchRemedyText(standing, keyboardUp(judged));
+      const way = touchRemedyText(standing, keyboardUnder(judged));
       return {
         message:
           `scroll_until ${describe} stopped ${stoppedWhen(o.swipes)} — element is in the viewport but ${what}; ` +
@@ -1258,7 +1258,7 @@ function shortText(short: Shortfall): string {
     }
     case 'sliver': {
       // The tap's refusal quoted word for word (touch-remedy.ts#touchRemedyText).
-      const remedy = touchRemedyText(short.standing, keyboardUp(short.judged));
+      const remedy = touchRemedyText(short.standing, keyboardUnder(short.judged));
       return `element reached the viewport but stayed ${sliverText(short)} (last rect ${JSON.stringify(short.judged.node.rect)}) — a tap refuses it so cut: ${remedy}`;
     }
     case 'absent':

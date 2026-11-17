@@ -114,7 +114,7 @@ describe('a stroke no further than the target still needs — a short scroll vie
 describe('the carry model (interact/stroke-plan.ts#carried): per point of finger travel, the largest sample, bounded', () => {
   const facts = { tree: CAPTURE, scene: sceneOf(CAPTURE), mainScroller: largestScroller(CAPTURE) };
   const f = [...everyNode(CAPTURE)].find((n) => n.identifier === F);
-  const read = seeRead(startStrokes(), { facts, line: undefined, target: f });
+  const read = seeRead(startStrokes(), { facts, keyboard: undefined, target: f });
   /** The memory once a stroke over `lower` was sent: what the read after it measures is `lower`'s carry. */
   const seen = strokeSent(planStroke(read, { kind: 'full', toward: 'down', reach: 1, gesture: BOX, read: { facts, target: f } }).memory);
   /** A stroke of `travel` points straight up the screen. */

@@ -7,7 +7,7 @@ import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { MIN_STROKE_BOX, nameScrollView, planProbe, planStroke, seeRead, startStrokes, strokedAcross, strokedBeside, strokeSent, touchedOn, TOUCH_DOWN_CUT_FLOOR, type StrokeMemory } from '../../src/interact/stroke-plan.js';
 import { shortenStroke, swipeVector, swipeVectorAbove, type Direction } from '../../src/interact/swipe.js';
 import { containsPoint, largestScroller } from '../../src/ui-tree/geometry.js';
-import { keyboardSideNodes } from '../../src/ui-tree/soft-keyboard.js';
+import { keyboardSideNodes, type KeyboardRemedy } from '../../src/ui-tree/soft-keyboard.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { node } from '../helpers/fake.js';
@@ -37,12 +37,15 @@ const scroller = (rect: Rect, children: UiNode[] = []): UiNode => node({ role: '
 const cover = (rect: Rect, label = 'cover'): UiNode => node({ role: 'other', label, rect: { ...rect } });
 /** A screen of `children` in draw order. */
 const screenOf = (children: UiNode[], extra: Partial<UiNode> = {}): UiNode => node({ role: 'container', rect: { ...BOX }, ...extra, children });
+/** What the keyboard in these memories is hidden with: the back key. */
+const BACK: KeyboardRemedy = { dismissal: 'back' };
+
 /** A tree's facts as the round derives them (scroll-read.ts#TreeFacts): its scene and its largest scroller. */
 const factsOf = (tree: UiNode) => ({ tree, scene: sceneOf(tree), mainScroller: largestScroller(tree), reading: { ofKeyboard: (n: UiNode) => keyboardSideNodes(tree).has(n) } });
 
-/** The memory after one read of `tree`: its keyboard line at `keyboardTop`, and the target when it found one. */
+/** The memory after one read of `tree`: its keyboard up from `keyboardTop`, and the target when it found one. */
 const after = (tree: UiNode, { target, keyboardTop }: { target?: UiNode; keyboardTop?: number } = {}): StrokeMemory =>
-  seeRead(startStrokes(), { facts: factsOf(tree), line: keyboardTop === undefined ? undefined : { y: keyboardTop, witnessed: true }, target });
+  seeRead(startStrokes(), { facts: factsOf(tree), keyboard: keyboardTop === undefined ? undefined : { lineY: keyboardTop, remedy: BACK }, target });
 
 /** The plan of one read of `tree` for a stroke `toward`, at `reach`, over `gesture`: the stroke as sent. */
 function planOn(tree: UiNode, toward: Direction, opts: { target?: UiNode; keyboardTop?: number; reach?: number; gesture?: Rect } = {}) {
@@ -676,7 +679,7 @@ describe('a named scroll view (`within`, D78) — the one the strokes go over un
   it('once a read finds the target, its own scroll views: `within` no longer counts', () => {
     const p = [...everyNode(bounded)].find((n) => n.identifier === 'lab.scroll-bounded.P')!;
     const named = nameScrollView(startStrokes(), factsOf(bounded), LOWER);
-    const found = seeRead(named, { facts: factsOf(bounded), line: undefined, target: p });
+    const found = seeRead(named, { facts: factsOf(bounded), keyboard: undefined, target: p });
     expect(planStroke(found, ask(bounded, p)).stroke.box).toEqual(UPPER);
   });
 
@@ -688,11 +691,11 @@ describe('a named scroll view (`within`, D78) — the one the strokes go over un
   // D80: a named scroll view with no room for a stroke — the keyboard over all of `lower` but 54 px of it (a keyboard
   // whose top lies at 1100, `lower` 1046–1541) — is NO stroke: the plan says so (`noRoom`) rather than fall back to the
   // gesture box whole, whose stroke would touch down on `upper` or anything else (ADR 0010's D78 residual 1).
-  const keyboardAt = (y: number, memory: StrokeMemory): StrokeMemory => seeRead(memory, { facts: factsOf(bounded), line: { y, witnessed: true }, target: undefined });
+  const keyboardAt = (y: number, memory: StrokeMemory): StrokeMemory => seeRead(memory, { facts: factsOf(bounded), keyboard: { lineY: y, remedy: BACK }, target: undefined });
 
-  it('no room in the named one under the keyboard: `noRoom` names it, the room left and the keyboard\'s top — no fallback to the gesture box decided', () => {
+  it('no room in the named one under the keyboard: `noRoom` names it, the room left and the keyboard (its line and its remedy) — no fallback to the gesture box decided', () => {
     const plan = planStroke(keyboardAt(1100, nameScrollView(startStrokes(), factsOf(bounded), LOWER)), ask(bounded));
-    expect(plan.noRoom).toEqual({ rect: LOWER, toward: 'down', room: 54, keyboardTop: 1100 });
+    expect(plan.noRoom).toEqual({ rect: LOWER, toward: 'down', room: 54, keyboard: { lineY: 1100, remedy: BACK } });
     // 80 above the keyboard is room: the stroke goes inside `lower`, above it.
     const roomy = planStroke(keyboardAt(1046 + MIN_STROKE_BOX, nameScrollView(startStrokes(), factsOf(bounded), LOWER)), ask(bounded));
     expect(roomy.noRoom).toBeUndefined();
@@ -706,18 +709,18 @@ describe('a named scroll view (`within`, D78) — the one the strokes go over un
   });
 
   it('…a keyboard above the named one\'s top leaves it no room at all (0), not a negative one', () => {
-    expect(planStroke(keyboardAt(900, nameScrollView(startStrokes(), factsOf(bounded), LOWER)), ask(bounded)).noRoom).toEqual({ rect: LOWER, toward: 'down', room: 0, keyboardTop: 900 });
+    expect(planStroke(keyboardAt(900, nameScrollView(startStrokes(), factsOf(bounded), LOWER)), ask(bounded)).noRoom).toEqual({ rect: LOWER, toward: 'down', room: 0, keyboard: { lineY: 900, remedy: BACK } });
   });
 
   it('…a round whose tree did not read judges it as the last plan did: still no room (the round holds for a read before it stops on it, scroll-rounds.ts)', () => {
     const first = planStroke(keyboardAt(1100, nameScrollView(startStrokes(), factsOf(bounded), LOWER)), ask(bounded));
-    expect(planStroke(first.memory, { ...ask(bounded), read: undefined }).noRoom).toEqual({ rect: LOWER, toward: 'down', room: 54, keyboardTop: 1100 });
+    expect(planStroke(first.memory, { ...ask(bounded), read: undefined }).noRoom).toEqual({ rect: LOWER, toward: 'down', room: 54, keyboard: { lineY: 1100, remedy: BACK } });
   });
 
   it('…once a read has found the target, `within` counts no more, nor its room: the target\'s own scroll views, their fallback', () => {
     const p = [...everyNode(bounded)].find((n) => n.identifier === 'lab.scroll-bounded.P')!;
     const named = nameScrollView(startStrokes(), factsOf(bounded), LOWER);
-    const found = seeRead(named, { facts: factsOf(bounded), line: { y: 305, witnessed: true }, target: p });
+    const found = seeRead(named, { facts: factsOf(bounded), keyboard: { lineY: 305, remedy: BACK }, target: p });
     const plan = planStroke(found, ask(bounded, p));
     expect(plan.noRoom).toBeUndefined();
     expect(plan.stroke.box).toEqual(BOX);
@@ -739,7 +742,7 @@ describe('a named scroll view (`within`, D78) — the one the strokes go over un
   it('…a sideways stroke is judged on the width, whatever the keyboard: a 60-wide named strip has 60', () => {
     const STRIP: Rect = { x: 500, y: 400, width: 60, height: 600 };
     const tree = screenOf([node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { ...STRIP } })]);
-    const named = seeRead(nameScrollView(startStrokes(), factsOf(tree), STRIP), { facts: factsOf(tree), line: { y: 700, witnessed: true }, target: undefined });
+    const named = seeRead(nameScrollView(startStrokes(), factsOf(tree), STRIP), { facts: factsOf(tree), keyboard: { lineY: 700, remedy: BACK }, target: undefined });
     expect(planStroke(named, { kind: 'full', toward: 'right', reach: 1, gesture: BOX, read: { facts: factsOf(tree), target: undefined } }).noRoom).toEqual({ rect: STRIP, toward: 'right', room: 60 });
     // One running past the gesture box is judged on its part on it — 30 of its 200.
     const PAST: Rect = { x: 1050, y: 400, width: 200, height: 600 };
@@ -867,7 +870,7 @@ describe('the presented touch-down — asked of the scene at the points as sent'
         key === 'presentedAt' ? (point: Point, on?: UiNode) => (asked.push({ ...point }), target.presentedAt(point, on)) : Reflect.get(target, key, receiver),
     });
     const facts = { tree, scene: recording, mainScroller: largestScroller(tree) };
-    const recorded = planStroke(seeRead(startStrokes(), { facts, line: undefined, target: field }), { kind: 'full', toward: 'down', reach: 1, gesture: { x: 0, y: 0, width: 402, height: 874 }, read: { facts, target: field } });
+    const recorded = planStroke(seeRead(startStrokes(), { facts, keyboard: undefined, target: field }), { kind: 'full', toward: 'down', reach: 1, gesture: { x: 0, y: 0, width: 402, height: 874 }, read: { facts, target: field } });
     expect(asked).toEqual([recorded.stroke.points?.from]);
     expect(asked).toEqual([{ x: 201, y: 329 }]);
   });
@@ -939,7 +942,7 @@ describe('the target\'s row — on a tree that tells no scroll view, a sideways 
 
   it('a later read that does not find the target keeps the row, as it keeps the target\'s scroll views', () => {
     const tree = idb();
-    const memory = seeRead(after(tree, { target: byId(tree, 'lab.carousel-in-list.C') }), { facts: factsOf(tree), line: undefined, target: undefined });
+    const memory = seeRead(after(tree, { target: byId(tree, 'lab.carousel-in-list.C') }), { facts: factsOf(tree), keyboard: undefined, target: undefined });
     expect(planStroke(memory, { kind: 'full', toward: 'right', reach: 1, gesture: PHONE, read: undefined }).stroke.box).toEqual(ROW);
   });
 
@@ -947,7 +950,7 @@ describe('the target\'s row — on a tree that tells no scroll view, a sideways 
     const tree = idb();
     const c = byId(tree, 'lab.carousel-in-list.C');
     const region: Rect = { x: 24, y: 140, width: 354, height: 80 };
-    const memory = seeRead(startStrokes(), { facts: factsOf(tree), line: undefined, target: c, region: { rect: region, axis: 'horizontal' } });
+    const memory = seeRead(startStrokes(), { facts: factsOf(tree), keyboard: undefined, target: c, region: { rect: region, axis: 'horizontal' } });
     const ask = { kind: 'full', toward: 'left', reach: 1, gesture: PHONE, read: { facts: factsOf(tree), target: c } } as const;
     expect(planStroke(memory, ask).stroke.box).toEqual(region);
     expect(planStroke(memory, { ...ask, toward: 'right', screenBox: true }).stroke.box).toEqual(ROW);

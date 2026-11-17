@@ -797,8 +797,9 @@ with no confirming read left it stops on the last read that read — still never
 one type (`src/interact/stroke-plan.ts#NoRoomFacts`: the named rect, the stroke's direction, the room — its length along
 the stroke on the gesture box, above the keyboard's top for a vertical stroke, 0 when none of it lies there), and
 `keyboard` (a `src/interact/target-text.ts#KeyboardUp`: its top and the adapter's remedy) when the keyboard cuts that
-part; the plan gives the top (`NamedNoRoom.keyboardTop`), the round adds the remedy. Raised through the same
-`src/interact/within.ts#WithinRefusedError`, so a flow sees the kind.
+part; the plan gives the top (`NamedNoRoom.keyboardTop`), the round adds the remedy. **Superseded 2026-11-17 (A70)**
+(below, "the plan's no-room carries the whole keyboard"): the plan gives the whole `KeyboardUp`, the round adds nothing.
+Raised through the same `src/interact/within.ts#WithinRefusedError`, so a flow sees the kind.
 
 (d) Its words (`src/interact/scroll-text.ts#noRoomText`), one sentence, the whole way out in the caller's form
 (`src/interact/scroll-text.ts#WithinRemedy`: `showMore`, `hideKeyboard`, `again`). The MCP tool's: `within <it> names
@@ -810,7 +811,8 @@ run the flow again` — steps, not tool calls, the no-keyboard case too. No keyb
 the screen, under the 80 a swipe needs`, the hide clause dropped. Room of 80 or more cut by what is drawn over it: `what
 is drawn over it leaves too little of the N of its height` (`… left` after the keyboard clause). A sideways stroke: `of
 its width`. How to hide the keyboard follows the platform's `KeyboardRemedy` (review round 1, MAJOR-1), one source: the
-round carries the applied cover's remedy (`lastCover`) into the refusal, and `hideKeyboard` words it by `dismissal`
+round carries the applied cover's remedy (`lastCover`) into the refusal (**superseded 2026-11-17, A70**: the plan's
+`noRoom` carries it, below), and `hideKeyboard` words it by `dismissal`
 through the shared helpers — the MCP tool's `src/interact/target-text.ts#hideKeyboardBriefly` (`press_key back`, or a
 neutral tap where no key hides it), a flow's `src/interact/target-text.ts#hideKeyboardInFlow` (the fill's
 `dismissKeyboard: true`, or a neutral tap in a `tap:` step before this one) — composed by
@@ -863,6 +865,8 @@ equivalents, kept, each guarding a type: the round's `s.rules.within !== undefin
 view only when `within` was given, so `noRoom` implies it; and its `s.lastCover === undefined` conjunct dropped — a
 keyboard line with no cover applied is idb's band alone (src/ui-tree/draw-order.ts, `DrawOrder.ofKeyboardBand`), and
 idb's `within` is refused `untold` before any plan (a comment at the conjunct says so, for a band on WDA or Android).
+**Superseded 2026-11-17 (A70)**: the conjunct and its comment are gone, the plan's `noRoom` carrying the remedy with the
+line (below).
 stroke-plan.ts, scroll-rounds.ts, scroll-text.ts, target-text.ts and engine.ts are not in scripts/mutation/scope.json,
 hence the hand mutants. Mutation (core): `src/interact/within.ts` 100 % (106 mutants, narrowed cold run), floor 98 — its
 change a type and comments.
@@ -969,6 +973,23 @@ drag. The old screen-box stroke had the same exposure, but on whatever row lay a
 for it. The region box (residual 6) can break `swipeVectorAbove`'s precondition the same way: a sideways stroke over a
 region lying below the keyboard line hands it a keyboard top outside the box, because a sideways stroke's room is
 judged on width alone. That is out of scope here.
+
+## Amendment: A70 — the plan's no-room carries the whole keyboard (2026-11-17)
+
+**Context.** D80 (c) had the plan give the keyboard's top (`NamedNoRoom.keyboardTop`, a bare number) and the round add
+the remedy from the last cover it applied (`lastCover`). The two were held together by a comment: a top with no cover
+applied dropped the keyboard from the refusal, and the types allowed it. It was unreachable only because a band-only
+line is idb's, and idb's `within` is refused `untold` before any plan.
+
+**Decision.** The plan's memory keeps the keyboard its strokes stay above as one
+`src/interact/target-text.ts#KeyboardUp`, its line with its remedy (`src/interact/scroll-read.ts#ReadJudgement`'s
+`strokeKeyboard`: the line `src/interact/scroll-read.ts#strokeLine`'s, the remedy the applied cover's, else the
+read's). `src/interact/stroke-plan.ts#NamedNoRoom` carries `keyboard?: KeyboardUp` when the keyboard cuts the named
+view's part, and the round passes the plan's `noRoom` into the refusal whole: it adds nothing, and `lastCover` is read
+only by the failure text. A `KeyboardUp` has one builder, `src/interact/target-text.ts#keyboardUp`, and the applied
+cover hands out its own (`src/interact/scroll-read.ts#keyboardUpOf`).
+
+**Golden.** Changed 0. Replies are byte-identical.
 
 ## Bug note
 

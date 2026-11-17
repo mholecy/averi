@@ -13,7 +13,7 @@ import { treeScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-s
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { describeTarget, type RefusedOnPresentElement, type Target } from './resolve.js';
 import type { SeenLook } from './keyboard-model.js';
-import { cutSliverText, hideClause, hideKeyboardHow, underKeyboardText, type KeyboardUp } from './target-text.js';
+import { cutSliverText, hideClause, hideKeyboardHow, keyboardUp, underKeyboardText, type KeyboardUp } from './target-text.js';
 import { touchRemedyText } from './touch-remedy.js';
 
 /**
@@ -280,8 +280,7 @@ export async function judgeTap(adapter: Pick<DeviceAdapter, 'viewport'>, target:
       const standing = await judgedWithOrder(look, node, eyes, (onLook) => judged(onLook === look ? standings : tapStandings(onLook, node, on)));
       // A cut by a node drawn after it: whether the soft keyboard is up, which its remedy names (touch-remedy.ts) — the reading's line, asked on that path only.
       const line = standing.kind === 'cut' && standing.cut.by !== undefined ? await look.keyboard.readingLine() : undefined;
-      const keyboard: KeyboardUp | undefined = line === undefined ? undefined : { lineY: line.y, remedy: look.reading.remedy };
-      return tapOutcome(standing, told, () => ({ judged: on ?? treeScreen(look.tree) }), keyboard);
+      return tapOutcome(standing, told, () => ({ judged: on ?? treeScreen(look.tree) }), keyboardUp(line, look.reading.remedy));
     },
   });
   const first = tapStandings(look, node, screen);

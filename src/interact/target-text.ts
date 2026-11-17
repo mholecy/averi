@@ -2,6 +2,7 @@ import type { Point, Rect, UiNode } from '../adapters/types.js';
 import { cutAtLaterText } from '../ui-tree/cover.js';
 import { rectText, type Cut, type Edge } from '../ui-tree/geometry.js';
 import { outsideScrollViewText } from '../ui-tree/node-words.js';
+import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { clippedOutText, SIDES } from '../ui-tree/sides.js';
 
@@ -15,7 +16,8 @@ import { clippedOutText, SIDES } from '../ui-tree/sides.js';
  * is touch-remedy.ts's; the clauses every verb quotes (a presented screen's,
  * a no-scroll cover's) are ui-tree/remedy-text.ts's. Shallow by design, like
  * ui-tree/system-bar.ts: delete it and each shared sentence reappears in its
- * two or three callers.
+ * two or three callers. It also owns the keyboard fact its remedies name
+ * (`KeyboardUp`, built by `keyboardUp` alone).
  *
  * Its words for a side come from ui-tree/sides.ts#SIDES — `past` and `lies`
  * (where a node past a side lies) and `reveals` (the `scroll_until` direction
@@ -99,6 +101,13 @@ function cutByText(by: UiNode, cut: Cut, rect: Rect, minPiece: number, lineY: nu
 export interface KeyboardUp {
   readonly lineY: number;
   readonly remedy: KeyboardRemedy;
+}
+
+/** The soft keyboard up at `line` (its `y`), hidden with `remedy`; none when there is no line. The one builder of a `KeyboardUp`. */
+export function keyboardUp(line: KeyboardLine, remedy: KeyboardRemedy): KeyboardUp;
+export function keyboardUp(line: KeyboardLine | undefined, remedy: KeyboardRemedy): KeyboardUp | undefined;
+export function keyboardUp(line: KeyboardLine | undefined, remedy: KeyboardRemedy): KeyboardUp | undefined {
+  return line === undefined ? undefined : { lineY: line.y, remedy };
 }
 
 /** What hides the soft keyboard where no key does (`KeyboardRemedy.dismissal` `none`): every wording below says it. */
