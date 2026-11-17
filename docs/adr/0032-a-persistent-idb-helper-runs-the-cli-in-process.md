@@ -216,7 +216,8 @@ it; it is a ~1 s wait inside CoreSimulator, worst beside a `simctl spawn launchc
   same sRGB). The stability wait (`verify/capture.ts`) compares a pair of captures byte for byte: one from each source
   reads as a moving screen. So an idb failure is the answer — a plain Error whose first line is exec's (the command,
   or its timeout) with the remedy after it (the companion, `idb list-targets`, the kill switch), exec's ExecError as
-  its `cause`: the remedy must sit on the line `captureRefusal` quotes; or, for bytes that are no PNG, the transport
+  its `cause`: the remedy must sit on the line a capture's caller quotes
+  (`util/error-message.ts#errorHeadline`); or, for bytes that are no PNG, the transport
   error naming `idb screenshot - --udid U` with the same remedy and the reboot.
 - **Baselines.** A stored baseline from simctl (every one before D26b), or one written by an adapter on the other tree
   source of the same simulator, differs from an idb capture in the island alone: 1.219 % of the lab frame, over the
