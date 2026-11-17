@@ -187,6 +187,7 @@ describe('AutoTreeSource — WebDriverAgent when it comes up, idb when it does n
     const note = fallen.fallback!.note;
     for (const text of ['Šťastný', 'a😀']) expect(refusalOf(text, fallen.typeable)).toBe(`${refusalOf(text, IDB_TYPEABLE)}\n⚠ ${note}`);
     expect(refusalOf('Novak', fallen.typeable)).toBeUndefined();
+    expect(fallen.typeable).toBe(fallen.typeable); // built once, with the fallback
   });
 
   it('released while choosing: the release is the answer, not a fallback to idb', async () => {

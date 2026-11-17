@@ -20,28 +20,25 @@ import type { Typeable } from './typeable.js';
  * `idb ui describe-all` (a FLAT list of AX elements) or WebDriverAgent's
  * `/source` (the NESTED XCUIElement tree that still carries the React Native
  * host-view identifiers idb drops — docs/plans/ios-wda-tree-source.md).
- * Two real adapters behind one small interface is what makes this a seam and
- * not a flag.
+ * Two real adapters behind one interface, and `auto` (AutoTreeSource) choosing one of them per adapter, is what makes
+ * this a seam and not a flag.
  *
- * At its core three methods. `read()` returns a
- * fresh normalized tree per call (the layers above mutate nodes — field-error
- * pairing writes `error` — so no source may hand out a cached graph).
- * `applicationLabel()` answers the one question the normalized tree cannot —
- * which app a read is of (its doc below). `dispose()` releases whatever the
- * source started; it is awaited by the process shutdown, so it resolves when
- * the resource is gone, not when the release was queued (the WDA source stops
- * its WebDriverAgent and waits for the port to go quiet). Both sources are
- * bound to ONE concrete simulator at construction: idb rejects simctl's
- * `booted` alias and WDA needs a UDID for `xcodebuild -destination`, so the
- * alias is resolved by whoever constructs the source — the registry, which
- * only ever binds concrete device ids.
+ * At its core three methods. `read()` returns a fresh normalized tree per call (the layers above mutate nodes —
+ * field-error pairing writes `error` — so no source may hand out a cached graph). `applicationLabel()` answers the
+ * one question the normalized tree cannot — which app a read is of (its doc below). `dispose()` releases whatever the
+ * source started; it is awaited by the process shutdown, so it resolves when the resource is gone, not when the
+ * release was queued (the WDA source stops its WebDriverAgent and waits for the port to go quiet). Every source is
+ * bound to ONE concrete simulator at construction: idb rejects simctl's `booted` alias and WDA needs a UDID for
+ * `xcodebuild -destination`, so the alias is resolved by whoever constructs the source — the registry, which only
+ * ever binds concrete device ids.
  *
  * Beside the tree read the seam holds what follows from which backend reads it, so that IosAdapter asks the source
  * and never decides by backend: the source's lifecycle (`startBeforeLaunch`, whose failure the source words;
  * `dispose`), its fallback (`fallback`, `auto`'s), the text it types beyond idb (`typeable`, `typeWide`: WDA's
- * `/wda/keys`, on the WebDriverAgent it already owns; the others refuse), and its measured facts (`settleCadenceMs`,
- * `systemAlert`). Taps, idb's typing, install and launch stay on idb/simctl whichever source is configured (plan,
- * decision 4): WDA frames are points, the same units idb rects use, so the coordinates agree.
+ * `/wda/keys`, on the WebDriverAgent it already owns; the others refuse), its measured settle cadence
+ * (`settleCadenceMs`), and one short read for iOS's system alert (`systemAlert`, WDA's). Taps, idb's typing, install
+ * and launch stay on idb/simctl whichever source is configured (plan, decision 4): WDA frames are points, the same
+ * units idb rects use, so the coordinates agree.
  */
 export interface IosTreeSource {
   /**
@@ -104,8 +101,9 @@ export interface IosTreeSource {
   /**
    * Types a text idb cannot type (ios-typing.ts#typingPathOf: IosAdapter.typeText sends this source every such text,
    * whole, and no other) into whatever holds keyboard focus — or refuses it, nothing sent. WDA types it (WdaTreeSource:
-   * `POST /session/:id/wda/keys`, D43); idb and the recorded source refuse it in idb's words (ios-typing.ts#
-   * idbTypingRefusal); `auto` makes its choice and hands it on, adding the claim note's line after a fallback.
+   * `POST /session/:id/wda/keys`, D43); idb and the recorded source refuse it in idb's words
+   * (ios-typing.ts#idbTypingRefusal); `auto` makes its choice and hands it on, adding the claim note's line after a
+   * fallback.
    */
   typeWide(text: string): Promise<void>;
   dispose(): Promise<void>;

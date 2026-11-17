@@ -977,6 +977,14 @@ describe('IosAdapter.typeText — the first key alone, on an app seen dropping a
     expect(log()).toEqual(['idb ui text --udid AAAA-1111 -- J', 'idb ui text --udid AAAA-1111 -- ~']);
   });
 
+  it('a text idb cannot type never reaches the split: over idb\'s source it is the source\'s refusal, no idb ui text', async () => {
+    const { fn, log } = typingLog();
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: new IdbTreeSource({ udid: 'AAAA-1111', exec: fn }) });
+    adapter.noteDroppedTail();
+    await expect(adapter.typeText('👍ok')).rejects.toThrow(/^cannot type U\+1F44D .*Refused before anything was sent/s);
+    expect(log()).toEqual([]);
+  });
+
   it('before any launch the app in front, whichever it is, is the one that dropped: first key alone', async () => {
     const { fn, log } = typingLog();
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });

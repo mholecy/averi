@@ -68,6 +68,8 @@ export class AutoTreeSource implements IosTreeSource {
   private choosing: Promise<IosTreeSource> | undefined;
   /** The fallback to idb, its note naming why WDA did not come up (fallbackReason) — set with the choice of idb. */
   private fellBackTo: { readonly note: string } | undefined;
+  /** idb's set carrying that note — built with the fallback, the same object every time it is asked. */
+  private fellBackTypeable: Typeable | undefined;
   /** WDA's shutdown after a fallback, awaited by dispose(). */
   private wdaReleased: Promise<void> | undefined;
   private disposed = false;
@@ -96,7 +98,7 @@ export class AutoTreeSource implements IosTreeSource {
    * 0037) and says why that set applies.
    */
   get typeable(): Typeable {
-    return this.fellBackTo === undefined ? this.wda.typeable : { ...this.idb.typeable, note: this.fellBackTo.note };
+    return this.fellBackTypeable ?? this.wda.typeable;
   }
 
   /**
@@ -161,7 +163,9 @@ export class AutoTreeSource implements IosTreeSource {
         "averi: treeSource auto — WebDriverAgent did not come up, so this simulator's tree is read through idb: " +
           errorMessage(err),
       );
-      this.fellBackTo = { note: idbFallbackNote(fallbackReason(err)) };
+      const note = idbFallbackNote(fallbackReason(err));
+      this.fellBackTo = { note };
+      this.fellBackTypeable = { ...this.idb.typeable, note };
       this.wdaReleased = this.wda.dispose().catch(() => undefined);
       this.chosen = this.idb;
     }

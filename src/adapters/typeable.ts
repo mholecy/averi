@@ -76,9 +76,11 @@ function blockedRemedy(text: string, wider: NonNullable<Typeable['widerPath']>):
 /**
  * The refusal of `text` by `typeable`, or undefined when it can type all of it. The refusal names the FIRST character it
  * cannot type (whole: a surrogate pair is one), never the value around it (a value may be a credential); says nothing
- * was sent — true at both places that throw it: before the fill's field is resolved (interact/type-text.ts) and before
- * Android's first `input text` — what the adapter types, and the remedy true for it (`otherPath`; with a `widerPath` that would
- * refuse the value too, its `blockedBy`, naming the first character that path refuses); then the set's `note` line, if any.
+ * was sent — true wherever it is thrown: before the fill's field is resolved (interact/type-text.ts), before Android's
+ * first `input text`, and by an iOS tree source's typeWide that types nothing beyond idb
+ * (ios-typing.ts#idbTypingRefusal) — what the adapter types, and the remedy true for it (`otherPath`; with a
+ * `widerPath` that would refuse the value too, its `blockedBy`, naming the first character that path refuses); then
+ * the set's `note` line, if any.
  */
 export function refusalOf(text: string, typeable: Typeable): string | undefined {
   const ch = text.match(typeable.refuses)?.[0];

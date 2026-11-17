@@ -1,6 +1,7 @@
 import { CONTROL_CHAR_RE, controlCharRemedy, inputTextControlFate } from '../adapters/input-text.js';
 import { codePoint, refusalOf, type Typeable } from '../adapters/typeable.js';
 import type { DeviceAdapter } from '../adapters/types.js';
+import { withNoteLine } from '../util/note-line.js';
 
 /**
  * Which text averi types, stated ONCE, where text is accepted — and checked
@@ -54,7 +55,10 @@ function visibleEscape(ch: string): string {
   return `"${SHORT_ESCAPES[ch] ?? `\\u${ch.charCodeAt(0).toString(16).padStart(4, '0')}`}"`;
 }
 
-/** Throws when `value` holds a character typing cannot deliver as text, or one `typeable` refuses (see the module doc). */
+/**
+ * Throws when `value` holds a character typing cannot deliver as text, or one `typeable` refuses (see the module doc).
+ * Either refusal ends with the set's note line when it has one (Typeable.note: iOS `auto` fallen back to idb), once.
+ */
 export function assertTypeable(value: string, typeable: Typeable): void {
   const match = value.match(CONTROL_CHAR_RE);
   if (match === null) {
@@ -65,9 +69,12 @@ export function assertTypeable(value: string, typeable: Typeable): void {
   const ch = match[0];
   const code = codePoint(ch);
   throw new Error(
-    `cannot type ${code} (${visibleEscape(ch)}, a control character): it is a key, not text — on Android ` +
-      `\`input text\` ${inputTextControlFate(ch)}, on iOS ` +
-      `idb types it as a key press. Refused on both platforms before anything was sent. ${controlCharRemedy(ch)}`,
+    withNoteLine(
+      `cannot type ${code} (${visibleEscape(ch)}, a control character): it is a key, not text — on Android ` +
+        `\`input text\` ${inputTextControlFate(ch)}, on iOS ` +
+        `idb types it as a key press. Refused on both platforms before anything was sent. ${controlCharRemedy(ch)}`,
+      typeable.note,
+    ),
   );
 }
 
