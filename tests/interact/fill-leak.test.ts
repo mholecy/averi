@@ -77,6 +77,24 @@ function typing(fake: FakeAdapter, show: (held: string, typed: string) => string
   };
 }
 
+/**
+ * A second match of the selector appearing with the typing: a textfield `id: field` whose label (and value) `second`
+ * makes of what the field holds; `ownLabel`: the field typed into is labelled by its own text too.
+ */
+function midFill(second: (value: string) => { label: string; value?: string; ownLabel?: true }): FieldFake {
+  const f = fieldFake();
+  const live = f.fake.live();
+  f.fake.typeText = async (text: string) => {
+    f.fake.typed.push(text);
+    const field = live.children[0];
+    field.value = (field.value ?? '') + text;
+    const { label, value = null, ownLabel } = second(field.value);
+    if (ownLabel) field.label = field.value;
+    live.children.push(el({ role: 'textfield', identifier: 'field', label, value }));
+  };
+  return f;
+}
+
 /** Run `then` on the live field right after the focus tap lands. */
 function onFocus(fake: FakeAdapter, then: (f: UiNode) => void): void {
   const tap = fake.tap.bind(fake);
@@ -316,38 +334,48 @@ const FAILURES: Record<string, FailureCase> = {
     opts: { clear: true },
     says: /\(content withheld from this error\); the matched node is role text, not a textfield — .* the nearest input is textfield id:"other"/,
   },
-  'a second match appearing mid-fill (ambiguous: refuse)': {
+  // Once the focus tap has landed, a re-read's refusal says every label by its length and rect: an app's label may hold
+  // the field's text in any form (resolve.ts, ResolveOptions.labelsByLength).
+  'a second match appearing mid-fill, labelled by its own text (ambiguous: refuse)': {
     // Android: an EditText with no content-desc is labelled by its own text (android-tree-dialect.ts).
-    build: () => {
-      const f = fieldFake();
-      const live = f.fake.live();
-      f.fake.typeText = async (text: string) => {
-        f.fake.typed.push(text);
-        const field = live.children[0];
-        field.value = (field.value ?? '') + text;
-        field.label = field.value;
-        live.children.push(el({ role: 'textfield', identifier: 'field', label: PREFILL, value: PREFILL }));
-      };
-      return f;
-    },
+    build: () => midFill(() => ({ label: PREFILL, value: PREFILL, ownLabel: true })),
     opts: { ambiguous: 'refuse' },
-    says: /^Selector matches 2 elements: id:"field"\n {2}textfield id=field label=<its text, 8 characters> at 0,20 100x10\n {2}textfield id=field label=<its text, 8 characters> at 0,60 100x10\n/,
+    says: /^Selector matches 2 elements: id:"field"\n {2}textfield id=field label=<8 characters> at 0,20 100x10\n {2}textfield id=field label=<8 characters> at 0,60 100x10\n/,
   },
   'a second match labelled with the typed value and more, appearing mid-fill (ambiguous: refuse)': {
-    // An app-built content-desc that holds the field's text: no derivation of averi's, so the fill's re-read says it.
+    build: () => midFill((value) => ({ label: `${value}, Password` })),
+    opts: { ambiguous: 'refuse' },
+    says: /^Selector matches 2 elements: id:"field"\n {2}textfield id=field label=null at 0,20 100x10\n {2}textfield id=field label=<18 characters> at 0,60 100x10\n/,
+  },
+  'a second match labelled with the typed value in another case, appearing mid-fill (ambiguous: refuse)': {
+    build: () => midFill((value) => ({ label: `${value.toUpperCase()}, Password` })),
+    opts: { ambiguous: 'refuse' },
+    says: /label=<18 characters> at 0,60 100x10\n/,
+  },
+  'a second match labelled with the first keys only, appearing mid-fill (ambiguous: refuse)': {
+    build: () => midFill((value) => ({ label: value.slice(0, 5) })),
+    opts: { ambiguous: 'refuse' },
+    says: /label=<5 characters> at 0,60 100x10\n/,
+  },
+  'a second match labelled with the typed digits regrouped, appearing mid-fill (ambiguous: refuse)': {
+    build: () => midFill((value) => ({ label: `Card ${value.slice(0, 2)} ${value.slice(2, 5)} ${value.slice(5)}` })),
+    value: DIGITS,
+    opts: { ambiguous: 'refuse' },
+    says: /label=<15 characters> at 0,60 100x10\n/,
+  },
+  'a second match labelled with the field\'s text, appearing while the clear deletes (ambiguous: refuse)': {
     build: () => {
-      const f = fieldFake();
+      const f = fieldFake({ value: PREFILL });
       const live = f.fake.live();
-      f.fake.typeText = async (text: string) => {
-        f.fake.typed.push(text);
-        const field = live.children[0];
-        field.value = (field.value ?? '') + text;
-        live.children.push(el({ role: 'textfield', identifier: 'field', label: `${field.value}, Password`, value: '••••••••' }));
+      const clear = f.fake.clearText.bind(f.fake);
+      f.fake.clearText = async (n: number) => {
+        await clear(n);
+        live.children.push(el({ role: 'textfield', identifier: 'field', label: `${PREFILL}, saved` }));
       };
       return f;
     },
-    opts: { ambiguous: 'refuse' },
-    says: /^Selector matches 2 elements: id:"field"\n {2}textfield id=field label=null\n {2}textfield id=field label="<the typed value, 8 characters>, Password"\n/,
+    opts: { ambiguous: 'refuse', clear: true },
+    says: /^Selector matches 2 elements: id:"field"\n {2}textfield id=field label=null at 0,20 100x10\n {2}textfield id=field label=<15 characters> at 0,60 100x10\n/,
   },
   'refused: a character the adapter cannot type': {
     build: () => {

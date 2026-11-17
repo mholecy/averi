@@ -198,7 +198,6 @@ export async function fillField(
     chosen: node,
     ...(focus.count === 'unread' && { resolvedOn: screenIdentity(resolvedIn) }),
     unreadable: (e) => failure({ code: 'reread-failed', target: describeTarget(target), cause: e.message }),
-    typed: value,
   });
   const startTyping = async (text: string): Promise<void> => {
     field.typingStarts();

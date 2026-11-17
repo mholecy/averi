@@ -1,11 +1,11 @@
 import { INPUT_ROLE, type DeviceAdapter, type UiNode } from '../adapters/types.js';
 import { describeElementSpec } from '../ui-tree/element-spec.js';
+import { rectText } from '../ui-tree/geometry.js';
 import { lookOn } from '../ui-tree/look.js';
 import { dialectOf } from '../ui-tree/dialect.js';
 import { KEYBOARD_UNLISTED, MissedError, missNote, missOf, presentedAloneHeadline, type Miss } from '../ui-tree/miss.js';
 import { pollTimeoutMessage, pollTree, readTreeOrMiss, type FirstSample } from '../ui-tree/read-tree.js';
 import { findTarget, hasArea, preferInteractive, type Target } from '../ui-tree/selectors.js';
-import { rectText } from '../ui-tree/geometry.js';
 import { markedForMiss } from '../ui-tree/window-mark.js';
 import { charactersText } from '../util/count.js';
 import { keyboardMayCoverText } from './target-text.js';
@@ -169,6 +169,12 @@ export class ElementNotFoundError extends MissedError {}
 
 export interface ResolveOptions {
   ambiguous: Ambiguity;
+  /**
+   * An ambiguity lists every candidate's label by its length and rect, never its words: a fill's re-reads after the
+   * focus tap (fill-refetch.ts), when any label may hold the field's text — typed, or held before a clear — in any form
+   * an app makes of it (another case, the first keys, digits regrouped). Absent: `candidateLabel`'s rule.
+   */
+  labelsByLength?: true;
 }
 
 export interface SettleOptions extends ResolveOptions {
@@ -212,7 +218,7 @@ export function resolveNow(tree: UiNode, target: Target, opts: ResolveOptions): 
   const more = candidates.length - SHOWN;
   const summary = (sep: string) =>
     [
-      ...candidates.slice(0, SHOWN).map((n) => `${n.role} id=${n.identifier} label=${candidateLabel(n)}`),
+      ...candidates.slice(0, SHOWN).map((n) => `${n.role} id=${n.identifier} label=${opts.labelsByLength ? labelByLength(n) : candidateLabel(n)}`),
       ...(more > 0 ? [`…and ${more} more`] : []),
     ].join(sep);
   if (opts.ambiguous === 'refuse') {
@@ -232,12 +238,17 @@ export function resolveNow(tree: UiNode, target: Target, opts: ResolveOptions): 
  * content-desc is labelled by its text (android-tree-dialect.ts), which may be a password typed a moment ago, and a
  * fill's re-read lists it when a second match appears mid-fill. That text is said by its length, as a fill says it, and
  * the input by its rect, so two without an id are still told apart. The limit: this covers averi's own derivation
- * only; a label the app built around the text (a content-desc holding it) is quoted, and mid-fill the fill's re-read
- * says the typed value inside it by its length (fill-refetch.ts#withoutTyped).
+ * only; a label the app built around the text (a content-desc holding it) is quoted — after a fill's focus tap every
+ * label is said by its length instead (`labelByLength`, ResolveOptions.labelsByLength).
  */
 function candidateLabel(n: UiNode): string {
   const text = n.role === INPUT_ROLE ? n.value?.trim() : undefined;
   return text && n.label?.trim() === text ? `<its text, ${charactersText(text.length)}> at ${rectText(n.rect)}` : JSON.stringify(n.label);
+}
+
+/** A label by its length and the candidate's rect, no words (`null` when it has none). */
+function labelByLength(n: UiNode): string {
+  return `${n.label === null ? 'null' : `<${charactersText(n.label.trim().length)}>`} at ${rectText(n.rect)}`;
 }
 
 /**

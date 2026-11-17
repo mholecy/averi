@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
-import { fieldRefetch, findAgain, sameField, withoutTyped, type TwinGuard } from '../../src/interact/fill-refetch.js';
-import { AmbiguityRefusal } from '../../src/interact/resolve.js';
+import { fieldRefetch, findAgain, sameField, type TwinGuard } from '../../src/interact/fill-refetch.js';
 import { screenIdentity } from '../../src/ui-tree/read-tree.js';
 import { node } from '../helpers/fake.js';
 
@@ -89,14 +88,14 @@ describe('fieldRefetch — the reads, and the guard typing sets', () => {
 
   it('no read yet: lastTree undefined; a read keeps its tree', async () => {
     const same = tree([field('old')]);
-    const reads = fieldRefetch({ adapter: reading(same), target: VALUE, resolve: OPTS, chosen, unreadable, typed: '' });
+    const reads = fieldRefetch({ adapter: reading(same), target: VALUE, resolve: OPTS, chosen, unreadable });
     expect(reads.lastTree()).toBeUndefined();
     expect(await reads.read()).toEqual({ node: field('old') });
     expect(reads.lastTree()).toEqual(same);
   });
 
   it('typing after a read: the guard is that read\'s screen — a twin on it found, on another lost as screen-changed', async () => {
-    const reads = fieldRefetch({ adapter: reading(tree([field('old')]), tree([field('new')]), tree([field('newer')], ['title', 'error'])), target: VALUE, resolve: OPTS, chosen, unreadable, typed: '' });
+    const reads = fieldRefetch({ adapter: reading(tree([field('old')]), tree([field('new')]), tree([field('newer')], ['title', 'error'])), target: VALUE, resolve: OPTS, chosen, unreadable });
     await reads.read();
     reads.typingStarts();
     expect(await reads.read()).toEqual({ node: field('new') });
@@ -104,7 +103,7 @@ describe('fieldRefetch — the reads, and the guard typing sets', () => {
   });
 
   it('the guard is set once: a later typing (a retype) keeps the first screen', async () => {
-    const reads = fieldRefetch({ adapter: reading(tree([field('old')]), tree([field('new')], ['next']), tree([field('new')])), target: VALUE, resolve: OPTS, chosen, unreadable, typed: '' });
+    const reads = fieldRefetch({ adapter: reading(tree([field('old')]), tree([field('new')], ['next']), tree([field('new')])), target: VALUE, resolve: OPTS, chosen, unreadable });
     await reads.read();
     reads.typingStarts();
     expect(await reads.read()).toEqual({ lost: 'screen-changed' });
@@ -114,19 +113,19 @@ describe('fieldRefetch — the reads, and the guard typing sets', () => {
 
   it('typing with no read before it: the twin never asked; the resolved screen words the why', async () => {
     const resolvedOn = screenIdentity(tree([field('old')]));
-    const same = fieldRefetch({ adapter: reading(tree([field('new')])), target: VALUE, resolve: OPTS, chosen, resolvedOn, unreadable, typed: '' });
+    const same = fieldRefetch({ adapter: reading(tree([field('new')])), target: VALUE, resolve: OPTS, chosen, resolvedOn, unreadable });
     same.typingStarts();
     expect(await same.read()).toEqual({ lost: 'unmatched' });
-    const other = fieldRefetch({ adapter: reading(tree([field('new')], ['next'])), target: VALUE, resolve: OPTS, chosen, resolvedOn, unreadable, typed: '' });
+    const other = fieldRefetch({ adapter: reading(tree([field('new')], ['next'])), target: VALUE, resolve: OPTS, chosen, resolvedOn, unreadable });
     other.typingStarts();
     expect(await other.read()).toEqual({ lost: 'screen-changed' });
-    const unworded = fieldRefetch({ adapter: reading(tree([field('new')], ['next'])), target: VALUE, resolve: OPTS, chosen, unreadable, typed: '' });
+    const unworded = fieldRefetch({ adapter: reading(tree([field('new')], ['next'])), target: VALUE, resolve: OPTS, chosen, unreadable });
     unworded.typingStarts();
     expect(await unworded.read()).toEqual({ lost: 'unmatched' });
   });
 
   it('typing with no read before it, then a retype after reads: the twin stays off — the guard is set once', async () => {
-    const reads = fieldRefetch({ adapter: reading(tree([field('new')])), target: VALUE, resolve: OPTS, chosen, unreadable, typed: '' });
+    const reads = fieldRefetch({ adapter: reading(tree([field('new')])), target: VALUE, resolve: OPTS, chosen, unreadable });
     reads.typingStarts();
     expect(await reads.read()).toEqual({ lost: 'unmatched' });
     reads.typingStarts(); // a read is there now: still not the guard
@@ -134,38 +133,13 @@ describe('fieldRefetch — the reads, and the guard typing sets', () => {
   });
 
   it('before typing: the twin on any screen', async () => {
-    const reads = fieldRefetch({ adapter: reading(tree([field('')], ['next'])), target: VALUE, resolve: OPTS, chosen, unreadable, typed: '' });
+    const reads = fieldRefetch({ adapter: reading(tree([field('')], ['next'])), target: VALUE, resolve: OPTS, chosen, unreadable });
     expect(await reads.read()).toEqual({ node: field('') });
   });
 
   it("a tree that cannot be read throws the caller's error", async () => {
-    const reads = fieldRefetch({ adapter: { uiTree: async () => Promise.reject(new Error('device gone')) }, target: VALUE, resolve: OPTS, chosen, unreadable, typed: '' });
+    const reads = fieldRefetch({ adapter: { uiTree: async () => Promise.reject(new Error('device gone')) }, target: VALUE, resolve: OPTS, chosen, unreadable });
     await expect(reads.read()).rejects.toThrow('wrapped: ');
     expect(reads.lastTree()).toBeUndefined();
-  });
-});
-
-describe('withoutTyped — a refusal mid-fill says the typed value inside a label by its length', () => {
-  const refusal = (labels: string[]) =>
-    new AmbiguityRefusal(
-      `Selector matches ${labels.length} elements: label~"12"\n  ${labels.map((l, i) => `textfield id=null label=${l} at 0,${i * 12} 100x12`).join('\n  ')}\nNarrow it`,
-    );
-
-  it('inside every label, quoted again; the selector, counts and rects as they were; the class kept', () => {
-    const said = withoutTyped(refusal(['"12, Password"', '"Card \\"12\\" 12"', '"Amount"', 'null']), '12');
-    expect(said).toBeInstanceOf(AmbiguityRefusal);
-    expect(said.message).toBe(
-      'Selector matches 4 elements: label~"12"\n' +
-        '  textfield id=null label="<the typed value, 2 characters>, Password" at 0,0 100x12\n' +
-        '  textfield id=null label="Card \\"<the typed value, 2 characters>\\" <the typed value, 2 characters>" at 0,12 100x12\n' +
-        '  textfield id=null label="Amount" at 0,24 100x12\n' +
-        '  textfield id=null label=null at 0,36 100x12\nNarrow it',
-    );
-  });
-
-  it('no label holding it, or nothing typed: the refusal itself', () => {
-    const plain = refusal(['"Amount"']);
-    expect(withoutTyped(plain, 'zq7v')).toBe(plain);
-    expect(withoutTyped(plain, '')).toBe(plain);
   });
 });
