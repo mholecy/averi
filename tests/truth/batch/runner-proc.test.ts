@@ -61,7 +61,7 @@ async function exited(run: ReturnType<typeof start>, ms = 9000) {
 const meta = () => at('out', 'meta', readdirSync(at('out', 'meta'))[0]);
 const summary = () => readFileSync(join(meta(), 'summary.txt'), 'utf8').split('\n');
 
-describe('runBatch on the real process seam (T2 S6a; b11-dry int.sh under the runner)', () => {
+describe('runBatch on the real process seam (T2 S6a)', () => {
   it('Ctrl-C mid-block: the probe\'s group stopped, the window put back, the abort SUMMARY with INTERRUPTED on the terminal, exit 130', async () => {
     const run = start('int');
     expect(await until(() => existsSync(at('ready')) && existsSync(at('probe.pids')) && readFileSync(at('probe.pids'), 'utf8').includes(' '))).toBe(true);

@@ -9,7 +9,7 @@ import { endChildren } from './proc-cleanup.js';
 // Each test carries its own timeout too; the hooks get theirs here (teardownTimeout is vitest's global default).
 vi.setConfig({ testTimeout: 15_000, hookTimeout: 10_000 });
 
-// scripts/truth/batch/abort.ts on the real process seam, with real signals: b11-dry's int.sh scenarios (a process
+// scripts/truth/batch/abort.ts on the real process seam, with real signals: the interrupt scenarios (a process
 // group sent SIGINT, a second SIGINT, a fatal error inside a window) as vitest tests. The child is
 // tests/fixtures/batch/abort-child.ts, started in a process group of its own as a terminal's foreground job is; a
 // Ctrl-C is SIGINT to that whole group. Pids and markers go through files in a temp dir (the sandbox blocks ps and
@@ -85,7 +85,7 @@ async function ready(run: Run): Promise<number[]> {
 
 const summary = () => text('summary.txt').split('\n');
 
-describe('SIGINT on the real process seam: restores run, RESTORE for the failed one, exit 130 (b11-dry int.sh)', () => {
+describe('SIGINT on the real process seam: restores run, RESTORE for the failed one, exit 130', () => {
   it('int-d55: Ctrl-C inside a dirty window — the probe\'s group stopped (grandchild too), the restore run and verified, the abort SUMMARY on the terminal, exit 130', async () => {
     const run = start('int');
     const [probe, grandchild] = await ready(run);

@@ -182,7 +182,7 @@ async function selectionGaps(asked: Asked, select: Selector, summary: string | u
  * stray `.cases` or `x.y.cases` in the folder) is a gap of its own, and nothing of it is read. Never throws.
  */
 export async function completeness({ fs = nodeFs, dir, name, select }: { fs?: BatchFs; dir: string; name: string; select: Selector }): Promise<Completeness> {
-  if (!PLAIN_SEGMENT.test(name)) return { ok: false, why: `${nameInLine(`${name}${CASES_EXT}`)}: its name is no plain path segment (letters, digits, _ and -), not read as a run` };
+  if (!PLAIN_SEGMENT.test(name)) return { ok: false, why: `${nameInLine(`${name}${CASES_EXT}`)}: its name is no plain path segment (a letter or digit, then letters, digits, _ and -), not read as a run` };
   const f = runFiles(dir, name);
   const ran = [f.record, f.log, f.summary].some((p) => fs.exists(p));
   if (!ran) return { ok: false, why: fs.exists(f.cases) ? 'asked but never ran (no record, log or summary beside its .cases)' : 'never ran (no .cases, record, log or summary)' };

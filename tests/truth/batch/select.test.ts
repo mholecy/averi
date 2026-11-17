@@ -6,7 +6,7 @@ import { knobs, selectBlocks, type KnobSpec } from '../../../scripts/truth/batch
 
 const BLOCKS = ['lab', 'kf', 'lvd62', 'T6', 'E5'] as const;
 
-describe('selectBlocks — ONLY= (batch-2 on; validated since batch-10/11: b11-dry knob-only, only-mixed)', () => {
+describe('selectBlocks — ONLY=', () => {
   it('no ONLY, or an empty one, wants every block in the batch\'s order', () => {
     expect(selectBlocks(BLOCKS, undefined)).toEqual({ ok: true, wanted: [...BLOCKS], warnings: [] });
     expect(selectBlocks(BLOCKS, '')).toEqual({ ok: true, wanted: [...BLOCKS], warnings: [] });
@@ -16,7 +16,7 @@ describe('selectBlocks — ONLY= (batch-2 on; validated since batch-10/11: b11-d
     expect(selectBlocks(BLOCKS, 'E5,lab,E5')).toEqual({ ok: true, wanted: ['lab', 'E5'], warnings: [] });
   });
 
-  it('commas or spaces between names (the README writes `lab kf lvd62 T6 E5`)', () => {
+  it('commas or spaces between names', () => {
     expect(selectBlocks(BLOCKS, ' kf, T6  lab ')).toEqual({ ok: true, wanted: ['lab', 'kf', 'T6'], warnings: [] });
   });
 

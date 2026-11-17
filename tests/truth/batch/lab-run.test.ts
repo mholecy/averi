@@ -168,7 +168,7 @@ describe('lab-run.ts: a clean run, the blocks\' order and the lab block', () => 
     expect(seam.exits).toEqual([]);
   });
 
-  it('T23, the agent\'s sandbox: java_home finds no JDK, one in a JVM folder builds — the android line WARNs naming both, the lab check PASS, exit 0', async () => {
+  it('the agent\'s sandbox: java_home finds no JDK, one in a JVM folder builds — the android line WARNs naming both, the lab check PASS, exit 0', async () => {
     fresh({ buildFails: 'java' });
     const jvms = join(root, 'jvms');
     const zulu = join(jvms, 'zulu-17.jdk', 'Contents', 'Home');
@@ -187,7 +187,7 @@ describe('lab-run.ts: a clean run, the blocks\' order and the lab block', () => 
     expect(seam.words.find((w) => w.endsWith('assembleDebug'))).toBeDefined();
   });
 
-  it('T23, no JDK 17 anywhere: nothing built, the android line WARNs (not rebuilt), the lab check WARNs naming every source, exit 3', async () => {
+  it('no JDK 17 anywhere: nothing built, the android line WARNs (not rebuilt), the lab check WARNs naming every source, exit 3', async () => {
     fresh({ buildFails: 'java' });
     const none = join(root, 'none');
     const argv = ['--out', out, '--repo', repo, '--serial', LAB_SERIAL, '--groups', 'forms'];

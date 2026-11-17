@@ -137,7 +137,7 @@ describe('StepLog — print, note, step, error', () => {
 describe('StepLog.summary — the SUMMARY to the .out, then to the terminal', () => {
   const s: Summary = { name: 'batch-n', runId: '1', checkout: 'OK checkout', labs: [], blocks: [], protectedLines: [], restore: { file: 'R', written: [] }, errors: [] };
 
-  it('appends it to summary.txt when one is given (batch-12\'s meta/summary.txt): the end\'s and a later abort\'s both kept', () => {
+  it('appends it to summary.txt when one is given (meta/summary.txt): the end\'s and a later abort\'s both kept', () => {
     const log = open({ summaryFile: join(meta, 'summary.txt') });
     log.summary(['======== SUMMARY', 'one', '======== SUMMARY end (run 1)']);
     log.summary(['======== SUMMARY', 'two', '======== SUMMARY end (run 1, INTERRUPTED)']);
@@ -153,7 +153,7 @@ describe('StepLog.summary — the SUMMARY to the .out, then to the terminal', ()
   });
 });
 
-describe('the terminal gone (the tee\'s EPIPE of batch-11) never stops the run\'s own output', () => {
+describe('the terminal gone (the tee\'s EPIPE) never stops the run\'s own output', () => {
   it('a terminal that throws is dropped: the .out and steps.log go on, the SUMMARY lands in the .out', () => {
     let calls = 0;
     const log = open({
@@ -271,7 +271,7 @@ describe('terminalOf — the default terminal: a synchronous write to fd 1, safe
   });
 });
 
-describe('stepWordOf — the judged exit-1 rule (batch-11): live.ts exit 1 is DONE only with its `# Live golden:` header', () => {
+describe('stepWordOf — the judged exit-1 rule: live.ts exit 1 is DONE only with its `# Live golden:` header', () => {
   it('exit 0 is OK, judged or not', () => {
     expect(stepWordOf(0)).toBe('OK');
     expect(stepWordOf(0, { judged: true, log: '' })).toBe('OK');

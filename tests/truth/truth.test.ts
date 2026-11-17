@@ -87,7 +87,7 @@ describe('directionOf — toward the target, along its scroll view\'s axis', () 
     expect(axisOf('right')).toBe('x');
     expect(axisOf('down')).toBe('y');
   });
-  it('anything else up or down by its centre, as before: in no scroll view, or one the state does not report, or beside the clip but off its rows', () => {
+  it('anything else up or down by its centre: in no scroll view, or one the state does not report, or beside the clip but off its rows', () => {
     expect(at(rect(378, 138, 354, 85))).toBe('up');
     expect(at(rect(378, 138, 354, 85), 'other')).toBe('up');
     expect(at(rect(378, 900, 354, 85), 'carousel')).toBe('down');
@@ -197,7 +197,7 @@ describe('imePanels — a floating IME\'s panels, from the touchable region', ()
     expect(imePanels('  mInputShown=false\n    touchable region=SkRegion((71,1092,1008,1884)(0,2088,1080,2220))\n', BAND)).toEqual([]);
     expect(imePanels(`${shown}    no region here\n`, BAND)).toEqual([]);
   });
-  it('both committed captures read as before (D69, averi\'s parsers): docked none, floating its one panel', async () => {
+  it('both committed captures read by averi\'s parsers (D69): docked none, floating its one panel', async () => {
     const touchable = async (cell: string) => (JSON.parse(await readFile(new URL(`../fixtures/truth/android-averi_lab-api33/${cell}.ime.json`, import.meta.url), 'utf8')) as { shown: { touchable: string } }).shown.touchable;
     expect(JSON.stringify(imePanels(await touchable('form-keyboard'), rect(0, 1398, 1080, 822)))).toBe('[]');
     expect(JSON.stringify(imePanels(await touchable('form-keyboard-floating'), BAND))).toBe('[{"x":71,"y":1092,"width":937,"height":792}]');
@@ -243,7 +243,7 @@ describe('situationOf', () => {
     expect(situationOf(rect(20, 516.7, 362, 46.3), state(), FORM, { tag: 'submit', inSheet: false })).toBe('open');
   });
 
-  it("a floating IME's panel: a centre under it is under the keyboard, a part of it only covered; the band as before", () => {
+  it("a floating IME's panel: a centre under it is under the keyboard, a part of it only covered; the strip below it still under the keyboard", () => {
     // averi_lab under a floating Gboard: the app hears of the 132-px strip only; the panel 71,1092 937x792 above it.
     const s = state({ screen: rect(0, 0, 1080, 2220), frames: {}, keyboard: { frame: rect(0, 2088, 1080, 132), visible: true, field: 'postcode' } });
     const panel = [rect(71, 1092, 937, 792)];

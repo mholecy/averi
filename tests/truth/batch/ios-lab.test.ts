@@ -36,8 +36,7 @@ import { CATALOG, LAB_UDID, labWorld, runOf, STALE_COMPANION_ERR, type LabWorld,
 // scripts/truth/batch/ios-lab.ts over the fake lab (lab-fakes.ts): the `ios` need, the health check and the Open-in
 // alert, the reset, the WDA window on its normal path and as the abort's dirty window, the iOS stretch's end and the
 // run's last step. Real files in a temp dir, through io.ts; waits recorded, never waited. Every call of every test is
-// checked for the VIOLATIONs lab-fakes.ts records (b11-dry's, made exact; afterEach). The titles name the batch and
-// the fix each rule comes from.
+// checked for the VIOLATIONs lab-fakes.ts records (b11-dry's, made exact; afterEach).
 
 let dir: string;
 let world: LabWorld;
@@ -106,7 +105,7 @@ function blockCtx(run: Run = runOf(world), id = 'D43') {
   return { ctx, events, windows };
 }
 
-describe('IosSim — the lab simulator had only through ios-domains.ts\'s LabSim guard (batch-11 lab_guard)', () => {
+describe('IosSim — the lab simulator had only through ios-domains.ts\'s LabSim guard', () => {
   it('a simulator not named `averi-lab …` is refused after simctl\'s list alone; the lab one opens with the guard\'s words', async () => {
     fresh({ simName: 'iPhone 17 Pro' });
     const r = await IosSim.open(LAB_UDID, runOf(world));
@@ -125,7 +124,7 @@ describe('IosSim — the lab simulator had only through ios-domains.ts\'s LabSim
   });
 });
 
-describe('the lab\'s WebDriverAgent ended by its exact patterns, port 8120 only (batch-11.sh:321–325 kill_lab_wda)', () => {
+describe('the lab\'s WebDriverAgent ended by its exact patterns, port 8120 only', () => {
   it('pkill by its derived data and by its runner under the lab simulator, then each listener of 8120 killed — each call bounded', async () => {
     fresh({ listeners: [4242, 4343] });
     const run = runOf(world);
@@ -135,7 +134,7 @@ describe('the lab\'s WebDriverAgent ended by its exact patterns, port 8120 only 
     expect(run.seen.every((s) => s.secs === HOST_SECS)).toBe(true);
   });
 
-  it('a listener left after pkill: killed by its pid (never this process\'s), read again after PORT_RECHECK_MS (portFree: one function, code review NIT 3)', async () => {
+  it('a listener left after pkill: killed by its pid (never this process\'s), read again after PORT_RECHECK_MS (portFree: one function)', async () => {
     fresh({ listeners: [4242, process.pid], stickyListener: true });
     const run = runOf(world);
     const r = await killLabWda({ run, udid: LAB_UDID, wait });
@@ -144,7 +143,7 @@ describe('the lab\'s WebDriverAgent ended by its exact patterns, port 8120 only 
     expect(r).toEqual({ port: { state: 'busy', pids: [4242, process.pid] }, killed: true, whys: [] });
   });
 
-  it('a pkill or a kill that fails is said in its whys; an unread port in the port it returns, its caller says it (code review, NIT 3)', async () => {
+  it('a pkill or a kill that fails is said in its whys; an unread port in the port it returns, its caller says it', async () => {
     const r = await killLabWda({ run: async (cmd) => ({ code: cmd === 'lsof' ? 2 : 3, timedOut: false, signal: null, out: '', err: `${cmd} broke` }), udid: LAB_UDID, wait });
     expect(r).toEqual({ port: { state: 'unread', why: 'lsof: exit 2 lsof broke' }, killed: false, whys: ['pkill: exit 3 pkill broke', 'pkill: exit 3 pkill broke'] });
     const k = await killLabWda({ run: async (cmd) => ({ code: cmd === 'kill' ? 1 : 0, timedOut: false, signal: null, out: cmd === 'lsof' ? '7\n' : '', err: '' }), udid: LAB_UDID, wait });
@@ -152,7 +151,7 @@ describe('the lab\'s WebDriverAgent ended by its exact patterns, port 8120 only 
   });
 });
 
-describe('the health check, the Open-in alert and the reset (batch-11.sh:326–361; open-in-alert.py)', () => {
+describe('the health check, the Open-in alert and the reset', () => {
   it('health: describe-all, then a swipe; either failing says which', async () => {
     expect(await health(await simOf())).toBeUndefined();
     expect(words(1)).toEqual([`idb ui describe-all --udid ${LAB_UDID}`, `idb ui swipe 200 600 200 400 --udid ${LAB_UDID}`]);
@@ -185,7 +184,7 @@ describe('the health check, the Open-in alert and the reset (batch-11.sh:326–3
     expect(await dismissOpenIn(await simOf())).toEqual({ state: 'unread', why: 'idb ui describe-all: exit 1 No translation object returned' });
   });
 
-  it('the reset in batch-11\'s order: the companion and the WDA ended, shutdown, boot, bootstatus -b, wait, launch, wait, health', async () => {
+  it('the reset, in order: the companion and the WDA ended, shutdown, boot, bootstatus -b, wait, launch, wait, health', async () => {
     const lab = await simOf();
     expect(await reset(needCtx(), lab)).toStrictEqual({ ok: true });
     expect(words(1)).toEqual([
@@ -240,7 +239,7 @@ describe('the health check, the Open-in alert and the reset (batch-11.sh:326–3
   });
 });
 
-describe('the ios need (batch-11.sh:383–410): guard, reset, the finportal key\'s first read, this run\'s build installed, the installed cells.json main\'s', () => {
+describe('the ios need: guard, reset, the finportal key\'s first read, this run\'s build installed, the installed cells.json main\'s', () => {
   it('met: its how names the simulator, the reset, the build and the cells; the installed cells kept in the lab folder', async () => {
     const ios = iosLab({ wait });
     const r = await (ios.need as { check(c: NeedCtx): Promise<unknown> }).check(needCtx());
@@ -294,7 +293,7 @@ describe('the ios need (batch-11.sh:383–410): guard, reset, the finportal key\
     expect(await check({ reset: false, build: builtRef(join(dir, 'no-such.app')) })).toEqual({ ok: false, why: `this run's build not installed (simctl install: exit 2 no app at ${join(dir, 'no-such.app')})` });
   });
 
-  it('this run\'s build: installed before the cells are compared (batch-11.sh:399–401), said in the how', async () => {
+  it('this run\'s build: installed before the cells are compared, said in the how', async () => {
     fresh({ appCells: '{"old":1}\n' });
     const app = join(dir, 'built.app');
     mkdirSync(app);
@@ -307,7 +306,7 @@ describe('the ios need (batch-11.sh:383–410): guard, reset, the finportal key\
     expect(ref.asked).toBe(1);
   });
 
-  it('this run\'s build failed: batch-11\'s WARN — its why, the app already installed is used — unless the batch requires the build (review round 1, MAJOR 2)', async () => {
+  it('this run\'s build failed: a WARN — its why, the app already installed is used — unless the batch requires the build', async () => {
     const failed = { ensure: async () => ({ ok: false as const, why: 'the iOS build failed (exit 65; ios-build.log)' }), built: () => undefined };
     const check = (o: object) => (iosLab({ wait, reset: false, ...o }).need as { check(c: NeedCtx): Promise<unknown> }).check(needCtx());
     expect(await check({ build: failed })).toEqual({ ok: true, warning: 'the iOS build failed (exit 65; ios-build.log); the app already installed is used', how: "averi-lab iPhone 17 simulator, iOS 27.0; not rebuilt; the installed cells.json is main's" });
@@ -325,7 +324,7 @@ describe('the ios need (batch-11.sh:383–410): guard, reset, the finportal key\
   });
 });
 
-describe('the iOS stretch\'s end: the finportal key read again, its line to the protected-key slot (batch-11.sh:656–658; batch-8\'s VOID)', () => {
+describe('the iOS stretch\'s end: the finportal key read again, its line to the protected-key slot (batch-8\'s VOID)', () => {
   async function stretch(o: Omit<WorldOptions, 'dir'>, startRead = true) {
     fresh(o);
     const ios = iosLab({ wait, reset: false });
@@ -341,13 +340,13 @@ describe('the iOS stretch\'s end: the finportal key read again, its line to the 
     expect(await stretch({ finportal: '1' })).toEqual(["protected OK   com.apple.launchservices.schemeapproval's -->sk.finportal.myport unchanged (1; read only)"]);
   });
 
-  it('CHANGED: a FAIL line (T2b batch-13 gap 4); the start never read: an ERROR line — never unchanged', async () => {
+  it('CHANGED: a FAIL line; the start never read: an ERROR line — never unchanged', async () => {
     expect((await stretch({ finportal: '1', finportalEnd: '2' }))[0]).toMatch(/^protected FAIL com\.apple\.launchservices\.schemeapproval's -->sk\.finportal\.myport CHANGED: 1 at the start, 2 at the end/);
     expect((await stretch({}, false))[0]).toMatch(/unread: unreadable \(not read at the iOS stretch's start\) at the start, absent at the end/);
   });
 });
 
-describe('the ios need\'s end (T2b batch-13 gap 4): the runner calls it once the blocks are done; the finportal key read again, its line to the protected-key slot', () => {
+describe('the ios need\'s end: the runner calls it once the blocks are done; the finportal key read again, its line to the protected-key slot', () => {
   async function ended(o: Omit<WorldOptions, 'dir'>, c: { startRead?: boolean; udid?: string | null } = {}) {
     fresh(o);
     const ios = iosLab({ wait, reset: false });
@@ -369,7 +368,7 @@ describe('the ios need\'s end (T2b batch-13 gap 4): the runner calls it once the
     expect((await ended({ finportal: '1', finportalEnd: '2' })).lines).toEqual([`FAIL ${what} CHANGED: 1 at the start, 2 at the end — no batch writes it: read it by hand (batch-5's backup stays read only)`]);
   });
 
-  it('its bound is its calls\' own bounds summed, each with its stop: it cannot pass its bound before its calls do (T2b review round 1, BLOCKER)', async () => {
+  it('its bound is its calls\' own bounds summed, each with its stop: it cannot pass its bound before its calls do', async () => {
     const { calls } = await ended({ finportal: '1' });
     const need = iosLab({ wait }).need as { endSecs: number };
     const stop = (GRACE_MS + CLOSE_GRACE_MS) / 1000;
@@ -378,7 +377,7 @@ describe('the ios need\'s end (T2b batch-13 gap 4): the runner calls it once the
     expect(IOS_END_SECS).toBe(2 * (120 + 3));
   });
 
-  it('its unread line, for the runner when its end threw or passed its bound: the key named, unread, why — never unchanged (T2b review round 1)', async () => {
+  it('its unread line, for the runner when its end threw or passed its bound: the key named, unread, why — never unchanged', async () => {
     fresh({ finportal: '1' });
     const ios = iosLab({ wait, reset: false });
     const need = ios.need as { check(c: NeedCtx): Promise<unknown>; endUnread(why: string): string };
@@ -392,7 +391,7 @@ describe('the ios need\'s end (T2b batch-13 gap 4): the runner calls it once the
   });
 });
 
-describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, the work, the WDA ended, the 4 s wait, port 8120 free, the restore key by key, the end check, the compare', () => {
+describe('the WDA window: the .cases first, the backup, the work, the WDA ended, the 4 s wait, port 8120 free, the restore key by key, the end check, the compare', () => {
   const asked: Asked = { platform: 'ios', app: 'native', sources: ['wda'], cases: ['p7w'] };
   const runs = [{ name: 'ios-wda-d43-1', asked }];
 
@@ -452,7 +451,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     expect(existsSync(join(ctx.dir, 'state.json'))).toBe(false);
   });
 
-  it('a late writer (the runner\'s exit after the restore, batch-11 review round 1): the compare WARN, its hand lines to RESTORE, the state marked dirty again', async () => {
+  it('a late writer (the runner\'s exit after the restore): the compare WARN, its hand lines to RESTORE, the state marked dirty again', async () => {
     fresh({ lateFlip: true });
     const { ctx, events } = blockCtx();
     await wdaWindow(ctx, await simOf(), { work: async () => void world.startWda() });
@@ -461,7 +460,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     expect(stateOf(nodeFs, join(ctx.dir, 'state.json'))).toBe('dirty');
   });
 
-  it('a listener of 8120 left after the wait: killed, read again after 1.5 s — free (a listener killed); one that stays: no restore, NOT VERIFIED, the state dirty, the window left open for RESTORE, nothing compared (review round 1, BLOCKER)', async () => {
+  it('a listener of 8120 left after the wait: killed, read again after 1.5 s — free (a listener killed); one that stays: no restore, NOT VERIFIED, the state dirty, the window left open for RESTORE, nothing compared', async () => {
     const { ctx, events } = blockCtx();
     // A listener that comes up during the 4 s wait (another runner's exit): killed at the port check.
     const opened = await IosSim.open(LAB_UDID, runOf(world), { wait: async (ms) => void (ms === WDA_EXIT_WAIT_MS && (world.st.listeners = [4343])) });
@@ -492,7 +491,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     expect(waits.filter((w) => w === PORT_RECHECK_MS)).toHaveLength(3);
   });
 
-  it('the port free but the restore failing: the window\'s own hand lines from the one builder — the WDA kill, each domain, the compare — as its getter gives them (code review, MAJOR 1)', async () => {
+  it('the port free but the restore failing: the window\'s own hand lines from the one builder — the WDA kill, each domain, the compare — as its getter gives them', async () => {
     fresh({ restoreFails: true });
     const lab = await simOf();
     const { ctx, windows } = blockCtx(runOf(world), 'D43f');
@@ -505,7 +504,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     expect(spec!.hand.at(-1)).toBe(compareHand(join(ctx.dir, 'state.json')));
   });
 
-  it('lsof unread (it fails, or passes its bound) blocks the restore as a listener does: nothing written back, the state dirty, the hand lines kept, the block INCONCLUSIVE (review round 2, MINOR 1)', async () => {
+  it('lsof unread (it fails, or passes its bound) blocks the restore as a listener does: nothing written back, the state dirty, the hand lines kept, the block INCONCLUSIVE', async () => {
     const { ctx, events, windows } = blockCtx(runOf(world), 'D43u');
     let working = false;
     const run: Run = async (cmd, args, call) => (cmd === 'lsof' && working ? { code: 142, timedOut: true, signal: 'SIGKILL', out: '', err: '' } : runOf(world)(cmd, args, call));
@@ -519,7 +518,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     expect(events).toContain("verdict D43 live verdict: INCONCLUSIVE — the lab's settings not put back (see RESTORE)");
   });
 
-  it('as the abort\'s dirty window: its restore over the abort\'s runner kills the WDA, waits, restores; its hand lines S4\'s and the WDA\'s kill', async () => {
+  it('as the abort\'s dirty window: its restore over the abort\'s runner kills the WDA, waits, restores; its hand lines the WDA\'s kill, each domain\'s import and the compare', async () => {
     const { ctx, windows } = blockCtx();
     const lab = await simOf();
     let spec: WindowSpec | undefined;
@@ -565,7 +564,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
   });
 });
 
-describe('the run\'s last step: the lab\'s WebDriverAgent and idb_companion ended (batch-11.sh:660, and the end of on_abort)', () => {
+describe('the run\'s last step: the lab\'s WebDriverAgent and idb_companion ended', () => {
   it('only once the guard cleared the simulator this run: no call before', async () => {
     const run = runOf(world);
     await endLabProcesses(() => undefined, wait)({ run, step: (w, t) => void steps.push(`${w} ${t}`) });
@@ -689,7 +688,7 @@ describe("batch-13 fixes: idb's companion entry dropped after every companion en
   });
 });
 
-describe("batch-13 code review: a mid-run reset's companion warning reaches the block, not only the steps", () => {
+describe("batch-13: a mid-run reset's companion warning reaches the block, not only the steps", () => {
   it("batch-13: the WDA window's checks — the one before and the end check — hand their resets' warnings back, in the same words", async () => {
     fresh({ sick: 'swipe' });
     const run: Run = async (cmd, args, call) => {

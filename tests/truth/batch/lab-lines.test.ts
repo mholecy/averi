@@ -29,14 +29,14 @@ import {
 
 // scripts/truth/batch/lab-lines.ts: the lab plumbing's pure half (T2 S6b) — what the port, pkill, the Open-in alert,
 // an installed cells.json and a JDK read say, the WDA window's restore line with its port part, the patterns the lab's
-// processes are ended by. Strings in, strings out. The titles name the batch and the fix that found each rule.
+// processes are ended by. Strings in, strings out.
 
 const ok = (out = ''): CallResult => ({ code: 0, timedOut: false, signal: null, out, err: '' });
 const exit = (code: number, err = '', out = ''): CallResult => ({ code, timedOut: false, signal: null, out, err });
 const timedOut: CallResult = { code: TIMED_OUT, timedOut: true, signal: 'SIGKILL', out: '', err: '' };
 const LAB = 'LAB-SIMULATOR-UDID';
 
-describe('the lab\'s processes, by their exact patterns (batch-11.sh:321–325 kill_lab_wda; never device-check\'s)', () => {
+describe('the lab\'s processes, by their exact patterns (never device-check\'s)', () => {
   it('the WebDriverAgent: the lab\'s own derived data, and the runner under the lab simulator\'s folder; the companion of the lab simulator', () => {
     expect(wdaKillPatterns(LAB)).toEqual(['DerivedData/averi-wda-lab([/ ]|$)', `Devices/${LAB}/.*WebDriverAgentRunner`]);
     expect(companionPattern(LAB)).toBe(`idb_companion --udid ${LAB}`);
@@ -49,7 +49,7 @@ describe('the lab\'s processes, by their exact patterns (batch-11.sh:321–325 k
     }
   });
 
-  it('anchored (review round 1, NIT 7): the lab\'s xcodebuild and runner match; device-check\'s derived data, this node process and a batch\'s own command line never', () => {
+  it('anchored: the lab\'s xcodebuild and runner match; device-check\'s derived data, this node process and a batch\'s own command line never', () => {
     const [derived, runner] = wdaKillPatterns(LAB).map((p) => new RegExp(p));
     expect(derived.test('xcodebuild test-without-building -derivedDataPath /h/Library/Developer/Xcode/DerivedData/averi-wda-lab -destination id=X')).toBe(true);
     expect(derived.test('/h/Library/Developer/Xcode/DerivedData/averi-wda-lab/Build/Products/WebDriverAgentRunner-Runner.app')).toBe(true);
@@ -74,7 +74,7 @@ describe('the lab\'s processes, by their exact patterns (batch-11.sh:321–325 k
   });
 });
 
-describe('port 8120 (d43-gate.ts\'s restore: the port free, else killed): lsof\'s answer as free, busy or unread', () => {
+describe('port 8120 (the restore: the port free, else killed): lsof\'s answer as free, busy or unread', () => {
   it('lsof asks the lab port only, never 8100 or 8101', () => {
     expect(LSOF_ARGV).toEqual(['-t', '-n', '-P', '-sTCP:LISTEN', '-i', 'tcp:8120']);
   });
@@ -105,19 +105,19 @@ describe('port 8120 (d43-gate.ts\'s restore: the port free, else killed): lsof\'
   });
 });
 
-describe('the WDA window\'s put-back line: S4\'s line and the port part (the port is the runner\'s: ios-defaults.ts#domainPart leaves it out)', () => {
+describe('the WDA window\'s put-back line: the domains\' restore line and the port part (the port is the runner\'s: ios-defaults.ts#domainPart leaves it out)', () => {
   const restored = { ok: true as const, line: 'D43 WDA-window restore: OK — every domain equals its backup (nothing put back)' };
   const failed = { ok: false as const, line: 'D43 WDA-window restore: ERROR — NOT VERIFIED — com.apple.Accessibility NOT equal to its backup' };
   const hand = ['D43 (iOS): the window\'s hand lines'];
 
-  it('restored with the port free: S4\'s line, the port named — free, or free once a listener was killed', () => {
+  it('restored with the port free: the domains\' line, the port named — free, or free once a listener was killed', () => {
     expect(wdaRestoredOf(restored, false, hand)).toEqual({ ok: true, line: 'D43 WDA-window restore: OK — every domain equals its backup (nothing put back); port 8120 free', hand: [] });
     expect(wdaRestoredOf(restored, true, hand).line).toMatch(/; port 8120 free \(a listener killed\)$/);
     // Not verified: the window's own hand lines (one builder for every end).
     expect(wdaRestoredOf(failed, false, hand)).toEqual({ ok: false, line: `${failed.line}; port 8120 free`, hand });
   });
 
-  it('the port not proven free (review round 1, BLOCKER): no restore at all — a runner still running undoes it at its exit; NOT VERIFIED, the state left dirty; the WDA\'s kill first, then each domain\'s lines, then the compare', () => {
+  it('the port not proven free: no restore at all — a runner still running undoes it at its exit; NOT VERIFIED, the state left dirty; the WDA\'s kill first, then each domain\'s lines, then the compare', () => {
     const domains = ['D43 (iOS): xcrun simctl spawn U defaults import com.apple.Accessibility /s/b.plist'];
     expect(wdaHandOf(LAB, domains, '/s/state.json')).toEqual([portHand(LAB), ...domains, compareHand('/s/state.json')]);
     expect(wdaBlockedOf({ state: 'busy', pids: [7] }, true, wdaHandOf(LAB, domains, '/s/state.json'))).toEqual({
@@ -130,7 +130,7 @@ describe('the WDA window\'s put-back line: S4\'s line and the port part (the por
   });
 });
 
-describe('the Open-in alert (open-in-alert.py, batch-2 block D/A: a leftover "Open in …?" holds every later launch)', () => {
+describe('the Open-in alert (a leftover "Open in …?" holds every later launch)', () => {
   const tree = (els: unknown[]) => ok(JSON.stringify(els));
   const alert = { AXLabel: 'Open in “AveriLab”?', type: 'StaticText' };
   const cancel = { AXLabel: 'Cancel', type: 'Button', frame: { x: 100, y: 400, width: 80, height: 40 } };
@@ -173,7 +173,7 @@ describe('the Open-in alert (open-in-alert.py, batch-2 block D/A: a leftover "Op
   });
 });
 
-describe('an installed cells.json against main\'s catalog, byte for byte (batch-11.sh:402–404, 437–441)', () => {
+describe('an installed cells.json against main\'s catalog, byte for byte', () => {
   it('equal: no why; else why, naming where it was read', () => {
     expect(cellsWhy('{"cells":[]}\n', '{"cells":[]}\n', 'the installed app')).toBeUndefined();
     expect(cellsWhy('{"cells":[]}', '{"cells":[]}\n', 'the installed app')).toBe("the installed app's cells.json is not main's");
@@ -182,7 +182,7 @@ describe('an installed cells.json against main\'s catalog, byte for byte (batch-
   });
 });
 
-describe('the JDK for the Android build (batch-11.sh:309–310; T23: JAVA_HOME, else `java_home -v 17`, else the JVM folders)', () => {
+describe('the JDK for the Android build (T23: JAVA_HOME, else `java_home -v 17`, else the JVM folders)', () => {
   /** The probes: JAVA_HOME as given, java_home's answer, the JVM folders' entries, each home's release, javac. */
   const probes = (o: { env?: string; javaHome?: CallResult; entries?: Record<string, string[]>; releases?: Record<string, string>; jre?: string[] }) => {
     const asked: string[] = [];
@@ -279,20 +279,20 @@ describe('the JDK for the Android build (batch-11.sh:309–310; T23: JAVA_HOME, 
   });
 });
 
-describe("batch-13 fixes: idb's companion entry — the disconnect's argv and warning, the stale entry's words", () => {
-  it('batch-13: `idb disconnect <lab udid>`, the udid alone (never `idb kill`); device-check\'s simulator refused, whatever its case', () => {
+describe("idb's companion entry — the disconnect's argv and warning, the stale entry's words", () => {
+  it('`idb disconnect <lab udid>`, the udid alone (never `idb kill`); device-check\'s simulator refused, whatever its case', () => {
     expect(disconnectArgv(LAB)).toEqual(['disconnect', LAB]);
     for (const udid of [DEVICE_CHECK_SIMULATOR, DEVICE_CHECK_SIMULATOR.toLowerCase()]) expect(() => disconnectArgv(udid)).toThrow(/device-check simulator/);
   });
 
-  it('batch-13: a disconnect that answered warns of nothing; one that failed or passed its bound: the entry may be stale, why', () => {
+  it('a disconnect that answered warns of nothing; one that failed or passed its bound: the entry may be stale, why', () => {
     expect(disconnectWarning(ok())).toBeUndefined();
     expect(disconnectWarning(exit(1, 'DisconnectCommandException: Could not disconnect from X:None\nmore'))).toBe("idb's companion entry may be stale — idb disconnect: exit 1 DisconnectCommandException: Could not disconnect from X:None");
     expect(disconnectWarning(timedOut)).toBe("idb's companion entry may be stale — idb disconnect: past its bound (exit 142)");
     expect(disconnectWarning({ ...ok(), timedOut: true })).toBe("idb's companion entry may be stale — idb disconnect: past its bound (exit 0)");
   });
 
-  it('batch-13 rerun 1: idb\'s "Failed to connect to companion" (stderr or stdout, any line) names the stale entry as the likely cause; other words are left as they are', () => {
+  it('idb\'s "Failed to connect to companion" (stderr or stdout, any line) names the stale entry as the likely cause; other words are left as they are', () => {
     const said = "Failed to connect to companion at address DomainSocketAddress(path='<idb>/X_companion.sock'): [Errno 2] No such file or directory";
     expect(idbFailText(exit(1, said))).toBe(`exit 1 ${said} — ${STALE_COMPANION_WHY}`);
     expect(idbFailText(exit(1, 'Traceback (most recent call last):\n' + said))).toBe(`exit 1 Traceback (most recent call last): — ${STALE_COMPANION_WHY}`);

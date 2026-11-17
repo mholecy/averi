@@ -45,7 +45,7 @@ describe('frontOf: what one read says is in front, and on the stack', () => {
     expect(frontOf({ ...AT_LAB, settle: { firstWindow: '  mCurrentFocus=null\n', waitedMs: 300 } })).toEqual({ why: 'the first focus read holds no mFocusedApp line' });
   });
 
-  it("review round 1's records kept `waitedMs` and `firstWindow` at the read's top: read the same", () => {
+  it("a record that kept `waitedMs` and `firstWindow` at the read's top: read the same", () => {
     const legacy = { ...AT_LAB, firstWindow: UNSETTLED(LAUNCHER), waitedMs: 300 } as FocusRead;
     expect(frontOf(legacy)).toEqual({ focusedFirst: LAUNCHER, focusedSettled: MAIN, settle: 'settled', records: [MAIN, LAUNCHER] });
     expect(frontOf({ window: UNSETTLED(MAIN), activities: hist(MAIN, 1), waitedMs: 5_000 } as FocusRead)).toMatchObject({ focusedFirst: MAIN, settle: 'ran-out' });
@@ -267,7 +267,7 @@ describe("lc4': launch_app with no activity, from the launcher (monkey): Launche
     expect(judge("lc4'", [launched('dev.averi.lab')], { before: AT_LAUNCHER, home: { error: 'offline' }, after: AT_LAB })).toEqual({ outcome: 'SKIP', why: 'the HOME activity read failed: offline' });
   });
 
-  it('a record with no HOME read (before the review): at least not the platform in front, and no lab or chooser record', () => {
+  it('a record with no HOME read: at least not the platform in front, and no lab or chooser record', () => {
     const settings: FocusRead = { window: windowOf('com.android.settings/.Settings'), activities: hist('com.android.settings/.Settings', 3) + hist(LAUNCHER, 4862) };
     expect(judge("lc4'", [launched('dev.averi.lab')], { before: settings, after: AT_LAB }, state('')).outcome).toBe('ok');
     const platform: FocusRead = { window: windowOf('android/.Something'), activities: hist(LAUNCHER, 4862) };

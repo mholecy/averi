@@ -17,7 +17,7 @@ import { BATCH_FAKE_MS, advanceUntil, onFakeTime } from './fake-time.js';
 // A fake two-block batch (one iOS block, one Android) yields the whole SUMMARY; then each rule of the order: the
 // refusals, the lab folder, the preconditions and needs (INCONCLUSIVE, never refused), the backstop, the ERROR lines,
 // RESTORE and the exit code, the abort, the non-live records and live_run. The real signals are
-// tests/truth/batch/runner-proc.test.ts. The titles name the fix and the batch or review that found it.
+// tests/truth/batch/runner-proc.test.ts.
 
 const HEAD = 'a'.repeat(40);
 const OTHER = 'b'.repeat(40);
@@ -242,7 +242,7 @@ const d43Block = (over: Partial<Block> = {}): Block => ({
   ...over,
 });
 
-describe('a fake two-block batch, one Android and one iOS block: the whole SUMMARY (spec T2 S6; batch-11.sh:718–735)', () => {
+describe('a fake two-block batch, one Android and one iOS block: the whole SUMMARY (spec T2 S6)', () => {
   it('checkout, lab lines in the order checked, each block\'s verdicts, the protected-key line, RESTORE, this run\'s ERRORs; exit 1 for the RESTORE', async () => {
     seam.rules = [git(), probes, live({ logExtra: 'ERROR the lab app did not launch on the first try\n' })];
     const code = await go([kfBlock(), d43Block()]);
@@ -289,7 +289,7 @@ describe('a fake two-block batch, one Android and one iOS block: the whole SUMMA
     expect(at('======== SUMMARY')).toBeGreaterThan(at('================================ details'));
   });
 
-  it('the details before the SUMMARY: this run\'s steps and each block\'s detail lines (batch-11.sh:698–716)', async () => {
+  it('the details before the SUMMARY: this run\'s steps and each block\'s detail lines', async () => {
     await go([kfBlock(), d43Block()]);
     const o = outText().split('\n');
     const from = o.indexOf('================================ details ================================');
@@ -319,7 +319,7 @@ describe('a fake two-block batch, one Android and one iOS block: the whole SUMMA
     expect(exitCodeOf(r.summary)).toBe(r.exit);
   });
 
-  it('each block\'s verdict lines kept in its verdict.txt too, as batch-11\'s verdict() tee\'d them', async () => {
+  it('each block\'s verdict lines kept in its verdict.txt too', async () => {
     await go([kfBlock(), d43Block()]);
     expect(text(join(dirOf('D43'), 'verdict.txt'))).toBe(`${COMPARE_WARN}\nD43 live verdict: PASS — p7w ok under wda\n`);
     expect(text(join(dirOf('kf'), 'verdict.txt'))).toBe('kf live kf1: PASS\nkf live verdict: PASS — kf1, kf2, kf3 ok\n');
@@ -330,7 +330,7 @@ describe('a fake two-block batch, one Android and one iOS block: the whole SUMMA
 
 const plain = (id: string, over: Partial<Block> = {}): Block => ({ id, label: `${id} verdict`, needs: [], run: async (ctx) => ctx.verdict('PASS'), ...over });
 
-describe('refused to start: exit 2, nothing done — no folder, no call (batch-10/11; S1\'s select and run-dir)', () => {
+describe('refused to start: exit 2, nothing done — no folder, no call (S1\'s select and run-dir)', () => {
   it('a knob that breaks its rule: its error, before any refusal is read', async () => {
     mkdirSync(out);
     writeFileSync(join(out, 'RESTORE.txt'), 'old hand line\n');
@@ -360,7 +360,7 @@ describe('refused to start: exit 2, nothing done — no folder, no call (batch-1
     expect(existsSync(dirOf('kf'))).toBe(false);
   });
 
-  it('a RESTORE left by an earlier run: refused with its hand lines (batch-10.sh:86–94)', async () => {
+  it('a RESTORE left by an earlier run: refused with its hand lines', async () => {
     mkdirSync(out);
     writeFileSync(join(out, 'RESTORE.txt'), 'D55 (Android): adb -s emulator-5554 install x.apk\n');
     expect(await go([plain('kf')])).toBe(2);
@@ -371,7 +371,7 @@ describe('refused to start: exit 2, nothing done — no folder, no call (batch-1
     expect(existsSync(join(out, 'meta'))).toBe(false);
   });
 
-  it('an earlier run\'s state file not clean: refused with the block\'s own hand lines (batch-11.sh:111–112)', async () => {
+  it('an earlier run\'s state file not clean: refused with the block\'s own hand lines', async () => {
     mkdirSync(join(out, 'E5', 'run-old'), { recursive: true });
     writeFileSync(join(out, 'E5', 'run-old', 'state.json'), '{"dirty":true}');
     const stateful = { what: 'E5 not put back', hand: (f: string) => [`  → node e5.ts --restore --state ${f}`] };
@@ -386,7 +386,7 @@ describe('refused to start: exit 2, nothing done — no folder, no call (batch-1
     expect(existsSync(dirOf('meta'))).toBe(false);
   });
 
-  it('an out folder that cannot be made (EPERM: the sandbox): refused, exit 2, its line on the terminal — never a stack trace, no SUMMARY, no call (T2b batch-13 gap 7)', async () => {
+  it('an out folder that cannot be made (EPERM: the sandbox): refused, exit 2, its line on the terminal — never a stack trace, no SUMMARY, no call', async () => {
     const fs = { ...nodeFs, mkdirExclusive: () => { throw Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' }); } };
     expect(await go([plain('kf')], { io: { fs } })).toBe(2);
     expect(terminal).toEqual([`ERROR the run folder ${dirOf('meta')} cannot be made (EPERM); made before it: none — nothing was done\n`]);
@@ -401,7 +401,7 @@ describe('refused to start: exit 2, nothing done — no folder, no call (batch-1
     expect(await go([plain('E5')])).toBe(0);
   });
 
-  it('the batch\'s own reasons refuse too (batch-12\'s pre-D62 worktree)', async () => {
+  it('the batch\'s own reasons refuse too (a pre-D62 worktree)', async () => {
     expect(await go([plain('kf')], { batchReasons: ['the pre-D62 worktree is still registered'] })).toBe(2);
     expect(terminal.join('')).toContain('the pre-D62 worktree is still registered\n');
   });
@@ -425,7 +425,7 @@ describe('refused to start: exit 2, nothing done — no folder, no call (batch-1
   });
 });
 
-describe('the run\'s folders: one fresh run-<id> per wanted block, and the lab folder on every run (batch-11.sh:116–121)', () => {
+describe('the run\'s folders: one fresh run-<id> per wanted block, and the lab folder on every run', () => {
   it('with no clock or pid given, the run\'s id is now\'s and this process\'s (`date +%Y%m%d-%H%M%S`-$$)', async () => {
     await runBatch({ name: 'batch-t', blocks: [plain('kf')], config: { ok: true, config: configFrom(['--out', out, '--repo', repo], {}) }, io: { seam, terminal: (t) => void terminal.push(t), table, graceMs: 5 } });
     const [run] = nodeFs.list(join(out, 'meta'));
@@ -438,7 +438,7 @@ describe('the run\'s folders: one fresh run-<id> per wanted block, and the lab f
     expect(existsSync(dirOf('E5'))).toBe(false);
   });
 
-  it('a block named lab (batch-11 and batch-12 had one) is that folder; made even when not wanted', async () => {
+  it('a block named lab is that folder; made even when not wanted', async () => {
     let seen: { dir: string; lab: string } | undefined;
     await go([plain('lab', { run: async (ctx) => void (seen = { dir: ctx.dir, lab: ctx.labDir }) }), plain('kf')], { env: { ONLY: 'kf' } });
     expect(existsSync(dirOf('lab'))).toBe(true);
@@ -489,8 +489,8 @@ describe('a block\'s ctx: its steps, its lines, its folder (S1\'s steps.ts under
 
 // ------------------------------------------------------------------------------------------------ preconditions
 
-describe('preconditions: a failed one makes the block INCONCLUSIVE, never a refusal; the SUMMARY is written (S3: the runner\'s choice, batch-11\'s way)', () => {
-  it('HEAD ≠ main: the checkout line says so (once: a NOTE step, no ERROR line besides), every block INCONCLUSIVE with its why, none run, no need checked, exit 2 (review round 1)', async () => {
+describe('preconditions: a failed one makes the block INCONCLUSIVE, never a refusal; the SUMMARY is written (S3: the runner\'s choice)', () => {
+  it('HEAD ≠ main: the checkout line says so (once: a NOTE step, no ERROR line besides), every block INCONCLUSIVE with its why, none run, no need checked, exit 2', async () => {
     seam.rules = [git({ 'refs/heads/main': ok(`${OTHER}\n`) }), probes, live()];
     const ran: string[] = [];
     const code = await go([kfBlock({ run: async () => void ran.push('kf') }), d43Block({ run: async () => void ran.push('D43'), preconditions: [async (k) => k.ancestor('c'.repeat(40), 'M_D43')] })]);
@@ -519,7 +519,7 @@ describe('preconditions: a failed one makes the block INCONCLUSIVE, never a refu
     expect(outText()).toContain(`SKIP D43 not run: precondition: M_D43=${'c'.repeat(40)} is not an ancestor of HEAD`);
   });
 
-  it('every wanted block\'s preconditions are asked before the first block runs (batch-11\'s prechecks)', async () => {
+  it('every wanted block\'s preconditions are asked before the first block runs', async () => {
     await go([plain('kf', { run: async (ctx) => void (await ctx.bounded('probe', ['kf'], { secs: 5 })) }), plain('D43', { preconditions: [async (k) => k.ancestor('c'.repeat(40))] })]);
     const w = seam.words();
     expect(w.findIndex((x) => x.startsWith('git merge-base'))).toBeLessThan(w.indexOf('probe kf'));
@@ -544,7 +544,7 @@ describe('preconditions: a failed one makes the block INCONCLUSIVE, never a refu
 });
 
 describe('needs: each checked once, when the first wanted block needing it comes; a failed one makes the block INCONCLUSIVE, not run (spec S6a)', () => {
-  it('a failed need: `<label>: INCONCLUSIVE — <need>: <why>`, its LAB line ERROR, the block not run (b11-dry noandroid, b2-noios)', async () => {
+  it('a failed need: `<label>: INCONCLUSIVE — <need>: <why>`, its LAB line ERROR, the block not run', async () => {
     const ran: string[] = [];
     await go([kfBlock({ run: async () => void ran.push('kf') }), d43Block()], { needs: { ...needs, android: async () => ({ ok: false, why: 'adb unreachable (get-state exit 1)' }) } });
     expect(summary()).toContain('LAB android: ERROR — adb unreachable (get-state exit 1)');
@@ -554,7 +554,7 @@ describe('needs: each checked once, when the first wanted block needing it comes
     expect(outText()).toContain('SKIP kf not run: android: adb unreachable (get-state exit 1)');
   });
 
-  it('a need is checked in full by the first block naming it, then its cheap `alive` before each later one; its lab line once; a need no wanted block names never checked (review round 1)', async () => {
+  it('a need is checked in full by the first block naming it, then its cheap `alive` before each later one; its lab line once; a need no wanted block names never checked', async () => {
     const checked: string[] = [];
     const n: Record<string, NeedSpec> = {
       android: { check: async () => (checked.push('android check'), { ok: true, how: 'up' }), alive: async () => (checked.push('android alive'), { ok: true, how: 'still up' }) },
@@ -593,7 +593,7 @@ describe('needs: each checked once, when the first wanted block needing it comes
     expect(summary()).toContain('b verdict: INCONCLUSIVE — android: down');
   });
 
-  it('no wanted block ran (every need failed): exit 2, "nothing was done" — never success (review round 1); one that ran: its own exit', async () => {
+  it('no wanted block ran (every need failed): exit 2, "nothing was done" — never success; one that ran: its own exit', async () => {
     const down = { ...needs, android: async () => ({ ok: false as const, why: 'down' }) };
     expect(await go([plain('a', { needs: ['android'] }), plain('b', { preconditions: [async () => ({ ok: false, why: 'no' })] })], { needs: down })).toBe(2);
     expect(summary().slice(-4, -1)).toEqual(['b verdict: INCONCLUSIVE — precondition: no', 'NOTE no wanted block ran (each one\'s why above)', 'RESTORE: none — everything dirty was put back and verified']);
@@ -626,7 +626,7 @@ describe('needs: each checked once, when the first wanted block needing it comes
   });
 });
 
-describe('a block\'s calls are its own: stopKept ends the groups it kept, no other block\'s (S2: batch-12 ended the companion after each iOS block)', () => {
+describe('a block\'s calls are its own: stopKept ends the groups it kept, no other block\'s', () => {
   it('an idb call\'s companion kept past the call; the block\'s stopKept ends it; another block\'s stays to the run\'s end', async () => {
     await go([
       plain('A', { run: async (ctx) => (await ctx.bounded('idb', ['a'], { secs: 5 }), ctx.verdict('PASS')) }),
@@ -636,7 +636,7 @@ describe('a block\'s calls are its own: stopKept ends the groups it kept, no oth
   });
 });
 
-describe('a need\'s end: once per need met, after the last block and before the windows go to RESTORE; its protected-key lines into the SUMMARY\'s slot (T2b batch-13 gap 4)', () => {
+describe('a need\'s end: once per need met, after the last block and before the windows go to RESTORE; its protected-key lines into the SUMMARY\'s slot', () => {
   /** A need met (or not), its end recording when it ran and what it saw. */
   const ending = (order: string[], name: string, o: { ok?: boolean; end?: (c: NeedEndCtx) => Promise<void>; endSecs?: number; unread?: boolean; alive?: NeedCtxCheck } = {}): NeedSpec => ({
     check: async () => (o.ok === false ? { ok: false, why: `${name} down` } : { ok: true, how: `${name} up` }),
@@ -679,7 +679,7 @@ describe('a need\'s end: once per need met, after the last block and before the 
     expect(seam.words()).toContain('probe end');
   });
 
-  it('an end that throws: an ERROR line naming the need and its first line, and its unread line (endUnread) in the slot; the next need\'s end still runs (T2b review round 1)', async () => {
+  it('an end that throws: an ERROR line naming the need and its first line, and its unread line (endUnread) in the slot; the next need\'s end still runs', async () => {
     const order: string[] = [];
     const n = {
       android: ending(order, 'android', { unread: true, end: async () => { throw new Error('simctl gone\nmore'); } }),
@@ -691,7 +691,7 @@ describe('a need\'s end: once per need met, after the last block and before the 
     expect(summary().slice(slot, slot + 3)).toEqual(["ERROR android's key unread: its end threw: simctl gone", 'OK   the key unchanged', 'RESTORE: none — everything dirty was put back and verified']);
   });
 
-  it('an end past its bound (endSecs; NEED_END_SECS unless given): an ERROR line and its unread line; settled before the SUMMARY, its lines replace the unread one — a late FAIL exits 1 (T2b review round 1, BLOCKER; T2c: on fake time)', () =>
+  it('an end past its bound (endSecs; NEED_END_SECS unless given): an ERROR line and its unread line; settled before the SUMMARY, its lines replace the unread one — a late FAIL exits 1 (T2c: on fake time)', () =>
     onFakeTime(async () => {
       expect(NEED_END_SECS).toBe(60);
       const slow = plain('slow', { noRecords: true, run: async () => {}, judge: async () => (await tick(120), ['slow verdict: PASS']) });
@@ -737,7 +737,7 @@ describe('a need\'s end: once per need met, after the last block and before the 
       expect(summary()).toContain(unreadLine);
     }));
 
-  it('a need met once, then down before a later block: its end still called once (T2b review round 1, MAJOR)', async () => {
+  it('a need met once, then down before a later block: its end still called once', async () => {
     const order: string[] = [];
     const n = { android: ending(order, 'android', { alive: async () => ({ ok: false, why: 'gone' }) }) };
     await go([plain('a', { needs: ['android'] }), plain('b', { needs: ['android'] })], { needs: n });
@@ -779,7 +779,7 @@ describe('a need\'s end: once per need met, after the last block and before the 
   });
 });
 
-describe('a need\'s calls recorded in lab/<need>-calls.jsonl, appended through the run\'s fs (T2b batch-13 gap 6: a failed LAB line diagnosed without a rerun)', () => {
+describe('a need\'s calls recorded in lab/<need>-calls.jsonl, appended through the run\'s fs (a failed LAB line diagnosed without a rerun)', () => {
   const callsOf = (need: string) => text(join(dirOf('lab'), `${need}-calls.jsonl`)).split('\n').slice(0, -1).map((l) => JSON.parse(l) as Record<string, unknown>);
 
   it('its check\'s, its alive\'s and its end\'s calls, in order, each its phase; a block\'s own calls not among them', async () => {
@@ -830,7 +830,7 @@ describe('a need\'s calls recorded in lab/<need>-calls.jsonl, appended through t
 
 // ------------------------------------------------------------------------------------------------ the backstop
 
-describe('the backstop: a wanted block with no verdict line of its label gets one (batch-10/11; b11-dry d43-backupfail, noandroid)', () => {
+describe('the backstop: a wanted block with no verdict line of its label gets one', () => {
   it('a block that wrote nothing: "not run (see the ERROR lines)"', async () => {
     await go([plain('D62', { run: async (ctx) => ctx.err('D62: the lab is not main\'s — skipped') })]);
     expect(summary()).toContain('D62 verdict: INCONCLUSIVE — not run (see the ERROR lines)');
@@ -858,7 +858,7 @@ describe('the backstop: a wanted block with no verdict line of its label gets on
     expect(summary()).toContain('kf live verdict: INCONCLUSIVE — its 1 run(s) are complete, but no verdict line was written (see the ERROR lines)');
   });
 
-  it('a block whose live run died is not judged: its judge\'s PASS never hides the gap; incompleteLine says it (code review c1)', async () => {
+  it('a block whose live run died is not judged: its judge\'s PASS never hides the gap; incompleteLine says it', async () => {
     seam.rules = [git(), probes, live({ code: 2, header: false, noRecord: true })];
     const judged: string[] = [];
     await go([kfBlock({ judge: async () => (judged.push('kf'), ['kf live verdict: PASS']) })]);
@@ -866,7 +866,7 @@ describe('the backstop: a wanted block with no verdict line of its label gets on
     expect(summary().find((l) => l.startsWith('kf live verdict:'))).toMatch(/^kf live verdict: INCONCLUSIVE — 1 of 1 run\(s\) incomplete: android-kf-1 — no record/);
   });
 
-  it('a live run whose rejudge summary lacks cases asked is not complete: not judged, INCONCLUSIVE naming them (review round 5, R3)', async () => {
+  it('a live run whose rejudge summary lacks cases asked is not complete: not judged, INCONCLUSIVE naming them', async () => {
     seam.rules = [git(), probes, live({ rejudge: { log: casesSummary(['kf1']) } })];
     const judged: string[] = [];
     await go([kfBlock({ judge: async () => (judged.push('kf'), ['kf live verdict: PASS']) })]);
@@ -874,7 +874,7 @@ describe('the backstop: a wanted block with no verdict line of its label gets on
     expect(summary()).toContain('kf live verdict: INCONCLUSIVE — 1 of 1 run(s) incomplete: android-kf-1 — uiautomator: kf2, kf3 missing from the summary');
   });
 
-  it('the same on the abort path: an incomplete run is INCONCLUSIVE with its gap, its judge not run (review round 5, R3)', async () => {
+  it('the same on the abort path: an incomplete run is INCONCLUSIVE with its gap, its judge not run', async () => {
     seam.rules = [git(), probes, live({ rejudge: { log: casesSummary(['kf1']) } })];
     const judged: string[] = [];
     const done = go([kfBlock({ judge: async () => (judged.push('kf'), ['kf live verdict: PASS']) }), plain('E5', { run: async (ctx) => void (await ctx.bounded('probe', ['hang'], { secs: 30 })) })]);
@@ -885,7 +885,7 @@ describe('the backstop: a wanted block with no verdict line of its label gets on
     expect(summary()).toContain('kf live verdict: INCONCLUSIVE — 1 of 1 run(s) incomplete: android-kf-1 — uiautomator: kf2, kf3 missing from the summary');
   });
 
-  it('a noRecords block that asks, records or runs live: the batch\'s mistake, thrown at that call (review round 5, R4, R5)', async () => {
+  it('a noRecords block that asks, records or runs live: the batch\'s mistake, thrown at that call', async () => {
     for (const [call, run] of [
       ['asks', async (ctx: Parameters<Block['run']>[0]) => ctx.asks('c', { kind: 'runs', runs: 1 })],
       ['record', async (ctx: Parameters<Block['run']>[0]) => ctx.record('c', { kind: 'runs', runs: 1 })],
@@ -899,7 +899,7 @@ describe('the backstop: a wanted block with no verdict line of its label gets on
     }
   });
 
-  it('a block\'s own complete() only adds a requirement: it never hides a live run\'s gap (review round 6, the R3 summary with complete: () => true)', async () => {
+  it('a block\'s own complete() only adds a requirement: it never hides a live run\'s gap', async () => {
     seam.rules = [git(), probes, live({ rejudge: { log: casesSummary(['kf1']) } })];
     const judged: string[] = [];
     await go([kfBlock({ complete: () => true, judge: async () => (judged.push('kf'), ['kf live verdict: PASS']) })]);
@@ -941,7 +941,7 @@ describe('the backstop: a wanted block with no verdict line of its label gets on
     expect(judged).toEqual([]);
   });
 
-  it('the judges run after finish: every window still open written to RESTORE and the kept groups ended first (review round 1)', async () => {
+  it('the judges run after finish: every window still open written to RESTORE and the kept groups ended first', async () => {
     let seen: { restore: boolean; signals: string[] } | undefined;
     await go([
       plain('a', {
@@ -973,8 +973,8 @@ describe('the backstop: a wanted block with no verdict line of its label gets on
 
 // ------------------------------------------------------------------------------------------------ ERROR lines
 
-describe('the ERROR lines: this run\'s steps and every ERROR line of its blocks\' logs and analyze.txt, each once (batch-6, batch-12.sh:667–668)', () => {
-  it('a block\'s .log and analyze.txt and the lab folder\'s logs read; another file, and an earlier run\'s logs, not; a line twice printed once, with its count (review round 2)', async () => {
+describe('the ERROR lines: this run\'s steps and every ERROR line of its blocks\' logs and analyze.txt, each once', () => {
+  it('a block\'s .log and analyze.txt and the lab folder\'s logs read; another file, and an earlier run\'s logs, not; a line twice printed once, with its count', async () => {
     mkdirSync(join(out, 'kf', 'run-old'), { recursive: true });
     writeFileSync(join(out, 'kf', 'run-old', 'probe.log'), 'ERROR an earlier run\'s\n');
     await go([
@@ -992,7 +992,7 @@ describe('the ERROR lines: this run\'s steps and every ERROR line of its blocks\
     expect(errors).toEqual(['ERROR the catalog drifted', 'ERROR the analyzer\'s own', `ERROR the cell did not open (×2, in kf/probe.log)`]);
   });
 
-  it('an ERROR said as a step and repeated in a log: one line, counted together, steps.log named (code review a4)', async () => {
+  it('an ERROR said as a step and repeated in a log: one line, counted together, steps.log named', async () => {
     await go([plain('kf', { run: async (ctx) => (ctx.err('the cell did not open'), writeFileSync(join(ctx.dir, 'probe.log'), 'ERROR the cell did not open\nERROR the cell did not open\n'), ctx.verdict('PASS')) })]);
     expect(summary().filter((l) => l.includes('the cell did not open'))).toEqual(['09:44:26 ERROR the cell did not open (×3, in steps.log, kf/probe.log)']);
     rmSync(out, { recursive: true, force: true });
@@ -1000,7 +1000,7 @@ describe('the ERROR lines: this run\'s steps and every ERROR line of its blocks\
     expect(summary().filter((l) => /ERROR (one|two)/.test(l))).toEqual(['09:44:26 ERROR one', '09:44:26 ERROR two']);
   });
 
-  it('one ERROR in several of this run\'s logs: one line, its total and where (review round 3: 50 in p, 1 in q, 2 in r)', async () => {
+  it('one ERROR in several of this run\'s logs: one line, its total and where (50 in p, 1 in q, 2 in r)', async () => {
     await go([
       plain('kf', { run: async (ctx) => (writeFileSync(join(ctx.dir, 'p.log'), Array.from({ length: 50 }, () => 'ERROR same').join('\n')), writeFileSync(join(ctx.labDir, 'q.log'), 'ERROR same\n'), ctx.verdict('PASS')) }),
       plain('E5', { run: async (ctx) => (writeFileSync(join(ctx.dir, 'r.log'), 'ERROR same\nERROR same\n'), ctx.verdict('PASS')) }),
@@ -1013,7 +1013,7 @@ describe('the ERROR lines: this run\'s steps and every ERROR line of its blocks\
     expect(summary()).toContain('ERROR stalled');
   });
 
-  it('a log the folder lists but that cannot be read: a NOTE naming it in the SUMMARY; a long ERROR line cut (review round 1)', async () => {
+  it('a log the folder lists but that cannot be read: a NOTE naming it in the SUMMARY; a long ERROR line cut', async () => {
     await go([
       plain('kf', {
         run: async (ctx) => (mkdirSync(join(ctx.dir, 'stuck.log')), mkdirSync(join(ctx.dir, 'full.log')), writeFileSync(join(ctx.dir, 'full.log', 'x'), ''), writeFileSync(join(ctx.dir, 'p.log'), `ERROR ${'x'.repeat(900)}\n`), ctx.verdict('PASS')),
@@ -1123,7 +1123,7 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
     expect(ran).toEqual([]);
   });
 
-  it('a later block skipped for its precondition is not even said skipped once the abort began: nothing more of the body runs (review round 2 mutation)', async () => {
+  it('a later block skipped for its precondition is not even said skipped once the abort began: nothing more of the body runs', async () => {
     const done = go([e5(), plain('b', { preconditions: [async () => ({ ok: false, why: 'no' })] })]);
     await until(() => seam.words().includes('probe hang'));
     seam.handlers!.signal('SIGINT');
@@ -1131,7 +1131,7 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
     expect(outText()).not.toContain('SKIP b not run');
   });
 
-  it('no further need of a block is checked once the abort began during one of them (review round 2)', async () => {
+  it('no further need of a block is checked once the abort began during one of them', async () => {
     const checked: string[] = [];
     const n = {
       android: async (c: NeedCtx) => (checked.push('android'), await c.bounded('probe', ['hang'], { secs: 30 }), { ok: true as const, how: 'up' }),
@@ -1144,7 +1144,7 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
     expect(checked).toEqual(['android']);
   });
 
-  it('a live run whose rejudge was cut: its run had not returned — INTERRUPTED, its gap the why, the rerun hint kept (batch-12: every .cases its record and rejudge; review round 6)', async () => {
+  it('a live run whose rejudge was cut: its run had not returned — INTERRUPTED, its gap the why, the rerun hint kept', async () => {
     seam.rules = [git(), probes, live({ rejudge: { hang: true } })];
     const done = go([kfBlock()]);
     await until(() => seam.words().some((w) => w.includes('--rejudge')));
@@ -1153,7 +1153,7 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
     expect(summary()).toContain('kf: INTERRUPTED — not judged (1 of 1 run(s) incomplete: android-kf-1 — android-kf-1.rejudge.txt has no `# Live golden:` line (the rejudge did not finish); uiautomator: kf1, kf2, kf3 missing from the summary; rerun ONLY=kf)');
   });
 
-  it('interrupted inside live.ts (no record yet): its run had not returned — INTERRUPTED, its gap the why, `rerun ONLY=kf` kept (review round 6)', async () => {
+  it('interrupted inside live.ts (no record yet): its run had not returned — INTERRUPTED, its gap the why, `rerun ONLY=kf` kept', async () => {
     seam.rules = [git(), probes, (cmd, args) => (args.includes('--record') ? { hang: true } : undefined)];
     const done = go([kfBlock()]);
     await until(() => seam.words().some((w) => w.includes('--record')));
@@ -1163,7 +1163,7 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
     expect(summary().some((l) => l.startsWith('kf live verdict:'))).toBe(false);
   });
 
-  it('the abort reads completeness within what is left of its judging budget: a table that never loads — not complete, said so (review round 6)', async () => {
+  it('the abort reads completeness within what is left of its judging budget: a table that never loads — not complete, said so', async () => {
     const done = go([kfBlock(), plain('E5', { run: async (ctx) => void (await ctx.bounded('probe', ['hang'], { secs: 30 })) })], { io: { table: () => new Promise(() => {}), judgeBudgetSecs: 0.05 } });
     await until(() => seam.words().includes('probe hang'));
     seam.handlers!.signal('SIGINT');
@@ -1206,7 +1206,7 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
     expect(outText()).not.toContain('finish() ignored');
   });
 
-  it('records complete, judged by the abort, but its judge wrote no verdict of its label: INCONCLUSIVE saying so, never missing (review round 1, MAJOR)', async () => {
+  it('records complete, judged by the abort, but its judge wrote no verdict of its label: INCONCLUSIVE saying so, never missing', async () => {
     const T6 = (judge: string[]) => plain('T6', { run: async (ctx) => (ctx.asks('c', { kind: 'runs', runs: 1 }), ctx.record('c', { kind: 'runs', runs: 1 })), judge: async () => judge });
     for (const lines of [[], ['T6 sample: 3 of 3']]) {
       rmSync(out, { recursive: true, force: true });
@@ -1219,7 +1219,7 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
     }
   });
 
-  it('every wanted block has a line in the abort SUMMARY, whatever its state at the interrupt (review round 1: the invariant)', async () => {
+  it('every wanted block has a line in the abort SUMMARY, whatever its state at the interrupt', async () => {
     const blocks = [
       plain('own'),
       plain('skipped', { preconditions: [async () => ({ ok: false, why: 'no' })] }),
@@ -1242,7 +1242,7 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
     for (const b of blocks) expect(summary().some((l) => l.startsWith(`${b.label}:`)), b.id).toBe(true);
   });
 
-  it('a protected-key line written after the interrupt is only noted: it never reaches the abort SUMMARY (review round 1, MAJOR)', async () => {
+  it('a protected-key line written after the interrupt is only noted: it never reaches the abort SUMMARY', async () => {
     const done = go([plain('E5', { run: async (ctx) => (await ctx.bounded('probe', ['hang'], { secs: 30 }), ctx.protectedLine('OK   the finportal key unchanged')) })]);
     await until(() => seam.words().includes('probe hang'));
     seam.handlers!.signal('SIGINT');
@@ -1252,7 +1252,7 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
     expect(outText()).toContain('NOTE a protected-key line after the interrupt not kept: OK   the finportal key unchanged');
   });
 
-  it('a need whose check ends after the interrupt (its probe stopped): no LAB line blaming the lab, no ERROR — only noted (review round 1, MAJOR)', async () => {
+  it('a need whose check ends after the interrupt (its probe stopped): no LAB line blaming the lab, no ERROR — only noted', async () => {
     for (const ending of ['fails', 'throws']) {
       rmSync(out, { recursive: true, force: true });
       seam = new FakeSeam([git(), probes, live()]);
@@ -1273,7 +1273,7 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
     }
   });
 
-  it('a noRecords block is complete for the abort only once its run returned: finished, judged; cut mid-run, INTERRUPTED (code review c1)', async () => {
+  it('a noRecords block is complete for the abort only once its run returned: finished, judged; cut mid-run, INTERRUPTED', async () => {
     const done = go([
       plain('a', { run: async () => {}, noRecords: true, judge: async () => ['a verdict: PASS — judged'] }),
       plain('E5', { noRecords: true, run: async (ctx) => void (await ctx.bounded('probe', ['hang'], { secs: 30 })), judge: async () => ['E5 verdict: PASS — never'] }),
@@ -1330,7 +1330,7 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
     expect(summary()[1]).toBe('NOTE checkout: not read before the interrupt');
   });
 
-  it('a non-live record complete is judged by the abort; an incomplete one INCONCLUSIVE with its gap (review round 5)', async () => {
+  it('a non-live record complete is judged by the abort; an incomplete one INCONCLUSIVE with its gap', async () => {
     const recorded = (id: string, runs: number) =>
       plain(id, {
         run: async (ctx) => {
@@ -1347,7 +1347,7 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
     expect(summary()).toContain('T7 verdict: INCONCLUSIVE — 1 of 1 run(s) incomplete: c — asked 3 run(s), recorded 2');
   });
 
-  it('a block\'s own complete() overrides the record rule, either way (batch-12\'s kf premise, T6\'s capture)', async () => {
+  it('a block\'s own complete() overrides the record rule, either way (the kf premise, T6\'s capture)', async () => {
     const T6 = plain('T6', {
       run: async (ctx) => (ctx.asks('c', { kind: 'runs', runs: 1 }), ctx.record('c', { kind: 'runs', runs: 1 })),
       complete: ({ dir }) => existsSync(join(dir, 'static.txt')),
@@ -1365,7 +1365,7 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
 
 // ------------------------------------------------------------------------------------------------ records
 
-describe('a non-live block\'s record: what it was asked, then what it did — complete only when they match (S3 review: batch-12\'s E5/T6 `{"runs":N}`)', () => {
+describe('a non-live block\'s record: what it was asked, then what it did — complete only when they match (E5/T6\'s `{"runs":N}`)', () => {
   it('asked 3, recorded 3, no verdict: the backstop says the runs are complete but nothing judged them', async () => {
     await go([plain('E5', { run: async (ctx) => (ctx.asks('c', { kind: 'runs', runs: 3 }), ctx.record('c', { kind: 'runs', runs: 3 })) })]);
     expect(summary()).toContain('E5 verdict: INCONCLUSIVE — its 1 run(s) are complete, but no verdict line was written (see the ERROR lines)');
@@ -1402,7 +1402,7 @@ describe('a non-live block\'s record: what it was asked, then what it did — co
 
 // ------------------------------------------------------------------------------------------------ live_run
 
-describe('liveRun: the .cases first, live.ts with its record, then its rejudge — each a bounded step (batch-11.sh:459–481, S3\'s stepOutcome)', () => {
+describe('liveRun: the .cases first, live.ts with its record, then its rejudge — each a bounded step (stepOutcome)', () => {
   it('the .cases written before live.ts starts; live.ts run from the checkout under test, its log and record in the block\'s folder', async () => {
     seam.watch = [join(dirOf('kf'), 'android-kf-1.cases')];
     let got: unknown;
@@ -1435,13 +1435,13 @@ describe('liveRun: the .cases first, live.ts with its record, then its rejudge �
     expect(outText()).toContain(`FAIL kf rejudge android-kf-1 (exit 2) — see ${join(dirOf('kf'), 'android-kf-1.rejudge.txt')}`);
   });
 
-  it('the rejudge is bounded by rejudgeSecs: past it, its group stopped and the step FAIL (review round 1)', async () => {
+  it('the rejudge is bounded by rejudgeSecs: past it, its group stopped and the step FAIL', async () => {
     seam.rules = [git(), probes, live({ rejudge: { hang: true } })];
     await go([kfBlock({ run: async (ctx) => void (await ctx.liveRun('android-kf-1', KF, { secs: 60, rejudgeSecs: 0.05 })) })]);
     expect(outText()).toContain(`FAIL kf rejudge android-kf-1 (timed out (exit 142: past its bound)) — see ${join(dirOf('kf'), 'android-kf-1.rejudge.txt')}`);
   });
 
-  it('exit 1 without it is FAIL: live.ts died before judging (batch-10\'s judged exit-1 rule)', async () => {
+  it('exit 1 without it is FAIL: live.ts died before judging (the judged exit-1 rule)', async () => {
     seam.rules = [git(), probes, live({ code: 1, header: false })];
     let got: unknown;
     await go([kfBlock({ run: async (ctx) => void (got = await ctx.liveRun('android-kf-1', KF, { secs: 60 })) })]);
@@ -1449,7 +1449,7 @@ describe('liveRun: the .cases first, live.ts with its record, then its rejudge �
     expect(got).toMatchObject({ live: { word: 'FAIL' } });
   });
 
-  it('no record written: FAIL naming it, and no rejudge (batch-11.sh:480)', async () => {
+  it('no record written: FAIL naming it, and no rejudge', async () => {
     seam.rules = [git(), probes, live({ noRecord: true })];
     let got: unknown;
     await go([kfBlock({ run: async (ctx) => void (got = await ctx.liveRun('android-kf-1', KF, { secs: 60 })) })]);
@@ -1474,7 +1474,7 @@ describe('liveRun: the .cases first, live.ts with its record, then its rejudge �
   });
 });
 
-describe('asksLive: a live run\'s .cases written before a stretch that may never reach it (T2 S6b: batch-11\'s WDA window wrote its .cases before its backup, 625–627)', () => {
+describe('asksLive: a live run\'s .cases written before a stretch that may never reach it', () => {
   it('the .cases written at once; liveRun of that name and the same asked later runs without writing it again', async () => {
     seam.watch = [join(dirOf('kf'), 'android-kf-1.cases')];
     await go([kfBlock({ run: async (ctx) => {
@@ -1487,7 +1487,7 @@ describe('asksLive: a live run\'s .cases written before a stretch that may never
     expect(summary()).toContain('kf live verdict: PASS — kf1, kf2, kf3 ok');
   });
 
-  it('asked and never run: the backstop says so (b11-dry d43-backupfail: "asked but never ran", never a missing line)', async () => {
+  it('asked and never run: the backstop says so ("asked but never ran", never a missing line)', async () => {
     await go([kfBlock({ judge: undefined, run: async (ctx) => ctx.asksLive('android-kf-1', KF) })]);
     expect(summary()).toContain('kf live verdict: INCONCLUSIVE — 1 of 1 run(s) incomplete: android-kf-1 — asked but never ran (no record, log or summary beside its .cases)');
   });
@@ -1517,7 +1517,7 @@ describe('the run\'s fs in a block\'s and a need\'s ctx: the lab plumbing reads 
   });
 });
 
-describe('the run\'s last steps (lastly): each after the kept groups, on both ends, through detached calls (T2 S6b: batch-11.sh:660, 205–206)', () => {
+describe('the run\'s last steps (lastly): each after the kept groups, on both ends, through detached calls', () => {
   const pkill: NonNullable<RunBatchOptions<KnobSpec>['lastly']>[number] = async ({ run, step }) => {
     const r = await run('probe', ['pkill-wda'], { secs: 5 });
     step('NOTE', `the lab's WebDriverAgent: probe exit ${r.code}`);

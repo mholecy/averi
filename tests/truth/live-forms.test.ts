@@ -292,7 +292,7 @@ describe('kf1–kf3 on batch-11\'s real run: the panel dragged over the submit (
     expect(judgeFloatingGap('kf1')(state, replies, 'uiautomator', unlaid)).toEqual({ outcome: 'SKIP', why: 'the submit not laid out at launch' });
   });
 
-  it('the panel dragged above the submit (bottom 1928, the gap\'s edge): kf1 and kf2 judged, not skipped — the refusal now a MISMATCH', () => {
+  it('the panel dragged above the submit (bottom 1928, the gap\'s edge): kf1 and kf2 judged, not skipped: a MISMATCH', () => {
     for (const id of ['kf1', 'kf2'] as const) {
       const { replies, state, launched } = recordedCase(b11, 'uiautomator', id);
       const above = withRegion(launched, `(87,1136,1024,1928)${STRIP}`);
@@ -1101,14 +1101,14 @@ describe('fp1 and fp2 (D64b): a dial code inserted on focus, the keys taken or r
     expect(judge(syntheticLeft('dialRefuses', '+421 '), [FILLED('dialRefuses')], 'uiautomator', SYNTHETIC_LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim' });
   });
 
-  it('refusedOnFocus (review round 1): a Filled while the field took the keys is the lab\'s fault, not averi\'s — SKIP naming what it holds; the fp2 known entry does not match it', () => {
+  it('refusedOnFocus: a Filled while the field took the keys is the lab\'s fault, not averi\'s — SKIP naming what it holds; the fp2 known entry does not match it', () => {
     const judge = refusedOnFocus('dialRefuses', '+421 ');
     const v = judge(syntheticLeft('dialRefuses', '+421 421'), [FILLED('dialRefuses')], 'uiautomator', SYNTHETIC_LAUNCHED);
     expect(v).toEqual({ outcome: 'SKIP', why: 'lab fault: the field took the keys (holds "+421 421")' });
     expect(knownLive('android', 'uiautomator', 'fp2', v.cls, v.kind)).toBeUndefined();
   });
 
-  it('refusedOnFocus (code review): no prefix inserted is the premise failed — SKIP whatever averi replied, checked first; a missing field said so, not "holds undefined"', () => {
+  it('refusedOnFocus: no prefix inserted is the premise failed — SKIP whatever averi replied, checked first; a missing field said so, not "holds undefined"', () => {
     const judge = refusedOnFocus('dialRefuses', '+421 ');
     const NOT_INSERTED = { outcome: 'SKIP', why: 'lab fault: the field did not insert its prefix (holds "")' };
     const MISSING = { outcome: 'SKIP', why: 'lab fault: the field did not insert its prefix (is missing from the app\'s state)' };
@@ -1119,7 +1119,7 @@ describe('fp1 and fp2 (D64b): a dial code inserted on focus, the keys taken or r
     }
   });
 
-  it('refusedOnFocus (final review): an empty or missing field with no focus event for it — the tap never focused it, averi\'s miss, not the lab\'s: LOUD loud-untouched, said so', () => {
+  it('refusedOnFocus: an empty or missing field with no focus event for it — the tap never focused it, averi\'s miss, not the lab\'s: LOUD loud-untouched, said so', () => {
     const judge = refusedOnFocus('dialRefuses', '+421 ');
     const MISS = 'ERROR fill: id:"lab.form-focus-prefix.dialRefuses" was not tapped';
     expect(judge(syntheticUnfocused(syntheticLeft('dialRefuses', '')), [MISS], 'idb', SYNTHETIC_LAUNCHED)).toEqual({ outcome: 'LOUD', cls: 'loud-untouched', kind: 'refused', why: `the tap never focused the field (no focus event for dialRefuses), which holds ""; averi: ${MISS}` });
@@ -1149,7 +1149,7 @@ describe('fp1 and fp2 (D64b): a dial code inserted on focus, the keys taken or r
     expect(judge(syntheticUnfocused(syntheticLeft('dialRefuses', '')), [`${filled} — NOT verified: the field could not be read`], 'idb', SYNTHETIC_LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'loud-untouched' });
   });
 
-  it('refusedOnFocus (review round 2): the lab fault worded by what the field holds — empty, no prefix inserted; the prefix and more, the keys taken; else neither', () => {
+  it('refusedOnFocus: the lab fault worded by what the field holds — empty, no prefix inserted; the prefix and more, the keys taken; else neither', () => {
     const judge = refusedOnFocus('dialRefuses', '+421 ');
     const claimed = (value: string) => judge(syntheticLeft('dialRefuses', value), [FILLED('dialRefuses')], 'uiautomator', SYNTHETIC_LAUNCHED);
     expect(claimed('')).toEqual({ outcome: 'SKIP', why: 'lab fault: the field did not insert its prefix (holds "")' });

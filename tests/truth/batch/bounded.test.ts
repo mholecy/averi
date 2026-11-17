@@ -100,8 +100,8 @@ class FakeSeam implements ProcessSeam {
 
 const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
 
-describe('boundFor — every device call bounded, by tool (batch-7\'s `bounded`, batch-11\'s per-tool wrappers)', () => {
-  it('xcrun: simctl boot and bootstatus 300 s, simctl install the install bound, anything else 120 s (batch-11.sh:224)', () => {
+describe('boundFor — every device call bounded, by tool', () => {
+  it('xcrun: simctl boot and bootstatus 300 s, simctl install the install bound, anything else 120 s', () => {
     expect(boundFor('xcrun', ['simctl', 'boot', 'U'])).toBe(300);
     expect(boundFor('xcrun', ['simctl', 'bootstatus', 'U', '-b'])).toBe(300);
     expect(boundFor('xcrun', ['simctl', 'install', 'U', 'a.app'])).toBe(600);
@@ -112,11 +112,11 @@ describe('boundFor — every device call bounded, by tool (batch-7\'s `bounded`,
     expect(boundFor('xcrun', [])).toBe(120);
   });
 
-  it('idb 60 s (batch-11.sh:225)', () => {
+  it('idb 60 s', () => {
     expect(boundFor('idb', ['ui', 'describe-all'])).toBe(60);
   });
 
-  it('adb: install or uninstall anywhere in its words the install bound (batch-12\'s B_INSTALL), anything else 120 s (batch-11.sh:226)', () => {
+  it('adb: install or uninstall anywhere in its words the install bound, anything else 120 s', () => {
     expect(boundFor('adb', ['-s', 'emulator-5554', 'install', '-r', 'a.apk'])).toBe(600);
     expect(boundFor('adb', ['-s', 'emulator-5554', 'uninstall', 'dev.averi.lab'], 450)).toBe(450);
     expect(boundFor('adb', ['-s', 'emulator-5554', 'shell', 'pm', 'path', 'dev.averi.lab'])).toBe(120);
@@ -163,7 +163,7 @@ describe('codeOf — a call\'s exit code as the shell gave it (batch-7: exit 142
 });
 
 describe('Calls.bounded — a call in a process group of its own, ended whole past its bound', () => {
-  it('a call that ends in time: its code and output; then SIGKILL to its group, so nothing it started outlives it (review round 1)', async () => {
+  it('a call that ends in time: its code and output; then SIGKILL to its group, so nothing it started outlives it', async () => {
     const seam = new FakeSeam();
     const calls = new Calls(seam);
     const r = calls.bounded('adb', ['devices']);
@@ -203,7 +203,7 @@ describe('Calls.bounded — a call in a process group of its own, ended whole pa
     expect(seam.kills).toEqual(['SIGKILL -100']);
   });
 
-  it('a leader that ended before its bound, its pipes held past the bound: its own code, never 142 (review round 1: the race)', async () => {
+  it('a leader that ended before its bound, its pipes held past the bound: its own code, never 142 (the race)', async () => {
     const seam = new FakeSeam();
     seam.holdPipesForEver = true;
     const calls = new Calls(seam, { graceMs: 5, closeGraceMs: 60 });
@@ -239,7 +239,7 @@ describe('Calls.bounded — a call in a process group of its own, ended whole pa
     expect(Date.now() - started).toBeLessThan(500);
   });
 
-  it('keepGroup (idb_companion, a daemon the call starts on purpose): no SIGKILL once the leader ended; stopAll leaves it, stopKept ends it (code review: the companion lives through the restores)', async () => {
+  it('keepGroup (idb_companion, a daemon the call starts on purpose): no SIGKILL once the leader ended; stopAll leaves it, stopKept ends it: the companion lives through the restores', async () => {
     const seam = new FakeSeam();
     seam.leaveGroup = true;
     const calls = new Calls(seam, { graceMs: 5 });
@@ -263,7 +263,7 @@ describe('Calls.bounded — a call in a process group of its own, ended whole pa
     expect(seam.calls).toEqual([]);
   });
 
-  it(`a bound above MAX_SECS is refused: setTimeout would overflow and fire at once (review round 1); MAX_SECS itself is taken`, async () => {
+  it(`a bound above MAX_SECS is refused: setTimeout would overflow and fire at once; MAX_SECS itself is taken`, async () => {
     const seam = new FakeSeam();
     const calls = new Calls(seam);
     expect(MAX_SECS * 1000).toBeLessThan(2 ** 31);
@@ -276,7 +276,7 @@ describe('Calls.bounded — a call in a process group of its own, ended whole pa
     expect(await r).toMatchObject({ code: 0, timedOut: false });
   });
 
-  it('the call\'s folder and env reach the seam; its log is opened through the fs seam (io.ts) and handed over as an fd (code review: io.ts the only fs seam)', async () => {
+  it('the call\'s folder and env reach the seam; its log is opened through the fs seam (io.ts) and handed over as an fd', async () => {
     const seam = new FakeSeam();
     const opened: string[] = [];
     const calls = new Calls(seam, { fs: { ...nodeFs, withAppend: (path, use) => (opened.push(path), use(7)) } });
@@ -329,7 +329,7 @@ describe('Calls.bounded — a call in a process group of its own, ended whole pa
   });
 });
 
-describe('a call leaves no timer behind: the runner can end on its own (review round 1)', () => {
+describe('a call leaves no timer behind: the runner can end on its own', () => {
   it('a call in time, one past its bound, one whose pipes closed with its end: every timer cleared', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
@@ -411,7 +411,7 @@ describe('Calls.stopAll — the abort stops every running probe, its whole group
   });
 });
 
-describe('Calls.scope — the detached calls of one restore, stopped together when the restore passes its bound (review round 1)', () => {
+describe('Calls.scope — the detached calls of one restore, stopped together when the restore passes its bound', () => {
   it('stop ends the groups of the scope\'s calls still running; another scope\'s, and stopAll, leave them', async () => {
     const seam = new FakeSeam();
     const calls = new Calls(seam, { graceMs: 5 });
@@ -440,7 +440,7 @@ describe('Calls.scope — the detached calls of one restore, stopped together wh
   });
 });
 
-describe('a group kill that is not delivered never rejects (review round 2, BLOCKER: `kill EPERM` under load left nothing put back)', () => {
+describe('a group kill that is not delivered never rejects: an EPERM is retried, then kept as unproven', () => {
   it('EPERM once: tried again EPERM_RETRY_MS later, then sent', async () => {
     const seam = new FakeSeam();
     seam.refuse = { SIGKILL: [{ notSent: 'EPERM' }] };
@@ -524,7 +524,7 @@ describe('a group kill that is not delivered never rejects (review round 2, BLOC
   });
 });
 
-describe('a stopped scope starts nothing more (review round 2): its restore, stopped at its bound, cannot go on to its next step', () => {
+describe('a stopped scope starts nothing more: its restore, stopped at its bound, cannot go on to its next step', () => {
   it('after stop, the scope\'s run throws, as a probe does once the run is stopping', async () => {
     const seam = new FakeSeam();
     const calls = new Calls(seam, { graceMs: 5 });
@@ -535,7 +535,7 @@ describe('a stopped scope starts nothing more (review round 2): its restore, sto
   });
 });
 
-describe('keepsGroup — which tools start a daemon in their own group (review round 2)', () => {
+describe('keepsGroup — which tools start a daemon in their own group', () => {
   it('idb keeps its group; adb, xcrun, the emulator (no batch starts it through bounded) and anything else do not', () => {
     expect([keepsGroup('idb'), keepsGroup('/opt/sdk/emulator/emulator'), keepsGroup('adb'), keepsGroup('xcrun'), keepsGroup('node')]).toEqual([true, false, false, false, false]);
     expect(Object.keys(KEEPS_GROUP).sort()).toEqual(['adb', 'idb', 'xcrun']);
@@ -555,7 +555,7 @@ describe('keepsGroup — which tools start a daemon in their own group (review r
   });
 });
 
-describe('a kept group is checked before it is kept and before it is killed (review round 3, MAJOR: a reused id SIGKILLed)', () => {
+describe('a kept group is checked before it is kept and before it is killed: a reused id would otherwise be signalled', () => {
   it('a kept call whose group is empty once its leader ended (an idb call that started no companion) is not kept: stopKept signals nothing', async () => {
     const seam = new FakeSeam();
     const calls = new Calls(seam, { graceMs: 5 });
@@ -586,7 +586,7 @@ describe('a kept group is checked before it is kept and before it is killed (rev
     expect(seam.probes).toEqual(['0 -100', '0 -100']);
   });
 
-  it('each new call first drops the kept groups gone since: an id taken again by another group before the abort is never signalled (review round 4)', async () => {
+  it('each new call first drops the kept groups gone since: an id taken again by another group before the abort is never signalled', async () => {
     const seam = new FakeSeam();
     seam.leaveGroup = true;
     const calls = new Calls(seam, { graceMs: 5 });
@@ -644,7 +644,7 @@ describe('stopKept(owner) — a block ends its own kept groups (final check)', (
   });
 });
 
-describe('undelivered kills are reported where they happen (review round 3)', () => {
+describe('undelivered kills are reported where they happen', () => {
   it('each one, as it happens, to onUndelivered — with the scope\'s owner when a scope\'s', async () => {
     const seen: Undelivered[] = [];
     const seam = new FakeSeam();

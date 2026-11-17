@@ -148,7 +148,7 @@ describe('lab-a41-ios.ts: a clean run — the lab, the idb probes, the WDA probe
     expect(readFileSync(join(dirOf('a41-wda'), 'cadence.log'), 'utf8')).toBe('cadence ran\n');
   });
 
-  it('the bounds: each child bounded; the expected total — children, lab block, health checks, window — under 30 minutes', async () => {
+  it('the bounds: each child bounded; the expected total — children, lab block, health checks, window — under 25 minutes', async () => {
     expect(await go()).toBe(0);
     expect(Object.keys(A41_SECS).sort()).toEqual(Object.keys(EXPECTED_SECS).sort());
     for (const [k, v] of Object.entries(EXPECTED_SECS)) expect(A41_SECS[k as keyof typeof A41_SECS], k).toBeGreaterThanOrEqual(2 * v);
@@ -171,19 +171,19 @@ describe('a probe that is not whole: INCONCLUSIVE naming it, the window still pu
     expect(summary()).toContain('RESTORE: none — everything dirty was put back and verified');
   });
 
-  it('A44: cadence exits 3 with its file written (no trial): the WDA block INCONCLUSIVE naming it', async () => {
+  it('cadence exits 3 with its file written (no trial): the WDA block INCONCLUSIVE naming it', async () => {
     seam.codes.cadence = 3;
     expect(await go()).toBe(3);
     expect(verdicts()[1]).toMatch(/^a41 wda probe verdict: INCONCLUSIVE — cadence: exit 3 — see .*cadence\.log$/);
   });
 
-  it('A44: every file there but a required part unproven: the report block INCONCLUSIVE naming it, never PASS', async () => {
+  it('every file there but a required part unproven: the report block INCONCLUSIVE naming it, never PASS', async () => {
     seam.unproven = ['cadence (no trial recorded)', 'first tap (b) (not measured)'];
     expect(await go()).toBe(3);
     expect(verdicts()[2]).toBe(`a41 report verdict: INCONCLUSIVE — unproven: cadence (no trial recorded); first tap (b) (not measured): ${join(dirOf('a41-report'), 'a41.json')}`);
   });
 
-  it('A44: missing and unproven both: both named', async () => {
+  it('missing and unproven both: both named', async () => {
     seam.codes['baseline-wda'] = 1;
     seam.unproven = ['cadence (no trial recorded)'];
     expect(await go()).toBe(3);

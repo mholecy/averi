@@ -169,7 +169,7 @@ async function interruptFaked(guard: AbortGuard, body: () => void | Promise<void
 
 const summaryText = () => text(join(out, 'meta', 'summary.txt'));
 
-describe('the abort on SIGINT, SIGTERM or SIGHUP — the dirty windows put back, verified; exit 130 (batch-6\'s on_abort: an interrupted run must not leave the remembered answer deleted)', () => {
+describe('the abort on SIGINT, SIGTERM or SIGHUP — the dirty windows put back, verified; exit 130 (an interrupted run must not leave the remembered answer deleted)', () => {
   it('int-d55: a dirty window\'s restore runs and is verified; no RESTORE; the abort SUMMARY; exit 130', async () => {
     const guard = guardOf();
     const ran: string[] = [];
@@ -219,13 +219,13 @@ describe('the abort on SIGINT, SIGTERM or SIGHUP — the dirty windows put back,
     expect(seam.installs).toBe(1);
   });
 
-  it.each(['SIGTERM', 'SIGHUP'] as const)('%s aborts the same way (trap on_abort INT TERM HUP)', async (sig) => {
+  it.each(['SIGTERM', 'SIGHUP'] as const)('%s aborts the same way', async (sig) => {
     const guard = guardOf();
     expect(await interrupt(guard, () => guard.open('E5', window()), sig)).toBe(130);
     expect(summaryText()).toContain(`ERROR batch-n interrupted (run 1) by ${sig}`);
   });
 
-  it('d55-chooser / d43-restorefail: a restore that fails writes its hand lines to RESTORE — "RESTORE: state not provably put back" (b11-dry check.sh:20)', async () => {
+  it('d55-chooser / d43-restorefail: a restore that fails writes its hand lines to RESTORE — "RESTORE: state not provably put back"', async () => {
     const guard = guardOf();
     await interrupt(guard, () => guard.open('E5', window({ restore: async () => ({ ok: false, why: 'check exit 3', hand: ['E5 (Android): not proven clean (check exit 3) — node e5.ts --check'] }) })));
     expect(text(restoreFile())).toBe('batch-n run 1 interrupted at 2026-11-04 09:44:26; state to put back by hand:\nE5 (Android): not proven clean (check exit 3) — node e5.ts --check\n');
@@ -259,7 +259,7 @@ describe('the abort on SIGINT, SIGTERM or SIGHUP — the dirty windows put back,
     expect(seam.exits).toEqual([130]);
   });
 
-  it('a restore stopped at its bound cannot start its next step (review round 2)', async () => {
+  it('a restore stopped at its bound cannot start its next step', async () => {
     const guard = guardOf();
     await interrupt(guard, () =>
       guard.open('E5', window({ secs: 0.03, restore: async (run) => {
@@ -273,7 +273,7 @@ describe('the abort on SIGINT, SIGTERM or SIGHUP — the dirty windows put back,
     expect(summaryText()).toContain('ERROR E5 not provably put back: its restore passed its bound (0.03 s) and was stopped there');
   });
 
-  it('a restore stopped at its bound: the detached calls it started are ended, each its group; the RESTORE says it was stopped part-way (review round 1)', async () => {
+  it('a restore stopped at its bound: the detached calls it started are ended, each its group; the RESTORE says it was stopped part-way', async () => {
     const guard = guardOf();
     await interrupt(guard, () =>
       guard.open('E5', window({ secs: 0.03, restore: async (run) => {
@@ -288,7 +288,7 @@ describe('the abort on SIGINT, SIGTERM or SIGHUP — the dirty windows put back,
     ]);
   });
 
-  it('a restore that says done while its state file is still dirty is not put back (batch-12: state_of after the restore)', async () => {
+  it('a restore that says done while its state file is still dirty is not put back', async () => {
     const state = join(out, 'state.json');
     const guard = guardOf();
     await interrupt(guard, () => {
@@ -352,7 +352,7 @@ describe('the abort on SIGINT, SIGTERM or SIGHUP — the dirty windows put back,
     expect(existsSync(restoreFile())).toBe(false);
   });
 
-  it('running probes are stopped, each its whole group, before the first restore starts (a probe no longer gets the terminal\'s Ctrl-C)', async () => {
+  it('running probes are stopped, each its whole group, before the first restore starts (a probe does not get the terminal\'s Ctrl-C)', async () => {
     const guard = guardOf();
     await interrupt(guard, () => {
       guard.open('E5', window({ restore: async () => (seam.events.push('restore E5'), { ok: true, how: 'x' }) }));
@@ -364,7 +364,7 @@ describe('the abort on SIGINT, SIGTERM or SIGHUP — the dirty windows put back,
   });
 });
 
-describe('the abort leaves no timer behind: the runner can end on its own (review round 1)', () => {
+describe('the abort leaves no timer behind: the runner can end on its own', () => {
   it('a restore and a judge settled in time: every bound\'s timer cleared', async () => {
     await onFakeTime(async () => {
       const guard = guardOf([block('kf', { complete: () => true })]);
@@ -374,7 +374,7 @@ describe('the abort leaves no timer behind: the runner can end on its own (revie
   });
 });
 
-describe('a group kill that throws EPERM stops no restore (review round 2, BLOCKER)', () => {
+describe('a group kill that throws EPERM stops no restore', () => {
   it('every kill throws: the probe not proven stopped, said; every window still put back; exit 130; nothing unhandled', async () => {
     seam.killThrows = true;
     const restored: string[] = [];
@@ -393,7 +393,7 @@ describe('a group kill that throws EPERM stops no restore (review round 2, BLOCK
     expect(seam.said).toEqual([]);
   });
 
-  it('a restore past its bound whose kill was not delivered: "may still be running", its group line first, no "stopped part-way" (review round 3)', async () => {
+  it('a restore past its bound whose kill was not delivered: "may still be running", its group line first, no "stopped part-way"', async () => {
     seam.refusePids.add(100);
     let judged = 0;
     const guard = guardOf([block('kf', { complete: () => true, judge: async () => (judged++, ['kf: PASS']) })]);
@@ -416,7 +416,7 @@ describe('a group kill that throws EPERM stops no restore (review round 2, BLOCK
     expect(summaryText()).toContain(`RESTORE: state not provably put back — ${restoreFile()}:`);
   });
 
-  it('the normal path: a SIGKILL after a leader\'s end not delivered is an ERROR line at once, and the end\'s RESTORE has its group line (review round 3)', async () => {
+  it('the normal path: a SIGKILL after a leader\'s end not delivered is an ERROR line at once, and the end\'s RESTORE has its group line', async () => {
     seam.refusePids.add(100);
     const guard = guardOf();
     await guard.run(async () => {
@@ -463,7 +463,7 @@ describe('a group kill that throws EPERM stops no restore (review round 2, BLOCK
   });
 });
 
-describe('kept groups live through the abort\'s restores and judging, and are ended last (code review: batch-11 pkilled the companion at the end of on_abort)', () => {
+describe('kept groups live through the abort\'s restores and judging, and are ended last', () => {
   /** A run whose idb call leaves its group (idb_companion), then opens E5; resolves once E5 is open. */
   async function keptThenWindow(guard: AbortGuard, restore: WindowSpec['restore']) {
     seam.leftGroups.add(100);
@@ -687,7 +687,7 @@ describe('TRAPEXIT\'s port: a throw or a rejection inside a window still restore
   });
 });
 
-describe('the abort SUMMARY (batch-12): INTERRUPTED, the finished blocks judged device-free, the cleanup line, through words.ts', () => {
+describe('the abort SUMMARY: INTERRUPTED, the finished blocks judged device-free, the cleanup line, through words.ts', () => {
   it('a block whose records are complete is judged now with a detached call; one cut inside its window, or incomplete, is INTERRUPTED', async () => {
     const guard = guardOf([
       block('kf', { complete: () => true, judge: async (run) => (await run('node', ['judge', 'kf live verdict: PASS'], { secs: 5 })).out.trim().split('\n') }),
@@ -721,7 +721,7 @@ describe('the abort SUMMARY (batch-12): INTERRUPTED, the finished blocks judged 
     expect(s).toContain('W cleanup: ERROR — adb unreachable (the abort)');
   });
 
-  it("a put back with a WARN (T2 S5 review round 1: the chooser's exit 6, a last-chosen entry not accepted): WARN in the step and the cleanup line, no RESTORE", async () => {
+  it("a put back with a WARN (the chooser's exit 6, a last-chosen entry not accepted): WARN in the step and the cleanup line, no RESTORE", async () => {
     const guard = guardOf([block('E5')]);
     await interrupt(guard, () => guard.open('E5', window({ block: 'E5', cleanup: 'E5 cleanup', restore: async () => ({ ok: true, how: 'a last-chosen entry not accepted', verdict: 'WARN' }) })));
     const s = summaryText();
@@ -736,14 +736,14 @@ describe('the abort SUMMARY (batch-12): INTERRUPTED, the finished blocks judged 
     expect(summaryText()).not.toMatch(/by the abort\)|\(the abort\)/);
   });
 
-  it('complete() may say why it is not (a string): INTERRUPTED with that why, the rerun hint kept (T2 S6a review round 6)', async () => {
+  it('complete() may say why it is not (a string): INTERRUPTED with that why, the rerun hint kept', async () => {
     const guard = guardOf([block('kf', { complete: async () => '1 of 1 run(s) incomplete: kf-1 — no record' }), block('E5', { complete: () => false })]);
     await interrupt(guard);
     expect(summaryText()).toContain('kf: INTERRUPTED — not judged (1 of 1 run(s) incomplete: kf-1 — no record; rerun ONLY=kf)');
     expect(summaryText()).toContain('E5: INTERRUPTED — its records are not complete, not judged (rerun ONLY=E5)');
   });
 
-  it('completeness is read within the judging budget: one that never settles is not complete, said so; the next block still read (T2 S6a review round 6; T2c: on fake time)', async () => {
+  it('completeness is read within the judging budget: one that never settles is not complete, said so; the next block still read (T2c: on fake time)', async () => {
     const slow = () => new Promise<boolean>((r) => setTimeout(() => r(true), 20));
     const guard = guardOf([block('kf', { complete: () => new Promise<boolean>(() => {}) }), block('E5', { complete: slow, judge: async () => ['E5 verdict: PASS'] })], { judgeBudgetSecs: 0.05 });
     expect(await onFakeTime(() => interruptFaked(guard))).toEqual([130]);
@@ -778,7 +778,7 @@ describe('the abort SUMMARY (batch-12): INTERRUPTED, the finished blocks judged 
   it.each([
     [49, 'kf verdict: PASS'],
     [51, "kf: INTERRUPTED — not judged (the abort's judging budget of 0.3 s was spent; rerun ONLY=kf)"],
-  ])('the judge gets what is left after its block\'s completeness was read: one budget for both, the bound pinned — completeness at 250 ms of 300, a judge of %i ms (T2 S6a review round 6; T2c: on fake time)', async (judgeMs, line) => {
+  ])('the judge gets what is left after its block\'s completeness was read: one budget for both, the bound pinned — completeness at 250 ms of 300, a judge of %i ms (T2c: on fake time)', async (judgeMs, line) => {
     const guard = guardOf([block('kf', { complete: () => after(250, true), judge: () => after(judgeMs, ['kf verdict: PASS']) })], { judgeBudgetSecs: 0.3 });
     expect(await onFakeTime(() => interruptFaked(guard))).toEqual([130]);
     expect(summaryText()).toContain(line);
@@ -800,7 +800,7 @@ describe('the abort SUMMARY (batch-12): INTERRUPTED, the finished blocks judged 
     expect(s).toContain('T6: INTERRUPTED — not judged (completeness not read: no dir; rerun ONLY=T6)');
   });
 
-  it('the judges share one budget (review round 1): a judge that never settles spends it, its calls are stopped, and the blocks after it are not judged (T2c: on fake time)', async () => {
+  it('the judges share one budget: a judge that never settles spends it, its calls are stopped, and the blocks after it are not judged (T2c: on fake time)', async () => {
     let judged = 0;
     const guard = guardOf(
       [
@@ -873,7 +873,7 @@ describe('an abort that fails itself still exits 130', () => {
     expect(seam.said.join('')).toMatch(/^batch-n: the abort failed: EISDIR/);
   });
 
-  it('the log failing (ENOSPC, the out folder gone) stops no restore: every window put back, RESTORE written, exit 130 (review round 1)', async () => {
+  it('the log failing (ENOSPC, the out folder gone) stops no restore: every window put back, RESTORE written, exit 130', async () => {
     let broken = false;
     const flaky: BatchFs = { ...nodeFs, append: (p, t) => {
       if (broken && p !== restoreFile()) throw new Error('ENOSPC: no space left on device');
@@ -950,7 +950,7 @@ describe('an abort that fails itself still exits 130', () => {
   });
 });
 
-describe('the body keeps running during the abort: its close() and finish() empty no window (review round 1, MAJOR)', () => {
+describe('the body keeps running during the abort: its close() and finish() empty no window', () => {
   const bodyThen = (guard: AbortGuard, after: () => void) => async () => {
     guard.open('E5', window({ restore: async () => ({ ok: false, why: 'check exit 3' }) }));
     await guard.bounded('node', ['probe.ts'], { secs: 60 });
@@ -987,7 +987,7 @@ describe('the body keeps running during the abort: its close() and finish() empt
   });
 });
 
-describe('finish — the normal end writes RESTORE for any window still dirty (batch-12: "ended … with state not provably put back")', () => {
+describe('finish — the normal end writes RESTORE for any window still dirty', () => {
   it('a window left open: its hand lines appended under an "ended at" header; returned for the SUMMARY; the windows cleared', async () => {
     const guard = guardOf();
     await guard.run(async () => {
@@ -1037,11 +1037,11 @@ describe('open and close — a dirty window from before its first change until a
     });
   });
 
-  it('a window opened before run() installed the abort: refused — nothing would put it back (review round 1)', () => {
+  it('a window opened before run() installed the abort: refused — nothing would put it back', () => {
     expect(() => guardOf().open('E5', window())).toThrow(/E5: the abort is not installed yet — open windows inside run\(\)/);
   });
 
-  it('opened over an existing state file: marked dirty, its other fields kept — a window reopened over a restore that had cleared it (batch-11\'s reinstall after the restore) reads dirty again', async () => {
+  it('opened over an existing state file: marked dirty, its other fields kept — a window reopened over a restore that had cleared it (a reinstall after the restore) reads dirty again', async () => {
     const state = join(out, 'state.json');
     writeFileSync(state, '{"dirty":false,"before":{"k":1}}');
     const guard = guardOf();
@@ -1073,7 +1073,7 @@ describe('markDirty — the state-file protocol: dirty until a verified restore 
   });
 });
 
-describe('leave — a block\'s hand lines outside any window go to RESTORE now (T2 S6a: S4\'s compare caught a late writer after the restore)', () => {
+describe('leave — a block\'s hand lines outside any window go to RESTORE at once', () => {
   it('appended under `<name> run <id> left by <block> at <date>`, said as an ERROR, and counted by finish\'s return and the exit code', async () => {
     const guard = guardOf();
     let written: string[] = [];
@@ -1125,7 +1125,7 @@ describe('interrupted — whether the abort has begun, for the runner\'s body (T
   });
 });
 
-describe('head\'s errors — the abort SUMMARY\'s ERROR section when the runner gives one (T2 S6a code review: the steps\' and the logs\' counted together)', () => {
+describe('head\'s errors — the abort SUMMARY\'s ERROR section when the runner gives one (the steps\' and the logs\' counted together)', () => {
   it('given, it is the whole section, read when the SUMMARY is written (the steps\' lines then included); none given: the steps\' ERROR lines', async () => {
     let at: string[] = [];
     const guard = guardOf(undefined, { head: () => ({ checkout: CHECKOUT, labs: [], protectedLines: [], errors: (at = [...log.errors(), 'ERROR from a probe log (×2, in kf/p.log)']) }) });
@@ -1143,7 +1143,7 @@ describe('head\'s errors — the abort SUMMARY\'s ERROR section when the runner 
   });
 });
 
-describe('the run\'s last steps (`lastly`): after the kept groups, on both ends, through detached calls (T2 S6b: batch-11 pkilled the lab\'s WebDriverAgent and idb_companion at its end and at the end of on_abort)', () => {
+describe('the run\'s last steps (`lastly`): after the kept groups, on both ends, through detached calls', () => {
   it('finish(): the kept groups ended first, then the last steps with a detached runner; a kill of its calls not delivered gets its RESTORE line', async () => {
     const guard = guardOf(undefined, {
       lastly: async (run) => {
@@ -1182,7 +1182,7 @@ describe('the run\'s last steps (`lastly`): after the kept groups, on both ends,
     expect(summaryText()).toContain('kf: PASS');
   });
 
-  it('the abort with a kept group (idb_companion): the kept group ended first, then the last steps (review round 1, MINOR 5)', async () => {
+  it('the abort with a kept group (idb_companion): the kept group ended first, then the last steps', async () => {
     const guard = guardOf([block('kf')], { lastly: async () => void seam.events.push(`lastly, group 100 ${seam.leftGroups.has(100) ? 'alive' : 'ended'}`) });
     seam.leftGroups.add(100);
     let opened = false;

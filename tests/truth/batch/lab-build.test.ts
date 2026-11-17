@@ -12,7 +12,7 @@ import { CATALOG, LAB_UDID, labWorld, runOf, type LabWorld, type WorldOptions } 
 // scripts/truth/batch/lab-build.ts over the fake host (lab-fakes.ts: catalog.ts --check, xcodegen, xcodebuild,
 // java_home, gradlew, unzip — each answered, nothing built): the two build needs, main's catalog checked once before
 // either, each build a bounded step logged in the lab folder, gradlew --stop after every Android build, and the lab
-// block. Real files in a temp dir. The titles name the batch and the fix each rule comes from.
+// block. Real files in a temp dir.
 
 let dir: string;
 let repo: string;
@@ -44,7 +44,7 @@ const needCtx = (run: Run = runOf(world), udid: string | null = LAB_UDID, env: R
 type Spec = { check(c: NeedCtx): Promise<unknown>; alive(c: NeedCtx): Promise<unknown> };
 const need = (b: ReturnType<typeof labBuild>, n: string) => b.needs[n as typeof IOS_BUILD_NEED] as Spec;
 
-describe('main\'s catalog --check before any build, once for both (S3\'s not-ported row; batch-12.sh:340)', () => {
+describe('main\'s catalog --check before any build, once for both', () => {
   it('the checkout under test\'s catalog.ts, bounded, its log in the lab folder; asked once for the two builds', async () => {
     const b = labBuild();
     const run = runOf(world);
@@ -54,7 +54,7 @@ describe('main\'s catalog --check before any build, once for both (S3\'s not-por
     expect(checks).toEqual([{ words: `node --import tsx ${join(repo, 'scripts/truth/catalog.ts')} --check`, secs: CATALOG_SECS, cwd: repo, log: join(dir, 'lab', 'catalog-check.log'), env: undefined }]);
   });
 
-  it('stale: both builds not met naming it, nothing built (batch-11.sh:300)', async () => {
+  it('stale: both builds not met naming it, nothing built', async () => {
     fresh({ buildFails: 'catalog' });
     const b = labBuild();
     const why = `main's cells.json is stale or unchecked (catalog --check) (exit 1; ${join(dir, 'lab', 'catalog-check.log')}) — nothing built`;
@@ -65,7 +65,7 @@ describe('main\'s catalog --check before any build, once for both (S3\'s not-por
   });
 });
 
-describe('the iOS build (batch-11.sh:297, 302–307): xcodegen, then xcodebuild for the lab simulator, bounded; its app\'s cells.json main\'s', () => {
+describe('the iOS build: xcodegen, then xcodebuild for the lab simulator, bounded; its app\'s cells.json main\'s', () => {
   it('built: each step in fixtures/apps/ios, logged; its bound BUILD_SECS unless given; built() the app', async () => {
     const b = labBuild();
     const run = runOf(world);
@@ -107,7 +107,7 @@ describe('the iOS build (batch-11.sh:297, 302–307): xcodegen, then xcodebuild 
   });
 });
 
-describe('the Android build (batch-11.sh:298, 308–314): JDK 17, gradlew assembleDebug, then gradlew --stop — always (S2: the daemon leaves the call\'s group)', () => {
+describe('the Android build: JDK 17, gradlew assembleDebug, then gradlew --stop — always (the daemon leaves the call\'s group)', () => {
   it('built: java_home, the build under JDK 17 and the SDK, its stop, the APK\'s cells.json read; built() the APK', async () => {
     const b = labBuild();
     const run = runOf(world);
@@ -132,7 +132,7 @@ describe('the Android build (batch-11.sh:298, 308–314): JDK 17, gradlew assemb
     expect([IOS_BUILD_NEED, ANDROID_BUILD_NEED]).toEqual(['ios-build', 'android-build']);
   });
 
-  it('the SDK the config names (configOf: ANDROID_HOME, else the one under the home folder — code review), none named: the build\'s own', async () => {
+  it('the SDK the config names (configOf: ANDROID_HOME, else the one under the home folder), none named: the build\'s own', async () => {
     const run = runOf(world);
     await need(labBuild(), ANDROID_BUILD_NEED).check(needCtx(run, LAB_UDID, {}, '/h/Library/Android/sdk'));
     expect(run.seen.find((s) => s.words.endsWith('assembleDebug'))?.env?.ANDROID_HOME).toBe('/h/Library/Android/sdk');
@@ -212,7 +212,7 @@ describe('the Android build (batch-11.sh:298, 308–314): JDK 17, gradlew assemb
   });
 });
 
-describe('the lab block (batch-11\'s and batch-12\'s `lab`: ONLY=lab checks the lab and runs nothing else)', () => {
+describe('the lab block (ONLY=lab checks the lab and runs nothing else)', () => {
   it('its needs the batch\'s; its run says they were met; it records nothing', async () => {
     const block = labBlock(['android-build', 'android']);
     expect([block.id, block.label, block.needs, block.noRecords, LAB_BLOCK]).toEqual(['lab', 'lab check', ['android-build', 'android'], true, 'lab']);
@@ -222,7 +222,7 @@ describe('the lab block (batch-11\'s and batch-12\'s `lab`: ONLY=lab checks the 
   });
 });
 
-describe('the build asked by the device need itself (review round 1, MAJOR 2): one build a run, whoever asks first', () => {
+describe('the build asked by the device need itself: one build a run, whoever asks first', () => {
   it('ensure and the need\'s own check share one run: built once; failures() names a build that failed', async () => {
     const b = labBuild();
     const run = runOf(world);
@@ -240,7 +240,7 @@ describe('the build asked by the device need itself (review round 1, MAJOR 2): o
   });
 });
 
-describe('the Gradle daemon after an interrupted Android build (review round 1, MINOR 6): the kit\'s last step stops it', () => {
+describe('the Gradle daemon after an interrupted Android build: the kit\'s last step stops it', () => {
   const say = (w: string, t: string) => void steps.push(`${w} ${t}`);
   it('a build started whose own --stop never ran (the abort refused it): `gradlew --stop` at the run\'s end, bounded, from the build\'s folder', async () => {
     const b = labBuild();
@@ -257,7 +257,7 @@ describe('the Gradle daemon after an interrupted Android build (review round 1, 
     expect(steps).toEqual(['NOTE lab android: the Gradle daemon stopped at the run\'s end (its build was cut short)']);
   });
 
-  it('its own --stop that failed keeps the marker: the last step stops the daemon (review round 2, MINOR 2)', async () => {
+  it('its own --stop that failed keeps the marker: the last step stops the daemon', async () => {
     const b = labBuild();
     await need(b, ANDROID_BUILD_NEED).check(needCtx(async (cmd, args, call) => (args.includes('--stop') ? { code: 1, timedOut: false, signal: null, out: '', err: 'busy' } : runOf(world)(cmd, args, call))));
     const run = runOf(world);
@@ -282,7 +282,7 @@ describe('the Gradle daemon after an interrupted Android build (review round 1, 
   });
 });
 
-describe('the lab block never says every need met when this run\'s build failed (review round 1, MAJOR 2)', () => {
+describe('the lab block never says every need met when this run\'s build failed', () => {
   it('a build that failed with the installed app used: a WARN naming it, not a PASS', async () => {
     const said: unknown[] = [];
     const block = labBlock(['android'], { build: { failures: () => ['android-build: the Android build failed (exit 1)', 'ios-build: xcodegen not found'] } });

@@ -56,7 +56,7 @@ function putRun(name: string, files: { cases?: string | null; record?: string | 
 }
 const judge = (name: string, s: Selector = select) => completeness({ fs: nodeFs, dir, name, select: s });
 
-describe('writeCases — what a run was asked, written before anything of it runs (batch-9; batch-11.sh:420–431, batch-12.sh:276–278)', () => {
+describe('writeCases — what a run was asked, written before anything of it runs (batch-9)', () => {
   it('writes <name>.cases as JSON, and returns its path; nothing else is written', () => {
     const path = writeCases(nodeFs, dir, 'android-kf-1', KF);
     expect(path).toBe(join(dir, 'android-kf-1.cases'));
@@ -65,7 +65,7 @@ describe('writeCases — what a run was asked, written before anything of it run
     expect(readdirSync(dir)).toEqual(['android-kf-1.cases']);
   });
 
-  it('only what a live run is asked: a non-live block\'s record (batch-12\'s E5 `{"runs":3}`) is refused, by the type and at run time, nothing written — runsIn reads every .cases as a live run (T2 S3 code review)', () => {
+  it('only what a live run is asked: a non-live block\'s record (batch-12\'s E5 `{"runs":3}`) is refused, by the type and at run time, nothing written — runsIn reads every .cases as a live run', () => {
     // @ts-expect-error writeCases takes an Asked only
     expect(() => writeCases(nodeFs, dir, 'a', { runs: 3 })).toThrow('a.cases: {"runs":3} is not what a live run is asked (platform ios or android, app, sources: one at least, cases: ids)');
     expect(() => writeCases(nodeFs, dir, 'b', { ...KF, sources: [] })).toThrow(/b\.cases: .* is not what a live run is asked/);
@@ -137,7 +137,7 @@ describe('stepOutcome — the judged exit-1 rule (batch-10 → batch-12\'s STEP_
   });
 });
 
-describe('completeness — a run counts only when complete (b11-analyze.ts:1–23, batch-9\'s "never an invisible gap")', () => {
+describe('completeness — a run counts only when complete (batch-9\'s "never an invisible gap")', () => {
   it('complete: its .cases, a record, `# Live golden:` in its log and its summary, every case main picks there: ok, with what it asked', async () => {
     putRun('kf-1');
     expect(await judge('kf-1')).toEqual({ ok: true, asked: KF });
@@ -214,12 +214,12 @@ describe('completeness — a run counts only when complete (b11-analyze.ts:1–2
     expect(await judge('c')).toEqual({ ok: false, why: 'c.rejudge.txt is unreadable' });
   });
 
-  it('a summary without its header still has its cases counted: every gap at once (review round 1)', async () => {
+  it('a summary without its header still has its cases counted: every gap at once', async () => {
     putRun('kf-1', { summary: summaryOf({ uiautomator: ['kf1'] }, false) });
     expect(await judge('kf-1')).toEqual({ ok: false, why: 'kf-1.rejudge.txt has no `# Live golden:` line (the rejudge did not finish); uiautomator: kf2, kf3 missing from the summary' });
   });
 
-  it('a run that proves nothing is never complete: an asked id main runs under none of the sources asked, named with the platform and sources; a selection of no case at all (review round 1)', async () => {
+  it('a run that proves nothing is never complete: an asked id main runs under none of the sources asked, named with the platform and sources; a selection of no case at all', async () => {
     const nope: Asked = { platform: 'android', app: 'native', sources: ['uiautomator'], cases: ['zz-nope'] };
     const empty = [`${LIVE_GOLDEN_HEADER} 0 cases, 0 ok, 0 loud, 0 mismatches (0 not known), 0 skipped`, ''].join('\n');
     putRun('a', { cases: JSON.stringify(nope), record: '{}', log: empty, summary: empty });
@@ -233,7 +233,7 @@ describe('completeness — a run counts only when complete (b11-analyze.ts:1–2
     expect(await judge('d', picks({}))).toEqual({ ok: false, why: 'main picks no case for what was asked (ios, native app, under idb or wda): the run proves nothing' });
   });
 
-  it('a source or an id holding a line break is named JSON-quoted: the block\'s line is still made (review round 1)', async () => {
+  it('a source or an id holding a line break is named JSON-quoted: the block\'s line is still made', async () => {
     putRun('kf-1', { cases: JSON.stringify({ ...KF, sources: ['ui\nx'], cases: ['k\nf'] }) });
     const r = await judge('kf-1', async () => ['k\nf']);
     expect(r).toEqual({ ok: false, why: '"ui\\nx": "k\\nf" missing from the summary' });
@@ -269,7 +269,7 @@ describe('completeness — a run counts only when complete (b11-analyze.ts:1–2
     expect(await judge('kf-1')).toEqual({ ok: false, why: 'its record (kf-1.json) is no JSON; kf-1.log has no `# Live golden:` line (live.ts did not finish); uiautomator: kf2, kf3 missing from the summary' });
   });
 
-  it('liveTableOf a checkout with no scripts/truth/live-cases.ts: its load rejects, and completeness names it (T2 S3 review round 1)', async () => {
+  it('liveTableOf a checkout with no scripts/truth/live-cases.ts: its load rejects, and completeness names it', async () => {
     putRun('kf-1');
     await expect(liveTableOf(dir)()).rejects.toThrow();
     const r = await judge('kf-1', selectorOf(liveTableOf(dir)));
@@ -291,19 +291,19 @@ describe('completeness — a run counts only when complete (b11-analyze.ts:1–2
     expect(asked.map(([a, s]) => [a.platform, s])).toEqual([['ios', 'idb'], ['ios', 'wda']]);
   });
 
-  it('a name that is no plain path segment is a gap, never a throw: nothing of it is read (review round 1)', async () => {
-    expect(await judge('../x')).toEqual({ ok: false, why: "../x.cases: its name is no plain path segment (letters, digits, _ and -), not read as a run" });
-    expect(await judge('a\nb')).toEqual({ ok: false, why: '"a\\nb.cases": its name is no plain path segment (letters, digits, _ and -), not read as a run' });
+  it('a name that is no plain path segment is a gap, never a throw: nothing of it is read', async () => {
+    expect(await judge('../x')).toEqual({ ok: false, why: "../x.cases: its name is no plain path segment (a letter or digit, then letters, digits, _ and -), not read as a run" });
+    expect(await judge('a\nb')).toEqual({ ok: false, why: '"a\\nb.cases": its name is no plain path segment (a letter or digit, then letters, digits, _ and -), not read as a run' });
   });
 
-  it('a stray .cases (".cases", "x.y.cases") in a block\'s folder: listed as a run, judged a named gap, the others still judged (review round 1)', async () => {
+  it('a stray .cases (".cases", "x.y.cases") in a block\'s folder: listed as a run, judged a named gap, the others still judged', async () => {
     putRun('kf-1');
     writeFileSync(join(dir, '.cases'), '{}');
     writeFileSync(join(dir, 'x.y.cases'), '{}');
     const runs = await Promise.all(runsIn(nodeFs, dir).map(async (name) => ({ name, result: await judge(name) })));
     expect(runs.map((r) => r.name)).toEqual(['', 'kf-1', 'x.y']);
     expect(incompleteLine('kf live verdict', runs)).toBe(
-      'kf live verdict: INCONCLUSIVE — 2 of 3 run(s) incomplete: "" — .cases: its name is no plain path segment (letters, digits, _ and -), not read as a run | x.y — x.y.cases: its name is no plain path segment (letters, digits, _ and -), not read as a run',
+      'kf live verdict: INCONCLUSIVE — 2 of 3 run(s) incomplete: "" — .cases: its name is no plain path segment (a letter or digit, then letters, digits, _ and -), not read as a run | x.y — x.y.cases: its name is no plain path segment (a letter or digit, then letters, digits, _ and -), not read as a run',
     );
   });
 
@@ -313,7 +313,7 @@ describe('completeness — a run counts only when complete (b11-analyze.ts:1–2
   });
 });
 
-describe('selectorOf — main\'s selectCases per source, as in b11-analyze.ts (Case.sources honoured)', () => {
+describe('selectorOf — main\'s selectCases per source (Case.sources honoured)', () => {
   const cases = [{ id: 'p7', sources: ['idb', 'uiautomator'] }, { id: 'p7w', sources: ['wda'] }, { id: 'b1d' }];
   const live =
     (seen: unknown[]): LiveTable =>
