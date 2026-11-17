@@ -210,7 +210,9 @@ A fill's errors and replies carry the typed value's length only, and the field's
 author's own and are shown as written: the selector, a `value:"…"` included, and the flow's fill line's value, which the
 engine shows as the author wrote it, `***` for a secret (it redacts a flow's secrets from every line, the selector's
 included). An ambiguity's list of candidates (`resolve.ts#resolveNow`, every verb's) names an input whose label is its
-own text — an Android EditText with no content-desc — by that text's length, `label=<its text, 8 characters>`: a second
-match appearing while a fill re-reads its field quoted the value just typed. `tests/interact/fill-leak.test.ts` sweeps
-fillField's errors, `fillReply` and `fillStepText` for both, under `ambiguous: refuse` and `first`, a level above
-`typed-text-leak.test.ts`.
+own text — an Android EditText with no content-desc — by that text's length and its rect, `label=<its text, 8
+characters> at 0,40 100x10`: a second match appearing while a fill re-reads its field quoted the value just typed. That
+covers averi's own derivation; a label the app built around the text is quoted, so the fill's re-read rethrows such a
+refusal with the typed value inside any label said as `<the typed value, 8 characters>` (`fill-refetch.ts#withoutTyped`).
+`tests/interact/fill-leak.test.ts` sweeps fillField's errors, `fillReply` and `fillStepText`, under `ambiguous: refuse`
+and `first`, for the typed value and the field's text, a level above `typed-text-leak.test.ts`.
