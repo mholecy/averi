@@ -1,6 +1,6 @@
 import type { DeviceAdapter, Platform } from '../adapters/types.js';
 import { appIdOf, type AveriConfig } from '../flow/config.js';
-import { errorMessage } from '../util/error-message.js';
+import { errorHeadline } from '../util/error-message.js';
 
 /**
  * App health: is the app under test still running, and if not, what the device's logs say about why — the
@@ -62,7 +62,7 @@ export async function appHealth(adapter: DeviceAdapter, cfg: AveriConfig): Promi
     // The question could not be ASKED — a device under load or unreachable is
     // not a dead app, and saying `false` here sends the caller after a crash
     // that never happened (measured 2026-09-17, finportal b4).
-    const why = errorMessage(e).split('\n')[0];
+    const why = errorHeadline(e);
     const check = adapter.platform === 'android'
       ? 'check `adb devices` and host load'
       : 'check `xcrun simctl list devices booted` and host load (reboot the simulator if it does not answer)';

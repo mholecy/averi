@@ -14,7 +14,7 @@ import { ReadHandOff } from '../../src/ui-tree/read-handoff.js';
 import { fakeFetch, fakeSpawn, tempDerivedData, WDA_STATUS } from '../helpers/fake-wda.js';
 import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
 import { NoLinkHandlerError } from '../../src/adapters/ios-link-failure.js';
-import { captureRefusal } from '../../src/verify/capture.js';
+import { errorHeadline } from '../../src/util/error-message.js';
 import type { IdbHelper } from '../../src/adapters/idb-helper.js';
 import type { DeviceAdapter, UiNode } from '../../src/adapters/types.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
@@ -862,12 +862,12 @@ describe('IosAdapter.screenshot — through idb on either tree source (D26b, D44
     const remedy =
       ' — check that its idb companion (idb_companion) is running and that `idb list-targets` lists the simulator as Booted; ' +
       'if it repeats, set AVERI_IOS_SCREENSHOT=simctl to capture through simctl';
-    expect(captureRefusal(got)).toBe('Command failed (exit 1): idb screenshot - --udid AAAA-1111' + remedy);
+    expect(errorHeadline(got)).toBe('Command failed (exit 1): idb screenshot - --udid AAAA-1111' + remedy);
     expect((got as Error).message).toBe('Command failed (exit 1): idb screenshot - --udid AAAA-1111' + remedy + '\nFailed to connect to companion');
     expect((got as Error).cause).toBeInstanceOf(ExecError);
     const timedOut = both(new ExecError('idb screenshot - --udid AAAA-1111', null, '', true));
     const late = await new IosAdapter({ udid: 'AAAA-1111', exec: timedOut.exec, treeSource: NO_TREE }).screenshot().catch((e: unknown) => e);
-    expect(captureRefusal(late)).toBe('Command timed out: idb screenshot - --udid AAAA-1111' + remedy);
+    expect(errorHeadline(late)).toBe('Command timed out: idb screenshot - --udid AAAA-1111' + remedy);
   });
 
   it('nor when idb answers bytes that are no PNG', async () => {

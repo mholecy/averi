@@ -2,7 +2,7 @@ import { IdbEmptyTreeError, type ApplicationLabel } from './ios-tree-source.js';
 import type { IosTreeSourceKind } from './ios-node.js';
 import { namesApp, titleAsksToOpen } from './ios-system-alert.js';
 import { FOREGROUND_WAIT_MS, type AppHolder, type SystemAlert } from './types.js';
-import { errorMessage } from '../util/error-message.js';
+import { errorHeadline } from '../util/error-message.js';
 import { formatSeconds } from '../util/duration.js';
 import { sleep } from '../util/sleep.js';
 
@@ -289,7 +289,7 @@ async function poll(check: ForegroundCheck): Promise<WaitEnd> {
       // A device that was not read: idb's empty tree is the launch's own
       // transient (read on, `read` left undefined); anything else is not this
       // check's to diagnose.
-      if (!(e instanceof IdbEmptyTreeError)) return unchecked(check, headline(e));
+      if (!(e instanceof IdbEmptyTreeError)) return unchecked(check, errorHeadline(e));
     }
     if (read !== undefined) {
       // The source does not ask (WDA not up yet): nothing to wait for and nothing to say.
@@ -316,7 +316,7 @@ async function poll(check: ForegroundCheck): Promise<WaitEnd> {
           } catch (e) {
             // D54: an alert whose title needs no names (the English "Open in “…”?") is named all the same.
             const alert = idbAlert(read, []);
-            return alert === undefined ? unchecked(check, headline(e)) : { kind: 'alert', alert, names: [] };
+            return alert === undefined ? unchecked(check, errorHeadline(e)) : { kind: 'alert', alert, names: [] };
           }
           // The window starts when the names have arrived: a slow lookup is added to it, not taken from it.
           deadline += Date.now() - asked;
@@ -367,9 +367,6 @@ function idbAlert(read: Extract<ApplicationLabel, { kind: 'label' }>, names: rea
   const { candidate } = read;
   return candidate !== undefined && titleAsksToOpen(candidate.title, names) ? candidate : undefined;
 }
-
-/** What a "could not check" note quotes of an error: its first line — the cause, not a stack or a paragraph of advice. */
-const headline = (e: unknown): string => errorMessage(e).split('\n')[0];
 
 const quoted = (names: readonly string[]) => names.map((n) => `"${n}"`).join(' or ');
 
@@ -436,6 +433,10 @@ function emptyThroughout(check: ForegroundCheck): string {
   );
 }
 
+/**
+ * The "could not check" note. `why`: the cause in one clause, either an error's first line
+ * (util/error-message.ts#errorHeadline) or the wait's own words — never a stack or a paragraph of advice.
+ */
 function unchecked(check: ForegroundCheck, why: string): WaitEnd {
   const note = `could not check that ${check.bundleId} is in front (${why}) — for a moment after an app switch ${WORDS[check.source].lag}; ${READ_AGAIN}`;
   return { kind: 'unchecked', note };

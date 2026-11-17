@@ -7,13 +7,13 @@ import { describeElementSpec, elementSpecSchema, type ElementSpec } from '../ui-
 import { pollOnVerdict, Undecided, type FirstSample, type PollRound } from '../ui-tree/read-tree.js';
 import { ReadHandOff } from '../ui-tree/read-handoff.js';
 import { durationSchema, formatSeconds, parseDuration } from '../util/duration.js';
+import { errorHeadline } from '../util/error-message.js';
 import { regexSource } from '../util/regex.js';
 import { elementAssertSchema } from './element-assert.js';
 import {
   type BaselineFrame,
   captureBaselineFrame,
   captureFrame,
-  captureRefusal,
   type Frame,
   ScreenWitness,
   unconfirmedReason,
@@ -702,7 +702,7 @@ export class Verifier {
       try {
         candidate = await captureBaselineFrame(this.adapter);
       } catch (e) {
-        return { pass: false, detail: screenshotFailed(captureRefusal(e), 'baseline match') };
+        return { pass: false, detail: screenshotFailed(errorHeadline(e), 'baseline match') };
       }
       // Fail closed: ONLY a confirmed window creates. Refusing on
       // `confirmed === false` alone would store unexamined a frame without
@@ -719,7 +719,7 @@ export class Verifier {
     try {
       frame = await captureFrame(this.adapter);
     } catch (e) {
-      return { pass: false, detail: screenshotFailed(captureRefusal(e), 'baseline match') };
+      return { pass: false, detail: screenshotFailed(errorHeadline(e), 'baseline match') };
     }
     const note = unsettledNote(frame);
     const withNote = (detail: string): string => (note === undefined ? detail : `${detail}\n${note}`);

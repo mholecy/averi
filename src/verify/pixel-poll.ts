@@ -11,10 +11,11 @@ import { findBySpec } from '../ui-tree/selectors.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import type { PixelRegionOf } from '../ui-tree/standing.js';
 import { judgedScreen, usableScreen, type UsableScreen } from '../ui-tree/usable-screen.js';
-import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, type MeasuredFrame, type TreeFrame } from './capture.js';
-import { apartOfFrame, orderOfFrame, untoldAll } from './eyes.js';
+import { captureFrame, isMoving, unsettledReason, type Frame, type MeasuredFrame, type TreeFrame } from './capture.js';
+import { apartOfFrame, orderOfFrame, screenshotUntold, untoldAll } from './eyes.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
 import { formatSeconds } from '../util/duration.js';
+import { errorHeadline } from '../util/error-message.js';
 import { asRound, notFound, pollVerdicts, type PixelMeasureInput, type PollVerdict, type RoundVerdict, type TimedOut, type Withdraw } from './poll-verdict.js';
 import { keyboardOver, pixelMissText } from './pixel-text.js';
 
@@ -496,7 +497,7 @@ async function orderOnCapture(question: PairQuestion, kept: KeptOrder, capture: 
   try {
     frame = await capture();
   } catch (e) {
-    return untoldAll(question, `the screenshot failed: ${captureRefusal(e)}`);
+    return untoldAll(question, screenshotUntold(e));
   }
   if (frame.stability !== 'settled') return untoldAll(question, 'the screen did not settle');
   if (frame.settledOver === 'region') return untoldAll(question, 'only the element held still, not the screen around it');
@@ -581,7 +582,7 @@ export async function pollPixels(
     try {
       frame = await capture();
     } catch (e) {
-      return { pass: false, detail: screenshotFailed(captureRefusal(e), unchecked), final: true };
+      return { pass: false, detail: screenshotFailed(errorHeadline(e), unchecked), final: true };
     }
     if (frame.stability !== 'settled') return pixelRound(memory.unsettled(frame));
     // Only the element's region held still: measure only at a rect two consecutive reads agree on (header).

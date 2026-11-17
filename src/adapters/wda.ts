@@ -9,7 +9,7 @@ import { detectXcodeEnv } from './xcode-env.js';
 import { rebootSimulatorAdvice } from './simulator-reboot.js';
 import { sleep } from '../util/sleep.js';
 import { formatSeconds } from '../util/duration.js';
-import { errorMessage } from '../util/error-message.js';
+import { errorHeadline, errorMessage } from '../util/error-message.js';
 import { WDA_READY_TIMEOUT_MS } from './types.js';
 
 /**
@@ -584,7 +584,7 @@ export class WdaServer {
       // (no lsof, a timeout) means we could NOT clear the port: say so, since
       // the next session will meet the refusal and needs to know why.
       if (!(e instanceof ExecError && e.exitCode === 1 && !e.timedOut)) {
-        console.error(`averi: could not list the listener on port ${this.port} (${errorMessage(e).split('\n')[0]}) — a WebDriverAgent may be left behind; \`pkill -f WebDriverAgentRunner\` before the next iOS call`);
+        console.error(`averi: could not list the listener on port ${this.port} (${errorHeadline(e)}) — a WebDriverAgent may be left behind; \`pkill -f WebDriverAgentRunner\` before the next iOS call`);
       }
       return;
     }

@@ -1,6 +1,7 @@
 import type { DeviceAdapter } from '../adapters/types.js';
+import { errorHeadline } from '../util/error-message.js';
 import { resultText, type AssertResult } from '../verify/assert.js';
-import { captureFrame, captureRefusal, unsettledNote, type Frame } from '../verify/capture.js';
+import { captureFrame, unsettledNote, type Frame } from '../verify/capture.js';
 
 /**
  * A run's reply: the final frame or the one line saying why there is none, the asserts' verdict and lines, and the
@@ -29,7 +30,7 @@ export async function finalFrame(
   try {
     return { frame: await captureFrame(adapter, { readTree: opts.readTree === true }) };
   } catch (e) {
-    return { failed: captureRefusal(e) };
+    return { failed: errorHeadline(e) };
   }
 }
 
