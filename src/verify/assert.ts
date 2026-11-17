@@ -250,16 +250,13 @@ interface PlannedAssert {
   run: () => Promise<PollVerdict>;
 }
 
-interface PollSpec<M> {
+interface PollSpec<M = never> {
   timeoutMs: number;
   /**
-   * Detail for the failing result at the deadline, from the miss that stands
-   * and the last tree-read error. Each assert
-   * words this itself, and they deliberately ORDER the two differently: an
-   * element assert prefers the read error (a tree it never read explains the
-   * miss), a rect assert prefers the measurement (it did read the tree, and
-   * the numbers are the finding) — as the pixel poll does for the color and
-   * ocr asserts (verify/pixel-poll.ts), which word theirs there.
+   * Detail for the failing result at the deadline, from the miss that stands and the last tree-read error. Each assert
+   * words this itself, and they deliberately ORDER the two differently: an element assert prefers the read error (a tree
+   * it never read explains the miss), a rect assert prefers the measurement (it did read the tree, and the numbers are
+   * the finding) — as the pixel poll does for the color and ocr asserts (verify/pixel-poll.ts), which word theirs there.
    */
   timeoutDetail: (last: TimedOut<M>) => string;
   /**
@@ -578,7 +575,7 @@ export class Verifier {
    * no capture budget is spent on top of it, and no verdict comes from a
    * frame that was still moving.
    */
-  private treePoll<M>(
+  private treePoll<M = never>(
     evaluate: (tree: UiNode, round: PollRound) => RoundVerdict<M> | typeof Undecided | undefined | Promise<RoundVerdict<M> | typeof Undecided | undefined>,
     spec: PollSpec<M>,
   ): Promise<PollVerdict> {
@@ -617,11 +614,11 @@ export class Verifier {
       // (Memoized by the adapter — adapters/types.ts — so this is one device
       // read per adapter, not per assert.)
       const viewport = await this.adapter.viewport();
-      return this.treePoll<never>(
+      return this.treePoll(
         (tree) => {
           const found = findBySpec(tree, element);
           return pollOnVerdict(absenceVerdict(found, viewport, tree), {
-            pass: true as const,
+            pass: true,
             detail:
               found.length > 0 ? `${found.length} node(s) in tree but none intersect the viewport` : undefined,
           });

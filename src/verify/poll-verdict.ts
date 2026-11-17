@@ -26,9 +26,9 @@ export type PollVerdict = { pass: boolean; detail?: string; final?: undefined } 
 /**
  * A miss no later round can change: the poll ends at once with this verdict
  * instead of polling to the deadline, which would only repeat it and bury it
- * under the timeout wording. Every poll honours it (`pollVerdicts`); the ocr
- * assert's measurement sets it, for an engine that will never read (text-parity.ts#measureOcrAssert, on
- * an `OcrUnavailableError`), and the pixel poll for a capture the adapter refused. Its own
+ * under the timeout wording — a check that cannot be made on this device at
+ * all (an engine that will never read, a capture the adapter refuses), not a
+ * screen that may still change. Every poll honours it (`pollVerdicts`). Its own
  * member of the union because a final verdict ENDS the assert and its detail
  * IS the failure sentence, so one that does not fail, or fails without its
  * sentence, does not type-check.
@@ -64,7 +64,10 @@ export interface PixelMeasureInput {
  * may legitimately be wrong for a frame, so only the state at the deadline is the verdict. `undefined` says nothing (the
  * element is not there yet) and erases nothing; `Undecided` is the tree poll's (ui-tree/read-tree.ts#Undecided).
  */
-export type RoundVerdict<M> = { pass: true; detail?: string } | FinalVerdict | Missed<M>;
+export type RoundVerdict<M> = Ending | Missed<M>;
+
+/** A round verdict that ends the poll: a pass, with its detail, or a final miss. */
+export type Ending = { pass: true; detail?: string } | FinalVerdict;
 
 /** A miss of one round, kept for the timeout until a later round replaces or withdraws it (`LastFinding`). */
 export interface Missed<M> {
@@ -86,8 +89,8 @@ export const asRound = (verdict: PollVerdict | undefined): RoundVerdict<string> 
 
 /**
  * The verifier's memory of a poll's last finding: the miss the last round that missed reported, until a later one
- * replaces it, or a later round finds it no longer true and withdraws it (the pixel poll's covered miss, once a round
- * finds the element clear). A round with nothing to say leaves it standing.
+ * replaces it, or a later round finds it no longer true and withdraws it — a miss that named a condition the later
+ * round saw gone. A round with nothing to say leaves it standing.
  */
 class LastFinding<M> implements Withdraw<M> {
   private miss: M | undefined;
@@ -101,7 +104,6 @@ class LastFinding<M> implements Withdraw<M> {
     this.miss = miss;
   }
 
-  /** Withdraw the standing miss when it is one `which` names; a miss it does not name stands. */
   withdraw(which: (miss: M) => boolean): void {
     if (this.miss !== undefined && which(this.miss)) this.miss = undefined;
   }
@@ -160,7 +162,7 @@ export async function pollVerdicts<M>(
   const finding = new LastFinding<M>();
   const outcome = await pollTree(
     adapter,
-    async (tree, poll): Promise<{ pass: true; detail?: string } | FinalVerdict | typeof Undecided | undefined> => {
+    async (tree, poll): Promise<Ending | typeof Undecided | undefined> => {
       const verdict = await round(tree, poll, finding);
       if (verdict === undefined || verdict === Undecided || verdict.pass) return verdict;
       if (poll.handedOn !== undefined) return undefined;
