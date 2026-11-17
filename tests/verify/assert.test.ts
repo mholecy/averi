@@ -421,6 +421,43 @@ describe('exact-text misses hint at a combined accessibility element', () => {
     }
   });
 
+  it("says an input's own text by its length and rect, and quotes a control's label (A66)", async () => {
+    // An input's text may be what a fill typed a moment ago, a password included: the hint names the input by id and
+    // rect and says its text by length, as an ambiguity lists it (resolve.ts). A sentinel the hint must never hold.
+    const OWN = 'zq7vXk2§';
+    resetLayout();
+    const fake = new FakeAdapter(
+      {
+        s: screen(
+          // An Android EditText with no content-desc: labelled by its own text.
+          el({ role: 'textfield', identifier: 'memo', label: `${OWN}, 1 of 13 selected`, value: `${OWN}, 1 of 13 selected` }),
+          // An input whose source gives no label: the hint's `label ?? value` would be its text.
+          el({ role: 'textfield', identifier: 'note', label: null, value: `${OWN} – 1 of 13 selected` }),
+          // An input with a title (iOS): the title is quoted, the text it holds is not.
+          el({ role: 'textfield', identifier: 'titled', label: 'Note', value: `${OWN} 1 of 13 selected` }),
+        ),
+      },
+      's',
+    );
+    const result = await new Verifier(fake, FAST).assert({ element: { text: '1 of 13 selected' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toBe(
+      'not found within 0.1 s\n' +
+        '  no node has this exact text, but 3 node(s) CONTAIN it as a whole segment:\n' +
+        '    id=memo label=<its text, 26 characters> at 0,20 100x10\n' +
+        '    id=note label=<its text, 27 characters> at 0,40 100x10\n' +
+        '    id=titled label="Note"\n' +
+        '    (iOS combines a container\'s children into one accessibility element — use match: "1 of 13 selected" for a cross-platform assert)',
+    );
+    expect(result.detail).not.toContain(OWN.slice(0, 4));
+
+    // The control: the same text on a node that is no input is screen copy, quoted.
+    resetLayout();
+    const copy = new FakeAdapter({ s: screen(el({ role: 'text', identifier: 'memo', label: `${OWN}, 1 of 13 selected` })) }, 's');
+    const quoted = await new Verifier(copy, FAST).assert({ element: { text: '1 of 13 selected' } });
+    expect(quoted.detail).toContain(`    id=memo label=${JSON.stringify(`${OWN}, 1 of 13 selected`)}\n`);
+  });
+
   it('names a node whose text differs only in typographic punctuation or diacritics, and still fails', async () => {
     resetLayout();
     const fake = new FakeAdapter(

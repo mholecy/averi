@@ -1,5 +1,6 @@
 import { everyNode, type UiNode } from '../adapters/types.js';
 import { escapeRegExp } from '../util/regex.js';
+import { quotedText } from '../ui-tree/own-text.js';
 import { namePairs, readingDifference, type RecognizerDifference } from './ocr-fold.js';
 import { normalizeText } from './text-parity.js';
 
@@ -94,7 +95,7 @@ function containsTextHint(candidates: UiNode[], expected: string): string | unde
   if (hits.length === 0) return undefined;
   const shown = hits
     .slice(0, 3)
-    .map((n) => `    id=${n.identifier ?? '(none)'} label=${JSON.stringify(n.label ?? n.value)}`)
+    .map((n) => `    id=${n.identifier ?? '(none)'} label=${quotedText(n, n.label ?? n.value)}`)
     .join('\n');
   return (
     `no node has this exact text, but ${hits.length} node(s) CONTAIN it as a whole segment:\n${shown}\n` +
