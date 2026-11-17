@@ -19,7 +19,7 @@ vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'))
 
 /**
  * THE EYES' THIRD QUESTION (verify/eyes.ts#apartOfFrame): does the colour assert's region read as the screen beside it?
- * Asked only of an element whose tree cannot tell where it is drawn (ui-tree/geometry.ts#DrawnUntold: idb's flat list,
+ * Asked only of an element whose tree cannot tell where it is drawn (ui-tree/scroll-clips.ts#DrawnUntold: idb's flat list,
  * which lists no scroll view), on the frame the assert captures anyway. Over the lab's real iOS 27 captures (402x874 pt,
  * the png 1206x2622): `scroll-bounded`'s O lies wholly below its scroll view `lower` (`0,380 402x180`), the white
  * background drawn where idb lists it; `carousel-in-list`'s C lies right of its carousel, the page's #EEEEEE there.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Rect, UiNode } from '../../src/adapters/types.js';
 import type { Cover } from '../../src/ui-tree/cover.js';
-import type { Cut } from '../../src/ui-tree/geometry.js';
+import type { Cut } from '../../src/ui-tree/scroll-clips.js';
 import { cutPinnedRemedyText, noScrollRemedyText, presentedRemedy } from '../../src/ui-tree/remedy-text.js';
 import type { Remedy, StandingFacts, TouchRemedied } from '../../src/ui-tree/standing.js';
 import { cutWayPast, stuckCutText, touchRemedyText } from '../../src/interact/touch-remedy.js';

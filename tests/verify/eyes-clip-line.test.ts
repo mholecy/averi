@@ -13,7 +13,7 @@ import { NO_EYES } from '../helpers/eyes.js';
 
 /**
  * THE EYES LOOK FOR A CLIP LINE (ui-tree/eyes.ts#eyesQuestion, verify/eyes.ts#judgeEyes): a `fully: true` claim on a
- * node whose tree cannot tell where it is drawn (ui-tree/geometry.ts#DrawnUntold: idb's flat list, which lists no
+ * node whose tree cannot tell where it is drawn (ui-tree/scroll-clips.ts#DrawnUntold: idb's flat list, which lists no
  * scroll view) is looked at once, every edge. Over the lab's real `scroll-bounded` capture (iOS 27, 402x874 pt, the png
  * 1206x2622): P `51,290 300x64` cut at `upper`'s bottom (330), S `51,552 300x64` at `lower`'s (560) — below each line
  * the screen's white runs across the target's columns and beside them alike, while beside its drawn rows the scroll

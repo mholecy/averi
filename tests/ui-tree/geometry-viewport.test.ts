@@ -6,12 +6,8 @@ import {
   clearOfSystemBands,
   clippedEdges,
   collectRects,
-  cutAtScreenEdges,
   distanceInside,
-  drawnPart,
-  isUntold,
   overlapsPastSlack,
-  toldFrame,
   visibleFractionInViewport,
   wholePast,
   windowTurnsScreen,
@@ -23,8 +19,9 @@ import { node } from '../helpers/fake.js';
  * geometry.ts's viewport and screen arithmetic, asked directly (backlog D45): which way a window says the screen faces
  * (`windowTurnsScreen`), which edges a rect runs past (`clippedEdges`) or lies wholly past (`wholePast`), how much of it
  * a box holds (`visibleFractionInViewport`), the system bands a box loses (`belowStatusBand`, `aboveNavigationBand`),
- * and the drawn-frame and screen-edge arithmetic. `inferScreenSize` and `screenOf` are geometry-screen-size.test.ts's,
- * the rect spellings geometry-text.test.ts's.
+ * and how far a side lies inside another (`distanceInside`). `inferScreenSize` and `screenOf` are
+ * geometry-screen-size.test.ts's, the rect spellings geometry-text.test.ts's, the drawn-frame and screen-edge arithmetic
+ * scroll-clips.test.ts's.
  */
 
 const rect = (x: number, y: number, width: number, height: number): Rect => ({ x, y, width, height });
@@ -285,31 +282,7 @@ describe('overlapsPastSlack — two rects sharing area thicker than PIXEL_OVERLA
   });
 });
 
-describe('drawnPart, isUntold, toldFrame — what of a rect its drawn frame holds', () => {
-  const row = rect(24, 700, 354, 120);
-  const told = (frame: Rect | undefined) => ({ told: true as const, frame, scrollers: [], listedWhereItLies: false });
-
-  it('the rect itself when nothing cuts it, or when the tree cannot tell; the part inside a told frame; undefined when nothing of it is drawn', () => {
-    expect(drawnPart(row, undefined)).toEqual(row);
-    expect(drawnPart(row, { told: false })).toEqual(row);
-    expect(drawnPart(row, told(rect(0, 0, 402, 780)))).toEqual(rect(24, 700, 354, 80));
-    expect(drawnPart(row, told(undefined))).toBeUndefined();
-    expect(drawnPart(row, told(rect(0, 900, 402, 100)))).toBeUndefined();
-  });
-
-  it('untold only for the tree that cannot tell; a told frame only where one is told', () => {
-    expect(isUntold({ told: false })).toBe(true);
-    expect(isUntold(undefined)).toBe(false);
-    expect(isUntold(told(undefined))).toBe(false);
-    expect(toldFrame(told(rect(0, 0, 402, 780)))).toEqual(told(rect(0, 0, 402, 780)));
-    expect(toldFrame({ told: false })).toBeUndefined();
-    expect(toldFrame(undefined)).toBeUndefined();
-  });
-});
-
-describe('cutAtScreenEdges, distanceInside — sides a source cut at the screen, and how far a side lies inside another', () => {
-  const SCREEN = rect(0, 0, 1080, 2220);
-
+describe('distanceInside — how far a side lies inside another', () => {
   it('distanceInside: positive inside, 0 on the side, negative past it — each side toward the middle', () => {
     const outer = rect(100, 200, 800, 1000);
     const inner = rect(110, 230, 700, 900);
@@ -321,20 +294,6 @@ describe('cutAtScreenEdges, distanceInside — sides a source cut at the screen,
     expect(distanceInside(rect(90, 190, 820, 1020), outer, 'bottom')).toBe(-10);
     expect(distanceInside(rect(90, 190, 820, 1020), outer, 'left')).toBe(-10);
     expect(distanceInside(rect(90, 190, 820, 1020), outer, 'right')).toBe(-10);
-  });
-
-  it("the lab's carousel card dumped `[586,380][1080,614]` in its carousel `[66,380][1014,614]`: right; at each side alike; none where the frame meets the screen too", () => {
-    const carousel = rect(66, 380, 948, 234);
-    expect(cutAtScreenEdges(rect(586, 380, 494, 234), carousel, SCREEN)).toEqual(['right']);
-    expect(cutAtScreenEdges(rect(0, 380, 500, 234), carousel, SCREEN)).toEqual(['left']);
-    expect(cutAtScreenEdges(rect(1, 380, 500, 234), carousel, SCREEN)).toEqual(['left']);
-    expect(cutAtScreenEdges(rect(2, 380, 500, 234), carousel, SCREEN)).toEqual([]);
-    const column = rect(100, 300, 800, 1600);
-    expect(cutAtScreenEdges(rect(200, 0, 300, 400), column, SCREEN)).toEqual(['top']);
-    expect(cutAtScreenEdges(rect(200, 1900, 300, 320), column, SCREEN)).toEqual(['bottom']);
-    expect(cutAtScreenEdges(rect(0, 700, 1080, 176), rect(0, 0, 1080, 2220), SCREEN)).toEqual([]);
-    // A frame a pixel inside the screen is the screen's edge: the cut may be the frame's.
-    expect(cutAtScreenEdges(rect(586, 380, 494, 234), rect(66, 380, 1013, 234), SCREEN)).toEqual([]);
   });
 });
 

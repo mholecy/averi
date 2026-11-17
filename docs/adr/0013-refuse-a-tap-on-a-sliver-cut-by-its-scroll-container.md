@@ -28,7 +28,7 @@ was already refused; one cut to that size by a CLIP was tapped and reported done
 The tap refuses a target its scroll container cuts to a sliver under the tap minimum
 (`ui-tree/draw-order.ts#MIN_TAP_PIECE_FRACTION`), with its own refusal class
 (`interact/tap-judgement.ts#ClippedRefusal`), and nothing is tapped. What counts as cut is
-`ui-tree/geometry.ts#Clips.cutSliver`'s. The remedy is a plain
+`ui-tree/scroll-clips.ts#Clips.cutSliver`'s. The remedy is a plain
 `scroll_until` toward the cut edge, whose plain stop does not stop on such a sliver either (`ui-tree/standing.ts#Scene`).
 
 ## Refined 2026-10-17 (owner): a sliver cut by a node drawn after it
@@ -42,7 +42,7 @@ field's own centre submitted the form).
 
 The same rule now covers that cut: a CONTROL thinner than the tap minimum across an edge that lies flush with a node
 drawn after it, that node spanning the edge (`ui-tree/standing.ts#cutByLater`), is a sliver cut by that node
-(`geometry.ts#Cut.by`). The tap refuses it (`ClippedRefusal`), naming that node, where the strip lies and how much of it
+(`scroll-clips.ts#Cut.by`). The tap refuses it (`ClippedRefusal`), naming that node, where the strip lies and how much of it
 shows; the remedy is to dismiss the soft keyboard first when it is up (a bar riding on it goes down with it), or to
 scroll it out from under that node. `scroll_until`'s plain stop and its `fully: true` stop do not stop on it. Its strokes
 go on (the node is outside the field's scroll view, so a scroll may bring the field out from under it), and when they
@@ -174,7 +174,7 @@ Residuals, stated:
 
 ## Refined 2026-10-20 (round 14, LE2): the eyes look for a CLIP LINE where the tree tells no drawn frame
 
-idb lists no scroll view, so its tree cannot say where a row is drawn (`ui-tree/geometry.ts#DrawnUntold`): the lab's
+idb lists no scroll view, so its tree cannot say where a row is drawn (`ui-tree/scroll-clips.ts#DrawnUntold`): the lab's
 `scroll-bounded` P (`51,290 300x64`, cut at `upper`'s bottom, 330) and S (`51,552`, cut at `lower`'s, 560 — 8 pt of it
 drawn) were "fully visible after 0 swipes" under `fully: true`
 (docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md).
@@ -775,7 +775,7 @@ app shows.
 
 ## Residuals accepted
 
-1. A node that only READS cut (whole, its own content running to the edge, `geometry.ts#evidentCut`) is refused too;
+1. A node that only READS cut (whole, its own content running to the edge, `scroll-clips.ts#evidentCut`) is refused too;
    the refusal names a child or a coordinate tap as the way past it.
 2. **"fully visible" while a surface with no node lies over part of the target** (live case k7, round 6's Android
    device check; accepted 2026-10-18; CLOSED 2026-10-19 by the eyes, above — the account below is kept as measured). After one stroke the lab's phone field (`1129–1228`) lay with its centre clear of

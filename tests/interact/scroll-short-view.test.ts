@@ -4,7 +4,7 @@ import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { round, startRounds, type RoundRules, type RoundSeen, type ScrollOutcome } from '../../src/interact/scroll-rounds.js';
 import { CARRY_CEILING, carried, planStroke, seeRead, startStrokes, strokeSent, UNMEASURED_CARRY, UNMEASURED_MIN_DRAG, type StrokeMemory } from '../../src/interact/stroke-plan.js';
-import { largestScroller } from '../../src/ui-tree/geometry.js';
+import { largestScroller } from '../../src/ui-tree/scroll-clips.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
 import { node } from '../helpers/fake.js';
 import { play, type Row } from '../helpers/rounds.js';

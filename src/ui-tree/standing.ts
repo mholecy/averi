@@ -12,30 +12,32 @@ import {
   belowStatusBand,
   clearOfSystemBands,
   clippedEdges,
-  clipsOf,
   containsPoint,
-  drawnPart,
   EDGES,
   overlapsPastSlack,
   PIXEL_OVERLAP_SLACK,
   rectWithin,
   rectCentre,
   sameRect,
-  toldFrame,
   visibleFractionInViewport,
+  type Edge,
+} from './geometry.js';
+import {
+  clipsOf,
+  drawnPart,
+  toldFrame,
   type Clips,
   type Cut,
   type Drawn,
   type DrawnFrame,
-  type Edge,
-} from './geometry.js';
+} from './scroll-clips.js';
 import type { KeyboardLine } from './keyboard-position.js';
 import { isInteractive, tapPoint } from './selectors.js';
 import { failsOpen, judgedScreen, type UsableScreen } from './usable-screen.js';
 
 /**
  * THE SCENE of one tree: its draw order (draw-order.ts) and its clip facts
- * (geometry.ts#clipsOf), each derived once, on first use — and the
+ * (scroll-clips.ts#clipsOf), each derived once, on first use — and the
  * STANDING of a node in it: where the node stands on a screen for what a
  * verb means to do with it, one ordered judgement for the tap,
  * `scroll_until`'s stop and the pixel assert. Facts cross this seam, and —
@@ -75,7 +77,7 @@ import { failsOpen, judgedScreen, type UsableScreen } from './usable-screen.js';
  * - THE DRAWN FRAME, every purpose: a scroll view draws none of its
  *   content outside its own frame, while WDA lists the content at its
  *   laid-out rect and uiautomator sometimes past the frame too
- *   (geometry.ts#Clips.drawnIn, the frames of every scrolling ancestor
+ *   (scroll-clips.ts#Clips.drawnIn, the frames of every scrolling ancestor
  *   intersected, on every tree that lists ancestry). Every frame a purpose
  *   judges in is cut to it (`drawnFrame`), so `visible`, `shows`, the
  *   covers and the tap's moved piece count only what is drawn; a centre on
@@ -87,7 +89,7 @@ import { failsOpen, judgedScreen, type UsableScreen } from './usable-screen.js';
  *   scroll view out taller; a stop judges it under any line. Where
  *   uiautomator did cut a rect to its scroll view the frame cuts nothing;
  *   a node under nothing that scrolls has none, and idb's flat list, which
- *   lists no scroll view, tells none (geometry.ts#DrawnUntold): judged on
+ *   lists no scroll view, tells none (scroll-clips.ts#DrawnUntold): judged on
  *   the screen alone — ADR 0010's residual 5, the eyes looking where a
  *   claim rests on it (verify/eyes.ts#apartOfFrame for the colour assert,
  *   ui-tree/eyes.ts#eyesQuestion's clip lines for a `fully: true` claim). Measured: the at-rest SWIFT
@@ -305,7 +307,7 @@ export interface Scene {
    * draw order was told (`sceneOf`'s `seen`); absent when no one looked. The remedy reads it for why a pair stayed untold.
    */
   readonly orderSeen?: SeenOrder;
-  /** The tree's clip facts (geometry.ts#clipsOf), its dialect as dialect.ts#TreeDialect says it (`ancestry`, `framesUnclipped`, `cutsAtScreen`). */
+  /** The tree's clip facts (scroll-clips.ts#clipsOf), its dialect as dialect.ts#TreeDialect says it (`ancestry`, `framesUnclipped`, `cutsAtScreen`). */
   readonly clips: Clips;
   /** The pixel assert's standing: its own union (`PixelStanding`), on the usable screen's `oriented` box, picked here. */
   standing(node: UiNode, screen: UsableScreen | undefined, purpose: PixelPurpose): PixelStanding;
@@ -317,7 +319,7 @@ export interface Scene {
   /**
    * THE region of the node a pixel measurement is asked of, on the screen the pixel purpose is judged on
    * (usable-screen.ts#judgedScreen: `screen`, else the tree's own): the part of its rect its scroll views draw (the
-   * drawn frame, geometry.ts#drawnPart) — the whole rect where nothing cuts it, and on a root of no area
+   * drawn frame, scroll-clips.ts#drawnPart) — the whole rect where nothing cuts it, and on a root of no area
    * (usable-screen.ts#TreeUsableScreen.failsOpen: nothing is judged off its box). The pixel standing judges over it
    * and the sampler reads it (verify/pixel-poll.ts#pollPixels): one function, so the two cannot diverge.
    */
@@ -425,7 +427,7 @@ export interface StandingFacts {
   /** The fraction of the node inside the frame, covers or not: of what is drawn there — an upper bound where `unknownPast` says how far it runs is unknown. */
   readonly visible: number;
   /**
-   * The sides along which the node runs on an unknown distance past its listed rect (geometry.ts#DrawnFrame.unknownPast:
+   * The sides along which the node runs on an unknown distance past its listed rect (scroll-clips.ts#DrawnFrame.unknownPast:
    * the source cut it at the screen's edge, uiautomator's): `visible` is then an upper bound — the node's true area is
    * larger — and its centre along that axis unknown (`scroll_until`'s plain stop, interact/scroll-rounds.ts#round,
    * strokes once more toward it). Absent when none.
@@ -458,12 +460,12 @@ export interface StandingFacts {
   readonly shows: number;
   /** The least piece a tap may be aimed at (draw-order.ts#Exposure.minPiece); absent when the frame leaves nothing to judge. */
   readonly minPiece?: number;
-  /** The node's cut to a sliver under `minPiece` — by its scroll container (geometry.ts#Clips.cutSliver) or by a node drawn after it (`cutByLater`, `Cut.by`) — whatever the kind; never judged for the pixel (D5, ADR 0012). */
+  /** The node's cut to a sliver under `minPiece` — by its scroll container (scroll-clips.ts#Clips.cutSliver) or by a node drawn after it (`cutByLater`, `Cut.by`) — whatever the kind; never judged for the pixel (D5, ADR 0012). */
   readonly sliver?: Cut;
-  /** The frame its scroll views draw it in (geometry.ts#Clips.drawnIn), when they cut it and share some area: `screen` is cut to it, and `scroll_until`'s far edge is judged at its edges as at the screen's (interact/course.ts#beyondFarEdgeIn). */
+  /** The frame its scroll views draw it in (scroll-clips.ts#Clips.drawnIn), when they cut it and share some area: `screen` is cut to it, and `scroll_until`'s far edge is judged at its edges as at the screen's (interact/course.ts#beyondFarEdgeIn). */
   readonly drawn?: Rect;
   /**
-   * With `drawn` only, on a tree whose source lists the node where it lies (geometry.ts#DrawnFrame.listedWhereItLies, WDA's):
+   * With `drawn` only, on a tree whose source lists the node where it lies (scroll-clips.ts#DrawnFrame.listedWhereItLies, WDA's):
    * `drawn` is then the window a row moves through as the content does — the one tree on which `scroll_until`'s carry
    * model measures a stroke's carry (interact/course.ts#stillNeeds).
    */
@@ -507,21 +509,21 @@ export interface StandingFacts {
  *    header or footer); under a cover, idb's flat-list root (`covered.overRoot`, `root`), a screen-sized element
  *    (`screen`) or a full-bleed header (`header`). Act on something in it clear of that.
  * 5. `bothPinned` — `covered` by a cover the tree orders over it (`drawn`, or `overlaid`), where NEITHER lies in a
- *    scroll view as the tree says (geometry.ts#Clips.inScroller false for the node and for its cover — the lab's
+ *    scroll view as the tree says (scroll-clips.ts#Clips.inScroller false for the node and for its cover — the lab's
  *    pinned-bar P and text-under-bar P under Continue, on WDA and Compose; rn-banner's "Saved"): no scroll moves either
  *    (D87). Not where either lies in one, though nothing scrolls between the two: a pinned section header lies in its
  *    scroll view's one content container beside its rows (scroll-sticky.wda), and a stroke moves the rows from under
  *    it. Not where the tree cannot say (idb's flat list).
  *    remedy-text.ts#bothPinnedRemedyText. `under`: the node it is pinned under — its cover's node, or (below) the node
  *    it is cut by.
- *    And (D88) a touch's `cut` by a node drawn after it (geometry.ts#Cut.by), on the same two facts of the node and that
+ *    And (D88) a touch's `cut` by a node drawn after it (scroll-clips.ts#Cut.by), on the same two facts of the node and that
  *    node — Compose's text-under-bar P, cut to 825x22 by Continue, which the pixel assert judges `covered` by it: one
  *    remedy for one target. The cut is ambiguous — the rest may lie under that node, or it is only that thin — and no
  *    scroll changes either. Not a cut at a clipping container's edge (`Cut.by` absent): the rest lies past that edge,
  *    `scroll`.
  *    docs/adr/0015-flat-list-reading-order-break.md (its D87 and D88 amendments)
  * 6. `pinned` — under a system bar or (the pixel assert) a cover, in no scroll view as the tree says
- *    (geometry.ts#Clips.inScroller false): no scroll moves it out. Under a cover it arises only for a cover in a
+ *    (scroll-clips.ts#Clips.inScroller false): no scroll moves it out. Under a cover it arises only for a cover in a
  *    scroll view over a node in none, which the draw order excuses (draw-order.ts's `scrolledContent` row) save in a
  *    later screen, `presented` first — defence in depth: 5.'s `over` half (`bothPinned`) survives the mutation run, an
  *    equivalent mutant there (ADR 0015's D87 amendment; ADR 0038's A25 amendment, which lists this module's others).
@@ -542,7 +544,7 @@ export interface StandingFacts {
  * (docs/adr/0010-pixel-assert-keyboard-first.md). Only idb's band, a keyboard line of the standing, is judged here,
  * presented first.
  *
- * Cost: the tree's scroll ancestry (geometry.ts#Clips.inScroller, one walk of the tree, kept by the scene) is asked
+ * Cost: the tree's scroll ancestry (scroll-clips.ts#Clips.inScroller, one walk of the tree, kept by the scene) is asked
  * only for a node under a system bar or a cover with no presented surface — for a cover whose order the tree tells, of
  * the node and of its cover, and for a cut by a node drawn after it, of the node and of that node (`bothPinned`): two
  * map reads.
@@ -852,7 +854,7 @@ function orderRemedy(scene: Scene, node: UiNode, { cover }: { readonly cover: Co
 /**
  * 5. of THE PRECEDENCE for a `covered` node whose cover's order the tree tells (2. took the rest), or a `cut` one cut
  * by a node drawn after it (`Cut.by`) — `over`, that cover's node or that node: `bothPinned` when neither it nor `over`
- * lies in a scroll view (geometry.ts#Clips.inScroller false for both); undefined where either may, or the tree cannot
+ * lies in a scroll view (scroll-clips.ts#Clips.inScroller false for both); undefined where either may, or the tree cannot
  * say.
  */
 function bothPinned(scene: Scene, node: UiNode, over: UiNode): RemedyCase<'bothPinned'> | undefined {
@@ -940,11 +942,11 @@ function placeOf(point: Point, boxes: readonly Rect[] | undefined, bands: Bands)
 }
 
 /**
- * `place` judged against the node's DRAWN frame (`Scene`'s contract; geometry.ts#Clips.drawnIn): a centre on the
+ * `place` judged against the node's DRAWN frame (`Scene`'s contract; scroll-clips.ts#Clips.drawnIn): a centre on the
  * screen, or in a system band, that lies outside what the node's scroll views draw is `outside` the scroll view
  * `scrollerOf` names — off the screen as a touch judges it, its edge the scroll view's: nothing a tap there presses is
  * the node. Off the screen stays off the screen, judged first. idb's flat list and a node under nothing that scrolls
- * have no drawn frame (idb's tells none: geometry.ts#DrawnUntold), and a rect uiautomator cut to its scroll view lies in it: `place` as it is. Under a witnessed keyboard
+ * have no drawn frame (idb's tells none: scroll-clips.ts#DrawnUntold), and a rect uiautomator cut to its scroll view lies in it: `place` as it is. Under a witnessed keyboard
  * line too: a stop never stops on a centre its scroll view does not draw — a stroke brings it up into the scroll view
  * laid out above the keyboard. Only the TAP defers it past its keyboard guard
  * (interact/tap-judgement.ts#judgeTap): hiding the keyboard may lay that scroll view out taller (React Native's
@@ -961,7 +963,7 @@ function drawnPlace(place: PointPlace, { scene, node, centre }: Judged): PointPl
 const scrollerOf = (drawn: DrawnFrame, leaves: (frame: Rect) => boolean): UiNode => drawn.scrollers.find((s) => leaves(s.rect)) ?? drawn.scrollers[0];
 
 /**
- * `frame` cut by the node's drawn frame (geometry.ts#drawnPart): `frame` itself when nothing cuts it (the same
+ * `frame` cut by the node's drawn frame (scroll-clips.ts#drawnPart): `frame` itself when nothing cuts it (the same
  * object); of no area, at `frame`'s origin, when nothing of `frame` is drawn.
  */
 function drawnFrame({ scene, node }: Judged, frame: Rect): Rect {
@@ -1134,7 +1136,7 @@ const aboveLine = (box: Rect, line: KeyboardLine | undefined): Rect =>
 
 /**
  * The node's cut to a sliver BY A NODE DRAWN AFTER IT (`Cut.by`) — the sliver rule's second evidence beside a clipping
- * container's edge (geometry.ts#Clips.cutSliver, asked first): the node is a control (selectors.ts#isInteractive)
+ * container's edge (scroll-clips.ts#Clips.cutSliver, asked first): the node is a control (selectors.ts#isInteractive)
  * thinner than `minPiece` across one of its edges, and a node drawn after it outside its subtree, which draws over it
  * as a target (draw-order.ts#DrawOrder.coversOf), holds the pixel row just past that edge along the node's whole
  * extent there without holding the node itself — the edge, of the first such node in draw order (the outermost: the
@@ -1313,7 +1315,7 @@ function fullyStanding(judged: Judged, place: PointPlace, box: Rect, bands: Judg
 
 /**
  * What of the node's clip (`facts.clipped`) its scroll view's edge makes (`ScrollViewCut`), or undefined when none of
- * it: an edge where the frame judged in ends at the drawn frame's edge (geometry.ts#Clips.drawnIn) and the box does
+ * it: an edge where the frame judged in ends at the drawn frame's edge (scroll-clips.ts#Clips.drawnIn) and the box does
  * not — a scroll view ending at the screen's edge, or a keyboard line above its edge, leaves the screen's or the
  * keyboard's cut.
  */
@@ -1482,7 +1484,7 @@ const singleBox = (usable: UsableScreen): JudgedBoxes => ({
 
 /**
  * The node's cut at the navigation bar, as the tree can tell it
- * (ADR 0009): the bottom of what of it is drawn (geometry.ts#drawnPart — its
+ * (ADR 0009): the bottom of what of it is drawn (scroll-clips.ts#drawnPart — its
  * rect, or the part its scroll views draw where uiautomator dumped it past
  * one, ADR 0010's drawn frame) flush, within a unit, with the band's top
  * (geometry.ts#flushEdges' unit), inside a clipping scroller

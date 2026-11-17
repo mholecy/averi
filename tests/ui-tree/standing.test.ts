@@ -5,7 +5,7 @@ import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { farEdgeFrames, sceneOf, type PixelPurpose, type PixelStanding, type Purpose, type Standing, type StandingFacts, type TapStanding, type TouchPurpose } from '../../src/ui-tree/standing.js';
 import type { Cover } from '../../src/ui-tree/cover.js';
-import { drawnPart, toldFrame } from '../../src/ui-tree/geometry.js';
+import { drawnPart, toldFrame } from '../../src/ui-tree/scroll-clips.js';
 import { keyboardPosition, type KeyboardLine } from '../../src/ui-tree/keyboard-position.js';
 import { judgedScreen, type DeviceUsableScreen, type UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
@@ -85,7 +85,7 @@ const said = (s: Standing | PixelStanding): unknown => {
     case 'reachable':
       return { kind: s.kind, at: s.at, ...('moved' in s && s.moved !== undefined && { moved: { piece: s.moved.piece, cover: s.moved.cover.node.identifier ?? s.moved.cover.node.label, aboveKeyboard: s.moved.aboveKeyboard } }) };
     case 'offScreen': {
-      // Outside the scroll view it lies in (its drawn frame, geometry.ts#Clips.drawnIn): the scroll view named.
+      // Outside the scroll view it lies in (its drawn frame, scroll-clips.ts#Clips.drawnIn): the scroll view named.
       const outside = s.scroller === undefined ? {} : { scroller: s.scroller.identifier };
       // The pixel's own: nothing of what it reads on the box judged, the box quoted.
       return 'box' in s ? { kind: s.kind, box: s.box, ...outside } : { kind: s.kind, at: s.at, visible: s.visible, ...outside };

@@ -35,7 +35,7 @@ export type AxisEvidence = Pick<StandingFacts, 'clipped' | 'unknownPast' | 'draw
     readonly along: ScrollAxis;
     /** The room-giving scroll view: the smallest of the target's along `along`. */
     readonly roomGiver: UiNode;
-    /** The target's nearest scroll view (geometry.ts#Clips.drawnIn's first `scrollers`), undefined when none. */
+    /** The target's nearest scroll view (scroll-clips.ts#Clips.drawnIn's first `scrollers`), undefined when none. */
     readonly nearest: UiNode | undefined;
   };
 

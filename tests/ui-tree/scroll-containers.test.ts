@@ -4,7 +4,7 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource, parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import { clips, scrollAxis, scrolls } from '../../src/ui-tree/scroll-containers.js';
-import { clipsOf } from '../../src/ui-tree/geometry.js';
+import { clipsOf } from '../../src/ui-tree/scroll-clips.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { node } from '../helpers/fake.js';
 import { CLASSIC_VIEWS, SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';

@@ -499,7 +499,7 @@ describe('residual: an undimmed partial sheet — the tap and the pixel assert s
 
 /**
  * A target listed in its scroll view but outside the scroll view's frame, on a tree of unclipped frames (WDA's): its
- * scroll view draws none of it there, or not its centre (ui-tree/standing.ts, the drawn frame; geometry.ts
+ * scroll view draws none of it there, or not its centre (ui-tree/standing.ts, the drawn frame; scroll-clips.ts
  * #Clips.drawnIn). One standing for every verb, its remedy the off-screen one: the tap refuses naming the scroll view,
  * the colour and ocr asserts fail closed naming it, `scroll_until` strokes — and beneath a presented screen each says
  * close it first. The at-rest SWIFT form's shape, synthetic: its form `0,0 402x780`, CONTINUE pinned below it,
@@ -936,7 +936,7 @@ describe('one remedy for a target under a drawn cover where neither lies in a sc
   });
 });
 
-// D88: a target CUT to a sliver by a node drawn after it (geometry.ts#Cut.by), where neither lies in a scroll view as the
+// D88: a target CUT to a sliver by a node drawn after it (scroll-clips.ts#Cut.by), where neither lies in a scroll view as the
 // tree says — the lab's text-under-bar P on Android (Compose), cut to 825x22 by the later sibling Continue — takes
 // `bothPinned` too (ui-tree/standing.ts#Remedy, 5.): the pixel assert judges that target `covered` by the same node and
 // already said so (D87), so the tap, both stops and the pixel assert agree, and scroll_until stops before any swipe

@@ -1,6 +1,6 @@
 import type { Rect, ScrollAxis } from '../adapters/types.js';
 import { dialectOf } from '../ui-tree/dialect.js';
-import { type ScrollAxes } from '../ui-tree/geometry.js';
+import { type ScrollAxes } from '../ui-tree/scroll-clips.js';
 import { quoted, type QuotedNode } from '../ui-tree/node-words.js';
 import { findTarget, parseSelector, type Target } from '../ui-tree/selectors.js';
 import type { TreeFacts } from './scroll-read.js';
@@ -22,7 +22,7 @@ import { axisOf, type Direction } from './swipe.js';
  *   takes a found target's (stroke-plan.ts#targetScrollers: Android's clipping chain, else the scrolling ancestors); a
  *   node under none is refused;
  * - a RECT, as ui_snapshot and a failure reply quote one: the listed scroll view of exactly that rect
- *   (ui-tree/geometry.ts#Clips.axesOf finds it by scroll-containers.ts#isScrollViewOf, the test every remembered scroll
+ *   (ui-tree/scroll-clips.ts#Clips.axesOf finds it by scroll-containers.ts#isScrollViewOf, the test every remembered scroll
  *   view is found again by), so a rect a pixel off is none.
  * And refused when its scroll view is told to scroll only ACROSS the stroke with no scroll view nested in it that may
  * scroll along it (told along, or of unknown axis — D59b's nested candidates): a swipe over it would move nothing. A
@@ -62,7 +62,7 @@ export type WithinRefusal =
   /**
    * No listed scroll view has exactly this rect: `views`, every scroll view a rect could name for a stroke on `axis` —
    * told to scroll on it, or of an axis the tree does not tell (`untold`), as the rect path itself accepts them — in
-   * tree order (ui-tree/geometry.ts#Clips.scrollViewsOn); `across`, how many more it lists, told to scroll across it.
+   * tree order (ui-tree/scroll-clips.ts#Clips.scrollViewsOn); `across`, how many more it lists, told to scroll across it.
    */
   | { readonly of: 'stale'; readonly axis: ScrollAxis; readonly views: readonly OfferedScrollView[]; readonly across: number }
   /** The named scroll view (`rect`) is told to scroll on `axis`, across a stroke `toward`, and holds none that may scroll along it. */
