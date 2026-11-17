@@ -24,9 +24,13 @@ const LEAD = /^\s*(?:\/\*\*?|\*(?!\/)|\/\/+)?\s*/;
 
 /**
  * A line wrapped onto the next: a path cut at a hyphen or a slash (`docs/bugs/2026-10-09-` / `android-…md`, `scroll-` /
- * `rounds.ts#…`), or a pointer cut after its file (`scroll-read.ts` / `#judgeRead`, or `scroll-read.ts#` / `judgeRead`).
+ * `rounds.ts#…`) or before its extension (`tests/verify/baseline-confirmation` / `.test.ts`), or a pointer cut after
+ * its file (`scroll-read.ts` / `#judgeRead`, or `scroll-read.ts#` / `judgeRead`).
  */
-const wrapped = (text: string, next: string): boolean => /[\w.#/-][-/]$|\.ts#$/.test(text) || (/\.ts$/.test(text) && next.replace(LEAD, '').startsWith('#'));
+const wrapped = (text: string, next: string): boolean => {
+  const rest = next.replace(LEAD, '');
+  return /[\w.#/-][-/]$|\.ts#$/.test(text) || (/\.ts$/.test(text) && rest.startsWith('#')) || (/\/[\w-]+$/.test(text) && /^\.(?:test\.)?m?ts\b/.test(rest));
+};
 
 /**
  * A text's lines, a wrapped one (see wrapped) joined to its continuation with the continuation's lead dropped, each
@@ -145,10 +149,10 @@ export interface Corpus {
   sources: readonly string[];
   comments: readonly Line[];
   titles: readonly Line[];
-  /** The words of the sources' code (comments blanked, strings kept), of tests/fixtures/ and of fixtures/. */
-  codeWords: ReadonlySet<string>;
-  /** A source's code (codeOf). */
-  code: ReadonlyMap<string, string>;
+  /** Each source's code words: its code (codeOf, strings kept) read by wordsOf. */
+  codeWords: ReadonlyMap<string, ReadonlySet<string>>;
+  /** The words of tests/fixtures/ and fixtures/ (their text files). */
+  fixtureWords: ReadonlySet<string>;
 }
 
 /** A fixture file worth reading for words: a text file. */
@@ -163,19 +167,17 @@ export function corpus(): Corpus {
   const sources = files.filter((f) => /^(?:src|scripts|tests)\//.test(f) && /\.m?ts$/.test(f));
   const comments: Line[] = [];
   const titles: Line[] = [];
-  const codeWords = new Set<string>();
-  const code = new Map<string, string>();
+  const codeWords = new Map<string, Set<string>>();
+  const fixtureWords = new Set<string>();
   for (const f of sources) {
     const source = readFileSync(join(ROOT, f), 'utf8');
     comments.push(...commentsOf(f, source));
     if (f.startsWith('tests/')) titles.push(...titlesOf(f, source));
-    const c = codeOf(f, source);
-    code.set(f, c);
-    wordsOf(c, codeWords);
+    codeWords.set(f, wordsOf(codeOf(f, source)));
   }
   for (const f of files.filter(textFixture)) {
     const text = readFileSync(join(ROOT, f), 'utf8');
-    if (!text.includes('\0')) wordsOf(text, codeWords);
+    if (!text.includes('\0')) wordsOf(text, fixtureWords);
   }
-  return (cached = { files, sources, comments, titles, codeWords, code });
+  return (cached = { files, sources, comments, titles, codeWords, fixtureWords });
 }
