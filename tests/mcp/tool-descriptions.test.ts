@@ -595,7 +595,7 @@ describe('troubleshooting on scroll_until\'s end proof, unchecked axis and the d
 
   it('the end turn\'s clause and the one-stroke stop\'s failure, as the code words them', async () => {
     const { endTurnText, boundText } = await vi.importActual<typeof import('../../src/interact/scroll-text.js')>('../../src/interact/scroll-text.js');
-    const { nodeText } = await vi.importActual<typeof import('../../src/ui-tree/geometry.js')>('../../src/ui-tree/geometry.js');
+    const { nodeText } = await import('../../src/ui-tree/node-words.js');
     const elide = (text: string): string => text.replace(nodeText(lower), '<scroll view>');
     expect(TROUBLESHOOTING).toContain(`- **\`scroll_until\` reply or failure has \`${elide(endTurnText({ way: 'up', to: 'down', after: 1, unmoved: 1, scrollView: lower }))}\`**`);
     expect(TROUBLESHOOTING).toContain(`\`${elide(endTurnText({ way: 'up', to: 'down', after: 3, unmoved: 1, scrollView: lower })).split(' — ')[0].slice(2)}\` means`);

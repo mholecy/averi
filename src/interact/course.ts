@@ -1,6 +1,7 @@
 import type { ClippedSide, Rect } from '../adapters/types.js';
 import { drawOrderFound } from '../ui-tree/cover.js';
-import { axisOfEdge, distanceInside, rectIntersection, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
+import { axisOfEdge, distanceInside, rectIntersection, type Edge } from '../ui-tree/geometry.js';
+import { type QuotedNode } from '../ui-tree/node-words.js';
 import { SIDES } from '../ui-tree/sides.js';
 import type { Judged, Since } from './scroll-read.js';
 import { axisOf, OPPOSITE, TOUCH_SLOP, type Direction } from './swipe.js';

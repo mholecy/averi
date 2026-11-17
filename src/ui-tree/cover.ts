@@ -1,6 +1,7 @@
 import type { Point, Rect, UiNode } from '../adapters/types.js';
 import { dialectOf } from './dialect.js';
-import { containsPoint, coverText, nodeText, type Edge, type QuotedNode } from './geometry.js';
+import { containsPoint, type Edge } from './geometry.js';
+import { coverText, nodeText, type QuotedNode } from './node-words.js';
 import { isInteractive, tapPoint } from './selectors.js';
 
 /**

@@ -1,5 +1,6 @@
 import { type DeviceScreen, type Point, type Rect, type Stroke, type UiNode } from '../adapters/types.js';
-import { belowStatusBand, clearOfSystemBands, quoted, toldFrame, type Edge, type ListedContent } from '../ui-tree/geometry.js';
+import { belowStatusBand, clearOfSystemBands, toldFrame, type Edge, type ListedContent } from '../ui-tree/geometry.js';
+import { quoted } from '../ui-tree/node-words.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
 import { screenChangedUnder, screenIdentity, type IdentifiedRead, type ScreenChange, type SheetDetent } from '../ui-tree/read-tree.js';
 import { drawOrderFound, type Cover } from '../ui-tree/cover.js';

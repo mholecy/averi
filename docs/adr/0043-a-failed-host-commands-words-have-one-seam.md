@@ -214,11 +214,22 @@ included). An ambiguity's list of candidates (`resolve.ts#resolveNow`, every ver
 own text — an Android EditText with no content-desc — by that text's length and its rect, `label=<its text, 8
 characters> at 0,40 100x10`: a second match appearing while a fill re-reads its field quoted the value just typed. An
 assert's contains-hint over the whole tree (its spec matched nothing, `verify/text-hint.ts`) lists other nodes by the
-same rule (`ui-tree/listed-text.ts#listedText`, backlog A66); an assert quotes its own subject, in its content line and
+same rule (`ui-tree/node-words.ts#listedText`, backlog A66); an assert quotes its own subject, in its content line and
 its hint, since that content is what it was asked about. A folded hint (`foldedTextHint`) quotes in either scope: its
 node differs from the expected text only in recognizer readings, which the hint names. That covers averi's own derivation; a label the app built around the text (another case, the first keys, digits regrouped)
 is not recognisable, so once the focus tap has landed a re-read's refusal lists every label by its length and rect,
-`label=<18 characters> at 0,60 100x10` (`ResolveOptions.labelsByLength`, passed by `fill-refetch.ts`). The cost: an
+`label=<18 characters> at 0,60 100x10` (`ResolveOptions.naming` `every-label`, passed by `fill-refetch.ts`). The cost: an
 agent loses the label words of a refusal mid-fill, and keeps the ids and rects to tell the candidates apart.
 `tests/interact/fill-leak.test.ts` sweeps fillField's errors, `fillReply` and `fillStepText`, under `ambiguous: refuse`
 and `first`, for the typed value and the field's text, a level above `typed-text-leak.test.ts`.
+
+The rule covers every sentence that names a node (2026-11-17, backlog A67). The cover a tap moved off or was refused
+under, a pixel assert's cover, a `within` refusal's matches, the node `scroll_until`'s strokes touched down on and a
+configured dismissal's skip line quoted an input labelled by its own text, since the node a sentence named had dropped
+its value. One module names a node, `ui-tree/node-words.ts`: `QuotedNode` carries whether its label is its own text
+(`ownText`, never the value), and `nodeText`, `coverText`, `outsideScrollViewText`, `coverName`, `labelWords` and
+`listedText` are forms of one function, so the input is said `textfield <its text, 8 characters> (0,40 100x10)` where
+the sentence gives the rect itself and `<its text, 8 characters> at 0,40 100x10` in a list. A fill's every-label refusal
+is that module's `NamingPolicy` (`every-label`), which `ResolveOptions.naming` carries. `tests/interact/node-words-leak.test.ts`
+sweeps the tap's, the pixel assert's, `scroll_until`'s and the dismissal's sentences; the keyboard's accessory button
+is no case, `accessoryDismissButton` taking a button only.

@@ -1,6 +1,7 @@
 import { everyNode, rectArea, rectIntersection, type DeviceAdapter, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { dialectOf } from '../ui-tree/dialect.js';
-import { outsideScrollViewText, screenOf } from '../ui-tree/geometry.js';
+import { screenOf } from '../ui-tree/geometry.js';
+import { coverName, labelWords, outsideScrollViewText } from '../ui-tree/node-words.js';
 import type { Look } from '../ui-tree/look.js';
 import { isUnnamedWrapper } from '../ui-tree/placed.js';
 import { scrollAxis, scrolls } from '../ui-tree/scroll-containers.js';
@@ -12,7 +13,7 @@ import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { KeyboardDismissal } from './keyboard-model.js';
 import { describeTarget, findTarget, type Ambiguity } from './resolve.js';
 import { tapStandings } from './tap-judgement.js';
-import { coverName, cutSliverText } from './target-text.js';
+import { cutSliverText } from './target-text.js';
 
 /**
  * HOW the in-tree model hides a soft keyboard: ORDERED LISTS OF NAMED STRATEGIES, each judged on one look and either
@@ -186,7 +187,7 @@ function configuredStrategy(d: KeyboardDismissal): DismissalStrategy {
       if (d.kind === 'accessory') {
         const button = accessoryDismissButton(tree);
         if (button === undefined) return { skipped: 'no accessory toolbar on screen' };
-        return { kind: 'tap', what: `the accessory toolbar's ${button.label === null ? 'button' : JSON.stringify(button.label)}`, at: tapPoint(button) };
+        return { kind: 'tap', what: `the accessory toolbar's ${button.label === null ? 'button' : labelWords(button)}`, at: tapPoint(button) };
       }
       const matches = findTarget(tree, d.target).filter((n) => rectArea(n.rect) > 0);
       const neutral = matches.filter((n) => !isInteractive(n));

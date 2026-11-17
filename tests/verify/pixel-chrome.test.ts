@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { everyNode, type DeviceScreen, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
-import { nodeText } from '../../src/ui-tree/geometry.js';
+import { nodeText } from '../../src/ui-tree/node-words.js';
 import { sceneOf, type PixelRegionOf as Reads, type PixelStanding } from '../../src/ui-tree/standing.js';
 import { lookOn } from '../../src/ui-tree/look.js';
 import { treeScreen, usableScreen } from '../../src/ui-tree/usable-screen.js';

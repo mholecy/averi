@@ -1,5 +1,6 @@
 import { rectArea, STRUCTURAL_ROLES, type UiNode } from '../adapters/types.js';
-import { nodeText, type Cut } from '../ui-tree/geometry.js';
+import { type Cut } from '../ui-tree/geometry.js';
+import { nodeText } from '../ui-tree/node-words.js';
 import { cutPinnedRemedyText, noScrollRemedyText, presentedOr } from '../ui-tree/remedy-text.js';
 import { isInteractive } from '../ui-tree/selectors.js';
 import { noScrollHelps, type RemedyCase, type TouchRemedied } from '../ui-tree/standing.js';

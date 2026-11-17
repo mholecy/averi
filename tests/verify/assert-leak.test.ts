@@ -6,7 +6,7 @@ import { el, FakeAdapter, resetLayout, screen } from '../helpers/fake.js';
 // The LEAK SWEEP of an element assert's failure (A66), in the style of tests/interact/fill-leak.test.ts: an input that is
 // NOT the assert's subject — on the screen when the spec matched nothing, so the hint lists the whole tree — never has
 // its own text in the reply, which may be a password a fill typed a moment ago. Its text is said by its length and rect
-// (ui-tree/listed-text.ts#listedText). The assert's own subject is quoted (assert.test.ts pins that), and so is a
+// (ui-tree/node-words.ts#listedText). The assert's own subject is quoted (assert.test.ts pins that), and so is a
 // folded hint's node (text-hint.ts#foldedTextHint: it differs from the expected string only in recognizer readings, so
 // it says nothing the caller did not write). Each case's sentence is asserted first, so a case that stops reaching its
 // path fails as such.

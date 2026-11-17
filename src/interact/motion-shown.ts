@@ -1,5 +1,6 @@
 import { rectIntersection, type Rect, type ScrollAxis, type Stroke, type UiNode } from '../adapters/types.js';
-import { quoted, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
+import { type Edge } from '../ui-tree/geometry.js';
+import { quoted, type QuotedNode } from '../ui-tree/node-words.js';
 import { listedOnce, nodeIdentity } from '../ui-tree/read-tree.js';
 import { SIDES } from '../ui-tree/sides.js';
 import { EDGE_TOWARD, OPPOSITE, swipeVector, type Direction } from './swipe.js';

@@ -477,7 +477,7 @@ it first`; `scroll_until` `stopped before any swipe — … — an alert is pres
 first, and a swipe would land on the alert, so none was sent`. Not "a modal or a sheet" and no "no scroll moves it out"
 clause (an alert is no screen a scroll could move anything out from under), and never the alert's internal backdrop
 leaf `41,365 402x874`, a rect that runs off the screen. The alert is named with its REACH, the whole screen
-(`geometry.ts#coverText`, one spelling for the tap, `scroll_until` and the pixel assert, which said it already): the
+(`node-words.ts#coverText`, one spelling for the tap, `scroll_until` and the pixel assert, which said it already): the
 point a sentence names — a centre at (44,84), a touch-down at (201,699) — lies on the reach, not on the card; so does
 every cover whose reach is not its rect (idb's pinned CONTINUE, run down to the screen's bottom or the keyboard's top,
 and a floating tab bar's item raised by its lift, now `button "Continue to summary" (24,780 354x44, reaching 24,780

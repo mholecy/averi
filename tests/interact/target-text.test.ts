@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { UiNode } from '../../src/adapters/types.js';
 import { EDGES } from '../../src/ui-tree/geometry.js';
 import { revealText } from '../../src/ui-tree/sides.js';
-import { coverName, cutRemedy, cutSliverText, pastSideText, underKeyboardText, untriedSideText } from '../../src/interact/target-text.js';
+import { cutRemedy, cutSliverText, pastSideText, underKeyboardText, untriedSideText } from '../../src/interact/target-text.js';
 
 /**
  * The phrases a cut or a side target is said in, one wording for the tap's
@@ -47,20 +46,6 @@ describe('revealText and untriedSideText — the direction that brings a side ba
       ['scroll_until it with direction: "left"', 'if it lies to the left, try direction: "left"'],
       ['scroll_until it with direction: "right"', 'if it lies to the right, try direction: "right"'],
     ]);
-  });
-});
-
-describe('coverName — a cover as the picker\'s skip line names it', () => {
-  const cover = (label: string | null): UiNode => ({ role: 'button', label, identifier: 'id_cover', value: null, rect: { x: 24, y: 780, width: 354, height: 44 }, children: [] });
-
-  it('with a label: role and the label quoted, no rect', () => {
-    expect(coverName(cover('Sign in'))).toBe('button "Sign in"');
-  });
-  it('without a label: the role alone, never the id', () => {
-    expect(coverName(cover(null))).toBe('button');
-  });
-  it('an empty label is quoted, not skipped', () => {
-    expect(coverName(cover(''))).toBe('button ""');
   });
 });
 

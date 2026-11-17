@@ -1,5 +1,6 @@
 import type { DeviceAdapter, Point, Rect, UiNode } from '../adapters/types.js';
-import { coverText, outsideScrollViewText, rectText } from '../ui-tree/geometry.js';
+import { rectText } from '../ui-tree/geometry.js';
+import { coverText, outsideScrollViewText } from '../ui-tree/node-words.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
 import { judgedWithOrder, type OrderEyes } from '../ui-tree/eyes.js';
 import type { Look, LookReading } from '../ui-tree/look.js';
