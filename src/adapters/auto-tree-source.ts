@@ -1,10 +1,10 @@
 import { errorMessage } from '../util/error-message.js';
-import { withNoteLine } from '../util/note-line.js';
 import type { IosTreeSourceKind } from './ios-node.js';
 import type { Typeable } from './typeable.js';
 import { mayStartBeforeLaunch } from './wda-tree-source.js';
 import type { ApplicationLabel, IosTreeSource } from './ios-tree-source.js';
-import type { SystemAlert, UiNode } from './types.js';
+import type { SystemAlert, TreeSourceFallback, UiNode } from './types.js';
+import { idbTypingRefusal } from './ios-typing.js';
 
 /**
  * The line every claiming reply carries once `auto` fell back to idb (IosTreeSource.fallback; the tools print it as
@@ -66,10 +66,11 @@ export class AutoTreeSource implements IosTreeSource {
   private chosen: IosTreeSource | undefined;
   /** The choice in flight, shared by every read that starts before it is made. */
   private choosing: Promise<IosTreeSource> | undefined;
-  /** The fallback to idb, its note naming why WDA did not come up (fallbackReason) — set with the choice of idb. */
-  private fellBackTo: { readonly note: string } | undefined;
-  /** idb's set carrying that note — built with the fallback, the same object every time it is asked. */
-  private fellBackTypeable: Typeable | undefined;
+  /**
+   * Set with the choice of idb: the fallback, its note naming why WDA did not come up (fallbackReason), and idb's set
+   * carrying that note (Typeable.note) — both built once, the same objects every time they are asked.
+   */
+  private fellBack: { readonly fallback: TreeSourceFallback; readonly typeable: Typeable } | undefined;
   /** WDA's shutdown after a fallback, awaited by dispose(). */
   private wdaReleased: Promise<void> | undefined;
   private disposed = false;
@@ -88,8 +89,8 @@ export class AutoTreeSource implements IosTreeSource {
   }
 
   /** Set once the choice was idb: WebDriverAgent did not come up (IosTreeSource.fallback). */
-  get fallback(): { readonly note: string } | undefined {
-    return this.fellBackTo;
+  get fallback(): TreeSourceFallback | undefined {
+    return this.fellBack?.fallback;
   }
 
   /**
@@ -98,21 +99,18 @@ export class AutoTreeSource implements IosTreeSource {
    * 0037) and says why that set applies.
    */
   get typeable(): Typeable {
-    return this.fellBackTypeable ?? this.wda.typeable;
+    return this.fellBack?.typeable ?? this.wda.typeable;
   }
 
   /**
-   * Makes the choice (a text sent here is one idb cannot type) and hands the text to the chosen source: WDA types it;
-   * after a fallback idb refuses it, and the refusal gets the claim note's line here, once — nothing typed.
+   * Makes the choice (a text sent here is one idb cannot type): WDA chosen types it; after a fallback it is refused by
+   * the fallen-back set (`typeable`), in idb's words with the claim note's line last — its one route, Typeable.note —
+   * nothing typed.
    */
   async typeWide(text: string): Promise<void> {
-    const chosen = await this.source();
-    if (chosen === this.wda) return this.wda.typeWide(text);
-    try {
-      await chosen.typeWide(text);
-    } catch (err) {
-      throw new Error(withNoteLine(errorMessage(err), this.fellBackTo?.note), { cause: err });
-    }
+    await this.source(); // the choice: idb chosen is a fallback
+    if (this.fellBack === undefined) return this.wda.typeWide(text);
+    throw new Error(idbTypingRefusal(text, this.fellBack.typeable));
   }
 
   async read(): Promise<UiNode> {
@@ -164,8 +162,7 @@ export class AutoTreeSource implements IosTreeSource {
           errorMessage(err),
       );
       const note = idbFallbackNote(fallbackReason(err));
-      this.fellBackTo = { note };
-      this.fellBackTypeable = { ...this.idb.typeable, note };
+      this.fellBack = { fallback: { note }, typeable: { ...this.idb.typeable, note } };
       this.wdaReleased = this.wda.dispose().catch(() => undefined);
       this.chosen = this.idb;
     }

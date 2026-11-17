@@ -1086,6 +1086,14 @@ export type FocusedWindow =
  */
 export class PersistentReadError extends Error {}
 
+/**
+ * A tree source's fallback from the backend it was configured for (DeviceAdapter.fallback, IosTreeSource.fallback): iOS
+ * `treeSource: auto` reading through idb (A41a). `note` is the line every claiming reply carries.
+ */
+export interface TreeSourceFallback {
+  readonly note: string;
+}
+
 export interface DeviceAdapter {
   readonly platform: Platform;
   /** Reinstall triggers the app's login requirement — intentional. */
@@ -1318,7 +1326,7 @@ export interface DeviceAdapter {
    * simulator drops an adapter that has one (mcp/registry.ts#select). Read after the call, whose first read made the
    * choice.
    */
-  readonly fallback?: { readonly note: string };
+  readonly fallback?: TreeSourceFallback;
   /**
    * What a fill tells the adapter after a REPAIRED drop (interact/fill-type.ts, docs/adr/0023-fill-types-a-dropped-
    * tail-again.md, its D24 amendment): the field kept a strict prefix of a typing whose delivery is `on-return`, the

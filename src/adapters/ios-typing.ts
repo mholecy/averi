@@ -66,12 +66,13 @@ export const IDB_TYPEABLE: Typeable = {
 };
 
 /**
- * idb's refusal of `text` (IDB_TYPEABLE, refusalOf) — for a text only WebDriverAgent types that reached a source that
- * types nothing beyond idb (IosTreeSource.typeWide: idb's, the differential harness's recorded one, and `auto`'s after a
- * fallback, which adds its note). Built here once; the fallback wording is for a text idb types, which no caller sends.
+ * idb's refusal of `text` (refusalOf, by IDB_TYPEABLE or the idb set `typeable` derives from it) — for a text only
+ * WebDriverAgent types that reached a source that types nothing beyond idb (IosTreeSource.typeWide: idb's, the
+ * differential harness's recorded one, and `auto`'s after a fallback, whose set carries the claim note: Typeable.note,
+ * which refusalOf puts last). Built here once; the fallback wording is for a text idb types, which no caller sends.
  */
-export const idbTypingRefusal = (text: string): string =>
-  refusalOf(text, IDB_TYPEABLE) ?? `cannot type it: ${IDB_TYPEABLE.says}`;
+export const idbTypingRefusal = (text: string, typeable: Typeable = IDB_TYPEABLE): string =>
+  refusalOf(text, typeable) ?? `cannot type it: ${typeable.says}`;
 
 /** What an IosAdapter over WebDriverAgent's source types (IosTreeSource.typeable: WDA's) — the module doc. */
 export const WDA_TYPEABLE: Typeable = {

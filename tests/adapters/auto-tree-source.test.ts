@@ -158,7 +158,7 @@ describe('AutoTreeSource — WebDriverAgent when it comes up, idb when it does n
     expect(idb.labels).toBe(1);
   });
 
-  it('typeWide before the first read makes the choice: WDA up types through it; WDA down is idb\'s refusal with the note, once', async () => {
+  it('typeWide before the first read makes the choice: WDA up types through it; WDA down is the fallback set\'s refusal, its note once', async () => {
     const up = fakeWda();
     const typedUp = new AutoTreeSource({ wda: up, idb: fakeIdb() });
     await typedUp.typeWide('Šťastný');
@@ -170,8 +170,9 @@ describe('AutoTreeSource — WebDriverAgent when it comes up, idb when it does n
     const note =
       'read through idb: WebDriverAgent did not come up (WebDriverAgent requires the appium-webdriveragent package; select_device again to retry) ' +
       'and idb lists no presented layer or scroll clip — a layer over the target or a clip cutting it was not judged';
-    await expect(fallen.typeWide('Šťastný')).rejects.toThrow(new Error(`idb refuses Šťastný\n⚠ ${note}`));
-    await expect(fallen.typeWide('Šťastný')).rejects.toThrow(new Error(`idb refuses Šťastný\n⚠ ${note}`));
+    const refusal = `${refusalOf('Šťastný', IDB_TYPEABLE)}\n⚠ ${note}`;
+    await expect(fallen.typeWide('Šťastný')).rejects.toThrow(new Error(refusal));
+    await expect(fallen.typeWide('Šťastný')).rejects.toThrow(new Error(refusal));
     expect(gone.typed).toEqual([]);
   });
 

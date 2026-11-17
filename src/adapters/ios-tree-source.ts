@@ -8,7 +8,7 @@ import { WdaTreeSource } from './wda-tree-source.js';
 import { AutoTreeSource } from './auto-tree-source.js';
 import type { WdaServerOptions } from './wda.js';
 import type { IdbHelper } from './idb-helper.js';
-import { PersistentReadError, rectArea, rectIntersection, zeroRect, type Rect, type SystemAlert, type UiNode } from './types.js';
+import { PersistentReadError, rectArea, rectIntersection, zeroRect, type Rect, type SystemAlert, type TreeSourceFallback, type UiNode } from './types.js';
 import { alertShapeInIdb } from './ios-system-alert.js';
 import { countOf } from '../util/count.js';
 import { IDB_TYPEABLE, idbTypingRefusal } from './ios-typing.js';
@@ -54,7 +54,7 @@ export interface IosTreeSource {
    * up (AutoTreeSource, A41a); its `note` is the line every claiming reply carries (DeviceAdapter.fallback, which
    * IosAdapter forwards). Absent on idb and wda: a configured source says nothing.
    */
-  readonly fallback?: { readonly note: string };
+  readonly fallback?: TreeSourceFallback;
   /**
    * The cadence at which two of this source's reads may prove an element holds still (types.ts#DeviceAdapter.
    * settleCadenceMs, which IosAdapter forwards; docs/adr/0040-the-settle-cadence-is-the-tree-sources.md). The SOURCE's
@@ -102,8 +102,8 @@ export interface IosTreeSource {
    * Types a text idb cannot type (ios-typing.ts#typingPathOf: IosAdapter.typeText sends this source every such text,
    * whole, and no other) into whatever holds keyboard focus — or refuses it, nothing sent. WDA types it (WdaTreeSource:
    * `POST /session/:id/wda/keys`, D43); idb and the recorded source refuse it in idb's words
-   * (ios-typing.ts#idbTypingRefusal); `auto` makes its choice and hands it on, adding the claim note's line after a
-   * fallback.
+   * (ios-typing.ts#idbTypingRefusal); `auto` makes its choice and hands it to WDA, or after a fallback refuses it so
+   * too, by its fallen-back set, whose note ends the refusal.
    */
   typeWide(text: string): Promise<void>;
   dispose(): Promise<void>;

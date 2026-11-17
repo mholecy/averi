@@ -9,7 +9,7 @@ import { screenshotPng } from './screenshot-bytes.js';
 import { rebootSimulatorAdvice } from './simulator-reboot.js';
 import { errorMessage } from '../util/error-message.js';
 import { DESCRIBE_ALL_TIMEOUT_MS, IdbEmptyTreeError, type IosTreeSource } from './ios-tree-source.js';
-import type { AppHolder, DeepLinkOptions, DeviceAdapter, DeviceScreen, Key, LaunchOptions, Point, UiNode } from './types.js';
+import type { AppHolder, DeepLinkOptions, DeviceAdapter, DeviceScreen, Key, LaunchOptions, Point, TreeSourceFallback, UiNode } from './types.js';
 import { awaitForeground, type ForegroundCheck } from './ios-foreground.js';
 import { appInfoBundle, appInfoNames, type AppBinary } from './simctl-appinfo.js';
 import { noLinkHandler } from './ios-link-failure.js';
@@ -185,7 +185,7 @@ export class IosAdapter implements DeviceAdapter {
   }
 
   /** The source's fallback and its note (DeviceAdapter.fallback, IosTreeSource.fallback): `auto`'s, once it read through idb (A41a). */
-  get fallback(): { readonly note: string } | undefined {
+  get fallback(): TreeSourceFallback | undefined {
     return this.treeSource.fallback;
   }
   private readonly exec: ExecFn;
