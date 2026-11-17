@@ -62,8 +62,8 @@ describe('resolveWithin — a selector: the matched scroll view, or the nearest 
     expect(resolveWithin(factsOf(edited), 'id:lab.list', 'down', ANDROID_SCREEN)).toEqual({ rect: LOWER });
   });
 
-  it('only zero-area matches: refused as no match, not as several — no narrowing would name a target', () => {
-    expect(resolveWithin(factsOf(SPRINGBOARD), 'id:"Maps"', 'down', PHONE)).toEqual({ refused: { of: 'absent' } });
+  it('only zero-area matches: refused as absent, not as several — no narrowing would name a target — the 0×0 matches said', () => {
+    expect(resolveWithin(factsOf(SPRINGBOARD), 'id:"Maps"', 'down', PHONE)).toEqual({ refused: { of: 'absent', zeroArea: true } });
   });
 
   it('a match in no scroll view (android:id/content holds both lists): refused, naming it', () => {

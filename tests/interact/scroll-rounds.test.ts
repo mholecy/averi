@@ -3249,6 +3249,11 @@ describe('round — `within`, the scroll view named for the strokes until the ta
   const UPPER: Rect = { x: 0, y: 303, width: 1080, height: 605 };
   const LOWER: Rect = { x: 0, y: 1046, width: 1080, height: 495 };
   const strokesOf = (played: Played) => played.steps.flatMap((st) => (st.do === 'stroke' ? [st] : []));
+  /** The dump with a 0x0 view of id `lab.zero` laid just before `lower`: a selector of it matches that node alone. */
+  const ZEROED = BOUNDED.replace(
+    '<node index="1" text="" resource-id="" class="android.widget.ScrollView"',
+    '<node index="0" text="" resource-id="lab.zero" class="android.view.ViewGroup" package="dev.averi.lab" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,1046][0,1046]" /><node index="1" text="" resource-id="" class="android.widget.ScrollView"',
+  );
 
   it.each([
     ['its rect', LOWER],
@@ -3269,6 +3274,12 @@ describe('round — `within`, the scroll view named for the strokes until the ta
   it.each([
     ['nothing matches', 'id:nope', { of: 'absent' }, 'within id:nope matches nothing in the tree, so it names no scroll view — give a selector of the scroll view or of an element inside it, or its rect (ui_snapshot)'],
     [
+      'it matches only 0×0 nodes',
+      'id:lab.zero',
+      { of: 'absent', zeroArea: true },
+      'within id:lab.zero matches only 0×0 nodes (scrolled off screen, or collapsed), so it names no scroll view — give a selector of the scroll view or of an element inside it, or its rect (ui_snapshot)',
+    ],
+    [
       'several match',
       'role:scrollable',
       { of: 'ambiguous' },
@@ -3282,7 +3293,7 @@ describe('round — `within`, the scroll view named for the strokes until the ta
       'within {"x":0,"y":1046,"width":1080,"height":496} is the rect of no scroll view in the tree; the tree shows 2 scroll views that may scroll vertically: scrollable (0,303 1080x605) as within: {"x":0,"y":303,"width":1080,"height":605}, scrollable (0,1046 1080x495) as within: {"x":0,"y":1046,"width":1080,"height":495}',
     ],
   ] as const)('refused before any swipe when %s — the first read, the target not judged', (_, within, refused, words) => {
-    const tree = parseDump(BOUNDED);
+    const tree = parseDump(ZEROED);
     const played = play({ ...ANDROID, maxSwipes: 6, timeoutMs: 15_000, within }, [{ tree }]);
     expect(played.outcome).toMatchObject({ kind: 'within', swipes: 0, refused });
     expect(failureOf(played, 'id:lab.scroll-bounded.O').message).toBe(`scroll_until id:lab.scroll-bounded.O stopped before any swipe — ${words}`);
@@ -3293,6 +3304,12 @@ describe('round — `within`, the scroll view named for the strokes until the ta
   it.each([
     ['nothing matches', { id: 'nope' }, { of: 'absent' }, 'within id:"nope" matches nothing in the tree, so it names no scroll view — give an element spec of the scroll view or of an element inside it'],
     [
+      'it matches only 0×0 nodes',
+      { id: 'lab.zero' },
+      { of: 'absent', zeroArea: true },
+      'within id:"lab.zero" matches only 0×0 nodes (scrolled off screen, or collapsed), so it names no scroll view — give an element spec of the scroll view or of an element inside it',
+    ],
+    [
       'several match',
       { role: 'scrollable' },
       { of: 'ambiguous' },
@@ -3300,7 +3317,7 @@ describe('round — `within`, the scroll view named for the strokes until the ta
     ],
     ['its match lies in no scroll view', { id: 'content' }, { of: 'unscrolled' }, 'within id:"content" matches container id:content (0,0 1080x2220), which is no scroll view and lies in none — name a scroll view or an element inside one'],
   ] as const)('an element spec (a flow\'s, D81) refused before any swipe when %s — no rect offered', (_, within, refused, words) => {
-    const tree = parseDump(BOUNDED);
+    const tree = parseDump(ZEROED);
     const played = play({ ...ANDROID, maxSwipes: 6, timeoutMs: 15_000, within }, [{ tree }]);
     expect(played.outcome).toMatchObject({ kind: 'within', swipes: 0, refused });
     const outcome = played.outcome as Exclude<NonNullable<Played['outcome']>, { kind: 'visible' }>;
