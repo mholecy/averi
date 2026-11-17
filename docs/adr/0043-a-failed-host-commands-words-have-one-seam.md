@@ -68,7 +68,7 @@ The function does three things to exec's shape and nothing else:
 **Residuals.** Host paths: a word holding both a URL and a host path keeps the path (`{"path":"/tmp/…","url":"http://x"}`), and so does a word that starts with `word:` (`error:"/Users/…"`), the own home apart. A device path after `=` that shares a host folder's name is reduced (`remote=/tmp/…`, read as a host's). Typed text: An exception's own message can still quote a piece of the text: `No keycode found for Š` carries one character, and ADR 0037 refuses that value before idb in a fill or `type:`. Any other stderr idb prints for a typing is not parsed. `idb ui text -h` exits 0, so `type_text "-h"` still reports success with nothing typed: not a leak, filed as D74 (closed by the D74 amendment below: iOS types after `--`).
 
 **The argv stays.** It names the device and the failed step, an agent can repeat it once it puts the real text and paths back, the traceback's pointer leans on it, and
-A capture's caller and the flow's `✗` line quote exactly that line (`util/error-message.ts#errorHeadline`). Pins and D73's `adb -s emulator-9998 shell monkey …` keep
+a capture's caller and the flow's `✗` line quote exactly that line (`util/error-message.ts#errorHeadline`). Pins and D73's `adb -s emulator-9998 shell monkey …` keep
 their bytes. The udid or serial is no secret: `list_devices` prints it. The one thing an argv must not hold is what was typed.
 
 **The leak this closes.** A flow's secrets are redacted by the engine as whole strings (`FlowEngine#redact`), and a failed

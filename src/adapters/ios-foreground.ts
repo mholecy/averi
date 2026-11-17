@@ -434,8 +434,8 @@ function emptyThroughout(check: ForegroundCheck): string {
 }
 
 /**
- * The "could not check" note. `why` quotes the error's first line (util/error-message.ts#errorHeadline): the cause,
- * not a stack or a paragraph of advice.
+ * The "could not check" note. `why`: the cause in one clause — an error's first line
+ * (util/error-message.ts#errorHeadline), not a stack or a paragraph of advice, or the wait's own words.
  */
 function unchecked(check: ForegroundCheck, why: string): WaitEnd {
   const note = `could not check that ${check.bundleId} is in front (${why}) — for a moment after an app switch ${WORDS[check.source].lag}; ${READ_AGAIN}`;
