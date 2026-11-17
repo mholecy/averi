@@ -693,7 +693,7 @@ describe('a named scroll view (`within`, D78) — the one the strokes go over un
   // gesture box whole, whose stroke would touch down on `upper` or anything else (ADR 0010's D78 residual 1).
   const keyboardAt = (y: number, memory: StrokeMemory): StrokeMemory => seeRead(memory, { facts: factsOf(bounded), keyboard: { lineY: y, remedy: BACK }, target: undefined });
 
-  it('no room in the named one under the keyboard: `noRoom` names it, the room left and the keyboard\'s top — no fallback to the gesture box decided', () => {
+  it('no room in the named one under the keyboard: `noRoom` names it, the room left and the keyboard (its line and its remedy) — no fallback to the gesture box decided', () => {
     const plan = planStroke(keyboardAt(1100, nameScrollView(startStrokes(), factsOf(bounded), LOWER)), ask(bounded));
     expect(plan.noRoom).toEqual({ rect: LOWER, toward: 'down', room: 54, keyboard: { lineY: 1100, remedy: BACK } });
     // 80 above the keyboard is room: the stroke goes inside `lower`, above it.

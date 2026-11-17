@@ -13,7 +13,7 @@ import { noScrollStanding, outsideItsScrollView, type NoScrollStanding } from '.
 import { SIDES } from '../ui-tree/sides.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { Target, WaitEvidence } from './resolve.js';
-import { fullyClaimed, judgeRead, scrollViewsOf, shortOf, stops, unfitAlong, upOf, type AppliedKeyboard, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type Since, type TreeFacts, type Unfit } from './scroll-read.js';
+import { fullyClaimed, judgeRead, scrollViewsOf, shortOf, stops, unfitAlong, keyboardUpOf, type AppliedKeyboard, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type Since, type TreeFacts, type Unfit } from './scroll-read.js';
 import { cardMoves, heldBack as heldBackBy, lastDrawn, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved, type Streaks, type StrokePhysics, type UnseenStrokes } from './motion-ledger.js';
 import { carriedCover, seeMargin, startMargin, type MarginMemo, type Offset } from './margin-memo.js';
 import { carried, nameScrollView, planStroke, seeRead, startStrokes, strokedAcross, strokedBeside, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StrokedAcross, type StrokedBeside, type StrokeKind, type StrokeMemory, type StrokePlan, type TouchedOn } from './stroke-plan.js';
@@ -1043,7 +1043,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
           // Never under `fully: true`, which does not stop on a match past its frame (`clipped`) — as one cut at the screen's edge is.
           return centreStroke(s, visible, { gesture, facts: now.facts, elapsedMs: seen.elapsedMs });
         } else {
-          unlisted = { of: 'unlisted', judged: best, finding, ...(offered !== undefined && { offered: upOf(offered) }) };
+          unlisted = { of: 'unlisted', judged: best, finding, ...(offered !== undefined && { offered: keyboardUpOf(offered) }) };
           if (question !== undefined) s.eyesRefused = { asked: askedOf(question), short: unlisted };
         }
       }

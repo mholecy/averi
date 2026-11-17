@@ -219,7 +219,7 @@ export interface AppliedKeyboard {
 }
 
 /** The applied keyboard as a remedy names it (target-text.ts#KeyboardUp): its line's `y` and its `remedy`. */
-export const upOf = ({ line, remedy }: AppliedKeyboard): KeyboardUp => keyboardUp(line, remedy);
+export const keyboardUpOf = ({ line, remedy }: AppliedKeyboard): KeyboardUp => keyboardUp(line, remedy);
 
 /**
  * One match as judged: the keyboard cover it was judged under (none for a
