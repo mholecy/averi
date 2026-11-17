@@ -52,16 +52,11 @@ export interface IosTreeSource {
    */
   readonly kind: IosTreeSourceKind;
   /**
-   * One line every reply that claims what it read through this source carries (DeviceAdapter.claimNote) — set only by
-   * `auto` once it fell back to idb (AutoTreeSource, A41a). Absent on idb and wda: a configured source says nothing.
+   * Set once this source fell back from the backend it was asked for — only `auto` whose WebDriverAgent did not come
+   * up (AutoTreeSource, A41a); its `note` is the line every claiming reply carries (DeviceAdapter.fallback, which
+   * IosAdapter forwards). Absent on idb and wda: a configured source says nothing.
    */
-  readonly claimNote?: string;
-  /**
-   * Whether this source fell back from the backend it was asked for — `auto` whose WebDriverAgent did not come up, so
-   * its typer is gone (AutoTreeSource, A41a). What IosAdapter.typeText's backstop decides by; absent (not fallen back)
-   * on idb and wda.
-   */
-  readonly fellBack?: boolean;
+  readonly fallback?: { readonly note: string };
   /**
    * The cadence at which two of this source's reads may prove an element holds still (types.ts#DeviceAdapter.
    * settleCadenceMs, which IosAdapter forwards; docs/adr/0040-the-settle-cadence-is-the-tree-sources.md). The SOURCE's

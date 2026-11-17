@@ -651,7 +651,7 @@ describe('createIosTreeSource — which backend a kind gets, pinned by what the 
     expect(spawner.spawns).toHaveLength(1);
     expect(exec.calls.filter((c) => c.full.startsWith('idb'))).toEqual([]);
     expect(source.kind).toBe('wda');
-    expect(source.claimNote).toBeUndefined();
+    expect(source.fallback).toBeUndefined();
   });
 
   it("'auto' (A41a), WDA cannot come up (a WebDriverAgent not ours holds the port): every read is idb's, with the note", async () => {
@@ -667,7 +667,7 @@ describe('createIosTreeSource — which backend a kind gets, pinned by what the 
     expect(fetcher.urls.filter((u) => u.endsWith('/status'))).toHaveLength(1); // asked once, at the first read
     expect(exec.calls.filter((c) => c.full === 'idb ui describe-all --json --udid AAAA-1111')).toHaveLength(2);
     expect(source.kind).toBe('idb');
-    expect(source.claimNote).toMatch(/^read through idb: WebDriverAgent did not come up/);
+    expect(source.fallback?.note).toMatch(/^read through idb: WebDriverAgent did not come up/);
     expect(errors.mock.calls.flat().join('\n')).toMatch(/treeSource auto — WebDriverAgent did not come up, so this simulator's tree is read through idb: A WebDriverAgent answers \/status on port/);
     errors.mockRestore();
   });

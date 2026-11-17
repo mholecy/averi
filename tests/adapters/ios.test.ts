@@ -541,7 +541,7 @@ describe('IosAdapter re-enables accessibility automation before every launch and
     await adapter.launch('com.app');
     expect(launchedWhenUp).toBe(false);
     expect(auto.bringUps()).toBe(1);
-    expect(adapter.claimNote).toBeUndefined();
+    expect(adapter.fallback).toBeUndefined();
     expect(JSON.stringify(await adapter.uiTree())).toContain('from.wda');
     await adapter.launch('com.app'); // a second launch: WDA already chosen, nothing asked
     expect(auto.bringUps()).toBe(1);
@@ -554,7 +554,7 @@ describe('IosAdapter re-enables accessibility automation before every launch and
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: auto.source });
     await expect(adapter.launch('com.app')).resolves.toBeDefined();
     expect(simctlCalls(calls)).toEqual([...WRITES, 'xcrun simctl launch AAAA-1111 com.app']);
-    expect(adapter.claimNote).toMatch(/^read through idb: WebDriverAgent did not come up \(WDA build failed;/);
+    expect(adapter.fallback?.note).toMatch(/^read through idb: WebDriverAgent did not come up \(WDA build failed;/);
     expect(JSON.stringify(await adapter.uiTree())).toContain('from.idb');
     expect(auto.bringUps()).toBe(1);
   });

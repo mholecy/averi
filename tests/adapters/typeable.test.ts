@@ -79,10 +79,10 @@ describe('IosAdapter.typeable comes from the tree source', () => {
     const wda = { ...treeSource('wda', true), bringUp: () => Promise.reject(new Error('no WebDriverAgent')), buildCached: async () => true };
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: recordingExec().fn, treeSource: new AutoTreeSource({ wda, idb: { ...treeSource('idb'), read: async () => parseIdbDescribeAll('[]') } }) });
     expect(adapter.typeable).toBe(WDA_TYPEABLE);
-    expect(adapter.claimNote).toBeUndefined();
+    expect(adapter.fallback).toBeUndefined();
     await adapter.uiTree();
     expect(adapter.typeable).toEqual({ ...IDB_TYPEABLE, note: idbFallbackNote('no WebDriverAgent') });
-    expect(adapter.claimNote).toBe(idbFallbackNote('no WebDriverAgent'));
+    expect(adapter.fallback?.note).toBe(idbFallbackNote('no WebDriverAgent'));
     errors.mockRestore();
   });
 

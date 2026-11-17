@@ -181,14 +181,9 @@ export class IosAdapter implements DeviceAdapter {
     return this.treeSource.typeable;
   }
 
-  /** The source's line for every claiming reply (DeviceAdapter.claimNote): `auto`'s, once it fell back (A41a). */
-  get claimNote(): string | undefined {
-    return this.treeSource.claimNote;
-  }
-
-  /** Whether the source fell back (DeviceAdapter.fellBack, IosTreeSource.fellBack): `auto` read through idb (A41a). */
-  get fellBack(): boolean {
-    return this.treeSource.fellBack === true;
+  /** The source's fallback and its note (DeviceAdapter.fallback, IosTreeSource.fallback): `auto`'s, once it read through idb (A41a). */
+  get fallback(): { readonly note: string } | undefined {
+    return this.treeSource.fallback;
   }
   private readonly exec: ExecFn;
   private readonly udid: string;

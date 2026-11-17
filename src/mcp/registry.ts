@@ -152,7 +152,7 @@ export class AdapterRegistry {
   }
 
   /**
-   * Selecting the device already bound keeps its adapters, except one that fell back (DeviceAdapter.fellBack: an iOS
+   * Selecting the device already bound keeps its adapters, except one that fell back (DeviceAdapter.fallback: an iOS
    * `treeSource: auto` adapter whose WebDriverAgent did not come up, A41a): that one is dropped, so the next call
    * builds a fresh adapter that tries WebDriverAgent again — the retry its note names.
    */
@@ -171,7 +171,7 @@ export class AdapterRegistry {
     this.assertOpen(); // before the write, as in get(): a shutdown during the probe must not leave a binding behind
     const previous = this.bindings.get(platform);
     if (previous && previous.deviceId !== deviceId) this.evict(platform, previous.deviceId);
-    else this.evict(platform, deviceId, (adapter) => adapter.fellBack === true);
+    else this.evict(platform, deviceId, (adapter) => adapter.fallback !== undefined);
     this.bindings.set(platform, { deviceId, pinned: true });
     return device;
   }

@@ -372,6 +372,7 @@ interface DeviceAdapter {             // bound to ONE device: the constructor re
     viewport(opts?: {fresh?}): DeviceScreen   // memoized (adapters/viewport-memo.ts); `fresh` re-reads
     tap(x, y), longPress, swipe(from, to, durationMs?), typeText, clearText(count), pressKey(back|home|enter)
     typeable                          // which characters typeText can type (ADR 0037)
+    fallback?: {note}                 // iOS `auto` read through idb: the line every claiming reply carries (ADR 0046)
     keyboard?: KeyboardOracle         // Android: state(), witness(), touchable() — never throw
     keyboardAdvice?: string           // iOS: why this adapter cannot hide a keyboard, quoted verbatim
     dragSpeed?, treeReadSettles?, settleCadenceMs?, typingDelivery?   // measured platform facts
@@ -421,13 +422,15 @@ error and trace line says the same, host paths stripped; the error's fields keep
   folders (`ios-data-container.ts`, ADR 0047).
 - idb calls all go through `adapters/idb.ts#runIdb`; a persistent helper per adapter (`idb-helper.ts`) runs the CLI
   in-process (ADR 0032). What iOS types, and through which path, is `ios-typing.ts`'s (ADR 0037).
-- **Tree sources** — `adapters/ios-tree-source.ts#IosTreeSource` (`read()`, `applicationLabel()`, `dispose()`), chosen
+- **Tree sources** — `adapters/ios-tree-source.ts#IosTreeSource` (`read()`, `applicationLabel()`, `dispose()`; and
+  what follows from the backend: `typeable` and `typeWide()`, a text only WebDriverAgent types, typed or refused;
+  `startBeforeLaunch()`, which words its own failure; `fallback`), chosen
   by `app.ios.treeSource` (`auto`, `idb` or `wda`) and injected at construction; node normalization is one pure module,
   `ios-node.ts` (`normalizeIosElement`; the settings and the default, `auto`, `DEFAULT_IOS_TREE_SOURCE`). Two adapters,
   and `auto` over both:
   - **auto** (`AutoTreeSource`, `auto-tree-source.ts`, the default; ADR 0046): the first tree read asks WDA to come up
     (`WdaTreeSource.bringUp`) and keeps ONE source for the adapter's life — WDA when it came up, else idb, said once on
-    stderr and on every claiming reply and failed flow (`claimNote`, printed `⚠ …` by `run/claims.ts#claimed`), with
+    stderr and on every claiming reply and failed flow (`fallback`'s note, printed `⚠ …` by `run/claims.ts#claimed`), with
     WDA's reason in a few words. Two trees are never reconciled. Before the choice the launch's label is idb's. A
     `select_device` of the simulator drops a fallen-back adapter (`registry.ts#select`), and the next call tries WDA
     again. A launch awaits the source's start before it touches the app (`IosTreeSource.startBeforeLaunch`; the

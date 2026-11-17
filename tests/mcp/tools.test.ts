@@ -1276,7 +1276,7 @@ describe('every tool gets the project\'s adapter — one per simulator and confi
   });
 
   /**
-   * A41a: an adapter under `treeSource: auto` whose WebDriverAgent did not come up says so (DeviceAdapter.claimNote) on
+   * A41a: an adapter under `treeSource: auto` whose WebDriverAgent did not come up says so (DeviceAdapter.fallback) on
    * every reply that claims what it read — a tap or fill on a selector, a scroll_until, an assert, a flow, an ensure, a
    * verify — as one `⚠` line after it, and on no other reply.
    */
@@ -1284,7 +1284,7 @@ describe('every tool gets the project\'s adapter — one per simulator and confi
   it.each([...EVERY_CASE, ['type_text (fill)', 'type_text', { platform: 'ios', text: 'a', selector: 'id:home_root' }] as [string, string, Record<string, unknown>]])(
     'ios %s: the claim note of an auto adapter fallen back to idb is the reply\'s last line exactly when the reply claims a read',
     async (label, tool, args) => {
-      const ios = Object.assign(home(), { claimNote: 'read through idb: the note' });
+      const ios = Object.assign(home(), { fallback: { note: 'read through idb: the note' } });
       const harness = await connect({ android: home(), ios });
       const configPath = await file('averi.yaml', VALID_CONFIG);
       const result = await harness.call(tool, { configPath, ...args });
@@ -1303,7 +1303,7 @@ describe('every tool gets the project\'s adapter — one per simulator and confi
   ] as const)('ios %s: an engine run that throws after a claimed tap carries the claim note on its error, once (A41a review M1)', async (tool, args) => {
     // Rendered, not bare (a labelled control): the ensure's ladder judges the screen at once, with no second look.
     const rendered = new FakeAdapter({ home: screen(el({ role: 'container', identifier: 'home_root' }), el({ role: 'button', label: 'Settings' })) }, 'home');
-    const ios = Object.assign(rendered, { claimNote: 'read through idb: the note' });
+    const ios = Object.assign(rendered, { fallback: { note: 'read through idb: the note' } });
     const harness = await connect({ android: home(), ios });
     const result = await harness.call(tool, { configPath: await file('averi.yaml', TAP_THEN_MISS), ...args });
     expect(result.isError, result.text).toBe(true);
@@ -1323,7 +1323,7 @@ describe('every tool gets the project\'s adapter — one per simulator and confi
     ['verify', { platforms: ['ios'], flow: 'fill_wda_only' }, false],
   ] as const)('ios %s: a refused fill: after a fallback carries the claim note exactly once (review r3-1)', async (tool, args, isError) => {
     const rendered = new FakeAdapter({ home: screen(el({ role: 'container', identifier: 'home_root' }), el({ role: 'button', label: 'Settings' })) }, 'home');
-    const ios = Object.assign(rendered, { claimNote: 'read through idb: the note', typeable: { ...rendered.typeable, note: 'read through idb: the note' } });
+    const ios = Object.assign(rendered, { fallback: { note: 'read through idb: the note' }, typeable: { ...rendered.typeable, note: 'read through idb: the note' } });
     const harness = await connect({ android: home(), ios });
     const result = await harness.call(tool, { configPath: await file('averi.yaml', FILL_WDA_ONLY), ...args });
     expect(result.isError, result.text).toBe(isError);
@@ -1333,7 +1333,7 @@ describe('every tool gets the project\'s adapter — one per simulator and confi
   });
 
   it('ios verify: a flow that fails is a section of the reply, not a throw — the reply carries the note once (run/claims.ts#claimed)', async () => {
-    const ios = Object.assign(home(), { claimNote: 'read through idb: the note' });
+    const ios = Object.assign(home(), { fallback: { note: 'read through idb: the note' } });
     const harness = await connect({ android: home(), ios });
     const result = await harness.call('verify', { platforms: ['ios'], flow: 'tap_then_miss', configPath: await file('averi.yaml', TAP_THEN_MISS) });
     expect(result.isError, result.text).toBe(false);
