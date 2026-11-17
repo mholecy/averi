@@ -89,7 +89,7 @@ export const asRound = (verdict: PollVerdict | undefined): RoundVerdict<string> 
  * replaces it, or a later round finds it no longer true and withdraws it (the pixel poll's covered miss, once a round
  * finds the element clear). A round with nothing to say leaves it standing.
  */
-export class LastFinding<M> {
+class LastFinding<M> implements Withdraw<M> {
   private miss: M | undefined;
 
   /** The miss that stands, if any. */
@@ -105,6 +105,15 @@ export class LastFinding<M> {
   withdraw(which: (miss: M) => boolean): void {
     if (this.miss !== undefined && which(this.miss)) this.miss = undefined;
   }
+}
+
+/**
+ * What a round is handed of its poll's `LastFinding`: the withdrawal alone. A round reports a miss by returning it, so
+ * the poll decides what is kept — never a handed-on round's.
+ */
+export interface Withdraw<M> {
+  /** Withdraw the standing miss when it is one `which` names; a miss it does not name stands. */
+  withdraw(which: (miss: M) => boolean): void;
 }
 
 /** What a poll that timed out leaves for its wording: the miss that stands, the last read's error, and its trees. */
@@ -135,8 +144,8 @@ export interface VerdictPollOptions<M> {
  * The verifier's poll, owned once for the tree-only asserts and the pixel poll: `round` on every tree the tree poll reads
  * (ui-tree/read-tree.ts#pollTree), until a pass or a final miss, which is the verdict; else, at the deadline, the one
  * timeout tail — the last tree marked by the window manager's word for a not-found (`missing`), then the assert's own
- * wording of the miss that stands. A round's miss goes to the poll's `LastFinding`, which the round is handed so that it
- * can withdraw one. A handed-on tree's miss or final miss is discarded, nothing of it kept (ADR 0030: a handed read is
+ * wording of the miss that stands. A round's miss goes to the poll's `LastFinding`, of which the round is handed only the
+ * withdrawal (`Withdraw`). A handed-on tree's miss or final miss is discarded, nothing of it kept (ADR 0030: a handed read is
  * a positive verdict or a first sample), so a miss is only ever a fresh read's.
  */
 export async function pollVerdicts<M>(
@@ -144,7 +153,7 @@ export async function pollVerdicts<M>(
   round: (
     tree: UiNode,
     poll: PollRound,
-    finding: LastFinding<M>,
+    finding: Withdraw<M>,
   ) => Promise<RoundVerdict<M> | typeof Undecided | undefined> | RoundVerdict<M> | typeof Undecided | undefined,
   { timeoutMs, pollMs, first, observer, missing, timeoutDetail }: VerdictPollOptions<M>,
 ): Promise<PollVerdict> {

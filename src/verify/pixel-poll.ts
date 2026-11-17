@@ -14,7 +14,7 @@ import { captureFrame, captureRefusal, isMoving, unsettledReason, type Frame, ty
 import { apartOfFrame, orderOfFrame, untoldAll } from './eyes.js';
 import { failClosed, type Unchecked } from './fail-closed.js';
 import { formatSeconds } from '../util/duration.js';
-import { asRound, notFound, pollVerdicts, type LastFinding, type PixelMeasureInput, type PollVerdict, type RoundVerdict, type TimedOut } from './poll-verdict.js';
+import { asRound, notFound, pollVerdicts, type PixelMeasureInput, type PollVerdict, type RoundVerdict, type TimedOut, type Withdraw } from './poll-verdict.js';
 import { keyboardOver, pixelMissText } from './pixel-text.js';
 
 /**
@@ -104,7 +104,7 @@ import { keyboardOver, pixelMissText } from './pixel-text.js';
  * WHAT LIES OVER THE ELEMENT (`overElement`), before anything is captured —
  * a miss naming it, never a measurement, and a finding like any other: the
  * poll goes on, a later round that finds the element clear withdraws it
- * (`pollPixels`, from the poll's poll-verdict.ts#LastFinding), and when every
+ * (`pollPixels`, through poll-verdict.ts#Withdraw), and when every
  * round was covered it is the timeout's wording.
  * - The soft keyboard, first: the round's reading
  *   (ui-tree/keyboard-cover.ts#readKeyboard — the adapter's oracle when it
@@ -549,7 +549,7 @@ export async function pollPixels(
 ): Promise<PollVerdict> {
   const { element, timeoutMs, pollMs, unchecked, measure } = spec;
   const memory = new PixelPollMemory(unchecked);
-  const round = async (tree: UiNode, deadline: number, finding: LastFinding<PixelMiss>): Promise<RoundVerdict<PixelMiss> | undefined> => {
+  const round = async (tree: UiNode, deadline: number, finding: Withdraw<PixelMiss>): Promise<RoundVerdict<PixelMiss> | undefined> => {
     const found = findBySpec(tree, element);
     if (found.length === 0) {
       memory.forgetRect();

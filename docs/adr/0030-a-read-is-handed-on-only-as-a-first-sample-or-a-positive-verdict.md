@@ -36,9 +36,9 @@ an absence.** `ui-tree/read-handoff.ts#ReadHandOff` keeps the last read; a poll 
   declare — bump an epoch before and after they run.
 - **One-shot**: `take` empties the slot whatever it returns. The keyboard guard's re-look inside the same tap, the
   next assert, the late read of a run of one: all read fresh.
-- **`pollTree(opts.first)`**: the handed tree is round zero. Only a value ends the poll on it. A miss, `Undecided` or a
-  predicate's throw is discarded, and the verifier keeps no miss of a handed round
-  (`verify/poll-verdict.ts#pollVerdicts`); `treesRead`, `lastTree` and `undecidedTree`
+- **`pollTree(opts.first)`**: the handed tree is round zero. Only a value ends the poll on it, and the
+  verifier hands it no miss and no final miss of a handed round, so only a pass ends the poll there
+  (`verify/poll-verdict.ts#pollVerdicts`). A miss, `Undecided` or a predicate's throw is discarded; `treesRead`, `lastTree` and `undecidedTree`
   count fresh reads only; the deadline is not checked, so at least one fresh read always follows; that read starts
   as if the handed read had been this poll's previous round (`pauseAfterRead` of its duration, less what has passed
   since it ended, ADR 0029). A predicate that keeps a tally across rounds is told `handedOn` and keeps the handed

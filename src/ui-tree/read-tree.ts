@@ -381,8 +381,10 @@ export interface PollRound {
  * - A handed-on read (`opts.first`, docs/adr/0030-a-read-
  *   is-handed-on-only-as-a-first-sample-or-a-positive-verdict.md) is round
  *   zero, asked before any device read. It may only END the poll: a value
- *   returns it; anything else — a miss, `Undecided`, a predicate's throw —
- *   is discarded, nothing of it reaches the
+ *   returns it — and the verifier hands pollTree no miss and no final miss of
+ *   a handed round, so only its pass ends the poll there
+ *   (verify/poll-verdict.ts#pollVerdicts); anything else — a miss,
+ *   `Undecided`, a predicate's throw — is discarded, nothing of it reaches the
  *   outcome (`treesRead`, `lastTree`, `undecidedTree` count fresh reads only),
  *   the deadline is not checked, and the first fresh read follows the pause
  *   `pauseAfterRead` gives after the handed read, counted from when it ended.

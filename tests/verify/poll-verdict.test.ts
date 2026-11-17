@@ -36,7 +36,7 @@ describe('pollVerdicts', () => {
     expect(reads()).toBe(1);
   });
 
-  it('a final verdict or a miss on a handed-on tree is discarded: the fresh reads decide', async () => {
+  it('a final verdict on a handed-on tree is discarded: the fresh reads decide', async () => {
     const { fake, reads } = counted();
     const handed = { tree: screen(), startedAt: Date.now(), endedAt: Date.now() };
     const verdict = await pollVerdicts<string>(
@@ -46,6 +46,17 @@ describe('pollVerdicts', () => {
     );
     expect(verdict).toEqual({ pass: false, detail: 'timed out on nothing' });
     expect(reads()).toBeGreaterThan(1);
+  });
+
+  it('a miss on a handed-on tree is discarded: it is never the timeout wording', async () => {
+    const { fake } = counted();
+    const handed = { tree: screen(), startedAt: Date.now(), endedAt: Date.now() };
+    const verdict = await pollVerdicts<string>(fake, (_tree, { handedOn }) => (handedOn ? { pass: false, miss: 'handed' } : undefined), {
+      ...FAST,
+      first: { take: () => handed },
+      timeoutDetail: wording,
+    });
+    expect(verdict).toEqual({ pass: false, detail: 'timed out on nothing' });
   });
 
   it('a miss is the timeout wording; a later round with nothing to say does not erase it', async () => {

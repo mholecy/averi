@@ -2416,6 +2416,34 @@ describe('pixel asserts under the Android soft keyboard (2026-10-06)', () => {
     expect(fake.screenshots).toHaveLength(2);
   });
 
+  /**
+   * Clear in both rounds: round 1 measured and wrong, round 2's one capture
+   * cut by the deadline. A clear round withdraws only a covered miss, so the
+   * measured finding stands over the cut round's silence.
+   */
+  it('a clear round withdraws no measured finding — the cut round after it leaves the sample as the wording', async () => {
+    const fake = cardFake();
+    let shots = 0;
+    const realTree = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      vi.setSystemTime(Date.now() + 600);
+      return realTree();
+    };
+    fake.screenshot = async () => {
+      // Round 1's two captures cost nothing; round 2's first runs past the deadline.
+      if (++shots > 2) vi.setSystemTime(Date.now() + 600);
+      const shot = png(1000, 320, (p) => fill(p, '#3F3F50'));
+      fake.screenshots.push(shot);
+      return shot;
+    };
+    // Round 1: read 0→600 ms, two agreeing captures, measured. Pause to 900. Round 2: read to 1500, one screencap to
+    // 2100 — past the 2000 ms deadline, unjudged.
+    const result = await new Verifier(fake, { pollMs: 900, timeoutMs: 2000 }).assert({ element: { id: 'card' }, color: { expected: '#FFFFFF' } });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toBe('sampled #3F3F50 (dominant, 100% of region) vs expected #FFFFFF → dE00 61.62 > 8; scale 1.000');
+    expect(fake.screenshots).toHaveLength(3);
+  });
+
   it('a real finding made AFTER a contradicted cover is the timeout wording — only the stale cover itself is dropped', async () => {
     const fake = cardFake();
     const SHOWN = { state: 'shown' as const, frame: COVERING };
