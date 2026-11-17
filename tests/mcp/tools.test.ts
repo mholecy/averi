@@ -915,14 +915,14 @@ describe('type_text with non-ASCII on iOS: typed over WDA\'s set, refused over i
     expect(fake.typed).toEqual(['O’Brien']);
   });
 
-  it('idb: refused before anything was sent, naming `ios.treeSource: wda` as the way', async () => {
+  it('idb: refused before anything was sent, naming WebDriverAgent as the tree source (`auto` or `wda`) as the way', async () => {
     const fake = form();
     fake.typeable = IDB_TYPEABLE;
     const { call } = await connect({ ios: fake });
     const result = await call('type_text', { platform: 'ios', selector: 'id:amount_input', text: 'Jan Šťastný', configPath: missing() });
     expect(result.isError).toBe(true);
     expect(result.text).toContain("cannot type U+0160 'Š'");
-    expect(result.text).toContain('A project with `ios.treeSource: wda` types it through WebDriverAgent (ADR 0037)');
+    expect(result.text).toContain('A project whose tree source is WebDriverAgent types it (`ios.treeSource: auto`, the default, once WebDriverAgent comes up, or `wda`; ADR 0037)');
     expect(fake.taps).toEqual([]);
     expect(fake.typed).toEqual([]);
   });

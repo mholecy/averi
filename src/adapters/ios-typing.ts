@@ -58,7 +58,7 @@ const BY_HAND = 'use a value without it, or enter it by hand.';
 export const IDB_TYPEABLE: Typeable = {
   refuses: IDB_REFUSES,
   says: "on iOS averi types only printable ASCII (U+0020–U+007E): `idb ui text` has no key for any other character and fails the whole call",
-  otherPath: `A project with \`ios.treeSource: wda\` types it through WebDriverAgent (ADR 0037); otherwise ${BY_HAND}`,
+  otherPath: `A project whose tree source is WebDriverAgent types it (\`ios.treeSource: auto\`, the default, once WebDriverAgent comes up, or \`wda\`; ADR 0037); otherwise ${BY_HAND}`,
   widerPath: {
     refuses: WDA_REFUSES,
     blockedBy: (char) => `averi has no typing path on iOS for this value (WebDriverAgent's \`/wda/keys\` is not measured for ${char}; ADR 0037): ${BY_HAND}`,

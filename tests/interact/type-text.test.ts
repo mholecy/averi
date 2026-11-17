@@ -176,8 +176,8 @@ describe('assertTypeable refuses a character the adapter cannot type', () => {
  * on API 33; WDA's names none, its set saying what is not measured. None of them quotes the value.
  */
 describe('assertTypeable ends each refusal with its adapter\'s remedy', () => {
-  it('iOS (idb): a character WebDriverAgent types — names `ios.treeSource: wda`', () => {
-    expect(refusal('Jan Šťastný', IOS)).toMatch(/nothing tapped, cleared or typed\. A project with `ios\.treeSource: wda` types it through WebDriverAgent \(ADR 0037\); otherwise use a value without it, or enter it by hand\.$/);
+  it('iOS (idb): a character WebDriverAgent types — names WebDriverAgent as the tree source, `auto` (the default) or `wda`', () => {
+    expect(refusal('Jan Šťastný', IOS)).toMatch(/nothing tapped, cleared or typed\. A project whose tree source is WebDriverAgent types it \(`ios\.treeSource: auto`, the default, once WebDriverAgent comes up, or `wda`; ADR 0037\); otherwise use a value without it, or enter it by hand\.$/);
   });
 
   it('iOS (idb): an emoji, which WebDriverAgent\'s set does not take — no path on iOS, no wda claim', () => {

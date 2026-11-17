@@ -99,9 +99,9 @@ describe('WDA_TYPEABLE: idb\'s set and what the gate measured exact through /wda
  * the character, and no path where it does not; WDA's names none. The value is never quoted.
  */
 describe('the refusals\' remedies', () => {
-  it('idb, a character /wda/keys types: names `ios.treeSource: wda`', () => {
+  it('idb, a character /wda/keys types: names WebDriverAgent as the tree source, `auto` (the default) or `wda`', () => {
     const msg = refusalOf('Jan Šťastný', IDB_TYPEABLE)!;
-    expect(msg).toMatch(/Refused before anything was sent — nothing tapped, cleared or typed\. A project with `ios\.treeSource: wda` types it through WebDriverAgent \(ADR 0037\); otherwise use a value without it, or enter it by hand\.$/);
+    expect(msg).toMatch(/Refused before anything was sent — nothing tapped, cleared or typed\. A project whose tree source is WebDriverAgent types it \(`ios\.treeSource: auto`, the default, once WebDriverAgent comes up, or `wda`; ADR 0037\); otherwise use a value without it, or enter it by hand\.$/);
   });
 
   it('idb, a character /wda/keys does not take either (an emoji): no path, and no claim that wda types it', () => {
