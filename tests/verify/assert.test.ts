@@ -482,6 +482,31 @@ describe('exact-text misses hint at a combined accessibility element', () => {
     expect(byMatch.detail).toBe('element found but content was: "Ref 7, 1 of 13 selected"');
   });
 
+  it('keeps the subject round\'s hint when the subject is gone from a later read (A66)', async () => {
+    // The content line is the last round that found the subject; a later read where the field remounted under another
+    // id must not turn the hint into a whole-tree list that gives the same field by length.
+    resetLayout();
+    const field = { role: 'textfield', label: 'Ref 7, 1 of 13 selected', value: 'Ref 7, 1 of 13 selected' };
+    const fake = new FakeAdapter(
+      { first: screen(el({ ...field, identifier: 'memo' })), later: screen(el({ ...field, identifier: 'memo2' })) },
+      'first',
+    );
+    const read = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      const tree = await read();
+      fake.current = 'later';
+      return tree;
+    };
+    const result = await new Verifier(fake, FAST).assert({ element: { id: 'memo' }, text: '1 of 13 selected' });
+    expect(result.pass).toBe(false);
+    expect(result.detail).toBe(
+      'element found but content was: "Ref 7, 1 of 13 selected"\n' +
+        '  no node has this exact text, but 1 node(s) CONTAIN it as a whole segment:\n' +
+        '    id=memo label="Ref 7, 1 of 13 selected"\n' +
+        '    (iOS combines a container\'s children into one accessibility element — use match: "1 of 13 selected" for a cross-platform assert)',
+    );
+  });
+
   it('names a node whose text differs only in typographic punctuation or diacritics, and still fails', async () => {
     resetLayout();
     const fake = new FakeAdapter(

@@ -395,7 +395,10 @@ export class Verifier {
       this.treePoll(
         (tree) => {
           const found = findBySpec(tree, element);
-          hintScope = found.length > 0 ? { nodes: found, scope: 'subject' } : { nodes: flattenTree(tree), scope: 'others' };
+          // A round that found the subject wrote the content line the deadline reports, so a later round that does
+          // not find it keeps that round's hint: the same field is never quoted above and listed by length below.
+          if (found.length > 0) hintScope = { nodes: found, scope: 'subject' };
+          else if (hintScope?.scope !== 'subject') hintScope = { nodes: flattenTree(tree), scope: 'others' };
           if (found.some(contentMatches)) return { pass: true };
           if (found.length === 0) return undefined;
           // The element is there but says the wrong thing — worth reporting at

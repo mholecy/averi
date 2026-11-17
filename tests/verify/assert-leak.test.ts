@@ -33,21 +33,30 @@ const SPECS: [string, AssertSpec, string][] = [
   ['a label spec', { element: { label: EXPECTED } }, HINT],
   ['a role and text spec', { element: { role: 'button', text: EXPECTED } }, HINT],
   ['a text on an id that is not there', { element: { id: 'absent' }, text: EXPECTED }, HINT],
-  ['a match on an id that is not there', { element: { id: 'absent' }, match: '1 of 13' }, 'not found within 0.1 s'],
 ];
+
+function inputFake(input: Partial<UiNode>): FakeAdapter {
+  resetLayout();
+  return new FakeAdapter(
+    { s: screen(el({ role: 'textfield', identifier: 'memo', ...input }), el({ role: 'text', identifier: 'title', label: 'Filters' })) },
+    's',
+  );
+}
 
 describe("an element assert never quotes the own text of an input that is not its subject (A66)", () => {
   describe.each(INPUTS)('%s', (_, input) => {
     it.each(SPECS)('%s', async (_name, spec, sentence) => {
-      resetLayout();
-      const fake = new FakeAdapter(
-        { s: screen(el({ role: 'textfield', identifier: 'memo', ...input }), el({ role: 'text', identifier: 'title', label: 'Filters' })) },
-        's',
-      );
-      const result = await new Verifier(fake, FAST).assert(spec);
+      const result = await new Verifier(inputFake(input), FAST).assert(spec);
       expect(result.pass).toBe(false);
       expect(result.detail).toContain(sentence);
       for (const run of runs) expect(result.detail).not.toContain(run);
+    });
+
+    it('a match on an id that is not there: the no-hint path, the miss alone', async () => {
+      // A match is containment already, so no hint lists the tree.
+      const result = await new Verifier(inputFake(input), FAST).assert({ element: { id: 'absent' }, match: '1 of 13' });
+      expect(result.pass).toBe(false);
+      expect(result.detail).toBe('not found within 0.1 s');
     });
   });
 });
