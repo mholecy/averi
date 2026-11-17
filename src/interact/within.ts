@@ -2,7 +2,7 @@ import type { Rect, ScrollAxis } from '../adapters/types.js';
 import { dialectOf } from '../ui-tree/dialect.js';
 import { type ScrollAxes } from '../ui-tree/geometry.js';
 import { quoted, type QuotedNode } from '../ui-tree/node-words.js';
-import { findTarget, hasArea, parseSelector, type Target } from '../ui-tree/selectors.js';
+import { findTarget, parseSelector, withArea, type Target } from '../ui-tree/selectors.js';
 import type { TreeFacts } from './scroll-read.js';
 import { targetScrollers, type NoRoomFacts } from './stroke-plan.js';
 import type { KeyboardUp } from './target-text.js';
@@ -138,7 +138,7 @@ export function resolveWithin(facts: Pick<TreeFacts, 'tree' | 'scene' | 'reading
     }
   } else {
     const matched = findTarget(facts.tree, within);
-    const found = matched.filter(hasArea);
+    const found = withArea(matched);
     if (found.length === 0) return { refused: { of: 'absent', ...(matched.length > 0 && { zeroArea: true as const }) } };
     if (found.length > 1) return { refused: { of: 'ambiguous', matches: found.map(quoted) } };
     const [node] = found;

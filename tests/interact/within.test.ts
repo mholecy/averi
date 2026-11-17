@@ -5,7 +5,7 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { checkWithin, isRect, resolveWithin, WithinRefusedError } from '../../src/interact/within.js';
 import { lookAt } from '../../src/ui-tree/look.js';
-import { parseDump } from '../helpers/android-dumps.js';
+import { parseDump, zeroAreaView } from '../helpers/android-dumps.js';
 
 /**
  * `scroll_until`'s `within` (D78) resolved to the one scroll view its strokes go over until the target is read
@@ -18,7 +18,7 @@ import { parseDump } from '../helpers/android-dumps.js';
 const ANDROID = parseDump(readFileSync(new URL('../fixtures/truth/android-averi_lab-api33/scroll-bounded.xml', import.meta.url), 'utf8'));
 const WDA = parseWdaSource(readFileSync(new URL('../fixtures/wda-capture-lab-scroll-bounded.json', import.meta.url), 'utf8'));
 const IDB = parseIdbDescribeAll(readFileSync(new URL('../fixtures/truth/ios-iphone17-ios27/scroll-bounded.idb.json', import.meta.url), 'utf8'));
-/** The home screen as WDA read it on iOS 27: the icons `Maps` and `Calendar` are each listed twice, both 0x0 at 0,0. */
+/** The home screen as WDA read it on iOS 27: the icons `Maps` and `Calendar` are each listed twice, both 0×0 at 0,0. */
 const SPRINGBOARD = parseWdaSource(readFileSync(new URL('../fixtures/wda-capture-springboard-after-open-in-cancel.json', import.meta.url), 'utf8'));
 
 const UPPER: Rect = { x: 0, y: 303, width: 1080, height: 605 };
@@ -52,13 +52,12 @@ describe('resolveWithin — a selector: the matched scroll view, or the nearest 
     expect(resolveWithin(factsOf(ANDROID), 'id:nope', 'down', ANDROID_SCREEN)).toEqual({ refused: { of: 'absent' } });
   });
 
-  it('a zero-area match is never named, as the tap names none: a 0x0 twin of `lower` leaves `lower` the one match', () => {
-    // The Android dump edited: `lower` takes the id `lab.list`, and a 0x0 view of the same id is laid just before it.
+  it('a zero-area match is never named, as the tap names none: a 0×0 twin of `lower` leaves `lower` the one match', () => {
+    // The Android dump edited: `lower` takes the id `lab.list`, and a 0×0 view of the same id is laid just before it.
     const lower = /<node index="1" text="" resource-id="(")( class="android\.widget\.ScrollView"[^>]*bounds="\[0,1046\]\[1080,1541\]">)/;
-    const twin = '<node index="0" text="" resource-id="lab.list" class="android.view.ViewGroup" package="dev.averi.lab" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,1046][0,1046]" />';
     const xml = readFileSync(new URL('../fixtures/truth/android-averi_lab-api33/scroll-bounded.xml', import.meta.url), 'utf8');
     expect(xml).toMatch(lower);
-    const edited = parseDump(xml.replace(lower, `${twin}<node index="1" text="" resource-id="lab.list$1$2`));
+    const edited = parseDump(xml.replace(lower, `${zeroAreaView('lab.list', 0, 1046)}<node index="1" text="" resource-id="lab.list$1$2`));
     expect(resolveWithin(factsOf(edited), 'id:lab.list', 'down', ANDROID_SCREEN)).toEqual({ rect: LOWER });
   });
 
