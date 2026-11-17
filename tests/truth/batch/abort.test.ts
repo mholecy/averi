@@ -352,7 +352,7 @@ describe('the abort on SIGINT, SIGTERM or SIGHUP — the dirty windows put back,
     expect(existsSync(restoreFile())).toBe(false);
   });
 
-  it('running probes are stopped, each its whole group, before the first restore starts (a probe no longer gets the terminal\'s Ctrl-C)', async () => {
+  it('running probes are stopped, each its whole group, before the first restore starts (a probe does not get the terminal\'s Ctrl-C)', async () => {
     const guard = guardOf();
     await interrupt(guard, () => {
       guard.open('E5', window({ restore: async () => (seam.events.push('restore E5'), { ok: true, how: 'x' }) }));
@@ -1073,7 +1073,7 @@ describe('markDirty — the state-file protocol: dirty until a verified restore 
   });
 });
 
-describe('leave — a block\'s hand lines outside any window go to RESTORE now', () => {
+describe('leave — a block\'s hand lines outside any window go to RESTORE at once', () => {
   it('appended under `<name> run <id> left by <block> at <date>`, said as an ERROR, and counted by finish\'s return and the exit code', async () => {
     const guard = guardOf();
     let written: string[] = [];

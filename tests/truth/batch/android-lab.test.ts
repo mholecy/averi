@@ -235,7 +235,7 @@ describe('a tree kept: evidence in the block\'s folder, its fitness as a fixture
   });
 });
 
-describe('the probe\'s own state put back (S5\'s StateRestore: the probe\'s `--restore`)', () => {
+describe('the probe\'s own state put back (S5\'s StateRestore: the d55 probe\'s `--restore`)', () => {
   const stateFile = () => join(dir, 'D55-state.json');
   const restoreOf = (stateCommand?: string) => probeRestore({ repo: join(dir, 'repo'), probe: '/probes/d55-b13.ts', args: ['--serial', LAB_SERIAL, '--apk', '/runs/lab/installed.apk'], stateFile: stateFile(), secs: 300, fs: nodeFs, stateCommand });
 

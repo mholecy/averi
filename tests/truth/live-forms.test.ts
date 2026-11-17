@@ -292,7 +292,7 @@ describe('kf1–kf3 on batch-11\'s real run: the panel dragged over the submit (
     expect(judgeFloatingGap('kf1')(state, replies, 'uiautomator', unlaid)).toEqual({ outcome: 'SKIP', why: 'the submit not laid out at launch' });
   });
 
-  it('the panel dragged above the submit (bottom 1928, the gap\'s edge): kf1 and kf2 judged, not skipped — the refusal now a MISMATCH', () => {
+  it('the panel dragged above the submit (bottom 1928, the gap\'s edge): kf1 and kf2 judged, not skipped: a MISMATCH', () => {
     for (const id of ['kf1', 'kf2'] as const) {
       const { replies, state, launched } = recordedCase(b11, 'uiautomator', id);
       const above = withRegion(launched, `(87,1136,1024,1928)${STRIP}`);

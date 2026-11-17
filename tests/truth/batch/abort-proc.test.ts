@@ -9,7 +9,7 @@ import { endChildren } from './proc-cleanup.js';
 // Each test carries its own timeout too; the hooks get theirs here (teardownTimeout is vitest's global default).
 vi.setConfig({ testTimeout: 15_000, hookTimeout: 10_000 });
 
-// scripts/truth/batch/abort.ts on the real process seam, with real signals: b11-dry's int.sh scenarios (a process
+// scripts/truth/batch/abort.ts on the real process seam, with real signals: the interrupt scenarios (a process
 // group sent SIGINT, a second SIGINT, a fatal error inside a window) as vitest tests. The child is
 // tests/fixtures/batch/abort-child.ts, started in a process group of its own as a terminal's foreground job is; a
 // Ctrl-C is SIGINT to that whole group. Pids and markers go through files in a temp dir (the sandbox blocks ps and

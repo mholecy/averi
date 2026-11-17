@@ -230,7 +230,7 @@ describe('judgeAtRest — a first row at rest flush under its sticky header (VA1
   const fired = rest({ strokes: [stroke(0, 0, 'list')], events: [{ kind: 'tap', tag: 'R', at }] });
   const VISIBLE = 'Element id:"lab.scroll-sticky-rest.R" fully visible after 1 swipe; its top edge lies on the edge of …, pinned at its scroll container\'s (0,303 1080x1238) top and drawn after it, and a probe swipe toward it moved nothing';
   const TWICE = 'Element id:"lab.scroll-sticky-rest.R" fully visible after 2 swipes; its top edge lies on the edge of …, pinned at its scroll container\'s (0,303 1080x1238) top and drawn after it, and 2 probe swipes toward it moved nothing — nothing of it is cut there';
-  it('one probe that moved nothing, then the tap fires R: ok — and two (T12: a held first probe is sent again), as src says it now', () => {
+  it('one probe that moved nothing, then the tap fires R: ok — and two (T12: a held first probe is sent again), as src says it', () => {
     expect(judgeAtRest('R', 'list', [VISIBLE, 'Tapped id:"lab.scroll-sticky-rest.R"'], fired, launched).outcome).toBe('ok');
     const twice = rest({ strokes: [stroke(0, 0, 'list'), stroke(0, 0, 'list')], events: [{ kind: 'tap', tag: 'R', at }] });
     expect(judgeAtRest('R', 'list', [TWICE, 'Tapped id:"lab.scroll-sticky-rest.R"'], twice, launched).outcome).toBe('ok');
@@ -543,21 +543,21 @@ describe('the live KNOWN pins the rule a case fails by and the kind of reply it 
   // could never match. live-visibility.ts produces `stop-claim` only on a `visible` reply; `tap-claim` on a `Tapped`
   // reply (judgeTap), and in an absent-at-end case (`absent:<cell>`, judgeAbsentAtEnd) on any reply but `visible` once
   // the app logged something since the launch.
-  const absentAtEnd = (key: string) => key.split(' ')[2]?.startsWith('absent:') === true;
-  const tapClaimable = (key: string, kind: string) => kind === 'Tapped' || (absentAtEnd(key) && kind !== 'visible');
-  const pinsAKindOfItsRule = ([k, e]: readonly [string, { cls: string; kind: string }]) =>
-    !((e.cls === 'stop-claim' && e.kind !== 'visible') || (e.cls === 'tap-claim' && !tapClaimable(k, e.kind)));
+  const isAbsentAtEndKey = (key: string) => key.split(' ')[2]?.startsWith('absent:') === true;
+  const tapClaimable = (key: string, kind: string) => kind === 'Tapped' || (isAbsentAtEndKey(key) && kind !== 'visible');
+  const breaksItsRule = ([k, e]: readonly [string, Pick<(typeof LIVE_KNOWN)[string], 'cls' | 'kind'>]) =>
+    (e.cls === 'stop-claim' && e.kind !== 'visible') || (e.cls === 'tap-claim' && !tapClaimable(k, e.kind));
   it('a claim pins a kind its rule claims on: a stop on `visible`; a tap on `Tapped`, or in an absent-at-end case on any kind but `visible`', () => {
-    expect(Object.entries(LIVE_KNOWN).filter((entry) => !pinsAKindOfItsRule(entry))).toEqual([]);
+    expect(Object.entries(LIVE_KNOWN).filter(breaksItsRule)).toEqual([]);
   });
   it('an absent-at-end entry with a tap-claim: on `not found` it pins a kind its rule gives; on `visible`, or on a tap case\'s `not found`, it does not', () => {
-    expect(pinsAKindOfItsRule(['ios wda absent:scroll-top-edge-end', { cls: 'tap-claim', kind: 'not found' }])).toBe(true);
-    expect(pinsAKindOfItsRule(['ios wda absent:scroll-top-edge-end', { cls: 'tap-claim', kind: 'visible' }])).toBe(false);
-    expect(pinsAKindOfItsRule(['ios wda tap:scroll-top-edge-end.T', { cls: 'tap-claim', kind: 'not found' }])).toBe(false);
+    expect(breaksItsRule(['ios wda absent:scroll-top-edge-end', { cls: 'tap-claim', kind: 'not found' }])).toBe(false);
+    expect(breaksItsRule(['ios wda absent:scroll-top-edge-end', { cls: 'tap-claim', kind: 'visible' }])).toBe(true);
+    expect(breaksItsRule(['ios wda tap:scroll-top-edge-end.T', { cls: 'tap-claim', kind: 'not found' }])).toBe(true);
   });
   // Its notes (a bug note of docs/bugs, a residual of a decision) are checked in tests/truth/lab-notes.test.ts.
-  // A visibility case's id names its kind (`tap:<cell>.<target>`, `absent:<cell>`, …); a forms case's is live-cases.ts's
-  // own (b1d, p5, rf4: D31).
+  // A visibility case's id names its kind (`tap:<cell>.<target>`, `absent:<cell>`, …); a forms case's is
+  // live-cases.ts's own (b1d, p5, rf4: D31).
   it('every entry is keyed `<platform> <source> <case id>` and names a rule', () => {
     const KEY = /^(android|ios) \w+ ((tap|scroll|turn|carry|absent):\S+|[a-z]+\d+[a-z]*) \S+$/;
     for (const [k, e] of Object.entries(LIVE_KNOWN)) expect(`${k} ${e.cls}`).toMatch(KEY);
@@ -731,7 +731,7 @@ describe('hedgedStops (T15): every hedged stop counted, by reason and by verdict
     expect(stops.all.map((h) => [h.id, h.bucket, h.why])).toEqual([['uiautomator n', 'other', 'held']]);
   });
 
-  it('no visible stop: no line, so a summary without one reads as before', () => {
+  it('no visible stop: no line, so a summary without one adds nothing', () => {
     const stops = hedgedStops([r('d', OK, 'Tapped id:"x"'), r('e', { outcome: 'SKIP' }, clean)]);
     expect(stops.visible).toBe(0);
     expect(hedgedStopsLine(stops)).toBeUndefined();
