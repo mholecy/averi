@@ -88,10 +88,14 @@ export interface WindowUsableScreen extends ScreenBoxes {
   readonly navigationBand?: undefined;
 }
 
-/** THE "no device screen" (`treeScreen`): the tree's own screen, no band, and whether a touch fails open on it. */
+/** THE "no device screen" (`treeScreen`): the tree's own screen, no band, and whether a judgement fails open on it. */
 export interface TreeUsableScreen extends ScreenBoxes {
   readonly from: 'tree';
-  /** The root has no area (idb's synthetic 0x0 root): `box` is only the largest node, and a touch judges no point off it (`treeScreen`). */
+  /**
+   * The root has no area (idb's synthetic 0x0 root): `box` is only the largest node, and nothing is judged off it
+   * (`treeScreen`) — a touch judges no point off it, and the pixel assert reads the node's own rect uncut and judges
+   * no region off it.
+   */
   readonly failsOpen: boolean;
   readonly statusBand?: undefined;
   readonly navigationBand?: undefined;
@@ -163,8 +167,9 @@ export function usableScreenOf(device: DeviceScreen | undefined, size: ScreenSiz
  * purpose — the tap, either stop — then places every point on the screen
  * and judges in the node's own rect: the on-screen rule exists to stop a
  * false "Tapped", and must never be why a tap on a device that could not
- * report its size did not happen. The pixel assert judges on `box`, the
- * largest node, as ever: it reads a region, and fails closed.
+ * report its size did not happen. The pixel assert judges nothing off
+ * `box` either: it reads the node's own rect, uncut, and only its keyboard
+ * band is judged on `box`.
  */
 export function treeScreen(tree: UiNode): TreeUsableScreen {
   const box = screenOf(tree);
@@ -178,7 +183,10 @@ export function treeScreen(tree: UiNode): TreeUsableScreen {
  */
 export const judgedScreen = (usable: UsableScreen | undefined, tree: UiNode): UsableScreen => usable ?? treeScreen(tree);
 
-/** A touch fails open on `screen`: the tree's own, on a root of no area (`TreeUsableScreen.failsOpen`). */
+/**
+ * A judgement fails open on `screen`: the tree's own, on a root of no area (`TreeUsableScreen.failsOpen`) — a touch
+ * judges no point off its box, and the pixel assert reads the node's rect uncut and judges no region off it.
+ */
 export const failsOpen = (screen: UsableScreen): boolean => screen.from === 'tree' && screen.failsOpen;
 
 /**

@@ -67,9 +67,10 @@ import { failsOpen, judgedScreen, type UsableScreen } from './usable-screen.js';
  *   `box` is. With no screen, every purpose reads ONE definition,
  *   usable-screen.ts#judgedScreen: the tree's own screen is the one box; on
  *   a root of no area (its `failsOpen`, which a tree's own screen handed in
- *   carries too) a touch — the tap, either stop —
- *   leaves every point on the screen and judges in the node's own rect,
- *   and the pixel assert judges on the largest node (`treeScreen`'s box).
+ *   carries too) a touch — the tap, either stop — leaves every point on
+ *   the screen and judges in the node's own rect, and the pixel assert
+ *   judges nothing off the box (the largest node): it reads the node's own
+ *   rect, uncut, and only its keyboard band is judged on the box.
  * - THE DRAWN FRAME, every purpose: a scroll view draws none of its
  *   content outside its own frame, while WDA lists the content at its
  *   laid-out rect and uiautomator sometimes past the frame too

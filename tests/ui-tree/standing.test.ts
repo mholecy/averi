@@ -625,10 +625,10 @@ describe('Scene.standing for the tap — the on-screen point rule (the in-tree k
 });
 
 /**
- * With no device screen, every purpose reads one definition (ui-tree/usable-screen.ts#treeScreen): a rooted tree is
+ * With no device screen, every purpose reads one definition (ui-tree/usable-screen.ts#judgedScreen): a rooted tree is
  * judged in its root rect; on a root of no area a touch fails open (every point on the screen, judged in the node's
  * own rect — the stops adopt the tap's fallback, unreachable from `scroll_until`, whose round always holds a frame),
- * and the pixel assert judges on the largest node.
+ * and the pixel assert's box is the largest node, nothing judged off it.
  */
 describe('Scene.standing with no screen — one "no device screen" for the tap, both stops and the pixel assert', () => {
   /** A 100x100 node at (x,y) in a root of `rect`, with a 402x874 node beside it when the root has no area (idb's flat list's Application). */
@@ -649,7 +649,7 @@ describe('Scene.standing with no screen — one "no device screen" for the tap, 
       expect([said(s), s.facts.screen]).toEqual([{ kind: 'reachable', at: { x: 200, y: 1050 } }, { x: 150, y: 1000, width: 100, height: 100 }]);
     }
   });
-  it('a root of no area: the pixel assert judges on the largest node (402x874), never failing open', () => {
+  it('a root of no area: the pixel assert\'s box is the largest node (402x874)', () => {
     const s = judgedAt(150, 300, box(0, 0), (n) => OCR(n));
     expect([said(s), s.facts.screen]).toEqual([{ kind: 'reachable', at: { x: 200, y: 350 } }, box(402, 874)]);
   });
@@ -1280,7 +1280,7 @@ describe('the presented remedy\'s cover — the one scroll_until\'s `presented` 
 
 /**
  * The pixel assert's `offScreen` kind — nothing of what it reads on the box judged — and where it is NOT judged: on a
- * root of no area (usable-screen.ts#treeScreen's `failsOpen`: the box is only the tree's largest node, so content
+ * root of no area (usable-screen.ts#TreeUsableScreen.failsOpen: the box is only the tree's largest node, so content
  * past it is measured, as a touch judges every point on the screen there), and for a rect of no area (judged by its
  * place).
  */
