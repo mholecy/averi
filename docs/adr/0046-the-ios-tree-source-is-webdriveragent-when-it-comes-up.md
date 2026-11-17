@@ -75,12 +75,14 @@ read is idb's for the adapter's life, and every reply that claims what it read c
     unchanged.
   - A text that needs WDA, typed before any read (`type_text` without a selector, a flow's `type:`), makes the choice
     itself. If WDA does not come up, it is refused as idb refuses it. Nothing is typed.
-  - `IosAdapter.typeText` was the backstop: a text only WDA types, reaching it over a source that fell back, got the
-    same refusal instead of idb's trace. idb and the recorded source never fall back, so `treeSource: idb` was
-    unchanged. (A72, the last section, moved the backstop into the source.)
-  - Each of these refusals, and any `typeable` refusal on an adapter that fell back (then added by
-    `interact/type-text.ts`; since A72 by the set itself), ends with the claim note's line, so it is grep-able as `read
-    through idb` and names the reason and the retry. One wording for idb's refusal: `adapters/ios-typing.ts#idbTypingRefusal`.
+  - `IosAdapter.typeText` is the backstop: a text only WDA types, reaching it over a source that fell back
+    (`IosTreeSource.fellBack`), gets the same refusal instead of idb's trace. idb and the recorded source never fall
+    back, so `treeSource: idb` is unchanged.
+  - Each of these refusals, and any `typeable` refusal on an adapter that fell back
+    (interact/type-text.ts, by a wrapper A72 removed), ends with the claim note's line, so it is grep-able as `read
+    through idb` and names the reason and the retry. One wording for idb's refusal:
+    `adapters/ios-typing.ts#idbTypingRefusal`.
+  - (Where these live now, see the A72 amendment.)
 - `treeSource: idb` behaves as before, byte for byte. So does `treeSource: wda`, with one exception: a missing
   `appium-webdriveragent` package is now said before the first-build line, and its refusal opens `WebDriverAgent
   requires …` instead of `treeSource: wda requires …` (above). The registry caches per setting, so `auto`, `idb` and
@@ -368,16 +370,18 @@ except where said below; golden Changed 0.
   error as it is; the release's class is now private to `adapters/wda-tree-source.ts`.
 - **Typing is the source's.** `IosTreeSource.typeable` (the set) and a required `typeWide(text)` (a text idb cannot
   type) replace the optional `typeText`. WDA types; idb and the differential harness's recorded source refuse in
-  idb's words (`adapters/ios-typing.ts#idbTypingRefusal`); `auto` makes its choice and hands the text on, and after a
-  fallback adds the claim note's line, once. `auto`'s set after a fallback is idb's with the note
-  (`adapters/typeable.ts#Typeable`, its `note`, which `refusalOf` puts last), so the fill's checks and `type_text`'s
-  carry it without `interact/` knowing of fallbacks. `IosAdapter.typeText` sends every text idb cannot type to
-  `typeWide` and has no backstop.
-- **One member for the fallback.** `fallback?: {note}` on `DeviceAdapter` and `IosTreeSource` replaces `claimNote`
-  and `fellBack`: the registry drops an adapter that has one, and the claim notes print its note.
-- **Behaviour that moves.** A text only WDA types, sent to `IosAdapter.typeText` directly over idb or the recorded
-  source, is refused in ADR 0037's words instead of reaching idb's Python trace. No tool reaches it: interact/ refuses
-  such a value first.
+  idb's words (`adapters/ios-typing.ts#idbTypingRefusal`); `auto` makes its choice, hands the text to WDA, and after a
+  fallback refuses it by its own set: idb's with the note (`adapters/typeable.ts#Typeable`, its `note`, which
+  `refusalOf` and the control-character refusal put last), the note's one route. So the fill's checks, `type_text`'s
+  and `typeWide`'s carry it once, without `interact/` knowing of fallbacks. `IosAdapter.typeText` sends every text
+  idb cannot type to `typeWide` and has no backstop.
+- **One member for the fallback.** `fallback?: TreeSourceFallback` (`{note}`, `adapters/types.ts#TreeSourceFallback`)
+  on `DeviceAdapter` and `IosTreeSource` replaces `claimNote` and `fellBack`: the registry drops an adapter that has
+  one, and the claim notes print its note.
+- **Behaviour that moves.** Over idb or the recorded source, `IosAdapter.typeText` now refuses EVERY text idb cannot
+  type (ios-typing.ts#typingPathOf `wda`: a text only WDA types, an emoji, a control character other than `\n` such as
+  `\t`, …) in idb's words (ADR 0037), nothing sent, where before it reached idb and its Python trace. No tool reaches
+  it: interact/ refuses such a value first, and the engine types ASCII digits.
 - **Wording that moves.** idb's refusal of a value WDA's set takes whole (`IDB_TYPEABLE.otherPath`) named
   `ios.treeSource: wda` only, though `auto` is the default. It now reads "A project whose tree source is WebDriverAgent
   types it (`ios.treeSource: auto`, the default, once WebDriverAgent comes up, or `wda`; ADR 0037); otherwise use a
