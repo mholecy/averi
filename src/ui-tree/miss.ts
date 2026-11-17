@@ -155,8 +155,14 @@ function clippedOutOf(matched: readonly UiNode[]): Edge[] {
   return sides.has(undefined) ? [] : ([...sides] as Edge[]);
 }
 
+/**
+ * Every match 0×0, as a reply says it: the tap's note when no match names the side it was clipped out at
+ * (`zeroAreaNote`), and within's absent refusal always (interact/scroll-text.ts#withinText).
+ */
+export const ONLY_ZERO_AREA = 'only 0×0 nodes (scrolled off screen, or collapsed)';
+
 /** The note beneath a never-resolved wait whose last tree matched the target only at 0×0, clipped out nowhere it can name. */
-const ZERO_AREA_HINT = 'it matched only 0×0 nodes (scrolled off screen, or collapsed) — if it is in a scroll view, scroll_until it first';
+const ZERO_AREA_HINT = `it matched ${ONLY_ZERO_AREA} — if it is in a scroll view, scroll_until it first`;
 
 /** The zero-area note: where the matches were clipped out, and the scroll back when there is one side (`ZERO_AREA_HINT` when they name none). */
 function zeroAreaNote([only, ...more]: readonly Edge[]): string {

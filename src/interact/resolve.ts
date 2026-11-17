@@ -5,7 +5,7 @@ import { listedText, type NamingPolicy } from '../ui-tree/node-words.js';
 import { dialectOf } from '../ui-tree/dialect.js';
 import { KEYBOARD_UNLISTED, MissedError, missNote, missOf, presentedAloneHeadline, type Miss } from '../ui-tree/miss.js';
 import { pollTimeoutMessage, pollTree, readTreeOrMiss, type FirstSample } from '../ui-tree/read-tree.js';
-import { findTarget, hasArea, preferInteractive, type Target } from '../ui-tree/selectors.js';
+import { findTarget, preferInteractive, withArea, type Target } from '../ui-tree/selectors.js';
 import { markedForMiss } from '../ui-tree/window-mark.js';
 import { keyboardMayCoverText, keyboardUp } from './target-text.js';
 
@@ -48,7 +48,7 @@ export const describeTarget = (target: Target): string =>
  * else the `survivors`: none, or several for the Ambiguity to decide.
  */
 export function preferred(found: readonly UiNode[]): { chosen: UiNode; note?: string } | { survivors: UiNode[] } {
-  const survivors = found.filter(hasArea);
+  const survivors = withArea(found);
   if (survivors.length === 1) return { chosen: survivors[0] };
   const pick = survivors.length > 1 ? preferInteractive(survivors) : undefined;
   return pick === undefined ? { survivors } : { chosen: pick.node, note: pick.note };

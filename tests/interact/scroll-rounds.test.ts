@@ -6,7 +6,7 @@ import { round, SETTLE_CONFIRM_READS, startRounds, type RoundRead, type RoundRul
 import { boundText, describeScrollResult, scrollFailure, WITHIN_REMEDY } from '../../src/interact/scroll-text.js';
 import { WithinRefusedError, type WithinRefusal } from '../../src/interact/within.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
-import { parseDump } from '../helpers/android-dumps.js';
+import { parseDump, zeroAreaView } from '../helpers/android-dumps.js';
 import { node } from '../helpers/fake.js';
 import { stackedLayers } from '../helpers/stacked-layers.js';
 import { containsPoint } from '../../src/ui-tree/geometry.js';
@@ -3249,6 +3249,9 @@ describe('round — `within`, the scroll view named for the strokes until the ta
   const UPPER: Rect = { x: 0, y: 303, width: 1080, height: 605 };
   const LOWER: Rect = { x: 0, y: 1046, width: 1080, height: 495 };
   const strokesOf = (played: Played) => played.steps.flatMap((st) => (st.do === 'stroke' ? [st] : []));
+  /** `lower`'s opening tag in the dump, before which a 0×0 view of id `lab.zero` is laid: a selector of it matches that node alone. */
+  const LOWER_TAG = '<node index="1" text="" resource-id="" class="android.widget.ScrollView"';
+  const ZEROED = BOUNDED.replace(LOWER_TAG, `${zeroAreaView('lab.zero', 0, 1046)}${LOWER_TAG}`);
 
   it.each([
     ['its rect', LOWER],
@@ -3305,6 +3308,29 @@ describe('round — `within`, the scroll view named for the strokes until the ta
     expect(played.outcome).toMatchObject({ kind: 'within', swipes: 0, refused });
     const outcome = played.outcome as Exclude<NonNullable<Played['outcome']>, { kind: 'visible' }>;
     expect(scrollFailure(outcome, 'id:lab.scroll-bounded.O', 'spec').message).toBe(`scroll_until id:lab.scroll-bounded.O stopped before any swipe — ${words}`);
+  });
+
+  // A76: a selector whose only matches are 0×0 is absent, its reply saying so — over the dump with `lab.zero` laid in.
+  it.each([
+    [
+      'a selector string',
+      'id:lab.zero',
+      'rect',
+      'within id:lab.zero matches only 0×0 nodes (scrolled off screen, or collapsed), so it names no scroll view — give a selector of the scroll view or of an element inside it, or its rect (ui_snapshot)',
+    ],
+    [
+      'an element spec',
+      { id: 'lab.zero' },
+      'spec',
+      'within id:"lab.zero" matches only 0×0 nodes (scrolled off screen, or collapsed), so it names no scroll view — give an element spec of the scroll view or of an element inside it',
+    ],
+  ] as const)('refused before any swipe as absent when %s matches only 0×0 nodes, the reply saying so', (_, within, form, words) => {
+    expect(BOUNDED).toContain(LOWER_TAG);
+    const tree = parseDump(ZEROED);
+    const played = play({ ...ANDROID, maxSwipes: 6, timeoutMs: 15_000, within }, [{ tree }]);
+    expect(played.outcome).toMatchObject({ kind: 'within', swipes: 0, refused: { of: 'absent', zeroArea: true } });
+    const outcome = played.outcome as Exclude<NonNullable<Played['outcome']>, { kind: 'visible' }>;
+    expect(scrollFailure(outcome, 'id:lab.scroll-bounded.O', form).message).toBe(`scroll_until id:lab.scroll-bounded.O stopped before any swipe — ${words}`);
   });
 
   it('refused across the stroke: `lower` scrolls vertically, the stroke goes sideways', () => {

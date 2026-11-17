@@ -13,6 +13,13 @@ export { drawnOverStrip };
 /** `parseUiautomatorXml` with the port production wires — what a test parses a dump with. */
 export const parseDump = (xml: string): UiNode => parseUiautomatorXml(xml, drawnOverStrip);
 
+/**
+ * A hand-written uiautomator ViewGroup of id `id` and no area, at (`x`,`y`): the 0×0 node a test lays into a recorded
+ * dump beside what it names.
+ */
+export const zeroAreaView = (id: string, x: number, y: number): string =>
+  `<node index="0" text="" resource-id="${id}" class="android.view.ViewGroup" package="dev.averi.lab" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[${x},${y}][${x},${y}]" />`;
+
 /** `uiautomator dump /dev/tty` as exec-out prints it, trimmed from a real one: hierarchy root, nested nodes, PIN field, button. */
 export const UIAUTOMATOR_XML = `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
 <hierarchy rotation="0">
