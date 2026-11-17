@@ -40,7 +40,7 @@ const base: Summary = {
 };
 
 describe('verdictLine — one verdict, `<label>: <VERDICT> — <why>`', () => {
-  it('formats the label, the word and the reason as every batch since batch-2 does', () => {
+  it('formats the label, the word and the reason', () => {
     expect(verdictLine('kf live verdict', 'INCONCLUSIVE', 'the premise does not hold')).toBe('kf live verdict: INCONCLUSIVE — the premise does not hold');
     expect(verdictLine('lv-d62 pre d62 drop', 'REPRODUCED', '3 false "fully visible"')).toBe('lv-d62 pre d62 drop: REPRODUCED — 3 false "fully visible"');
     expect(verdictLine('E5 verdict', 'PASS')).toBe('E5 verdict: PASS');
@@ -62,7 +62,7 @@ describe('verdictLine — one verdict, `<label>: <VERDICT> — <why>`', () => {
     expect(VERDICTS).toEqual(['PASS', 'FAIL', 'INCONCLUSIVE', 'REPRODUCED', 'OBSERVED', 'SKIP', 'INTERRUPTED', 'OK', 'WARN', 'ERROR']);
   });
 
-  it("WARN is a verdict word (T2 S4 review round 1: batch-11's `D43 WDA-window compare: WARN — …`), read back, and alone exits 0", () => {
+  it("WARN is a verdict word (`D43 WDA-window compare: WARN — …`), read back, and alone exits 0", () => {
     const line = verdictLine('D43 WDA-window compare', 'WARN', 'a late writer');
     expect(line).toBe('D43 WDA-window compare: WARN — a late writer');
     expect(parseVerdictLine(line)).toEqual({ label: 'D43 WDA-window compare', verdict: 'WARN', why: 'a late writer' });
@@ -85,7 +85,7 @@ describe('parseVerdictLine — the line back to its parts', () => {
   });
 });
 
-describe('stepLine — a step word, padded as batch-1 to batch-12 pad it', () => {
+describe('stepLine — a step word, padded', () => {
   it('OK, DONE, FAIL, WARN, NOTE, SKIP and ERROR line up', () => {
     expect(stepLine('OK', 'kf analyze')).toBe('OK   kf analyze');
     expect(stepLine('DONE', 'kf live')).toBe('DONE kf live');
@@ -94,8 +94,8 @@ describe('stepLine — a step word, padded as batch-1 to batch-12 pad it', () =>
   });
 });
 
-describe("failsIn — batch-12's exit rule, `^[^:]+: FAIL( |$)`, plus the step form", () => {
-  it('a FAIL verdict with a tail that is no reason still fails, as under batch-12\'s rule', () => {
+describe("failsIn — the exit rule, `^[^:]+: FAIL( |$)`, plus the step form", () => {
+  it('a FAIL verdict with a tail that is no reason still fails', () => {
     expect(failsIn('lv-d62 verdict: FAIL 2/3 dropped')).toBe(true);
     expect(failsIn('kf live verdict: FAIL (1 of 3 MISMATCH)')).toBe(true);
     expect(failsIn('(before the interrupt) E5 cleanup: FAIL — x')).toBe(true);
@@ -107,7 +107,7 @@ describe("failsIn — batch-12's exit rule, `^[^:]+: FAIL( |$)`, plus the step f
     expect(failsIn(': FAIL')).toBe(false);
   });
 
-  it('a FAIL verdict line, and a FAIL step line (a FAIL protected-key line would have exited 0 under batch-12\'s regex)', () => {
+  it('a FAIL verdict line, a FAIL step line and a FAIL protected-key line', () => {
     expect(failsIn('E5 cleanup: FAIL — a lab default')).toBe(true);
     expect(failsIn('LAB android: FAIL — the guard refused emulator-5554')).toBe(true);
     expect(failsIn("FAIL com.apple.launchservices.schemeapproval's key changed")).toBe(true);
@@ -122,7 +122,7 @@ describe("failsIn — batch-12's exit rule, `^[^:]+: FAIL( |$)`, plus the step f
 });
 
 describe('summaryLines — the SUMMARY, its marker unchanged so the waiting rule holds', () => {
-  it('fixed order: marker, checkout, lab lines, each block\'s verdict lines, the protected-key lines, RESTORE, this run\'s ERRORs, end marker (batch-6 → batch-12)', () => {
+  it('fixed order: marker, checkout, lab lines, each block\'s verdict lines, the protected-key lines, RESTORE, this run\'s ERRORs, end marker', () => {
     const errors = ['09:50:01 ERROR E5: one thing'];
     expect(summaryLines({ ...base, errors })).toEqual([
       '======== SUMMARY',
@@ -139,13 +139,13 @@ describe('summaryLines — the SUMMARY, its marker unchanged so the waiting rule
     expect(SUMMARY_MARKER).toBe('======== SUMMARY');
   });
 
-  it('each line once: identical lines — the same ERROR line twice, a verdict line twice — print once (batch-6\'s `awk \'!seen[$0]++\'`)', () => {
+  it('each line once: identical lines — the same ERROR line twice, a verdict line twice — print once', () => {
     const lines = summaryLines({ ...base, blocks: [{ block: 'kf', lines: ['kf live verdict: PASS', 'kf live verdict: PASS'] }], errors: ['09:50:01 ERROR x', '09:50:01 ERROR x'] });
     expect(lines.filter((l) => l === 'kf live verdict: PASS')).toHaveLength(1);
     expect(lines.filter((l) => l === '09:50:01 ERROR x')).toHaveLength(1);
   });
 
-  it('a RESTORE written by this run prints its file, then what this run wrote into it — its header line and every hand line (batch-12 cat the file)', () => {
+  it('a RESTORE written by this run prints its file, then what this run wrote into it — its header line and every hand line', () => {
     const written = ['batch-n run 1 ended 2026-11-04 10:00:00; state to put back by hand:', 'E5 (Android): adb -s emulator-5554 shell pm path dev.averi.lab', 'lvd62: git worktree prune'];
     const lines = summaryLines({ ...base, restore: { file: 'out/RESTORE.txt', written } });
     expect(lines.slice(-5)).toEqual([
@@ -201,7 +201,7 @@ describe('interruptedBlock — an unfinished block in the abort SUMMARY', () => 
   });
 });
 
-describe('exitCodeOf — 0, 1 on a FAIL or a RESTORE, 130 when interrupted (batch-12; batch-11 exited 0 whatever its verdicts)', () => {
+describe('exitCodeOf — 0, 1 on a FAIL or a RESTORE, 130 when interrupted', () => {
   it('0 when every line passes and nothing is left to put back', () => {
     expect(exitCodeOf(base)).toBe(EXIT.ok);
     expect(EXIT).toEqual({ ok: 0, failed: 1, nothingDone: 2, interrupted: 130 });
@@ -222,7 +222,7 @@ describe('exitCodeOf — 0, 1 on a FAIL or a RESTORE, 130 when interrupted (batc
     expect(exitCodeOf({ ...base, errors: ['09:00:00 ERROR kf: FAIL'], blocks: [{ block: 'T6', lines: ['T6 verdict: INCONCLUSIVE — not possible', 'T6 x: SKIP'] }] })).toBe(0);
   });
 
-  it('2 when no wanted block ran (T2 S6a review round 1: a failed checkout, every need or precondition failed) — "nothing was done", never success', () => {
+  it('2 when no wanted block ran (a failed checkout, every need or precondition failed) — "nothing was done", never success', () => {
     const none = { ...base, noneRan: true };
     expect(exitCodeOf(none)).toBe(EXIT.nothingDone);
     expect(exitCodeOf({ ...base, noneRan: false })).toBe(0);
@@ -231,7 +231,7 @@ describe('exitCodeOf — 0, 1 on a FAIL or a RESTORE, 130 when interrupted (batc
     expect(exitCodeOf({ ...none, interrupted: { at: '10:12:00' } })).toBe(130);
   });
 
-  it('the SUMMARY of a run where no wanted block ran says so after the blocks\' lines, whatever the exit (review rounds 2, 3: a RESTORE makes it 1)', () => {
+  it('the SUMMARY of a run where no wanted block ran says so after the blocks\' lines, whatever the exit (a RESTORE makes it 1)', () => {
     const lines = summaryLines({ ...base, noneRan: true });
     expect(NONE_RAN_LINE).toBe("NOTE no wanted block ran (each one's why above)");
     expect(lines.indexOf(NONE_RAN_LINE)).toBe(lines.indexOf('E5 verdict: PASS — a PASS, c PASS') + 1);
@@ -249,7 +249,7 @@ describe('exitCodeOf — 0, 1 on a FAIL or a RESTORE, 130 when interrupted (batc
   });
 });
 
-describe('messageOf and timeOf — said once, here, for every module of the batch core (code review)', () => {
+describe('messageOf and timeOf — said once, here, for every module of the batch core', () => {
   it('messageOf: an Error\'s message; anything else as a string', () => {
     expect([messageOf(new Error('boom')), messageOf('text'), messageOf(42), messageOf(undefined)]).toEqual(['boom', 'text', '42', 'undefined']);
   });
@@ -259,7 +259,7 @@ describe('messageOf and timeOf — said once, here, for every module of the batc
   });
 });
 
-describe('nameInLine and firstLineOf — a name or a tool\'s words inside a why never break its line (T2 S3 review round 1)', () => {
+describe('nameInLine and firstLineOf — a name or a tool\'s words inside a why never break its line', () => {
   it('nameInLine: a name as given; one holding a line break, or empty (else unseen), JSON-quoted, as words.ts\'s own errors quote a value', () => {
     expect([nameInLine('a b/Šť.ts'), nameInLine('a\nb'), nameInLine('a\rb')]).toEqual(['a b/Šť.ts', '"a\\nb"', '"a\\rb"']);
     expect(nameInLine('')).toBe('""');
@@ -271,7 +271,7 @@ describe('nameInLine and firstLineOf — a name or a tool\'s words inside a why 
   });
 });
 
-describe("exitText — a failed call in words, for every module of the batch core (ios-defaults.ts's, shared since T2 S5)", () => {
+describe("exitText — a failed call in words, for every module of the batch core", () => {
   const r = (code: number, out: string, err: string, timedOut = false): CallResult => ({ code, timedOut, signal: null, out, err });
 
   it('`exit n` and the first line said, stderr before stdout; nothing said, the exit alone', () => {
@@ -287,14 +287,14 @@ describe("exitText — a failed call in words, for every module of the batch cor
   });
 });
 
-describe('failedCall — one predicate for a failed call (T2 S5 code review)', () => {
+describe('failedCall — one predicate for a failed call', () => {
   const r = (code: number, timedOut = false): CallResult => ({ code, timedOut, signal: null, out: '', err: '' });
   it('any exit but 0, or past its bound whatever its code', () => {
     expect([failedCall(r(0)), failedCall(r(1)), failedCall(r(255)), failedCall(r(0, true)), failedCall(r(142, true))]).toEqual([false, true, true, true, true]);
   });
 });
 
-describe('canonicalJson — a value as one key, its objects\' fields sorted at every depth (T2 S6b review round 1, NIT 8: asksLive\'s key)', () => {
+describe('canonicalJson — a value as one key, its objects\' fields sorted at every depth (asksLive\'s key)', () => {
   it('two equal values built in another field order give one key; nested objects keep every field; arrays keep their order', () => {
     expect(canonicalJson({ b: 1, a: { d: [2, 1], c: null } })).toBe('{"a":{"c":null,"d":[2,1]},"b":1}');
     expect(canonicalJson({ a: { c: null, d: [2, 1] }, b: 1 })).toBe(canonicalJson({ b: 1, a: { d: [2, 1], c: null } }));

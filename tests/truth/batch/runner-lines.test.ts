@@ -73,7 +73,7 @@ describe('configOf — the out folder and the device ids from argv, then env; no
     expect(r.ok && Object.keys(r.config).sort()).toEqual(['androidHome', 'env', 'out', 'repo']);
   });
 
-  it('the Android SDK for a lab build: ANDROID_HOME, else the one under the home folder given (T2 S6b code review: read here, not in lab-build.ts)', () => {
+  it('the Android SDK for a lab build: ANDROID_HOME, else the one under the home folder given (read here, not in lab-build.ts)', () => {
     const at = (e: Record<string, string>) => {
       const r = configOf(['--out', '/o'], env(e), '/r', '/hm');
       return r.ok ? r.config.androidHome : undefined;
@@ -204,11 +204,11 @@ describe('errorLinesIn — the ERROR lines a block\'s log or analyze.txt holds',
   });
 });
 
-describe('logErrors — this run\'s ERROR lines from its logs, counted across them all, bounded (T2 S6a review rounds 1–3)', () => {
+describe('logErrors — this run\'s ERROR lines from its logs, counted across them all, bounded', () => {
   const log = (name: string, text: string | undefined, why?: string) => ({ name, path: `/o/${name}`, text, ...(why === undefined ? {} : { why }) });
   const times = (n: number, line: string) => Array.from({ length: n }, () => line).join('\n');
 
-  it('one line per distinct ERROR, run-wide, in first-seen order; repeated: its total and where (the reviewer\'s 50 in p, 1 in q, 2 in r); once: bare', () => {
+  it('one line per distinct ERROR, run-wide, in first-seen order; repeated: its total and where (50 in p, 1 in q, 2 in r); once: bare', () => {
     expect(logErrors([log('kf/p.log', `${times(50, 'ERROR same')}\nERROR only here`), log('kf/q.log', 'ERROR same'), log('E5/r.log', times(2, 'ERROR same'))])).toEqual([
       'ERROR same (×53, in kf/p.log, kf/q.log, E5/r.log)',
       'ERROR only here',
@@ -264,7 +264,7 @@ describe('liveCalls — live.ts\'s and its rejudge\'s calls: each bounded, from 
   });
 });
 
-describe('judgedNothingLine — a block the abort judged whose judge wrote no verdict of its label (T2 S6a review round 1)', () => {
+describe('judgedNothingLine — a block the abort judged whose judge wrote no verdict of its label', () => {
   it('INCONCLUSIVE, saying so: no wanted block is ever missing from the abort SUMMARY', () => {
     expect(judgedNothingLine('T6 verdict')).toBe('T6 verdict: INCONCLUSIVE — interrupted: its judge wrote no verdict');
   });
@@ -388,7 +388,7 @@ describe('the lines meet words.ts\'s exit rule', () => {
   });
 });
 
-describe('needCallLine — one call of a need, recorded in lab/<need>-calls.jsonl (T2b batch-13 gap 6: batch-13 wrapped the ios need\'s calls itself)', () => {
+describe('needCallLine — one call of a need, recorded in lab/<need>-calls.jsonl', () => {
   const result = (over: Partial<{ code: number; timedOut: boolean; out: string; err: string }> = {}) => ({ code: 0, timedOut: false, signal: null, out: 'the whole tree\n', err: '', ...over });
   const call = { need: 'ios', phase: 'check' as const, at: '09:44:26', cmd: '/usr/bin/xcrun', args: ['simctl', 'boot', 'U-1'], secs: 300, result: result() };
 
@@ -414,7 +414,7 @@ describe('needCallLine — one call of a need, recorded in lab/<need>-calls.json
   });
 });
 
-describe('a need\'s end in words: its whys, its notes, the abort\'s unread why (T2b-1 code review: the runner builds none inline)', () => {
+describe('a need\'s end in words: its whys, its notes, the abort\'s unread why (the runner builds none inline)', () => {
   it('the whys an unread line and the ERROR line carry; the LAB ERROR line; the notes', () => {
     expect(endLateWhy(0.02)).toBe('its end did not finish within 0.02 s');
     expect(endThrewWhy('simctl gone\nmore')).toBe('its end threw: simctl gone');

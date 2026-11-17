@@ -37,7 +37,7 @@ function caseInsensitive(): boolean {
 const E5: Stateful = { block: 'E5', what: 'E5 not put back', hand: (file) => [`  → node e5.ts --restore --state ${file}`] };
 const D43: Stateful = { block: 'D43', what: 'the simulator settings not put back', hand: () => ['  → node d43-gate.ts --restore'] };
 
-describe('stateOf — a probe\'s state file: dirty, clean or unreadable, by JSON\'s own parser (batch-7 → batch-12)', () => {
+describe('stateOf — a probe\'s state file: dirty, clean or unreadable, by JSON\'s own parser', () => {
   it('clean only when `dirty` is exactly false', () => {
     put('s.json', '{"dirty":false,"backup":"x"}');
     expect(stateOf(nodeFs, join(out, 's.json'))).toBe('clean');
@@ -59,13 +59,13 @@ describe('stateOf — a probe\'s state file: dirty, clean or unreadable, by JSON
   });
 });
 
-describe('refusals — the batch refuses to start, nothing done, while state is left (batch-10 refused, batch-11 every run)', () => {
+describe('refusals — the batch refuses to start, nothing done, while state is left', () => {
   it('a first run, an empty or missing out folder: nothing refuses', () => {
     expect(refusals(nodeFs, { out, stateful: [E5] })).toEqual([]);
     expect(refusals(nodeFs, { out: join(out, 'not-yet'), stateful: [E5] })).toEqual([]);
   });
 
-  it('refuse-restore: a RESTORE file left refuses, its hand lines printed, never renamed aside (batch-7 to batch-9 only renamed it with a WARN; batch-10 refuses)', () => {
+  it('refuse-restore: a RESTORE file left refuses, its hand lines printed, never renamed aside', () => {
     put('RESTORE.txt', 'batch-n run 1 interrupted; state to put back by hand:\nE5: adb install lab.apk\n');
     const lines = refusals(nodeFs, { out, stateful: [] });
     expect(lines).toEqual([
@@ -97,7 +97,7 @@ describe('refusals — the batch refuses to start, nothing done, while state is 
     expect(refusals(nodeFs, { out, stateful: [] })[0]).toMatch(/RESTORE\.txt exists/);
   });
 
-  it('refuse-dirty: every earlier run\'s state of every stateful block is read — dirty and unreadable refuse, clean does not (batch-11 extended it to every run folder)', () => {
+  it('refuse-dirty: every earlier run\'s state of every stateful block is read — dirty and unreadable refuse, clean does not', () => {
     put('E5/run-1/state.json', '{"dirty":false}');
     put('E5/run-2/state.json', '{"dirty":true}');
     put('E5/run-3/state.json', '{"dirty":');
@@ -154,7 +154,7 @@ describe('refusals — the batch refuses to start, nothing done, while state is 
     expect(refusals(nodeFs, { out: join(out, 'REPO'), repo: join(out, 'repo'), stateful: [] })).toHaveLength(1);
   });
 
-  it("a batch's own reasons (batch-12: a pre-D62 worktree of an earlier run still registered) come last, after the module's", () => {
+  it("a batch's own reasons (a pre-D62 worktree of an earlier run still registered) come last, after the module's", () => {
     put('RESTORE.txt', 'x\n');
     const lines = refusals(nodeFs, { out, stateful: [], batchReasons: ['the pre-D62 worktree w of an earlier run is still registered:', '  → git worktree prune'] });
     expect(lines.slice(-2)).toEqual(['the pre-D62 worktree w of an earlier run is still registered:', '  → git worktree prune']);
@@ -167,7 +167,7 @@ describe('refusals — the batch refuses to start, nothing done, while state is 
   });
 });
 
-describe('newRunId — the date and the pid, as batch-3 to batch-12 name a run', () => {
+describe('newRunId — the date and the pid', () => {
   it('YYYYMMDD-HHMMSS-<pid>, local time, zero-padded', () => {
     expect(newRunId(new Date(2026, 10, 4, 9, 4, 6), 2763)).toBe('20261104-090406-2763');
     expect(newRunId(new Date(2026, 0, 1, 23, 59, 59), 1)).toBe('20260101-235959-1');
@@ -177,7 +177,7 @@ describe('newRunId — the date and the pid, as batch-3 to batch-12 name a run',
 describe('openRun — one fresh run-<RUN_ID> folder per block, never emptied or reused (batch-3\'s B2 lost its raw data to a second run that emptied the folder)', () => {
   const BLOCKS = ['lab', 'kf', 'E5'];
 
-  it('creates meta and each wanted block\'s folder, nothing for a block not wanted (batch-12\'s run folder per block)', () => {
+  it('creates meta and each wanted block\'s folder, nothing for a block not wanted', () => {
     const run = openRun(nodeFs, { out, runId: '20261104-094426-2763', blocks: BLOCKS, wanted: ['lab', 'E5'] });
     expect(run).toEqual({
       ok: true,
@@ -223,7 +223,7 @@ describe('openRun — one fresh run-<RUN_ID> folder per block, never emptied or 
     expect(readFileSync(join(out, 'E5/run-X/data.json'), 'utf8')).toBe('kept');
   });
 
-  it('a folder that cannot be made for another reason: a refusal naming its code and the folders made before it, never "already exists", never a throw (T2b batch-13 gap 7)', () => {
+  it('a folder that cannot be made for another reason: a refusal naming its code and the folders made before it, never "already exists", never a throw', () => {
     const deniedAt = (n: number, e: unknown) => {
       let made = 0;
       return { ...nodeFs, mkdirExclusive: (p: string) => (++made === n ? (() => { throw e; })() : nodeFs.mkdirExclusive(p)) };
@@ -240,7 +240,7 @@ describe('openRun — one fresh run-<RUN_ID> folder per block, never emptied or 
     expect(openRun(deniedAt(1, 'no'), { out, runId: 'W', blocks: BLOCKS, wanted: BLOCKS })).toMatchObject({ error: expect.stringContaining('cannot be made (no);') });
   });
 
-  it('blockName: the one rule for a block\'s name, which openRun and the runner both ask (T2 S6a review round 1)', () => {
+  it('blockName: the one rule for a block\'s name, which openRun and the runner both ask', () => {
     expect(blockName('kf')).toBe('kf');
     expect(blockName('lab')).toBe('lab');
     for (const b of ['', '..', 'a/b', '-x', 'meta', 'k f']) expect(() => blockName(b), b).toThrow(`block name ${JSON.stringify(b)}: one plain path segment, not "meta", is needed`);
@@ -288,7 +288,7 @@ describe('writeRestore — the hand commands of state not provably put back', ()
   });
 });
 
-describe('plainSegment — one plain path segment or a throw naming what it is (shared with cases.ts, T2 S3 code review)', () => {
+describe('plainSegment — one plain path segment or a throw naming what it is (shared with cases.ts)', () => {
   it('a plain name comes back; anything else throws, the name JSON-quoted', () => {
     expect(plainSegment('run name', 'android-kf_1')).toBe('android-kf_1');
     for (const bad of ['', '.x', 'a/b', '../a', 'a.b', 'a b', '-a', 'a\nb']) expect(() => plainSegment('run name', bad), bad).toThrow(`run name ${JSON.stringify(bad)}: one plain path segment is needed`);

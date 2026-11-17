@@ -29,7 +29,7 @@ describe('T7b: the chooser group\'s records, rejudged', () => {
     expect(await verdictsOf(f)).toEqual(IDS.map((id) => [id, 'ok']));
   });
 
-  it("the first run, its reads after monkey taken once, mid-transition: lc4'' was MISMATCH and lc4' ok when run; now each one's mFocusedApp (the lab's .MainActivity) holds and what is left on the stack is unread: SKIP both", async () => {
+  it("the first run, its reads after monkey taken once, mid-transition: lc4'' was MISMATCH and lc4' ok when run; rejudged, each one's mFocusedApp (the lab's .MainActivity) holds and what is left on the stack is unread: SKIP both", async () => {
     const results = await rejudgedResults(read('unsettled-1.json'), { groups: ['chooser'] });
     expect(results.map((r) => [r.c.id, r.verdict.outcome])).toEqual([...IDS.slice(0, 3).map((id) => [id, 'ok']), ["lc4'", 'SKIP'], ["lc4''", 'SKIP']]);
     expect(results[3].verdict.why).toBe(results[4].verdict.why);

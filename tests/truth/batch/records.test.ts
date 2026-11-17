@@ -15,7 +15,7 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-describe('recordOf and recordGap — a non-live block\'s own record, apart from the live runs\' .cases (S3 review: batch-12\'s E5/T6 `{"runs":N}`)', () => {
+describe('recordOf and recordGap — a non-live block\'s own record, apart from the live runs\' .cases (E5/T6\'s `{"runs":N}`)', () => {
   it('a record is `{kind: "runs", runs: <whole number>}`', () => {
     expect(recordOf({ kind: 'runs', runs: 3 })).toEqual({ kind: 'runs', runs: 3 });
     expect(recordOf({ kind: 'runs', runs: 0 })).toEqual({ kind: 'runs', runs: 0 });
@@ -47,7 +47,7 @@ describe('recordOf and recordGap — a non-live block\'s own record, apart from 
 });
 
 
-describe('the records in a folder, written once each, and their gaps (T2 S6a code review: moved out of the runner)', () => {
+describe('the records in a folder, written once each, and their gaps', () => {
   it('writeAsked then writeDone; recordsIn lists each asked, sorted; recordGapIn reads both files', () => {
     writeAsked(nodeFs, dir, 'b', { kind: 'runs', runs: 2 });
     writeAsked(nodeFs, dir, 'a', { kind: 'runs', runs: 1 });
