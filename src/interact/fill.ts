@@ -115,7 +115,8 @@ function rectGap(a: Rect, b: Rect): number {
  * contract (DeviceAdapter.typeText), so the step reads "clear this field"
  * with clear and "focus without typing" without.
  * Errors carry the typed value's LENGTH only, and the field's text as
- * lengths: a value may be a credential. The selector is echoed as the caller
+ * lengths (after the focus tap; before it, a label the app built is quoted,
+ * as in every tool's list): a value may be a credential. The selector is echoed as the caller
  * wrote it — it is the caller's own text, and the flow engine redacts a
  * secret from every line (tests/interact/fill-leak.test.ts).
  * A value holding a control character is refused before anything is sent

@@ -206,7 +206,8 @@ own declaration and its own rows there.
 
 ## Amendment: what a fill must not say is what was typed, not its selector (2026-11-17, backlog A54)
 
-A fill's errors and replies carry the typed value's length only, and the field's text as lengths. Two texts are the
+A fill's errors and replies carry the typed value's length only, and the field's text as lengths (after the focus tap;
+before it, a label the app built is quoted, as in every tool's list). Two texts are the
 author's own and are shown as written: the selector, a `value:"…"` included, and the flow's fill line's value, which the
 engine shows as the author wrote it, `***` for a secret (it redacts a flow's secrets from every line, the selector's
 included). An ambiguity's list of candidates (`resolve.ts#resolveNow`, every verb's) names an input whose label is its
