@@ -6,6 +6,7 @@ import { IdbTreeSource } from '../../src/adapters/ios-tree-source.js';
 import { fillField, FillValueFailure } from '../../src/interact/fill.js';
 import { typeIntoFocused } from '../../src/interact/type-text.js';
 import { NO_EYES } from '../helpers/eyes.js';
+import { WDA_TYPEABLE } from '../../src/adapters/ios-typing.js';
 
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 
@@ -33,7 +34,8 @@ function fallenBack() {
     buildCached: async () => true,
     read: () => Promise.reject(new Error('never read')),
     applicationLabel: () => Promise.reject(new Error('never asked')),
-    typeText: () => Promise.reject(new Error('never typed')),
+    typeable: WDA_TYPEABLE,
+    typeWide: () => Promise.reject(new Error('never typed')),
     dispose: () => Promise.resolve(),
   };
   const adapter = new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: new AutoTreeSource({ wda, idb: new IdbTreeSource({ udid: 'AAAA-1111', exec }) }) });
@@ -57,13 +59,29 @@ describe('a fill under treeSource auto whose first read falls back to idb (A41a 
     errors.mockRestore();
   });
 
-  it('the adapter\'s backstop: a text that needs WDA reaching typeText after the fallback is refused as ADR 0037 words it, nothing sent', async () => {
+  it('a text that needs WDA reaching typeText after the fallback is the source\'s refusal, as ADR 0037 words it, with the note once, nothing sent', async () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const { adapter, calls } = fallenBack();
     await adapter.uiTree(); // the choice: idb
-    await expect(adapter.typeText('Šťastný')).rejects.toThrow(/^cannot type U\+0160 .*Refused before anything was sent.*\n⚠ read through idb: /s);
+    const err = (await adapter.typeText('Šťastný').catch((e: unknown) => e)) as Error;
+    expect(err.message).toMatch(/^cannot type U\+0160 .*Refused before anything was sent.*\n⚠ read through idb: /s);
+    expect(err.message.split('⚠')).toHaveLength(2);
     await expect(typeIntoFocused(adapter, 'Šťastný')).rejects.toThrow(/^cannot type U\+0160 .*\n⚠ read through idb: /s);
     expect(calls.filter((c) => c.startsWith('idb ui text'))).toEqual([]);
+    errors.mockRestore();
+  });
+
+  it('a control character refused after the fallback carries the note too, once — every refusal of the fallback\'s set does', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { adapter, calls } = fallenBack();
+    await adapter.uiTree(); // the choice: idb
+    const err = (await typeIntoFocused(adapter, 'a\nb').catch((e: unknown) => e)) as Error;
+    expect(err.message).toMatch(/^cannot type U\+000A \("\\n", a control character\).*\n⚠ read through idb: WebDriverAgent did not come up/s);
+    expect(err.message.split('⚠')).toHaveLength(2);
+    const fill = (await fillField(adapter, 'id:lab.name', 'a\tb', { ambiguous: 'first', clear: true, timeoutMs: 200, pollMs: 2, eyes: NO_EYES }).catch((e: unknown) => e)) as Error;
+    expect(fill.message).toMatch(/^cannot type U\+0009 .*\n⚠ read through idb: /s);
+    expect(fill.message.split('⚠')).toHaveLength(2);
+    expect(calls.filter((c) => /^idb ui (tap|text|key|swipe)/.test(c))).toEqual([]);
     errors.mockRestore();
   });
 });

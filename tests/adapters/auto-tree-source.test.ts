@@ -5,6 +5,8 @@ import { WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
 import { IOS_TREE_SOURCE_SETTINGS, DEFAULT_IOS_TREE_SOURCE } from '../../src/adapters/ios-node.js';
 import { zeroRect, type UiNode } from '../../src/adapters/types.js';
 import { fakeExec, fakeFetch, fakeSpawn, tempDerivedData } from '../helpers/fake-wda.js';
+import { IDB_TYPEABLE, WDA_TYPEABLE } from '../../src/adapters/ios-typing.js';
+import { refusalOf } from '../../src/adapters/typeable.js';
 
 /**
  * `treeSource: auto` (A41a, docs/adr/0046-the-ios-tree-source-is-webdriveragent-when-it-comes-up.md): one source per
@@ -48,7 +50,8 @@ function fakeWda(bringUp: () => Promise<void> = async () => undefined, cached: (
     async systemAlert() {
       return { title: 'from wda', buttons: [] } as never;
     },
-    async typeText(text: string) {
+    typeable: WDA_TYPEABLE,
+    async typeWide(text: string) {
       wda.typed.push(text);
     },
     async dispose() {
@@ -72,6 +75,10 @@ function fakeIdb(): IosTreeSource & { reads: number; labels: number } {
       idb.labels++;
       return { kind: 'label', label: 'Lab' };
     },
+    typeable: IDB_TYPEABLE,
+    async typeWide(text: string) {
+      throw new Error(`idb refuses ${text}`);
+    },
     async dispose() {},
   };
   return idb;
@@ -94,10 +101,10 @@ describe('AutoTreeSource — WebDriverAgent when it comes up, idb when it does n
     expect(wda.bringUps).toBe(1);
     expect(idb.reads).toBe(0);
     expect(auto.kind).toBe('wda');
-    expect(auto.fellBack).toBe(false);
-    expect(auto.claimNote).toBeUndefined();
+    expect(auto.fallback).toBeUndefined();
+    expect(auto.fallback).toBeUndefined();
     expect(auto.settleCadenceMs).toBeUndefined();
-    expect(auto.typeText).toBeDefined();
+    expect(auto.typeable).toBe(WDA_TYPEABLE);
   });
 
   it('WDA does not come up: every read is idb\'s, said once on stderr, WDA released, and each claim carries the note', async () => {
@@ -115,13 +122,12 @@ describe('AutoTreeSource — WebDriverAgent when it comes up, idb when it does n
       ['averi: treeSource auto — WebDriverAgent did not come up, so this simulator\'s tree is read through idb: WebDriverAgent requires the appium-webdriveragent package, an optional dependency of averi that is not installed — reinstall averi'],
     ]);
     expect(auto.kind).toBe('idb');
-    expect(auto.fellBack).toBe(true);
-    expect(auto.claimNote).toBe(
+        expect(auto.fallback?.note).toBe(
       'read through idb: WebDriverAgent did not come up (WebDriverAgent requires the appium-webdriveragent package; select_device again to retry) ' +
         'and idb lists no presented layer or scroll clip — a layer over the target or a clip cutting it was not judged',
     );
     expect(auto.settleCadenceMs).toBe(300);
-    expect(auto.typeText).toBeUndefined();
+    expect(refusalOf('Šťastný', auto.typeable)).toBe(`${refusalOf('Šťastný', IDB_TYPEABLE)}\n⚠ ${auto.fallback?.note}`);
   });
 
   it('WDA chosen, then failing: the failure is WDA\'s — never a switch to idb', async () => {
@@ -132,7 +138,7 @@ describe('AutoTreeSource — WebDriverAgent when it comes up, idb when it does n
     wda.read = () => Promise.reject(new Error('WDA /source request failed'));
     await expect(auto.read()).rejects.toThrow('WDA /source request failed');
     expect(idb.reads).toBe(0);
-    expect(auto.claimNote).toBeUndefined();
+    expect(auto.fallback).toBeUndefined();
   });
 
   it('before the first read: the label is idb\'s, no WDA is asked, no cadence, no note', async () => {
@@ -144,7 +150,7 @@ describe('AutoTreeSource — WebDriverAgent when it comes up, idb when it does n
     expect(wda.bringUps).toBe(0);
     expect(auto.kind).toBe('idb');
     expect(auto.settleCadenceMs).toBeUndefined();
-    expect(auto.claimNote).toBeUndefined();
+    expect(auto.fallback).toBeUndefined();
     // After WDA was chosen the label and the alert are WDA's.
     await auto.read();
     expect(await auto.applicationLabel()).toEqual({ kind: 'declined' });
@@ -152,20 +158,37 @@ describe('AutoTreeSource — WebDriverAgent when it comes up, idb when it does n
     expect(idb.labels).toBe(1);
   });
 
-  it('typing before the first read makes the choice: WDA up types through it; WDA down types nothing and says why', async () => {
+  it('typeWide before the first read makes the choice: WDA up types through it; WDA down is the fallback set\'s refusal, its note once', async () => {
     const up = fakeWda();
     const typedUp = new AutoTreeSource({ wda: up, idb: fakeIdb() });
-    await typedUp.typeText?.('Šťastný');
+    await typedUp.typeWide('Šťastný');
     expect(up.typed).toEqual(['Šťastný']);
 
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const gone = fakeWda(down);
     const fallen = new AutoTreeSource({ wda: gone, idb: fakeIdb() });
-    await expect(fallen.typeText?.('Šťastný')).rejects.toThrow(
-      /^cannot type U\+0160 .*Refused before anything was sent.*\n⚠ read through idb: WebDriverAgent did not come up \(WebDriverAgent requires the appium-webdriveragent package; select_device again to retry\) and idb lists/s,
-    );
+    const note =
+      'read through idb: WebDriverAgent did not come up (WebDriverAgent requires the appium-webdriveragent package; select_device again to retry) ' +
+      'and idb lists no presented layer or scroll clip — a layer over the target or a clip cutting it was not judged';
+    const refusal = `${refusalOf('Šťastný', IDB_TYPEABLE)}\n⚠ ${note}`;
+    await expect(fallen.typeWide('Šťastný')).rejects.toThrow(new Error(refusal));
+    await expect(fallen.typeWide('Šťastný')).rejects.toThrow(new Error(refusal));
     expect(gone.typed).toEqual([]);
-    expect(fallen.typeText).toBeUndefined();
+  });
+
+  it('typeable: WDA\'s before the choice and once WDA was chosen; after a fallback idb\'s, each refusal ending with the note', async () => {
+    const chosen = new AutoTreeSource({ wda: fakeWda(), idb: fakeIdb() });
+    expect(chosen.typeable).toBe(WDA_TYPEABLE);
+    await chosen.read();
+    expect(chosen.typeable).toBe(WDA_TYPEABLE);
+
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const fallen = new AutoTreeSource({ wda: fakeWda(down), idb: fakeIdb() });
+    await fallen.read();
+    const note = fallen.fallback!.note;
+    for (const text of ['Šťastný', 'a😀']) expect(refusalOf(text, fallen.typeable)).toBe(`${refusalOf(text, IDB_TYPEABLE)}\n⚠ ${note}`);
+    expect(refusalOf('Novak', fallen.typeable)).toBeUndefined();
+    expect(fallen.typeable).toBe(fallen.typeable); // built once, with the fallback
   });
 
   it('released while choosing: the release is the answer, not a fallback to idb', async () => {
@@ -214,7 +237,7 @@ describe('AutoTreeSource.startBeforeLaunch — the choice made before a launch, 
     const idb = fakeIdb();
     const auto = new AutoTreeSource({ wda, idb });
     let done = false;
-    const starting = auto.startBeforeLaunch().then(() => (done = true));
+    const starting = auto.startBeforeLaunch('com.app').then(() => (done = true));
     await drain();
     expect([wda.bringUps, done]).toEqual([1, false]); // awaited: not done while WDA comes up
     up.settle();
@@ -230,8 +253,8 @@ describe('AutoTreeSource.startBeforeLaunch — the choice made before a launch, 
     const wda = fakeWda(() => up.promise);
     const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
     const reading = auto.read();
-    const first = auto.startBeforeLaunch();
-    const second = auto.startBeforeLaunch();
+    const first = auto.startBeforeLaunch('com.app');
+    const second = auto.startBeforeLaunch('com.app');
     await drain();
     expect(wda.bringUps).toBe(1);
     expect(wda.cachedAsks).toBe(0); // a choice in flight is joined, whatever the build
@@ -245,9 +268,8 @@ describe('AutoTreeSource.startBeforeLaunch — the choice made before a launch, 
     const wda = fakeWda(() => Promise.reject(new Error('WDA build failed (xcodebuild build-for-testing) — output: /tmp/x.log')));
     const idb = fakeIdb();
     const auto = new AutoTreeSource({ wda, idb });
-    await expect(auto.startBeforeLaunch()).resolves.toBeUndefined();
-    expect(auto.fellBack).toBe(true);
-    expect(auto.claimNote).toBe(idbFallbackNote('WDA build failed'));
+    await expect(auto.startBeforeLaunch('com.app')).resolves.toBeUndefined();
+        expect(auto.fallback?.note).toBe(idbFallbackNote('WDA build failed'));
     expect(said).toHaveBeenCalledTimes(1);
     expect((await auto.read()).identifier).toBe('idb');
     expect(wda.bringUps).toBe(1);
@@ -256,7 +278,7 @@ describe('AutoTreeSource.startBeforeLaunch — the choice made before a launch, 
   it('WebDriverAgent not built: nothing is started or awaited — the first read makes the choice, the build inside it', async () => {
     const wda = fakeWda(undefined, async () => false);
     const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
-    await auto.startBeforeLaunch();
+    await auto.startBeforeLaunch('com.app');
     expect([wda.cachedAsks, wda.bringUps]).toEqual([1, 0]);
     expect((await auto.read()).identifier).toBe('wda');
     expect(wda.bringUps).toBe(1);
@@ -265,7 +287,7 @@ describe('AutoTreeSource.startBeforeLaunch — the choice made before a launch, 
   it('a build check that throws is no build: nothing started, the start resolves', async () => {
     const wda = fakeWda(undefined, () => Promise.reject(new Error('EACCES')));
     const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
-    await expect(auto.startBeforeLaunch()).resolves.toBeUndefined();
+    await expect(auto.startBeforeLaunch('com.app')).resolves.toBeUndefined();
     expect(wda.bringUps).toBe(0);
   });
 
@@ -273,7 +295,7 @@ describe('AutoTreeSource.startBeforeLaunch — the choice made before a launch, 
     const wda = fakeWda();
     const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
     await auto.read();
-    await auto.startBeforeLaunch();
+    await auto.startBeforeLaunch('com.app');
     expect([wda.cachedAsks, wda.bringUps]).toEqual([0, 1]);
 
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -281,25 +303,25 @@ describe('AutoTreeSource.startBeforeLaunch — the choice made before a launch, 
     const failing = Object.assign(fakeWda(down), { startBeforeLaunch: async () => void wdaStarts++ });
     const fellBack = new AutoTreeSource({ wda: failing, idb: fakeIdb() });
     await fellBack.read();
-    await fellBack.startBeforeLaunch();
+    await fellBack.startBeforeLaunch('com.app');
     expect([failing.cachedAsks, failing.bringUps, wdaStarts]).toEqual([0, 1, 0]); // a fallback's WDA is not started again
   });
 
   it('WDA chosen and since gone: WDA\'s own start runs before the launch — restarted, and its failure is WDA\'s error', async () => {
-    let starts = 0;
+    const starts: string[] = [];
     let fail: Error | undefined;
     const wda: FakeWda = Object.assign(fakeWda(), {
-      async startBeforeLaunch() {
-        starts++;
+      async startBeforeLaunch(bundleId: string) {
+        starts.push(bundleId);
         if (fail !== undefined) throw fail;
       },
     });
     const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
     await auto.read();
-    await auto.startBeforeLaunch();
-    expect([starts, wda.bringUps]).toEqual([1, 1]);
+    await auto.startBeforeLaunch('com.app');
+    expect([starts, wda.bringUps]).toEqual([['com.app'], 1]);
     fail = new Error('WDA did not answer /status on port 8100 within 60 s');
-    await expect(auto.startBeforeLaunch()).rejects.toBe(fail);
+    await expect(auto.startBeforeLaunch('com.app')).rejects.toBe(fail);
     expect(auto.kind).toBe('wda'); // never a switch to idb
   });
 
@@ -312,9 +334,8 @@ describe('AutoTreeSource.startBeforeLaunch — the choice made before a launch, 
       derivedDataPath: dd, readyTimeoutMs: 40, pollIntervalMs: 5,
     });
     const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
-    await expect(auto.startBeforeLaunch()).resolves.toBeUndefined();
-    expect(auto.fellBack).toBe(true);
-    expect(auto.claimNote).toMatch(/WebDriverAgent did not come up \(WDA did not answer \/status on port \d+ within 0\.04 s;/);
+    await expect(auto.startBeforeLaunch('com.app')).resolves.toBeUndefined();
+        expect(auto.fallback?.note).toMatch(/WebDriverAgent did not come up \(WDA did not answer \/status on port \d+ within 0\.04 s;/);
     expect(spawner.kills).toContain('SIGTERM');
     await auto.dispose();
   });
@@ -323,14 +344,14 @@ describe('AutoTreeSource.startBeforeLaunch — the choice made before a launch, 
     const later = fakeWda();
     const released = new AutoTreeSource({ wda: later, idb: fakeIdb() });
     await released.dispose();
-    await released.startBeforeLaunch();
+    await released.startBeforeLaunch('com.app');
     expect([later.cachedAsks, later.bringUps]).toEqual([0, 0]);
 
     const said = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const up = deferred();
     const wda = fakeWda(() => up.promise);
     const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
-    const starting = auto.startBeforeLaunch();
+    const starting = auto.startBeforeLaunch('com.app');
     starting.catch(() => undefined);
     await drain();
     await auto.dispose();
@@ -343,7 +364,7 @@ describe('AutoTreeSource.startBeforeLaunch — the choice made before a launch, 
     const cached = deferred();
     const wda = fakeWda(undefined, () => cached.promise.then(() => true));
     const auto = new AutoTreeSource({ wda, idb: fakeIdb() });
-    const starting = auto.startBeforeLaunch();
+    const starting = auto.startBeforeLaunch('com.app');
     await drain();
     await auto.dispose();
     cached.settle();

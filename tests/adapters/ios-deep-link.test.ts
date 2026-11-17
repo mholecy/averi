@@ -14,6 +14,7 @@ import {
 } from '../helpers/ios-lab.js';
 import { execErrorLikeExec } from '../helpers/exec-error.js';
 import { deepLinkText } from '../../src/mcp/tool-text.js';
+import { IDB_TYPING } from '../helpers/ios-typing.js';
 
 // The one sleep owner, recorded and not waited on; under a Date-only fake clock each recorded sleep moves the clock
 // by its length, so the wait's deadline plays out in virtual time.
@@ -535,6 +536,7 @@ describe('IosAdapter.openDeepLink — which app the typing goes into', () => {
       systemAlert: async () => (tree === undefined ? Promise.reject(new Error('unused')) : alertInWda(structuredClone(tree))),
       applicationLabel: async () => next[Math.min(i++, next.length - 1)],
       dispose: () => Promise.resolve(),
+      ...IDB_TYPING,
     };
     const exec: ExecFn = async (cmd, args) => {
       const full = [cmd, ...args].join(' ');

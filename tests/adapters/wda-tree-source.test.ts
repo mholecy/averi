@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { WDA_SETTLE_CADENCE_MS, WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
 import { SYSTEM_ALERT_SOURCE_TIMEOUT_MS, type FetchFn } from '../../src/adapters/wda.js';
 import { findAll } from '../../src/ui-tree/selectors.js';
+import { WDA_TYPEABLE } from '../../src/adapters/ios-typing.js';
 import { fakeExec, fakeFetch, fakeSpawn, tempDerivedData, WDA_STATUS } from '../helpers/fake-wda.js';
 
 // Raw /source envelope as WdaServer.source() returns it — the host-view
@@ -159,7 +160,7 @@ describe('WdaTreeSource.bringUp — WebDriverAgent up without a tree read (treeS
 describe('WdaTreeSource.startBeforeLaunch — WebDriverAgent brought up before a launch, awaited (treeSource wda, A41d)', () => {
   it('resolves with WebDriverAgent up; the first read reuses it — one WebDriverAgent, no /source before the read', async () => {
     const { source, spawner, fetcher } = await setup();
-    await source.startBeforeLaunch();
+    await source.startBeforeLaunch('com.app');
     expect(spawner.spawns).toHaveLength(1);
     expect(fetcher.urls.filter((u) => u.includes('/source'))).toEqual([]);
     await source.read();
@@ -170,7 +171,7 @@ describe('WdaTreeSource.startBeforeLaunch — WebDriverAgent brought up before a
   it('single-flight: a start while a read is starting WebDriverAgent joins it (WdaServer.ensureRunning)', async () => {
     const { source, spawner } = await setup();
     const reading = source.read();
-    await source.startBeforeLaunch();
+    await source.startBeforeLaunch('com.app');
     await reading;
     expect(spawner.spawns).toHaveLength(1);
     await source.dispose();
@@ -183,16 +184,26 @@ describe('WdaTreeSource.startBeforeLaunch — WebDriverAgent brought up before a
       udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fakeFetch(() => 'refused').fn, spawnFn: spawner.fn,
       derivedDataPath: dd, readyTimeoutMs: 40, pollIntervalMs: 5,
     });
-    await expect(source.startBeforeLaunch()).rejects.toThrow(/did not answer \/status on port \d+ within 0\.04 s/);
+    await expect(source.startBeforeLaunch('com.app')).rejects.toThrow(/did not answer \/status on port \d+ within 0\.04 s/);
     expect(spawner.kills).toContain('SIGTERM');
     await source.dispose();
+  });
+
+  it('a start that fails rejects saying the launch touched nothing, WDA\'s error quoted and kept as the cause', async () => {
+    const { dd } = await tempDerivedData(true);
+    const fetcher = fakeFetch(() => ({ status: 200, body: WDA_STATUS })); // answering before we spawned: not ours
+    const source = new WdaTreeSource({ udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fetcher.fn, spawnFn: fakeSpawn().fn, derivedDataPath: dd, pollIntervalMs: 5 });
+    const err = (await source.startBeforeLaunch('com.app').catch((e: unknown) => e)) as Error;
+    const cause = err.cause as Error;
+    expect(cause.message).toMatch(/but this session did not start it/);
+    expect(err.message).toBe(`WebDriverAgent did not come up before launching com.app — nothing was wiped or launched: ${cause.message}`);
   });
 
   it('a start that fails rejects with WDA\'s error, and is not kept: the read after it starts again', async () => {
     const { dd } = await tempDerivedData(true);
     const fetcher = fakeFetch(() => ({ status: 200, body: WDA_STATUS })); // answering before we spawned: not ours
     const source = new WdaTreeSource({ udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fetcher.fn, spawnFn: fakeSpawn().fn, derivedDataPath: dd, pollIntervalMs: 5 });
-    await expect(source.startBeforeLaunch()).rejects.toThrow(/but this session did not start it/);
+    await expect(source.startBeforeLaunch('com.app')).rejects.toThrow(/but this session did not start it/);
     const probes = () => fetcher.urls.filter((u) => u.endsWith('/status')).length;
     const before = probes();
     await expect(source.read()).rejects.toThrow(/but this session did not start it/);
@@ -205,7 +216,7 @@ describe('WdaTreeSource.startBeforeLaunch — WebDriverAgent brought up before a
     const fetcher = fakeFetch(() => 'refused');
     const exec = fakeExec();
     const source = new WdaTreeSource({ udid: 'AAAA-1111', exec: exec.fn, fetchFn: fetcher.fn, spawnFn: spawner.fn, derivedDataPath: dd, pollIntervalMs: 5 });
-    await source.startBeforeLaunch();
+    await source.startBeforeLaunch('com.app');
     expect(spawner.spawns).toEqual([]);
     expect(fetcher.urls).toEqual([]);
     expect(exec.calls).toEqual([]);
@@ -215,7 +226,7 @@ describe('WdaTreeSource.startBeforeLaunch — WebDriverAgent brought up before a
     const { source, spawner, fetcher } = await setup();
     await source.read();
     const asked = fetcher.urls.length;
-    await source.startBeforeLaunch();
+    await source.startBeforeLaunch('com.app');
     expect(fetcher.urls.length).toBe(asked);
     expect(spawner.spawns).toHaveLength(1);
     await source.dispose();
@@ -224,14 +235,23 @@ describe('WdaTreeSource.startBeforeLaunch — WebDriverAgent brought up before a
   it('released: starts nothing', async () => {
     const { source, spawner, fetcher } = await setup();
     await source.dispose();
-    await source.startBeforeLaunch();
+    await source.startBeforeLaunch('com.app');
     expect(spawner.spawns).toEqual([]);
     expect(fetcher.urls).toEqual([]);
   });
 
+  it('released during the start (select_device mid-launch): the released error as it is, never "did not come up"', async () => {
+    const { dd } = await tempDerivedData(true);
+    const source = new WdaTreeSource({ udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fakeFetch(() => 'refused').fn, spawnFn: fakeSpawn().fn, derivedDataPath: dd, pollIntervalMs: 5 });
+    const starting = source.startBeforeLaunch('com.app').catch((e: unknown) => e);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await source.dispose();
+    expect(((await starting) as Error).message).toMatch(/^The WebDriverAgent tree source for simulator AAAA-1111 has been released/);
+  });
+
   it('released while it looked for the build: starts nothing', async () => {
     const { source, spawner, fetcher } = await setup();
-    const starting = source.startBeforeLaunch();
+    const starting = source.startBeforeLaunch('com.app');
     await source.dispose();
     await starting;
     expect(spawner.spawns).toEqual([]);
@@ -487,7 +507,7 @@ describe('WdaTreeSource.systemAlert — one short /source read, never a start or
 });
 
 // D43 (ADR 0037's D43 amendment): the source also types what idb cannot — WdaServer.keys, on the one server it owns.
-describe('WdaTreeSource.typeText — WdaServer.keys on the source\'s own server (D43)', () => {
+describe('WdaTreeSource.typeWide — WdaServer.keys on the source\'s own server (D43)', () => {
   async function typingSetup(keys: () => 'refused' | { status: number; body?: unknown } = () => ({ status: 200, body: { value: null } })) {
     const { dd } = await tempDerivedData(true);
     const spawner = fakeSpawn();
@@ -502,10 +522,14 @@ describe('WdaTreeSource.typeText — WdaServer.keys on the source\'s own server 
     return { source, spawner, fetcher, keyBodies };
   }
 
+  it('typeable is WDA_TYPEABLE: what /wda/keys types', () => {
+    expect(new WdaTreeSource({ udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fakeFetch(() => 'refused').fn, spawnFn: fakeSpawn().fn }).typeable).toBe(WDA_TYPEABLE);
+  });
+
   it('types the text through the one server it owns: a session, then /wda/keys with the text — after a read, no second spawn', async () => {
     const { source, spawner, keyBodies } = await typingSetup();
     await source.read();
-    await source.typeText('Jan Šťastný');
+    await source.typeWide('Jan Šťastný');
     expect(keyBodies()).toEqual(['Jan Šťastný']);
     expect(spawner.spawns).toHaveLength(1);
     await source.dispose();
@@ -513,7 +537,7 @@ describe('WdaTreeSource.typeText — WdaServer.keys on the source\'s own server 
 
   it('a failure is WDA\'s, in its words', async () => {
     const { source } = await typingSetup(() => ({ status: 500, body: { value: { error: 'invalid element state', message: 'no focus' } } }));
-    await expect(source.typeText('Šťastný')).rejects.toThrow(/^WDA \/wda\/keys failed: HTTP 500 invalid element state on port/);
+    await expect(source.typeWide('Šťastný')).rejects.toThrow(/^WDA \/wda\/keys failed: HTTP 500 invalid element state on port/);
     await source.dispose();
   });
 
@@ -522,7 +546,7 @@ describe('WdaTreeSource.typeText — WdaServer.keys on the source\'s own server 
     await source.read();
     await source.dispose();
     const before = fetcher.urls.length;
-    const err = (await source.typeText('Šťastný').catch((e: unknown) => e)) as Error;
+    const err = (await source.typeWide('Šťastný').catch((e: unknown) => e)) as Error;
     expect(err.message).toMatch(/deselected or averi is shutting down/);
     expect(err.cause).toBeUndefined(); // released before the server is asked: no WdaServer error behind it
     expect(fetcher.urls.slice(before)).toEqual([]);
@@ -531,7 +555,7 @@ describe('WdaTreeSource.typeText — WdaServer.keys on the source\'s own server 
   it('disposed while typing: the released error, WdaServer\'s words only as its cause', async () => {
     const { source } = await typingSetup(() => 'refused');
     await source.read();
-    const typing = source.typeText('Šťastný').catch((e: Error) => e);
+    const typing = source.typeWide('Šťastný').catch((e: Error) => e);
     const disposing = source.dispose();
     const err = (await typing) as Error;
     expect(err.message).toMatch(/deselected or averi is shutting down/);

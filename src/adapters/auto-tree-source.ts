@@ -1,13 +1,13 @@
 import { errorMessage } from '../util/error-message.js';
-import { withNoteLine } from '../util/note-line.js';
 import type { IosTreeSourceKind } from './ios-node.js';
-import { idbTypingRefusal } from './ios-typing.js';
+import type { Typeable } from './typeable.js';
 import { mayStartBeforeLaunch } from './wda-tree-source.js';
 import type { ApplicationLabel, IosTreeSource } from './ios-tree-source.js';
-import type { SystemAlert, UiNode } from './types.js';
+import type { SystemAlert, TreeSourceFallback, UiNode } from './types.js';
+import { idbTypingRefusal } from './ios-typing.js';
 
 /**
- * The line every claiming reply carries once `auto` fell back to idb (IosTreeSource.claimNote; the tools print it as
+ * The line every claiming reply carries once `auto` fell back to idb (IosTreeSource.fallback; the tools print it as
  * `⚠ <line>`). Says the one fact that changes the claim — idb lists no presented layer and no scroll clip, so neither
  * was judged — why WebDriverAgent did not come up, in a few words (`reason`, fallbackReason), and the way to try again
  * (a select_device of the simulator drops a fallen-back adapter: mcp/registry.ts#select). The whole error is on stderr.
@@ -47,13 +47,13 @@ export type WdaSide = IosTreeSource & { bringUp(): Promise<void>; buildCached():
  * nothing. It is kept for the adapter's life:
  * - WDA came up → every call is WDA's, exactly as under `treeSource: wda` — a later WDA failure is WDA's error, never a
  *   switch to idb.
- * - It did not → the reason is said once on stderr, WDA is shut down, every read is idb's, and `claimNote` is set: the
+ * - It did not → the reason is said once on stderr, WDA is shut down, every read is idb's, and `fallback` is set: the
  *   tools add it to each reply that claims what it read (idbFallbackNote). No read is refused for it; a text idb
- *   cannot type is refused as under `treeSource: idb` (typeText).
+ *   cannot type is refused as under `treeSource: idb`, with the note's line (typeable, typeWide).
  *
  * Before the choice, what is asked without a tree read is idb's: a launch's application label (WDA's would be
  * `declined` — it is not up), `kind` (the label's wording) and no settle cadence (the default 500). Typing waits for
- * the choice (typeText).
+ * the choice (typeWide).
  *
  * The choice may be made before the first read (startBeforeLaunch): a launch awaits it before it touches the app,
  * when WDA's build is cached. It is the same choice — one attempt, which a read joins, and whose outcome is the one that
@@ -66,8 +66,11 @@ export class AutoTreeSource implements IosTreeSource {
   private chosen: IosTreeSource | undefined;
   /** The choice in flight, shared by every read that starts before it is made. */
   private choosing: Promise<IosTreeSource> | undefined;
-  /** Why WDA did not come up (fallbackReason), set with a fallback to idb. */
-  private reason: string | undefined;
+  /**
+   * Set with the choice of idb: the fallback, its note naming why WDA did not come up (fallbackReason), and idb's set
+   * carrying that note (Typeable.note) — both built once, the same objects every time they are asked.
+   */
+  private fellBack: { readonly fallback: TreeSourceFallback; readonly typeable: Typeable } | undefined;
   /** WDA's shutdown after a fallback, awaited by dispose(). */
   private wdaReleased: Promise<void> | undefined;
   private disposed = false;
@@ -85,31 +88,30 @@ export class AutoTreeSource implements IosTreeSource {
     return this.chosen?.settleCadenceMs;
   }
 
-  /** The first read chose idb: WebDriverAgent did not come up. */
-  get fellBack(): boolean {
-    return this.chosen === this.idb;
-  }
-
-  get claimNote(): string | undefined {
-    return this.fellBack ? idbFallbackNote(this.reason ?? NO_REASON) : undefined;
+  /** Set once the choice was idb: WebDriverAgent did not come up (IosTreeSource.fallback). */
+  get fallback(): TreeSourceFallback | undefined {
+    return this.fellBack?.fallback;
   }
 
   /**
-   * WDA's typer while WDA is or may be chosen; none once idb was, so a fallback refuses what idb cannot type before
-   * anything is sent (ADR 0037). Before the choice it makes it: a text sent here is one idb cannot type, and if WDA
-   * does not come up it is refused as idb refuses it, with the claim note's line (the reason, the retry) — nothing
-   * typed.
+   * WDA's set while WDA is or may be chosen; idb's once idb was, its every refusal ending with the claim note's line
+   * (Typeable.note: the reason, the retry), so a fallback refuses what idb cannot type before anything is sent (ADR
+   * 0037) and says why that set applies.
    */
-  get typeText(): ((text: string) => Promise<void>) | undefined {
-    return this.chosen === this.idb ? undefined : this.typeThroughWda;
+  get typeable(): Typeable {
+    return this.fellBack?.typeable ?? this.wda.typeable;
   }
 
-  private readonly typeThroughWda = async (text: string): Promise<void> => {
-    if ((await this.source()) !== this.wda || this.wda.typeText === undefined) {
-      throw new Error(withNoteLine(idbTypingRefusal(text), this.claimNote));
-    }
-    return this.wda.typeText(text);
-  };
+  /**
+   * Makes the choice (a text sent here is one idb cannot type): WDA chosen types it; after a fallback it is refused by
+   * the fallen-back set (`typeable`), in idb's words with the claim note's line last — its one route, Typeable.note —
+   * nothing typed.
+   */
+  async typeWide(text: string): Promise<void> {
+    await this.source(); // the choice: idb chosen is a fallback
+    if (this.fellBack === undefined) return this.wda.typeWide(text);
+    throw new Error(idbTypingRefusal(text, this.fellBack.typeable));
+  }
 
   async read(): Promise<UiNode> {
     return (await this.source()).read();
@@ -127,9 +129,9 @@ export class AutoTreeSource implements IosTreeSource {
    * A WDA that does not come up is the fallback (choose): the start resolves, with the stderr line and the claim note
    * the first read would have met. Released: nothing; released mid-choice: the read's released error.
    */
-  async startBeforeLaunch(): Promise<void> {
+  async startBeforeLaunch(bundleId: string): Promise<void> {
     if (this.disposed) return;
-    if (this.chosen !== undefined) return this.chosen === this.wda ? this.wda.startBeforeLaunch?.() : undefined;
+    if (this.chosen !== undefined) return this.chosen === this.wda ? this.wda.startBeforeLaunch?.(bundleId) : undefined;
     if (this.choosing === undefined && !(await mayStartBeforeLaunch(this.wda, () => this.disposed))) return;
     await this.source();
   }
@@ -159,7 +161,8 @@ export class AutoTreeSource implements IosTreeSource {
         "averi: treeSource auto — WebDriverAgent did not come up, so this simulator's tree is read through idb: " +
           errorMessage(err),
       );
-      this.reason = fallbackReason(err);
+      const note = idbFallbackNote(fallbackReason(err));
+      this.fellBack = { fallback: { note }, typeable: { ...this.idb.typeable, note } };
       this.wdaReleased = this.wda.dispose().catch(() => undefined);
       this.chosen = this.idb;
     }

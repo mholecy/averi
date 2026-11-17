@@ -1,3 +1,5 @@
+import { withNoteLine } from '../util/note-line.js';
+
 /**
  * Which characters an adapter's `typeText` can type — a per-adapter fact (`DeviceAdapter.typeable`), read by one
  * function (`refusalOf`), which finds the first character it refuses and words the refusal
@@ -34,6 +36,11 @@ export interface Typeable {
    * no such path.
    */
   readonly widerPath?: Pick<Typeable, 'refuses'> & { blockedBy(char: string): string };
+  /**
+   * A claim note's line every refusal of this set ends with (util/note-line.ts#withNoteLine): the line that says why
+   * this set applies — iOS `treeSource: auto` fallen back to idb (adapters/auto-tree-source.ts, ADR 0046). Absent: none.
+   */
+  readonly note?: string;
 }
 
 /** Printable ASCII (U+0020–U+007E) as the body of a RegExp character class — what Android's `input text` and idb's `ui text` type. */
@@ -69,13 +76,15 @@ function blockedRemedy(text: string, wider: NonNullable<Typeable['widerPath']>):
 /**
  * The refusal of `text` by `typeable`, or undefined when it can type all of it. The refusal names the FIRST character it
  * cannot type (whole: a surrogate pair is one), never the value around it (a value may be a credential); says nothing
- * was sent — true at both places that throw it: before the fill's field is resolved (interact/type-text.ts) and before
- * Android's first `input text` — what the adapter types, and the remedy true for it (`otherPath`; with a `widerPath` that would
- * refuse the value too, its `blockedBy`, naming the first character that path refuses).
+ * was sent — true wherever it is thrown: before the fill's field is resolved (interact/type-text.ts), before Android's
+ * first `input text`, and by an iOS tree source's typeWide that types nothing beyond idb
+ * (ios-typing.ts#idbTypingRefusal) — what the adapter types, and the remedy true for it (`otherPath`; with a
+ * `widerPath` that would refuse the value too, its `blockedBy`, naming the first character that path refuses); then
+ * the set's `note` line, if any.
  */
 export function refusalOf(text: string, typeable: Typeable): string | undefined {
   const ch = text.match(typeable.refuses)?.[0];
   if (ch === undefined) return undefined;
   const remedy = (typeable.widerPath && blockedRemedy(text, typeable.widerPath)) ?? typeable.otherPath;
-  return `cannot type ${named(ch)}: ${typeable.says}. Refused before anything was sent — nothing tapped, cleared or typed. ${remedy}`;
+  return withNoteLine(`cannot type ${named(ch)}: ${typeable.says}. Refused before anything was sent — nothing tapped, cleared or typed. ${remedy}`, typeable.note);
 }

@@ -8,9 +8,11 @@ import { WdaTreeSource } from './wda-tree-source.js';
 import { AutoTreeSource } from './auto-tree-source.js';
 import type { WdaServerOptions } from './wda.js';
 import type { IdbHelper } from './idb-helper.js';
-import { PersistentReadError, rectArea, rectIntersection, zeroRect, type Rect, type SystemAlert, type UiNode } from './types.js';
+import { PersistentReadError, rectArea, rectIntersection, zeroRect, type Rect, type SystemAlert, type TreeSourceFallback, type UiNode } from './types.js';
 import { alertShapeInIdb } from './ios-system-alert.js';
 import { countOf } from '../util/count.js';
+import { IDB_TYPEABLE, idbTypingRefusal } from './ios-typing.js';
+import type { Typeable } from './typeable.js';
 
 /**
  * The iOS tree-source seam. `simctl` cannot read the accessibility tree,
@@ -18,27 +20,25 @@ import { countOf } from '../util/count.js';
  * `idb ui describe-all` (a FLAT list of AX elements) or WebDriverAgent's
  * `/source` (the NESTED XCUIElement tree that still carries the React Native
  * host-view identifiers idb drops — docs/plans/ios-wda-tree-source.md).
- * Two real adapters behind one small interface is what makes this a seam and
- * not a flag.
+ * Two real adapters behind one interface, and `auto` (AutoTreeSource) choosing one of them per adapter, is what makes
+ * this a seam and not a flag.
  *
- * The interface is deliberately small: three methods. `read()` returns a
- * fresh normalized tree per call (the layers above mutate nodes — field-error
- * pairing writes `error` — so no source may hand out a cached graph).
- * `applicationLabel()` answers the one question the normalized tree cannot —
- * which app a read is of (its doc below). `dispose()` releases whatever the
- * source started; it is awaited by the process shutdown, so it resolves when
- * the resource is gone, not when the release was queued (the WDA source stops
- * its WebDriverAgent and waits for the port to go quiet). Both sources are
- * bound to ONE concrete simulator at construction: idb rejects simctl's
- * `booted` alias and WDA needs a UDID for `xcodebuild -destination`, so the
- * alias is resolved by whoever constructs the source — the registry, which
- * only ever binds concrete device ids.
+ * At its core three methods. `read()` returns a fresh normalized tree per call (the layers above mutate nodes —
+ * field-error pairing writes `error` — so no source may hand out a cached graph). `applicationLabel()` answers the
+ * one question the normalized tree cannot — which app a read is of (its doc below). `dispose()` releases whatever the
+ * source started; it is awaited by the process shutdown, so it resolves when the resource is gone, not when the
+ * release was queued (the WDA source stops its WebDriverAgent and waits for the port to go quiet). Every source is
+ * bound to ONE concrete simulator at construction: idb rejects simctl's `booted` alias and WDA needs a UDID for
+ * `xcodebuild -destination`, so the alias is resolved by whoever constructs the source — the registry, which only
+ * ever binds concrete device ids.
  *
- * Only the tree read lives behind this seam. Taps, typing, install and launch
- * stay on idb/simctl whichever source is configured (plan, decision 4): WDA
- * frames are points, the same units idb rects use, so the coordinates agree.
- * One exception: WDA's source types what idb cannot (`typeText`, optional,
- * as `systemAlert`), on the WebDriverAgent it already owns.
+ * Beside the tree read the seam holds what follows from which backend reads it, so that IosAdapter asks the source
+ * and never decides by backend: the source's lifecycle (`startBeforeLaunch`, whose failure the source words;
+ * `dispose`), its fallback (`fallback`, `auto`'s), the text it types beyond idb (`typeable`, `typeWide`: WDA's
+ * `/wda/keys`, on the WebDriverAgent it already owns; the others refuse), its measured settle cadence
+ * (`settleCadenceMs`), and one short read for iOS's system alert (`systemAlert`, WDA's). Taps, idb's typing, install
+ * and launch stay on idb/simctl whichever source is configured (plan, decision 4): WDA frames are points, the same
+ * units idb rects use, so the coordinates agree.
  */
 export interface IosTreeSource {
   /**
@@ -50,16 +50,11 @@ export interface IosTreeSource {
    */
   readonly kind: IosTreeSourceKind;
   /**
-   * One line every reply that claims what it read through this source carries (DeviceAdapter.claimNote) — set only by
-   * `auto` once it fell back to idb (AutoTreeSource, A41a). Absent on idb and wda: a configured source says nothing.
+   * Set once this source fell back from the backend it was asked for — only `auto` whose WebDriverAgent did not come
+   * up (AutoTreeSource, A41a); its `note` is the line every claiming reply carries (DeviceAdapter.fallback, which
+   * IosAdapter forwards). Absent on idb and wda: a configured source says nothing.
    */
-  readonly claimNote?: string;
-  /**
-   * Whether this source fell back from the backend it was asked for — `auto` whose WebDriverAgent did not come up, so
-   * its typer is gone (AutoTreeSource, A41a). What IosAdapter.typeText's backstop decides by; absent (not fallen back)
-   * on idb and wda.
-   */
-  readonly fellBack?: boolean;
+  readonly fallback?: TreeSourceFallback;
   /**
    * The cadence at which two of this source's reads may prove an element holds still (types.ts#DeviceAdapter.
    * settleCadenceMs, which IosAdapter forwards; docs/adr/0040-the-settle-cadence-is-the-tree-sources.md). The SOURCE's
@@ -70,12 +65,13 @@ export interface IosTreeSource {
   readonly settleCadenceMs?: number;
   read(): Promise<UiNode>;
   /**
-   * Does what this source's first read would otherwise start, and resolves when that is done — or decides to start
-   * nothing (the implementations say when). Rejects only where a read would fail for the same reason. Awaited by
-   * IosAdapter.launch before it touches the app (ADR 0046's A41d amendment). Absent on idb and on the recorded source:
-   * nothing to start.
+   * Does what this source's first read would otherwise start, before the launch of `bundleId`, and resolves when that
+   * is done — or decides to start nothing (the implementations say when). Rejects only where a read would fail for the
+   * same reason, with an error the launch passes on as it is: the source words it (WdaTreeSource's names the bundle and
+   * says nothing was wiped or launched; a release is the released error). Awaited by IosAdapter.launch before it
+   * touches the app (ADR 0046's A41d amendment). Absent on idb and on the recorded source: nothing to start.
    */
-  startBeforeLaunch?(): Promise<void>;
+  startBeforeLaunch?(bundleId: string): Promise<void>;
   /**
    * Which app a fresh read is OF. idb: the label of the payload's
    * `Application` element — its display name ("Skeleton Internal",
@@ -96,12 +92,20 @@ export interface IosTreeSource {
    */
   systemAlert?(): Promise<SystemAlert | undefined>;
   /**
-   * Types `text` into whatever holds keyboard focus — WDA's only (WdaTreeSource: `POST /session/:id/wda/keys`, D43;
-   * ADR 0037's D43 amendment). IosAdapter sends it only what idb cannot type (ios-typing.ts#typingPathOf), and declares
-   * WDA_TYPEABLE when it is present. Absent on idb and on the differential harness's recorded source: their adapter
-   * types through idb alone.
+   * What an IosAdapter over this source types (DeviceAdapter.typeable, ios-typing.ts, ADR 0037's D43 amendment) — the
+   * source's fact, since only WebDriverAgent's types beyond idb: WDA_TYPEABLE on WDA; IDB_TYPEABLE on idb and on the
+   * differential harness's recorded source (of kind `wda` too, typing nothing); under `auto` WDA's until a fallback,
+   * then idb's with the claim note's line on every refusal (AutoTreeSource).
    */
-  typeText?(text: string): Promise<void>;
+  readonly typeable: Typeable;
+  /**
+   * Types a text idb cannot type (ios-typing.ts#typingPathOf: IosAdapter.typeText sends this source every such text,
+   * whole, and no other) into whatever holds keyboard focus — or refuses it, nothing sent. WDA types it (WdaTreeSource:
+   * `POST /session/:id/wda/keys`, D43); idb and the recorded source refuse it in idb's words
+   * (ios-typing.ts#idbTypingRefusal); `auto` makes its choice and hands it to WDA, or after a fallback refuses it so
+   * too, by its fallen-back set, whose note ends the refusal.
+   */
+  typeWide(text: string): Promise<void>;
   dispose(): Promise<void>;
 }
 
@@ -529,6 +533,7 @@ export const IDB_SETTLE_CADENCE_MS = 300;
 export class IdbTreeSource implements IosTreeSource {
   readonly kind = 'idb' as const;
   readonly settleCadenceMs = IDB_SETTLE_CADENCE_MS;
+  readonly typeable = IDB_TYPEABLE;
   private readonly udid: string;
   private readonly exec: ExecFn;
   /**
@@ -585,6 +590,11 @@ export class IdbTreeSource implements IosTreeSource {
     // Area on the NORMALIZED rects (rounded, a missing frame zeroed); the raw types only name the shape.
     if (!tree.children.some((el) => rectArea(el.rect) > 0)) throw new IdbEmptyTreeError(this.udid, elements.map((el) => el.type));
     return { elements, tree };
+  }
+
+  /** idb types no text this is sent: refused in idb's words (ADR 0037), nothing sent — never idb's Python trace. */
+  typeWide(text: string): Promise<void> {
+    return Promise.reject(new Error(idbTypingRefusal(text)));
   }
 
   dispose(): Promise<void> {

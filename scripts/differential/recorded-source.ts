@@ -1,6 +1,7 @@
 import { markIdbDialect, type ApplicationLabel, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
 import type { UiNode } from '../../src/adapters/types.js';
 import { markWdaDialect } from '../../src/adapters/wda-source.js';
+import { IDB_TYPEABLE, idbTypingRefusal } from '../../src/adapters/ios-typing.js';
 import type { Recording } from './corpus.js';
 import { REPLAYED_APP } from './fake-device.js';
 
@@ -38,6 +39,8 @@ import { REPLAYED_APP } from './fake-device.js';
  */
 export class RecordedTreeSource implements IosTreeSource {
   readonly kind: 'wda' | 'idb';
+  /** It types nothing beyond idb, whatever kind it replays: idb's set (IosTreeSource.typeable). */
+  readonly typeable = IDB_TYPEABLE;
 
   constructor(
     private readonly recording: Recording,
@@ -77,6 +80,11 @@ export class RecordedTreeSource implements IosTreeSource {
   async applicationLabel(): Promise<ApplicationLabel> {
     if (this.kind === 'idb') return { kind: 'unlabelled' };
     return this.asksWdaBundle ? { kind: 'bundle', bundleId: REPLAYED_APP } : { kind: 'declined' };
+  }
+
+  /** A text only WebDriverAgent types: refused in idb's words, as its `typeable` refuses it — nothing sent. */
+  async typeWide(text: string): Promise<void> {
+    throw new Error(idbTypingRefusal(text));
   }
 
   async dispose(): Promise<void> {}

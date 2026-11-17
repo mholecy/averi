@@ -9,7 +9,7 @@ import { screenshotPng } from './screenshot-bytes.js';
 import { rebootSimulatorAdvice } from './simulator-reboot.js';
 import { errorMessage } from '../util/error-message.js';
 import { DESCRIBE_ALL_TIMEOUT_MS, IdbEmptyTreeError, type IosTreeSource } from './ios-tree-source.js';
-import type { AppHolder, DeepLinkOptions, DeviceAdapter, DeviceScreen, Key, LaunchOptions, Point, UiNode } from './types.js';
+import type { AppHolder, DeepLinkOptions, DeviceAdapter, DeviceScreen, Key, LaunchOptions, Point, TreeSourceFallback, UiNode } from './types.js';
 import { awaitForeground, type ForegroundCheck } from './ios-foreground.js';
 import { appInfoBundle, appInfoNames, type AppBinary } from './simctl-appinfo.js';
 import { noLinkHandler } from './ios-link-failure.js';
@@ -19,10 +19,8 @@ import { ViewportMemo } from './viewport-memo.js';
 import { iosStatusBand } from './ios-status-band.js';
 import { isAppDataContainer, resetDataContainer } from './ios-data-container.js';
 import { sleep } from '../util/sleep.js';
-import { TreeSourceReleasedError } from './wda-tree-source.js';
 import type { Typeable } from './typeable.js';
-import { withNoteLine } from '../util/note-line.js';
-import { IDB_TYPEABLE, idbTypingRefusal, typingPathOf, WDA_TYPEABLE } from './ios-typing.js';
+import { typingPathOf } from './ios-typing.js';
 
 /**
  * How long uiTree({ settle: true }) waits before its one re-read of an idb
@@ -168,31 +166,27 @@ function appKey(front: FrontApp): AppKey | undefined {
  * injected IosTreeSource for the accessibility tree (ios-tree-source.ts —
  * idb's describe-all or WebDriverAgent's /source, chosen by the registry from
  * averi.yaml). Everything idb-specific for INPUT stays in the `idb*` methods;
- * the tree read belongs to the source, so swapping the tree backend touches
- * no line of this class (ARCHITECTURE.md §3, §10).
+ * the tree read belongs to the source, and so does whatever follows from its
+ * backend — its start before a launch and that start's failure, its fallback,
+ * the text only WebDriverAgent types — and this class asks it rather than
+ * deciding by backend; only words that name the source read its `kind`
+ * (keyboardAdvice, the foreground wait's notes) (ARCHITECTURE.md §3, §10).
  */
 export class IosAdapter implements DeviceAdapter {
   readonly platform = 'ios' as const;
   /** `idb ui text` delivers its HID events before it returns (types.ts#TypingDelivery, measured 2026-10-19). */
   readonly typingDelivery = 'on-return' as const;
   /**
-   * What this adapter types (ios-typing.ts, ADR 0037's D43 amendment): WDA_TYPEABLE over a tree source that types
-   * (IosTreeSource.typeText — WDA's), else IDB_TYPEABLE. Decided by the source's typer, not its kind: the differential
-   * harness's recorded source is of kind `wda` and types nothing. Asked of the source per call: fixed for idb and wda,
-   * and under `auto` (A41a) WDA's until its first read chose idb, IDB_TYPEABLE from then on.
+   * What this adapter types (ios-typing.ts, ADR 0037's D43 amendment): the tree source's fact (IosTreeSource.typeable),
+   * asked of it per call — under `auto` (A41a) it changes once, at the choice.
    */
   get typeable(): Typeable {
-    return this.treeSource.typeText !== undefined ? WDA_TYPEABLE : IDB_TYPEABLE;
+    return this.treeSource.typeable;
   }
 
-  /** The source's line for every claiming reply (DeviceAdapter.claimNote): `auto`'s, once it fell back (A41a). */
-  get claimNote(): string | undefined {
-    return this.treeSource.claimNote;
-  }
-
-  /** Whether the source fell back (DeviceAdapter.fellBack, IosTreeSource.fellBack): `auto` read through idb (A41a). */
-  get fellBack(): boolean {
-    return this.treeSource.fellBack === true;
+  /** The source's fallback and its note (DeviceAdapter.fallback, IosTreeSource.fallback): `auto`'s, once it read through idb (A41a). */
+  get fallback(): TreeSourceFallback | undefined {
+    return this.treeSource.fallback;
   }
   private readonly exec: ExecFn;
   private readonly udid: string;
@@ -245,7 +239,7 @@ export class IosAdapter implements DeviceAdapter {
     return simctl(this.exec, args, timeoutMs);
   }
 
-  // --- idb boundary (input only — the tree read is the source's) ---
+  // --- idb boundary (input only — the tree read, and the text only WebDriverAgent types, are the source's) ---
 
   private idb(args: string[], timeoutMs?: number) {
     return runIdb(this.exec, this.udid, args, { timeoutMs, helper: this.idbHelper });
@@ -340,13 +334,8 @@ export class IosAdapter implements DeviceAdapter {
       );
     }
     // The tree source's start first, awaited, so it never races the wipe or the launch (IosTreeSource.startBeforeLaunch,
-    // ADR 0046's A41d amendment). Its failure fails the launch, nothing touched; a release is passed on as it is.
-    try {
-      await this.treeSource.startBeforeLaunch?.();
-    } catch (err) {
-      if (err instanceof TreeSourceReleasedError) throw err;
-      throw new Error(`WebDriverAgent did not come up before launching ${bundleId} — nothing was wiped or launched: ${errorMessage(err)}`, { cause: err });
-    }
+    // ADR 0046's A41d amendment). Its failure fails the launch, nothing touched, in the source's own words.
+    await this.treeSource.startBeforeLaunch?.(bundleId);
     if (opts.clearState) await this.clearAppData(bundleId);
     await this.prepareForOpen(`launching ${bundleId}`);
     await this.simctl(['launch', this.udid, bundleId]);
@@ -764,32 +753,23 @@ export class IosAdapter implements DeviceAdapter {
     // Guarded here, once, because the refusal is idb's, a platform fact no
     // caller owns, and every caller hands its text through unexamined.
     if (text === '') return;
-    // D43 (ios-typing.ts): a text idb cannot type goes whole to the source's typer — WDA's `/wda/keys`, which delivers
-    // on return (batch-10's G1: 20/20), so `typingDelivery` holds for it too. No D24 split there: batch-10's G5 typed
-    // 10/10 into the RN field with no tail dropped, and the fill's retype stays the net. Every text idb can type stays
-    // on idb, byte for byte; over a source without a typer every text does.
-    if (this.treeSource.typeText !== undefined && typingPathOf(text) === 'wda') {
-      await this.treeSource.typeText(text);
+    // D43 (ios-typing.ts): a text idb cannot type goes whole to the source (IosTreeSource.typeWide), which types it
+    // or refuses it, nothing sent. WDA's types through `/wda/keys`, which delivers on return (batch-10's G1: 20/20), so
+    // `typingDelivery` holds for it too. No D24 split there: batch-10's G5 typed 10/10 into the RN field with no tail
+    // dropped, and the fill's retype stays the net. Every text idb can type stays on idb, byte for byte.
+    if (typingPathOf(text) === 'wda') {
+      await this.treeSource.typeWide(text);
       return;
     }
-    // A backstop, not a path: a source that fell back (IosTreeSource.fellBack — `auto` whose WebDriverAgent did not
-    // come up) lost its typer after a caller checked `typeable`. A text only WDA types gets ADR 0037's refusal, nothing
-    // sent, instead of idb's trace. Over idb and the recorded source (never fallen back) nothing changes.
-    if (this.fellBack && typingPathOf(text) === 'wda') {
-      throw new Error(withNoteLine(idbTypingRefusal(text), this.treeSource.claimNote));
-    }
-    // An app seen dropping a tail (D24, FIRST_KEY_ALONE_MS): its first character alone, a wait, then the rest. The
-    // first character is a grapheme (Intl.Segmenter), so a surrogate pair or a letter with its combining mark is never
-    // split between two idb calls. A one-character text has no rest: one call, no wait.
+    // An app seen dropping a tail (D24, FIRST_KEY_ALONE_MS): its first character alone, a wait, then the rest. A text
+    // here is idb's (typingPathOf: printable ASCII and `\n`), one UTF-16 unit a character, so the first unit is the
+    // first character whole. A one-character text has no rest: one call, no wait.
     const key = appKey(this.front);
-    if (key !== undefined && this.dropsTail.has(key)) {
-      const [first] = new Intl.Segmenter().segment(text);
-      if (first !== undefined && first.segment.length < text.length) {
-        await this.idbText(first.segment);
-        await sleep(FIRST_KEY_ALONE_MS);
-        await this.idbText(text.slice(first.segment.length));
-        return;
-      }
+    if (key !== undefined && this.dropsTail.has(key) && text.length > 1) {
+      await this.idbText(text[0]);
+      await sleep(FIRST_KEY_ALONE_MS);
+      await this.idbText(text.slice(1));
+      return;
     }
     await this.idbText(text);
   }

@@ -139,7 +139,7 @@ export const HANDOFF_MAX_AGE_MS = 1_000;
  * - `acts`: may change what the device shows (or tears the adapter down). Each call invalidates the kept read.
  * - `fact`: a value of the adapter, never called — no device call, so the kept read stands across it. Most are
  *   constants. A few change once, at the adapter's first tree read, and are read as they stand when used: under iOS
- *   `treeSource: auto` (A41a) `typeable`, `settleCadenceMs`, `claimNote` and `fellBack` follow the source that read
+ *   `treeSource: auto` (A41a) `typeable`, `settleCadenceMs` and `fallback` follow the source that read
  *   chose. Reading one asks the device nothing either way, which is all this record classifies.
  * `noteDroppedTail` is classed `reads`: it asks nothing of the device and changes nothing it shows (it tells the
  * adapter how to type from then on), so the kept read stands across it.
@@ -167,8 +167,7 @@ export const ADAPTER_SURFACE: Record<keyof DeviceAdapter, 'tree' | 'reads' | 'ac
   settleCadenceMs: 'fact',
   typingDelivery: 'fact',
   typeable: 'fact',
-  claimNote: 'fact',
-  fellBack: 'fact',
+  fallback: 'fact',
   noteDroppedTail: 'reads',
   focusedWindow: 'reads',
   logs: 'reads',

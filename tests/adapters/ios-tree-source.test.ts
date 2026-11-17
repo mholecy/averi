@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { createIosTreeSource, IdbEmptyTreeError, IdbNoFrontmostError, IdbTreeSource, parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { rebootSimulatorAdvice } from '../../src/adapters/simulator-reboot.js';
+import { IDB_TYPEABLE } from '../../src/adapters/ios-typing.js';
+import { refusalOf } from '../../src/adapters/typeable.js';
 import { recordedSpinner } from '../helpers/live-records.js';
 import { fakeFetch, fakeSpawn, tempDerivedData, WDA_STATUS } from '../helpers/fake-wda.js';
 import { IOS_ROLE_MAP, type RawIosElement } from '../../src/adapters/ios-node.js';
@@ -346,6 +348,20 @@ describe('IdbTreeSource — the idb adapter at the seam', () => {
   });
 });
 
+describe('IdbTreeSource — types what idb types: IDB_TYPEABLE, and a text only WebDriverAgent types refused (typeWide)', () => {
+  it('typeable is IDB_TYPEABLE', () => {
+    expect(new IdbTreeSource({ udid: 'AAAA-1111', exec: fakeExec({}).fn }).typeable).toBe(IDB_TYPEABLE);
+  });
+
+  it('typeWide refuses in idb\'s words (ADR 0037), with no note — nothing sent to the device', async () => {
+    const { fn, calls } = fakeExec({});
+    await expect(new IdbTreeSource({ udid: 'AAAA-1111', exec: fn }).typeWide('Šťastný')).rejects.toThrow(
+      new Error(refusalOf('Šťastný', IDB_TYPEABLE)),
+    );
+    expect(calls).toEqual([]);
+  });
+});
+
 // docs/bugs/2026-10-09-ios-launch-app-reads-previous-apps-tree.md: for ~1–2 s
 // after launch_app brings a running app to the front, idb lists the PREVIOUS
 // app's tree, headed by an Application labelled with THAT app's display name.
@@ -635,7 +651,7 @@ describe('createIosTreeSource — which backend a kind gets, pinned by what the 
     expect(spawner.spawns).toHaveLength(1);
     expect(exec.calls.filter((c) => c.full.startsWith('idb'))).toEqual([]);
     expect(source.kind).toBe('wda');
-    expect(source.claimNote).toBeUndefined();
+    expect(source.fallback).toBeUndefined();
   });
 
   it("'auto' (A41a), WDA cannot come up (a WebDriverAgent not ours holds the port): every read is idb's, with the note", async () => {
@@ -651,7 +667,7 @@ describe('createIosTreeSource — which backend a kind gets, pinned by what the 
     expect(fetcher.urls.filter((u) => u.endsWith('/status'))).toHaveLength(1); // asked once, at the first read
     expect(exec.calls.filter((c) => c.full === 'idb ui describe-all --json --udid AAAA-1111')).toHaveLength(2);
     expect(source.kind).toBe('idb');
-    expect(source.claimNote).toMatch(/^read through idb: WebDriverAgent did not come up/);
+    expect(source.fallback?.note).toMatch(/^read through idb: WebDriverAgent did not come up/);
     expect(errors.mock.calls.flat().join('\n')).toMatch(/treeSource auto — WebDriverAgent did not come up, so this simulator's tree is read through idb: A WebDriverAgent answers \/status on port/);
     errors.mockRestore();
   });

@@ -14,7 +14,7 @@ import { sleep } from '../util/sleep.js';
 import { resolveClearOfKeyboard } from './keyboard.js';
 import type { TapOptions } from './tap.js';
 import { describeTarget, type Target } from './resolve.js';
-import { assertTypeableOn } from './type-text.js';
+import { assertTypeable } from './type-text.js';
 import { fillFailureText, focusTapNote } from './fill-text.js';
 import { heldText, shownText, type FillFailure, type FillResult, type NearbyInput, type ReadBack } from './fill-facts.js';
 import { fieldRefetch } from './fill-refetch.js';
@@ -148,7 +148,7 @@ export async function fillField(
   // Marked 'refused' (FillValueFailure) — the message is type-text.ts's.
   const refuseUntypeable = (): void => {
     try {
-      assertTypeableOn(adapter, value);
+      assertTypeable(value, adapter.typeable);
     } catch (e) {
       throw new FillValueFailure(errorMessage(e), 'refused', { cause: e });
     }

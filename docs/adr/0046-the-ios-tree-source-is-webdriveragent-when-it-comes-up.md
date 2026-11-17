@@ -79,8 +79,10 @@ read is idb's for the adapter's life, and every reply that claims what it read c
     (`IosTreeSource.fellBack`), gets the same refusal instead of idb's trace. idb and the recorded source never fall
     back, so `treeSource: idb` is unchanged.
   - Each of these refusals, and any `typeable` refusal on an adapter that fell back
-    (`interact/type-text.ts#assertTypeableOn`), ends with the claim note's line, so it is grep-able as `read through
-    idb` and names the reason and the retry. One wording for idb's refusal: `adapters/ios-typing.ts#idbTypingRefusal`.
+    (interact/type-text.ts, by a wrapper A72 removed), ends with the claim note's line, so it is grep-able as `read
+    through idb` and names the reason and the retry. One wording for idb's refusal:
+    `adapters/ios-typing.ts#idbTypingRefusal`.
+  - (Where these live now, see the A72 amendment.)
 - `treeSource: idb` behaves as before, byte for byte. So does `treeSource: wda`, with one exception: a missing
   `appium-webdriveragent` package is now said before the first-build line, and its refusal opens `WebDriverAgent
   requires …` instead of `treeSource: wda requires …` (above). The registry caches per setting, so `auto`, `idb` and
@@ -354,3 +356,44 @@ timeout, a failure rejects and is not kept, uncached, already up asks nothing, r
 (leg (a)'s two bars, each at its edge and 1 ms over, not measured without any part, unproven on a fallback;
 `waitedLaunches`); tests/mcp/tool-descriptions.test.ts (launch_app's new sentence).
 Each was hand-mutated and killed.
+
+## Amendment: A72 — the tree source owns its start, its fallback and its typing (2026-11-17)
+
+From the architecture review of 2026-11-17 (docs/architecture-reviews/2026-11-17-architecture-review.md, A72).
+IosAdapter used to word WebDriverAgent's start failure, un-wrap a release by its class, and backstop the fallback in
+`typeText`; the refusal of a value only WDA types after a fallback lived in three places. Behaviour is unchanged
+except where said below; golden Changed 0.
+
+- **The start words its own failure.** `IosTreeSource.startBeforeLaunch(bundleId)` rejects with the error the launch
+  passes on as it is. `WdaTreeSource` words it: `WebDriverAgent did not come up before launching <bundle> — nothing
+  was wiped or launched: <WDA's error>`, WDA's error its cause, unchanged. A release during the start is the released
+  error as it is; the release's class is now private to `adapters/wda-tree-source.ts`.
+- **Typing is the source's.** `IosTreeSource.typeable` (the set) and a required `typeWide(text)` (a text idb cannot
+  type) replace the optional `typeText`. WDA types; idb and the differential harness's recorded source refuse in
+  idb's words (`adapters/ios-typing.ts#idbTypingRefusal`); `auto` makes its choice, hands the text to WDA, and after a
+  fallback refuses it by its own set: idb's with the note (`adapters/typeable.ts#Typeable`, its `note`, which
+  `refusalOf` and the control-character refusal put last), the note's one route. So the fill's checks, `type_text`'s
+  and `typeWide`'s carry it once, without `interact/` knowing of fallbacks. `IosAdapter.typeText` sends every text
+  idb cannot type to `typeWide` and has no backstop.
+- **One member for the fallback.** `fallback?: TreeSourceFallback` (`{note}`, `adapters/types.ts#TreeSourceFallback`)
+  on `DeviceAdapter` and `IosTreeSource` replaces `claimNote` and `fellBack`: the registry drops an adapter that has
+  one, and the claim notes print its note.
+- **Behaviour that moves.** Over idb or the recorded source, `IosAdapter.typeText` now refuses EVERY text idb cannot
+  type (ios-typing.ts#typingPathOf `wda`: a text only WDA types, an emoji, a control character other than `\n` such as
+  `\t`, …) in idb's words (ADR 0037), nothing sent, where before it reached idb and its Python trace. No tool reaches
+  it: interact/ refuses such a value first, and the engine types ASCII digits.
+- **Wording that moves.** idb's refusal of a value WDA's set takes whole (`IDB_TYPEABLE.otherPath`) named
+  `ios.treeSource: wda` only, though `auto` is the default. It now reads "A project whose tree source is WebDriverAgent
+  types it (`ios.treeSource: auto`, the default, once WebDriverAgent comes up, or `wda`; ADR 0037); otherwise use a
+  value without it, or enter it by hand." (Residual 4's remark on the remedy, and ADR 0037's quote of it, are of their
+  day.)
+
+Gate C covers the launch path on the device: a `launch_app` under `wda` and under `auto` with WDA's build cached, a
+fallback's claim note, and form-basic's b1d and b7 on the idb block, refused with the new remedy.
+
+Tests: tests/adapters/wda-tree-source.test.ts (the start's wording and cause; released mid-start passed on; typeable
+and typeWide); tests/adapters/ios-tree-source.test.ts (idb's typeable and typeWide's refusal, nothing sent);
+tests/adapters/auto-tree-source.test.ts (typeWide chooses and delegates, the note once; typeable before and after the
+choice; the bundle handed to WDA's start); tests/differential/recorded-device.test.ts (the recorded source refuses);
+tests/adapters/ios.test.ts (the launch passes the source's error on as it is; a real WdaTreeSource's wording; typeText
+hands a wide text to typeWide).

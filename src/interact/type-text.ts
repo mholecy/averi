@@ -1,7 +1,6 @@
 import { CONTROL_CHAR_RE, controlCharRemedy, inputTextControlFate } from '../adapters/input-text.js';
 import { codePoint, refusalOf, type Typeable } from '../adapters/typeable.js';
 import type { DeviceAdapter } from '../adapters/types.js';
-import { errorMessage } from '../util/error-message.js';
 import { withNoteLine } from '../util/note-line.js';
 
 /**
@@ -56,7 +55,10 @@ function visibleEscape(ch: string): string {
   return `"${SHORT_ESCAPES[ch] ?? `\\u${ch.charCodeAt(0).toString(16).padStart(4, '0')}`}"`;
 }
 
-/** Throws when `value` holds a character typing cannot deliver as text, or one `typeable` refuses (see the module doc). */
+/**
+ * Throws when `value` holds a character typing cannot deliver as text, or one `typeable` refuses (see the module doc).
+ * Either refusal ends with the set's note line when it has one (Typeable.note: iOS `auto` fallen back to idb), once.
+ */
 export function assertTypeable(value: string, typeable: Typeable): void {
   const match = value.match(CONTROL_CHAR_RE);
   if (match === null) {
@@ -67,29 +69,17 @@ export function assertTypeable(value: string, typeable: Typeable): void {
   const ch = match[0];
   const code = codePoint(ch);
   throw new Error(
-    `cannot type ${code} (${visibleEscape(ch)}, a control character): it is a key, not text — on Android ` +
-      `\`input text\` ${inputTextControlFate(ch)}, on iOS ` +
-      `idb types it as a key press. Refused on both platforms before anything was sent. ${controlCharRemedy(ch)}`,
+    withNoteLine(
+      `cannot type ${code} (${visibleEscape(ch)}, a control character): it is a key, not text — on Android ` +
+        `\`input text\` ${inputTextControlFate(ch)}, on iOS ` +
+        `idb types it as a key press. Refused on both platforms before anything was sent. ${controlCharRemedy(ch)}`,
+      typeable.note,
+    ),
   );
 }
 
-/**
- * `assertTypeable` against the adapter's set, its refusal carrying the adapter's claim note line (DeviceAdapter.
- * claimNote, util/note-line.ts) when it has one: after iOS `treeSource: auto` fell back to idb, a value only
- * WebDriverAgent types is refused by idb's set, and the line says why that set applies (A41a). Without a note, the
- * refusal as it was.
- */
-export function assertTypeableOn(adapter: DeviceAdapter, value: string): void {
-  try {
-    assertTypeable(value, adapter.typeable);
-  } catch (e) {
-    if (adapter.claimNote === undefined) throw e;
-    throw new Error(withNoteLine(errorMessage(e), adapter.claimNote), { cause: e });
-  }
-}
-
-/** Type into whatever is focused, after `assertTypeableOn` — the one path for a caller that has no field to fill. */
+/** Type into whatever is focused, after `assertTypeable` against the adapter's set — the one path for a caller that has no field to fill. */
 export async function typeIntoFocused(adapter: DeviceAdapter, value: string): Promise<void> {
-  assertTypeableOn(adapter, value);
+  assertTypeable(value, adapter.typeable);
   await adapter.typeText(value);
 }

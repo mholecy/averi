@@ -8,10 +8,10 @@ import { tapText } from '../../src/mcp/tool-text.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { FIRST_KEY_ALONE_MS, IDB_EMPTY_RETRY_MS, IosAdapter, PGREP_TIMEOUT_MS } from '../../src/adapters/ios.js';
 import { IDB_SETTLE_CADENCE_MS, IdbEmptyTreeError, IdbTreeSource, parseIdbDescribeAll, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
-import { TreeSourceReleasedError, WDA_SETTLE_CADENCE_MS, WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
+import { WDA_SETTLE_CADENCE_MS, WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
 import { AutoTreeSource } from '../../src/adapters/auto-tree-source.js';
 import { ReadHandOff } from '../../src/ui-tree/read-handoff.js';
-import { fakeFetch, fakeSpawn, tempDerivedData } from '../helpers/fake-wda.js';
+import { fakeFetch, fakeSpawn, tempDerivedData, WDA_STATUS } from '../helpers/fake-wda.js';
 import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
 import { NoLinkHandlerError } from '../../src/adapters/ios-link-failure.js';
 import { captureRefusal } from '../../src/verify/capture.js';
@@ -24,6 +24,7 @@ import { el, FAST, resetLayout, screen } from '../helpers/fake.js';
 import { execErrorLikeExec, typingExecError } from '../helpers/exec-error.js';
 import { appinfo } from '../helpers/simctl-appinfo.js';
 import { NO_EYES } from '../helpers/eyes.js';
+import { IDB_TYPING } from '../helpers/ios-typing.js';
 
 // The one sleep owner, recorded and not waited on: uiTree's settle re-read
 // waits IDB_EMPTY_RETRY_MS, pinned by value rather than spent in real time.
@@ -53,6 +54,7 @@ const NO_TREE: IosTreeSource = {
   read: () => Promise.reject(new Error('this test reads no tree')),
   applicationLabel: () => Promise.reject(new Error('this test reads no tree')),
   dispose: () => Promise.resolve(),
+  ...IDB_TYPING,
 };
 
 /** NO_TREE of the WDA kind — its screenshots too are idb's (ios.ts#screenshotVia). */
@@ -294,6 +296,7 @@ describe('IosAdapter.uiTree and dispose — one delegation each to the tree sour
     const state = { reads: 0, disposes: 0 };
     const source: IosTreeSource = {
       kind: 'idb',
+      ...IDB_TYPING,
       read: async () => {
         state.reads++;
         return structuredClone(TREE);
@@ -345,6 +348,7 @@ describe('IosAdapter.uiTree and dispose — one delegation each to the tree sour
         },
         applicationLabel: () => Promise.reject(new Error('unused')),
         dispose: () => Promise.resolve(),
+        ...IDB_TYPING,
       };
       return { source, state };
     };
@@ -443,7 +447,7 @@ describe('IosAdapter re-enables accessibility automation before every launch and
 
   it('the same on a WDA-source adapter — a wda project\'s teardown poisons idb for every other reader of the simulator', async () => {
     const { fn, calls } = fakeExec({});
-    const wda: IosTreeSource = { kind: 'wda', read: () => Promise.reject(new Error('unused')), applicationLabel: async () => ({ kind: 'declined' }), dispose: () => Promise.resolve() };
+    const wda: IosTreeSource = { kind: 'wda', read: () => Promise.reject(new Error('unused')), applicationLabel: async () => ({ kind: 'declined' }), dispose: () => Promise.resolve(), ...IDB_TYPING };
     await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda }).launch('com.app');
     expect(simctlCalls(calls)).toEqual([...WRITES, 'xcrun simctl launch AAAA-1111 com.app']);
   });
@@ -481,27 +485,26 @@ describe('IosAdapter re-enables accessibility automation before every launch and
     }
   });
 
-  it('a start that fails fails the launch, saying nothing was wiped or launched, WDA\'s error quoted and kept as the cause (treeSource wda)', async () => {
+  it('a start that fails fails the launch with the source\'s own error, as it is — nothing wiped or launched', async () => {
     const { fn, calls } = fakeExec({});
-    const cause = new Error('WDA did not answer /status on port 8100 within 60 s');
-    const wda: IosTreeSource = { ...WDA_NO_TREE, startBeforeLaunch: () => Promise.reject(cause) };
-    const err = await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda }).launch('com.app', { clearState: true }).then(
-      () => undefined,
-      (e: Error) => e,
-    );
-    expect(err?.message).toBe(
-      'WebDriverAgent did not come up before launching com.app — nothing was wiped or launched: WDA did not answer /status on port 8100 within 60 s',
-    );
-    expect(err?.cause).toBe(cause);
+    const failure = new Error('the source\'s own words');
+    let asked: string | undefined;
+    const wda: IosTreeSource = { ...WDA_NO_TREE, startBeforeLaunch: (bundleId) => ((asked = bundleId), Promise.reject(failure)) };
+    await expect(new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda }).launch('com.app', { clearState: true })).rejects.toBe(failure);
+    expect(asked).toBe('com.app');
     expect(calls).toEqual([]);
   });
 
-  it('a source released during its start (select_device mid-launch): the release is passed on unchanged, never "did not come up"', async () => {
+  it('a real WdaTreeSource whose WebDriverAgent does not come up: the launch fails in its words, WDA\'s error quoted', async () => {
     const { fn, calls } = fakeExec({});
-    const released = new TreeSourceReleasedError('The WebDriverAgent tree source for simulator AAAA-1111 has been released — …');
-    const wda: IosTreeSource = { ...WDA_NO_TREE, startBeforeLaunch: () => Promise.reject(released) };
-    await expect(new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda }).launch('com.app')).rejects.toBe(released);
-    expect(calls).toEqual([]);
+    const { dd } = await tempDerivedData(true);
+    const fetcher = fakeFetch(() => ({ status: 200, body: WDA_STATUS })); // answering before we spawned: not ours
+    const source = new WdaTreeSource({ udid: 'AAAA-1111', exec: fn, fetchFn: fetcher.fn, spawnFn: fakeSpawn().fn, derivedDataPath: dd, pollIntervalMs: 5 });
+    await expect(new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: source }).launch('com.app')).rejects.toThrow(
+      /^WebDriverAgent did not come up before launching com\.app — nothing was wiped or launched: .*but this session did not start it/,
+    );
+    expect(simctlCalls(calls)).toEqual([]);
+    await source.dispose();
   });
 
   it('a real WdaTreeSource released during its start: the launch fails with its released error', async () => {
@@ -538,7 +541,7 @@ describe('IosAdapter re-enables accessibility automation before every launch and
     await adapter.launch('com.app');
     expect(launchedWhenUp).toBe(false);
     expect(auto.bringUps()).toBe(1);
-    expect(adapter.claimNote).toBeUndefined();
+    expect(adapter.fallback).toBeUndefined();
     expect(JSON.stringify(await adapter.uiTree())).toContain('from.wda');
     await adapter.launch('com.app'); // a second launch: WDA already chosen, nothing asked
     expect(auto.bringUps()).toBe(1);
@@ -551,7 +554,7 @@ describe('IosAdapter re-enables accessibility automation before every launch and
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: auto.source });
     await expect(adapter.launch('com.app')).resolves.toBeDefined();
     expect(simctlCalls(calls)).toEqual([...WRITES, 'xcrun simctl launch AAAA-1111 com.app']);
-    expect(adapter.claimNote).toMatch(/^read through idb: WebDriverAgent did not come up \(WDA build failed;/);
+    expect(adapter.fallback?.note).toMatch(/^read through idb: WebDriverAgent did not come up \(WDA build failed;/);
     expect(JSON.stringify(await adapter.uiTree())).toContain('from.idb');
     expect(auto.bringUps()).toBe(1);
   });
@@ -970,30 +973,38 @@ describe('IosAdapter.typeText — the first key alone, on an app seen dropping a
     adapter.noteDroppedTail();
     resetSleeps();
     await adapter.typeText('J');
-    await adapter.typeText('👍');
-    expect(log()).toEqual(['idb ui text --udid AAAA-1111 -- J', 'idb ui text --udid AAAA-1111 -- 👍']);
+    await adapter.typeText('~');
+    expect(log()).toEqual(['idb ui text --udid AAAA-1111 -- J', 'idb ui text --udid AAAA-1111 -- ~']);
   });
 
-  it('the first key is a whole character: a surrogate pair is never cut between the two calls', async () => {
+  it('a text idb cannot type never reaches the split: over idb\'s source it is the source\'s refusal, no idb ui text', async () => {
+    const { fn, log } = typingLog();
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: new IdbTreeSource({ udid: 'AAAA-1111', exec: fn }) });
+    adapter.noteDroppedTail();
+    await expect(adapter.typeText('👍ok')).rejects.toThrow(/^cannot type U\+1F44D .*Refused before anything was sent/s);
+    expect(log()).toEqual([]);
+  });
+
+  it('before any launch the app in front, whichever it is, is the one that dropped: first key alone', async () => {
     const { fn, log } = typingLog();
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
-    adapter.noteDroppedTail(); // before any launch: the app in front, whichever it is
-    await adapter.typeText('👍ok');
-    expect(log()).toEqual(['idb ui text --udid AAAA-1111 -- 👍', 50, 'idb ui text --udid AAAA-1111 -- ok']);
+    adapter.noteDroppedTail();
+    await adapter.typeText('~ok');
+    expect(log()).toEqual(['idb ui text --udid AAAA-1111 -- ~', 50, 'idb ui text --udid AAAA-1111 -- ok']);
   });
 });
 
 // D43 (docs/adr/0037-a-value-the-adapter-cannot-type-is-refused-before-any-device-call.md, the D43 amendment): over a
-// tree source that types (IosTreeSource.typeText: WDA's), each typeText is routed by its own characters — idb for every
-// text idb can type, unchanged (the D24 split included); WebDriverAgent's `/wda/keys`, whole, for any other.
-describe('IosAdapter.typeText — routed per call: idb for what idb types, the source\'s typer for the rest (D43)', () => {
+// tree source, each typeText is routed by its own characters — idb for every text idb can type, unchanged (the D24
+// split included); the source's typeWide, whole, for any other (WDA's `/wda/keys`, or the source's refusal).
+describe('IosAdapter.typeText — routed per call: idb for what idb types, the source\'s typeWide for the rest (D43)', () => {
   beforeEach(() => {
     resetSleeps();
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
   afterEach(() => vi.restoreAllMocks());
 
-  /** A WDA-kind source with a typer, and an exec, both recording into one log — the order of idb calls, waits and WDA typings. */
+  /** A WDA-kind source that types, and an exec, both recording into one log — the order of idb calls, waits and WDA typings. */
   function routed() {
     const log: (string | number)[] = [];
     const fn: ExecFn = async (cmd, args) => {
@@ -1003,7 +1014,7 @@ describe('IosAdapter.typeText — routed per call: idb for what idb types, the s
     };
     const source: IosTreeSource = {
       ...WDA_NO_TREE,
-      typeText: async (text: string) => {
+      typeWide: async (text: string) => {
         log.push(...sleeps.splice(0), `wda ${text}`);
       },
     };
@@ -1011,13 +1022,13 @@ describe('IosAdapter.typeText — routed per call: idb for what idb types, the s
     return { adapter, log: () => [...log.splice(0), ...sleeps.splice(0)] };
   }
 
-  it('an ASCII text goes to idb ui text and never to the source\'s typer', async () => {
+  it('an ASCII text goes to idb ui text and never to the source\'s typeWide', async () => {
     const { adapter, log } = routed();
     await adapter.typeText('Jan Novak');
     expect(log()).toEqual(['idb ui text --udid AAAA-1111 -- Jan Novak']);
   });
 
-  it('a text idb cannot type goes to the source\'s typer once, whole, and no idb ui text is sent', async () => {
+  it('a text idb cannot type goes to the source\'s typeWide once, whole, and no idb ui text is sent', async () => {
     const { adapter, log } = routed();
     await adapter.typeText('Jan Šťastný');
     expect(log()).toEqual(['wda Jan Šťastný']);
@@ -1046,14 +1057,16 @@ describe('IosAdapter.typeText — routed per call: idb for what idb types, the s
     expect(log()).toEqual(['wda Jan Šťastný']);
   });
 
-  it('over a source without a typer (a WDA-kind stub with no typeText), a non-ASCII text goes to idb', async () => {
+  it('over a source that refuses it (idb\'s, the recorded one), a non-ASCII text is the source\'s refusal: no idb ui text, no trace', async () => {
     const { fn, calls } = fakeExec({});
-    await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: WDA_NO_TREE }).typeText('Šťastný');
-    expect(calls.at(-1)?.full).toBe('idb ui text --udid AAAA-1111 -- Šťastný');
+    await expect(new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: new IdbTreeSource({ udid: 'AAAA-1111', exec: fn }) }).typeText('Šťastný')).rejects.toThrow(
+      /^cannot type U\+0160 .*Refused before anything was sent/s,
+    );
+    expect(calls).toEqual([]);
   });
 
-  it('a failure of the source\'s typer is the typing\'s failure, as WDA said it', async () => {
-    const source: IosTreeSource = { ...WDA_NO_TREE, typeText: () => Promise.reject(new Error('WDA /wda/keys failed: HTTP 500')) };
+  it('a failure of the source\'s typeWide is the typing\'s failure, as WDA said it', async () => {
+    const source: IosTreeSource = { ...WDA_NO_TREE, typeWide: () => Promise.reject(new Error('WDA /wda/keys failed: HTTP 500')) };
     const { fn, calls } = fakeExec({});
     await expect(new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: source }).typeText('Šťastný')).rejects.toThrow('WDA /wda/keys failed: HTTP 500');
     expect(calls).toEqual([]);
@@ -1089,6 +1102,7 @@ describe('IosAdapter + fillField — a dropped tail on one fill makes the next f
       read: async () => structuredClone(tree),
       applicationLabel: async () => ({ kind: 'declined' }),
       dispose: () => Promise.resolve(),
+      ...IDB_TYPING,
     };
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: source });
     /** The texts idb typed since the last call, with the 50-ms first-key wait where it fell; then the field emptied. */
