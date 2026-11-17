@@ -339,6 +339,27 @@ describe('runAsserts', () => {
     expect(await run((await validProject()).cfg)).toBe(`${bare}\nappAlive: true`);
   });
 
+  it('the whole reply, line for line: verdict, one line per assert, health line', async () => {
+    expect(await run((await validProject()).cfg)).toBe(
+      '1/2 asserts FAILED\n' +
+        'PASS  element id:"home_root" exists\n' +
+        'FAIL  element id:"nope" exists — not found within 0 s\n' +
+        'appAlive: true',
+    );
+  });
+
+  // The tool's schema takes an empty list (tools.ts#assertsInput sets no minimum). Its reply keeps the line the
+  // missing assert lines leave, before the health line.
+  it('no asserts → the vacuous verdict, an empty line, then the health line', async () => {
+    const text = await runAsserts({
+      adapter: home(),
+      specs: [],
+      baselineDir: baselineDirFor(missing()),
+      cfg: (await validProject()).cfg,
+    });
+    expect(text).toBe('All 0 asserts passed\n\nappAlive: true');
+  });
+
   // One failure policy for the health line (run/app-health.ts, A29): appHealth words every device failure into the
   // line itself, and anything else it throws is a broken adapter, which fails the call — here as in ensure_state,
   // run_flow and a verify leg. The throw is made where the other two callers' tests make it: a log read that answers

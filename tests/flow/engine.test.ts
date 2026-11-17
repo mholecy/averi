@@ -2830,6 +2830,23 @@ ${assert}
       FlowEngine.run(cfg('          - { element: { text: "No such text" } }'), fake, FAST, { flow: 'f' }),
     ).rejects.toThrow(/1\/1 flow asserts failed:[\s\S]*FAIL.*No such text/);
   });
+
+  it('the trace says each verdict as `assert PASS`/`assert FAIL`, the error lists each failure indented', async () => {
+    const fake = new FakeAdapter(buildScreens(), 'dashboard');
+    const run = FlowEngine.run(
+      cfg('          - { element: { id: dashboard_root } }\n          - { element: { text: "No such text" }, timeout: 0ms }'),
+      fake,
+      FAST,
+      { flow: 'f' },
+    );
+    const error = (await run.catch((e: unknown) => e)) as FlowError;
+    expect(error.message.split('\n\nSteps that ran before the failure:\n')).toEqual([
+      '1/2 flow asserts failed:\n  FAIL element text:"No such text" exists — not found within 0 s',
+      expect.stringContaining(
+        'assert PASS: element id:"dashboard_root" exists\nassert FAIL: element text:"No such text" exists — not found within 0 s\n',
+      ),
+    ]);
+  });
 });
 
 describe('absent detect conditions', () => {
