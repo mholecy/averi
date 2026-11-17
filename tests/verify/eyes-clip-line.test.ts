@@ -142,7 +142,7 @@ describe('scroll_until under idb — a `fully: true` claim the eyes see cut', ()
  */
 describe('judgeEyes — no clip line where nothing cuts the target', () => {
   // Every lab capture's PNG decoded and judged (about 4–5 s alone): close to vitest's 5-s default under a loaded run.
-  it('over every lab capture, only scroll-bounded P and S read cut', { timeout: 30_000 }, async () => {
+  it('over every iOS lab capture (ios-iphone17-ios27), only scroll-bounded P and S read cut', { timeout: 30_000 }, async () => {
     const { readdir } = await import('node:fs/promises');
     const cells = (await readdir(IOS)).filter((f) => f.endsWith('.idb.json')).map((f) => f.replace('.idb.json', '')).sort();
     expect(cells.length).toBeGreaterThanOrEqual(32);

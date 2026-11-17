@@ -456,7 +456,7 @@ describe('parseUiautomatorXml — a node cut short of its own descendants is wid
     expect(drawOrder(t).exposure(card, PIXEL).shows).toBe(1);
   });
 
-  it('a card whose carousel breaks out of its padding is not widened sideways — its own button still spans it, and the button\'s label shows whole (the round-6 own-button refusal stays fixed)', () => {
+  it('a card whose carousel breaks out of its padding is not widened sideways — its own button still spans it, and the button\'s label shows whole', () => {
     const t = parseDump(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
 <node class="android.view.View" scrollable="true" bounds="[0,400][1080,2000]">
  <node class="android.view.View" resource-id="card" bounds="[66,500][1014,900]">
