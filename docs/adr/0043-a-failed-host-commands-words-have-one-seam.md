@@ -212,7 +212,9 @@ engine shows as the author wrote it, `***` for a secret (it redacts a flow's sec
 included). An ambiguity's list of candidates (`resolve.ts#resolveNow`, every verb's) names an input whose label is its
 own text — an Android EditText with no content-desc — by that text's length and its rect, `label=<its text, 8
 characters> at 0,40 100x10`: a second match appearing while a fill re-reads its field quoted the value just typed. That
-covers averi's own derivation; a label the app built around the text is quoted, so the fill's re-read rethrows such a
-refusal with the typed value inside any label said as `<the typed value, 8 characters>` (`fill-refetch.ts#withoutTyped`).
+covers averi's own derivation; a label the app built around the text (another case, the first keys, digits regrouped)
+is not recognisable, so once the focus tap has landed a re-read's refusal lists every label by its length and rect,
+`label=<18 characters> at 0,60 100x10` (`ResolveOptions.labelsByLength`, passed by `fill-refetch.ts`). The cost: an
+agent loses the label words of a refusal mid-fill, and keeps the ids and rects to tell the candidates apart.
 `tests/interact/fill-leak.test.ts` sweeps fillField's errors, `fillReply` and `fillStepText`, under `ambiguous: refuse`
 and `first`, for the typed value and the field's text, a level above `typed-text-leak.test.ts`.
