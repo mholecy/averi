@@ -305,6 +305,13 @@ describe('WdaTreeSource.applicationLabel — which app WebDriverAgent reads, ask
     expect(spawner.spawns).toHaveLength(1);
   });
 
+  it('an ask that answers remembers nothing: every later launch asks the same child again', async () => {
+    const { source, fetcher } = await setup();
+    await source.read();
+    for (let i = 0; i < 3; i++) expect(await source.applicationLabel()).toEqual({ kind: 'bundle', bundleId: 'dev.averi.lab' });
+    expect(asked(fetcher.urls)).toHaveLength(3);
+  });
+
   // T4: real envelopes, as WDA 16.1.7 answered them on the averi-lab iPhone 17 simulator (iOS 27.0): batch-4's D49
   // (main 7e6d2d47) after averilab://cell/open from SpringBoard (the lab) and after https://example.com (Safari), and
   // batch-5's D49A E2 (main 28c1d37d) with the "Open in “AveriLab”?" alert up (SpringBoard). Each has `name: ""`,
