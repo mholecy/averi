@@ -54,35 +54,37 @@ const assertSummary = (results: AssertResult[]): string => {
     : `${failed}/${results.length} asserts FAILED`;
 };
 
-/** What one run's reply is made of. A part a caller has nothing for, left out or empty, takes no line. */
+/**
+ * What one run's reply is made of. Each single-platform tool's reply (ensure_state, run_flow, assert) is laid out as a
+ * verify leg's section is, without the head. A part a caller has nothing for, left out or empty, takes no line.
+ */
 interface Leg {
   /** A verify leg's `## <platform>` line. */
   head?: string;
   /** The engine's trace, as flow/engine.ts#formatTrace prints it. */
   trace?: string;
   /**
-   * The asserts' lines, and whether the verdict over them heads them: the `assert` tool always prints it, a verify leg
-   * only when the call named asserts.
+   * The asserts the call named, headed by the verdict over them. Left out of a verify leg whose call named none; the
+   * `assert` tool always passes its list, an empty one included.
    */
-  asserts?: { results: AssertResult[]; verdict: boolean };
+  asserts?: AssertResult[];
   /** The final frame, for its one note line. */
   frame?: FinalFrame;
-  /** run/app-health.ts#appHealth's line with its leading newline, or '' when there is no app to ask about. */
+  /** run/app-health.ts#appHealth's line (it comes with its leading newline), or '' when there is no app to ask about. */
   health: string;
 }
 
 /**
  * The reply of ensure_state, run_flow, assert and each verify leg, in the one order they share: the head, the trace,
- * the verdict, the assert lines, the frame's note, and the health line last (ARCHITECTURE.md §8). An empty part takes
- * no line: a verify leg with no state, flow or asserts is its head and health line. The verdict and its lines are one
- * part, so the `assert` tool's reply to an empty list keeps the line break after `All 0 asserts passed`.
+ * the verdict, the assert lines, the frame's note, and the health line last, before the caller's claim note
+ * (ARCHITECTURE.md §8). An empty part takes no line: a verify leg with no state, flow or asserts is its head and health
+ * line. The verdict and its lines are one part, so the `assert` tool's reply to an empty list keeps the line break
+ * after `All 0 asserts passed`.
  */
 export function legText({ head, trace, asserts, frame, health }: Leg): string {
-  const assertBlock =
-    asserts === undefined ? undefined
-    : asserts.verdict ? `${assertSummary(asserts.results)}\n${formatAsserts(asserts.results)}`
-    : formatAsserts(asserts.results);
+  const assertBlock = asserts === undefined ? undefined : `${assertSummary(asserts)}\n${formatAsserts(asserts)}`;
   const note = frame === undefined ? undefined : frameNote(frame);
-  const parts = [head, trace, assertBlock, note].filter((p): p is string => p !== undefined && p !== '');
-  return parts.join('\n') + health;
+  // appHealth's line comes with its leading newline; the join gives every part its own.
+  const parts = [head, trace, assertBlock, note, health.slice(1)];
+  return parts.filter((p): p is string => p !== undefined && p !== '').join('\n');
 }

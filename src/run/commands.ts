@@ -153,5 +153,5 @@ export async function runAsserts({ adapter, specs, baselineDir, cfg }: AssertCal
   // its message the detail, rather than an error result that drops the asserts and the health line (VerifierOptions).
   const results = await new Verifier(adapter, { baselineDir, persistentRead: 'fail' }).assertAll(specs);
   const health = cfg === undefined ? '' : await appHealth(adapter, cfg);
-  return claimed([adapter], legText({ asserts: { results, verdict: true }, health }));
+  return claimed([adapter], legText({ asserts: results, health }));
 }

@@ -458,7 +458,7 @@ export async function runVerification(
       legText({
         head: `## ${p}`,
         trace: formatTrace(trace),
-        asserts: { results, verdict: specs.length > 0 },
+        asserts: specs.length === 0 ? undefined : results,
         frame: final,
         health,
       }),

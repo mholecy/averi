@@ -13,28 +13,31 @@ const MOVING_NOTE =
 
 describe('legText', () => {
   it('the assert tool: the verdict, one line per assert, the health line', () => {
-    expect(legText({ asserts: { results: [pass, fail], verdict: true }, health: HEALTH })).toBe(
+    expect(legText({ asserts: [pass, fail], health: HEALTH })).toBe(
       '1/2 asserts FAILED\nPASS  a\nFAIL  b — not found\nappAlive: true',
     );
-    expect(legText({ asserts: { results: [pass, pass], verdict: true }, health: HEALTH })).toBe(
-      'All 2 asserts passed\nPASS  a\nPASS  a\nappAlive: true',
-    );
+    expect(legText({ asserts: [pass, pass], health: HEALTH })).toBe('All 2 asserts passed\nPASS  a\nPASS  a\nappAlive: true');
+  });
+
+  it('the assert tool with no averi.yaml: no health line, and nothing after the last assert', () => {
+    expect(legText({ asserts: [fail], health: '' })).toBe('1/1 asserts FAILED\nFAIL  b — not found');
   });
 
   it('a verdict over no asserts is vacuously passed, and keeps the line its missing assert lines leave', () => {
-    expect(legText({ asserts: { results: [], verdict: true }, health: HEALTH })).toBe('All 0 asserts passed\n\nappAlive: true');
-  });
-
-  it('without a verdict, the assert lines stand alone', () => {
-    expect(legText({ trace: 't', asserts: { results: [fail], verdict: false }, health: '' })).toBe('t\nFAIL  b — not found');
+    expect(legText({ asserts: [], health: HEALTH })).toBe('All 0 asserts passed\n\nappAlive: true');
+    expect(legText({ asserts: [], health: '' })).toBe('All 0 asserts passed\n');
   });
 
   it('an empty part takes no line: a verify leg that ran nothing and asserted nothing is its head and health line', () => {
-    expect(legText({ head: '## ios', trace: '', asserts: { results: [], verdict: false }, health: HEALTH })).toBe(
-      '## ios\nappAlive: true',
-    );
-    expect(legText({ head: '## ios', trace: '', asserts: { results: [pass], verdict: true }, health: HEALTH })).toBe(
+    expect(legText({ head: '## ios', trace: '', health: HEALTH })).toBe('## ios\nappAlive: true');
+    expect(legText({ head: '## ios', trace: '', asserts: [pass], health: HEALTH })).toBe(
       '## ios\nAll 1 asserts passed\nPASS  a\nappAlive: true',
+    );
+  });
+
+  it('a health line with a crash excerpt is carried whole, below the rest', () => {
+    expect(legText({ trace: 't', health: '\nappAlive: false\n  E/AndroidRuntime: FATAL' })).toBe(
+      't\nappAlive: false\n  E/AndroidRuntime: FATAL',
     );
   });
 
@@ -51,7 +54,7 @@ describe('legText', () => {
       legText({
         head: '## android',
         trace: 'state home: already active',
-        asserts: { results: [pass], verdict: true },
+        asserts: [pass],
         frame: { frame: frameOf('moving') },
         health: HEALTH,
       }),
