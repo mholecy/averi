@@ -123,7 +123,6 @@ const EXTERNAL_NAMES: readonly { origin: string; why: string; names: readonly st
   { origin: 'Python and fb-idb', why: "the interpreter and the CLI averi's idb helper runs inside", names: ['PYTHONPATH', 'PYTHONSAFEPATH', 'prog', 'video'] },
   { origin: 'React Native', why: 'the props and roles a React Native screen is built with', names: ['absoluteFill', 'tablist'] },
   { origin: 'TypeScript', why: 'a compiler option, which tsconfig.json holds and no code does', names: ['rootDir'] },
-  { origin: 'JavaScript', why: "an object's built-in key, named where a lookup must not inherit it", names: ['__proto__'] },
   { origin: 'the MCP protocol', why: "the handshake's field the server's version is reported in", names: ['serverInfo', 'serverInfo.version'] },
   { origin: 'a made-up identifier', why: 'field-errors.ts: an error message identified some other way than its field', names: ['error_iban'] },
   { origin: 'a made-up reading', why: "fill-landing.ts: what a field shows when typing lands before the caret's text", names: ['aba'] },
