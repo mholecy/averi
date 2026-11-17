@@ -7,9 +7,9 @@ ARCHITECTURE.md for the design, docs/adr/ for the decisions behind it.
 ## Comments
 
 A diff that changes code re-reads the comments on and above what it changed and fixes what no longer holds. Comments
-name code as `path.ts#symbol`: no line numbers, caller lists, bare review labels or history told as today;
-tests/docs/comments.test.ts and references.test.ts refuse the mechanical kinds. A comment audit reads only the diff
-since the commit the last audit record names.
+name code as `path.ts#symbol`. tests/docs/comments.test.ts and references.test.ts refuse the mechanical kinds: missing
+paths, line pointers, backticked names no code holds, bare review labels, caller phrases; history told as today needs a
+reader. A comment audit reads only the diff since the commit the last record in docs/audits/ names.
 
 ## Releasing: binding
 
