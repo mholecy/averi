@@ -5,9 +5,11 @@ import {
   BASELINE_CONFIRMATION_DELAYS_MS,
   captureBaselineFrame,
   captureFrame,
+  type Frame,
   measuredFrameFor,
   pngRegion,
   STABILITY_DELAY_MS,
+  type TreeFrame,
   unconfirmedReason,
   unsettledNote,
   unsettledReason,
@@ -302,6 +304,34 @@ describe('captureFrame — stability over the caller\'s region', () => {
     await captureFrame(fake, readTreeOpts);
     // @ts-expect-error — `region?: never` on the png-only arm
     await captureFrame(fake, pngOnlyOpts);
+  });
+});
+
+/**
+ * The frame's types hold only the states `stableScreenshot` can produce, so a
+ * consumer reading `settledOver` or `measured` has no impossible state to pick
+ * a default for. The `@ts-expect-error` lines fail `npm run lint`
+ * (tsconfig.test.json) as soon as a type admits the state again.
+ */
+describe('Frame — the types admit only producible states', () => {
+  it('`settledOver` is present exactly when the frame settled', () => {
+    const shot = Shot.ofPng(frame('a'));
+    const screen: Frame = { shot, stability: 'settled', settledOver: 'screen', captures: 2 };
+    const moving: Frame = { shot, stability: 'moving', captures: 6 };
+    // @ts-expect-error — a frame that never settled did not settle over anything
+    const movingOverRegion: Frame = { shot, stability: 'moving', settledOver: 'region', captures: 6 };
+    // @ts-expect-error — a settled frame says what it settled over
+    const settledOverNothing: Frame = { shot, stability: 'settled', captures: 2 };
+    expect([screen, moving, movingOverRegion, settledOverNothing].map((f) => f.stability)).toEqual(['settled', 'moving', 'moving', 'settled']);
+  });
+
+  it('a supplied tree comes back on the frame: the `{tree}` arm has no treeless frame', async () => {
+    const got = await captureFrame(device([frame('a'), frame('a')]), { tree: SCREEN });
+    const treeFrame: TreeFrame = got;
+    // @ts-expect-error — the frame `captureFrame(…, { tree })` returns has no measured arm without a tree
+    const treeless: Extract<typeof got.measured, { tree?: undefined }> = { error: 'the tree read failed' };
+    expect(treeFrame.measured.tree).toBe(SCREEN);
+    expect(treeless).toEqual({ error: 'the tree read failed' });
   });
 });
 
