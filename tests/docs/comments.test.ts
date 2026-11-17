@@ -5,13 +5,15 @@ import { codeOf, commentsOf, corpus, titlesOf, wordsOf, type Line } from '../hel
  * The comments and test titles of src/, scripts/ and tests/ say nothing a machine can see is false: no path to a file
  * that is not there, no line number, no backticked name that no code holds, no bare review label or caller list. Each
  * rule below names its hits as `file:line  rule  fragment`; a fix rewords the comment, never the rule.
- * Not checked, on purpose: whether the prose is true, history told as today ("no longer", "the old"), and how many
- * callers a name has — those need a reader, not a pattern.
+ * Not checked, on purpose: whether the prose is true, history told as today ("no longer", "the old"), how many callers
+ * a name has (those need a reader), and titles held in variables or `.each(table)` rows not written inline.
  */
 
 /** What a rule reads a line against: the checkout's files and directories, and the words its code is made of. */
 interface Ctx {
   files: ReadonlySet<string>;
+  /** Every file's tails after a slash (`verify/capture.ts`, `capture.ts`): what a bare name may be. */
+  tails: ReadonlySet<string>;
   dirs: ReadonlySet<string>;
   sorted: readonly string[];
   words: ReadonlySet<string>;
@@ -23,7 +25,9 @@ const ctxOf = (files: readonly string[], words: ReadonlySet<string>): Ctx => {
     const parts = f.split('/');
     for (let i = 1; i < parts.length; i++) dirs.add(parts.slice(0, i).join('/'));
   }
-  return { files: new Set(files), dirs, sorted: [...files, ...dirs].sort(), words };
+  const tails = new Set<string>();
+  for (const f of files) for (let i = f.indexOf('/'); i >= 0; i = f.indexOf('/', i + 1)) tails.add(f.slice(i + 1));
+  return { files: new Set(files), tails, dirs, sorted: [...files, ...dirs].sort(), words };
 };
 
 /** Whether some file or directory of the checkout starts with `prefix`. */
@@ -77,7 +81,7 @@ function missingPaths(text: string, ctx: Ctx): string[] {
   for (const m of text.matchAll(BARE_TS)) {
     const p = m[1];
     if (new RegExp(`^(?:${ROOTS})/`).test(p) || OUT_OF_REPO.has(p)) continue;
-    if (ctx.files.has(p) || [...ctx.files].some((f) => f.endsWith(`/${p}`))) continue;
+    if (ctx.files.has(p) || ctx.tails.has(p)) continue;
     out.push(p);
   }
   return out;
@@ -102,6 +106,7 @@ const EXTERNAL_NAMES: readonly { origin: string; why: string; names: readonly st
     origin: 'Android SDK and Jetpack',
     why: "the platform code a dump's shape comes from, cited where averi reads it",
     names: [
+      'textAllCaps',
       'ViewGroup.ViewLocationHolder.compareBoundsOfTree',
       'ViewGroup.addChildrenForAccessibility',
       'addChildrenForAccessibility',
@@ -114,10 +119,13 @@ const EXTERNAL_NAMES: readonly { origin: string; why: string; names: readonly st
     ],
   },
   { origin: 'adb', why: 'its quoting and its device states, which averi parses or mirrors', names: ['escape_arg', 'authorizing', 'connecting'] },
-  { origin: 'Apple: UIKit, CoreGraphics, the simulator runtime, WebDriverAgent', why: 'what an iOS reading or a WDA call is made of', names: ['CGImage', 'df', 'keyNames', 'fb_activeApplication'] },
+  { origin: 'Apple: UIKit, CoreGraphics, the simulator runtime, WebDriverAgent', why: 'what an iOS reading or a WDA call is made of', names: ['CGImage', 'df', 'inputAccessoryView', 'keyboardDismissMode', 'onDrag', 'keyNames', 'fb_activeApplication'] },
   { origin: 'Python and fb-idb', why: "the interpreter and the CLI averi's idb helper runs inside", names: ['PYTHONPATH', 'PYTHONSAFEPATH', 'prog', 'video'] },
-  { origin: 'React Native', why: 'the props and roles a React Native screen is built with', names: ['keyboardDismissMode', 'absoluteFill', 'tablist'] },
+  { origin: 'React Native', why: 'the props and roles a React Native screen is built with', names: ['absoluteFill', 'tablist'] },
   { origin: 'TypeScript', why: 'a compiler option, which tsconfig.json holds and no code does', names: ['rootDir'] },
+  { origin: 'JavaScript', why: "an object's built-in key, named where a lookup must not inherit it", names: ['__proto__'] },
+  { origin: 'the MCP protocol', why: "the handshake's field the server's version is reported in", names: ['serverInfo', 'serverInfo.version'] },
+  { origin: 'made-up examples', why: "an identifier and a reading a comment makes up to show a rule's edge", names: ['error_iban', 'aba'] },
   {
     origin: "the client app's ids and its device checks",
     why: 'the measured screens, backend replies and checks a finding was made on (docs/bugs/)',
@@ -130,14 +138,18 @@ const EXTERNAL: ReadonlySet<string> = new Set(EXTERNAL_NAMES.flatMap((g) => g.na
 /** A backticked identifier, dotted or not, its call parentheses dropped. */
 const IDENT = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/;
 
-/** The backticked identifiers of a line, but those a platform's possessive owns (UIKit's `UIScrollView`) and values with spaces. */
+/** The platforms whose possessive owns the backticked name after it — UIKit's `UIScrollView`, Material's, an RN Pressable's: their names are theirs. */
+const PLATFORM_OWNERS = ['UIKit', 'Material', 'Pressable'];
+const PLATFORM_POSSESSIVE = new RegExp(`\\b(?:${PLATFORM_OWNERS.join('|')})(?:'s|’s) $`);
+
+/** The backticked identifiers of a line, but those a platform's possessive owns (PLATFORM_OWNERS) and values with spaces. */
 function backticked(text: string): string[] {
   const out: string[] = [];
   for (const m of text.matchAll(/`([^`\n]+)`/g)) {
     // A value with its spaces (`Jan `) is text, not a name.
     const name = m[1].replace(/\(\)$/, '');
     if (!IDENT.test(name)) continue;
-    if (/\b[A-Z][\w.-]*(?:'s|’s) $/.test(text.slice(0, m.index))) continue;
+    if (PLATFORM_POSSESSIVE.test(text.slice(0, m.index))) continue;
     out.push(name);
   }
   return out;
@@ -150,16 +162,25 @@ const unknownNames = (text: string, ctx: Ctx): string[] =>
 const REVIEW_LABELS = [/\breview round \d+\b/gi, /\bcode[- ]review\b/gi, /\b(?:BLOCKER|MAJOR|MINOR|NIT)-\d+\b/g, /\ba review found\b/gi, /\bthe reviewer(?:'s|’s)/gi];
 /** An id that a review label may follow: a backlog or decision id (D18, A53, T7b), an ADR, a lab id. */
 const OWNED = /(?:\b[A-Z]{1,3}\d+[a-z]?\d*(?:'s|’s)?|\bADR \d{4}|\blab [\w-]+(?:'s|’s)?|\bround \d+(?:'s|’s))[\s,(]*$/;
-/** A review a sentence has already named — `its review round 1`, `the code review's renames` — is no bare label. */
-const NAMED_BEFORE = /\b(?:its|the|their)\s+$/i;
 const CALLER_PHRASES = [/\b(?:the|its) (?:one|only|sole) (?:reader|writer|producer|caller)s?\b/gi, /\b(?:used|called) (?:only )?by\b/gi];
 
 /** (d) A review label no id owns, or a sentence about who calls what. */
 const reviewLabels = (text: string): string[] =>
   REVIEW_LABELS.flatMap((re) =>
-    [...text.matchAll(re)].filter((m) => !OWNED.test(text.slice(0, m.index)) && !(/review/i.test(m[0]) && !/reviewer/i.test(m[0]) && NAMED_BEFORE.test(text.slice(0, m.index)))).map((m) => m[0]),
+    [...text.matchAll(re)].filter((m) => !OWNED.test(text.slice(0, m.index))).map((m) => m[0]),
   );
 const callerPhrases = (text: string): string[] => CALLER_PHRASES.flatMap((re) => [...text.matchAll(re)].map((m) => m[0]));
+
+/**
+ * The list entries no longer needed: an OUT_OF_REPO path nothing cites or the checkout holds (a file or a folder), an
+ * EXTERNAL_NAMES name no backtick cites or the code holds.
+ */
+function staleEntries(prose: readonly Line[], ctx: Ctx): string[] {
+  const cited = (s: string) => prose.some((l) => l.text.includes(s));
+  const staleOut = [...OUT_OF_REPO.keys()].filter((p) => !cited(p) || ctx.files.has(p) || ctx.dirs.has(p));
+  const staleNames = [...EXTERNAL].filter((n) => !prose.some((l) => backticked(l.text).includes(n)) || n.split('.').every((part) => ctx.words.has(part)));
+  return [...staleOut, ...staleNames];
+}
 
 /** The guard's own files: their examples name nothing on purpose; the pins below hold them. */
 const GUARD = new Set(['tests/docs/comments.test.ts', 'tests/docs/references.test.ts', 'tests/helpers/comments.ts']);
@@ -183,9 +204,10 @@ describe('what the guard reads', () => {
     expect(titlesOf('x.test.ts', source).map(({ line, text }) => `${line} ${text}`)).toEqual(['1 a group', '2 a test', '6 %s: each', '4 row one', '5 row two']);
   });
 
-  it("code words: a string's words kept, a comment's not, and the word after an escape", () => {
-    const words = wordsOf(codeOf('x.ts', "const shown = '\\nappAlive: yes'; // hiddenWord"));
-    expect([...words].filter((w) => ['shown', 'appAlive', 'yes', 'hiddenWord'].includes(w)).sort()).toEqual(['appAlive', 'shown', 'yes']);
+  it("code words: a string's words kept, a comment's and a test title's not, and the word after an escape", () => {
+    const source = "const shown = '\\nappAlive: yes'; // hiddenWord\nit('titleWord', () => shown);\nit.each([['rowWord', 1]])('%s', () => {});";
+    const words = wordsOf(codeOf('x.test.ts', source));
+    expect([...words].filter((w) => ['shown', 'appAlive', 'yes', 'hiddenWord', 'titleWord', 'rowWord'].includes(w)).sort()).toEqual(['appAlive', 'shown', 'yes']);
   });
 });
 
@@ -208,7 +230,18 @@ describe('the comment rules, each on what it names and what it keeps', () => {
 
   it("(c) a backticked name no code holds is named; a code word, a dotted chain of them and a platform's possessive are kept", () => {
     expect(unknownNames('its `homeFocus`, `preLen()`', PIN_CTX)).toEqual(['homeFocus', 'preLen']);
+    expect(unknownNames("Foo's `madeUpName`, Lab's `otherMadeUp`", PIN_CTX)).toEqual(['madeUpName', 'otherMadeUp']);
+    // A title's own words hold nothing up: its unknown name is caught against the file's code.
+    const source = "it('reads `noSuchReader` once', () => { clipThenInset(); });";
+    const fileCtx = ctxOf([], wordsOf(codeOf('x.test.ts', source)));
+    expect(titlesOf('x.test.ts', source).flatMap((t) => unknownNames(t.text, fileCtx))).toEqual(['noSuchReader']);
     expect(unknownNames("`clipThenInset`, `Modifier.clickable`, UIKit's `UIScrollView`, `a value with spaces`, `JJan `", PIN_CTX)).toEqual([]);
+  });
+
+  it('a list entry is stale once nothing cites it or the checkout holds it — a file, a folder (docs/releases), a code word', () => {
+    const cites: Line[] = [...OUT_OF_REPO.keys(), ...EXTERNAL].map((p, i) => ({ file: 'x.ts', line: i + 1, text: `see ${p} and \`${p}\`` }));
+    expect(staleEntries(cites, ctxOf([], new Set()))).toEqual([]);
+    expect(staleEntries(cites.slice(1), ctxOf(['docs/releases/v1.0.0.md', 'batch-13.ts'], new Set(['rootDir'])))).toEqual(['scripts/color-parity.py', 'batch-13.ts', 'docs/releases', 'rootDir']);
   });
 
   it('(d) a bare review label and a caller phrase are named; a label an id owns is kept', () => {
@@ -219,7 +252,14 @@ describe('the comment rules, each on what it names and what it keeps', () => {
       'a review found',
       "the reviewer's",
     ]);
-    expect(reviewLabels("T7b's review round 1 records; ADR 0032 NIT-2; A53's code review; D7b, review round 2; round 7's code review; A3 after its review round 1; the code review's renames")).toEqual([]);
+    // A determiner owns nothing: a label is bare whatever article it wears.
+    expect(reviewLabels("the code review's renames; their review round 4; the code-review renamed it; A3 after its review round 1")).toEqual([
+      'review round 4',
+      'review round 1',
+      'code review',
+      'code-review',
+    ]);
+    expect(reviewLabels("T7b's review round 1 records; ADR 0032 NIT-2; A53's code review; D7b, review round 2; round 7's code review; A3's review round 1")).toEqual([]);
     expect(callerPhrases('launch is its one writer; the only reader; used by run.ts; Used ONLY by the CLI; called by tap')).toEqual([
       'its one writer',
       'the only reader',
@@ -256,9 +296,6 @@ describe('the comments and test titles of src/, scripts/ and tests/', () => {
   });
 
   it('every OUT_OF_REPO and EXTERNAL_NAMES entry is still needed: cited, and not in this repo', () => {
-    const cited = (s: string) => prose.some((l) => l.text.includes(s));
-    const staleOut = [...OUT_OF_REPO.keys()].filter((p) => !cited(p) || ctx.files.has(p));
-    const staleNames = [...EXTERNAL].filter((n) => !prose.some((l) => backticked(l.text).includes(n)) || n.split('.').every((part) => ctx.words.has(part)));
-    expect([...staleOut, ...staleNames]).toEqual([]);
+    expect(staleEntries(prose, ctx)).toEqual([]);
   });
 });

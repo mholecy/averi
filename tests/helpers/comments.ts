@@ -25,7 +25,8 @@ const LEAD = /^\s*(?:\/\*\*?|\*(?!\/)|\/\/+)?\s*/;
 /**
  * A line wrapped onto the next: a path cut at a hyphen or a slash (`docs/bugs/2026-10-09-` / `android-…md`, `scroll-` /
  * `rounds.ts#…`) or before its extension (`tests/verify/baseline-confirmation` / `.test.ts`), or a pointer cut after
- * its file (`scroll-read.ts` / `#judgeRead`, or `scroll-read.ts#` / `judgeRead`).
+ * its file (`scroll-read.ts` / `#judgeRead`, or `scroll-read.ts#` / `judgeRead`). Any line ending in a slash joins,
+ * a bare root too: `src/` at a line's end and `are` on the next read `src/are`, so prose keeps a root off a line's end.
  */
 const wrapped = (text: string, next: string): boolean => {
   const rest = next.replace(LEAD, '');
@@ -92,13 +93,20 @@ function commentLines(file: string, sf: ts.SourceFile, ranges: readonly ts.Comme
   });
 }
 
-/** A source with its comments blanked (same length, line breaks kept): its code and strings. */
-export const codeOf = (file: string, source: string): string => blanked(source, commentRanges(parse(file, source)));
+/**
+ * A source with its comments and its test titles blanked (same length, line breaks kept): its code and strings. A
+ * title is prose, so its words hold up no backticked name — its own least of all.
+ */
+export const codeOf = (file: string, source: string): string => {
+  const sf = parse(file, source);
+  return blanked(source, [...commentRanges(sf), ...titleNodes(sf).map(({ node }) => ({ pos: node.getStart(sf), end: node.end }))]);
+};
 
-function blanked(source: string, ranges: readonly ts.CommentRange[]): string {
+function blanked(source: string, ranges: readonly { pos: number; end: number }[]): string {
   let out = '';
   let at = 0;
-  for (const r of ranges) {
+  for (const r of [...ranges].sort((a, b) => a.pos - b.pos)) {
+    if (r.pos < at) continue;
     out += source.slice(at, r.pos) + source.slice(r.pos, r.end).replace(/[^\n]/g, ' ');
     at = r.end;
   }
@@ -116,11 +124,16 @@ const titleText = (n: ts.StringLiteral | ts.NoSubstitutionTemplateLiteral | ts.T
  * A test file's titles: the first argument of describe/it/test (and their .skip, .only, …), and of `X.each(rows)(title)`
  * the title and each inline row's first string (a row's title part, `%s`), each at the line it starts on.
  */
-export const titlesOf = (file: string, source: string): Line[] => titlesIn(file, parse(file, source));
+export const titlesOf = (file: string, source: string): Line[] =>
+  titlesIn(file, parse(file, source));
 
-function titlesIn(file: string, sf: ts.SourceFile): Line[] {
-  const out: Line[] = [];
-  const at = (n: ts.Node, text: string) => out.push({ file, line: sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1, text });
+const titlesIn = (file: string, sf: ts.SourceFile): Line[] =>
+  titleNodes(sf).map(({ node, text }) => ({ file, line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1, text }));
+
+/** The title literals of a source (titlesOf), each with its text. */
+function titleNodes(sf: ts.SourceFile): { node: ts.Node; text: string }[] {
+  const out: { node: ts.Node; text: string }[] = [];
+  const at = (node: ts.Node, text: string) => out.push({ node, text });
   const visit = (n: ts.Node) => {
     if (ts.isCallExpression(n) && n.arguments[0] && isText(n.arguments[0])) {
       const callee = n.expression;
@@ -185,9 +198,10 @@ export function corpus(): Corpus {
     const source = readFileSync(join(ROOT, f), 'utf8');
     const sf = parse(f, source);
     const ranges = commentRanges(sf);
+    const named = titleNodes(sf);
     comments.push(...commentLines(f, sf, ranges));
     if (f.startsWith('tests/')) titles.push(...titlesIn(f, sf));
-    codeWords.set(f, wordsOf(blanked(source, ranges)));
+    codeWords.set(f, wordsOf(blanked(source, [...ranges, ...named.map(({ node }) => ({ pos: node.getStart(sf), end: node.end }))])));
   }
   for (const f of files.filter(textFixture)) {
     const text = readFileSync(join(ROOT, f), 'utf8');

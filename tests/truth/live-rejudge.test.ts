@@ -182,7 +182,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['android-vis-sheet-dialog-run1.json', 'visibility', { cases: 13, ok: 13, loud: 0, mismatches: 0 }],
     ['android-vis-sheet-dialog-run2.json', 'visibility', { cases: 13, ok: 13, loud: 0, mismatches: 0 }],
     ['android-vis-sheet-dialog-run3.json', 'visibility', { cases: 13, ok: 13, loud: 0, mismatches: 0 }],
-    // round 7's A3 (src arch/r23-hint-everywhere 9fa59ae, then e726c77 after its review round 1, through --side):
+    // round 7's A3 (src arch/r23-hint-everywhere 9fa59ae, then e726c77 after A3's review round 1, through --side):
     // form-picker's c2–c4 with every not-found carrying the miss note — the replies of the taps unchanged, ok
     ['android-hint-everywhere-9fa59ae-c2c4.json', 'forms', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
     ['android-hint-everywhere-e726c77-c2c4.json', 'forms', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
@@ -236,7 +236,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // (…and the whole visibility group under idb once, ios-idb-vis-a5.json: below, before L4's fix)
     // round 7's A6 (src arch/r23-eyes through --side; docs/truth/live-android-2026-10-18-visibility.md): k7 with the
     // eyes — "visible after 1 swipe — PARTLY UNDER a surface the tree does not list: its bottom 28 px …", the band
-    // named, ok — three runs, once more after its review round 1; and the forms group once (b1d, b7 LOUD: adb's input
+    // named, ok — three runs, once more after A6's review round 1; and the forms group once (b1d, b7 LOUD: adb's input
     // text has no non-ASCII)
     ['android-k7-eyes-1.json', 'forms', { cases: 1, ok: 1, loud: 0, mismatches: 0 }],
     ['android-k7-eyes-2.json', 'forms', { cases: 1, ok: 1, loud: 0, mismatches: 0 }],
@@ -282,7 +282,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // after that refusal both Tapped on the background, known (residual 5) — and under WDA refused / stopped inside `lower`
     // after 2 swipes, Tapped.
     ['ios-vis-r16-le2-1.json', 'visibility', { cases: 4, ok: 2, loud: 0, mismatches: 2 }],
-    // Its code review (round 16): the same two cases at the final src, and mp-native's chooser rebuilt (chooser-over-list) —
+    // LE2's code review (round 16): the same two cases at the final src, and mp-native's chooser rebuilt (chooser-over-list) —
     // under idb S refused, nothing fired (LOUD: the eyes cannot tell it over R on the real screenshot, white on white), O
     // Tapped, R refused; under WDA O and S Tapped, R refused, its stop stroking the dim (#31) — pinned below since the
     // merge struck that stroke off.
@@ -349,7 +349,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // the next title over its touch margin seen clear on one screenshot — and k7 unchanged; then the whole forms group.
     ['android-forms-r1023-phone-1.json', 'forms', { cases: 2, ok: 2, loud: 0, mismatches: 0 }],
     ['android-forms-r1023-phone-2.json', 'forms', { cases: 29, ok: 27, loud: 2, mismatches: 0, preD43a: true }],
-    // The same two at the branch's tip (the strict beside rows, one kept answer per text, the code review's renames).
+    // The same two at the branch's tip (the strict beside rows, one kept answer per text, round 1023's code review's renames).
     ['android-forms-r1023-phone-3.json', 'forms', { cases: 2, ok: 2, loud: 0, mismatches: 0 }],
     // Round 1023's LV2 fix (bugs/r1023-lv2, ADR 0013 refined 2026-10-23): scroll-bounded-flush five times — S.fully
     // fully visible after 2 swipes, a probe then a reveal (pinned below), P.fully after 1 — then the visibility group once.
@@ -613,7 +613,7 @@ describe('live.ts --rejudge over the committed iOS records of the src before the
       // WDA; C's tap and scroll_until refused as under W, seen so, nothing fired or stroked. Its first run, -1.json, is
       // pinned below: idb's first case timed out there, vacuous, as round 8's -3.json.
       ['ios-vis-r9-l4w-2.json', 'visibility', { cases: 40, ok: 15, loud: 0, mismatches: 25 }],
-      // round 9's final device check at its final src (fix/round-9 14a7d90d, after the code review tightened the eyes'
+      // round 9's final device check at its final src (fix/round-9 14a7d90d, after round 9's code review tightened the eyes'
       // guards; docs/truth/live-ios-2026-10-18-visibility.md and live-android-2026-10-18-visibility.md, their round-9
       // final sections): the blur menus read as at 1ef11b9c — W Tapped, W alone fired, under idb and WDA; C's tap and
       // scroll_until refused as under W, seen so, nothing fired or stroked (-2.json; -1.json below: the first-case idb
