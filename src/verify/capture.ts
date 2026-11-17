@@ -290,8 +290,8 @@ type Stability =
 type StableShot = FrameFacts & Stability;
 
 /**
- * A frame as `captureFrame` returns it to a caller that may not have asked for
- * a tree. A type alias over the `Stability` union, not an interface: an
+ * A frame as `captureFrame` returns it to a caller that did not supply a
+ * tree. A type alias over the `Stability` union, not an interface: an
  * interface cannot extend a union, and `Omit` over it would drop the
  * pairing of `stability` with `settledOver`. A reader that needs only one
  * field (`unsettledReason`, `isMoving`) still takes a `Pick` of it: it reads
@@ -423,12 +423,6 @@ export const unconfirmedReason = (frame: Pick<Frame, 'captures'>): string =>
   `the screen did not settle: ${frame.captures} captures — two consecutive ones matched, then a later confirming capture differed from them — a periodic change such as a blinking caret or a ticking clock, which a matching pair can land in phase with; hide or stop it (unfocus the field, freeze the clock) and re-run`;
 
 /**
- * A frame whose tree was READ here (`readTree: true`): its measured half is
- * always there, though it may say the read failed (`Treeless`).
- */
-export type TreeRequestedFrame = StableShot & { measured: FrameMeasurement };
-
-/**
  * A frame that HAS a tree: what `captureFrame` returns to a caller that
  * supplied one (`tree`). That arm never reads a tree, so it has no read to
  * fail and its `measured` has no treeless arm; an `error` on it is a png that
@@ -517,10 +511,6 @@ export function captureFrame(
   adapter: Pick<DeviceAdapter, 'screenshot' | 'capture' | 'uiTree' | 'viewport'>,
   opts: CaptureOptions & { tree: UiNode },
 ): Promise<TreeFrame>;
-export function captureFrame(
-  adapter: Pick<DeviceAdapter, 'screenshot' | 'capture' | 'uiTree' | 'viewport'>,
-  opts: CaptureOptions & { readTree: true },
-): Promise<TreeRequestedFrame>;
 export function captureFrame(
   adapter: Pick<DeviceAdapter, 'screenshot' | 'capture' | 'uiTree' | 'viewport'>,
   opts?: CaptureOptions,
