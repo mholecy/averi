@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest';
  *   other mcp/ module reads adapters/ through the interface module only. A constant a tool description quotes lives
  *   where both may read it (FOREGROUND_WAIT_MS in adapters/types.ts, not adapters/ios-foreground.ts).
  * - interact/ (A18): imports no platform module — the interface module and typeable.ts (the per-adapter typing fact's
- *   shape and its one reader), plus ARCHITECTURE.md's named exception: interact/type-text.ts reads
+ *   shape and the function that reads it), plus ARCHITECTURE.md's named exception: interact/type-text.ts reads
  *   adapters/input-text.ts, Android's `input text` control-character vocabulary, to word its refusal before any device
  *   call (input-text.ts is a leaf so interact/ does not import the Android adapter for a sentence).
  * - flow/, verify/, ui-tree/, run/ (A24): the interface module, plus ARCHITECTURE.md's named exceptions — the config

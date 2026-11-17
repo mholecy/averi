@@ -17,8 +17,8 @@ import type { AveriConfig } from './config.js';
  * that is one number, how many wipes (`launch { clearState: true }` steps
  * and `launch_app { clearState: true }` calls) the session has performed —
  * the `⚠ clearState` line's "(3 this session)", which is what makes a finite
- * resource (a device registration) budgetable. It lives here because the
- * launch is its one writer.
+ * resource (a device registration) budgetable. It lives here, beside the
+ * launch that wipes.
  *
  * Owned by the caller and handed in (`EngineOptions.session`, and
  * `launchApp`'s argument), as the environment is, not kept in the module:

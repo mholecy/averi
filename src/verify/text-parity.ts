@@ -201,8 +201,8 @@ export function renderedTextFromTree(tree: UiNode, id: string): string[] {
 }
 
 /**
- * Did a tree string survive into the recognized reading? Used ONLY by the
- * UNREAD guard, to ask "did this copy vanish", never to judge copy drift — so
+ * Did a tree string survive into the recognized reading? It answers the
+ * UNREAD guard's "did this copy vanish", never whether copy drifted — so
  * it is deliberately forgiving where the two sources differ for known,
  * innocent reasons:
  *

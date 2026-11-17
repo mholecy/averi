@@ -1095,7 +1095,7 @@ export const bandRect = (line: KeyboardLine, screen: Rect): Rect => ({ x: screen
  * top with the content above it, it is past the far edge, and the next
  * stroke turns and lifts it. Only then: every other standing judges the far
  * edge in the frames as ever. The cut reads `band` here, beside
- * `fullyStanding`, its only writer, so the region rule and the frame it
+ * `fullyStanding`, which sets it, so the region rule and the frame it
  * turns in cannot drift apart; the cuts themselves are geometry's band
  * cutters, the ones `systemBands` composes, not `systemBands` itself. The
  * shapes are kept as the round always cut them, residuals of `Scene`'s

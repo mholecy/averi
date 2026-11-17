@@ -152,7 +152,7 @@ describe('Scene.standing for the pixel assert over every fixture node', () => {
     expect(misses.filter((m) => m.endsWith(' — the status bar'))).toHaveLength(22);
   });
 
-  it('the reviewer\'s false covers stay gone for both readers: own content beside the element, a clickable layer, a 2-pt edge', async () => {
+  it('false covers stay gone for both readers: own content beside the element, a clickable layer, a 2-pt edge', async () => {
     for (const reads of [OCR, colorSampleRect]) {
       const { misses } = await sweep(undefined, reads);
       const over = (element: string) => misses.filter((m) => m.includes(`: ${element} — `));

@@ -137,7 +137,7 @@ export interface CaseReads {
   /** Never read again after a first read not ok (wantsLateRead): a later read would let a fling finish behind the reply's back. */
   late?: false;
   /**
-   * Android: the device's word on what is in front and on the activity stack (AndroidLab.focus, live-chooser.ts#FocusRead),
+   * Android: the device's word on what is in front and on the activity stack (AndroidLab.focus, lab-device.ts#FocusRead),
    * read before the calls, between them and after them (CaseRecord `focus`, the judge's `log.focus`); a chooser left in
    * front after them is dropped with one BACK and read again (`focus.teardown`), so the next case does not start over it.
    */

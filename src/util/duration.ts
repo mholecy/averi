@@ -10,8 +10,8 @@ import { z } from 'zod';
 const DURATION = /^(\d+(?:\.\d+)?)(ms|s|m)$/;
 
 /**
- * The one reader of a duration: its ms, or why it is no duration — in the words parseDuration throws and
- * durationSchema refuses with. A number is ms as it is; a negative or non-finite one is no duration.
+ * A duration read: its ms, or why it is no duration — one reading, so parseDuration throws and durationSchema
+ * refuses in the same words. A number is ms as it is; a negative or non-finite one is no duration.
  */
 function readDuration(value: string | number): { ms: number } | { issue: string } {
   if (typeof value === 'number') {

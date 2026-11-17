@@ -1,0 +1,286 @@
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import ts from 'typescript';
+
+/**
+ * What the comment guards read: the comments and test titles of src/, scripts/ and tests/, as the TypeScript parser
+ * finds them, and the words their code is made of. Read once per worker (corpus).
+ */
+
+/** The averi checkout's root. */
+export const ROOT = join(import.meta.dirname, '..', '..');
+
+/** A line of prose: where it starts (1-based) and its text. */
+export interface Line {
+  file: string;
+  line: number;
+  text: string;
+}
+
+/** A whole comment, its lines joined by spaces, and where each of them starts in that text. */
+export interface CommentBlock extends Line {
+  /** Each source line's start in `text` and its line number, in order. */
+  starts: readonly { at: number; line: number }[];
+}
+
+/** The line a comment block's text has at `index`. */
+export const lineAt = (block: CommentBlock, index: number): number => {
+  let line = block.line;
+  for (const s of block.starts) if (s.at <= index) line = s.line;
+  return line;
+};
+
+/** A comment line's lead: the indent, the `/**`, `/*`, `*` or `//`, the space after. */
+const LEAD = /^\s*(?:\/\*\*?|\*(?!\/)|\/\/+)?\s*/;
+
+/** A path cut at a hyphen or a slash (`docs/bugs/2026-10-09-`, `scroll-`, `src/`), or a pointer cut after its `#`. */
+const cutPath = (text: string): boolean => /[\w.#/-][-/]$|\.ts#$/.test(text);
+/** A file name at the line's end whose `#symbol` starts the next (`scroll-read.ts` / `#judgeRead`). */
+const cutBeforeSymbol = (text: string, rest: string): boolean => /\.ts$/.test(text) && rest.startsWith('#');
+/** A path whose extension starts the next line (`tests/verify/baseline-confirmation` / `.test.ts`). */
+const cutBeforeExtension = (text: string, rest: string): boolean => /\/[\w-]+$/.test(text) && /^\.(?:test\.)?m?ts\b/.test(rest);
+
+/**
+ * A line wrapped onto the next (cutPath, cutBeforeSymbol, cutBeforeExtension). Any line ending in a slash joins, a bare
+ * root too: `src/` at a line's end and `are` on the next read `src/are`, so prose keeps a root off a line's end.
+ */
+const wrapped = (text: string, next: string): boolean => {
+  const rest = next.replace(LEAD, '');
+  return cutPath(text) || cutBeforeSymbol(text, rest) || cutBeforeExtension(text, rest);
+};
+
+/**
+ * A text's lines, a wrapped one (see wrapped) joined to its continuation with the continuation's lead dropped, each
+ * numbered by the line it starts on.
+ */
+export function logicalLines(source: string): { line: number; text: string }[] {
+  const lines = source.split('\n');
+  const out: { line: number; text: string }[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const start = i;
+    let text = lines[i];
+    while (i + 1 < lines.length && wrapped(text, lines[i + 1])) text += lines[++i].replace(LEAD, '');
+    out.push({ line: start + 1, text });
+  }
+  return out;
+}
+
+const parse = (file: string, source: string) => ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+
+/** Every comment of a source, once each, in order: the leading and trailing ranges around every node and token. */
+function commentRanges(sf: ts.SourceFile): ts.CommentRange[] {
+  const text = sf.text;
+  const seen = new Map<number, ts.CommentRange>();
+  const add = (pos: number) => {
+    for (const r of ts.getLeadingCommentRanges(text, pos) ?? []) seen.set(r.pos, r);
+    for (const r of ts.getTrailingCommentRanges(text, pos) ?? []) seen.set(r.pos, r);
+  };
+  const visit = (n: ts.Node) => {
+    add(n.pos);
+    add(n.end);
+    for (const c of n.getChildren(sf)) visit(c);
+  };
+  add(0);
+  visit(sf);
+  return [...seen.values()].sort((a, b) => a.pos - b.pos);
+}
+
+/** A comment range's lines, lead and closing `*\/` dropped, each with its line number. */
+function rawLines(sf: ts.SourceFile, r: ts.CommentRange): { line: number; text: string }[] {
+  const first = sf.getLineAndCharacterOfPosition(r.pos).line + 1;
+  return sf.text
+    .slice(r.pos, r.end)
+    .split('\n')
+    .map((l, i) => ({ line: first + i, text: l.replace(LEAD, '').replace(/\s*\*\/\s*$/, '') }));
+}
+
+/** A comment's lines, a wrapped line (see wrapped) joined to its continuation in the same comment; blank lines left out. */
+function commentLines(file: string, sf: ts.SourceFile, ranges: readonly ts.CommentRange[]): Line[] {
+  return ranges.flatMap((r) => {
+    const raw = rawLines(sf, r);
+    return logicalLines(raw.map((l) => l.text).join('\n'))
+      .filter(({ text }) => text.trim() !== '')
+      .map(({ line, text }) => ({ file, line: raw[0].line + line - 1, text }));
+  });
+}
+
+/** `//` comments on consecutive lines, only whitespace between them, grouped as one; any other comment alone. */
+function grouped(sf: ts.SourceFile, ranges: readonly ts.CommentRange[]): ts.CommentRange[][] {
+  const groups: ts.CommentRange[][] = [];
+  const lineOf = (pos: number) => sf.getLineAndCharacterOfPosition(pos).line;
+  for (const r of ranges) {
+    const last = groups.at(-1)?.at(-1);
+    const joins =
+      last !== undefined &&
+      last.kind === ts.SyntaxKind.SingleLineCommentTrivia &&
+      r.kind === ts.SyntaxKind.SingleLineCommentTrivia &&
+      lineOf(r.pos) === lineOf(last.pos) + 1 &&
+      sf.text.slice(last.end, r.pos).trim() === '';
+    if (joins) groups.at(-1)!.push(r);
+    else groups.push([r]);
+  }
+  return groups;
+}
+
+/**
+ * Each comment whole — a run of `//` lines one comment (grouped) — its non-blank lines joined by one space: a phrase
+ * wrapped across lines reads as one.
+ */
+function commentBlocks(file: string, sf: ts.SourceFile, ranges: readonly ts.CommentRange[]): CommentBlock[] {
+  return grouped(sf, ranges).flatMap((group) => {
+    const starts: { at: number; line: number }[] = [];
+    let text = '';
+    for (const l of group.flatMap((r) => rawLines(sf, r))) {
+      if (l.text.trim() === '') continue;
+      if (text !== '') text += ' ';
+      starts.push({ at: text.length, line: l.line });
+      text += l.text.trim();
+    }
+    return starts.length === 0 ? [] : [{ file, line: starts[0].line, text, starts }];
+  });
+}
+
+/** A source's comment lines (commentLines). */
+export const commentsOf = (file: string, source: string): Line[] => {
+  const sf = parse(file, source);
+  return commentLines(file, sf, commentRanges(sf));
+};
+
+/** A source's comments whole (commentBlocks). */
+export const commentBlocksOf = (file: string, source: string): CommentBlock[] => {
+  const sf = parse(file, source);
+  return commentBlocks(file, sf, commentRanges(sf));
+};
+
+function blanked(source: string, ranges: readonly { pos: number; end: number }[]): string {
+  let out = '';
+  let at = 0;
+  for (const r of [...ranges].sort((a, b) => a.pos - b.pos)) {
+    if (r.pos < at) continue;
+    out += source.slice(at, r.pos) + source.slice(r.pos, r.end).replace(/[^\n]/g, ' ');
+    at = r.end;
+  }
+  return out + source.slice(at);
+}
+
+const TEST_CALL = /^(?:describe|it|test)(?:\.(?:skip|only|todo|concurrent|sequential|fails|runIf\(.*\)|skipIf\(.*\)))*$/s;
+const isText = (n: ts.Node): n is ts.StringLiteral | ts.NoSubstitutionTemplateLiteral | ts.TemplateExpression =>
+  ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n) || ts.isTemplateExpression(n);
+/** A title's text: a string's value, a template's source between its backticks. */
+const titleText = (n: ts.StringLiteral | ts.NoSubstitutionTemplateLiteral | ts.TemplateExpression, sf: ts.SourceFile): string =>
+  ts.isTemplateExpression(n) ? n.getText(sf).slice(1, -1) : n.text;
+
+/**
+ * The title literals of a source: the first argument of describe/it/test (and their .skip, .only, …), and of
+ * `X.each(rows)(title)` the title and each inline row's first string (a row's title part, `%s`), each with its text.
+ */
+function titleNodesOf(sf: ts.SourceFile): { node: ts.Node; text: string }[] {
+  const out: { node: ts.Node; text: string }[] = [];
+  const push = (node: ts.Node, text: string) => out.push({ node, text });
+  const visit = (n: ts.Node) => {
+    if (ts.isCallExpression(n) && n.arguments[0] && isText(n.arguments[0])) {
+      const callee = n.expression;
+      if (TEST_CALL.test(callee.getText(sf))) push(n.arguments[0], titleText(n.arguments[0], sf));
+      else if (ts.isCallExpression(callee) && ts.isPropertyAccessExpression(callee.expression) && callee.expression.name.text === 'each' && TEST_CALL.test(callee.expression.expression.getText(sf))) {
+        push(n.arguments[0], titleText(n.arguments[0], sf));
+        const rows = callee.arguments[0];
+        if (rows && ts.isArrayLiteralExpression(rows))
+          for (const row of rows.elements) {
+            const first = ts.isArrayLiteralExpression(row) ? row.elements[0] : row;
+            if (first && isText(first)) push(first, titleText(first, sf));
+          }
+      }
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(sf);
+  return out;
+}
+
+/**
+ * A source's code — comments and test titles blanked (same length, line breaks kept), strings kept: a title is prose,
+ * so its words hold up no backticked name, its own least of all — and its titles, each at the line it starts on.
+ */
+function codeAndTitles(file: string, sf: ts.SourceFile, ranges: readonly ts.CommentRange[]): { code: string; titles: Line[] } {
+  const nodes = titleNodesOf(sf);
+  const titles = nodes.map(({ node, text }) => ({ file, line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1, text }));
+  const code = blanked(sf.text, [...ranges, ...nodes.map(({ node }) => ({ pos: node.getStart(sf), end: node.end }))]);
+  return { code, titles };
+}
+
+/** A source's code (codeAndTitles). */
+export const codeOf = (file: string, source: string): string => {
+  const sf = parse(file, source);
+  return codeAndTitles(file, sf, commentRanges(sf)).code;
+};
+
+/** A test file's titles (codeAndTitles). */
+export const titlesOf = (file: string, source: string): Line[] => {
+  const sf = parse(file, source);
+  return codeAndTitles(file, sf, commentRanges(sf)).titles;
+};
+
+/** The words of a text: identifiers, and the words after an escape (`\nappAlive:` holds appAlive). */
+export function wordsOf(text: string, into = new Set<string>()): Set<string> {
+  for (const m of text.matchAll(/[A-Za-z_$][\w$]*/g)) into.add(m[0]);
+  for (const m of text.replace(/\\[nrtv]/g, ' ').matchAll(/[A-Za-z_$][\w$]*/g)) into.add(m[0]);
+  return into;
+}
+
+/** The listed paths that are files of the checkout now: a tracked file deleted in the working tree is none. */
+export const existing = (listed: readonly string[], root = ROOT): string[] => listed.filter((f) => existsSync(join(root, f)));
+
+/** The checkout's files: what git tracks and what it would (untracked, not ignored), that exist. */
+export const repoFiles = (): string[] =>
+  existing(
+    execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+      .split('\n')
+      .filter(Boolean),
+  );
+
+export interface Corpus {
+  /** The checkout's files (repoFiles). */
+  files: readonly string[];
+  /** The .ts and .mts sources of src/, scripts/ and tests/. */
+  sources: readonly string[];
+  comments: readonly Line[];
+  /** Each comment whole (commentBlocks). */
+  blocks: readonly CommentBlock[];
+  titles: readonly Line[];
+  /** Each source's code words: its code (codeAndTitles, strings kept) read by wordsOf. */
+  codeWords: ReadonlyMap<string, ReadonlySet<string>>;
+  /** The words of tests/fixtures/ and fixtures/ (their text files). */
+  fixtureWords: ReadonlySet<string>;
+}
+
+/** A fixture file worth reading for words: a text file. */
+const textFixture = (f: string) => /^(?:tests\/)?fixtures\//.test(f) && !/\.(?:png|jpe?g|gif|jar|webp|ico|keystore|zip)$/i.test(f);
+
+let cached: Corpus | undefined;
+
+/** The checkout's comments, titles and code words, read once per worker. */
+export function corpus(): Corpus {
+  if (cached) return cached;
+  const files = repoFiles();
+  const sources = files.filter((f) => /^(?:src|scripts|tests)\//.test(f) && /\.m?ts$/.test(f));
+  const comments: Line[] = [];
+  const blocks: CommentBlock[] = [];
+  const titles: Line[] = [];
+  const codeWords = new Map<string, Set<string>>();
+  const fixtureWords = new Set<string>();
+  for (const f of sources) {
+    const sf = parse(f, readFileSync(join(ROOT, f), 'utf8'));
+    const ranges = commentRanges(sf);
+    comments.push(...commentLines(f, sf, ranges));
+    blocks.push(...commentBlocks(f, sf, ranges));
+    const read = codeAndTitles(f, sf, ranges);
+    if (f.startsWith('tests/')) titles.push(...read.titles);
+    codeWords.set(f, wordsOf(read.code));
+  }
+  for (const f of files.filter(textFixture)) {
+    const text = readFileSync(join(ROOT, f), 'utf8');
+    if (!text.includes('\0')) wordsOf(text, fixtureWords);
+  }
+  return (cached = { files, sources, comments, blocks, titles, codeWords, fixtureWords });
+}

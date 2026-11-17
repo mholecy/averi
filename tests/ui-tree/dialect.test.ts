@@ -7,9 +7,9 @@ import { dialectOf, type TreeDialect } from '../../src/ui-tree/dialect.js';
 import { markByWindow } from '../../src/ui-tree/window-mark.js';
 import { parseDump } from '../helpers/android-dumps.js';
 
-// THE TREE'S DIALECT (ui-tree/dialect.ts, backlog A45): the one reader of the root marks the three parsers and the
-// window manager's word set. Pinned on one real capture of each source — the lab's `bands` screen, read by idb, by WDA
-// and by uiautomator — and on a tree no source marked (a hand-built tree, a normalized snapshot).
+// THE TREE'S DIALECT (ui-tree/dialect.ts, backlog A45): the marks the three parsers and the window manager's word set
+// leave on the root, read in one place. Pinned on one real capture of each source — the lab's `bands` screen, read by
+// idb, by WDA and by uiautomator — and on a tree no source marked (a hand-built tree, a normalized snapshot).
 
 const IOS = new URL('../fixtures/truth/ios-iphone17-ios27/', import.meta.url);
 const ANDROID = new URL('../fixtures/truth/android-averi_lab-api33/', import.meta.url);

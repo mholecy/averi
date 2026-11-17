@@ -426,7 +426,7 @@ describe('scrollUntilVisible — after the device check', () => {
   it.each([
     // Symmetric: 729 pt each way for a full stroke (344 pt down, 283 pt up). Full strokes both ways ping-pong 681 ↔ -48 to maxSwipes.
     ['symmetric 729/729', 729 / 344, 729 / 283, 2],
-    // The reviewer's 681 / −729 down, 650 up: full strokes reach it only on the 6th swipe.
+    // 681 / −729 down, 650 up: full strokes reach it only on the 6th swipe.
     ['681/−729 down, 650 up', 729 / 344, 650 / 283, 2],
   ])('convergence, %s: the turned stroke is halved, so the distance left shrinks whatever the app flings', async (_name, down, up, swipes) => {
     const fake = wdaForm(681, flinging(down, up));

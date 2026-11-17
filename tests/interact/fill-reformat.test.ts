@@ -6,7 +6,7 @@ import { maskTemplate, prefixOf, reformatOf, separatedOf, skeleton } from '../..
  * character, in order, with separators of its own between them — measured on the lab's Compose, React Native and
  * VisualTransformation fields (docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md). Tight: a field
  * that dropped, reordered or changed a character never passes, nor an added separator that is no grouping (every
- * pair a review found is pinned below).
+ * such pair is pinned below).
  */
 describe('reformatOf — the typed characters in order, one separator added between groups', () => {
   it('an IBAN grouped in fours, an amount grouped by thousands (a no-break space), a date and a phone', () => {

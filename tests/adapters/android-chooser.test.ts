@@ -21,7 +21,7 @@ const RESOLVER = 'android/com.android.internal.app.ResolverActivity';
 const LAB = 'dev.averi.lab/.MainActivity';
 /** The chooser as the focused window, batch-9's record. */
 const CHOOSER_WINDOW = `Window{56b9ca0 u0 ${RESOLVER}}`;
-/** The launcher's focus as batch-9 recorded it before the link (its `homeFocus`). */
+/** The launcher's focus as batch-9 recorded it before the link. */
 const LAUNCHER_FOCUS = '  mCurrentFocus=Window{9d5e433 u0 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity}\n';
 
 /**
