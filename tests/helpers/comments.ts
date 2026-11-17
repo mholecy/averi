@@ -105,12 +105,33 @@ function commentLines(file: string, sf: ts.SourceFile, ranges: readonly ts.Comme
   });
 }
 
-/** Each comment whole, its non-blank lines joined by one space: a phrase wrapped across lines reads as one. */
+/** `//` comments on consecutive lines, only whitespace between them, grouped as one; any other comment alone. */
+function grouped(sf: ts.SourceFile, ranges: readonly ts.CommentRange[]): ts.CommentRange[][] {
+  const groups: ts.CommentRange[][] = [];
+  const lineOf = (pos: number) => sf.getLineAndCharacterOfPosition(pos).line;
+  for (const r of ranges) {
+    const last = groups.at(-1)?.at(-1);
+    const joins =
+      last !== undefined &&
+      last.kind === ts.SyntaxKind.SingleLineCommentTrivia &&
+      r.kind === ts.SyntaxKind.SingleLineCommentTrivia &&
+      lineOf(r.pos) === lineOf(last.pos) + 1 &&
+      sf.text.slice(last.end, r.pos).trim() === '';
+    if (joins) groups.at(-1)!.push(r);
+    else groups.push([r]);
+  }
+  return groups;
+}
+
+/**
+ * Each comment whole — a run of `//` lines one comment (grouped) — its non-blank lines joined by one space: a phrase
+ * wrapped across lines reads as one.
+ */
 function commentBlocks(file: string, sf: ts.SourceFile, ranges: readonly ts.CommentRange[]): CommentBlock[] {
-  return ranges.flatMap((r) => {
+  return grouped(sf, ranges).flatMap((group) => {
     const starts: { at: number; line: number }[] = [];
     let text = '';
-    for (const l of rawLines(sf, r)) {
+    for (const l of group.flatMap((r) => rawLines(sf, r))) {
       if (l.text.trim() === '') continue;
       if (text !== '') text += ' ';
       starts.push({ at: text.length, line: l.line });

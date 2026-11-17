@@ -215,6 +215,14 @@ describe('what the guard reads', () => {
     expect([m[0], lineAt(block, m.index!)]).toEqual(['the one reader', 2]);
   });
 
+  it('`//` comments on consecutive lines are one comment: a phrase wrapped across them is read whole', () => {
+    const source = ['const a = 1;', '// Review', '// round 4 kept it; the one', '  // reader of it', '', '// apart'].join('\n');
+    const blocks = commentBlocksOf('x.ts', source);
+    expect(blocks.map((b) => `${b.line} ${b.text}`)).toEqual(['2 Review round 4 kept it; the one reader of it', '6 apart']);
+    const [m] = callerPhraseMatches(blocks[0].text);
+    expect([reviewLabels(blocks[0].text), m[0], lineAt(blocks[0], m.index!)]).toEqual([['Review round 4'], 'the one reader', 3]);
+  });
+
   it('the files: a listed file the working tree deleted is none', () => {
     expect(existing(['package.json', 'tests/no-such-file-a65.ts'])).toEqual(['package.json']);
   });
