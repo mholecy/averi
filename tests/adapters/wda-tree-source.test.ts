@@ -404,6 +404,67 @@ describe('WdaTreeSource.applicationLabel — which app WebDriverAgent reads, ask
     expect(asked(fetcher.urls)).toEqual([]);
   });
 
+  it('disposed while asking: the released error, WDA\'s words only as its cause', async () => {
+    let hold = false;
+    let fail!: (err: Error) => void;
+    const { source, fetcher } = await setup(undefined, undefined, (fn) => (url, init) => {
+      if (!hold || !url.endsWith('/wda/activeAppInfo')) return fn(url, init);
+      fetcher.urls.push(url);
+      return new Promise((_ok, reject) => { fail = reject; });
+    });
+    await source.read();
+    hold = true;
+    const asking = source.applicationLabel().then(() => undefined, (e: unknown) => e as Error);
+    while (asked(fetcher.urls).length === 0) await new Promise((r) => setTimeout(r, 2));
+    await source.dispose();
+    fail(new Error('ECONNRESET'));
+    const err = await asking;
+    expect(err?.message).toMatch(/deselected or averi is shutting down; select the device again/);
+    expect((err?.cause as Error | undefined)?.message).toMatch(/activeAppInfo request failed .*ECONNRESET/);
+    await expect(source.applicationLabel()).rejects.toThrow(/select the device again/);
+    expect(asked(fetcher.urls)).toHaveLength(1);
+  });
+
+  it('a failed ask, then dispose: the released error, not the remembered one', async () => {
+    const { source, fetcher } = await setup(() => 'refused');
+    await source.read();
+    await expect(source.applicationLabel()).rejects.toThrow(/activeAppInfo request failed/);
+    await source.dispose();
+    const err = await source.applicationLabel().then(() => undefined, (e: unknown) => e as Error);
+    expect(err?.message).toMatch(/deselected or averi is shutting down; select the device again/);
+    expect(err?.cause).toBeUndefined();
+    expect(asked(fetcher.urls)).toHaveLength(1);
+  });
+
+  it('a /source read that fails on the same child does not clear a failed ask: it is not asked again', async () => {
+    let answer: 'refused' | { status: number; body?: unknown } = 'refused';
+    let source500 = false;
+    const { source, spawner, fetcher } = await setup(() => answer, () => (source500 ? { status: 500 } : { status: 200, body: WDA_ENVELOPE }));
+    await source.read();
+    const first = await source.applicationLabel().then(() => undefined, (e: unknown) => e as Error);
+    expect(first?.message).toMatch(/activeAppInfo request failed/);
+    source500 = true;
+    answer = { status: 200, body: ACTIVE_LAB };
+    await expect(source.read()).rejects.toThrow(/HTTP 500/);
+    expect(spawner.spawns).toHaveLength(1); // the same child: a 500 on /source restarts nothing
+    expect(await source.applicationLabel().then(() => undefined, (e: unknown) => e)).toBe(first);
+    expect(asked(fetcher.urls)).toHaveLength(1);
+  });
+
+  it('a /source read that answers clears a failed ask even when its payload holds no tree', async () => {
+    let answer: 'refused' | { status: number; body?: unknown } = 'refused';
+    let body: unknown = WDA_ENVELOPE;
+    const { source, spawner, fetcher } = await setup(() => answer, () => ({ status: 200, body }));
+    await source.read();
+    await expect(source.applicationLabel()).rejects.toThrow(/activeAppInfo request failed/);
+    body = { value: null };
+    answer = { status: 200, body: ACTIVE_LAB };
+    await expect(source.read()).rejects.toThrow(/payload has no element root/);
+    expect(spawner.spawns).toHaveLength(1);
+    expect(await source.applicationLabel()).toEqual({ kind: 'bundle', bundleId: 'dev.averi.lab' });
+    expect(asked(fetcher.urls)).toHaveLength(2);
+  });
+
   it('after our xcodebuild child exited, WDA is not up: declined — no ask, no spawn', async () => {
     const { source, spawner, fetcher } = await setup();
     await source.read();
@@ -503,6 +564,26 @@ describe('WdaTreeSource.systemAlert — one short /source read, never a start or
     const before = fetcher.urls.length;
     await expect(source.systemAlert()).rejects.toThrow(/deselected or averi is shutting down/);
     expect(sources(fetcher.urls.slice(before))).toEqual([]);
+  });
+
+  it('disposed while reading: the released error, WDA\'s words only as its cause', async () => {
+    let hold = false;
+    let fail!: (err: Error) => void;
+    const { source, fetcher } = await setup(undefined, undefined, (fn) => (url, init) => {
+      if (!hold || !url.includes('/source')) return fn(url, init);
+      fetcher.urls.push(url);
+      return new Promise((_ok, reject) => { fail = reject; });
+    });
+    await source.read();
+    hold = true;
+    const before = fetcher.urls.length;
+    const reading = source.systemAlert().then(() => undefined, (e: unknown) => e as Error);
+    while (sources(fetcher.urls.slice(before)).length === 0) await new Promise((r) => setTimeout(r, 2));
+    await source.dispose();
+    fail(new Error('ECONNRESET'));
+    const err = await reading;
+    expect(err?.message).toMatch(/deselected or averi is shutting down; select the device again/);
+    expect((err?.cause as Error | undefined)?.message).toMatch(/\/source request failed .*ECONNRESET/);
   });
 });
 
