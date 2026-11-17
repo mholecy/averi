@@ -59,6 +59,13 @@ function textWords(n: NamedNode, text: string | null, policy: NamingPolicy): { r
   return own === undefined ? { words: JSON.stringify(text), byLength: false } : { words: `<its text, ${charactersText(own.length)}>`, byLength: true };
 }
 
+/**
+ * A presented layer's label as a sentence quotes it (ui-tree/remedy-text.ts: `an alert "Delete?"`): the label alone,
+ * kept as presentation.ts#MarkedLayer.label without the node it was read off, so always quoted — that node is a typed
+ * layer's element or the layer itself, never an input, and only an input's label can be its own text (`textWords`).
+ */
+export const layerLabelWords = (label: string): string => JSON.stringify(label);
+
 /** A label in a sentence that names the node's rect itself: `"Sign in"`, or `<its text, 8 characters>`. */
 export const labelWords = (n: NamedNode): string => textWords(n, n.label, 'own-text').words;
 

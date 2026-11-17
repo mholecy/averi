@@ -1,4 +1,5 @@
 import { isTyped, type TypedPresentationKind } from '../adapters/types.js';
+import { layerLabelWords } from './node-words.js';
 import type { MarkedLayer } from './presentation.js';
 import type { NoScrollRemedy, Remedy, RemedyCase } from './standing.js';
 
@@ -14,7 +15,7 @@ import type { NoScrollRemedy, Remedy, RemedyCase } from './standing.js';
  * interact/touch-remedy.ts's; the pixel verb's is verify/pixel-text.ts's.
  *
  * A leaf of the UI-tree layer: it imports standing.ts's types (and presentation.ts's `MarkedLayer`, adapters/types.ts's
- * `isTyped`), no verb, so the decision and its words are two modules, and either changes alone.
+ * `isTyped`, a layer's label as node-words.ts#layerLabelWords says it), no verb, so the decision and its words are two modules, and either changes alone.
  *
  * One `purpose` names whose sentence a clause sits in — `touch` (the tap, `scroll_until`) or `pixel` (the pixel assert)
  * — and the node's pronoun follows from it (`pronoun`): `it` in a touch's sentence, `the element` in the pixel
@@ -61,12 +62,12 @@ const typedWords = (layer: MarkedLayer | undefined): TypedWords | undefined => (
 export const presentedLayerName = (layer: MarkedLayer | undefined): string => {
   if (layer?.kind === 'backdrop') return BACKDROP;
   const typed = typedWords(layer);
-  return typed === undefined ? 'a sheet or modal' : `${typed.article} ${typed.noun}${layer?.label ? ` ${JSON.stringify(layer.label)}` : ''}`;
+  return typed === undefined ? 'a sheet or modal' : `${typed.article} ${typed.noun}${layer?.label ? ` ${layerLabelWords(layer.label)}` : ''}`;
 };
 
 /**
  * A `backdrop` layer's words (adapters/types.ts#PresentationKind): what it is taken for, the evidence it rests on —
- * one empty element WDA lists over the whole screen, which a hidden overlay that lets touches through (a decorative
+ * one empty element the tree lists over the whole screen, which a hidden overlay that lets touches through (a decorative
  * tint, `.allowsHitTesting(false)`, RN `pointerEvents="none"`) matches too (ADR 0018, the amendment "an in-window
  * backdrop", its residual) — and the way out then: a screenshot shows whether a menu is up; with none, what is beneath
  * the overlay takes a touch by coordinates (the tap and swipe tools' x/y, which judge nothing), or is judged on that
@@ -112,7 +113,7 @@ export const presentedRemedy = (purpose: RemedyPurpose, layer?: MarkedLayer): st
   const what = pronoun(purpose);
   const typed = typedWords(layer);
   return typed !== undefined
-    ? `${typed.article} ${typed.noun} is presented over ${what}${layer?.label ? ` (${JSON.stringify(layer.label)})` : ''} — close it first`
+    ? `${typed.article} ${typed.noun} is presented over ${what}${layer?.label ? ` (${layerLabelWords(layer.label)})` : ''} — close it first`
     : `a screen is presented over ${what} (a modal or a sheet) — close it first; no scroll moves ${what} out from under that screen`;
 };
 
