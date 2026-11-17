@@ -74,8 +74,14 @@
   "src/ui-tree/geometry.ts": {
     "group": "core",
     "tests": ["tests/ui-tree/geometry*.test.ts"],
-    "floor": 93,
-    "baseline": "95.32 % on 2026-11-05 (D68 code review, OPPOSITE_EDGE; cold): the same survivors, none in OPPOSITE_EDGE"
+    "floor": 95,
+    "baseline": "97.09 % on 2026-11-17 (A75: the scroll clips moved out to scroll-clips.ts; `npm run mutate -- --group core --force --mutate src/ui-tree/geometry.ts,src/ui-tree/scroll-clips.ts`, cold, 70 s): 653 mutants, 19 survived, 2 timeouts counted killed, 0 without coverage. With scroll-clips.ts, 1160 mutants and 55 survived: as many survivors as the one-file run of 2026-11-03 (D59b review round 2, 55 in 1175)"
+  },
+  "src/ui-tree/scroll-clips.ts": {
+    "group": "core",
+    "tests": ["tests/ui-tree/scroll-clips*.test.ts"],
+    "floor": 90,
+    "baseline": "92.90 % on 2026-11-17 (A75, split from geometry.ts with its tests; the same run as geometry.ts's): 507 mutants, 36 survived, 0 timeouts, 0 without coverage — under geometry.ts's old floor of 93, which the two shared until the split"
   },
   "src/ui-tree/standing.ts": {
     "group": "scene",

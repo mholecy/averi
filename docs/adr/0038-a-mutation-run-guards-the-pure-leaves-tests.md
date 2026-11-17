@@ -35,6 +35,8 @@ group, `android` — see the A27 amendment at the end).
 Amended 2026-11-11 (A34: runner.ts, standing.ts and lab-run.ts changed — the A34 line at the end).
 Amended 2026-11-11 (A32: scope.json keeps each module's latest baseline only; the earlier ones moved to
 docs/mutation-ledger.md — see the A32 amendment at the end).
+Amended 2026-11-17 (A75: geometry.ts splits; src/ui-tree/scroll-clips.ts joins the core group with a floor of its own —
+see the A75 amendment at the end).
 
 ## Context
 
@@ -2101,3 +2103,21 @@ survivors are equivalent. One is the client's version `'0'` emptied: nothing rea
 `server?.close()` as `server.close()`: the server is undefined only when it could not be built, and that close's
 failure is dropped, since the open throws its own error. The first run, before the review, scored 96.00 % (25 mutants,
 1 survived; docs/mutation-ledger.md). Every other lab module stayed at or above its floor.
+
+## Amendment: geometry.ts splits, and scroll-clips.ts takes a floor of its own (2026-11-17, backlog A75)
+
+A75 moved the scroll clips (`Clips`, `clipsOf`, the drawn frame, the evidenced cuts and `largestScroller`) out of
+src/ui-tree/geometry.ts into src/ui-tree/scroll-clips.ts, and their tests with them: geometry-clips.test.ts became
+scroll-clips.test.ts and took geometry-viewport.test.ts's drawn-frame and screen-edge cases (drawnPart, isUntold,
+toldFrame, cutAtScreenEdges), and geometry.test.ts's tree cases went to scroll-clips-trees.test.ts. scope.json gives the
+new module its own `core` entry, tested by `tests/ui-tree/scroll-clips*.test.ts`; geometry.ts keeps
+`tests/ui-tree/geometry*.test.ts`. The group's test set holds the same cases as before, so the cross-module kills the
+D45 amendment describes still count.
+
+Cold run of the two (`npm run mutate -- --group core --force --mutate
+src/ui-tree/geometry.ts,src/ui-tree/scroll-clips.ts --tempDirName reports/mutation/stryker-tmp-a75`, 70 s): geometry.ts
+97.09 % (653 mutants, 19 survived, 2 timeouts), scroll-clips.ts 92.90 % (507 mutants, 36 survived). Together that is 55
+survivors in 1160, as many survivors as the one-file run of 2026-11-03 (D59b review round 2: 55 in 1175). A narrowed run
+reports the group's other modules as not mutated and so exits 1: only the two lines it scores are read. One floor could
+no longer hold both, since the clips score under geometry.ts's old 93. By the rule (about two below the score's whole
+number) the floors are geometry.ts 95 (was 93) and scroll-clips.ts 90. The split adds no mutant and drops no test.
