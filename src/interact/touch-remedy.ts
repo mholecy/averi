@@ -1,5 +1,5 @@
 import { rectArea, STRUCTURAL_ROLES, type UiNode } from '../adapters/types.js';
-import { type Cut } from '../ui-tree/geometry.js';
+import { type Cut } from '../ui-tree/scroll-clips.js';
 import { nodeText } from '../ui-tree/node-words.js';
 import { cutPinnedRemedyText, noScrollRemedyText, presentedOr } from '../ui-tree/remedy-text.js';
 import { isInteractive } from '../ui-tree/selectors.js';
@@ -52,7 +52,7 @@ export function touchRemedyText(standing: TouchRemedied, keyboard?: KeyboardUp):
   }
 }
 
-/** The way past a cut the node's own content evidences, should it only READ cut (geometry.ts#evidentCut's residual). */
+/** The way past a cut the node's own content evidences, should it only READ cut (scroll-clips.ts#evidentCut's residual). */
 const OWN_CUT_WAY_PAST = 'if it is whole and only its own content runs to that edge, no scroll shows more: tap a child of it that lies clear of that edge, or tap by coordinates';
 /** The way past a cut inherited from what the node lies in (`Cut.within`): the evidence is that ancestor's, so its "whole" case is that ancestor's. */
 const INHERITED_CUT_WAY_PAST =
@@ -61,8 +61,8 @@ const INHERITED_CUT_WAY_PAST =
 /**
  * THE WAY PAST a cut, should the node only READ cut — what no scroll changes, so what a tap does instead.
  * - At a clipping container's edge (`Cut.by` absent): the node that is whole, its own content running to the edge
- *   (geometry.ts#evidentCut's residual) — a child that lies CLEAR of that edge, or a coordinate tap: a child flush
- *   with it inside a sliver cut there is refused too (geometry.ts#Clips.cutSliver's inherited cut, `Cut.within`;
+ *   (scroll-clips.ts#evidentCut's residual) — a child that lies CLEAR of that edge, or a coordinate tap: a child flush
+ *   with it inside a sliver cut there is refused too (scroll-clips.ts#Clips.cutSliver's inherited cut, `Cut.within`;
  *   measured: the toggle's leaf label "Payment details", tapped as a child, did nothing) — whose own way past names
  *   what it lies in: something in THAT clear of the edge. A container's cut needs a clipping ancestor
  *   (UiNode.clipsDescendants, Android's); an iOS tree is none (WDA's frames are unclipped, idb's list flat), so no

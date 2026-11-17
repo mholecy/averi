@@ -31,7 +31,7 @@ const COLOUR: PixelPurpose = { of: 'pixel', reads: colorSampleRect, glyphs: fals
 
 /** A nested tree (dialect.ts#TreeDialect.ancestry): `inScroller` is told for every node. */
 const root = (...children: UiNode[]): UiNode => node({ role: 'container', rect: box(400, 800), children });
-/** A scroll view (geometry.ts#Clips.inScroller: it clips its descendants). */
+/** A scroll view (scroll-clips.ts#Clips.inScroller: it clips its descendants). */
 const list = (rect: Rect, ...children: UiNode[]): UiNode => node({ role: 'container', identifier: 'list', clipsDescendants: true, rect, children });
 const el = (identifier: string, rect: Rect, role = 'button'): UiNode => node({ role, identifier, rect });
 

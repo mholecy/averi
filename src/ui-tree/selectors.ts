@@ -165,6 +165,9 @@ export const findTarget = (tree: UiNode, target: Target): UiNode[] =>
 /** A node with area — one a tap may act on. */
 export const hasArea = (node: UiNode): boolean => node.rect.width > 0 && node.rect.height > 0;
 
+/** The matches a tap may act on and a reply may name: those with area — a zero-area node is never a target. */
+export const withArea = (found: readonly UiNode[]): UiNode[] => found.filter(hasArea);
+
 /**
  * The id a target names ALONE — one exact `id` and nothing else (`id:"x"`, `{ id: x }`) — or undefined. Only then is
  * "no tree read held a match" a statement about the id (miss.ts's `noIdListed`, `idUnlisted`): the fields AND (`matches`), so

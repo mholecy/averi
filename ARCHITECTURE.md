@@ -149,10 +149,11 @@ question:
   is `PersistentReadError`, thrown at once, ADR 0036) and `pollTree`, the one owner of the deadline loop (its pause
   counts the read, ADR 0029; a `PollObserver` is told each fresh read's timing); `read-handoff.ts` (`ReadHandOff`: the
   last read handed to the next poll only as a first sample or a positive verdict, ADR 0030).
-- **Geometry** — `geometry.ts`: viewport predicates, rect arithmetic, and `clipsOf` (each node's clipping ancestors,
-  slivers, drawn frame, scroll axes, one walk per question); `scroll-containers.ts` (a node `clips` and/or `scrolls`,
-  `clips ⇒ scrolls`); `sides.ts` (a rect's sides and the direction that brings one back); `later-edges.ts` (the one
-  classification of Compose's cut at a later node, `LaterEdge`).
+- **Geometry** — `geometry.ts`: screen inference, viewport predicates, rect and edge arithmetic; `scroll-clips.ts`:
+  `clipsOf` (each node's clipping ancestors, slivers, drawn frame, scroll axes, one walk per question);
+  `scroll-containers.ts` (a node `clips` and/or `scrolls`, `clips ⇒ scrolls`); `sides.ts` (a rect's sides and the
+  direction that brings one back); `later-edges.ts` (the one classification of Compose's cut at a later node,
+  `LaterEdge`).
 - **Draw order** — `draw-order.ts`: what a tree says is drawn on top of what. One pre-order walk read as paint order,
   and `exposure(node, within)`: a target's covers, what share shows, its largest uncovered piece and where a tap goes.
   What draws is ONE table, `draw-order.ts#NOT_DRAWN`, a named row per kind of node judged to draw nothing, each with its

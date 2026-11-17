@@ -700,7 +700,7 @@ describe('textMeasurement(...).measure — the text table\'s per-leg measurement
   const ios = root(402, [n({ identifier: 'cta', label: 'CONTINUE', rect: { x: 24, y: 780, width: 354, height: 44 } })]);
   const shot = Shot.ofPng(Buffer.from('png bytes'));
   /** A leg's frame as the run hands it over: the settled bytes plus what the capture concluded (capture.ts#TreeFrame). */
-  const leg = (measured: MeasuredFrame | Undecoded): TreeFrame => ({ shot, stability: 'settled', captures: 2, measured });
+  const leg = (measured: MeasuredFrame | Undecoded): TreeFrame => ({ shot, stability: 'settled', settledOver: 'screen', captures: 2, measured });
   const recording = (byId: Record<string, OcrLine[]> = { cta: [line('CONTINUE', 36)] }) => {
     const calls: OcrRegion[][] = [];
     const engine: OcrEngine = {
@@ -793,7 +793,7 @@ describe('textMeasurement — the text table\'s one run-level decision', () => {
   };
   const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
   const ios = root(402, [n({ identifier: 'cta', label: 'CONTINUE', rect: { x: 24, y: 780, width: 354, height: 44 } })]);
-  const leg = (measured: MeasuredFrame): TreeFrame => ({ shot: Shot.ofPng(Buffer.from('png bytes')), stability: 'settled', captures: 2, measured });
+  const leg = (measured: MeasuredFrame): TreeFrame => ({ shot: Shot.ofPng(Buffer.from('png bytes')), stability: 'settled', settledOver: 'screen', captures: 2, measured });
 
   it('a supplied engine is used as given, with no caveat, and `measure` recognizes with it', async () => {
     const calls: OcrRegion[][] = [];

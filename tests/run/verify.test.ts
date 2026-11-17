@@ -968,7 +968,7 @@ describe('paritySection — the containment every table shares', () => {
    */
   const leg = (platform: Platform): Parameters<typeof paritySection>[2][number] => ({
     status: 'fulfilled',
-    value: { trace: [], results: [], final: { frame: { shot: Shot.ofPng(whitePng()), stability: 'settled', captures: 2 } }, health: platform },
+    value: { trace: [], results: [], final: { frame: { shot: Shot.ofPng(whitePng()), stability: 'settled', settledOver: 'screen', captures: 2 } }, health: platform },
   });
 
   it('a collector that throws for one leg degrades that leg to a note and compares the other', async () => {

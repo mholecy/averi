@@ -646,7 +646,7 @@ function inWindowBackdrops(window: WdaElement): readonly WdaElement[] {
  *   a host `Other 0,0 402x874` that is `0/0` in both states with an `isVisible "1"` content child.
  * - Why NO STRUCTURAL ROOT: a wrapper's flags say nothing of what it holds. The SWIFT form's `payee_name_input`
  *   row, `Other 24,801 354x52`, is `0/0` with an all-invisible subtree (truthfully: it lies below its form's
- *   ScrollView, which draws none of it — the standing's drawn frame judges that, ui-tree/geometry.ts#Clips.drawnIn);
+ *   ScrollView, which draws none of it — the standing's drawn frame judges that, ui-tree/scroll-clips.ts#Clips.drawnIn);
  *   as a root it took its label and its text field (each `isAccessible "1"`) with it, and the text field stopped
  *   holding the label's centre for the dismissal picker. The screen beneath a modal is reported the same way: Finportal's login
  *   screen under its RN modal, the Contacts list under the New Contact sheet, the sheet under its discard popover —

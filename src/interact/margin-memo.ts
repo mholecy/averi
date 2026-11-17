@@ -25,7 +25,7 @@ import type { Judged, TreeFacts } from './scroll-read.js';
  * - A kept `under` or `untold` keeps the cover whatever the others are: nothing is asked while one holds.
  * - A text asked again replaces its entry.
  *
- * The target's scroll view is its nearest clipping ancestor in the read (ui-tree/geometry.ts#Clips.scrollersOf),
+ * The target's scroll view is its nearest clipping ancestor in the read (ui-tree/scroll-clips.ts#Clips.scrollersOf),
  * undefined when the tree marks none — then nothing is carried.
  *
  * The interface, which is also the test surface (tests/interact/margin-memo.test.ts): `startMargin` (the call's memo
@@ -105,7 +105,7 @@ export function carriedCover(memo: MarginMemo, best: Judged, facts: TreeFacts): 
   return found === undefined ? undefined : carriedSince(found, { target: best.node.rect, peer: cover.rect, scrollView: nearestScrollView(facts, best.node) });
 }
 
-/** `node`'s nearest scroll view in this read — its nearest clipping ancestor (ui-tree/geometry.ts#Clips.scrollersOf) — undefined when the tree marks none. */
+/** `node`'s nearest scroll view in this read — its nearest clipping ancestor (ui-tree/scroll-clips.ts#Clips.scrollersOf) — undefined when the tree marks none. */
 function nearestScrollView(facts: TreeFacts, node: UiNode): Rect | undefined {
   return facts.scene.clips.scrollersOf(node)[0];
 }

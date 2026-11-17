@@ -164,7 +164,7 @@ export class CoveredRefusal extends PresentElementRefusal {}
  * the section did not expand — nor for hand taps on the strip. Nothing is
  * tapped. The covered sliver's sibling (CoveredRefusal): what shows is cut
  * by a clip, not by a node drawn over it, and refused by the same minimum.
- * Or cut by a node drawn AFTER it (geometry.ts#Cut.by: Compose leaves out of
+ * Or cut by a node drawn AFTER it (scroll-clips.ts#Cut.by: Compose leaves out of
  * a node's bounds what a later node covers): the lab's `note` after `back`,
  * dumped `55,2126 970x14` under Continue, was tapped at y 2133 and reached
  * only because that bar lets touches through — refused naming that node,
@@ -401,7 +401,7 @@ function offScreenRefusal(standing: OffTheScreen, { node, refusal }: Told, { jud
  * What to do about a target whose centre lies under a system bar (the bar
  * at `edge`), said as far as the tree knows it — the standing's remedy
  * (ui-tree/standing.ts#Remedy, which asks the tree's scroll ancestry,
- * geometry.ts#Clips.inScroller), rendered, so a button pinned at the top,
+ * scroll-clips.ts#Clips.inScroller), rendered, so a button pinned at the top,
  * which no scroll moves, is not told `scroll_until it first`. In a scroll
  * view (`scroll`), `scroll_until` moves it out from under the bar; in none
  * (`pinned`), it is pinned there — a layout that does not keep clear of the

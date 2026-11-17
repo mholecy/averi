@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { Rect, ScrollAxis, UiNode } from '../../src/adapters/types.js';
-import { clipsOf, toldFrame } from '../../src/ui-tree/geometry.js';
+import { clipsOf, cutAtScreenEdges, drawnPart, isUntold, toldFrame } from '../../src/ui-tree/scroll-clips.js';
 import { node } from '../helpers/fake.js';
 
 /**
- * geometry.ts#clipsOf asked directly (backlog D45): what a read lists of a scroll view's content toward an edge
+ * scroll-clips.ts#clipsOf asked directly (backlog D45): what a read lists of a scroll view's content toward an edge
  * (`Clips.contentToward`, ADR 0021's `blank` and the end proof), a scroll view's axes (`Clips.axesOf`), and the corners
- * of `drawnIn` and `cutSliver` no caller's suite reached. The shapes are the lab app's measured ones where one exists
- * (`scroll-bounded`'s `lower`, `tabbar-floating`'s `list`, `carousel-in-list`'s carousel); the parsed captures are
- * tests/ui-tree/listed-content.test.ts's and scroll-containers.test.ts's.
+ * of `drawnIn` and `cutSliver` no caller's suite reached; and the drawn-frame and screen-edge arithmetic (`drawnPart`,
+ * `toldFrame`, `cutAtScreenEdges`). The shapes are the lab app's measured ones where one exists (`scroll-bounded`'s
+ * `lower`, `tabbar-floating`'s `list`, `carousel-in-list`'s carousel); the parsed captures are
+ * tests/ui-tree/listed-content.test.ts's and scroll-containers.test.ts's, and whole trees scroll-clips-trees.test.ts's.
  */
 
 const rect = (x: number, y: number, width: number, height: number): Rect => ({ x, y, width, height });
@@ -285,7 +286,7 @@ describe('Clips.cutSliver — an inherited cut is the edge the node lies flush w
   });
 });
 
-describe('Clips.cutSliver — the evidence at the edges tests/ui-tree/geometry.test.ts does not measure: the top from inside, the sides of a carousel off the origin', () => {
+describe('Clips.cutSliver — the evidence at the edges tests/ui-tree/scroll-clips-trees.test.ts does not measure: the top from inside, the sides of a carousel off the origin', () => {
   /** The cut `target`'s own content evidences inside clipping containers of `chain`'s rects, nearest first, at any depth. */
   const cutOf = (target: UiNode, ...chain: Rect[]) => {
     let inner = target;
@@ -323,5 +324,45 @@ describe('Clips.cutSliver — the evidence at the edges tests/ui-tree/geometry.t
     const clamped = (y: number) => box(rect(0, 297, 1080, 33), node({ rect: rect(198, y, 0, 0), clippedOut: 'top' }));
     expect(cutOf(clamped(298), LIST)).toEqual({ edge: 'top', container: LIST, depth: 33 });
     expect(cutOf(clamped(299), LIST)).toBeUndefined();
+  });
+});
+
+describe('drawnPart, isUntold, toldFrame — what of a rect its drawn frame holds', () => {
+  const row = rect(24, 700, 354, 120);
+  const told = (frame: Rect | undefined) => ({ told: true as const, frame, scrollers: [], listedWhereItLies: false });
+
+  it('the rect itself when nothing cuts it, or when the tree cannot tell; the part inside a told frame; undefined when nothing of it is drawn', () => {
+    expect(drawnPart(row, undefined)).toEqual(row);
+    expect(drawnPart(row, { told: false })).toEqual(row);
+    expect(drawnPart(row, told(rect(0, 0, 402, 780)))).toEqual(rect(24, 700, 354, 80));
+    expect(drawnPart(row, told(undefined))).toBeUndefined();
+    expect(drawnPart(row, told(rect(0, 900, 402, 100)))).toBeUndefined();
+  });
+
+  it('untold only for the tree that cannot tell; a told frame only where one is told', () => {
+    expect(isUntold({ told: false })).toBe(true);
+    expect(isUntold(undefined)).toBe(false);
+    expect(isUntold(told(undefined))).toBe(false);
+    expect(toldFrame(told(rect(0, 0, 402, 780)))).toEqual(told(rect(0, 0, 402, 780)));
+    expect(toldFrame({ told: false })).toBeUndefined();
+    expect(toldFrame(undefined)).toBeUndefined();
+  });
+});
+
+describe('cutAtScreenEdges — sides a source cut at the screen', () => {
+  const SCREEN = rect(0, 0, 1080, 2220);
+
+  it("the lab's carousel card dumped `[586,380][1080,614]` in its carousel `[66,380][1014,614]`: right; at each side alike; none where the frame meets the screen too", () => {
+    const carousel = rect(66, 380, 948, 234);
+    expect(cutAtScreenEdges(rect(586, 380, 494, 234), carousel, SCREEN)).toEqual(['right']);
+    expect(cutAtScreenEdges(rect(0, 380, 500, 234), carousel, SCREEN)).toEqual(['left']);
+    expect(cutAtScreenEdges(rect(1, 380, 500, 234), carousel, SCREEN)).toEqual(['left']);
+    expect(cutAtScreenEdges(rect(2, 380, 500, 234), carousel, SCREEN)).toEqual([]);
+    const column = rect(100, 300, 800, 1600);
+    expect(cutAtScreenEdges(rect(200, 0, 300, 400), column, SCREEN)).toEqual(['top']);
+    expect(cutAtScreenEdges(rect(200, 1900, 300, 320), column, SCREEN)).toEqual(['bottom']);
+    expect(cutAtScreenEdges(rect(0, 700, 1080, 176), rect(0, 0, 1080, 2220), SCREEN)).toEqual([]);
+    // A frame a pixel inside the screen is the screen's edge: the cut may be the frame's.
+    expect(cutAtScreenEdges(rect(586, 380, 494, 234), rect(66, 380, 1013, 234), SCREEN)).toEqual([]);
   });
 });

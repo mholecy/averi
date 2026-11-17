@@ -1,5 +1,6 @@
 import type { Rect, ScrollAxis, Stroke, UiNode } from '../adapters/types.js';
-import { isUntold, sameRectWithinPixel, sameSizeWithinPixel } from '../ui-tree/geometry.js';
+import { sameRectWithinPixel, sameSizeWithinPixel } from '../ui-tree/geometry.js';
+import { isUntold } from '../ui-tree/scroll-clips.js';
 import { listedOnce, nodeIdentity, sameTreeWithinPixel } from '../ui-tree/read-tree.js';
 import { carriedUnder, goesOver, NO_REGION, seeRegion, type CarriedUnder, type MotionShown, type RegionMemory } from './motion-shown.js';
 import { FIT_ROOM_PX, SPAN, type Since, type TreeFacts } from './scroll-read.js';
@@ -31,7 +32,7 @@ export type { CarriedUnder, MotionShown } from './motion-shown.js';
  *
  * EACH QUESTION KEEPS ITS OWN "same". Every question here is within a pixel (a unit of the source's frames); the
  * exact-rect side of docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md Decision 2 — the scroll view a proof or a
- * carry was measured over (geometry.ts#Clips.contentToward, stroke-plan.ts#carryOver) — is not the ledger's. What
+ * carry was measured over (scroll-clips.ts#Clips.contentToward, stroke-plan.ts#carryOver) — is not the ledger's. What
  * differs here is identity, and one definition of "the same node" for every question is a behaviour change (owner
  * decision D5), not this module's:
  * - the JUDGED match unmoved: its rect within a pixel of the last judged match's — no identity (the stuck test, the

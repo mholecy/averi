@@ -64,7 +64,7 @@ read; implemented on `feat/t6d-unfit-cell`. Its capture is the owner's.
    The caller's direction is always stroked first. The turn keeps the full reach — no fling carried the target past;
    it was never near — and is not counted among the fling's turns (`course.ts#EndTurn`).
 2. **What counts as proof** (`scroll-rounds.ts#Observed.ends`, `stroke-plan.ts#strokedContent`,
-   `ui-tree/geometry.ts#Clips.contentToward`, its `ends`): on the read right after a stroke toward the target (never the flush probe):
+   `ui-tree/scroll-clips.ts#Clips.contentToward`, its `ends`): on the read right after a stroke toward the target (never the flush probe):
    every match where it was (with no target, the whole tree unchanged), no progress node shown, the stroke touching
    down on nothing drawn over its scroll view, and the tree LISTING that scroll view's content ending at the edge the
    stroke brings content in through — no node of it past that edge — for a scroll view that scrolls along that axis
@@ -258,7 +258,7 @@ read; implemented on `feat/t6d-unfit-cell`. Its capture is the owner's.
     last 2, swiping down, did not change the screen …)` with F one stroke away. `scroll-bounded`'s `upper` (W at 10 dp,
     P at 180 dp of 700) read empty after its second stroke, and its third moved it 435 px. An unchanged tree says the
     content did not move only where the stroked scroll view lists a node whose edge along the stroke's axis lies off
-    the frame's own edges, where it would move. So `Clips.endsAt` became `geometry.ts#Clips.contentToward`, the one
+    the frame's own edges, where it would move. So `Clips.endsAt` became `scroll-clips.ts#Clips.contentToward`, the one
     question of what a read lists of that scroll view's content toward the stroke's edge (`ListedContent`): `ends`
     (the WDA proof above, unchanged), `listed`, or `blank` — no node of some area under it with an edge on that axis more
     than a pixel off both of the frame's edges (an empty viewport, or only a node cut at both ends; a rule of the frame
@@ -413,7 +413,7 @@ the lab's form-picker lists its country list ending at 2154, above the navigatio
 
 **Decision.**
 1. *The mark.* The uiautomator parser marks its root `boundsCutAtScreen` (adapters/types.ts#UiNode.boundsCutAtScreen),
-   as WDA's parser marks `unclippedFrames`. The drawn frame (ui-tree/geometry.ts#Clips.drawnIn) then names the
+   as WDA's parser marks `unclippedFrames`. The drawn frame (ui-tree/scroll-clips.ts#Clips.drawnIn) then names the
    UNKNOWN sides (`DrawnFrame.unknownPast`, `cutAtScreenEdges`): a side within a pixel of the screen's edge (the root's
    rect), where the drawn frame's side lies more than a pixel inside the screen. A full-width row of a full-width list
    lies on the screen's edges with its scroll view, so it has none.

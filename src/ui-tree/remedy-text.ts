@@ -172,7 +172,7 @@ export const bothPinnedRemedyText = (purpose: RemedyPurpose): string =>
     : `${PINNED_TOUCH} if a screenshot shows this element on top, tap it by coordinates`;
 
 /**
- * `bothPinnedRemedyText`'s for a touch's target CUT by a node drawn after it (geometry.ts#Cut.by, D88) — the node the
+ * `bothPinnedRemedyText`'s for a touch's target CUT by a node drawn after it (scroll-clips.ts#Cut.by, D88) — the node the
  * remedy is pinned under (`under`), whose way out is the cut's own: the dump cannot tell a cut from a whole control
  * that thin laid flush against that node (standing.ts#cutByLater's residual), and a coordinate tap on the strip of a
  * cut one is the tap its refusal prevents — so a tap by coordinates only if a screenshot shows it whole. Thin or cut,

@@ -48,7 +48,7 @@ export interface FinalVerdict {
 export interface PixelMeasureInput {
   /**
    * The first `findBySpec` match's rect — the same duplicate-id rule as rect-parity — from the tree handed to the
-   * capture, cut to what its scroll views draw (ui-tree/geometry.ts#Clips.drawnIn: the drawn frame) — what
+   * capture, cut to what its scroll views draw (ui-tree/scroll-clips.ts#Clips.drawnIn: the drawn frame) — what
    * the capture shows of it.
    */
   rect: Rect;

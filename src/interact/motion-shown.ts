@@ -6,7 +6,7 @@ import { SIDES } from '../ui-tree/sides.js';
 import { EDGE_TOWARD, OPPOSITE, swipeVector, type Direction } from './swipe.js';
 
 /**
- * THE SCROLL VIEW THE MOTION SHOWS, on a tree that tells none — idb's flat list (ui-tree/geometry.ts#DrawnUntold):
+ * THE SCROLL VIEW THE MOTION SHOWS, on a tree that tells none — idb's flat list (ui-tree/scroll-clips.ts#DrawnUntold):
  * where the target's content was seen moving between reads (`MotionShown`), which strokes go over it (`goesOver`), and
  * which stops it holds back (`carriedUnder`). Lab note LV3,
  * docs/bugs/2026-10-16-lab-ios-scroll-until-turn-back-stroke-touches-down-above-the-list-and-moves-nothing.md; the rule

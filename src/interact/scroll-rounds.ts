@@ -1,5 +1,6 @@
 import { type DeviceScreen, type Point, type Rect, type Stroke, type UiNode } from '../adapters/types.js';
-import { belowStatusBand, clearOfSystemBands, toldFrame, type Edge, type ListedContent } from '../ui-tree/geometry.js';
+import { belowStatusBand, clearOfSystemBands, type Edge } from '../ui-tree/geometry.js';
+import { toldFrame, type ListedContent } from '../ui-tree/scroll-clips.js';
 import { quoted } from '../ui-tree/node-words.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
 import { screenChangedUnder, screenIdentity, type IdentifiedRead, type ScreenChange, type SheetDetent } from '../ui-tree/read-tree.js';
@@ -545,7 +546,7 @@ export const SETTLE_CONFIRM_READS = 3;
  *
  * A BLANK read is no evidence either way (lab note LV1, ADR 0021's 2026-10-21 refinement): the read after a stroke,
  * the target not in it, whose tree lists none of the content of the scroll view the stroke went over where its
- * motion would show (interact/stroke-plan.ts#strokedContent, geometry.ts#Clips.contentToward's `blank`: an empty
+ * motion would show (interact/stroke-plan.ts#strokedContent, scroll-clips.ts#Clips.contentToward's `blank`: an empty
  * viewport, or only nodes cut at both of its edges). uiautomator dumps no scroll offset, and Compose no content
  * container, so blank space — a spacer, an image or a chart with no node — dumps the same tree at every offset:
  * measured, the lab app's `tabbar-floating` read "the last 2 … did not change the screen" after 4 strokes while each
@@ -751,7 +752,7 @@ interface Observed {
    * target (not the flush check's probe) that moved nothing: every match where it was, or, with no target in the tree,
    * the whole tree unchanged; never while a progress node shows, nor of a stroke that touched down on a node drawn over
    * its scroll view (`touchedOn`: that node may have taken it, and the fast fail names it first); and only of a scroll
-   * view that scrolls along the stroke's axis (geometry.ts#Clips.contentToward's `ends`; a `blank` read is no proof,
+   * view that scrolls along the stroke's axis (scroll-clips.ts#Clips.contentToward's `ends`; a `blank` read is no proof,
    * nor evidence of an unmoved tree at all: UNMOVED_STROKES_EXHAUST). What counts as proof, stated: the tree's
    * listing of the content, not the strokes — a stroke not taken moves nothing too, but cannot make a list's content
    * end where the tree shows it ending; and the read unmoved besides, so a list still settling (a bounce at its end,
@@ -1094,7 +1095,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // Not for a sliver stuck on strokes toward its cut edge: the content is exhausted where
     // the rest of it lies, and a stroke the other way only pushes it out
     // through that edge — measured on the fake, a whole 50-px row at a
-    // list's top, its image flush with that top (geometry.ts#evidentCut's
+    // list's top, its image flush with that top (scroll-clips.ts#evidentCut's
     // residual), swung out and lost after 5 swipes. `outward`, said so.
     const backUnmoved = answersBack && observed.bestUnmoved;
     const { sliver } = best.standing.facts;
@@ -1384,7 +1385,7 @@ function endProof(s: State, view: UiNode, unchanged: 'matches' | 'tree', streaks
 
 /**
  * The end turn's condition the tree answers (`EndTurn`, interact/course.ts#turnAtEnd has the rest): the judged match
- * lies INSIDE `view` — one of the scroll views it is drawn in (ui-tree/geometry.ts#Clips.drawnIn).
+ * lies INSIDE `view` — one of the scroll views it is drawn in (ui-tree/scroll-clips.ts#Clips.drawnIn).
  */
 function insideScrollView(best: Judged, view: UiNode, facts: TreeFacts): boolean {
   return toldFrame(facts.scene.clips.drawnIn(best.node))?.scrollers.includes(view) === true;

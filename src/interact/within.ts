@@ -1,8 +1,8 @@
 import type { Rect, ScrollAxis } from '../adapters/types.js';
 import { dialectOf } from '../ui-tree/dialect.js';
-import { type ScrollAxes } from '../ui-tree/geometry.js';
+import { type ScrollAxes } from '../ui-tree/scroll-clips.js';
 import { quoted, type QuotedNode } from '../ui-tree/node-words.js';
-import { findTarget, parseSelector, type Target } from '../ui-tree/selectors.js';
+import { findTarget, parseSelector, withArea, type Target } from '../ui-tree/selectors.js';
 import type { TreeFacts } from './scroll-read.js';
 import { targetScrollers, type NoRoomFacts } from './stroke-plan.js';
 import type { KeyboardUp } from './target-text.js';
@@ -20,9 +20,10 @@ import { axisOf, type Direction } from './swipe.js';
  *   node itself when it scrolls, the list a wrapper is laid exactly over, and so too the list an unrelated overlay of
  *   its rect lies over: the rect is that scroll view's), else the NEAREST scroll view of the node, by the rule that
  *   takes a found target's (stroke-plan.ts#targetScrollers: Android's clipping chain, else the scrolling ancestors); a
- *   node under none is refused;
+ *   node under none is refused; its matches are the tap's, zero-area ones never named (interact/resolve.ts#preferred),
+ *   with no interactive match preferred: several are refused, listed, and only 0×0 ones are absent, said so;
  * - a RECT, as ui_snapshot and a failure reply quote one: the listed scroll view of exactly that rect
- *   (ui-tree/geometry.ts#Clips.axesOf finds it by scroll-containers.ts#isScrollViewOf, the test every remembered scroll
+ *   (ui-tree/scroll-clips.ts#Clips.axesOf finds it by scroll-containers.ts#isScrollViewOf, the test every remembered scroll
  *   view is found again by), so a rect a pixel off is none.
  * And refused when its scroll view is told to scroll only ACROSS the stroke with no scroll view nested in it that may
  * scroll along it (told along, or of unknown axis — D59b's nested candidates): a swipe over it would move nothing. A
@@ -54,15 +55,16 @@ export interface OfferedScrollView {
 
 /** Why a `within` names no scroll view to stroke — each with the facts its sentence quotes (scroll-text.ts#withinText). */
 export type WithinRefusal =
-  /** The selector matches several nodes, listed in tree order. */
+  /** The selector matches several nodes with area, listed in tree order. */
   | { readonly of: 'ambiguous'; readonly matches: readonly QuotedNode[] }
-  | { readonly of: 'absent' }
+  /** The selector matches no node with area: `zeroArea` when it matches nodes, every one of them 0×0. */
+  | { readonly of: 'absent'; readonly zeroArea?: true }
   /** The selector's one match neither scrolls nor lies in anything that scrolls. */
   | { readonly of: 'unscrolled'; readonly node: QuotedNode }
   /**
    * No listed scroll view has exactly this rect: `views`, every scroll view a rect could name for a stroke on `axis` —
    * told to scroll on it, or of an axis the tree does not tell (`untold`), as the rect path itself accepts them — in
-   * tree order (ui-tree/geometry.ts#Clips.scrollViewsOn); `across`, how many more it lists, told to scroll across it.
+   * tree order (ui-tree/scroll-clips.ts#Clips.scrollViewsOn); `across`, how many more it lists, told to scroll across it.
    */
   | { readonly of: 'stale'; readonly axis: ScrollAxis; readonly views: readonly OfferedScrollView[]; readonly across: number }
   /** The named scroll view (`rect`) is told to scroll on `axis`, across a stroke `toward`, and holds none that may scroll along it. */
@@ -135,8 +137,9 @@ export function resolveWithin(facts: Pick<TreeFacts, 'tree' | 'scene' | 'reading
       return { refused: { of: 'stale', axis: way, views, across: listed.length - views.length } };
     }
   } else {
-    const found = findTarget(facts.tree, within);
-    if (found.length === 0) return { refused: { of: 'absent' } };
+    const matched = findTarget(facts.tree, within);
+    const found = withArea(matched);
+    if (found.length === 0) return { refused: { of: 'absent', ...(matched.length > 0 && { zeroArea: true as const }) } };
     if (found.length > 1) return { refused: { of: 'ambiguous', matches: found.map(quoted) } };
     const [node] = found;
     // One rule: a scroll view of the match's very rect — the match itself, a wrapper laid exactly over its list, an

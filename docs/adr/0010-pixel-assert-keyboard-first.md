@@ -47,7 +47,7 @@ draws none of it there (UIKit's `UIScrollView` clips to its bounds; so do a tabl
 the capture shows there (`sampled #DEE0E6 … clipped 90% off-png`), and a tap on `payee_name_input` (`24,801 354x52`)
 was reported done at (201,827), 3 pt below CONTINUE.
 
-- **The drawn frame** (`ui-tree/geometry.ts#Clips.drawnIn`): the intersection of the frames of every ancestor that
+- **The drawn frame** (`ui-tree/scroll-clips.ts#Clips.drawnIn`): the intersection of the frames of every ancestor that
   scrolls (an ancestor of no area cuts nothing: it fails open), on a tree whose SOURCE says its frames are unclipped:
   the WDA parser marks its root (`UiNode.unclippedFrames`), as idb's marks `flatList` and uiautomator's
   `paddedTouchTargets`, and `dialect.ts#TreeDialect.framesUnclipped` reads it. Android's rects are already cut to their
@@ -105,12 +105,12 @@ above its scroll view's top too.
   The verbs answer as on WDA's tree of the same screen: `S`'s tap is refused outside `lower` ("only 25% of it … is
   drawn"), both stops stroke inside `lower` and `upper` and fail clipped at their edge; `C`'s tap is refused outside
   the carousel, its colour fails closed, and `scroll_until C right` strokes sideways inside the carousel.
-- **A unit past the edge is flush, not past** (`geometry.ts#overhangAsFlush`), on every tree — the tolerance is one
+- **A unit past the edge is flush, not past** (`scroll-clips.ts#overhangAsFlush`), on every tree — the tolerance is one
   unit of the source, a px on Android and a pt on WDA, as `flushEdges`' is; measured on Android only: mp-native's SWIFT
   toggle `66,1924 948x55` ends at 1979 under its form `[0,242][1080,1978]`, the line CONTINUE starts on. Cut there by a
   pixel, the `fully` stop read it `clipped` where its flush probe is the rule (ADR 0013). `flushEdges` and `contentToward`
   read "past" as more than a pixel already.
-- **The carry model stays WDA's** (`ui-tree/geometry.ts#DrawnFrame.listedWhereItLies`, true only where
+- **The carry model stays WDA's** (`ui-tree/scroll-clips.ts#DrawnFrame.listedWhereItLies`, true only where
   `dialect.ts#TreeDialect.framesUnclipped`; the standing hands it on as `StandingFacts.listedWhereItLies`, which
   `interact/course.ts#stillNeeds` asks): the drawn frame no longer tells the dialect, and on Android a row's
   rect as it comes in is mostly cut to its scroll view, so its motion is no measure of the content's. The dialect is
@@ -144,7 +144,7 @@ Bug note: docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-co
 4. A stale `shown` costs covered rounds until the window state catches up. Under a short timeout it fails closed with the
    covered wording, never a false pass.
 5. **idb lists no scroll view** (a flat list) — **refined 2026-10-20** (round 14, LE2): the drawn frame is UNTOLD there
-   (`ui-tree/geometry.ts#DrawnUntold`, a named answer of `Clips.drawnIn`, not "nothing cuts it"), and the eyes look
+   (`ui-tree/scroll-clips.ts#DrawnUntold`, a named answer of `Clips.drawnIn`, not "nothing cuts it"), and the eyes look
    where a claim rests on it, from the frame the claim is checked on:
    - the colour assert asks whether its region reads as the screen beside it (`verify/eyes.ts#apartOfFrame`, on the
      frame it measures — no capture added): a region of nothing but one colour, a plain strip beside it that colour
@@ -365,7 +365,7 @@ Bug note: docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-co
 ## Amendment: D59b — before the target is found, the largest scroller's nested scroll views (2026-11-03)
 
 **Context.** Residual 7's rule chose among the TARGET's scroll views; before a read finds the target the only
-candidate was the screen's largest scroller (`ui-tree/geometry.ts#largestScroller`). Batch-11 (the averi_lab emulator,
+candidate was the screen's largest scroller (`ui-tree/scroll-clips.ts#largestScroller`). Batch-11 (the averi_lab emulator,
 API 33, 1080x2220, `d59b-measure` on main a5fefd32): `scroll_until` right for card C of the L7 cells
 `carousel-lazy-free` and `carousel-recycler-free` from a fresh launch, where C is not laid out, so no read finds it.
 6/6 runs stroked `(864,1110)→(216,1110)`, the page's centre row, 496 px below the carousel's band (y 380–614). The
@@ -444,14 +444,14 @@ the in-scroll-view check when the target is absent (T6). The shared band helper 
 `tests/fixtures/uiautomator-lab-carousel-*-launch.xml`, made from the committed `carousel-in-list` capture, since the
 batches kept no dump, and batch-11's strokes, `tests/fixtures/d59b-b11-strokes.json`, trimmed),
 tests/interact/scroll-rounds.test.ts (the across clause, its order and wordings, the screen bands, the maxSwipes stop
-of the derived tree), tests/ui-tree/geometry-clips.test.ts (the text input left out, `toldOn` and its filters),
+of the derived tree), tests/ui-tree/scroll-clips.test.ts (the text input left out, `toldOn` and its filters),
 tests/ui-tree/geometry-viewport.test.ts (`clearOfSystemBands`). Hand mutants, each from a saved copy, each killed:
 - M1 page only → the lazy-free stroke; M2 nested smallest first → "two nested of unknown axis"; M3 nested before the
-  page → the `down`/`up` control; M4 text-input filter removed → geometry's text-input test; M5 unknown axis as
-  across → the carousel `down` group; M6 `strokedAcross` on an unknown axis and M7 `===` for `!==` → its test; M8 the
-  across clause before `touched` → `boundText`'s order; M9 `across` dropped from the bound and M13 the bound asked
-  for `down` → the across reply; M10 nested `over` emptied → the pager `down` under a bar; M11 nested axes undefined →
-  the told-vertical-list control; M12 the axis word fixed → `boundText`'s horizontal-page case.
+  page → the `down`/`up` control; M4 text-input filter removed → scroll-clips.test.ts's text-input test; M5 unknown axis
+  as across → the carousel `down` group; M6 `strokedAcross` on an unknown axis and M7 `===` for `!==` → its test; M8 the
+  across clause before `touched` → `boundText`'s order; M9 `across` dropped from the bound and M13 the bound asked for
+  `down` → the across reply; M10 nested `over` emptied → the pager `down` under a bar; M11 nested axes undefined → the
+  told-vertical-list control; M12 the axis word fixed → `boundText`'s horizontal-page case.
 - Round 1: N1 ranking dropped and N2 inverted → chips before feed; N3 `toldOn` keeps text inputs and N4 its flat-list
   guard removed → `toldOn`'s test; N5 `along` never set, N6 smallest picked, N7 `noRoom` inverted, N9 asked of the
   page's own axis → `strokedAcross`' tests; N8 the two wordings swapped → the rounds replies.
@@ -597,7 +597,15 @@ and holds none nested that is told along it or of unknown axis (the other axis' 
 offered; unknown axis proceeds); or the tree lists no scroll view at all (idb's flat list: `set app.ios.treeSource:
 wda, or swipe inside it by coordinates`). Never a silent fallback to the largest scroller: a caller who named a list
 and had another stroked would read the exhausted reply as that list's. It is refused even when the first read already
-shows the target: the option is checked where it is resolved, not only when a swipe needs it.
+shows the target: the option is checked where it is resolved, not only when a swipe needs it. **Amended 2026-11-17
+(A76)**: a selector's matches are those with area, as the tap's (`resolve.ts#preferred`): a zero-area node is never
+named, so a 0×0 twin beside the list leaves the list the one match, and a selector whose only matches are zero-area
+is refused as `absent`, the reply saying its matches are only 0×0 (`matches only 0×0 nodes (scrolled off screen, or
+collapsed)`, the tap's words, ui-tree/miss.ts#ONLY_ZERO_AREA; WDA's springboard lists the icon `Maps` twice, both 0×0
+at 0,0, and was refused as ambiguous, asking to narrow a selector no narrowing could make name a target). The tap's
+preference for the sole interactive match is not taken, on purpose: `within` has no note to say which match it
+chose, and a title in one list and a button in another under one selector would have the button's list stroked
+silently.
 
 (e) D76's reply cites it: `— if the element lies in it, scroll_until it again with within: {"x":0,"y":1046,"width":1080,"height":495}`
 (several: each named `<node> as within: {…}`, as the stale refusal lists them, then `— if the element lies in one of

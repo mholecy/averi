@@ -1,12 +1,12 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { Rect, UiNode } from '../../src/adapters/types.js';
-import { largestScroller } from '../../src/ui-tree/geometry.js';
+import { largestScroller } from '../../src/ui-tree/scroll-clips.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
 import { parseDump } from '../helpers/android-dumps.js';
 
 /**
- * What a read lists of a scroll view's content toward an edge (ui-tree/geometry.ts#Clips.contentToward,
+ * What a read lists of a scroll view's content toward an edge (ui-tree/scroll-clips.ts#Clips.contentToward,
  * `ListedContent`) on uiautomator's trees, whose rects are cut to their scroll view: `blank` when nothing under it has
  * an edge along that axis where the content's motion would show — lab note LV1,
  * docs/bugs/2026-10-16-lab-android-scroll-until-reads-a-list-moving-through-blank-content-as-exhausted.md. The real

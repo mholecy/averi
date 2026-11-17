@@ -390,7 +390,7 @@ export interface UiNode {
    * runs on to the view's edge: not flush, not caught either. And a Compose
    * `verticalScroll` in an edge-to-edge window does not cut its rows to it
    * (at a line the status bar's height past it, if at all): the drawn frame
-   * cuts them (ui-tree/geometry.ts#Clips.drawnIn),
+   * cuts them (ui-tree/scroll-clips.ts#Clips.drawnIn),
    * docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn.md.
    */
   clipsDescendants?: true;
@@ -539,7 +539,7 @@ export interface UiNode {
    * `[586,380][1080,614]` — cut at the screen's 1080, not at its 948 px — so its listed centre 833 lies inside the
    * carousel while its true centre, 1060, lies past it. So where a node's side lies on the screen's edge and its drawn
    * frame's matching side lies inside the screen, how far the node runs past that side is unknown
-   * (geometry.ts#DrawnFrame.unknownPast): its visible fraction is an upper bound, and its centre unknown along that
+   * (scroll-clips.ts#DrawnFrame.unknownPast): its visible fraction is an upper bound, and its centre unknown along that
    * axis. A full-width row in a full-width list is not such a node: its scroll view ends at the screen's edge too. Read
    * as ui-tree/dialect.ts#TreeDialect.cutsAtScreen. A mark of the source, like `flatList`: ui-tree knows no platform.
    * Absent on WDA's trees (frames unclipped, `unclippedFrames`) and idb's flat list (no scroll view listed).
@@ -700,7 +700,7 @@ export interface UiNode {
  * every layer that walks a tree needs it and none owns it. It yields nodes
  * only: a walk that needs each node's subtree end in the order
  * (ui-tree/draw-order.ts) or what its ancestors hand down
- * (ui-tree/geometry.ts#clipsOf) recurses on its own.
+ * (ui-tree/scroll-clips.ts#clipsOf) recurses on its own.
  *
  * Lazy: a node's children are read only once the consumer has had the node
  * and asked for the next, so a consumer that stops early reads nothing past

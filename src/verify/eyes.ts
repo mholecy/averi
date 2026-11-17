@@ -57,7 +57,7 @@ export const orderOfFrame = (frame: MeasuredFrame, question: PairQuestion): read
 
 /**
  * THE EYES' THIRD QUESTION — does the colour assert's region read as THE SCREEN BESIDE IT? Asked of an element whose
- * tree cannot tell where it is drawn (ui-tree/geometry.ts#DrawnUntold: idb's flat list, which lists no scroll view),
+ * tree cannot tell where it is drawn (ui-tree/scroll-clips.ts#DrawnUntold: idb's flat list, which lists no scroll view),
  * on the frame the assert captures anyway (verify/pixel-poll.ts#pollPixels), as the order question is
  * (`orderOfFrame`): no capture added.
  *

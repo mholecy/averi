@@ -238,7 +238,8 @@ interface Treeless {
  */
 type FrameMeasurement = MeasuredFrame | Undecoded | Treeless;
 
-export interface Frame {
+/** What every frame says about itself, whatever the wait concluded and whatever tree was in play. */
+interface FrameFacts {
   /**
    * The screenshot bytes. Settled over the whole screen: the first capture
    * that repeated. Settled over the caller's region only: the later capture
@@ -248,42 +249,59 @@ export interface Frame {
    * verify/shot.ts).
    */
   shot: Shot;
-  /**
-   * What the stability wait concluded — decided HERE, once, so no consumer
-   * re-derives it from the capture count:
-   * - `settled`: two consecutive captures matched — over the whole png, or
-   *   over the caller's `region` when one was given —
-   *   within the budget (and the caller's `deadline`, when one was given);
-   * - `moving`: two or more captures were taken and every one differed from
-   *   the last — the screen was still changing when the wait stopped. The
-   *   polling asserts treat that as a miss, the baseline assert refuses to
-   *   create from it, a tool returns the picture with a note;
-   * - `unjudged`: only one capture fit before the deadline, so nothing can be
-   *   said about stability either way. The polling asserts say "found, no
-   *   time left"; nothing else words it.
-   */
-  stability: 'settled' | 'moving' | 'unjudged';
-  /**
-   * HOW a `settled` frame settled, present only when it did —
-   * decided here, once, no consumer re-derives it:
-   * - `screen`: two whole captures were byte-identical — the fast path, and
-   *   the only answer a caller without a `region` can get;
-   * - `region`: the whole captures differed and only the caller's region
-   *   matched. The crop is still only as fresh as the rect the caller
-   *   supplied: a region pair can match at a rect the element has already
-   *   left (the header), so a consumer measuring at that rect must confirm
-   *   it first — the pixel poll does, with a second tree read.
-   */
-  settledOver?: 'screen' | 'region';
   /** Captures taken: 2 for a still screen, up to STABILITY_ATTEMPTS + 1 for one that never settles; 1 when the deadline cut the wait before a second. A `BaselineFrame` adds the confirmations it took. */
   captures: number;
-  /**
-   * Present whenever a tree was read or supplied; absent for a png-only frame
-   * (the `screenshot` and `ensure_state` tools), which asked for nothing more
-   * and so has nothing to report — not even a reason.
-   */
-  measured?: FrameMeasurement;
 }
+
+/**
+ * What the stability wait concluded — decided by
+ * `stableScreenshot`, once, so no consumer re-derives it
+ * from the capture count. `stability`:
+ * - `settled`: two consecutive captures matched — over the whole png, or
+ *   over the caller's `region` when one was given —
+ *   within the budget (and the caller's `deadline`, when one was given);
+ * - `moving`: two or more captures were taken and every one differed from
+ *   the last — the screen was still changing when the wait stopped. The
+ *   polling asserts treat that as a miss, the baseline assert refuses to
+ *   create from it, a tool returns the picture with a note;
+ * - `unjudged`: only one capture fit before the deadline, so nothing can be
+ *   said about stability either way. The polling asserts say "found, no
+ *   time left"; nothing else words it.
+ *
+ * `settledOver` is HOW a `settled` frame settled. It is a union arm rather
+ * than an optional field so that a settled frame always says it and any
+ * other frame never does: a consumer comparing it against one value has no
+ * missing case to pick a default for. Readers keep no fallback for a settled
+ * frame without `settledOver`, so a frame is built by `stableScreenshot`,
+ * never cast.
+ * - `screen`: two whole captures were byte-identical — the fast path, and
+ *   the only answer a caller without a `region` can get;
+ * - `region`: the whole captures differed and only the caller's region
+ *   matched. The crop is still only as fresh as the rect the caller
+ *   supplied: a region pair can match at a rect the element has already
+ *   left (the header), so a consumer measuring at that rect must confirm
+ *   it first — the pixel poll does, with a second tree read.
+ */
+type Stability =
+  | { stability: 'settled'; settledOver: 'screen' | 'region' }
+  | { stability: 'moving' | 'unjudged'; settledOver?: undefined };
+
+/** What `stableScreenshot` returns: the frame before any tree is in play. */
+type StableShot = FrameFacts & Stability;
+
+/**
+ * A frame as `captureFrame` returns it to a caller that may not have asked for
+ * a tree. A type alias over the `Stability` union, not an interface: an
+ * interface cannot extend a union, and `Omit` over it would drop the
+ * pairing of `stability` with `settledOver`. A reader that needs only one
+ * field (`unsettledReason`, `isMoving`) still takes a `Pick` of it: it reads
+ * no pairing to lose.
+ *
+ * `measured` is present whenever a tree was read or supplied; absent for a
+ * png-only frame (the `screenshot` and `ensure_state` tools), which asked for
+ * nothing more and so has nothing to report — not even a reason.
+ */
+export type Frame = StableShot & { measured?: FrameMeasurement };
 
 /**
  * The one sentence for a frame that did not settle, worded here because the
@@ -405,26 +423,19 @@ export const unconfirmedReason = (frame: Pick<Frame, 'captures'>): string =>
   `the screen did not settle: ${frame.captures} captures — two consecutive ones matched, then a later confirming capture differed from them — a periodic change such as a blinking caret or a ticking clock, which a matching pair can land in phase with; hide or stop it (unfocus the field, freeze the clock) and re-run`;
 
 /**
- * A frame for which a tree was ASKED — read here or supplied — so its
- * measured half is always there, though it may say the read failed
- * (`Treeless`). What `captureFrame` returns to such a caller.
+ * A frame whose tree was READ here (`readTree: true`): its measured half is
+ * always there, though it may say the read failed (`Treeless`).
  */
-export interface TreeRequestedFrame extends Frame {
-  measured: FrameMeasurement;
-}
+export type TreeRequestedFrame = StableShot & { measured: FrameMeasurement };
 
 /**
- * A frame that HAS a tree: the captured bytes, the tree (with or without
- * decoded pixels) beside them, and whatever else the frame says about
- * itself (`stability`, `captures`). Derived from `Frame` rather than
- * spelled as `{ shot, measured }`, so a field added to the frame reaches
- * every consumer without an edit here; the one narrowing is `measured`,
- * which has lost its treeless arm — the difference from `TreeRequestedFrame`
- * above, which only promises the question was asked.
+ * A frame that HAS a tree: what `captureFrame` returns to a caller that
+ * supplied one (`tree`). That arm never reads a tree, so it has no read to
+ * fail and its `measured` has no treeless arm; an `error` on it is a png that
+ * did not decode (`Undecoded`). Built from `StableShot`, as `Frame` is, so a field
+ * added to the frame reaches every consumer without an edit here.
  */
-export interface TreeFrame extends Omit<Frame, 'measured'> {
-  measured: MeasuredFrame | Undecoded;
-}
+export type TreeFrame = StableShot & { measured: MeasuredFrame | Undecoded };
 
 /**
  * Where the tree comes from, as three states a caller cannot mix: read it
@@ -501,7 +512,11 @@ type CaptureOptions = {
  */
 export function captureFrame(
   adapter: Pick<DeviceAdapter, 'screenshot' | 'capture' | 'uiTree' | 'viewport'>,
-  opts: CaptureOptions & ({ readTree: true } | { tree: UiNode }),
+  opts: CaptureOptions & { tree: UiNode },
+): Promise<TreeFrame>;
+export function captureFrame(
+  adapter: Pick<DeviceAdapter, 'screenshot' | 'capture' | 'uiTree' | 'viewport'>,
+  opts: CaptureOptions & { readTree: true },
 ): Promise<TreeRequestedFrame>;
 export function captureFrame(
   adapter: Pick<DeviceAdapter, 'screenshot' | 'capture' | 'uiTree' | 'viewport'>,
@@ -781,7 +796,7 @@ async function stableScreenshot(
   adapter: Pick<DeviceAdapter, 'screenshot' | 'capture' | 'viewport'>,
   deadline?: number,
   region?: SizedRegion,
-): Promise<Pick<Frame, 'shot' | 'stability' | 'settledOver' | 'captures'>> {
+): Promise<StableShot> {
   let previous = await captureShot(adapter);
   let captures = 1;
   let recaptureMs = 0; // measured cost of the last re-capture (delay + screencap); 0 until one has run
