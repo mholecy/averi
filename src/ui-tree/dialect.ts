@@ -1,8 +1,8 @@
 import type { UiNode } from '../adapters/types.js';
 
 /**
- * THE TREE'S DIALECT: what its source's listing means, read off the marks the source put on the tree's ROOT — the one
- * reader of those marks in src/. A mark of the source, never of the tree's shape: ui-tree knows no platform, and a
+ * THE TREE'S DIALECT: what its source's listing means, read off the marks the source put on the tree's ROOT — read
+ * here, so what a mark means is decided in one place. A mark of the source, never of the tree's shape: ui-tree knows no platform, and a
  * shape (a rectless root over leaves) would also match a test's or a future source's tree. A tree no source marked (a
  * hand-built tree, a normalized snapshot) reads as a nested tree with clipped frames (`cutsAtLater`) and no other mark.
  *

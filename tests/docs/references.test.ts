@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { codeOf, logicalLines, wordsOf } from '../helpers/comments.js';
+import { corpus, logicalLines, ROOT } from '../helpers/comments.js';
 
 /**
  * The prose of this repo points at its owners by name — `file.ts#symbol`
@@ -24,23 +24,21 @@ import { codeOf, logicalLines, wordsOf } from '../helpers/comments.js';
  * as dangling as a missing one for everyone else.
  */
 
-const ROOT = join(import.meta.dirname, '..', '..');
-
 /**
  * Bug notes the source cites that git does not track yet: exactly these paths are let through, and a NEW untracked
  * reference still fails. Remove a line once its note is tracked (the test then says so) or its references are gone.
  */
 const UNDECIDED_BUG_NOTES: ReadonlySet<string> = new Set<string>([]);
 
-const filesUnder = (dir: string): string[] =>
-  readdirSync(join(ROOT, dir)).flatMap((name) => {
-    const path = join(dir, name);
-    return statSync(join(ROOT, path)).isDirectory() ? filesUnder(path) : [path];
-  });
+// The checkout's files as the comment guard sees them (tests/helpers/comments.ts#repoFiles): what git tracks or would.
+const { files: FILES, codeWords: CODE_WORDS } = corpus();
+const filesUnder = (dir: string): string[] => FILES.filter((f) => f.startsWith(`${dir}/`));
 
 const SRC = filesUnder('src').filter((f) => f.endsWith('.ts'));
 const TESTS = filesUnder('tests').filter((f) => f.endsWith('.ts'));
 const SCRIPTS = filesUnder('scripts').filter((f) => f.endsWith('.ts'));
+/** Every source a possessive may name. */
+const SOURCES = [...SRC, ...SCRIPTS, ...TESTS];
 // The scripts' and the tests' prose too, except this file's own, whose examples (`a.ts#x`) name nothing.
 const PROSE = [...SRC, ...SCRIPTS, ...TESTS.filter((f) => f !== 'tests/docs/references.test.ts'), 'ARCHITECTURE.md', ...filesUnder('skill').filter((f) => f.endsWith('.md')), ...filesUnder('docs/adr').filter((f) => f.endsWith('.md'))];
 
@@ -116,19 +114,10 @@ function possessivesIn(text: string, from: string): string[] {
     const [, file, name] = m;
     if (!camelName(name)) continue;
     const names = owners(file, from);
-    const found = [...SRC, ...SCRIPTS, ...TESTS].filter(names);
-    if (!found.some((f) => wordsIn(f).has(name))) out.push(`${file}'s ${name}`);
+    if (!SOURCES.filter(names).some((f) => CODE_WORDS.get(f)?.has(name))) out.push(`${file}'s ${name}`);
   }
   return out;
 }
-
-const words = new Map<string, Set<string>>();
-/** A source's code words (comments blanked, strings kept), read once. */
-const wordsIn = (file: string): Set<string> => {
-  let w = words.get(file);
-  if (w === undefined) words.set(file, (w = wordsOf(codeOf(file, read(file)))));
-  return w;
-};
 
 /** Every reference in the prose, with where it starts. */
 function references(pattern: RegExp): { where: string; ref: string; groups: string[] }[] {

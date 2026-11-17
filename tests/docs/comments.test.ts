@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { codeOf, commentsOf, corpus, titlesOf, wordsOf, type Line } from '../helpers/comments.js';
+import { codeOf, commentBlocksOf, commentsOf, corpus, existing, lineAt, titlesOf, wordsOf, type CommentBlock, type Line } from '../helpers/comments.js';
 
 /**
  * The comments and test titles of src/, scripts/ and tests/ say nothing a machine can see is false: no path to a file
@@ -10,16 +10,16 @@ import { codeOf, commentsOf, corpus, titlesOf, wordsOf, type Line } from '../hel
  */
 
 /** What a rule reads a line against: the checkout's files and directories, and the words its code is made of. */
-interface Ctx {
+interface Checkout {
   files: ReadonlySet<string>;
   /** Every file's tails after a slash (`verify/capture.ts`, `capture.ts`): what a bare name may be. */
   tails: ReadonlySet<string>;
   dirs: ReadonlySet<string>;
-  sorted: readonly string[];
+  pathsSorted: readonly string[];
   words: ReadonlySet<string>;
 }
 
-const ctxOf = (files: readonly string[], words: ReadonlySet<string>): Ctx => {
+const checkoutOf = (files: readonly string[], words: ReadonlySet<string>): Checkout => {
   const dirs = new Set<string>();
   for (const f of files) {
     const parts = f.split('/');
@@ -27,19 +27,19 @@ const ctxOf = (files: readonly string[], words: ReadonlySet<string>): Ctx => {
   }
   const tails = new Set<string>();
   for (const f of files) for (let i = f.indexOf('/'); i >= 0; i = f.indexOf('/', i + 1)) tails.add(f.slice(i + 1));
-  return { files: new Set(files), tails, dirs, sorted: [...files, ...dirs].sort(), words };
+  return { files: new Set(files), tails, dirs, pathsSorted: [...files, ...dirs].sort(), words };
 };
 
 /** Whether some file or directory of the checkout starts with `prefix`. */
-const startsSome = (ctx: Ctx, prefix: string): boolean => {
+const startsSome = (ctx: Checkout, prefix: string): boolean => {
   let lo = 0;
-  let hi = ctx.sorted.length;
+  let hi = ctx.pathsSorted.length;
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
-    if (ctx.sorted[mid] < prefix) lo = mid + 1;
+    if (ctx.pathsSorted[mid] < prefix) lo = mid + 1;
     else hi = mid;
   }
-  return lo < ctx.sorted.length && ctx.sorted[lo].startsWith(prefix);
+  return lo < ctx.pathsSorted.length && ctx.pathsSorted[lo].startsWith(prefix);
 };
 
 const MINIATURE = 'a file of the miniature checkout tests/truth/side-cache.test.ts writes to a temporary folder';
@@ -68,7 +68,7 @@ const ROOTED = new RegExp(`(?<![\\w./@-])((?:${ROOTS})/[\\w./@-]*[\\w@])([.-]?[*
 const BARE_TS = new RegExp(`(?<![\\w./@<>*{}…-])((?:[\\w-]+/)*[\\w.-]+\\.m?ts)(?![\\w/])`, 'g');
 
 /** (a) A path that names no file or directory of the checkout. */
-function missingPaths(text: string, ctx: Ctx): string[] {
+function missingPaths(text: string, ctx: Checkout): string[] {
   const out: string[] = [];
   for (const m of text.matchAll(ROOTED)) {
     const [, p, pattern] = m;
@@ -125,7 +125,8 @@ const EXTERNAL_NAMES: readonly { origin: string; why: string; names: readonly st
   { origin: 'TypeScript', why: 'a compiler option, which tsconfig.json holds and no code does', names: ['rootDir'] },
   { origin: 'JavaScript', why: "an object's built-in key, named where a lookup must not inherit it", names: ['__proto__'] },
   { origin: 'the MCP protocol', why: "the handshake's field the server's version is reported in", names: ['serverInfo', 'serverInfo.version'] },
-  { origin: 'made-up examples', why: "an identifier and a reading a comment makes up to show a rule's edge", names: ['error_iban', 'aba'] },
+  { origin: 'a made-up identifier', why: 'field-errors.ts: an error message identified some other way than its field', names: ['error_iban'] },
+  { origin: 'a made-up reading', why: "fill-landing.ts: what a field shows when typing lands before the caret's text", names: ['aba'] },
   {
     origin: "the client app's ids and its device checks",
     why: 'the measured screens, backend replies and checks a finding was made on (docs/bugs/)',
@@ -156,29 +157,33 @@ function backticked(text: string): string[] {
 }
 
 /** (c) A backticked identifier that no code holds (every dotted part a code word), and no reviewed outside name. */
-const unknownNames = (text: string, ctx: Ctx): string[] =>
+const unknownNames = (text: string, ctx: Checkout): string[] =>
   backticked(text).filter((name) => !EXTERNAL.has(name) && !name.split('.').every((part) => ctx.words.has(part)));
 
 const REVIEW_LABELS = [/\breview round \d+\b/gi, /\bcode[- ]review\b/gi, /\b(?:BLOCKER|MAJOR|MINOR|NIT)-\d+\b/g, /\ba review found\b/gi, /\bthe reviewer(?:'s|’s)/gi];
-/** An id that a review label may follow: a backlog or decision id (D18, A53, T7b), an ADR, a lab id. */
-const OWNED = /(?:\b[A-Z]{1,3}\d+[a-z]?\d*(?:'s|’s)?|\bADR \d{4}|\blab [\w-]+(?:'s|’s)?|\bround \d+(?:'s|’s))[\s,(]*$/;
+/**
+ * An id that a review label may follow: a backlog, decision, slice or finding id (A53, D7b, T7b, S1, LE2 — the prefixes
+ * the repo's ids use), an ADR, a lab id, a lab round.
+ */
+const OWNED = /(?:\b(?:[ADTPSHFGKLR]|LE|LV|NI)\d+[a-z]?\d*(?:'s|’s)?|\bADR \d{4}|\blab [\w-]+(?:'s|’s)?|\bround \d+(?:'s|’s))[\s,(]*$/;
 const CALLER_PHRASES = [/\b(?:the|its) (?:one|only|sole) (?:reader|writer|producer|caller)s?\b/gi, /\b(?:used|called) (?:only )?by\b/gi];
 
 /** (d) A review label no id owns, or a sentence about who calls what. */
-const reviewLabels = (text: string): string[] =>
-  REVIEW_LABELS.flatMap((re) =>
-    [...text.matchAll(re)].filter((m) => !OWNED.test(text.slice(0, m.index))).map((m) => m[0]),
-  );
-const callerPhrases = (text: string): string[] => CALLER_PHRASES.flatMap((re) => [...text.matchAll(re)].map((m) => m[0]));
+const reviewLabelMatches = (text: string): RegExpMatchArray[] => REVIEW_LABELS.flatMap((re) => [...text.matchAll(re)].filter((m) => !OWNED.test(text.slice(0, m.index))));
+const callerPhraseMatches = (text: string): RegExpMatchArray[] => CALLER_PHRASES.flatMap((re) => [...text.matchAll(re)]);
+const reviewLabels = (text: string): string[] => reviewLabelMatches(text).map((m) => m[0]);
+const callerPhrases = (text: string): string[] => callerPhraseMatches(text).map((m) => m[0]);
 
 /**
  * The list entries no longer needed: an OUT_OF_REPO path nothing cites or the checkout holds (a file or a folder), an
  * EXTERNAL_NAMES name no backtick cites or the code holds.
  */
-function staleEntries(prose: readonly Line[], ctx: Ctx): string[] {
-  const cited = (s: string) => prose.some((l) => l.text.includes(s));
-  const staleOut = [...OUT_OF_REPO.keys()].filter((p) => !cited(p) || ctx.files.has(p) || ctx.dirs.has(p));
-  const staleNames = [...EXTERNAL].filter((n) => !prose.some((l) => backticked(l.text).includes(n)) || n.split('.').every((part) => ctx.words.has(part)));
+function staleEntries(prose: readonly Line[], ctx: Checkout): string[] {
+  // The guard's own text cites every entry; only the rest of the prose keeps one needed.
+  const held = prose.filter((l) => !GUARD.has(l.file));
+  const named = new Set(held.flatMap((l) => backticked(l.text)));
+  const staleOut = [...OUT_OF_REPO.keys()].filter((p) => !held.some((l) => l.text.includes(p)) || ctx.files.has(p) || ctx.dirs.has(p));
+  const staleNames = [...EXTERNAL].filter((n) => !named.has(n) || n.split('.').every((part) => ctx.words.has(part)));
   return [...staleOut, ...staleNames];
 }
 
@@ -188,7 +193,11 @@ const GUARD = new Set(['tests/docs/comments.test.ts', 'tests/docs/references.tes
 const hits = (lines: readonly Line[], rule: string, find: (text: string) => string[]): string[] =>
   lines.filter((l) => !GUARD.has(l.file)).flatMap((l) => find(l.text).map((f) => `${l.file}:${l.line}  ${rule}  ${f}`));
 
-const PIN_CTX = ctxOf(
+/** A phrase rule over whole comments (a phrase wrapped across lines included), each hit at the line it starts on. */
+const blockHits = (blocks: readonly CommentBlock[], rule: string, find: (text: string) => RegExpMatchArray[]): string[] =>
+  blocks.filter((b) => !GUARD.has(b.file)).flatMap((b) => find(b.text).map((m) => `${b.file}:${lineAt(b, m.index!)}  ${rule}  ${m[0]}`));
+
+const PIN_CTX = checkoutOf(
   ['src/verify/capture.ts', 'docs/adr/0044-a-case-declares-its-reads.md', 'tests/fixtures/truth/ios/blur-menu.idb.json', 'tests/differential/golden/base.known.ts', 'src/util/sleep.ts'],
   new Set(['clipThenInset', 'Modifier', 'clickable', 'appAlive']),
 );
@@ -197,6 +206,17 @@ describe('what the guard reads', () => {
   it('every comment once — a trailing one and one alone in a block included — its lead dropped, a path wrapped before its extension joined', () => {
     const source = ['/** Head, see tests/verify/baseline-confirmation', ' * .test.ts too. */', 'const a = 1; // trailing', 'try {', '  a;', '} catch {', '  // alone', '}', "const s = '// not a comment';"].join('\n');
     expect(commentsOf('x.ts', source).map(({ line, text }) => `${line} ${text}`)).toEqual(['1 Head, see tests/verify/baseline-confirmation.test.ts too.', '3 trailing', '7 alone']);
+  });
+
+  it('a comment whole: its lines joined by one space, each hit placed on the line it starts on', () => {
+    const [block] = commentBlocksOf('x.ts', ['/**', ' * Read here, the one', ' *', ' * reader of those marks.', ' */'].join('\n'));
+    expect(block.text).toBe('Read here, the one reader of those marks.');
+    const [m] = callerPhraseMatches(block.text);
+    expect([m[0], lineAt(block, m.index!)]).toEqual(['the one reader', 2]);
+  });
+
+  it('the files: a listed file the working tree deleted is none', () => {
+    expect(existing(['package.json', 'tests/no-such-file-a65.ts'])).toEqual(['package.json']);
   });
 
   it("the titles: describe, it and test, and of X.each its title and each inline row's first string", () => {
@@ -233,15 +253,17 @@ describe('the comment rules, each on what it names and what it keeps', () => {
     expect(unknownNames("Foo's `madeUpName`, Lab's `otherMadeUp`", PIN_CTX)).toEqual(['madeUpName', 'otherMadeUp']);
     // A title's own words hold nothing up: its unknown name is caught against the file's code.
     const source = "it('reads `noSuchReader` once', () => { clipThenInset(); });";
-    const fileCtx = ctxOf([], wordsOf(codeOf('x.test.ts', source)));
+    const fileCtx = checkoutOf([], wordsOf(codeOf('x.test.ts', source)));
     expect(titlesOf('x.test.ts', source).flatMap((t) => unknownNames(t.text, fileCtx))).toEqual(['noSuchReader']);
     expect(unknownNames("`clipThenInset`, `Modifier.clickable`, UIKit's `UIScrollView`, `a value with spaces`, `JJan `", PIN_CTX)).toEqual([]);
   });
 
   it('a list entry is stale once nothing cites it or the checkout holds it — a file, a folder (docs/releases), a code word', () => {
     const cites: Line[] = [...OUT_OF_REPO.keys(), ...EXTERNAL].map((p, i) => ({ file: 'x.ts', line: i + 1, text: `see ${p} and \`${p}\`` }));
-    expect(staleEntries(cites, ctxOf([], new Set()))).toEqual([]);
-    expect(staleEntries(cites.slice(1), ctxOf(['docs/releases/v1.0.0.md', 'batch-13.ts'], new Set(['rootDir'])))).toEqual(['scripts/color-parity.py', 'batch-13.ts', 'docs/releases', 'rootDir']);
+    expect(staleEntries(cites, checkoutOf([], new Set()))).toEqual([]);
+    // Cited by the guard's own text alone, an entry is cited nowhere.
+    expect(staleEntries(cites.map((l) => ({ ...l, file: 'tests/docs/comments.test.ts' })), checkoutOf([], new Set()))).toEqual([...OUT_OF_REPO.keys(), ...EXTERNAL]);
+    expect(staleEntries(cites.slice(1), checkoutOf(['docs/releases/v1.0.0.md', 'batch-13.ts'], new Set(['rootDir'])))).toEqual(['scripts/color-parity.py', 'batch-13.ts', 'docs/releases', 'rootDir']);
   });
 
   it('(d) a bare review label and a caller phrase are named; a label an id owns is kept', () => {
@@ -259,7 +281,9 @@ describe('the comment rules, each on what it names and what it keeps', () => {
       'code review',
       'code-review',
     ]);
-    expect(reviewLabels("T7b's review round 1 records; ADR 0032 NIT-2; A53's code review; D7b, review round 2; round 7's code review; A3's review round 1")).toEqual([]);
+    expect(reviewLabels("T7b's review round 1 records; ADR 0032 NIT-2; A53's code review; D7b, review round 2; round 7's code review; A3's review round 1; LE2's code review")).toEqual([]);
+    // Capitals and digits are no id unless the repo's ids start so.
+    expect(reviewLabels("XY12's code review; Q9's review round 1")).toEqual(['review round 1', 'code review']);
     expect(callerPhrases('launch is its one writer; the only reader; used by run.ts; Used ONLY by the CLI; called by tap')).toEqual([
       'its one writer',
       'the only reader',
@@ -272,11 +296,11 @@ describe('the comment rules, each on what it names and what it keeps', () => {
 });
 
 describe('the comments and test titles of src/, scripts/ and tests/', () => {
-  const { files, comments, titles, codeWords, fixtureWords } = corpus();
+  const { files, comments, blocks, titles, codeWords, fixtureWords } = corpus();
   // The guard's own strings are examples, not code: a name its pins make up holds nothing up.
   const words = new Set(fixtureWords);
   for (const [file, w] of codeWords) if (!GUARD.has(file)) for (const word of w) words.add(word);
-  const ctx = ctxOf(files, words);
+  const ctx = checkoutOf(files, words);
   const prose = [...comments, ...titles];
 
   it('(a) name no path that is not there', () => {
@@ -292,7 +316,12 @@ describe('the comments and test titles of src/, scripts/ and tests/', () => {
   });
 
   it('(d) carry no bare review label and no caller phrase', () => {
-    expect([...hits(prose, 'review label', reviewLabels), ...hits(prose, 'caller phrase', callerPhrases)]).toEqual([]);
+    expect([
+      ...blockHits(blocks, 'review label', reviewLabelMatches),
+      ...hits(titles, 'review label', reviewLabels),
+      ...blockHits(blocks, 'caller phrase', callerPhraseMatches),
+      ...hits(titles, 'caller phrase', callerPhrases),
+    ]).toEqual([]);
   });
 
   it('every OUT_OF_REPO and EXTERNAL_NAMES entry is still needed: cited, and not in this repo', () => {
