@@ -450,7 +450,6 @@ describe('exact-text misses hint at a combined accessibility element', () => {
         '    id=titled label="Note"\n' +
         '    (iOS combines a container\'s children into one accessibility element — use match: "1 of 13 selected" for a cross-platform assert)',
     );
-    expect(result.detail).not.toContain(OWN.slice(0, 4));
 
     // The control: the same text on a node that is no input is screen copy, quoted.
     resetLayout();

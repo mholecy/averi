@@ -4,7 +4,7 @@ import pixelmatch from 'pixelmatch';
 import { z } from 'zod';
 import { PersistentReadError, type DeviceAdapter, type UiNode } from '../adapters/types.js';
 import { describeElementSpec, elementSpecSchema, type ElementSpec } from '../ui-tree/element-spec.js';
-import { pollOnVerdict, pollTree, Undecided, type FirstSample } from '../ui-tree/read-tree.js';
+import { pollOnVerdict, pollTree, Undecided, type FirstSample, type PollRound } from '../ui-tree/read-tree.js';
 import { ReadHandOff } from '../ui-tree/read-handoff.js';
 import { markedForMiss } from '../ui-tree/window-mark.js';
 import { durationSchema, formatSeconds, parseDuration } from '../util/duration.js';
@@ -31,7 +31,7 @@ import { DEFAULT_TOLERANCE_PCT, evaluateRectAssert, type RectExpectation } from 
 import { measureOcrAssert, type OcrExpectation } from './text-parity.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { absenceVerdict, bareTimeoutNote } from '../ui-tree/verdict.js';
-import { flattenTree, textHint, type HintScope } from './text-hint.js';
+import { flattenTree, textHint } from './text-hint.js';
 
 /**
  * Declarative checks (ARCHITECTURE.md §5, the `assert` tool), cheapest
@@ -384,21 +384,16 @@ export class Verifier {
     // explain a failure that did not happen.
     const exactText =
       text ?? (match === undefined && error === undefined ? (element.text ?? element.label) : undefined);
-    // What the verdict is really about, captured for the deadline where poll
-    // no longer has a tree. The hint is scoped to the nodes the SPEC matched
-    // whenever it matched any — an id-addressed assert must not be explained
-    // by an unrelated node elsewhere on screen — and widens to the whole tree
-    // only when the spec found nothing to talk about: then it lists other
-    // nodes, an input's own text by its length (text-hint.ts#HintScope).
-    let hintScope: { nodes: UiNode[]; scope: HintScope } | undefined;
+    // The hint is scoped to the nodes the SPEC matched in the fresh read that left the content line, when one did —
+    // an id-addressed assert must not be explained by an unrelated node elsewhere on screen — and widens to the last
+    // tree read only when the spec found nothing to talk about (text-hint.ts#HintScope). A handed-on tree's miss is
+    // discarded (ADR 0030), so its nodes are no subject.
+    let subject: UiNode[] | undefined;
     const run = (): Promise<PollVerdict> =>
       this.treePoll(
-        (tree) => {
+        (tree, round) => {
           const found = findBySpec(tree, element);
-          // A round that found the subject wrote the content line the deadline reports, so a later round that does
-          // not find it keeps that round's hint: the same field is never quoted above and listed by length below.
-          if (found.length > 0) hintScope = { nodes: found, scope: 'subject' };
-          else if (hintScope?.scope !== 'subject') hintScope = { nodes: flattenTree(tree), scope: 'others' };
+          if (found.length > 0 && round.handedOn === undefined) subject = found;
           if (found.some(contentMatches)) return { pass: true };
           if (found.length === 0) return undefined;
           // The element is there but says the wrong thing — worth reporting at
@@ -422,9 +417,10 @@ export class Verifier {
                 `element found but ${error !== undefined ? 'error' : 'content'} was: ${detail}`
               : notFound(timeoutMs, { lastTree }, element);
             const hint =
-              exactText === undefined || hintScope === undefined ?
-                undefined
-              : textHint(hintScope.nodes, exactText, hintScope.scope);
+              exactText === undefined ? undefined
+              : subject !== undefined ? textHint(subject, exactText, 'subject')
+              : lastTree !== undefined ? textHint(flattenTree(lastTree), exactText, 'others')
+              : undefined;
             return hint === undefined ? base : `${base}\n  ${hint}`;
           },
         },
@@ -578,11 +574,14 @@ export class Verifier {
    * frame that was still moving.
    */
   private async treePoll(
-    evaluate: (tree: UiNode) => PollVerdict | typeof Undecided | undefined | Promise<PollVerdict | typeof Undecided | undefined>,
+    evaluate: (
+      tree: UiNode,
+      round: PollRound,
+    ) => PollVerdict | typeof Undecided | undefined | Promise<PollVerdict | typeof Undecided | undefined>,
     spec: PollSpec,
   ): Promise<PollVerdict> {
-    const outcome = await pollTree(this.adapter, async (tree) => {
-      const verdict = await evaluate(tree);
+    const outcome = await pollTree(this.adapter, async (tree, round) => {
+      const verdict = await evaluate(tree, round);
       return verdict === Undecided ? Undecided : verdictToPoll(verdict);
     }, {
       timeoutMs: spec.timeoutMs,

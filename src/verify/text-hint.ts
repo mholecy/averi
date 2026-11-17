@@ -103,8 +103,8 @@ function containsTextHint(candidates: UiNode[], expected: string, scope: HintSco
   const shown = hits
     .slice(0, 3)
     .map((n) => {
-      const shown = n.label ?? n.value;
-      return `    id=${n.identifier ?? '(none)'} label=${scope === 'subject' ? JSON.stringify(shown) : listedText(n, shown)}`;
+      const text = n.label ?? n.value;
+      return `    id=${n.identifier ?? '(none)'} label=${scope === 'subject' ? JSON.stringify(text) : listedText(n, text)}`;
     })
     .join('\n');
   return (
@@ -126,8 +126,9 @@ function containsTextHint(candidates: UiNode[], expected: string, scope: HintSco
  * NBSP separator is a space here too. The tree carries the app's characters
  * exactly, so the assert stays exact and still fails — a `’` → `'` change in
  * the app is a copy change the tree can see; the hint only names the node, so
- * the reader need not dump the tree. It quotes an input's text in either scope: a folded hit differs from the
- * expected string only in recognizer readings, which the hint names, so it says nothing the caller did not write.
+ * the reader need not dump the tree. It quotes an input's text in either
+ * scope: a folded hit differs from the expected string only in recognizer
+ * readings, which the hint names, so it says nothing the caller did not write.
  */
 function foldedTextHint(candidates: UiNode[], expected: string): string | undefined {
   const hits: { node: UiNode; field: 'label' | 'value'; text: string; difference: RecognizerDifference }[] = [];
